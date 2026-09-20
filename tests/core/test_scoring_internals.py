@@ -14,7 +14,7 @@ from quodeq.core.scoring.internals import (
     violation_ceiling,
     weight_as_multiplier,
 )
-from quodeq.core.scoring._constants import (
+from quodeq.core.scoring.constants import (
     _MAX_PENALTY_MULTIPLIER,
 )
 import dataclasses

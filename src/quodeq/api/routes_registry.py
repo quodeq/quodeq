@@ -35,7 +35,7 @@ from quodeq.api.routes_compare import register_compare_routes
 from quodeq.api.routes_runs import register_runs_routes
 from quodeq.api.routes_shared import register_shared_routes
 from quodeq.api._grade_formula_routes import register_grade_formula_routes
-from quodeq.services._warmup import engine as warmup_engine
+from quodeq.services.warmup import engine as warmup_engine
 from quodeq.services.base import ActionProvider
 
 

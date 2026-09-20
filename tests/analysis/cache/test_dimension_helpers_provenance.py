@@ -73,14 +73,14 @@ class TestProvenanceDrift:
         # Threshold overrides fold into the standards hash: entries produced
         # before a project tuned .quodeq/standards-overrides.json must show
         # standards drift on reuse — the compiled JSON alone is unchanged.
-        from quodeq.analysis.fingerprint import _hash_standards
+        from quodeq.analysis.fingerprint import hash_standards
 
         src = tmp_path / "src"
         files = _write_files(src, {"a.py": "x"})
         standards_dir = tmp_path / "standards"
         _write_compiled_standards(standards_dir, "security", '{"rule": "v1"}')
         config = _make_config(src, standards_dir=standards_dir)
-        pre_override = _hash_standards(standards_dir, "security") or ""
+        pre_override = hash_standards(standards_dir, "security") or ""
         self._seed(cache, config, files, provenance={
             "model_id": "test-model", "standards_hash": pre_override,
             "prompts_hash": "", "quodeq_version": "",

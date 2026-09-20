@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.services._wiring import list_runs
+from quodeq.services.wiring import list_runs
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)

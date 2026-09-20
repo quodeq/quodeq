@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.scoring.params import ScoringParams
-from quodeq.services._dashboard_trend import build_accumulated_trend
+from quodeq.services.dashboard_trend import build_accumulated_trend
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.grade_formula import is_custom, load_params
 from quodeq.services.scoring_view import select_trend_runs
@@ -23,9 +23,9 @@ from quodeq.services.score_cache import (
     cached_accumulated,
     per_run_versions,
 )
-from quodeq.services._wiring import find_children, list_runs
+from quodeq.services.wiring import find_children, list_runs
 from quodeq.services.scoring import _fetchers
-from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
+from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.scoring._rescoring import _rescore_accumulated_with_coverage
 
 
@@ -125,7 +125,7 @@ def get_project_scores(
     if not (reports_root / project).exists():
         return None
 
-    d = deps or _NO_DEPS
+    d = deps or NO_DEPS
     params = load_params()
 
     # How the numbers were produced, not what they are. A tuned formula moves

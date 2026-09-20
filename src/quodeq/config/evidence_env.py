@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 
-from quodeq.core.evidence._refs import _CWE_URL_TEMPLATE_DEFAULT
+from quodeq.core.evidence.refs import CWE_URL_TEMPLATE_DEFAULT
 
 
 def cwe_url_template(env: dict[str, str] | None = None) -> str:
@@ -16,4 +16,4 @@ def cwe_url_template(env: dict[str, str] | None = None) -> str:
     Overridable for offline or internal deployments; unset means the packaged
     default (the same one core falls back to when no template is passed).
     """
-    return (os.environ if env is None else env).get("QUODEQ_CWE_URL_TEMPLATE", _CWE_URL_TEMPLATE_DEFAULT)
+    return (os.environ if env is None else env).get("QUODEQ_CWE_URL_TEMPLATE", CWE_URL_TEMPLATE_DEFAULT)

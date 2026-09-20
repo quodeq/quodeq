@@ -1,7 +1,7 @@
 """CLI adapter streaming: token frames, echo suppression, tool-use frames, codex items."""
 import pytest
 
-from quodeq.assistant.adapters._cli import run_cli_turn
+from quodeq.assistant.adapters.cli import run_cli_turn
 
 from ._cli_adapter_helpers import FakeProc, _config, _repo, _session
 

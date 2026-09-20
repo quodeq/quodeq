@@ -1,10 +1,10 @@
 """The assistant-only style discriminators (resume_style, session_id_source,
 system_prompt_style) agree across their three sides.
 
-_cli_config.py declares them and reads them off the ai_providers.json
+cli_config.py declares them and reads them off the ai_providers.json
 "assistant" block; _cli.py and _cli_command.py compare against them to pick
 the argv shape for a turn. Nobody may retype the strings: a comparing module
-must hold the same object _cli_config does, and every value the packaged
+must hold the same object cli_config does, and every value the packaged
 catalog ships must be one of the declared constants -- otherwise a provider
 entry silently falls through to the default branch.
 """
@@ -14,22 +14,22 @@ import json
 
 import pytest
 
-from quodeq.assistant.adapters._cli_config import (
+from quodeq.assistant.adapters.cli_config import (
     RESUME_STYLE_EXEC, RESUME_STYLE_FLAG_RESUME, RESUME_STYLE_GEMINI,
     SESSION_ID_SOURCE_PARSE_JSONL, SESSION_ID_SOURCE_PREASSIGN,
     SYSTEM_PROMPT_STYLE_ARGV_APPEND, SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX,
 )
-from quodeq.shared.provider_env import _providers_path
+from quodeq.shared.provider_env import providers_path
 
 _RESUME_STYLES = {RESUME_STYLE_FLAG_RESUME, RESUME_STYLE_EXEC, RESUME_STYLE_GEMINI}
 _SESSION_ID_SOURCES = {SESSION_ID_SOURCE_PREASSIGN, SESSION_ID_SOURCE_PARSE_JSONL}
 _SYSTEM_PROMPT_STYLES = {SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX, SYSTEM_PROMPT_STYLE_ARGV_APPEND}
 
 # Module that compares a CliChatConfig field against a constant -> the names
-# it must share with _cli_config. Keep in step with the comparisons in
+# it must share with cli_config. Keep in step with the comparisons in
 # _cli.py and _cli_command.py.
 _CONSUMERS = {
-    "quodeq.assistant.adapters._cli": ("SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX",),
+    "quodeq.assistant.adapters.cli": ("SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX",),
     "quodeq.assistant.adapters._cli_command": (
         "RESUME_STYLE_GEMINI", "SESSION_ID_SOURCE_PARSE_JSONL", "SYSTEM_PROMPT_STYLE_ARGV_APPEND",
     ),
@@ -37,19 +37,19 @@ _CONSUMERS = {
 
 
 def _catalog():
-    return json.loads(_providers_path().read_text(encoding="utf-8"))
+    return json.loads(providers_path().read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize(("module_name", "names"), sorted(_CONSUMERS.items()))
 def test_comparing_modules_use_the_cli_config_constants(module_name, names):
     import importlib
 
-    from quodeq.assistant.adapters import _cli_config
+    from quodeq.assistant.adapters import cli_config
 
     module = importlib.import_module(module_name)
 
     for name in names:
-        assert getattr(module, name) is getattr(_cli_config, name), f"{module_name}.{name}"
+        assert getattr(module, name) is getattr(cli_config, name), f"{module_name}.{name}"
 
 
 def test_catalog_resume_styles_are_declared_constants():

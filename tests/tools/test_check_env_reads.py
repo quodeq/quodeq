@@ -33,9 +33,10 @@ def test_scan_finds_an_environ_read(tmp_path):
 
 def test_config_layer_is_allowed(tmp_path):
     for relpath in (
-        "src/quodeq/shared/_env.py",
+        "src/quodeq/shared/env.py",
+        "src/quodeq/shared/env_paths.py",
+        "src/quodeq/shared/env_resolve.py",
         "src/quodeq/shared/_env_ai.py",
-        "src/quodeq/shared/_env_paths.py",
         "src/quodeq/shared/_env_db.py",
         "src/quodeq/shared/_env_embeddings.py",
         "src/quodeq/config/loader.py",
@@ -47,7 +48,8 @@ def test_config_layer_is_allowed(tmp_path):
 
 
 def test_every_shared_env_module_is_allowed_but_its_siblings_are_not(tmp_path):
-    """The allowlist covers `shared/_env*`, not the rest of `shared/`."""
+    """The allowlist covers `shared/env*` and `shared/_env*`, not the rest of `shared/`."""
+    _write(tmp_path, "src/quodeq/shared/env_whatever.py", "import os\nX = os.getenv('A')\n")
     _write(tmp_path, "src/quodeq/shared/_env_whatever.py", "import os\nX = os.getenv('A')\n")
     _write(tmp_path, "src/quodeq/shared/frozen.py", "import os\nX = os.getenv('A')\n")
     assert [h.key for h in check_env_reads.scan_tree(tmp_path / "src")] == [

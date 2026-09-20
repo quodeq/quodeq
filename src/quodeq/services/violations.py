@@ -10,7 +10,7 @@ from typing import Any
 from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown
 from quodeq.data.fs.standards_loader import is_known_dimension
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
-from quodeq.shared.utils import _env_int, read_text
+from quodeq.shared.utils import env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # re-export
 from quodeq.services._violation_filters import (  # noqa: F401 — re-exported for tests
     _deleted_key_for_violation,
@@ -35,7 +35,7 @@ def _max_violation_files(override: int | None = None, env: dict[str, str] | None
     """Return the max number of violation files to include. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return _env_int("QUODEQ_MAX_VIOLATION_FILES", _DEFAULT_MAX_VIOLATION_FILES, env=env)
+    return env_int("QUODEQ_MAX_VIOLATION_FILES", _DEFAULT_MAX_VIOLATION_FILES, env=env)
 
 
 @dataclass(frozen=True)

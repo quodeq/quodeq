@@ -13,7 +13,7 @@ import time
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.subagents._pool_launcher import (
     _MAX_AUTO_POOL_BUDGET,
     _SECONDS_PER_FILE_AUTOSCALE,

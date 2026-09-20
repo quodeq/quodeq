@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
-from quodeq.shared._env_resolve import resolve_env
-from quodeq.shared._io import read_json
+from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.text_io import read_json
 
 
 def defaults_path(env: Mapping[str, str] | None = None) -> Path:

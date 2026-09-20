@@ -7,7 +7,7 @@ from typing import Any
 
 from quodeq.core.types.finding import Finding
 from quodeq.data.projection.projector import Projector
-from quodeq.data.sqlite._row_mappers import (
+from quodeq.data.sqlite.row_mappers import (
     finding_dict_to_row,
     row_to_finding,
 )

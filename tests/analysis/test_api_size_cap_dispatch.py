@@ -7,7 +7,7 @@ The files never entered the cache, so every incremental run re-counted them as
 misses, re-queued them, and re-skipped them. The same ~3% of files haunted
 every run and dim coverage never reached 100%.
 
-The fix has one rule: the queue builder / estimates (``_list_source_files``)
+The fix has one rule: the queue builder / estimates (``list_source_files``)
 and the dispatch-time worker must share ONE dispatchability predicate
 (``quodeq.analysis.dispatch_policy``), and any file the worker still drops
 must leave an explicit ``skipped`` marker behind. The worker-side markers
@@ -21,7 +21,7 @@ from unittest.mock import patch
 from quodeq.analysis._dim_estimates import compute_dim_estimates
 from quodeq.analysis.cache import LocalFileBackend
 from quodeq.analysis.dispatch_policy import DispatchPolicy
-from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.analysis.subagents.source_files import list_source_files
 
 from ._api_size_cap_dispatch_helpers import CAP, _TEST_PROVIDER, _make_config, _write_repo
 
@@ -34,7 +34,7 @@ class TestEnumerationAppliesCap:
         _write_repo(src)
         config = _make_config(src, ["small.py", "big.py"])
 
-        files, _ext, excluded = _list_source_files(config, "security")
+        files, _ext, excluded = list_source_files(config, "security")
 
         assert files == ["small.py"]
         assert excluded == ["big.py"]
@@ -46,7 +46,7 @@ class TestEnumerationAppliesCap:
         _write_repo(src)
         config = _make_config(src, ["small.py", "big.py"])
 
-        files, _ext, excluded = _list_source_files(config, "security")
+        files, _ext, excluded = list_source_files(config, "security")
 
         assert sorted(files) == ["big.py", "small.py"]
         assert excluded == []
@@ -126,7 +126,7 @@ class TestCoverageDenominator:
 
 class TestDispatchPolicyParity:
     """The queue/denominator divergence-bug guard (the "perpetual 97%"
-    coverage bug): ``_list_source_files`` (queue/estimates enumeration) and
+    coverage bug): ``list_source_files`` (queue/estimates enumeration) and
     ``RunConfig._policy()`` (the coverage denominator) must agree on which
     files are dispatchable for the SAME RunConfig. A future change that lets
     one of these paths resolve a different DispatchPolicy than the other
@@ -139,7 +139,7 @@ class TestDispatchPolicyParity:
         config = _make_config(src, ["small.py", "big.py"])
         all_files = config.manifest.source_files
 
-        files, _ext, _excluded = _list_source_files(config, "security")
+        files, _ext, _excluded = list_source_files(config, "security")
         dispatchable, _excluded2 = config._policy().split_api_dispatchable(config.src, all_files)
 
         assert files == dispatchable

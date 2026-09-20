@@ -1,6 +1,6 @@
 """Git CLI adapter — the single place that shells out to git.
 
-services/_fs_scan, services/project_registration, shared/_repo and
+services/fs_scan, services/project_registration, shared/_repo and
 analysis/subagents/_git_scoring used to run subprocess directly, coupling
 business flows to process execution. Every helper here is best-effort:
 missing git, non-repo directories, timeouts and failures yield None or
@@ -14,7 +14,7 @@ import unicodedata
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 
-from quodeq.shared._repo import normalize_remote_url
+from quodeq.shared.repo import normalize_remote_url
 
 _logger = logging.getLogger(__name__)
 

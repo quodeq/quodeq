@@ -22,7 +22,7 @@ from quodeq.assistant.tools._read_tools_violations import (
     _trim_violation,
     _visible_only,
 )
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_visible
 from quodeq.data.fs.report_parser.finding_details import (
     iter_eval_reports,
@@ -30,10 +30,10 @@ from quodeq.data.fs.report_parser.finding_details import (
 )
 from quodeq.data.ports.findings import FindingsRepository
 # Imported for its module identity, not called directly here: tests patch
-# `quodeq.assistant.tools._read_tools._fs_reports.get_accumulated`, which
-# mutates the shared `_fs_reports` module object that
+# `quodeq.assistant.tools._read_tools.fs_reports.get_accumulated`, which
+# mutates the shared `fs_reports` module object that
 # `_read_tools_scope._accumulated_dims` actually calls through.
-from quodeq.services import _fs_reports  # noqa: F401 - re-export (patch target)
+from quodeq.services import fs_reports  # noqa: F401 - re-export (patch target)
 from quodeq.services.standards import StandardsService
 
 # Dimension ids are simple slugs. The tool-call `dimension` argument is
@@ -91,7 +91,7 @@ def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
     hits = repo.search(query, limit=max(1, min(int(limit), 50)),
                         exclude_dimensions=hidden or None)
     # Model-facing key is "requirement"; the Finding attribute is `req`
-    # (see data/sqlite/_row_mappers.py row_to_finding).
+    # (see data/sqlite/row_mappers.py row_to_finding).
     rows = [
         {"dimension": f.dimension, "requirement": f.req, "severity": f.severity,
          "file": f.file, "line": f.line, "reason": f.reason, "snippet": f.snippet}

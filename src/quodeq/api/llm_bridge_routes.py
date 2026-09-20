@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.config.ai_provider import _store_api_key, get_api_key_secure
+from quodeq.config.ai_provider import store_api_key, get_api_key_secure
 from quodeq.llm_bridge import (
     get_ollama_status,
     list_ollama_models,
@@ -224,7 +224,7 @@ def provider_store_key() -> Response:
     if not api_key or not isinstance(api_key, str):
         return jsonify({"error": "apiKey is required", "code": "MISSING_PARAM"}), 400
     try:
-        stored, secure = _store_api_key(provider, api_key)
+        stored, secure = store_api_key(provider, api_key)
     except ValueError:
         # Provider names are interpolated into `.quodeq.env` lines, so a
         # name with control characters is rejected outright rather than

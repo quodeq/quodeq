@@ -14,7 +14,7 @@ from quodeq.analysis._dim_estimates import (
     read_dim_estimates,
     write_dim_estimates,
 )
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import (
     CacheEntry, LocalFileBackend, build_cache_key_for_file,
 )

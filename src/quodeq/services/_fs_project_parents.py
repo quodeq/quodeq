@@ -1,16 +1,16 @@
 """Parent-detection helpers for the filesystem action provider.
 
-Split out of _fs_project_helpers.py (Task 13): auto-detecting a local
+Split out of fs_project_helpers.py (Task 13): auto-detecting a local
 project's parent by longest-path-prefix match, plus the max-projects-listed
-env-backed limit. Both are re-exported from _fs_project_helpers.py, which
-_fs_projects.py imports them from.
+env-backed limit. Both are re-exported from fs_project_helpers.py, which
+fs_projects.py imports them from.
 """
 from __future__ import annotations
 
 from dataclasses import replace
 
 from quodeq.core.types import ProjectEntry
-from quodeq.shared.utils import _env_int
+from quodeq.shared.utils import env_int
 
 _DEFAULT_MAX_PROJECTS_LISTED = 200
 
@@ -34,7 +34,7 @@ def _max_projects_listed(override: int | None = None, env: dict[str, str] | None
     """Return the max number of projects to list. *override* bypasses env."""
     if override is not None:
         return override
-    return _env_int("QUODEQ_MAX_PROJECTS_LISTED", _DEFAULT_MAX_PROJECTS_LISTED, env=env)
+    return env_int("QUODEQ_MAX_PROJECTS_LISTED", _DEFAULT_MAX_PROJECTS_LISTED, env=env)
 
 
 def _auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:

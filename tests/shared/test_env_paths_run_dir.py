@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.shared._env_paths import get_run_dir
+from quodeq.shared.env_paths import get_run_dir
 
 
 def test_default_is_under_home(monkeypatch, tmp_path):

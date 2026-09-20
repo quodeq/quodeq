@@ -35,7 +35,7 @@ from quodeq.services._scan_progress_types import (  # noqa: F401 - _DimProgress/
     _ProgressContext,
     _ScanProgress,
 )
-from quodeq.services._wiring import read_run_status_json, read_scan_total_files
+from quodeq.services.wiring import read_run_status_json, read_scan_total_files
 from quodeq.services.suppression import project_suppressions
 from quodeq.shared.dim_estimates_io import read_dim_estimates
 from quodeq.data.fs.dimensions_state_store import read_dimensions

@@ -144,7 +144,7 @@ class TestOmlxBaseUrlValidation:
 
 class TestProviderKeyRoutes:
     def test_store_reports_stored_and_secure(self, client):
-        with patch("quodeq.api.llm_bridge_routes._store_api_key") as mock:
+        with patch("quodeq.api.llm_bridge_routes.store_api_key") as mock:
             mock.return_value = (True, True)
             resp = client.post(
                 "/api/provider/key",
@@ -156,7 +156,7 @@ class TestProviderKeyRoutes:
         mock.assert_called_once_with("claude", _TEST_API_KEY)
 
     def test_store_reports_cleartext_fallback_used(self, client):
-        with patch("quodeq.api.llm_bridge_routes._store_api_key") as mock:
+        with patch("quodeq.api.llm_bridge_routes.store_api_key") as mock:
             mock.return_value = (True, False)
             resp = client.post(
                 "/api/provider/key",

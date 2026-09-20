@@ -89,7 +89,7 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
     (a stuck ``state=running`` row in ``index.db`` once leaked through and
     the dashboard auto-resumed it as a phantom job). The previous version
     of this fixture set ``QUODEQ_HOME``, which **nothing in the codebase
-    reads** — so the defaults in ``shared/_env.py`` continued to fall
+    reads** — so the defaults in ``shared/env.py`` continued to fall
     through to ``Path.home() / ".quodeq"``.
 
     Set the env vars the production code actually consults:

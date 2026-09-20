@@ -1,7 +1,7 @@
 from __future__ import annotations
-from quodeq.services._runs_unit import _ui_status, _row_to_run_entry
+from quodeq.services.runs_unit import _ui_status, _row_to_run_entry
 from quodeq.data.sqlite.run_index import RunRow
-from quodeq.services import _runs_unit as ru
+from quodeq.services import runs_unit as ru
 from quodeq.data.sqlite.run_index import open_index
 
 def _row(run_id="r1", state="done", started_at="2026-01-02T03:04:05Z"):

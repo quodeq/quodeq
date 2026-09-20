@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from quodeq.shared.utils import get_evaluations_dir, get_static_dist
-from quodeq.shared._env import get_dashboard_port
+from quodeq.shared.env import get_dashboard_port
 from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
 from ._build import _static_dir
 

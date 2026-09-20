@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
+from quodeq.analysis.diff_resolver import DiffResolveError, resolve_diff_files
 
 
 def _run(cmd: list[str], cwd: Path) -> None:

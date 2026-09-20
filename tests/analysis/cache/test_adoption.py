@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import CacheEntry, LocalFileBackend
 from quodeq.analysis.cache._key_provenance import build_cache_key_struct
 from quodeq.analysis.cache.dimension_helpers import (

@@ -195,7 +195,7 @@ class EvaluationsIndex:
         if snapshot.status != "running":
             return False
 
-        from quodeq.data.sqlite._index_sync import force_promote_to_cancelled_stale
+        from quodeq.data.sqlite.index_sync import force_promote_to_cancelled_stale
 
         run_dir: Path | None = None
         if snapshot.output_project and snapshot.output_run_id and reports_dir:

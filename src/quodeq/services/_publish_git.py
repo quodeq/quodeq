@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     PUBLISHED_META_FILENAME,
     check_repo_format,
     ensure_shared_clone,

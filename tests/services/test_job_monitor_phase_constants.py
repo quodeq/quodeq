@@ -1,5 +1,5 @@
 """The CC_MARKER_KEY phase vocabulary (setup/analyzing/scoring/analyzing_start/
-deadline_extended/report_path) is written by analysis/_runner_markers.emit_marker
+deadline_extended/report_path) is written by analysis/runner_markers.emit_marker
 (and its callers across analysis/) and read back by
 services/_job_monitor_mixin._JobMonitorMixin._apply_marker. Both sides import
 the same constants from shared.constants -- services may not import analysis

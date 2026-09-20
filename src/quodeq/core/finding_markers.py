@@ -6,10 +6,10 @@ that it came from cache rather than this scan. The severity itself reaches the
 grade; the marker is the only thing that can ever explain it.
 
 Markers are unusually easy to lose. Each one has to be threaded by hand through
-a chain of serialization boundaries -- ``_VIOLATION_FIELDS``, ``build_finding``,
+a chain of serialization boundaries -- ``VIOLATION_FIELDS``, ``build_finding``,
 ``Finding``, ``FindingSpec``, ``Judgment``, the evidence JSONL, the SQLite
 projection, the SSE stream, the UI model -- and **no boundary raises when one is
-missed**. ``_VIOLATION_FIELDS`` is a strict whitelist that silently drops unknown
+missed**. ``VIOLATION_FIELDS`` is a strict whitelist that silently drops unknown
 keys, and ``build_finding`` returns only the fields it names. A gap produces no
 error, no warning and no failing test: just a finding that quietly forgot why it
 was downgraded.
@@ -18,7 +18,7 @@ That has now happened three times, once per marker that exists:
 
 * ``carried_forward`` -- dropped on the report path, so cache-replayed findings
   reappeared as new the moment a dimension finished.
-* ``provenance_downgrade`` -- missing from ``_VIOLATION_FIELDS`` and
+* ``provenance_downgrade`` -- missing from ``VIOLATION_FIELDS`` and
   ``build_finding``, so a critical demoted to major lost the reason (#1044).
 * ``scope_downgrade`` -- reached the per-dim JSONL but not ``events.jsonl``,
   which is what the SQL projection and the dashboard read, so a finding capped

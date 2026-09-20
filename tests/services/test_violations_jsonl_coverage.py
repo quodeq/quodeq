@@ -84,7 +84,7 @@ class TestParseJsonlFindings:
         assert len(v) == 0
 
     def test_req_to_principle_mapping(self):
-        from quodeq.core.evidence._req_mapping import PrincipleResolver
+        from quodeq.core.evidence.req_mapping import PrincipleResolver
         from quodeq.services._violations_jsonl import _parse_jsonl_findings
         line = json.dumps({"p": "REQ-1", "t": "compliance", "file": "a.py", "line": 1})
         resolver = PrincipleResolver({"REQ-1": "Authentication"}, frozenset({"Authentication"}))
@@ -94,7 +94,7 @@ class TestParseJsonlFindings:
 
     def test_unmappable_finding_is_skipped(self):
         """Matches the report path, which quarantines it out of the evaluation."""
-        from quodeq.core.evidence._req_mapping import PrincipleResolver
+        from quodeq.core.evidence.req_mapping import PrincipleResolver
         from quodeq.services._violations_jsonl import _parse_jsonl_findings
         line = json.dumps({"req": "N/A", "t": "violation", "file": "a.py", "line": 1})
         resolver = PrincipleResolver({"REQ-1": "Authentication"}, frozenset({"Authentication"}))

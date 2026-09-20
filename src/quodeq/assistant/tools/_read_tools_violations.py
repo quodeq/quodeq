@@ -11,7 +11,7 @@ import json
 from quodeq.assistant.tools import _read_tools as _facade
 from quodeq.assistant.tools import _read_tools_scope as _scope_facade
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._registry import ToolError
+from quodeq.assistant.tools.registry import ToolError
 from quodeq.core.standards.visibility import (
     hidden_ids_for_names,
     partition_entries_visible,
@@ -22,7 +22,7 @@ from quodeq.core.standards.visibility import (
 # the fields that let the model locate and explain an issue and DROP the large
 # `snippet`/`context` blobs so a report full of violations stays within a sane
 # context budget. Use search_findings when the model needs the code snippet.
-_VIOLATION_FIELDS = ("principle", "file", "line", "severity", "title", "reason")
+VIOLATION_FIELDS = ("principle", "file", "line", "severity", "title", "reason")
 # get_violations paging limits.
 _VIOLATIONS_DEFAULT_LIMIT = 40
 _VIOLATIONS_MAX_LIMIT = 100
@@ -79,7 +79,7 @@ def _requirement_of(v: dict) -> str:
 
 
 def _trim_violation(v: dict) -> dict:
-    out = {k: v.get(k) for k in _VIOLATION_FIELDS}
+    out = {k: v.get(k) for k in VIOLATION_FIELDS}
     out["principle"] = _principle_of(v)
     # Expose the requirement id so the model can form a correct dismiss/verify
     # key. Without it, get_report/get_violations only surfaced `principle`, and

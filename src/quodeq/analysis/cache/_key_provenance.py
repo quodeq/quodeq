@@ -16,15 +16,15 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache.entry import quodeq_version
 from quodeq.analysis.cache.key import SCHEMA_VERSION as _SCHEMA_VERSION
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.fingerprint import (
-    _hash_file,
-    _hash_prompts_map,
-    _hash_standards,
-    _stat_key,
+    hash_file,
+    hash_prompts_map,
+    hash_standards,
+    stat_key,
     dimension_params_state,
 )
 
@@ -49,7 +49,7 @@ _PROV_LABELS = {
 def _current_provenance(config: RunConfig, dimension: str) -> dict:
     """The provenance the current run would stamp on a fresh entry."""
     standards_hash = (
-        _hash_standards(config.standards_dir, dimension, config.src)
+        hash_standards(config.standards_dir, dimension, config.src)
         if config.standards_dir else ""
     ) or ""
     return {
@@ -105,7 +105,7 @@ def _hash_prompts_combined(prompts_dir: Path | None) -> str:
     *prompts_dir* is required: callers resolve ``default_paths().prompts_dir``
     (composition-root concern, not this module's).
     """
-    pmap = _hash_prompts_map(prompts_dir) or {}
+    pmap = hash_prompts_map(prompts_dir) or {}
     if not pmap:
         return ""
     h = hashlib.sha256()
@@ -134,15 +134,15 @@ def _content_hash_for(
     dispatched, so a file edited in between is analysed with the new content
     and would be cached under the old hash. Reuse is therefore conditional on
     the file still being the one classify hashed: the stamp is its
-    ``_stat_key`` (size, mtime_ns), and a stat is cheap where a second SHA
+    ``stat_key`` (size, mtime_ns), and a stat is cheap where a second SHA
     over the file is exactly what the reuse saves. A missing or empty stashed
     hash means "unknown" and is hashed here, as both paths did before the
     reuse existed -- an entry keyed on "" is never adoptable and misses
     forever.
     """
-    if stashed_hash and stashed_stamp is not None and _stat_key(resolved) == stashed_stamp:
+    if stashed_hash and stashed_stamp is not None and stat_key(resolved) == stashed_stamp:
         return stashed_hash
-    return _hash_file(resolved) or ""
+    return hash_file(resolved) or ""
 
 
 def build_cache_key_struct(config: RunConfig, file_path: str, dimension: str) -> CacheKey:
@@ -161,7 +161,7 @@ def build_cache_key_struct(config: RunConfig, file_path: str, dimension: str) ->
     ``CacheKey`` is the single source of truth and all three populate exactly
     its fields.
     """
-    content_hash = _hash_file(config.src / file_path) or ""
+    content_hash = hash_file(config.src / file_path) or ""
     params_hash, _ = dimension_params_state(config.standards_dir, dimension, config.src)
     return CacheKey(
         schema_version=_SCHEMA_VERSION,

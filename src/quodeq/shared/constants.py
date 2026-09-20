@@ -10,7 +10,7 @@ DEFAULT_TIME_LIMIT = 600  # 10 minutes total time limit (seconds)
 # Structured marker key used for job-tracking JSON markers
 CC_MARKER_KEY = "_cc"
 
-# CC_MARKER_KEY's value vocabulary. Written by analysis/_runner_markers.py's
+# CC_MARKER_KEY's value vocabulary. Written by analysis/runner_markers.py's
 # emit_marker (and callers across analysis/), read back by
 # services/_job_monitor_mixin.py's _apply_marker; both layers import from here
 # since services may not import analysis.

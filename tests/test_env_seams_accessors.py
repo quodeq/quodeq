@@ -18,7 +18,7 @@ def _clear_process_env(monkeypatch):
 
 
 def test_extra_body_reads_context_size_from_injected_env():
-    from quodeq.assistant.adapters._api import ApiTurnConfig, _extra_body
+    from quodeq.assistant.adapters.api import ApiTurnConfig, _extra_body
 
     config = ApiTurnConfig(api_base="http://localhost:11434/v1", api_key=None,
                            model="m", native_tools=False)
@@ -72,7 +72,7 @@ def test_default_persist_dir_honours_injected_env(tmp_path: Path):
 
 
 def test_providers_path_honours_injected_env(tmp_path: Path):
-    from quodeq.shared.provider_env import _DEFAULT_PATH, _providers_path
+    from quodeq.shared.provider_env import _DEFAULT_PATH, providers_path
 
-    assert _providers_path(env={}) == _DEFAULT_PATH
-    assert _providers_path(env={"QUODEQ_AI_PROVIDERS_PATH": str(tmp_path / "p.json")}) == tmp_path / "p.json"
+    assert providers_path(env={}) == _DEFAULT_PATH
+    assert providers_path(env={"QUODEQ_AI_PROVIDERS_PATH": str(tmp_path / "p.json")}) == tmp_path / "p.json"

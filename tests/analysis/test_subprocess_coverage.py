@@ -148,7 +148,7 @@ class TestResolveProviderConfig:
         provider = {"omlx": {"type": "api", "model": "m", "api_base": "http://localhost:8000/v1"}}
         cfg = AnalysisConfig(ai_cmd="omlx", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             patch("quodeq.llm_bridge._omlx._read_omlx_api_key", return_value="omlx-key"):
+             patch("quodeq.llm_bridge.omlx.read_omlx_api_key", return_value="omlx-key"):
             _, _, key = _resolve_provider_config(cfg, {})
         assert key == "omlx-key"
 
@@ -156,7 +156,7 @@ class TestResolveProviderConfig:
         provider = {"omlx": {"type": "api", "model": "m", "api_base": "http://localhost:8000/v1"}}
         cfg = AnalysisConfig(ai_cmd="omlx", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             patch("quodeq.llm_bridge._omlx._read_omlx_api_key", return_value=""):
+             patch("quodeq.llm_bridge.omlx.read_omlx_api_key", return_value=""):
             _, _, key = _resolve_provider_config(cfg, {})
         assert key == ""
 

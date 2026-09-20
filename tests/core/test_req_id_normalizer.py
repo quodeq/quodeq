@@ -12,7 +12,7 @@ one character apart.
 """
 from __future__ import annotations
 
-from quodeq.core.evidence._req_mapping import PrincipleResolver, normalize_req_id
+from quodeq.core.evidence.req_mapping import PrincipleResolver, normalize_req_id
 
 CANONICAL = ("CLEA-DEP-01", "CLEA-DEP-05", "CLEA-TES-02", "CLEA-SEP-03", "CLEA-ENT-02")
 
@@ -80,7 +80,7 @@ class TestResolverUsesTheFold:
 
     def test_canonical_id_tuple_is_built_once(self, monkeypatch):
         """resolve() runs once per judgment; the fold's id tuple must not be rebuilt per call."""
-        import quodeq.core.evidence._req_mapping as mod
+        import quodeq.core.evidence.req_mapping as mod
         seen: list[object] = []
 
         def spy(raw, canonical_ids):

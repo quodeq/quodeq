@@ -25,7 +25,7 @@ from quodeq.analysis._mcp_arg_builders import (
     _resolve_model_id,
     _resolve_standards_dir,
 )
-from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
+from quodeq.analysis.provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
 from quodeq.config.process_env import process_environment_copy
 from quodeq.shared.utils import get_ai_cmd, get_ai_model
@@ -129,7 +129,7 @@ def _is_known_cli_provider(cmd: str) -> bool:
     """Return True only if *cmd* matches a registered provider of type 'cli'.
 
     ``cmd`` ultimately comes from the user-controlled AI_CMD/AI_PROVIDER env
-    var (see ``quodeq.shared._env.get_ai_cmd``) with no prior validation. Gate
+    var (see ``quodeq.shared.env.get_ai_cmd``) with no prior validation. Gate
     subprocess execution to the known provider registry so a typo'd or
     unexpected value fails closed instead of shelling out to an arbitrary
     program. Only ``type == "cli"`` providers reach this CLI-register path;

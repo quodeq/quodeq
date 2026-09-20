@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from quodeq.core.evidence._req_mapping import PrincipleResolver
+from quodeq.core.evidence.req_mapping import PrincipleResolver
 from quodeq.shared.utils import open_text
 
 _logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ def _classify_finding_row(
 
     *resolver* classifies "quarantined" a finding whose principle is not in
     the dimension's standard, matching the report path's
-    :func:`~quodeq.core.evidence._req_mapping._group_judgments`. *suppressed*
+    :func:`~quodeq.core.evidence.req_mapping._group_judgments`. *suppressed*
     (see ``quodeq.services.suppression``, injected to keep this module free
     of a services dependency) classifies "suppressed" a violation the user
     already dismissed or deleted. Quarantine is checked first: a finding

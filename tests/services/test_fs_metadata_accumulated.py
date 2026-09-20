@@ -77,7 +77,7 @@ class TestReadAccumulatedSummary:
         """A KeyError bug inside the rescoring business rule must surface.
 
         Historically one except clause wrapped both the file reads and the
-        ``_rescore_dimension`` call, so a rescoring bug silently became
+        ``rescore_dimension`` call, so a rescoring bug silently became
         {"grade": None} — indistinguishable from a genuinely missing file.
         """
         from quodeq.core.scoring.params import DEFAULT_PARAMS
@@ -97,7 +97,7 @@ class TestReadAccumulatedSummary:
         def buggy_rescore(*a, **kw):
             raise KeyError("rescore bug")
 
-        monkeypatch.setattr("quodeq.services.rescore._rescore_dimension", buggy_rescore)
+        monkeypatch.setattr("quodeq.services.rescore.rescore_dimension", buggy_rescore)
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
         with pytest.raises(KeyError, match="rescore bug"):
             _compute_summary(Path("/r"), "proj", runs, DEFAULT_PARAMS, {"security"})

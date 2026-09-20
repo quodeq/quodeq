@@ -228,7 +228,7 @@ def _api_key_var_for(provider: str) -> str:
     return api_key_var
 
 
-def _store_api_key(provider: str, api_key: str,
+def store_api_key(provider: str, api_key: str,
                    paths: ConfigPaths | None = None) -> tuple[bool, bool]:
     """Store *provider*'s key and report how. Returns (stored, secure).
 
@@ -264,7 +264,7 @@ def store_api_key_secure(provider: str, api_key: str,
     cleartext `.quodeq.env` write path, under *paths* (``default_paths()``
     when None). Returns True if either succeeded.
     """
-    stored, _secure = _store_api_key(provider, api_key, paths)
+    stored, _secure = store_api_key(provider, api_key, paths)
     return stored
 
 

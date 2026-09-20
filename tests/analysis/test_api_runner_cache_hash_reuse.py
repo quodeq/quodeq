@@ -9,11 +9,11 @@ over the file-length threshold -- kept separate rather than grown.
 from __future__ import annotations
 
 from quodeq.analysis._api_runner import _build_cache_writer
-from quodeq.analysis._types import AnalysisOptions, ClassifyStash, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, ClassifyStash, RunConfig
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult
 from quodeq.analysis.cache.key import CacheKey, compute_key
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.fingerprint import _hash_file, _stat_key
+from quodeq.analysis.fingerprint import hash_file, stat_key
 
 
 def _run_config(src_root, *, classify_cache=None):
@@ -41,11 +41,11 @@ def test_build_cache_writer_reuses_the_stashed_classify_time_hash(tmp_path, monk
     def _boom(*_args, **_kwargs):
         raise AssertionError("re-hashed")
 
-    monkeypatch.setattr(_key_provenance, "_hash_file", _boom)
+    monkeypatch.setattr(_key_provenance, "hash_file", _boom)
 
     classify = ClassifyResult(
         misses=["Foo.kt"], miss_hashes={"Foo.kt": "stashed-hash"},
-        miss_stamps={"Foo.kt": _stat_key(src_root / "Foo.kt")},
+        miss_stamps={"Foo.kt": stat_key(src_root / "Foo.kt")},
     )
     run_config = _run_config(src_root, classify_cache={
         "flexibility": ClassifyStash(("Foo.kt",), classify),
@@ -88,11 +88,11 @@ def test_build_cache_writer_hashes_when_the_stash_has_no_entry(tmp_path, monkeyp
 
     expected_key = compute_key(CacheKey(
         schema_version=cache_writer_module._SCHEMA_VERSION,
-        file_content_hash=_hash_file(src_root / "Foo.kt") or "",
+        file_content_hash=hash_file(src_root / "Foo.kt") or "",
         file_path="Foo.kt",
         dimension="flexibility",
         params_hash="",
     ))
     entry = LocalFileBackend(root=cache_root).get(expected_key)
     assert entry is not None
-    assert entry.file_content_hash == _hash_file(src_root / "Foo.kt")
+    assert entry.file_content_hash == hash_file(src_root / "Foo.kt")

@@ -18,18 +18,18 @@ from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
-from quodeq.services.dashboard import _make_run_dimension_fetcher
+from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.ports import GradeTablesReader
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     SQLiteStateStore,
     load_suppression_rules,
     read_active_findings,
     row_to_finding,
 )
 from quodeq.services.rescore import rescore_dimensions
-from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
+from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
 
@@ -235,8 +235,8 @@ def _build_response_from_eval_files(
     path, so callers (UI dismiss handlers) don't need to branch.
     """
     validate_path_segment(project, run_id)
-    d = deps or _NO_DEPS
-    base_fetcher = _make_run_dimension_fetcher(reports_root, project)
+    d = deps or NO_DEPS
+    base_fetcher = make_run_dimension_fetcher(reports_root, project)
     project_dir = reports_root / project
     dismissed = (d.dismissed_keys or dismissed_keys)(project_dir)
     deleted = (d.deleted_keys or deleted_keys)(project_dir)

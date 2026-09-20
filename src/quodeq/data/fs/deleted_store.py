@@ -15,7 +15,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from quodeq.data._file_lock import lock_file, unlock_file
+from quodeq.data.file_lock import lock_file, unlock_file
 
 FILENAME = "deleted.json"
 _LOCK_FILENAME = "deleted.json.lock"

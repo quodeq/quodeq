@@ -21,7 +21,7 @@ def test_clean_scan_and_diff_from_mutually_exclusive(capsys) -> None:
     # *before* running the pipeline. run_evaluate is the enforcement point.
     # Note: --incremental is now a deprecated no-op alias; the mutex is
     # between --clean-scan and --diff-from.
-    from quodeq._cli_evaluation import run_evaluate
+    from quodeq.cli_evaluation import run_evaluate
 
     parser = build_parser()
     args = parser.parse_args([
@@ -48,7 +48,7 @@ def test_legacy_incremental_with_diff_from_does_not_error(capsys) -> None:
     output -- if a future refactor re-introduces a mutex on the legacy flag,
     that phrase would surface and this test would fail.
     """
-    from quodeq._cli_evaluation import run_evaluate
+    from quodeq.cli_evaluation import run_evaluate
 
     parser = build_parser()
     args = parser.parse_args([

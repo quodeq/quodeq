@@ -46,7 +46,7 @@ def _run_recency_key(run_dir: Path) -> tuple[int, str | float]:
 def _event_log_runs(project_dir: Path) -> list[Path]:
     """Run dirs under *project_dir* that have an events.jsonl, newest-first.
 
-    Run ids are random UUIDs (see ``_cli_evaluation.run_id = uuid4()``), so a
+    Run ids are random UUIDs (see ``cli_evaluation.run_id = uuid4()``), so a
     name sort would not surface the most recent run.  Ordered by
     ``started_at`` from status.json (codebase convention); directory mtime is
     used as a fallback for legacy runs that lack status.json.  Using mtime

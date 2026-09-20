@@ -14,8 +14,8 @@ from quodeq.api.routes_common import reports_dir
 from quodeq.api.routes_project_create import _create_project
 from quodeq.api.routes_project_scan import register_project_scan_routes
 from quodeq.api.zip import export_project_zip
-from quodeq.services._warmup import WarmupEngine, engine as warmup_engine
-from quodeq.services._wiring import is_valid_repo_url
+from quodeq.services.warmup import WarmupEngine, engine as warmup_engine
+from quodeq.services.wiring import is_valid_repo_url
 from quodeq.services.base import ActionProvider
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import validate_canonical_absolute, validate_path_segment

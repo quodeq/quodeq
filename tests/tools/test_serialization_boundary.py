@@ -17,12 +17,12 @@ SRC_ROOT = Path(__file__).resolve().parent.parent.parent / "src" / "quodeq"
 DECLARED_WIRE_BOUNDARIES: dict[str, str] = {
     "shared/serialization.py": "defines the serializer",
     "assistant/tools/_read_tools_scope.py": "assistant tool output is its own wire (LLM-facing)",
-    "data/fs/dimension_report/_report_scoring.py": "dimension report files on disk are camelCase (stored contract)",
+    "data/fs/dimension_report/report_scoring.py": "dimension report files on disk are camelCase (stored contract)",
     "data/fs/report_parser/_eval_parsing.py": "parses stored camelCase findings back out (stored contract)",
     "services/_accumulated_aggregate.py": "payload feeds both routes and the persisted score cache — burn-down: WS5/scoring reader",
     "services/rescore.py": "envelope consumed by routes AND services/scoring — burn-down: WS5/scoring reader",
     "services/_dashboard_response.py": "run-dim LRU stores wire payloads — burn-down: WS5/scoring reader",
-    "services/_fs_reports.py": "violation responses cached in wire shape — burn-down: WS5",
+    "services/fs_reports.py": "violation responses cached in wire shape — burn-down: WS5",
     "services/scoring/_response_builders.py": "scoring payloads flow into SSE + caches in wire shape — burn-down: WS5/scoring reader",
 }
 

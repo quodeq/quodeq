@@ -34,7 +34,7 @@ def test_run_log_captures_log_info_during_pipeline(tmp_path: Path, monkeypatch) 
 
 def test_pipeline_installs_and_removes_run_log_handler(tmp_path: Path, monkeypatch) -> None:
     """_run_pipeline_with_cleanup must install RunLogHandler on entry and remove on exit."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
     from quodeq.shared.run_log import RunLogHandler
 
     logger = logging.getLogger("quodeq")

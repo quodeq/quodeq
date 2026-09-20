@@ -14,7 +14,7 @@ import pytest
 
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.subprocess import run_analysis
-from quodeq.assistant.adapters._cli import run_cli_turn
+from quodeq.assistant.adapters.cli import run_cli_turn
 from quodeq.shared.copilot import build_copilot_env
 from tests.assistant._cli_adapter_helpers import _config, _repo, _session
 

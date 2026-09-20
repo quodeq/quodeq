@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.core.evidence._req_mapping import QuarantinedFinding, _group_judgments
+from quodeq.core.evidence.req_mapping import QuarantinedFinding, _group_judgments
 from quodeq.core.evidence.parser import (
     EvidenceContext,
     EvidenceParseOptions,

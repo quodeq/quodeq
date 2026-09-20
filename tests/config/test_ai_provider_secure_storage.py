@@ -182,7 +182,7 @@ class TestProviderNameValidation:
     ])
     def test_rejects_non_identifier_provider_names(self, paths, no_keyring, provider):
         with pytest.raises(ValueError):
-            ai_provider._store_api_key(provider, "sk-injected")
+            ai_provider.store_api_key(provider, "sk-injected")
         assert not paths.env_file.exists()
 
     def test_rejection_happens_before_the_keyring_is_touched(self, paths, monkeypatch):
@@ -192,20 +192,20 @@ class TestProviderNameValidation:
             lambda *a: calls.append(a),
         )
         with pytest.raises(ValueError):
-            ai_provider._store_api_key("gemini\nexport EVIL=1", "sk-injected")
+            ai_provider.store_api_key("gemini\nexport EVIL=1", "sk-injected")
         assert calls == []
 
     def test_injection_attempt_leaves_an_existing_file_untouched(self, paths, no_keyring):
         store_api_key_secure("claude", "sk-anthropic")
         before = paths.env_file.read_text()
         with pytest.raises(ValueError):
-            ai_provider._store_api_key("x\nexport EVIL=1", "sk-injected")
+            ai_provider.store_api_key("x\nexport EVIL=1", "sk-injected")
         assert paths.env_file.read_text() == before
 
     def test_provider_without_an_api_key_var_is_rejected_cleanly(self, paths, no_keyring):
         """PROVIDERS maps ollama to "", which would write `export =<key>`."""
         assert ai_provider._api_key_var_for("ollama") == ""
-        stored, secure = ai_provider._store_api_key("ollama", "sk-nowhere")
+        stored, secure = ai_provider.store_api_key("ollama", "sk-nowhere")
         assert (stored, secure) == (False, False)
         assert not paths.env_file.exists()
 

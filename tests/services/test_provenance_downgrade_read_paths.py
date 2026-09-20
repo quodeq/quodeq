@@ -7,7 +7,7 @@ that loses it is indistinguishable from an ordinary major.
 
 Two boundaries have to agree, and neither raises when it disagrees:
 
-  write  ``_flatten_findings`` copies ONLY the keys in ``_VIOLATION_FIELDS``
+  write  ``flatten_findings`` copies ONLY the keys in ``VIOLATION_FIELDS``
          into evaluation/<dim>.json -- a strict whitelist that silently drops
          anything unlisted.
   read   ``build_finding`` re-hydrates that JSON back into a ``Finding``, and
@@ -22,8 +22,8 @@ from __future__ import annotations
 import json
 
 from quodeq.analysis._report_assembly import build_report_json
-from quodeq.analysis._report_constants import _VIOLATION_FIELDS
-from quodeq.analysis._report_findings import _flatten_findings
+from quodeq.analysis._report_constants import VIOLATION_FIELDS
+from quodeq.analysis._report_findings import flatten_findings
 from quodeq.analysis.mcp.provenance_gate import DOWNGRADE_MARKER
 from quodeq.data.fs.report_parser._report_parsing import build_finding, parse_report_json
 
@@ -71,14 +71,14 @@ def test_marker_survives_the_full_report_json_round_trip(tmp_path):
 
 
 def test_report_write_whitelist_carries_the_marker_through_flatten():
-    """_VIOLATION_FIELDS is a strict whitelist. Omission drops the marker
+    """VIOLATION_FIELDS is a strict whitelist. Omission drops the marker
     silently -- no error, just a finding that forgot it was downgraded."""
     items = [
         _gated_finding(),
         {"file": "b.py", "line": 2, "severity": "major", "title": "t", "reason": "r"},
     ]
 
-    flattened = _flatten_findings(items, "Access Control", _VIOLATION_FIELDS)
+    flattened = flatten_findings(items, "Access Control", VIOLATION_FIELDS)
 
     downgraded, untouched = flattened
     assert downgraded[DOWNGRADE_MARKER] is True

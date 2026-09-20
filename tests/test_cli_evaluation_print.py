@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq._cli_evaluation import _print_scores
+from quodeq.cli_evaluation import _print_scores
 from quodeq._cli_scoring import _format_score_line
 from quodeq.analysis._report_io import write_dimension_report
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
@@ -152,7 +152,7 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
     def _boom(*args, **kwargs):
         raise RuntimeError("scoring engine exploded")
 
-    monkeypatch.setattr("quodeq._cli_evaluation.rescore_dimension_from_evidence", _boom)
+    monkeypatch.setattr("quodeq.cli_evaluation.rescore_dimension_from_evidence", _boom)
 
     _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 

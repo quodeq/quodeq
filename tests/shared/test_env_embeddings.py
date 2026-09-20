@@ -1,5 +1,5 @@
 """Env accessors for the semantic-precedent embedding configuration."""
-from quodeq.shared._env import (
+from quodeq.shared.env import (
     get_embedding_base_url,
     get_embedding_model,
     get_precedent_similarity_threshold,

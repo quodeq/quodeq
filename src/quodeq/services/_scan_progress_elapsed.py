@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.services._scan_progress_types import DimProgressState
-from quodeq.services._wiring import file_mtime, latest_dim_activity_mtime, read_queue_state
+from quodeq.services.wiring import file_mtime, latest_dim_activity_mtime, read_queue_state
 
 
 def _parse_iso_utc(raw: object) -> datetime | None:

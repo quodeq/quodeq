@@ -7,7 +7,7 @@ import threading
 from datetime import datetime, timezone
 
 from quodeq import __version__
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.update import channel as _channel
 from quodeq.update import selfupdate as _selfupdate
 from quodeq.update.compare import is_newer

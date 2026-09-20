@@ -104,7 +104,7 @@ def real_project_fixture(tmp_path, monkeypatch):
     )
     # Project-level scan.json (quick-scan coverage metadata). Publishing must
     # carry it into the clone (Finding 3) so the dashboard's coverage header
-    # (totalFiles/analyzedFiles, added by _fs_reports._enrich_with_coverage)
+    # (totalFiles/analyzedFiles, added by fs_reports._enrich_with_coverage)
     # is identical on both sides instead of only appearing locally.
     (project_dir / "scan.json").write_text(
         json.dumps({"total_files": 42, "code_files": 30}), encoding="utf-8",

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from quodeq.analysis._types import ClassifyStash, RunConfig
+from quodeq.analysis.run_types import ClassifyStash, RunConfig
 from quodeq.analysis.cache._adoption import try_adopt
 from quodeq.analysis.cache._key_provenance import (
     _accumulate_drift,
@@ -21,7 +21,7 @@ from quodeq.analysis.cache._key_provenance import (
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.entry import CacheEntry
 from quodeq.analysis.cache.key import compute_key
-from quodeq.analysis.fingerprint import _stat_key
+from quodeq.analysis.fingerprint import stat_key
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,7 @@ class ClassifyResult:
     # entries after dispatch without recomputing the key.
     miss_keys: dict[str, str] = field(default_factory=dict)
     miss_hashes: dict[str, str] = field(default_factory=dict)  # per-miss content hash, for the cache writer
-    # Per-miss ``_stat_key`` read just before that hash, so a write path can
+    # Per-miss ``stat_key`` read just before that hash, so a write path can
     # tell whether the file is still the one classify hashed.
     miss_stamps: dict[str, tuple[int, int]] = field(default_factory=dict)
     # Per-field drift among cache hits: field -> {"count", "from", "to"}.
@@ -91,7 +91,7 @@ def _partition_files_by_cache(
         # Stamped before the hash below, never after: a file that changes
         # between the two then carries a stamp older than its hash, and the
         # write path re-hashes rather than trusting a stale hash.
-        stamp = _stat_key(config.src / f)
+        stamp = stat_key(config.src / f)
         key, content_hash, hit, was_adopted = _classify_one_file(
             config, dimension, f, cache, bypass_reads=bypass_reads,
         )

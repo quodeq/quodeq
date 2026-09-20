@@ -20,9 +20,9 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import json_error
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
-from quodeq.services import _fs_projects, _fs_reports
+from quodeq.services import fs_reports, fs_projects
 from quodeq.services.compare import build_compare_summary
-from quodeq.services._runs_unit import build_runs_unit
+from quodeq.services.runs_unit import build_runs_unit
 from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.services.shared_repo import (
     published_meta,
@@ -62,7 +62,7 @@ def _shared_projects(
     # inline_summaries=True: this route has no warm-up engine to fill a
     # missing project-card summary later, so a cache miss must compute
     # it inline here instead of reporting it pending forever.
-    projects = _fs_projects.build_project_list(
+    projects = fs_projects.build_project_list(
         eval_root, backfill=False, inline_summaries=True,
     )
     listing = {"projects": [to_camel_dict(p) for p in projects]}
@@ -99,7 +99,7 @@ def shared_project_info(project: str, eval_root: Path, url: str):
     if err:
         return err
     info, err = _load_or_500(
-        lambda: _fs_projects.get_project_info(str(eval_root), project), project,
+        lambda: fs_projects.get_project_info(str(eval_root), project), project,
         log_msg="Failed to load shared project info for %s", error_msg="Failed to load project info",
     )
     if err:
@@ -140,7 +140,7 @@ def shared_dashboard(project: str, eval_root: Path):
         return err
     run = request.args.get("run", "latest")
     try:
-        payload = _fs_reports.get_dashboard(str(eval_root), project, run, log=SHARED_LOG)
+        payload = fs_reports.get_dashboard(str(eval_root), project, run, log=SHARED_LOG)
     except FileNotFoundError:
         return json_error("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(payload)
@@ -153,7 +153,7 @@ def shared_accumulated(project: str, eval_root: Path):
     if err:
         return err
     as_of = request.args.get("asOf")
-    payload = _fs_reports.get_accumulated(str(eval_root), project, as_of)
+    payload = fs_reports.get_accumulated(str(eval_root), project, as_of)
     if payload is None:
         return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(payload)
@@ -219,7 +219,7 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
     err = _validate_segment(project, dim, run_id)
     if err:
         return err
-    payload = _fs_reports.get_dimension_eval(str(eval_root), project, run_id, dim)
+    payload = fs_reports.get_dimension_eval(str(eval_root), project, run_id, dim)
     if payload is None:
         return json_error("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     if payload.get("waiting"):
@@ -235,7 +235,7 @@ def shared_violations(project: str, eval_root: Path):
     if err:
         return err
     try:
-        payload = _fs_reports.get_violations(str(eval_root), project, run_id, log=SHARED_LOG)
+        payload = fs_reports.get_violations(str(eval_root), project, run_id, log=SHARED_LOG)
     except FileNotFoundError:
         return json_error("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     return jsonify(to_camel_dict(payload))

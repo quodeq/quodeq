@@ -1,7 +1,7 @@
 """Numerical-mode scoring helpers: deduction computation and grade drops."""
 from __future__ import annotations
 
-from quodeq.core.scoring._constants import MAX_SCORE
+from quodeq.core.scoring.constants import MAX_SCORE
 from quodeq.core.types import Deductions
 
 # Progressive drop tables: (min_type_count_inclusive, levels_to_drop).

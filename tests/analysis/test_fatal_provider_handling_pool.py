@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.analysis._loops import _interruption_reason, _raise_on_fatal_cancel
-from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+from quodeq.analysis.cache.failure_streak import CircuitBreakerError
 from quodeq.analysis.errors import (
     REASON_AGENT_FAILURE_STREAK, REASON_CANCELLED_SIGNAL, REASON_PROVIDER_FATAL,
     FatalProviderError,

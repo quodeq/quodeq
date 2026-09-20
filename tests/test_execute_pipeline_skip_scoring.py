@@ -5,8 +5,8 @@ import argparse
 from pathlib import Path
 from unittest.mock import patch
 
-from quodeq._cli_evaluation import _execute_pipeline
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.cli_evaluation import _execute_pipeline
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.manifest_models import SourceManifest
 from quodeq.core.evidence.model import Evidence
 
@@ -37,8 +37,8 @@ def test_skip_scoring_calls_run_not_run_full(tmp_path: Path) -> None:
     """PR diff mode: run() is called (evidence pipeline), run_full is NOT."""
     args = _args(tmp_path)
     config = _config(skip_scoring=True)
-    with patch("quodeq._cli_evaluation.run", return_value=_fake_evidence()) as r, \
-         patch("quodeq._cli_evaluation.run_full") as rf:
+    with patch("quodeq.cli_evaluation.run", return_value=_fake_evidence()) as r, \
+         patch("quodeq.cli_evaluation.run_full") as rf:
         exit_code = _execute_pipeline(args, config, tmp_path / "evi", tmp_path / "eval")
     assert exit_code == 0
     r.assert_called_once()
@@ -51,7 +51,7 @@ def test_skip_scoring_does_not_write_merged_json(tmp_path: Path) -> None:
     config = _config(skip_scoring=True)
     evidence_dir = tmp_path / "evi"
     evidence_dir.mkdir()
-    with patch("quodeq._cli_evaluation.run", return_value=_fake_evidence()):
+    with patch("quodeq.cli_evaluation.run", return_value=_fake_evidence()):
         _execute_pipeline(args, config, evidence_dir, tmp_path / "eval")
     assert not (evidence_dir / "python_evidence.json").exists()
 
@@ -60,8 +60,8 @@ def test_scoring_enabled_calls_run_full(tmp_path: Path) -> None:
     """Baseline: normal mode calls run_full (scoring)."""
     args = _args(tmp_path)
     config = _config(skip_scoring=False)
-    with patch("quodeq._cli_evaluation.run"), \
-         patch("quodeq._cli_evaluation.run_full", return_value={}) as rf:
+    with patch("quodeq.cli_evaluation.run"), \
+         patch("quodeq.cli_evaluation.run_full", return_value={}) as rf:
         exit_code = _execute_pipeline(args, config, tmp_path / "evi", tmp_path / "eval")
     assert exit_code == 0
     rf.assert_called_once()
@@ -74,6 +74,6 @@ def test_evidence_only_writes_merged_json(tmp_path: Path) -> None:
     config = _config(skip_scoring=False)
     evidence_dir = tmp_path / "evi"
     evidence_dir.mkdir()
-    with patch("quodeq._cli_evaluation.run", return_value=_fake_evidence()):
+    with patch("quodeq.cli_evaluation.run", return_value=_fake_evidence()):
         _execute_pipeline(args, config, evidence_dir, tmp_path / "eval")
     assert (evidence_dir / "python_evidence.json").exists()

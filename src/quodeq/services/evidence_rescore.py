@@ -23,7 +23,7 @@ from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_prin
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
-from quodeq.services._wiring import evidence_file_size
+from quodeq.services.wiring import evidence_file_size
 from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
 from quodeq.shared.validation import validate_path_segment
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
@@ -34,7 +34,7 @@ _logger = logging.getLogger(__name__)
 def standard_dirs() -> tuple[Path | None, Path | None]:
     """(compiled_dir, evaluators_dir) resolved exactly as scan time does.
 
-    Scan runs build RunConfig from default_paths() (see _cli_evaluation), so
+    Scan runs build RunConfig from default_paths() (see cli_evaluation), so
     resolving here keeps the rescore's PrincipleResolver identical to the one
     that quarantined findings at scan time. Without these dirs the resolver is
     permissive and quarantined findings would re-enter the grade on rescore.

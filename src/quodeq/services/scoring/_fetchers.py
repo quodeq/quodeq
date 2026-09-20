@@ -13,13 +13,13 @@ from typing import Callable
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.dimension import DimensionResult
-from quodeq.services._trend_fetcher import make_trend_fetcher
-from quodeq.services.dashboard import _make_run_dimension_fetcher
+from quodeq.services.trend_fetcher import make_trend_fetcher
+from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services._wiring import read_run_scalars
-from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
-from quodeq.shared._env import env_int
+from quodeq.services.wiring import read_run_scalars
+from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
+from quodeq.shared.env import env_int
 
 
 def _max_history_runs() -> int:
@@ -40,12 +40,12 @@ def _make_trend_fetcher(
     when None), plus the shared full-data base-fetcher factory. See
     :func:`make_trend_fetcher` for the fast/heavy path and caching semantics.
     """
-    d = deps or _NO_DEPS
+    d = deps or NO_DEPS
     return make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
         deps=replace(
             d,
-            base_fetcher_factory=d.base_fetcher_factory or _make_run_dimension_fetcher,
+            base_fetcher_factory=d.base_fetcher_factory or make_run_dimension_fetcher,
             read_run_scalars=d.read_run_scalars or read_run_scalars,
             dismissed_keys=d.dismissed_keys or dismissed_keys,
             deleted_keys=d.deleted_keys or deleted_keys,

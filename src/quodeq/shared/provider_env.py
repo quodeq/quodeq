@@ -12,12 +12,12 @@ import json
 from collections.abc import Mapping
 from pathlib import Path
 
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 _DEFAULT_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
 
 
-def _providers_path(env: Mapping[str, str] | None = None) -> Path:
+def providers_path(env: Mapping[str, str] | None = None) -> Path:
     """Path of ``ai_providers.json``; ``QUODEQ_AI_PROVIDERS_PATH`` overrides the bundled file."""
     return Path(resolve_env(env).get("QUODEQ_AI_PROVIDERS_PATH", str(_DEFAULT_PATH)))
 
@@ -37,7 +37,7 @@ def provider_env_exports(
     if not provider_id:
         return {}
     try:
-        configs = json.loads(_providers_path().read_text(encoding="utf-8"))
+        configs = json.loads(providers_path().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return {}
     cfg = configs.get(provider_id)

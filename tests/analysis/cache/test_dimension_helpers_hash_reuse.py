@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import CacheEntry, LocalFileBackend
 from quodeq.analysis.cache._persist_watcher import CachePersistProvenance
 from quodeq.analysis.cache.dimension_helpers import (
@@ -18,7 +18,7 @@ from quodeq.analysis.cache.dimension_helpers import (
     build_cache_key_for_file,
     classify_files_via_cache,
 )
-from quodeq.analysis.fingerprint import _hash_file, _stat_key
+from quodeq.analysis.fingerprint import hash_file, stat_key
 
 
 def _make_config(src: Path) -> RunConfig:
@@ -43,7 +43,7 @@ def test_classify_returns_miss_hashes_for_every_miss(tmp_path: Path):
     assert result.misses == files
     assert set(result.miss_hashes.keys()) == set(files)
     for f in files:
-        assert result.miss_hashes[f] == (_hash_file(config.src / f) or "")
+        assert result.miss_hashes[f] == (hash_file(config.src / f) or "")
 
 
 def test_classify_omits_hits_from_miss_hashes(tmp_path: Path):
@@ -61,7 +61,7 @@ def test_classify_omits_hits_from_miss_hashes(tmp_path: Path):
 
     assert result.misses == ["b.py"]
     assert set(result.miss_hashes.keys()) == {"b.py"}
-    assert result.miss_hashes["b.py"] == (_hash_file(config.src / "b.py") or "")
+    assert result.miss_hashes["b.py"] == (hash_file(config.src / "b.py") or "")
 
 
 def test_classify_records_a_stat_stamp_beside_every_miss_hash(tmp_path: Path):
@@ -73,7 +73,7 @@ def test_classify_records_a_stat_stamp_beside_every_miss_hash(tmp_path: Path):
 
     result = classify_files_via_cache(config, "security", files, cache)
 
-    assert result.miss_stamps == {"a.py": _stat_key(config.src / "a.py")}
+    assert result.miss_stamps == {"a.py": stat_key(config.src / "a.py")}
 
 
 def _entry_for(config: RunConfig, content_hash: str, content_stamp) -> CacheEntry:
@@ -95,12 +95,12 @@ def test_persist_rehashes_when_the_file_changed_after_classify(tmp_path: Path):
     src = tmp_path / "src"
     _write_files(src, {"a.py": "x"})
     config = _make_config(src)
-    stamp = _stat_key(src / "a.py")
+    stamp = stat_key(src / "a.py")
 
     (src / "a.py").write_text("x = edited between classify and persist")
     entry = _entry_for(config, "classify-time-hash", stamp)
 
-    assert entry.file_content_hash == _hash_file(src / "a.py")
+    assert entry.file_content_hash == hash_file(src / "a.py")
 
 
 def test_persist_reuses_the_hash_while_the_stamp_still_matches(tmp_path: Path):
@@ -108,7 +108,7 @@ def test_persist_reuses_the_hash_while_the_stamp_still_matches(tmp_path: Path):
     _write_files(src, {"a.py": "x"})
     config = _make_config(src)
 
-    entry = _entry_for(config, "classify-time-hash", _stat_key(src / "a.py"))
+    entry = _entry_for(config, "classify-time-hash", stat_key(src / "a.py"))
 
     assert entry.file_content_hash == "classify-time-hash"
 
@@ -120,4 +120,4 @@ def test_persist_rehashes_an_unstamped_hash(tmp_path: Path):
 
     entry = _entry_for(config, "classify-time-hash", None)
 
-    assert entry.file_content_hash == _hash_file(src / "a.py")
+    assert entry.file_content_hash == hash_file(src / "a.py")

@@ -109,7 +109,7 @@ class TestScanPath:
             files: int = 5
             languages: list = None
 
-        with patch("quodeq.services._fs_scan.scan_project", return_value=FakeScanResult(files=5, languages=["py"])), \
+        with patch("quodeq.services.fs_scan.scan_project", return_value=FakeScanResult(files=5, languages=["py"])), \
              patch("pathlib.Path.home", return_value=tmp_path):
             resp = client.post("/api/scan", json={"path": str(target)})
             assert resp.status_code == 200

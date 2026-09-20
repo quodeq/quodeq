@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import os  # noqa: F401 -- kept for the os.replace patch target above
 
-from quodeq.data.fs.dimension_report._report_io import (  # noqa: F401
-    _persist_json,
+from quodeq.data.fs.dimension_report.report_io import (  # noqa: F401
+    persist_json,
     write_dimension_report,
     write_reports,
 )

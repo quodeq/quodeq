@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.analysis.prompts._template import load_template
+from quodeq.analysis.prompts.template import load_template
 from quodeq.analysis.prompts.builder import load_evaluation_rules
 from quodeq.config.prompt_templates import render_template
 from quodeq.context.path_role import Role, path_role

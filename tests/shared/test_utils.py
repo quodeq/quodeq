@@ -120,7 +120,7 @@ class TestGetters:
         monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", "/custom/dir/../other")
         assert utils.get_evaluations_dir() == os.path.abspath("/custom/other")
         monkeypatch.setenv("QUODEQ_DIR", "~/quodeq-state")
-        from quodeq.shared._env import get_quodeq_dir
+        from quodeq.shared.env import get_quodeq_dir
         assert get_quodeq_dir() == Path.home() / "quodeq-state"
 
     def test_get_anthropic_api_key_none_by_default(self, monkeypatch):

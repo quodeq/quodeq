@@ -17,7 +17,7 @@ that index is keyed by ``resolve_project_uuid``'s create-or-find identity,
 which folds a scope_path into the child project's compound name.
 ``find_existing_project`` instead matches the literal ``name``/``path``/
 ``scopePath`` fields stored in ``repository_info.json`` (see
-``_fs_project_helpers.find_existing_project``), so this index uses that same
+``fs_project_helpers.find_existing_project``), so this index uses that same
 three-field key rather than reusing a key scheme that doesn't match it.
 """
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """Guard: services/ports.py stays protocols-only, never regrows concretions.
 
-Concretion defaults belong in services/_wiring.py; ports.py carries only
+Concretion defaults belong in services/wiring.py; ports.py carries only
 Protocols and boundary error types imported from quodeq.data.ports.*.
 """
 from __future__ import annotations
@@ -29,5 +29,5 @@ def test_ports_module_imports_no_concretions():
     ]
     assert offenders == [], (
         "services/ports.py must stay protocols-only — move concretion "
-        "re-exports to services/_wiring.py instead:\n" + "\n".join(offenders)
+        "re-exports to services/wiring.py instead:\n" + "\n".join(offenders)
     )

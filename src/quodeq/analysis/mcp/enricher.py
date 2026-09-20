@@ -24,13 +24,13 @@ from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.context.precedent import PrecedentCorpus
 from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.trust_model import TrustModel
-from quodeq.core._constants import FULL_CONFIDENCE
+from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.observability import NULL_LOG, LogSink
 
 _FINDING_SCHEMA_VERSION = 1
 # These downweights set `confidence`, a UI/triage signal ONLY: confidence drives
 # the dashboard's "Low confidence" grouping and does NOT affect the grade (it is
-# excluded from the scoring fields -- see _report_constants._VIOLATION_FIELDS and
+# excluded from the scoring fields -- see _report_constants.VIOLATION_FIELDS and
 # #640). Severity, set by the analysis LLM and enforced by the provenance gate
 # (#639), is the lever that moves the score.
 _NON_PROD_DOWNWEIGHT = 50

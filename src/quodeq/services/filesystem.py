@@ -26,7 +26,7 @@ from typing import Any
 
 from quodeq.core.types import ProjectEntry, ViolationSummary
 from quodeq.core.types.job import JobSnapshot
-from quodeq.services import _fs_projects, _fs_reports
+from quodeq.services import fs_reports, fs_projects
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._post_run_hook import PostRunHook
 from quodeq.services._projects_cache import ProjectsCache
@@ -55,10 +55,10 @@ class FilesystemActionProvider(ActionProvider):
         reports_root: Path | None = None,
     ) -> None:
         if reports_root is None:
-            from quodeq.shared._env import get_evaluations_dir
+            from quodeq.shared.env import get_evaluations_dir
             reports_root = Path(get_evaluations_dir())
         if index_db_path is None:
-            from quodeq.shared._env import get_index_db_path
+            from quodeq.shared.env import get_index_db_path
             index_db_path = Path(get_index_db_path())
         self._reports_root = reports_root
         self._compiled_dir = compiled_dir
@@ -173,7 +173,7 @@ class FilesystemActionProvider(ActionProvider):
         """Walk *reports_root* and rebuild the SQLite run index from scratch."""
         return self._evaluations.rebuild(reports_root=reports_root)
 
-    # -- projects (delegate to ProjectsCache + _fs_projects) ------------
+    # -- projects (delegate to ProjectsCache + fs_projects) ------------
 
     def list_projects(self, reports_dir: str, *, offset: int = 0, limit: int = 0) -> dict[str, Any]:
         """Return the ``{"projects": [...]}`` payload, served from the TTL-bounded cache."""
@@ -189,43 +189,43 @@ class FilesystemActionProvider(ActionProvider):
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
         """Repoint a registered project at *new_path*. Return True on success."""
-        return _fs_projects.update_project_path(reports_dir, project, new_path)
+        return fs_projects.update_project_path(reports_dir, project, new_path)
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
         """Remove a project's registry entry and its report data. Return True on success."""
-        return _fs_projects.delete_project(reports_dir, project)
+        return fs_projects.delete_project(reports_dir, project)
 
     def get_project_info(self, reports_dir: str, project: str) -> dict[str, Any] | None:
         """Return a project's metadata (discipline, dimensions), or None if unregistered."""
-        return _fs_projects.get_project_info(reports_dir, project)
+        return fs_projects.get_project_info(reports_dir, project)
 
     @staticmethod
     def _build_project_list(reports_root: Path) -> list[ProjectEntry]:
-        return _fs_projects.build_project_list(reports_root)
+        return fs_projects.build_project_list(reports_root)
 
-    # -- reports (delegate to _fs_reports) ------------------------------
+    # -- reports (delegate to fs_reports) ------------------------------
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:
         """Return the dashboard payload assembled from one run's on-disk artifacts."""
-        return _fs_reports.get_dashboard(reports_dir, project, run, log=SHARED_LOG)
+        return fs_reports.get_dashboard(reports_dir, project, run, log=SHARED_LOG)
 
     def get_accumulated(
         self, reports_dir: str, project: str, as_of: str | None,
     ) -> dict[str, Any] | None:
         """Return dimension data accumulated across every run up to *as_of*, or None."""
-        return _fs_reports.get_accumulated(reports_dir, project, as_of)
+        return fs_reports.get_accumulated(reports_dir, project, as_of)
 
     def get_dimension_eval(
         self, reports_dir: str, project: str, run_id: str, dimension: str,
     ) -> dict[str, Any] | None:
         """Return one dimension's parsed evaluation, resolved against ``_compiled_dir``."""
-        return _fs_reports.get_dimension_eval(
+        return fs_reports.get_dimension_eval(
             reports_dir, project, run_id, dimension, compiled_dir=self._compiled_dir,
         )
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
         """Return the violation counts aggregated across a run's dimensions."""
-        return _fs_reports.get_violations(reports_dir, project, run_id, log=SHARED_LOG)
+        return fs_reports.get_violations(reports_dir, project, run_id, log=SHARED_LOG)
 
     # -- tooling (delegate to FsToolingMixin) ---------------------------
 

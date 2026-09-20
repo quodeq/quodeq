@@ -13,7 +13,7 @@ against.
 
 ``build_project_entries`` then fully hydrates exactly the ids a caller
 needs (typically one page), reusing the same threaded builder
-``_fs_projects.build_project_list`` uses for its own (unpaginated,
+``fs_projects.build_project_list`` uses for its own (unpaginated,
 untouched) full-list callers.
 
 One known trade-off vs. ``build_project_list``: a directory with run data
@@ -29,19 +29,19 @@ from pathlib import Path
 
 from quodeq.core.types import ProjectEntry
 from quodeq.services._fs_metadata import _extract_project_metadata
-from quodeq.services._fs_project_helpers import (
+from quodeq.services.fs_project_helpers import (
     _KnownProjectIds,
     _ListingOptions,
     _auto_detect_parents,
     _backfill_onboarding_field,
     _max_projects_listed,
 )
-from quodeq.services._fs_projects import (
+from quodeq.services.fs_projects import (
     _build_parent_child_sets,
     _build_project_entries_threaded,
     _collect_candidate_dirs,
 )
-from quodeq.services._wiring import repository_info_exists
+from quodeq.services.wiring import repository_info_exists
 
 
 def _build_lightweight_entry(entry_name: str, info: dict) -> ProjectEntry:

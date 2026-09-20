@@ -9,7 +9,7 @@ Split (Task 13) into two sibling modules plus this orchestrator:
     _find_discipline_in_run, _infer_discipline, _has_fingerprints).
 
 Both are re-exported here: _local_repo_root is used by compare.py, and
-_has_fingerprints/_infer_discipline are used by _fs_projects.py.
+_has_fingerprints/_infer_discipline are used by fs_projects.py.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
-from quodeq.services._wiring import RunInfo, read_run_data, summarize_dimensions
+from quodeq.services.wiring import RunInfo, read_run_data, summarize_dimensions
 from quodeq.services._fs_project_primitives import _local_repo_root
 from quodeq.services._fs_project_primitives import (  # noqa: F401 — re-export
     _check_path_exists,
@@ -95,7 +95,7 @@ def _apply_dismiss_delete_rescore(
 
     Applies the project-wide dismiss/delete rescore so the card agrees with
     every other read path (detail/explorer/dashboard/trend all route through
-    ``scored_run_dimensions``, i.e. read_run_data + ``_rescore_dimension``).
+    ``scored_run_dimensions``, i.e. read_run_data + ``rescore_dimension``).
     ``read_run_data`` returns the raw scan; its SQL grade overlay reflects
     dismisses only when the run is freshly projected, and NEVER reflects
     deletions. Without this the project-card grade kept a stale, too-low
@@ -105,12 +105,12 @@ def _apply_dismiss_delete_rescore(
     """
     if not (dismissed or deleted):
         return list(latest_by_dim.values())
-    from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
+    from quodeq.services.rescore import rescore_dimension  # noqa: PLC0415
     from quodeq.services.suppression_keys import SuppressionKeys  # noqa: PLC0415
 
     keys = SuppressionKeys(dismissed, deleted)
     return [
-        _rescore_dimension(d, keys, params=params, run_dir=run_dir_by_dim.get(dim_name))
+        rescore_dimension(d, keys, params=params, run_dir=run_dir_by_dim.get(dim_name))
         for dim_name, d in latest_by_dim.items()
     ]
 
@@ -226,7 +226,7 @@ def _read_accumulated_summary(
     """Compute accumulated grade and score across all runs. Returns (grade, score, files, pending).
 
     The card summary applies the same project-wide dismiss/delete rescore as
-    every other read path (see the ``_rescore_dimension`` step in
+    every other read path (see the ``rescore_dimension`` step in
     ``_compute_summary``), so the repositories-screen grade agrees with the
     Overview / explorer / trend. *params* (loaded from the saved formula when
     None) keeps the aggregate threshold labels and dimension weights
@@ -246,7 +246,7 @@ def _read_accumulated_summary(
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
 
-    from quodeq.shared._env import score_cache_disabled  # noqa: PLC0415
+    from quodeq.shared.env import score_cache_disabled  # noqa: PLC0415
     scope = _summary_version(reports_root, entry_name, runs, params)
     if compute_on_miss or score_cache_disabled():
         return _compute_on_miss_summary(reports_root, entry_name, runs, params, scope)

@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Callable
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.copilot import build_copilot_env
 
 # The spawned agent CLI is network-capable and tool-executing; it must NOT

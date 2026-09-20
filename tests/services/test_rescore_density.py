@@ -3,7 +3,7 @@ from quodeq.core.types.dimension import DimensionResult
 from quodeq.core.types.finding import Finding
 from quodeq.services.deleted import delete_finding, filter_deleted_from_dimensions
 from quodeq.services.dismissed import dismiss_finding, filter_dismissed_from_dimensions
-from quodeq.services.rescore import _rescore_dimension
+from quodeq.services.rescore import rescore_dimension
 from quodeq.services.suppression_keys import SuppressionKeys
 
 
@@ -15,7 +15,7 @@ def test_rescore_recomputes_density_from_files_read():
     ]
     dim = DimensionResult(dimension="reliability", violations=violations,
                           source_file_count=10, files_read=8)
-    rescored = _rescore_dimension(dim, SuppressionKeys({("R-1", "a.py", 1)}))
+    rescored = rescore_dimension(dim, SuppressionKeys({("R-1", "a.py", 1)}))
     assert rescored.totals.violation_count == 3
     assert rescored.totals.violations_per100_files == 37.5
 

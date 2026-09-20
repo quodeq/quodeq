@@ -25,7 +25,7 @@ def _legacy_dim_score(violations, compliance) -> float | None:
     """Compute a dimension score via the underlying legacy scoring path.
 
     Calls _score_principle per principle and weighted_overall to aggregate,
-    mirroring exactly what _rescore_dimension does after filtering dismissed
+    mirroring exactly what rescore_dimension does after filtering dismissed
     findings.
     """
     from quodeq.core.scoring.overall import MODE_NUMERICAL, weighted_overall

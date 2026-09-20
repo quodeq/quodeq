@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from quodeq.services._ephemeral_cleanup import maybe_cleanup_after_job
+from quodeq.services.ephemeral_cleanup import maybe_cleanup_after_job
 
 _logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class PostRunHook:
     @staticmethod
     def cleanup_clone(project_uuid: str, reports_root: Path) -> None:
         """Delete the ephemeral clone (if any) for *project_uuid*."""
-        from quodeq.shared._env import get_clones_dir
+        from quodeq.shared.env import get_clones_dir
         maybe_cleanup_after_job(
             reports_root=Path(reports_root),
             project_uuid=project_uuid,
@@ -82,5 +82,5 @@ class PostRunHook:
 
 
 def _default_reports_root() -> Path:
-    from quodeq.shared._env import get_evaluations_dir
+    from quodeq.shared.env import get_evaluations_dir
     return Path(get_evaluations_dir())

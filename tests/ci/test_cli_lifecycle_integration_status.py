@@ -16,7 +16,7 @@ from quodeq.data.fs.run_status_store import read_status
 
 def test_pipeline_writes_running_then_done(tmp_path: Path) -> None:
     """On clean exit the pipeline leaves status.json state=done."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
 
     evidence_dir = tmp_path / "proj" / "run" / "evidence"
     evaluation_dir = tmp_path / "proj" / "run" / "evaluation"
@@ -41,7 +41,7 @@ def test_pipeline_writes_running_then_done(tmp_path: Path) -> None:
 
 def test_pipeline_writes_failed_on_exception(tmp_path: Path) -> None:
     """On exception the pipeline leaves status.json state=failed."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
 
     evidence_dir = tmp_path / "proj" / "run" / "evidence"
     evaluation_dir = tmp_path / "proj" / "run" / "evaluation"
@@ -70,7 +70,7 @@ def test_pipeline_writes_failed_on_exception(tmp_path: Path) -> None:
 
 def test_pipeline_writes_failed_on_domain_error(tmp_path: Path) -> None:
     """AnalysisError / EvaluationError propagate → status.json state=failed."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
     from quodeq.analysis.runner import EvaluationError
 
     evidence_dir = tmp_path / "proj" / "run" / "evidence"

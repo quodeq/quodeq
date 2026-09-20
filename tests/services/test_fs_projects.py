@@ -1,4 +1,4 @@
-"""Tests for _fs_projects.py — project listing (find_children, parent/child sets, build_project_list, index)."""
+"""Tests for fs_projects.py — project listing (find_children, parent/child sets, build_project_list, index)."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ from unittest.mock import patch
 
 
 from quodeq.services._fs_project_index import build_project_index
-from quodeq.services._fs_projects import (
+from quodeq.services.fs_projects import (
     _build_parent_child_sets,
     build_project_list,
 )
-from quodeq.services._wiring import find_children
+from quodeq.services.wiring import find_children
 
 
 # ---------------------------------------------------------------------------
@@ -144,8 +144,8 @@ class TestBuildProjectList:
 
         call_count: dict[str, int] = {}
 
-        with patch("quodeq.services._fs_projects.read_repository_info") as mock_read:
-            with patch("quodeq.services._fs_project_helpers.read_repository_info") as mock_read_helpers:
+        with patch("quodeq.services.fs_projects.read_repository_info") as mock_read:
+            with patch("quodeq.services.fs_project_helpers.read_repository_info") as mock_read_helpers:
                 def side_effect(path):
                     dir_name = path.name
                     call_count[dir_name] = call_count.get(dir_name, 0) + 1
@@ -184,7 +184,7 @@ class TestBuildProjectListFailSoft:
             "name": "bad", "path": str(tmp_path), "location": "local",
         }))
 
-        import quodeq.services._fs_projects as mod
+        import quodeq.services.fs_projects as mod
         real_build = mod._build_project_entry
 
         def side_effect(reports_root, entry_name, runs, options, **kwargs):
@@ -192,8 +192,8 @@ class TestBuildProjectListFailSoft:
                 raise OSError("simulated disk error reading bad-uuid")
             return real_build(reports_root, entry_name, runs, options, **kwargs)
 
-        with patch("quodeq.services._fs_projects._build_project_entry", side_effect=side_effect):
-            with caplog.at_level("WARNING", logger="quodeq.services._fs_projects"):
+        with patch("quodeq.services.fs_projects._build_project_entry", side_effect=side_effect):
+            with caplog.at_level("WARNING", logger="quodeq.services.fs_projects"):
                 entries = build_project_list(tmp_path)
 
         ids = {e.id for e in entries}

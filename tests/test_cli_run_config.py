@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 
 class TestBuildRunConfig:
-    @patch("quodeq._cli_evaluation.default_paths")
-    @patch("quodeq._cli_evaluation.get_ai_model", return_value="claude-3")
+    @patch("quodeq.cli_evaluation.default_paths")
+    @patch("quodeq.cli_evaluation.get_ai_model", return_value="claude-3")
     def test_basic_config(self, mock_model, mock_paths, tmp_path):
         from quodeq.cli import ResolvedInputs, build_run_config
         mock_paths_obj = MagicMock()
@@ -27,8 +27,8 @@ class TestBuildRunConfig:
         assert config.language == "python"
         assert config.options.verify_findings is True
 
-    @patch("quodeq._cli_evaluation.default_paths")
-    @patch("quodeq._cli_evaluation.get_ai_model", return_value=None)
+    @patch("quodeq.cli_evaluation.default_paths")
+    @patch("quodeq.cli_evaluation.get_ai_model", return_value=None)
     def test_subagent_model_fallback(self, mock_model, mock_paths, tmp_path):
         from quodeq.cli import ResolvedInputs, build_run_config
         mock_paths_obj = MagicMock()
@@ -54,8 +54,8 @@ class TestBuildRunConfig:
         assert config.options.verify_findings is False
         assert config.standards_dir is None
 
-    @patch("quodeq._cli_evaluation.default_paths")
-    @patch("quodeq._cli_evaluation.get_ai_model", return_value="model-x")
+    @patch("quodeq.cli_evaluation.default_paths")
+    @patch("quodeq.cli_evaluation.get_ai_model", return_value="model-x")
     def test_single_file_disables_consolidated(self, mock_model, mock_paths, tmp_path):
         from quodeq.cli import ResolvedInputs, build_run_config
         mock_paths_obj = MagicMock()
@@ -73,8 +73,8 @@ class TestBuildRunConfig:
         config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env={})
         assert config.options.consolidated is False
 
-    @patch("quodeq._cli_evaluation.default_paths")
-    @patch("quodeq._cli_evaluation.get_ai_model", return_value="model-x")
+    @patch("quodeq.cli_evaluation.default_paths")
+    @patch("quodeq.cli_evaluation.get_ai_model", return_value="model-x")
     def test_env_no_consolidate(self, mock_model, mock_paths, tmp_path):
         from quodeq.cli import ResolvedInputs, build_run_config
         mock_paths_obj = MagicMock()
@@ -90,8 +90,8 @@ class TestBuildRunConfig:
         config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env={"QUODEQ_NO_CONSOLIDATE": "1"})
         assert config.options.consolidated is False
 
-    @patch("quodeq._cli_evaluation.default_paths")
-    @patch("quodeq._cli_evaluation.get_ai_model", return_value="model-x")
+    @patch("quodeq.cli_evaluation.default_paths")
+    @patch("quodeq.cli_evaluation.get_ai_model", return_value="model-x")
     def test_env_overrides_for_turns_and_duration(self, mock_model, mock_paths, tmp_path):
         from quodeq.cli import ResolvedInputs, build_run_config
         mock_paths_obj = MagicMock()
@@ -111,8 +111,8 @@ class TestBuildRunConfig:
         # Legacy QUODEQ_POOL_BUDGET still routes into time_limit via the env-var fallback.
         assert config.options.time_limit == 300
 
-    @patch("quodeq._cli_evaluation.default_paths")
-    @patch("quodeq._cli_evaluation.get_ai_model", return_value="model-x")
+    @patch("quodeq.cli_evaluation.default_paths")
+    @patch("quodeq.cli_evaluation.get_ai_model", return_value="model-x")
     def test_env_time_limit_zero_is_unlimited(self, mock_model, mock_paths, tmp_path):
         # Contract pin: the dashboard propagates unlimited as
         # QUODEQ_TIME_LIMIT=0. It must resolve to 0 (not None), otherwise
@@ -133,11 +133,11 @@ class TestBuildRunConfig:
         assert config.options.time_limit == 0
 
 
-@patch("quodeq._cli_evaluation.default_paths")
-@patch("quodeq._cli_evaluation.get_ai_model", return_value="claude-3")
+@patch("quodeq.cli_evaluation.default_paths")
+@patch("quodeq.cli_evaluation.get_ai_model", return_value="claude-3")
 def test_clean_scan_flag_parsed_and_inverts_strategy(mock_model, mock_paths, tmp_path):
     """--clean-scan disables the internal incremental strategy."""
-    from quodeq._cli_evaluation import ResolvedInputs, build_run_config
+    from quodeq.cli_evaluation import ResolvedInputs, build_run_config
     from quodeq.cli_parser import build_parser
 
     mock_paths_obj = MagicMock()
@@ -155,11 +155,11 @@ def test_clean_scan_flag_parsed_and_inverts_strategy(mock_model, mock_paths, tmp
     assert config.options.incremental is False, "--clean-scan must set AnalysisOptions.incremental=False"
 
 
-@patch("quodeq._cli_evaluation.default_paths")
-@patch("quodeq._cli_evaluation.get_ai_model", return_value="claude-3")
+@patch("quodeq.cli_evaluation.default_paths")
+@patch("quodeq.cli_evaluation.get_ai_model", return_value="claude-3")
 def test_no_flag_means_incremental_default(mock_model, mock_paths, tmp_path):
     """Without --clean-scan, the internal strategy is incremental (the new default)."""
-    from quodeq._cli_evaluation import ResolvedInputs, build_run_config
+    from quodeq.cli_evaluation import ResolvedInputs, build_run_config
     from quodeq.cli_parser import build_parser
 
     mock_paths_obj = MagicMock()
@@ -177,11 +177,11 @@ def test_no_flag_means_incremental_default(mock_model, mock_paths, tmp_path):
     assert config.options.incremental is True
 
 
-@patch("quodeq._cli_evaluation.default_paths")
-@patch("quodeq._cli_evaluation.get_ai_model", return_value="claude-3")
+@patch("quodeq.cli_evaluation.default_paths")
+@patch("quodeq.cli_evaluation.get_ai_model", return_value="claude-3")
 def test_legacy_incremental_flag_warns_but_works(mock_model, mock_paths, tmp_path, capsys):
     """--incremental is accepted as a no-op deprecated alias: it warns AND yields incremental=True."""
-    from quodeq._cli_evaluation import ResolvedInputs, build_run_config, run_evaluate
+    from quodeq.cli_evaluation import ResolvedInputs, build_run_config, run_evaluate
     from quodeq.cli_parser import build_parser
 
     mock_paths_obj = MagicMock()
@@ -211,8 +211,8 @@ def test_legacy_incremental_flag_warns_but_works(mock_model, mock_paths, tmp_pat
 
     # "warns" half: run_evaluate emits the deprecation warning to stderr via the
     # quodeq logger (propagate=False, StderrHandler), so capsys captures it.
-    with patch("quodeq._cli_evaluation._resolve_evaluation_inputs", return_value=None):
-        with patch("quodeq._cli_evaluation.check_evaluate_prereqs"):
+    with patch("quodeq.cli_evaluation._resolve_evaluation_inputs", return_value=None):
+        with patch("quodeq.cli_evaluation.check_evaluate_prereqs"):
             run_evaluate(args)
     captured = capsys.readouterr()
     assert "deprecated" in captured.err.lower(), (
@@ -222,7 +222,7 @@ def test_legacy_incremental_flag_warns_but_works(mock_model, mock_paths, tmp_pat
 
 def test_diff_from_forces_clean_scan_internally(tmp_path):
     """--diff-from is evidence-only, so internally it forces incremental=False."""
-    from quodeq._cli_evaluation import build_run_config
+    from quodeq.cli_evaluation import build_run_config
     from quodeq._cli_resolution import ResolvedInputs
     from quodeq.analysis.manifest_models import SourceManifest
 

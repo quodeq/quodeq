@@ -21,7 +21,7 @@ def reports_with_project(tmp_path):
 
 
 def test_info_includes_last_fetched_at_from_fetch_head(tmp_path, reports_with_project):
-    from quodeq.services._fs_projects import get_project_info
+    from quodeq.services.fs_projects import get_project_info
     reports, project_uuid, _, write_info = reports_with_project
     repo = tmp_path / "myrepo"
     (repo / ".git").mkdir(parents=True)
@@ -41,7 +41,7 @@ def test_info_includes_last_fetched_at_from_fetch_head(tmp_path, reports_with_pr
 
 
 def test_info_falls_back_to_head_when_fetch_head_missing(tmp_path, reports_with_project):
-    from quodeq.services._fs_projects import get_project_info
+    from quodeq.services.fs_projects import get_project_info
     reports, project_uuid, _, write_info = reports_with_project
     repo = tmp_path / "freshclone"
     (repo / ".git").mkdir(parents=True)
@@ -54,7 +54,7 @@ def test_info_falls_back_to_head_when_fetch_head_missing(tmp_path, reports_with_
 
 
 def test_info_evaluable_false_for_deleted_ephemeral(tmp_path, reports_with_project):
-    from quodeq.services._fs_projects import get_project_info
+    from quodeq.services.fs_projects import get_project_info
     reports, project_uuid, _, write_info = reports_with_project
     write_info(location="local", ephemeral=True, path=str(tmp_path / "no-such-dir"))
 
@@ -65,7 +65,7 @@ def test_info_evaluable_false_for_deleted_ephemeral(tmp_path, reports_with_proje
 
 
 def test_info_no_git_dir_returns_none_last_fetched(tmp_path, reports_with_project):
-    from quodeq.services._fs_projects import get_project_info
+    from quodeq.services.fs_projects import get_project_info
     reports, project_uuid, _, write_info = reports_with_project
     repo = tmp_path / "no-git-repo"
     repo.mkdir()

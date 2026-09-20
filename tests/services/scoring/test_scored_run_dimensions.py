@@ -101,7 +101,7 @@ def test_scored_run_dimensions_no_dismissals_returns_unchanged():
 def test_scored_run_dimensions_passes_the_run_dir_to_rescore():
     """The rescore must receive THIS run's directory as its evidence basis.
 
-    ``_rescore_dimension`` scores from ``<run_dir>/evidence/<dim>_evidence.jsonl``
+    ``rescore_dimension`` scores from ``<run_dir>/evidence/<dim>_evidence.jsonl``
     when given a run_dir; passing none (or the wrong run's) silently falls back
     to the legacy formula / scores from another scan's evidence.
     """

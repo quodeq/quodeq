@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._registry import ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolRegistry, ToolSpec
 
 
 def _run_id(ctx: ToolContext) -> str | None:

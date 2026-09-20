@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from quodeq.llm_bridge._embeddings import (
+from quodeq.llm_bridge.embeddings import (
     BATCH_TIMEOUT,
     QUERY_TIMEOUT,
     EmbeddingAvailabilityCache,

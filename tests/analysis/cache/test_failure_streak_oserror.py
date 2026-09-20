@@ -1,4 +1,4 @@
-"""Tests for _failure_streak.py — OSError handling in _scan_once."""
+"""Tests for failure_streak.py — OSError handling in _scan_once."""
 from __future__ import annotations
 
 import json
@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from unittest.mock import patch
 
-from quodeq.analysis.cache._failure_streak import FailureStreakWatcher
+from quodeq.analysis.cache.failure_streak import FailureStreakWatcher
 
 
 def _append(jsonl: Path, line: dict) -> None:
@@ -38,7 +38,7 @@ class TestScanOnceOSError:
                 Path, "open", side_effect=PermissionError("access denied")
             ):
                 with caplog.at_level(
-                    logging.WARNING, logger="quodeq.analysis.cache._failure_streak"
+                    logging.WARNING, logger="quodeq.analysis.cache.failure_streak"
                 ):
                     offset, streak, recent = watcher._scan_once(0, 3, [])
         finally:

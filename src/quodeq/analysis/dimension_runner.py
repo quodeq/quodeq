@@ -11,14 +11,14 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.checks.runner import apply_checks_for_run
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.analysis._runner_markers import emit_marker
+from quodeq.analysis.runner_markers import emit_marker
 from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_SCORING
 
 

@@ -1,13 +1,13 @@
 """Force-promote-to-cancelled helpers for the SQLite run index.
 
-Split out of ``_index_sync.py`` purely to keep that module under the size
+Split out of ``index_sync.py`` purely to keep that module under the size
 cap (an intra-file extraction there would have pushed it over 300 lines).
-``force_promote_to_cancelled_stale`` is re-exported from ``_index_sync`` --
+``force_promote_to_cancelled_stale`` is re-exported from ``index_sync`` --
 that is the stable entry point callers use. The few names shared with
-``_index_sync`` (``_logger``, ``_TERMINAL_STATE_VALUES``,
+``index_sync`` (``_logger``, ``_TERMINAL_STATE_VALUES``,
 ``_upsert_from_status``) are looked up via a deferred import inside each
 function body, so this module carries no top-level dependency back on
-``_index_sync`` and there is no import cycle.
+``index_sync`` and there is no import cycle.
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def _promote_via_status_write(
     Returns True on success. On a write failure, logs and returns False so
     the caller can fall back to the DB-only path.
     """
-    from quodeq.data.sqlite._index_sync import _logger, _upsert_from_status
+    from quodeq.data.sqlite.index_sync import _logger, _upsert_from_status
 
     try:
         existing = read_status(run_dir) or {}
@@ -103,7 +103,7 @@ def force_promote_to_cancelled_stale(
     Returns True if the row was promoted, False if it didn't exist or was
     already terminal.
     """
-    from quodeq.data.sqlite._index_sync import _TERMINAL_STATE_VALUES
+    from quodeq.data.sqlite.index_sync import _TERMINAL_STATE_VALUES
 
     row = db.execute(
         "SELECT state, project_uuid, run_id, started_at, phase, "

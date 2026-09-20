@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import quodeq.services._fs_projects as fs_projects
-from quodeq.services._fs_projects import delete_project
+import quodeq.services.fs_projects as fs_projects
+from quodeq.services.fs_projects import delete_project
 from quodeq.services._repo_index import RepoIdentity, _load_repo_index, add_repo_index_entry
 
 

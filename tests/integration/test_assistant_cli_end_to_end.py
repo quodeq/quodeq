@@ -3,7 +3,7 @@
 Mirrors ``test_assistant_end_to_end.py`` (Plan 1, API providers) but drives a
 CLI-provider ("claude") turn instead. No real CLI binary is ever spawned: the
 `spawn_turn` boundary that `run_cli_turn` falls back to
-(`quodeq.assistant.adapters._cli.spawn_turn`) is monkeypatched with a
+(`quodeq.assistant.adapters.cli.spawn_turn`) is monkeypatched with a
 `FakeProc` factory, the same seam already used by the unit tests in
 `tests/assistant/test_cli_adapter.py`.
 
@@ -115,7 +115,7 @@ def app(tmp_path, monkeypatch):
         STANDARDS_DIMENSIONS_FILE=str(tmp_path / "dimensions.json"),
     )
     monkeypatch.setattr(
-        "quodeq.assistant.adapters._cli.spawn_turn", _make_spawn_fn(app, holder))
+        "quodeq.assistant.adapters.cli.spawn_turn", _make_spawn_fn(app, holder))
     register_assistant_routes(app)
     app.extensions["_test_holder"] = holder
     return app

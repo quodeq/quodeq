@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-from quodeq.analysis._dimension_aliases import expand_dimension_aliases
+from quodeq.analysis.dimension_aliases import expand_dimension_aliases
 from quodeq.shared.utils import get_evaluations_dir
 
 _logger = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ def _run_pr_diff_and_locate_evidence(
 
     print(f"Running PR diff evaluation (base: origin/{base_branch})...")
     start = time.time()
-    from quodeq._cli_evaluation import run_diff_evaluation
+    from quodeq.cli_evaluation import run_diff_evaluation
     exit_code = run_diff_evaluation(
         ".",
         base_ref=f"origin/{base_branch}",

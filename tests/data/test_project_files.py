@@ -167,11 +167,11 @@ class TestServiceDelegation:
         assert spy.call_args.args[1].get("onboardingCompletedAt")
 
     def test_backfill_heal_writes_through_adapter(self, tmp_path):
-        from quodeq.services._fs_project_helpers import _backfill_onboarding_field
+        from quodeq.services.fs_project_helpers import _backfill_onboarding_field
 
         (tmp_path / "repository_info.json").write_text('{"createdAt": "2026-01-01"}')
         with patch(
-            "quodeq.services._fs_project_helpers.write_repository_info",
+            "quodeq.services.fs_project_helpers.write_repository_info",
             return_value=True,
         ) as spy:
             data = _backfill_onboarding_field(tmp_path)
@@ -180,10 +180,10 @@ class TestServiceDelegation:
         assert data["onboardingCompletedAt"] == "2026-01-01"
 
     def test_scan_write_delegates_to_adapter(self, tmp_path):
-        from quodeq.services import _fs_scan
+        from quodeq.services import fs_scan
 
         scan = ScanData(scanned_at="2026-08-01T00:00:00Z")
-        with patch("quodeq.services._fs_scan.write_scan_json") as spy:
-            _fs_scan._write_scan_json(scan, tmp_path)
+        with patch("quodeq.services.fs_scan.write_scan_json") as spy:
+            fs_scan._write_scan_json(scan, tmp_path)
 
         spy.assert_called_once_with(scan, tmp_path)

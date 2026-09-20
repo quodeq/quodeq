@@ -12,12 +12,12 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from quodeq.core.evidence._req_mapping import build_principle_resolver
+from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.data.fs.evidence_tally import FindingTally, IncrementalTally
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services._scan_progress_elapsed import _dim_elapsed_s
 from quodeq.services._scan_progress_types import DimProgressState, _DimCounts, _DimProgress, _ProgressContext
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     count_active_agent_streams,
     dimension_evidence_file,
     dimension_queue_file,

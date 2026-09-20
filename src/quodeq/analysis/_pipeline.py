@@ -10,18 +10,18 @@ from quodeq.analysis._dim_order import DimEstimates, _order_by_backlog
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loop_state import DimTransition, _run_dir_for, _safe_write_dim_state
 from quodeq.analysis._loops import LoopDeps, run_incremental_loop, run_per_dimension_loop
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
-from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.subprocess import _get_provider_type
 from quodeq.core.evidence.model import Evidence
 from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.core.evidence.merge import merge_evidence
-from quodeq.analysis._runner_markers import emit_marker
+from quodeq.analysis.runner_markers import emit_marker
 from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_SCORING, CC_PHASE_SETUP
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG

@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.errors import (
     REASON_AGENT_FAILURE_STREAK, REASON_CANCELLED_SIGNAL, REASON_CIRCUIT_BREAKER,
     REASON_FAILED_EXCEPTION, REASON_PROVIDER_FATAL,
@@ -95,7 +95,7 @@ def _interruption_reason(exc: BaseException | None = None) -> str:
       'agent_failure_streak') when there is one, else 'cancelled_signal'.
     - Otherwise: 'failed_exception'.
     """
-    from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+    from quodeq.analysis.cache.failure_streak import CircuitBreakerError
     if isinstance(exc, FatalProviderError):
         return provider_exit_reason(exc.reason)
     if isinstance(exc, CircuitBreakerError):

@@ -24,8 +24,8 @@ def _touch(tmp_path: Path, name: str) -> tuple[Path, int, int]:
 
 
 def _file_reads(cache: HashCache, *entries: tuple[Path, int, int]) -> int:
-    """Real ``_hash_file`` reads that looking up *entries* through *cache* costs."""
-    with patch.object(fingerprint, "_hash_file", wraps=fingerprint._hash_file) as spy:
+    """Real ``hash_file`` reads that looking up *entries* through *cache* costs."""
+    with patch.object(fingerprint, "hash_file", wraps=fingerprint.hash_file) as spy:
         for entry in entries:
             cache.file_hash(*entry)
     return spy.call_count

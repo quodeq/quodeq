@@ -6,7 +6,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.logging import log_warning
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32, get_evaluations_dir
 

@@ -1,7 +1,7 @@
 import os.path
 from pathlib import Path
 
-from quodeq.shared._env import get_score_cache_path, score_cache_disabled
+from quodeq.shared.env import get_score_cache_path, score_cache_disabled
 
 
 def test_explicit_env_path_wins():

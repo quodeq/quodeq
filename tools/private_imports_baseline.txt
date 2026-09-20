@@ -1,0 +1,9 @@
+# Grandfathered private-import violations in src/quodeq (rule A: a
+# private name imported across packages; rule B: a private module
+# imported across packages). Do NOT add entries without justification
+# -- the goal is to burn this list to ZERO, not grow it.
+# Regenerate intentionally: python tools/check_private_imports.py --update-baseline
+# Entries are line-keyed (relpath:lineno:kind:module.name), so an unrelated
+# line-count change above a grandfathered import shifts its entry. Prefer
+# hand-editing the baseline over blind --update-baseline regeneration, which
+# can silently absorb a genuinely new violation introduced in the same change.

@@ -16,14 +16,14 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     read_repository_info,
     read_scan_json,
     validate_remote_url,
     write_repository_info,
 )
 from quodeq.services._fs_clone import CloneError
-from quodeq.services._fs_project_helpers import find_existing_project
+from quodeq.services.fs_project_helpers import find_existing_project
 from quodeq.services._registration_scan import _zero_run_scan_fallback
 from quodeq.services._registration_url import _strip_credentials
 from quodeq.services._project_registration_steps import (

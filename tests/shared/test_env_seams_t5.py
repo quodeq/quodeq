@@ -19,10 +19,10 @@ import pytest
 
 from quodeq.shared import frozen
 from quodeq.shared._config import _ConfigHolder, defaults_path
-from quodeq.shared._io import configure_stdio_utf8
+from quodeq.shared.text_io import configure_stdio_utf8
 from quodeq.shared._log_format import _should_use_color
 from quodeq.shared.logging import _apply_env_log_level, _logger
-from quodeq.shared.provider_env import _providers_path
+from quodeq.shared.provider_env import providers_path
 
 
 class TestDefaultsPath:
@@ -73,11 +73,11 @@ class TestProvidersPath:
     def test_uses_the_injected_value(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_AI_PROVIDERS_PATH", str(tmp_path / "from-process.json"))
         injected = tmp_path / "from-env.json"
-        assert _providers_path({"QUODEQ_AI_PROVIDERS_PATH": str(injected)}) == injected
+        assert providers_path({"QUODEQ_AI_PROVIDERS_PATH": str(injected)}) == injected
 
     def test_empty_injected_env_ignores_the_process(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_AI_PROVIDERS_PATH", str(tmp_path / "from-process.json"))
-        assert _providers_path({}).name == "ai_providers.json"
+        assert providers_path({}).name == "ai_providers.json"
 
 
 class TestShouldUseColor:

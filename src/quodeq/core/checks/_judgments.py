@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from quodeq.core.checks.model import SourceLocation
 from quodeq.core.events.models import Judgment, VERDICT_COMPLIANCE, VERDICT_VIOLATION
-from quodeq.core._constants import FULL_CONFIDENCE
+from quodeq.core.constants import FULL_CONFIDENCE
 
 SEVERITY = "major"
 

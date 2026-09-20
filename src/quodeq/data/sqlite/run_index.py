@@ -6,7 +6,7 @@ The index is **derived state** — rebuildable at any time from the filesystem
 ``~/.quodeq/index.db`` at any time; the next ``open_index`` creates an empty
 database and the next ``sync_index`` call repopulates.
 
-Public API is the only stable surface — internals live in ``_index_sync``.
+Public API is the only stable surface — internals live in ``index_sync``.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.data.sqlite._index_sync import (
+from quodeq.data.sqlite.index_sync import (
     _check_stale_and_promote,
     _delete_orphan_non_terminal_rows,
     _status_mtime_ns,

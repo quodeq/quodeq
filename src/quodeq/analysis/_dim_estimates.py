@@ -28,10 +28,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache import LocalFileBackend, classify_files_via_cache
 from quodeq.analysis.dispatch_policy import api_file_size_cap
-from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.dim_estimates_io import (
     DIM_ESTIMATES_FILENAME,
@@ -113,7 +113,7 @@ def compute_dim_estimates(
     cache = LocalFileBackend()
     excluded_logged = False
     for dim_id in dimensions:
-        files, _ext, excluded = _list_source_files(config, dim_id, ignore_file_filter=True)
+        files, _ext, excluded = list_source_files(config, dim_id, ignore_file_filter=True)
         n_excluded = len(excluded)
         excluded_logged = _log_excluded_once(log, n_excluded, excluded_logged)
         if not files:

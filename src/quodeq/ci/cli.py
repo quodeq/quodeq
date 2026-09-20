@@ -6,7 +6,7 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 
 def handle_ci(args: argparse.Namespace, env: Mapping[str, str] | None = None) -> int:

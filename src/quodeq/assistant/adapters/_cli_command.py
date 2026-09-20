@@ -4,17 +4,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, NamedTuple
 
-from quodeq.assistant.adapters._cli_config import (
+from quodeq.assistant.adapters.cli_config import (
     RESUME_STYLE_GEMINI, SESSION_ID_SOURCE_PARSE_JSONL, SYSTEM_PROMPT_STYLE_ARGV_APPEND,
     CliChatConfig,
 )
-from quodeq.core._constants import (
+from quodeq.core.constants import (
     MCP_CONFIG_ARG_FLAG, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE, PROMPT_STYLE_POSITIONAL,
 )
-from quodeq.shared._models import normalize_model_id
+from quodeq.shared.models import normalize_model_id
 
 if TYPE_CHECKING:
-    from quodeq.assistant.adapters._cli import CliTurnConfig
+    from quodeq.assistant.adapters.cli import CliTurnConfig
 
 _NATIVE_WEB_TOOLS = ("WebSearch", "WebFetch")
 

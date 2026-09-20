@@ -7,7 +7,7 @@ re-exports its public names so every pre-existing
 """
 from __future__ import annotations
 
-from quodeq.data.fs.dimension_report._report_scoring import (  # noqa: F401
+from quodeq.data.fs.dimension_report.report_scoring import (  # noqa: F401
     build_score_lookup,
     extract_scores,
     grade_from_score,

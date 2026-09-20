@@ -15,7 +15,7 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from quodeq.services._wiring import CACHE_WRITER_EPOCH
+from quodeq.services.wiring import CACHE_WRITER_EPOCH
 from quodeq.services.suppression_keys import as_dismissed_keys
 
 if TYPE_CHECKING:

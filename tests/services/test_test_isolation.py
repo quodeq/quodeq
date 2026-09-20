@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.services.filesystem import FilesystemActionProvider
-from quodeq.shared._env import get_evaluations_dir, get_index_db_path
+from quodeq.shared.env import get_evaluations_dir, get_index_db_path
 
 
 def test_default_index_db_path_resolves_inside_tmp() -> None:

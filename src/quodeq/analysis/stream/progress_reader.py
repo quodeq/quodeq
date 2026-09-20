@@ -14,7 +14,7 @@ _TYPE_VIOLATION = "violation"
 _TYPE_COMPLIANCE = "compliance"
 
 
-class _IncrementalProgressReader:
+class IncrementalProgressReader:
     """Reads new bytes from stream/JSONL files since last check."""
 
     def __init__(self, stream_file: Path, jsonl_file: Path | None) -> None:

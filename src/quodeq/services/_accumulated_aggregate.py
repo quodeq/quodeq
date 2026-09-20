@@ -14,7 +14,7 @@ from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types import DimensionResult
 from quodeq.shared.serialization import to_camel_dict
-from quodeq.services._wiring import calculate_trend, most_frequent_grade, parse_numeric_score
+from quodeq.services.wiring import calculate_trend, most_frequent_grade, parse_numeric_score
 
 
 def numeric_average(

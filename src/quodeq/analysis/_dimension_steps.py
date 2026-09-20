@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream, run_analysis
 from quodeq.analysis.stream.parser import extract_evidence_from_stream
 from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid
@@ -14,7 +14,7 @@ from quodeq.core.evidence.parser import (
     EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
-from quodeq.analysis._runner_markers import make_heartbeat
+from quodeq.analysis.runner_markers import make_heartbeat
 from quodeq.shared.logging import log_warning
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 

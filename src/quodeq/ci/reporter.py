@@ -16,7 +16,7 @@ from quodeq.ci.review_builder import (
     determine_verdict,
     violation_to_comment,
 )
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 

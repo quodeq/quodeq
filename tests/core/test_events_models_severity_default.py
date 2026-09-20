@@ -18,9 +18,9 @@ def test_finding_mappings_uses_the_shared_default():
 
 
 def test_req_mapping_uses_the_shared_default():
-    from quodeq.core.evidence import _req_mapping
+    from quodeq.core.evidence import req_mapping
 
-    assert _req_mapping.DEFAULT_SEVERITY is DEFAULT_SEVERITY
+    assert req_mapping.DEFAULT_SEVERITY is DEFAULT_SEVERITY
 
 
 def test_evidence_parser_uses_the_shared_default():
@@ -30,13 +30,13 @@ def test_evidence_parser_uses_the_shared_default():
 
 
 def test_jsonl_parser_uses_the_shared_default():
-    from quodeq.core.evidence import _jsonl
+    from quodeq.core.evidence import jsonl
 
-    assert _jsonl.DEFAULT_SEVERITY is DEFAULT_SEVERITY
+    assert jsonl.DEFAULT_SEVERITY is DEFAULT_SEVERITY
 
 
 def test_sqlite_row_mappers_use_the_shared_default_and_verdict():
-    from quodeq.data.sqlite import _row_mappers
+    from quodeq.data.sqlite import row_mappers
 
-    assert _row_mappers.DEFAULT_SEVERITY is DEFAULT_SEVERITY
-    assert _row_mappers.VERDICT_VIOLATION is VERDICT_VIOLATION
+    assert row_mappers.DEFAULT_SEVERITY is DEFAULT_SEVERITY
+    assert row_mappers.VERDICT_VIOLATION is VERDICT_VIOLATION

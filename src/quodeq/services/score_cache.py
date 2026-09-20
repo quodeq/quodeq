@@ -7,7 +7,7 @@ older-schema db is rebuilt, and any cache error falls through to recompute.
 This module owns the version hashes (the cache's invalidation contract) and is
 the facade every caller imports. The connection/schema and per-table
 reads/writes live in ``quodeq.data.sqlite`` (``score_cache_db`` /
-``score_cache_store``), reached through ``services/_wiring.py`` like every
+``score_cache_store``), reached through ``services/wiring.py`` like every
 other services -> data edge; the read-through wrappers stay in this package's
 ``_score_cache_fetch``.
 """
@@ -28,13 +28,13 @@ from quodeq.services._run_version_memo import (  # facade re-export
     remember_run_version,
     suppression_state_fingerprint as _state_fingerprint,
 )
-from quodeq.services._wiring import load_suppression_rules
+from quodeq.services.wiring import load_suppression_rules
 
 # ---------------------------------------------------------------------------
 # Every moved/data-layer name is re-exported here so external callers and
 # test patch targets keep working against this module.
 # ---------------------------------------------------------------------------
-from quodeq.services._wiring import (  # noqa: F401 — facade re-export
+from quodeq.services.wiring import (  # noqa: F401 — facade re-export
     CACHE_WRITER_EPOCH as _CACHE_WRITER_EPOCH,
     load_run_keys,
     load_run_keys_or_empty,
@@ -55,7 +55,7 @@ from quodeq.services._score_cache_fetch import (  # noqa: F401 — facade re-exp
     cached_project_summary,
     make_cache_backed_fetcher,
 )
-from quodeq.shared._env import get_score_cache_path  # noqa: F401 — facade re-export
+from quodeq.shared.env import get_score_cache_path  # noqa: F401 — facade re-export
 
 if TYPE_CHECKING:
     from quodeq.core.dismissals import DismissedKeys
@@ -192,7 +192,7 @@ def per_run_versions(
     after the run is first observed mid-scan would not intersect the frozen set
     and would silently under-invalidate. Non-terminal runs therefore compute
     their scoped version from a fresh ``read_run_key_sets`` each call and never
-    write it back, mirroring ``_trend_fetcher.version_for``.
+    write it back, mirroring ``trend_fetcher.version_for``.
 
     That immutability also makes a terminal run's version a pure function of
     its keys and the suppression state, so :func:`memoized_run_version` serves

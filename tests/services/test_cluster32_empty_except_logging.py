@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from quodeq.services import (
     _evaluations_index,
-    _fs_reports,
+    fs_reports,
     _repo_index,
     _run_discard,
     _score_cache_fetch,
@@ -24,9 +24,9 @@ from quodeq.services.shared_settings import SharedSettings
 
 def test_enrich_with_coverage_logs_corrupt_scan_json(tmp_path, recording_log) -> None:
     (tmp_path / "proj").mkdir()
-    (tmp_path / "proj" / _fs_reports._SCAN_FILENAME).write_text("{not json", encoding="utf-8")
+    (tmp_path / "proj" / fs_reports._SCAN_FILENAME).write_text("{not json", encoding="utf-8")
     payload = {"filesCount": 3}
-    out = _fs_reports._enrich_with_coverage(str(tmp_path), "proj", payload, log=recording_log)
+    out = fs_reports._enrich_with_coverage(str(tmp_path), "proj", payload, log=recording_log)
     assert out is payload
     assert "totalFiles" not in out
     assert recording_log.debug_messages
@@ -34,10 +34,10 @@ def test_enrich_with_coverage_logs_corrupt_scan_json(tmp_path, recording_log) ->
 
 
 def test_get_dashboard_threads_log_into_enrichment(tmp_path, recording_log, monkeypatch) -> None:
-    monkeypatch.setattr(_fs_reports, "build_dashboard", lambda *_a, **_k: {"filesCount": 1})
+    monkeypatch.setattr(fs_reports, "build_dashboard", lambda *_a, **_k: {"filesCount": 1})
     (tmp_path / "proj").mkdir()
-    (tmp_path / "proj" / _fs_reports._SCAN_FILENAME).write_text("[", encoding="utf-8")
-    _fs_reports.get_dashboard(str(tmp_path), "proj", "run-1", log=recording_log)
+    (tmp_path / "proj" / fs_reports._SCAN_FILENAME).write_text("[", encoding="utf-8")
+    fs_reports.get_dashboard(str(tmp_path), "proj", "run-1", log=recording_log)
     assert recording_log.debug_messages
 
 

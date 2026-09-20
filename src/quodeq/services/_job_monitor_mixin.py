@@ -33,7 +33,7 @@ from quodeq.services.jobs import (
     _REPORT_PATH_MARKER, _WATCHDOG_POLL_INTERVAL_S,
 )
 from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
-from quodeq.shared._env import env_float
+from quodeq.shared.env import env_float
 from quodeq.shared.constants import (
     CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_DEADLINE_EXTENDED,
     CC_PHASE_REPORT_PATH, CC_PHASE_SCORING, CC_PHASE_SETUP,
@@ -162,7 +162,7 @@ class _JobMonitorMixin:
 
         The analysis loops break out at the deadline without raising, and the
         lifecycle records ``exit_reason="deadline"`` (see
-        ``_cli_evaluation._record_deadline_if_hit``). When the process then
+        ``cli_evaluation._record_deadline_if_hit``). When the process then
         exits nonzero without the job watchdog ever firing, this is the only
         signal that the exit was a time-limit truncation, not a failure.
         """

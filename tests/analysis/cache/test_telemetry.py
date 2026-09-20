@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig, _AnalysisContext
 from quodeq.analysis.cache import (
     CacheEntry, LocalFileBackend, build_cache_key_for_file,
 )

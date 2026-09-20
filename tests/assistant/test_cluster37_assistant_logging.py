@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.assistant.mcp import _config
+from quodeq.assistant.mcp import mcp_config
 from quodeq.llm_bridge import _ollama
 
 
@@ -17,9 +17,9 @@ def test_unregister_locked_logs_when_cli_is_missing(monkeypatch) -> None:
     def _missing(*_args, **_kwargs):
         raise FileNotFoundError(2, "No such file", "claude")
 
-    monkeypatch.setattr(_config.subprocess, "run", _missing)
-    with patch.object(_config._logger, "debug") as debug:
-        _config._unregister_locked("claude")
+    monkeypatch.setattr(mcp_config.subprocess, "run", _missing)
+    with patch.object(mcp_config._logger, "debug") as debug:
+        mcp_config._unregister_locked("claude")
     assert debug.called
     # The log call is lazy %-style (cmd, exc as separate args, not inlined
     # into the message), so render it before checking for "claude".
@@ -111,7 +111,7 @@ def test_cli_hook_logs_and_swallows_when_dup2_fails(monkeypatch) -> None:
 
 def test_cleanup_run_artifacts_logs_when_pid_unlink_fails(monkeypatch, tmp_path) -> None:
     import quodeq._cli_lifecycle as lifecycle
-    from quodeq._cli_evaluation import _lifecycle_hooks
+    from quodeq.cli_evaluation import _lifecycle_hooks
     from quodeq.cli import ResolvedInputs
 
     pid_file = tmp_path / ".pid"
@@ -130,7 +130,7 @@ def test_cleanup_run_artifacts_logs_when_pid_unlink_fails(monkeypatch, tmp_path)
 
 def test_run_pipeline_with_cleanup_logs_when_pid_write_fails(monkeypatch, tmp_path) -> None:
     import quodeq._cli_lifecycle as lifecycle
-    from quodeq._cli_evaluation import _run_pipeline_with_cleanup
+    from quodeq.cli_evaluation import _run_pipeline_with_cleanup
     from quodeq.cli import ResolvedInputs
 
     class _Sentinel(Exception):
@@ -149,7 +149,7 @@ def test_run_pipeline_with_cleanup_logs_when_pid_write_fails(monkeypatch, tmp_pa
         raise _Sentinel()
 
     monkeypatch.setattr(Path, "write_text", _raise_write)
-    monkeypatch.setattr("quodeq._cli_evaluation._build_run_config", _raise_sentinel)
+    monkeypatch.setattr("quodeq.cli_evaluation._build_run_config", _raise_sentinel)
 
     with patch.object(lifecycle._logger, "debug") as debug:
         with pytest.raises(_Sentinel):

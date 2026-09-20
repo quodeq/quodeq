@@ -114,7 +114,7 @@ class TestReadActiveFindings:
         assert [r["requirement"] for r in rows] == ["X-1"]
 
     def test_row_shape_matches_row_to_finding_contract(self, tmp_path):
-        from quodeq.data.sqlite._row_mappers import row_to_finding
+        from quodeq.data.sqlite.row_mappers import row_to_finding
         from quodeq.data.sqlite.findings_queries import read_active_findings
 
         _seed(tmp_path)

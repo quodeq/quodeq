@@ -1,6 +1,6 @@
 """Tunable scoring parameters for the Q² formula.
 
-The Q² constants in ``_constants.py`` remain the canonical defaults; this
+The Q² constants in ``constants.py`` remain the canonical defaults; this
 module wraps them in an immutable, validated, serializable object so the
 formula can run with user overrides without any global mutation.
 """
@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
-from quodeq.core.scoring._constants import (
+from quodeq.core.scoring.constants import (
     _BASE_K,
     _CEIL_SCALE,
     _GRADE_THRESHOLDS,

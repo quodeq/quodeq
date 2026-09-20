@@ -1,4 +1,4 @@
-"""Tests for _cache.py — LRU dimension cache with inflight coordination."""
+"""Tests for cache.py — LRU dimension cache with inflight coordination."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from collections import OrderedDict
 from pathlib import Path
 from unittest.mock import patch
 
-from quodeq.services._cache import (
+from quodeq.services.cache import (
     DimensionCacheContext,
     _cache_lookup,
     _cache_store,
@@ -74,18 +74,18 @@ class TestCacheStore:
 
 
 class TestFetchDimensionsFromDisk:
-    @patch("quodeq.services._cache.read_run_data")
+    @patch("quodeq.services.cache.read_run_data")
     def test_returns_data(self, mock_read):
         mock_read.return_value = [_make_dim()]
         result = _fetch_dimensions_from_disk(Path("/r"), "proj", "run1")
         assert len(result) == 1
 
-    @patch("quodeq.services._cache.read_run_data", side_effect=OSError("disk err"))
+    @patch("quodeq.services.cache.read_run_data", side_effect=OSError("disk err"))
     def test_returns_empty_on_error(self, mock_read):
         result = _fetch_dimensions_from_disk(Path("/r"), "proj", "run1")
         assert result == []
 
-    @patch("quodeq.services._cache.read_run_data", side_effect=ValueError("bad data"))
+    @patch("quodeq.services.cache.read_run_data", side_effect=ValueError("bad data"))
     def test_handles_value_error(self, mock_read):
         assert _fetch_dimensions_from_disk(Path("/r"), "proj", "run1") == []
 
@@ -120,7 +120,7 @@ class TestWaitForInflight:
 
 
 class TestFetchAndStore:
-    @patch("quodeq.services._cache.read_run_data")
+    @patch("quodeq.services.cache.read_run_data")
     def test_stores_and_notifies(self, mock_read):
         ctx = _make_ctx()
         key = (Path("/r"), "proj", "run1")
@@ -134,7 +134,7 @@ class TestFetchAndStore:
         assert event.is_set()
         assert key not in ctx.inflight
 
-    @patch("quodeq.services._cache.read_run_data", return_value=[])
+    @patch("quodeq.services.cache.read_run_data", return_value=[])
     def test_empty_data_not_cached(self, mock_read):
         ctx = _make_ctx()
         key = (Path("/r"), "proj", "run1")
@@ -150,7 +150,7 @@ class TestFetchAndStore:
 
 
 class TestMakeLruDimensionFetcher:
-    @patch("quodeq.services._cache.read_run_data")
+    @patch("quodeq.services.cache.read_run_data")
     def test_fetches_and_caches(self, mock_read):
         mock_read.return_value = [_make_dim()]
         cache = OrderedDict()
@@ -164,7 +164,7 @@ class TestMakeLruDimensionFetcher:
         assert len(result2) == 1
         assert mock_read.call_count == 1
 
-    @patch("quodeq.services._cache.read_run_data")
+    @patch("quodeq.services.cache.read_run_data")
     def test_concurrent_access(self, mock_read):
         """Two threads requesting the same key — only one disk read."""
         call_count = {"n": 0}

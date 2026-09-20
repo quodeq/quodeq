@@ -22,7 +22,7 @@ from quodeq.analysis._api_schema import _Finding, _parse_findings
 _COMPLIANCE_FINDING = {
     "req": "S-AUT-3",
     "t": "compliance",
-    "file": "src/quodeq/services/_fs_projects.py",
+    "file": "src/quodeq/services/fs_projects.py",
     "line": 165,
     "severity": "compliance",
     "w": "Path traversal protection via scope validation",

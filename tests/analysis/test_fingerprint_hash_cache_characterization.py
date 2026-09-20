@@ -1,6 +1,6 @@
-"""Characterization pin for ``_hash_standards`` output.
+"""Characterization pin for ``hash_standards`` output.
 
-Locks the exact hash values ``_hash_standards`` produces BEFORE the
+Locks the exact hash values ``hash_standards`` produces BEFORE the
 module-global ``functools.lru_cache`` machinery in ``fingerprint.py`` is
 replaced by an injectable ``HashCache`` (TES-03 / C8). The hash VALUES a
 cache-key-producing function returns must never shift as a caching-strategy
@@ -37,7 +37,7 @@ def test_hash_standards_pinned_output_no_project_root(tmp_path: Path):
     standards_dir = tmp_path / "standards"
     _write_compiled(standards_dir, "flexibility", _COMPILED_BODY)
 
-    result = fingerprint._hash_standards(standards_dir, "flexibility")
+    result = fingerprint.hash_standards(standards_dir, "flexibility")
 
     assert result == hashlib.sha256(_COMPILED_BODY.encode()).hexdigest()
     assert result == _EXPECTED_BASE_HASH
@@ -46,7 +46,7 @@ def test_hash_standards_pinned_output_no_project_root(tmp_path: Path):
 def test_hash_standards_pinned_output_with_overrides(tmp_path: Path):
     """With *project_root* overrides present, the hash is the SHA-256 of
     ``base\\x00overrides\\x00overrides_hash`` -- the exact composition
-    ``_hash_standards`` documents, independently reproduced here."""
+    ``hash_standards`` documents, independently reproduced here."""
     standards_dir = tmp_path / "standards"
     _write_compiled(standards_dir, "flexibility", _COMPILED_BODY)
     project_root = tmp_path / "repo"
@@ -56,7 +56,7 @@ def test_hash_standards_pinned_output_with_overrides(tmp_path: Path):
     overrides_body = {"version": 1, "overrides": {"M-ANA-2": {"max_lines": 60}}}
     overrides_path.write_text(json.dumps(overrides_body))
 
-    result = fingerprint._hash_standards(standards_dir, "flexibility", project_root)
+    result = fingerprint.hash_standards(standards_dir, "flexibility", project_root)
 
     base = hashlib.sha256(_COMPILED_BODY.encode()).hexdigest()
     canonical_overrides = json.dumps(

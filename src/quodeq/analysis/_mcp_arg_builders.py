@@ -22,11 +22,11 @@ from quodeq.analysis._config import (
 )
 from quodeq.analysis._mcp_config import _codex_mcp_config_arg, _create_mcp_config
 from quodeq.config.analysis_env import ai_tools, base_ai_args
-from quodeq.core._constants import (
+from quodeq.core.constants import (
     MCP_CONFIG_ARG_FLAG, MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE,
     PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )
-from quodeq.shared._models import normalize_model_id
+from quodeq.shared.models import normalize_model_id
 from quodeq.shared.utils import get_ai_cmd_path
 
 

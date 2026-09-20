@@ -95,7 +95,7 @@ class TestApplyToARun:
 
     def test_the_wire_rows_round_trip_back_to_judgments(self, project, compiled, tmp_path):
         """Whatever we write must parse the way an LLM finding would."""
-        from quodeq.core.evidence._jsonl import parse_jsonl_line
+        from quodeq.core.evidence.jsonl import parse_jsonl_line
 
         _added, _evidence, jsonl = self._apply(project, compiled(STANDARD), tmp_path)
 
@@ -140,7 +140,7 @@ class TestRunWiring:
     def _config(self, project, compiled_dir, tmp_path, *, manifest=True):
         from types import SimpleNamespace
 
-        from quodeq.analysis._types import RunConfig
+        from quodeq.analysis.run_types import RunConfig
 
         work_dir = tmp_path / "run" / "evidence"
         work_dir.mkdir(parents=True, exist_ok=True)

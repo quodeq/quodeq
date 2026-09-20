@@ -16,7 +16,7 @@ from quodeq.core.dismissals import DismissedKeys
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
-from quodeq.data.sqlite._row_mappers import judgment_to_row
+from quodeq.data.sqlite.row_mappers import judgment_to_row
 from quodeq.data.sqlite._state_store_meta import _StateStoreMetaMixin
 
 _logger = logging.getLogger(__name__)

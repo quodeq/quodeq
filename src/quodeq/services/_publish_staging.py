@@ -19,7 +19,7 @@ import json
 import time
 from pathlib import Path
 
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     ACTIONS_LOG_FILENAME,
     DIMENSIONS_FILENAME,
     PUBLISHED_META_FILENAME,
@@ -123,7 +123,7 @@ def stage_project(project_dir: Path, dest_project_dir: Path) -> int:
         dest_project_dir / "repository_info.json",
     )
     # Project-level scan.json (quick-scan coverage metadata: total_files etc.)
-    # is consumed by _fs_reports._enrich_with_coverage and the project-card
+    # is consumed by fs_reports._enrich_with_coverage and the project-card
     # coverage reader -- without it, a published clone's dashboard/card never
     # shows a coverage header. Copied only when present; a project scanned
     # before this field existed simply stays absent on the clone too.

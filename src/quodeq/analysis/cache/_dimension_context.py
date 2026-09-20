@@ -19,8 +19,8 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.analysis._runner_markers import emit_marker
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.runner_markers import emit_marker
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache._replay import _jsonl_path, _write_replayed_keys_sidecar
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_helpers import (
@@ -31,7 +31,7 @@ from quodeq.analysis.cache.dimension_helpers import (
 )
 from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 
 _logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ def _prepare_cache_context(
         cache = LocalFileBackend()
         ensure_cache_ready(cache.root)
     trust_model = resolve_trust_model(config.src) if config.src is not None else None
-    files, _ext, _excluded = _list_source_files(config, dim_id)
+    files, _ext, _excluded = list_source_files(config, dim_id)
     if not files:
         return None
 

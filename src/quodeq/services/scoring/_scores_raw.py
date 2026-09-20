@@ -13,8 +13,8 @@ from quodeq.services.grade_formula import load_params
 from quodeq.services.ports import StoreUnreadableError
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services._wiring import SQLiteStateStore, SqliteFindingsRepository
-from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
+from quodeq.services.wiring import SQLiteStateStore, SqliteFindingsRepository
+from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.scoring._response_builders import (
     _build_response_from_eval_files,
     _build_response_from_grade_tables,
@@ -95,7 +95,7 @@ def get_scores_raw(
     POST returned no scores, the UI had nothing to apply.
     """
     validate_path_segment(project, run_id)
-    d = deps or _NO_DEPS
+    d = deps or NO_DEPS
     run_dir = reports_root / project / run_id
     if not run_dir.is_dir():
         raise FileNotFoundError(f"Run directory not found: {run_dir}")

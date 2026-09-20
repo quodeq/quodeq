@@ -108,7 +108,7 @@ def _rescore_legacy_fallback(
     )
 
 
-def _rescore_dimension(
+def rescore_dimension(
     dim: DimensionResult,
     keys: SuppressionKeys,
     params: ScoringParams = DEFAULT_PARAMS,
@@ -146,12 +146,12 @@ def rescore_dimensions(
     Returns a dict with 'dimensions' (list of camelCase dicts) and 'summary' (camelCase dict).
     When *params* is None, the saved grade-formula params are loaded. When
     *run_dir* is given, each touched dimension is rescored from that run's
-    evidence when available (see `_rescore_dimension`).
+    evidence when available (see `rescore_dimension`).
     """
     if params is None:
         params = grade_formula.load_params()
     rescored = [
-        _rescore_dimension(dim, keys, params=params, run_dir=run_dir)
+        rescore_dimension(dim, keys, params=params, run_dir=run_dir)
         for dim in dimensions
     ]
     summary = summarize_dimensions(rescored, params=params)

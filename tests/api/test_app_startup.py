@@ -31,7 +31,7 @@ def test_main_starts_warmup_before_serving(monkeypatch, tmp_path):
 
     monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path / "evaluations"))
     started = []
-    monkeypatch.setattr("quodeq.services._warmup.engine.start", started.append)
+    monkeypatch.setattr("quodeq.services.warmup.engine.start", started.append)
     monkeypatch.setattr("flask.Flask.run", lambda self, **kwargs: None)
 
     app_module.main(env={})
@@ -44,6 +44,6 @@ def test_create_app_does_not_start_warmup(monkeypatch):
     from quodeq.api.app import create_app
 
     started = []
-    monkeypatch.setattr("quodeq.services._warmup.engine.start", started.append)
+    monkeypatch.setattr("quodeq.services.warmup.engine.start", started.append)
     create_app(test_config={"TESTING": True})
     assert started == []

@@ -3,7 +3,7 @@ materialize it on disk and scan.
 
 Split out of ``project_registration.py`` (Task 22, M-MOD-6): that module sits
 at the 300-line size ratchet, so these steps live here instead. This module
-imports only downward (``_wiring``, ``_fs_clone``, ``_fs_scan``,
+imports only downward (``wiring``, ``_fs_clone``, ``fs_scan``,
 ``_registration_scan``, ``_registration_url``, ``shared``) and never imports
 back from ``project_registration`` -- ``project_registration.py`` imports it
 at the top instead. ``_resolve_target_path``, ``_persist_repository_info``,
@@ -19,17 +19,17 @@ from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services._fs_clone import run_git_clone
-from quodeq.services._fs_scan import scan_project
+from quodeq.services.fs_scan import scan_project
 from quodeq.services._registration_scan import _scan_parent_project
 from quodeq.services._registration_url import _read_origin_remote, _strip_credentials
-from quodeq.services._wiring import (
+from quodeq.services.wiring import (
     ProjectIdentity,
     read_repository_info,
     resolve_project_uuid,
     validate_remote_url,
     write_repository_info,
 )
-from quodeq.shared._env import get_clones_dir
+from quodeq.shared.env import get_clones_dir
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
 _LOCATION_LOCAL = "local"
@@ -100,7 +100,7 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
     Called during registration (via `_resolve_project_slot`) so newly-registered
     projects start with the field set to null. Existing projects without the
     field get a backfill on read (see `_backfill_onboarding_field` in
-    _fs_project_helpers.py).
+    fs_project_helpers.py).
     """
     data = read_repository_info(project_dir)
     if data is None or "onboardingCompletedAt" in data:

@@ -1,7 +1,7 @@
 """Build a SARIF 2.1.0 document from Quodeq evaluation reports.
 
 Pure: report dicts in, a SARIF dict out. No I/O. The CLI glue
-(`export_cli.py`, `_cli_evaluation.py`) handles loading and writing.
+(`export_cli.py`, `cli_evaluation.py`) handles loading and writing.
 """
 from __future__ import annotations
 

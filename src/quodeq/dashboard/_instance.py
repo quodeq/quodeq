@@ -9,7 +9,7 @@ import threading
 from pathlib import Path
 from typing import Callable
 
-from quodeq.shared._env_paths import get_run_dir
+from quodeq.shared.env_paths import get_run_dir
 
 _logger = logging.getLogger(__name__)
 _SOCK_TIMEOUT = 0.5

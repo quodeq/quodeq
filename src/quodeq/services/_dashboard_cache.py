@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.core.types import DimensionResult
-from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.shared.env_resolve import resolve_env
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +51,7 @@ class DimensionCache:
     """Thread-safe LRU-eligible store of run-dimension data (dict+lock+clear).
 
     Without a shared cache, every dashboard request used a fresh one (built
-    fresh in ``_make_run_dimension_fetcher`` below), so re-fetching the same
+    fresh in ``make_run_dimension_fetcher`` below), so re-fetching the same
     project's history (which ``collect_stale_dimensions`` /
     ``_collect_previous_scores`` / ``build_accumulated_trend`` all walk) cost
     ~750ms per request even on warm calls. The shared cache eliminates the
@@ -102,7 +102,7 @@ def clear_shared_dimension_cache(cache: DimensionCache | None = None) -> None:
     (cache or _shared_dimension_cache).clear()
 
 
-def _make_run_dimension_fetcher(
+def make_run_dimension_fetcher(
     reports_root: Path,
     project: str,
     config: DashboardCacheConfig | None = None,

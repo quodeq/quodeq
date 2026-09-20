@@ -18,7 +18,7 @@ from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.projection.projector import Projector
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.services.deleted import delete_finding
-from quodeq.services._dismissed_listing import load_dismissed
+from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services.dismissed import (
     dismiss_finding,
     dismissed_keys,

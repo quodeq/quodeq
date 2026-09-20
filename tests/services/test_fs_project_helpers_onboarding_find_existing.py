@@ -5,9 +5,9 @@ import logging
 from pathlib import Path
 from unittest.mock import patch
 
-from quodeq.services import _fs_project_helpers as helpers
-from quodeq.services._fs_project_helpers import find_existing_project
-from quodeq.services._fs_projects import update_project_path
+from quodeq.services import fs_project_helpers as helpers
+from quodeq.services.fs_project_helpers import find_existing_project
+from quodeq.services.fs_projects import update_project_path
 from quodeq.services._repo_index import _load_repo_index, _repo_index_key, _save_repo_index
 from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import register_project

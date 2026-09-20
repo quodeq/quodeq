@@ -22,13 +22,13 @@ from quodeq.llm_bridge._llamacpp import (
     list_llamacpp_models,
     run_concurrency_test as run_llamacpp_concurrency_test,
 )
-from quodeq.llm_bridge._omlx import (
+from quodeq.llm_bridge.omlx import (
     get_omlx_status,
     list_omlx_models,
     run_concurrency_test as run_omlx_concurrency_test,
 )
 from quodeq.llm_bridge._cloud import check_cloud_connection
-from quodeq.llm_bridge._embeddings import (
+from quodeq.llm_bridge.embeddings import (
     EmbeddingEndpoint,
     embed_texts,
     embedding_model_available,

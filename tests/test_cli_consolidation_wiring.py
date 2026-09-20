@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq import _cli_evaluation
+from quodeq import cli_evaluation
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.analysis.manifest_models import SourceManifest
 
@@ -51,15 +51,15 @@ def wired(tmp_path: Path, monkeypatch):
     paths = (tmp_path / "reports", evidence_dir, evaluation_dir)
 
     monkeypatch.setattr(
-        _cli_evaluation, "_resolve_evaluation_inputs",
+        cli_evaluation, "_resolve_evaluation_inputs",
         lambda a: ResolvedInputs(
             src=src, language="python",
             manifest=SourceManifest(), dims_data={"applies": []},
         ),
     )
-    monkeypatch.setattr(_cli_evaluation, "_setup_run_dirs", lambda a, s: paths)
+    monkeypatch.setattr(cli_evaluation, "_setup_run_dirs", lambda a, s: paths)
     monkeypatch.setattr(
-        _cli_evaluation, "_run_pipeline_with_cleanup", lambda a, i, p: 0,
+        cli_evaluation, "_run_pipeline_with_cleanup", lambda a, i, p: 0,
     )
 
     calls: list[Path] = []
@@ -74,7 +74,7 @@ def wired(tmp_path: Path, monkeypatch):
 
 def test_run_evaluate_consolidates_the_run_dir(tmp_path: Path, wired):
     calls, run_dir = wired
-    assert _cli_evaluation.run_evaluate(_args(tmp_path)) == 0
+    assert cli_evaluation.run_evaluate(_args(tmp_path)) == 0
     assert calls == [run_dir]
 
 
@@ -82,7 +82,7 @@ def test_run_evaluate_skips_consolidation_for_evidence_only(tmp_path: Path, wire
     """--evidence-only produces no scored reports, so nothing reaches the
     Overview and its entries must stay unconsolidated."""
     calls, _run_dir = wired
-    assert _cli_evaluation.run_evaluate(_args(tmp_path, evidence_only=True)) == 0
+    assert cli_evaluation.run_evaluate(_args(tmp_path, evidence_only=True)) == 0
     assert calls == []
 
 
@@ -90,7 +90,7 @@ def test_run_evaluate_skips_consolidation_for_diff_from(tmp_path: Path, wired, m
     """--diff-from is evidence-only output for a specific ref. Same reason."""
     calls, _run_dir = wired
     monkeypatch.setattr(
-        _cli_evaluation, "resolve_diff_files", lambda src, ref: {"changed.py"},
+        cli_evaluation, "resolve_diff_files", lambda src, ref: {"changed.py"},
     )
-    assert _cli_evaluation.run_evaluate(_args(tmp_path, diff_from="main")) == 0
+    assert cli_evaluation.run_evaluate(_args(tmp_path, diff_from="main")) == 0
     assert calls == []
