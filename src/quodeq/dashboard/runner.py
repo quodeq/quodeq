@@ -8,7 +8,6 @@ Sub-modules:
 from __future__ import annotations
 
 import logging
-import os
 import sys
 from collections.abc import MutableMapping
 
@@ -21,6 +20,7 @@ from quodeq.dashboard._server import (
     _ensure_action_api,
     _ensure_action_api_forced,
 )
+from quodeq.shared._env_inject import resolve_mutable_env
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.paths import resolve_path
@@ -191,7 +191,7 @@ def _resolve_environ(
     config: DashboardConfig, env: MutableMapping[str, str] | None,
 ) -> MutableMapping[str, str]:
     """Apply config-derived variables to *env* (``os.environ`` by default) and return it."""
-    environ: MutableMapping[str, str] = env if env is not None else os.environ
+    environ: MutableMapping[str, str] = resolve_mutable_env(env)
     if config.build.verbose:
         environ["QUODEQ_VERBOSE"] = "1"
     return environ

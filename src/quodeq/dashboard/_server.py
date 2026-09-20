@@ -9,6 +9,7 @@ import sys
 import threading
 import typing
 import webbrowser
+from collections.abc import MutableMapping
 from pathlib import Path
 
 from quodeq.dashboard._api_health import ApiConfig
@@ -23,6 +24,7 @@ from quodeq.dashboard._webview_token import (
     _warn_reused_api_token_mismatch,
     spawn_window_with_token,
 )
+from quodeq.shared._env_inject import resolve_mutable_env
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
@@ -54,8 +56,16 @@ def _ensure_action_api(
     start_port: int,
     max_tries: int = _MAX_PORT_SCAN_TRIES,
     api_config: ApiConfig | None = None,
-    *, probes: ApiProbes | None = None,
+    *,
+    probes: ApiProbes | None = None,
+    env: MutableMapping[str, str] | None = None,
 ) -> tuple[str, subprocess.Popen | None]:
+    """Find a free port and start (or reuse) the action API on it.
+
+    *env* is where this launch's webview token is published for the API
+    subprocess to inherit; it defaults to ``os.environ``, which is the only
+    mapping ``probes.spawn`` passes on by default.
+    """
     probes = probes or ApiProbes()
     cfg = api_config or ApiConfig()
     _guard_plaintext_http(host, cfg.allow_plaintext, probes=probes)
@@ -66,7 +76,7 @@ def _ensure_action_api(
                 _warn_reused_api_token_mismatch(base_url)
                 return base_url, None
             continue
-        os.environ[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
+        resolve_mutable_env(env)[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
         return probes.spawn(port, base_url, cfg)
     raise RuntimeError("Unable to find a free port for Action API.")
 
@@ -76,8 +86,15 @@ def _ensure_action_api_forced(
     port: int,
     static_dist: Path | None = None,
     evaluations_dir: str | None = None,
-    *, probes: ApiProbes | None = None,
+    *,
+    probes: ApiProbes | None = None,
+    env: MutableMapping[str, str] | None = None,
 ) -> tuple[str, subprocess.Popen | None]:
+    """Start (or reuse) the action API on exactly *port*.
+
+    *env* is where this launch's webview token is published; see
+    :func:`_ensure_action_api`.
+    """
     probes = probes or ApiProbes()
     _guard_plaintext_http(host, probes=probes)
     base_url = f"http://{host}:{port}"
@@ -86,7 +103,7 @@ def _ensure_action_api_forced(
             _warn_reused_api_token_mismatch(base_url)
             return base_url, None
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
-    os.environ[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
+    resolve_mutable_env(env)[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
     return probes.spawn(
         port, base_url, ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir),
     )

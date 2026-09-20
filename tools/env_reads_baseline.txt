@@ -8,24 +8,6 @@
 # change above a grandfathered read shifts its entry. Prefer hand-editing
 # the baseline over blind --update-baseline regeneration, which can
 # silently absorb a genuinely new read introduced in the same change.
-src/quodeq/api/_assistant_hygiene.py:27
-src/quodeq/api/_evaluation_helpers.py:160
-src/quodeq/api/_evaluation_helpers.py:187
-src/quodeq/api/_llamacpp_log_routes.py:64
-src/quodeq/api/_llamacpp_log_routes.py:68
-src/quodeq/api/_llamacpp_log_routes.py:76
-src/quodeq/api/_log_tail_helpers.py:29
-src/quodeq/api/_ollama_log_routes.py:22
-src/quodeq/api/_ollama_log_routes.py:26
-src/quodeq/api/_rate_limit_factory.py:61
-src/quodeq/api/_run_event_stream.py:58
-src/quodeq/api/_run_event_watcher.py:49
-src/quodeq/api/_sse_log_helpers.py:13
-src/quodeq/api/_sse_log_helpers.py:19
-src/quodeq/api/_sse_log_helpers.py:34
-src/quodeq/api/app.py:198
-src/quodeq/api/app.py:44
-src/quodeq/api/security.py:86
 src/quodeq/assistant/adapters/_api.py:50
 src/quodeq/assistant/adapters/_cli_spawn.py:59
 src/quodeq/assistant/skills.py:13
@@ -34,16 +16,6 @@ src/quodeq/assistant/worktree.py:96
 src/quodeq/ci/cli.py:123
 src/quodeq/ci/cli.py:26
 src/quodeq/ci/reporter.py:35
-src/quodeq/dashboard/_api_spawn.py:47
-src/quodeq/dashboard/_build_npm.py:16
-src/quodeq/dashboard/_build_npm.py:21
-src/quodeq/dashboard/_build_npm.py:26
-src/quodeq/dashboard/_build_npm.py:88
-src/quodeq/dashboard/_networking.py:19
-src/quodeq/dashboard/_networking.py:50
-src/quodeq/dashboard/_server.py:69
-src/quodeq/dashboard/_server.py:89
-src/quodeq/dashboard/runner.py:194
 src/quodeq/data/cache_store/local.py:57
 src/quodeq/data/copilot_models.py:145
 src/quodeq/data/fs/repo_clone.py:34
