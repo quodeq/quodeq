@@ -14,6 +14,10 @@ import { projectKeys, samePlaceholderScope } from "../api/queryKeys.js";
 import { resolveAsOf, deriveAvailableRuns } from './projectScoresDerived.js';
 import { t } from '../strings/index.js';
 
+// Shared by the latest and as-of query configs below so the two staleness
+// windows can't silently drift apart.
+const STALE_TIME_MS = 60_000;
+
 /**
  * @param {{
  *   selectedProject: string,
@@ -34,7 +38,7 @@ function buildLatestQueryConfig({ projectKey, selectedSource, fetchScores, selec
     queryKey: projectKeys.scores(projectKey, null, selectedSource),
     queryFn: () => fetchScores(selectedProject),
     enabled: !!selectedProject,
-    staleTime: 60_000,
+    staleTime: STALE_TIME_MS,
     // Latest scores are project-wide (no per-run swap), so within one project
     // there is nothing to flash — but a project/source switch must still drop
     // to a real loading state rather than showing the old project's grades.
@@ -55,7 +59,7 @@ function buildScoresQueryConfig({ projectKey, asOf, selectedSource, fetchScores,
     // explicit actions (dismiss/delete/formula) — all of which invalidate
     // the project subtree and force a refetch regardless of staleTime.
     // Freeze to skip the routine background refetch on re-entry.
-    staleTime: asOf ? Infinity : 60_000,
+    staleTime: asOf ? Infinity : STALE_TIME_MS,
     // Keep prior scores visible while switching runs — see useDashboard for
     // rationale. Scoped to this project+source, so a project switch loads clean.
     placeholderData: keepPlaceholder ? keepInScope : undefined,
