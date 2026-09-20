@@ -43,13 +43,21 @@ describe('StandardLaunchStep', () => {
     expect(onLaunch).toHaveBeenCalledWith(['std-a']);
   });
 
-  it('summary strip shows project, provider, model, and selected standards', () => {
+  it('summary strip shows the project id', () => {
+    render(<StandardLaunchStep state={baseState({ standardIds: new Set(['std-a']) })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onBack={noop} />);
+    const label = screen.getByText('PROJECT');
+    expect(label.closest('.term-stat').querySelector('.term-stat__value')).toHaveTextContent('uuid-1');
+  });
+
+  it('summary strip shows the provider and model', () => {
     render(<StandardLaunchStep state={baseState({ standardIds: new Set(['std-a']) })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onBack={noop} />);
     expect(screen.getByText(/codex-cli/i)).toBeInTheDocument();
     expect(screen.getByText(/gpt-5.2-codex/i)).toBeInTheDocument();
-    // "Security 101" appears in both the summary strip and the card list,
-    // so assert at least one match rather than a single one.
-    const matches = screen.getAllByText(/security 101/i);
-    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('summary strip shows the selected standard name', () => {
+    render(<StandardLaunchStep state={baseState({ standardIds: new Set(['std-a']) })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onBack={noop} />);
+    const label = screen.getByText('STANDARD');
+    expect(label.closest('.term-stat').querySelector('.term-stat__value')).toHaveTextContent('Security 101');
   });
 });

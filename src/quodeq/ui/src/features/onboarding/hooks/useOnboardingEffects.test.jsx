@@ -41,6 +41,5 @@ describe('useOnboardingEffects', () => {
         expect.any(Error),
       );
     });
-    warn.mockRestore();
   });
 });

@@ -26,17 +26,22 @@ const NODE = {
 };
 
 describe('ZoomablePackView container Escape key (#1907)', () => {
-  it('svg container supports Escape to zoom out (has onKeyDown handler)', () => {
+  it('svg container carries a keydown handler', () => {
+    const { container } = render(
+      <ZoomablePackView node={NODE} viewMode="violations" onDrillDown={vi.fn()} />
+    );
+    const svg = container.querySelector('svg');
+    expect(svg).not.toBeNull();
+  });
+
+  it('Escape zooms out to the root path', () => {
     const onDrillDown = vi.fn();
     const { container } = render(
       <ZoomablePackView node={NODE} viewMode="violations" onDrillDown={onDrillDown} />
     );
-    // The svg should carry a keydown handler that handles Escape
     const svg = container.querySelector('svg');
-    expect(svg).not.toBeNull();
-    // Fire Escape — should call onDrillDown (zoom out / reset path)
     fireEvent.keyDown(svg, { key: 'Escape' });
-    expect(onDrillDown).toHaveBeenCalled();
+    expect(onDrillDown).toHaveBeenCalledWith('');
   });
 
   it('svg container carries the viz-focusable class (suppresses stray focus ring)', () => {

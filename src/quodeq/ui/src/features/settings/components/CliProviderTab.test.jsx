@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
@@ -21,18 +21,36 @@ function makeWrapper() {
 }
 
 describe('CliProviderTab', () => {
-  it('offers Copilot account models and hides setup after successful discovery', async () => {
+  afterEach(() => {
+    delete fakeApi.checkCmdPath;
+  });
+
+  function renderCopilot(update = vi.fn()) {
     const Wrapper = makeWrapper();
-    const update = vi.fn();
     render(
       <Wrapper>
         <CliProviderTab providerId="copilot" state={{ model: 'auto' }} update={update} />
       </Wrapper>,
     );
+    return update;
+  }
+
+  it('offers Copilot account models and hides setup after successful discovery', async () => {
+    renderCopilot();
     await screen.findAllByRole('option', { name: 'claude-test' });
     expect(screen.queryByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeNull();
+  });
+
+  it('changing the main model calls update("model", ...)', async () => {
+    const update = renderCopilot();
+    await screen.findAllByRole('option', { name: 'claude-test' });
     fireEvent.change(screen.getByDisplayValue('Auto'), { target: { value: 'claude-test' } });
     expect(update).toHaveBeenCalledWith('model', 'claude-test');
+  });
+
+  it('changing the Fast model calls update("model-fast", ...)', async () => {
+    const update = renderCopilot();
+    await screen.findAllByRole('option', { name: 'claude-test' });
     fireEvent.change(screen.getByLabelText('Fast model'), { target: { value: 'claude-test' } });
     expect(update).toHaveBeenCalledWith('model-fast', 'claude-test');
   });

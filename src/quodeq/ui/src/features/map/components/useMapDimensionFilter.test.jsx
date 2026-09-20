@@ -29,6 +29,7 @@ describe('useMapDimensionFilter', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   it('keeps only the dimensions whose lower-cased name is a visible standard', () => {
@@ -44,7 +45,7 @@ describe('useMapDimensionFilter', () => {
     expect(result.current.filteredDimensions).toHaveLength(3);
   });
 
-  it('toggling a dimension off narrows the selection and persists it', () => {
+  it('toggling a dimension off narrows the selection', () => {
     const { result } = setup();
     act(() => { result.current.handleToggleDimension('Security'); });
     expect(result.current.effectiveSelected).toEqual(new Set(['Maintainability', 'Performance']));

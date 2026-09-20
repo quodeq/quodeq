@@ -26,11 +26,16 @@ afterAll(() => {
 const DEFAULT_STAR_SCORE = 5; // buildDimStar/updateSceneLiveData's documented fallback
 
 describe('galaxyViewScene — parseFloat NaN guards', () => {
-  it('computePrincipleScore falls through to the grade/ratio chain, landing on the documented default, for a non-numeric rawScore', () => {
+  it('computePrincipleScore falls through to the grade when rawScore is not numeric', () => {
     // Grade still resolves to a real (non-NaN) numeric score.
     expect(computePrincipleScore('not-a-number', 'A', 1, 3)).not.toBeNaN();
-    // With no grade either, falls through to the compliance ratio.
+  });
+
+  it('computePrincipleScore falls through to the compliance ratio when rawScore and grade are both absent', () => {
     expect(computePrincipleScore('not-a-number', null, 1, 3)).toBeCloseTo((3 / 4) * 10);
+  });
+
+  it('computePrincipleScore falls through to the documented default when rawScore, grade, violations and compliance are all absent', () => {
     // With no grade and no violations/compliance either, lands on the
     // documented neutral default rather than NaN.
     expect(computePrincipleScore('not-a-number', null, 0, 0)).toBe(DEFAULT_STAR_SCORE);

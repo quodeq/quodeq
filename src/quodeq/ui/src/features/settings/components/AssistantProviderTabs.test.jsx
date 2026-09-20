@@ -94,16 +94,33 @@ describe('AssistantProviderTabs', () => {
     expect(container.querySelector('select')).toBeNull();
   });
 
-  it('supports Copilot account models independently and hides login instructions', async () => {
+  function withCopilot() {
     fakeApi.getAiClients.mockResolvedValueOnce({ clients: [
       ...CLIENTS, { id: 'copilot', label: 'GitHub Copilot', type: 'cli', installed: true },
     ] });
     localStorage.setItem('cc-assistant-mode', 'custom');
     localStorage.setItem('cc-assistant-active-provider', 'copilot');
-    const { findByText, findByRole, queryByText, getByLabelText } = await renderPanel();
+    return renderPanel();
+  }
+
+  it('renders the Copilot provider pill', async () => {
+    const { findByText } = await withCopilot();
     expect(await findByText('GitHub Copilot')).toBeTruthy();
+  });
+
+  it('offers Copilot account models', async () => {
+    const { findByRole } = await withCopilot();
     expect(await findByRole('option', { name: 'gpt-test' })).toBeTruthy();
+  });
+
+  it('hides the Copilot login instructions once account models are available', async () => {
+    const { queryByText, findByText } = await withCopilot();
+    await findByText('GitHub Copilot');
     expect(queryByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeNull();
+  });
+
+  it('changing the Copilot model leaves the active provider untouched', async () => {
+    const { getByLabelText } = await withCopilot();
     fireEvent.change(getByLabelText('Assistant model'), { target: { value: 'gpt-test' } });
     expect(localStorage.getItem('cc-active-provider')).toBe('claude');
   });
