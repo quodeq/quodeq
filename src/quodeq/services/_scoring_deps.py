@@ -54,4 +54,4 @@ class ScoringDeps:
     max_history: int | None = None
 
 
-_NO_DEPS = ScoringDeps()
+NO_DEPS = ScoringDeps()

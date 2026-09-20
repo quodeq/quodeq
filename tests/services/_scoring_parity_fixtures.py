@@ -47,7 +47,7 @@ def _build_run_with_violations(reports_root: Path, project: str) -> Path:
 
     Findings are baked into SQL (so read_dimension_scores / the SQL fast path
     have real grades) AND written into the eval JSON's ``violations`` array (so
-    read_run_data -> _rescore_dimension sees them and a project-wide dismiss can
+    read_run_data -> rescore_dimension sees them and a project-wide dismiss can
     move the score). This is what makes the raw vs dismiss-adjusted score differ.
     """
     run_dir = reports_root / project / _RUN

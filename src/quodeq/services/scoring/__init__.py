@@ -24,12 +24,12 @@ from typing import Any, Callable
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.dimension import DimensionResult
 from quodeq.services._trend_fetcher import make_rescoring_fetcher
-from quodeq.services.dashboard import _make_run_dimension_fetcher
+from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.grade_formula import load_params
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services._wiring import read_run_data
-from quodeq.services.rescore import _rescore_dimension
+from quodeq.services.rescore import rescore_dimension
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
 from quodeq.services.scoring._summary import recompute_summary  # noqa: F401 — facade re-export
@@ -38,7 +38,7 @@ from quodeq.services.scoring._summary import recompute_summary  # noqa: F401 —
 # Decomposed submodules. Every moved name is re-exported here so external
 # callers and test patch targets keep working against the package facade.
 # ---------------------------------------------------------------------------
-from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
+from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.scoring._fetchers import _make_trend_fetcher, _max_history_runs  # noqa: F401
 from quodeq.services.scoring._response_builders import (  # noqa: F401
     _build_dimension_dict,
@@ -70,7 +70,7 @@ def scored_run_dimensions(
     This is the single seam every per-run read path routes through so the SAME
     run+dimension reports the SAME score everywhere. It is
     ``read_run_data`` (raw, dismissals NOT applied) composed with the same
-    project-wide ``_rescore_dimension`` the accumulated view already runs, and
+    project-wide ``rescore_dimension`` the accumulated view already runs, and
     returns ``DimensionResult`` objects (not camelCase dicts).
 
     Rescore is deliberately kept *out* of ``read_run_data`` itself: that
@@ -81,7 +81,7 @@ def scored_run_dimensions(
     ``get_scores_raw`` / ``build_dashboard``.
     """
     validate_path_segment(project, run_id)
-    d = deps or _NO_DEPS
+    d = deps or NO_DEPS
     if params is None:
         params = load_params()
     project_dir = reports_root / project
@@ -95,7 +95,7 @@ def scored_run_dimensions(
     if not dismissed and not deleted and not rules:
         return dims
     run_dir = project_dir / run_id
-    rescore = d.rescore_dimension or _rescore_dimension
+    rescore = d.rescore_dimension or rescore_dimension
     keys = SuppressionKeys(dismissed, deleted, rules)
     return [rescore(dim, keys, params=params, run_dir=run_dir) for dim in dims]
 
@@ -113,7 +113,7 @@ def _make_rescoring_fetcher(
     """
     return make_rescoring_fetcher(
         reports_root, project, params=params,
-        base_fetcher=_make_run_dimension_fetcher(reports_root, project), deps=deps,
+        base_fetcher=make_run_dimension_fetcher(reports_root, project), deps=deps,
     )
 
 

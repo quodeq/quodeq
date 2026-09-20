@@ -81,7 +81,7 @@ def test_dismissed_dimension_score_comes_from_run_evidence(tmp_path):
     finding must then re-score the dimension from that run's evidence (the
     exact scan-time basis) -- NOT via the legacy report-JSON formula, which
     loses violation types and diverges. Requires ``build_dashboard`` to pass
-    ``run_dir`` down to ``_rescore_dimension``.
+    ``run_dir`` down to ``rescore_dimension``.
     """
     reports = tmp_path / "evaluations"
     project = "proj"

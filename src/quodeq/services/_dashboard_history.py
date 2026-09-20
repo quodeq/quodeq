@@ -14,7 +14,7 @@ from typing import Any, Callable
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult, DimensionSummary
 
-from quodeq.services._dashboard_cache import DashboardCacheConfig, _make_run_dimension_fetcher
+from quodeq.services._dashboard_cache import DashboardCacheConfig, make_run_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services._scoring_deps import ScoringDeps
@@ -201,7 +201,7 @@ def _make_history_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
         deps=ScoringDeps(
             max_history=window.max_history,
-            base_fetcher_factory=lambda rr, proj: _make_run_dimension_fetcher(
+            base_fetcher_factory=lambda rr, proj: make_run_dimension_fetcher(
                 rr, proj, dim_cache_config,
             ),
         ),

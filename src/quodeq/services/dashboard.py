@@ -28,14 +28,14 @@ from quodeq.services._wiring import (
     read_run_data,
     summarize_dimensions,
 )
-from quodeq.services.rescore import _rescore_dimension
+from quodeq.services.rescore import rescore_dimension
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
 
 from quodeq.services._dashboard_cache import (  # noqa: F401
     DashboardCacheConfig,
     _DEFAULT_RUN_DIM_CACHE_MAX,
-    _make_run_dimension_fetcher,
+    make_run_dimension_fetcher,
     _run_dim_cache_max,
     clear_shared_dimension_cache,
     create_dimension_cache,
@@ -72,7 +72,7 @@ def _rescore_run_dimensions(
     """Apply the project-wide dismiss/delete rescore to a run's dimensions.
 
     Identity when the project has no active dismissals/deletions. Otherwise each
-    dimension passes through the same ``_rescore_dimension`` transform the
+    dimension passes through the same ``rescore_dimension`` transform the
     accumulated view and the per-run explorer use, so every read path reports
     the identical dismiss-adjusted score/grade. *run_id* is the run the *dims*
     were read from: its directory is passed as the evidence basis so a touched
@@ -89,7 +89,7 @@ def _rescore_run_dimensions(
     validate_path_segment(run_id)
     run_dir = project_dir / run_id
     keys = SuppressionKeys(dismissed, deleted, rules)
-    return [_rescore_dimension(d, keys, params=params, run_dir=run_dir) for d in dims]
+    return [rescore_dimension(d, keys, params=params, run_dir=run_dir) for d in dims]
 
 
 def _make_status_aware_fetcher(
@@ -106,7 +106,7 @@ def _make_status_aware_fetcher(
     PID-liveness check that status.json alone can't see), so a run whose
     process is still alive reads fresh even before its state flips.
     """
-    cached = _make_run_dimension_fetcher(reports_root, project, config)
+    cached = make_run_dimension_fetcher(reports_root, project, config)
     status_by_id = {r.run_id: r.status for r in runs}
 
     def fetch(run_id: str) -> list[DimensionResult]:
@@ -181,7 +181,7 @@ def _resolve_selected_dims(
     projected into THIS run and NOT project-wide dismissals/deletions that
     accrued later -- so the raw selected-run score can disagree with the
     accumulated overview. Rescore the selected run's dimensions with the
-    SAME project-wide ``_rescore_dimension`` transform the accumulated view
+    SAME project-wide ``rescore_dimension`` transform the accumulated view
     and the per-run explorer use, so every path reports the identical
     dismiss-adjusted score/grade AND drops the dismissed + deleted
     violations from the counts. ``read_run_data`` stays the dimension source

@@ -15,12 +15,12 @@ from typing import Any
 from dataclasses import replace
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
-from quodeq.services.dashboard import _make_run_dimension_fetcher
+from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services._wiring import load_suppression_rules
 from quodeq.services.rescore import rescore_dimensions
-from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
+from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.scoring._summary import recompute_summary
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
@@ -45,7 +45,7 @@ def _rescore_runs_by_dimension(
         if key and rid:
             dim_to_run[key] = rid
 
-    fetcher = _make_run_dimension_fetcher(reports_root, project)
+    fetcher = make_run_dimension_fetcher(reports_root, project)
     rescored_by_dim: dict[str, dict] = {}
     seen_runs: dict[str, dict[str, dict]] = {}
     for dim_key, run_id in dim_to_run.items():
@@ -116,7 +116,7 @@ def _rescore_accumulated_with_coverage(
     keep their raw baked scores and the payload MUST NOT be persisted: its
     version hash cannot tell it apart from a fully rescored one.
     """
-    d = deps or _NO_DEPS
+    d = deps or NO_DEPS
     project_dir = reports_root / project
     dismissed = (d.dismissed_keys or dismissed_keys)(project_dir)
     deleted = (d.deleted_keys or deleted_keys)(project_dir)

@@ -95,7 +95,7 @@ def _apply_dismiss_delete_rescore(
 
     Applies the project-wide dismiss/delete rescore so the card agrees with
     every other read path (detail/explorer/dashboard/trend all route through
-    ``scored_run_dimensions``, i.e. read_run_data + ``_rescore_dimension``).
+    ``scored_run_dimensions``, i.e. read_run_data + ``rescore_dimension``).
     ``read_run_data`` returns the raw scan; its SQL grade overlay reflects
     dismisses only when the run is freshly projected, and NEVER reflects
     deletions. Without this the project-card grade kept a stale, too-low
@@ -105,12 +105,12 @@ def _apply_dismiss_delete_rescore(
     """
     if not (dismissed or deleted):
         return list(latest_by_dim.values())
-    from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
+    from quodeq.services.rescore import rescore_dimension  # noqa: PLC0415
     from quodeq.services.suppression_keys import SuppressionKeys  # noqa: PLC0415
 
     keys = SuppressionKeys(dismissed, deleted)
     return [
-        _rescore_dimension(d, keys, params=params, run_dir=run_dir_by_dim.get(dim_name))
+        rescore_dimension(d, keys, params=params, run_dir=run_dir_by_dim.get(dim_name))
         for dim_name, d in latest_by_dim.items()
     ]
 
@@ -226,7 +226,7 @@ def _read_accumulated_summary(
     """Compute accumulated grade and score across all runs. Returns (grade, score, files, pending).
 
     The card summary applies the same project-wide dismiss/delete rescore as
-    every other read path (see the ``_rescore_dimension`` step in
+    every other read path (see the ``rescore_dimension`` step in
     ``_compute_summary``), so the repositories-screen grade agrees with the
     Overview / explorer / trend. *params* (loaded from the saved formula when
     None) keeps the aggregate threshold labels and dimension weights

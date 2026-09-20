@@ -33,12 +33,12 @@ from typing import Callable
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult
 from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
-from quodeq.services._scoring_deps import ScoringDeps, _NO_DEPS
+from quodeq.services._scoring_deps import ScoringDeps, NO_DEPS
 from quodeq.services.deleted import deleted_keys as _default_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
 from quodeq.data.fs.report_parser.runs import read_run_scalars as _default_read_run_scalars
 from quodeq.services._wiring import load_suppression_rules
-from quodeq.services.rescore import _rescore_dimension
+from quodeq.services.rescore import rescore_dimension
 from quodeq.services.score_cache import VersionInputs, make_cache_backed_fetcher
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.log_sink import SHARED_LOG
@@ -65,7 +65,7 @@ def make_rescoring_fetcher(
     (production defaults when None or unset).
     """
     validate_path_segment(project)
-    d = deps or _NO_DEPS
+    d = deps or NO_DEPS
     project_dir = reports_root / project
     dismissed = (d.dismissed_keys or _default_dismissed_keys)(project_dir)
     deleted = (d.deleted_keys or _default_deleted_keys)(project_dir)
@@ -81,7 +81,7 @@ def make_rescoring_fetcher(
         # the evidence basis for the rescore.
         validate_path_segment(run_id)
         run_dir = project_dir / run_id
-        return [_rescore_dimension(d, keys, params=params, run_dir=run_dir) for d in dims]
+        return [rescore_dimension(d, keys, params=params, run_dir=run_dir) for d in dims]
 
     return rescoring_fetcher
 

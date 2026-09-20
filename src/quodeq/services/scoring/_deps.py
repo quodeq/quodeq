@@ -8,4 +8,4 @@ as a thin re-export so the in-package importers keep resolving unchanged.
 """
 from __future__ import annotations
 
-from quodeq.services._scoring_deps import ScoringDeps, _NO_DEPS  # noqa: F401
+from quodeq.services._scoring_deps import ScoringDeps, NO_DEPS  # noqa: F401
