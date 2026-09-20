@@ -7,7 +7,7 @@ from quodeq.assistant.tools._read_tools import (
     default_findings_repo_factory,
     register_read_tools,
 )
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.assistant.tools._repo_tools import register_repo_tools
 from quodeq.assistant.tools._web_tools import register_web_tools
 

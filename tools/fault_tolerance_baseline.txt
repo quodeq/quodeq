@@ -63,7 +63,7 @@ src/quodeq/assistant/mcp/server.py:68:broad-except
 src/quodeq/assistant/orchestrator.py:274:broad-except
 src/quodeq/assistant/tools/_read_tools_scope.py:127:broad-except
 src/quodeq/assistant/tools/_read_tools_scope.py:87:broad-except
-src/quodeq/assistant/tools/_registry.py:58:broad-except
+src/quodeq/assistant/tools/registry.py:66:broad-except
 src/quodeq/ci/cli.py:101:broad-except
 src/quodeq/cli.py:94:broad-except
 src/quodeq/config/ai_provider.py:244:broad-except

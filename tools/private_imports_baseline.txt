@@ -114,7 +114,6 @@ src/quodeq/api/routes_shared_mirrors.py:23:private-module:quodeq.services._fs_re
 src/quodeq/api/security.py:15:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/api/standards_read_routes.py:15:private-module:quodeq.shared._env.env_int
 src/quodeq/api/zip.py:17:private-module:quodeq.shared._env.env_int
-src/quodeq/assistant/adapters/api.py:22:private-module:quodeq.assistant.tools._registry.ToolRegistry
 src/quodeq/assistant/adapters/api.py:23:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/assistant/adapters/cli.py:23:private-module:quodeq.assistant.mcp._config
 src/quodeq/assistant/adapters/cli.py:24:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG
@@ -133,7 +132,6 @@ src/quodeq/assistant/adapters/_cli_config.py:7:private-module:quodeq.core._const
 src/quodeq/assistant/adapters/_cli_config.py:7:private-module:quodeq.core._constants.PROMPT_STYLE_FLAG
 src/quodeq/assistant/adapters/_cli_spawn.py:10:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/assistant/mcp/_config.py:12:private-module:quodeq.shared._mcp.codex_mcp_override
-src/quodeq/assistant/mcp/server.py:13:private-module:quodeq.assistant.tools._registry.ToolRegistry
 src/quodeq/assistant/mcp/server.py:84:private-module:quodeq.shared._env.get_evaluations_dir
 src/quodeq/assistant/orchestrator.py:11:private-module:quodeq.assistant.adapters._capabilities.supports_native_tools
 src/quodeq/assistant/orchestrator.py:13:private-module:quodeq.assistant.adapters._cli_config.load_cli_chat_config

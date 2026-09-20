@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.services.import_validator import validate_import
 from quodeq.shared.validation import validate_path_segment
 

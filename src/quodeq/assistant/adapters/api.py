@@ -19,7 +19,7 @@ from quodeq.assistant.adapters._fallback import (
 )
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, guard_tool_result
-from quodeq.assistant.tools._registry import ToolRegistry
+from quodeq.assistant.tools.registry import ToolRegistry
 from quodeq.shared._env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)

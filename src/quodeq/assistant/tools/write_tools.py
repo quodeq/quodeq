@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.assistant.tools._repo_tools import _jail
 from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
 

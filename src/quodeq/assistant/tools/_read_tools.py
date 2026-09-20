@@ -22,7 +22,7 @@ from quodeq.assistant.tools._read_tools_violations import (
     _trim_violation,
     _visible_only,
 )
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_visible
 from quodeq.data.fs.report_parser.finding_details import (
     iter_eval_reports,

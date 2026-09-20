@@ -11,7 +11,7 @@ import json
 from quodeq.assistant.tools import _read_tools as _facade
 from quodeq.assistant.tools import _read_tools_scope as _scope_facade
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._registry import ToolError
+from quodeq.assistant.tools.registry import ToolError
 from quodeq.core.standards.visibility import (
     hidden_ids_for_names,
     partition_entries_visible,

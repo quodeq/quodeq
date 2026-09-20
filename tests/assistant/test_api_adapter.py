@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from quodeq.assistant.adapters.api import ApiTurnConfig, ApiTurnSession, run_api_turn
-from quodeq.assistant.tools._registry import ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolRegistry, ToolSpec
 from tests._timeouts import budget
 
 

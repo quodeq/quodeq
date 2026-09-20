@@ -11,7 +11,7 @@ from pathlib import Path
 from quodeq.assistant.tools import _read_tools as _facade
 from quodeq.assistant.tools import _read_tools_violations as _violations_facade
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._registry import ToolError
+from quodeq.assistant.tools.registry import ToolError
 from quodeq.data.ports.findings import FindingsRepository
 from quodeq.services import _fs_reports
 from quodeq.services.deleted import deleted_keys
