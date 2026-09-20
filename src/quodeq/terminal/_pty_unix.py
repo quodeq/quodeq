@@ -11,6 +11,7 @@ import subprocess
 import sys
 import termios
 
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared._process_kill import kill_proc_tree
 
 _logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ def _make_controlling_tty() -> None:
 def resolve_shell(env: dict[str, str] | None = None) -> list[str]:
     """Return argv for a login+interactive shell, validating $SHELL against an
     allowlist (a crafted $SHELL is arbitrary-binary execution)."""
-    src = env if env is not None else os.environ
+    src = resolve_env(env)
     shell = src.get("SHELL", "")
     default = "/bin/zsh" if sys.platform == "darwin" else "/bin/bash"
     if (
@@ -80,7 +81,7 @@ class UnixPty:
         self._watch(master)
         try:
             _set_winsize(master, cols, rows)
-            env = dict(self._env if self._env is not None else os.environ)
+            env = dict(resolve_env(self._env))
             env["TERM"] = "xterm-256color"
             for k in ("QUODEQ_API_KEY", "QUODEQ_ACTION_API_HOST", "QUODEQ_ACTION_API_PORT"):
                 env.pop(k, None)

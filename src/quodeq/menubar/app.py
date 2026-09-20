@@ -14,13 +14,14 @@ Dashboard start/stop/open lives in _app_lifecycle.py (mixin, split for size).
 from __future__ import annotations
 
 import logging as _logging
-import os
 import subprocess
 import threading
+from collections.abc import Mapping, MutableMapping
 
 import rumps
 
 from quodeq.shared._env import env_int
+from quodeq.shared._env_resolve import resolve_env
 from quodeq.shared.frozen import source_user_path as _source_user_path
 from quodeq.menubar import control as _control
 from quodeq.menubar import state as _state
@@ -50,10 +51,10 @@ def _set_menu_item(item, callback) -> None:
     item._menuitem.setEnabled_(callback is not None)
 
 
-def _load_config(env=None):
+def _load_config(env: Mapping[str, str] | None = None) -> tuple[int, tuple[int, ...]]:
     """Read port configuration from the environment (or an injected mapping)."""
     _cfg_log = _logging.getLogger(__name__)
-    env = os.environ if env is None else env
+    env = resolve_env(env)
     app_port = env_int("QUODEQ_PORT", _DEFAULT_APP_PORT, env=env)
     raw_ports = env.get("QUODEQ_PORTS", _DEFAULT_PORTS)
     ports_list = []
@@ -74,12 +75,12 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
     ``DashboardLifecycleMixin``.
     """
 
-    def __init__(self):
+    def __init__(self, env: Mapping[str, str] | None = None):
         super().__init__(
             "Quodeq", icon=_find_icon("menubar_iconTemplate.png"), template=True,
             quit_button=None,
         )
-        self._app_port, self._ports = _load_config()
+        self._app_port, self._ports = _load_config(env)
         self._port_cache: dict = {}  # shared cache dict for find_running_port helper
         self._process: subprocess.Popen | None = None
         self._port: int | None = None
@@ -221,16 +222,20 @@ def _set_accessory_policy() -> None:
         _logging.getLogger(__name__).debug("could not set accessory policy", exc_info=True)
 
 
-def main() -> None:
-    """Run the menu bar until quit. Returns immediately if a bar already owns the pidfile."""
-    _source_user_path()
+def main(env: MutableMapping[str, str] | None = None) -> None:
+    """Run the menu bar until quit. Returns immediately if a bar already owns the pidfile.
+
+    *env* is this process's composition root: the mapping the PATH bootstrap
+    and the port configuration read, ``None`` meaning the real environment.
+    """
+    _source_user_path(env)
     if _control.is_running():
         # Another bar owns the status item; a second icon would only confuse.
         return
     _set_accessory_policy()
     _control.write_pidfile()
     try:
-        QuodeqApp().run()
+        QuodeqApp(env).run()
     finally:
         _control.remove_pidfile()
 
