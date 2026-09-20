@@ -3,35 +3,18 @@ import { gradeLetter } from '../../../utils/formatters.js';
 import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
 import { t } from '../../../strings/index.js';
 import {
-  ComposedChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  ReferenceLine,
-} from 'recharts';
-import {
-  cssVar,
-  scoreBarColor,
-  refLineValues,
-  CHART_MARGIN,
-  SELECTED_BAR_OPACITY,
-  DESELECTED_BAR_OPACITY,
-  HISTORY_CHART_HEIGHT,
-  HOVER_STROKE_WIDTH,
-  REF_LINE_OPACITY_EVEN,
-  REF_LINE_OPACITY_ODD,
-} from '../../../components/scoreChartHelpers.js';
+  ScoreHistoryChart,
+  ScoreTooltipCard,
+  tooltipScore,
+} from '../../../components/scoreChartParts.jsx';
+import { HISTORY_CHART_HEIGHT } from '../../../components/scoreChartHelpers.js';
 import { computeHistoryChartStats, buildHistoryKbdItems } from './historyChartStats.js';
 import { DATA_THEME_ATTR } from '../../../constants.js';
 
 const MAX_CHART_RUNS = 40;
 const CHART_HEIGHT = HISTORY_CHART_HEIGHT;
-const TREND_LINE_STROKE_WIDTH = 2;
-const TREND_LINE_OPACITY = 0.9;
+const MAX_BAR_SIZE = 32;
+const MISSING_SCORE = '?';
 
 function windowAroundSelected(trend, selectedRunId) {
   if (trend.length <= MAX_CHART_RUNS) return trend;
@@ -59,89 +42,12 @@ function RunHistoryTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const entry = payload[0]?.payload;
   if (!entry) return null;
-  const score = Number.isFinite(entry.numericAverage) ? entry.numericAverage.toFixed(1) : '?';
-  const grade = gradeLetter(entry.overallGrade);
   return (
-    <div className="run-history-tooltip">
-      <span className="rht-date">{entry.dateLabel}</span>
-      <span className="rht-score">{score} - {grade}</span>
-    </div>
-  );
-}
-
-function renderChartReferenceLines() {
-  return refLineValues([0, 10]).map((y, i) => (
-    <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? REF_LINE_OPACITY_ODD : REF_LINE_OPACITY_EVEN} />
-  ));
-}
-
-function renderScoreBarCells(data, { hoveredIndex, selectedRunId }) {
-  return data.map((entry, i) => (
-    <Cell
-      key={entry.runId ?? i}
-      fill={scoreBarColor(entry.numericAverage)}
-      opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
-      stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
-      strokeWidth={hoveredIndex === i ? HOVER_STROKE_WIDTH : 0}
+    <ScoreTooltipCard
+      label={entry.dateLabel}
+      score={tooltipScore(entry.numericAverage, MISSING_SCORE)}
+      grade={gradeLetter(entry.overallGrade)}
     />
-  ));
-}
-
-// Click and hover live on the chart container, not on the Bar. The shared
-// `.run-history-panel .recharts-surface *` rule sets pointer-events:none so
-// the Area/Line layers cannot swallow clicks before they reach the visible
-// bar; in turn we read activeTooltipIndex from Recharts' chart-level events.
-function makeChartMoveHandler(setHoveredIndex) {
-  return (state) => setHoveredIndex(state?.activeTooltipIndex ?? null);
-}
-
-function makeChartClickHandler(data, onBarClick) {
-  return (state) => {
-    const idx = state?.activeTooltipIndex;
-    if (idx == null) return;
-    const runId = data[idx]?.runId;
-    if (runId) onBarClick?.(runId);
-  };
-}
-
-function ScoreHistoryChart({ data, interaction }) {
-  const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
-  const handleMove = makeChartMoveHandler(setHoveredIndex);
-  const handleClick = makeChartClickHandler(data, onBarClick);
-  return (
-    <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-      <ComposedChart
-        data={data}
-        margin={CHART_MARGIN}
-        onMouseMove={handleMove}
-        onMouseLeave={() => setHoveredIndex(null)}
-        onClick={onBarClick ? handleClick : undefined}
-        style={onBarClick ? { cursor: 'pointer' } : undefined}
-      >
-        <XAxis dataKey="dateLabel" hide />
-        <YAxis domain={[0, 10]} hide />
-        <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
-        {renderChartReferenceLines()}
-        <Bar
-              dataKey="numericAverage"
-          radius={[0, 0, 0, 0]}
-          maxBarSize={32}
-          isAnimationActive={false}
-        >
-          {renderScoreBarCells(data, { hoveredIndex, selectedRunId })}
-        </Bar>
-        <Line
-          isAnimationActive={false}
-          dataKey="numericAverage"
-          type="monotone"
-          stroke={cssVar('--color-accent')}
-          strokeOpacity={TREND_LINE_OPACITY}
-          strokeWidth={TREND_LINE_STROKE_WIDTH}
-          dot={false}
-          activeDot={false}
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
   );
 }
 
@@ -179,7 +85,13 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
       <div className="chart-with-kbd">
         <ScoreHistoryChart
           data={data}
-          interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
+          height={CHART_HEIGHT}
+          maxBarSize={MAX_BAR_SIZE}
+          tooltip={<RunHistoryTooltip />}
+          hoveredIndex={hoveredIndex}
+          setHoveredIndex={setHoveredIndex}
+          selectedRunId={selectedRunId}
+          onActivate={onBarClick ? (point) => onBarClick(point.runId) : undefined}
         />
         <ChartKeyboardControls label={t('history.kbdRunsLabel')} items={kbdItems} />
       </div>
