@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+from quodeq.analysis.cache.failure_streak import CircuitBreakerError
 from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 

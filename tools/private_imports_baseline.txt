@@ -13,8 +13,6 @@ src/quodeq/_cli_resolution.py:34:private-name:quodeq.analysis.manifest_scope._fi
 src/quodeq/_cli_run_config.py:22:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
 src/quodeq/analysis/_api_source_gathering.py:25:private-name:quodeq.llm_bridge._omlx._read_omlx_api_key
 src/quodeq/analysis/_dim_estimates.py:34:private-name:quodeq.analysis.subagents._source_files._list_source_files
-src/quodeq/analysis/_loop_guards.py:69:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
-src/quodeq/analysis/_loop_state.py:98:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
 src/quodeq/analysis/_mcp_arg_builders.py:25:private-module:quodeq.core._constants.MCP_CONFIG_ARG_FLAG
 src/quodeq/analysis/_mcp_arg_builders.py:25:private-module:quodeq.core._constants.MCP_STYLE_CLI_REGISTER
 src/quodeq/analysis/_mcp_arg_builders.py:25:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG

@@ -95,7 +95,7 @@ def _interruption_reason(exc: BaseException | None = None) -> str:
       'agent_failure_streak') when there is one, else 'cancelled_signal'.
     - Otherwise: 'failed_exception'.
     """
-    from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+    from quodeq.analysis.cache.failure_streak import CircuitBreakerError
     if isinstance(exc, FatalProviderError):
         return provider_exit_reason(exc.reason)
     if isinstance(exc, CircuitBreakerError):

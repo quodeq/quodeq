@@ -145,7 +145,7 @@ def test_exception_exit_reason_overrides_user_set(tmp_path: Path) -> None:
 def test_breaker_exit_writes_failed_with_reason(tmp_path: Path) -> None:
     """CircuitBreakerError raised from inside the lifecycle context maps
     to state=failed with exit_reason=failure_streak."""
-    from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+    from quodeq.analysis.cache.failure_streak import CircuitBreakerError
     from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 
     raised = False

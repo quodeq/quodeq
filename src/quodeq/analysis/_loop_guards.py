@@ -66,7 +66,7 @@ def _raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> 
             f"evaluation aborted: {reason.partition(':')[2].strip() or 'fatal provider error'}",
             reason=reason.partition(":")[2].partition(":")[0] or REASON_PROVIDER_FATAL,
         )
-    from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+    from quodeq.analysis.cache.failure_streak import CircuitBreakerError
     raise CircuitBreakerError(REASON_AGENT_FAILURE_STREAK)
 
 

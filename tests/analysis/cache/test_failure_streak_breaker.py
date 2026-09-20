@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 from quodeq.shared import cancellation
-from quodeq.analysis.cache._failure_streak import (
+from quodeq.analysis.cache.failure_streak import (
     FailureStreakWatcher,
     TripEvent,
     CircuitBreakerError,

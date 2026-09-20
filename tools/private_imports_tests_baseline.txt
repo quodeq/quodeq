@@ -47,11 +47,6 @@ tests/analysis/cache/test_dimension_helpers_provenance.py:9:private-module:quode
 tests/analysis/cache/test_dimension_runner_cache_hits.py:19:private-module:quodeq.analysis.cache._key_provenance.build_cache_key_struct
 tests/analysis/cache/test_dimension_runner_carried_forward_write.py:17:private-name:quodeq.analysis.cache.dimension_runner._emit_cached_findings
 tests/analysis/cache/test_dimension_runner_carried_forward_write.py:17:private-name:quodeq.analysis.cache.dimension_runner._write_findings
-tests/analysis/cache/test_dimension_runner_circuit_breaker.py:17:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
-tests/analysis/cache/test_failure_streak_breaker.py:8:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
-tests/analysis/cache/test_failure_streak_breaker.py:8:private-module:quodeq.analysis.cache._failure_streak.FailureStreakWatcher
-tests/analysis/cache/test_failure_streak_breaker.py:8:private-module:quodeq.analysis.cache._failure_streak.TripEvent
-tests/analysis/cache/test_failure_streak_oserror.py:9:private-module:quodeq.analysis.cache._failure_streak.FailureStreakWatcher
 tests/analysis/cache/test_jsonl_state.py:19:private-module:quodeq.analysis.cache._jsonl_state.DispatchJsonlState
 tests/analysis/cache/test_jsonl_state.py:20:private-module:quodeq.analysis.cache._persist_watcher.CachePersistProvenance
 tests/analysis/cache/test_jsonl_state.py:20:private-module:quodeq.analysis.cache._persist_watcher.CachePersistTarget
@@ -151,7 +146,6 @@ tests/analysis/test_api_size_cap_dispatch_worker.py:137:private-module:quodeq.an
 tests/analysis/test_api_size_cap_dispatch_worker.py:139:private-name:quodeq.analysis.subprocess._run_api_analysis_bridge
 tests/analysis/test_api_size_cap_dispatch_worker.py:22:private-name:quodeq.analysis.subprocess._gather_api_source_files
 tests/analysis/test_api_size_cap_dispatch_worker.py:51:private-name:quodeq.analysis.subprocess._gather_api_source_files
-tests/analysis/test_api_size_cap_dispatch_worker.py:84:private-module:quodeq.analysis.cache._failure_streak.FailureStreakWatcher
 tests/analysis/test_cluster33_empty_except_logging.py:13:private-module:quodeq.analysis._api_standards_text
 tests/analysis/test_cluster33_empty_except_logging.py:13:private-module:quodeq.analysis._loop_state
 tests/analysis/test_cluster33_empty_except_logging.py:14:private-name:quodeq.analysis._run_lifecycle_support._SIGNALS_TO_HANDLE
@@ -255,7 +249,6 @@ tests/analysis/test_fatal_provider_handling.py:18:private-module:quodeq.analysis
 tests/analysis/test_fatal_provider_handling.py:18:private-name:quodeq.analysis._process._check_process_result
 tests/analysis/test_fatal_provider_handling_pool.py:10:private-name:quodeq.analysis._loops._interruption_reason
 tests/analysis/test_fatal_provider_handling_pool.py:10:private-name:quodeq.analysis._loops._raise_on_fatal_cancel
-tests/analysis/test_fatal_provider_handling_pool.py:11:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
 tests/analysis/test_fatal_provider_handling_pool.py:16:private-module:quodeq.analysis.subagents._pool_models.SubagentResult
 tests/analysis/test_fatal_provider_handling_pool.py:17:private-module:quodeq.analysis.subagents._pool_scaling.check_agent_failure_streak
 tests/analysis/test_fatal_provider_handling_pool.py:17:private-module:quodeq.analysis.subagents._pool_scaling.should_respawn
@@ -383,7 +376,6 @@ tests/analysis/test_report_quarantined_metadata.py:21:private-module:quodeq.anal
 tests/analysis/test_report_scoring_coverage.py:7:private-module:quodeq.analysis._report_scoring.build_score_lookup
 tests/analysis/test_report_scoring_coverage.py:7:private-module:quodeq.analysis._report_scoring.extract_scores
 tests/analysis/test_report_scoring_coverage.py:7:private-module:quodeq.analysis._report_scoring.grade_from_score
-tests/analysis/test_run_lifecycle.py:148:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
 tests/analysis/test_runner_dispatch.py:8:private-module:quodeq.analysis._config.AnalysisConfig
 tests/analysis/test_source_gathering.py:6:private-module:quodeq.analysis._api_standards_text
 tests/analysis/test_source_gathering.py:7:private-module:quodeq.analysis._config.AnalysisConfig
@@ -1038,7 +1030,6 @@ tests/integration/_cancel_resume_fixtures.py:55:private-name:quodeq.analysis.run
 tests/integration/_cancel_resume_fixtures.py:66:private-name:quodeq.analysis._dimension_steps._build_dimension_prompt
 tests/integration/_cancel_resume_fixtures.py:66:private-name:quodeq.analysis._dimension_steps._parse_dimension_evidence
 tests/integration/_cancel_resume_fixtures.py:66:private-name:quodeq.analysis._dimension_steps._run_dimension_analysis
-tests/integration/test_cancel_resume_breaker.py:14:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
 tests/integration/test_cancel_resume_dispatch.py:66:private-name:quodeq.services.evaluation_mixin._discard_run_state
 tests/integration/test_copilot_cli_local.py:15:private-module:quodeq.analysis._config.AnalysisConfig
 tests/integration/test_sqlite_dual_write_e2e.py:15:private-module:quodeq.data.fs.report_parser._evidence.load_evidence_map

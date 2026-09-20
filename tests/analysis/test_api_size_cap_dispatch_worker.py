@@ -81,7 +81,7 @@ class TestSkippedMarkerSemantics:
         assert calls == []  # skipped must never write a cache entry
 
     def test_failure_streak_ignores_skipped_markers(self, tmp_path: Path):
-        from quodeq.analysis.cache._failure_streak import FailureStreakWatcher
+        from quodeq.analysis.cache.failure_streak import FailureStreakWatcher
 
         jsonl = tmp_path / "ev.jsonl"
         lines = [
