@@ -13,7 +13,7 @@ from enum import Enum
 from typing import Dict, Generic, List, Optional, TypeVar
 from uuid import uuid4, UUID
 
-from quodeq.core._constants import FULL_CONFIDENCE
+from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.types.req_ref import ReqRef
 
 

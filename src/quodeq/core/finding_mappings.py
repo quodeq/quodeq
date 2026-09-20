@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from quodeq.core._constants import FULL_CONFIDENCE
+from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
 from quodeq.core.finding_coercions import coerce_scope_downgrade
 from quodeq.core.types.finding import Finding

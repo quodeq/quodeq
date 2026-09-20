@@ -17,7 +17,7 @@ from quodeq.context.precedent import (
     fingerprint as _precedent_fingerprint,
     precedent_text as _precedent_text,
 )
-from quodeq.core._constants import FULL_CONFIDENCE
+from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.observability import NULL_LOG, LogSink
 
 _PRECEDENT_DOWNWEIGHT = 25

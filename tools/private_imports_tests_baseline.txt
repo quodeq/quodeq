@@ -725,13 +725,6 @@ tests/assistant/test_constants_cli_style.py:17:private-module:quodeq.assistant.a
 tests/assistant/test_constants_cli_style.py:17:private-module:quodeq.assistant.adapters._cli_config.SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX
 tests/assistant/test_constants_cli_style.py:22:private-name:quodeq.shared.provider_env._providers_path
 tests/assistant/test_constants_cli_style.py:47:private-module:quodeq.assistant.adapters._cli_config
-tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.MCP_CONFIG_ARG_FLAG
-tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.MCP_STYLE_CLI_REGISTER
-tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG
-tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_FILE
-tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.PROMPT_FLAG_DEFAULT
-tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.PROMPT_STYLE_FLAG
-tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.PROMPT_STYLE_POSITIONAL
 tests/assistant/test_constants_provider_style.py:23:private-module:quodeq.analysis._provider_cache
 tests/assistant/test_constants_provider_style.py:38:private-module:quodeq.analysis._provider_cache
 tests/assistant/test_constants_provider_style.py:50:private-module:quodeq.analysis._mcp_arg_builders
