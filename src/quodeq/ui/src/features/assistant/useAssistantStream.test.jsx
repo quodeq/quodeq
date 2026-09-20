@@ -4,6 +4,7 @@ import { useAssistantStream } from './useAssistantStream.js';
 
 class MockES {
   static instances = [];
+  static CLOSED = 2;
   constructor(url) { this.url = url; this._h = {}; this.readyState = 0; MockES.instances.push(this); }
   addEventListener(n, f) { (this._h[n] = this._h[n] || []).push(f); }
   set onmessage(f) { this._m = f; } get onmessage() { return this._m; }

@@ -16,6 +16,10 @@ export const META_COMMANDS = [
 
 export const VISIBLE_META_COMMANDS = META_COMMANDS.filter((c) => !c.hidden);
 
+// A padded pill whose skill cannot run in the current scope invites a
+// guaranteed-to-fail first tool call, so the view's pill row is capped.
+const MAX_PILLS_PER_VIEW = 4;
+
 export function parseMetaCommand(text) {
   const first = text.trim().split(/\s+/)[0];
   if (!first.startsWith('/')) return null;
@@ -70,7 +74,7 @@ export function pillsForView(catalog, view, { readOnly = false } = {}) {
   // in the current scope invites a guaranteed-to-fail first tool call.
   return skills
     .filter((s) => (s.views ?? []).includes(view))
-    .slice(0, 4)
+    .slice(0, MAX_PILLS_PER_VIEW)
     .map((s) => ({
       label: s.name.replace(/-/g, ' ').replace(/^./, (ch) => ch.toUpperCase()),
       fill: `/${s.name} `,

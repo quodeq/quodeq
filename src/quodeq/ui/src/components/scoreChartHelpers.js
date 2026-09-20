@@ -86,18 +86,27 @@ export function scoreBarColor(score) {
  * renders empty (the floor sits below the lowest score) or full (the
  * ceiling sits above the highest).
  */
+// Padding applied to the min/max score before flooring/ceiling the domain
+// (see scoreDomain doc comment: keeps the trend shape visible without a bar
+// ever rendering empty or full).
+const SCORE_DOMAIN_PADDING = 0.5;
+
 export function scoreDomain(values) {
   const valid = (values || []).filter((n) => Number.isFinite(n));
   if (!valid.length) return [0, 10];
-  const lo = Math.max(0, Math.floor(Math.min(...valid) - 0.5));
-  const hi = Math.min(10, Math.ceil(Math.max(...valid) + 0.5));
+  const lo = Math.max(0, Math.floor(Math.min(...valid) - SCORE_DOMAIN_PADDING));
+  const hi = Math.min(10, Math.ceil(Math.max(...valid) + SCORE_DOMAIN_PADDING));
   return [lo, hi > lo ? hi : lo + 1];
 }
 
+// Domain split into quarters: 5 ticks at 0/4, 1/4, 2/4, 3/4 and 4/4 of the range.
+const REF_LINE_QUARTER_DIVISIONS = 4;
+const REF_LINE_THIRD_QUARTER_STEPS = 3;
+
 /** Reference-line ticks: domain bounds plus quarter divisions of the range. */
 export function refLineValues([lo, hi]) {
-  const step = (hi - lo) / 4;
-  return [lo, lo + step, lo + 2 * step, lo + 3 * step, hi];
+  const step = (hi - lo) / REF_LINE_QUARTER_DIVISIONS;
+  return [lo, lo + step, lo + 2 * step, lo + REF_LINE_THIRD_QUARTER_STEPS * step, hi];
 }
 
 /** Margin zeroed so bars span edge-to-edge inside the panel body. */

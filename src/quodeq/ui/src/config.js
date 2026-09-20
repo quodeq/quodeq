@@ -15,4 +15,5 @@ export const SERVER_BASE_URL = _runtimeConfig.serverBaseUrl || `${SERVER_PROTOCO
 // the Python side, src/quodeq/shared/_env.py::get_dashboard_port). Kept as a
 // runtime-overridable value here too so a non-default dashboard port can be
 // reflected without a rebuild.
-export const DASHBOARD_BASE_PORT = _runtimeConfig.dashboardBasePort || 7863;
+const DEFAULT_DASHBOARD_PORT = 7863;
+export const DASHBOARD_BASE_PORT = _runtimeConfig.dashboardBasePort || DEFAULT_DASHBOARD_PORT;

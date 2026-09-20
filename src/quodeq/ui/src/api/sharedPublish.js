@@ -5,6 +5,10 @@
 
 import { request, BASE } from './request.js';
 
+// Generous: a pull imports a zip stream from the shared repository, but a
+// stalled connection must not leave the pull pending forever.
+const PULL_TIMEOUT_MS = 600000; // 10 min
+
 /**
  * Publish a local project to the shared repository.
  * @param {string} projectId
@@ -39,9 +43,7 @@ export async function pullSharedProject(projectId, action) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      // Generous: a pull imports a zip stream from the shared repository,
-      // but a stalled connection must not leave the pull pending forever.
-      signal: AbortSignal.timeout(600000), // 10 min
+      signal: AbortSignal.timeout(PULL_TIMEOUT_MS),
     });
   } catch (e) {
     if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {

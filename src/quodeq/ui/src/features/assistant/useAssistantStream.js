@@ -8,6 +8,9 @@ const INACTIVITY_MS = 60000;
 // without deltas (codex) deliver a whole message as ONE frame, which sweeps
 // in at a readable rate instead of popping as a block.
 const CHARS_PER_TICK = 60;
+// Fallback flush cadence when no animation frame fires (e.g. a background
+// tab): keeps text revealing at a readable pace instead of stalling.
+const FLUSH_DEBOUNCE_MS = 50;
 
 /**
  * Pure frame-dispatch table: given a parsed SSE frame and the effect's
@@ -64,7 +67,7 @@ function createTurnRevealer({ pending, raf, timer, turnBoundary, endPending, set
   };
   const scheduleFlush = () => {
     if (raf.current == null) raf.current = requestAnimationFrame(() => drain(false));
-    if (timer.current == null) timer.current = setTimeout(() => drain(false), 50);
+    if (timer.current == null) timer.current = setTimeout(() => drain(false), FLUSH_DEBOUNCE_MS);
   };
   // Structural frames (tool calls, warnings, errors, stop) force the rest
   // of the reveal out at once so ordering stays exact and errors are never
@@ -117,7 +120,7 @@ function makeFrameHandlers({ revealer, append, beginContent, setError, endPendin
       append({ role: 'action', actionId: f.actionId, actionType: f.actionType, summary: f.summary }); },
     onWarning: (f) => { beginContent(); flushTokens(); append({ role: 'warning', message: f.message }); },
     onError: (f) => { flushTokens(); setError(f.message || 'error'); endTurn(); },
-    onStopped: () => { flushTokens(); append({ role: 'warning', message: 'Stopped.' }); endTurn(); },
+    onStopped: () => { flushTokens(); append({ role: 'warning', message: t('assistant.turnStopped') }); endTurn(); },
     onDone: () => { endTurn(); },
   };
 }
@@ -164,7 +167,7 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
       applyFrame(frame, handlers);
     };
     es.addEventListener('done', revealer.endTurn);
-    es.onerror = () => { if (es.readyState === 2) { setStreaming(false); setError((p) => p || 'disconnected'); } };
+    es.onerror = () => { if (es.readyState === EventSource.CLOSED) { setStreaming(false); setError((p) => p || t('assistant.disconnected')); } };
     resetInactivity();
 
     return () => { es.close();

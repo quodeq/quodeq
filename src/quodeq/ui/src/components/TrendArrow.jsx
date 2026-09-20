@@ -11,7 +11,7 @@ export default function TrendArrow({ trend, delta }) {
 
   const angle = (d !== null && !isNaN(d))
     ? angleFromDelta(d)
-    : (TREND_ANGLES[trend] ?? 90);
+    : (TREND_ANGLES[trend] ?? TREND_ANGLES.stable);
 
   const colorClass =
     angle <= ANGLE_UP_MAX      ? 'trend-up'
