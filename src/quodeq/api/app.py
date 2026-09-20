@@ -258,7 +258,7 @@ def main(env: dict[str, str] | None = None) -> None:
     # main() only: create_app callers (tests, embedding) stay thread-free.
     try:
         from quodeq.api.routes_common import reports_dir  # noqa: PLC0415
-        from quodeq.services._warmup import engine as warmup_engine  # noqa: PLC0415
+        from quodeq.services.warmup import engine as warmup_engine  # noqa: PLC0415
         from quodeq.services.cache_maintenance import start_cache_maintenance  # noqa: PLC0415
         from quodeq.shared.log_sink import SHARED_LOG  # noqa: PLC0415
         warmup_engine.start(reports_dir())

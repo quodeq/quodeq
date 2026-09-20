@@ -557,7 +557,6 @@ tests/api/test_rate_limit_hardening.py:16:private-name:quodeq.api._rate_limit_co
 tests/api/test_rate_limit_hardening.py:16:private-name:quodeq.api._rate_limit_config._DEFAULT_RATE_LIMIT_WINDOW
 tests/api/test_rate_limit_hardening.py:16:private-name:quodeq.api._rate_limit_config._rate_limit_max
 tests/api/test_rate_limit_hardening.py:16:private-name:quodeq.api._rate_limit_config._rate_limit_window
-tests/api/test_routes_project_list_crud.py:194:private-module:quodeq.services._warmup.WarmupEngine
 tests/api/test_routes_project_list_crud.py:62:private-module:quodeq.services._fs_projects
 tests/api/test_routes_shared_read.py:245:private-module:quodeq.shared._env.get_score_cache_path
 tests/api/test_routes_shared_read_dimension.py:5:private-module:quodeq.services._fs_reports
@@ -1504,8 +1503,7 @@ tests/services/test_violations_stream_coverage.py:93:private-name:quodeq.service
 tests/services/test_violations_stream_coverage.py:93:private-name:quodeq.services._violations_stream._parse_stream_line
 tests/services/test_violations_stream_coverage.py:99:private-name:quodeq.services._violations_stream._StreamAccumulator
 tests/services/test_violations_stream_coverage.py:99:private-name:quodeq.services._violations_stream._parse_stream_line
-tests/services/test_warmup_engine.py:12:private-module:quodeq.services._warmup.WarmupEngine
-tests/services/test_warmup_engine.py:184:private-name:quodeq.services._warmup._warm_project
+tests/services/test_warmup_engine.py:184:private-name:quodeq.services.warmup._warm_project
 tests/shared/test_cluster34_empty_except_logging.py:12:private-module:quodeq.shared._io
 tests/shared/test_cluster34_empty_except_logging.py:12:private-module:quodeq.shared._process_kill
 tests/shared/test_coerce_line.py:36:private-module:quodeq.assistant.tools._read_tools_violations

@@ -125,9 +125,9 @@ src/quodeq/services/_mutation_scoring.py:86:broad-except
 src/quodeq/services/_post_run_hook.py:37:broad-except
 src/quodeq/services/_post_run_hook.py:45:broad-except
 src/quodeq/services/_run_discard.py:138:broad-except
-src/quodeq/services/_warmup.py:164:broad-except
-src/quodeq/services/_warmup.py:170:broad-except
-src/quodeq/services/_warmup.py:98:broad-except
+src/quodeq/services/warmup.py:168:broad-except
+src/quodeq/services/warmup.py:174:broad-except
+src/quodeq/services/warmup.py:99:broad-except
 src/quodeq/services/active_evaluation.py:68:broad-except
 src/quodeq/services/background.py:44:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except

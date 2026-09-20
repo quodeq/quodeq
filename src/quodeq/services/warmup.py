@@ -81,6 +81,7 @@ class WarmupEngine:
         self._done = 0
 
     def start(self, reports_dir: str) -> None:
+        """Queue every project under ``reports_dir`` and start the worker thread."""
         # Warming a disabled cache stores nothing, so it would be pure wasted
         # compute every boot; the inline read-through paths already handle
         # the kill switch themselves.
@@ -106,6 +107,7 @@ class WarmupEngine:
             self._thread.start()
 
     def enqueue(self, project_id: str) -> None:
+        """Queue one project for warm-up (no-op before ``start`` or if already queued)."""
         with self._cond:
             if self._thread is None or project_id in self._queued:
                 return
@@ -117,6 +119,7 @@ class WarmupEngine:
             self._cond.notify()
 
     def snapshot(self) -> dict | None:
+        """Return warm-up progress for the API, or None before ``start``."""
         with self._cond:
             if self._thread is None:
                 return None
@@ -129,6 +132,7 @@ class WarmupEngine:
             }
 
     def reset_for_tests(self) -> None:
+        """Stop the worker and clear all queued state (test seam)."""
         # Signal worker to shut down and wait for it to exit
         self._shutdown.set()
         thread_to_join = None

@@ -105,16 +105,12 @@ src/quodeq/api/app.py:119:private-module:quodeq.shared._env.get_quodeq_dir
 src/quodeq/api/app.py:230:private-module:quodeq.shared._io.configure_stdio_utf8
 src/quodeq/api/app.py:23:private-module:quodeq.shared._env.env_int
 src/quodeq/api/app.py:24:private-module:quodeq.shared._env_resolve.resolve_env
-src/quodeq/api/app.py:261:private-module:quodeq.services._warmup.engine
 src/quodeq/api/app.py:41:private-module:quodeq.shared._env.get_index_db_path
 src/quodeq/api/llm_bridge_routes.py:6:private-name:quodeq.config.ai_provider._store_api_key
 src/quodeq/api/routes_findings.py:22:private-module:quodeq.services._dismissed_listing.load_dismissed
-src/quodeq/api/routes_project_list.py:17:private-module:quodeq.services._warmup.WarmupEngine
-src/quodeq/api/routes_project_list.py:17:private-module:quodeq.services._warmup.engine
 src/quodeq/api/routes_project_scan.py:30:private-module:quodeq.services._fs_project_helpers.project_record_exists
 src/quodeq/api/routes_project_scan.py:30:private-module:quodeq.services._fs_project_helpers.read_project_record
 src/quodeq/api/routes_project_scan.py:34:private-module:quodeq.services._fs_scan.scan_project
-src/quodeq/api/routes_registry.py:38:private-module:quodeq.services._warmup.engine
 src/quodeq/api/routes_runs.py:13:private-module:quodeq.services._runs_unit.build_runs_unit
 src/quodeq/api/routes_runs.py:14:private-module:quodeq.shared._env.get_index_db_path
 src/quodeq/api/routes_shared_findings_mirrors.py:14:private-module:quodeq.services._dismissed_listing.load_dismissed
@@ -237,7 +233,7 @@ src/quodeq/services/_scan_progress_dims.py:15:private-module:quodeq.core.evidenc
 src/quodeq/services/_score_cache_fetch.py:25:private-module:quodeq.shared._env.score_cache_disabled
 src/quodeq/services/_violations_jsonl.py:10:private-module:quodeq.core.evidence._req_mapping.PrincipleResolver
 src/quodeq/services/_violations_jsonl.py:10:private-module:quodeq.core.evidence._req_mapping.build_principle_resolver
-src/quodeq/services/_warmup.py:87:private-module:quodeq.shared._env.score_cache_disabled
+src/quodeq/services/warmup.py:88:private-module:quodeq.shared._env.score_cache_disabled
 src/quodeq/services/wiring.py:38:private-module:quodeq.data.fs.dimension_report._report_io.write_dimension_report
 src/quodeq/services/wiring.py:96:private-module:quodeq.data.sqlite._row_mappers.row_to_finding
 src/quodeq/services/filesystem.py:58:private-module:quodeq.shared._env.get_evaluations_dir

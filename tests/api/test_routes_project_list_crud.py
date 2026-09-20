@@ -191,7 +191,7 @@ def test_list_projects_uses_injected_warmup_engine_not_the_singleton(monkeypatch
     from flask import Flask
 
     from quodeq.core.types import ProjectEntry
-    from quodeq.services._warmup import WarmupEngine
+    from quodeq.services.warmup import WarmupEngine
     from tests.api._routes_project_list_fixtures import _FakeProvider
 
     fake_engine = WarmupEngine(warm_fn=lambda *_: None, list_fn=lambda _rd: [])
