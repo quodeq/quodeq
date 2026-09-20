@@ -118,14 +118,13 @@ src/quodeq/assistant/adapters/_cli_command.py:11:private-module:quodeq.core._con
 src/quodeq/assistant/adapters/_cli_command.py:11:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_FILE
 src/quodeq/assistant/adapters/_cli_command.py:11:private-module:quodeq.core._constants.PROMPT_STYLE_POSITIONAL
 src/quodeq/assistant/adapters/_cli_command.py:14:private-module:quodeq.shared._models.normalize_model_id
-src/quodeq/assistant/adapters/_cli_config.py:7:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_FILE
-src/quodeq/assistant/adapters/_cli_config.py:7:private-module:quodeq.core._constants.PROMPT_FLAG_DEFAULT
-src/quodeq/assistant/adapters/_cli_config.py:7:private-module:quodeq.core._constants.PROMPT_STYLE_FLAG
+src/quodeq/assistant/adapters/cli_config.py:7:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_FILE
+src/quodeq/assistant/adapters/cli_config.py:7:private-module:quodeq.core._constants.PROMPT_FLAG_DEFAULT
+src/quodeq/assistant/adapters/cli_config.py:7:private-module:quodeq.core._constants.PROMPT_STYLE_FLAG
 src/quodeq/assistant/adapters/_cli_spawn.py:10:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/assistant/mcp/_config.py:12:private-module:quodeq.shared._mcp.codex_mcp_override
 src/quodeq/assistant/mcp/server.py:84:private-module:quodeq.shared._env.get_evaluations_dir
 src/quodeq/assistant/orchestrator.py:11:private-module:quodeq.assistant.adapters._capabilities.supports_native_tools
-src/quodeq/assistant/orchestrator.py:13:private-module:quodeq.assistant.adapters._cli_config.load_cli_chat_config
 src/quodeq/assistant/orchestrator.py:15:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG
 src/quodeq/assistant/orchestrator.py:15:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_FILE
 src/quodeq/assistant/skills.py:11:private-module:quodeq.shared._env_resolve.resolve_env

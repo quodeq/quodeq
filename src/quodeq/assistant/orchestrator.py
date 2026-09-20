@@ -10,7 +10,7 @@ from quodeq.assistant._context import build_system_prompt, build_turn_message
 from quodeq.assistant.adapters.api import ApiTurnConfig, ApiTurnSession, run_api_turn
 from quodeq.assistant.adapters._capabilities import supports_native_tools
 from quodeq.assistant.adapters.cli import CliTurnConfig, CliTurnSession, run_cli_turn
-from quodeq.assistant.adapters._cli_config import load_cli_chat_config
+from quodeq.assistant.adapters.cli_config import load_cli_chat_config
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.core._constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.assistant.guard import (

@@ -13,7 +13,7 @@ from typing import Callable
 from quodeq.assistant.adapters._cli_command import (
     McpConfigRef, TurnArgvRequest, build_turn_argv)
 from quodeq.assistant.adapters._cli_cleanup import TurnResources, release_turn_resources
-from quodeq.assistant.adapters._cli_config import (
+from quodeq.assistant.adapters.cli_config import (
     SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX, load_cli_chat_config,
 )
 from quodeq.assistant.adapters._cli_spawn import (

@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, NamedTuple
 
-from quodeq.assistant.adapters._cli_config import (
+from quodeq.assistant.adapters.cli_config import (
     RESUME_STYLE_GEMINI, SESSION_ID_SOURCE_PARSE_JSONL, SYSTEM_PROMPT_STYLE_ARGV_APPEND,
     CliChatConfig,
 )

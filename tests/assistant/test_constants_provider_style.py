@@ -66,11 +66,11 @@ def test_analysis_subprocess_uses_the_shared_mcp_style_constants():
 
 
 def test_assistant_cli_config_uses_the_shared_constants():
-    from quodeq.assistant.adapters import _cli_config
+    from quodeq.assistant.adapters import cli_config
 
-    assert _cli_config.MCP_STYLE_CONFIG_FILE is MCP_STYLE_CONFIG_FILE
-    assert _cli_config.PROMPT_STYLE_FLAG is PROMPT_STYLE_FLAG
-    assert _cli_config.PROMPT_FLAG_DEFAULT is PROMPT_FLAG_DEFAULT
+    assert cli_config.MCP_STYLE_CONFIG_FILE is MCP_STYLE_CONFIG_FILE
+    assert cli_config.PROMPT_STYLE_FLAG is PROMPT_STYLE_FLAG
+    assert cli_config.PROMPT_FLAG_DEFAULT is PROMPT_FLAG_DEFAULT
 
 
 def test_assistant_cli_command_uses_the_shared_constants():

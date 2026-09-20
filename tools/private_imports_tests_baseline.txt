@@ -577,8 +577,6 @@ tests/assistant/test_cli_adapter_sandbox.py:14:private-module:quodeq.assistant.a
 tests/assistant/test_cli_command.py:1:private-module:quodeq.assistant.adapters._cli_command.TurnArgvRequest
 tests/assistant/test_cli_command.py:1:private-module:quodeq.assistant.adapters._cli_command.build_turn_argv
 tests/assistant/test_cli_command.py:1:private-name:quodeq.assistant.adapters._cli_command._with_web_access
-tests/assistant/test_cli_command.py:3:private-module:quodeq.assistant.adapters._cli_config.load_cli_chat_config
-tests/assistant/test_cli_config.py:1:private-module:quodeq.assistant.adapters._cli_config.load_cli_chat_config
 tests/assistant/test_cli_events.py:6:private-name:quodeq.assistant.adapters._cli_events._BENIGN_RAW_LINES
 tests/assistant/test_cli_events.py:6:private-name:quodeq.assistant.adapters._cli_events._raw_error_line
 tests/assistant/test_cli_spawn.py:7:private-module:quodeq.assistant.adapters._cli_spawn
@@ -601,15 +599,7 @@ tests/assistant/test_cluster37_assistant_logging.py:133:private-name:quodeq._cli
 tests/assistant/test_cluster37_assistant_logging.py:13:private-module:quodeq.llm_bridge._ollama
 tests/assistant/test_cluster37_assistant_logging.py:51:private-module:quodeq.assistant._worktree_manager
 tests/assistant/test_cluster37_assistant_logging.py:72:private-module:quodeq.assistant.tools._read_tools_scope
-tests/assistant/test_constants_cli_style.py:17:private-module:quodeq.assistant.adapters._cli_config.RESUME_STYLE_EXEC
-tests/assistant/test_constants_cli_style.py:17:private-module:quodeq.assistant.adapters._cli_config.RESUME_STYLE_FLAG_RESUME
-tests/assistant/test_constants_cli_style.py:17:private-module:quodeq.assistant.adapters._cli_config.RESUME_STYLE_GEMINI
-tests/assistant/test_constants_cli_style.py:17:private-module:quodeq.assistant.adapters._cli_config.SESSION_ID_SOURCE_PARSE_JSONL
-tests/assistant/test_constants_cli_style.py:17:private-module:quodeq.assistant.adapters._cli_config.SESSION_ID_SOURCE_PREASSIGN
-tests/assistant/test_constants_cli_style.py:17:private-module:quodeq.assistant.adapters._cli_config.SYSTEM_PROMPT_STYLE_ARGV_APPEND
-tests/assistant/test_constants_cli_style.py:17:private-module:quodeq.assistant.adapters._cli_config.SYSTEM_PROMPT_STYLE_MESSAGE_PREFIX
 tests/assistant/test_constants_cli_style.py:22:private-name:quodeq.shared.provider_env._providers_path
-tests/assistant/test_constants_cli_style.py:47:private-module:quodeq.assistant.adapters._cli_config
 tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.MCP_CONFIG_ARG_FLAG
 tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.MCP_STYLE_CLI_REGISTER
 tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.MCP_STYLE_CONFIG_ARG
@@ -618,7 +608,6 @@ tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._
 tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.PROMPT_STYLE_FLAG
 tests/assistant/test_constants_provider_style.py:12:private-module:quodeq.core._constants.PROMPT_STYLE_POSITIONAL
 tests/assistant/test_constants_provider_style.py:50:private-module:quodeq.analysis._mcp_arg_builders
-tests/assistant/test_constants_provider_style.py:69:private-module:quodeq.assistant.adapters._cli_config
 tests/assistant/test_constants_provider_style.py:77:private-module:quodeq.assistant.adapters._cli_command
 tests/assistant/test_constants_provider_style.py:86:private-module:quodeq.assistant.adapters._cli_cleanup
 tests/assistant/test_constants_provider_style.py:92:private-name:quodeq.assistant.orchestrator._ISOLATED_MCP_STYLES

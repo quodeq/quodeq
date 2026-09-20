@@ -1,6 +1,6 @@
 from quodeq.assistant.adapters._cli_command import (
     TurnArgvRequest, _with_web_access, build_turn_argv)
-from quodeq.assistant.adapters._cli_config import load_cli_chat_config
+from quodeq.assistant.adapters.cli_config import load_cli_chat_config
 
 
 def _spec(provider, **kw):
