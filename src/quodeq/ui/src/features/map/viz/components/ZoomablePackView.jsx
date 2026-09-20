@@ -15,6 +15,13 @@ const LABEL_FONT_DIVISOR = 4;
 const TOOLTIP_OFFSET = 16;
 const TOOLTIP_MAX_MARGIN = 180;
 const TOOLTIP_MAX_MARGIN_Y = 160;
+// Gap d3-pack leaves between a circle and its parent, in layout units.
+const PACK_PADDING = 6;
+// Gap between a circle's top edge and its label baseline.
+const LABEL_GAP_PX = 4;
+// Container size assumed while the element has not been measured yet, so
+// the tooltip still clamps to something sane on the first hover.
+const CONTAINER_FALLBACK_PX = 300;
 
 /* ---- usePackLayout: d3 pack layout computation ---- */
 function usePackLayout(node, viewMode) {
@@ -24,7 +31,7 @@ function usePackLayout(node, viewMode) {
       .sum((d) => (d.children?.length ? 0 : Math.max(1, nodeSize(d, viewMode))))
       .sort((a, b) => (b.value || 0) - (a.value || 0));
     if (!r.value) return { root: r, circles: [] };
-    pack().size([BASE_SIZE, BASE_SIZE]).padding(6)(r);
+    pack().size([BASE_SIZE, BASE_SIZE]).padding(PACK_PADDING)(r);
     return { root: r, circles: r.descendants().filter((c) => c.r > 0) };
   }, [node, viewMode]);
 }
@@ -157,7 +164,7 @@ function PackLabels({ circles, screenCoords, focusNode, skipTransition }) {
     return (
       <text
         key={'lbl-' + (d.path || i)}
-        x={sc.cx} y={sc.cy - sc.r - 4}
+        x={sc.cx} y={sc.cy - sc.r - LABEL_GAP_PX}
         textAnchor="middle" dominantBaseline="auto"
         style={{
           fontSize: Math.min(LABEL_FONT_MAX, Math.max(LABEL_FONT_MIN, sc.r / LABEL_FONT_DIVISOR)),
@@ -180,7 +187,7 @@ function PackTooltip({ circles, hover, mousePos, containerRef }) {
   const hd = circles[hover].data;
   const sev = hd.severity || {};
   return (
-    <div className="map-tooltip" style={{ position: 'absolute', left: Math.min(mousePos.current.x + TOOLTIP_OFFSET, (containerRef.current?.offsetWidth || 300) - TOOLTIP_MAX_MARGIN), top: Math.min(mousePos.current.y + TOOLTIP_OFFSET, (containerRef.current?.offsetHeight || 300) - TOOLTIP_MAX_MARGIN_Y), pointerEvents: 'none', zIndex: 10 }}>
+    <div className="map-tooltip" style={{ position: 'absolute', left: Math.min(mousePos.current.x + TOOLTIP_OFFSET, (containerRef.current?.offsetWidth || CONTAINER_FALLBACK_PX) - TOOLTIP_MAX_MARGIN), top: Math.min(mousePos.current.y + TOOLTIP_OFFSET, (containerRef.current?.offsetHeight || CONTAINER_FALLBACK_PX) - TOOLTIP_MAX_MARGIN_Y), pointerEvents: 'none', zIndex: 10 }}>
       <div className="map-tooltip-title">{(hd.path || hd.name || '').replace(/\/$/, '')}</div>
       <div className="map-tooltip-row"><span>{t('map.violations')}</span><span>{hd.violations}</span></div>
       {hd.violations > 0 && sev.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>{t('map.critical')}</span><span>{sev.critical}</span></div>}

@@ -26,6 +26,12 @@
 
 /* ── Shared by both views ── */
 
+// One dashed-stroke pattern, in the [on, off] pixel pairs ctx.setLineDash
+// wants. Written as a named pair so the two numbers cannot be read the
+// wrong way round, and frozen once at module load: a dash array is handed
+// to the context on every frame that draws its shape.
+const dash = ({ onPx, offPx }) => Object.freeze([onPx, offPx]);
+
 /** Below this an element is invisible, so the draw is skipped entirely. */
 export const MIN_VISIBLE_ALPHA = 0.01;
 
@@ -120,7 +126,7 @@ export const VIOLATION_ORBS = Object.freeze({
 /** The dashed ring marking the keyboard-focused node (a11y, #675). */
 export const FOCUS_RING = Object.freeze({ padPx: 4, alpha: 0.9 });
 /** Its dash pattern, in [on, off] screen pixels. */
-export const FOCUS_RING_DASH = Object.freeze([5, 4]);
+export const FOCUS_RING_DASH = dash({ onPx: 5, offPx: 4 });
 
 /**
  * The animation clock and the framing rules both camera hooks obey. The
@@ -162,8 +168,8 @@ export const CONSTELLATION = Object.freeze({
   labelAlpha: 0.55,
 });
 /** The ring's and the lines' dash patterns, in [on, off] screen pixels. */
-export const CONSTELLATION_RING_DASH = Object.freeze([8, 14]);
-export const CONSTELLATION_LINE_DASH = Object.freeze([3, 5]);
+export const CONSTELLATION_RING_DASH = dash({ onPx: 8, offPx: 14 });
+export const CONSTELLATION_LINE_DASH = dash({ onPx: 3, offPx: 5 });
 
 /**
  * The dot that stands in for a principle while the camera is still at
@@ -248,7 +254,7 @@ export const FOLDER_NEBULA = Object.freeze({
   innerRingAlpha: 0.12,
 });
 /** The cluster border's dash pattern, in [on, off] screen pixels. */
-export const FOLDER_NEBULA_DASH = Object.freeze([6, 12]);
+export const FOLDER_NEBULA_DASH = dash({ onPx: 6, offPx: 12 });
 
 /**
  * A folder or file star itself: its particles, its violation orbs, its hit
