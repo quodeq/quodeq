@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch, MagicMock
 
-from quodeq.llm_bridge._omlx import (
+from quodeq.llm_bridge.omlx import (
     _list_model_dirs,
     list_omlx_models,
     run_concurrency_test,
@@ -25,7 +25,7 @@ class TestListOmlxModels:
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
 
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp):
+        with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp):
             models = list_omlx_models()
 
         assert len(models) == 2
@@ -41,7 +41,7 @@ class TestListOmlxModels:
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
 
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp):
+        with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp):
             models = list_omlx_models()
 
         assert len(models) == 1
@@ -55,8 +55,8 @@ class TestListOmlxModels:
         mock_resp.__exit__ = MagicMock(return_value=False)
         dir_models = [{"name": "mlx-community/gemma-3-4b-it-4bit", "size": 0, "quantization": "", "family": ""}]
 
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp), \
-             patch("quodeq.llm_bridge._omlx._list_model_dirs", return_value=dir_models):
+        with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp), \
+             patch("quodeq.llm_bridge.omlx._list_model_dirs", return_value=dir_models):
             result = list_omlx_models()
 
         assert result == dir_models
@@ -68,14 +68,14 @@ class TestListOmlxModels:
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
 
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp), \
-             patch("quodeq.llm_bridge._omlx._list_model_dirs", return_value=[]):
+        with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp), \
+             patch("quodeq.llm_bridge.omlx._list_model_dirs", return_value=[]):
             assert list_omlx_models() == []
 
     def test_server_offline_falls_back_to_dirs(self):
         dir_models = [{"name": "my-model", "size": 0, "quantization": "", "family": ""}]
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", side_effect=ConnectionRefusedError), \
-             patch("quodeq.llm_bridge._omlx._list_model_dirs", return_value=dir_models):
+        with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", side_effect=ConnectionRefusedError), \
+             patch("quodeq.llm_bridge.omlx._list_model_dirs", return_value=dir_models):
             assert list_omlx_models() == dir_models
 
     def test_non_object_body_falls_back_to_dirs(self):
@@ -87,8 +87,8 @@ class TestListOmlxModels:
         mock_resp.__exit__ = MagicMock(return_value=False)
         dir_models = [{"name": "my-model", "size": 0, "quantization": "", "family": ""}]
 
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp), \
-             patch("quodeq.llm_bridge._omlx._list_model_dirs", return_value=dir_models):
+        with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp), \
+             patch("quodeq.llm_bridge.omlx._list_model_dirs", return_value=dir_models):
             assert list_omlx_models() == dir_models
 
     def test_non_dict_entries_skipped(self):
@@ -98,7 +98,7 @@ class TestListOmlxModels:
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
 
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp):
+        with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp):
             models = list_omlx_models()
 
         assert len(models) == 1
@@ -111,8 +111,8 @@ class TestListOmlxModels:
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
 
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp) as mock_open, \
-             patch("quodeq.llm_bridge._omlx.read_omlx_api_key", return_value="test-key"):
+        with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp) as mock_open, \
+             patch("quodeq.llm_bridge.omlx.read_omlx_api_key", return_value="test-key"):
             list_omlx_models()
 
         req = mock_open.call_args[0][0]
@@ -125,8 +125,8 @@ class TestListOmlxModels:
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
 
-        with patch("quodeq.llm_bridge._omlx.urllib.request.urlopen", return_value=mock_resp) as mock_open, \
-             patch("quodeq.llm_bridge._omlx.read_omlx_api_key", return_value=""):
+        with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp) as mock_open, \
+             patch("quodeq.llm_bridge.omlx.read_omlx_api_key", return_value=""):
             list_omlx_models()
 
         req = mock_open.call_args[0][0]
@@ -142,7 +142,7 @@ class TestListModelDirs:
         target.mkdir()
         (models_dir / "symlinked-model").symlink_to(target)
 
-        with patch("quodeq.llm_bridge._omlx.Path") as mock_path_cls:
+        with patch("quodeq.llm_bridge.omlx.Path") as mock_path_cls:
             mock_path_cls.home.return_value = tmp_path
             result = _list_model_dirs()
 
@@ -151,7 +151,7 @@ class TestListModelDirs:
         assert "symlinked-model" in names
 
     def test_returns_empty_when_dir_missing(self, tmp_path):
-        with patch("quodeq.llm_bridge._omlx.Path") as mock_path_cls:
+        with patch("quodeq.llm_bridge.omlx.Path") as mock_path_cls:
             mock_path_cls.home.return_value = tmp_path  # no .omlx/models subdir
             result = _list_model_dirs()
         assert result == []
@@ -159,24 +159,24 @@ class TestListModelDirs:
 
 class TestConcurrency:
     def test_no_models_available(self):
-        with patch("quodeq.llm_bridge._omlx.list_omlx_models", return_value=[]), \
-             patch("quodeq.llm_bridge._omlx._detect_memory", return_value=48e9):
+        with patch("quodeq.llm_bridge.omlx.list_omlx_models", return_value=[]), \
+             patch("quodeq.llm_bridge.omlx._detect_memory", return_value=48e9):
             result = run_concurrency_test("any")
         assert result["recommended"] == 1
         assert "reason" in result
 
     def test_estimates_with_models_available(self):
         mock_models = [{"name": "mlx-community/gemma-3-4b-it-4bit", "size": 0}]
-        with patch("quodeq.llm_bridge._omlx.list_omlx_models", return_value=mock_models), \
-             patch("quodeq.llm_bridge._omlx._detect_memory", return_value=128e9):
+        with patch("quodeq.llm_bridge.omlx.list_omlx_models", return_value=mock_models), \
+             patch("quodeq.llm_bridge.omlx._detect_memory", return_value=128e9):
             result = run_concurrency_test("mlx-community/gemma-3-4b-it-4bit")
         assert result["recommended"] >= 1
         assert result["gpu_memory"] == 128e9
 
     def test_no_host_memory_detected(self):
         mock_models = [{"name": "mlx-community/gemma-3-4b-it-4bit", "size": 0}]
-        with patch("quodeq.llm_bridge._omlx.list_omlx_models", return_value=mock_models), \
-             patch("quodeq.llm_bridge._omlx._detect_memory", return_value=0):
+        with patch("quodeq.llm_bridge.omlx.list_omlx_models", return_value=mock_models), \
+             patch("quodeq.llm_bridge.omlx._detect_memory", return_value=0):
             result = run_concurrency_test("mlx-community/gemma-3-4b-it-4bit")
         assert result["recommended"] == 1
         assert "reason" in result

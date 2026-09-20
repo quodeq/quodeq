@@ -22,7 +22,7 @@ from quodeq.llm_bridge._llamacpp import (
     list_llamacpp_models,
     run_concurrency_test as run_llamacpp_concurrency_test,
 )
-from quodeq.llm_bridge._omlx import (
+from quodeq.llm_bridge.omlx import (
     get_omlx_status,
     list_omlx_models,
     run_concurrency_test as run_omlx_concurrency_test,

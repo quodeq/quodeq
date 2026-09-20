@@ -19,6 +19,6 @@ def test_llamacpp_imports_the_shared_fraction():
 
 
 def test_omlx_imports_the_shared_fraction():
-    from quodeq.llm_bridge import _omlx
+    from quodeq.llm_bridge import omlx
 
-    assert _omlx.DEFAULT_MEMORY_FRACTION is DEFAULT_MEMORY_FRACTION
+    assert omlx.DEFAULT_MEMORY_FRACTION is DEFAULT_MEMORY_FRACTION

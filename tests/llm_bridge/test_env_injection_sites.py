@@ -6,7 +6,7 @@ They are read per call now; these tests pin that.
 """
 from __future__ import annotations
 
-from quodeq.llm_bridge import _llamacpp, _ollama, _omlx, _providers
+from quodeq.llm_bridge import _llamacpp, _ollama, omlx, _providers
 
 
 def test_llamacpp_base_url_honours_injected_env(monkeypatch):
@@ -44,18 +44,18 @@ def test_omlx_base_url_is_read_per_call(monkeypatch):
 
     monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
     monkeypatch.setenv("OMLX_BASE_URL", "http://localhost:9992")
-    _omlx.get_omlx_status()
+    omlx.get_omlx_status()
     assert seen == ["http://localhost:9992/health"]
 
 
 def test_omlx_api_key_honours_injected_env(monkeypatch):
     monkeypatch.setenv("OMLX_API_KEY", "from-process")
-    assert _omlx.read_omlx_api_key(env={"OMLX_API_KEY": "sk-injected"}) == "sk-injected"
+    assert omlx.read_omlx_api_key(env={"OMLX_API_KEY": "sk-injected"}) == "sk-injected"
     # env={} means "nothing set": the process value must not leak in. The
     # settings.json fallback is the only remaining source.
     monkeypatch.setattr(
-        "quodeq.llm_bridge._omlx.Path.home", lambda: __import__("pathlib").Path("/nonexistent"))
-    assert _omlx.read_omlx_api_key(env={}) == ""
+        "quodeq.llm_bridge.omlx.Path.home", lambda: __import__("pathlib").Path("/nonexistent"))
+    assert omlx.read_omlx_api_key(env={}) == ""
 
 
 def test_local_api_markers_honours_injected_env(monkeypatch):

@@ -22,7 +22,7 @@ _log = logging.getLogger(__name__)
 
 
 def _read_omlx_key(env: Mapping[str, str] | None = None) -> str | None:
-    from quodeq.llm_bridge._omlx import read_omlx_api_key  # noqa: PLC0415
+    from quodeq.llm_bridge.omlx import read_omlx_api_key  # noqa: PLC0415
     return read_omlx_api_key(env)
 
 
