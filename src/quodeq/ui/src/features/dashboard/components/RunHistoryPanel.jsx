@@ -23,16 +23,13 @@ import {
   CHART_MARGIN,
   SELECTED_BAR_OPACITY,
   DESELECTED_BAR_OPACITY,
+  HOVER_STROKE_WIDTH,
+  REF_LINE_OPACITY_EVEN,
+  REF_LINE_OPACITY_ODD,
 } from '../../../components/scoreChartHelpers.js';
 
 const MAX_CHART_RUNS = 20;
 const CHART_HEIGHT = 160;
-// Stroke width of the bar cell currently under the mouse.
-const HOVER_STROKE_WIDTH = 1.5;
-// Alternating reference-line opacity: even indices (0, 2, ...) render a
-// touch stronger than odd ones, breaking up the repeated dashed lines.
-const REF_LINE_OPACITY_EVEN = 0.3;
-const REF_LINE_OPACITY_ODD = 0.2;
 const GRANULARITY_SUFFIX = {
   day: t('granularity.dayAbbrev'),
   week: t('granularity.weekAbbrev'),
