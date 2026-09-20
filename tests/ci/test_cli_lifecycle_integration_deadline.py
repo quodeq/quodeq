@@ -20,7 +20,7 @@ from tests.ci._lifecycle_helpers import _assert_partial_state_invariants
 def test_record_deadline_if_hit_tags_lifecycle_when_deadline_past(tmp_path: Path) -> None:
     """_record_deadline_if_hit must call set_exit_reason('deadline') when
     config.options.deadline_at is in the past (i.e. loop broke on deadline)."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
     from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
     run_dir = tmp_path / "run"
@@ -41,7 +41,7 @@ def test_record_deadline_if_hit_tags_lifecycle_when_deadline_past(tmp_path: Path
 def test_record_deadline_if_hit_noop_when_no_deadline(tmp_path: Path) -> None:
     """If config.options.deadline_at is None, the helper must NOT touch
     exit_reason — a clean run still finalizes with exit_reason=null."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
     from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
     run_dir = tmp_path / "run"
@@ -64,7 +64,7 @@ def test_record_deadline_if_hit_noop_when_no_deadline(tmp_path: Path) -> None:
 def test_record_deadline_if_hit_noop_when_deadline_not_yet_reached(tmp_path: Path) -> None:
     """If the deadline is still in the future when the loops returned (clean
     completion before the budget), the helper must NOT tag exit_reason."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
     from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
     run_dir = tmp_path / "run"
@@ -90,7 +90,7 @@ def test_pipeline_records_deadline_exit_reason_when_budget_expired(tmp_path: Pat
     """End-to-end: when _execute_pipeline returns cleanly but the deadline
     set on config.options has already passed, the pipeline's status.json
     must show state=done AND exit_reason='deadline'."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
 
     evidence_dir = tmp_path / "proj" / "run" / "evidence"
     evaluation_dir = tmp_path / "proj" / "run" / "evaluation"
@@ -153,7 +153,7 @@ def test_c88be50e_partial_state_invariants_agree(tmp_path: Path) -> None:
     completions and 1 error before the deadline trips and the remaining
     file never gets a marker.
     """
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
     from quodeq.analysis.run_lifecycle import RunLifecycleContext
 
     # --- Half (a): lifecycle records exit_reason="deadline" -----------------

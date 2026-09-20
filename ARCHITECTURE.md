@@ -103,7 +103,7 @@ Each evaluation has a directory under `~/.quodeq/evaluations/<project_uuid>/<run
 |---|---|---|
 | `status.json` | CLI (`shared/run_status.py`) | **Authoritative lifecycle state.** Atomic write-tmp-then-rename. Schema-versioned. |
 | `.heartbeat` | CLI (`shared/run_heartbeat.py`) | Empty file whose mtime is the liveness signal. Touched every 5s while `state ∈ {running, finalizing}`. |
-| `.pid` | CLI (`_cli_evaluation.py`) | OS PID. Used by the cancel flow (`services/_external_jobs.py`) to deliver SIGTERM. |
+| `.pid` | CLI (`cli_evaluation.py`) | OS PID. Used by the cancel flow (`services/_external_jobs.py`) to deliver SIGTERM. |
 | `evidence/manifest.json` | Analysis engine | Scan inputs. Presence marks "a run was started." |
 | `evidence/<dim>_evidence.jsonl` | Subagent pool (via `analysis/mcp/router.py::FindingsRouter`) | **Durable findings log.** Append-only stream, source of truth. JSONL is human-readable, recoverable from any disk, and never deleted by the system. |
 | `events.jsonl` | Analysis MCP server (`analysis/mcp/findings_server.py`) + mutation services (dismiss/verify) via `data/events/writer.py::EventLogWriter` | **Event Log.** Append-only stream of typed events (`RUN_STARTED`, `JUDGMENT_CREATED`, `FINDING_DISMISSED`, …) defined in `core/events/models.py`. |

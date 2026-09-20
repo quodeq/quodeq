@@ -2,8 +2,8 @@
 
 Split from ``_cli_resolution.py`` to keep each module under 300 lines.
 Re-exported by ``_cli_resolution.py`` (which is in turn re-exported by
-``_cli_evaluation.py``), so existing ``quodeq._cli_resolution.<name>`` and
-``quodeq._cli_evaluation.<name>`` patch targets keep working unchanged.
+``cli_evaluation.py``), so existing ``quodeq._cli_resolution.<name>`` and
+``quodeq.cli_evaluation.<name>`` patch targets keep working unchanged.
 
 ``_create_worktree``'s failure path calls ``_cleanup_worktree`` through a
 deferred lookup on ``quodeq._cli_resolution`` (rather than a bare name)

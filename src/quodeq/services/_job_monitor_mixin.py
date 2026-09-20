@@ -162,7 +162,7 @@ class _JobMonitorMixin:
 
         The analysis loops break out at the deadline without raising, and the
         lifecycle records ``exit_reason="deadline"`` (see
-        ``_cli_evaluation._record_deadline_if_hit``). When the process then
+        ``cli_evaluation._record_deadline_if_hit``). When the process then
         exits nonzero without the job watchdog ever firing, this is the only
         signal that the exit was a time-limit truncation, not a failure.
         """

@@ -8,8 +8,6 @@
 # hand-editing the baseline over blind --update-baseline regeneration, which
 # can silently absorb a genuinely new violation introduced in the same change.
 src/quodeq/_cli_evaluate_finalize.py:15:private-module:quodeq.analysis._diff_resolver.DiffResolveError
-src/quodeq/_cli_evaluation.py:47:private-module:quodeq.analysis._runner_markers.emit_marker
-src/quodeq/_cli_evaluation.py:49:private-module:quodeq.analysis._diff_resolver.resolve_diff_files
 src/quodeq/_cli_resolution.py:34:private-name:quodeq.analysis.manifest_scope._filter_manifest_by_scope
 src/quodeq/_cli_run_config.py:22:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
 src/quodeq/analysis/_api_source_gathering.py:25:private-name:quodeq.llm_bridge._omlx._read_omlx_api_key
@@ -110,7 +108,8 @@ src/quodeq/assistant/orchestrator.py:20:private-module:quodeq.assistant.tools._w
 src/quodeq/assistant/tools/_read_tools.py:36:private-module:quodeq.services._fs_reports
 src/quodeq/assistant/tools/_read_tools_scope.py:16:private-module:quodeq.services._fs_reports
 src/quodeq/ci/review.py:11:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
-src/quodeq/ci/review.py:138:private-module:quodeq._cli_evaluation.run_diff_evaluation
+src/quodeq/cli_evaluation.py:47:private-module:quodeq.analysis._runner_markers.emit_marker
+src/quodeq/cli_evaluation.py:49:private-module:quodeq.analysis._diff_resolver.resolve_diff_files
 src/quodeq/config/evidence_env.py:10:private-name:quodeq.core.evidence._refs._CWE_URL_TEMPLATE_DEFAULT
 src/quodeq/llm_bridge/_providers.py:4:private-module:quodeq.analysis._provider_cache.get_provider_configs
 src/quodeq/services/_accumulated_cache.py:16:private-name:quodeq.shared.utils._env_int

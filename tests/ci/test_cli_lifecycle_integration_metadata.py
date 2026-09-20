@@ -13,7 +13,7 @@ from quodeq.data.fs.run_status_store import read_status
 
 def test_pipeline_records_provider_and_model_from_env(tmp_path: Path, monkeypatch) -> None:
     """status.json records the AI_PROVIDER/AI_MODEL the CLI ran with."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
 
     monkeypatch.setenv("AI_PROVIDER", "test-provider")
     monkeypatch.setenv("AI_MODEL", "test-model")
@@ -46,7 +46,7 @@ def test_pipeline_records_ai_cmd_as_provider(tmp_path: Path, monkeypatch) -> Non
     AI_CMD → AI_PROVIDER → default; the external path must record the same
     value as the internal path's options.ai_cmd.
     """
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
 
     monkeypatch.setenv("AI_CMD", "llamacpp")
     monkeypatch.setenv("AI_MODEL", "qwen3.6-27b")
@@ -78,7 +78,7 @@ def test_pool_deadline_extension_reaches_status_json(tmp_path: Path) -> None:
     pipeline runs: invoking it (as the pool auto-scale does) must land the
     new deadline in status.json, where the dashboard countdown and the
     post-#956 exit-reason labeling read it."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
     from quodeq.analysis._types import RunConfig
 
     evidence_dir = tmp_path / "proj" / "run" / "evidence"

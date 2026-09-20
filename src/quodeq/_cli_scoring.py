@@ -1,12 +1,12 @@
 """Post-scan score printing — suppression-aware rescoring for the CLI.
 
-Split from ``_cli_evaluation.py`` to keep each module under 300 lines.
-Re-exported from ``_cli_evaluation.py`` so existing
-``quodeq._cli_evaluation.<name>`` imports keep working.
+Split from ``cli_evaluation.py`` to keep each module under 300 lines.
+Re-exported from ``cli_evaluation.py`` so existing
+``quodeq.cli_evaluation.<name>`` imports keep working.
 
 ``_adjusted_score`` calls ``rescore_dimension_from_evidence``, which tests
-patch at ``quodeq._cli_evaluation.rescore_dimension_from_evidence`` — that
-call goes through a deferred ``from quodeq import _cli_evaluation as
+patch at ``quodeq.cli_evaluation.rescore_dimension_from_evidence`` — that
+call goes through a deferred ``from quodeq import cli_evaluation as
 _facade`` lookup so a patch on the facade module lands at call time. That one
 call also reports how many suppressions excluded, so a dimension's evidence
 jsonl is parsed exactly once per print, not once to count exclusions and
@@ -106,10 +106,10 @@ def _adjusted_score(
     """Evidence-based rescore of *dim*: (adjusted score or None to fall back,
     count of violations the suppressions excluded).
 
-    Goes through the ``_cli_evaluation`` facade so tests can patch
-    ``quodeq._cli_evaluation.rescore_dimension_from_evidence`` (module docstring).
+    Goes through the ``cli_evaluation`` facade so tests can patch
+    ``quodeq.cli_evaluation.rescore_dimension_from_evidence`` (module docstring).
     """
-    from quodeq import _cli_evaluation as _facade
+    from quodeq import cli_evaluation as _facade
 
     dismissed, deleted = suppressions
     source_file_count, files_read = _dim_evidence_counts(run_dir / "evaluation", dim)

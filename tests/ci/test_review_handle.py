@@ -5,7 +5,7 @@ import argparse
 import json
 from unittest.mock import MagicMock, patch
 
-from quodeq._cli_evaluation import run_diff_evaluation
+from quodeq.cli_evaluation import run_diff_evaluation
 from quodeq.ci.review import handle_review
 from quodeq.services.dismissed import dismiss_finding
 
@@ -28,7 +28,7 @@ def test_handle_review_default_does_not_pass_dimensions(tmp_path):
     repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
 
     with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
-         patch("quodeq._cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
+         patch("quodeq.cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
         from quodeq.ci.review import handle_review
         handle_review(args)
 
@@ -52,7 +52,7 @@ def test_handle_review_expands_dimension_alias(tmp_path):
     repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
 
     with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
-         patch("quodeq._cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
+         patch("quodeq.cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
         from quodeq.ci.review import handle_review
         handle_review(args)
 
@@ -74,7 +74,7 @@ def test_review_invokes_evaluate_with_diff_from_not_incremental(tmp_path, monkey
     monkeypatch.setattr("quodeq.ci.review.snapshot_run_dirs", lambda d: set())
     # run_diff_evaluation is imported INSIDE handle_review; patch it at its
     # source module so the in-function import picks up the patch.
-    monkeypatch.setattr("quodeq._cli_evaluation.run_diff_evaluation", fake_run_diff_evaluation)
+    monkeypatch.setattr("quodeq.cli_evaluation.run_diff_evaluation", fake_run_diff_evaluation)
     # short-circuit the post/report stage for this test. load_violations_from_evidence
     # is imported inside handle_review, so patch at its source.
     monkeypatch.setattr(
@@ -122,7 +122,7 @@ def test_handle_review_excludes_dismissed_finding(tmp_path, monkeypatch, capsys)
     monkeypatch.setattr("quodeq.ci.review.detect_pr", lambda pr_override=None: (42, "develop"))
     monkeypatch.setattr("quodeq.ci.review.get_repo_info", lambda: ("owner", "repo"))
     monkeypatch.setattr(
-        "quodeq._cli_evaluation.run_diff_evaluation",
+        "quodeq.cli_evaluation.run_diff_evaluation",
         lambda src, **kwargs: 0,
     )
 
@@ -157,7 +157,7 @@ def test_handle_review_time_limit_zero_means_unlimited(tmp_path):
     repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
 
     with patch("quodeq.ci.review.subprocess.run", side_effect=[pr_result, repo_result]), \
-         patch("quodeq._cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
+         patch("quodeq.cli_evaluation.run_diff_evaluation", return_value=0) as mock_run:
         from quodeq.ci.review import handle_review
         handle_review(args)
 
@@ -174,7 +174,7 @@ def test_run_diff_evaluation_builds_evaluate_namespace(tmp_path):
         captured["ns"] = ns
         return 0
 
-    with patch("quodeq._cli_evaluation.run_evaluate", fake_run_evaluate):
+    with patch("quodeq.cli_evaluation.run_evaluate", fake_run_evaluate):
         rc = run_diff_evaluation(
             ".", base_ref="origin/main", output_dir=tmp_path,
             dimensions="security", time_limit=120,
@@ -197,7 +197,7 @@ def test_run_diff_evaluation_defaults(tmp_path):
         captured["ns"] = ns
         return 0
 
-    with patch("quodeq._cli_evaluation.run_evaluate", fake_run_evaluate):
+    with patch("quodeq.cli_evaluation.run_evaluate", fake_run_evaluate):
         run_diff_evaluation(".", base_ref="origin/develop", output_dir=tmp_path)
 
     ns = captured["ns"]

@@ -1,9 +1,9 @@
 """Evaluation input resolution — repo, language, manifest, and scope helpers.
 
-Split from ``_cli_evaluation.py`` to keep each module under 300 lines.
+Split from ``cli_evaluation.py`` to keep each module under 300 lines.
 Worktree management lives in ``_cli_worktree.py``; re-exported here (and, in
-turn, from ``_cli_evaluation.py``) so ``quodeq._cli_resolution._create_worktree``
-and ``quodeq._cli_evaluation._cleanup_worktree`` stay valid patch targets.
+turn, from ``cli_evaluation.py``) so ``quodeq._cli_resolution._create_worktree``
+and ``quodeq.cli_evaluation._cleanup_worktree`` stay valid patch targets.
 ``import subprocess`` stays in this module even though the worktree
 functions moved out — ``_resolve_repo`` below still needs the exception
 types, and tests patch ``quodeq._cli_resolution.subprocess.run``, which
@@ -37,7 +37,7 @@ from quodeq.shared.log_sink import SHARED_LOG
 # Re-exported: moved to _cli_worktree.py to keep this module under 300 lines.
 # _cleanup_worktree is unused directly in this module but must stay imported
 # — it is a patch target (quodeq._cli_resolution._cleanup_worktree) and the
-# public re-export chain through quodeq._cli_evaluation depends on it.
+# public re-export chain through quodeq.cli_evaluation depends on it.
 from quodeq._cli_worktree import _cleanup_worktree, _create_worktree  # noqa: F401
 
 import logging

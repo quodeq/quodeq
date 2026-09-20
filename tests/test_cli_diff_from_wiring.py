@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 
-from quodeq._cli_evaluation import _build_run_config, run_evaluate
+from quodeq.cli_evaluation import _build_run_config, run_evaluate
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.analysis.manifest_models import SourceManifest
 

@@ -1,6 +1,6 @@
 """Command-line interface for Quodeq evaluation and dashboard commands.
 
-Heavy evaluation logic lives in ``quodeq._cli_evaluation`` and its siblings;
+Heavy evaluation logic lives in ``quodeq.cli_evaluation`` and its siblings;
 this module re-exports their entry points under public spellings, so
 ``from quodeq.cli import …`` never has to name an underscore. The underscore
 originals are still importable from the module that defines them.
@@ -42,7 +42,7 @@ from quodeq._cli_resolution import (  # noqa: F401 — public re-exports
     resolve_scope,
     resolve_single_file,
 )
-from quodeq._cli_evaluation import (  # noqa: F401 — public re-exports
+from quodeq.cli_evaluation import (  # noqa: F401 — public re-exports
     build_run_config,
     execute_pipeline,
     run_evaluate,

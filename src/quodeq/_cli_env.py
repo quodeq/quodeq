@@ -1,6 +1,6 @@
 """Environment and argv helpers shared by the evaluate CLI modules.
 
-A leaf: ``_cli_evaluation`` re-exports every name here (and ``quodeq.cli``
+A leaf: ``cli_evaluation`` re-exports every name here (and ``quodeq.cli``
 in turn), and ``_cli_lifecycle`` imports ``_resolve_time_limit`` directly.
 """
 

@@ -11,7 +11,7 @@ def test_no_direct_stderr_prints_in_pipeline() -> None:
     (line 133: `print(f"  {dim}: {score}")`) because those print to stdout for
     shell piping.
     """
-    src = Path("src/quodeq/_cli_evaluation.py").read_text()
+    src = Path("src/quodeq/cli_evaluation.py").read_text()
     tree = ast.parse(src)
     offenders: list[tuple[int, str]] = []
     for node in ast.walk(tree):

@@ -135,7 +135,7 @@ def _run_pr_diff_and_locate_evidence(
 
     print(f"Running PR diff evaluation (base: origin/{base_branch})...")
     start = time.time()
-    from quodeq._cli_evaluation import run_diff_evaluation
+    from quodeq.cli_evaluation import run_diff_evaluation
     exit_code = run_diff_evaluation(
         ".",
         base_ref=f"origin/{base_branch}",

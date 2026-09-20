@@ -34,7 +34,7 @@ _logger = logging.getLogger(__name__)
 def standard_dirs() -> tuple[Path | None, Path | None]:
     """(compiled_dir, evaluators_dir) resolved exactly as scan time does.
 
-    Scan runs build RunConfig from default_paths() (see _cli_evaluation), so
+    Scan runs build RunConfig from default_paths() (see cli_evaluation), so
     resolving here keeps the rescore's PrincipleResolver identical to the one
     that quarantined findings at scan time. Without these dirs the resolver is
     permissive and quarantined findings would re-enter the grade on rescore.
