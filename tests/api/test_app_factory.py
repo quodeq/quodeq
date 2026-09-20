@@ -143,7 +143,7 @@ class TestMainFunction:
         mock_configure = MagicMock()
         with patch("quodeq.api.app.create_app") as mock_create, \
              patch("quodeq.api.app.signal.signal"), \
-             patch("quodeq.shared._io.configure_stdio_utf8", mock_configure):
+             patch("quodeq.shared.text_io.configure_stdio_utf8", mock_configure):
             mock_app = MagicMock()
             mock_app.config = {"_provider": MagicMock()}
             mock_create.return_value = mock_app

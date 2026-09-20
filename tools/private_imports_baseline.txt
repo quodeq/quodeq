@@ -87,7 +87,6 @@ src/quodeq/api/_evaluation_helpers.py:18:private-name:quodeq.shared.repo._looks_
 src/quodeq/api/_rate_limit_file_store.py:14:private-module:quodeq.core.utils._file_lock.lock_file
 src/quodeq/api/_rate_limit_file_store.py:14:private-module:quodeq.core.utils._file_lock.unlock_file
 src/quodeq/api/app.py:118:private-module:quodeq.services._ephemeral_cleanup.sweep_orphaned_clones
-src/quodeq/api/app.py:230:private-module:quodeq.shared._io.configure_stdio_utf8
 src/quodeq/api/app.py:261:private-module:quodeq.services._warmup.engine
 src/quodeq/api/assistant_session_routes.py:23:private-module:quodeq.assistant.tools._actions.ACTION_DESCRIPTIONS
 src/quodeq/api/assistant_session_routes.py:23:private-module:quodeq.assistant.tools._actions.ACTION_TYPES
@@ -127,7 +126,6 @@ src/quodeq/assistant/tools/_read_tools.py:36:private-module:quodeq.services._fs_
 src/quodeq/assistant/tools/_read_tools_scope.py:16:private-module:quodeq.services._fs_reports
 src/quodeq/ci/review.py:11:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
 src/quodeq/ci/review.py:138:private-module:quodeq._cli_evaluation.run_diff_evaluation
-src/quodeq/cli.py:133:private-module:quodeq.shared._io.configure_stdio_utf8
 src/quodeq/config/evidence_env.py:10:private-name:quodeq.core.evidence._refs._CWE_URL_TEMPLATE_DEFAULT
 src/quodeq/context/precedent_corpus.py:139:private-module:quodeq.llm_bridge._embeddings.BATCH_TIMEOUT
 src/quodeq/context/precedent_corpus.py:139:private-module:quodeq.llm_bridge._embeddings.EmbeddingEndpoint

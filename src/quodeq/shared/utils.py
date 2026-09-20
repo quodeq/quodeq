@@ -11,7 +11,7 @@ Categories of re-exported utilities
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. **I/O helpers** -- ``read_text``, ``write_text``, ``open_text``, ``read_json``
-   (from ``_io.py``)
+   (from ``text_io.py``)
 2. **Security helpers** -- ``SENSITIVE_PATTERNS``, ``sanitize_sensitive``
    (from ``_security.py``)
 3. **Config loading** -- ``Config`` dataclass, lazy singleton via ``_get_config()``
@@ -33,7 +33,7 @@ import sys
 # Re-exports — I/O and security helpers
 # ---------------------------------------------------------------------------
 
-from quodeq.shared._io import TEXT_ENCODING, read_text, write_text, open_text, read_json
+from quodeq.shared.text_io import TEXT_ENCODING, read_text, write_text, open_text, read_json
 from quodeq.shared._security import SENSITIVE_PATTERNS, sanitize_sensitive
 
 # ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ def __getattr__(name: str) -> str:
 
 
 __all__ = [
-    # I/O helpers (re-exported from _io.py)
+    # I/O helpers (re-exported from text_io.py)
     "TEXT_ENCODING", "read_text", "write_text", "open_text", "read_json",
     # Security helpers (re-exported from _security.py)
     "SENSITIVE_PATTERNS", "sanitize_sensitive",

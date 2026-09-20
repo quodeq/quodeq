@@ -1559,14 +1559,12 @@ tests/services/test_violations_stream_coverage.py:99:private-name:quodeq.service
 tests/services/test_violations_stream_coverage.py:99:private-name:quodeq.services._violations_stream._parse_stream_line
 tests/services/test_warmup_engine.py:12:private-module:quodeq.services._warmup.WarmupEngine
 tests/services/test_warmup_engine.py:184:private-name:quodeq.services._warmup._warm_project
-tests/shared/test_cluster34_empty_except_logging.py:12:private-module:quodeq.shared._io
 tests/shared/test_coerce_line.py:36:private-module:quodeq.assistant.tools._read_tools_violations
 tests/shared/test_config_loader.py:5:private-module:quodeq.shared._config
 tests/shared/test_copilot.py:7:private-module:quodeq.assistant.adapters._cli_spawn.build_chat_env
 tests/shared/test_env_numeric.py:6:private-name:quodeq.shared._config._get_config
 tests/shared/test_env_seams_t5.py:21:private-module:quodeq.shared._config.defaults_path
 tests/shared/test_env_seams_t5.py:21:private-name:quodeq.shared._config._ConfigHolder
-tests/shared/test_env_seams_t5.py:22:private-module:quodeq.shared._io.configure_stdio_utf8
 tests/shared/test_env_seams_t5.py:23:private-name:quodeq.shared._log_format._should_use_color
 tests/shared/test_env_seams_t5.py:24:private-name:quodeq.shared.logging._apply_env_log_level
 tests/shared/test_env_seams_t5.py:24:private-name:quodeq.shared.logging._logger
@@ -1577,7 +1575,6 @@ tests/shared/test_resource_sampler.py:18:private-name:quodeq.shared.resource_sam
 tests/shared/test_resource_sampler.py:18:private-name:quodeq.shared.resource_sampler._self_rss_mb
 tests/shared/test_security.py:4:private-module:quodeq.shared._security.sanitize_sensitive
 tests/shared/test_sqlite_kill_switch.py:52:private-module:quodeq.data.fs.report_parser._evidence.load_evidence_map
-tests/shared/test_stdio_utf8.py:15:private-module:quodeq.shared._io.configure_stdio_utf8
 tests/shared/test_utils.py:11:private-module:quodeq.shared._diff.show_diff
 tests/terminal/test_pty_unix.py:34:private-module:quodeq.terminal._pty_unix.UnixPty
 tests/terminal/test_pty_unix.py:48:private-module:quodeq.terminal._pty_unix.UnixPty

@@ -227,7 +227,7 @@ def create_app(
 
 def main(env: dict[str, str] | None = None) -> None:
     """Start the Flask development server using environment configuration."""
-    from quodeq.shared._io import configure_stdio_utf8
+    from quodeq.shared.text_io import configure_stdio_utf8
     configure_stdio_utf8(env)
     _env = resolve_env(env)
     # SECURITY: API key read from environment. For hardened deployments,

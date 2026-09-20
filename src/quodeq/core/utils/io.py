@@ -2,7 +2,7 @@
 
 These live in core (stdlib-only, no outward imports) so domain modules like
 the evidence parser and standards loader can use them without reaching into
-``shared/``. ``shared/_io.py`` re-exports them for the rest of the codebase.
+``shared/``. ``shared/text_io.py`` re-exports them for the rest of the codebase.
 """
 from __future__ import annotations
 

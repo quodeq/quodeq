@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.shared import _io, process_kill, frozen, ssrf
+from quodeq.shared import text_io, process_kill, frozen, ssrf
 
 # The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
 # restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
@@ -21,10 +21,10 @@ def test_configure_stdio_utf8_logs_each_unreconfigurable_stream(monkeypatch) -> 
         def reconfigure(self, **_kwargs):
             raise ValueError("not reconfigurable")
 
-    monkeypatch.setattr(_io.sys, "stdout", _Stream())
-    monkeypatch.setattr(_io.sys, "stderr", _Stream())
-    with patch.object(_io._logger, "debug") as debug:
-        _io.configure_stdio_utf8()
+    monkeypatch.setattr(text_io.sys, "stdout", _Stream())
+    monkeypatch.setattr(text_io.sys, "stderr", _Stream())
+    with patch.object(text_io._logger, "debug") as debug:
+        text_io.configure_stdio_utf8()
     assert debug.call_count == 2
     assert "reconfigured to UTF-8" in debug.call_args.args[0]
 
