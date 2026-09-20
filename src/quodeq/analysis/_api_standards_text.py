@@ -14,6 +14,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from quodeq.analysis import dispatch_policy
+from quodeq.config.analysis_env import max_api_prompt_chars, max_standards_chars
 
 _log = logging.getLogger(__name__)
 
@@ -87,24 +88,15 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     return selected
 
 
-_DEFAULT_MAX_API_PROMPT_CHARS = 30000  # Target inlined-file budget for local models (~8K tokens)
-
-
 def _api_prompt_char_budget(env: dict[str, str] | None = None) -> int:
     """Max bytes of file content to inline per model call.
 
-    *env* lets subprocess.py pass the process environment explicitly so
-    this analysis-layer function doesn't read os.environ unprompted; also
-    raised together with QUODEQ_MAX_API_FILE_SIZE for larger-context models.
+    *env* lets subprocess.py pass the process environment explicitly; the
+    ``None`` default resolves in the config layer, so nothing here reads
+    os.environ. Raised together with QUODEQ_MAX_API_FILE_SIZE for
+    larger-context models.
     """
-    raw = (os.environ if env is None else env).get("QUODEQ_MAX_API_PROMPT_CHARS", "")
-    try:
-        return int(raw) if raw else _DEFAULT_MAX_API_PROMPT_CHARS
-    except ValueError:
-        return _DEFAULT_MAX_API_PROMPT_CHARS
-
-
-_DEFAULT_MAX_STANDARDS_CHARS = 50000  # Allow full standards for models with large context
+    return max_api_prompt_chars(env)
 
 
 def _max_standards_chars(env: dict[str, str] | None = None) -> int:
@@ -115,11 +107,7 @@ def _max_standards_chars(env: dict[str, str] | None = None) -> int:
     when running larger-context models. Malformed values fall back to the
     default instead of raising.
     """
-    raw = (os.environ if env is None else env).get("QUODEQ_MAX_STANDARDS_CHARS", "")
-    try:
-        return int(raw) if raw else _DEFAULT_MAX_STANDARDS_CHARS
-    except ValueError:
-        return _DEFAULT_MAX_STANDARDS_CHARS
+    return max_standards_chars(env)
 
 
 def _load_standards_text(

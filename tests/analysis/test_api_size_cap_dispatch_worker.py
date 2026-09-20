@@ -158,6 +158,9 @@ class TestSizeAwareBatching:
             "quodeq.analysis._api_runner.run_api_analysis",
             side_effect=lambda **kw: calls.append(kw["request"].source_file_paths),
         ):
+            # The budget is injected, not exported: the bridge's ``env``
+            # mapping IS the environment it sees, so an empty one would mean
+            # "nothing set" rather than "fall back to the process".
             _run_api_analysis_bridge(
                 src, "prompt", tmp_path / "a1.stream", cfg,
                 {"QUODEQ_MAX_API_PROMPT_CHARS": "150"},

@@ -1,7 +1,6 @@
 """Pool creation, launching, and stream-level evidence collection."""
 from __future__ import annotations
 
-import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -12,6 +11,7 @@ from quodeq.analysis._runner_markers import emit_marker
 from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+from quodeq.config.analysis_env import non_scout_providers, subagent_model_override
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd
@@ -34,9 +34,7 @@ _UNLIMITED_BUDGET = 0
 
 def _non_scout_providers(env: dict[str, str] | None = None) -> tuple[str, ...]:
     """Providers that skip scout mode (no per-token billing), read per call."""
-    raw = (env if env is not None else os.environ).get(
-        "QUODEQ_NON_SCOUT_PROVIDERS", "codex,gemini")
-    return tuple(p.strip() for p in raw.split(",") if p.strip())
+    return non_scout_providers(env)
 
 
 def _resolve_time_limit(user_budget: int | None, queue_size: int) -> int:
@@ -97,10 +95,10 @@ def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override, or None to use the client's default.
 
     Checks SUBAGENT_MODEL first (set by dashboard/service layer),
-    then QUODEQ_SUBAGENT_MODEL (direct env var override).
+    then QUODEQ_SUBAGENT_MODEL (direct env var override). Both are
+    resolved by the config layer.
     """
-    _env = os.environ if env is None else env
-    return _env.get("SUBAGENT_MODEL") or _env.get("QUODEQ_SUBAGENT_MODEL") or None
+    return subagent_model_override(env)
 
 
 @dataclass
