@@ -18,8 +18,8 @@ import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { projectKeys } from "../../../api/queryKeys.js";
+import { STALE_TIME_MS } from "../../../hooks/queryDefaults.js";
 
-const STALE_TIME_MS = 60_000;
 export const PREFETCH_DWELL_MS = 150;
 
 /**

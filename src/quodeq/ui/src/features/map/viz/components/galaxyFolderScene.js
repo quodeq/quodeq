@@ -1,6 +1,7 @@
 import {
   TAU, scoreRGB, sevRGB,
   seedHash, seededRng, mkBackgroundStars,
+  RNG_MIDPOINT, MIN_SEPARATION_PX, REPULSION_PASSES_LARGE,
 } from '../core/galaxyCore.js';
 
 /* ── Position consistency engine ── */
@@ -52,18 +53,13 @@ const FILE_DIST_MIN = 0.2;
 const FILE_DIST_MAX = 0.5;
 const LARGE_SCENE_STARS = 50;
 const MEDIUM_SCENE_STARS = 20;
-const REPULSION_PASSES_LARGE = 3;
 const REPULSION_PASSES_MEDIUM = 5;
 const REPULSION_PASSES_SMALL = 8;
 const TARGET_RADIUS_FRACTION = 0.42;
-// Midpoint of a 0..1 RNG sample: half the particles orbit anticlockwise.
-const RNG_MIDPOINT = 0.5;
 const FOLDER_RADIUS_BASE_PX = 6; // before the sqrt-of-contents growth term
 const FILE_RADIUS_BASE_PX = 5;
 // The folder gap widens with the star count, up to this many stars.
 const FOLDER_GAP_STAR_CAP = 20;
-// Floor on a star-to-star distance, so the push never divides by zero.
-const MIN_SEPARATION_PX = 0.1;
 // Fit margin, as a multiple of a star's radius (wider with particles).
 const FIT_MARGIN_RATIO_WITH_PARTICLES = 3;
 const FIT_MARGIN_RATIO_PLAIN = 2;

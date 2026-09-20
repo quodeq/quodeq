@@ -4,6 +4,7 @@ import FileShape from './FileShape.jsx';
 import { activateOnKey } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
 import { riskBubbleKey } from './riskBubbleName.js';
+import { LABEL_GAP_PX } from './viewLabels.js';
 
 const W = 600, H = 420, PAD = { l: 55, r: 25, t: 35, b: 55 };
 const PW = W - PAD.l - PAD.r, PH = H - PAD.t - PAD.b;
@@ -28,10 +29,8 @@ const TOOLTIP_OFFSET_PX = 12;
 // resting radius, and the radius the pulse swells out to.
 const CRITICAL_RING_PAD_PX = 4;
 const CRITICAL_RING_PULSE_PAD_PX = 8;
-// Gap between a bubble's top edge and its label baseline. A file is drawn
-// as a page glyph rather than a circle, so its visual top sits inside the
-// nominal radius and the label follows it in.
-const LABEL_GAP_PX = 4;
+// A file is drawn as a page glyph rather than a circle, so its visual top
+// sits inside the nominal radius and the label follows it in.
 const FILE_LABEL_RADIUS_FRACTION = 0.9;
 // The plot is split into this many bands on each axis; the gridlines are
 // the boundaries between them, as fractions of the axis.

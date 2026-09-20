@@ -1,4 +1,6 @@
-import { TAU, seedHash, seededRng } from '../core/galaxyCore.js';
+import {
+  TAU, seedHash, seededRng, MIN_SEPARATION_PX, REPULSION_PASSES_LARGE,
+} from '../core/galaxyCore.js';
 
 // Cluster centres sit on a unit circle at this fraction of the layout
 // radius, jittered by the seeded RNG so the groups do not ring evenly.
@@ -6,10 +8,7 @@ const CLUSTER_DIST_FRACTION_MIN = 0.3;
 const CLUSTER_DIST_FRACTION_RANGE = 0.5;
 // Repulsion is O(n^2) per pass, so a crowded cluster gets fewer passes.
 const LARGE_CLUSTER_STARS = 30;
-const REPULSION_PASSES_LARGE = 3;
 const REPULSION_PASSES_SMALL = 6;
-// Floor on a star-to-star distance, so the push never divides by zero.
-const MIN_SEPARATION_PX = 0.1;
 // Extra room a constellation's ring and its label need beyond its spread.
 const CONSTELLATION_MARGIN_X_PX = 40;
 const CONSTELLATION_MARGIN_Y_PX = 50;

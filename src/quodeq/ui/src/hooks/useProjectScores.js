@@ -13,10 +13,7 @@ import { useApi } from "../api/ApiContext.jsx";
 import { projectKeys, samePlaceholderScope } from "../api/queryKeys.js";
 import { resolveAsOf, deriveAvailableRuns } from './projectScoresDerived.js';
 import { t } from '../strings/index.js';
-
-// Shared by the latest and as-of query configs below so the two staleness
-// windows can't silently drift apart.
-const STALE_TIME_MS = 60_000;
+import { STALE_TIME_MS } from './queryDefaults.js';
 
 /**
  * @param {{

@@ -1,8 +1,8 @@
 import { TermHeader, StatStrip, Stat } from '../../../../components/terminal/index.js';
 import HelpHint from '../../../../components/HelpHint.jsx';
 import { t } from '../../../../strings/index.js';
+import { SECONDS_PER_HOUR } from '../../../../utils/time.js';
 
-const SECONDS_PER_HOUR = 3600;
 
 function formatTimeLimit(seconds) {
   if (!seconds || seconds <= 0) return 'No limit';

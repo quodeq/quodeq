@@ -3,11 +3,16 @@ import { readString, writeString } from '../../../adapters/storage.js';
 
 export const NEW_FINDINGS_ONLY_KEY = 'cc-eval-new-findings-only';
 const CHANGE_EVENT = 'live-feed-settings-changed';
+// How the boolean is encoded in localStorage. Read and write must agree, so
+// both go through these rather than spelling the strings out twice.
+const STORED_ON = 'true';
+const STORED_OFF = 'false';
+const STORAGE_EVENT = 'storage';
 
 function loadNewOnly(storage) {
   // On by default: only an explicit opt-out ('false') shows findings
   // carried forward from the incremental cache.
-  return readString(NEW_FINDINGS_ONLY_KEY, null, storage) !== 'false';
+  return readString(NEW_FINDINGS_ONLY_KEY, null, storage) !== STORED_OFF;
 }
 
 /**
@@ -23,7 +28,7 @@ export default function useLiveFeedSettings({ storage = localStorage } = {}) {
   const [newOnly, setNewOnlyState] = useState(() => loadNewOnly(storage));
 
   const setNewOnly = useCallback((value) => {
-    const ok = writeString(NEW_FINDINGS_ONLY_KEY, value ? 'true' : 'false', storage);
+    const ok = writeString(NEW_FINDINGS_ONLY_KEY, value ? STORED_ON : STORED_OFF, storage);
     if (!ok) console.warn('[useLiveFeedSettings] could not persist new-findings-only setting');
     setNewOnlyState(value);
     // A 'storage' event does not fire in the tab that wrote the value, so
@@ -36,10 +41,10 @@ export default function useLiveFeedSettings({ storage = localStorage } = {}) {
     if (typeof window === 'undefined') return undefined;
     const onChange = () => setNewOnlyState(loadNewOnly(storage));
     window.addEventListener(CHANGE_EVENT, onChange);
-    window.addEventListener('storage', onChange);
+    window.addEventListener(STORAGE_EVENT, onChange);
     return () => {
       window.removeEventListener(CHANGE_EVENT, onChange);
-      window.removeEventListener('storage', onChange);
+      window.removeEventListener(STORAGE_EVENT, onChange);
     };
   }, [storage]);
 

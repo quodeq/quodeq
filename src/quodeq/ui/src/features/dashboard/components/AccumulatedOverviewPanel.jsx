@@ -20,6 +20,7 @@ import { buildTopOffendingFiles, buildProjectRootFile } from '../../../utils/exp
 import { withDimensionsStr } from '../../../utils/dimensionUtils.js';
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
+import { DEFAULT_SCORE_HISTORY_GRANULARITY } from '../../../constants.js';
 import { useAccumulatedComputations, computeAccumulatedStats } from '../hooks/useAccumulatedComputations.js';
 import { AccumulatedHeroSection } from './AccumulatedHeroSection.jsx';
 import { useAccumulatedReportSpec } from './accumulatedReportSpecs.jsx';
@@ -69,7 +70,7 @@ function HistoryPanelsRow({
             trend={filteredPeriodTrend}
             selectedRunId={currentOverviewRun}
             onBarClick={onRunClick}
-            granularity={granularity || 'day'}
+            granularity={granularity || DEFAULT_SCORE_HISTORY_GRANULARITY}
             onGranularityChange={onGranularityChange}
           />
         )}

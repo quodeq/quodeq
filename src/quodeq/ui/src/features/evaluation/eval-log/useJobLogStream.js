@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { t } from '../../../strings/index.js';
 
 const MAX_LINES = 5000;
-const READYSTATE_CLOSED = 2;
 const INACTIVITY_MS = 60000;
 // Timer fallback for the rAF batching below: browsers throttle rAF to 0 in
 // background tabs, so without this the queue would never drain there.
@@ -84,7 +83,7 @@ function wireEventSource({ es, append, resetInactivity, inactivityRef, setTermin
   });
   es.onerror = () => {
     if (finishedBox.current) return;
-    if (es.readyState === READYSTATE_CLOSED) {
+    if (es.readyState === EventSource.CLOSED) {
       append(t('evaluate.logDisconnected'));
       setStatus('error');
     }

@@ -198,7 +198,7 @@ export const DIM_PARTICLE = Object.freeze({
 export const DIM_LABEL = Object.freeze({
   fontPx: 14,
   fontMinPx: 11,
-  offsetPx: 24,
+  offsetPx: 24, scoreOffsetPx: 24, // the name sits above the star, the score below
   scoreFontPx: 12,
   scoreFontMinPx: 9,
   scoreAlpha: 0.8,

@@ -5,6 +5,7 @@ import PackInfoPanel from './PackInfoPanel.jsx';
 import PackCircles from './PackCircles.jsx';
 import MapLegend from './MapLegend.jsx';
 import { t } from '../../../../strings/index.js';
+import { LABEL_GAP_PX } from './viewLabels.js';
 
 const BASE_SIZE = 600;
 const PAD = 20;
@@ -17,8 +18,6 @@ const TOOLTIP_MAX_MARGIN = 180;
 const TOOLTIP_MAX_MARGIN_Y = 160;
 // Gap d3-pack leaves between a circle and its parent, in layout units.
 const PACK_PADDING = 6;
-// Gap between a circle's top edge and its label baseline.
-const LABEL_GAP_PX = 4;
 // Container size assumed while the element has not been measured yet, so
 // the tooltip still clamps to something sane on the first hover.
 const CONTAINER_FALLBACK_PX = 300;

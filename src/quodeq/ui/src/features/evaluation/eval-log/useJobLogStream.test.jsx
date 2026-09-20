@@ -14,6 +14,7 @@ function flushBatched() {
 // --- Mock EventSource ---
 class MockEventSource {
   static instances = [];
+  static CLOSED = 2;
   constructor(url) {
     this.url = url;
     this.listeners = {};
@@ -106,7 +107,7 @@ describe('useJobLogStream', () => {
     // close()d mid-flight; readyState reads CLOSED at that point same as a
     // real disconnect would, so the hook must distinguish "done, then
     // closed" from "disconnected".
-    es.readyState = 2; // READYSTATE_CLOSED
+    es.readyState = MockEventSource.CLOSED;
     act(() => { es.emit('error', {}); });
     expect(screen.getByTestId('status')).toHaveTextContent('done');
   });

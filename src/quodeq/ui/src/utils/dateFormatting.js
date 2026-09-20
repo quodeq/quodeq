@@ -1,12 +1,12 @@
 import { isoWeekKey, localDayKey, YEAR_MONTH_KEY_LENGTH } from './dailyGrouping.js';
 import { LOCALE, t } from '../strings/index.js';
+import { SECONDS_PER_HOUR } from './time.js';
 
 // Intl formatters are comparatively expensive to construct, and these run in
 // list renders. Build once at module scope.
 const DAY_MONTH_YEAR = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
 const MONTH_YEAR = new Intl.DateTimeFormat(LOCALE, { month: 'long', year: 'numeric' });
 const RUN_ID_TRUNCATE_LENGTH = 8;
-const SECONDS_PER_HOUR = 3600;
 
 /**
  * Format a date string as "20 Feb 2026" (day + abbreviated month + year).

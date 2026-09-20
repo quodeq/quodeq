@@ -11,7 +11,8 @@
 
 // Onboarding-side IDs differ from the server's ai_providers.json IDs.
 const CLI_SERVER_ID = { 'codex-cli': 'codex', 'claude-code': 'claude' };
-const PROBE_TIMEOUT_MS = 5000;
+/** How long each detection probe waits before aborting its fetch. */
+export const PROBE_TIMEOUT_MS = 5000;
 
 async function detectCliProvider(id) {
   const serverId = CLI_SERVER_ID[id] || id;

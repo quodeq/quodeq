@@ -14,6 +14,15 @@ import { DATA_THEME_ATTR } from '../../../../constants.js';
 
 export const TAU = Math.PI * 2;
 
+/* Shared by both scenes' builders and layout passes: the midpoint of a 0..1
+   RNG sample (centres a jitter on zero, flips half the orbits), the floor on
+   a star-to-star distance so repulsion never divides by zero, and the pass
+   count for the most crowded scenes (repulsion is O(n^2) per pass, so each
+   scene keeps its own counts for the smaller cases). */
+export const RNG_MIDPOINT = 0.5;
+export const MIN_SEPARATION_PX = 0.1;
+export const REPULSION_PASSES_LARGE = 3;
+
 /* ── Theme color helpers ── */
 
 export function parseCSSColor(cssColor) {
@@ -185,8 +194,6 @@ const PARTICLE_SIZE_MINOR = 1.8;
 const PARTICLE_SIZE_MINOR_RANGE = 0.5;
 const PARTICLE_ECCENTRICITY_BASE = 0.65;
 const PARTICLE_ECCENTRICITY_RANGE = 0.35;
-// Midpoint of a 0..1 random sample: half the particles orbit anticlockwise.
-const RNG_MIDPOINT = 0.5;
 
 export function mkParticles(critical, major, minor, baseRadius) {
   const ps = [];

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { listStandards } from '../../../api/standards.js';
+import { STANDARD_TYPES } from '../../standards/hooks/useStandards.js';
 
 /**
  * The map page's one data fetch: standard id → type, used for galaxy
@@ -15,7 +16,7 @@ export function useVisibleStandards() {
   useEffect(() => {
     listStandards().then(stds => {
       const map = {};
-      stds.forEach(s => { map[(s.id || '').toLowerCase()] = s.type || 'custom'; });
+      stds.forEach(s => { map[(s.id || '').toLowerCase()] = s.type || STANDARD_TYPES.CUSTOM; });
       setStandardTypes(map);
     }).catch((err) => {
       console.warn('[useVisibleStandards] standards fetch failed:', err);

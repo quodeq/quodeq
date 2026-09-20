@@ -16,6 +16,10 @@ import { trendDomain, monotonePath } from '../compareTrendModel.js';
 const W = 640;
 const H = 240;
 const PAD = { top: 12, right: 14, bottom: 8, left: 14 };
+// Only a lone-point series draws a visible dot; every point gets a larger
+// transparent circle so the tooltip has a comfortable hit target.
+const LONE_POINT_R = 4;
+const TOOLTIP_HIT_R = 7;
 
 const shortDate = (ms) => new Date(ms).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
 
@@ -36,7 +40,7 @@ function DuelTrendLine({ series, variant, x, y }) {
           className={`compare-duel-trend__dot compare-duel-trend__dot--${variant}`}
           cx={x(series[0].dateISO).toFixed(1)}
           cy={y(series[0].value).toFixed(1)}
-          r="4"
+          r={LONE_POINT_R}
         />
       )}
       {series.map((e) => (
@@ -45,7 +49,7 @@ function DuelTrendLine({ series, variant, x, y }) {
           className="compare-duel-trend__hit"
           cx={x(e.dateISO).toFixed(1)}
           cy={y(e.value).toFixed(1)}
-          r="7"
+          r={TOOLTIP_HIT_R}
         >
           <title>
             {t('compare.duelPointTip', { date: shortDate(Date.parse(e.dateISO)), score: e.value.toFixed(1) })}

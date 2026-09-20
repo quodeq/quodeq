@@ -21,6 +21,10 @@ const RING_LEVEL_3 = 0.6;
 const RING_LEVEL_4 = 0.8;
 const RING_LEVEL_5 = 1.0;
 const RING_LEVELS = [RING_LEVEL_1, RING_LEVEL_2, RING_LEVEL_3, RING_LEVEL_4, RING_LEVEL_5]; // fraction of max
+// Where the insufficient-evidence marker sits, as a fraction of the outer
+// radius. Not a ring level: it happens to coincide with the innermost ring
+// today, but it marks "no score to plot", not a score of 2/10.
+const INSUFFICIENT_DOT_RADIUS_FRACTION = 0.2;
 const LABEL_OFFSET = 18;     // svg units beyond the outer ring (name baseline)
 const VERT_RADIUS = 3.2;
 const INSUF_RADIUS = 3.0;
@@ -128,7 +132,7 @@ function RadialVertices({ points, plotted, principles, angles, outerRadius, onPr
       })}
       {principles.map((p, i) => {
         if (p.hasEvidence) return null;
-        const [x, y] = polar(angles[i], outerRadius * RING_LEVEL_1);
+        const [x, y] = polar(angles[i], outerRadius * INSUFFICIENT_DOT_RADIUS_FRACTION);
         return (
           <circle
             key={`insuf-${i}`}

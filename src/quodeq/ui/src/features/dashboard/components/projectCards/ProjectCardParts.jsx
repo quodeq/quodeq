@@ -18,14 +18,14 @@ export function GradeChip({ grade, score, pending = false }) {
 
 // How many top languages the card's stat row shows before the rest collapse
 // into the file total.
-const MAX_LANGUAGES_SHOWN = 4;
+const CARD_MAX_LANGUAGES_SHOWN = 4;
 
 export function LanguageNumbers({ stats, filesCount }) {
   if (!stats || Object.keys(stats).length === 0) {
     if (filesCount != null) return <span className="project-stat"><span className="project-stat-num">{filesCount.toLocaleString(LOCALE)}</span> <span className="project-stat-label">{t('evaluate.filesLabel')}</span></span>;
     return null;
   }
-  const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, MAX_LANGUAGES_SHOWN);
+  const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, CARD_MAX_LANGUAGES_SHOWN);
   const total = filesCount || sorted.reduce((s, [, c]) => s + c, 0);
   return (
     <div className="project-lang-row">

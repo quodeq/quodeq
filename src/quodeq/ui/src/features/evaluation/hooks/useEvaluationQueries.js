@@ -14,6 +14,10 @@ import { SSE_ENABLED, findingsRefetchInterval } from "./useEvaluation.helpers.js
 import { createViolation } from "../../../models/violation.js";
 
 const JOB_POLL_MS = 1500;
+// Stand-in job id for the disabled queries below: react-query still wants a
+// stable key while `enabled` is false, and routing it through evaluationKeys
+// keeps the placeholder inside the same cache subtree as the real entries.
+const NO_JOB_ID = "_none_";
 
 // Under SSE the cache is filled by useRunEventStream; this queryFn is a
 // no-op. Under polling, fetch each dimension's eval and flatten violations.
@@ -84,7 +88,7 @@ function groupFindingsByDimension(findings) {
 export function useEvaluationQueries(api, jobId) {
   // --- Status (the "job" object) ---------------------------------------
   const statusQuery = useQuery({
-    queryKey: jobId ? evaluationKeys.status(jobId) : ["evaluation", "_none_", "status"],
+    queryKey: evaluationKeys.status(jobId || NO_JOB_ID),
     queryFn: () => api.getEvaluation(jobId),
     enabled: !!jobId,
     staleTime: SSE_ENABLED ? Infinity : 0,
@@ -95,7 +99,7 @@ export function useEvaluationQueries(api, jobId) {
 
   // --- Findings (a flat list, then grouped into liveViolations) --------
   const findingsQuery = useQuery({
-    queryKey: jobId ? evaluationKeys.findings(jobId) : ["evaluation", "_none_", "findings"],
+    queryKey: evaluationKeys.findings(jobId || NO_JOB_ID),
     queryFn: () => fetchFindings(api, job),
     enabled: !!jobId && (SSE_ENABLED || !!job?.outputProject),
     staleTime: SSE_ENABLED ? Infinity : 0,

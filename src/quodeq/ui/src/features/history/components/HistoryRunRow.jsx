@@ -1,6 +1,13 @@
 import { scoreColorClass, gradeLabel } from '../../../utils/formatters.js';
 import { t, LOCALE } from '../../../strings/index.js';
 
+// History index status for a run that is still being evaluated: the row is
+// dimmed and not clickable until it lands.
+const IN_PROGRESS_STATUS = 'in_progress';
+const IN_PROGRESS_ROW_STYLE = { opacity: 0.6, cursor: 'not-allowed' };
+// Stands in for any score the row cannot show yet or at all.
+const NO_VALUE = '—';
+
 function formatDate(dateISO) {
   if (!dateISO) return '';
   try {
@@ -88,7 +95,7 @@ function HistoryRowAcc({ isInProgress, accScore, accLetter, delta }) {
           ? <span style={{ color: 'var(--color-text-subtle)', fontSize: 'var(--text-sm)' }}>{t('history.inProgress')}</span>
           : <>
               <span className={`chip small ${scoreColorClass(accScore)}`} style={{ opacity: 0.85 }}>{accLetter}</span>
-              <span className="history-row-acc-score">{isNaN(accScore) ? '—' : accScore.toFixed(1)}</span>
+              <span className="history-row-acc-score">{isNaN(accScore) ? NO_VALUE : accScore.toFixed(1)}</span>
               <TrendBadge delta={delta} />
             </>
         }
@@ -105,24 +112,24 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
     dimensionDetails,
     status,
   } = entry;
-  const isInProgress = status === 'in_progress';
+  const isInProgress = status === IN_PROGRESS_STATUS;
   const runScore = parseFloat(runNumericAverage);
   const accScore = parseFloat(numericAverage);
   const dims = dimensionDetails || [];
-  const runLetter = gradeLabel(runOverallGrade) || '—';
-  const accLetter = gradeLabel(overallGrade) || '—';
+  const runLetter = gradeLabel(runOverallGrade) || NO_VALUE;
+  const accLetter = gradeLabel(overallGrade) || NO_VALUE;
   const runGradeWord = runOverallGrade ? capitalize(runOverallGrade) : '';
   return (
     <button
       type="button"
       className={`history-row${isSelected ? ' selected' : ''}`}
       onClick={isInProgress ? undefined : () => onClick(runId, dateLabel)}
-      style={isInProgress ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+      style={isInProgress ? IN_PROGRESS_ROW_STYLE : undefined}
       disabled={isInProgress}
     >
       <HistoryRowDate dateISO={dateISO} dateLabel={dateLabel} isInProgress={isInProgress} />
       <div className="history-row-score">
-        <span className="history-row-score-val">{isInProgress ? '—' : (isNaN(runScore) ? '—' : runScore.toFixed(1))}</span>
+        <span className="history-row-score-val">{isInProgress ? NO_VALUE : (isNaN(runScore) ? NO_VALUE : runScore.toFixed(1))}</span>
       </div>
       <HistoryRowEval isInProgress={isInProgress} runScore={runScore} runLetter={runLetter} runGradeWord={runGradeWord} dims={dims} />
       <HistoryRowAcc isInProgress={isInProgress} accScore={accScore} accLetter={accLetter} delta={delta} />

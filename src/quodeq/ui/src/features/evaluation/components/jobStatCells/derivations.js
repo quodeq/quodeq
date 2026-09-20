@@ -6,6 +6,7 @@
 import { computeOverallProgress } from '../scanProgressTotals.js';
 import { t } from '../../../../strings/index.js';
 import { SCAN_MODE } from '../scanModes.js';
+import { SECONDS_PER_HOUR } from '../../../../utils/time.js';
 
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
@@ -16,7 +17,6 @@ import { SCAN_MODE } from '../scanModes.js';
 export const RATE_WINDOW_MS = 120000;  // 2-min sliding window the buffer is trimmed to
 const RATE_MIN_SPAN_MS = 30000;        // refuse to estimate from < this much data
 const ETA_FINISHING_SEC = 45;          // below this, "finishing" reads truer than a rounded "~1 min left"
-const SECONDS_PER_HOUR = 3600;
 // Round the "~N min left" estimate to a legible step instead of showing an
 // exact minute that visibly jitters as the rate estimate wobbles.
 const MINUTE_ROUNDING_STEP = 5;

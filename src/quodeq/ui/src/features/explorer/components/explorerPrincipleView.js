@@ -1,11 +1,15 @@
 import { countBySeverity } from '../../../utils/severity.js';
 
+// Grade the backend writes when a principle had no evidence to judge; the
+// radial dashes those points instead of plotting a score.
+const INSUFFICIENT_GRADE = 'insufficient';
+
 /** Radial chart points: one per principle, score null (dashed on the
  * radial) when the grade carries no real evidence. */
 export function buildRadialPrinciples(principleGrades) {
   return (principleGrades || []).map((pg) => {
     const score = parseFloat(pg.score);
-    const hasEvidence = (pg.grade || '').toLowerCase() !== 'insufficient'
+    const hasEvidence = (pg.grade || '').toLowerCase() !== INSUFFICIENT_GRADE
       && !Number.isNaN(score);
     return { name: pg.principle, score: hasEvidence ? score : null, hasEvidence };
   });

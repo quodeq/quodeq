@@ -1,6 +1,11 @@
 import { TerminalIcon } from '../../components/CopyButton.jsx';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
+import { t } from '../../strings/index.js';
+
+// The switcher sits inside a panel header, so its glyph is smaller than the
+// topbar launcher's default.
+const SWITCH_ICON_PX = 11;
 
 /**
  * Compact icon toggle between the drawer's open panels, rendered inside each
@@ -16,8 +21,11 @@ export default function PanelSwitcher() {
   const meta = {
     // The assistant's Q mark wobbles while a turn streams, so activity shows
     // even when the terminal panel is frontmost.
-    assistant: { label: 'Assistant', icon: <QMarkIcon size={11} className={streaming ? 'assistant-q--think' : undefined} /> },
-    terminal: { label: 'Terminal', icon: <TerminalIcon /> },
+    assistant: {
+      label: t('drawer.panelAssistant'),
+      icon: <QMarkIcon size={SWITCH_ICON_PX} className={streaming ? 'assistant-q--think' : undefined} />,
+    },
+    terminal: { label: t('drawer.panelTerminal'), icon: <TerminalIcon /> },
   };
   return (
     <div className="drawer-switch" role="tablist">

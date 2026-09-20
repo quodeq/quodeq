@@ -5,6 +5,11 @@
 import { createJob } from '../models/job.js';
 import { BASE, request } from './request.js';
 
+// The server-side cancel path can block for the full SIGTERM grace window
+// (~30s) plus the terminal-status wait before responding; the default 30s
+// request timeout aborted client-side right before the backend finished.
+const CANCEL_TIMEOUT_MS = 45000;
+
 /**
  * URL of a run's server-sent-events stream. Full URL rather than a request()
  * path, because EventSource opens the connection itself.
@@ -64,10 +69,7 @@ export function getEvaluationProgress(jobId) {
  */
 export function cancelEvaluation(jobId, opts = {}) {
   const qs = opts.discard ? '?intent=cancel&discard=true' : '?intent=cancel';
-  // The server-side cancel path can block for the full SIGTERM grace window
-  // (~30s) plus the terminal-status wait before responding; the default 30s
-  // request timeout aborted client-side right before the backend finished.
-  return request(`/evaluations/${encodeURIComponent(jobId)}${qs}`, { method: 'DELETE', timeout: 45000 });
+  return request(`/evaluations/${encodeURIComponent(jobId)}${qs}`, { method: 'DELETE', timeout: CANCEL_TIMEOUT_MS });
 }
 
 /**

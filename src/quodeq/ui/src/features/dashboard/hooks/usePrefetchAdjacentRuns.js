@@ -10,6 +10,7 @@
  */
 import { useCallback } from "react";
 import { usePrefetchRun } from "./usePrefetchRun.js";
+import { DEFAULT_PROJECT_SOURCE } from "../../../constants.js";
 
 /**
  * Mouse-enter handlers for the run navigator that warm the adjacent runs'
@@ -17,7 +18,7 @@ import { usePrefetchRun } from "./usePrefetchRun.js";
  *
  * @returns {{onPrevHover: Function, onNextHover: Function, onLatestHover: Function}}
  */
-export function usePrefetchAdjacentRuns({ selectedProject, selectedSource = "local", availableRuns, overviewRunIndex }) {
+export function usePrefetchAdjacentRuns({ selectedProject, selectedSource = DEFAULT_PROJECT_SOURCE, availableRuns, overviewRunIndex }) {
   const { prefetchRun } = usePrefetchRun(selectedProject, selectedSource);
 
   const onPrevHover = useCallback(() => {

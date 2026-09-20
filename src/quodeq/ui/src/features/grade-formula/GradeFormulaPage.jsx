@@ -7,12 +7,17 @@ import {
 } from './tabs.jsx';
 import { t } from '../../strings/index.js';
 
+// labelKey, not label: the catalog is read at render so the tab strip picks
+// up the active locale like every other visible string on the page.
 const TABS = [
-  { id: 'severity', label: 'SEVERITY', Body: SeverityTab },
-  { id: 'curve', label: 'CURVE', Body: CurveTab },
-  { id: 'boundaries', label: 'BOUNDARIES', Body: BoundariesTab },
-  { id: 'dimensions', label: 'DIMENSIONS', Body: DimensionsTab },
+  { id: 'severity', labelKey: 'gradeFormula.tabSeverity', Body: SeverityTab },
+  { id: 'curve', labelKey: 'gradeFormula.tabCurve', Body: CurveTab },
+  { id: 'boundaries', labelKey: 'gradeFormula.tabBoundaries', Body: BoundariesTab },
+  { id: 'dimensions', labelKey: 'gradeFormula.tabDimensions', Body: DimensionsTab },
 ];
+
+// The tab `tab` state falls back to when it matches no TABS entry.
+const DEFAULT_TAB_ID = TABS[0].id;
 
 // A single panel is rendered at a time (swapped by active tab), so every tab
 // button controls the same panel id; the panel in turn is labelled by
@@ -37,7 +42,7 @@ function TabButtons({ tab, setTab }) {
           className={`gf-tab${tab === tabDef.id ? ' gf-tab--active' : ''}`}
           onClick={() => setTab(tabDef.id)}
         >
-          {tabDef.label}
+          {t(tabDef.labelKey)}
         </button>
       ))}
     </div>
@@ -109,7 +114,7 @@ function makeOnReset(resetToDefaults) {
 
 export default function GradeFormulaPage({ navigation }) {
   const projectId = navigation?.selectedProject || null;
-  const [tab, setTab] = useState('severity');
+  const [tab, setTab] = useState(DEFAULT_TAB_ID);
   const {
     draft, isCustom, isDirty, preview, busy, error, partialNotice, update, apply, resetToDefaults,
   } = useGradeFormula(projectId);
@@ -120,7 +125,7 @@ export default function GradeFormulaPage({ navigation }) {
   if (!draft) {
     return (
       <div className="settings-page settings-page--terminal">
-        <TermHeader name="grade formula" sub="loading" />
+        <TermHeader name={t('gradeFormula.headerName')} sub={t('gradeFormula.headerLoading')} />
         {error ? <p className="settings-description">{error}</p> : null}
       </div>
     );
@@ -132,7 +137,7 @@ export default function GradeFormulaPage({ navigation }) {
   return (
     <div className="settings-page settings-page--terminal">
       <TermHeader
-        name="grade formula"
+        name={t('gradeFormula.headerName')}
         sub={projectId ? t('gradeFormula.previewOf', { project: projectId }) : t('gradeFormula.noPreviewProject')}
       />
       <TabButtons tab={tab} setTab={setTab} />

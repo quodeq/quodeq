@@ -65,7 +65,7 @@ export function resolveInitialProject({ list, currentProject, currentSource, onC
   // to a local project + source 'local' — that would silently undo the
   // user's shared selection on every restart. Leave it as restored; the
   // shared clone itself is fetched/validated by Task 17's data hooks.
-  if (currentSource === 'shared' && current) return;
+  if (currentSource === PROJECT_SOURCE.SHARED && current) return;
   if (list.length === 0) {
     if (onNoProjects) onNoProjects();
     return;

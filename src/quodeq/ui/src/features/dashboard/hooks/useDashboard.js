@@ -6,9 +6,9 @@ import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
 import { isFrozenRun } from '../../../models/runRules.js';
 import { t } from '../../../strings/index.js';
 import { useDashboardInvalidation } from './useDashboardInvalidation.js';
+import { STALE_TIME_MS } from '../../../hooks/queryDefaults.js';
 
 const EMPTY_TREND = [];
-const STALE_TIME_MS = 60_000;
 
 /**
  * @param {{

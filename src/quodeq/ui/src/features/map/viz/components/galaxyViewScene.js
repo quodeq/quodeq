@@ -1,6 +1,6 @@
 import {
   TAU, scoreRGB, seedHash, seededRng, gradeToScore, mkParticles,
-  mkBackgroundStars, NEUTRAL_SCORE,
+  mkBackgroundStars, NEUTRAL_SCORE, RNG_MIDPOINT,
 } from '../core/galaxyCore.js';
 import {
   computeClusterPositions, buildMSTLines, applyRepulsionAndRecenter,
@@ -8,9 +8,6 @@ import {
 } from './galaxyViewLayout.js';
 import { t } from '../../../../strings/index.js';
 
-// Midpoint of a 0..1 RNG sample: centres a jitter on zero, and flips an
-// orbit's direction for half the particles.
-const RNG_MIDPOINT = 0.5;
 
 // Scene geometry, in world units. Radii and orbit distances grow with the
 // square root of a node's finding count, so one huge dimension widens the

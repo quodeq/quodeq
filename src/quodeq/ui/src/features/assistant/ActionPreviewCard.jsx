@@ -3,9 +3,20 @@ import { applyAssistantAction, rejectAssistantAction } from '../../api/assistant
 import { notifyAssistantActionApplied } from '../../constants.js';
 import { t } from '../../strings/index.js';
 
+// Server-side action kinds this card knows how to summarise. Anything else
+// falls through to the generic standard-edit summary.
+const ACTION_TYPE = Object.freeze({ DISMISS_FINDING: 'dismiss_finding', VERIFY_FINDING: 'verify_finding' });
+
+// Local lifecycle of one card: idle until the user picks, pending while the
+// request is in flight, then the terminal outcome. Drives both the banner and
+// the disabled state of the buttons.
+const CARD_STATUS = Object.freeze({
+  IDLE: 'idle', PENDING: 'pending', APPLIED: 'applied', REJECTED: 'rejected', ERROR: 'error',
+});
+
 function CardSummary({ actionType, summary }) {
-  if (actionType === 'dismiss_finding' || actionType === 'verify_finding') {
-    const isDismiss = actionType === 'dismiss_finding';
+  if (actionType === ACTION_TYPE.DISMISS_FINDING || actionType === ACTION_TYPE.VERIFY_FINDING) {
+    const isDismiss = actionType === ACTION_TYPE.DISMISS_FINDING;
     return (
       <div className="assistant-card-summary">
         <div className="assistant-card-name">
@@ -29,13 +40,13 @@ function CardSummary({ actionType, summary }) {
 }
 
 function ActionStatusBanner({ status }) {
-  if (status === 'applied') {
+  if (status === CARD_STATUS.APPLIED) {
     return <div className="assistant-card-status assistant-card-status-applied">{t('assistant.applied')}</div>;
   }
-  if (status === 'rejected') {
+  if (status === CARD_STATUS.REJECTED) {
     return <div className="assistant-card-status assistant-card-status-rejected">{t('assistant.rejected')}</div>;
   }
-  if (status === 'error') {
+  if (status === CARD_STATUS.ERROR) {
     return (
       <div className="assistant-card-status assistant-card-status-error">
         {t('assistant.somethingWrong')}
@@ -46,25 +57,25 @@ function ActionStatusBanner({ status }) {
 }
 
 async function applyAction({ actionId, actionType, setStatus }) {
-  setStatus('pending');
+  setStatus(CARD_STATUS.PENDING);
   try {
     const res = await applyAssistantAction(actionId);
     notifyAssistantActionApplied({ actionType, scores: res?.result?.scores, delta: res?.result?.delta });
-    setStatus('applied');
+    setStatus(CARD_STATUS.APPLIED);
   } catch (err) {
     console.warn('[ActionPreviewCard] apply action failed:', err);
-    setStatus('error');
+    setStatus(CARD_STATUS.ERROR);
   }
 }
 
 async function rejectAction({ actionId, setStatus }) {
-  setStatus('pending');
+  setStatus(CARD_STATUS.PENDING);
   try {
     await rejectAssistantAction(actionId);
-    setStatus('rejected');
+    setStatus(CARD_STATUS.REJECTED);
   } catch (err) {
     console.warn('[ActionPreviewCard] reject action failed:', err);
-    setStatus('error');
+    setStatus(CARD_STATUS.ERROR);
   }
 }
 
@@ -99,10 +110,10 @@ function ActionCardButtons({ disabled, onApply, onReject }) {
  * fields provided by the server.
  */
 export function ActionPreviewCard({ action }) {
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState(CARD_STATUS.IDLE);
   const { actionId, actionType, summary } = action;
 
-  const disabled = status !== 'idle';
+  const disabled = status !== CARD_STATUS.IDLE;
 
   return (
     <div className="assistant-card">

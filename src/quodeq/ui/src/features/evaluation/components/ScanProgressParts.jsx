@@ -18,6 +18,9 @@ import { exitReasonInfo, exitReasonWarn } from '../../../models/exitReason.js';
 import { t } from '../../../strings/index.js';
 
 const STATUS_MARKERS = { arrow: '→', check: '✓', error: 'Error:', failed: 'failed' };
+// Job status that still produced results, so a recorded exit reason reads as
+// a partial-coverage warning rather than a failure.
+const STATUS_DONE = 'done';
 
 function isStatusLine(line) {
   const prefixes = [STATUS_MARKERS.arrow, STATUS_MARKERS.check, STATUS_MARKERS.error];
@@ -59,7 +62,7 @@ export function ScanProgressBanner({ isFailed, isLost, status, progress, logs, e
   // Done-with-errors: the provider died mid-run but files had already been
   // analysed, so the run kept its partial results. Warn that the numbers
   // below cover only part of the project.
-  if (status === 'done' && failInfo && exitReasonWarn(reason)) {
+  if (status === STATUS_DONE && failInfo && exitReasonWarn(reason)) {
     return (
       <div className="scan-progress__warning" role="alert">
         <strong>{failInfo.label}</strong> · {t('evaluate.runStoppedEarly')}

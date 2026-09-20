@@ -162,7 +162,7 @@ function drawOneDimStar(ctx, target, view, opts, tc) {
     ctx.fillText(s.name, sc.x, sc.y - sr - DIM_LABEL.offsetPx * fs);
     ctx.font = `${Math.max(DIM_LABEL.scoreFontMinPx, DIM_LABEL.scoreFontPx * fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
     ctx.fillStyle = rgba(tc.textMuted, DIM_LABEL.scoreAlpha * labelAlpha);
-    ctx.fillText(s.score.toFixed(1), sc.x, sc.y + sr + DIM_LABEL.offsetPx * fs);
+    ctx.fillText(s.score.toFixed(1), sc.x, sc.y + sr + DIM_LABEL.scoreOffsetPx * fs);
   }
   // Keyboard focus ring (a11y, #675) — drawn at the dim's hit radius so it
   // lines up with where Enter activates.

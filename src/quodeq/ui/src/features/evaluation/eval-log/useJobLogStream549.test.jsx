@@ -10,6 +10,7 @@ import { useJobLogStream } from './useJobLogStream.js';
 
 class MockEventSource {
   static instances = [];
+  static CLOSED = 2;
   constructor(url) {
     this.url = url;
     this.listeners = {};
@@ -31,7 +32,7 @@ class MockEventSource {
     if (name === 'message' && this._onmessage) this._onmessage(event);
     (this.listeners[name] || []).forEach((fn) => fn(event));
   }
-  close() { this.closed = true; this.readyState = 2; }
+  close() { this.closed = true; this.readyState = MockEventSource.CLOSED; }
 }
 
 function Probe({ jobId }) {
