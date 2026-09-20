@@ -92,6 +92,29 @@ def test_cloud_provider_key_check_honours_injected_env(monkeypatch):
         _check_api_provider("fake", env={})
 
 
+def test_omlx_credential_loader_honours_the_injected_env(monkeypatch, tmp_path: Path):
+    """The registry loader reads the run's mapping, not the process.
+
+    Before the loaders took an ``env``, ``_read_omlx_api_key`` defaulted to
+    ``os.environ`` on every call, so an injected ``{}`` still picked up an
+    exported OMLX_API_KEY.
+    """
+    from quodeq.analysis._config import AnalysisConfig
+    from quodeq.analysis.subprocess import _resolve_provider_config
+
+    monkeypatch.setenv("OMLX_API_KEY", "from-process")
+    # ~/.omlx/settings.json is the loader's other source; point it at an
+    # empty dir so the mapping is the only thing that can supply a key.
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    provider = {"omlx": {"type": "api", "model": "m", "api_base": "http://localhost:8000/v1"}}
+    monkeypatch.setattr(
+        "quodeq.analysis.subprocess.get_provider_configs", lambda: provider)
+    cfg = AnalysisConfig(ai_cmd="omlx", ai_model="m")
+
+    assert _resolve_provider_config(cfg, {"OMLX_API_KEY": "sk-injected"})[2] == "sk-injected"
+    assert _resolve_provider_config(cfg, {})[2] == ""
+
+
 def test_build_analysis_env_uses_the_injected_mapping(monkeypatch):
     monkeypatch.setenv("FROM_PROCESS", "1")
     built = _build_analysis_env(None, {"KEEP": "yes"})

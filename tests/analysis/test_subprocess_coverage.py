@@ -165,7 +165,7 @@ class TestResolveProviderConfig:
         dispatched through the registry rather than via a hard-coded branch."""
         from quodeq.analysis.subprocess import _CREDENTIAL_LOADERS
         # Patch a fake provider into the registry for the duration of the test.
-        _CREDENTIAL_LOADERS["testprovider"] = lambda: "registry-key"
+        _CREDENTIAL_LOADERS["testprovider"] = lambda _env: "registry-key"
         try:
             provider = {"testprovider": {"type": "api", "model": "m", "api_base": "http://tp/v1"}}
             cfg = AnalysisConfig(ai_cmd="testprovider", ai_model="m")

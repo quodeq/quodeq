@@ -165,7 +165,7 @@ def _resolve_provider_config(
     if not api_key:
         loader = _CREDENTIAL_LOADERS.get(ai_cmd)
         if loader is not None:
-            api_key = loader() or ""
+            api_key = loader(env) or ""
 
     if not model:
         raise AnalysisError(
