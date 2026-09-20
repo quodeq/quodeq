@@ -4,9 +4,13 @@ import { AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 import { t } from '../../../strings/index.js';
 import CopilotModelSelect from './CopilotModelSelect.jsx';
 
+// The one CLI provider whose models come from a live account lookup instead
+// of a free-text field.
+const COPILOT_PROVIDER_ID = 'copilot';
+
 /** Use live model choices for Copilot without changing other CLI providers. */
 export function CliModelInput({ providerId, ...props }) {
-  return providerId === 'copilot' ? <CopilotModelSelect {...props} /> : <ModelTextInput {...props} />;
+  return providerId === COPILOT_PROVIDER_ID ? <CopilotModelSelect {...props} /> : <ModelTextInput {...props} />;
 }
 
 export function ModelTextInput({ label, value, placeholder, onChange, required, ariaLabel }) {
@@ -32,7 +36,7 @@ export function ModelTextInput({ label, value, placeholder, onChange, required, 
 }
 
 function AnalysisModelsRow({ providerId, state, update, analysisHint }) {
-  const placeholder = providerId === 'copilot' ? t('settings.copilotInheritModel') : undefined;
+  const placeholder = providerId === COPILOT_PROVIDER_ID ? t('settings.copilotInheritModel') : undefined;
   return (
     <div className="settings-row">
       <div className="settings-row-label">

@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useDragLifecycle } from './useDragLifecycle.js';
 
 const MIN_WINDOW_RATIO = 0.1;
+// Default 50/50 split between two adjacent stacked windows, before any drag
+// or keyboard resize has run.
+export const DEFAULT_SPLIT_RATIO = 0.5;
 
 /**
  * Drag-to-resize between stacked side-pane windows.
@@ -20,9 +23,9 @@ const MIN_WINDOW_RATIO = 0.1;
 export function useInnerDividerDrag({ windowCount, containerRef, setResizingFlag, activeDragCleanupRef }) {
   // Per-resizer ratios: ratios[i] in [0,1] is the share of (weights[i] + weights[i+1])
   // that goes to weights[i]. Reset whenever the window count changes (structural reset).
-  const [ratios, setRatios] = useState(() => Array(Math.max(0, windowCount - 1)).fill(0.5));
+  const [ratios, setRatios] = useState(() => Array(Math.max(0, windowCount - 1)).fill(DEFAULT_SPLIT_RATIO));
   useEffect(() => {
-    setRatios(Array(Math.max(0, windowCount - 1)).fill(0.5));
+    setRatios(Array(Math.max(0, windowCount - 1)).fill(DEFAULT_SPLIT_RATIO));
   }, [windowCount]);
 
   const beginDrag = useDragLifecycle({ setResizingFlag, activeDragCleanupRef });
@@ -36,7 +39,7 @@ export function useInnerDividerDrag({ windowCount, containerRef, setResizingFlag
     const bEl = slots[index + 1];
     if (!aEl || !bEl) return;
     const startY = e.clientY;
-    const startRatio = ratios[index] ?? 0.5;
+    const startRatio = ratios[index] ?? DEFAULT_SPLIT_RATIO;
     const span = aEl.offsetHeight + bEl.offsetHeight;
     if (span <= 0) return;
     // Combined weight of these two slots stays constant during this drag —

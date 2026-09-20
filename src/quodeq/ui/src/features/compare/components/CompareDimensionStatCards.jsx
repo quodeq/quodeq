@@ -4,6 +4,9 @@ import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t } from '../../../strings/index.js';
 import { nf, score1 } from '../compareFormatters.js';
 
+// Below the midpoint of the 0-10 score scale: the weakest-principle stat
+// renders with critical tone instead of the default.
+const CRITICAL_SCORE_THRESHOLD = 5;
 
 /** The dimension-scoped stat cards: scope score, spread, violations, weakest
  * principle. */
@@ -42,7 +45,7 @@ export default function CompareDimensionStatCards({ view }) {
         label={t('compare.cardWeakest')}
         value={view.weakest ? view.weakest.label : '—'}
         hint={view.weakest ? t('compare.weakestNote', { score: score1(view.weakest.avg) }) : ''}
-        tone={view.weakest && view.weakest.avg != null && view.weakest.avg < 5 ? 'critical' : 'default'}
+        tone={view.weakest && view.weakest.avg != null && view.weakest.avg < CRITICAL_SCORE_THRESHOLD ? 'critical' : 'default'}
       />
     </StatStrip>
   );

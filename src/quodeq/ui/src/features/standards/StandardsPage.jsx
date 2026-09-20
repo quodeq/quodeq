@@ -8,15 +8,19 @@ import ImportModal from './components/ImportModal.jsx';
 import { TermHeader } from '../../components/terminal/index.js';
 import { useAppState } from '../../hooks/useAppState.js';
 import { t } from '../../strings/index.js';
+import { PROJECT_SOURCE } from '../../constants.js';
+
+// Which screen the page shows: the table, or the editor in create/edit mode.
+const VIEW_MODE = { LIST: 'list', EDIT: 'edit', NEW: 'new' };
 
 export function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible) {
-  const [view, setView] = useState({ mode: 'list' });
+  const [view, setView] = useState({ mode: VIEW_MODE.LIST });
   const [showImport, setShowImport] = useState(false);
 
-  const handleEdit = (standardId) => setView({ mode: 'edit', standardId });
-  const handleNewStandard = () => setView({ mode: 'new' });
-  const handleEditorBack = () => { setView({ mode: 'list' }); refresh(); };
-  const handleSaved = (savedId) => { if (savedId) addVisible(savedId); setView({ mode: 'list' }); refresh(); };
+  const handleEdit = (standardId) => setView({ mode: VIEW_MODE.EDIT, standardId });
+  const handleNewStandard = () => setView({ mode: VIEW_MODE.NEW });
+  const handleEditorBack = () => { setView({ mode: VIEW_MODE.LIST }); refresh(); };
+  const handleSaved = (savedId) => { if (savedId) addVisible(savedId); setView({ mode: VIEW_MODE.LIST }); refresh(); };
   const handleImported = (importedId) => { if (importedId) addVisible(importedId); setShowImport(false); refresh(); };
   const handleDeleteWithCleanup = async (id) => {
     removeVisible(id);
@@ -56,7 +60,7 @@ export default function StandardsPage({ onRescan }) {
   // per-project PUT would 404 and vanish in persist()'s fire-and-forget
   // catch. The toggle still lands in the browser-local visible set, which
   // is what every screen filters by.
-  const visibilityProjectId = selectedSource === 'shared' ? null : selectedProject;
+  const visibilityProjectId = selectedSource === PROJECT_SOURCE.SHARED ? null : selectedProject;
   const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards({ projectId: visibilityProjectId });
   // A new standard only reaches the Evaluate picker once it is visible for
   // this project. Create does that in handleSaved; duplicate and import
@@ -75,8 +79,8 @@ export default function StandardsPage({ onRescan }) {
     handleDeleteWithCleanup,
   } = useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible);
 
-  if (view.mode === 'edit' || view.mode === 'new') {
-    return <StandardEditor standardId={view.standardId} isNew={view.mode === 'new'} onBack={handleEditorBack} onSaved={handleSaved} onRescan={onRescan} />;
+  if (view.mode === VIEW_MODE.EDIT || view.mode === VIEW_MODE.NEW) {
+    return <StandardEditor standardId={view.standardId} isNew={view.mode === VIEW_MODE.NEW} onBack={handleEditorBack} onSaved={handleSaved} onRescan={onRescan} />;
   }
 
   const activeCount = grouped

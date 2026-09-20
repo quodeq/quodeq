@@ -14,6 +14,21 @@ from typing import Callable
 _TOOL_USE_TYPE = "tool_use"
 _FILE_READ_TOOLS = frozenset({"Read", "Grep"})
 
+# Stream event "type" values, compared more than once in this module (and by
+# assistant/adapters/_stream.py, which reads the same wire formats).
+EVENT_TYPE_ASSISTANT = "assistant"
+EVENT_TYPE_ASSISTANT_MESSAGE = "assistant.message"
+EVENT_TYPE_RESULT = "result"
+EVENT_TYPE_ITEM_COMPLETED = "item.completed"
+EVENT_TYPE_SESSION_WARNING = "session.warning"
+EVENT_TYPE_SESSION_ERROR = "session.error"
+EVENT_TYPE_TOOL_EXECUTION_START = "tool.execution_start"
+# Copilot's tool-name equivalents of Claude's _FILE_READ_TOOLS.
+_COPILOT_FILE_READ_TOOLS = frozenset({"view", "grep"})
+# Non-retryable reason code for a Copilot MCP-policy block. Read back by
+# analysis/errors.py's provider_exit_reason and services/_job_monitor_mixin.py.
+COPILOT_MCP_POLICY_REASON = "copilot_mcp_policy"
+
 
 def texts_from_assistant(event: dict) -> list[str]:
     """Extract text blocks from an ``assistant`` stream event."""
@@ -67,32 +82,32 @@ def _copilot_mcp_policy_error(data: dict) -> tuple[str, str] | None:
                 f"Copilot policy blocked Quodeq's required MCP server '{server}'. "
                 "Ask your organization administrator to allow this MCP server. "
                 "Signing in or selecting a model does not grant MCP access.",
-                "copilot_mcp_policy",
+                COPILOT_MCP_POLICY_REASON,
             )
     return None
 
 
 def copilot_error(event: dict) -> tuple[str, str | None] | None:
     """Return a Copilot error message and optional non-retryable reason."""
-    if event.get("type") == "session.warning":
+    if event.get("type") == EVENT_TYPE_SESSION_WARNING:
         return _copilot_mcp_policy_error(copilot_event_data(event))
-    if event.get("type") == "session.error":
+    if event.get("type") == EVENT_TYPE_SESSION_ERROR:
         data = copilot_event_data(event)
         message = data.get("message")
         category = data.get("errorType")
         reason = {"authentication": "auth", "authorization": "auth",
                   "quota": "quota", "policy": "policy"}.get(category) if isinstance(category, str) else None
         return (message if isinstance(message, str) and message else "Copilot session failed", reason)
-    if event.get("type") == "result" and event.get("exitCode"):
+    if event.get("type") == EVENT_TYPE_RESULT and event.get("exitCode"):
         return (f"Copilot exited with code {event['exitCode']}", None)
     return None
 
 
 TEXT_EXTRACTORS: dict[str, Callable[[dict], list[str]]] = {
-    "assistant": texts_from_assistant,
-    "result": texts_from_result,
-    "item.completed": texts_from_item_completed,
-    "assistant.message": texts_from_copilot,
+    EVENT_TYPE_ASSISTANT: texts_from_assistant,
+    EVENT_TYPE_RESULT: texts_from_result,
+    EVENT_TYPE_ITEM_COMPLETED: texts_from_item_completed,
+    EVENT_TYPE_ASSISTANT_MESSAGE: texts_from_copilot,
 }
 
 
@@ -123,14 +138,14 @@ def extract_files_from_event(data: dict) -> set[str]:
     if not isinstance(data, dict):
         return set()
     etype = data.get("type", "")
-    if etype == "assistant":
+    if etype == EVENT_TYPE_ASSISTANT:
         return extract_files_from_blocks(data.get("message", {}).get("content", []))
-    if etype == "item.completed":
+    if etype == EVENT_TYPE_ITEM_COMPLETED:
         return extract_files_from_blocks(data.get("item", {}).get("content", []))
-    if etype == "tool.execution_start":
+    if etype == EVENT_TYPE_TOOL_EXECUTION_START:
         payload = copilot_event_data(data)
         args = payload.get("arguments")
-        if payload.get("toolName") in ("view", "grep") and isinstance(args, dict):
+        if payload.get("toolName") in _COPILOT_FILE_READ_TOOLS and isinstance(args, dict):
             path = args.get("path")
             if isinstance(path, str) and path:
                 return {path}

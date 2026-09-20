@@ -4,6 +4,7 @@ import FileShape from './FileShape.jsx';
 import { activateOnKey } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
 import { riskBubbleKey } from './riskBubbleName.js';
+import { LABEL_GAP_PX } from './viewLabels.js';
 
 const W = 600, H = 420, PAD = { l: 55, r: 25, t: 35, b: 55 };
 const PW = W - PAD.l - PAD.r, PH = H - PAD.t - PAD.b;
@@ -23,6 +24,30 @@ const AXIS_SCALE_MARGIN = 1.15;
 const ENTRANCE_DELAY_MS = 50;
 const TOOLTIP_FLIP_X_THRESHOLD = 0.65;
 const TOOLTIP_FLIP_Y_THRESHOLD = 0.75;
+const TOOLTIP_OFFSET_PX = 12;
+// The pulsing ring that marks a bubble carrying critical violations: its
+// resting radius, and the radius the pulse swells out to.
+const CRITICAL_RING_PAD_PX = 4;
+const CRITICAL_RING_PULSE_PAD_PX = 8;
+// A file is drawn as a page glyph rather than a circle, so its visual top
+// sits inside the nominal radius and the label follows it in.
+const FILE_LABEL_RADIUS_FRACTION = 0.9;
+// The plot is split into this many bands on each axis; the gridlines are
+// the boundaries between them, as fractions of the axis.
+const GRIDLINE_BANDS = 4;
+const GRIDLINE_FRACTIONS = Object.freeze(
+  Array.from({ length: GRIDLINE_BANDS - 1 }, (_, i) => (i + 1) / GRIDLINE_BANDS),
+);
+// The two corner captions ("fix first" / "low priority"): how far in from
+// the plot's edges they sit, and their type.
+const QUADRANT_LABEL_INSET_PX = 8;
+const QUADRANT_LABEL_TOP_PX = 18;
+const QUADRANT_LABEL_FONT_PX = 10;
+// The axis titles: their type, and the gap below the plot / in from the
+// left edge that they are centred in.
+const AXIS_TITLE_FONT_PX = 11;
+const AXIS_TITLE_BOTTOM_GAP_PX = 8;
+const AXIS_TITLE_LEFT_PX = 14;
 
 /* ── Hook: bubble positioning & collision detection ── */
 
@@ -67,8 +92,8 @@ function BubbleNode({ point, px, py, br, entered, tip, setTip, onDrillDown, onFi
   const canDrill = !child.isFile && child.children?.length > 0;
   return (
     <g style={{ opacity: entered ? 1 : 0, transition: 'opacity 0.2s ease' }}>
-      {hasCritical && <circle cx={cx} cy={cy} r={r + 4} fill="none" stroke={color} strokeWidth={1} opacity={0.3}>
-        <animate attributeName="r" values={`${r + 2};${r + 8};${r + 2}`} dur="2s" repeatCount="indefinite" />
+      {hasCritical && <circle cx={cx} cy={cy} r={r + CRITICAL_RING_PAD_PX} fill="none" stroke={color} strokeWidth={1} opacity={0.3}>
+        <animate attributeName="r" values={`${r + 2};${r + CRITICAL_RING_PULSE_PAD_PX};${r + 2}`} dur="2s" repeatCount="indefinite" />
         <animate attributeName="opacity" values="0.3;0.1;0.3" dur="2s" repeatCount="indefinite" />
       </circle>}
       {canDrill ? (
@@ -110,7 +135,7 @@ function BubbleLabels({ points, px, py, br, entered }) {
   return sorted.map(({ child, x, y, b }) => {
     const cx = px(x), cy = py(y), r = br(b);
     const canDrill = !child.isFile && child.children?.length > 0;
-    const labelY = canDrill ? cy - r - 4 : cy - r * 0.9 - 4;
+    const labelY = canDrill ? cy - r - LABEL_GAP_PX : cy - r * FILE_LABEL_RADIUS_FRACTION - LABEL_GAP_PX;
     const fs = Math.min(LABEL_FONT_MAX, Math.max(LABEL_FONT_MIN, r / LABEL_FONT_DIVISOR));
     const estW = (child.name || '').length * fs * LABEL_CHAR_WIDTH_FACTOR;
     const estH = fs + 2;
@@ -171,10 +196,10 @@ function MatrixTooltip({ tip }) {
   return (
     <div className="map-tooltip" style={{
       position: 'fixed',
-      left: tip.x > window.innerWidth * TOOLTIP_FLIP_X_THRESHOLD ? undefined : tip.x + 12,
-      right: tip.x > window.innerWidth * TOOLTIP_FLIP_X_THRESHOLD ? window.innerWidth - tip.x + 12 : undefined,
-      top: tip.y > window.innerHeight * TOOLTIP_FLIP_Y_THRESHOLD ? undefined : tip.y - 12,
-      bottom: tip.y > window.innerHeight * TOOLTIP_FLIP_Y_THRESHOLD ? window.innerHeight - tip.y + 12 : undefined,
+      left: tip.x > window.innerWidth * TOOLTIP_FLIP_X_THRESHOLD ? undefined : tip.x + TOOLTIP_OFFSET_PX,
+      right: tip.x > window.innerWidth * TOOLTIP_FLIP_X_THRESHOLD ? window.innerWidth - tip.x + TOOLTIP_OFFSET_PX : undefined,
+      top: tip.y > window.innerHeight * TOOLTIP_FLIP_Y_THRESHOLD ? undefined : tip.y - TOOLTIP_OFFSET_PX,
+      bottom: tip.y > window.innerHeight * TOOLTIP_FLIP_Y_THRESHOLD ? window.innerHeight - tip.y + TOOLTIP_OFFSET_PX : undefined,
     }}>
       <div className="map-tooltip-title">{c.path || c.name}</div>
       <div className="map-tooltip-row"><span>{t('map.violations')}</span><span>{c.violations}</span></div>
@@ -215,18 +240,18 @@ export default function RiskMatrixView({ node, onDrillDown, onFileClick, showLab
         </defs>
         <rect x={PAD.l} y={PAD.t} width={PW} height={PH} fill="url(#riskDanger)" />
         <rect x={PAD.l} y={PAD.t} width={PW} height={PH} fill="url(#riskSafe)" />
-        {[0.25, 0.5, 0.75].map((f) => (
+        {GRIDLINE_FRACTIONS.map((f) => (
           <g key={f} opacity={0.3}>
             <line x1={PAD.l} y1={PAD.t + PH * (1 - f)} x2={PAD.l + PW} y2={PAD.t + PH * (1 - f)} stroke="var(--color-border)" strokeWidth={0.5} />
             <line x1={PAD.l + PW * f} y1={PAD.t} x2={PAD.l + PW * f} y2={PAD.t + PH} stroke="var(--color-border)" strokeWidth={0.5} />
           </g>
         ))}
-        <text x={PAD.l + PW - 8} y={PAD.t + 18} textAnchor="end" fontSize={10} fill="var(--color-sev-critical-text)" opacity={0.6} fontWeight="600" fontFamily="var(--font-sans)">{t('map.fixFirst')}</text>
-        <text x={PAD.l + 8} y={PAD.t + PH - 8} textAnchor="start" fontSize={10} fill="var(--color-compliance)" opacity={0.6} fontWeight="600" fontFamily="var(--font-sans)">{t('map.lowPriority')}</text>
+        <text x={PAD.l + PW - QUADRANT_LABEL_INSET_PX} y={PAD.t + QUADRANT_LABEL_TOP_PX} textAnchor="end" fontSize={QUADRANT_LABEL_FONT_PX} fill="var(--color-sev-critical-text)" opacity={0.6} fontWeight="600" fontFamily="var(--font-sans)">{t('map.fixFirst')}</text>
+        <text x={PAD.l + QUADRANT_LABEL_INSET_PX} y={PAD.t + PH - QUADRANT_LABEL_INSET_PX} textAnchor="start" fontSize={QUADRANT_LABEL_FONT_PX} fill="var(--color-compliance)" opacity={0.6} fontWeight="600" fontFamily="var(--font-sans)">{t('map.lowPriority')}</text>
         <line x1={PAD.l} y1={PAD.t + PH} x2={PAD.l + PW} y2={PAD.t + PH} stroke="var(--color-border)" strokeWidth={1} />
         <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={PAD.t + PH} stroke="var(--color-border)" strokeWidth={1} />
-        <text x={PAD.l + PW / 2} y={H - 8} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)" fontFamily="var(--font-sans)">{t('map.violations')}</text>
-        <text x={14} y={PAD.t + PH / 2} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)" fontFamily="var(--font-sans)" transform={`rotate(-90, 14, ${PAD.t + PH / 2})`}>{t('map.severity')}</text>
+        <text x={PAD.l + PW / 2} y={H - AXIS_TITLE_BOTTOM_GAP_PX} textAnchor="middle" fontSize={AXIS_TITLE_FONT_PX} fill="var(--color-text-muted)" fontFamily="var(--font-sans)">{t('map.violations')}</text>
+        <text x={AXIS_TITLE_LEFT_PX} y={PAD.t + PH / 2} textAnchor="middle" fontSize={AXIS_TITLE_FONT_PX} fill="var(--color-text-muted)" fontFamily="var(--font-sans)" transform={`rotate(-90, ${AXIS_TITLE_LEFT_PX}, ${PAD.t + PH / 2})`}>{t('map.severity')}</text>
         <BubbleGroup points={points} px={px} py={py} br={br} entered={entered}
           showLabels={showLabels} tip={tip} setTip={setTip}
           onDrillDown={onDrillDown} onFileClick={onFileClick} />

@@ -13,6 +13,7 @@ from quodeq.analysis.subagents._pool_models import (
     SubagentResult,
     _AGENT_ID_PREFIX,
 )
+from quodeq.analysis.errors import REASON_AGENT_FAILURE_STREAK
 from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
 from quodeq.config.analysis_env import agent_failure_streak_limit
 from quodeq.shared import cancellation
@@ -151,7 +152,7 @@ def check_agent_failure_streak(results: list[SubagentResult]) -> None:
             f"-- cancelling run, provider appears unable to serve requests. "
             f"Adjust with QUODEQ_AGENT_FAILURE_STREAK (0 disables)."
         )
-        cancellation.request_cancel(reason="agent_failure_streak")
+        cancellation.request_cancel(reason=REASON_AGENT_FAILURE_STREAK)
 
 
 def compute_scale_up(remaining: int, free_slots: int) -> int:

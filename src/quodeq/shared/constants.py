@@ -10,6 +10,17 @@ DEFAULT_TIME_LIMIT = 600  # 10 minutes total time limit (seconds)
 # Structured marker key used for job-tracking JSON markers
 CC_MARKER_KEY = "_cc"
 
+# CC_MARKER_KEY's value vocabulary. Written by analysis/_runner_markers.py's
+# emit_marker (and callers across analysis/), read back by
+# services/_job_monitor_mixin.py's _apply_marker; both layers import from here
+# since services may not import analysis.
+CC_PHASE_SETUP = "setup"
+CC_PHASE_ANALYZING = "analyzing"
+CC_PHASE_SCORING = "scoring"
+CC_PHASE_ANALYZING_START = "analyzing_start"
+CC_PHASE_DEADLINE_EXTENDED = "deadline_extended"
+CC_PHASE_REPORT_PATH = "report_path"
+
 # Assistant-session source: the user's own repo ("local") vs a read-only
 # shared-results mirror ("shared"). Not the project location, which uses
 # "local"/"online" on a different axis.

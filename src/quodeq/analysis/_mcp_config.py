@@ -61,14 +61,14 @@ def _create_mcp_config(
     ]
     config = {
         "mcpServers": {
-            "findings": {
+            _SERVER_NAME: {
                 "command": sys.executable,
                 "args": mcp_args,
             }
         }
     }
     if tools is not None:
-        config["mcpServers"]["findings"]["tools"] = tools
+        config["mcpServers"][_SERVER_NAME]["tools"] = tools
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", prefix="mcp_findings_", delete=False,
     )

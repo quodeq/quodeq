@@ -17,6 +17,7 @@ import { useApi } from '../api/ApiContext.jsx';
 import { chooseDialog } from '../utils/chooseDialog.js';
 import { t } from '../strings/index.js';
 import { apiErrorMessage } from '../strings/apiErrors.js';
+import { HTTP_STATUS } from '../constants.js';
 
 // Strip filesystem-unfriendly characters so a project name like
 // "foo/bar" or "..\\evil" can't influence the download path.
@@ -150,7 +151,7 @@ function makeHandleImportProject({ importProject, loadProjects, fail }) {
     if (!file) return { ok: false, cancelled: true };
 
     let attempt = await attemptImport(file);
-    if (!attempt.ok && attempt.err.status === 409 && attempt.err.kind) {
+    if (!attempt.ok && attempt.err.status === HTTP_STATUS.CONFLICT && attempt.err.kind) {
       attempt = await resolveImportConflict(file, attempt.err);
       if (attempt === null) return { ok: false, cancelled: true }; // user cancelled
     }

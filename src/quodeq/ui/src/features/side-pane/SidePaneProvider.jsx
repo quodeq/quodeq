@@ -10,6 +10,10 @@ const LEGACY_STORAGE_KEY = 'quodeq.reportPaneWidth';
 const DEFAULT_WIDTH_PX = 560;
 const MAX_WINDOWS = 3;
 const NOTICE_DISMISS_MS = 4000;
+// Typical desktop viewport width, used only when `window` is unavailable
+// (SSR / non-browser test environment) so clampSidePaneWidth still has a
+// sane bound to clamp against.
+const FALLBACK_VIEWPORT_WIDTH_PX = 1920;
 const AT_CAP_MESSAGE = t('sidePane.atCap', { max: MAX_WINDOWS });
 
 /**
@@ -188,7 +192,7 @@ export function SidePaneProvider({ children }) {
   const { registerSpec, unregisterSpec, getRegisteredSpec } = useRegisteredSpecs();
 
   const setPaneWidth = useCallback((px) => {
-    const next = clampSidePaneWidth(px, typeof window !== 'undefined' ? window.innerWidth : 1920);
+    const next = clampSidePaneWidth(px, typeof window !== 'undefined' ? window.innerWidth : FALLBACK_VIEWPORT_WIDTH_PX);
     setPaneWidthState(next);
     writeStoredWidth(next);
   }, []);

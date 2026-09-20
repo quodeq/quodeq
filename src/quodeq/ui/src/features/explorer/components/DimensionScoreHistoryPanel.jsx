@@ -23,6 +23,9 @@ import {
   CHART_MARGIN,
   SELECTED_BAR_OPACITY,
   DESELECTED_BAR_OPACITY,
+  HOVER_STROKE_WIDTH,
+  REF_LINE_OPACITY_EVEN,
+  REF_LINE_OPACITY_ODD,
 } from '../../../components/scoreChartHelpers.js';
 
 const MAX = 16;
@@ -64,7 +67,7 @@ function DimensionTooltip({ active, payload }) {
 
 function SelectedDot({ cx, cy, payload, selectedRunId }) {
   if (payload?.runId !== selectedRunId) return null;
-  return <circle cx={cx} cy={cy} r={4} fill={cssVar('--color-chart-line')} stroke="white" strokeWidth={1.5} />;
+  return <circle cx={cx} cy={cy} r={4} fill={cssVar('--color-chart-line')} stroke="white" strokeWidth={HOVER_STROKE_WIDTH} />;
 }
 
 function makeChartClickHandler(data, onBarClick) {
@@ -89,7 +92,7 @@ function renderDimensionBarCells({ data, selectedRunId, hoveredIndex }) {
       fill={scoreBarColor(entry.numericAverage)}
       opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
       stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
-      strokeWidth={hoveredIndex === i ? 1.5 : 0}
+      strokeWidth={hoveredIndex === i ? HOVER_STROKE_WIDTH : 0}
     />
   ));
 }
@@ -116,7 +119,7 @@ function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIn
         <YAxis domain={[0, 10]} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<DimensionTooltip />} />
         {refLineValues([0, 10]).map((y, i) => (
-          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? REF_LINE_OPACITY_ODD : REF_LINE_OPACITY_EVEN} />
         ))}
         <Area dataKey="numericAverage" type="monotone" fill="url(#dimScoreAreaGrad)" stroke="none" isAnimationActive={false} />
         <Bar dataKey="numericAverage" radius={[0, 0, 0, 0]} maxBarSize={28} isAnimationActive={false}>

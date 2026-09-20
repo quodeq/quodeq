@@ -8,7 +8,7 @@ from quodeq.core.evidence._jsonl import judgment_to_dict, parse_jsonl_line, read
 from quodeq.core.evidence._options import EvidenceParseOptions
 from quodeq.core.evidence._refs import enrich_judgment, resolve_llm_refs
 from quodeq.core.utils.io import open_text
-from quodeq.core.events.models import Judgment
+from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
 from quodeq.core.evidence._req_mapping import _GroupedJudgments, _group_judgments
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
 
@@ -43,7 +43,7 @@ def _build_principles(
     for sc in sorted(all_keys):
         pe = PrincipleEvidence(
             practice_id=sc, display_name=sc, dimension=dimension_name,
-            severity=grouped.severity.get(sc, "medium"),
+            severity=grouped.severity.get(sc, DEFAULT_SEVERITY),
             violations=[judgment_to_dict(j) for j in grouped.violations.get(sc, [])],
             compliance=[judgment_to_dict(j) for j in grouped.compliance.get(sc, [])],
         )

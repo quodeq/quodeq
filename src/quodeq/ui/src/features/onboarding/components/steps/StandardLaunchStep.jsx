@@ -1,11 +1,13 @@
 import { TermHeader, StatStrip, Stat } from '../../../../components/terminal/index.js';
 import HelpHint from '../../../../components/HelpHint.jsx';
 import { t } from '../../../../strings/index.js';
+import { SECONDS_PER_HOUR } from '../../../../utils/time.js';
+
 
 function formatTimeLimit(seconds) {
   if (!seconds || seconds <= 0) return 'No limit';
-  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
-  return `${Math.round(seconds / 3600)} h`;
+  if (seconds < SECONDS_PER_HOUR) return `${Math.round(seconds / 60)} min`;
+  return `${Math.round(seconds / SECONDS_PER_HOUR)} h`;
 }
 
 function StandardListItem({ s, inputType, state, actions }) {

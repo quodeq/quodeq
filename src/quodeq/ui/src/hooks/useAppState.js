@@ -21,7 +21,9 @@ const TAB_HISTORY_RUN = 'history-run';
 // 'compare' is appended AFTER the first four on purpose: PROJECT_TABS is a
 // positional slice of the head of this list.
 export const KNOWN_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history', 'projects', 'evaluate', 'standards', 'help', 'settings', 'compare'];
-export const PROJECT_TABS = KNOWN_TABS.slice(0, 4);
+// 'compare' is appended after these four on purpose (see comment above).
+const PROJECT_TAB_COUNT = 4;
+export const PROJECT_TABS = KNOWN_TABS.slice(0, PROJECT_TAB_COUNT);
 
 function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
   const accDims = accumulated?.dimensions || [];

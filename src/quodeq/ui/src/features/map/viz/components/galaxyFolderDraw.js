@@ -3,6 +3,11 @@ import {
   drawGlow, drawParticles,
 } from '../core/galaxyCore.js';
 import { newCueBatch, collectSeverityCue, drawCueBatch } from './galaxyFolderCues.js';
+import {
+  BACKGROUND, STAR, NEBULA, NEBULA_SCENE_BLOBS, NEBULA_FOLDER_BLOBS,
+  VIOLATION_ORBS, LABEL_ALPHA, FOLDER_NEBULA, FOLDER_NEBULA_DASH,
+  FOLDER_STAR, FOLDER_LABEL,
+} from './galaxyTuning.js';
 
 export { starShapeFor } from './galaxyFolderCues.js';
 
@@ -14,36 +19,20 @@ export function drawScene(ctx, activeScene, params) {
   const tc = getThemeColors(canvasRef.current?.parentElement);
 
   // Background gradient
-  const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.6);
+  const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * BACKGROUND.gradientRadiusFraction);
   grad.addColorStop(0, tc.bgAlt); grad.addColorStop(1, tc.bg);
   ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
 
   return { tc };
 }
 
-// The fixed shape of each nebula's blob ring. Hoisted to module scope so a
-// folder star, which draws once per star per animation frame, allocates
-// nothing: the frame's `t` is merged in once per frame and everything else
-// that varies comes in as an argument.
-const SCENE_NEBULA_BLOBS = {
-  count: 4, spin: 0.005, orbit: 0.35, sizeBase: 0.3, sizeAmp: 0.08,
-  wobble: 0.015, wobbleStep: 1.7,
-};
-const SCENE_BLOB_ALPHA = 0.008;
-const FOLDER_NEBULA_BLOBS = {
-  count: 3, spin: 0.01, orbit: 0.3, sizeBase: 0.4, sizeAmp: 0.1,
-  wobble: 0.02, wobbleStep: 2,
-};
-
 /**
  * One ring of soft, slowly orbiting texture blobs over a nebula disc. Both
  * nebulas draw the same shape, at their own count, speed, alpha and size.
  *
- * `spec` is one of the constants above with the frame's `t` merged in.
- * `orbit` is the blob centre's distance from `centre` as a fraction of
- * `radius`, and `sizeBase`/`sizeAmp` the blob radius as a fraction of it,
- * breathing at `wobble`. Both colour stops are the same for every blob in a
- * ring, so they are built once rather than per blob.
+ * `spec` is NEBULA_SCENE_BLOBS or NEBULA_FOLDER_BLOBS with the frame's `t`
+ * merged in. Both colour stops are the same for every blob in a ring, so
+ * they are built once rather than per blob.
  */
 function drawNebulaBlobs(ctx, spec, centre, radius, col, alpha) {
   const { count, spin, orbit, sizeBase, sizeAmp, wobble, wobbleStep, t } = spec;
@@ -72,15 +61,15 @@ export function drawNebula(ctx, curNode, tc, frame) {
   const { W, H, t } = frame;
   const nbCol = scoreRGB((curNode.complianceRate || 0) * 10);
   const { r: nr, g: ng, b: nb } = nbCol;
-  const nbR = Math.max(W, H) * 0.7;
+  const nbR = Math.max(W, H) * NEBULA.sceneRadiusFraction;
   const nbGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, nbR);
-  nbGrad.addColorStop(0, `rgba(${nr},${ng},${nb},0.015)`);
-  nbGrad.addColorStop(0.5, `rgba(${nr},${ng},${nb},0.007)`);
+  nbGrad.addColorStop(0, `rgba(${nr},${ng},${nb},${NEBULA.sceneCentreAlpha})`);
+  nbGrad.addColorStop(NEBULA.midStopOffset, `rgba(${nr},${ng},${nb},${NEBULA.sceneMidAlpha})`);
   nbGrad.addColorStop(1, `rgba(${nr},${ng},${nb},0)`);
   ctx.beginPath(); ctx.arc(W / 2, H / 2, nbR, 0, TAU);
   ctx.fillStyle = nbGrad; ctx.fill();
   drawNebulaBlobs(
-    ctx, { ...SCENE_NEBULA_BLOBS, t }, { x: W / 2, y: H / 2 }, nbR, nbCol, SCENE_BLOB_ALPHA,
+    ctx, { ...NEBULA_SCENE_BLOBS, t }, { x: W / 2, y: H / 2 }, nbR, nbCol, NEBULA.sceneBlobAlpha,
   );
 }
 
@@ -91,7 +80,7 @@ export function drawStarfield(ctx, bg, tc, frame) {
   const { W, H, t } = frame;
   const { r: mr, g: mg, b: mb } = tc.textMuted;
   bg.forEach(s => {
-    const a = 0.15 + 0.15 * Math.sin(t * s.sp + s.tw);
+    const a = BACKGROUND.starAlphaBase + BACKGROUND.starAlphaAmp * Math.sin(t * s.sp + s.tw);
     ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.sz, 0, TAU);
     ctx.fillStyle = `rgba(${mr},${mg},${mb},${a})`; ctx.fill();
   });
@@ -119,36 +108,38 @@ function drawFolderNebula(ctx, star, view) {
   const { s, i, sc, sr } = star;
   const { cam, curFly, blobSpec } = view;
   const { r: cr, g: cg, b: cb } = s.col;
-  const zoomed = cam.z > 2;
+  const zoomed = cam.z > FOLDER_NEBULA.zoomedAtZoom;
   const isFlying = curFly && !curFly.reverse && !curFly.swapped && curFly.dimStarIdx === i;
-  const nebulaFade = isFlying ? Math.max(0, 1 - (curFly.t / 0.35)) : 1;
+  const nebulaFade = isFlying ? Math.max(0, 1 - (curFly.t / FOLDER_NEBULA.flyFadeOutBy)) : 1;
 
   const nebulaR = zoomed
-    ? (s.radius + 40) * cam.z * 0.4
-    : sr * 5;
-  const nebulaA = (zoomed ? Math.min(1, (cam.z - 2) / 3) * 0.35 : 0.08) * nebulaFade;
+    ? (s.radius + FOLDER_NEBULA.zoomedPadPx) * cam.z * FOLDER_NEBULA.zoomedRadiusFraction
+    : sr * FOLDER_NEBULA.restRadiusRatio;
+  const zoomedAlpha = Math.min(1, (cam.z - FOLDER_NEBULA.zoomedAtZoom) / FOLDER_NEBULA.alphaRampSpan) * FOLDER_NEBULA.zoomedMaxAlpha;
+  const nebulaA = (zoomed ? zoomedAlpha : FOLDER_NEBULA.restAlpha) * nebulaFade;
   const nebulaGrad = ctx.createRadialGradient(sc.x, sc.y, 0, sc.x, sc.y, nebulaR);
   nebulaGrad.addColorStop(0, `rgba(${cr},${cg},${cb},${nebulaA})`);
-  nebulaGrad.addColorStop(0.5, `rgba(${cr},${cg},${cb},${nebulaA * 0.5})`);
+  nebulaGrad.addColorStop(NEBULA.midStopOffset, `rgba(${cr},${cg},${cb},${nebulaA * NEBULA.midAlphaFraction})`);
   nebulaGrad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
   ctx.beginPath(); ctx.arc(sc.x, sc.y, nebulaR, 0, TAU);
   ctx.fillStyle = nebulaGrad; ctx.fill();
 
   // Animated texture blobs
-  const blobA = (zoomed ? Math.min(0.18, (cam.z - 2) / 15) : 0.025) * nebulaFade;
+  const zoomedBlobA = Math.min(FOLDER_NEBULA.blobMaxAlpha, (cam.z - FOLDER_NEBULA.zoomedAtZoom) / FOLDER_NEBULA.blobAlphaRampSpan);
+  const blobA = (zoomed ? zoomedBlobA : FOLDER_NEBULA.blobRestAlpha) * nebulaFade;
   drawNebulaBlobs(ctx, blobSpec, sc, nebulaR, s.col, blobA);
 
   // Dashed circle border
-  const borderR = sr * 3.5;
+  const borderR = sr * FOLDER_NEBULA.borderRadiusRatio;
   ctx.beginPath(); ctx.arc(sc.x, sc.y, borderR, 0, TAU);
-  ctx.strokeStyle = `rgba(${cr},${cg},${cb},${0.1 * nebulaFade})`;
+  ctx.strokeStyle = `rgba(${cr},${cg},${cb},${FOLDER_NEBULA.borderAlpha * nebulaFade})`;
   ctx.lineWidth = 1;
-  ctx.setLineDash([6, 12]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.setLineDash(FOLDER_NEBULA_DASH); ctx.stroke(); ctx.setLineDash([]);
   s._clusterHitR = borderR;
 
   if (!zoomed) {
-    ctx.beginPath(); ctx.arc(sc.x, sc.y, sr * 2.2, 0, TAU);
-    ctx.strokeStyle = rgba(s.col, 0.12); ctx.lineWidth = 0.8; ctx.stroke();
+    ctx.beginPath(); ctx.arc(sc.x, sc.y, sr * FOLDER_NEBULA.innerRingRadiusRatio, 0, TAU);
+    ctx.strokeStyle = rgba(s.col, FOLDER_NEBULA.innerRingAlpha); ctx.lineWidth = 0.8; ctx.stroke();
   }
 }
 
@@ -156,7 +147,7 @@ function drawFolderNebula(ctx, star, view) {
  * severity rings are queued on `cues` and stroked once at the end of the frame. */
 function drawFileParticles(ctx, s, sc, cam, t, cues) {
   if (s.particles.length === 0) return;
-  const pScale = cam.z * 0.5;
+  const pScale = cam.z * FOLDER_STAR.particleScaleFraction;
   drawParticles(ctx, s.particles, { cx: sc.x, cy: sc.y, scale: pScale, alpha: 0.8, t, drawScale: pScale });
   s.particles.forEach((p) => collectSeverityCue(cues, p, sc, pScale, t));
 }
@@ -165,22 +156,23 @@ function drawFileParticles(ctx, s, sc, cam, t, cues) {
  * `view` is the drawStars params bundle: { cam, t, showLabels, ... }. */
 function drawLabeledOrbs(ctx, s, sc, view) {
   const { cam, t, showLabels } = view;
-  if (s.isFolder || cam.z <= 2.5 || s.particles.length === 0) return;
-  const vAlpha = Math.min(1, (cam.z - 2.5) / 2);
-  const vScale = cam.z * 0.06;
+  if (s.isFolder || cam.z <= FOLDER_STAR.orbZoomThreshold || s.particles.length === 0) return;
+  const vAlpha = Math.min(1, (cam.z - FOLDER_STAR.orbZoomThreshold) / 2);
+  const vScale = cam.z * VIOLATION_ORBS.scaleFraction;
   s.particles.forEach(p => {
     const a = t * p.os + p.op;
     const px = sc.x + Math.cos(a) * p.or * p.ec * vScale;
     const py = sc.y + Math.sin(a) * p.or * vScale;
-    const tw = 0.5 + 0.06 * Math.sin(t * 0.4 + p.tp);
-    const psr = p.sz * vScale * 0.5;
-    if (psr > 1.5) {
+    const tw = VIOLATION_ORBS.twinkleBase + VIOLATION_ORBS.twinkleAmp * Math.sin(t * VIOLATION_ORBS.twinkleSpeed + p.tp);
+    const psr = p.sz * vScale * VIOLATION_ORBS.radiusFraction;
+    if (psr > FOLDER_STAR.orbMinRadiusPx) {
       drawGlow(ctx, { x: px, y: py, r: psr, col: p.col, alpha: vAlpha * tw });
-      if (showLabels && psr > 3) {
+      if (showLabels && psr > VIOLATION_ORBS.labelMinRadiusPx) {
         const sevName = p.sev.charAt(0).toUpperCase() + p.sev.slice(1);
-        ctx.font = `500 ${Math.max(7, Math.min(11, psr * 0.8))}px -apple-system,BlinkMacSystemFont,sans-serif`;
-        ctx.textAlign = 'center'; ctx.fillStyle = rgba(p.col, 0.85 * vAlpha);
-        ctx.fillText(sevName, px, py - psr - 4);
+        const fontPx = Math.max(VIOLATION_ORBS.labelFontMinPx, Math.min(VIOLATION_ORBS.labelFontMaxPx, psr * VIOLATION_ORBS.labelFontRadiusFraction));
+        ctx.font = `500 ${fontPx}px -apple-system,BlinkMacSystemFont,sans-serif`;
+        ctx.textAlign = 'center'; ctx.fillStyle = rgba(p.col, VIOLATION_ORBS.labelAlpha * vAlpha);
+        ctx.fillText(sevName, px, py - psr - VIOLATION_ORBS.labelOffsetPx);
       }
     }
   });
@@ -189,14 +181,14 @@ function drawLabeledOrbs(ctx, s, sc, view) {
 /** Collect this star's label-placement info (or null), for the collision pass in drawLabels. */
 function collectStarLabel(s, sc, sr, cam, showLabels) {
   if (!showLabels || sr <= 1) return null;
-  const fs = Math.min(cam.z, 1.5);
+  const fs = Math.min(cam.z, FOLDER_LABEL.scaleCap);
   const shortName = s.name.includes('/') ? s.name.split('/')[0] : s.name;
   const label = s.isFolder ? shortName : s.name;
-  const fontSize = Math.max(9, 11 * fs);
-  const lw = label.length * fontSize * 0.55;
-  const lh = fontSize + 4;
+  const fontSize = Math.max(FOLDER_LABEL.fontMinPx, FOLDER_LABEL.fontPx * fs);
+  const lw = label.length * fontSize * FOLDER_LABEL.charWidthFraction;
+  const lh = fontSize + FOLDER_LABEL.heightPadPx;
   const lx = sc.x;
-  const ly = sc.y - sr - 14 * fs;
+  const ly = sc.y - sr - FOLDER_LABEL.offsetPx * fs;
   const importance = (s.isFolder ? 1000 : 0) + (s.violations || 0) + (s.radius || 0);
   return { s, sc, sr, fs, label, fontSize, lx, ly, lw, lh, importance, col: s.col };
 }
@@ -210,7 +202,7 @@ function hitTestStar({ s, i, sc, sr }, params) {
   const dx = mx - sc.x, dy = my - sc.y;
   const d2 = dx * dx + dy * dy;
   const clusterR = s.isFolder && s._clusterHitR > 0 ? s._clusterHitR : 0;
-  const starHitR = Math.max(sr * 2, 14);
+  const starHitR = Math.max(sr * 2, FOLDER_STAR.hitRadiusMinPx);
   if (d2 < starHitR * starHitR || (clusterR > 0 && d2 < clusterR * clusterR)) {
     return { type: s.isFolder ? 'folder' : 'file', starIdx: i, data: s };
   }
@@ -226,17 +218,17 @@ export function drawStars(ctx, activeScene, params) {
   const pendingLabels = [];
   const cues = newCueBatch();
   // Built once per frame, not once per folder star.
-  const blobSpec = { ...FOLDER_NEBULA_BLOBS, t };
+  const blobSpec = { ...NEBULA_FOLDER_BLOBS, t };
 
   activeScene.rootStars.forEach((s, i) => {
     const sc = w2s(s.x, s.y);
-    const pulse = 1 + 0.01 * Math.sin(t * 0.4 + s.pp);
-    const sr = s.radius * pulse * cam.z * 0.5;
+    const pulse = 1 + STAR.pulseAmplitude * Math.sin(t * STAR.pulseSpeed + s.pp);
+    const sr = s.radius * pulse * cam.z * STAR.screenRadiusFraction;
 
     const curFly = flyRef.current;
-    const dimThreshold = 30;
+    const dimThreshold = FOLDER_STAR.dimAboveRadiusPx;
     const starAlpha = s.isFolder && sr > dimThreshold
-      ? Math.max(0.15, 1 - (sr - dimThreshold) / 80)
+      ? Math.max(FOLDER_STAR.dimMinAlpha, 1 - (sr - dimThreshold) / FOLDER_STAR.dimFadeSpanPx)
       : 1;
     drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: starAlpha });
 
@@ -264,23 +256,28 @@ export function drawLabels(ctx, pendingLabels, tc) {
   pendingLabels.forEach(lb => {
     const halfW = lb.lw / 2, halfH = lb.lh / 2;
     const collides = placedLabels.some(pl => {
-      return Math.abs(lb.lx - pl.lx) < (halfW + pl.lw / 2 + 4) &&
+      return Math.abs(lb.lx - pl.lx) < (halfW + pl.lw / 2 + FOLDER_LABEL.collisionPadXPx) &&
              Math.abs(lb.ly - pl.ly) < (halfH + pl.lh / 2 + 2);
     });
     if (collides) return;
     placedLabels.push(lb);
     ctx.font = `500 ${lb.fontSize}px -apple-system,BlinkMacSystemFont,sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = rgba(tc.text, 0.6);
+    ctx.fillStyle = rgba(tc.text, LABEL_ALPHA);
     ctx.fillText(lb.label, lb.lx, lb.ly);
+    // The font string stays inside each branch: a file star with no
+    // violations draws no sub-line at all, and building it up here would
+    // cost that star a string per frame for nothing.
+    const subSize = Math.max(FOLDER_LABEL.subFontMinPx, FOLDER_LABEL.subFontPx * lb.fs);
+    const subDrop = FOLDER_LABEL.subOffsetPx * lb.fs;
     if (lb.s.violations > 0) {
-      ctx.font = `${Math.max(7, 9 * lb.fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
-      ctx.fillStyle = rgba(tc.textMuted, 0.6);
-      ctx.fillText(lb.s.violations + ' viol.', lb.sc.x, lb.sc.y + lb.sr + 12 * lb.fs);
+      ctx.font = `${subSize}px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.fillStyle = rgba(tc.textMuted, FOLDER_LABEL.subLineAlpha);
+      ctx.fillText(lb.s.violations + ' viol.', lb.sc.x, lb.sc.y + lb.sr + subDrop);
     } else if (lb.s.isFolder) {
-      ctx.font = `${Math.max(7, 9 * lb.fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
-      ctx.fillStyle = rgba(tc.textMuted, 0.5);
-      ctx.fillText((lb.s.complianceRate * 100).toFixed(0) + '%', lb.sc.x, lb.sc.y + lb.sr + 12 * lb.fs);
+      ctx.font = `${subSize}px -apple-system,BlinkMacSystemFont,sans-serif`;
+      ctx.fillStyle = rgba(tc.textMuted, FOLDER_LABEL.rateAlpha);
+      ctx.fillText((lb.s.complianceRate * 100).toFixed(0) + '%', lb.sc.x, lb.sc.y + lb.sr + subDrop);
     }
   });
 }

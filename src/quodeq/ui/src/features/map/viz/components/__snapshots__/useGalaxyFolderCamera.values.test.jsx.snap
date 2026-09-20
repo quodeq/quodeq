@@ -1,0 +1,87 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`useGalaxyFolderCamera value characterization > advances the clock by a fixed frame step > frame-time-steps 1`] = `
+[
+  0.016,
+  0.032,
+  0.048,
+  0.064,
+]
+`;
+
+exports[`useGalaxyFolderCamera value characterization > falls back to a default preview radius when the star is missing > focus-target-missing-star 1`] = `
+{
+  "x": 200,
+  "y": 150,
+  "z": 12,
+}
+`;
+
+exports[`useGalaxyFolderCamera value characterization > fits the scene inside the view margin and caps the fit zoom > fit-zoom-by-extent 1`] = `
+{
+  "ext=0": 1,
+  "ext=10": 4,
+  "ext=100": 2.55,
+  "ext=60": 4,
+  "ext=null": 1,
+}
+`;
+
+exports[`useGalaxyFolderCamera value characterization > floors a zoomed file at the recorded minimum zoom > focus-target-zoomed-file 1`] = `
+{
+  "x": 120,
+  "y": 90,
+  "z": 10.2,
+}
+`;
+
+exports[`useGalaxyFolderCamera value characterization > paints the initial fly frame at the recorded alpha > initial-fly-alpha 1`] = `
+[
+  0.998187,
+  1,
+]
+`;
+
+exports[`useGalaxyFolderCamera value characterization > ramps the scene and bloom alphas across a whole fly-in > fly-in-alpha-ramp 1`] = `
+[
+  0.998187,
+  0.954686,
+  0.853181,
+  0.693674,
+  0.486488,
+  0.317918,
+  0.207351,
+  0.154786,
+  0.252099,
+  0.404984,
+  0.53547,
+  0.645332,
+  0.736344,
+  0.81028,
+  0.868915,
+]
+`;
+
+exports[`useGalaxyFolderCamera value characterization > sizes a focused-folder preview from the star radius and screen fraction > focus-target-folder-preview 1`] = `
+{
+  "x": 200,
+  "y": 150,
+  "z": 7.5,
+}
+`;
+
+exports[`useGalaxyFolderCamera value characterization > targets the fit-everything centre when nothing is focused > focus-target-default 1`] = `
+{
+  "x": 400,
+  "y": 300,
+  "z": 2.55,
+}
+`;
+
+exports[`useGalaxyFolderCamera value characterization > uses an explicit zoom target verbatim > focus-target-explicit 1`] = `
+{
+  "x": 5,
+  "y": 6,
+  "z": 7.5,
+}
+`;

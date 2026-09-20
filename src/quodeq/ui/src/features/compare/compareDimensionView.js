@@ -4,6 +4,28 @@
  */
 import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
 
+// Score scale: every dimension/principle score is 0-10.
+const MAX_SCORE = 10;
+
+// Outlier detection: a principle counts as an outlier when the worst project
+// sits at least this many points under the next-worst score, or below the
+// floor score outright. A gap past the second threshold bumps it to elevated.
+const OUTLIER_GAP_THRESHOLD = 1.5;
+const OUTLIER_FLOOR_SCORE = 4.5;
+const OUTLIER_ELEVATED_GAP_THRESHOLD = 2.5;
+
+// Drop detection: a standing counts as a drop once its trend delta falls at
+// least this many points; past the second threshold it bumps to elevated.
+const DROP_DELTA_THRESHOLD = -0.5;
+const DROP_ELEVATED_DELTA_THRESHOLD = -1;
+// Weighs a drop's delta twice as heavily as its distance from the max score
+// when ranking which outliers/drops surface first in the attention strip.
+const DROP_WEIGHT_FACTOR = 2;
+
+// Higher than any real 0-10 average (MAX_SCORE) so a principle with no
+// average never wins the "weakest" comparison below.
+const AVG_SENTINEL_ABOVE_MAX = 11;
+
 /**
  * Outliers inside ONE dimension, for its scoped needs-attention strip.
  * Two signals: a principle where one project sits far under the rest
@@ -23,27 +45,27 @@ export function buildDimensionAttention(view) {
     if (by.length < 2) continue;
     const worst = by[0];
     const gap = Math.round((by[1].score - worst.score) * 10) / 10;
-    if (gap < 1.5 && worst.score >= 4.5) continue;
+    if (gap < OUTLIER_GAP_THRESHOLD && worst.score >= OUTLIER_FLOOR_SCORE) continue;
     items.push({
       kind: 'outlier',
       name: worst.name,
-      level: worst.score < 4.5 || gap >= 2.5 ? 'elevated' : 'watch',
+      level: worst.score < OUTLIER_FLOOR_SCORE || gap >= OUTLIER_ELEVATED_GAP_THRESHOLD ? 'elevated' : 'watch',
       principleLabel: p.label,
       score: worst.score,
-      gap: gap >= 1.5 ? gap : null,
+      gap: gap >= OUTLIER_GAP_THRESHOLD ? gap : null,
       cell: worst,
-      weight: (10 - worst.score) + gap,
+      weight: (MAX_SCORE - worst.score) + gap,
     });
   }
   for (const s of view.standings) {
-    if (s.delta == null || s.delta > -0.5) continue;
+    if (s.delta == null || s.delta > DROP_DELTA_THRESHOLD) continue;
     items.push({
       kind: 'drop',
       name: s.row.name,
-      level: s.delta <= -1 ? 'elevated' : 'watch',
+      level: s.delta <= DROP_ELEVATED_DELTA_THRESHOLD ? 'elevated' : 'watch',
       delta: s.delta,
       row: s.row,
-      weight: Math.abs(s.delta) * 2 + (10 - (s.score ?? 10)),
+      weight: Math.abs(s.delta) * DROP_WEIGHT_FACTOR + (MAX_SCORE - (s.score ?? MAX_SCORE)),
     });
   }
   return items.sort((a, b) => b.weight - a.weight);
@@ -149,7 +171,7 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
   const severity = _summarizeSeverity(standings);
   const principles = _buildPrincipleBoard(standings);
   const weakest = principles.reduce(
-    (acc, p) => (acc == null || (p.avg ?? 11) < (acc.avg ?? 11) ? p : acc),
+    (acc, p) => (acc == null || (p.avg ?? AVG_SENTINEL_ABOVE_MAX) < (acc.avg ?? AVG_SENTINEL_ABOVE_MAX) ? p : acc),
     null,
   );
 

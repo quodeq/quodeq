@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { projectKeys } from '../../../api/queryKeys.js';
 
+// Coalesces rapid multi-dismiss/restore bursts into one refetch instead of
+// one per action (see useScheduleDashboardReconcile below).
+const RECONCILE_DEBOUNCE_MS = 1200;
+
 // refreshDashboard: mark project queries stale but DON'T trigger an
 // immediate refetch. The dashboard payload is 10-20 MB on large projects
 // (one run's full violation + compliance arrays × multiple dimensions);
@@ -76,7 +80,7 @@ function useScheduleDashboardReconcile({ queryClient, selectedProject, selectedS
       queryClient.invalidateQueries({
         queryKey: projectKeys.project(selectedProject, selectedSource),
       });
-    }, 1200);
+    }, RECONCILE_DEBOUNCE_MS);
   }, [queryClient, selectedProject, selectedSource]);
   useEffect(() => () => clearTimeout(reconcileTimer.current), []);
 

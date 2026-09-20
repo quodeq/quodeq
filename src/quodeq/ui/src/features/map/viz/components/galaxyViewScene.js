@@ -1,11 +1,30 @@
 import {
   TAU, scoreRGB, seedHash, seededRng, gradeToScore, mkParticles,
+  mkBackgroundStars, NEUTRAL_SCORE, RNG_MIDPOINT,
 } from '../core/galaxyCore.js';
 import {
   computeClusterPositions, buildMSTLines, applyRepulsionAndRecenter,
   buildSharedFileConnections, computeMaxExtent,
 } from './galaxyViewLayout.js';
 import { t } from '../../../../strings/index.js';
+
+
+// Scene geometry, in world units. Radii and orbit distances grow with the
+// square root of a node's finding count, so one huge dimension widens the
+// layout instead of swamping it. `dimParticle` is the dot that stands in
+// for a principle while the camera is still at dimension level.
+const LAYOUT = Object.freeze({
+  dimRadiusBasePx: 3, dimRadiusPerRootFinding: 0.4, dimRingJitterSpanPx: 40,
+  clusterSpreadFraction: 0.5, clusterBaseSpreadFraction: 0.3,
+  clusterCentreMultiplier: 1.8, clusterSpreadPerDimPx: 12,
+  starDistFractionMin: 0.3, starDistFractionRange: 0.45, starDistMinPx: 40,
+  prinRadiusBasePx: 6, prinRadiusPerRootFinding: 1.5,
+  prinOrbitMinPx: 25, prinOrbitSpanPx: 35, prinOrbitJitterPx: 5,
+  dimParticleOrbitBasePx: 12, dimParticleOrbitPerRootFinding: 1.5,
+  dimParticleSpeedMin: 0.02, dimParticleSpeedRange: 0.05,
+  dimParticleSizeBasePx: 0.8, dimParticleSizePerRootFinding: 0.15,
+  dimParticleEccentricityBase: 0.9, dimParticleEccentricityRange: 0.1,
+});
 
 /** Group violations and compliance by principle name, returning { [principleName]: { violations, compliance } } */
 export function groupByPrinciple(dim) {
@@ -54,7 +73,7 @@ export function computePrincipleScore(rawScore, grade, violationCount, complianc
   if (Number.isFinite(parsed)) return parsed;
   if (grade) return gradeToScore(grade);
   const total = violationCount + complianceCount;
-  return total > 0 ? (complianceCount / total) * 10 : 5;
+  return total > 0 ? (complianceCount / total) * 10 : NEUTRAL_SCORE;
 }
 
 export const CONSTELLATION_LABELS = {
@@ -83,8 +102,8 @@ function buildDimStar(dim, extra) {
   const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
   const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
   const parsedScore = parseFloat(dim.overallScore);
-  const score = Number.isFinite(parsedScore) ? parsedScore : 5;
-  const radius = 3 + Math.sqrt(totalV + totalC) * 0.4;
+  const score = Number.isFinite(parsedScore) ? parsedScore : NEUTRAL_SCORE;
+  const radius = LAYOUT.dimRadiusBasePx + Math.sqrt(totalV + totalC) * LAYOUT.dimRadiusPerRootFinding;
   return {
     name: dim.dimension || 'Unknown',
     score, radius,
@@ -106,10 +125,10 @@ function buildConstellationLayout({ dimGroups, groupKeys, spread, baseClusterSpr
 
   groupKeys.forEach((type, gi) => {
     const [px, py] = clusterPositions[gi];
-    const clusterCx = px * spread * 1.8;
-    const clusterCy = py * spread * 1.8;
+    const clusterCx = px * spread * LAYOUT.clusterCentreMultiplier;
+    const clusterCy = py * spread * LAYOUT.clusterCentreMultiplier;
     const groupDims = dimGroups[type];
-    const clusterSpread = baseClusterSpread + groupDims.length * 12;
+    const clusterSpread = baseClusterSpread + groupDims.length * LAYOUT.clusterSpreadPerDimPx;
     const startIdx = globalIdx;
 
     const clRng = seededRng(seedHash('cl:' + type));
@@ -117,8 +136,8 @@ function buildConstellationLayout({ dimGroups, groupKeys, spread, baseClusterSpr
     groupDims.forEach((dim) => {
       const n2 = groupDims.length;
       const a = phaseOffset + clRng() * TAU;
-      const distVar = 0.3 + clRng() * 0.45;
-      const dist = n2 === 1 ? 0 : Math.max(clusterSpread * distVar, 40);
+      const distVar = LAYOUT.starDistFractionMin + clRng() * LAYOUT.starDistFractionRange;
+      const dist = n2 === 1 ? 0 : Math.max(clusterSpread * distVar, LAYOUT.starDistMinPx);
       stars.push(buildDimStar(dim, {
         ba: 0, j: 0,
         _clusterCx: clusterCx, _clusterCy: clusterCy,
@@ -142,7 +161,7 @@ function buildConstellationLayout({ dimGroups, groupKeys, spread, baseClusterSpr
 function buildSingleGroupLayout(dimensions, rng) {
   return dimensions.map((dim, i) => buildDimStar(dim, {
     ba: (i / dimensions.length) * TAU - Math.PI / 2,
-    j: (rng() - 0.5) * 40,
+    j: (rng() - RNG_MIDPOINT) * LAYOUT.dimRingJitterSpanPx,
     _clusterCx: 0, _clusterCy: 0, _ox: 0, _oy: 0,
     pp: rng() * TAU,
   }));
@@ -166,7 +185,7 @@ function buildPrinciples(dimensions) {
       const pv = p.violations.length;
       const pc = p.compliance.length;
       const pScore = computePrincipleScore(p.score, p.grade, pv, pc);
-      const radius = 6 + Math.sqrt(pv + pc) * 1.5;
+      const radius = LAYOUT.prinRadiusBasePx + Math.sqrt(pv + pc) * LAYOUT.prinRadiusPerRootFinding;
       const sev = countSeverities(p.violations);
       return {
         name: p.name,
@@ -176,7 +195,7 @@ function buildPrinciples(dimensions) {
         violations: pv, compliance: pc,
         radius, col: scoreRGB(pScore),
         ba: (pi / (prinList.length || 1)) * TAU - Math.PI / 2,
-        od: 25 + (pi / (prinList.length || 1)) * 35 + pRng() * 5,
+        od: LAYOUT.prinOrbitMinPx + (pi / (prinList.length || 1)) * LAYOUT.prinOrbitSpanPx + pRng() * LAYOUT.prinOrbitJitterPx,
         pp: pRng() * TAU,
         ...sev,
         x: 0, y: 0,
@@ -185,11 +204,11 @@ function buildPrinciples(dimensions) {
         _rawCompliance: p.compliance,
         dimParticle: {
           col: scoreRGB(pScore),
-          or: 12 + Math.sqrt(pv + pc) * 1.5,
-          os: (0.02 + pRng() * 0.05) * (pRng() > 0.5 ? 1 : -1),
+          or: LAYOUT.dimParticleOrbitBasePx + Math.sqrt(pv + pc) * LAYOUT.dimParticleOrbitPerRootFinding,
+          os: (LAYOUT.dimParticleSpeedMin + pRng() * LAYOUT.dimParticleSpeedRange) * (pRng() > RNG_MIDPOINT ? 1 : -1),
           op: pRng() * TAU,
-          sz: 0.8 + Math.sqrt(pv + pc) * 0.15,
-          ec: 0.9 + pRng() * 0.1,
+          sz: LAYOUT.dimParticleSizeBasePx + Math.sqrt(pv + pc) * LAYOUT.dimParticleSizePerRootFinding,
+          ec: LAYOUT.dimParticleEccentricityBase + pRng() * LAYOUT.dimParticleEccentricityRange,
           tp: pRng() * TAU,
         },
       };
@@ -198,24 +217,14 @@ function buildPrinciples(dimensions) {
   return principles;
 }
 
-function buildBackgroundStars(dimFingerprint) {
-  const bgRng = seededRng(seedHash('bg:' + dimFingerprint));
-  return Array.from({ length: 120 }, () => ({
-    x: bgRng(), y: bgRng(),
-    sz: bgRng() * 1.2,
-    tw: bgRng() * TAU,
-    sp: 0.3 + bgRng() * 0.7,
-  }));
-}
-
 export function buildScene(dimensions, W, H, standardTypes) {
   const dimFingerprint = dimensions.map(d => d.dimension || '').sort().join('|');
   const rng = seededRng(seedHash('galaxy:' + dimFingerprint));
 
   const { dimGroups, groupKeys, useConstellations } = groupDimensionsByType(dimensions, standardTypes);
 
-  const spread = Math.min(W, H) * 0.5;
-  const baseClusterSpread = Math.min(W, H) * 0.3;
+  const spread = Math.min(W, H) * LAYOUT.clusterSpreadFraction;
+  const baseClusterSpread = Math.min(W, H) * LAYOUT.clusterBaseSpreadFraction;
 
   const { stars, constellations } = useConstellations
     ? buildConstellationLayout({ dimGroups, groupKeys, spread, baseClusterSpread, rng })
@@ -225,7 +234,7 @@ export function buildScene(dimensions, W, H, standardTypes) {
   stars.forEach((s, i) => { s.principleCount = (principles[i] || []).length; });
 
   const connections = buildSharedFileConnections(dimensions);
-  const bg = buildBackgroundStars(dimFingerprint);
+  const bg = mkBackgroundStars(seededRng(seedHash('bg:' + dimFingerprint)));
   const _maxExtent = computeMaxExtent(stars, constellations);
 
   return { stars, principles, connections, constellations, bg, _maxExtent };
@@ -241,7 +250,7 @@ export function updateSceneLiveData(scene, dimensions) {
     const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
     const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
     const parsedScore = parseFloat(dim.overallScore);
-    const score = Number.isFinite(parsedScore) ? parsedScore : 5;
+    const score = Number.isFinite(parsedScore) ? parsedScore : NEUTRAL_SCORE;
     star.violations = totalV;
     star.compliance = totalC;
     star.score = score;

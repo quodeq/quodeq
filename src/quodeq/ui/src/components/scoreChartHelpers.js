@@ -86,18 +86,27 @@ export function scoreBarColor(score) {
  * renders empty (the floor sits below the lowest score) or full (the
  * ceiling sits above the highest).
  */
+// Padding applied to the min/max score before flooring/ceiling the domain
+// (see scoreDomain doc comment: keeps the trend shape visible without a bar
+// ever rendering empty or full).
+const SCORE_DOMAIN_PADDING = 0.5;
+
 export function scoreDomain(values) {
   const valid = (values || []).filter((n) => Number.isFinite(n));
   if (!valid.length) return [0, 10];
-  const lo = Math.max(0, Math.floor(Math.min(...valid) - 0.5));
-  const hi = Math.min(10, Math.ceil(Math.max(...valid) + 0.5));
+  const lo = Math.max(0, Math.floor(Math.min(...valid) - SCORE_DOMAIN_PADDING));
+  const hi = Math.min(10, Math.ceil(Math.max(...valid) + SCORE_DOMAIN_PADDING));
   return [lo, hi > lo ? hi : lo + 1];
 }
 
+// Domain split into quarters: 5 ticks at 0/4, 1/4, 2/4, 3/4 and 4/4 of the range.
+const REF_LINE_QUARTER_DIVISIONS = 4;
+const REF_LINE_THIRD_QUARTER_STEPS = 3;
+
 /** Reference-line ticks: domain bounds plus quarter divisions of the range. */
 export function refLineValues([lo, hi]) {
-  const step = (hi - lo) / 4;
-  return [lo, lo + step, lo + 2 * step, lo + 3 * step, hi];
+  const step = (hi - lo) / REF_LINE_QUARTER_DIVISIONS;
+  return [lo, lo + step, lo + 2 * step, lo + REF_LINE_THIRD_QUARTER_STEPS * step, hi];
 }
 
 /** Margin zeroed so bars span edge-to-edge inside the panel body. */
@@ -106,6 +115,15 @@ export const CHART_MARGIN = { top: 8, right: 0, bottom: 0, left: 0 };
 /** Opacity for the selected vs deselected bars across all score charts. */
 export const SELECTED_BAR_OPACITY = 0.85;
 export const DESELECTED_BAR_OPACITY = 0.4;
+
+/** Stroke width of the selected-run dot / hovered bar outline across all
+ * score charts. */
+export const HOVER_STROKE_WIDTH = 1.5;
+
+// Alternating reference-line opacity: even indices (0, 2, ...) render a
+// touch stronger than odd ones, breaking up the repeated dashed lines.
+export const REF_LINE_OPACITY_EVEN = 0.3;
+export const REF_LINE_OPACITY_ODD = 0.2;
 
 /** Fixed chart height for the History tab's score chart (HistoryChartPanel),
  * shared with its Suspense placeholder so the two never drift apart. */

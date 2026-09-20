@@ -13,15 +13,20 @@ import { exitReasonLabel, isTimeLimitExit } from '../../../models/exitReason.js'
 import { t } from '../../../strings/index.js';
 import { jobStatusLabel } from '../../../strings/labels.js';
 
-const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
-const TERMINAL_STATES = new Set(['done', 'completed', 'failed', 'cancelled', 'lost']);
+const STATUS = {
+  RUNNING: 'running', DONE: 'done', COMPLETED: 'completed',
+  FAILED: 'failed', CANCELLED: 'cancelled', LOST: 'lost',
+};
+const TERMINAL_STATES = new Set([
+  STATUS.DONE, STATUS.COMPLETED, STATUS.FAILED, STATUS.CANCELLED, STATUS.LOST,
+]);
 
 // A cancelled/failed job whose run hit its time budget is not an error:
 // the header must agree with the coverage banner below it, which already
 // says "time limit reached" from the run's status.json. Done runs keep
 // their "complete" header; the banner tells the truncation story there.
 function isTimeLimitEnd(status, exitReason) {
-  return (status === 'cancelled' || status === STATUS.FAILED) && isTimeLimitExit(exitReason);
+  return (status === STATUS.CANCELLED || status === STATUS.FAILED) && isTimeLimitExit(exitReason);
 }
 
 function termNameForStatus(status, exitReason) {

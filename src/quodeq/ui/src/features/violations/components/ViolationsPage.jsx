@@ -117,7 +117,7 @@ function ViolationsHeader({ summary, visibleDimensions, topFilesCount, uniquePri
       <TermHeader
         name={t('violations.termName')}
         sub={subLine}
-        badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
+        badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
       />
       <div className="violations-flag-row">
         <FlagPill flag={t('violations.flagByDimension')} active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
@@ -147,7 +147,7 @@ export function ViolationsSubTabContent(props) {
     // the list stays visible read-only. useDismissedFindings' own handlers
     // also no-op as defense in depth (see that hook), but the button must not
     // even render here.
-    const isShared = selectedSource === 'shared';
+    const isShared = selectedSource === PROJECT_SOURCE.SHARED;
     return dismissed.length > 0
       ? (
         <DismissedSubTab

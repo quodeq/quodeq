@@ -5,9 +5,12 @@ const H = 130;
 const PAD_L = 26;
 const PAD_T = 12;
 const PAD_B = 15;
-const PLOT_W = W - PAD_L - 6;
+const PAD_R = 6;
+const PLOT_W = W - PAD_L - PAD_R;
 const PLOT_H = H - PAD_T - PAD_B;
 const MAX_WV = 40;
+// Nudges the threshold tick label down so it sits centered on its gridline.
+const TICK_LABEL_Y_OFFSET = 3;
 
 const x = (wv) => PAD_L + (wv / MAX_WV) * PLOT_W;
 const y = (score) => PAD_T + ((10 - score) / 10) * PLOT_H;
@@ -34,19 +37,19 @@ export default function CurvePlot({ baseK, ceilScale, thresholds }) {
           key={t}
           x1={PAD_L}
           y1={y(t)}
-          x2={W - 6}
+          x2={W - PAD_R}
           y2={y(t)}
           stroke="var(--color-border)"
           strokeWidth="1"
         />
       ))}
       {thresholds.map(([t]) => (
-        <text key={`t${t}`} x="2" y={y(t) + 3} fontSize="9" fill="var(--color-text-muted)">
+        <text key={`t${t}`} x="2" y={y(t) + TICK_LABEL_Y_OFFSET} fontSize="9" fill="var(--color-text-muted)">
           {t}
         </text>
       ))}
       <line x1={PAD_L} y1={PAD_T} x2={PAD_L} y2={H - PAD_B} stroke="var(--color-border)" />
-      <line x1={PAD_L} y1={H - PAD_B} x2={W - 6} y2={H - PAD_B} stroke="var(--color-border)" />
+      <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="var(--color-border)" />
       <path d={zone} fill="var(--color-accent)" opacity="0.12" />
       <path
         d={ceilPath}

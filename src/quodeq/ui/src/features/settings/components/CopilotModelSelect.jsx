@@ -3,6 +3,10 @@ import { useCopilotModels } from '../hooks/useCopilotModels.js';
 import { t } from '../../../strings/index.js';
 import CopilotSetupHint from './CopilotSetupHint.jsx';
 
+// Copilot's "let the service pick" entry; it needs a spelled-out label in the
+// dropdown, every other id renders as itself.
+const AUTO_MODEL_ID = 'auto';
+
 /** Login help is only needed when the live account-model lookup fails. */
 export function CopilotModelStatus() {
   const { error, refetch, isFetching } = useCopilotModels();
@@ -39,7 +43,7 @@ export default function CopilotModelSelect({ label, value, onChange, required, a
         <option value="">{placeholder || t('settings.pickAModel')}</option>
         {savedModel && <option value={value} disabled>{t('settings.copilotSavedModel', { model: value })}</option>}
         {models.map((model) => (
-          <option key={model} value={model}>{model === 'auto' ? t('settings.copilotAutoModel') : model}</option>
+          <option key={model} value={model}>{model === AUTO_MODEL_ID ? t('settings.copilotAutoModel') : model}</option>
         ))}
       </select>
       {isPending && <span className="settings-model-hint" role="status">{t('settings.copilotModelsLoading')}</span>}

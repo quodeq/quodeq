@@ -3,7 +3,8 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
-const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+const BYTES_PER_KB = 1024;
+const MAX_FILE_SIZE = BYTES_PER_KB * BYTES_PER_KB; // 1MB
 // File extension is product identity, not translatable prose.
 const QUODEQ_FILE_EXT = '.quodeq';
 const WARNINGS_MAX_HEIGHT = 200;
@@ -130,7 +131,7 @@ async function handleFileInput(e, onImported, state, importStandard) {
   const file = e.target.files?.[0];
   if (!file) return;
   if (file.size > MAX_FILE_SIZE) {
-    setError(t('standards.fileTooLarge', { size: (file.size / 1024).toFixed(0) }));
+    setError(t('standards.fileTooLarge', { size: (file.size / BYTES_PER_KB).toFixed(0) }));
     setStep(STEP.ERROR);
     return;
   }

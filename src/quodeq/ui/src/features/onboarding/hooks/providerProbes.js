@@ -11,11 +11,13 @@
 
 // Onboarding-side IDs differ from the server's ai_providers.json IDs.
 const CLI_SERVER_ID = { 'codex-cli': 'codex', 'claude-code': 'claude' };
+/** How long each detection probe waits before aborting its fetch. */
+export const PROBE_TIMEOUT_MS = 5000;
 
 async function detectCliProvider(id) {
   const serverId = CLI_SERVER_ID[id] || id;
   try {
-    const res = await fetch('/api/ai-clients', { method: 'GET', signal: AbortSignal.timeout(5000) });
+    const res = await fetch('/api/ai-clients', { method: 'GET', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     if (!res.ok) return { id, classification: 'cli', detected: false, defaultModel: null };
     const data = await res.json();
     const detected = (data.clients || []).some((c) => c.id === serverId && c.type === 'cli' && c.installed !== false);
@@ -28,7 +30,7 @@ async function detectCliProvider(id) {
 
 async function detectOllamaDaemon() {
   try {
-    const res = await fetch('/api/ollama/health', { method: 'GET', signal: AbortSignal.timeout(5000) });
+    const res = await fetch('/api/ollama/health', { method: 'GET', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     return { id: 'ollama', classification: 'local-api', detected: res.ok, defaultModel: null };
   } catch (err) {
     console.warn('[providerProbes] Ollama daemon probe failed:', err);
@@ -38,7 +40,7 @@ async function detectOllamaDaemon() {
 
 async function detectStoredCloudKey(providerId) {
   try {
-    const res = await fetch(`/api/provider/key-status?provider=${encodeURIComponent(providerId)}`, { method: 'GET', signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`/api/provider/key-status?provider=${encodeURIComponent(providerId)}`, { method: 'GET', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     if (!res.ok) return { id: providerId, classification: 'cloud', detected: false, defaultModel: null };
     const data = await res.json();
     return { id: providerId, classification: 'cloud', detected: Boolean(data.configured), defaultModel: null };

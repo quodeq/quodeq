@@ -5,6 +5,19 @@ import { createUrlLinkProvider, createFileLinkProvider } from './terminalLinks.j
 import { themeFromCss } from './xtermTheme.js';
 import { openExternal } from '../updates/openExternal.js';
 
+// xterm tuning. A real terminal font (Menlo = macOS Terminal default,
+// Monaco = iTerm's classic default), NOT the code-panel's JetBrains Mono.
+// All system fonts — available synchronously, so xterm measures the cell
+// correctly with no webfont race (JBM, a Google webfont, caused the
+// extra-spacing bug).
+const TERM_FONT_FAMILY = 'Menlo, Monaco, "SF Mono", "SFMono-Regular", Consolas, "DejaVu Sans Mono", monospace';
+const TERM_FONT_SIZE_PX = 13;
+// iTerm-tight vertical rhythm. 1.5 read like a text editor (too airy);
+// iTerm's default is ~1.0 — 1.1 keeps a hair of breathing room.
+const TERM_LINE_HEIGHT = 1.1;
+const TERM_SCROLLBACK_LINES = 5000;
+const TERM_CURSOR_STYLE = 'bar'; // sleeker than the default square block
+
 // Two drawer chords are reserved for the host; return false so xterm lets them
 // bubble to the window handler instead of typing into the shell.
 export function isReservedChord(e) {
@@ -18,19 +31,13 @@ export function isReservedChord(e) {
  * inline in the mount effect, per the split's scope).
  */
 export function createTerminalInstance({ rootEl, sessionId, send }) {
-  // A real terminal font (Menlo = macOS Terminal default, Monaco = iTerm's
-  // classic default), NOT the code-panel's JetBrains Mono. All system fonts
-  // — available synchronously, so xterm measures the cell correctly with no
-  // webfont race (JBM, a Google webfont, caused the extra-spacing bug).
   const term = new Terminal({
-    scrollback: 5000,
-    fontFamily: 'Menlo, Monaco, "SF Mono", "SFMono-Regular", Consolas, "DejaVu Sans Mono", monospace',
-    fontSize: 13,
-    // iTerm-tight vertical rhythm. 1.5 read like a text editor (too airy);
-    // iTerm's default is ~1.0 — 1.1 keeps a hair of breathing room.
-    lineHeight: 1.1,
+    scrollback: TERM_SCROLLBACK_LINES,
+    fontFamily: TERM_FONT_FAMILY,
+    fontSize: TERM_FONT_SIZE_PX,
+    lineHeight: TERM_LINE_HEIGHT,
     cursorBlink: true,
-    cursorStyle: 'bar',     // sleeker than the default square block
+    cursorStyle: TERM_CURSOR_STYLE,
     theme: themeFromCss(),
     // OSC 8 hyperlinks (emitted by gh, npm, coding CLIs…) are handled by
     // xterm itself, not by our link providers below. Without a linkHandler

@@ -1,0 +1,286 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`galaxyFolderScene value characterization > applies more repulsion passes to small scenes than to large ones > large-scene-ox 1`] = `
+[
+  -153.383932,
+  75.564254,
+  -62.704898,
+  -10.499867,
+  122.814681,
+  105.99317,
+  -24.435246,
+  -1.838779,
+  113.050934,
+  247.654113,
+  -128.132071,
+  -213.967547,
+  190.849653,
+  -29.302628,
+  -204.344689,
+  207.389042,
+  35.799295,
+  -7.602942,
+  -101.439507,
+  -210.386629,
+  -99.164658,
+  89.359863,
+  221.438273,
+  -121.510621,
+  -72.330115,
+  -53.041588,
+  -93.845988,
+  126.76183,
+  122.842693,
+  -87.030586,
+  -163.139928,
+  -210.600353,
+  177.017033,
+  -124.870769,
+  141.892946,
+  184.365252,
+  -117.953851,
+  112.672833,
+  -121.505684,
+  -93.055274,
+  8.016052,
+  107.325662,
+  212.450952,
+  -65.316377,
+  130.829079,
+  -54.358504,
+  187.583394,
+  191.865435,
+  -159.332265,
+  88.74176,
+  76.862412,
+  159.81336,
+  -35.87152,
+  -71.326262,
+  -90.707775,
+  -34.107282,
+  -130.36506,
+  -43.493582,
+  -196.05621,
+  -51.930982,
+]
+`;
+
+exports[`galaxyFolderScene value characterization > applies more repulsion passes to small scenes than to large ones > small-scene-ox 1`] = `
+[
+  156.731927,
+  55.705237,
+  -127.345396,
+  -138.672868,
+  -159.15726,
+  212.738361,
+]
+`;
+
+exports[`galaxyFolderScene value characterization > builds folder-nebula alert particles from the recorded ranges > folder-alert-particles 1`] = `
+[
+  {
+    "ec": 0.928633,
+    "op": 4.914398,
+    "or": 18.673086,
+    "os": 0.02627,
+    "sev": "critical",
+    "sz": 3.530774,
+    "tp": 0.423977,
+  },
+  {
+    "ec": 0.952572,
+    "op": 4.830201,
+    "or": 12.790046,
+    "os": 0.015903,
+    "sev": "major",
+    "sz": 2.464532,
+    "tp": 5.054698,
+  },
+  {
+    "ec": 0.768509,
+    "op": 0.310269,
+    "or": 16.326222,
+    "os": 0.03959,
+    "sev": "major",
+    "sz": 2.798515,
+    "tp": 0.664113,
+  },
+  {
+    "ec": 0.972211,
+    "op": 0.221969,
+    "or": 14.854208,
+    "os": -0.038441,
+    "sev": "minor",
+    "sz": 1.912371,
+    "tp": 6.25013,
+  },
+  {
+    "ec": 0.711345,
+    "op": 2.99619,
+    "or": 14.712665,
+    "os": -0.031919,
+    "sev": "minor",
+    "sz": 1.998625,
+    "tp": 2.46296,
+  },
+  {
+    "ec": 0.872175,
+    "op": 0.171097,
+    "or": 13.376805,
+    "os": -0.024757,
+    "sev": "minor",
+    "sz": 1.919808,
+    "tp": 2.123816,
+  },
+]
+`;
+
+exports[`galaxyFolderScene value characterization > builds per-file violation particles from the recorded ranges > file-violation-particles 1`] = `
+[
+  {
+    "ec": 0.6598,
+    "op": 2.282975,
+    "or": 15.323216,
+    "os": 0.076114,
+    "sev": "major",
+    "sz": 1.842821,
+    "tp": 4.792314,
+  },
+  {
+    "ec": 0.769712,
+    "op": 0.940705,
+    "or": 13.249405,
+    "os": -0.057562,
+    "sev": "minor",
+    "sz": 1.310313,
+    "tp": 0.677388,
+  },
+  {
+    "ec": 0.94978,
+    "op": 5.487105,
+    "or": 9.275652,
+    "os": 0.037964,
+    "sev": "minor",
+    "sz": 1.382256,
+    "tp": 1.677393,
+  },
+]
+`;
+
+exports[`galaxyFolderScene value characterization > keeps the background starfield count, size and speed ranges > background-star-values 1`] = `
+[
+  {
+    "sp": 0.681818,
+    "sz": 0.327273,
+    "tw": 5.711987,
+    "x": 0,
+    "y": 0.636364,
+  },
+  {
+    "sp": 0.809091,
+    "sz": 0.545455,
+    "tw": 0.571199,
+    "x": 0.181818,
+    "y": 0.818182,
+  },
+  {
+    "sp": 0.936364,
+    "sz": 0.763636,
+    "tw": 1.713596,
+    "x": 0.363636,
+    "y": 0,
+  },
+  {
+    "sp": 0.363636,
+    "sz": 0.981818,
+    "tw": 2.855993,
+    "x": 0.545455,
+    "y": 0.181818,
+  },
+]
+`;
+
+exports[`galaxyFolderScene value characterization > layoutChildren and countDescendants stay deterministic per node > layout-children 1`] = `
+[
+  {
+    "angle": 5.571119,
+    "dist": 0.516304,
+    "isFolder": true,
+    "name": "src",
+  },
+  {
+    "angle": 5.890055,
+    "dist": 0.108391,
+    "isFolder": true,
+    "name": "lib",
+  },
+  {
+    "angle": 0.619321,
+    "dist": 0.162067,
+    "isFolder": false,
+    "name": "index.js",
+  },
+  {
+    "angle": 6.276673,
+    "dist": 0.018922,
+    "isFolder": false,
+    "name": "README.md",
+  },
+]
+`;
+
+exports[`galaxyFolderScene value characterization > places every root star at the recorded radius and offset > max-extent 1`] = `154.190565`;
+
+exports[`galaxyFolderScene value characterization > places every root star at the recorded radius and offset > mst-lines 1`] = `
+[
+  {
+    "a": 0,
+    "b": 1,
+  },
+  {
+    "a": 1,
+    "b": 3,
+  },
+  {
+    "a": 3,
+    "b": 2,
+  },
+]
+`;
+
+exports[`galaxyFolderScene value characterization > places every root star at the recorded radius and offset > root-star-geometry 1`] = `
+[
+  {
+    "isFolder": true,
+    "name": "src",
+    "ox": 71.208682,
+    "oy": -131.099396,
+    "pp": 5.571119,
+    "radius": 7.697056,
+  },
+  {
+    "isFolder": true,
+    "name": "lib",
+    "ox": 20.264197,
+    "oy": -19.208216,
+    "pp": 5.890055,
+    "radius": 7.697056,
+  },
+  {
+    "isFolder": false,
+    "name": "index.js",
+    "ox": -41.957152,
+    "oy": 107.231101,
+    "pp": 0.619321,
+    "radius": 7.078461,
+  },
+  {
+    "isFolder": false,
+    "name": "README.md",
+    "ox": -49.515728,
+    "oy": 43.076512,
+    "pp": 6.276673,
+    "radius": 6.2,
+  },
+]
+`;

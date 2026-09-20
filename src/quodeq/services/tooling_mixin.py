@@ -24,6 +24,8 @@ _CLI_MODEL_TIMEOUT_S = 8
 _CLI_OUTPUT_IGNORE_PREFIXES = {"#", "=", "-", "[", "("}
 _ANTHROPIC_API_TIMEOUT_S = 8
 _BROWSE_DIR_LIMIT = 500
+_CUSTOM_PROVIDER_ID = "custom"  # user-defined endpoint; excluded from the client-discovery list
+_DEFAULT_CLIENT_SORT_ORDER = 50  # ai_providers.json's "order" default when unset
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _AI_DEFAULTS_PATH = _PACKAGE_ROOT / "config" / "ai_defaults.json"
 
@@ -214,10 +216,8 @@ class FsToolingMixin:
     # Default AI CLI candidates. Override via the QUODEQ_AI_CLIENTS env var
     # (comma-separated list of client IDs, e.g. "claude,codex").
     _CLI_CANDIDATES = [
-        {"id": "claude", "label": "Claude"},
-        {"id": "codex", "label": "Codex"},
-        {"id": "gemini", "label": "Gemini"},
-        {"id": "copilot", "label": "GitHub Copilot"},
+        {"id": "claude", "label": "Claude"}, {"id": "codex", "label": "Codex"},
+        {"id": "gemini", "label": "Gemini"}, {"id": "copilot", "label": "GitHub Copilot"},
     ]
 
     def get_ai_clients(self, env: dict[str, str] | None = None) -> dict[str, list[dict[str, str]]]:
@@ -245,7 +245,7 @@ class FsToolingMixin:
         # reads awkwardly (e.g. "Llamacpp" instead of "llama.cpp").
         api_label_overrides = {"llamacpp": "llama.cpp"}
         for provider_id, cfg in provider_configs.items():
-            if cfg.get("type") == "api" and provider_id != "custom":
+            if cfg.get("type") == "api" and provider_id != _CUSTOM_PROVIDER_ID:
                 requires = cfg.get("requires_platform", "")
                 if requires and not _platform_matches(requires):
                     continue
@@ -258,7 +258,7 @@ class FsToolingMixin:
                     })
 
         # Sort by 'order' field from ai_providers.json
-        clients.sort(key=lambda c: provider_configs.get(c["id"], {}).get("order", 50))
+        clients.sort(key=lambda c: provider_configs.get(c["id"], {}).get("order", _DEFAULT_CLIENT_SORT_ORDER))
 
         return {"clients": clients}
 

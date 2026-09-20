@@ -13,6 +13,7 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 from quodeq.shared import cancellation
 
 _logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class CircuitBreakerError(Exception):
     it to exit_reason='failure_streak' on the run-level status.
     """
 
-    def __init__(self, reason: str = "circuit_breaker") -> None:
+    def __init__(self, reason: str = REASON_CIRCUIT_BREAKER) -> None:
         super().__init__(reason)
         self.reason = reason
 

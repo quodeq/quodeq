@@ -35,6 +35,9 @@ from __future__ import annotations
 
 import logging
 
+from quodeq.analysis.mcp.schemas import (
+    FINDING_TYPE_VIOLATION, SEVERITY_MAJOR, SEVERITY_MINOR,
+)
 from quodeq.analysis.mcp.scope_gate_rules import matched_rule
 from quodeq.context.trust_model import TrustModel
 from quodeq.core.finding_markers import SCOPE_DOWNGRADE
@@ -49,8 +52,8 @@ SCOPE_DOWNGRADE_MARKER = SCOPE_DOWNGRADE
 
 
 def _downgrade(finding: dict, rule: str) -> bool:
-    finding[SCOPE_DOWNGRADE_MARKER] = {"rule": rule, "from": "major", "to": "minor"}
-    finding["severity"] = "minor"
+    finding[SCOPE_DOWNGRADE_MARKER] = {"rule": rule, "from": SEVERITY_MAJOR, "to": SEVERITY_MINOR}
+    finding["severity"] = SEVERITY_MINOR
     _log.debug(
         "scope gate: %s capped %s finding to minor (%s)",
         rule, finding.get("req"), finding.get("file"),
@@ -79,7 +82,7 @@ def _restore(finding: dict, marker: object) -> bool:
     as found -- this gate must never raise, and must never write a severity
     it did not itself previously stamp.
     """
-    if not isinstance(marker, dict) or marker.get("from") != "major":
+    if not isinstance(marker, dict) or marker.get("from") != SEVERITY_MAJOR:
         del finding[SCOPE_DOWNGRADE_MARKER]
         _log.debug(
             "scope gate: dropped an unrecognized scope_downgrade marker on "
@@ -88,7 +91,7 @@ def _restore(finding: dict, marker: object) -> bool:
         )
         return False
 
-    finding["severity"] = "major"
+    finding["severity"] = SEVERITY_MAJOR
     del finding[SCOPE_DOWNGRADE_MARKER]
     _log.debug(
         "scope gate: restored %s finding to major, marker %s no longer applies (%s)",
@@ -124,7 +127,7 @@ def _restore_or_clear_stale_marker(
     justify it does not fire. This does not count as changing the finding's
     severity, so it never causes this function to return True on its own.
     """
-    if marker is not None and severity == "minor":
+    if marker is not None and severity == SEVERITY_MINOR:
         if model is not None and matched_rule(finding, model) is None:
             return _restore(finding, marker)
         return False
@@ -145,7 +148,7 @@ def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
     write the same field at the same severity would make the outcome depend
     on call order.
     """
-    if finding.get("t") != "violation":
+    if finding.get("t") != FINDING_TYPE_VIOLATION:
         return False
 
     marker = finding.get(SCOPE_DOWNGRADE_MARKER)
@@ -157,7 +160,7 @@ def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
 
     if model is None:
         return False
-    if severity != "major":
+    if severity != SEVERITY_MAJOR:
         return False
 
     rule = matched_rule(finding, model)

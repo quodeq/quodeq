@@ -1,0 +1,197 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`galaxyViewLayout value characterization > applyRepulsionAndRecenter enforces the default minimum gap > repulsion-default-gap 1`] = `
+[
+  {
+    "_ox": -73.722922,
+    "_oy": -4.17278,
+  },
+  {
+    "_ox": 73.670035,
+    "_oy": -5.081514,
+  },
+  {
+    "_ox": 0.052886,
+    "_oy": 9.254293,
+  },
+]
+`;
+
+exports[`galaxyViewLayout value characterization > computeClusterPositions seeds distances inside the recorded range > cluster-positions 1`] = `
+[
+  [
+    0.193558,
+    -0.327177,
+  ],
+  [
+    -0.455289,
+    -0.108737,
+  ],
+  [
+    0.261731,
+    0.435914,
+  ],
+]
+`;
+
+exports[`galaxyViewLayout value characterization > computeMaxExtent adds the recorded star and constellation margins > max-extent-stars-only 1`] = `134`;
+
+exports[`galaxyViewLayout value characterization > computeMaxExtent adds the recorded star and constellation margins > max-extent-with-constellations 1`] = `310`;
+
+exports[`galaxyViewScene value characterization > buildBackgroundStars keeps the recorded count, size and speed ranges > background-star-values 1`] = `
+[
+  {
+    "sp": 0.44024,
+    "sz": 0.725329,
+    "tw": 5.679446,
+    "x": 0.540725,
+    "y": 0.724486,
+  },
+  {
+    "sp": 0.889639,
+    "sz": 0.296393,
+    "tw": 5.316664,
+    "x": 0.596897,
+    "y": 0.991617,
+  },
+  {
+    "sp": 0.802785,
+    "sz": 0.684797,
+    "tw": 4.196431,
+    "x": 0.755356,
+    "y": 0.857922,
+  },
+  {
+    "sp": 0.674651,
+    "sz": 1.082519,
+    "tw": 5.591994,
+    "x": 0.94265,
+    "y": 0.270831,
+  },
+]
+`;
+
+exports[`galaxyViewScene value characterization > buildPrinciples derives radius, orbit distance and dim-particle ranges > principle-geometry 1`] = `
+[
+  {
+    "ba": -1.570796,
+    "dimParticle": {
+      "ec": 0.911892,
+      "op": 2.057954,
+      "or": 14.598076,
+      "os": -0.059349,
+      "sz": 1.059808,
+      "tp": 1.626598,
+    },
+    "name": "P1",
+    "od": 25.46272,
+    "particleCount": 2,
+    "pp": 0.820016,
+    "radius": 8.598076,
+    "score": 8,
+  },
+  {
+    "ba": 1.570796,
+    "dimParticle": {
+      "ec": 0.986138,
+      "op": 5.362078,
+      "or": 14.598076,
+      "os": -0.033572,
+      "sz": 1.059808,
+      "tp": 2.156658,
+    },
+    "name": "P2",
+    "od": 44.41562,
+    "particleCount": 1,
+    "pp": 4.483662,
+    "radius": 8.598076,
+    "score": 6.666667,
+  },
+]
+`;
+
+exports[`galaxyViewScene value characterization > buildScene falls back to the circular single-group layout > single-group-star-geometry 1`] = `
+[
+  {
+    "ba": -1.570796,
+    "j": 3.939855,
+    "name": "clean",
+    "pp": 2.526521,
+    "radius": 3.979796,
+  },
+  {
+    "ba": 1.570796,
+    "j": 3.684997,
+    "name": "solid",
+    "pp": 6.164486,
+    "radius": 3.979796,
+  },
+]
+`;
+
+exports[`galaxyViewScene value characterization > buildScene places constellation stars at the recorded spread and offsets > constellation-geometry 1`] = `
+[
+  {
+    "cx": -253.652384,
+    "cy": 59.738844,
+    "lines": [
+      {
+        "a": 0,
+        "b": 1,
+      },
+    ],
+    "spread": 204,
+    "type": "builtin",
+  },
+  {
+    "cx": 253.652384,
+    "cy": -59.738844,
+    "lines": [],
+    "spread": 192,
+    "type": "community",
+  },
+]
+`;
+
+exports[`galaxyViewScene value characterization > buildScene places constellation stars at the recorded spread and offsets > constellation-max-extent 1`] = `497.652384`;
+
+exports[`galaxyViewScene value characterization > buildScene places constellation stars at the recorded spread and offsets > constellation-star-geometry 1`] = `
+[
+  {
+    "_clusterCx": -253.652384,
+    "_clusterCy": 59.738844,
+    "_ox": 53.456808,
+    "_oy": -63.842464,
+    "ba": 0,
+    "j": 0,
+    "name": "clean",
+    "pp": 4.880614,
+    "radius": 3.979796,
+    "score": 7.5,
+  },
+  {
+    "_clusterCx": -253.652384,
+    "_clusterCy": 59.738844,
+    "_ox": -53.456808,
+    "_oy": 63.842464,
+    "ba": 0,
+    "j": 0,
+    "name": "solid",
+    "pp": 5.036259,
+    "radius": 3.979796,
+    "score": 7.5,
+  },
+  {
+    "_clusterCx": 253.652384,
+    "_clusterCy": -59.738844,
+    "_ox": 0,
+    "_oy": 0,
+    "ba": 0,
+    "j": 0,
+    "name": "secure",
+    "pp": 5.746419,
+    "radius": 3.979796,
+    "score": 7.5,
+  },
+]
+`;

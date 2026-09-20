@@ -6,6 +6,7 @@ import {
   buildEvalPrincipalFn,
   computeComplianceByPrinciple,
 } from '../../../utils/evalPrincipal.js';
+import { STALE_TIME_MS } from '../../../hooks/queryDefaults.js';
 
 /**
  * Open one project's own view of one principle: fetch that project's
@@ -26,7 +27,7 @@ export function useOpenPrinciple({ onOpenEvalPrincipal, openProject }) {
       const evalData = await queryClient.fetchQuery({
         queryKey: projectKeys.dimensionEval(target.id, target.runId, target.dimName),
         queryFn: () => getDimensionEval(target.id, target.runId, target.dimName),
-        staleTime: 60_000,
+        staleTime: STALE_TIME_MS,
       });
       const evalPrincipal = buildEvalPrincipalFn(
         evalData,

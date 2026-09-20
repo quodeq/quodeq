@@ -16,11 +16,7 @@ from quodeq.core.evidence._req_mapping import build_principle_resolver
 from quodeq.data.fs.evidence_tally import FindingTally, IncrementalTally
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services._scan_progress_elapsed import _dim_elapsed_s
-from quodeq.services._scan_progress_types import (
-    _DimCounts,
-    _DimProgress,
-    _ProgressContext,
-)
+from quodeq.services._scan_progress_types import DimProgressState, _DimCounts, _DimProgress, _ProgressContext
 from quodeq.services._wiring import (
     count_active_agent_streams,
     dimension_evidence_file,
@@ -148,7 +144,7 @@ def _dim_state(
     *,
     has_queue: bool,
     has_evaluation: bool,
-) -> str:
+) -> DimProgressState:
     """Classify a dimension as done | running | pending.
 
     Order of checks:
@@ -204,7 +200,7 @@ def _consolidated_dim_progress(run_dir: Path) -> _DimProgress:
     )
 
 
-def _dim_files_summary(queue: dict | None, d_state: str, dim_estimates: dict, dim_id: str) -> dict:
+def _dim_files_summary(queue: dict | None, d_state: DimProgressState, dim_estimates: dict, dim_id: str) -> dict:
     if queue is not None:
         # `taken` is a list of batch entries [{"files": [...], "agent": ..., "ts": ...}, ...].
         # Match FileQueue.stats(): flatten file counts across batches so the
@@ -254,7 +250,7 @@ def _dim_evidence_tally(dim_id: str, ctx: _ProgressContext, dismissed, deleted):
 
 
 def _dim_counts(
-    dim_id: str, ctx: _ProgressContext, dismissed, deleted, d_state: str, record: dict | None,
+    dim_id: str, ctx: _ProgressContext, dismissed, deleted, d_state: DimProgressState, record: dict | None,
 ) -> _DimCounts:
     """Evidence tally, elapsed time, live agents and estimate counts for one dim."""
     meta = ctx.dim_estimates.get(dim_id)

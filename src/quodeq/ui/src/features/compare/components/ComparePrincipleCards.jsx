@@ -1,7 +1,7 @@
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { scoreGradeColorVar } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
-import { score1 } from '../compareFormatters.js';
+import { score1, MIN_BAR_HEIGHT_PCT } from '../compareFormatters.js';
 
 
 function PrincipleDonut({ score }) {
@@ -70,7 +70,7 @@ function PrincipleBars({ p, onOpenPrinciple }) {
             <span
               className="compare-principle__bar"
               style={{
-                height: `${Math.max(15, Math.round(pp.score * 10))}%`,
+                height: `${Math.max(MIN_BAR_HEIGHT_PCT, Math.round(pp.score * 10))}%`,
                 background: scoreGradeColorVar(pp.score),
               }}
             />

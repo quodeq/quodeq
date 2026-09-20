@@ -9,7 +9,7 @@ from quodeq.core._constants import FULL_CONFIDENCE
 from quodeq.core.evidence._options import EvidenceParseOptions, MalformedLineSink
 from quodeq.core.evidence._refs import enrich_judgment
 from quodeq.core.finding_coercions import coerce_confidence, coerce_scope_downgrade
-from quodeq.core.events.models import Judgment, VALID_VERDICTS
+from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment, VALID_VERDICTS
 from quodeq.core.types.req_ref import ReqRef
 from quodeq.core.utils.io import open_text
 
@@ -48,7 +48,7 @@ def parse_jsonl_line(
     j = Judgment(
         practice_id=practice_id, verdict=verdict, dimension=obj.get("d", ""),
         file=obj.get("file", ""), line=obj.get("line", 0), end_line=obj.get("end_line"),
-        snippet=obj.get("snippet", ""), severity=obj.get("severity", "medium"),
+        snippet=obj.get("snippet", ""), severity=obj.get("severity", DEFAULT_SEVERITY),
         violation_type=obj.get("vt") or None, reason=obj.get("reason", ""),
         violation_type_raw=obj.get("vt_raw") or None,
         req=obj.get("req"), title=obj.get("w") or None,

@@ -4,13 +4,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, NamedTuple
 
-from quodeq.assistant.adapters._cli_config import CliChatConfig
+from quodeq.assistant.adapters._cli_config import (
+    RESUME_STYLE_GEMINI, SESSION_ID_SOURCE_PARSE_JSONL, SYSTEM_PROMPT_STYLE_ARGV_APPEND,
+    CliChatConfig,
+)
+from quodeq.core._constants import (
+    MCP_CONFIG_ARG_FLAG, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE, PROMPT_STYLE_POSITIONAL,
+)
 from quodeq.shared._models import normalize_model_id
 
 if TYPE_CHECKING:
     from quodeq.assistant.adapters._cli import CliTurnConfig
 
 _NATIVE_WEB_TOOLS = ("WebSearch", "WebFetch")
+
+# argv flag spellings this module emits. Named so a typo can't silently
+# desync the flag from what the consuming CLI actually recognises, and so
+# they read distinctly from a provider's own `-p`/`-r` short flags
+# (cfg.prompt_flag / RESUME_STYLE_GEMINI's "-r"). The MCP-config-arg flag is
+# the one analysis/_mcp_arg_builders.py also emits, so it comes from core.
+_FLAG_MODEL = "--model"
+_FLAG_APPEND_SYSTEM_PROMPT = "--append-system-prompt"
+_FLAG_SESSION_ID = "--session-id"
+_FLAG_RESUME = "--resume"
+_FLAG_GEMINI_RESUME = "-r"
 
 
 def _with_web_access(args: list[str]) -> list[str]:
@@ -75,17 +92,17 @@ class TurnArgvRequest:
 
 def _resume_args(cfg: CliChatConfig, prior: str | None, new_id: str) -> tuple[list[str], str | None, bool]:
     """Return (session-related argv fragment, assigned id, needs_parse)."""
-    if cfg.session_id_source == "parse-jsonl":
+    if cfg.session_id_source == SESSION_ID_SOURCE_PARSE_JSONL:
         # codex: turn 1 plain exec (parse id); turn N `resume <id>` after subcommand
         if prior is None:
             return [], None, True
         return ["resume", prior], None, False
     # preassign providers (claude, gemini)
     if prior is None:
-        return ["--session-id", new_id], new_id, False
-    if cfg.resume_style == "gemini-resume":
-        return ["-r", prior], prior, False
-    return ["--resume", prior], prior, False
+        return [_FLAG_SESSION_ID, new_id], new_id, False
+    if cfg.resume_style == RESUME_STYLE_GEMINI:
+        return [_FLAG_GEMINI_RESUME, prior], prior, False
+    return [_FLAG_RESUME, prior], prior, False
 
 
 def _model_arg(cfg: CliChatConfig, model: str | None) -> str | None:
@@ -102,7 +119,7 @@ def build_turn_argv(cfg: CliChatConfig, request: TurnArgvRequest) -> CliTurnSpec
     resume_frag, assigned, needs_parse = _resume_args(
         cfg, request.prior_session_id, request.new_session_id)
     # codex `resume <id>` must sit immediately after the `exec` subcommand
-    if cfg.session_id_source == "parse-jsonl" and resume_frag:
+    if cfg.session_id_source == SESSION_ID_SOURCE_PARSE_JSONL and resume_frag:
         argv.extend(resume_frag)
         resume_frag = []
 
@@ -110,17 +127,17 @@ def build_turn_argv(cfg: CliChatConfig, request: TurnArgvRequest) -> CliTurnSpec
                else cfg.assistant_args)
     if resume_frag:
         argv.extend(resume_frag)
-    if request.mcp_config_path and cfg.mcp_style == "config-file":
+    if request.mcp_config_path and cfg.mcp_style == MCP_STYLE_CONFIG_FILE:
         argv.extend([cfg.mcp_config_flag, f"{cfg.mcp_config_prefix}{request.mcp_config_path}"])
-    if request.mcp_config_arg and cfg.mcp_style == "config-arg":
-        argv.extend(["-c", request.mcp_config_arg])
+    if request.mcp_config_arg and cfg.mcp_style == MCP_STYLE_CONFIG_ARG:
+        argv.extend([MCP_CONFIG_ARG_FLAG, request.mcp_config_arg])
     normalized_model = _model_arg(cfg, request.model)
     if normalized_model:
-        argv.extend(["--model", normalized_model])
-    if request.system_prompt and cfg.system_prompt_style == "argv-append":
-        argv.extend(["--append-system-prompt", request.system_prompt])
+        argv.extend([_FLAG_MODEL, normalized_model])
+    if request.system_prompt and cfg.system_prompt_style == SYSTEM_PROMPT_STYLE_ARGV_APPEND:
+        argv.extend([_FLAG_APPEND_SYSTEM_PROMPT, request.system_prompt])
 
-    if cfg.prompt_style == "positional":
+    if cfg.prompt_style == PROMPT_STYLE_POSITIONAL:
         argv.append(request.prompt)
     else:
         argv.extend([cfg.prompt_flag, request.prompt])

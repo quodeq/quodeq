@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { runDetection } from './providerProbes.js';
+import { runDetection, PROBE_TIMEOUT_MS } from './providerProbes.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -22,7 +22,7 @@ describe('providerProbes – timeout behaviour', () => {
     });
   }
 
-  it('#261 detectCliProvider calls fetch with AbortSignal.timeout(5000)', async () => {
+  it('#261 detectCliProvider calls fetch with AbortSignal.timeout(PROBE_TIMEOUT_MS)', async () => {
     const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(
       AbortSignal.abort() // only used to verify AbortSignal.timeout's return value is passed as opts.signal
     );
@@ -31,7 +31,7 @@ describe('providerProbes – timeout behaviour', () => {
 
     await runDetection();
 
-    expect(timeoutSpy).toHaveBeenCalledWith(5000);
+    expect(timeoutSpy).toHaveBeenCalledWith(PROBE_TIMEOUT_MS);
     const clientCalls = fetchMock.mock.calls.filter(([url]) => url.includes('/ai-clients'));
     expect(clientCalls.length).toBeGreaterThanOrEqual(1);
     const [, opts] = clientCalls[0];
@@ -51,7 +51,7 @@ describe('providerProbes – timeout behaviour', () => {
     expect(codex.detected).toBe(false);
   });
 
-  it('#262 detectOllamaDaemon calls fetch with AbortSignal.timeout(5000)', async () => {
+  it('#262 detectOllamaDaemon calls fetch with AbortSignal.timeout(PROBE_TIMEOUT_MS)', async () => {
     const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(
       AbortSignal.abort()
     );
@@ -60,7 +60,7 @@ describe('providerProbes – timeout behaviour', () => {
 
     await runDetection();
 
-    expect(timeoutSpy).toHaveBeenCalledWith(5000);
+    expect(timeoutSpy).toHaveBeenCalledWith(PROBE_TIMEOUT_MS);
     const ollamaCalls = fetchMock.mock.calls.filter(([url]) => url.includes('/ollama/'));
     expect(ollamaCalls.length).toBeGreaterThanOrEqual(1);
     const [, opts] = ollamaCalls[0];

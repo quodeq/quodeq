@@ -4,7 +4,7 @@ import { SidePaneWindow } from './SidePaneWindow.jsx';
 import { clampSidePaneWidth } from './paneWidthMath.js';
 import { t } from '../../strings/index.js';
 import { useOuterPaneDrag } from './hooks/useOuterPaneDrag.js';
-import { useInnerDividerDrag, MIN_WINDOW_RATIO } from './hooks/useInnerDividerDrag.js';
+import { useInnerDividerDrag, MIN_WINDOW_RATIO, DEFAULT_SPLIT_RATIO } from './hooks/useInnerDividerDrag.js';
 import './SidePane.css';
 
 // Build weights from ratios: walk through, treating each ratios[i] as the
@@ -20,7 +20,7 @@ export function computeWeights(windowCount, ratios) {
   const weights = Array(windowCount).fill(1);
   if (ratios.length > windowCount - 1) return weights;
   for (let i = 0; i < ratios.length; i += 1) {
-    const r = ratios[i] ?? 0.5;
+    const r = ratios[i] ?? DEFAULT_SPLIT_RATIO;
     const sum = weights[i] + weights[i + 1];
     weights[i] = sum * r;
     weights[i + 1] = sum * (1 - r);
@@ -59,7 +59,7 @@ function InnerRowDivider({ i, windowCount, ratios, setRatios, onInnerDividerPoin
       role="separator"
       aria-orientation="horizontal"
       aria-label={t('sidePane.resizeBetween', { first: i + 1, second: i + 2 })}
-      aria-valuenow={Math.round((ratios[i] ?? 0.5) * 100)}
+      aria-valuenow={Math.round((ratios[i] ?? DEFAULT_SPLIT_RATIO) * 100)}
       aria-valuemin={0}
       aria-valuemax={100}
       tabIndex={0}
@@ -71,7 +71,7 @@ function InnerRowDivider({ i, windowCount, ratios, setRatios, onInnerDividerPoin
           const delta = e.key === 'ArrowUp' ? -STEP : STEP;
           setRatios((prev) => {
             const out = [...prev];
-            out[i] = Math.min(1 - MIN_WINDOW_RATIO, Math.max(MIN_WINDOW_RATIO, (out[i] ?? 0.5) + delta));
+            out[i] = Math.min(1 - MIN_WINDOW_RATIO, Math.max(MIN_WINDOW_RATIO, (out[i] ?? DEFAULT_SPLIT_RATIO) + delta));
             return out;
           });
         }

@@ -21,13 +21,15 @@ import {
   SELECTED_BAR_OPACITY,
   DESELECTED_BAR_OPACITY,
   HISTORY_CHART_HEIGHT,
+  HOVER_STROKE_WIDTH,
+  REF_LINE_OPACITY_EVEN,
+  REF_LINE_OPACITY_ODD,
 } from '../../../components/scoreChartHelpers.js';
 import { computeHistoryChartStats, buildHistoryKbdItems } from './historyChartStats.js';
 import { DATA_THEME_ATTR } from '../../../constants.js';
 
 const MAX_CHART_RUNS = 40;
 const CHART_HEIGHT = HISTORY_CHART_HEIGHT;
-const HOVER_STROKE_WIDTH = 1.5;
 const TREND_LINE_STROKE_WIDTH = 2;
 const TREND_LINE_OPACITY = 0.9;
 
@@ -69,7 +71,7 @@ function RunHistoryTooltip({ active, payload }) {
 
 function renderChartReferenceLines() {
   return refLineValues([0, 10]).map((y, i) => (
-    <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+    <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? REF_LINE_OPACITY_ODD : REF_LINE_OPACITY_EVEN} />
   ));
 }
 

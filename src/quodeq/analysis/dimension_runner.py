@@ -19,6 +19,7 @@ from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.analysis._runner_markers import emit_marker
+from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_SCORING
 
 
 def _default_callbacks() -> DimensionCallbacks:
@@ -72,7 +73,7 @@ class DimensionRunner:
     ) -> Evidence | None:
         """Analyze *dim_id* and return its Evidence, or None on failure."""
         if emit_log:
-            emit_marker("analyzing", dimension=dim_id)
+            emit_marker(CC_PHASE_ANALYZING, dimension=dim_id)
             self._log.info(f"→ [{idx}/{ctx.total}] Analyzing {dim_id}")
 
         ev = process_dimension_with_cache(config, dim_id, idx, ctx, self._opts)
@@ -105,7 +106,7 @@ def _log_dimension_result(
     ev: Evidence, dimension: str, idx: int, total: int, *,
     log: LogSink = NULL_LOG,
 ) -> None:
-    emit_marker("scoring", dimension=dimension)
+    emit_marker(CC_PHASE_SCORING, dimension=dimension)
     violations = sum(len(pe.violations) for pe in ev.principles.values())
     compliances = sum(len(pe.compliance) for pe in ev.principles.values())
     log.success(f"[{idx}/{total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c")

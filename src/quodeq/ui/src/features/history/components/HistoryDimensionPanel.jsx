@@ -21,12 +21,21 @@ const CHART_LEFT_MARGIN = -16;
 const CHART_HEIGHT = 160;
 const CHART_MAX_BAR_SIZE = 40;
 const CHART_CELL_OPACITY = 0.85;
-const CHART_Y_TICKS = [0, 2.5, 5, 7.5, 10];
-const CHART_BAR_RADIUS = [3, 3, 0, 0];
+const CHART_Y_TICK_QUARTER = 2.5;
+const CHART_Y_TICK_HALF = 5;
+const CHART_Y_TICK_THREE_QUARTER = 7.5;
+const CHART_Y_TICKS = [0, CHART_Y_TICK_QUARTER, CHART_Y_TICK_HALF, CHART_Y_TICK_THREE_QUARTER, 10];
+const CHART_BAR_CORNER_RADIUS = 3;
+const CHART_BAR_RADIUS = [CHART_BAR_CORNER_RADIUS, CHART_BAR_CORNER_RADIUS, 0, 0];
 const TREND_UP_ANGLE = 70;
 const TREND_SOFT_UP = 88;
 const TREND_DOWN = 110;
 const TREND_SOFT_DOWN = 92;
+// Fallback shortcode length for a dimension name not in DIM_CODE.
+const FALLBACK_DIM_CODE_LENGTH = 4;
+// Trend label placement: the delta text sits above the arrow glyph.
+const DELTA_LABEL_Y_OFFSET = 25;
+const ARROW_LABEL_Y_OFFSET = 14;
 
 function scoreBarColor(score) {
   const n = parseFloat(score);
@@ -69,7 +78,7 @@ const DIM_CODE = {
 
 function dimCode(name) {
   if (!name) return '';
-  return (DIM_CODE[name.toLowerCase()] ?? name.slice(0, 4)).toUpperCase();
+  return (DIM_CODE[name.toLowerCase()] ?? name.slice(0, FALLBACK_DIM_CODE_LENGTH)).toUpperCase();
 }
 
 function trendColorVar(colorClass) {
@@ -116,13 +125,13 @@ function renderTrendLabel(data, { x, y, width, index }) {
   const deltaStr = entry.delta > 0 ? `+${entry.delta.toFixed(1)}` : entry.delta.toFixed(1);
   return (
     <g>
-      <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={fill}>
+      <text x={cx} y={y - DELTA_LABEL_Y_OFFSET} textAnchor="middle" fontSize={9} fill={fill}>
         {deltaStr}
       </text>
       <text
-        x={cx} y={y - 14}
+        x={cx} y={y - ARROW_LABEL_Y_OFFSET}
         textAnchor="middle" fontSize={11} fill={fill}
-        transform={`rotate(${Math.round(angle)}, ${cx}, ${y - 14})`}
+        transform={`rotate(${Math.round(angle)}, ${cx}, ${y - ARROW_LABEL_Y_OFFSET})`}
       >
         ↑
       </text>

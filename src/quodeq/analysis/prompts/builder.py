@@ -133,7 +133,7 @@ def build_analysis_prompt(template: str, context: ctx.PromptContext) -> str:
         ctx.TPL_SOURCE_FILE_COUNT: str(context.source_file_count),
         ctx.TPL_STANDARDS_CHECKLIST: standards_checklist,
         ctx.TPL_ANALYSIS_GUIDANCE: manifest_context,
-        "DIMENSIONS": dimensions_text,
+        ctx.TPL_DIMENSIONS: dimensions_text,
         ctx.TPL_PROMPT_HASH: prompt_hash,
         ctx.TPL_SOURCE_MANIFEST: manifest_context,
         _TPL_EVALUATION_RULES: load_evaluation_rules(),

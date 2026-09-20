@@ -14,6 +14,15 @@ import { DATA_THEME_ATTR } from '../../../../constants.js';
 
 export const TAU = Math.PI * 2;
 
+/* Shared by both scenes' builders and layout passes: the midpoint of a 0..1
+   RNG sample (centres a jitter on zero, flips half the orbits), the floor on
+   a star-to-star distance so repulsion never divides by zero, and the pass
+   count for the most crowded scenes (repulsion is O(n^2) per pass, so each
+   scene keeps its own counts for the smaller cases). */
+export const RNG_MIDPOINT = 0.5;
+export const MIN_SEPARATION_PX = 0.1;
+export const REPULSION_PASSES_LARGE = 3;
+
 /* ── Theme color helpers ── */
 
 export function parseCSSColor(cssColor) {
@@ -117,20 +126,41 @@ const GLOW_OUTER_RATIO = 3;
 const GLOW_CENTER_ALPHA = 0.15;
 const GLOW_MID_ALPHA = 0.9;
 const GLOW_EDGE_ALPHA = 0.6;
+// Below either floor the glow is invisible; skipping it saves two gradients
+// per star per frame on a zoomed-out scene full of tiny stars.
+const GLOW_MIN_RADIUS_PX = 0.3;
+const GLOW_MIN_ALPHA = 0.01;
+// The core gradient starts from a lightened copy of the colour, clamped to
+// the top of the 8-bit channel range. Hoisted to module scope because
+// drawGlow runs once per star per frame.
+const CHANNEL_MAX = 255;
+const GLOW_CORE_LIGHTEN = 60;
+const lightenChannel = (c) => Math.min(CHANNEL_MAX, c + GLOW_CORE_LIGHTEN);
 
 export function drawGlow(ctx, { x, y, r, col, alpha }) {
-  if (r < 0.3 || alpha < 0.01) return;
+  if (r < GLOW_MIN_RADIUS_PX || alpha < GLOW_MIN_ALPHA) return;
   const { r: cr, g, b } = col;
   const gl = ctx.createRadialGradient(x, y, r * GLOW_INNER_RATIO, x, y, r * GLOW_OUTER_RATIO);
   gl.addColorStop(0, `rgba(${cr},${g},${b},${GLOW_CENTER_ALPHA * alpha})`);
   gl.addColorStop(1, `rgba(${cr},${g},${b},0)`);
   ctx.beginPath(); ctx.arc(x, y, r * GLOW_OUTER_RATIO, 0, TAU); ctx.fillStyle = gl; ctx.fill();
   const co = ctx.createRadialGradient(x, y, 0, x, y, r);
-  co.addColorStop(0, `rgba(${Math.min(255, cr + 60)},${Math.min(255, g + 60)},${Math.min(255, b + 60)},${GLOW_MID_ALPHA * alpha})`);
+  co.addColorStop(0, `rgba(${lightenChannel(cr)},${lightenChannel(g)},${lightenChannel(b)},${GLOW_MID_ALPHA * alpha})`);
   co.addColorStop(GLOW_EDGE_ALPHA, `rgba(${cr},${g},${b},${GLOW_EDGE_ALPHA * alpha})`);
   co.addColorStop(1, `rgba(${cr},${g},${b},${GLOW_CENTER_ALPHA * alpha})`);
   ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = co; ctx.fill();
 }
+
+// A particle breathes between base-amp and base+amp, paints a soft halo at
+// HALO_RATIO times its own size, and is dropped once it is too small to see.
+const PARTICLE_TWINKLE_BASE = 0.5;
+const PARTICLE_TWINKLE_AMP = 0.08;
+const PARTICLE_TWINKLE_SPEED = 0.5;
+const PARTICLE_MIN_DRAW_SIZE_PX = 0.15;
+const PARTICLE_HALO_RATIO = 3;
+const PARTICLE_HALO_ALPHA = 0.12;
+// The dot itself is drawn brighter than its twinkle alone would make it.
+const PARTICLE_CORE_ALPHA_BOOST = 0.2;
 
 export function drawParticles(ctx, particles, { cx, cy, scale, alpha, t, drawScale }) {
   const ds = drawScale ?? scale;
@@ -138,14 +168,14 @@ export function drawParticles(ctx, particles, { cx, cy, scale, alpha, t, drawSca
     const a = t * p.os + p.op;
     const px = cx + Math.cos(a) * p.or * p.ec * scale;
     const py = cy + Math.sin(a) * p.or * scale;
-    const tw = 0.5 + 0.08 * Math.sin(t * 0.5 + p.tp);
+    const tw = PARTICLE_TWINKLE_BASE + PARTICLE_TWINKLE_AMP * Math.sin(t * PARTICLE_TWINKLE_SPEED + p.tp);
     const sz = p.sz * ds;
-    if (sz < 0.15) return;
+    if (sz < PARTICLE_MIN_DRAW_SIZE_PX) return;
     const { r, g, b } = p.col;
-    ctx.beginPath(); ctx.arc(px, py, sz * 3, 0, TAU);
-    ctx.fillStyle = `rgba(${r},${g},${b},${tw * 0.12 * alpha})`; ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, sz * PARTICLE_HALO_RATIO, 0, TAU);
+    ctx.fillStyle = `rgba(${r},${g},${b},${tw * PARTICLE_HALO_ALPHA * alpha})`; ctx.fill();
     ctx.beginPath(); ctx.arc(px, py, sz, 0, TAU);
-    ctx.fillStyle = `rgba(${r},${g},${b},${(tw + 0.2) * alpha})`; ctx.fill();
+    ctx.fillStyle = `rgba(${r},${g},${b},${(tw + PARTICLE_CORE_ALPHA_BOOST) * alpha})`; ctx.fill();
   });
 }
 
@@ -173,7 +203,7 @@ export function mkParticles(critical, major, minor, baseRadius) {
       ps.push({
         col, sev,
         or: baseRadius + PARTICLE_ORBIT_OFFSET + Math.random() * PARTICLE_ORBIT_RANGE,
-        os: (PARTICLE_SPEED_BASE + Math.random() * PARTICLE_SPEED_RANGE) * (Math.random() > 0.5 ? 1 : -1),
+        os: (PARTICLE_SPEED_BASE + Math.random() * PARTICLE_SPEED_RANGE) * (Math.random() > RNG_MIDPOINT ? 1 : -1),
         op: Math.random() * TAU,
         sz: sev === 'critical' ? PARTICLE_SIZE_CRITICAL + Math.random() * PARTICLE_SIZE_CRITICAL_RANGE : sev === 'major' ? PARTICLE_SIZE_MAJOR + Math.random() * PARTICLE_SIZE_MAJOR_RANGE : PARTICLE_SIZE_MINOR + Math.random() * PARTICLE_SIZE_MINOR_RANGE,
         ec: PARTICLE_ECCENTRICITY_BASE + Math.random() * PARTICLE_ECCENTRICITY_RANGE,
@@ -187,12 +217,43 @@ export function mkParticles(critical, major, minor, baseRadius) {
   return ps;
 }
 
+/* ── Background starfield ── */
+
+// Both galaxy views paint the same decorative starfield: positions are a
+// fraction of the canvas, size and twinkle speed are seeded from these
+// ranges. Nothing about a scene's layout depends on it.
+const BG_STAR_COUNT = 120;
+const BG_STAR_MAX_SIZE_PX = 1.2;
+const BG_STAR_SPEED_MIN = 0.3;
+const BG_STAR_SPEED_RANGE = 0.7;
+
+/**
+ * Build one background starfield.
+ *
+ * @param {Function} rand A 0..1 generator — a seeded RNG where the field
+ *   must be stable across rebuilds, Math.random where it need not be.
+ * @returns {Array<{x: number, y: number, sz: number, tw: number, sp: number}>}
+ *   Stars, with x/y as fractions of the canvas and tw/sp the twinkle phase
+ *   and speed.
+ */
+export function mkBackgroundStars(rand) {
+  return Array.from({ length: BG_STAR_COUNT }, () => ({
+    x: rand(), y: rand(),
+    sz: rand() * BG_STAR_MAX_SIZE_PX,
+    tw: rand() * TAU,
+    sp: BG_STAR_SPEED_MIN + rand() * BG_STAR_SPEED_RANGE,
+  }));
+}
+
 /* ── Seeded PRNG ── */
+
+// `(h << 5) - h` is `h * 31`, the classic string-hash multiplier.
+const SEED_HASH_SHIFT = 5;
 
 export function seedHash(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+    h = ((h << SEED_HASH_SHIFT) - h + str.charCodeAt(i)) | 0;
   }
   return h;
 }
@@ -211,9 +272,16 @@ export function seededRng(seed) {
 
 /* ── Grade helpers ── */
 
+/**
+ * The score a dimension or principle falls back to when the report carries
+ * no usable number: the middle of the 0-10 scale, so it renders neither as a
+ * success nor as a failure.
+ */
+export const NEUTRAL_SCORE = 5;
+
 // Returns 0-10 scale to match scoreRGB thresholds
 export function gradeToScore(grade) {
-  return { A: 9.5, B: 8, C: 6.5, D: 4.5, F: 2 }[grade] || 5;
+  return { A: 9.5, B: 8, C: 6.5, D: 4.5, F: 2 }[grade] || NEUTRAL_SCORE;
 }
 
 /* ── Constants ── */

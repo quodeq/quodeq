@@ -4,7 +4,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.analysis.errors import EvaluationError, FatalProviderError
+from quodeq.analysis.errors import (
+    REASON_AGENT_FAILURE_STREAK, REASON_PROVIDER_FATAL,
+    EvaluationError, FatalProviderError,
+)
+from quodeq.analysis.mcp.schemas import FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_OK
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
@@ -45,8 +49,8 @@ def _raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> 
       a clean completion.
     """
     reason = cancellation.cancel_reason() or ""
-    is_provider_fatal = reason.startswith("provider_fatal")
-    is_streak = reason == "agent_failure_streak"
+    is_provider_fatal = reason.startswith(REASON_PROVIDER_FATAL)
+    is_streak = reason == REASON_AGENT_FAILURE_STREAK
     if not (is_provider_fatal or is_streak):
         return
     ok_files = _count_ok_files(run_dir)
@@ -60,10 +64,10 @@ def _raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> 
     if is_provider_fatal:
         raise FatalProviderError(
             f"evaluation aborted: {reason.partition(':')[2].strip() or 'fatal provider error'}",
-            reason=reason.partition(":")[2].partition(":")[0] or "provider_fatal",
+            reason=reason.partition(":")[2].partition(":")[0] or REASON_PROVIDER_FATAL,
         )
     from quodeq.analysis.cache._failure_streak import CircuitBreakerError
-    raise CircuitBreakerError("agent_failure_streak")
+    raise CircuitBreakerError(REASON_AGENT_FAILURE_STREAK)
 
 
 def check_zero_findings(
@@ -126,12 +130,14 @@ def _tally_markers(jsonl_path: Path) -> tuple[int, int]:
                     continue
                 file = entry.get("file")
                 status = entry.get("status")
-                if isinstance(file, str) and status in ("ok", "error"):
+                if isinstance(file, str) and status in (
+                    FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR,
+                ):
                     last_status[file] = status
     except (FileNotFoundError, OSError):
         return 0, 0
-    ok = sum(1 for s in last_status.values() if s == "ok")
-    err = sum(1 for s in last_status.values() if s == "error")
+    ok = sum(1 for s in last_status.values() if s == FILE_DONE_STATUS_OK)
+    err = sum(1 for s in last_status.values() if s == FILE_DONE_STATUS_ERROR)
     return ok, err
 
 

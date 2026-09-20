@@ -105,3 +105,8 @@ export const MOBILE_BREAKPOINT_QUERY = `(max-width: ${MOBILE_BREAKPOINT_PX}px)`;
 // Third-party contract: pywebview dispatches this on window once its JS
 // bridge is injected. Never rename.
 export const PYWEBVIEW_READY_EVENT = 'pywebviewready';
+
+// HTTP status codes the UI branches on by name (a 409 collision, a 404
+// gone-missing). Not a full status enum, only the codes callers compare
+// against res.status / err.status.
+export const HTTP_STATUS = Object.freeze({ CONFLICT: 409, NOT_FOUND: 404 });

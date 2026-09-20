@@ -10,7 +10,7 @@ import json
 import logging
 from typing import Any
 
-from quodeq.core.events.models import Judgment
+from quodeq.core.events.models import DEFAULT_SEVERITY, VERDICT_VIOLATION, Judgment
 from quodeq.core.finding_coercions import coerce_confidence
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.req_ref import ReqRef
@@ -39,7 +39,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
     practice_id = finding.get("p", "")
     file = finding.get("file", "") or ""
     line = int(finding.get("line", 0) or 0)
-    verdict = finding.get("t", "violation")
+    verdict = finding.get("t", VERDICT_VIOLATION)
     refs = finding.get("req_refs")
     return {
         "schema_version": int(finding.get("schema_version", 1)),
@@ -47,7 +47,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
         "dimension": finding.get("d", "") or "",
         "requirement": finding.get("req"),
         "verdict": verdict,
-        "severity": finding.get("severity", "medium"),
+        "severity": finding.get("severity", DEFAULT_SEVERITY),
         "file": file,
         "line": line,
         "end_line": int(finding.get("end_line", 0) or 0),
@@ -129,12 +129,12 @@ def row_to_finding(row: dict[str, Any]) -> Finding:
 
     return Finding(
         practice_id=row["practice_id"],
-        verdict=row.get("verdict", "violation"),
+        verdict=row.get("verdict", VERDICT_VIOLATION),
         file=row.get("file", ""),
         line=row.get("line", 0),
         end_line=row.get("end_line", 0),
         snippet=row.get("snippet", ""),
-        severity=row.get("severity", "medium"),
+        severity=row.get("severity", DEFAULT_SEVERITY),
         reason=row.get("reason", ""),
         dimension=row.get("dimension", ""),
         req=row.get("requirement"),

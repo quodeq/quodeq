@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useApi } from '../../api/ApiContext.jsx';
 
 const ACTIVE_PHASES = new Set(['downloading', 'verifying', 'installing', 'relaunching']);
+// Fast enough that the phase/percent banner reads as live progress.
+const STATUS_POLL_MS = 1000;
 
 /**
  * Drives the packaged app's update-and-relaunch flow: starts the backend
@@ -19,7 +21,7 @@ export function useSelfUpdate(status, adoptStatus) {
     if (!active) return undefined;
     const id = setInterval(() => {
       getUpdateStatus().then(adoptStatus).catch((e) => console.warn('self-update status poll failed:', e));
-    }, 1000);
+    }, STATUS_POLL_MS);
     return () => clearInterval(id);
   }, [active, adoptStatus, getUpdateStatus]);
 

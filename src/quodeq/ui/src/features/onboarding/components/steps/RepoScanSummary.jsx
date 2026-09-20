@@ -23,10 +23,10 @@ export function RepoScanSummary({ scan }) {
   return (
     <div className="onboarding-scan-summary">
       <StatStrip cards>
-        <Stat label="FILES" value={totalFiles} hint={filesHint} />
-        <Stat label="CODE" value={codeFiles} hint={t('onboarding.codeFilesHint')} />
-        <Stat label="LANGUAGES" value={langCount} />
-        <Stat label="BRANCHES" value={branchCount} />
+        <Stat label={t('onboarding.statFiles')} value={totalFiles} hint={filesHint} />
+        <Stat label={t('onboarding.statCode')} value={codeFiles} hint={t('onboarding.codeFilesHint')} />
+        <Stat label={t('onboarding.statLanguages')} value={langCount} />
+        <Stat label={t('onboarding.statBranches')} value={branchCount} />
       </StatStrip>
       {topLangs.length > 0 && (
         <div className="onboarding-scan-summary__langs">

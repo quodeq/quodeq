@@ -1,10 +1,11 @@
 import { t } from '../../../../strings/index.js';
 
-// Most severe first, so the panel reads the same in both branches.
+// Most severe first, so the panel reads the same in both branches. Labels
+// are resolved per build, not here, so a locale change is picked up.
 const SEVERITY_LINES = [
-  { key: 'critical', label: 'Critical', color: 'var(--color-sev-critical-text)' },
-  { key: 'major', label: 'Major', color: 'var(--color-sev-major-text)' },
-  { key: 'minor', label: 'Minor', color: 'var(--color-sev-minor-text)' },
+  { key: 'critical', labelKey: 'map.critical', color: 'var(--color-sev-critical-text)' },
+  { key: 'major', labelKey: 'map.major', color: 'var(--color-sev-major-text)' },
+  { key: 'minor', labelKey: 'map.minor', color: 'var(--color-sev-minor-text)' },
 ];
 
 // One panel line per non-zero severity. The folder branch tints its lines
@@ -13,9 +14,10 @@ function severityLines(counts, colored) {
   const sev = counts || {};
   return SEVERITY_LINES
     .filter(({ key }) => sev[key] > 0)
-    .map(({ key, label, color }) => (
-      colored ? { label, value: sev[key], color } : { label, value: sev[key] }
-    ));
+    .map(({ key, labelKey, color }) => {
+      const label = t(labelKey);
+      return colored ? { label, value: sev[key], color } : { label, value: sev[key] };
+    });
 }
 
 /**
@@ -30,8 +32,8 @@ export function buildLevelInfo({ scene, currentNode, zoomedFileRef, navRef, proj
     return {
       title: s.name,
       lines: [
-        { label: 'Violations', value: s.violations },
-        { label: 'Compliance', value: s.compliance },
+        { label: t('map.violations'), value: s.violations },
+        { label: t('map.compliance'), value: s.compliance },
         ...severityLines(sev, false),
       ],
       hint: null,
@@ -45,9 +47,9 @@ export function buildLevelInfo({ scene, currentNode, zoomedFileRef, navRef, proj
   const cnSev = cn.severity || {};
   const isRoot = navRef.current.path.length <= 1;
   const lines = [
-    { label: 'Compliance', value: (rate * 100).toFixed(0) + '%' },
-    { label: 'Contents', value: folderCount + fileCount },
-    { label: 'Violations', value: cn.violations },
+    { label: t('map.compliance'), value: (rate * 100).toFixed(0) + '%' },
+    { label: t('map.contents'), value: folderCount + fileCount },
+    { label: t('map.violations'), value: cn.violations },
   ];
   if (cn.violations > 0) lines.push(...severityLines(cnSev, true));
   return {

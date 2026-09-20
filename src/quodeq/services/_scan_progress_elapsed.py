@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.services._scan_progress_types import DimProgressState
 from quodeq.services._wiring import file_mtime, latest_dim_activity_mtime, read_queue_state
 
 
@@ -41,7 +42,7 @@ def _queue_take_timestamps(qstate: dict) -> list[float]:
     ]
 
 
-def _stamped_elapsed_s(record: dict | None, state: str) -> float | None:
+def _stamped_elapsed_s(record: dict | None, state: DimProgressState) -> float | None:
     """Per-dim elapsed from the transition timestamps in dimensions.json.
 
     write_dim_state stamps ``started_at`` when the dimension starts and
@@ -63,7 +64,7 @@ def _stamped_elapsed_s(record: dict | None, state: str) -> float | None:
     return max(0.0, (end - start).total_seconds())
 
 
-def _dim_elapsed_s(dim_id: str, run_dir: Path, state: str, record: dict | None = None) -> float | None:
+def _dim_elapsed_s(dim_id: str, run_dir: Path, state: DimProgressState, record: dict | None = None) -> float | None:
     """Per-dim elapsed time.
 
     Prefers the transition timestamps stamped in dimensions.json (see

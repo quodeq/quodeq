@@ -1,18 +1,51 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { drawFrame } from './galaxyViewDraw.js';
+import { CAMERA } from './galaxyTuning.js';
+import { easeInOutCubic, easeLagged } from './galaxyEasing.js';
 
 const TRANSITION_DURATION_S = 0.8;
+
+// Idle drift for a clustered star: sine on x, cosine on y. The speeds and
+// phases are deliberately unequal so the two axes never sync into a
+// straight-line wobble. One amplitude (world units) serves both axes.
+const DRIFT_SPEED_X = 0.015;
+const DRIFT_SPEED_Y = 0.012;
+const DRIFT_PHASE_X = 1.1;
+const DRIFT_PHASE_Y = 0.8;
+const DRIFT_AMPLITUDE = 2;
+// A star on the single-group ring instead breathes along the ring itself.
+const RING_RADIUS_FRACTION = 0.22;
+const RING_WOBBLE_SPEED = 0.02;
+const RING_WOBBLE_PHASE = 0.7;
+const RING_WOBBLE_AMPLITUDE = 0.03;
+// Principles orbit their dimension star, each a little faster than the last
+// so the ring never locks into a rigid wheel.
+const PRINCIPLE_ORBIT_SPEED_BASE = 0.008;
+const PRINCIPLE_ORBIT_SPEED_PER_INDEX = 0.003;
+const PRINCIPLE_WOBBLE_SPEED = 0.04;
+const PRINCIPLE_WOBBLE_PHASE = 2.1;
+const PRINCIPLE_WOBBLE_AMPLITUDE = 0.02;
+// Fraction of the remaining distance the idle camera covers each frame.
+const IDLE_LERP_FRACTION = 0.06;
+// Where each navigation depth parks the camera, and the room a cluster or
+// the whole scene is given inside the viewport when fitting it.
+const DIMENSION_ZOOM = 5;
+const PRINCIPLE_ZOOM = 50;
+const CLUSTER_RING_PAD_PX = 15;
+const CLUSTER_FALLBACK_EXTENT_PX = 80;
+const CLUSTER_VIEW_MARGIN_PX = 30;
+const FIT_VIEW_MARGIN_PX = 20;
 
 /* ── Animation helpers ── */
 
 function updateStarPositions(stars, W, H, SP, t) {
   stars.forEach((s, i) => {
     if (s._clusterCx !== undefined) {
-      const drift = Math.sin(t * 0.015 + i * 1.1) * 2;
+      const drift = Math.sin(t * DRIFT_SPEED_X + i * DRIFT_PHASE_X) * DRIFT_AMPLITUDE;
       s.x = W / 2 + s._clusterCx + s._ox + drift;
-      s.y = H / 2 + s._clusterCy + s._oy + Math.cos(t * 0.012 + i * 0.8) * 2;
+      s.y = H / 2 + s._clusterCy + s._oy + Math.cos(t * DRIFT_SPEED_Y + i * DRIFT_PHASE_Y) * DRIFT_AMPLITUDE;
     } else {
-      const a = s.ba + Math.sin(t * 0.02 + i * 0.7) * 0.03;
+      const a = s.ba + Math.sin(t * RING_WOBBLE_SPEED + i * RING_WOBBLE_PHASE) * RING_WOBBLE_AMPLITUDE;
       s.x = W / 2 + Math.cos(a) * (SP + s.j);
       s.y = H / 2 + Math.sin(a) * (SP + s.j);
     }
@@ -21,24 +54,24 @@ function updateStarPositions(stars, W, H, SP, t) {
 
 function updatePrinciplePositions(principles, dim, t) {
   (principles || []).forEach((p, pi) => {
-    const speed = 0.008 + pi * 0.003;
-    const wobble = Math.sin(t * 0.04 + pi * 2.1) * 0.02;
+    const speed = PRINCIPLE_ORBIT_SPEED_BASE + pi * PRINCIPLE_ORBIT_SPEED_PER_INDEX;
+    const wobble = Math.sin(t * PRINCIPLE_WOBBLE_SPEED + pi * PRINCIPLE_WOBBLE_PHASE) * PRINCIPLE_WOBBLE_AMPLITUDE;
     p.x = dim.x + Math.cos(p.ba + t * speed + wobble) * p.od;
     p.y = dim.y + Math.sin(p.ba + t * speed + wobble) * p.od;
   });
 }
 
 function interpolateCamera(cam, tg, anim, frameCount) {
-  if (!anim && frameCount <= 3) {
+  if (!anim && frameCount <= CAMERA.snapFrames) {
     cam.x = tg.x; cam.y = tg.y; cam.z = tg.z;
   } else if (!anim) {
-    cam.x += (tg.x - cam.x) * 0.06;
-    cam.y += (tg.y - cam.y) * 0.06;
-    cam.z += (tg.z - cam.z) * 0.06;
+    cam.x += (tg.x - cam.x) * IDLE_LERP_FRACTION;
+    cam.y += (tg.y - cam.y) * IDLE_LERP_FRACTION;
+    cam.z += (tg.z - cam.z) * IDLE_LERP_FRACTION;
   } else {
-    anim.t = Math.min(1, anim.t + 0.016 / TRANSITION_DURATION_S);
-    const ease = anim.t < 0.5 ? 4 * anim.t * anim.t * anim.t : 1 - Math.pow(-2 * anim.t + 2, 3) / 2;
-    const lag = Math.pow(anim.t, 0.7); const lagE = lag * lag * (3 - 2 * lag);
+    anim.t = Math.min(1, anim.t + CAMERA.frameStepS / TRANSITION_DURATION_S);
+    const ease = easeInOutCubic(anim.t);
+    const lagE = easeLagged(anim.t);
     const posE = anim.out ? ease : lagE;
     const zoomE = anim.out ? lagE : ease;
     cam.x = anim.sx + (tg.x - anim.sx) * posE;
@@ -59,10 +92,11 @@ function makeAnimationFrame({
 }) {
   return function frame() {
     if (!runningBox.current) return;
-    const t = timeRef.current += 0.016;
+    timeRef.current += CAMERA.frameStepS;
+    const t = timeRef.current;
     const nav = navRef.current;
     const W = size.w, H = size.h;
-    const SP = Math.min(W, H) * 0.22;
+    const SP = Math.min(W, H) * RING_RADIUS_FRACTION;
     if (!camRef.current) camRef.current = { x: W / 2, y: H / 2, z: getFitZoom(), _sceneId: scene };
     const cam = camRef.current;
 
@@ -101,15 +135,15 @@ function computeTarget({ nav, scene, size, camRef, fz }) {
   if (nav.depth === 0) {
     if (nav.clusterCx != null) {
       const con = scene?.constellations?.find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy);
-      const clusterExtent = con ? con.spread + 15 : 80;
-      const halfView = Math.min(size.w, size.h) / 2 - 30;
+      const clusterExtent = con ? con.spread + CLUSTER_RING_PAD_PX : CLUSTER_FALLBACK_EXTENT_PX;
+      const halfView = Math.min(size.w, size.h) / 2 - CLUSTER_VIEW_MARGIN_PX;
       const clusterFz = halfView / clusterExtent;
       return { x: size.w / 2 + nav.clusterCx, y: size.h / 2 + nav.clusterCy, z: clusterFz };
     }
     return { x: size.w / 2, y: size.h / 2, z: fz };
   }
-  if (nav.depth === 1 && nav.dim !== null) { const s = scene.stars?.[nav.dim]; if (!s) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: s.x, y: s.y, z: 5 }; }
-  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) { const s = scene.stars?.[nav.dim]; const p = s ? scene.principles?.[nav.dim]?.[nav.prin] : null; if (!p) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: p.x, y: p.y, z: 50 }; }
+  if (nav.depth === 1 && nav.dim !== null) { const s = scene.stars?.[nav.dim]; if (!s) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: s.x, y: s.y, z: DIMENSION_ZOOM }; }
+  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) { const s = scene.stars?.[nav.dim]; const p = s ? scene.principles?.[nav.dim]?.[nav.prin] : null; if (!p) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: p.x, y: p.y, z: PRINCIPLE_ZOOM }; }
   return camRef.current;
 }
 
@@ -133,8 +167,8 @@ export function useGalaxyCamera({ canvasRef, scene, size, showLabels, savedCamRe
   const getFitZoom = useCallback(() => {
     const ext = scene?._maxExtent;
     if (!ext || ext <= 0) return 1;
-    const halfView = Math.min(size.w, size.h) / 2 - 20;
-    return Math.min(halfView / ext, 4);
+    const halfView = Math.min(size.w, size.h) / 2 - FIT_VIEW_MARGIN_PX;
+    return Math.min(halfView / ext, CAMERA.fitZoomMax);
   }, [scene, size.w, size.h]);
 
   const getTarget = useCallback(

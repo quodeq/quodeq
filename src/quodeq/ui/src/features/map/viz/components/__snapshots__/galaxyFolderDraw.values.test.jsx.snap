@@ -1,0 +1,1455 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`galaxyFolderDraw value characterization > drawConstellationLines strokes at the recorded alpha and width > constellation-line-values 1`] = `
+[
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    400,
+    300,
+  ],
+  [
+    "lineTo",
+    500,
+    350,
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.25)",
+  ],
+  [
+    "=lineWidth",
+    0.8,
+  ],
+  [
+    "stroke",
+  ],
+]
+`;
+
+exports[`galaxyFolderDraw value characterization > drawLabels places by importance and skips colliding boxes > draw-labels-values 1`] = `
+[
+  [
+    "=font",
+    "500 16.5px -apple-system,BlinkMacSystemFont,sans-serif",
+  ],
+  [
+    "=textAlign",
+    "center",
+  ],
+  [
+    "=fillStyle",
+    "rgba(100,150,200,0.6)",
+  ],
+  [
+    "fillText",
+    "src/deep",
+    400,
+    270,
+  ],
+  [
+    "=font",
+    "13.5px -apple-system,BlinkMacSystemFont,sans-serif",
+  ],
+  [
+    "=fillStyle",
+    "rgba(100,150,200,0.6)",
+  ],
+  [
+    "fillText",
+    "3 viol.",
+    400,
+    330,
+  ],
+  [
+    "=font",
+    "500 16.5px -apple-system,BlinkMacSystemFont,sans-serif",
+  ],
+  [
+    "=textAlign",
+    "center",
+  ],
+  [
+    "=fillStyle",
+    "rgba(100,150,200,0.6)",
+  ],
+  [
+    "fillText",
+    "index.js",
+    500,
+    320,
+  ],
+  [
+    "=font",
+    "13.5px -apple-system,BlinkMacSystemFont,sans-serif",
+  ],
+  [
+    "=fillStyle",
+    "rgba(100,150,200,0.6)",
+  ],
+  [
+    "fillText",
+    "4 viol.",
+    500,
+    380,
+  ],
+]
+`;
+
+exports[`galaxyFolderDraw value characterization > drawScene paints the background gradient at the recorded radius > scene-background-values 1`] = `
+[
+  [
+    "createRadialGradient",
+    400,
+    300,
+    0,
+    400,
+    300,
+    480,
+  ],
+  [
+    "stop",
+    0,
+    "#111",
+  ],
+  [
+    "stop",
+    1,
+    "#000",
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fillRect",
+    0,
+    0,
+    800,
+    600,
+  ],
+]
+`;
+
+exports[`galaxyFolderDraw value characterization > drawStarfield twinkles each background star between its recorded alphas > starfield-values 1`] = `
+[
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    400,
+    300,
+    1,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    "rgba(100,150,200,0.09738251584655702)",
+  ],
+  [
+    "fill",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    160,
+    480,
+    0.4,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    "rgba(100,150,200,0.2775654930942847)",
+  ],
+  [
+    "fill",
+  ],
+]
+`;
+
+exports[`galaxyFolderDraw value characterization > drawStars at cam.z=1 keeps the zoomed-out nebula, border ring and no orbs > draw-stars-zoomed-out-values 1`] = `
+[
+  [
+    "drawGlow",
+    {
+      "alpha": 1,
+      "r": 10.033499,
+      "x": 400,
+      "y": 300,
+    },
+  ],
+  [
+    "createRadialGradient",
+    400,
+    300,
+    0,
+    400,
+    300,
+    50.167494,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.08)",
+  ],
+  [
+    "stop",
+    0.5,
+    "rgba(100,150,200,0.04)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    400,
+    300,
+    50.167494,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    415.01339,
+    301.052657,
+    0,
+    415.01339,
+    301.052657,
+    20.76705,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.025)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    415.01339,
+    301.052657,
+    20.76705,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    391.581677,
+    312.475649,
+    0,
+    391.581677,
+    312.475649,
+    24.292758,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.025)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    391.581677,
+    312.475649,
+    24.292758,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    393.404933,
+    286.471694,
+    0,
+    393.404933,
+    286.471694,
+    15.849871,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.025)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    393.404933,
+    286.471694,
+    15.849871,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    400,
+    300,
+    35.117246,
+    0,
+    6.283185,
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.1)",
+  ],
+  [
+    "=lineWidth",
+    1,
+  ],
+  [
+    "setLineDash",
+    [
+      6,
+      12,
+    ],
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "setLineDash",
+    [],
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    400,
+    300,
+    22.073697,
+    0,
+    6.283185,
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.12)",
+  ],
+  [
+    "=lineWidth",
+    0.8,
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "drawParticles",
+    1,
+    {
+      "alpha": 0.8,
+      "cx": 400,
+      "cy": 300,
+      "drawScale": 0.5,
+      "scale": 0.5,
+    },
+  ],
+  [
+    "drawGlow",
+    {
+      "alpha": 1,
+      "r": 3.99369,
+      "x": 500,
+      "y": 350,
+    },
+  ],
+  [
+    "drawParticles",
+    2,
+    {
+      "alpha": 0.8,
+      "cx": 500,
+      "cy": 350,
+      "drawScale": 0.5,
+      "scale": 0.5,
+    },
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    0.6,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    412.346827,
+    309.854799,
+  ],
+  [
+    "arc",
+    409.046827,
+    309.854799,
+    3.3,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    0.6,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    414.146827,
+    309.854799,
+  ],
+  [
+    "arc",
+    409.046827,
+    309.854799,
+    5.1,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    0.6,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    507.854267,
+    354.927399,
+  ],
+  [
+    "arc",
+    505.654267,
+    354.927399,
+    2.2,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+]
+`;
+
+exports[`galaxyFolderDraw value characterization > drawStars at cam.z=3: folder nebula, particles, labeled orbs, labels > draw-stars-zoomed-values 1`] = `
+[
+  [
+    "drawGlow",
+    {
+      "alpha": 0.998744,
+      "r": 30.100496,
+      "x": 400,
+      "y": 300,
+    },
+  ],
+  [
+    "createRadialGradient",
+    400,
+    300,
+    0,
+    400,
+    300,
+    72,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.11666666666666665)",
+  ],
+  [
+    "stop",
+    0.5,
+    "rgba(100,150,200,0.05833333333333333)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    400,
+    300,
+    72,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    421.547102,
+    301.510766,
+    0,
+    421.547102,
+    301.510766,
+    29.80471,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.06666666666666667)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    421.547102,
+    301.510766,
+    29.80471,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    387.918088,
+    317.904955,
+    0,
+    387.918088,
+    317.904955,
+    34.864779,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.06666666666666667)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    387.918088,
+    317.904955,
+    34.864779,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    390.534811,
+    280.58428,
+    0,
+    390.534811,
+    280.58428,
+    22.747612,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.06666666666666667)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    390.534811,
+    280.58428,
+    22.747612,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    400,
+    300,
+    105.351738,
+    0,
+    6.283185,
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.1)",
+  ],
+  [
+    "=lineWidth",
+    1,
+  ],
+  [
+    "setLineDash",
+    [
+      6,
+      12,
+    ],
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "setLineDash",
+    [],
+  ],
+  [
+    "drawParticles",
+    1,
+    {
+      "alpha": 0.8,
+      "cx": 400,
+      "cy": 300,
+      "drawScale": 1.5,
+      "scale": 1.5,
+    },
+  ],
+  [
+    "drawGlow",
+    {
+      "alpha": 1,
+      "r": 11.981071,
+      "x": 500,
+      "y": 350,
+    },
+  ],
+  [
+    "drawParticles",
+    2,
+    {
+      "alpha": 0.8,
+      "cx": 500,
+      "cy": 350,
+      "drawScale": 1.5,
+      "scale": 1.5,
+    },
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    1.125,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    437.040481,
+    329.564397,
+  ],
+  [
+    "arc",
+    427.140481,
+    329.564397,
+    9.9,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    1.125,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    442.440481,
+    329.564397,
+  ],
+  [
+    "arc",
+    427.140481,
+    329.564397,
+    15.3,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    0.75,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    523.562801,
+    364.782198,
+  ],
+  [
+    "arc",
+    516.962801,
+    364.782198,
+    6.6,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+]
+`;
+
+exports[`galaxyFolderDraw value characterization > drawStars at cam.z=3: folder nebula, particles, labeled orbs, labels > pending-label-geometry 1`] = `
+[
+  {
+    "fontSize": 16.5,
+    "fs": 1.5,
+    "importance": 1023,
+    "lh": 20.5,
+    "lw": 27.225,
+    "lx": 400,
+    "ly": 248.899504,
+  },
+  {
+    "fontSize": 16.5,
+    "fs": 1.5,
+    "importance": 8,
+    "lh": 20.5,
+    "lw": 72.6,
+    "lx": 500,
+    "ly": 317.018929,
+  },
+]
+`;
+
+exports[`galaxyFolderDraw value characterization > drawStars dims a folder star once its screen radius passes the threshold > draw-stars-dimmed-folder-values 1`] = `
+[
+  [
+    "drawGlow",
+    {
+      "alpha": 0.15,
+      "r": 120.401986,
+      "x": 400,
+      "y": 300,
+    },
+  ],
+  [
+    "createRadialGradient",
+    400,
+    300,
+    0,
+    400,
+    300,
+    160,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.2333333333333333)",
+  ],
+  [
+    "stop",
+    0.5,
+    "rgba(100,150,200,0.11666666666666665)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    400,
+    300,
+    160,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    447.882448,
+    303.357257,
+    0,
+    447.882448,
+    303.357257,
+    66.23269,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.13333333333333333)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    447.882448,
+    303.357257,
+    66.23269,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    373.151306,
+    339.788788,
+    0,
+    373.151306,
+    339.788788,
+    77.477287,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.13333333333333333)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    373.151306,
+    339.788788,
+    77.477287,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    378.966246,
+    256.853955,
+    0,
+    378.966246,
+    256.853955,
+    50.55025,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.13333333333333333)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    378.966246,
+    256.853955,
+    50.55025,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    400,
+    300,
+    421.40695,
+    0,
+    6.283185,
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.1)",
+  ],
+  [
+    "=lineWidth",
+    1,
+  ],
+  [
+    "setLineDash",
+    [
+      6,
+      12,
+    ],
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "setLineDash",
+    [],
+  ],
+  [
+    "drawParticles",
+    1,
+    {
+      "alpha": 0.8,
+      "cx": 400,
+      "cy": 300,
+      "drawScale": 2,
+      "scale": 2,
+    },
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    1.5,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    449.387308,
+    339.419196,
+  ],
+  [
+    "arc",
+    436.187308,
+    339.419196,
+    13.2,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    1.5,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    456.587308,
+    339.419196,
+  ],
+  [
+    "arc",
+    436.187308,
+    339.419196,
+    20.4,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+]
+`;
+
+exports[`galaxyFolderDraw value characterization > drawStars fades the folder nebula while flying into it > draw-stars-flying-values 1`] = `
+[
+  [
+    "drawGlow",
+    {
+      "alpha": 0.998744,
+      "r": 30.100496,
+      "x": 400,
+      "y": 300,
+    },
+  ],
+  [
+    "createRadialGradient",
+    400,
+    300,
+    0,
+    400,
+    300,
+    72,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.04999999999999999)",
+  ],
+  [
+    "stop",
+    0.5,
+    "rgba(100,150,200,0.024999999999999994)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    400,
+    300,
+    72,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    421.547102,
+    301.510766,
+    0,
+    421.547102,
+    301.510766,
+    29.80471,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.028571428571428567)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    421.547102,
+    301.510766,
+    29.80471,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    387.918088,
+    317.904955,
+    0,
+    387.918088,
+    317.904955,
+    34.864779,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.028571428571428567)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    387.918088,
+    317.904955,
+    34.864779,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "createRadialGradient",
+    390.534811,
+    280.58428,
+    0,
+    390.534811,
+    280.58428,
+    22.747612,
+  ],
+  [
+    "stop",
+    0,
+    "rgba(100,150,200,0.028571428571428567)",
+  ],
+  [
+    "stop",
+    1,
+    "rgba(100,150,200,0)",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    390.534811,
+    280.58428,
+    22.747612,
+    0,
+    6.283185,
+  ],
+  [
+    "=fillStyle",
+    {
+      "addColorStop": [Function],
+    },
+  ],
+  [
+    "fill",
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "arc",
+    400,
+    300,
+    105.351738,
+    0,
+    6.283185,
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.04285714285714285)",
+  ],
+  [
+    "=lineWidth",
+    1,
+  ],
+  [
+    "setLineDash",
+    [
+      6,
+      12,
+    ],
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "setLineDash",
+    [],
+  ],
+  [
+    "drawParticles",
+    1,
+    {
+      "alpha": 0.8,
+      "cx": 400,
+      "cy": 300,
+      "drawScale": 1.5,
+      "scale": 1.5,
+    },
+  ],
+  [
+    "drawGlow",
+    {
+      "alpha": 1,
+      "r": 11.981071,
+      "x": 500,
+      "y": 350,
+    },
+  ],
+  [
+    "drawParticles",
+    2,
+    {
+      "alpha": 0.8,
+      "cx": 500,
+      "cy": 350,
+      "drawScale": 1.5,
+      "scale": 1.5,
+    },
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    1.125,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    437.040481,
+    329.564397,
+  ],
+  [
+    "arc",
+    427.140481,
+    329.564397,
+    9.9,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    1.125,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    442.440481,
+    329.564397,
+  ],
+  [
+    "arc",
+    427.140481,
+    329.564397,
+    15.3,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+  [
+    "=strokeStyle",
+    "rgba(100,150,200,0.9)",
+  ],
+  [
+    "=lineWidth",
+    0.75,
+  ],
+  [
+    "beginPath",
+  ],
+  [
+    "moveTo",
+    523.562801,
+    364.782198,
+  ],
+  [
+    "arc",
+    516.962801,
+    364.782198,
+    6.6,
+    0,
+    6.283185,
+  ],
+  [
+    "stroke",
+  ],
+]
+`;

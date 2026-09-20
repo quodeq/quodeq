@@ -4,6 +4,9 @@ from __future__ import annotations
 import json
 import threading
 
+from quodeq.core._constants import (
+    MCP_STYLE_CONFIG_ARG, PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
+)
 from quodeq.shared.provider_env import _providers_path
 
 # Fallback provider configs used when the primary JSON file
@@ -14,8 +17,8 @@ _PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
         "cmd": "claude",
         "cmd_subcommand": "",
         "base_args": "--print --output-format stream-json --verbose",
-        "prompt_style": "flag",
-        "prompt_flag": "-p",
+        "prompt_style": PROMPT_STYLE_FLAG,
+        "prompt_flag": PROMPT_FLAG_DEFAULT,
         "supports_mcp": True,
         "supports_tools": True,
         "supports_budget": True,
@@ -30,8 +33,8 @@ _PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
         "cmd": "codex",
         "cmd_subcommand": "exec",
         "base_args": "--json --dangerously-bypass-approvals-and-sandbox",
-        "prompt_style": "positional",
-        "mcp_style": "config-arg",
+        "prompt_style": PROMPT_STYLE_POSITIONAL,
+        "mcp_style": MCP_STYLE_CONFIG_ARG,
         "supports_tools": False,
         "supports_budget": False,
         "supports_turns": False,

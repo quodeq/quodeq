@@ -28,6 +28,7 @@ _logger = logging.getLogger(__name__)
 
 _DEFAULT_EVALUATION_RATE_LIMIT_WINDOW = 300
 _DEFAULT_EVALUATION_RATE_LIMIT_MAX = 10
+_MULTIPART_FRAMING_HEADROOM_BYTES = 1 * 1024 * 1024  # 1 MiB over the zip cap for multipart overhead
 
 
 def _default_provider(env: Mapping[str, str] | None = None) -> ActionProvider:
@@ -87,7 +88,9 @@ def _configure_upload_limits(app: Flask) -> None:
     413 before reading the full body, which keeps large bogus uploads cheap.
     """
     from quodeq.api.zip import _max_zip_size_bytes
-    app.config.setdefault("MAX_CONTENT_LENGTH", _max_zip_size_bytes() + 1 * 1024 * 1024)
+    app.config.setdefault(
+        "MAX_CONTENT_LENGTH", _max_zip_size_bytes() + _MULTIPART_FRAMING_HEADROOM_BYTES,
+    )
 
 
 def _configure_extensions(app: Flask) -> None:

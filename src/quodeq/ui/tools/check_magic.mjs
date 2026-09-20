@@ -14,7 +14,7 @@ import { main } from './ratchet.mjs';
 
 // Revise DOWNWARD as burn-down tasks land; NEVER raise without a
 // justification reviewed in the PR that raises it.
-const TOTAL_CEILING = 514; // set to the total printed by --update; lower it as entries burn down
+const TOTAL_CEILING = 0; // the baseline is empty: every magic number is a named constant (cycle 3, PR 3)
 
 main({
   script: 'check_magic.mjs',

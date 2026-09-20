@@ -156,12 +156,16 @@ class DismissedKeys:
 EMPTY_DISMISSED = DismissedKeys()
 
 
+_IDENTITY_TAG_LINE = "line"
+_IDENTITY_TAG_FP = "fp"
+
+
 def _line_identity(req: str, file: str, line: int) -> tuple:
-    return ("line", req, file, line)
+    return (_IDENTITY_TAG_LINE, req, file, line)
 
 
 def _fp_identity(req: str, file: str, fp: str) -> tuple:
-    return ("fp", req, file, fp)
+    return (_IDENTITY_TAG_FP, req, file, fp)
 
 
 def fold_dismissals(events: Iterable[BaseEvent]) -> DismissedKeys:
@@ -203,7 +207,7 @@ def fold_dismissals(events: Iterable[BaseEvent]) -> DismissedKeys:
             continue
         for identity in [
             k for k, e in active.items()
-            if k[0] == "fp" and e.req == req and e.file == file and e.line == line
+            if k[0] == _IDENTITY_TAG_FP and e.req == req and e.file == file and e.line == line
         ]:
             active.pop(identity, None)
     entries = tuple(sorted(active.values(), key=_entry_order))

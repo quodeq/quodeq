@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from quodeq.assistant.adapters._cli_command import McpConfigRef
 from quodeq.assistant.mcp import _config as mcp_config
+from quodeq.core._constants import MCP_STYLE_CLI_REGISTER
 from quodeq.shared._process_kill import kill_proc_tree as _kill_proc_tree
 
 
@@ -34,7 +35,7 @@ def release_turn_resources(
         Path(mcp_config_ref.path).unlink(missing_ok=True)
     if resources.sandbox_cleanup is not None:
         resources.sandbox_cleanup()
-    if cli_cfg.mcp_style == "cli-register":
+    if cli_cfg.mcp_style == MCP_STYLE_CLI_REGISTER:
         mcp_config.unregister_cli_mcp(cli_cfg.cmd)
     if resources.cwd is not None:
         shutil.rmtree(resources.cwd, ignore_errors=True)

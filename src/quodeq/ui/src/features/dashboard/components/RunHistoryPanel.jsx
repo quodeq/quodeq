@@ -23,6 +23,9 @@ import {
   CHART_MARGIN,
   SELECTED_BAR_OPACITY,
   DESELECTED_BAR_OPACITY,
+  HOVER_STROKE_WIDTH,
+  REF_LINE_OPACITY_EVEN,
+  REF_LINE_OPACITY_ODD,
 } from '../../../components/scoreChartHelpers.js';
 
 const MAX_CHART_RUNS = 20;
@@ -98,7 +101,7 @@ function ScoreBars({ data, hoveredIndex, selectedRunId }) {
           fill={scoreBarColor(entry.numericAverage)}
           opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
           stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
-          strokeWidth={hoveredIndex === i ? 1.5 : 0}
+          strokeWidth={hoveredIndex === i ? HOVER_STROKE_WIDTH : 0}
         />
       ))}
     </Bar>
@@ -159,7 +162,7 @@ function ScoreHistoryChart({ data, interaction }) {
         <YAxis domain={[0, 10]} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<RunHistoryTooltip />} />
         {refLineValues([0, 10]).map((y, i) => (
-          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? 0.2 : 0.3} />
+          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? REF_LINE_OPACITY_ODD : REF_LINE_OPACITY_EVEN} />
         ))}
         <Area dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
         <ScoreBars data={data} hoveredIndex={hoveredIndex} selectedRunId={selectedRunId} />

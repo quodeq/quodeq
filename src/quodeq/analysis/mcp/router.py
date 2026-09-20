@@ -19,6 +19,9 @@ from quodeq.analysis.mcp.enricher import (
     FileReader,
     FindingEnricher,
 )
+from quodeq.analysis.mcp.schemas import (
+    FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_OK, FILE_DONE_STATUS_SKIPPED,
+)
 from quodeq.shared.log_sink import SHARED_LOG
 from typing import TYPE_CHECKING, TextIO
 
@@ -183,9 +186,11 @@ class FindingsRouter:
             at all (API size cap / missing on disk) — an explicit record that
             the file was considered, not a transient failure to retry loudly.
         """
-        if status not in ("ok", "error", "skipped"):
+        allowed = (FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_SKIPPED)
+        if status not in allowed:
+            names = ", ".join(repr(s) for s in allowed)
             raise ValueError(
-                f"mark_file_done: status must be 'ok', 'error', or 'skipped', got {status!r}"
+                f"mark_file_done: status must be one of {names}, got {status!r}"
             )
         payload: dict = {"_marker": "file_done", "file": file, "status": status}
         if reason is not None:
@@ -194,7 +199,7 @@ class FindingsRouter:
         _locked_write(self._fh, line)
         if self._on_file_done is not None:
             accumulated = self._findings_by_file.pop(file, [])
-            if status == "ok":
+            if status == FILE_DONE_STATUS_OK:
                 try:
                     self._on_file_done(file, accumulated)
                 except Exception:  # noqa: BLE001 — callback failure must never lose the ok marker

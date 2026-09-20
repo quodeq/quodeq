@@ -54,6 +54,10 @@ const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRC = 2 * Math.PI * RING_RADIUS;
 const RING_CX = RING_SIZE / 2;
 const RING_CY = RING_SIZE / 2;
+// Text baseline offsets from ring center: score sits just above, grade word
+// just below.
+const SCORE_TEXT_OFFSET_Y = 4;
+const GRADE_TEXT_OFFSET_Y = 16;
 
 function InsufficientGauge() {
   return (
@@ -66,8 +70,8 @@ function InsufficientGauge() {
             strokeWidth={RING_STROKE}
             strokeDasharray="3 4"
           />
-          <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>—</text>
-          <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>{t('overview.insufficientGrade')}</text>
+          <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - SCORE_TEXT_OFFSET_Y}>—</text>
+          <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + GRADE_TEXT_OFFSET_Y}>{t('overview.insufficientGrade')}</text>
         </svg>
       </div>
       <div className="dim-gauge-card__insuf-line">{t('overview.insufficientEvidence')}</div>
@@ -93,11 +97,11 @@ function ScoreGauge({ scoreDisplay, gradeWord, ringColor, dashOffset }) {
           strokeDashoffset={dashOffset}
           transform={`rotate(-90 ${RING_CX} ${RING_CY})`}
         />
-        <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>
+        <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - SCORE_TEXT_OFFSET_Y}>
           {scoreDisplay}
         </text>
         {gradeWord && (
-          <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>
+          <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + GRADE_TEXT_OFFSET_Y}>
             {gradeWord}
           </text>
         )}

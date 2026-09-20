@@ -1,5 +1,13 @@
 import { MS_PER_DAY } from './time.js';
 
+const DAYS_PER_WEEK = 7;
+// ISO weeks are anchored on Thursday: shifting any date in the week to its
+// Thursday and reading that Thursday's year/week gives the correct ISO week
+// even when the week spans a year boundary.
+const ISO_WEEK_ANCHOR_DAY = 4;
+// "YYYY-MM".length
+export const YEAR_MONTH_KEY_LENGTH = 7;
+
 /**
  * Local calendar-day key (YYYY-MM-DD) for a trend entry's dateISO.
  *
@@ -41,11 +49,11 @@ export function isoWeekKey(dateISO) {
   // reject anything that does not round-trip so a malformed date is not
   // grouped under a week it never specified.
   if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return '';
-  const dayNum = date.getUTCDay() || 7;           // Mon=1 .. Sun=7
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum); // shift to this week's Thursday
+  const dayNum = date.getUTCDay() || DAYS_PER_WEEK; // Mon=1 .. Sun=7
+  date.setUTCDate(date.getUTCDate() + ISO_WEEK_ANCHOR_DAY - dayNum); // shift to this week's Thursday
   const isoYear = date.getUTCFullYear();
   const yearStart = new Date(Date.UTC(isoYear, 0, 1));
-  const weekNo = Math.ceil(((date - yearStart) / MS_PER_DAY + 1) / 7);
+  const weekNo = Math.ceil(((date - yearStart) / MS_PER_DAY + 1) / DAYS_PER_WEEK);
   return `${isoYear}-W${String(weekNo).padStart(2, '0')}`;
 }
 
@@ -59,7 +67,7 @@ export function isoWeekKey(dateISO) {
  * @returns {string}
  */
 export function bucketKey(dateISO, granularity = 'day') {
-  if (granularity === 'month') return localDayKey(dateISO).slice(0, 7);
+  if (granularity === 'month') return localDayKey(dateISO).slice(0, YEAR_MONTH_KEY_LENGTH);
   if (granularity === 'week') return isoWeekKey(dateISO);
   return localDayKey(dateISO);
 }

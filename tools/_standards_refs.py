@@ -23,6 +23,8 @@ CERT_DIMENSIONS = {"reliability"}
 
 _ASVS_FILE = "asvs/level1.json"
 _WCAG_FILE = "wcag/level_a.json"
+_CISQ_DIR = "cisq"
+_CERT_DIR = "cert"
 
 _logger = logging.getLogger(__name__)
 
@@ -61,7 +63,7 @@ def attach_cisq_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     """Attach CISQ cross-references to requirements whose CWEs appear in CISQ."""
     if dimension not in CISQ_DIMENSIONS:
         return
-    cisq_file = standards_dir / "cisq" / f"{dimension}.json"
+    cisq_file = standards_dir / _CISQ_DIR / f"{dimension}.json"
     cisq_data = _load_standards_json(cisq_file, f"CISQ for {dimension}")
     if cisq_data is None:
         return
@@ -142,7 +144,7 @@ def attach_cert_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     """Attach CERT cross-references via CWE matching and explicit cert fields."""
     if dimension not in CERT_DIMENSIONS:
         return
-    cert_file = standards_dir / "cert" / f"{dimension}.json"
+    cert_file = standards_dir / _CERT_DIR / f"{dimension}.json"
     cert_data = _load_standards_json(cert_file, f"CERT for {dimension}")
     if cert_data is None:
         return

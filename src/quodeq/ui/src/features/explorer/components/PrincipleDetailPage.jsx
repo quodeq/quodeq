@@ -34,11 +34,16 @@ function buildListItems({ displayedBySeverity, compliance, activeSevFilter }) {
   return arr;
 }
 
+// Estimated row heights for the virtualizer: a finding/compliance card vs a
+// section header row.
+const ROW_HEIGHT_CARD = 160;
+const ROW_HEIGHT_HEADER = 36;
+
 function estimateItemSize(items) {
   return (i) => {
     const item = items[i];
-    if (!item) return 160;
-    return item.kind === 'sev-header' || item.kind === 'compliance-header' ? 36 : 160;
+    if (!item) return ROW_HEIGHT_CARD;
+    return item.kind === 'sev-header' || item.kind === 'compliance-header' ? ROW_HEIGHT_HEADER : ROW_HEIGHT_CARD;
   };
 }
 

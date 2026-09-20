@@ -6,7 +6,7 @@ import pytest
 from quodeq._cli_lifecycle import _record_provider_fatal_if_cancelled
 from quodeq.analysis._loop_guards import _raise_on_fatal_cancel
 from quodeq.analysis._loop_state import _interruption_reason
-from quodeq.analysis.errors import FatalProviderError
+from quodeq.analysis.errors import REASON_PROVIDER_FATAL, FatalProviderError
 from quodeq.analysis.run_lifecycle import RunLifecycleContext
 from quodeq.core.stream.events import copilot_error
 from quodeq.data.fs.run_status_store import read_status
@@ -37,7 +37,7 @@ def test_policy_failure_persists_specific_reason_in_status_and_progress(tmp_path
 
 def test_policy_cancellation_keeps_reason_through_loop_failure(tmp_path):
     error = _policy_error()
-    cancellation.request_cancel(reason=f"provider_fatal:{error.reason}: {error}")
+    cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:{error.reason}: {error}")
     assert _interruption_reason() == "copilot_mcp_policy"
     assert _interruption_reason(error) == "copilot_mcp_policy"
     with pytest.raises(FatalProviderError) as exc:
@@ -53,7 +53,7 @@ def test_policy_failure_preserves_completed_files_with_specific_warning(tmp_path
     }) + "\n")
     with RunLifecycleContext(tmp_path, "job-1", ["security"]) as lifecycle:
         error = _policy_error()
-        cancellation.request_cancel(reason=f"provider_fatal:{error.reason}: {error}")
+        cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:{error.reason}: {error}")
         _raise_on_fatal_cancel(tmp_path)
         _record_provider_fatal_if_cancelled(lifecycle)
     status = read_status(tmp_path)

@@ -33,9 +33,10 @@ function formatDateParts(dateISO, fallbackLabel) {
 }
 
 // Drop trailing .0 so integers render as "9" and zeros as "0" — matches mock.
+const TRAILING_ZERO_SUFFIX_LENGTH = 2; // ".0"
 function trimTrailingZero(n) {
   const fixed = n.toFixed(1);
-  return fixed.endsWith('.0') ? fixed.slice(0, -2) : fixed;
+  return fixed.endsWith('.0') ? fixed.slice(0, -TRAILING_ZERO_SUFFIX_LENGTH) : fixed;
 }
 
 function formatDimSummary(entry) {

@@ -146,11 +146,12 @@ def test_breaker_exit_writes_failed_with_reason(tmp_path: Path) -> None:
     """CircuitBreakerError raised from inside the lifecycle context maps
     to state=failed with exit_reason=failure_streak."""
     from quodeq.analysis.cache._failure_streak import CircuitBreakerError
+    from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 
     raised = False
     try:
         with RunLifecycleContext(run_dir=tmp_path, job_id="j1", dimensions=["a"]):
-            raise CircuitBreakerError("circuit_breaker")
+            raise CircuitBreakerError(REASON_CIRCUIT_BREAKER)
     except CircuitBreakerError:
         raised = True
 

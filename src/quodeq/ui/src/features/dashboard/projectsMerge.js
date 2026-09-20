@@ -5,11 +5,13 @@
  * separate on purpose (forks, same-named repos).
  */
 
+const GIT_SUFFIX_LENGTH = 4; // ".git"
+
 export function normalizeOriginUrl(url) {
   if (!url) return null;
   let u = String(url).trim();
   if (u.endsWith('/')) u = u.slice(0, -1);
-  if (u.endsWith('.git')) u = u.slice(0, -4);
+  if (u.endsWith('.git')) u = u.slice(0, -GIT_SUFFIX_LENGTH);
   return u || null;
 }
 

@@ -16,6 +16,7 @@ import pytest
 
 from quodeq.analysis.cache._failure_streak import CircuitBreakerError
 from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
+from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 from tests.analysis.cache.conftest import (
     _ListHandler,
     _make_callbacks,
@@ -59,7 +60,7 @@ class TestCircuitBreakerWiring:
                     config, "security", idx=1, ctx=_make_ctx(),
                     opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=err_dispatcher),
                 )
-            assert excinfo.value.reason == "circuit_breaker"
+            assert excinfo.value.reason == REASON_CIRCUIT_BREAKER
             assert cancellation.is_cancelled()
         finally:
             cancellation.reset()

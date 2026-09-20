@@ -25,12 +25,15 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.analysis.run_lifecycle import RunLifecycleContext
-from quodeq.analysis.errors import provider_exit_reason
+from quodeq.analysis.errors import (
+    REASON_AGENT_FAILURE_STREAK, REASON_PROVIDER_FATAL, provider_exit_reason,
+)
 from quodeq.analysis.runner import EvaluationError, RunConfig
 from quodeq.analysis.subprocess import AnalysisError
 from quodeq._cli_env import _resolve_time_limit
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.data.fs.project_resolver import ProjectIdentity
+from quodeq.shared.constants import CC_PHASE_REPORT_PATH
 from quodeq.shared.logging import log_error, log_info
 from quodeq.shared.utils import get_ai_cmd, is_repo_url
 
@@ -121,9 +124,9 @@ def _record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> Non
     """
     from quodeq.shared import cancellation
     reason = cancellation.cancel_reason() or ""
-    if reason.startswith("provider_fatal"):
+    if reason.startswith(REASON_PROVIDER_FATAL):
         lifecycle.set_exit_reason(provider_exit_reason(reason))
-    elif reason == "agent_failure_streak":
+    elif reason == REASON_AGENT_FAILURE_STREAK:
         lifecycle.set_exit_reason("failure_streak")
 
 
@@ -245,7 +248,7 @@ def _run_pipeline_with_cleanup(
     run_dir = evaluation_dir.parent
     run_id = run_dir.name
     project_uuid = run_dir.parent.name
-    hooks.emit_marker("report_path", project=project_uuid, runId=run_id)
+    hooks.emit_marker(CC_PHASE_REPORT_PATH, project=project_uuid, runId=run_id)
     hooks.save_manifest(inputs.manifest, evidence_dir)
 
     # Write a .pid file so the dashboard can detect and cancel this external run

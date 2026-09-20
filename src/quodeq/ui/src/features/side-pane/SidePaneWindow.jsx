@@ -6,6 +6,8 @@ const COPY_FEEDBACK_MS = 1500;
 // Defer mounting the body until the slide-in animation finishes (~220ms).
 // Otherwise the heavy markdown render happens mid-animation and stutters.
 const SLIDE_MS = 220;
+// How many characters of the body feed the auto-generated download filename.
+const SLUG_SOURCE_LENGTH = 32;
 
 function slugify(s) {
   return (s || 'window').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'window';
@@ -17,7 +19,7 @@ function todayISO() {
 }
 
 function triggerDownload({ filename, body }) {
-  const safeName = filename || `${slugify(body?.slice(0, 32))}-${todayISO()}.md`;
+  const safeName = filename || `${slugify(body?.slice(0, SLUG_SOURCE_LENGTH))}-${todayISO()}.md`;
   const pyApi = typeof window !== 'undefined' && window.pywebview && window.pywebview.api;
   if (pyApi && typeof pyApi.save_file === 'function') {
     pyApi.save_file(body, safeName);
@@ -83,8 +85,8 @@ function WindowHeaderActions({ spec, justCopied, onCopy, onDownload, onClickClos
           type="button"
           className={`side-pane-window__icon-btn${justCopied ? ' side-pane-window__icon-btn--ok' : ''}`}
           onClick={onCopy}
-          aria-label={justCopied ? 'Copied' : 'Copy'}
-          title={justCopied ? 'Copied' : 'Copy'}
+          aria-label={justCopied ? t('sidePane.copied') : t('sidePane.copy')}
+          title={justCopied ? t('sidePane.copied') : t('sidePane.copy')}
         >{justCopied ? '✓' : '⧉'}</button>
       )}
       {spec.download && (

@@ -125,6 +125,9 @@ def _build_accumulated_for_runs(
     return _AccumulatedResult(all_dims, dims_with_trend, severity, avg, prev_avg)
 
 
+_MAX_CHILD_RUNS_CONSIDERED = 50  # per-child run cap when merging into a parent's accumulated view
+
+
 @dataclass(frozen=True, slots=True)
 class _ParentScope:
     """A parent project's id, its scoped child projects, and its own dimensions.
@@ -148,7 +151,7 @@ def _compute_parent_accumulated(
     # Track which child each dimension came from
     dim_source: dict[str, str] = {}  # dimension_name -> child_project_id
     for child in scope.children:
-        child_runs = list_runs(reports_root, child, limit=50)
+        child_runs = list_runs(reports_root, child, limit=_MAX_CHILD_RUNS_CONSIDERED)
         if not child_runs:
             continue
         result = _compute_result(reports_root, child, child_runs, cache_config, params)

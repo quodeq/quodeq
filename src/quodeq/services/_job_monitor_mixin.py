@@ -32,7 +32,12 @@ from quodeq.services.jobs import (
     _DEADLINE_EXIT_REASONS, _EXIT_CODE_TIMEOUT, _EXIT_REASON_DEADLINE,
     _REPORT_PATH_MARKER, _WATCHDOG_POLL_INTERVAL_S,
 )
+from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
 from quodeq.shared._env import env_float
+from quodeq.shared.constants import (
+    CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_DEADLINE_EXTENDED,
+    CC_PHASE_REPORT_PATH, CC_PHASE_SCORING, CC_PHASE_SETUP,
+)
 
 
 class _JobMonitorMixin:
@@ -44,18 +49,18 @@ class _JobMonitorMixin:
         except json.JSONDecodeError:
             return
         phase = marker.get("_cc")
-        if phase == "setup":
-            job.phase = "setup"
+        if phase == CC_PHASE_SETUP:
+            job.phase = CC_PHASE_SETUP
             job.dimensions = marker.get("dimensions")
-        elif phase in ("analyzing", "scoring"):
+        elif phase in (CC_PHASE_ANALYZING, CC_PHASE_SCORING):
             job.current_dimension = marker.get("dimension")
             job.phase = phase
-        elif phase in ("analyzing_start", "deadline_extended"):
+        elif phase in (CC_PHASE_ANALYZING_START, CC_PHASE_DEADLINE_EXTENDED):
             # deadline_extended: the pool auto-scale ratcheted the run
             # deadline forward; the watchdog must follow or it kills a
             # healthy run at the original deadline.
             job.deadline_at = marker.get("deadline_at")
-        elif phase == "report_path":
+        elif phase == CC_PHASE_REPORT_PATH:
             project = marker.get("project")
             run_id = marker.get("runId")
             if project and run_id:
@@ -172,7 +177,7 @@ class _JobMonitorMixin:
         if watchdog_killed:
             return _EXIT_REASON_DEADLINE
         reason = self._run_status_exit_reason(self._store.get(job_id))
-        if reason == "copilot_mcp_policy" or (exit_code != 0 and reason in _DEADLINE_EXIT_REASONS):
+        if reason == COPILOT_MCP_POLICY_REASON or (exit_code != 0 and reason in _DEADLINE_EXIT_REASONS):
             return reason
         return None
 

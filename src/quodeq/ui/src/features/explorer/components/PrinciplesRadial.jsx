@@ -14,13 +14,31 @@
  */
 import { scoreGradeColorVar } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
-const RING_LEVELS = [0.2, 0.4, 0.6, 0.8, 1.0]; // fraction of max
+// Ring levels, as a fraction of the outer radius (fifths).
+const RING_LEVEL_1 = 0.2;
+const RING_LEVEL_2 = 0.4;
+const RING_LEVEL_3 = 0.6;
+const RING_LEVEL_4 = 0.8;
+const RING_LEVEL_5 = 1.0;
+const RING_LEVELS = [RING_LEVEL_1, RING_LEVEL_2, RING_LEVEL_3, RING_LEVEL_4, RING_LEVEL_5]; // fraction of max
+// Where the insufficient-evidence marker sits, as a fraction of the outer
+// radius. Not a ring level: it happens to coincide with the innermost ring
+// today, but it marks "no score to plot", not a score of 2/10.
+const INSUFFICIENT_DOT_RADIUS_FRACTION = 0.2;
 const LABEL_OFFSET = 18;     // svg units beyond the outer ring (name baseline)
 const VERT_RADIUS = 3.2;
 const INSUF_RADIUS = 3.0;
 // Horizontal padding around the plot so long principle names don't clip.
 const VIEWBOX_PAD_X = 140;
 const VIEWBOX_PAD_Y = 24;
+// Text-anchor flips once a label's angle leans far enough left/right that
+// centering it on the axis would read off-balance.
+const LABEL_ANCHOR_COS_THRESHOLD = 0.2;
+// Coarse character budget per wrapped label line.
+const LABEL_MAX_CHARS_PER_LINE = 14;
+// A polygon needs at least 3 plotted vertices to read as a filled shape
+// (see the module doc comment's edge cases).
+const MIN_FILLED_POLYGON_POINTS = 3;
 
 function axisAngles(n) {
   // First axis at 12 o'clock, then clockwise.
@@ -114,7 +132,7 @@ function RadialVertices({ points, plotted, principles, angles, outerRadius, onPr
       })}
       {principles.map((p, i) => {
         if (p.hasEvidence) return null;
-        const [x, y] = polar(angles[i], outerRadius * 0.2);
+        const [x, y] = polar(angles[i], outerRadius * INSUFFICIENT_DOT_RADIUS_FRACTION);
         return (
           <circle
             key={`insuf-${i}`}
@@ -140,9 +158,9 @@ function RadialLabels({ principles, angles, outerRadius, onPrincipleClick, handl
         const [x, y] = polar(angles[i], outerRadius + LABEL_OFFSET);
         const isInsuf = !p.hasEvidence;
         const cosA = Math.cos(angles[i]);
-        const anchor = cosA > 0.2 ? 'start' : cosA < -0.2 ? 'end' : 'middle';
+        const anchor = cosA > LABEL_ANCHOR_COS_THRESHOLD ? 'start' : cosA < -LABEL_ANCHOR_COS_THRESHOLD ? 'end' : 'middle';
         const words = p.name.toUpperCase().split(/\s+/);
-        const lines = wrapLines(words, 14);
+        const lines = wrapLines(words, LABEL_MAX_CHARS_PER_LINE);
         return (
           <g
             key={`lab-${i}`}
@@ -190,10 +208,10 @@ function computeRadialLayout(principles, angles, scaleMax, outerRadius, size) {
     return polar(p.angle, r);
   });
 
-  const polylineFill = plotted.length >= 3
+  const polylineFill = plotted.length >= MIN_FILLED_POLYGON_POINTS
     ? 'color-mix(in srgb, var(--color-accent) 18%, transparent)'
     : 'none';
-  const isClosed = plotted.length >= 3 && plotted.length === principles.length;
+  const isClosed = plotted.length >= MIN_FILLED_POLYGON_POINTS && plotted.length === principles.length;
   const showPolyline = plotted.length >= 2;
 
   const half = size / 2;

@@ -12,6 +12,7 @@ import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import { t } from "../../../strings/index.js";
 import { apiErrorMessage } from "../../../strings/apiErrors.js";
 import { preparePayload } from "./useEvaluation.helpers.js";
+import { HTTP_STATUS } from "../../../constants.js";
 
 function startMutationFn(api) {
   return (input) => {
@@ -94,7 +95,7 @@ function cancelOnError({ queryClient, jobId, setJobId, setJobError }) {
   // apiErrorMessage, which preserves err.message for unmapped codes.
   return (err) => {
     setJobError(err?.message ? `${t("evaluate.cancelFailed")} (${err.message})` : t("evaluate.cancelFailed"));
-    if (err?.status !== 409 && err?.status !== 404) return;
+    if (err?.status !== HTTP_STATUS.CONFLICT && err?.status !== HTTP_STATUS.NOT_FOUND) return;
     const id = jobId;
     if (id) queryClient.removeQueries({ queryKey: evaluationKeys.evaluation(id) });
     setJobId(null);

@@ -1,6 +1,7 @@
 import {
   TAU, scoreRGB, sevRGB,
-  seedHash, seededRng,
+  seedHash, seededRng, mkBackgroundStars,
+  RNG_MIDPOINT, MIN_SEPARATION_PX, REPULSION_PASSES_LARGE,
 } from '../core/galaxyCore.js';
 
 /* ── Position consistency engine ── */
@@ -52,11 +53,34 @@ const FILE_DIST_MIN = 0.2;
 const FILE_DIST_MAX = 0.5;
 const LARGE_SCENE_STARS = 50;
 const MEDIUM_SCENE_STARS = 20;
-const REPULSION_PASSES_LARGE = 3;
 const REPULSION_PASSES_MEDIUM = 5;
 const REPULSION_PASSES_SMALL = 8;
 const TARGET_RADIUS_FRACTION = 0.42;
-const BG_STAR_COUNT = 120;
+const FOLDER_RADIUS_BASE_PX = 6; // before the sqrt-of-contents growth term
+const FILE_RADIUS_BASE_PX = 5;
+// The folder gap widens with the star count, up to this many stars.
+const FOLDER_GAP_STAR_CAP = 20;
+// Fit margin, as a multiple of a star's radius (wider with particles).
+const FIT_MARGIN_RATIO_WITH_PARTICLES = 3;
+const FIT_MARGIN_RATIO_PLAIN = 2;
+
+// Folder-nebula alert blips orbiting a folder star. `orbit*Ratio` are
+// multiples of the star radius, speeds radians per time unit, sizes world
+// units; `maxPerSeverity` caps how many a single severity contributes.
+const FOLDER_ALERT = Object.freeze({
+  maxPerSeverity: 3, orbitRadiusRatio: 1.5, orbitJitterRatio: 1,
+  speedMin: 0.015, speedRange: 0.03, eccentricityBase: 0.7, eccentricityRange: 0.3,
+  sizeCritical: 3.0, sizeCriticalRange: 0.7, sizeMajor: 2.3, sizeMajorRange: 0.5,
+  sizeMinor: 1.6, sizeMinorRange: 0.4,
+});
+
+// Per-file violation particles: tighter, faster, smaller, less capped.
+const FILE_PARTICLE = Object.freeze({
+  maxPerSeverity: 10, orbitRadiusRatio: 1.2, orbitJitterRatio: 1.5,
+  speedMin: 0.03, speedRange: 0.07, eccentricityBase: 0.65, eccentricityRange: 0.35,
+  sizeCritical: 2.2, sizeCriticalRange: 0.5, sizeMajor: 1.8, sizeMajorRange: 0.4,
+  sizeMinor: 1.2, sizeMinorRange: 0.3,
+});
 
 /* ── Scene builder ── */
 
@@ -74,15 +98,15 @@ function _buildFolderParticles(c, radius, sev) {
   const fRng = seededRng(seedHash((c.path || c.name) + ':fsev'));
   const addAlert = (count, sevName) => {
     const sevCol = sevRGB(sevName);
-    const pn = Math.min(count, 3);
+    const pn = Math.min(count, FOLDER_ALERT.maxPerSeverity);
     for (let j = 0; j < pn; j++) {
       particles.push({
         col: sevCol, sev: sevName,
-        or: radius * 1.5 + fRng() * radius * 1.0,
-        os: (0.015 + fRng() * 0.03) * (fRng() > 0.5 ? 1 : -1),
+        or: radius * FOLDER_ALERT.orbitRadiusRatio + fRng() * radius * FOLDER_ALERT.orbitJitterRatio,
+        os: (FOLDER_ALERT.speedMin + fRng() * FOLDER_ALERT.speedRange) * (fRng() > RNG_MIDPOINT ? 1 : -1),
         op: fRng() * TAU,
-        sz: sevName === 'critical' ? 3.0 + fRng() * 0.7 : sevName === 'major' ? 2.3 + fRng() * 0.5 : 1.6 + fRng() * 0.4,
-        ec: 0.7 + fRng() * 0.3,
+        sz: sevName === 'critical' ? FOLDER_ALERT.sizeCritical + fRng() * FOLDER_ALERT.sizeCriticalRange : sevName === 'major' ? FOLDER_ALERT.sizeMajor + fRng() * FOLDER_ALERT.sizeMajorRange : FOLDER_ALERT.sizeMinor + fRng() * FOLDER_ALERT.sizeMinorRange,
+        ec: FOLDER_ALERT.eccentricityBase + fRng() * FOLDER_ALERT.eccentricityRange,
         tp: fRng() * TAU,
       });
     }
@@ -101,14 +125,14 @@ function _buildFileParticles(c, radius) {
   const rng2 = seededRng(seedHash((c.path || c.name) + ':fp'));
   const addP = (count, sevName) => {
     const pcol = sevRGB(sevName);
-    for (let j = 0; j < Math.min(count, 10); j++) {
+    for (let j = 0; j < Math.min(count, FILE_PARTICLE.maxPerSeverity); j++) {
       particles.push({
         col: pcol, sev: sevName,
-        or: radius * 1.2 + rng2() * radius * 1.5,
-        os: (0.03 + rng2() * 0.07) * (rng2() > 0.5 ? 1 : -1),
+        or: radius * FILE_PARTICLE.orbitRadiusRatio + rng2() * radius * FILE_PARTICLE.orbitJitterRatio,
+        os: (FILE_PARTICLE.speedMin + rng2() * FILE_PARTICLE.speedRange) * (rng2() > RNG_MIDPOINT ? 1 : -1),
         op: rng2() * TAU,
-        sz: sevName === 'critical' ? 2.2 + rng2() * 0.5 : sevName === 'major' ? 1.8 + rng2() * 0.4 : 1.2 + rng2() * 0.3,
-        ec: 0.65 + rng2() * 0.35,
+        sz: sevName === 'critical' ? FILE_PARTICLE.sizeCritical + rng2() * FILE_PARTICLE.sizeCriticalRange : sevName === 'major' ? FILE_PARTICLE.sizeMajor + rng2() * FILE_PARTICLE.sizeMajorRange : FILE_PARTICLE.sizeMinor + rng2() * FILE_PARTICLE.sizeMinorRange,
+        ec: FILE_PARTICLE.eccentricityBase + rng2() * FILE_PARTICLE.eccentricityRange,
         tp: rng2() * TAU,
       });
     }
@@ -130,8 +154,8 @@ function placeRootStars(positioned, W, H) {
     const c = ip.child;
     const desc = ip.isFolder ? countDescendants(c) : 0;
     const radius = ip.isFolder
-      ? 6 + Math.sqrt(Math.max(desc, 1)) * RADIUS_MULTIPLIER
-      : 5 + Math.sqrt(c.violations || 1) * RADIUS_MULTIPLIER;
+      ? FOLDER_RADIUS_BASE_PX + Math.sqrt(Math.max(desc, 1)) * RADIUS_MULTIPLIER
+      : FILE_RADIUS_BASE_PX + Math.sqrt(c.violations || 1) * RADIUS_MULTIPLIER;
     const rate = c.complianceRate || 0;
     const sev = c.severity || { critical: 0, major: 0, minor: 0 };
     const col = scoreRGB(rate * 10);
@@ -174,7 +198,7 @@ function recenterStars(rootStars) {
 
 /** Push overlapping stars apart until every pair clears its gap (folders need more room than files). */
 function applyRepulsion(rootStars, n) {
-  const folderGap = 10 + Math.min(n, 20) * 1.0;
+  const folderGap = 10 + Math.min(n, FOLDER_GAP_STAR_CAP) * 1.0;
   const fileGap = 1;
   const repulsionIters = rootStars.length > LARGE_SCENE_STARS ? REPULSION_PASSES_LARGE : rootStars.length > MEDIUM_SCENE_STARS ? REPULSION_PASSES_MEDIUM : REPULSION_PASSES_SMALL;
   for (let iter = 0; iter < repulsionIters; iter++) {
@@ -182,7 +206,7 @@ function applyRepulsion(rootStars, n) {
       for (let j = i + 1; j < rootStars.length; j++) {
         const a = rootStars[i], b = rootStars[j];
         const dx = b.ox - a.ox, dy = b.oy - a.oy;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+        const dist = Math.sqrt(dx * dx + dy * dy) || MIN_SEPARATION_PX;
         const gap = (!a.isFolder && !b.isFolder) ? fileGap : folderGap;
         const minDist = a.radius + b.radius + gap;
         if (dist < minDist) {
@@ -203,7 +227,7 @@ function normalizeToFit(rootStars, W, H) {
   const targetR = Math.min(W, H) * TARGET_RADIUS_FRACTION;
   let maxExtent = 0;
   rootStars.forEach(s => {
-    const margin = s.particles.length > 0 ? s.radius * 3 : s.radius * 2;
+    const margin = s.radius * (s.particles.length > 0 ? FIT_MARGIN_RATIO_WITH_PARTICLES : FIT_MARGIN_RATIO_PLAIN);
     const ext = Math.max(Math.abs(s.ox) + margin, Math.abs(s.oy) + margin);
     if (ext > maxExtent) maxExtent = ext;
   });
@@ -239,16 +263,6 @@ function buildMST(rootStars) {
   return lines;
 }
 
-/** Background starfield — decorative only, not part of the seeded layout. */
-function buildBackgroundStars() {
-  return Array.from({ length: BG_STAR_COUNT }, () => ({
-    x: Math.random(), y: Math.random(),
-    sz: Math.random() * 1.2,
-    tw: Math.random() * TAU,
-    sp: 0.3 + Math.random() * 0.7,
-  }));
-}
-
 export function buildFolderScene(node, W, H) {
   const positioned = layoutChildren(node);
   const { rootStars, n } = placeRootStars(positioned, W, H);
@@ -257,7 +271,7 @@ export function buildFolderScene(node, W, H) {
   recenterStars(rootStars);
   const _maxExtent = normalizeToFit(rootStars, W, H);
   const lines = buildMST(rootStars);
-  const bg = buildBackgroundStars();
+  const bg = mkBackgroundStars(Math.random); // decorative, not seeded
   return { rootStars, lines, bg, _maxExtent };
 }
 

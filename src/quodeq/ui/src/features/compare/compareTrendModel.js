@@ -31,6 +31,10 @@ export function trendDomain(series) {
  * that still pass through every value and never overshoot a peak or put a
  * wobble on a plateau — the same interpolation the Overview's line uses.
  */
+// Standard Hermite-to-Bezier conversion: each segment's cubic control points
+// sit a third of the way along it.
+const CONTROL_POINT_FRACTION_DIVISOR = 3;
+
 export function monotonePath(pts) {
   const n = pts.length;
   if (n < 2) return '';
@@ -55,7 +59,7 @@ export function monotonePath(pts) {
   tangent.push(slope[n - 2]);
   const parts = [`M${seg(pts[0])}`];
   for (let i = 0; i < n - 1; i += 1) {
-    const h = dx[i] / 3;
+    const h = dx[i] / CONTROL_POINT_FRACTION_DIVISOR;
     parts.push(
       ` C${(pts[i][0] + h).toFixed(1)},${(pts[i][1] + h * tangent[i]).toFixed(1)}`
       + ` ${(pts[i + 1][0] - h).toFixed(1)},${(pts[i + 1][1] - h * tangent[i + 1]).toFixed(1)}`

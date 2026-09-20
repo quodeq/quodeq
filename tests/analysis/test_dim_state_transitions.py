@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 from quodeq.analysis._loops import LoopDeps, run_per_dimension_loop, run_incremental_loop
 from quodeq.analysis._types import RunConfig, AnalysisOptions
+from quodeq.analysis.errors import REASON_CANCELLED_SIGNAL, REASON_FAILED_EXCEPTION
 from quodeq.shared import cancellation
 from quodeq.data.fs.dimensions_state_store import read_dimensions
 
@@ -61,7 +62,7 @@ class TestPerDimensionLoopTransitions:
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
-        assert entry["reason"] == "failed_exception"
+        assert entry["reason"] == REASON_FAILED_EXCEPTION
 
     def test_cancelled_marks_incomplete_signal(self, tmp_path: Path):
         config = _mk_config(tmp_path)
@@ -77,7 +78,7 @@ class TestPerDimensionLoopTransitions:
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
-        assert entry["reason"] == "cancelled_signal"
+        assert entry["reason"] == REASON_CANCELLED_SIGNAL
 
     def test_ev_none_marks_incomplete(self, tmp_path: Path):
         config = _mk_config(tmp_path)
@@ -171,7 +172,7 @@ class TestIncrementalLoopTransitions:
 
         entry = read_dimensions(tmp_path)["dimensions"]["security"]
         assert entry["state"] == "incomplete"
-        assert entry["reason"] == "failed_exception"
+        assert entry["reason"] == REASON_FAILED_EXCEPTION
 
 
 # ============================================================

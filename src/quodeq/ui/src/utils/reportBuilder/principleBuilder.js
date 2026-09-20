@@ -1,10 +1,10 @@
 // src/quodeq/ui/src/utils/reportBuilder/principleBuilder.js
 import { SEVERITY_ORDER } from '../formatters.js';
-import { formatDate, formatViolationEntry, groupBySeverity, buildComplianceSection } from './shared.js';
+import { formatDate, formatViolationEntry, groupBySeverity, buildComplianceSection, RUN_ID_DISPLAY_LENGTH } from './shared.js';
 
 function buildPrincipleHeaderSection({ principle, dimension, score, grade, runId, dateLabel, principleData }) {
   const date = dateLabel || formatDate();
-  const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, 8)}` : '';
+  const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, RUN_ID_DISPLAY_LENGTH)}` : '';
   const dimSuffix = dimension ? ` · **Dimension:** ${dimension}` : '';
   const scoreDisplay = score ? `${String(score).replace('/10', '')}/10` : '—';
 

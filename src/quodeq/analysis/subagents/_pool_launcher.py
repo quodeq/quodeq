@@ -12,7 +12,7 @@ from quodeq.analysis._types import AnalysisOptions, RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.config.analysis_env import non_scout_providers, subagent_model_override
-from quodeq.shared.constants import DEFAULT_TIME_LIMIT
+from quodeq.shared.constants import CC_PHASE_DEADLINE_EXTENDED, DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd
 
@@ -78,7 +78,7 @@ def _extend_run_deadline(options: AnalysisOptions, time_limit: int) -> None:
     new_iso = (
         datetime.now(timezone.utc) + timedelta(seconds=time_limit)
     ).isoformat()
-    emit_marker("deadline_extended", deadline_at=new_iso, budget_s=time_limit)
+    emit_marker(CC_PHASE_DEADLINE_EXTENDED, deadline_at=new_iso, budget_s=time_limit)
     if options.on_deadline_extended is not None:
         try:
             options.on_deadline_extended(new_iso)

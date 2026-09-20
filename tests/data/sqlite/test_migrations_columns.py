@@ -3,6 +3,11 @@ import sqlite3
 from quodeq.data.sqlite._migrations import apply_evaluation_schema
 from quodeq.data.sqlite._schema import EVALUATION_DDL, SCHEMA_VERSION
 
+def test_schema_version_is_pinned():
+    # The v5 baseline DDL and the per-version upgrade cases below target v9;
+    # bumping SCHEMA_VERSION without extending them leaves the new path untested.
+    assert SCHEMA_VERSION == 9
+
 
 # Findings table as it existed at SCHEMA_VERSION=5, before issue #656 added
 # the provenance_downgrade column. Used to verify the v5 -> v6 upgrade path.
@@ -233,7 +238,7 @@ def test_upgrade_v7_to_v8_idempotent_when_index_already_present():
 def test_fresh_db_is_v9_with_violation_type_raw():
     conn = sqlite3.connect(":memory:")
     apply_evaluation_schema(conn)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 9
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
     assert "violation_type_raw" in columns
 
@@ -255,7 +260,7 @@ def _v8_db() -> sqlite3.Connection:
 def test_upgrade_v8_to_v9_adds_column_and_keeps_rows():
     conn = _v8_db()
     apply_evaluation_schema(conn)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     assert conn.execute("SELECT violation_type_raw FROM findings").fetchone() == ("",)
 
 
@@ -267,7 +272,7 @@ def test_upgrade_v8_to_v9_idempotent_when_column_already_present():
     conn.executescript(EVALUATION_DDL)
     conn.execute("PRAGMA user_version = 8")
     apply_evaluation_schema(conn)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
 # Very old (v1/v2) DBs never created `findings`; every additive upgrade skips
