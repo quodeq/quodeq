@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-from quodeq.analysis._dimension_aliases import expand_dimension_aliases
+from quodeq.analysis.dimension_aliases import expand_dimension_aliases
 from quodeq.shared.utils import get_evaluations_dir
 
 _logger = logging.getLogger(__name__)

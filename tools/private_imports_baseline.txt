@@ -10,7 +10,6 @@
 src/quodeq/_cli_evaluate_finalize.py:15:private-module:quodeq.analysis._diff_resolver.DiffResolveError
 src/quodeq/_cli_evaluation.py:49:private-module:quodeq.analysis._diff_resolver.resolve_diff_files
 src/quodeq/_cli_resolution.py:34:private-name:quodeq.analysis.manifest_scope._filter_manifest_by_scope
-src/quodeq/_cli_run_config.py:22:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
 src/quodeq/analysis/_api_source_gathering.py:25:private-name:quodeq.llm_bridge._omlx._read_omlx_api_key
 src/quodeq/analysis/_dim_estimates.py:34:private-name:quodeq.analysis.subagents._source_files._list_source_files
 src/quodeq/analysis/_mcp_arg_builders.py:25:private-module:quodeq.core._constants.MCP_CONFIG_ARG_FLAG
@@ -141,7 +140,6 @@ src/quodeq/assistant/tools/_read_tools_scope.py:16:private-module:quodeq.service
 src/quodeq/assistant/worktree.py:17:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/ci/cli.py:9:private-module:quodeq.shared._env_resolve.resolve_env
 src/quodeq/ci/reporter.py:19:private-module:quodeq.shared._env_resolve.resolve_env
-src/quodeq/ci/review.py:11:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
 src/quodeq/ci/review.py:138:private-module:quodeq._cli_evaluation.run_diff_evaluation
 src/quodeq/cli.py:133:private-module:quodeq.shared._io.configure_stdio_utf8
 src/quodeq/config/clone_env.py:11:private-module:quodeq.shared._env.env_int

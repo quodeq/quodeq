@@ -201,14 +201,6 @@ tests/analysis/test_dim_state_transitions.py:218:private-name:quodeq.analysis._l
 tests/analysis/test_dim_state_transitions.py:6:private-module:quodeq.analysis._loops.LoopDeps
 tests/analysis/test_dim_state_transitions.py:6:private-module:quodeq.analysis._loops.run_incremental_loop
 tests/analysis/test_dim_state_transitions.py:6:private-module:quodeq.analysis._loops.run_per_dimension_loop
-tests/analysis/test_dimension_aliases.py:11:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
-tests/analysis/test_dimension_aliases.py:17:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
-tests/analysis/test_dimension_aliases.py:22:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
-tests/analysis/test_dimension_aliases.py:28:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
-tests/analysis/test_dimension_aliases.py:33:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
-tests/analysis/test_dimension_aliases.py:38:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
-tests/analysis/test_dimension_aliases.py:43:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
-tests/analysis/test_dimension_aliases.py:6:private-module:quodeq.analysis._dimension_aliases.expand_dimension_aliases
 tests/analysis/test_drop_stats.py:19:private-module:quodeq.analysis._drop_stats
 tests/analysis/test_dry_run_pipeline.py:104:private-module:quodeq.analysis._pipeline.run
 tests/analysis/test_dry_run_pipeline.py:122:private-module:quodeq.analysis._pipeline.run_per_dimension
