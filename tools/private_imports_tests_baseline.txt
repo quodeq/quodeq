@@ -101,7 +101,6 @@ tests/analysis/conftest.py:30:private-module:quodeq.analysis._api_runner.ApiRunn
 tests/analysis/conftest.py:6:private-module:quodeq.analysis._provider_cache.reset_provider_config_cache
 tests/analysis/mcp/test_findings_server.py:10:private-name:quodeq.analysis.mcp.findings_server._build_compiled_context
 tests/analysis/mcp/test_findings_server.py:10:private-name:quodeq.analysis.mcp.findings_server._build_router
-tests/analysis/mcp/test_findings_server.py:77:private-module:quodeq.llm_bridge._embeddings.reset_embedding_availability_cache
 tests/analysis/mcp/test_findings_server_cache.py:125:private-name:quodeq.analysis.mcp.findings_server._build_router
 tests/analysis/mcp/test_findings_server_cache.py:147:private-name:quodeq.analysis.mcp.findings_server._build_router
 tests/analysis/mcp/test_findings_server_cache.py:169:private-name:quodeq.analysis.mcp.findings_server._build_router
@@ -180,7 +179,6 @@ tests/analysis/test_api_runner_router_context.py:111:private-module:quodeq.analy
 tests/analysis/test_api_runner_router_context.py:137:private-module:quodeq.analysis._api_runner.api_runner_module
 tests/analysis/test_api_runner_router_context.py:35:private-module:quodeq.analysis._types.AnalysisOptions
 tests/analysis/test_api_runner_router_context.py:35:private-module:quodeq.analysis._types.RunConfig
-tests/analysis/test_api_runner_router_context.py:93:private-module:quodeq.llm_bridge._embeddings.reset_embedding_availability_cache
 tests/analysis/test_api_schema_drop_reasons.py:12:private-name:quodeq.analysis._api_schema._parse_findings
 tests/analysis/test_api_schema_drop_reasons.py:13:private-module:quodeq.analysis._drop_stats.format_reasons
 tests/analysis/test_api_schema_severity_coercion.py:19:private-name:quodeq.analysis._api_schema._Finding
@@ -1123,15 +1121,8 @@ tests/integration/test_sse_run_events_e2e.py:11:private-module:quodeq.api._run_e
 tests/integration/test_terminal_pty_reliability_e2e.py:35:private-module:quodeq.api._terminal_ws_helpers.pump_terminal_out
 tests/integration/test_terminal_pty_reliability_e2e.py:35:private-module:quodeq.api._terminal_ws_helpers.terminal_read_loop
 tests/llm_bridge/test_cloud.py:7:private-module:quodeq.llm_bridge._cloud.check_cloud_connection
-tests/llm_bridge/test_embeddings.py:6:private-module:quodeq.llm_bridge._embeddings.BATCH_TIMEOUT
-tests/llm_bridge/test_embeddings.py:6:private-module:quodeq.llm_bridge._embeddings.EmbeddingAvailabilityCache
-tests/llm_bridge/test_embeddings.py:6:private-module:quodeq.llm_bridge._embeddings.EmbeddingEndpoint
-tests/llm_bridge/test_embeddings.py:6:private-module:quodeq.llm_bridge._embeddings.QUERY_TIMEOUT
-tests/llm_bridge/test_embeddings.py:6:private-module:quodeq.llm_bridge._embeddings.embed_texts
-tests/llm_bridge/test_embeddings.py:6:private-module:quodeq.llm_bridge._embeddings.embedding_model_available
-tests/llm_bridge/test_embeddings.py:6:private-module:quodeq.llm_bridge._embeddings.reset_embedding_availability_cache
-tests/llm_bridge/test_embeddings.py:6:private-name:quodeq.llm_bridge._embeddings._client_kwargs
-tests/llm_bridge/test_embeddings.py:6:private-name:quodeq.llm_bridge._embeddings._v1_base
+tests/llm_bridge/test_embeddings.py:6:private-name:quodeq.llm_bridge.embeddings._client_kwargs
+tests/llm_bridge/test_embeddings.py:6:private-name:quodeq.llm_bridge.embeddings._v1_base
 tests/llm_bridge/test_env_injection_sites.py:9:private-module:quodeq.llm_bridge._llamacpp
 tests/llm_bridge/test_env_injection_sites.py:9:private-module:quodeq.llm_bridge._ollama
 tests/llm_bridge/test_env_injection_sites.py:9:private-module:quodeq.llm_bridge._omlx

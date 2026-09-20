@@ -90,7 +90,7 @@ class TestBuildRouterContextCorpus:
         assert ctx.precedent_corpus is None
 
     def test_corpus_degrades_when_flag_on_but_no_embedder(self, tmp_path, monkeypatch):
-        from quodeq.llm_bridge._embeddings import reset_embedding_availability_cache
+        from quodeq.llm_bridge.embeddings import reset_embedding_availability_cache
 
         reset_embedding_availability_cache()
         monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")

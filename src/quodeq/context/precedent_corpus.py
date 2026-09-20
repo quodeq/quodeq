@@ -136,7 +136,7 @@ def _resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, Availability
     the production BATCH_TIMEOUT, used only when the loader explicitly
     overrides the query-time default for backfill chunks.
     """
-    from quodeq.llm_bridge._embeddings import (  # noqa: PLC0415
+    from quodeq.llm_bridge.embeddings import (  # noqa: PLC0415
         BATCH_TIMEOUT, QUERY_TIMEOUT, EmbeddingEndpoint, embed_texts,
         embedding_model_available)
 

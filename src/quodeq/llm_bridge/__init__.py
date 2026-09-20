@@ -28,7 +28,7 @@ from quodeq.llm_bridge._omlx import (
     run_concurrency_test as run_omlx_concurrency_test,
 )
 from quodeq.llm_bridge._cloud import check_cloud_connection
-from quodeq.llm_bridge._embeddings import (
+from quodeq.llm_bridge.embeddings import (
     EmbeddingEndpoint,
     embed_texts,
     embedding_model_available,
