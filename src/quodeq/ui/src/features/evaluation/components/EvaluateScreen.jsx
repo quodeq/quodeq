@@ -7,6 +7,9 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
 
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
+// Above this length, an error message is treated as raw/technical (likely a
+// stack trace or a path) and swapped for a generic console-pointer message.
+const MESSAGE_TRUNCATE_LENGTH = 120;
 
 export function readBudgetSeconds(storage = localStorage) {
   const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
@@ -35,7 +38,7 @@ function EvaluateHeader() {
 
 function sanitizeErrorMessage(message) {
   if (typeof message !== 'string') return t('evaluate.errorOccurred');
-  if (message.includes('\n') || /[/\\](?:usr|home|tmp|var|etc|src|node_modules)/.test(message) || message.length > 120) {
+  if (message.includes('\n') || /[/\\](?:usr|home|tmp|var|etc|src|node_modules)/.test(message) || message.length > MESSAGE_TRUNCATE_LENGTH) {
     console.error('Raw error:', message);
     return t('evaluate.errorOccurredConsole');
   }

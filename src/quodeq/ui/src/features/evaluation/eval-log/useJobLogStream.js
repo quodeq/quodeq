@@ -4,6 +4,9 @@ import { t } from '../../../strings/index.js';
 const MAX_LINES = 5000;
 const READYSTATE_CLOSED = 2;
 const INACTIVITY_MS = 60000;
+// Timer fallback for the rAF batching below: browsers throttle rAF to 0 in
+// background tabs, so without this the queue would never drain there.
+const FLUSH_FALLBACK_MS = 50;
 
 function clearRef(ref, canceller) {
   if (ref.current != null) {
@@ -43,7 +46,7 @@ function makeAppend({ pendingRef, rafRef, timerRef, flush }) {
       rafRef.current = requestAnimationFrame(flush);
     }
     if (timerRef.current == null) {
-      timerRef.current = setTimeout(flush, 50);
+      timerRef.current = setTimeout(flush, FLUSH_FALLBACK_MS);
     }
   };
 }

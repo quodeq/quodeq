@@ -6,11 +6,13 @@ export const DEFAULT_MODELS = {
 
 export const MODEL_STORAGE_PREFIX = 'cc-model-level-';
 
+const MAX_POWER_LEVEL = 3;
+
 export function getLevels(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
   const overrides = {};
   try {
     if (storage) {
-      for (const lvl of [1, 2, 3]) {
+      for (const lvl of [1, 2, MAX_POWER_LEVEL]) {
         const stored = storage.getItem(`${MODEL_STORAGE_PREFIX}${lvl}`);
         if (stored) overrides[lvl] = stored;
       }

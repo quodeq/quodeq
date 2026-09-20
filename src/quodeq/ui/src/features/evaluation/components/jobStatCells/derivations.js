@@ -16,6 +16,10 @@ import { SCAN_MODE } from '../scanModes.js';
 export const RATE_WINDOW_MS = 120000;  // 2-min sliding window the buffer is trimmed to
 const RATE_MIN_SPAN_MS = 30000;        // refuse to estimate from < this much data
 const ETA_FINISHING_SEC = 45;          // below this, "finishing" reads truer than a rounded "~1 min left"
+const SECONDS_PER_HOUR = 3600;
+// Round the "~N min left" estimate to a legible step instead of showing an
+// exact minute that visibly jitters as the rate estimate wobbles.
+const MINUTE_ROUNDING_STEP = 5;
 
 /**
  * Files/sec from a buffer of {t, taken} samples (t = epoch ms, ascending).
@@ -58,14 +62,14 @@ export function formatEta(remainingFiles, rate) {
   if (remainingFiles <= 0) return 'finishing';
   const etaSec = remainingFiles / rate;
   if (etaSec <= ETA_FINISHING_SEC) return 'finishing';
-  if (etaSec < 3600) {
+  if (etaSec < SECONDS_PER_HOUR) {
     const rawMin = etaSec / 60;
-    let min = rawMin < 10 ? Math.max(1, Math.round(rawMin)) : Math.round(rawMin / 5) * 5;
+    let min = rawMin < 10 ? Math.max(1, Math.round(rawMin)) : Math.round(rawMin / MINUTE_ROUNDING_STEP) * MINUTE_ROUNDING_STEP;
     if (min >= 60) return '~1h left';
     return `~${min} min left`;
   }
-  let hours = Math.floor(etaSec / 3600);
-  let min = Math.round(((etaSec % 3600) / 60) / 5) * 5;
+  let hours = Math.floor(etaSec / SECONDS_PER_HOUR);
+  let min = Math.round(((etaSec % SECONDS_PER_HOUR) / 60) / MINUTE_ROUNDING_STEP) * MINUTE_ROUNDING_STEP;
   if (min === 60) { hours += 1; min = 0; }
   return min === 0 ? `~${hours}h left` : `~${hours}h ${min}m left`;
 }
