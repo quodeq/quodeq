@@ -7,22 +7,3 @@
 # line-count change above a grandfathered import shifts its entry. Prefer
 # hand-editing the baseline over blind --update-baseline regeneration, which
 # can silently absorb a genuinely new violation introduced in the same change.
-src/quodeq/analysis/_api_source_gathering.py:25:private-module:quodeq.llm_bridge._omlx.read_omlx_api_key
-src/quodeq/analysis/_dim_estimates.py:34:private-module:quodeq.analysis.subagents._source_files.list_source_files
-src/quodeq/analysis/_report_constants.py:10:private-module:quodeq.data.fs.dimension_report._report_constants.COMPLIANCE_FIELDS
-src/quodeq/analysis/_report_constants.py:10:private-module:quodeq.data.fs.dimension_report._report_constants.FIELD_CONFIDENCE_INTERVAL
-src/quodeq/analysis/_report_constants.py:10:private-module:quodeq.data.fs.dimension_report._report_constants.FIELD_CONFIDENCE_INTERVAL_SNAKE
-src/quodeq/analysis/_report_constants.py:10:private-module:quodeq.data.fs.dimension_report._report_constants.FIELD_FINAL_SCORE
-src/quodeq/analysis/_report_constants.py:10:private-module:quodeq.data.fs.dimension_report._report_constants.FIELD_FINAL_SCORE_SNAKE
-src/quodeq/analysis/_report_constants.py:10:private-module:quodeq.data.fs.dimension_report._report_constants.FIELD_WEIGHTED_SCORE
-src/quodeq/analysis/_report_constants.py:10:private-module:quodeq.data.fs.dimension_report._report_constants.FIELD_WEIGHTED_SCORE_SNAKE
-src/quodeq/analysis/_report_constants.py:10:private-module:quodeq.data.fs.dimension_report._report_constants.GRADE_INSUFFICIENT
-src/quodeq/analysis/_report_constants.py:10:private-module:quodeq.data.fs.dimension_report._report_constants.REPORT_SCHEMA_VERSION
-src/quodeq/analysis/_report_constants.py:10:private-module:quodeq.data.fs.dimension_report._report_constants.VIOLATION_FIELDS
-src/quodeq/analysis/cache/_dimension_context.py:34:private-module:quodeq.analysis.subagents._source_files.list_source_files
-src/quodeq/api/routes_shared_mirrors.py:23:private-module:quodeq.services._fs_reports
-src/quodeq/assistant/adapters/_cli_cleanup.py:11:private-module:quodeq.assistant.mcp._config
-src/quodeq/assistant/adapters/cli.py:23:private-module:quodeq.assistant.mcp._config
-src/quodeq/assistant/tools/_read_tools.py:36:private-module:quodeq.services._fs_reports
-src/quodeq/assistant/tools/_read_tools_scope.py:16:private-module:quodeq.services._fs_reports
-src/quodeq/config/evidence_env.py:10:private-module:quodeq.core.evidence._refs.CWE_URL_TEMPLATE_DEFAULT
