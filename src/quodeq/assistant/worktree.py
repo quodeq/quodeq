@@ -14,7 +14,7 @@ import shutil  # noqa: F401 - patch target attribute holder
 from collections.abc import Mapping
 from pathlib import Path
 
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 _GIT_TIMEOUT_S = 120
 

@@ -1604,8 +1604,6 @@ tests/shared/test_env_numeric.py:7:private-module:quodeq.shared._env.get_dashboa
 tests/shared/test_env_numeric.py:7:private-module:quodeq.shared._env.get_github_raw_base_url
 tests/shared/test_env_numeric.py:7:private-module:quodeq.shared._env.get_github_search_url
 tests/shared/test_env_paths_run_dir.py:8:private-module:quodeq.shared._env_paths.get_run_dir
-tests/shared/test_env_resolve.py:6:private-module:quodeq.shared._env_resolve.resolve_env
-tests/shared/test_env_resolve.py:6:private-module:quodeq.shared._env_resolve.resolve_env_mut
 tests/shared/test_env_score_cache.py:4:private-module:quodeq.shared._env.get_score_cache_path
 tests/shared/test_env_score_cache.py:4:private-module:quodeq.shared._env.score_cache_disabled
 tests/shared/test_env_seams_t5.py:21:private-module:quodeq.shared._config.defaults_path

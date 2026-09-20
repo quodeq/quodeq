@@ -36,7 +36,7 @@ from pathlib import Path
 # not api -> data). services/evaluation_mixin.py imports the same function
 # straight from quodeq.data.fs.repo_validation for the same reason.
 from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 logger = logging.getLogger(__name__)
 

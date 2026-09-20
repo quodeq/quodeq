@@ -22,7 +22,7 @@ from quodeq.context.online_cache import (
     is_inside_cache,
 )
 from quodeq.data.fs.repo_validation import validate_remote_url as _validate_remote_url
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 

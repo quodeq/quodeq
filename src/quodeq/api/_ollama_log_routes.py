@@ -9,7 +9,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._sse_log_helpers import sse_tail_generator
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 
 def _ollama_log_path(env: Mapping[str, str] | None = None) -> Path | None:

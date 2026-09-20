@@ -16,7 +16,7 @@ import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 

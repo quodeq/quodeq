@@ -12,7 +12,7 @@ import sys
 from collections.abc import MutableMapping
 from os.path import expanduser
 
-from quodeq.shared._env_resolve import resolve_env_mut
+from quodeq.shared.env_resolve import resolve_env_mut
 
 _logger = logging.getLogger(__name__)
 

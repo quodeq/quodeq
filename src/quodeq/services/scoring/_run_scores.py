@@ -7,7 +7,7 @@ from pathlib import Path
 
 from quodeq.core.types import DimensionResult
 from quodeq.services._cache import DimensionCacheContext, make_lru_dimension_fetcher
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 _FALLBACK_CACHE_MAX = 256
 

@@ -14,7 +14,7 @@ from flask import Response, request
 
 from quodeq.api.helpers import ClientMessageError, json_error
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared._repo import SCHEME_RE, _looks_like_authority
 from quodeq.shared.utils import get_ai_cmd as _get_ai_cmd
 

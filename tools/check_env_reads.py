@@ -55,9 +55,10 @@ BASELINE_PATH = Path(__file__).resolve().parent / "env_reads_baseline.txt"
 # Paths (relative to the repo root) that own environment access. An entry
 # ending in "/" is a directory prefix, one ending in ".py" is an exact
 # file, and anything else is a file-name prefix within its own directory
-# (so `src/quodeq/shared/_env` covers _env.py, _env_ai.py, _env_db.py and
+# (so `src/quodeq/shared/env` covers env.py, env_paths.py, env_resolve.py and
 # every future sibling, but not `src/quodeq/shared/frozen.py`).
 ALLOWLIST = (
+    "src/quodeq/shared/env",
     "src/quodeq/shared/_env",
     "src/quodeq/config/",
     "src/quodeq/_cli_env.py",

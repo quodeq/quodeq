@@ -16,7 +16,7 @@ from quodeq.core.utils.io import (  # noqa: F401 — re-exported API
     open_text,
     read_json,
 )
-from quodeq.shared._env_resolve import resolve_env_mut
+from quodeq.shared.env_resolve import resolve_env_mut
 
 _logger = logging.getLogger(__name__)
 

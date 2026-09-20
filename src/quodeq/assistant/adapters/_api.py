@@ -20,7 +20,7 @@ from quodeq.assistant.adapters._fallback import (
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, guard_tool_result
 from quodeq.assistant.tools._registry import ToolRegistry
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 _TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)

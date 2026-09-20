@@ -11,7 +11,7 @@ import subprocess
 import sys
 import termios
 
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared._process_kill import kill_proc_tree
 
 _logger = logging.getLogger(__name__)

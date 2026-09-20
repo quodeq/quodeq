@@ -9,7 +9,7 @@ for its existing callers/tests) is a thin static-method delegate to it. The
 from __future__ import annotations
 
 from quodeq.services.base import EvaluationOptions
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.provider_env import provider_env_exports
 
 

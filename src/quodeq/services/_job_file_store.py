@@ -20,7 +20,7 @@ from pathlib import Path
 # already carries a declared exemption for (see
 # tests/tools/test_logging_boundary.py's DECLARED_LOGGING_SITES).
 from quodeq.services._job_model import Job, JobStore, _MAX_LOG_LINES, _logger
-from quodeq.shared._env_resolve import resolve_env
+from quodeq.shared.env_resolve import resolve_env
 
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
 
