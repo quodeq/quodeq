@@ -56,6 +56,9 @@ const ICONS = {
   ),
 };
 
+const ICON_PREFIX = 'icon:';
+const TAG_PREFIX = 'tag:';
+
 function badgeLabel(kind) {
   return kind === 'compliance'
     ? t('explorer.compliantBadge')
@@ -123,9 +126,9 @@ const COMPONENTS = {
   code({ inline: isInline, className, children }) {
     const text = String(children ?? '');
     if (isInline !== false && !className) {
-      if (text.startsWith('icon:')) return pick(ICONS, text.slice(5)) ?? null;
-      if (text.startsWith('tag:')) {
-        const kind = text.slice(4);
+      if (text.startsWith(ICON_PREFIX)) return pick(ICONS, text.slice(ICON_PREFIX.length)) ?? null;
+      if (text.startsWith(TAG_PREFIX)) {
+        const kind = text.slice(TAG_PREFIX.length);
         return <span className={`severity-tag ${kind}`}>{badgeLabel(kind)}</span>;
       }
       return <code>{children}</code>;
