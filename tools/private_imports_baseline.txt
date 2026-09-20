@@ -58,7 +58,6 @@ src/quodeq/analysis/cache/_key_provenance.py:23:private-name:quodeq.analysis.fin
 src/quodeq/analysis/cache/_key_provenance.py:23:private-name:quodeq.analysis.fingerprint._stat_key
 src/quodeq/analysis/cache/_persist_watcher.py:32:private-name:quodeq.analysis.fingerprint._hash_standards
 src/quodeq/analysis/cache/cache_writer.py:35:private-name:quodeq.analysis.fingerprint._hash_standards
-src/quodeq/analysis/cache/dimension_runner.py:33:private-module:quodeq.analysis._evidence_parser.parse_evidence_from_jsonl
 src/quodeq/analysis/cache/dimension_runner.py:34:private-name:quodeq.analysis.run_types._AnalysisContext
 src/quodeq/analysis/checks/runner.py:21:private-module:quodeq.core.evidence._jsonl.judgment_to_dict
 src/quodeq/analysis/checks/runner.py:22:private-module:quodeq.core.evidence._req_mapping.build_principle_resolver

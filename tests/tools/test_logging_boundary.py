@@ -37,7 +37,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_command.py': 'AI CLI command-line construction and environment setup - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_dimension_steps.py': 'Dimension step functions: prompt building, AI execution, evidence parsing - imports quodeq.shared.logging directly (out of scope for this sweep) and quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring',
     'analysis/_drop_stats.py': 'Per-run aggregate of API-runner parse drops (issue #606) - out of scope for this sweep (not a flagged per-site conversion)',
-    'analysis/_evidence_parser.py': 'Evidence-parsing composition wiring: imports quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring, not a logging-boundary violation',
+    'analysis/evidence_parser.py': 'Evidence-parsing composition wiring: imports quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring, not a logging-boundary violation',
     'analysis/_pipeline.py': 'Pipeline coordination - dimension orchestration, merging, and public API - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/_process.py': 'Subprocess spawning, heartbeat monitoring, and error handling - out of scope for this sweep (not a flagged per-site conversion)',
     'analysis/runner_markers.py': 'Structured marker emission and heartbeat callback for the runner pipeline - out of scope for this sweep (not a flagged per-site conversion)',
