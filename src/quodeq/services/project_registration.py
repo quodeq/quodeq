@@ -23,7 +23,7 @@ from quodeq.services.wiring import (
     write_repository_info,
 )
 from quodeq.services._fs_clone import CloneError
-from quodeq.services._fs_project_helpers import find_existing_project
+from quodeq.services.fs_project_helpers import find_existing_project
 from quodeq.services._registration_scan import _zero_run_scan_fallback
 from quodeq.services._registration_url import _strip_credentials
 from quodeq.services._project_registration_steps import (

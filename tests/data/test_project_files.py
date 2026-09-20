@@ -167,11 +167,11 @@ class TestServiceDelegation:
         assert spy.call_args.args[1].get("onboardingCompletedAt")
 
     def test_backfill_heal_writes_through_adapter(self, tmp_path):
-        from quodeq.services._fs_project_helpers import _backfill_onboarding_field
+        from quodeq.services.fs_project_helpers import _backfill_onboarding_field
 
         (tmp_path / "repository_info.json").write_text('{"createdAt": "2026-01-01"}')
         with patch(
-            "quodeq.services._fs_project_helpers.write_repository_info",
+            "quodeq.services.fs_project_helpers.write_repository_info",
             return_value=True,
         ) as spy:
             data = _backfill_onboarding_field(tmp_path)

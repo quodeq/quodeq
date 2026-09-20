@@ -14,7 +14,7 @@ from quodeq.services._filesystem_helpers import _list_available_dimensions_for_d
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
 from quodeq.services._fs_working_copy import _annotate_working_copy, _online_path_missing
-from quodeq.services._fs_project_helpers import (
+from quodeq.services.fs_project_helpers import (
     _KnownProjectIds,
     _ListingOptions,
     _auto_detect_parents,

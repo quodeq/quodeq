@@ -29,7 +29,7 @@ from pathlib import Path
 
 from quodeq.core.types import ProjectEntry
 from quodeq.services._fs_metadata import _extract_project_metadata
-from quodeq.services._fs_project_helpers import (
+from quodeq.services.fs_project_helpers import (
     _KnownProjectIds,
     _ListingOptions,
     _auto_detect_parents,

@@ -27,7 +27,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import _path_from_body, json_error, scan_target_error as _scan_target_error
-from quodeq.services._fs_project_helpers import (
+from quodeq.services.fs_project_helpers import (
     project_record_exists,
     read_project_record,
 )
