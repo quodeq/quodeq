@@ -137,7 +137,6 @@ src/quodeq/data/_file_lock.py:9:private-module:quodeq.core.utils._file_lock.unlo
 src/quodeq/data/fs/deleted_store.py:18:private-module:quodeq.data._file_lock.lock_file
 src/quodeq/data/fs/deleted_store.py:18:private-module:quodeq.data._file_lock.unlock_file
 src/quodeq/data/fs/dimension_report/_report_assembly.py:6:private-module:quodeq.core.scoring._constants.MAX_SCORE
-src/quodeq/data/projection/grade_projector.py:18:private-module:quodeq.data.sqlite._row_mappers.row_to_finding
 src/quodeq/llm_bridge/_providers.py:4:private-module:quodeq.analysis._provider_cache.get_provider_configs
 src/quodeq/services/_accumulated_cache.py:16:private-name:quodeq.shared.utils._env_int
 src/quodeq/services/_evaluations_index.py:198:private-module:quodeq.data.sqlite._index_sync.force_promote_to_cancelled_stale
@@ -147,7 +146,6 @@ src/quodeq/services/_fs_project_parents.py:13:private-name:quodeq.shared.utils._
 src/quodeq/services/_registration_url.py:12:private-name:quodeq.shared.repo._looks_like_authority
 src/quodeq/services/_rescore_legacy.py:11:private-module:quodeq.core.scoring._principle.compute_tallies
 src/quodeq/services/_wiring.py:38:private-module:quodeq.data.fs.dimension_report._report_io.write_dimension_report
-src/quodeq/services/_wiring.py:96:private-module:quodeq.data.sqlite._row_mappers.row_to_finding
 src/quodeq/services/scoring/__init__.py:26:private-module:quodeq.services._trend_fetcher.make_rescoring_fetcher
 src/quodeq/services/scoring/__init__.py:27:private-name:quodeq.services.dashboard._make_run_dimension_fetcher
 src/quodeq/services/scoring/__init__.py:31:private-module:quodeq.services._wiring.read_run_data

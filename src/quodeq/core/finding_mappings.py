@@ -2,7 +2,7 @@
 
 This is the only module that knows how to convert between the LLM wire format,
 the canonical Judgment, the read-side Finding view, and the API response dict.
-SQL row mapping lives in data/sqlite/_row_mappers.py.
+SQL row mapping lives in data/sqlite/row_mappers.py.
 """
 from __future__ import annotations
 

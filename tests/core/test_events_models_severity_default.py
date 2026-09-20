@@ -36,7 +36,7 @@ def test_jsonl_parser_uses_the_shared_default():
 
 
 def test_sqlite_row_mappers_use_the_shared_default_and_verdict():
-    from quodeq.data.sqlite import _row_mappers
+    from quodeq.data.sqlite import row_mappers
 
-    assert _row_mappers.DEFAULT_SEVERITY is DEFAULT_SEVERITY
-    assert _row_mappers.VERDICT_VIOLATION is VERDICT_VIOLATION
+    assert row_mappers.DEFAULT_SEVERITY is DEFAULT_SEVERITY
+    assert row_mappers.VERDICT_VIOLATION is VERDICT_VIOLATION

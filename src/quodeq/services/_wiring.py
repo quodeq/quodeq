@@ -93,7 +93,7 @@ from quodeq.data.sqlite.findings_queries import (  # noqa: F401
     read_active_findings,
     read_finding_details,
 )
-from quodeq.data.sqlite._row_mappers import row_to_finding  # noqa: F401
+from quodeq.data.sqlite.row_mappers import row_to_finding  # noqa: F401
 
 # Custom-standard file mechanics (see StandardsStore in services/ports.py).
 from quodeq.data.fs.standards_store import (  # noqa: F401

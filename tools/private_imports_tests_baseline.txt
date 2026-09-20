@@ -875,7 +875,6 @@ tests/core/test_copilot_events.py:3:private-module:quodeq.assistant.adapters._st
 tests/core/test_enrich_judgment_refs_reader.py:11:private-module:quodeq.core.evidence._options.EvidenceParseOptions
 tests/core/test_enrich_judgment_refs_reader.py:12:private-module:quodeq.core.evidence._refs.enrich_judgment
 tests/core/test_events_models_severity_default.py:33:private-module:quodeq.core.evidence._jsonl
-tests/core/test_events_models_severity_default.py:39:private-module:quodeq.data.sqlite._row_mappers
 tests/core/test_evidence_jsonl_carried_forward.py:9:private-module:quodeq.core.evidence._jsonl.judgment_to_dict
 tests/core/test_evidence_jsonl_carried_forward.py:9:private-module:quodeq.core.evidence._jsonl.parse_jsonl_line
 tests/core/test_evidence_jsonl_vt_raw.py:7:private-module:quodeq.core.evidence._jsonl.judgment_to_dict
@@ -1073,12 +1072,6 @@ tests/data/sqlite/test_migrations_columns.py:294:private-name:quodeq.data.sqlite
 tests/data/sqlite/test_migrations_columns.py:3:private-module:quodeq.data.sqlite._migrations.apply_evaluation_schema
 tests/data/sqlite/test_migrations_columns.py:4:private-module:quodeq.data.sqlite._schema.EVALUATION_DDL
 tests/data/sqlite/test_migrations_columns.py:4:private-module:quodeq.data.sqlite._schema.SCHEMA_VERSION
-tests/data/sqlite/test_row_mappers.py:3:private-module:quodeq.data.sqlite._row_mappers.finding_dict_to_row
-tests/data/sqlite/test_row_mappers.py:3:private-module:quodeq.data.sqlite._row_mappers.judgment_to_row
-tests/data/sqlite/test_row_mappers.py:3:private-module:quodeq.data.sqlite._row_mappers.row_to_finding
-tests/data/sqlite/test_row_mappers_vt_raw.py:3:private-module:quodeq.data.sqlite._row_mappers.finding_dict_to_row
-tests/data/sqlite/test_row_mappers_vt_raw.py:3:private-module:quodeq.data.sqlite._row_mappers.judgment_to_row
-tests/data/sqlite/test_row_mappers_vt_raw.py:3:private-module:quodeq.data.sqlite._row_mappers.row_to_finding
 tests/data/sqlite/test_schema.py:6:private-module:quodeq.data.sqlite._schema
 tests/data/sqlite/test_schema.py:7:private-module:quodeq.data.sqlite._schema.SCHEMA_VERSION
 tests/data/sqlite/test_schema_exit_reason.py:7:private-module:quodeq.data.sqlite._migrations.apply_evaluation_schema
@@ -1101,7 +1094,6 @@ tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._cach
 tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._git_env
 tests/data/test_file_lock.py:17:private-module:quodeq.core.utils._file_lock
 tests/data/test_file_lock.py:18:private-module:quodeq.data._file_lock
-tests/data/test_findings_queries_snippets.py:117:private-module:quodeq.data.sqlite._row_mappers.row_to_finding
 tests/data/test_git_cli.py:215:private-module:quodeq.analysis.subagents._git_scoring.git_scoring
 tests/data/test_git_cli.py:216:private-module:quodeq.services._fs_scan.fs_scan
 tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite._index_sync._is_pid_alive

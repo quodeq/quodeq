@@ -91,7 +91,7 @@ def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
     hits = repo.search(query, limit=max(1, min(int(limit), 50)),
                         exclude_dimensions=hidden or None)
     # Model-facing key is "requirement"; the Finding attribute is `req`
-    # (see data/sqlite/_row_mappers.py row_to_finding).
+    # (see data/sqlite/row_mappers.py row_to_finding).
     rows = [
         {"dimension": f.dimension, "requirement": f.req, "severity": f.severity,
          "file": f.file, "line": f.line, "reason": f.reason, "snippet": f.snippet}
