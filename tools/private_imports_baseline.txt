@@ -50,7 +50,6 @@ src/quodeq/analysis/_report_io.py:18:private-name:quodeq.data.fs.dimension_repor
 src/quodeq/analysis/_report_scoring.py:10:private-module:quodeq.data.fs.dimension_report._report_scoring.build_score_lookup
 src/quodeq/analysis/_report_scoring.py:10:private-module:quodeq.data.fs.dimension_report._report_scoring.extract_scores
 src/quodeq/analysis/_report_scoring.py:10:private-module:quodeq.data.fs.dimension_report._report_scoring.grade_from_score
-src/quodeq/analysis/api_prompt_assembly.py:12:private-module:quodeq.analysis.prompts._template.load_template
 src/quodeq/analysis/cache/_classify.py:24:private-name:quodeq.analysis.fingerprint._stat_key
 src/quodeq/analysis/cache/_dimension_context.py:34:private-name:quodeq.analysis.subagents._source_files._list_source_files
 src/quodeq/analysis/cache/_key_provenance.py:23:private-name:quodeq.analysis.fingerprint._hash_file

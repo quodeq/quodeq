@@ -15,7 +15,7 @@ from quodeq.analysis.prompts._standards_io import (
     render_all_standards,
     write_standards_and_instruction,
 )
-from quodeq.analysis.prompts._template import load_template, template_hash
+from quodeq.analysis.prompts.template import load_template, template_hash
 from quodeq.config.prompt_templates import render_template
 
 _logger = logging.getLogger(__name__)

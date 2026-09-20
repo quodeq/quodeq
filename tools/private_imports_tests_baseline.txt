@@ -329,7 +329,6 @@ tests/analysis/test_progress_reader_coverage.py:91:private-name:quodeq.analysis.
 tests/analysis/test_prompt_builder_fallback.py:2:private-name:quodeq.analysis.prompts.builder._load_dimension_data
 tests/analysis/test_prompt_context.py:1:private-module:quodeq.analysis.prompts._context.PromptContext
 tests/analysis/test_prompt_context.py:54:private-name:quodeq.analysis.subagents._prompts._build_subagent_prompt
-tests/analysis/test_prompt_provenance_gate.py:23:private-module:quodeq.analysis.prompts._template.load_template
 tests/analysis/test_prompt_trust_model.py:5:private-name:quodeq.analysis.api_prompt_assembly._format_shape_block
 tests/analysis/test_provenance_gate_behavioral.py:50:private-module:quodeq.analysis._api_runner.ApiRunnerConfig
 tests/analysis/test_provenance_gate_behavioral.py:50:private-name:quodeq.analysis._api_runner._call_api
