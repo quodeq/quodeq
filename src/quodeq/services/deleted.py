@@ -20,7 +20,7 @@ from pathlib import Path
 from quodeq.core.dismissals import DismissedEntry, DismissedKeys
 from quodeq.core.finding_identity import DismissKey, finding_dismiss_keys, snippet_fingerprint
 from quodeq.data.ports.actions_log import ActionLog
-from quodeq.services._dismissed_listing import load_dismissed
+from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services._run_recency import run_dirs_newest_first
 from quodeq.services.dismissed import dismissed_keys, undismiss_event
 from quodeq.services.wiring import (

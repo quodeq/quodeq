@@ -5,7 +5,7 @@ dismissed_keys() folds the log into the project's net ``DismissedKeys``
 (``core.dismissals``): a dismissal is identified by its snippet fingerprint
 and survives the line shifts every refactor causes; the line is kept as a
 display hint and as the identity of snippet-less findings. The Dismissed tab
-listing lives in ``services/_dismissed_listing``.
+listing lives in ``services/dismissed_listing``.
 """
 from __future__ import annotations
 
@@ -159,7 +159,7 @@ def load_dismissed(
     The listing needs ``dismissed_keys`` and lives in ``_dismissed_listing``;
     the import is deferred so this module stays its import root.
     """
-    from quodeq.services._dismissed_listing import load_dismissed as listing  # noqa: PLC0415
+    from quodeq.services.dismissed_listing import load_dismissed as listing  # noqa: PLC0415
 
     return listing(project_dir, offset=offset, limit=limit)
 

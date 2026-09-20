@@ -1192,17 +1192,13 @@ tests/services/test_dismiss_backfill.py:15:private-module:quodeq.services._dismi
 tests/services/test_dismiss_backfill.py:16:private-module:quodeq.services._dismiss_fingerprints.BACKFILL_MARKER
 tests/services/test_dismiss_backfill.py:16:private-module:quodeq.services._dismiss_fingerprints.backfill_if_needed
 tests/services/test_dismiss_backfill.py:16:private-name:quodeq.services._dismiss_fingerprints._backfill_locks
-tests/services/test_dismiss_path_batching.py:23:private-module:quodeq.services._dismissed_listing
-tests/services/test_dismiss_path_batching.py:24:private-module:quodeq.services._dismissed_listing.load_dismissed
 tests/services/test_dismiss_path_batching.py:25:private-name:quodeq.services.deleted._sweep_dismissed_matching
-tests/services/test_dismissed_extended.py:108:private-module:quodeq.services._dismissed_listing
 tests/services/test_dismissed_extended.py:150:private-module:quodeq.services._run_recency
 tests/services/test_dismissed_extended.py:248:private-name:quodeq.services._run_recency._RecencyCache
 tests/services/test_dismissed_extended.py:256:private-name:quodeq.services._run_recency._RecencyCache
 tests/services/test_dismissed_extended.py:263:private-name:quodeq.services._run_recency._RecencyCache
 tests/services/test_dismissed_extended.py:272:private-module:quodeq.services._run_recency.run_started_at
 tests/services/test_dismissed_extended.py:272:private-name:quodeq.services._run_recency._RecencyCache
-tests/services/test_dismissed_fingerprint.py:21:private-module:quodeq.services._dismissed_listing.load_dismissed
 tests/services/test_env_fallbacks.py:15:private-name:quodeq.services.scoring._max_history_runs
 tests/services/test_env_seams_t5.py:10:private-name:quodeq.services._dashboard_history._DEFAULT_MAX_HISTORY_RUNS
 tests/services/test_env_seams_t5.py:10:private-name:quodeq.services._dashboard_history._max_history_runs

@@ -19,7 +19,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import json_error, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
-from quodeq.services._dismissed_listing import load_dismissed
+from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services.dismissed import dismiss_finding, restore_finding, restore_all_findings
 from quodeq.services.mutation_rescore import (
     delete_all_delta,

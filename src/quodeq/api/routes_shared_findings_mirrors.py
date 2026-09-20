@@ -11,7 +11,7 @@ from typing import Callable
 from flask import Flask, jsonify, request
 
 from quodeq.api.helpers import page_params
-from quodeq.services._dismissed_listing import load_dismissed
+from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services.verified import verified_entries
 
 from .routes_shared_common import _shared_project_dir, _validate_segment, _with_shared_root
