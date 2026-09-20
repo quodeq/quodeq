@@ -34,11 +34,14 @@ function useHistoryRunNavLabel(trend, currentOverviewRun) {
   }, [trend, currentOverviewRun]);
 }
 
+// How many top languages the subtitle shows before the rest are dropped.
+const MAX_LANGUAGES_SHOWN = 5;
+
 function useHistoryLanguageSub(projectInfo) {
   return useMemo(() => {
     const stats = projectInfo?.languageStats;
     if (!stats) return null;
-    const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, 5);
+    const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, MAX_LANGUAGES_SHOWN);
     if (sorted.length === 0) return null;
     return sorted.map(([lang, count]) => `${count} ${lang.toLowerCase()}`).join('  ');
   }, [projectInfo]);
