@@ -25,6 +25,9 @@ VERDICT_VIOLATION = "violation"
 VERDICT_COMPLIANCE = "compliance"
 VALID_VERDICTS = frozenset({VERDICT_VIOLATION, VERDICT_COMPLIANCE})
 
+# Judgment.severity's default when the model doesn't set one explicitly.
+DEFAULT_SEVERITY = "medium"
+
 
 class EventType(str, Enum):
     """Discriminator stored on every event line; the decoder keys both maps off it.
@@ -75,7 +78,7 @@ class Judgment:
     # Optional
     end_line: Optional[int] = None
     snippet: Optional[str] = None
-    severity: str = "medium"
+    severity: str = DEFAULT_SEVERITY
     violation_type: Optional[str] = None
     # The model's tag exactly as emitted, before any taxonomy mapping. Feeds
     # the per-run unmapped-types report; never a scoring input.

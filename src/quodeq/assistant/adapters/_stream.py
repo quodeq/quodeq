@@ -2,9 +2,14 @@
 from __future__ import annotations
 
 import json
-from quodeq.core.stream.events import copilot_error, copilot_event_data, texts_from_copilot
+from quodeq.core.stream.events import (
+    EVENT_TYPE_ASSISTANT, EVENT_TYPE_ASSISTANT_MESSAGE, EVENT_TYPE_ITEM_COMPLETED,
+    EVENT_TYPE_RESULT, EVENT_TYPE_TOOL_EXECUTION_START,
+    copilot_error, copilot_event_data, texts_from_copilot,
+)
 
 _TEXT_TYPES = ("text", "output_text")
+_ARGS_SUMMARY_MAX_CHARS = 80  # display truncation width for a tool call's args/command summary
 
 
 def parse_line(line: str) -> dict | None:
@@ -48,16 +53,16 @@ def partial_text(event: dict) -> str | None:
 
 def assistant_text(event: dict) -> list[str]:
     etype = event.get("type")
-    if etype == "assistant.message":
+    if etype == EVENT_TYPE_ASSISTANT_MESSAGE:
         return texts_from_copilot(event)
-    if etype == "assistant":
+    if etype == EVENT_TYPE_ASSISTANT:
         msg = event.get("message")
         blocks = msg.get("content") if isinstance(msg, dict) else None
         return _texts_from_blocks(blocks)
-    if etype == "result":
+    if etype == EVENT_TYPE_RESULT:
         result = event.get("result")
         return [result] if isinstance(result, str) else []
-    if etype == "item.completed":
+    if etype == EVENT_TYPE_ITEM_COMPLETED:
         item = event.get("item")
         item = item if isinstance(item, dict) else {}
         if item.get("type") == "agent_message":
@@ -68,7 +73,7 @@ def assistant_text(event: dict) -> list[str]:
 
 
 def _args_summary(args) -> str:
-    return (json.dumps(args, ensure_ascii=False)[:80]
+    return (json.dumps(args, ensure_ascii=False)[:_ARGS_SUMMARY_MAX_CHARS]
             if isinstance(args, dict) and args else "")
 
 
@@ -81,7 +86,7 @@ def _codex_tool_detail(item: dict) -> dict | None:
         return {"name": name, "args_summary": _args_summary(item.get("arguments"))}
     if itype == "command_execution":
         cmd = item.get("command")
-        return {"name": "shell", "args_summary": cmd[:80] if isinstance(cmd, str) else ""}
+        return {"name": "shell", "args_summary": cmd[:_ARGS_SUMMARY_MAX_CHARS] if isinstance(cmd, str) else ""}
     return None
 
 
@@ -94,7 +99,7 @@ def tool_use_details(event: dict) -> list[dict]:
     to avoid a duplicate frame).
     """
     etype = event.get("type")
-    if etype == "tool.execution_start":
+    if etype == EVENT_TYPE_TOOL_EXECUTION_START:
         data = copilot_event_data(event)
         name = data.get("mcpToolName") or data.get("toolName")
         if isinstance(name, str) and name:
@@ -104,10 +109,10 @@ def tool_use_details(event: dict) -> list[dict]:
         item = event.get("item")
         detail = _codex_tool_detail(item) if isinstance(item, dict) else None
         return [detail] if detail else []
-    if etype == "assistant":
+    if etype == EVENT_TYPE_ASSISTANT:
         msg = event.get("message")
         blocks = msg.get("content") if isinstance(msg, dict) else None
-    elif etype == "item.completed":
+    elif etype == EVENT_TYPE_ITEM_COMPLETED:
         item = event.get("item")
         blocks = item.get("content") if isinstance(item, dict) else None
     else:

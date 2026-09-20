@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from quodeq.core.events.models import Judgment
+from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
 
 _SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 _MIN_REQ_ID_SEGMENTS = 2  # ``<category>-<number>`` is the shortest ID we guess about
@@ -239,7 +239,7 @@ def _group_judgments(
             sc_violations.setdefault(principle, []).append(j)
         elif j.verdict == "compliance":
             sc_compliance.setdefault(principle, []).append(j)
-        sev = j.severity or "medium"
+        sev = j.severity or DEFAULT_SEVERITY
         if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
             sc_severity[principle] = sev
 

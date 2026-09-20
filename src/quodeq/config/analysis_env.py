@@ -60,14 +60,18 @@ def context_size_override(env: dict[str, str] | None = None) -> int | None:
     return int(raw) if raw.isdigit() else None
 
 
+_DEFAULT_MAX_TURNS = 200
+_DEFAULT_MAX_DURATION_S = 1800  # 30 minutes
+
+
 def default_max_turns(env: dict[str, str] | None = None) -> int:
     """Turn ceiling per agent, resolved per construction (not at import)."""
-    return env_int("QUODEQ_DEFAULT_MAX_TURNS", 200, env=env)
+    return env_int("QUODEQ_DEFAULT_MAX_TURNS", _DEFAULT_MAX_TURNS, env=env)
 
 
 def default_max_duration(env: dict[str, str] | None = None) -> int:
     """Wall-clock ceiling per agent in seconds (30 min), resolved per construction."""
-    return env_int("QUODEQ_DEFAULT_MAX_DURATION", 1800, env=env)
+    return env_int("QUODEQ_DEFAULT_MAX_DURATION", _DEFAULT_MAX_DURATION_S, env=env)
 
 
 _REPAIR_DISABLE_TRUTHY = frozenset({"1", "true", "yes", "on"})

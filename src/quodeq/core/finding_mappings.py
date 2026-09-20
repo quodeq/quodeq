@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from quodeq.core._constants import FULL_CONFIDENCE
-from quodeq.core.events.models import Judgment
+from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
 from quodeq.core.finding_coercions import coerce_scope_downgrade
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.req_ref import ReqRef
@@ -51,7 +51,7 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         line=_safe_int(d.get("line") or 0, 0),
         end_line=d.get("end_line"),
         snippet=d.get("snippet"),
-        severity=d.get("severity") or "medium",
+        severity=d.get("severity") or DEFAULT_SEVERITY,
         # The taxonomy travels as 'vt' on the JSONL wire (see evidence/_jsonl.py);
         # accept the long key too so both spellings survive this seam.
         violation_type=d.get("vt") or d.get("violation_type"),
