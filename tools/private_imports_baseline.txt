@@ -18,11 +18,8 @@ src/quodeq/analysis/_loop_guards.py:69:private-module:quodeq.analysis.cache._fai
 src/quodeq/analysis/_loop_state.py:98:private-module:quodeq.analysis.cache._failure_streak.CircuitBreakerError
 src/quodeq/analysis/_process.py:9:private-name:quodeq.analysis.stream.progress_reader._IncrementalProgressReader
 src/quodeq/analysis/_provider_cache.py:10:private-name:quodeq.shared.provider_env._providers_path
-src/quodeq/analysis/_report_assembly.py:10:private-module:quodeq.data.fs.dimension_report._report_assembly.build_dashboard_report
-src/quodeq/analysis/_report_assembly.py:10:private-module:quodeq.data.fs.dimension_report._report_assembly.build_full_report
-src/quodeq/analysis/_report_assembly.py:10:private-module:quodeq.data.fs.dimension_report._report_assembly.build_report_json
-src/quodeq/analysis/_report_assembly.py:10:private-name:quodeq.data.fs.dimension_report._report_assembly._ReportData
-src/quodeq/analysis/_report_assembly.py:10:private-name:quodeq.data.fs.dimension_report._report_assembly._assemble_report_dict
+src/quodeq/analysis/_report_assembly.py:10:private-name:quodeq.data.fs.dimension_report.report_assembly._ReportData
+src/quodeq/analysis/_report_assembly.py:10:private-name:quodeq.data.fs.dimension_report.report_assembly._assemble_report_dict
 src/quodeq/analysis/_report_constants.py:10:private-name:quodeq.data.fs.dimension_report._report_constants._COMPLIANCE_FIELDS
 src/quodeq/analysis/_report_constants.py:10:private-name:quodeq.data.fs.dimension_report._report_constants._FIELD_CONFIDENCE_INTERVAL
 src/quodeq/analysis/_report_constants.py:10:private-name:quodeq.data.fs.dimension_report._report_constants._FIELD_CONFIDENCE_INTERVAL_SNAKE

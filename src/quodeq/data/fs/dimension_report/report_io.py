@@ -11,7 +11,7 @@ from quodeq.core.types import ScoringResult
 from quodeq.core.evidence.model import Evidence
 from quodeq.shared.validation import validate_path_segment
 
-from quodeq.data.fs.dimension_report._report_assembly import build_full_report, build_dashboard_report
+from quodeq.data.fs.dimension_report.report_assembly import build_full_report, build_dashboard_report
 
 _logger = logging.getLogger(__name__)
 

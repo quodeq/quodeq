@@ -4,7 +4,7 @@ Sub-modules:
   _report_constants  -- field-name constants
   report_scoring     -- score/grade conversion and lookup building
   report_findings    -- findings flattening and principle-row building
-  _report_assembly   -- report dict assembly
+  report_assembly    -- report dict assembly
   report_io          -- disk persistence (I/O adapters)
 
 The reader for these files lives at ``data/fs/report_parser/``.
