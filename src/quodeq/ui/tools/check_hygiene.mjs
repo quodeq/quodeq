@@ -16,10 +16,10 @@ import { main } from './ratchet.mjs';
 // Revise DOWNWARD as burn-down tasks land; NEVER raise without a
 // justification reviewed in the PR that raises it.
 // 2026-09: lowered from 172 to 32 once no-unused-vars burned down to zero.
-// Everything left is complexity (M-MOD-1); no-unused-vars, max-params,
-// max-depth and jsdoc/require-jsdoc all carry zero, so any new one fails the
-// gate outright.
-const TOTAL_CEILING = 32; // set to the total printed by --update; lower it as entries burn down
+// Lowered 32 -> 0 when the last 30 complexity offenders were split into named
+// helpers: the baseline is empty, so every rule here now fails the gate
+// outright on a new violation. tools/hygiene_baseline.test.mjs pins it there.
+const TOTAL_CEILING = 0; // set to the total printed by --update; lower it as entries burn down
 
 main({
   script: 'check_hygiene.mjs',
