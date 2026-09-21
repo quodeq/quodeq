@@ -72,8 +72,3 @@ def test_legacy_incremental_with_diff_from_does_not_error(capsys) -> None:
         "Expected deprecation warning for --incremental in output; got none. "
         "The legacy alias may not be wired through to run_evaluate."
     )
-
-    # The deprecation warning must be present so callers know to migrate.
-    assert "deprecated" in combined_output, (
-        "Expected a deprecation warning for --incremental but found none in stderr/stdout."
-    )

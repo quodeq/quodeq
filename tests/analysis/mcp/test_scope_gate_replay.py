@@ -20,12 +20,11 @@ import pytest
 
 from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.mcp.scope_gate import apply_scope_gate
-from quodeq.context.trust_model import CONSERVATIVE, TrustModel
+from quodeq.context.trust_model import CONSERVATIVE
+
+from ._scope_gate_helpers import LOCAL
 
 _FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/scope_gate_replay/security_findings.json"
-
-LOCAL = TrustModel(multi_tenant=False, network_exposure="loopback",
-                   deployment_topology="distributed")
 
 
 def _violations(severity: str):
