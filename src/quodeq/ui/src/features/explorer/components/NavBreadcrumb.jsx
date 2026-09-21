@@ -47,9 +47,12 @@ export function labelFor(entry) {
   if (entry.page === 'map' && entry.path) {
     return entry.path.split('/').filter(Boolean).pop() || t('explorer.mapCrumb');
   }
-  if (PAGE_LABELS[entry.page]) return PAGE_LABELS[entry.page];
+  // hasOwn, not a plain lookup: `entry.page` comes off a stack entry, so a
+  // page named 'constructor' or 'toString' would otherwise hit Object's
+  // prototype and be treated as a label spec.
+  if (Object.hasOwn(PAGE_LABELS, entry.page) && PAGE_LABELS[entry.page]) return PAGE_LABELS[entry.page];
+  if (!Object.hasOwn(ENTRY_LABELS, entry.page)) return entry.label || entry.page;
   const spec = ENTRY_LABELS[entry.page];
-  if (!spec) return entry.label || entry.page;
   const [read, fallback] = spec;
   return read(entry) || fallback;
 }

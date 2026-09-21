@@ -4,6 +4,9 @@ import {
 import { ZOOM_DIMENSION_LEVEL, ZOOM_PRINCIPLE_LEVEL, CANVAS_FONT_FAMILY } from '../core/galaxyTunables.js';
 import { drawStarfield } from './galaxyStarfield.js';
 import {
+  clusterDimming, selectedZoomFade, principleParticleFade, principleLabelAlpha, PRINCIPLE_FADE_SPAN,
+} from './galaxyFade.js';
+import {
   BACKGROUND, STAR, VIOLATION_ORBS, MIN_VISIBLE_ALPHA, LABEL_ALPHA,
   FOCUS_RING, FOCUS_RING_DASH, UNFOCUSED_CLUSTER_MIN_ALPHA, DIM_FADE_SPAN,
   CONSTELLATION, CONSTELLATION_RING_DASH, CONSTELLATION_LINE_DASH,
@@ -13,12 +16,6 @@ import {
 // Dimension labels grow with the zoom up to this cap. Deliberately equal
 // to ZOOM_DIMENSION_LEVEL: once principles appear the label stops growing.
 const LABEL_SCALE_CAP = ZOOM_DIMENSION_LEVEL;
-// Zoom units past ZOOM_PRINCIPLE_LEVEL over which the selected principle's
-// particles and label hand off to its violation orbs, which fade in over
-// the same span.
-const PRINCIPLE_FADE_SPAN = 20;
-// The other principles' labels get out of the way faster than that.
-const SIBLING_LABEL_FADE_SPAN = 15;
 
 /**
  * Render one animation frame on the galaxy canvas.
@@ -127,17 +124,6 @@ function drawDimParticles(ctx, principles, orbit) {
       ctx.fillStyle = `rgba(${r},${g},${b},${(tw + DIM_PARTICLE.coreAlphaBoost) * particleAlpha})`; ctx.fill();
     }
   });
-}
-
-/** Dimming applied to stars outside the focused cluster. */
-function clusterDimming(s, cam, nav) {
-  const inFocusedCluster = nav.clusterCx == null || (s._clusterCx === nav.clusterCx && s._clusterCy === nav.clusterCy);
-  return inFocusedCluster ? 1 : Math.max(UNFOCUSED_CLUSTER_MIN_ALPHA, 1 - (cam.z - 1) / 2);
-}
-
-/** Alpha for the selected star's own decorations as the camera zooms in. */
-function selectedZoomFade(camZ) {
-  return Math.max(0, 1 - (camZ - ZOOM_DIMENSION_LEVEL) / 2);
 }
 
 /** Draws one dimension star (glow, label, focus ring) and returns hover info when hit. */
@@ -256,20 +242,6 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
     }
   });
   return newHovered;
-}
-
-/** Particle fade for one principle: the selected planet hands its particles
- *  over to the large orbs as the camera zooms in; siblings keep theirs. */
-function principleParticleFade(camZ, isSelected) {
-  return isSelected ? Math.max(0, 1 - (camZ - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN) : 1;
-}
-
-/** Label alpha for one principle: the selected one fades as the camera zooms
- *  into it, its siblings fade faster once any principle is selected. */
-function principleLabelAlpha(camZ, isSelected, anySelected) {
-  if (isSelected) return Math.max(0, 1 - (camZ - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN);
-  if (!anySelected) return 1;
-  return Math.max(0, 1 - (camZ - ZOOM_PRINCIPLE_LEVEL) / SIBLING_LABEL_FADE_SPAN);
 }
 
 /** Phase 5: violation/compliance orbs when zoomed deeply into a principle. */

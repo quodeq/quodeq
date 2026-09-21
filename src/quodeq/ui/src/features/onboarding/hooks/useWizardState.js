@@ -57,9 +57,20 @@ const HANDLERS = {
   RESET: (state, action) => initialState(action.initial),
 };
 
-function reducer(state, action) {
-  const handler = HANDLERS[action.type];
-  return handler ? handler(state, action) : state;
+/**
+ * The wizard reducer. Exported so the unlisted-action contract can be pinned
+ * without a dispatch escape hatch on the hook's public surface.
+ *
+ * @param {object} state - current wizard state.
+ * @param {{ type: string }} action - the dispatched action.
+ * @returns {object} the next state, or `state` itself when nothing matches.
+ */
+export function reducer(state, action) {
+  // hasOwn, not a plain lookup: an action type of 'constructor' or 'toString'
+  // would otherwise resolve to an Object.prototype member and get called as
+  // if it were a handler.
+  if (!Object.hasOwn(HANDLERS, action.type)) return state;
+  return HANDLERS[action.type](state, action);
 }
 
 /**

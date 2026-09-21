@@ -202,9 +202,14 @@ export function buildSummary({ showCoverage, totalFiles, takenFiles, overallPct,
   const clockPart = buildClockPart({ isRunning, runBudgetS, overrun, elapsedS });
   const tail = () => buildDoneTail({ takenFiles, overallPct, excludedFiles, clockPart });
 
-  if (showCoverage && totalFiles === 0) return <>{t('evaluate.nothingNew')}{clockPart}</>;
+  // `> 0`, not `!== 0`: an absent or non-finite count reads as "nothing to
+  // report yet" too, and would otherwise fall through to a line that renders
+  // it verbatim.
+  const hasFiles = totalFiles > 0;
+
+  if (showCoverage && !hasFiles) return <>{t('evaluate.nothingNew')}{clockPart}</>;
   if (showCoverage) return coverageLine({ totalFiles, tail: tail() });
-  if (totalFiles === 0) return preparingLine({ isRunning, inlineLabel });
+  if (!hasFiles) return preparingLine({ isRunning, inlineLabel });
   if (scanMode === SCAN_MODE.CLEAN) return cleanScanLine({ totalFiles, tail: tail() });
   return incrementalLine({ takenFiles, totalFiles, overallPct, isRunning, inlineLabel, clockPart });
 }

@@ -12,6 +12,22 @@ const EvaluateScreen = lazy(() => import('../features/evaluation/components/Eval
 const SettingsPage = lazy(() => import('../features/settings/components/SettingsPage.jsx'));
 const PrincipleDetailPage = lazy(() => import('../features/explorer/components/PrincipleDetailPage.jsx'));
 
+/**
+ * Evaluate route: splits the evaluation bundle into the three prop groups
+ * EvaluateScreen takes, and resolves the project names the screen shows as
+ * labels (the global selection, the running job's own project, and the
+ * project the job was started for) into full project records.
+ * @param {object} props
+ * @param {object} props.evaluation - useEvaluation's bundle: the job, its
+ *   error, live violations and the start/cancel/dismiss handlers.
+ * @param {string} props.selectedProject - the app's global project selection.
+ * @param {Array} props.projects - every known project, for the name lookups.
+ * @param {() => void} props.onGoToProjects - escape hatch from an empty state.
+ * @param {() => void} props.onGoToSettings - escape hatch when no provider is
+ *   configured yet.
+ * @param {Array} [props.preselectDims] - dimensions to tick on entry.
+ * @returns {JSX.Element}
+ */
 export function EvaluateCase({ evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation, startedProject } = evaluation;
   const projectInfo = findProject(projects, selectedProject);
@@ -64,6 +80,16 @@ export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects
   return { id, source: 'local' };
 }
 
+/**
+ * Principle detail route. The URL params carry the finding, but a jump from
+ * Compare or a parent dimension can omit its project and run, so both are
+ * backfilled from the current navigation before the page is wired to dismiss.
+ * @param {object} params - the parsed route params: `evalPrincipal` and an
+ *   optional `severity` filter.
+ * @param {object} props - the route props; `props.navigation` supplies the
+ *   selection fallbacks and the rest is passed to the dismiss handler.
+ * @returns {JSX.Element}
+ */
 export function renderEvalPrincipleDetail(params, props) {
   const { selectedProject, selectedRun, selectedSource } = props.navigation;
   const evalPrincipal = {

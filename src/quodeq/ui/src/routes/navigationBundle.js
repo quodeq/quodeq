@@ -62,7 +62,8 @@ function makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }) {
  *
  * @param {object} args
  * @param {object} args.state - useAppState's bundle; spread in wholesale.
- * @param {string} args.navTab - the active top-level tab.
+ * @param {(tab: string) => void} args.navTab - switches the top-level tab;
+ *   forwarded as-is and also used to build onBrowseRemote.
  * @param {number} args.navStackLength - depth of the in-page back stack.
  * @param {boolean} args.isEvaluating - blocks every navigation action.
  * @param {(msg: string) => void} args.showToast - shows the blocked action's

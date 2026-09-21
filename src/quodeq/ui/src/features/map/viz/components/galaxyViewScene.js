@@ -155,8 +155,8 @@ function buildStarLayout(dimensions, standardTypes, { W, H, rng }) {
  * @param {number} H - canvas height in px.
  * @param {Object} standardTypes - dimension id -> standard type, which decides
  *   whether dimensions are grouped into constellations.
- * @returns {object} the scene: `rootStars`, `bg` and the layout metadata the
- *   draw and camera helpers read.
+ * @returns {object} the scene: `stars`, `principles`, `connections`,
+ *   `constellations`, `bg` and the `_maxExtent` the camera fits to.
  */
 export function buildScene(dimensions, W, H, standardTypes) {
   const dimFingerprint = dimensions.map(d => d.dimension || '').sort().join('|');

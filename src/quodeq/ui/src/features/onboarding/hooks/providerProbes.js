@@ -1,9 +1,11 @@
 /**
  * Onboarding's provider detection probes. Every probe is a timed GET against
- * the local backend; none of them import from the settings feature. Each
- * returns
+ * the local backend; none of them import from the settings feature. A probe
+ * that resolves returns
  *   { id, classification: 'cli' | 'local-api' | 'cloud', detected, defaultModel }
- * and `runDetection` fans them out in parallel.
+ * and `runDetection` fans them out in parallel. A probe that rejects outright
+ * (rather than reporting a miss) is reported as a bare `{ detected: false }`
+ * with no id, so callers must key off `detected` before reading the rest.
  *
  * The onboarding hook's tests mock this module's `runDetection` export, so the
  * probes themselves are covered by the integration tests rather than in
