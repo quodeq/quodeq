@@ -74,7 +74,7 @@ function useRefitOnOpen({ status, resize, rootRef, fitRef, termRef }) {
   useEffect(() => {
     const el = rootRef.current;
     if (status !== 'open' || !fitRef.current || !termRef.current || isHidden(el)) return;
-    fitAndResize(fitRef.current, termRef.current, resize, 'refit on open');
+    fitAndResize(fitRef.current, termRef.current, resize, 'refit-on-open');
   }, [status, resize]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
@@ -90,7 +90,7 @@ function makeSessionSetup({ rootRef, termRef, fitRef, sessionId, send, resize, b
     // tab or backgrounded panel), fitting measures a 0x0 box (bogus PTY
     // size); the status-open and activation effects both fit once shown.
     if (!isHidden(rootRef.current)) {
-      fitAndResize(fit, term, resize, 'initial fit');
+      fitAndResize(fit, term, resize, 'initial-fit');
     }
     // Fit ONCE after the size settles (FIT_DEBOUNCE_MS). ResizeObserver isn't
     // in JSDOM; guard so tests and any lacking environment don't crash.
@@ -102,7 +102,7 @@ function makeSessionSetup({ rootRef, termRef, fitRef, sessionId, send, resize, b
         // isHidden — a 0x0 fit drives the PTY to a bogus size and the shell
         // floods the prompt with cursor-position replies (the "14;3R…" garbage).
         if (isHidden(rootRef.current)) return;
-        fitAndResize(fit, term, resize, 'debounced fit');
+        fitAndResize(fit, term, resize, 'debounced-fit');
       }, FIT_DEBOUNCE_MS);
     };
     box.ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleFit) : null;
@@ -152,7 +152,7 @@ function useRefitOnActivate({ active, resize, rootRef, fitRef, termRef }) {
   useEffect(() => {
     const el = rootRef.current;
     if (!active || !fitRef.current || !termRef.current || isHidden(el)) return;
-    fitAndResize(fitRef.current, termRef.current, resize, 'refit on activate');
+    fitAndResize(fitRef.current, termRef.current, resize, 'refit-on-activate');
   }, [active, resize]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
