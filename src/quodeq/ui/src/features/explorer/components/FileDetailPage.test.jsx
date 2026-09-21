@@ -1,10 +1,9 @@
 /**
- * Smoke coverage for FileDetailPage.jsx, written BEFORE it is split into
- * ViolationCard.jsx, FileDetailHeader.jsx, fileDetailWidgets.jsx,
- * useFileDetailFiltering.js and useFileDetailWindowSpecs.js. Covers the
- * mount path and the dismiss hot path (the brief calls this out explicitly
- * — dismissing a violation must remove it from the live list without
- * calling onDismiss again for the same row).
+ * Smoke coverage for FileDetailPage.jsx and the modules it composes
+ * (ViolationCard.jsx, FileDetailHeader.jsx, fileDetailWidgets.jsx,
+ * useFileDetailFiltering.js, useFileDetailWindowSpecs.js). Covers the mount
+ * path and the dismiss hot path: dismissing a violation must remove it from
+ * the live list without calling onDismiss again for the same row.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';

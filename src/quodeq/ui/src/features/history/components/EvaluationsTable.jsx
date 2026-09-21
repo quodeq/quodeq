@@ -9,11 +9,9 @@ import { PARTIAL_STATUSES } from './historyRowAssembly.js';
 
 const NOT_READY_MESSAGE = t('history.notReadyMessage');
 
-/**
- * The History table (header row + evaluation rows), plus its row-level
- * subcomponents and formatting helpers, extracted verbatim from
- * HistoryPage.jsx.
- */
+// Splits an ISO timestamp into the row's two-line date/time cell. A
+// malformed timestamp degrades to the caller's fallback label rather than
+// throwing mid-render.
 function formatDateParts(dateISO, fallbackLabel) {
   if (!dateISO) return { date: fallbackLabel || '', time: '' };
   try {

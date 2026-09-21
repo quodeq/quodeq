@@ -66,8 +66,9 @@ test('provider failures warn on done runs, clean stops do not', () => {
   assert.equal(exitReasonWarn(null), false);
 });
 
-test('absent codes yield null label and hint', () => {
+test('an absent code has no info, no label and no hint', () => {
   assert.equal(exitReasonInfo(null), null);
+  // Label reads through the missing info object, so it is undefined, not null.
   assert.equal(exitReasonLabel(undefined), undefined);
   assert.equal(exitReasonHint(null), null);
 });

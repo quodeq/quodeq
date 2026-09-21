@@ -19,6 +19,8 @@
  * @property {number|null}  latestScore
  * @property {number}       runsCount
  * @property {number|null}  filesCount
+ * @property {string|null}  scopePath   - subdirectory the project is scoped to, or null for the whole repo
+ * @property {boolean}      hasFingerprints - true once the backend has indexed the project's files
  * @property {Object|null}  languageStats - e.g. { py: 302, js: 84 }
  * @property {string|null}  scanDate
  * @property {number|null}  totalFiles

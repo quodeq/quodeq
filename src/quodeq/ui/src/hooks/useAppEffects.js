@@ -123,11 +123,10 @@ export function useProjectScrollResetEffect(selectedProject) {
  * earliest point at which "the current project" is known, so it runs
  * before any newly-mounted page reads readVisibleStandardIds() for that
  * project. It migrates a pre-existing local selection up to the server on
- * first run and never throws (see hydrateVisibleStandardIds). Note: pages
- * already mounted with a memoized visible-standards Set (e.g. the sidebar
- * trend/accumulated filters below, keyed with empty deps) do not
- * recompute from this — that is a pre-existing limitation of those read
- * sites, not something this hydration fixes.
+ * first run and never throws (see hydrateVisibleStandardIds). Note: a page
+ * already mounted with a memoized visible-standards Set keyed on empty deps
+ * does not recompute from this. That is a limitation of those read sites, not
+ * something this hydration fixes.
  *
  * isStale guards a real race: switching A -> B before A's request resolves
  * must not let A's (now-stale) response overwrite B's selection in the

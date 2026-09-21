@@ -9,17 +9,13 @@ const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
 // that may not have finished its first scan yet) isn't cut short.
 const RESUME_SCAN_TIMEOUT_MS = 120000;
 
-// Map backend error codes (Task A8) to user-facing messages. The switch that
+// Map backend error codes to user-facing messages. The switch that
 // used to live here moved into strings/apiErrors.js so every screen resolves
 // codes the same way; the copy is unchanged, just translatable now.
 function friendlyCloneError(err) {
   return apiErrorMessage(err, 'onboarding.cloneFailed');
 }
 
-/**
- * RepoScanStep.jsx's scan/clone submission state and handlers (including the
- * 409-resume flow), extracted verbatim.
- */
 // 409 + existingProjectId means a project was already registered for this
 // repo. If it has no evaluations yet, silently resume into it — the user
 // most likely abandoned an earlier onboarding attempt. If it does have
