@@ -7,7 +7,7 @@ from typing import NamedTuple
 from datetime import datetime, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
-from quodeq.analysis._dim_order import _order_by_backlog
+from quodeq.analysis._dim_order import DimEstimates, _order_by_backlog
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loop_state import DimTransition, _run_dir_for, _safe_write_dim_state
 from quodeq.analysis._loop_steps import default_loop_deps
@@ -29,6 +29,7 @@ from quodeq.analysis.runner_markers import emit_marker
 from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_SCORING, CC_PHASE_SETUP
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG
+
 
 def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContext]:
     """Load dimensions data and resolve which dimensions to analyze."""

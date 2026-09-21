@@ -1,6 +1,7 @@
 """Tests for the reload URL guard that restricts webview navigation to localhost."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from unittest.mock import MagicMock, patch
 
 from quodeq.dashboard._webview_window import (
@@ -68,7 +69,7 @@ class TestOnReloadGuard:
     to fail.
     """
 
-    def _make_handler(self) -> tuple["Callable[[str], None]", MagicMock]:
+    def _make_handler(self) -> tuple[Callable[[str], None], MagicMock]:
         window = MagicMock()
         return _make_on_reload(window), window
 

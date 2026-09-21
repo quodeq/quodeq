@@ -64,6 +64,24 @@ def test_unused_argument_gate_selected():
     )
 
 
+def test_undefined_name_gate_selected():
+    """F821 is selected everywhere, so test_ruff_clean below also proves no
+    module references a name it never defines or imports.
+
+    Pinned because the whole tree, tests included, is the surface: a name that
+    only appears on an error branch (a logger in an except handler, say) would
+    otherwise reach production as a NameError.
+    """
+    with (REPO_ROOT / "pyproject.toml").open("rb") as fh:
+        lint = tomllib.load(fh)["tool"]["ruff"]["lint"]
+    assert "F821" in lint["select"]
+    ignoring = [
+        pattern for pattern, rules in lint.get("per-file-ignores", {}).items()
+        if "F821" in rules
+    ]
+    assert not ignoring, f"F821 must not be ignored per file. Got: {ignoring}"
+
+
 def test_ruff_clean():
     proc = subprocess.run(
         [sys.executable, "-m", "ruff", "check", "--output-format", "concise", *LINT_PATHS],

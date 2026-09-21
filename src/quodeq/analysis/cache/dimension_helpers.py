@@ -34,6 +34,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache._classify import (
@@ -54,8 +55,14 @@ from quodeq.analysis.cache._key_provenance import (
 )
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
 
-# CachePersistProvenance/CachePersistTarget live in _persist_watcher.py
-# (which imports from here); referenced below only as annotations.
+if TYPE_CHECKING:
+    # _persist_watcher imports from this module, so a runtime import here
+    # would close the cycle. These two names are annotations only.
+    from quodeq.analysis.cache._persist_watcher import (
+        CachePersistProvenance,
+        CachePersistTarget,
+    )
+
 _logger = logging.getLogger(__name__)
 
 
