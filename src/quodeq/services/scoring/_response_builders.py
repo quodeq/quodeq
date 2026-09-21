@@ -125,8 +125,11 @@ def _build_summary_from_dim_dicts(
 ) -> dict:
     """Build a camelCase summary dict from a list of dimension camelCase dicts.
 
-    Mirrors ``summarize_dimensions`` logic but works directly on the already-
-    serialised dicts produced by ``_build_dimension_dict``. *score_pairs* are
+    Same shape as ``summarize_dimensions`` but working directly on the
+    already-serialised dicts produced by ``_build_dimension_dict``. The
+    grade fallback is deliberately NOT shared: a tied vote resolves here on
+    ``Counter`` insertion order (first grade seen wins) and there on grade
+    rank, because only the parser side has the rank table. *score_pairs* are
     the raw (dimension, score) floats -- the caller already has them before
     they get formatted into the ``overallScore`` display strings, so no
     parsing back out of ``"7.5/10"`` is needed here.

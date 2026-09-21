@@ -209,9 +209,12 @@ class FindingEnricher:
         if args.get("vt"):
             finding["vt_raw"] = str(args["vt"])
 
-        principle = resolve_principle(args.get("p"), req, self._reqs)
-        if principle is not None:
-            finding["p"] = principle
+        # Same rule as dedup_key's resolve_principle, but the write is the
+        # finding's own: the requirement's principle is written even when it
+        # is None, so "this requirement declares no principle" stays
+        # distinguishable from "no principle field at all" downstream.
+        if not args.get("p") and req and req in self._reqs:
+            finding["p"] = self._reqs[req]["principle"]
 
         self._resolve_finding_dimension(finding, args, req)
 

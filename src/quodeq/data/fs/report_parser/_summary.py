@@ -30,7 +30,10 @@ def summarize_dimensions(
     numeric_average = dimension_weighted_average(score_pairs, params)
 
     # Derive overall grade from the numeric average when available,
-    # falling back to most-frequent vote when scores are absent.
+    # falling back to most-frequent vote when scores are absent. This path
+    # breaks a vote tie on grade rank (most_frequent_grade); the services
+    # path breaks it on Counter insertion order. Deliberate: only this one
+    # has the rank table, and the two feed different responses.
     if numeric_average is not None:
         overall_grade = score_to_grade_label(numeric_average, params=params)
     else:

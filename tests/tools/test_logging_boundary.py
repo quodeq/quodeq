@@ -46,7 +46,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'analysis/_api_source_gathering.py': 'Credential loading and file-batching helpers for the direct API runner - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_api_standards_text.py': 'Source-file gathering and compiled-standards text for the API prompt - split out of subprocess.py, inherits its out-of-scope logging (not a flagged per-site conversion)',
     'analysis/_command.py': _out_of_scope('AI CLI command-line construction and environment setup'),
-    'analysis/_dimension_steps.py': 'Dimension step functions: prompt building, AI execution, evidence parsing - imports quodeq.shared.logging directly (out of scope for this sweep) and quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring',
+    'analysis/_dimension_steps.py': 'Dimension step functions: prompt building, AI execution, evidence parsing - imports quodeq.shared.logging directly (out of scope for this sweep); the quarantine-sink logging moved to evidence_parser.py with the parsing it belongs to',
     'analysis/_drop_stats.py': _out_of_scope('Per-run aggregate of API-runner parse drops (issue #606)'),
     'analysis/evidence_parser.py': 'Evidence-parsing composition wiring: imports quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring, not a logging-boundary violation',
     'analysis/_pipeline.py': _out_of_scope('Pipeline coordination - dimension orchestration, merging, and public API'),
