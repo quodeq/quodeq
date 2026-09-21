@@ -157,6 +157,19 @@ export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
 }
 
 /**
+ * The constellation crumb, when navigation sits inside one. The cluster is
+ * the explicit nav selection, else the selected star's own cluster.
+ */
+function clusterCrumb(scene, nav, star) {
+  const cx = nav.clusterCx ?? star?._clusterCx;
+  const cy = nav.clusterCy ?? star?._clusterCy;
+  if (cx == null) return null;
+  const con = (scene?.constellations || []).find(c => c.cx === cx && c.cy === cy);
+  if (!con) return null;
+  return { label: con.label, depth: 0, action: () => { nav.clusterCx = con.cx; nav.clusterCy = con.cy; } };
+}
+
+/**
  * Build breadcrumb items for current navigation state.
  *
  * @param {object} scene - The scene data
@@ -165,12 +178,13 @@ export function computeLevelInfo(scene, nav, projectName, onNavigate, navRef) {
  * @returns {Array} Breadcrumb parts with { label, depth, action? }
  */
 export function buildBreadcrumb(scene, nav, projectName) {
-  const parts = [{ label: projectName ? t('map.projectSystemNamed', { project: projectName }) : t('map.breadcrumbSystem'), depth: 0, action: () => { nav.clusterCx = null; nav.clusterCy = null; } }];
+  const rootLabel = projectName
+    ? t('map.projectSystemNamed', { project: projectName })
+    : t('map.breadcrumbSystem');
+  const parts = [{ label: rootLabel, depth: 0, action: () => { nav.clusterCx = null; nav.clusterCy = null; } }];
   const star = nav.dim !== null ? scene?.stars[nav.dim] : null;
-  const clusterCx = nav.clusterCx ?? star?._clusterCx;
-  const clusterCy = nav.clusterCy ?? star?._clusterCy;
-  const clusterCon = clusterCx != null ? (scene?.constellations || []).find(c => c.cx === clusterCx && c.cy === clusterCy) : null;
-  if (clusterCon) parts.push({ label: clusterCon.label, depth: 0, action: () => { nav.clusterCx = clusterCon.cx; nav.clusterCy = clusterCon.cy; } });
+  const cluster = clusterCrumb(scene, nav, star);
+  if (cluster) parts.push(cluster);
   if (nav.dim !== null && scene) parts.push({ label: scene.stars[nav.dim].name, depth: 1 });
   if (nav.prin !== null && scene) parts.push({ label: scene.principles[nav.dim][nav.prin].name, depth: 2 });
   return parts;

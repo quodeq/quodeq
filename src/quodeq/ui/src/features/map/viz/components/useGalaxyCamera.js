@@ -110,19 +110,34 @@ function makeAnimationFrame({
   };
 }
 
+/** Galaxy level: the whole system, or the focused constellation filling the view. */
+function galaxyTarget(nav, scene, size, fz) {
+  if (nav.clusterCx == null) return { x: size.w / 2, y: size.h / 2, z: fz };
+  const con = scene?.constellations?.find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy);
+  const clusterExtent = con ? con.spread + CLUSTER_RING_PAD_PX : CLUSTER_FALLBACK_EXTENT_PX;
+  const halfView = Math.min(size.w, size.h) / 2 - CLUSTER_VIEW_MARGIN_PX;
+  return { x: size.w / 2 + nav.clusterCx, y: size.h / 2 + nav.clusterCy, z: halfView / clusterExtent };
+}
+
+/** Dimension level: centred on the star, or back to the fitted view if it is gone. */
+function dimensionTarget(nav, scene, size, fz) {
+  const s = scene.stars?.[nav.dim];
+  if (!s) return { x: size.w / 2, y: size.h / 2, z: fz };
+  return { x: s.x, y: s.y, z: DIMENSION_ZOOM };
+}
+
+/** Principle level: centred on the planet, or back to the fitted view. */
+function principleTarget(nav, scene, size, fz) {
+  const s = scene.stars?.[nav.dim];
+  const p = s ? scene.principles?.[nav.dim]?.[nav.prin] : null;
+  if (!p) return { x: size.w / 2, y: size.h / 2, z: fz };
+  return { x: p.x, y: p.y, z: PRINCIPLE_ZOOM };
+}
+
 function computeTarget({ nav, scene, size, camRef, fz }) {
-  if (nav.depth === 0) {
-    if (nav.clusterCx != null) {
-      const con = scene?.constellations?.find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy);
-      const clusterExtent = con ? con.spread + CLUSTER_RING_PAD_PX : CLUSTER_FALLBACK_EXTENT_PX;
-      const halfView = Math.min(size.w, size.h) / 2 - CLUSTER_VIEW_MARGIN_PX;
-      const clusterFz = halfView / clusterExtent;
-      return { x: size.w / 2 + nav.clusterCx, y: size.h / 2 + nav.clusterCy, z: clusterFz };
-    }
-    return { x: size.w / 2, y: size.h / 2, z: fz };
-  }
-  if (nav.depth === 1 && nav.dim !== null) { const s = scene.stars?.[nav.dim]; if (!s) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: s.x, y: s.y, z: DIMENSION_ZOOM }; }
-  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) { const s = scene.stars?.[nav.dim]; const p = s ? scene.principles?.[nav.dim]?.[nav.prin] : null; if (!p) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: p.x, y: p.y, z: PRINCIPLE_ZOOM }; }
+  if (nav.depth === 0) return galaxyTarget(nav, scene, size, fz);
+  if (nav.depth === 1 && nav.dim !== null) return dimensionTarget(nav, scene, size, fz);
+  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) return principleTarget(nav, scene, size, fz);
   return camRef.current;
 }
 
