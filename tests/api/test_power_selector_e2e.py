@@ -71,20 +71,10 @@ def _extract_model_from_args(args: list[str]) -> str | None:
 class TestModelReachesSubprocess:
     """The --model flag in the spawned CLI must match the configured ai_model."""
 
-    def test_haiku_reaches_cli(self, tmp_path: Path) -> None:
-        args = _capture_popen_args(tmp_path, _MODEL_HAIKU)
-        model = _extract_model_from_args(args)
-        assert model == _MODEL_HAIKU
-
-    def test_sonnet_reaches_cli(self, tmp_path: Path) -> None:
-        args = _capture_popen_args(tmp_path, _MODEL_SONNET)
-        model = _extract_model_from_args(args)
-        assert model == _MODEL_SONNET
-
-    def test_opus_reaches_cli(self, tmp_path: Path) -> None:
-        args = _capture_popen_args(tmp_path, _MODEL_OPUS)
-        model = _extract_model_from_args(args)
-        assert model == _MODEL_OPUS
+    @pytest.mark.parametrize("configured", [_MODEL_HAIKU, _MODEL_SONNET, _MODEL_OPUS])
+    def test_configured_model_reaches_cli(self, tmp_path: Path, configured: str) -> None:
+        args = _capture_popen_args(tmp_path, configured)
+        assert _extract_model_from_args(args) == configured
 
     def test_no_model_flag_when_none(self, tmp_path: Path) -> None:
         """When ai_model is None and no env, --model should not appear (uses provider default)."""
@@ -102,42 +92,34 @@ class TestModelReachesSubprocess:
 class TestSubagentPoolModelPropagation:
     """SubagentPool._build_agent_config must copy ai_model from base config."""
 
-    def test_pool_agents_inherit_model(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(
+        ("model", "files", "dimension"),
+        [
+            (_MODEL_OPUS, ["a.py", "b.py"], "security"),
+            (_MODEL_HAIKU, ["x.py"], "perf"),
+        ],
+    )
+    def test_pool_agents_inherit_model(
+        self, tmp_path: Path, model: str, files: list[str], dimension: str,
+    ) -> None:
         from quodeq.analysis.subagents.file_queue import FileQueue
         from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
         queue_path = tmp_path / "queue.json"
-        FileQueue(queue_path, ["a.py", "b.py"])
+        FileQueue(queue_path, files)
 
-        base = AnalysisConfig(ai_model=_MODEL_OPUS)
+        base = AnalysisConfig(ai_model=model)
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=2, prompt="test", dimension="security"),
+            options=PoolOptions(n_agents=len(files), prompt="test", dimension=dimension),
             config=base,
         )
 
-        for idx in range(2):
+        for idx in range(len(files)):
             ac, _, _ = pool._build_agent_config(idx)
-            assert ac.ai_model == _MODEL_OPUS, (
-                f"agent-{idx} got ai_model={ac.ai_model!r}, expected {_MODEL_OPUS!r}"
+            assert ac.ai_model == model, (
+                f"agent-{idx} got ai_model={ac.ai_model!r}, expected {model!r}"
             )
-
-    def test_pool_agents_inherit_haiku(self, tmp_path: Path) -> None:
-        from quodeq.analysis.subagents.file_queue import FileQueue
-        from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
-
-        queue_path = tmp_path / "queue.json"
-        FileQueue(queue_path, ["x.py"])
-
-        base = AnalysisConfig(ai_model=_MODEL_HAIKU)
-        pool = SubagentPool(
-            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=1, prompt="test", dimension="perf"),
-            config=base,
-        )
-
-        ac, _, _ = pool._build_agent_config(0)
-        assert ac.ai_model == _MODEL_HAIKU
 
 
 # ---------------------------------------------------------------------------
@@ -164,14 +146,9 @@ class TestRunnerModelResolution:
             _FALLBACK_MODEL = _MODEL_HAIKU
             return opts.subagent_model or env_subagent_model() or _FALLBACK_MODEL
 
-    def test_level1_fast_haiku(self) -> None:
-        assert self._resolve(_MODEL_HAIKU) == _MODEL_HAIKU
-
-    def test_level2_balanced_sonnet(self) -> None:
-        assert self._resolve(_MODEL_SONNET) == _MODEL_SONNET
-
-    def test_level3_thorough_opus(self) -> None:
-        assert self._resolve(_MODEL_OPUS) == _MODEL_OPUS
+    @pytest.mark.parametrize("requested", [_MODEL_HAIKU, _MODEL_SONNET, _MODEL_OPUS])
+    def test_requested_model_wins(self, requested: str) -> None:
+        assert self._resolve(requested) == requested
 
     def test_env_fallback_when_no_option(self) -> None:
         assert self._resolve(None, _MODEL_SONNET) == _MODEL_SONNET
