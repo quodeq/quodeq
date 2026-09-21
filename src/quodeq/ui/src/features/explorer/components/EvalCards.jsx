@@ -1,13 +1,11 @@
 import { useRef } from 'react';
 import { parseFileRef } from '../../../utils/formatters.js';
-import { filterValidRefs } from '../../../utils/reqRefs.js';
-import { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
+import { RefLinks } from '../../../components/findingDetail.jsx';
 import SevBadge from '../../../components/terminal/SevBadge.jsx';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
-import { useSidePane, violationFixPlanSpec } from '../../side-pane/index.js';
-import { VerifiedChip } from '../../violations/components/VerifiedChip.jsx';
+import { ViolationActions } from './violationActions.jsx';
 import { t } from '../../../strings/index.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
@@ -27,16 +25,6 @@ function useFileInfo(file, fileLine, fileEndLine) {
   return { filePath, filename, ref, display };
 }
 
-function RefsLinks({ reqRefs }) {
-  const valid = filterValidRefs(reqRefs);
-  if (valid.length === 0) return null;
-  return (
-    <span className="cwe-link-group">{valid.map((r, i) => (
-      <a key={i} className="cwe-link" href={r.url} target="_blank" rel="noopener noreferrer">{r.label}</a>
-    ))}</span>
-  );
-}
-
 function ViolationDetail({ item }) {
   // Measure the wrap-sensitive REASON title and DETAIL paragraph off-DOM via
   // pretext so heights are stable across resizes and so a future virtualiser
@@ -53,7 +41,7 @@ function ViolationDetail({ item }) {
         <div className="vlive-detail-section">
           <div className="vlive-detail-section-header">
             {item.title && <span className="vlive-detail-section-label">{t('explorer.reasonLabelCaps')}</span>}
-            <RefsLinks reqRefs={item.reqRefs} />
+            <RefLinks reqRefs={item.reqRefs} />
           </div>
           {item.title && (
             <p
@@ -84,7 +72,6 @@ function ViolationDetail({ item }) {
 }
 
 export function EvalViolationCard({ v, principle, index, onDismiss }) {
-  const { addWindow } = useSidePane();
   const { filename, ref, display } = useFileInfo(v.file, v.line, v.endLine);
   return (
     <div
@@ -95,28 +82,7 @@ export function EvalViolationCard({ v, principle, index, onDismiss }) {
         <SevBadge level={v.severity} format="long" />
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
-        <div className="vrow-actions">
-          <VerifiedChip v={v} />
-          <button
-            type="button"
-            className="fix-plan-btn"
-            onClick={() => { const spec = violationFixPlanSpec(v, v.principle || principle); if (spec) addWindow(spec); }}
-          >
-            <SparkleIcon />
-            {t('explorer.fixPlan')}
-          </button>
-          {onDismiss && (
-            <button
-              type="button"
-              className="dismiss-btn"
-              onClick={(e) => { e.stopPropagation(); onDismiss(v); }}
-              title={t('explorer.dismissFinding')}
-              aria-label={t('explorer.dismissFinding')}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          )}
-        </div>
+        <ViolationActions v={v} principle={v.principle || principle} onDismiss={onDismiss} />
       </div>
       <ViolationDetail item={v} />
     </div>
