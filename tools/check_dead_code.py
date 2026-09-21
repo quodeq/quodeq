@@ -49,6 +49,11 @@ BASELINE_PATH = Path(__file__).resolve().parent / "dead_code_baseline.txt"
 # tool is a standalone script.
 SCAN_PATHS = ("src/quodeq", "tools/vulture_whitelist.py")
 MIN_CONFIDENCE = 60
+# src/quodeq/ui/node_modules holds vendored packages, a few of which ship
+# Python. They are not our code and they are only present when the UI
+# dependencies are installed, so leaving them in would make the baseline
+# depend on whether `npm install` has run.
+EXCLUDE = "*/node_modules/*"
 
 # `path:line: unused <kind> '<name>' (N% confidence)`, vulture's one report
 # per line. `<kind>` is one or two words (variable, function, method,
@@ -111,6 +116,7 @@ def run_vulture(root: Path = REPO_ROOT) -> str:
     """
     proc = subprocess.run(
         [sys.executable, "-m", "vulture", *SCAN_PATHS,
+         "--exclude", EXCLUDE,
          "--min-confidence", str(MIN_CONFIDENCE)],
         cwd=root, capture_output=True, text=True, timeout=300, check=False,
     )

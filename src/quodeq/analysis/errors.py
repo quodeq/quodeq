@@ -21,18 +21,6 @@ class EvaluationError(RuntimeError):
     """Base error for evaluation pipeline failures."""
 
 
-class RepoNotFoundError(EvaluationError):
-    """Repository path does not exist or is not accessible."""
-
-
-class RepoCloneError(EvaluationError):
-    """Failed to clone a remote repository."""
-
-
-class NoSourceFilesError(EvaluationError):
-    """No recognized source files found in the repository or scope."""
-
-
 class ProviderError(EvaluationError):
     """AI provider failed (CLI exited with error, auth failure, etc.)."""
 
@@ -56,10 +44,6 @@ def provider_exit_reason(reason: str | None) -> str:
     if reason and reason.startswith(f"{REASON_PROVIDER_FATAL}:"):
         reason = reason.split(":", 2)[1]
     return COPILOT_MCP_POLICY_REASON if reason == COPILOT_MCP_POLICY_REASON else REASON_PROVIDER_FATAL
-
-
-class BudgetExceededError(EvaluationError):
-    """Evaluation exceeded the configured time or cost budget."""
 
 
 # Fatal-message classification shared by the CLI path (stderr of the claude/

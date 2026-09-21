@@ -70,12 +70,6 @@ _cli_mcp_lock = threading.Lock()
 _cli_mcp_registered: set[str] = set()  # tracks (cmd, name) pairs
 
 
-def _reset_mcp_registry() -> None:
-    """Clear the MCP registration cache. Useful for test isolation."""
-    with _cli_mcp_lock:
-        _cli_mcp_registered.clear()
-
-
 def _mcp_server_name() -> str:
     """Return the MCP server name.
 

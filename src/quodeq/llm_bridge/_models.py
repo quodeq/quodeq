@@ -56,8 +56,3 @@ def get_known_models(*, _cache: dict | None = None, store: KnownModelsStore | No
     if _cache is not None:
         return _cache
     return (store or _known_models_store).get()
-
-
-def reset_known_models() -> None:
-    """Clear the module-wide cached models. Useful for test isolation."""
-    _known_models_store.reset()

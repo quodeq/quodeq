@@ -58,11 +58,6 @@ def _find_commands_cached(names: tuple[str, ...]) -> dict[str, str | None]:
     return _find_commands_uncached(names, env=None)
 
 
-def clear_commands_cache() -> None:
-    """Clear the find_commands LRU cache. Useful for test isolation."""
-    _find_commands_cached.cache_clear()
-
-
 def _find_commands_uncached(
     names: tuple[str, ...], env: dict[str, str] | None,
 ) -> dict[str, str | None]:
