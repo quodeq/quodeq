@@ -9,8 +9,10 @@ listing lives in ``services/dismissed_listing``.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 from quodeq.core.dismissals import (
     EMPTY_DISMISSED,
@@ -204,6 +206,28 @@ def recount_totals(
     )
 
 
+def filter_dimension_violations(dimensions: list, keep: Callable[[Any, Finding], bool]) -> list:
+    """Dimensions with every violation *keep* rejects removed and totals recounted.
+
+    *keep* is called with ``(dimension, violation)``. A dimension whose
+    violations all survive is passed through unchanged (the same object);
+    otherwise a copy carries the filtered list and recounted totals, and
+    every other field is left alone.
+    """
+    result = []
+    for dim in dimensions:
+        filtered = [v for v in dim.violations if keep(dim, v)]
+        if len(filtered) == len(dim.violations):
+            result.append(dim)
+        else:
+            result.append(replace(
+                dim,
+                violations=filtered,
+                totals=recount_totals(filtered, old_totals=dim.totals, files_read=dim.files_read),
+            ))
+    return result
+
+
 def filter_dismissed_from_dimensions(
     dimensions: list, project_dir: Path,
 ) -> list:
@@ -216,20 +240,9 @@ def filter_dismissed_from_dimensions(
     rules = load_suppression_rules(project_dir)
     if not keys and not rules:
         return dimensions
-    result = []
-    for dim in dimensions:
-        filtered = [
-            v for v in dim.violations
-            if not is_dismissed(keys, FindingRef(
-                req=v.req, principle=v.practice_id, file=v.file, line=v.line,
-                snippet=v.snippet), rules=rules)
-        ]
-        if len(filtered) == len(dim.violations):
-            result.append(dim)
-        else:
-            result.append(replace(
-                dim,
-                violations=filtered,
-                totals=recount_totals(filtered, old_totals=dim.totals, files_read=dim.files_read),
-            ))
-    return result
+    return filter_dimension_violations(
+        dimensions,
+        lambda _dim, v: not is_dismissed(keys, FindingRef(
+            req=v.req, principle=v.practice_id, file=v.file, line=v.line,
+            snippet=v.snippet), rules=rules),
+    )

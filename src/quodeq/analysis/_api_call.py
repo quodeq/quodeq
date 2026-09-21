@@ -99,16 +99,14 @@ def _resolve_timeout(config: ApiRunnerConfig, *, is_openai: bool) -> httpx.Timeo
     base = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
     override = api_read_timeout_override()
     if override is not None and override > 0:
-        return httpx.Timeout(
-            connect=base.connect, read=float(override),
-            write=base.write, pool=base.pool,
-        )
-    scale = max(1, config.n_subagents)
-    if is_openai or scale == 1:
-        return base
+        read = float(override)
+    else:
+        scale = max(1, config.n_subagents)
+        if is_openai or scale == 1:
+            return base
+        read = base.read * scale
     return httpx.Timeout(
-        connect=base.connect, read=base.read * scale,
-        write=base.write, pool=base.pool,
+        connect=base.connect, read=read, write=base.write, pool=base.pool,
     )
 
 

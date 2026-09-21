@@ -28,6 +28,7 @@ RULES = Path("src/quodeq/data/prompts/evaluation_rules.md").read_text()
 COMPASS = Path("src/quodeq/data/prompts/compass.md").read_text()
 
 _CASES = discover_cases()
+_INTERNAL_CASES = [c for c in _CASES if c.expected["provenance"] == "internal"]
 _CASE_IDS = [c.name for c in _CASES]
 
 
@@ -130,7 +131,7 @@ class TestFixtureMatrixIsWellFormed:
         assert _CASES, "no provenance-gate fixtures discovered"
 
     def test_at_least_four_internal_fixtures(self):
-        internal = [c for c in _CASES if c.expected["provenance"] == "internal"]
+        internal = _INTERNAL_CASES
         assert len(internal) >= 4, f"expected >=4 internal FP fixtures, got {len(internal)}"
 
     def test_external_provenance_covers_both_dimensions(self):
@@ -188,8 +189,7 @@ def test_fixture_construct_anchored_at_target_line(case):
 
 
 @pytest.mark.parametrize(
-    "case", [c for c in _CASES if c.expected["provenance"] == "internal"],
-    ids=[c.name for c in _CASES if c.expected["provenance"] == "internal"],
+    "case", _INTERNAL_CASES, ids=[c.name for c in _INTERNAL_CASES],
 )
 def test_internal_fixture_prompt_has_no_role_label(case):
     """The assembled production prompt for an internal fixture must not tone down.

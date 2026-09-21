@@ -66,12 +66,7 @@ def _emit_done_frame(terminal_state, offset: int) -> str:
             state = terminal_state() or ""
         except Exception:  # noqa: BLE001 — never block the done frame on a bad reader
             state = ""
-    parts: list[str] = []
-    if offset:
-        parts.append(f"id: {offset}\n")
-    parts.append("event: done\n")
-    parts.append(f"data: {state}\n\n")
-    return "".join(parts)
+    return sse_line(state, event="done", event_id=offset or None)
 
 
 def _wait_for_log_file(is_done, waited_ms: int, keepalive_ms: int):

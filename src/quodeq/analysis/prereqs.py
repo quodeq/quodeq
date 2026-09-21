@@ -113,35 +113,40 @@ def _check_cli_provider(provider: str) -> None:
         ) from exc
 
 
+def _probe_local_server(url: str, message: str) -> None:
+    """GET *url* to confirm a local model server is up; raise RuntimeError with *message*.
+
+    Any transport-level failure (connection refused, DNS, timeout) means the
+    server is not reachable; the response body is never read.
+    """
+    try:
+        with urllib.request.urlopen(url, timeout=_API_CHECK_TIMEOUT_S):
+            pass
+    except (urllib.error.URLError, OSError) as exc:
+        raise RuntimeError(message) from exc
+
+
 def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> None:
     """Check that an API provider has basic connectivity (Ollama: server running)
     and that cloud providers have their required API key set."""
     if provider == "ollama":
-        try:
-            _ollama_base = ollama_base_url(env)
-            with urllib.request.urlopen(f"{_ollama_base}/api/tags", timeout=_API_CHECK_TIMEOUT_S):
-                pass
-        except (urllib.error.URLError, OSError) as exc:
-            raise RuntimeError(
-                "Ollama is configured as your AI provider but the server is not running.\n\n"
-                "Start it with:\n"
-                "  ollama serve\n\n"
-                "Or install Ollama from https://ollama.com/download"
-            ) from exc
+        _probe_local_server(
+            f"{ollama_base_url(env)}/api/tags",
+            "Ollama is configured as your AI provider but the server is not running.\n\n"
+            "Start it with:\n"
+            "  ollama serve\n\n"
+            "Or install Ollama from https://ollama.com/download",
+        )
     elif provider == "llamacpp":
-        try:
-            _base = llamacpp_base_url(env)
-            with urllib.request.urlopen(f"{_base}/health", timeout=_API_CHECK_TIMEOUT_S):
-                pass
-        except (urllib.error.URLError, OSError) as exc:
-            raise RuntimeError(
-                "llama.cpp is configured as your AI provider but llama-server is not running.\n\n"
-                "Start it with a GGUF model, for example:\n"
-                "  llama-server -m path/to/model.gguf --port 8080\n\n"
-                "For speculative decoding (MTP), pair it with a draft model:\n"
-                "  llama-server -m path/to/target.gguf -md path/to/drafter.gguf --port 8080\n\n"
-                "Install llama.cpp from https://github.com/ggml-org/llama.cpp"
-            ) from exc
+        _probe_local_server(
+            f"{llamacpp_base_url(env)}/health",
+            "llama.cpp is configured as your AI provider but llama-server is not running.\n\n"
+            "Start it with a GGUF model, for example:\n"
+            "  llama-server -m path/to/model.gguf --port 8080\n\n"
+            "For speculative decoding (MTP), pair it with a draft model:\n"
+            "  llama-server -m path/to/target.gguf -md path/to/drafter.gguf --port 8080\n\n"
+            "Install llama.cpp from https://github.com/ggml-org/llama.cpp",
+        )
     else:
         # Cloud API providers (openrouter, ...): fail fast on a missing key
         # instead of surfacing 401s mid-evaluation.

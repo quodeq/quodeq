@@ -74,6 +74,37 @@ def _strip_userinfo(url: str) -> str:
     return url[at_pos + 1 :]
 
 
+def split_userinfo(url: str) -> tuple[str, str] | None:
+    """``(scheme, everything after the userinfo "@")`` when *url* embeds credentials.
+
+    None when *url* carries no scheme (scp-style ``git@host:path`` remotes,
+    where the leading ``git@`` is a username convention, not a credential),
+    when the authority has no "@", or when the "@" belongs to a path segment.
+
+    Userinfo ends at the LAST "@" of the authority (RFC 3986), so the search
+    runs from the right. A "/" before that "@" usually means the authority
+    already ended -- but only when the text before that "/" is itself a
+    plausible host. Real credentials (base64-derived tokens, JWTs, CI PATs)
+    often contain a literal "/", and bounding the search by the first "/"
+    would then hide the real "@" and let the whole credential through.
+
+    The two callers differ only in what they put back: the registration path
+    drops the userinfo, the API error path masks it as ``***@``.
+    """
+    match = SCHEME_RE.match(url)
+    if not match:
+        return None
+    scheme = match.group(1)
+    rest = url[len(scheme):]
+    at_pos = rest.rfind("@")
+    if at_pos == -1:
+        return None
+    slash_pos = rest.find("/")
+    if -1 < slash_pos < at_pos and looks_like_authority(rest[:slash_pos]):
+        return None
+    return scheme, rest[at_pos + 1:]
+
+
 def normalize_remote_url(url: str) -> str | None:
     """Fold equivalent git remote URL forms into one canonical form.
 

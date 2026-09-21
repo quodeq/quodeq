@@ -88,11 +88,21 @@ _CROSS_PRINCIPAL_TERMS: frozenset[str] = frozenset({
     "hijack", "hijacking", "hijacked",
 })
 
-_CROSS_PATTERN = re.compile(
-    "|".join(rf"\b{re.escape(t)}s?\b"
-             for t in sorted(_CROSS_PRINCIPAL_TERMS, key=len, reverse=True)),
-    re.IGNORECASE,
-)
+def _term_pattern(terms: frozenset[str] | set[str]) -> "re.Pattern[str]":
+    """A case-insensitive alternation matching any of *terms* as a whole word.
+
+    A trailing optional "s" covers the plural of each term, and the
+    alternation is ordered longest-first so a longer phrase wins over a
+    shorter one it contains.
+    """
+    return re.compile(
+        "|".join(rf"\b{re.escape(t)}s?\b"
+                 for t in sorted(terms, key=len, reverse=True)),
+        re.IGNORECASE,
+    )
+
+
+_CROSS_PATTERN = _term_pattern(_CROSS_PRINCIPAL_TERMS)
 
 # Rule 4: S-CON-10's entire premise ("sensitive data MUST be transmitted only
 # over encrypted channels", CWE-319) is an on-path observer of traffic into
@@ -120,11 +130,7 @@ _TRANSPORT_TERMS: frozenset[str] = frozenset({
     "man-in-the-middle", "mitm",
 })
 
-_TRANSPORT_PATTERN = re.compile(
-    "|".join(rf"\b{re.escape(t)}s?\b"
-             for t in sorted(_TRANSPORT_TERMS, key=len, reverse=True)),
-    re.IGNORECASE,
-)
+_TRANSPORT_PATTERN = _term_pattern(_TRANSPORT_TERMS)
 
 # The back-off. A loopback declaration states who can open a socket INTO the
 # process; it says nothing about where the process SENDS data. A cleartext
@@ -138,11 +144,7 @@ _OUTBOUND_TERMS: frozenset[str] = frozenset({
     "remote server", "remote host", "remote endpoint", "upstream",
 })
 
-_OUTBOUND_PATTERN = re.compile(
-    "|".join(rf"\b{re.escape(t)}s?\b"
-             for t in sorted(_OUTBOUND_TERMS, key=len, reverse=True)),
-    re.IGNORECASE,
-)
+_OUTBOUND_PATTERN = _term_pattern(_OUTBOUND_TERMS)
 
 
 def _prose(finding: dict) -> str:

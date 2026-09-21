@@ -9,7 +9,7 @@ on one surface and visible on another. Identity rules and key shapes are in
 """
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -168,6 +168,19 @@ def _fp_identity(req: str, file: str, fp: str) -> tuple:
     return (_IDENTITY_TAG_FP, req, file, fp)
 
 
+_DISMISSAL_EVENT_TYPES = (EventType.FINDING_DISMISSED, EventType.FINDING_UNDISMISSED)
+
+
+def _dismissal_events(events: Iterable[BaseEvent]) -> Iterator[BaseEvent]:
+    """Yield the dismiss/undismiss events of *events*, in order, skipping the rest."""
+    return (event for event in events if event.event_type in _DISMISSAL_EVENT_TYPES)
+
+
+def _payload_fingerprint(payload: object) -> str | None:
+    """The event payload's snippet fingerprint, with the empty string read as None."""
+    return getattr(payload, "fingerprint", None) or None
+
+
 def fold_dismissals(events: Iterable[BaseEvent]) -> DismissedKeys:
     """Replay dismiss/undismiss events, in order, into the net dismissed state.
 
@@ -180,15 +193,13 @@ def fold_dismissals(events: Iterable[BaseEvent]) -> DismissedKeys:
     Events of other types are ignored.
     """
     active: dict[tuple, DismissedEntry] = {}
-    for event in events:
+    for event in _dismissal_events(events):
         event_type = event.event_type
-        if event_type not in (EventType.FINDING_DISMISSED, EventType.FINDING_UNDISMISSED):
-            continue
         payload = event.payload
         req = str(payload.req or "")
         file = str(payload.file or "")
         line = coerce_line(payload.line)
-        fp = getattr(payload, "fingerprint", None) or None
+        fp = _payload_fingerprint(payload)
         if event_type == EventType.FINDING_DISMISSED:
             entry = DismissedEntry(
                 req, file, line, fp,
@@ -224,12 +235,9 @@ def restored_fingerprints(events: Iterable[BaseEvent]) -> frozenset[tuple[str, s
     they name one location, not a piece of code.
     """
     last: dict[tuple[str, str], EventType] = {}
-    for event in events:
-        event_type = event.event_type
-        if event_type not in (EventType.FINDING_DISMISSED, EventType.FINDING_UNDISMISSED):
-            continue
-        fp = getattr(event.payload, "fingerprint", None) or None
+    for event in _dismissal_events(events):
+        fp = _payload_fingerprint(event.payload)
         if not fp:
             continue
-        last[(str(event.payload.req or ""), fp)] = event_type
+        last[(str(event.payload.req or ""), fp)] = event.event_type
     return frozenset(k for k, t in last.items() if t == EventType.FINDING_UNDISMISSED)

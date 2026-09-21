@@ -78,6 +78,27 @@ def _recover_dim_ids(status: dict, dim_records: dict, dim_estimates: dict) -> li
     return list(recovered)
 
 
+def _scan_progress(
+    job_id: str, ctx: _ProgressContext, dimensions: list[_DimProgress],
+) -> _ScanProgress:
+    """A progress snapshot: the run-level header from *ctx*, plus *dimensions*.
+
+    Both the consolidated-live and per-dim paths report the same header, so
+    the field list is written once here.
+    """
+    return _ScanProgress(
+        job_id=job_id,
+        state=ctx.state,
+        phase=ctx.status.get("phase"),
+        current_dimension=ctx.status.get("current_dimension"),
+        project_files=ctx.project_files,
+        total_elapsed_s=ctx.total_elapsed_s,
+        budget_s=ctx.run_budget_s,
+        exit_reason=ctx.status.get("exit_reason"),
+        dimensions=dimensions,
+    )
+
+
 def _maybe_consolidated_live_progress(job_id: str, ctx: _ProgressContext) -> _ScanProgress | None:
     """Consolidated (grouped) runs dispatch every dimension in one pass and
     write consolidated_* files — there are no per-dim queues, so the per-dim
@@ -94,17 +115,7 @@ def _maybe_consolidated_live_progress(job_id: str, ctx: _ProgressContext) -> _Sc
         or any((evidence_dir / f"{d}_queue.json").is_file() for d in ctx.dim_ids)
     ):
         return None
-    return _ScanProgress(
-        job_id=job_id,
-        state=ctx.state,
-        phase=ctx.status.get("phase"),
-        current_dimension=ctx.status.get("current_dimension"),
-        project_files=ctx.project_files,
-        total_elapsed_s=ctx.total_elapsed_s,
-        budget_s=ctx.run_budget_s,
-        exit_reason=ctx.status.get("exit_reason"),
-        dimensions=[_consolidated_dim_progress(ctx.run_dir)],
-    )
+    return _scan_progress(job_id, ctx, [_consolidated_dim_progress(ctx.run_dir)])
 
 
 def _gather_progress_context(
@@ -160,17 +171,7 @@ def _build_per_dim_progress(job_id: str, ctx: _ProgressContext) -> _ScanProgress
         # in the memo until 256 other keys evict them.
         forget_live_tallies(ctx.run_dir)
 
-    return _ScanProgress(
-        job_id=job_id,
-        state=ctx.state,
-        phase=ctx.status.get("phase"),
-        current_dimension=ctx.status.get("current_dimension"),
-        project_files=ctx.project_files,
-        total_elapsed_s=ctx.total_elapsed_s,
-        budget_s=ctx.run_budget_s,
-        exit_reason=ctx.status.get("exit_reason"),
-        dimensions=dim_results,
-    )
+    return _scan_progress(job_id, ctx, dim_results)
 
 
 def build_scan_progress(

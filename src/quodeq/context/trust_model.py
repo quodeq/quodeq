@@ -124,6 +124,23 @@ def _read_profile(project_root: Path) -> dict:
     return data
 
 
+def _enum_field(data: dict, key: str, allowed: frozenset[str] | set[str]) -> str | None:
+    """The declared *key*, normalised, when it names one of *allowed*.
+
+    None for an absent field and for a bad one, which is warned about: the
+    file is a declaration, not a transaction, so one bad axis never discards
+    the others.
+    """
+    raw = data.get(key)
+    if isinstance(raw, str) and raw.strip().lower() in allowed:
+        return raw.strip().lower()
+    if raw is not None:
+        _logger.warning(
+            "project profile: %s must be one of %s, got %r", key, sorted(allowed), raw,
+        )
+    return None
+
+
 def _declared_fields(data: dict) -> tuple[bool | None, str | None, str | None]:
     """Extract the three axes from a parsed profile, per field.
 
@@ -137,25 +154,8 @@ def _declared_fields(data: dict) -> tuple[bool | None, str | None, str | None]:
     elif raw_tenant is not None:
         _logger.warning("project profile: multiTenant must be a boolean, got %r", raw_tenant)
 
-    exposure: str | None = None
-    raw_exposure = data.get("networkExposure")
-    if isinstance(raw_exposure, str) and raw_exposure.strip().lower() in NETWORK_EXPOSURES:
-        exposure = raw_exposure.strip().lower()
-    elif raw_exposure is not None:
-        _logger.warning(
-            "project profile: networkExposure must be one of %s, got %r",
-            sorted(NETWORK_EXPOSURES), raw_exposure,
-        )
-
-    topology: str | None = None
-    raw_topology = data.get("deploymentTopology")
-    if isinstance(raw_topology, str) and raw_topology.strip().lower() in DEPLOYMENT_TOPOLOGIES:
-        topology = raw_topology.strip().lower()
-    elif raw_topology is not None:
-        _logger.warning(
-            "project profile: deploymentTopology must be one of %s, got %r",
-            sorted(DEPLOYMENT_TOPOLOGIES), raw_topology,
-        )
+    exposure = _enum_field(data, "networkExposure", NETWORK_EXPOSURES)
+    topology = _enum_field(data, "deploymentTopology", DEPLOYMENT_TOPOLOGIES)
     return multi_tenant, exposure, topology
 
 

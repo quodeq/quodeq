@@ -51,15 +51,53 @@ def count_principles_and_requirements(data: dict) -> tuple[int, int]:
     )
 
 
+def _custom_fields(data: dict, sid: str, type_default: str) -> dict[str, object]:
+    """The header fields a user-supplied standard's detail and meta both carry.
+
+    Everything outside the payload itself: id, name, description, weight,
+    source, type, managed flag and origin provenance, each read from *data*
+    with the historical default.
+    """
+    return {
+        "id": sid,
+        "name": data.get("name", sid),
+        "description": data.get("description", ""),
+        "weight": data.get("weight", 1.0),
+        "source": data.get("source", ""),
+        "type": data.get("type", type_default),
+        "managed": data.get("managed", False),
+        "origin": data.get("origin"),
+        "origin_hash": data.get("origin_hash"),
+    }
+
+
+def _builtin_fields(
+    data: dict, sid: str, name: str, description: str, weight: float, source: str,
+) -> dict[str, object]:
+    """The same header fields for a built-in dimension.
+
+    A built-in is always managed and never carries an upload origin; its
+    name, description, weight and source are resolved by the caller, which
+    reads them from a different shape per surface.
+    """
+    return {
+        "id": sid,
+        "name": name,
+        "description": description,
+        "weight": weight,
+        "source": source,
+        "type": data.get("type", _TYPE_BUILTIN),
+        "managed": True,
+        "origin": None,
+        "origin_hash": None,
+    }
+
+
 def build_detail(data: dict, *, type_default: str = _TYPE_CUSTOM) -> StandardDetail:
     """Construct a StandardDetail from a raw JSON dict."""
     sid = _require_id(data, "standard")
     return StandardDetail(
-        id=sid, name=data.get("name", sid),
-        description=data.get("description", ""),
-        weight=data.get("weight", 1.0), source=data.get("source", ""),
-        type=data.get("type", type_default), managed=data.get("managed", False),
-        origin=data.get("origin"), origin_hash=data.get("origin_hash"),
+        **_custom_fields(data, sid, type_default),
         principles=data.get("principles", []),
     )
 
@@ -69,11 +107,10 @@ def build_builtin_detail(data: dict, standard_id: str, weight: float) -> Standar
     source = data.get("source") or (", ".join(sources) if isinstance(sources, list) else "")
     description = data.get("description") or f"{data.get('name', standard_id)} standard"
     return StandardDetail(
-        id=standard_id, name=data.get("name", standard_id),
-        description=description,
-        weight=weight, source=source,
-        type=data.get("type", _TYPE_BUILTIN), managed=True,
-        origin=None, origin_hash=None, principles=data.get("principles", []),
+        **_builtin_fields(
+            data, standard_id, data.get("name", standard_id), description, weight, source,
+        ),
+        principles=data.get("principles", []),
     )
 
 
@@ -81,11 +118,7 @@ def build_custom_meta(data: dict, p_count: int, r_count: int) -> StandardMeta:
     """Build a StandardMeta for a user-created custom standard."""
     sid = _require_id(data, "custom standard")
     return StandardMeta(
-        id=sid, name=data.get("name", sid),
-        description=data.get("description", ""),
-        weight=data.get("weight", 1.0), source=data.get("source", ""),
-        type=data.get("type", _TYPE_CUSTOM), managed=data.get("managed", False),
-        origin=data.get("origin"), origin_hash=data.get("origin_hash"),
+        **_custom_fields(data, sid, _TYPE_CUSTOM),
         principle_count=p_count, requirement_count=r_count,
     )
 
@@ -102,11 +135,10 @@ def build_builtin_meta(
     did = _require_id(dim, "built-in dimension")
     final_description = description or f'{dim.get("source", "Built-in")} standard'
     return StandardMeta(
-        id=did, name=dim.get("iso_25010") or dim.get("name", did),
-        description=final_description,
-        weight=dim.get("weight", 1.0), source=dim.get("source", ""),
-        type=dim.get("type", _TYPE_BUILTIN), managed=True,
-        origin=None, origin_hash=None,
+        **_builtin_fields(
+            dim, did, dim.get("iso_25010") or dim.get("name", did), final_description,
+            dim.get("weight", 1.0), dim.get("source", ""),
+        ),
         principle_count=p_count, requirement_count=r_count,
     )
 

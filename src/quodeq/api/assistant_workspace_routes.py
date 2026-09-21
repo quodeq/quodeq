@@ -74,20 +74,43 @@ def _workspace_diff(app: Flask, sid: str):
         return json_error("failed to compute the workspace diff", 500, "WORKSPACE_DIFF_FAILED")
 
 
-def _workspace_apply(app: Flask, sid: str):
+def _workspace_target(app: Flask, sid: str):
+    """``(repo, row, None)`` for a session that has a worktree row, else an error.
+
+    Folds the lookup and the "no worktree" 404 that apply, pr and discard all
+    answer with before they touch the worktree.
+    """
     repo, row, err = _lookup(app, sid)
     if err:
-        return err
+        return None, None, err
     if row is None:
-        return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
-    outcome = apply_workspace(repo, sid, claim_turn=_try_claim_turn,
-                              release_turn=_release_turn)
+        return None, None, json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
+    return repo, row, None
+
+
+def _turn_conflict(outcome):
+    """The 409 a busy turn or an already-resolved worktree answers with, else None.
+
+    Shared by apply, pr and discard: same text, same status, same error code.
+    """
     if outcome.kind == "turn_busy":
         return json_error(
             "a turn or workspace action is in progress; wait for it to finish",
             409, "TURN_IN_PROGRESS")
     if outcome.kind == "not_active":
         return json_error(f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
+    return None
+
+
+def _workspace_apply(app: Flask, sid: str):
+    repo, _row, err = _workspace_target(app, sid)
+    if err:
+        return err
+    outcome = apply_workspace(repo, sid, claim_turn=_try_claim_turn,
+                              release_turn=_release_turn)
+    conflict = _turn_conflict(outcome)
+    if conflict is not None:
+        return conflict
     if outcome.kind == "failed":
         _logger.warning("workspace apply failed for %s: %s", sid, outcome.detail)
         return json_error("failed to apply the workspace changes", 409, "WORKSPACE_APPLY_FAILED")
@@ -95,21 +118,16 @@ def _workspace_apply(app: Flask, sid: str):
 
 
 def _workspace_pr(app: Flask, sid: str):
-    repo, row, err = _lookup(app, sid)
+    repo, _row, err = _workspace_target(app, sid)
     if err:
         return err
-    if row is None:
-        return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
     req_body = request.get_json(silent=True) or {}
     draft = PrDraft(title=str(req_body.get("title", "")), body=str(req_body.get("body", "")))
     outcome = create_workspace_pr(
         repo, sid, draft, claim_turn=_try_claim_turn, release_turn=_release_turn)
-    if outcome.kind == "turn_busy":
-        return json_error(
-            "a turn or workspace action is in progress; wait for it to finish",
-            409, "TURN_IN_PROGRESS")
-    if outcome.kind == "not_active":
-        return json_error(f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
+    conflict = _turn_conflict(outcome)
+    if conflict is not None:
+        return conflict
     if outcome.kind == "failed":
         _logger.warning("workspace pr creation failed for %s: %s", sid, outcome.detail)
         return json_error("failed to create the pull request", 500, "WORKSPACE_PR_FAILED")
@@ -117,25 +135,20 @@ def _workspace_pr(app: Flask, sid: str):
 
 
 def _workspace_discard(app: Flask, sid: str):
-    repo, row, err = _lookup(app, sid)
+    repo, _row, err = _workspace_target(app, sid)
     if err:
         return err
-    if row is None:
-        return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
     # Claim the turn slot like apply/pr: without this, discard raced an
     # in-flight apply (overwriting "applied" with "discarded" while the
     # changes sat in the user's real tree) and pulled the worktree out
     # from under a running write turn.
     outcome = discard_workspace(repo, sid, claim_turn=_try_claim_turn,
                                 release_turn=_release_turn)
-    if outcome.kind == "turn_busy":
-        return json_error(
-            "a turn or workspace action is in progress; wait for it to finish",
-            409, "TURN_IN_PROGRESS")
+    conflict = _turn_conflict(outcome)
+    if conflict is not None:
+        return conflict
     if outcome.kind == "gone":
         return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
-    if outcome.kind == "not_active":
-        return json_error(f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
     if outcome.kind == "failed":
         _logger.warning("workspace discard failed for %s: %s", sid, outcome.detail)
         return json_error("failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")

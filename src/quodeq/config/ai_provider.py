@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import tempfile
+from pathlib import Path
 
 import keyring
 
@@ -42,6 +43,17 @@ PROVIDERS = {
 }
 
 
+def _read_export_value(env_file: Path, prefix: str) -> str | None:
+    """The first ``export NAME=`` line matching *prefix*, as the shell would read it.
+
+    None when no line matches.
+    """
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        if line.strip().startswith(prefix):
+            return line.split("=", 1)[1].strip()
+    return None
+
+
 def get_current_provider(
     paths: ConfigPaths,
     *,
@@ -59,9 +71,9 @@ def get_current_provider(
     if provider is not None:
         return provider
     if paths.env_file.exists():
-        for line in paths.env_file.read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith(_AI_PROVIDER_EXPORT_PREFIX):
-                return line.split("=", 1)[1].strip()
+        from_file = _read_export_value(paths.env_file, _AI_PROVIDER_EXPORT_PREFIX)
+        if from_file is not None:
+            return from_file
     if default_provider is not None:
         return default_provider
     return get_ai_provider()
@@ -285,8 +297,4 @@ def get_api_key_secure(provider: str, paths: ConfigPaths | None = None) -> str |
     api_key_var = _api_key_var_for(provider)
     if not api_key_var:
         return None
-    prefix = f"export {api_key_var}="
-    for line in paths.env_file.read_text(encoding="utf-8").splitlines():
-        if line.strip().startswith(prefix):
-            return line.split("=", 1)[1].strip()
-    return None
+    return _read_export_value(paths.env_file, f"export {api_key_var}=")

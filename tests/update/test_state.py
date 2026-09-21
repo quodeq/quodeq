@@ -65,7 +65,7 @@ def test_write_uses_unique_temp_names(tmp_path: Path, monkeypatch) -> None:
         names.append(name)
         return fd, name
 
-    monkeypatch.setattr("quodeq.update.state.tempfile.mkstemp", spy)
+    monkeypatch.setattr("quodeq.shared.json_state.tempfile.mkstemp", spy)
     write_state(UpdateState(latest_version="3.0.0"), env)
     write_state(UpdateState(latest_version="3.0.1"), env)
 
@@ -86,6 +86,6 @@ def test_write_failure_is_silent_and_cleans_temp(tmp_path: Path, monkeypatch) ->
     def boom(*args, **kwargs):
         raise OSError("disk full")
 
-    monkeypatch.setattr("quodeq.update.state.os.replace", boom)
+    monkeypatch.setattr("quodeq.shared.json_state.os.replace", boom)
     write_state(UpdateState(latest_version="9.9.9"), env)  # must not raise
     assert list(tmp_path.iterdir()) == []

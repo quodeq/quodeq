@@ -113,6 +113,16 @@ def attach_asvs_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
         _collect_asvs_refs_for_req(req, asvs_by_cwe)
 
 
+def _cert_ref(rule: dict) -> dict:
+    """The ref entry a CERT rule contributes to a requirement."""
+    return {
+        "source": "cert",
+        "id": rule["id"],
+        "name": rule["name"],
+        "url": rule.get("source_url", _CERT_MAIN_URL),
+    }
+
+
 def _collect_cert_refs_for_req(
     req: dict, cert_by_cwe: dict[int, list[dict]], cert_by_id: dict[str, dict],
 ) -> None:
@@ -122,22 +132,12 @@ def _collect_cert_refs_for_req(
         for rule in cert_by_cwe.get(cwe_id, []):
             if rule["id"] not in seen:
                 seen.add(rule["id"])
-                req["refs"].append({
-                    "source": "cert",
-                    "id": rule["id"],
-                    "name": rule["name"],
-                    "url": rule.get("source_url", _CERT_MAIN_URL),
-                })
+                req["refs"].append(_cert_ref(rule))
     for cert_id in req["_cert_ids"]:
         if cert_id not in seen and cert_id in cert_by_id:
             rule = cert_by_id[cert_id]
             seen.add(cert_id)
-            req["refs"].append({
-                "source": "cert",
-                "id": rule["id"],
-                "name": rule["name"],
-                "url": rule.get("source_url", _CERT_MAIN_URL),
-            })
+            req["refs"].append(_cert_ref(rule))
 
 
 def attach_cert_refs(index: dict[str, list[dict]], standards_dir: Path, dimension: str) -> None:

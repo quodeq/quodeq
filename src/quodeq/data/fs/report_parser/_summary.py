@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from quodeq.core.types import DimensionResult, DimensionSummary, GradeBreakdown
+from quodeq.core.types import DimensionResult, DimensionSummary
+from quodeq.core.scoring.dimension_summary import build_dimension_summary
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.data.fs.report_parser._scoring import most_frequent_grade, parse_numeric_score
@@ -28,10 +29,6 @@ def summarize_dimensions(
     ]
     numeric_average = dimension_weighted_average(score_pairs, params)
 
-    grade_counts: dict[str, int] = {}
-    for grade in overall_grades:
-        grade_counts[grade] = grade_counts.get(grade, 0) + 1
-
     # Derive overall grade from the numeric average when available,
     # falling back to most-frequent vote when scores are absent.
     if numeric_average is not None:
@@ -39,12 +36,6 @@ def summarize_dimensions(
     else:
         overall_grade = most_frequent_grade(overall_grades)
 
-    return DimensionSummary(
-        dimensions_count=len(dimensions),
-        overall_grade=overall_grade,
-        numeric_average=numeric_average,
-        grade_breakdown=[
-            GradeBreakdown(grade=grade, count=count)
-            for grade, count in sorted(grade_counts.items(), key=lambda item: (-item[1], item[0]))
-        ],
+    return build_dimension_summary(
+        len(dimensions), overall_grades, overall_grade, numeric_average,
     )

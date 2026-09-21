@@ -14,10 +14,11 @@ from pathlib import Path
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.core.evidence.model import violations_per_100_files
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
+from quodeq.core.scoring.dimension_summary import build_dimension_summary
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types.report import PrincipleGrade
-from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
+from quodeq.core.types.dimension import DimensionResult
 from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
@@ -142,18 +143,8 @@ def _build_summary_from_dim_dicts(
     else:
         overall_grade = None
 
-    grade_counts: dict[str, int] = {}
-    for g in overall_grades:
-        grade_counts[g] = grade_counts.get(g, 0) + 1
-
-    summary = DimensionSummary(
-        dimensions_count=len(dim_dicts),
-        overall_grade=overall_grade,
-        numeric_average=numeric_average,
-        grade_breakdown=[
-            GradeBreakdown(grade=grade, count=count)
-            for grade, count in sorted(grade_counts.items(), key=lambda item: (-item[1], item[0]))
-        ],
+    summary = build_dimension_summary(
+        len(dim_dicts), overall_grades, overall_grade, numeric_average,
     )
     return to_camel_dict(summary)
 

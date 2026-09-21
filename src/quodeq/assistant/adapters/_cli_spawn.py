@@ -101,11 +101,20 @@ def _seatbelt_profile(*, writable_dirs: list[str], writable_files: list[str]) ->
     return "\n".join(lines) + "\n"
 
 
+def _writable_paths(writable_dirs: list[str], writable_files: list[str]) -> list[str]:
+    """Every path the sandbox must allow writes under.
+
+    The writable dirs themselves, plus the parent of each writable file -- a
+    sandbox grants a directory, not a single file.
+    """
+    return [*writable_dirs, *(str(Path(f).parent) for f in writable_files)]
+
+
 def _bwrap_prefix(writable_dirs: list[str], writable_files: list[str]) -> list[str]:
     argv = ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
             "--tmpfs", "/tmp", "--share-net", "--die-with-parent", "--unshare-pid"]
     seen: set[str] = set()
-    for d in [*writable_dirs, *(str(Path(f).parent) for f in writable_files)]:
+    for d in _writable_paths(writable_dirs, writable_files):
         if d and d not in seen:
             seen.add(d)
             argv += ["--bind", d, d]
@@ -136,7 +145,7 @@ def external_sandbox_prefix(*, writable_dirs: list[str],
         if shutil.which("firejail"):
             # firejail read-only whole fs, then allow-list the writable dirs
             argv = ["firejail", "--quiet", "--read-only=/"]
-            for d in [*writable_dirs, *(str(Path(f).parent) for f in writable_files)]:
+            for d in _writable_paths(writable_dirs, writable_files):
                 argv.append(f"--read-write={d}")
             return argv, lambda: None
         raise RuntimeError(

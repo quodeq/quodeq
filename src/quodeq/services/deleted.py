@@ -13,7 +13,6 @@ sweeping matching dismissed entries).
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +21,7 @@ from quodeq.core.finding_identity import DismissKey, finding_dismiss_keys, snipp
 from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services._run_recency import run_dirs_newest_first
-from quodeq.services.dismissed import dismissed_keys, undismiss_event
+from quodeq.services.dismissed import dismissed_keys, filter_dimension_violations, undismiss_event
 from quodeq.services.wiring import (
     ActionLogWriter,
     find_dismissed_matching,
@@ -32,7 +31,6 @@ from quodeq.services.wiring import (
 )
 from quodeq.services.suppression_keys import is_deleted
 from quodeq.core.types.finding import Finding
-from quodeq.services.dismissed import recount_totals
 
 
 _logger = logging.getLogger(__name__)
@@ -228,23 +226,13 @@ def filter_deleted_from_dimensions(
     keys = deleted_keys(project_dir)
     if not keys:
         return dimensions
-    result = []
-    for dim in dimensions:
-        dim_id = (getattr(dim, "dimension", "") or "")
-        filtered = [
-            v for v in dim.violations
-            if not is_finding_deleted(keys, dimension=dim_id,
-                                      principle=_principle_of(v), file=v.file or "")
-        ]
-        if len(filtered) == len(dim.violations):
-            result.append(dim)
-        else:
-            result.append(replace(
-                dim,
-                violations=filtered,
-                totals=recount_totals(filtered, old_totals=dim.totals, files_read=dim.files_read),
-            ))
-    return result
+    return filter_dimension_violations(
+        dimensions,
+        lambda dim, v: not is_finding_deleted(
+            keys, dimension=(getattr(dim, "dimension", "") or ""),
+            principle=_principle_of(v), file=v.file or "",
+        ),
+    )
 
 
 def _principle_of(f: Finding) -> str:

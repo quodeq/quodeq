@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.data.fs.report_parser import safe_read_dir
+from quodeq.services._browse_entries import readable_entries
 from quodeq.services.wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
@@ -113,18 +114,14 @@ class FsToolingMixin:
         *entries* supplies an already-read listing so a caller that also needs
         the files does not pay for a second scandir.
         """
-        directories = []
-        for entry in (safe_read_dir(target) if entries is None else entries):
-            if entry.name.startswith(".") or not entry.is_dir():
-                continue
-            entry_path = target / entry.name
-            if not os.access(entry_path, os.R_OK):
-                continue
-            directories.append({
+        directories = [
+            {
                 "name": entry.name,
                 "path": str(entry_path),
                 "isGitRepo": (entry_path / ".git").exists(),
-            })
+            }
+            for entry, entry_path in readable_entries(target, entries, want_dirs=True)
+        ]
         directories.sort(key=lambda item: item["name"])
         return directories
 
@@ -136,17 +133,10 @@ class FsToolingMixin:
 
         *entries* supplies an already-read listing, as in ``_list_directories``.
         """
-        files: list[dict[str, Any]] = []
-        for entry in (safe_read_dir(target) if entries is None else entries):
-            if entry.name.startswith(".") or not entry.is_file():
-                continue
-            entry_path = target / entry.name
-            if not os.access(entry_path, os.R_OK):
-                continue
-            files.append({
-                "name": entry.name,
-                "path": str(entry_path),
-            })
+        files: list[dict[str, Any]] = [
+            {"name": entry.name, "path": str(entry_path)}
+            for entry, entry_path in readable_entries(target, entries, want_dirs=False)
+        ]
         files.sort(key=lambda item: item["name"])
         return files
 

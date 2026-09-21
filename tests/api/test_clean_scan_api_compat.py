@@ -40,6 +40,14 @@ def client(monkeypatch):
     return create_app(_StubProvider()).test_client()
 
 
+def _assert_deprecation_warned(mock_warn):
+    """The legacy `incremental` field must warn, naming both the field and its status."""
+    assert mock_warn.called, "Expected a deprecation warning for legacy `incremental` field"
+    warn_msg = mock_warn.call_args[0][0]
+    assert "deprecated" in warn_msg.lower()
+    assert "incremental" in warn_msg.lower()
+
+
 def test_clean_scan_field_default_false():
     opts = _build_evaluation_options({})
     assert opts.clean_scan is False
@@ -60,10 +68,7 @@ def test_legacy_incremental_false_maps_to_clean_scan_true():
     assert opts.clean_scan is True
     # Deprecation warning should fire on resolve_clean_scan's logger
     # (api/_evaluation_helpers.py -- wire-key parsing is adapter work).
-    assert mock_warn.called, "Expected a deprecation warning for legacy `incremental` field"
-    warn_msg = mock_warn.call_args[0][0]
-    assert "deprecated" in warn_msg.lower()
-    assert "incremental" in warn_msg.lower()
+    _assert_deprecation_warned(mock_warn)
 
 
 def test_legacy_incremental_true_maps_to_clean_scan_false():
@@ -71,10 +76,7 @@ def test_legacy_incremental_true_maps_to_clean_scan_false():
     with patch.object(_eval_helpers_mod._logger, "warning") as mock_warn:
         opts = _build_evaluation_options({"incremental": True})
     assert opts.clean_scan is False
-    assert mock_warn.called, "Expected a deprecation warning for legacy `incremental` field"
-    warn_msg = mock_warn.call_args[0][0]
-    assert "deprecated" in warn_msg.lower()
-    assert "incremental" in warn_msg.lower()
+    _assert_deprecation_warned(mock_warn)
 
 
 def test_conflicting_fields_rejected():

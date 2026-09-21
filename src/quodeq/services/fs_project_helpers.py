@@ -106,6 +106,24 @@ def _derive_latest_done_run_id(runs: list[RunInfo]) -> str | None:
     return next((run.run_id for run in runs if run.status == "complete"), None)
 
 
+def _project_entry_identity(entry_name: str, meta: dict) -> dict[str, object]:
+    """The identity half of a ``ProjectEntry``'s kwargs, read off a metadata dict.
+
+    Everything a sparse entry carries: id, name, parent, display name,
+    discipline, path, location and scope path.
+    """
+    return {
+        "id": entry_name,
+        "name": meta["name"],
+        "parent": meta["parent"],
+        "display_name": meta["displayName"],
+        "discipline": meta["discipline"],
+        "path": meta["path"],
+        "location": meta["location"],
+        "scope_path": meta.get("scopePath"),
+    }
+
+
 def _backfill_and_read_meta(
     reports_root: Path, entry_name: str, runs: list[RunInfo], *, backfill: bool,
     pre_read_info: dict | None = None,
@@ -158,14 +176,7 @@ def _build_project_entry(
     )
     latest_done_run_id = _derive_latest_done_run_id(runs)
     return ProjectEntry(
-        id=entry_name,
-        name=meta["name"],
-        parent=meta["parent"],
-        display_name=meta["displayName"],
-        discipline=meta["discipline"],
-        path=meta["path"],
-        location=meta["location"],
-        scope_path=meta.get("scopePath"),
+        **_project_entry_identity(entry_name, meta),
         runs_count=len(runs),
         latest_run_id=runs[0].run_id if runs else None,
         latest_done_run_id=latest_done_run_id,

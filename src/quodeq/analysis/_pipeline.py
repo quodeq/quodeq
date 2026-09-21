@@ -9,7 +9,8 @@ from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_esti
 from quodeq.analysis._dim_order import DimEstimates, _order_by_backlog
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loop_state import DimTransition, _run_dir_for, _safe_write_dim_state
-from quodeq.analysis._loops import LoopDeps, run_incremental_loop, run_per_dimension_loop
+from quodeq.analysis._loop_steps import default_loop_deps
+from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
@@ -228,7 +229,7 @@ def _dispatch_fixed_mode(
         emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
         return run_per_dimension_loop(
             config, dimensions, ctx,
-            LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=SHARED_LOG),
+            default_loop_deps(runner, on_dimension_done, SHARED_LOG),
         )
     if config.options.incremental:
         # Default path. AnalysisOptions.incremental defaults to True so
@@ -238,7 +239,7 @@ def _dispatch_fixed_mode(
         emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
         return run_incremental_loop(
             config, dimensions, ctx,
-            LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=SHARED_LOG),
+            default_loop_deps(runner, on_dimension_done, SHARED_LOG),
             dim_counts=dim_counts,
         )
     return None
@@ -274,7 +275,7 @@ def _run_dimensions(
 
     return run_per_dimension_loop(
         config, dimensions, ctx,
-        LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=SHARED_LOG),
+        default_loop_deps(runner, on_dimension_done, SHARED_LOG),
     )
 
 

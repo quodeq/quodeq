@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from quodeq.services._registration_url import _strip_credentials
 
+from tests._credential_urls import SLASH_CREDENTIAL_SECRETS, SLASH_IN_CREDENTIAL_URLS
+
 
 def test_strip_credentials_simple_user_pass():
     assert _strip_credentials("https://user:token@host/repo.git") == "https://host/repo.git"
@@ -37,18 +39,13 @@ def test_strip_credentials_leaves_a_legitimate_path_at_sign_alone():
 
 
 def test_strip_credentials_removes_userinfo_containing_a_slash():
-    """A "/" inside the credential must not truncate the userinfo search
-    window: real tokens (base64/JWT-derived) commonly contain "/", and
-    bounding the search by the first "/" hides the real "@" and lets the
-    whole unredacted credential pass through."""
-    cases = {
-        "https://user:pa/ss@github.com/org/repo.git": "https://github.com/org/repo.git",
-        "https://x-access-token:gh_p/xyz@github.com/foo/bar.git": "https://github.com/foo/bar.git",
-        "https://token/with/slashes@github.com/org/repo.git": "https://github.com/org/repo.git",
-    }
-    for leaky, expected in cases.items():
+    """A "/" inside the credential must not truncate the userinfo search window.
+
+    Cases and rationale: tests/_credential_urls.py.
+    """
+    for leaky, tail in SLASH_IN_CREDENTIAL_URLS:
         stripped = _strip_credentials(leaky)
-        assert stripped == expected
+        assert stripped == f"https://{tail}"
         assert "@" not in stripped
-        assert "pa" not in stripped and "gh_p" not in stripped
-        assert "token" not in stripped and "slashes" not in stripped
+        for secret in SLASH_CREDENTIAL_SECRETS:
+            assert secret not in stripped

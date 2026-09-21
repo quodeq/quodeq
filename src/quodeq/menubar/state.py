@@ -10,14 +10,11 @@ isolates this file automatically.
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.json_state import read_json_state, state_file_path, write_json_state
 
 _logger = logging.getLogger(__name__)
 
@@ -33,12 +30,7 @@ class MenubarState:
 
 def get_menubar_state_path(env: dict[str, str] | None = None) -> str:
     """Resolve the state file path. *env* overrides ``os.environ`` for tests."""
-    environ = resolve_env(env)
-    explicit = environ.get("QUODEQ_MENUBAR_STATE_PATH")
-    if explicit:
-        return explicit
-    base = environ.get("QUODEQ_DIR") or str(Path.home() / ".quodeq")
-    return str(Path(base) / _STATE_FILENAME)
+    return state_file_path("QUODEQ_MENUBAR_STATE_PATH", _STATE_FILENAME, env)
 
 
 def read_state(env: dict[str, str] | None = None) -> MenubarState:
@@ -47,38 +39,12 @@ def read_state(env: dict[str, str] | None = None) -> MenubarState:
     Unknown keys are dropped so an older process can read a file written by a
     newer one.
     """
-    path = Path(get_menubar_state_path(env))
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return MenubarState()
-    if not isinstance(raw, dict):
-        return MenubarState()
-    known = {f for f in MenubarState().__dict__}
-    return MenubarState(**{k: v for k, v in raw.items() if k in known})
+    return read_json_state(Path(get_menubar_state_path(env)), MenubarState)
 
 
 def write_state(state: MenubarState, env: dict[str, str] | None = None) -> None:
     """Persist the preference atomically. Failures are logged, never raised."""
-    path = Path(get_menubar_state_path(env))
-    # Fresh unique temp file then os.replace() onto the target so concurrent
-    # writers never share a temp path and a reader never sees a half-written
-    # file (same pattern as update/state.py).
-    tmp_name: str | None = None
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-        with os.fdopen(tmp_fd, "w", encoding="utf-8") as fh:
-            fh.write(json.dumps(asdict(state), indent=2))
-        os.replace(tmp_name, path)
-    except OSError as exc:
-        _logger.debug("menubar state write failed (fail-soft): %s", exc)
-        # fail-silent: a preference write is never worth crashing over
-        if tmp_name is not None:
-            try:
-                os.unlink(tmp_name)
-            except OSError as inner_exc:
-                _logger.debug("temp state file %s not removed: %s", tmp_name, inner_exc)
+    write_json_state(state, Path(get_menubar_state_path(env)), "menubar", _logger)
 
 
 def set_enabled(enabled: bool, env: dict[str, str] | None = None) -> None:

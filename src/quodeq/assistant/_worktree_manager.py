@@ -39,6 +39,14 @@ class WorktreeManager:
     path: Path
     branch: str
 
+    def _git_repo(self, *args: str) -> str:
+        """Run git against the user's repository root and return its stdout."""
+        return _run(["git", "-C", str(self.repo_root), *args])
+
+    def _git_worktree(self, *args: str) -> str:
+        """Run git against this session's worktree and return its stdout."""
+        return _run(["git", "-C", str(self.path), *args])
+
     @classmethod
     def for_session(cls, repo_root: Path, project_id: str, session_id: str,
                     base: Path | None = None) -> "WorktreeManager":
@@ -53,7 +61,7 @@ class WorktreeManager:
 
     def create(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        _run(["git", "-C", str(self.repo_root), "worktree", "prune"])
+        self._git_repo("worktree", "prune")
         if self.path.exists() and not self.exists():
             # stale leftover directory (crash, stray files); a live worktree has .git
             shutil.rmtree(self.path, ignore_errors=True)
@@ -62,8 +70,7 @@ class WorktreeManager:
             candidate = (self.branch if attempt == 0
                          else f"{self.branch}-{attempt + 1}")
             try:
-                _run(["git", "-C", str(self.repo_root), "worktree", "add",
-                      "-b", candidate, str(self.path)])
+                self._git_repo("worktree", "add", "-b", candidate, str(self.path))
                 self.branch = candidate
                 return
             except WorktreeError as exc:
@@ -77,14 +84,13 @@ class WorktreeManager:
 
     def remove(self, delete_branch: bool = True) -> None:
         if self.exists():
-            _run(["git", "-C", str(self.repo_root), "worktree", "remove",
-                  "--force", str(self.path)])
+            self._git_repo("worktree", "remove", "--force", str(self.path))
         else:
             shutil.rmtree(self.path, ignore_errors=True)
-            _run(["git", "-C", str(self.repo_root), "worktree", "prune"])
+            self._git_repo("worktree", "prune")
         if delete_branch:
             try:
-                _run(["git", "-C", str(self.repo_root), "branch", "-D", self.branch])
+                self._git_repo("branch", "-D", self.branch)
             except WorktreeError as exc:
                 _logger.debug("branch %s already gone: %s", self.branch, exc)
 
@@ -96,7 +102,7 @@ class WorktreeManager:
         deletions, binary and non-UTF-8 changes survive the roundtrip. The
         patch file lives OUTSIDE the worktree so a failed cleanup can never
         leak it into a later diff or apply."""
-        _run(["git", "-C", str(self.path), "add", "-N", "."])
+        self._git_worktree("add", "-N", ".")
         patch = _run_bytes(["git", "-C", str(self.path), "diff", "HEAD",
                             "--binary"])
         if not patch.strip():
@@ -108,22 +114,22 @@ class WorktreeManager:
         try:
             with os.fdopen(fd, "wb") as fh:
                 fh.write(patch)
-            _run(["git", "-C", str(self.repo_root), "apply", "--check",
-                  str(patch_file)])
-            _run(["git", "-C", str(self.repo_root), "apply", str(patch_file)])
+            self._git_repo("apply", "--check", str(patch_file))
+            self._git_repo("apply", str(patch_file))
         finally:
             patch_file.unlink(missing_ok=True)
         return stats
 
     def commit_all(self, message: str) -> bool:
-        status = _run(["git", "-C", str(self.path), "status", "--porcelain"])
+        status = self._git_worktree("status", "--porcelain")
         if not status.strip():
             return False
-        _run(["git", "-C", str(self.path), "add", "-A"])
-        _run(["git", "-C", str(self.path),
-              "-c", "user.name=Quodeq Assistant",
-              "-c", "user.email=assistant@quodeq.local",
-              "commit", "-q", "-m", message])
+        self._git_worktree("add", "-A")
+        self._git_worktree(
+            "-c", "user.name=Quodeq Assistant",
+            "-c", "user.email=assistant@quodeq.local",
+            "commit", "-q", "-m", message,
+        )
         return True
 
     def create_pr(self, title: str, body: str) -> dict:
@@ -134,10 +140,10 @@ class WorktreeManager:
         working; on push success the commit stays (it is on the remote)."""
         committed = self.commit_all(title or "Quodeq assistant fix")
         try:
-            _run(["git", "-C", str(self.path), "push", "-u", "origin", self.branch])
+            self._git_worktree("push", "-u", "origin", self.branch)
         except WorktreeError as exc:
             if committed:
-                _run(["git", "-C", str(self.path), "reset", "--soft", "HEAD~1"])
+                self._git_worktree("reset", "--soft", "HEAD~1")
             return {"prUrl": None, "branch": self.branch, "pushed": False,
                     "message": (f"Push failed: {exc}. The changes are back in the"
                                 " worktree; apply them or open a PR manually.")}

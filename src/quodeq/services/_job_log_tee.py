@@ -133,6 +133,25 @@ def consume_stream(
         ctx.pre_marker_buffer.pop(job_id, None)
 
 
+def _open_run_log_writer(job_id: str, ctx: TeeContext) -> RunLogWriter | None:
+    """Open and register the job's run.log writer, or None if its run dir is unknown.
+
+    The directory is known once the job snapshot carries an output project
+    and run id, a reports root is configured, and the directory exists on
+    disk. A writer that is opened is stored in ``ctx.run_log_writers`` so
+    later lines reuse it.
+    """
+    job = ctx.store.get(job_id)
+    if not (job and job.output_project and job.output_run_id and ctx.reports_root is not None):
+        return None
+    run_dir = ctx.reports_root / job.output_project / job.output_run_id
+    if not run_dir.is_dir():
+        return None
+    writer = RunLogWriter(run_dir)
+    ctx.run_log_writers[job_id] = writer
+    return writer
+
+
 def drain_pre_marker_buffer(job_id: str, ctx: TeeContext) -> None:
     """Attempt to resolve run_dir and flush any buffered pre-marker lines.
 
@@ -143,18 +162,15 @@ def drain_pre_marker_buffer(job_id: str, ctx: TeeContext) -> None:
     if ctx.run_log_writers.get(job_id) is not None:
         # Writer already open — nothing to drain.
         return
-    job = ctx.store.get(job_id)
-    if job and job.output_project and job.output_run_id and ctx.reports_root is not None:
-        run_dir = ctx.reports_root / job.output_project / job.output_run_id
-        if run_dir.is_dir():
-            writer = RunLogWriter(run_dir)
-            ctx.run_log_writers[job_id] = writer
-            try:
-                for pending in ctx.pre_marker_buffer.get(job_id, []):
-                    writer.write(pending)
-            except OSError as exc:  # IOError is OSError; BrokenPipeError is a subclass
-                ctx.log.warning(f"Drain write error for job {job_id}: {exc}")
-            ctx.pre_marker_buffer[job_id] = []
+    writer = _open_run_log_writer(job_id, ctx)
+    if writer is None:
+        return
+    try:
+        for pending in ctx.pre_marker_buffer.get(job_id, []):
+            writer.write(pending)
+    except OSError as exc:  # IOError is OSError; BrokenPipeError is a subclass
+        ctx.log.warning(f"Drain write error for job {job_id}: {exc}")
+    ctx.pre_marker_buffer[job_id] = []
 
 
 def tee_run_log(job_id: str, line: str, ctx: TeeContext) -> None:
@@ -170,17 +186,12 @@ def tee_run_log(job_id: str, line: str, ctx: TeeContext) -> None:
     writer = ctx.run_log_writers.get(job_id)
     if writer is None:
         # Try to resolve run_dir from the job snapshot now.
-        job = ctx.store.get(job_id)
-        if job and job.output_project and job.output_run_id and ctx.reports_root is not None:
-            run_dir = ctx.reports_root / job.output_project / job.output_run_id
-            if run_dir.is_dir():
-                writer = RunLogWriter(run_dir)
-                ctx.run_log_writers[job_id] = writer
-                # Flush any buffered pre-marker lines.
-                for pending in ctx.pre_marker_buffer.get(job_id, []):
-                    writer.write(pending)
-                ctx.pre_marker_buffer[job_id] = []
+        writer = _open_run_log_writer(job_id, ctx)
         if writer is None:
             ctx.pre_marker_buffer.setdefault(job_id, []).append(line)
             return
+        # Flush any buffered pre-marker lines.
+        for pending in ctx.pre_marker_buffer.get(job_id, []):
+            writer.write(pending)
+        ctx.pre_marker_buffer[job_id] = []
     writer.write(line)

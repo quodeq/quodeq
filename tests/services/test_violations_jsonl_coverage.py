@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
+from quodeq.services._violations_jsonl import _parse_jsonl_findings
+
 
 # ---------------------------------------------------------------------------
 # #145 — non-dict JSON values (lists, strings, numbers) must be skipped
@@ -13,7 +15,6 @@ import pytest
 
 class TestNonDictJsonlLineIsSkipped:
     def test_non_dict_string_line_is_skipped(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         lines = [
             '"just a string"',
             '[1, 2, 3]',
@@ -23,14 +24,12 @@ class TestNonDictJsonlLineIsSkipped:
         assert len(violations) == 1
 
     def test_non_dict_list_line_is_skipped(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         lines = ['[{"p": "M-MOD-1", "t": "violation"}]']
         violations, compliance = _parse_jsonl_findings(lines, "security")
         assert violations == []
         assert compliance == []
 
     def test_non_dict_null_line_is_skipped(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         lines = ['null', json.dumps({"p": "P1", "t": "compliance", "file": "b.py", "line": 2})]
         _, compliance = _parse_jsonl_findings(lines, "security")
         assert len(compliance) == 1
@@ -38,29 +37,24 @@ class TestNonDictJsonlLineIsSkipped:
 
 class TestParseJsonlFindings:
     def test_empty_lines(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         v, c = _parse_jsonl_findings(["", "  ", "\n"], "security")
         assert v == []
         assert c == []
 
     def test_invalid_json(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         v, c = _parse_jsonl_findings(["not json", "{bad"], "security")
         assert v == []
         assert c == []
 
     def test_missing_principle(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         v, c = _parse_jsonl_findings([json.dumps({"t": "violation"})], "sec")
         assert v == []
 
     def test_invalid_type(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         v, c = _parse_jsonl_findings([json.dumps({"p": "P1", "t": "unknown"})], "sec")
         assert v == []
 
     def test_violations_and_compliance(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         lines = [
             json.dumps({"p": "P1", "t": "violation", "file": "a.py", "line": 1}),
             json.dumps({"p": "P2", "t": "compliance", "file": "b.py", "line": 2}),
@@ -70,13 +64,11 @@ class TestParseJsonlFindings:
         assert len(c) == 1
 
     def test_deduplication(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         line = json.dumps({"p": "P1", "t": "violation", "file": "a.py", "line": 1})
         v, c = _parse_jsonl_findings([line, line], "security")
         assert len(v) == 1
 
     def test_dismissed_key_filtering(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         from quodeq.services.suppression_keys import SuppressionKeys
         line = json.dumps({"p": "P1", "req": "M-MOD-3", "t": "violation", "file": "a.py", "line": 1})
         keys = SuppressionKeys({("M-MOD-3", "a.py", 1)})
@@ -85,7 +77,6 @@ class TestParseJsonlFindings:
 
     def test_req_to_principle_mapping(self):
         from quodeq.core.evidence.req_mapping import PrincipleResolver
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         line = json.dumps({"p": "REQ-1", "t": "compliance", "file": "a.py", "line": 1})
         resolver = PrincipleResolver({"REQ-1": "Authentication"}, frozenset({"Authentication"}))
         v, c = _parse_jsonl_findings([line], "security", resolver=resolver)
@@ -95,7 +86,6 @@ class TestParseJsonlFindings:
     def test_unmappable_finding_is_skipped(self):
         """Matches the report path, which quarantines it out of the evaluation."""
         from quodeq.core.evidence.req_mapping import PrincipleResolver
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         line = json.dumps({"req": "N/A", "t": "violation", "file": "a.py", "line": 1})
         resolver = PrincipleResolver({"REQ-1": "Authentication"}, frozenset({"Authentication"}))
         v, c = _parse_jsonl_findings([line], "security", resolver=resolver)
@@ -185,7 +175,6 @@ class TestLiveViewAcceptsDismissedKeys:
 
     def test_dismissed_keys_object_does_not_raise(self):
         from quodeq.core.dismissals import DismissedKeys
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         from quodeq.services.suppression_keys import SuppressionKeys
 
         keys = SuppressionKeys(DismissedKeys.from_line_keys({("S-AUT-3", "a.py", 1)}), frozenset())
@@ -196,7 +185,6 @@ class TestLiveViewAcceptsDismissedKeys:
 
     def test_empty_dismissed_keys_object_does_not_raise(self):
         from quodeq.core.dismissals import DismissedKeys
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         from quodeq.services.suppression_keys import SuppressionKeys
 
         keys = SuppressionKeys(DismissedKeys(), frozenset())
@@ -204,7 +192,6 @@ class TestLiveViewAcceptsDismissedKeys:
         assert len(violations) == 2
 
     def test_legacy_bare_line_key_set_still_works(self):
-        from quodeq.services._violations_jsonl import _parse_jsonl_findings
         from quodeq.services.suppression_keys import SuppressionKeys
 
         keys = SuppressionKeys(frozenset({("S-AUT-3", "a.py", 1)}), frozenset())

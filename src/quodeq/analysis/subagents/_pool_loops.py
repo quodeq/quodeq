@@ -51,6 +51,21 @@ class LoopContext:
     is_cancelled: Callable[[], bool] = cancellation.is_cancelled
 
 
+def _respawn_for_surplus(ctx: LoopContext, just_done: int) -> None:
+    """Submit one agent per pending file no in-flight agent will take.
+
+    Agents still in flight take from the same pending set, so only the
+    surplus needs a fresh slot -- and only the *just_done* slots that were
+    vacated this poll are free to fill.
+    """
+    remaining = should_respawn(
+        ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
+        deadline_at=ctx.deadline_at,
+    )
+    for _ in range(compute_scale_up(remaining - len(ctx.futures), just_done)):
+        ctx.submit_fn()
+
+
 def scout_loop(ctx: LoopContext) -> None:
     """Scout-then-scale loop: one agent first, then fill the pool when the
     scout finishes or times out. Each later poll respawns for the pending
@@ -84,14 +99,7 @@ def scout_loop(ctx: LoopContext) -> None:
             # included. Respawning for it on top would launch one agent more
             # than there are files left.
             continue
-        remaining = should_respawn(
-            ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
-            deadline_at=ctx.deadline_at,
-        )
-        # Agents still in flight will take from the same pending set; only the
-        # surplus needs a fresh slot, and only the slots just vacated are free.
-        for _ in range(compute_scale_up(remaining - len(ctx.futures), len(done))):
-            ctx.submit_fn()
+        _respawn_for_surplus(ctx, len(done))
 
 
 def immediate_loop(ctx: LoopContext) -> None:
@@ -111,11 +119,4 @@ def immediate_loop(ctx: LoopContext) -> None:
         if not done:
             time.sleep(_FUTURE_POLL_INTERVAL_S)
             continue
-        remaining = should_respawn(
-            ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
-            deadline_at=ctx.deadline_at,
-        )
-        # Agents still in flight will take from the same pending set; only the
-        # surplus needs a fresh slot, and only the slots just vacated are free.
-        for _ in range(compute_scale_up(remaining - len(ctx.futures), len(done))):
-            ctx.submit_fn()
+        _respawn_for_surplus(ctx, len(done))
