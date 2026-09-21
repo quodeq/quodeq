@@ -172,17 +172,24 @@ function buildClockPart({ isRunning, runBudgetS, overrun, elapsedS }) {
   return null;
 }
 
+// The "N done · X excluded · clock" tail both file-count summaries end with.
+// Kept on one line: a line break inside JSX text changes the rendered
+// whitespace.
+function buildDoneTail({ takenFiles, overallPct, excludedFiles, clockPart }) {
+  return <>{t('evaluate.doneCount', { count: takenFiles, pct: overallPct })}{excludedFiles > 0 && <> · {t('evaluate.excludedSizeCap', { count: excludedFiles })}</>}{clockPart}</>;
+}
+
 export function buildSummary({ showCoverage, totalFiles, takenFiles, overallPct, excludedFiles, scanMode, isRunning, progress, elapsedS, runBudgetS, overrun }) {
   const inlineLabel = buildInlineLabel(progress);
   const clockPart = buildClockPart({ isRunning, runBudgetS, overrun, elapsedS });
   if (showCoverage) {
     return totalFiles > 0
-      ? <>{t('evaluate.targetsPrefix')} <strong>{totalFiles}</strong> {t('evaluate.changedFilesSuffix')} · {t('evaluate.doneCount', { count: takenFiles, pct: overallPct })}{excludedFiles > 0 && <> · {t('evaluate.excludedSizeCap', { count: excludedFiles })}</>}{clockPart}</>
+      ? <>{t('evaluate.targetsPrefix')} <strong>{totalFiles}</strong> {t('evaluate.changedFilesSuffix')} · {buildDoneTail({ takenFiles, overallPct, excludedFiles, clockPart })}</>
       : <>{t('evaluate.nothingNew')}{clockPart}</>;
   }
   if (totalFiles > 0) {
     return scanMode === SCAN_MODE.CLEAN
-      ? <>{t('evaluate.reanalyzesPrefix')} <strong>{totalFiles}</strong> {t('evaluate.filesLabel')} · {t('evaluate.doneCount', { count: takenFiles, pct: overallPct })}{excludedFiles > 0 && <> · {t('evaluate.excludedSizeCap', { count: excludedFiles })}</>}{clockPart}</>
+      ? <>{t('evaluate.reanalyzesPrefix')} <strong>{totalFiles}</strong> {t('evaluate.filesLabel')} · {buildDoneTail({ takenFiles, overallPct, excludedFiles, clockPart })}</>
       : <><strong>{t('evaluate.countOf', { taken: takenFiles, total: totalFiles })}</strong> {t('evaluate.checksLabel')} · {overallPct}%{isRunning && inlineLabel && <> · {inlineLabel}</>}{clockPart}</>;
   }
   return <><strong>{t('evaluate.preparing')}</strong>{isRunning && inlineLabel && <> · {inlineLabel}</>}</>;

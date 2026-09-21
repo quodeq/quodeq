@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { parseFileRef } from '../../../utils/formatters.js';
+import { staggerDelayStyle } from '../../../utils/animation.js';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { RefLinks } from '../../../components/findingDetail.jsx';
@@ -76,7 +77,7 @@ export function EvalViolationCard({ v, principle, index, onDismiss }) {
   return (
     <div
       className={`vdetail-row vdetail-row--terminal vdetail-row--${v.severity}`}
-      style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}
+      style={staggerDelayStyle(index, ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}
     >
       <div className="vdetail-row-main">
         <SevBadge level={v.severity} format="long" />
@@ -94,7 +95,7 @@ export function ComplianceCard({ c, principle, index }) {
   return (
     <div
       className="vdetail-row vdetail-row--terminal vdetail-row--compliant"
-      style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}
+      style={staggerDelayStyle(index, ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}
     >
       <div className="vdetail-row-main">
         <span className="term-sev-badge term-sev-badge--compliant">{t('explorer.compliantBadge')}</span>

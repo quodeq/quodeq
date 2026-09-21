@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { FindingDetailBody } from '../../../components/findingDetail.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
+import { staggerDelayStyle } from '../../../utils/animation.js';
 import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
@@ -25,7 +26,7 @@ function ViolationLiveRow({ violation, index }) {
   return (
     <div
       className={`vdetail-row vdetail-row--${v.severity}`}
-      style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}
+      style={staggerDelayStyle(index, ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}
     >
       <div
         className="vdetail-row-main vlive-collapsible"

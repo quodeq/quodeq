@@ -13,12 +13,7 @@
  * never map through model factories or deep-clone inside the updater.
  */
 import { projectKeys } from "./queryKeys";
-
-// Same key convention as mergeRescoreIntoEval (explorerDataHooks.js): a
-// violation is identified by req|file|line, defaulting missing parts.
-function violationKey(v) {
-  return `${v?.req || ""}|${v?.file || ""}|${v?.line || 0}`;
-}
+import { violationKey } from "../utils/violationKey.js";
 
 function clampNonNegative(n) {
   return Math.max(0, n | 0);

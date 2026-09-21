@@ -31,8 +31,25 @@ export function comparator(col, dir) {
   };
 }
 
+// A fresh per-severity tally. Built rather than shared so each counter is
+// independent, and named so the dimension total and a principle's own counts
+// can never disagree on which severities exist.
+export function newSeverityCounts() {
+  return { critical: 0, major: 0, minor: 0 };
+}
+
 export function newPrincipleEntry() {
-  return { violations: 0, compliance: 0, severity: { critical: 0, major: 0, minor: 0 }, violationItems: [], complianceItems: [] };
+  return { violations: 0, compliance: 0, severity: newSeverityCounts(), violationItems: [], complianceItems: [] };
+}
+
+// The principle's entry in `principleMap`, created on first sight.
+function principleEntry(principleMap, name) {
+  let entry = principleMap.get(name);
+  if (!entry) {
+    entry = newPrincipleEntry();
+    principleMap.set(name, entry);
+  }
+  return entry;
 }
 
 export function buildPrincipleRow(name, data, dim) {
@@ -59,26 +76,20 @@ export function buildDimensionGroup(dim) {
   const compliance = dim.compliance || [];
   if (violations.length === 0 && compliance.length === 0) return null;
 
-  const dimSev = { critical: 0, major: 0, minor: 0 };
+  const dimSev = newSeverityCounts();
   const principleMap = new Map();
 
   for (const v of violations) {
     const sev = (v.severity || DEFAULT_SEVERITY).toLowerCase();
     if (dimSev[sev] !== undefined) dimSev[sev]++;
-    const pName = v.principle || UNKNOWN_PRINCIPLE;
-    if (!principleMap.has(pName)) principleMap.set(pName, newPrincipleEntry());
-    const p = principleMap.get(pName);
+    const p = principleEntry(principleMap, v.principle || UNKNOWN_PRINCIPLE);
     p.violations++;
     if (p.severity[sev] !== undefined) p.severity[sev]++;
     p.violationItems.push(v);
   }
 
   for (const c of compliance) {
-    const pName = c.principle || UNKNOWN_PRINCIPLE;
-    if (!principleMap.has(pName)) principleMap.set(pName, newPrincipleEntry());
-    // has()+set() above guarantee an entry here, same as the violations loop
-    // above: one lookup into a local, not a re-derefed call expression.
-    const p = principleMap.get(pName);
+    const p = principleEntry(principleMap, c.principle || UNKNOWN_PRINCIPLE);
     p.compliance++;
     p.complianceItems.push(c);
   }
