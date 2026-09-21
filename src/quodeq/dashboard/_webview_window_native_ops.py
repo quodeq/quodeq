@@ -73,10 +73,12 @@ def _send_cancel_evaluation(base_url: str, job_id: str | None) -> None:
         _logger.warning("cancel-on-quit for job %s failed", job_id, exc_info=True)
 
 
-def _save_via_dialog(window: object, content: str, filename: str) -> bool:
-    """Open a native Save dialog and write content to the chosen path."""
-    if not window:
-        return False
+def _ask_save_path(window: object, filename: str) -> str | None:
+    """Open a native Save dialog defaulting to *filename*; the chosen path or None.
+
+    None when the user cancels, or when the dialog answers with nothing
+    usable. The file-type filter is derived from *filename*'s extension.
+    """
     ext = filename.rsplit('.', 1)[-1] if '.' in filename else '*'
     result = window.create_file_dialog(
         webview.SAVE_DIALOG,
@@ -84,8 +86,16 @@ def _save_via_dialog(window: object, content: str, filename: str) -> bool:
         file_types=(f'{ext.upper()} files (*.{ext})', 'All files (*.*)'),
     )
     if not result:
-        return False
+        return None
     path = result if isinstance(result, str) else result[0] if result else None
+    return path or None
+
+
+def _save_via_dialog(window: object, content: str, filename: str) -> bool:
+    """Open a native Save dialog and write content to the chosen path."""
+    if not window:
+        return False
+    path = _ask_save_path(window, filename)
     if not path:
         return False
     try:
@@ -99,15 +109,7 @@ def _download_via_dialog(window: object, base_url: str, path: str, filename: str
     """Fetch a URL from the API and save it via native Save dialog."""
     if not window or not base_url:
         return False
-    ext = filename.rsplit('.', 1)[-1] if '.' in filename else '*'
-    result = window.create_file_dialog(
-        webview.SAVE_DIALOG,
-        save_filename=filename,
-        file_types=(f'{ext.upper()} files (*.{ext})', 'All files (*.*)'),
-    )
-    if not result:
-        return False
-    save_path = result if isinstance(result, str) else result[0] if result else None
+    save_path = _ask_save_path(window, filename)
     if not save_path:
         return False
     try:

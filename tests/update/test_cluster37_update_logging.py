@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from quodeq.shared import json_state
 from quodeq.update import state
 
 
@@ -16,8 +17,8 @@ def test_write_state_logs_write_and_cleanup_failures(monkeypatch, tmp_path) -> N
     def _unlink_fails(*_args, **_kwargs):
         raise OSError(13, "Permission denied")
 
-    monkeypatch.setattr(state.os, "replace", _replace_fails)
-    monkeypatch.setattr(state.os, "unlink", _unlink_fails)
+    monkeypatch.setattr(json_state.os, "replace", _replace_fails)
+    monkeypatch.setattr(json_state.os, "unlink", _unlink_fails)
     with patch.object(state._logger, "debug") as debug:
         state.write_state(current, env)
     messages = [c.args[0] for c in debug.call_args_list]

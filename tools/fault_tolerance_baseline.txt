@@ -91,7 +91,7 @@ src/quodeq/dashboard/_webview_window_help_menu.py:165:broad-except
 src/quodeq/dashboard/_webview_window_help_menu.py:39:broad-except
 src/quodeq/dashboard/_webview_window_lifecycle.py:44:broad-except
 src/quodeq/dashboard/_webview_window_lifecycle.py:50:broad-except
-src/quodeq/dashboard/_webview_window_native_ops.py:164:broad-except
+src/quodeq/dashboard/_webview_window_native_ops.py:166:broad-except
 src/quodeq/dashboard/_webview_window_native_ops.py:72:broad-except
 src/quodeq/dashboard/cli.py:89:broad-except
 src/quodeq/dashboard/runner.py:157:broad-except
