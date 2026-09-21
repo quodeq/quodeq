@@ -12,6 +12,12 @@ from quodeq.analysis.subprocess import _run_cli_analysis
 from quodeq.config.ai_provider import PROVIDERS
 from quodeq.services.tooling_mixin import FsToolingMixin, get_allowed_client_ids
 
+# The stream event Copilot emits when an org policy blocks the findings MCP
+# server. Four tests drive the same event through different entry points.
+POLICY_BLOCK_EVENT = {"type": "session.warning", "data": {
+    "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
+}}
+
 
 @pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):
@@ -125,8 +131,7 @@ def test_copilot_stdout_auth_error_aborts_evaluation(tmp_path, monkeypatch):
 @pytest.mark.parametrize("event", [
     {"type": "session.error", "data": {"message": "Model unavailable"}},
     {"type": "result", "exitCode": 1},
-    {"type": "session.warning", "data": {
-        "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'"}},
+    POLICY_BLOCK_EVENT,
 ])
 def test_copilot_error_stream_is_invalid(tmp_path, event):
     stream = tmp_path / "s.jsonl"
@@ -166,10 +171,7 @@ def test_copilot_policy_block_terminates_running_evaluation(tmp_path, monkeypatc
     from quodeq.analysis._process import _run_with_heartbeat
 
     stream = tmp_path / "s.jsonl"
-    warning = {"type": "session.warning", "data": {
-        "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
-    }}
-    events = [prior_event, warning] if prior_event else [warning]
+    events = [prior_event, POLICY_BLOCK_EVENT] if prior_event else [POLICY_BLOCK_EVENT]
     stream.write_text("".join(json.dumps(event) + "\n" for event in events))
     process = Mock()
     process.poll.side_effect = [None, 0]
@@ -201,9 +203,7 @@ def test_copilot_policy_block_cancels_pool_and_cleans_resources(tmp_path, monkey
     def spawn(args, **kwargs):
         captured["cwd"] = Path(kwargs["cwd"])
         captured["mcp"] = Path(args[args.index("--additional-mcp-config") + 1][1:])
-        kwargs["stdout"].write(json.dumps({"type": "session.warning", "data": {
-            "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
-        }}) + "\n")
+        kwargs["stdout"].write(json.dumps(POLICY_BLOCK_EVENT) + "\n")
         kwargs["stdout"].flush()
         return process
 
@@ -227,9 +227,7 @@ def test_copilot_policy_block_cancels_pool_and_cleans_resources(tmp_path, monkey
 
 def test_copilot_policy_block_in_completed_stream_aborts_evaluation(tmp_path, monkeypatch):
     def spawn(args, work_dir, env, paths, cfg):
-        paths.stream_file.write_text(json.dumps({"type": "session.warning", "data": {
-            "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
-        }}) + "\n")
+        paths.stream_file.write_text(json.dumps(POLICY_BLOCK_EVENT) + "\n")
         return Mock(returncode=0), False
 
     monkeypatch.setattr("quodeq.analysis.subprocess._spawn_and_monitor", spawn)
