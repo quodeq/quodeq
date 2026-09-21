@@ -1,5 +1,9 @@
 """macOS app identity: dock icon, bundle name, and the rich About panel.
 
+The About-panel install writes its progress to the webview diagnostic log
+(``_webview_diag``), which this module re-exports as ``_diag`` for the help
+menu that writes to the same file.
+
 Leaf module for _webview_window.py — self-contained AppKit setup with no
 patch-tested cross-function co-location requirements (see
 tests/dashboard/test_native_chrome.py's TestMacAppIdentityIdempotent, which
@@ -9,15 +13,24 @@ _set_macos_app_identity and _icon_path, which it also calls itself.
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from quodeq.dashboard._webview_diag import _diag
 from quodeq.shared.logging import log_debug
 
 _APP_DISPLAY_NAME = "quodeq"
 
-_macos_app_icon: object | None = None  # cache the NSImage across _set calls
 
-_about_target: object | None = None  # keep delegate alive for the menu item's weak ref
-_about_override_installed = False  # the _AboutHandler ObjC class may only be defined once
+@dataclass
+class _MacAppState:
+    """The AppKit objects this module must outlive a single call to keep alive."""
+
+    app_icon: object | None = None  # the NSImage, reused across _set calls
+    about_target: object | None = None  # the menu item holds only a weak ref
+    about_override_installed: bool = False  # _AboutHandler may be defined once
+
+
+_STATE = _MacAppState()
 
 _QUODEQ_WEBSITE = "https://quodeq.com"
 _QUODEQ_REPO = "https://github.com/quodeq/quodeq"
@@ -41,17 +54,6 @@ def _icon_path(ext: str) -> str | None:
     else:
         return None
     return str(p) if p.exists() else None
-
-
-def _diag_path() -> Path:
-    return Path.home() / ".quodeq" / "run" / "webview_debug.log"
-
-
-try:
-    _diag_path().parent.mkdir(parents=True, exist_ok=True)
-    _diag = _diag_path().open("a", encoding="utf-8")  # noqa: SIM115 — lives for the process
-except OSError:
-    _diag = sys.stderr
 
 
 def _quodeq_version() -> str:
@@ -129,8 +131,8 @@ def _build_about_handler() -> object:
                 "Version": "",  # hide the "Build" line Apple renders by default
                 "Copyright": copyright_line,
             }
-            if _macos_app_icon is not None:
-                opts["ApplicationIcon"] = _macos_app_icon
+            if _STATE.app_icon is not None:
+                opts["ApplicationIcon"] = _STATE.app_icon
             credits = _build_about_credits()
             if credits is not None:
                 opts["Credits"] = credits
@@ -217,17 +219,16 @@ def _install_about_panel_override() -> None:
     defined once per process, so a second call (e.g. on a repeat ``loaded``
     event) would raise ``objc.error`` and abort the caller.
     """
-    global _about_target, _about_override_installed
-    if _about_override_installed:
+    if _STATE.about_override_installed:
         return
     try:
         from AppKit import NSApplication, NSObject  # noqa: PLC0415, F401
         from Foundation import NSTimer  # noqa: PLC0415, F401
     except ImportError:
         return
-    _about_override_installed = True
-    _about_target = _build_about_handler()
-    _schedule_about_install_poller(_about_target)
+    _STATE.about_override_installed = True
+    _STATE.about_target = _build_about_handler()
+    _schedule_about_install_poller(_STATE.about_target)
 
 
 def _set_macos_app_identity() -> None:
@@ -242,7 +243,6 @@ def _set_macos_app_identity() -> None:
     dict, not the runtime icon image, so we also write NSApplicationIcon
     into the info dict and register a swizzled action on the menu item.
     """
-    global _macos_app_icon
     try:
         from AppKit import NSApplication, NSBundle, NSImage  # type: ignore[import-untyped]
     except ImportError:
@@ -267,7 +267,7 @@ def _set_macos_app_identity() -> None:
         icon = None
     if not icon:
         return
-    _macos_app_icon = icon  # keep a live reference for the About-panel override
+    _STATE.app_icon = icon  # keep a live reference for the About-panel override
     try:
         NSApplication.sharedApplication().setApplicationIconImage_(icon)
     except (AttributeError, ValueError) as exc:
