@@ -180,13 +180,6 @@ class TestClassify:
 def test_classify_splits_hits_by_consolidation_state(tmp_path):
     """A hit from a run that never completed must stay out of cached_findings,
     so the replay path does not stamp it carried_forward."""
-    from quodeq.analysis.cache.dimension_helpers import (
-        build_cache_key_for_file,
-        classify_files_via_cache,
-    )
-    from quodeq.analysis.cache.entry import CacheEntry
-    from quodeq.analysis.cache.local import LocalFileBackend
-
     src = tmp_path / "src"
     src.mkdir()
     (src / "a.py").write_text("x")
@@ -217,13 +210,6 @@ def test_classify_splits_hits_by_consolidation_state(tmp_path):
 
 
 def test_classify_leaves_unconsolidated_fields_empty_when_all_hits_consolidated(tmp_path):
-    from quodeq.analysis.cache.dimension_helpers import (
-        build_cache_key_for_file,
-        classify_files_via_cache,
-    )
-    from quodeq.analysis.cache.entry import CacheEntry
-    from quodeq.analysis.cache.local import LocalFileBackend
-
     src = tmp_path / "src"
     src.mkdir()
     (src / "a.py").write_text("x")
@@ -247,13 +233,6 @@ def test_classify_leaves_unconsolidated_fields_empty_when_all_hits_consolidated(
 def test_classify_treats_a_legacy_entry_as_consolidated(tmp_path):
     """An entry stored before the field existed has no consolidated key.
     from_json defaults it True, so it must land in cached_findings."""
-    from quodeq.analysis.cache.dimension_helpers import (
-        build_cache_key_for_file,
-        classify_files_via_cache,
-    )
-    from quodeq.analysis.cache.entry import CacheEntry
-    from quodeq.analysis.cache.local import LocalFileBackend
-
     src = tmp_path / "src"
     src.mkdir()
     (src / "a.py").write_text("x")

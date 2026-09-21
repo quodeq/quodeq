@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-
 from quodeq.analysis._api_call import (
     ApiRunnerConfig,
     _call_api,
@@ -32,13 +31,7 @@ from quodeq.analysis._api_enrichment import (
 )
 from quodeq.analysis.errors import FatalProviderError
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
-
-if TYPE_CHECKING:
-    from quodeq.analysis.run_types import RunConfig
-    from quodeq.data.events.writer import EventLogWriter
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
-from quodeq.services.precedent_dismiss import precedent_match_hook
-from quodeq.shared.log_sink import LoggerSink
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_refs, load_compiled_requirements
@@ -46,8 +39,40 @@ from quodeq.data.sqlite.findings_queries import (
     dismissed_source_stamp,
     read_dismissed_snippets_strict,
 )
+from quodeq.services.precedent_dismiss import precedent_match_hook
+from quodeq.shared.log_sink import LoggerSink
+
+if TYPE_CHECKING:
+    from quodeq.analysis.run_types import RunConfig
+    from quodeq.data.events.writer import EventLogWriter
 
 _log = logging.getLogger(__name__)
+
+
+def _repo_signals(work_dir: Path | None) -> dict[str, object]:
+    """The shape/trust facts the router reads off the repo under evaluation."""
+    if work_dir is None:
+        return {"project_shape": None, "trust_model": None}
+    return {"project_shape": detect_shape(work_dir), "trust_model": resolve_trust_model(work_dir)}
+
+
+def _precedent_signals(project_dir: Path | None, run_dir: Path | None) -> dict[str, object]:
+    """The already-dismissed findings the router downweights against.
+
+    The strict reader raises on a failed open, so the per-run memo skips the
+    run instead of remembering it as having no dismissals.
+    """
+    if not project_dir:
+        return {"precedent_fingerprints": set(), "precedent_corpus": None,
+                "on_precedent_match": precedent_match_hook(None, log=LoggerSink(_log))}
+    return {
+        "precedent_fingerprints": load_precedent_fingerprints(
+            project_dir, read_dismissed=read_dismissed_snippets_strict,
+            source_stamp=dismissed_source_stamp,
+        ),
+        "precedent_corpus": load_precedent_corpus(project_dir, run_dir) if run_dir else None,
+        "on_precedent_match": precedent_match_hook(project_dir, log=LoggerSink(_log)),
+    }
 
 
 def _build_router_context(
@@ -68,33 +93,13 @@ def _build_router_context(
     if not compiled_dir:
         return None
     try:
-        compiled_refs = load_compiled_refs(compiled_dir, dimension) or {}
-        compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
-        project_shape = detect_shape(work_dir) if work_dir is not None else None
-        trust_model = resolve_trust_model(work_dir) if work_dir is not None else None
-        # The strict reader raises on a failed open, so the per-run memo skips
-        # the run instead of remembering it as having no dismissals.
-        precedents = (
-            load_precedent_fingerprints(
-                project_dir, read_dismissed=read_dismissed_snippets_strict,
-                source_stamp=dismissed_source_stamp,
-            )
-            if project_dir else set()
-        )
-        corpus = (
-            load_precedent_corpus(project_dir, run_dir)
-            if project_dir and run_dir else None
-        )
         return CompiledContext(
-            compiled_refs=compiled_refs,
-            compiled_reqs=compiled_reqs,
+            compiled_refs=load_compiled_refs(compiled_dir, dimension) or {},
+            compiled_reqs=load_compiled_requirements(compiled_dir, dimension) or {},
             dimension=dimension,
             work_dir=work_dir,
-            project_shape=project_shape,
-            trust_model=trust_model,
-            precedent_fingerprints=precedents,
-            precedent_corpus=corpus,
-            on_precedent_match=precedent_match_hook(project_dir, log=LoggerSink(_log)),
+            **_repo_signals(work_dir),
+            **_precedent_signals(project_dir, run_dir),
         )
     except Exception as exc:  # noqa: BLE001 - degrade gracefully to raw findings on enrichment setup failure
         _log.warning("Could not build enrichment context: %s -- writing raw", exc)

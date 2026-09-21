@@ -120,11 +120,11 @@ def _silence_broken_stdout() -> None:
     """
     try:
         devnull = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115 - long-lived
-        sys.stdout = devnull
-        sys.stderr = devnull
     except OSError:
         # /dev/null itself could not be opened, so the streams stay broken and
         # there is no channel left to report on. Callers proceed; later writes
         # keep raising BrokenPipeError, which the loop already treats as
         # non-fatal.
         return
+    sys.stdout = devnull
+    sys.stderr = devnull

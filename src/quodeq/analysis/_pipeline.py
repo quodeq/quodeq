@@ -1,15 +1,19 @@
 """Pipeline coordination — dimension orchestration, merging, and public API."""
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import NamedTuple
+from datetime import datetime, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
-from quodeq.analysis._dim_order import DimEstimates, _order_by_backlog
+from quodeq.analysis._dim_order import _order_by_backlog
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loop_state import DimTransition, _run_dir_for, _safe_write_dim_state
 from quodeq.analysis._loop_steps import default_loop_deps
+from quodeq.analysis._pipeline_setup import (
+    _set_run_deadline, _warn_if_local_api_oversubscribed,
+)
 from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.cache.gc import ensure_cache_ready
@@ -17,50 +21,59 @@ from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
-from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.subprocess import _get_provider_type
 from quodeq.core.evidence.model import Evidence
 from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis.runner_markers import emit_marker
-from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_SCORING, CC_PHASE_SETUP
+from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_SCORING, CC_PHASE_SETUP
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG
-
-_LOCAL_API_HOSTS = ("localhost", "127.0.0.1", "::1")
-
-
-def _warn_if_local_api_oversubscribed(config: RunConfig) -> None:
-    """Warn when subagents will queue behind one local-API inference slot.
-
-    Local model servers (Ollama, llama.cpp, omlx) default to serving one
-    request per loaded model, so with ``--n-subagents > 1`` the extra agents
-    queue behind the first. The read timeout scales with the subagent count
-    (see ``_api_call._resolve_timeout``) so queued calls no longer die, but
-    throughput is still capped at the server's parallelism until it is raised
-    (e.g. ``OLLAMA_NUM_PARALLEL``). Cloud API providers don't have this
-    constraint, so we narrow the warning to loopback bases.
-    """
-    if config.options.max_subagents <= 1:
-        return
-    ai_cmd = config.ai_cmd
-    if _get_provider_type(ai_cmd) != "api":
-        return
-    api_base = get_provider_configs().get(ai_cmd, {}).get("api_base", "")
-    if not any(host in api_base for host in _LOCAL_API_HOSTS):
-        return
-    log_warning(
-        f"--n-subagents={config.options.max_subagents} with local provider "
-        f"'{ai_cmd}': local model servers serve one request per model by "
-        f"default, so subagents queue and add little throughput. To run "
-        f"them truly in parallel, raise the server's parallelism (e.g. "
-        f"OLLAMA_NUM_PARALLEL={config.options.max_subagents})."
-    )
-
 
 def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContext]:
     """Load dimensions data and resolve which dimensions to analyze."""
     return _load_ctx(config)
+
+
+class _DryRunScope(NamedTuple):
+    """The per-run values every dry-run dimension reuses."""
+    run_dir: Path | None
+    evidence_dir: Path
+    date_str: str
+    total: int
+
+
+def _dry_run_dimension(
+    config: RunConfig, scope: _DryRunScope, dimension: str, idx: int,
+) -> Evidence:
+    """Walk one dimension through the dry-run states and return empty Evidence.
+
+    Dim states must move to DONE here just like the real loops: the lifecycle
+    flips anything still pending at exit to INCOMPLETE and stamps the run
+    exit_reason=incomplete_dimensions.
+    """
+    _safe_write_dim_state(
+        scope.run_dir, dimension, DimTransition(DimState.RUNNING), log=SHARED_LOG)
+    log_info(f"→ [{idx}/{scope.total}] Dry-run: skipping AI call for {dimension}")
+    emit_marker(CC_PHASE_ANALYZING, dimension=dimension)
+    ev = Evidence(
+        repository=str(config.src),
+        language=config.language,
+        date=scope.date_str,
+        source_file_count=config.source_file_count,
+        files_read=0,
+        coverage_pct=0.0,
+    )
+    # V2 cache writes happen per-file inside the dispatch path; dry-run
+    # has nothing to dispatch, so no cache state is created here.
+    jsonl_path = scope.evidence_dir / f"{dimension}_evidence.jsonl"
+    jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+    if not jsonl_path.exists():
+        jsonl_path.touch()
+    emit_marker(CC_PHASE_SCORING, dimension=dimension)
+    _safe_write_dim_state(
+        scope.run_dir, dimension, DimTransition(DimState.DONE), log=SHARED_LOG)
+    return ev
 
 
 def _run_dry_run(
@@ -70,34 +83,16 @@ def _run_dry_run(
     """Return empty Evidence per dimension without making any AI calls."""
     dimensions, ctx = load_analysis_context(config)
     emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
+    scope = _DryRunScope(
+        run_dir=_run_dir_for(config),
+        evidence_dir=config.work_dir or config.src,
+        date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        total=ctx.total,
+    )
     result: dict[str, Evidence] = {}
-    date_str = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    evidence_dir = config.work_dir or config.src
-    run_dir = _run_dir_for(config)
     for idx, dimension in enumerate(dimensions, 1):
-        # Dim states must move to DONE here just like the real loops: the
-        # lifecycle flips anything still pending at exit to INCOMPLETE and
-        # stamps the run exit_reason=incomplete_dimensions.
-        _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=SHARED_LOG)
-        log_info(f"→ [{idx}/{ctx.total}] Dry-run: skipping AI call for {dimension}")
-        emit_marker(CC_PHASE_ANALYZING, dimension=dimension)
-        ev = Evidence(
-            repository=str(config.src),
-            language=config.language,
-            date=date_str,
-            source_file_count=config.source_file_count,
-            files_read=0,
-            coverage_pct=0.0,
-        )
-        # V2 cache writes happen per-file inside the dispatch path; dry-run
-        # has nothing to dispatch, so no cache state is created here.
-        jsonl_path = evidence_dir / f"{dimension}_evidence.jsonl"
-        jsonl_path.parent.mkdir(parents=True, exist_ok=True)
-        if not jsonl_path.exists():
-            jsonl_path.touch()
-        emit_marker(CC_PHASE_SCORING, dimension=dimension)
+        ev = _dry_run_dimension(config, scope, dimension, idx)
         result[dimension] = ev
-        _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.DONE), log=SHARED_LOG)
         if on_dimension_done:
             on_dimension_done(dimension, ev)
     return result
@@ -163,19 +158,19 @@ def _prepare_run_context(
     return dimensions, ctx, runner, dim_counts
 
 
-def _set_run_deadline(config: RunConfig) -> None:
-    """Set the run-level deadline once, just before the dim loop starts.
+def _consolidated_is_available(config: RunConfig, dimensions: list[str]) -> bool:
+    """True when one all-dimensions pass is worth attempting.
 
-    Skipped for dry runs (caller returns earlier), unlimited budget, or when
-    an outer caller (tests) has pre-set deadline_at.
+    It needs more than one dimension to consolidate, more than one subagent
+    to spread them over, and a non-api provider: local models lose coverage
+    when asked for eight dimensions in a single prompt.
     """
-    budget_s = config.options.time_limit
-    if config.options.deadline_at is None and budget_s is not None and budget_s > 0:
-        config.options.deadline_at = time.monotonic() + budget_s
-        deadline_iso = (
-            datetime.now(timezone.utc) + timedelta(seconds=budget_s)
-        ).isoformat()
-        emit_marker(CC_PHASE_ANALYZING_START, deadline_at=deadline_iso, budget_s=budget_s)
+    return (
+        config.options.consolidated
+        and len(dimensions) > 1
+        and config.options.max_subagents > 1
+        and _get_provider_type(config.ai_cmd) != "api"
+    )
 
 
 def _try_consolidated_mode(
@@ -188,11 +183,7 @@ def _try_consolidated_mode(
     Disabled for API providers — per-dimension gives better coverage since
     local models struggle with 8 dimensions in one prompt.
     """
-    _provider_type = _get_provider_type(config.ai_cmd)
-    if not (config.options.consolidated
-            and len(dimensions) > 1
-            and config.options.max_subagents > 1
-            and _provider_type != "api"):
+    if not _consolidated_is_available(config, dimensions):
         return None
     try:
         result = process_consolidated_dimensions(
@@ -245,6 +236,28 @@ def _dispatch_fixed_mode(
     return None
 
 
+def _run_clean_scan(
+    config: RunConfig,
+    dimensions: list[str],
+    ctx: _AnalysisContext,
+    runner: DimensionRunner,
+    on_dimension_done: "Callable[[str, Evidence], None] | None",
+) -> dict[str, Evidence]:
+    """Full re-analysis with no carry-forward, consolidated where possible.
+
+    Reached only for --clean-scan or --diff-from. Consolidated mode is
+    allowed here because there is no prior fingerprint to honour.
+    """
+    emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
+    consolidated_result = _try_consolidated_mode(config, dimensions, ctx)
+    if consolidated_result is not None:
+        return consolidated_result
+    return run_per_dimension_loop(
+        config, dimensions, ctx,
+        default_loop_deps(runner, on_dimension_done, SHARED_LOG),
+    )
+
+
 def _run_dimensions(
     config: RunConfig,
     on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
@@ -253,7 +266,7 @@ def _run_dimensions(
     if config.options.dry_run:
         return _run_dry_run(config, on_dimension_done=on_dimension_done)
 
-    _warn_if_local_api_oversubscribed(config)
+    _warn_if_local_api_oversubscribed(config, log=SHARED_LOG)
 
     dimensions, ctx, runner, dim_counts = _prepare_run_context(config)
     _set_run_deadline(config)
@@ -264,19 +277,7 @@ def _run_dimensions(
     if fixed_mode_result is not None:
         return fixed_mode_result
 
-    # Clean-scan path: full re-analysis, no carry-forward. Reached only
-    # when the user requested --clean-scan or --diff-from. Consolidated
-    # mode is allowed here because there is no prior fingerprint to honour.
-    emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
-
-    consolidated_result = _try_consolidated_mode(config, dimensions, ctx)
-    if consolidated_result is not None:
-        return consolidated_result
-
-    return run_per_dimension_loop(
-        config, dimensions, ctx,
-        default_loop_deps(runner, on_dimension_done, SHARED_LOG),
-    )
+    return _run_clean_scan(config, dimensions, ctx, runner, on_dimension_done)
 
 
 def run(config: RunConfig) -> Evidence:

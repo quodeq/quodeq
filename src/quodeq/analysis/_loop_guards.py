@@ -146,7 +146,7 @@ def _tally_markers(jsonl_path: Path) -> tuple[int, int]:
                     FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR,
                 ):
                     last_status[file] = status
-    except (FileNotFoundError, OSError):
+    except OSError:
         return 0, 0
     ok = sum(1 for s in last_status.values() if s == FILE_DONE_STATUS_OK)
     err = sum(1 for s in last_status.values() if s == FILE_DONE_STATUS_ERROR)

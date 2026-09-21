@@ -18,7 +18,7 @@ def filter_manifest_by_scope(
 ) -> SourceManifest | None:
     """Narrow a manifest to only files under *scope_path*.
 
-    Returns None (with error printed) when no files match.
+    Returns None (logging a warning) when no files match.
     """
     if not manifest or not manifest.targets:
         return manifest

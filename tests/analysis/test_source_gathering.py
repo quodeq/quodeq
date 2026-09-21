@@ -112,12 +112,18 @@ class TestGatherSourceFiles:
         assert "style.css" in names
 
     def test_does_not_descend_into_skipped_dirs(self, tmp_path, monkeypatch):
-        (tmp_path / "src").mkdir(); (tmp_path / "src" / "a.py").write_text("x")
-        nm = tmp_path / "node_modules" / "pkg"; nm.mkdir(parents=True); (nm / "b.js").write_text("y")
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "a.py").write_text("x")
+        nm = tmp_path / "node_modules" / "pkg"
+        nm.mkdir(parents=True)
+        (nm / "b.js").write_text("y")
         visited = []
         real_scandir = os.scandir
+
         def spy(path=".", *a, **k):
-            visited.append(str(path)); return real_scandir(path, *a, **k)
+            visited.append(str(path))
+            return real_scandir(path, *a, **k)
+
         monkeypatch.setattr(os, "scandir", spy)
         files = _gather_source_files(tmp_path)
         assert [f.name for f in files] == ["a.py"]

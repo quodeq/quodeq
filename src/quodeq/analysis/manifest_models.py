@@ -87,7 +87,6 @@ class SourceManifest:
             return None
         return max(self.targets, key=lambda t: t.total_files)
 
-
     @property
     def language(self) -> str:
         """Language of the primary target, "unknown" for an empty manifest."""

@@ -90,7 +90,7 @@ def _template(slots: tuple[str, ...], prefix: str = "") -> str:
 # ---------------------------------------------------------------------------
 
 class TestBuildAnalysisPrompt:
-    def _make_context(self, tmp_path=None, **kwargs):
+    def _make_context(self, **kwargs):
         defaults = dict(
             language="python",
             repo_name="test-repo",
