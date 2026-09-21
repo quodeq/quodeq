@@ -4,6 +4,7 @@ import { SidePaneWindow } from './SidePaneWindow.jsx';
 import { clampSidePaneWidth } from './paneWidthMath.js';
 import { t } from '../../strings/index.js';
 import { useOuterPaneDrag } from './hooks/useOuterPaneDrag.js';
+import { usePaneDragPlumbing } from './hooks/usePaneDragPlumbing.js';
 import { useInnerDividerDrag, MIN_WINDOW_RATIO, DEFAULT_SPLIT_RATIO } from './hooks/useInnerDividerDrag.js';
 import './SidePane.css';
 
@@ -83,11 +84,13 @@ function InnerRowDivider({ i, windowCount, ratios, setRatios, onInnerDividerPoin
 export function SidePane() {
   const { windows, isOpen, paneWidth, setPaneWidth, removeWindow } = useSidePane();
 
-  // Outer pane (left-edge) drag, plus the shared drag plumbing (container
-  // ref, resizing flag, active-drag cleanup ref) — see hooks/useOuterPaneDrag.js.
-  const {
-    containerRef, setResizingFlag, activeDragCleanupRef, isDragging, onOuterDividerPointerDown,
-  } = useOuterPaneDrag({ paneWidth, setPaneWidth });
+  // The container ref, resizing flag and cleanup slot both drags share.
+  const { containerRef, setResizingFlag, activeDragCleanupRef } = usePaneDragPlumbing();
+
+  // Outer pane (left-edge) drag -- see hooks/useOuterPaneDrag.js.
+  const { isDragging, onOuterDividerPointerDown } = useOuterPaneDrag({
+    paneWidth, setPaneWidth, setResizingFlag, activeDragCleanupRef,
+  });
 
   // Internal between-window resizer, plus the per-resizer ratios state —
   // see hooks/useInnerDividerDrag.js.

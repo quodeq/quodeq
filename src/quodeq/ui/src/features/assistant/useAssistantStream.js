@@ -129,6 +129,24 @@ function makeFrameHandlers({ revealer, append, beginContent, setError, endPendin
   };
 }
 
+// Everything one session's stream needs, built once when the stream opens:
+// the reveal machinery, the inactivity guard, the first-content gate and the
+// frame dispatch table. They close over the same refs, so they are built
+// together rather than assembled at the call site.
+function buildStreamPipeline({
+  pending, raf, timer, turnBoundary, endPending, inactivity,
+  setMessages, setStreaming, setError, onDoneRef,
+}) {
+  const revealer = createTurnRevealer({
+    pending, raf, timer, turnBoundary, endPending, setMessages, setStreaming, onDoneRef,
+  });
+  const resetInactivity = createInactivityGuard({ inactivity, setError, endTurn: revealer.endTurn });
+  const append = (msg) => setMessages((prev) => [...prev, msg]);
+  const beginContent = createContentGate({ turnBoundary, setError, setStreaming });
+  const handlers = makeFrameHandlers({ revealer, append, beginContent, setError, endPending });
+  return { revealer, resetInactivity, handlers };
+}
+
 export function useAssistantStream(sessionId, { onDone } = {}) {
   const [messages, setMessages] = useState([]);
   const [streaming, setStreaming] = useState(false);
@@ -159,11 +177,10 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
     turnBoundary.current = false;
     endPending.current = false;
 
-    const revealer = createTurnRevealer({ pending, raf, timer, turnBoundary, endPending, setMessages, setStreaming, onDoneRef });
-    const resetInactivity = createInactivityGuard({ inactivity, setError, endTurn: revealer.endTurn });
-    const append = (msg) => setMessages((prev) => [...prev, msg]);
-    const beginContent = createContentGate({ turnBoundary, setError, setStreaming });
-    const handlers = makeFrameHandlers({ revealer, append, beginContent, setError, endPending });
+    const { revealer, resetInactivity, handlers } = buildStreamPipeline({
+      pending, raf, timer, turnBoundary, endPending, inactivity,
+      setMessages, setStreaming, setError, onDoneRef,
+    });
 
     const es = new EventSource(assistantEventsUrl(sessionId, 0));
     es.onmessage = (e) => {

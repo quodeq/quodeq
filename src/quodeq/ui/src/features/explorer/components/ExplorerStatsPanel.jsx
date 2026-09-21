@@ -24,7 +24,7 @@ export default function ExplorerStatsPanel({
         <Stat
           label={t('overview.statViolations')}
           value={allViolations.length}
-          hint={(sev.critical || sev.major || sev.minor) ? (
+          hint={SUMMARY_SEVERITIES.some((level) => sev[level]) ? (
             <span className="principle-detail-sev-row">
               {SUMMARY_SEVERITIES.map((level) => sev[level] > 0 && (
                 <SevBadge

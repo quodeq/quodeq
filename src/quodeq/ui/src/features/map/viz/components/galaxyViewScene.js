@@ -133,6 +133,19 @@ function buildSingleGroupLayout(dimensions, rng) {
   }));
 }
 
+// The dimension stars, and the constellations holding them when the
+// standards carry types worth grouping by. Both layouts share the scene's
+// seeded RNG, so a given set of dimension names always lands the same way.
+function buildStarLayout(dimensions, standardTypes, { W, H, rng }) {
+  const { dimGroups, groupKeys, useConstellations } = groupDimensionsByType(dimensions, standardTypes);
+  if (!useConstellations) {
+    return { stars: buildSingleGroupLayout(dimensions, rng), constellations: [] };
+  }
+  const spread = Math.min(W, H) * LAYOUT.clusterSpreadFraction;
+  const baseClusterSpread = Math.min(W, H) * LAYOUT.clusterBaseSpreadFraction;
+  return buildConstellationLayout({ dimGroups, groupKeys, spread, baseClusterSpread, rng });
+}
+
 /**
  * Lay out the whole galaxy: one cluster per dimension, its principles in
  * orbit, and the background starfield. Positions are seeded from the
@@ -149,14 +162,7 @@ export function buildScene(dimensions, W, H, standardTypes) {
   const dimFingerprint = dimensions.map(d => d.dimension || '').sort().join('|');
   const rng = seededRng(seedHash('galaxy:' + dimFingerprint));
 
-  const { dimGroups, groupKeys, useConstellations } = groupDimensionsByType(dimensions, standardTypes);
-
-  const spread = Math.min(W, H) * LAYOUT.clusterSpreadFraction;
-  const baseClusterSpread = Math.min(W, H) * LAYOUT.clusterBaseSpreadFraction;
-
-  const { stars, constellations } = useConstellations
-    ? buildConstellationLayout({ dimGroups, groupKeys, spread, baseClusterSpread, rng })
-    : { stars: buildSingleGroupLayout(dimensions, rng), constellations: [] };
+  const { stars, constellations } = buildStarLayout(dimensions, standardTypes, { W, H, rng });
 
   const principles = buildPrinciples(dimensions);
   stars.forEach((s, i) => { s.principleCount = (principles[i] || []).length; });

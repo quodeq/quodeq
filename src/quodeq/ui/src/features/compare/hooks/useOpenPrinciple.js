@@ -8,6 +8,24 @@ import {
 } from '../../../utils/evalPrincipal.js';
 import { STALE_TIME_MS } from '../../../hooks/queryDefaults.js';
 
+// Fetch the target run's dimension eval through that project's query subtree
+// (so the explorer's own cache entry is reused rather than duplicated) and
+// shape it the way the principle page expects.
+async function loadEvalPrincipal(queryClient, target) {
+  const evalData = await queryClient.fetchQuery({
+    queryKey: projectKeys.dimensionEval(target.id, target.runId, target.dimName),
+    queryFn: () => getDimensionEval(target.id, target.runId, target.dimName),
+    staleTime: STALE_TIME_MS,
+  });
+  return buildEvalPrincipalFn(
+    evalData,
+    computeComplianceByPrinciple(evalData),
+    target.id,
+    target.runId,
+    target.dateLabel || '',
+  )(target.principle);
+}
+
 /**
  * Open one project's own view of one principle: fetch that project's
  * dimension eval (cached in its query subtree), build the evalPrincipal with
@@ -24,19 +42,7 @@ export function useOpenPrinciple({ onOpenEvalPrincipal, openProject }) {
     if (target?.remote) { openProject(target.id); return; }
     if (!onOpenEvalPrincipal || !target?.runId || !target?.dimName) return;
     try {
-      const evalData = await queryClient.fetchQuery({
-        queryKey: projectKeys.dimensionEval(target.id, target.runId, target.dimName),
-        queryFn: () => getDimensionEval(target.id, target.runId, target.dimName),
-        staleTime: STALE_TIME_MS,
-      });
-      const evalPrincipal = buildEvalPrincipalFn(
-        evalData,
-        computeComplianceByPrinciple(evalData),
-        target.id,
-        target.runId,
-        target.dateLabel || '',
-      )(target.principle);
-      onOpenEvalPrincipal(evalPrincipal);
+      onOpenEvalPrincipal(await loadEvalPrincipal(queryClient, target));
     } catch (err) {
       // Fetch failed (run pruned, server hiccup): stay on Compare rather
       // than landing on an empty principle page.
