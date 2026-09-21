@@ -28,10 +28,10 @@ from quodeq.services._job_model import (
     STATUS_DONE,
     STATUS_FAILED,
     STATUS_RUNNING,
-    _DEADLINE_EXIT_REASONS,  # noqa: F401 — re-export (patch/import target)
-    _EXIT_CODE_TIMEOUT,  # noqa: F401 — re-export (patch/import target)
-    _MAX_COMPLETED_JOBS,  # noqa: F401 — re-export (patch/import target)
-    _WATCHDOG_POLL_INTERVAL_S,  # noqa: F401 — re-export (patch/import target)
+    _DEADLINE_EXIT_REASONS,
+    _EXIT_CODE_TIMEOUT,
+    _MAX_COMPLETED_JOBS,
+    _WATCHDOG_POLL_INTERVAL_S,
     mark_spawn_failed,
     new_job,
 )
@@ -47,6 +47,10 @@ __all__ = [
     "Job", "JobLaunchOptions", "JobProcessSeams", "JobStore", "InMemoryJobStore",
     "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager",
     "STATUS_RUNNING", "STATUS_CANCELLED", "STATUS_DONE", "STATUS_FAILED",
+    # Owned by _job_model (which _job_monitor_mixin also reads them from) and
+    # re-exported here: tests import and patch them at this module's path.
+    "_DEADLINE_EXIT_REASONS", "_EXIT_CODE_TIMEOUT", "_MAX_COMPLETED_JOBS",
+    "_WATCHDOG_POLL_INTERVAL_S",
 ]
 
 _EXIT_CODE_SPAWN_FAILURE = -1

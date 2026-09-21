@@ -75,6 +75,7 @@ from quodeq._cli_evaluate_finalize import (  # noqa: F401
 )
 from quodeq._cli_pipeline_exec import _execute_pipeline, _save_manifest
 
+
 class _RunConfigLocals(NamedTuple):
     """The per-run scalars `_build_run_config` resolves before assembling RunConfig.
 

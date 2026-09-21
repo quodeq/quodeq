@@ -32,6 +32,7 @@ from quodeq.services._run_discard import (  # noqa: F401 — re-export
 if TYPE_CHECKING:
     from quodeq.services.jobs import JobManager
 
+
 def _run_ref(job: JobSnapshot) -> dict[str, str | None]:
     """The ``{"outputProject", "outputRunId"}`` payload the run-state helpers take."""
     return {"outputProject": job.output_project, "outputRunId": job.output_run_id}

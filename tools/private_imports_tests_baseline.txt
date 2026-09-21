@@ -798,9 +798,9 @@ tests/dashboard/test_process_coverage.py:27:private-name:quodeq.dashboard._proce
 tests/dashboard/test_process_coverage.py:32:private-name:quodeq.dashboard._process._get_pid_file
 tests/dashboard/test_process_coverage.py:37:private-name:quodeq.dashboard._process._get_pid_file
 tests/dashboard/test_process_coverage.py:58:private-name:quodeq.dashboard._process._kill_stale_action_api
-tests/dashboard/test_reload_url_guard.py:6:private-name:quodeq.dashboard._webview_window._download_via_dialog
-tests/dashboard/test_reload_url_guard.py:6:private-name:quodeq.dashboard._webview_window._is_safe_reload_url
-tests/dashboard/test_reload_url_guard.py:6:private-name:quodeq.dashboard._webview_window._make_on_reload
+tests/dashboard/test_reload_url_guard.py:7:private-name:quodeq.dashboard._webview_window._download_via_dialog
+tests/dashboard/test_reload_url_guard.py:7:private-name:quodeq.dashboard._webview_window._is_safe_reload_url
+tests/dashboard/test_reload_url_guard.py:7:private-name:quodeq.dashboard._webview_window._make_on_reload
 tests/dashboard/test_server_coverage.py:100:private-name:quodeq.dashboard._server._ensure_action_api
 tests/dashboard/test_server_coverage.py:113:private-name:quodeq.dashboard._server._ensure_action_api_forced
 tests/dashboard/test_server_coverage.py:120:private-name:quodeq.dashboard._server._ensure_action_api_forced

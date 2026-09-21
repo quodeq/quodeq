@@ -37,9 +37,9 @@ from quodeq.shared.log_sink import SHARED_LOG
 # _cleanup_worktree is unused directly in this module but must stay imported
 # — it is a patch target (quodeq._cli_resolution._cleanup_worktree) and the
 # public re-export chain through quodeq.cli_evaluation depends on it.
-from quodeq._cli_worktree import _cleanup_worktree, _create_worktree  # noqa: F401
+from quodeq._cli_worktree import _cleanup_worktree, _create_worktree
 # Re-exported: moved to _cli_scope.py to keep this module under 300 lines.
-from quodeq._cli_scope import (  # noqa: F401
+from quodeq._cli_scope import (
     _override_manifest_single_file, _resolve_scope, _resolve_single_file,
 )
 
@@ -253,6 +253,21 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
         single_file=bool(scope.single_file),
     )
 
+
+__all__ = [
+    # Defined here.
+    "ResolvedInputs", "filter_manifest_by_scope",
+    "_build_manifest", "_require_standards_config", "_resolve_evaluation_inputs",
+    "_resolve_language", "_resolve_repo",
+    # Re-exported from _cli_scope / _cli_worktree so the historical
+    # ``quodeq._cli_resolution.<name>`` import and patch paths keep working.
+    "_cleanup_worktree", "_create_worktree",
+    "_override_manifest_single_file", "_resolve_scope", "_resolve_single_file",
+    # Public spellings, assigned below.
+    "build_cli_manifest", "cleanup_worktree", "create_worktree",
+    "override_manifest_single_file", "resolve_evaluation_inputs",
+    "resolve_language", "resolve_repo", "resolve_scope", "resolve_single_file",
+]
 
 # Public spellings of the names ``quodeq.cli`` re-exports. The underscore
 # originals stay importable from here for in-package callers.

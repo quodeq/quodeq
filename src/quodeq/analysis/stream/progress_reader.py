@@ -74,7 +74,6 @@ class IncrementalProgressReader:
             if isinstance(data, dict) and self.provider_error is None:
                 self.provider_error = _fatal_provider_error(data)
 
-
     def _read_jsonl(self) -> None:
         if self._jsonl_file is None or not self._jsonl_file.exists():
             return

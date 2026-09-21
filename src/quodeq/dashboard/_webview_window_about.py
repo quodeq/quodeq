@@ -1,5 +1,9 @@
 """macOS app identity: dock icon, bundle name, and the rich About panel.
 
+The webview's user-agent string lives in ``_webview_user_agent`` and is
+re-exported here, where ``_webview_window`` and the drift tests have always
+imported it from.
+
 The About-panel install writes its progress to the webview diagnostic log
 (``_webview_diag``), which this module re-exports as ``_diag`` for the help
 menu that writes to the same file.
@@ -16,7 +20,20 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from quodeq.dashboard._webview_diag import _diag
+from quodeq.dashboard._webview_user_agent import (
+    _WEBVIEW_TOKEN_UA_PREFIX, _WEBVIEW_UA_MARKER, _quodeq_version,
+    _webview_user_agent,
+)
 from quodeq.shared.logging import log_debug
+
+__all__ = [
+    "_icon_path", "_install_about_panel_override", "_set_app_icon",
+    "_set_macos_app_identity",
+    # Re-exported: _webview_window and the drift tests have always imported
+    # these from here.
+    "_WEBVIEW_TOKEN_UA_PREFIX", "_WEBVIEW_UA_MARKER", "_diag",
+    "_quodeq_version", "_webview_user_agent",
+]
 
 _APP_DISPLAY_NAME = "quodeq"
 
@@ -56,33 +73,6 @@ def _icon_path(ext: str) -> str | None:
     return str(p) if p.exists() else None
 
 
-def _quodeq_version() -> str:
-    try:
-        from importlib.metadata import version  # noqa: PLC0415
-        return version("quodeq")
-    except Exception:  # noqa: BLE001 — metadata may be missing in dev
-        return "dev"
-
-
-# Human-readable marker (must match quodeq.api.security._WEBVIEW_UA_MARKER).
-# Not itself a security check — any HTTP client can send this substring; the
-# CSP relaxation is gated on the per-launch token below.
-_WEBVIEW_UA_MARKER = "QuodeqDesktop"
-
-# UA prefix ahead of the token (must match security._WEBVIEW_TOKEN_UA_PREFIX).
-_WEBVIEW_TOKEN_UA_PREFIX = "QuodeqWebviewToken/"
-
-
-def _webview_user_agent(token: str | None = None) -> str:
-    """UA carrying the marker (human-readable) and the token that actually
-    grants the relaxed CSP (see quodeq.api.security._is_trusted_webview)."""
-    token_part = f" {_WEBVIEW_TOKEN_UA_PREFIX}{token}" if token else ""
-    return (
-        "Mozilla/5.0 (quodeq) AppleWebKit/605.1.15 (KHTML, like Gecko) "
-        f"{_WEBVIEW_UA_MARKER}/{_quodeq_version()}{token_part} Safari/605.1.15"
-    )
-
-
 def _build_about_credits() -> object | None:
     """Build a clickable NSAttributedString with website + repo links."""
     try:
@@ -96,6 +86,7 @@ def _build_about_credits() -> object | None:
         return None
     try:
         body = NSMutableAttributedString.alloc().init()
+
         def _append(text: str, link: str | None = None) -> None:
             attrs = {}
             if link:

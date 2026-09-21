@@ -18,11 +18,10 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-
-from quodeq.services._accumulated_data import _has_valid_score
 from typing import TYPE_CHECKING
 
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
+from quodeq.services._accumulated_data import _has_valid_score
 from quodeq.services.wiring import RunInfo, read_run_data, summarize_dimensions
 from quodeq.services._fs_project_primitives import _local_repo_root
 from quodeq.services._fs_project_primitives import (  # noqa: F401 — re-export

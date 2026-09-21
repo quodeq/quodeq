@@ -71,7 +71,8 @@ def main() -> None:
     if not sa.findings_file:
         sys.stderr.write(
             "Error: findings output path is required.\n"
-            "Usage: findings_server <findings_file> [--compiled-dir DIR --dimension DIM]"
+            "Usage: python -m quodeq.analysis.mcp.findings_server <findings_file>"
+            " [--compiled-dir DIR --dimension DIM]"
             " [--queue PATH --agent-id ID]\n"
             "Provide the path where findings JSONL should be written.\n"
         )

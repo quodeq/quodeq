@@ -22,6 +22,7 @@ from quodeq.core.observability import NULL_LOG, LogSink
 
 _PRECEDENT_DOWNWEIGHT = 25
 
+
 class _UnsetScore:
     """Type of :data:`UNSET_SCORE`; it exists only so the sentinel has one."""
 
