@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react';
 import { treeNodeToFileObj } from '../viz/index.js';
 import { readCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
 import { useDashboardFullHeight } from './useDashboardFullHeight.js';
-import { useVisibleStandards } from './useVisibleStandards.js';
+import { useStandardTypes } from './useStandardTypes.js';
 import { useMapDisplayPrefs } from './useMapDisplayPrefs.js';
 import { useMapDimensionFilter } from './useMapDimensionFilter.js';
 import { useMapTreeState } from './useMapTreeState.js';
@@ -99,13 +99,13 @@ function useMapPageLifecycle({ selectedProject, tabKey, callbacks }) {
   }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Standard types for galaxy constellation grouping.
-  const { standardTypes } = useVisibleStandards();
+  const { standardTypes } = useStandardTypes();
   return { cached, standardTypes };
 }
 
 /**
  * Map page state, as composition: DOM sizing (useDashboardFullHeight), the
- * standards fetch (useVisibleStandards), display prefs (useMapDisplayPrefs),
+ * standards fetch (useStandardTypes), display prefs (useMapDisplayPrefs),
  * the dimension filter (useMapDimensionFilter), the tree (useMapTreeState),
  * and storage via the shared adapters (adapters/storage.js + pageStateCache).
  */

@@ -110,6 +110,14 @@ function makeAnimationFrame({
   };
 }
 
+// Where the camera sits when there is nothing to focus on: the viewport
+// centre at the fit zoom. Every depth falls back to it when its target star
+// is missing. A function, not a shared object, so a caller that mutates its
+// camera cannot write through to the next frame's fallback.
+function centredTarget(size, fz) {
+  return { x: size.w / 2, y: size.h / 2, z: fz };
+}
+
 function computeTarget({ nav, scene, size, camRef, fz }) {
   if (nav.depth === 0) {
     if (nav.clusterCx != null) {
@@ -119,10 +127,19 @@ function computeTarget({ nav, scene, size, camRef, fz }) {
       const clusterFz = halfView / clusterExtent;
       return { x: size.w / 2 + nav.clusterCx, y: size.h / 2 + nav.clusterCy, z: clusterFz };
     }
-    return { x: size.w / 2, y: size.h / 2, z: fz };
+    return centredTarget(size, fz);
   }
-  if (nav.depth === 1 && nav.dim !== null) { const s = scene.stars?.[nav.dim]; if (!s) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: s.x, y: s.y, z: DIMENSION_ZOOM }; }
-  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) { const s = scene.stars?.[nav.dim]; const p = s ? scene.principles?.[nav.dim]?.[nav.prin] : null; if (!p) return { x: size.w / 2, y: size.h / 2, z: fz }; return { x: p.x, y: p.y, z: PRINCIPLE_ZOOM }; }
+  if (nav.depth === 1 && nav.dim !== null) {
+    const s = scene.stars?.[nav.dim];
+    if (!s) return centredTarget(size, fz);
+    return { x: s.x, y: s.y, z: DIMENSION_ZOOM };
+  }
+  if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) {
+    const s = scene.stars?.[nav.dim];
+    const p = s ? scene.principles?.[nav.dim]?.[nav.prin] : null;
+    if (!p) return centredTarget(size, fz);
+    return { x: p.x, y: p.y, z: PRINCIPLE_ZOOM };
+  }
   return camRef.current;
 }
 

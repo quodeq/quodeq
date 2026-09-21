@@ -67,15 +67,17 @@ function updateStarPositions(activeScene, frame, fly, refs) {
     s.y = H / 2 + s.oy + Math.cos(t * DRIFT_SPEED_Y + i * DRIFT_PHASE_Y) * DRIFT_AMPLITUDE;
   });
   if (fly) return;
-  const ff2 = refs.focusedFolderRef.current;
-  if (ff2 && ff2.starIdx < activeScene.rootStars.length) {
-    const fs = activeScene.rootStars[ff2.starIdx];
-    ff2.x = fs.x; ff2.y = fs.y;
+  const focusedFolder = refs.focusedFolderRef.current;
+  if (focusedFolder && focusedFolder.starIdx < activeScene.rootStars.length) {
+    const folderStar = activeScene.rootStars[focusedFolder.starIdx];
+    focusedFolder.x = folderStar.x;
+    focusedFolder.y = folderStar.y;
   }
-  const zfr = refs.zoomedFileRef.current;
-  if (zfr && zfr.starIdx != null && zfr.starIdx < activeScene.rootStars.length) {
-    const zfs = activeScene.rootStars[zfr.starIdx];
-    zfr.x = zfs.x; zfr.y = zfs.y;
+  const zoomedFile = refs.zoomedFileRef.current;
+  if (zoomedFile && zoomedFile.starIdx != null && zoomedFile.starIdx < activeScene.rootStars.length) {
+    const fileStar = activeScene.rootStars[zoomedFile.starIdx];
+    zoomedFile.x = fileStar.x;
+    zoomedFile.y = fileStar.y;
   }
 }
 

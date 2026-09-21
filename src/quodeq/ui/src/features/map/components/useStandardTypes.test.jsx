@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useVisibleStandards } from './useVisibleStandards.js';
+import { useStandardTypes } from './useStandardTypes.js';
 
 vi.mock('../../../api/standards.js', () => ({
   listStandards: vi.fn(),
@@ -9,16 +9,16 @@ vi.mock('../../../api/standards.js', () => ({
 // eslint-disable-next-line import/first -- must follow the vi.mock hoist above
 import { listStandards } from '../../../api/standards.js';
 
-describe('useVisibleStandards (map)', () => {
+describe('useStandardTypes (map)', () => {
   it('logs a failed standards fetch instead of swallowing it', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     listStandards.mockRejectedValueOnce(new Error('fetch failed'));
 
-    const { result } = renderHook(() => useVisibleStandards());
+    const { result } = renderHook(() => useStandardTypes());
 
     await waitFor(() => {
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('[useVisibleStandards]'),
+        expect.stringContaining('[useStandardTypes]'),
         expect.any(Error),
       );
     });

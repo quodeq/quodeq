@@ -18,6 +18,12 @@ import { t } from '../../../strings/index.js';
 // effects on mount — rendering them all before first paint froze the page for
 // seconds with no spinner. React now holds ~30 row instances at once.
 
+// The compliance section shows unless the user has narrowed to one severity:
+// no filter, the explicit "all", and the compliance-only view all keep it.
+function showsComplianceSection(activeSevFilter) {
+  return !activeSevFilter || activeSevFilter === 'all' || activeSevFilter === 'compliance';
+}
+
 function buildListItems({ displayedBySeverity, compliance, activeSevFilter }) {
   const arr = [];
   if (activeSevFilter !== 'compliance') {
@@ -28,7 +34,7 @@ function buildListItems({ displayedBySeverity, compliance, activeSevFilter }) {
       vs.forEach((v, idx) => arr.push({ kind: 'violation', v, idx }));
     }
   }
-  if ((!activeSevFilter || activeSevFilter === 'all' || activeSevFilter === 'compliance') && compliance.length > 0) {
+  if (showsComplianceSection(activeSevFilter) && compliance.length > 0) {
     arr.push({ kind: 'compliance-header', count: compliance.length });
     compliance.forEach((c, idx) => arr.push({ kind: 'compliance', c, idx }));
   }
