@@ -51,6 +51,14 @@ class LoopDeps:
     drop_counter: DropStatsCounter | None = None
 
 
+def default_loop_deps(
+    runner: DimensionRunner, on_dimension_done: Callable[[str, Evidence], None] | None,
+    log: LogSink = NULL_LOG,
+) -> LoopDeps:
+    """The dependency bundle a dimension loop is driven with."""
+    return LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=log)
+
+
 @dataclass(frozen=True, slots=True)
 class _LoopRun:
     """One loop's collaborators plus the Evidence accumulator it returns."""

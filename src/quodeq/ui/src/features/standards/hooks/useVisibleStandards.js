@@ -22,36 +22,36 @@ function makePersist({ storage, projectId, queryClient }) {
   };
 }
 
-function makeToggle(setVisibleIds, persist) {
+// Every mutation is the same updater: compute the next list from the current
+// one, persist it, and return it. `nextOf` returns the previous list itself
+// to signal "nothing to do", which keeps React from re-rendering.
+function makeVisibilityUpdater(setVisibleIds, persist, nextOf) {
   return (id) => {
     setVisibleIds((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      const next = nextOf(prev, id);
+      if (next === prev) return prev;
       persist(next);
       return next;
     });
   };
+}
+
+function makeToggle(setVisibleIds, persist) {
+  return makeVisibilityUpdater(setVisibleIds, persist, (prev, id) => (
+    prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  ));
 }
 
 function makeAdd(setVisibleIds, persist) {
-  return (id) => {
-    setVisibleIds((prev) => {
-      if (prev.includes(id)) return prev;
-      const next = [...prev, id];
-      persist(next);
-      return next;
-    });
-  };
+  return makeVisibilityUpdater(setVisibleIds, persist, (prev, id) => (
+    prev.includes(id) ? prev : [...prev, id]
+  ));
 }
 
 function makeRemove(setVisibleIds, persist) {
-  return (id) => {
-    setVisibleIds((prev) => {
-      if (!prev.includes(id)) return prev;
-      const next = prev.filter((x) => x !== id);
-      persist(next);
-      return next;
-    });
-  };
+  return makeVisibilityUpdater(setVisibleIds, persist, (prev, id) => (
+    prev.includes(id) ? prev.filter((x) => x !== id) : prev
+  ));
 }
 
 /**

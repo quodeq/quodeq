@@ -127,7 +127,11 @@ class TestDimensionDeadlineFloor:
 
 
 class TestIncrementalLoopDeadlineSlices:
-    def test_slices_advance_toward_the_run_deadline_and_are_restored(self, monkeypatch):
+    @pytest.fixture()
+    def _sliced_run(self, monkeypatch):
+        """Run the incremental loop over a backlog-ordered set of dims and
+        collect what each dim saw as its per-dim deadline, plus the config
+        left behind. Each test below checks one property of that slicing."""
         clock = [0.0]
         # _loop_steps and _dim_order both do `import time`, so one patch of
         # the shared module attribute covers the loop guard and the slicer.
@@ -148,12 +152,34 @@ class TestIncrementalLoopDeadlineSlices:
                 dim_counts={"clean-architecture": 806, "security": 187, "reliability": 187},
             )
 
+        return cfg, seen
+
+    def test_slices_process_dims_biggest_backlog_first(self, _sliced_run):
+        _cfg, seen = _sliced_run
         assert [dim for dim, _ in seen] == ["clean-architecture", "security", "reliability"]
+
+    def test_slice_deadlines_advance_monotonically(self, _sliced_run):
+        _cfg, seen = _sliced_run
         deadlines = [deadline for _, deadline in seen]
         assert deadlines == sorted(deadlines)
+
+    def test_slice_deadlines_never_exceed_the_run_deadline(self, _sliced_run):
+        _cfg, seen = _sliced_run
+        deadlines = [deadline for _, deadline in seen]
         assert all(deadline <= 1000.0 for deadline in deadlines)
+
+    def test_first_slice_is_proportional_to_backlog(self, _sliced_run):
+        _cfg, seen = _sliced_run
+        deadlines = [deadline for _, deadline in seen]
         assert deadlines[0] == pytest.approx(806 / 1180 * 880)
+
+    def test_last_slice_gets_the_full_run_deadline(self, _sliced_run):
+        _cfg, seen = _sliced_run
+        deadlines = [deadline for _, deadline in seen]
         assert deadlines[-1] == pytest.approx(1000.0)
+
+    def test_run_deadline_is_restored_after_the_last_slice(self, _sliced_run):
+        cfg, _seen = _sliced_run
         assert cfg.options.deadline_at == 1000.0
 
     def test_unlimited_budget_sets_no_per_dim_deadline(self):

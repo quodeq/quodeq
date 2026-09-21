@@ -158,14 +158,17 @@ function useImportActions(onImported, state, importStandard) {
   const { parsedData, setParsedData } = state;
 
   const handleFile = async (e) => handleFileInput(e, onImported, state, importStandard);
-  const handleForceImport = async () => { await importEvaluator(parsedData, true, onImported, state, importStandard); };
+  // One action, offered from two steps: "overwrite the conflicting standard"
+  // on the conflict step and "import anyway" on the warnings step.
+  const handleImportAnyway = async () => {
+    await importEvaluator(parsedData, true, onImported, state, importStandard);
+  };
   const handleImportAsCopy = async () => {
     const copied = { ...parsedData, id: buildImportedCopyId(parsedData.id) };
     setParsedData(copied);
     await importEvaluator(copied, false, onImported, state, importStandard);
   };
-  const handleProceedWithWarnings = async () => { await importEvaluator(parsedData, true, onImported, state, importStandard); };
-  return { handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings };
+  return { handleFile, handleImportAnyway, handleImportAsCopy };
 }
 
 function useImportModal(onImported) {
@@ -184,8 +187,7 @@ function useImportModal(onImported) {
 export default function ImportModal({ onClose, onImported }) {
   const {
     step, error, warnings, conflict, parsedData,
-    fileRef, handleFile, handleForceImport,
-    handleImportAsCopy, handleProceedWithWarnings,
+    fileRef, handleFile, handleImportAnyway, handleImportAsCopy,
   } = useImportModal(onImported);
 
   return (
@@ -194,8 +196,8 @@ export default function ImportModal({ onClose, onImported }) {
         {step === STEP.PICK && <PickStep fileRef={fileRef} onFile={handleFile} onClose={onClose} />}
         {step === STEP.REVIEWING && <ImportingStep />}
         {step === STEP.ERROR && <ErrorStep error={error} onClose={onClose} />}
-        {step === STEP.WARNINGS && <WarningsStep warnings={warnings} onClose={onClose} onProceed={handleProceedWithWarnings} />}
-        {step === STEP.CONFLICT && <ConflictStep parsedData={parsedData} conflict={conflict} warnings={warnings} actions={{ onClose, onImportAsCopy: handleImportAsCopy, onOverwrite: handleForceImport }} />}
+        {step === STEP.WARNINGS && <WarningsStep warnings={warnings} onClose={onClose} onProceed={handleImportAnyway} />}
+        {step === STEP.CONFLICT && <ConflictStep parsedData={parsedData} conflict={conflict} warnings={warnings} actions={{ onClose, onImportAsCopy: handleImportAsCopy, onOverwrite: handleImportAnyway }} />}
       </div>
     </div>
   );

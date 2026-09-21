@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
+from quodeq.analysis.mcp._enricher_rules import apply_downweight, resolve_principle
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.precedent_downweight import (
     UNSET_SCORE,
@@ -24,7 +25,6 @@ from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.context.precedent import PrecedentCorpus
 from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.trust_model import TrustModel
-from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.observability import NULL_LOG, LogSink
 
 _FINDING_SCHEMA_VERSION = 1
@@ -85,9 +85,7 @@ def _apply_path_role_downweight(finding: dict[str, object]) -> None:
     role = path_role(finding.get("file"))
     if role not in NON_PROD_ROLES:
         return
-    existing = finding.get("confidence")
-    if existing is None or existing == FULL_CONFIDENCE:
-        finding["confidence"] = _NON_PROD_DOWNWEIGHT
+    apply_downweight(finding, _NON_PROD_DOWNWEIGHT)
 
 
 def _shape_irrelevant_to_hosted_service(shape: ProjectShape | None) -> bool:
@@ -117,9 +115,7 @@ def _apply_shape_downweight(
     haystack = " ".join(haystack_parts)
     if not any(kw in haystack for kw in _HOSTED_SERVICE_KEYWORDS):
         return
-    existing = finding.get("confidence")
-    if existing is None or existing == FULL_CONFIDENCE:
-        finding["confidence"] = _SHAPE_DOWNWEIGHT
+    apply_downweight(finding, _SHAPE_DOWNWEIGHT)
 
 
 def _default_read_file(path: Path) -> str:
@@ -165,10 +161,8 @@ class FindingEnricher:
 
     def dedup_key(self, args: dict) -> tuple:
         """Compute the deduplication key for a raw finding args dict."""
-        p = args.get("p")
         req = args.get("req")
-        if not p and req and req in self._reqs:
-            p = self._reqs[req]["principle"]
+        p = resolve_principle(args.get("p"), req, self._reqs)
         return (p, args.get("file"), args.get("line"), args.get("t"))
 
     def _resolve_finding_dimension(
@@ -215,6 +209,10 @@ class FindingEnricher:
         if args.get("vt"):
             finding["vt_raw"] = str(args["vt"])
 
+        # Same rule as dedup_key's resolve_principle, but the write is the
+        # finding's own: the requirement's principle is written even when it
+        # is None, so "this requirement declares no principle" stays
+        # distinguishable from "no principle field at all" downstream.
         if not args.get("p") and req and req in self._reqs:
             finding["p"] = self._reqs[req]["principle"]
 

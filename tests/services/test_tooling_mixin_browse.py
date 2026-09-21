@@ -39,12 +39,14 @@ class TestValidateBrowsePath:
         finally:
             Path(fpath).unlink(missing_ok=True)
 
-    def test_outside_home(self, tmp_path: Path):
-        target, err = FsToolingMixin._validate_browse_path("/tmp")
-        # /tmp is typically not under $HOME
-        if not Path("/tmp").resolve().is_relative_to(Path.home()):
-            assert err is not None
-            assert err["error_code"] == "PATH_OUTSIDE_BOUNDARY"
+    def test_outside_home(self, tmp_path: Path, monkeypatch):
+        # Pin HOME to tmp_path so the root dir is deterministically outside
+        # it, regardless of where the platform's real temp dir happens to
+        # live relative to the real $HOME.
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        target, err = FsToolingMixin._validate_browse_path("/")
+        assert err is not None
+        assert err["error_code"] == "PATH_OUTSIDE_BOUNDARY"
 
     def test_valid_directory(self):
         target, err = FsToolingMixin._validate_browse_path(str(Path.home()))

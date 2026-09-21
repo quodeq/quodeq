@@ -15,31 +15,50 @@ function typeInfo(dim) {
   return { label: t(labelKey), className, order };
 }
 
-function DimensionChip({ dim, isSelected, onToggle }) {
-  const info = typeInfo(dim);
+// The dimension's ISO 25010 mapping when it has one, its own name otherwise.
+function dimensionTitle(dim) {
+  return dim.iso_25010 ? t('evaluate.iso25010Title', { value: dim.iso_25010 }) : dim.label || dim.id;
+}
+
+// Both the compact chip and the full card are one toggle button for one
+// dimension; only what they draw inside differs.
+function DimensionToggle({ dim, isSelected, onToggle, className, children }) {
   return (
     <button
       type="button"
-      className={`dimension-chip-btn${isSelected ? ' selected' : ''}`}
-      title={dim.iso_25010 ? t('evaluate.iso25010Title', { value: dim.iso_25010 }) : dim.label || dim.id}
+      className={className}
+      title={dimensionTitle(dim)}
       aria-pressed={isSelected}
       onClick={() => onToggle(dim.id)}
     >
+      {children}
+    </button>
+  );
+}
+
+function DimensionChip({ dim, isSelected, onToggle }) {
+  const info = typeInfo(dim);
+  return (
+    <DimensionToggle
+      dim={dim}
+      isSelected={isSelected}
+      onToggle={onToggle}
+      className={`dimension-chip-btn${isSelected ? ' selected' : ''}`}
+    >
       {dim.label || dim.id}
       <span className={`dimension-chip-type ${info.className}`}>{info.label}</span>
-    </button>
+    </DimensionToggle>
   );
 }
 
 function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
   const info = typeInfo(dim);
   return (
-    <button
-      type="button"
+    <DimensionToggle
+      dim={dim}
+      isSelected={isSelected}
+      onToggle={onToggle}
       className={`eval-dim-card${isSelected ? ' eval-dim-card--selected' : ''}`}
-      title={dim.iso_25010 ? t('evaluate.iso25010Title', { value: dim.iso_25010 }) : dim.label || dim.id}
-      aria-pressed={isSelected}
-      onClick={() => onToggle(dim.id)}
     >
       <span className="eval-dim-card__check" aria-hidden="true">{isSelected ? '✓' : ''}</span>
       <span className="eval-dim-card__body">
@@ -62,7 +81,7 @@ function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
           <span className="eval-dim-card__meta eval-dim-card__meta--skeleton" title={t('evaluate.estimating')} aria-hidden="true" />
         ) : null}
       </span>
-    </button>
+    </DimensionToggle>
   );
 }
 

@@ -23,6 +23,5 @@ describe('useVisibleStandards (map)', () => {
       );
     });
     expect(result.current.standardTypes).toEqual({});
-    warn.mockRestore();
   });
 });

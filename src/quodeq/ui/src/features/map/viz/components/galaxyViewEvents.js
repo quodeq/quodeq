@@ -1,5 +1,5 @@
 import { rgb } from '../core/galaxyCore.js';
-import { clampTooltipToViewport } from '../core/tooltipPlacement.js';
+import { pushSeverityRows, showTooltip } from './galaxyTooltipDom.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { t } from '../../../../strings/index.js';
 
@@ -39,18 +39,16 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
         else sn++;
       });
     }
-    if (sc > 0) rows.push(row(t('map.critical'), sc, 'var(--color-sev-critical-text)'));
-    if (sm > 0) rows.push(row(t('map.major'), sm, 'var(--color-sev-major-text)'));
-    if (sn > 0) rows.push(row(t('map.minor'), sn, 'var(--color-sev-minor-text)'));
+    pushSeverityRows(rows, row, sc, sm, sn);
   }
   rows.push(row(t('map.compliance'), d.compliance));
-  el.innerHTML = `<div style="font-weight:600;color:${rgb(d.col)};margin-bottom:4px">${escapeHtml(d.name)}</div>
+  showTooltip(
+    el,
+    `<div style="font-weight:600;color:${rgb(d.col)};margin-bottom:4px">${escapeHtml(d.name)}</div>
     ${rows.join('')}
-    <div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">${escapeHtml(t('map.clickToExplore'))}</div>`;
-  el.style.display = 'block';
-  const { left, top } = clampTooltipToViewport(cx, cy, window.innerWidth, window.innerHeight);
-  el.style.left = left + 'px';
-  el.style.top = top + 'px';
+    <div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">${escapeHtml(t('map.clickToExplore'))}</div>`,
+    cx, cy,
+  );
 }
 
 function navigateIntoHovered(h, nav, navigateTo) {

@@ -60,11 +60,16 @@ import { createPrinciple, createPrincipleGrade } from './principle.js';
  */
 export function createDimension(raw) {
   if (!raw || typeof raw !== 'object') return raw;
+  return { ...raw, ...canonicalFindings(raw) };
+}
+
+// The violations/compliance/principles mapping both the dashboard Dimension
+// and the DimensionEval apply, with an absent key coerced to an empty list.
+function canonicalFindings(raw) {
   return {
-    ...raw,
-    violations:  createViolations(raw.violations),
-    compliance:  createViolations(raw.compliance),
-    principles:  (raw.principles || []).map(createPrinciple),
+    violations: createViolations(raw.violations),
+    compliance: createViolations(raw.compliance),
+    principles: (raw.principles || []).map(createPrinciple),
   };
 }
 
@@ -103,9 +108,7 @@ export function createDimensionEval(raw) {
   if (!raw || typeof raw !== 'object') return raw;
   return {
     ...raw,
-    violations:      createViolations(raw.violations),
-    compliance:      createViolations(raw.compliance),
-    principles:      (raw.principles || []).map(createPrinciple),
+    ...canonicalFindings(raw),
     principleGrades: (raw.principleGrades || []).map(createPrincipleGrade),
   };
 }

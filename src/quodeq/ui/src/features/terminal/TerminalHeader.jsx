@@ -1,9 +1,8 @@
 import { useRef, useState } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import PanelSwitcher from '../drawer/PanelSwitcher.jsx';
-import {
-  COPY_FEEDBACK_MS, ChevronDownIcon, CopyIcon, MaximizeIcon, MinimizeIcon, PlusIcon,
-} from '../../components/CopyButton.jsx';
+import { COPY_FEEDBACK_MS, CopyIcon, PlusIcon } from '../../components/CopyButton.jsx';
+import { DrawerWindowControls } from '../../components/DrawerWindowControls.jsx';
 import { t } from '../../strings/index.js';
 
 /**
@@ -20,18 +19,7 @@ function TerminalPanelControls({ copied, handleCopy, maximized, toggleMaximized,
         title={copied ? t('common.copiedShort') : t('terminal.copySelection')}>
         <CopyIcon />
       </button>
-      <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
-        aria-label={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}
-        aria-pressed={maximized}
-        title={maximized ? 'Restore' : 'Maximize'}>
-        {maximized ? <MinimizeIcon /> : <MaximizeIcon />}
-      </button>
-      {/* Chevron-down, NOT an ×: the shell keeps running server-side;
-          reopening the tab reattaches to it. */}
-      <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
-        aria-label={t('common.hideTab')} title={t('common.hideKeepsRunning')}>
-        <ChevronDownIcon />
-      </button>
+      <DrawerWindowControls maximized={maximized} onToggleMaximized={toggleMaximized} onHide={closeActiveTab} />
     </div>
   );
 }

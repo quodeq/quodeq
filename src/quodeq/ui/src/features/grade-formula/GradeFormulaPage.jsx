@@ -98,18 +98,20 @@ function FormulaActions({ isDirty, busy, isCustom, error, partialNotice, onApply
   );
 }
 
-function makeOnApply(apply) {
+// Both formula actions rescore every run, so each asks first and does
+// nothing when the user declines.
+function confirmThen(messageKey, action) {
   return async () => {
-    const ok = window.confirm(t('gradeFormula.confirmApply'));
-    if (ok) await apply();
+    if (window.confirm(t(messageKey))) await action();
   };
 }
 
+function makeOnApply(apply) {
+  return confirmThen('gradeFormula.confirmApply', apply);
+}
+
 function makeOnReset(resetToDefaults) {
-  return async () => {
-    const ok = window.confirm(t('gradeFormula.confirmReset'));
-    if (ok) await resetToDefaults();
-  };
+  return confirmThen('gradeFormula.confirmReset', resetToDefaults);
 }
 
 export default function GradeFormulaPage({ navigation }) {

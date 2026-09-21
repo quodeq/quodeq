@@ -35,6 +35,7 @@ from quodeq.services.fs_project_helpers import (
     _auto_detect_parents,
     _backfill_onboarding_field,
     _max_projects_listed,
+    _project_entry_identity,
 )
 from quodeq.services.fs_projects import (
     _build_parent_child_sets,
@@ -47,11 +48,7 @@ from quodeq.services.wiring import repository_info_exists
 def _build_lightweight_entry(entry_name: str, info: dict) -> ProjectEntry:
     """A sparse ``ProjectEntry`` carrying only what parent-detection needs."""
     meta = _extract_project_metadata(info, entry_name)
-    return ProjectEntry(
-        id=entry_name, name=meta["name"], parent=meta["parent"],
-        display_name=meta["displayName"], discipline=meta["discipline"],
-        path=meta["path"], location=meta["location"], scope_path=meta.get("scopePath"),
-    )
+    return ProjectEntry(**_project_entry_identity(entry_name, meta))
 
 
 def _collect_lightweight_entries(reports_root: Path, dir_names: list[str]) -> list[ProjectEntry]:

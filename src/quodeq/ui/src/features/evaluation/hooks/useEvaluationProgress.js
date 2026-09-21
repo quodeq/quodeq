@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getEvaluationProgress } from '../../../api/index.js';
-import { evaluationKeys } from '../../../api/queryKeys.js';
+import { NO_JOB_ID, evaluationKeys } from '../../../api/queryKeys.js';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -25,7 +25,7 @@ const POLL_INTERVAL_MS = 2000;
  */
 export function useEvaluationProgress(jobId, isTerminal) {
   const query = useQuery({
-    queryKey: jobId ? [...evaluationKeys.evaluation(jobId), 'progress'] : ['evaluation', '_none_', 'progress'],
+    queryKey: [...evaluationKeys.evaluation(jobId || NO_JOB_ID), 'progress'],
     queryFn: () => getEvaluationProgress(jobId),
     enabled: !!jobId,
     refetchInterval: isTerminal ? false : POLL_INTERVAL_MS,

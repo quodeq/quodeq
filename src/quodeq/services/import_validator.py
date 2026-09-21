@@ -48,16 +48,20 @@ def _truncate(value: str, limit: int) -> str:
     return value[:limit] if len(value) > limit else value
 
 
+def _truncate_field(cleaned: dict, key: str, limit: int) -> None:
+    """Truncate ``cleaned[key]`` in place to *limit* chars, when it is a present string."""
+    if key in cleaned and isinstance(cleaned[key], str):
+        cleaned[key] = _truncate(cleaned[key], limit)
+
+
 def _whitelist_ref(ref: dict) -> dict:
     return {k: ref[k] for k in _ALLOWED_REF if k in ref}
 
 
 def _whitelist_requirement(req: dict) -> dict:
     cleaned = {k: req[k] for k in _ALLOWED_REQUIREMENT if k in req}
-    if "text" in cleaned and isinstance(cleaned["text"], str):
-        cleaned["text"] = _truncate(cleaned["text"], _MAX_REQ_TEXT)
-    if "description" in cleaned and isinstance(cleaned["description"], str):
-        cleaned["description"] = _truncate(cleaned["description"], _MAX_DESCRIPTION)
+    _truncate_field(cleaned, "text", _MAX_REQ_TEXT)
+    _truncate_field(cleaned, "description", _MAX_DESCRIPTION)
     if "refs" in cleaned and isinstance(cleaned["refs"], list):
         cleaned["refs"] = [_whitelist_ref(r) for r in cleaned["refs"] if isinstance(r, dict)]
     return cleaned
@@ -65,10 +69,8 @@ def _whitelist_requirement(req: dict) -> dict:
 
 def _whitelist_principle(principle: dict) -> dict:
     cleaned = {k: principle[k] for k in _ALLOWED_PRINCIPLE if k in principle}
-    if "name" in cleaned and isinstance(cleaned["name"], str):
-        cleaned["name"] = _truncate(cleaned["name"], _MAX_NAME)
-    if "description" in cleaned and isinstance(cleaned["description"], str):
-        cleaned["description"] = _truncate(cleaned["description"], _MAX_DESCRIPTION)
+    _truncate_field(cleaned, "name", _MAX_NAME)
+    _truncate_field(cleaned, "description", _MAX_DESCRIPTION)
     if "requirements" in cleaned and isinstance(cleaned["requirements"], list):
         cleaned["requirements"] = [
             _whitelist_requirement(r) for r in cleaned["requirements"] if isinstance(r, dict)
@@ -115,10 +117,8 @@ def validate_import(data: dict) -> dict:
         return {"valid": False, "errors": errors, "data": None}
 
     cleaned = {k: data[k] for k in _ALLOWED_TOP if k in data}
-    if "name" in cleaned and isinstance(cleaned["name"], str):
-        cleaned["name"] = _truncate(cleaned["name"], _MAX_NAME)
-    if "description" in cleaned and isinstance(cleaned["description"], str):
-        cleaned["description"] = _truncate(cleaned["description"], _MAX_DESCRIPTION)
+    _truncate_field(cleaned, "name", _MAX_NAME)
+    _truncate_field(cleaned, "description", _MAX_DESCRIPTION)
     if isinstance(cleaned.get("principles"), list):
         cleaned["principles"] = [
             _whitelist_principle(p) for p in cleaned["principles"] if isinstance(p, dict)

@@ -38,43 +38,45 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
 
   const { requestPreview, update } = useGradePreview({ projectId, draft, updateDraft, showPreview, debounceRef, loadedRef });
 
-  const apply = useCallback(async () => {
+  // Apply and reset differ only in which endpoint they call, what they log
+  // and what they return; everything the server sends back is adopted the
+  // same way. `run` performs the write and returns the formula payload.
+  const submitFormula = useCallback(async (run, failureKey, logLabel) => {
     beginRequest();
     try {
-      const d = await saveGradeFormula(draft);
+      const d = await run();
       adoptServerFormula(d.current, d.isCustom);
       thresholdsStore.set(d.current.gradeThresholds);
       notePartialRescore(noticeFor(d));
       invalidateScoreQueries();
       requestPreview(d.current);
-      return d.applied;
+      return d;
     } catch (err) {
-      console.warn('[useGradeFormula] apply failed:', err);
-      failWith(t('gradeFormula.applyFailed'));
+      console.warn(logLabel, err);
+      failWith(t(failureKey));
       return null;
-    } finally {
-      endRequest();
-    }
-  }, [draft, requestPreview, invalidateScoreQueries, thresholdsStore,
-      beginRequest, endRequest, failWith, adoptServerFormula, notePartialRescore]);
-
-  const resetToDefaults = useCallback(async () => {
-    beginRequest();
-    try {
-      const d = await resetGradeFormula();
-      adoptServerFormula(d.current, d.isCustom);
-      thresholdsStore.set(d.current.gradeThresholds);
-      notePartialRescore(noticeFor(d));
-      invalidateScoreQueries();
-      requestPreview(d.current);
-    } catch (err) {
-      console.warn('[useGradeFormula] reset failed:', err);
-      failWith(t('gradeFormula.resetFailed'));
     } finally {
       endRequest();
     }
   }, [requestPreview, invalidateScoreQueries, thresholdsStore,
       beginRequest, endRequest, failWith, adoptServerFormula, notePartialRescore]);
+
+  const apply = useCallback(async () => {
+    const d = await submitFormula(
+      () => saveGradeFormula(draft),
+      'gradeFormula.applyFailed',
+      '[useGradeFormula] apply failed:',
+    );
+    return d ? d.applied : null;
+  }, [draft, submitFormula]);
+
+  const resetToDefaults = useCallback(async () => {
+    await submitFormula(
+      resetGradeFormula,
+      'gradeFormula.resetFailed',
+      '[useGradeFormula] reset failed:',
+    );
+  }, [submitFormula]);
 
   return { draft, defaults, isCustom, isDirty, preview, busy, error, partialNotice, update, apply, resetToDefaults };
 }

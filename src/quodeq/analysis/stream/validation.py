@@ -11,9 +11,18 @@ from quodeq.shared.utils import open_text
 _MCP_SERVER_NAME = "findings"
 
 
+def _has_content(stream_file: Path) -> bool:
+    """True when *stream_file* exists and holds at least one byte.
+
+    One stat, shared by every reader here: an absent or empty stream carries
+    neither an MCP status nor an error event.
+    """
+    return stream_file.exists() and stream_file.stat().st_size > 0
+
+
 def get_mcp_status(stream_file: Path, *, log: LogSink = NULL_LOG) -> str | None:
     """Return MCP server status from the stream init event, or None if unavailable."""
-    if not stream_file.exists() or stream_file.stat().st_size == 0:
+    if not _has_content(stream_file):
         return None
     try:
         with open_text(stream_file) as f:
@@ -56,7 +65,7 @@ def _is_error_event(
 
 def is_stream_valid(stream_file: Path, *, log: LogSink = NULL_LOG) -> bool:
     """Return True if stream exists, is non-empty, and has no error events."""
-    if not stream_file.exists() or stream_file.stat().st_size == 0:
+    if not _has_content(stream_file):
         return False
     try:
         with open_text(stream_file) as f:

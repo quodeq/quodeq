@@ -24,6 +24,18 @@ class ApplyOutcome:
     result: dict | None = None
 
 
+def _is_read_only_action(repo: AssistantStore, action: Mapping) -> bool:
+    """True when *action* belongs to a shared, read-only session.
+
+    Defense in depth: read-only sessions never draft actions (draft_action
+    is not registered), so nothing legitimate reaches here. Both apply and
+    reject refuse rather than mutate the local store under a shared project
+    id.
+    """
+    owner = repo.get_session(action["session_id"])
+    return owner is not None and (owner.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED
+
+
 def apply_drafted_action(
     repo: AssistantStore, action_id: str, context: ActionContext,
     *, actions: Mapping[str, ActionSpec] = ACTIONS,
@@ -32,12 +44,7 @@ def apply_drafted_action(
     action = repo.get_action(action_id)
     if action is None:
         return ApplyOutcome("unknown_action")
-    owner = repo.get_session(action["session_id"])
-    if owner is not None and (owner.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
-        # Defense in depth: read-only sessions never draft actions
-        # (draft_action is not registered), so nothing legitimate reaches
-        # here. Refuse rather than mutate the local store under a shared
-        # project id.
+    if _is_read_only_action(repo, action):
         return ApplyOutcome("read_only")
     if action["status"] != "drafted":
         return ApplyOutcome("already", detail=action["status"])
@@ -76,12 +83,7 @@ def reject_drafted_action(repo: AssistantStore, action_id: str) -> RejectOutcome
     action = repo.get_action(action_id)
     if action is None:
         return RejectOutcome("unknown_action")
-    owner = repo.get_session(action["session_id"])
-    if owner is not None and (owner.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
-        # Defense in depth: read-only sessions never draft actions
-        # (draft_action is not registered), so nothing legitimate reaches
-        # here. Refuse rather than mutate the local store under a shared
-        # project id.
+    if _is_read_only_action(repo, action):
         return RejectOutcome("read_only")
     # Same replay guard as apply, made atomic: an applied action must not
     # flip to rejected on a stale card click, SSE replay, or a race with a

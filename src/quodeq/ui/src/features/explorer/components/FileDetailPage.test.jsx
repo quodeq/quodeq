@@ -63,10 +63,16 @@ describe('FileDetailPage', () => {
     expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
   });
 
-  it('does not throw and shows 0 dimensions when the file object has no dimensionsCount', () => {
+  it('does not throw when the file object has no dimensionsCount', () => {
     const file = makeFile({ dimensionsCount: undefined });
     expect(() => renderPage({ file })).not.toThrow();
-    expect(screen.getByText(t('explorer.dimensionsStat'))).toBeInTheDocument();
+  });
+
+  it('shows 0 dimensions when the file object has no dimensionsCount', () => {
+    const file = makeFile({ dimensionsCount: undefined });
+    renderPage({ file });
+    const label = screen.getByText(t('explorer.dimensionsStat'));
+    expect(label.closest('.term-stat').querySelector('.term-stat__value')).toHaveTextContent('0');
   });
 
   it('severity filter pills narrow the list to the selected severity', () => {

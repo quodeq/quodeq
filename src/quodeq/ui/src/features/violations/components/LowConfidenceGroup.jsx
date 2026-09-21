@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { t } from '../../../strings/index.js';
+import { LowConfidenceToggle } from '../../../components/LowConfidenceToggle.jsx';
 import { isLowConfidence } from '../../../models/runRules.js';
 
 // The rule lives in models/runRules.js; re-exported here so existing
@@ -12,18 +12,7 @@ export default function LowConfidenceGroup({ violations, renderViolation }) {
   const count = violations.length;
   return (
     <div className="low-confidence-group">
-      <button
-        type="button"
-        className="violation-group-header low-confidence-group-header"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <span className="violation-group-title">{t('violations.lowConfidence')}</span>
-        <span className="violation-group-count">{count}</span>
-        <span className="low-confidence-group-hint">
-          {expanded ? t('violations.hideLikelyFp') : t('violations.showLikelyFp')}
-        </span>
-      </button>
+      <LowConfidenceToggle count={count} expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
       {expanded && (
         <div className="vlive-violations-group">
           {violations.map((v, idx) => renderViolation(v, idx))}

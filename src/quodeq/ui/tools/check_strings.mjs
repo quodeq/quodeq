@@ -8,15 +8,18 @@
 //     npm run lint:strings:update
 //
 // Same pattern as tools/check_imports.py at the repo root, but counts per
-// file instead of line-keyed entries so unrelated edits don't churn it.
+// file instead of line-keyed entries so unrelated edits don't churn it. The
+// eslint pass, the baseline I/O and the counts comparison come from
+// tools/_ratchet_common.mjs, shared with tools/ratchet.mjs; this gate keeps
+// its own main because it also validates the catalog itself.
 //
 // Also validates the catalog itself: no em-dashes in user-facing strings.
-import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { ESLint } from 'eslint';
+import {
+  UI_ROOT, collectCounts, diffCounts, loadBaseline, total, writeBaseline, parseGateArgs,
+} from './_ratchet_common.mjs';
 
-const UI_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE_PATH = path.join(UI_ROOT, 'tools', 'strings_baseline.json');
 const CATALOG_PATH = path.join(UI_ROOT, 'src', 'strings', 'en.json');
 
@@ -29,39 +32,6 @@ const RATCHET_RULES = new Set([
   'i18n/no-literal-visible-attrs',
   'i18n/no-prose-literals',
 ]);
-
-async function collectCounts() {
-  const eslint = new ESLint({ cwd: UI_ROOT });
-  const results = await eslint.lintFiles(['src/**/*.jsx', 'src/**/*.js']);
-  const counts = {};
-  for (const r of results) {
-    const fatal = r.messages.filter((m) => m.fatal);
-    if (fatal.length > 0) {
-      throw new Error(`lint failed on ${r.filePath}: ${fatal[0].message}`);
-    }
-    // Count only the ratchet rules themselves. Stray messages from other
-    // sources (e.g. an eslint-disable comment naming a rule this config
-    // doesn't define) must not masquerade as hardcoded strings.
-    const n = r.messages.filter((m) => RATCHET_RULES.has(m.ruleId)).length;
-    if (n > 0) {
-      counts[path.relative(UI_ROOT, r.filePath).split(path.sep).join('/')] = n;
-    }
-  }
-  return counts;
-}
-
-function loadBaseline() {
-  if (!existsSync(BASELINE_PATH)) return {};
-  return JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
-}
-
-function writeBaseline(counts) {
-  const sorted = Object.fromEntries(
-    Object.entries(counts).sort(([a], [b]) => (a < b ? -1 : 1)),
-  );
-  writeFileSync(BASELINE_PATH, JSON.stringify(sorted, null, 2) + '\n', 'utf8');
-  return Object.keys(sorted).length;
-}
 
 function checkCatalog() {
   const catalog = JSON.parse(readFileSync(CATALOG_PATH, 'utf8'));
@@ -103,34 +73,23 @@ function checkKeysResolve() {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const update = args.includes('--update');
-  const unknown = args.filter((a) => a !== '--update');
-  if (unknown.length > 0) {
-    console.error(`Unknown argument(s): ${unknown.join(' ')}. Usage: check_strings.mjs [--update]`);
+  const { update, error } = parseGateArgs(process.argv.slice(2), 'check_strings.mjs');
+  if (error) {
+    console.error(error);
     return 2;
   }
 
   const catalogOk = checkCatalog() && checkKeysResolve();
-  const counts = await collectCounts();
+  const counts = await collectCounts(RATCHET_RULES);
 
   if (update) {
-    const n = writeBaseline(counts);
+    const n = Object.keys(writeBaseline(BASELINE_PATH, counts)).length;
     console.log(`Wrote baseline for ${n} file(s) to ${path.relative(UI_ROOT, BASELINE_PATH)}`);
     return catalogOk ? 0 : 1;
   }
 
-  const baseline = loadBaseline();
-  const grew = [];
-  const shrank = [];
-  for (const [file, count] of Object.entries(counts)) {
-    const allowed = baseline[file] ?? 0;
-    if (count > allowed) grew.push({ file, count, allowed });
-    else if (count < allowed) shrank.push({ file, count, allowed });
-  }
-  for (const [file, allowed] of Object.entries(baseline)) {
-    if (!(file in counts)) shrank.push({ file, count: 0, allowed });
-  }
+  const baseline = loadBaseline(BASELINE_PATH);
+  const { grew, shrank } = diffCounts(counts, baseline);
 
   if (grew.length > 0) {
     console.error(`Found NEW hardcoded user-visible string(s) in ${grew.length} file(s):\n`);
@@ -150,8 +109,7 @@ async function main() {
   }
 
   if (grew.length === 0 && shrank.length === 0 && catalogOk) {
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    console.log(`OK: no new hardcoded strings (${total} grandfathered across ${Object.keys(counts).length} files).`);
+    console.log(`OK: no new hardcoded strings (${total(counts)} grandfathered across ${Object.keys(counts).length} files).`);
     return 0;
   }
   return 1;

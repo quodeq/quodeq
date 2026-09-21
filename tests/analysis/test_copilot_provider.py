@@ -12,6 +12,12 @@ from quodeq.analysis.subprocess import _run_cli_analysis
 from quodeq.config.ai_provider import PROVIDERS
 from quodeq.services.tooling_mixin import FsToolingMixin, get_allowed_client_ids
 
+# The stream event Copilot emits when an org policy blocks the findings MCP
+# server. Four tests drive the same event through different entry points.
+POLICY_BLOCK_EVENT = {"type": "session.warning", "data": {
+    "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
+}}
+
 
 @pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):
@@ -36,35 +42,56 @@ def test_copilot_model_listing_uses_account_discovery_not_interactive_cli(monkey
     run.assert_not_called()
 
 
-def test_copilot_analysis_args_and_scoped_mcp(tmp_path):
+@pytest.fixture()
+def _built_ai_cmd(tmp_path):
+    """Build the copilot CLI args + scoped MCP config file once; each test
+    checks one slice of the result. Teardown removes the MCP config file
+    regardless of test outcome."""
     config = AnalysisConfig(
         ai_cmd="copilot", ai_model="claude-sonnet-4.6",
         jsonl_file=tmp_path / "findings.jsonl", queue_path=tmp_path / "queue.json",
         agent_id="agent-2", max_turns=3, analysis_budget=1,
     )
     args, path = _build_ai_cmd("Inspect sources", config, work_dir=tmp_path)
-    try:
-        assert args[0] == "copilot"
-        assert args[args.index("--output-format") + 1] == "json"
-        assert args[args.index("--additional-mcp-config") + 1] == f"@{path}"
-        assert args[args.index("--model") + 1] == "claude-sonnet-4.6"
-        assert args[args.index("--allow-tool") + 1] == "findings"
-        assert "--available-tools" in args
-        assert all(tool in args for tool in ("view", "glob", "grep", "findings"))
-        assert "--disable-builtin-mcps" in args
-        assert "--no-custom-instructions" in args
-        assert "Use view, glob and grep" in args[-1]
-        assert not {"--tools", "--strict-mcp-config", "--max-turns",
-                    "--max-budget-usd", "--allow-all-tools", "--yolo"} & set(args)
-        payload = json.loads(path.read_text())
-        server = payload["mcpServers"]["findings"]
-        assert server["tools"] == ["*"]
-        assert "agent-2" in server["args"]
-        assert str(tmp_path / "queue.json") in server["args"]
-        assert str(tmp_path.resolve()) in server["args"]
-    finally:
-        if path:
-            path.unlink(missing_ok=True)
+    yield args, path
+    if path:
+        path.unlink(missing_ok=True)
+
+
+def test_copilot_command_line_flags(_built_ai_cmd):
+    args, path = _built_ai_cmd
+    assert args[0] == "copilot"
+    assert args[args.index("--output-format") + 1] == "json"
+    assert args[args.index("--additional-mcp-config") + 1] == f"@{path}"
+    assert args[args.index("--model") + 1] == "claude-sonnet-4.6"
+    assert args[args.index("--allow-tool") + 1] == "findings"
+    assert "--available-tools" in args
+    assert all(tool in args for tool in ("view", "glob", "grep", "findings"))
+    assert "--disable-builtin-mcps" in args
+    assert "--no-custom-instructions" in args
+    assert "Use view, glob and grep" in args[-1]
+
+
+def test_copilot_forbidden_flags_are_absent(_built_ai_cmd):
+    args, _path = _built_ai_cmd
+    assert not {"--tools", "--strict-mcp-config", "--max-turns",
+                "--max-budget-usd", "--allow-all-tools", "--yolo"} & set(args)
+
+
+def test_copilot_scoped_mcp_json_exposes_only_the_findings_tool(_built_ai_cmd):
+    _args, path = _built_ai_cmd
+    payload = json.loads(path.read_text())
+    server = payload["mcpServers"]["findings"]
+    assert server["tools"] == ["*"]
+
+
+def test_copilot_scoped_mcp_server_args_identify_the_agent_and_paths(_built_ai_cmd, tmp_path):
+    _args, path = _built_ai_cmd
+    payload = json.loads(path.read_text())
+    server = payload["mcpServers"]["findings"]
+    assert "agent-2" in server["args"]
+    assert str(tmp_path / "queue.json") in server["args"]
+    assert str(tmp_path.resolve()) in server["args"]
 
 
 def test_copilot_analysis_env_uses_dedicated_profile(tmp_path, monkeypatch):
@@ -125,8 +152,7 @@ def test_copilot_stdout_auth_error_aborts_evaluation(tmp_path, monkeypatch):
 @pytest.mark.parametrize("event", [
     {"type": "session.error", "data": {"message": "Model unavailable"}},
     {"type": "result", "exitCode": 1},
-    {"type": "session.warning", "data": {
-        "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'"}},
+    POLICY_BLOCK_EVENT,
 ])
 def test_copilot_error_stream_is_invalid(tmp_path, event):
     stream = tmp_path / "s.jsonl"
@@ -166,10 +192,7 @@ def test_copilot_policy_block_terminates_running_evaluation(tmp_path, monkeypatc
     from quodeq.analysis._process import _run_with_heartbeat
 
     stream = tmp_path / "s.jsonl"
-    warning = {"type": "session.warning", "data": {
-        "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
-    }}
-    events = [prior_event, warning] if prior_event else [warning]
+    events = [prior_event, POLICY_BLOCK_EVENT] if prior_event else [POLICY_BLOCK_EVENT]
     stream.write_text("".join(json.dumps(event) + "\n" for event in events))
     process = Mock()
     process.poll.side_effect = [None, 0]
@@ -201,9 +224,7 @@ def test_copilot_policy_block_cancels_pool_and_cleans_resources(tmp_path, monkey
     def spawn(args, **kwargs):
         captured["cwd"] = Path(kwargs["cwd"])
         captured["mcp"] = Path(args[args.index("--additional-mcp-config") + 1][1:])
-        kwargs["stdout"].write(json.dumps({"type": "session.warning", "data": {
-            "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
-        }}) + "\n")
+        kwargs["stdout"].write(json.dumps(POLICY_BLOCK_EVENT) + "\n")
         kwargs["stdout"].flush()
         return process
 
@@ -227,9 +248,7 @@ def test_copilot_policy_block_cancels_pool_and_cleans_resources(tmp_path, monkey
 
 def test_copilot_policy_block_in_completed_stream_aborts_evaluation(tmp_path, monkeypatch):
     def spawn(args, work_dir, env, paths, cfg):
-        paths.stream_file.write_text(json.dumps({"type": "session.warning", "data": {
-            "warningType": "mcp", "message": "1 MCP server was blocked by policy: 'findings'",
-        }}) + "\n")
+        paths.stream_file.write_text(json.dumps(POLICY_BLOCK_EVENT) + "\n")
         return Mock(returncode=0), False
 
     monkeypatch.setattr("quodeq.analysis.subprocess._spawn_and_monitor", spawn)

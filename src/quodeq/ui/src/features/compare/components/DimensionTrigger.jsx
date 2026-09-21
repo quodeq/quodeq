@@ -1,16 +1,15 @@
-import { useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
-import { launcherMenuPos } from './compareLauncherMenu.js';
-import { useLauncherDismiss } from './useLauncherDismiss.js';
-import { useLauncherFocus } from './useLauncherFocus.js';
-import { score1 } from '../compareFormatters.js';
-
+import {
+  LauncherButton,
+  LauncherMenu,
+  LauncherRoot,
+  LauncherScore,
+  useLauncherPopover,
+} from './compareLauncherParts.jsx';
 
 function DimensionTriggerMenu({ menuRef, pos, board, onPick }) {
-  return createPortal(
-    <span className="compare-dueltrigger__menu" role="menu" ref={menuRef} style={pos}>
+  return (
+    <LauncherMenu menuRef={menuRef} pos={pos}>
       {board.map((b) => (
         <button
           key={b.key}
@@ -20,13 +19,10 @@ function DimensionTriggerMenu({ menuRef, pos, board, onPick }) {
           onClick={() => onPick(b.key)}
         >
           <span>{b.label}</span>
-          <span className={`compare-dueltrigger__itemScore ${scoreColorClass(b.avg)}`}>
-            {score1(b.avg)}
-          </span>
+          <LauncherScore score={b.avg} />
         </button>
       ))}
-    </span>,
-    document.body,
+    </LauncherMenu>
   );
 }
 
@@ -34,38 +30,17 @@ function DimensionTriggerMenu({ menuRef, pos, board, onPick }) {
    that dimension's drill-down. Same list the DIMENSIONS board shows,
    with the scope average alongside each name. */
 export default function DimensionTrigger({ board, onOpen }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState(null);
-  const btnRef = useRef(null);
-  const menuRef = useRef(null);
-
-  const close = () => setOpen(false);
-
-  const toggle = () => {
-    if (open) { close(); return; }
-    const at = launcherMenuPos(btnRef.current);
-    if (!at) return;
-    setPos(at);
-    setOpen(true);
-  };
-
-  useLauncherDismiss(open, btnRef, menuRef, close);
-  // The menu is portaled to document.body, so Tab alone would never reach it.
-  useLauncherFocus(open, btnRef, menuRef, close);
+  const { open, pos, btnRef, menuRef, close, toggle } = useLauncherPopover();
 
   return (
-    <span className="compare-dueltrigger" onClick={(e) => e.stopPropagation()}>
-      <button
-        ref={btnRef}
-        type="button"
-        className="compare-dueltrigger__btn compare-dueltrigger__btn--launcher"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={t('compare.dimLaunchAria')}
-        onClick={toggle}
-      >
-        {t('compare.dimOpen')} {open ? '▾' : '▸'}
-      </button>
+    <LauncherRoot>
+      <LauncherButton
+        btnRef={btnRef}
+        open={open}
+        ariaLabel={t('compare.dimLaunchAria')}
+        label={t('compare.dimOpen')}
+        onToggle={toggle}
+      />
       {open && pos && (
         <DimensionTriggerMenu
           menuRef={menuRef}
@@ -74,6 +49,6 @@ export default function DimensionTrigger({ board, onOpen }) {
           onPick={(key) => { close(); onOpen(key); }}
         />
       )}
-    </span>
+    </LauncherRoot>
   );
 }

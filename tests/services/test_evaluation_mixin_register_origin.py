@@ -9,7 +9,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.services.base import NewProjectSpec
-from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import register_project as _register_project
 from quodeq.services.project_registration import register_project_with_rollback
 

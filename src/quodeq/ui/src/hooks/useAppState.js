@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { LOCALE, t } from '../strings/index.js';
+import { t } from '../strings/index.js';
+import { formatRunDate } from '../utils/formatters.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSidePane } from '../features/side-pane/SidePaneContext.jsx';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
@@ -118,14 +119,7 @@ function useAppNavigation() {
  */
 export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRunIndex) {
   const entry = (trend || []).find((r) => r.runId === currentOverviewRun);
-  if (entry?.dateISO) {
-    try {
-      return new Date(entry.dateISO).toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch (err) {
-      console.warn('[useAppState] date format failed:', err);
-      return entry.dateISO;
-    }
-  }
+  if (entry?.dateISO) return formatRunDate(entry.dateISO, entry.dateISO, 'useAppState');
   return dailyRuns[overviewRunIndex]?.dateLabel || currentOverviewRun;
 }
 

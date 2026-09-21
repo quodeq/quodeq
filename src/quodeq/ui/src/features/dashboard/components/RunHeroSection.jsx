@@ -1,11 +1,12 @@
-import { TermHeader, StatStrip, Stat } from '../../../components/terminal/index.js';
+import { TermHeader, Stat } from '../../../components/terminal/index.js';
+import { HeroPanel, ComplianceAndRatioStats, heroCardHandlers } from './heroSectionParts.jsx';
 import { formatRunId, gradeLetter, complianceRatio } from '../../../utils/formatters.js';
 import SeverityBadgeRow from './SeverityBadgeRow.jsx';
 import { t } from '../../../strings/index.js';
 
 function RunStatStrip({ scoreDisplay, grade, violations, compliance, suppressed, totalChecks, ratio, handleViolations, handleCompliance, handleSeverity, severity }) {
   return (
-    <StatStrip cards>
+    <>
       <Stat
         label={t('overview.statScore')}
         value={scoreDisplay}
@@ -25,19 +26,14 @@ function RunStatStrip({ scoreDisplay, grade, violations, compliance, suppressed,
         onClick={handleViolations}
         ariaLabel={violations > 0 ? t('overview.showRunViolationsAria') : undefined}
       />
-      <Stat
-        label={t('overview.statCompliance')}
-        value={compliance}
-        hint={totalChecks > 0 ? t('overview.passingChecks', { count: totalChecks }) : null}
-        onClick={handleCompliance}
-        ariaLabel={compliance > 0 ? t('overview.showRunComplianceAria') : undefined}
+      <ComplianceAndRatioStats
+        compliance={compliance}
+        totalChecks={totalChecks}
+        ratio={ratio}
+        onCompliance={handleCompliance}
+        complianceAriaKey="overview.showRunComplianceAria"
       />
-      <Stat
-        label={t('overview.statRatio')}
-        value={ratio}
-        hint={t('overview.ratioHint')}
-      />
-    </StatStrip>
+    </>
   );
 }
 
@@ -52,15 +48,10 @@ export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNav
   const totalChecks = violations + compliance;
   const ratio = complianceRatio(violations, compliance);
 
-  const handleViolations = onCardNavigate && violations > 0 ? () => onCardNavigate('violations') : undefined;
-  const handleCompliance = onCardNavigate && compliance > 0 ? () => onCardNavigate('compliance') : undefined;
-  const handleSeverity = onCardNavigate ? (level) => onCardNavigate(level) : undefined;
+  const { handleViolations, handleCompliance, handleSeverity } = heroCardHandlers(onCardNavigate, { violations, compliance });
 
   return (
-    <section className="acc-eval-panel acc-eval-panel--terminal">
-      <div className="acc-eval-panel__top">
-        <TermHeader name={t('overview.termNameRun')} sub={dateLabel} />
-      </div>
+    <HeroPanel header={<TermHeader name={t('overview.termNameRun')} sub={dateLabel} />}>
       <RunStatStrip
         scoreDisplay={scoreDisplay}
         grade={grade}
@@ -74,6 +65,6 @@ export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNav
         handleSeverity={handleSeverity}
         severity={runSummary.severity}
       />
-    </section>
+    </HeroPanel>
   );
 }

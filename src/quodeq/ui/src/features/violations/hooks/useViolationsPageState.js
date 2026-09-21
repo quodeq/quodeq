@@ -63,12 +63,12 @@ export function useViolationsData({ accumulatedDimensions, selectedProject, onRe
   const summary = useMemo(() => computeSummaryFromDimensions(visibleDimensions), [visibleDimensions]);
 
   const topFilesCount = useMemo(
-    () => new Set(visibleDimensions.flatMap((d) => (d.violations || []).map((v) => v.file)).filter(Boolean)).size,
+    () => countDistinctViolationField(visibleDimensions, 'file'),
     [visibleDimensions]
   );
 
   const uniquePrinciples = useMemo(
-    () => new Set(visibleDimensions.flatMap((d) => (d.violations || []).map((v) => v.principle)).filter(Boolean)).size,
+    () => countDistinctViolationField(visibleDimensions, 'principle'),
     [visibleDimensions]
   );
 
@@ -79,6 +79,19 @@ export function useViolationsData({ accumulatedDimensions, selectedProject, onRe
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
   };
+}
+
+/**
+ * How many distinct values of `field` the visible dimensions' violations
+ * carry. Missing values are dropped rather than counted as one empty group.
+ *
+ * @param {Array} dimensions
+ * @param {string} field Violation field to count distinct values of.
+ * @returns {number}
+ */
+function countDistinctViolationField(dimensions, field) {
+  const values = dimensions.flatMap((d) => (d.violations || []).map((v) => v[field]));
+  return new Set(values.filter(Boolean)).size;
 }
 
 /**

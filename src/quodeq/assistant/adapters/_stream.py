@@ -51,14 +51,26 @@ def partial_text(event: dict) -> str | None:
     return text if isinstance(text, str) else None
 
 
+def _dict_field(container: object, key: str) -> object:
+    """``container[key]`` when *container* is a dict, else None.
+
+    The stream is untrusted JSON, so every nested lookup has to survive a
+    non-dict at any level.
+    """
+    return container.get(key) if isinstance(container, dict) else None
+
+
+def _message_blocks(event: dict) -> object:
+    """The content blocks of an ``assistant`` event's message, or None."""
+    return _dict_field(event.get("message"), "content")
+
+
 def assistant_text(event: dict) -> list[str]:
     etype = event.get("type")
     if etype == EVENT_TYPE_ASSISTANT_MESSAGE:
         return texts_from_copilot(event)
     if etype == EVENT_TYPE_ASSISTANT:
-        msg = event.get("message")
-        blocks = msg.get("content") if isinstance(msg, dict) else None
-        return _texts_from_blocks(blocks)
+        return _texts_from_blocks(_message_blocks(event))
     if etype == EVENT_TYPE_RESULT:
         result = event.get("result")
         return [result] if isinstance(result, str) else []
@@ -110,11 +122,9 @@ def tool_use_details(event: dict) -> list[dict]:
         detail = _codex_tool_detail(item) if isinstance(item, dict) else None
         return [detail] if detail else []
     if etype == EVENT_TYPE_ASSISTANT:
-        msg = event.get("message")
-        blocks = msg.get("content") if isinstance(msg, dict) else None
+        blocks = _message_blocks(event)
     elif etype == EVENT_TYPE_ITEM_COMPLETED:
-        item = event.get("item")
-        blocks = item.get("content") if isinstance(item, dict) else None
+        blocks = _dict_field(event.get("item"), "content")
     else:
         blocks = None
     details = []

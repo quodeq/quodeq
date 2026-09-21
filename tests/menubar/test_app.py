@@ -7,9 +7,31 @@ tests/packaging/test_menubar_*.py files used).
 from __future__ import annotations
 
 import importlib
+import logging
 import sys
 import types
 from unittest.mock import MagicMock, patch
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _restore_menubar_modules():
+    """``_load_app_module`` stubs ``sys.modules["rumps"]`` and reimports
+    ``quodeq.menubar.app`` against the stub. Restore both afterwards so a
+    later test (in this file or another) does not inherit the stub or the
+    module re-imported against it."""
+    original_rumps = sys.modules.get("rumps")
+    original_app = sys.modules.get("quodeq.menubar.app")
+    yield
+    if original_rumps is None:
+        sys.modules.pop("rumps", None)
+    else:
+        sys.modules["rumps"] = original_rumps
+    if original_app is None:
+        sys.modules.pop("quodeq.menubar.app", None)
+    else:
+        sys.modules["quodeq.menubar.app"] = original_app
 
 
 class _FakeMenuItem:
@@ -62,8 +84,8 @@ class TestLoadConfigNonNumericEnv:
         assert port == 7863  # default
 
     def test_non_numeric_ports_falls_back_to_default(self) -> None:
-        port, ports = self._load_config(env={"QUODEQ_PORTS": "abc,def,ghi"})
-        assert isinstance(ports, tuple)
+        _port, ports = self._load_config(env={"QUODEQ_PORTS": "abc,def,ghi"})
+        assert ports == (7863, 7864, 7865, 7866, 7867, 7868, 7869)
 
     def test_valid_numeric_env_still_works(self) -> None:
         port, ports = self._load_config(env={"QUODEQ_PORT": "8080", "QUODEQ_PORTS": "8080,8081"})
@@ -119,46 +141,43 @@ def test_start_uses_own_binary(monkeypatch) -> None:
     assert cmd == [sys.executable, "-m", "quodeq.dashboard", "--no-open", "--port", "7863"]
 
 
-def test_on_quit_logs_when_preference_set_fails(monkeypatch, caplog) -> None:
-    import logging
+def _raising(message: str):
+    """A stand-in that always raises, so the caller's fail-soft path runs."""
+    def boom(*_args, **_kwargs):
+        raise RuntimeError(message)
+    return boom
 
-    module, _, app = _make_app()
 
-    def boom(*a, **k):
-        raise RuntimeError("state write failed")
-
-    monkeypatch.setattr("quodeq.menubar.state.set_enabled", boom)
+def _assert_logs(monkeypatch, caplog, target: str, message: str, action, expected: str) -> None:
+    """Patch *target* to raise, run *action*, and assert the debug line landed."""
+    monkeypatch.setattr(target, _raising(message))
     with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
-        app._on_quit(None)
-    assert "could not disable menubar preference on quit" in caplog.text
+        action()
+    assert expected in caplog.text
+
+
+def test_on_quit_logs_when_preference_set_fails(monkeypatch, caplog) -> None:
+    _module, _, app = _make_app()
+    _assert_logs(
+        monkeypatch, caplog, "quodeq.menubar.state.set_enabled", "state write failed",
+        lambda: app._on_quit(None), "could not disable menubar preference on quit",
+    )
 
 
 def test_on_check_updates_logs_when_check_fails(monkeypatch, caplog) -> None:
-    import logging
-
-    module, _, app = _make_app()
-
-    def boom(*a, **k):
-        raise RuntimeError("update check failed")
-
-    monkeypatch.setattr("quodeq.update.checker.run_check", boom)
-    with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
-        app._on_check_updates(None)
-    assert "update check failed" in caplog.text
+    _module, _, app = _make_app()
+    _assert_logs(
+        monkeypatch, caplog, "quodeq.update.checker.run_check", "update check failed",
+        lambda: app._on_check_updates(None), "update check failed",
+    )
 
 
 def test_poll_logs_when_update_status_check_fails(monkeypatch, caplog) -> None:
-    import logging
-
-    module, _, app = _make_app()
-
-    def boom(*a, **k):
-        raise RuntimeError("status check failed")
-
-    monkeypatch.setattr("quodeq.update.checker.get_status", boom)
-    with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
-        app._poll(None)
-    assert "update availability check failed" in caplog.text
+    _module, _, app = _make_app()
+    _assert_logs(
+        monkeypatch, caplog, "quodeq.update.checker.get_status", "status check failed",
+        lambda: app._poll(None), "update availability check failed",
+    )
 
 
 def test_set_ui_state_running_enables_open_and_stop_only() -> None:

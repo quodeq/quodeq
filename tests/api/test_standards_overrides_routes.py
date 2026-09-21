@@ -122,8 +122,8 @@ def test_put_malformed_spec_missing_bounds_does_not_500(tmp_path: Path, monkeypa
         "STANDARDS_DIMENSIONS_FILE": str(dims),
     })
 
-    import quodeq.api.standards_overrides_routes as _mod
-    monkeypatch.setattr(_mod, "resolve_repo_root", lambda pid: str(project_root))
+    import quodeq.api.standards_project as _guard
+    monkeypatch.setattr(_guard, "resolve_repo_root", lambda pid: str(project_root))
 
     with app.test_client() as c:
         # A value within "unbounded" range should be accepted (mirrors _is_valid)
@@ -172,8 +172,8 @@ def test_put_shape_invalid_param_spec_does_not_500(tmp_path: Path, monkeypatch: 
         "STANDARDS_DIMENSIONS_FILE": str(dims),
     })
 
-    import quodeq.api.standards_overrides_routes as _mod
-    monkeypatch.setattr(_mod, "resolve_repo_root", lambda pid: str(project_root))
+    import quodeq.api.standards_project as _guard
+    monkeypatch.setattr(_guard, "resolve_repo_root", lambda pid: str(project_root))
 
     with app.test_client() as c:
         resp = c.put(OVERRIDES_URL, json={"overrides": {}}, headers=_LOCALHOST)

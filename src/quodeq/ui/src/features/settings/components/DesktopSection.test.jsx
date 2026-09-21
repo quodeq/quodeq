@@ -75,6 +75,5 @@ describe('DesktopSection', () => {
       expect.stringContaining('[DesktopSection]'),
       expect.any(Error),
     );
-    warn.mockRestore();
   });
 });

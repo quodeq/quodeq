@@ -38,6 +38,11 @@ describe('useDragLifecycle', () => {
   });
 
   afterEach(() => {
+    // Any test that began a drag without explicitly ending it leaves the
+    // hook's pointermove/pointerup listeners on window. Ending the gesture
+    // here is a no-op for tests that already tore it down (no listeners
+    // left to respond) and cleans up the rest.
+    act(() => { window.dispatchEvent(new Event('pointerup')); });
     vi.unstubAllGlobals();
   });
 

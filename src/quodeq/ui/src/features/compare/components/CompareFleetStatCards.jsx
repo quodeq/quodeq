@@ -1,5 +1,5 @@
 import { StatStrip, Stat } from '../../../components/terminal/index.js';
-import SevBadge from '../../../components/terminal/SevBadge.jsx';
+import { SeverityCardHint } from './severityCells.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t } from '../../../strings/index.js';
@@ -22,11 +22,7 @@ export default function CompareFleetStatCards({ fleet }) {
         label={t('compare.cardViolations')}
         value={nf(fleet.totalViolations)}
         hint={(
-          <span className="compare-card__sev">
-            <SevBadge level="critical" count={fleet.severity.critical} />
-            <SevBadge level="major" count={fleet.severity.major} />
-            <SevBadge level="minor" count={fleet.severity.minor} />
-          </span>
+          <SeverityCardHint severity={fleet.severity} />
         )}
       />
       <Stat

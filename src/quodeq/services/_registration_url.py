@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.services.wiring import remote_origin_url_raw
-from quodeq.shared.repo import SCHEME_RE, looks_like_authority
+from quodeq.shared.repo import split_userinfo
 
 
 
@@ -28,18 +28,11 @@ def _strip_credentials(url: str) -> str:
     bounding the search by the first "/" would then hide the real "@" and
     let the whole credential through unstripped.
     """
-    match = SCHEME_RE.match(url)
-    if not match:
+    parts = split_userinfo(url)
+    if parts is None:
         return url
-    scheme = match.group(1)
-    rest = url[len(scheme):]
-    at_pos = rest.rfind("@")
-    if at_pos == -1:
-        return url
-    slash_pos = rest.find("/")
-    if -1 < slash_pos < at_pos and looks_like_authority(rest[:slash_pos]):
-        return url
-    return scheme + rest[at_pos + 1:]
+    scheme, after = parts
+    return scheme + after
 
 
 def _read_origin_remote(repo_dir: Path) -> str | None:

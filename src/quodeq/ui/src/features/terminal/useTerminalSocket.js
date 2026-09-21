@@ -16,6 +16,14 @@ const RETRY_MAX_MS = 5000;
 const FRAME_DATA = '0';
 const FRAME_RESIZE = '1';
 
+// Drop a pending reconnect. Clearing the handle as well as the timer is what
+// keeps a later cancel (or a status read) from acting on a dead timer.
+function cancelRetry(retryTimerRef) {
+  if (!retryTimerRef.current) return;
+  clearTimeout(retryTimerRef.current);
+  retryTimerRef.current = null;
+}
+
 function connectSocket({ sessionId, wsRef, retryTimerRef, attemptsRef, onOpenRef, onDataRef, setStatus, setGen }) {
   const ws = new WebSocket(terminalSocketUrl(window.location, sessionId));
   wsRef.current = ws;
@@ -50,7 +58,7 @@ function connectSocket({ sessionId, wsRef, retryTimerRef, attemptsRef, onOpenRef
     if (s[0] === FRAME_DATA) onDataRef.current?.(s.slice(1));
   };
   return () => {
-    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    cancelRetry(retryTimerRef);
     ws.onopen = ws.onmessage = ws.onclose = null;
     try {
       ws.close();
@@ -101,7 +109,7 @@ export function useTerminalSocket({ active, onData, onOpen, restartKey = 0, sess
 
   // Manual retry (overlay click): skip any pending backoff and go now.
   const reconnectNow = useCallback(() => {
-    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    cancelRetry(retryTimerRef);
     attemptsRef.current = 0;
     setGen((g) => g + 1);
   }, []);

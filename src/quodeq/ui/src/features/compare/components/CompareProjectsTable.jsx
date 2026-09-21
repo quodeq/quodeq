@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { SectionLabel } from '../../../components/terminal/index.js';
-import SevBadge from '../../../components/terminal/SevBadge.jsx';
+import { ViolationsCellBody } from './severityCells.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import ProjectRow from './ProjectRow.jsx';
-import { nf, score1 } from '../compareFormatters.js';
+import { score1 } from '../compareFormatters.js';
 
 
 function CollapsedUnevaluated({ unevaluated, showUnevaluated, setShowUnevaluated }) {
@@ -44,12 +44,7 @@ function ScopeAverageRow({ fleet }) {
       <span className={`compare-row__score ${scoreColorClass(fleet.score)}`}>{score1(fleet.score)}</span>
       <span className="compare-row__trend"><TrendBadge delta={fleet.delta} /></span>
       <span className="compare-row__viol">
-        <span className="compare-row__violTotal">{nf(fleet.totalViolations)}</span>
-        <span className="compare-row__sev">
-          <SevBadge level="critical" format="count-abbr" count={fleet.severity.critical} />
-          <SevBadge level="major" format="count-abbr" count={fleet.severity.major} />
-          <SevBadge level="minor" format="count-abbr" count={fleet.severity.minor} />
-        </span>
+        <ViolationsCellBody total={fleet.totalViolations} severity={fleet.severity} />
       </span>
       <span className="compare-row__ratio">{complianceRatio(fleet.totalViolations, fleet.totalCompliance)}</span>
       <span className="compare-row__last" />

@@ -63,12 +63,12 @@ def test_read_returns_empty_quickly_when_idle():
         pty.kill()
 
 
-def test_read_works_when_the_master_fd_is_above_select_limit():
-    """select.select() rejects fds >= 1024; a long-lived server reaches them."""
-    import os
+@pytest.fixture()
+def _raised_nofile_limit():
+    """Raise RLIMIT_NOFILE enough to reach fd 1100 if it isn't already, and
+    restore the original soft limit afterwards regardless of test outcome."""
     import resource
 
-    from quodeq.terminal._pty_unix import UnixPty
     soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
     if soft < 1200:
         try:
@@ -78,6 +78,17 @@ def test_read_works_when_the_master_fd_is_above_select_limit():
             )
         except (ValueError, OSError):
             pytest.skip("cannot raise RLIMIT_NOFILE to reach fd 1100")
+    try:
+        yield
+    finally:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))
+
+
+def test_read_works_when_the_master_fd_is_above_select_limit(_raised_nofile_limit):
+    """select.select() rejects fds >= 1024; a long-lived server reaches them."""
+    import os
+
+    from quodeq.terminal._pty_unix import UnixPty
     pty = UnixPty(argv=["/bin/sh"])
     pty.spawn(cwd="/", cols=80, rows=24)
     try:

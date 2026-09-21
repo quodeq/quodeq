@@ -1,9 +1,7 @@
 """Tests for model tier routing through the analysis pipeline."""
 from __future__ import annotations
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from quodeq.analysis.run_types import AnalysisOptions
-from unittest.mock import patch
 from quodeq.analysis.run_types import RunConfig, AnalysisOptions, _AnalysisContext
 from quodeq.analysis._dimension_steps import _run_dimension_analysis
 from quodeq.analysis._config import AnalysisConfig

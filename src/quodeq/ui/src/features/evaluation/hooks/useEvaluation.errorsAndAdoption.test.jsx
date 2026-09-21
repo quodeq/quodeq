@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useEvaluation } from "./useEvaluation";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
@@ -47,6 +47,10 @@ describe("useEvaluation", () => {
     // preparePayload reads localStorage; seed a working provider+model.
     localStorage.setItem("cc-active-provider", "ollama");
     localStorage.setItem("cc-ollama-model", "llama3.1");
+  });
+
+  afterEach(() => {
+    localStorage.clear();
   });
 
   it("cancelEvaluation surfaces an error and keeps the job on a status-less rejection", async () => {
@@ -181,6 +185,5 @@ describe("useEvaluation", () => {
     await waitFor(() => expect(result.current.jobError).toMatch(/network|resum/i));
     expect(result.current.job).toBeNull();
     expect(warnSpy).toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 });

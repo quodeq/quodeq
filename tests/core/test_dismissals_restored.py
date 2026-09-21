@@ -35,7 +35,9 @@ def test_restore_then_dismiss_again_is_not_restored() -> None:
 
 
 def test_restore_is_keyed_on_code_not_file() -> None:
-    events = [_dismiss("R1", "a.py", "fp1"), _restore("R1", "a.py", "fp1")]
+    # Dismiss in one file, restore from a different one: the net answer must
+    # still track (req, fingerprint), not the file the restore event carried.
+    events = [_dismiss("R1", "a.py", "fp1"), _restore("R1", "b.py", "fp1")]
     restored = restored_fingerprints(events)
     assert ("R1", "fp1") in restored
 

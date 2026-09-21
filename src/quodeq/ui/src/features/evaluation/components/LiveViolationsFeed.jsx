@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
-import ContextBlock from '../../../components/ContextBlock.jsx';
+import { FindingDetailBody } from '../../../components/findingDetail.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
+import { staggerDelayStyle } from '../../../utils/animation.js';
 import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
@@ -12,34 +13,6 @@ import { severityLabel } from '../../../strings/labels.js';
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
 const KNOWN_SEVERITIES = new Set(['critical', 'major', 'minor']);
-
-function ViolationDetail({ v }) {
-  return (
-    <div className="vlive-detail">
-      {(v.title || v.reason) && (
-        <div className="vlive-detail-section">
-          <div className="vlive-detail-section-header">
-            <span className="vlive-detail-section-label">{t('violations.reasonLabel')}</span>
-            {(() => {
-              const urlRefs = v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url)) || [];
-              return urlRefs.length > 0 && (
-                <span className="cwe-link-group">{urlRefs.map((ref, i) => (
-                  <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                ))}</span>
-              );
-            })()}
-          </div>
-          {v.title && <p className="vlive-detail-title">{v.title}</p>}
-          {v.reason && <>
-            <span className="vlive-detail-section-label">{t('violations.detailLabel')}</span>
-            <p className="vlive-detail-reason">{v.reason}</p>
-          </>}
-        </div>
-      )}
-      <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} />
-    </div>
-  );
-}
 
 function ViolationLiveRow({ violation, index }) {
   const [open, setOpen] = useState(false);
@@ -53,7 +26,7 @@ function ViolationLiveRow({ violation, index }) {
   return (
     <div
       className={`vdetail-row vdetail-row--${v.severity}`}
-      style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}
+      style={staggerDelayStyle(index, ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}
     >
       <div
         className="vdetail-row-main vlive-collapsible"
@@ -80,7 +53,7 @@ function ViolationLiveRow({ violation, index }) {
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </div>
-      {open && <ViolationDetail v={v} />}
+      {open && <FindingDetailBody v={v} />}
     </div>
   );
 }

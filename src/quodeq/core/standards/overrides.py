@@ -14,6 +14,7 @@ import hashlib
 import json
 import logging
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 _logger = logging.getLogger(__name__)
@@ -56,6 +57,20 @@ def resolve_requirement_text(req: dict, req_overrides: dict | None = None) -> st
         text)
 
 
+def _param_requirements(dimension_data: dict) -> Iterator[tuple[str, dict, dict]]:
+    """Yield ``(req_id, req, params)`` for each requirement of *dimension_data* declaring params.
+
+    Requirements with no id or no params block are skipped.
+    """
+    for principle in dimension_data.get("principles", []):
+        for req in principle.get("requirements", []):
+            req_id = req.get("id")
+            params = req.get("params")
+            if not req_id or not params:
+                continue
+            yield req_id, req, params
+
+
 def dimension_params(
     dimension_data: dict, overrides: dict[str, dict],
 ) -> tuple[dict[str, dict[str, int]], dict[str, dict[str, int]]]:
@@ -69,20 +84,15 @@ def dimension_params(
     """
     effective: dict[str, dict[str, int]] = {}
     non_default: dict[str, dict[str, int]] = {}
-    for principle in dimension_data.get("principles", []):
-        for req in principle.get("requirements", []):
-            req_id = req.get("id")
-            params = req.get("params")
-            if not req_id or not params:
-                continue
-            values = effective_params(req, overrides.get(req_id))
-            effective[req_id] = values
-            diff = {
-                name: value for name, value in values.items()
-                if value != (params.get(name) or {}).get("default")
-            }
-            if diff:
-                non_default[req_id] = diff
+    for req_id, req, params in _param_requirements(dimension_data):
+        values = effective_params(req, overrides.get(req_id))
+        effective[req_id] = values
+        diff = {
+            name: value for name, value in values.items()
+            if value != (params.get(name) or {}).get("default")
+        }
+        if diff:
+            non_default[req_id] = diff
     return effective, non_default
 
 
@@ -114,15 +124,10 @@ def non_default_from_effective(
     re-evaluation for that project rather than a wrong reuse.
     """
     defaults: dict[str, dict[str, object]] = {}
-    for principle in dimension_data.get("principles", []):
-        for req in principle.get("requirements", []):
-            req_id = req.get("id")
-            params = req.get("params")
-            if not req_id or not params:
-                continue
-            defaults[req_id] = {
-                name: (spec or {}).get("default") for name, spec in params.items()
-            }
+    for req_id, _req, params in _param_requirements(dimension_data):
+        defaults[req_id] = {
+            name: (spec or {}).get("default") for name, spec in params.items()
+        }
     non_default: dict[str, dict[str, int]] = {}
     for req_id, values in (effective or {}).items():
         declared = defaults.get(req_id, {})

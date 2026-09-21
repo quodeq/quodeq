@@ -17,6 +17,34 @@ from functools import lru_cache
 # once, not once per discipline rule that probes it.
 _PARSE_CACHE_MAX = 64
 
+def _json_dep_names(
+    content: str, keys: tuple[str, ...], *, include_lists: bool = True,
+) -> frozenset[str]:
+    """Lower-cased dependency names under *keys* of a JSON manifest.
+
+    Empty for content that is not a JSON object. A key holding a mapping
+    contributes its keys (the usual ``{"name": "range"}`` shape); a key
+    holding a list contributes its strings (npm's ``bundledDependencies``).
+
+    *include_lists* is off for manifests whose spec only ever allows the
+    mapping shape, so a list there stays unread rather than being guessed at.
+    """
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, ValueError):
+        return frozenset()
+    if not isinstance(data, dict):
+        return frozenset()
+    names: set[str] = set()
+    for key in keys:
+        v = data.get(key)
+        if isinstance(v, dict):
+            names.update(k.lower() for k in v if isinstance(k, str))
+        elif include_lists and isinstance(v, list):
+            names.update(s.lower() for s in v if isinstance(s, str))
+    return frozenset(names)
+
+
 # --- package.json ------------------------------------------------------------
 
 
@@ -28,20 +56,7 @@ _PACKAGE_JSON_DEP_KEYS = (
 
 @lru_cache(maxsize=_PARSE_CACHE_MAX)
 def _package_json_names(content: str) -> frozenset[str]:
-    try:
-        data = json.loads(content)
-    except (json.JSONDecodeError, ValueError):
-        return frozenset()
-    if not isinstance(data, dict):
-        return frozenset()
-    names: set[str] = set()
-    for key in _PACKAGE_JSON_DEP_KEYS:
-        v = data.get(key)
-        if isinstance(v, dict):
-            names.update(k.lower() for k in v if isinstance(k, str))
-        elif isinstance(v, list):  # bundledDependencies is a list of strings
-            names.update(s.lower() for s in v if isinstance(s, str))
-    return frozenset(names)
+    return _json_dep_names(content, _PACKAGE_JSON_DEP_KEYS)
 
 
 def has_package_json_dependency(content: str, needle: str) -> bool:
@@ -132,18 +147,9 @@ def has_go_mod_module(content: str, needle: str) -> bool:
 
 @lru_cache(maxsize=_PARSE_CACHE_MAX)
 def _composer_dep_names(content: str) -> frozenset[str]:
-    try:
-        data = json.loads(content)
-    except (json.JSONDecodeError, ValueError):
-        return frozenset()
-    if not isinstance(data, dict):
-        return frozenset()
-    names: set[str] = set()
-    for key in ("require", "require-dev"):
-        v = data.get(key)
-        if isinstance(v, dict):
-            names.update(k.lower() for k in v if isinstance(k, str))
-    return frozenset(names)
+    # composer's require/require-dev are objects by spec, so a list there is
+    # not a dependency list -- keep it unread, as this parser always has.
+    return _json_dep_names(content, ("require", "require-dev"), include_lists=False)
 
 
 def has_composer_dependency(content: str, needle: str) -> bool:

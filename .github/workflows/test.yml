@@ -165,3 +165,10 @@ jobs:
         # above its committed ceiling. Shrunk counts are locked in with
         # `npm run lint:fault:update`.
         run: npm run lint:fault
+
+      - name: Check UI duplication (clone ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on jscpd-detected copy-paste duplication beyond the spans in
+        # tools/clones_baseline.json, or a baseline above its committed
+        # ceiling. Shrunk entries are locked in with `npm run lint:clones:update`.
+        run: npm run lint:clones

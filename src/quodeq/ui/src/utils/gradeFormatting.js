@@ -36,6 +36,23 @@ export function splitScore(score) {
 
 const GRADE_CLASSES = ['grade-top', 'grade-high', 'grade-mid', 'grade-low'];
 const TIER_LETTERS = ['A', 'B', 'C', 'D'];
+const BOTTOM_TIER_LETTER = 'F';
+const ALL_TIER_LETTERS = [...TIER_LETTERS, BOTTOM_TIER_LETTER];
+
+// Walk the served grade bands highest-first and label the first one the score
+// reaches. `labels` is positional (index 0 = highest band); `extraBand` covers
+// a served threshold list longer than `labels`, `bottom` a score below every
+// band and `notANumber` a score that does not parse. scoreColorClass and
+// scoreTierLabel are the same walk with different labels.
+function scoreBandLabel(score, { labels, extraBand, bottom, notANumber }) {
+  const n = typeof score === 'number' ? score : parseFloat(score);
+  if (Number.isNaN(n)) return notANumber;
+  const thresholds = getGradeThresholds();
+  for (let i = 0; i < thresholds.length; i += 1) {
+    if (n >= thresholds[i][0]) return labels[i] ?? extraBand;
+  }
+  return bottom;
+}
 
 /**
  * Map a numeric score (0–10) to a CSS grade class.
@@ -48,13 +65,12 @@ const TIER_LETTERS = ['A', 'B', 'C', 'D'];
  * @returns {string}
  */
 export function scoreColorClass(score) {
-  const n = typeof score === 'number' ? score : parseFloat(score);
-  if (Number.isNaN(n)) return 'grade-none';
-  const thresholds = getGradeThresholds();
-  for (let i = 0; i < thresholds.length; i += 1) {
-    if (n >= thresholds[i][0]) return GRADE_CLASSES[i] ?? 'grade-low';
-  }
-  return 'grade-bottom';
+  return scoreBandLabel(score, {
+    labels: GRADE_CLASSES,
+    extraBand: 'grade-low',
+    bottom: 'grade-bottom',
+    notANumber: 'grade-none',
+  });
 }
 
 export const GRADE_WORD_TO_LETTER = {
@@ -123,13 +139,12 @@ export function capitalizeGrade(str) {
  * @returns {string} Single letter grade ('A', 'B', 'C', 'D', 'F') or empty string
  */
 export function scoreTierLabel(score) {
-  const n = typeof score === 'number' ? score : parseFloat(score);
-  if (Number.isNaN(n)) return '';
-  const thresholds = getGradeThresholds();
-  for (let i = 0; i < thresholds.length; i += 1) {
-    if (n >= thresholds[i][0]) return TIER_LETTERS[i] ?? 'D';
-  }
-  return 'F';
+  return scoreBandLabel(score, {
+    labels: TIER_LETTERS,
+    extraBand: TIER_LETTERS[TIER_LETTERS.length - 1],
+    bottom: BOTTOM_TIER_LETTER,
+    notANumber: '',
+  });
 }
 
 /**
@@ -141,7 +156,7 @@ export function gradeLabel(grade) {
   const k = grade.trim().toLowerCase();
   if (GRADE_WORD_TO_LETTER[k]) return GRADE_WORD_TO_LETTER[k];
   const firstChar = grade.trim().toUpperCase().charAt(0);
-  return ['A', 'B', 'C', 'D', 'F'].includes(firstChar) ? firstChar : null;
+  return ALL_TIER_LETTERS.includes(firstChar) ? firstChar : null;
 }
 
 /**

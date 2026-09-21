@@ -5,6 +5,7 @@ import subprocess
 from unittest.mock import patch
 
 from quodeq.menubar import _app_lifecycle, _process, control, state
+from quodeq.shared import json_state
 
 
 def test_remove_pidfile_logs_when_unlink_fails(monkeypatch, tmp_path) -> None:
@@ -46,8 +47,8 @@ def test_write_state_logs_write_and_cleanup_failures(monkeypatch, tmp_path) -> N
     def _unlink_fails(*_args, **_kwargs):
         raise OSError(13, "Permission denied")
 
-    monkeypatch.setattr(state.os, "replace", _replace_fails)
-    monkeypatch.setattr(state.os, "unlink", _unlink_fails)
+    monkeypatch.setattr(json_state.os, "replace", _replace_fails)
+    monkeypatch.setattr(json_state.os, "unlink", _unlink_fails)
     with patch.object(state._logger, "debug") as debug:
         state.write_state(current, env)  # must not raise
     messages = [c.args[0] for c in debug.call_args_list]

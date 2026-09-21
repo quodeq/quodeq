@@ -71,20 +71,10 @@ def _extract_model_from_args(args: list[str]) -> str | None:
 class TestModelReachesSubprocess:
     """The --model flag in the spawned CLI must match the configured ai_model."""
 
-    def test_haiku_reaches_cli(self, tmp_path: Path) -> None:
-        args = _capture_popen_args(tmp_path, _MODEL_HAIKU)
-        model = _extract_model_from_args(args)
-        assert model == _MODEL_HAIKU
-
-    def test_sonnet_reaches_cli(self, tmp_path: Path) -> None:
-        args = _capture_popen_args(tmp_path, _MODEL_SONNET)
-        model = _extract_model_from_args(args)
-        assert model == _MODEL_SONNET
-
-    def test_opus_reaches_cli(self, tmp_path: Path) -> None:
-        args = _capture_popen_args(tmp_path, _MODEL_OPUS)
-        model = _extract_model_from_args(args)
-        assert model == _MODEL_OPUS
+    @pytest.mark.parametrize("configured", [_MODEL_HAIKU, _MODEL_SONNET, _MODEL_OPUS])
+    def test_configured_model_reaches_cli(self, tmp_path: Path, configured: str) -> None:
+        args = _capture_popen_args(tmp_path, configured)
+        assert _extract_model_from_args(args) == configured
 
     def test_no_model_flag_when_none(self, tmp_path: Path) -> None:
         """When ai_model is None and no env, --model should not appear (uses provider default)."""
@@ -102,42 +92,34 @@ class TestModelReachesSubprocess:
 class TestSubagentPoolModelPropagation:
     """SubagentPool._build_agent_config must copy ai_model from base config."""
 
-    def test_pool_agents_inherit_model(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(
+        ("model", "files", "dimension"),
+        [
+            (_MODEL_OPUS, ["a.py", "b.py"], "security"),
+            (_MODEL_HAIKU, ["x.py"], "perf"),
+        ],
+    )
+    def test_pool_agents_inherit_model(
+        self, tmp_path: Path, model: str, files: list[str], dimension: str,
+    ) -> None:
         from quodeq.analysis.subagents.file_queue import FileQueue
         from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
         queue_path = tmp_path / "queue.json"
-        FileQueue(queue_path, ["a.py", "b.py"])
+        FileQueue(queue_path, files)
 
-        base = AnalysisConfig(ai_model=_MODEL_OPUS)
+        base = AnalysisConfig(ai_model=model)
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=2, prompt="test", dimension="security"),
+            options=PoolOptions(n_agents=len(files), prompt="test", dimension=dimension),
             config=base,
         )
 
-        for idx in range(2):
+        for idx in range(len(files)):
             ac, _, _ = pool._build_agent_config(idx)
-            assert ac.ai_model == _MODEL_OPUS, (
-                f"agent-{idx} got ai_model={ac.ai_model!r}, expected {_MODEL_OPUS!r}"
+            assert ac.ai_model == model, (
+                f"agent-{idx} got ai_model={ac.ai_model!r}, expected {model!r}"
             )
-
-    def test_pool_agents_inherit_haiku(self, tmp_path: Path) -> None:
-        from quodeq.analysis.subagents.file_queue import FileQueue
-        from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
-
-        queue_path = tmp_path / "queue.json"
-        FileQueue(queue_path, ["x.py"])
-
-        base = AnalysisConfig(ai_model=_MODEL_HAIKU)
-        pool = SubagentPool(
-            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=1, prompt="test", dimension="perf"),
-            config=base,
-        )
-
-        ac, _, _ = pool._build_agent_config(0)
-        assert ac.ai_model == _MODEL_HAIKU
 
 
 # ---------------------------------------------------------------------------
@@ -148,30 +130,29 @@ class TestRunnerModelResolution:
     """The runner builds AnalysisConfig.ai_model from options → env → default."""
 
     def _resolve(self, subagent_model: str | None = None, env_model: str | None = None) -> str:
-        """Exercise the runner's resolution chain using the actual cli helper.
-
-        The env-based fallback delegates to ``quodeq.cli.subagent_model`` which
-        is the same function used by the real CLI (``cli.py`` line ~43).  The
-        option-level override (``subagent_model`` arg) and the final default are
-        handled here in the same order as the evaluate command.
+        """Exercise the model-resolution precedence by calling the real
+        ``_pool_launcher._build_pool_config`` production function, so a
+        regression at its ``config.options.subagent_model or
+        _default_subagent_model(env) or config.options.ai_model`` line fails
+        these tests. ``ai_model`` is set to the haiku constant here to stand
+        in for whatever default the caller configured, since AnalysisOptions
+        itself has no built-in default.
         """
-        from quodeq.cli import subagent_model as env_subagent_model
-        from quodeq.analysis.runner import AnalysisOptions
-        opts = AnalysisOptions(subagent_model=subagent_model)
-        with patch.dict(os.environ, {"SUBAGENT_MODEL": env_model} if env_model else {}, clear=False):
-            if not env_model:
-                os.environ.pop("SUBAGENT_MODEL", None)
-            _FALLBACK_MODEL = _MODEL_HAIKU
-            return opts.subagent_model or env_subagent_model() or _FALLBACK_MODEL
+        from quodeq.analysis.runner import AnalysisOptions, RunConfig
+        from quodeq.analysis.subagents._pool_launcher import LaunchPoolParams, _build_pool_config
 
-    def test_level1_fast_haiku(self) -> None:
-        assert self._resolve(_MODEL_HAIKU) == _MODEL_HAIKU
+        config = RunConfig(
+            src=Path("."), language="python",
+            options=AnalysisOptions(subagent_model=subagent_model, ai_model=_MODEL_HAIKU),
+        )
+        params = LaunchPoolParams(evidence_dir=Path("."), queue_path=Path("queue.json"), prompt="p")
+        env = {"SUBAGENT_MODEL": env_model} if env_model else {}
+        built = _build_pool_config(config, "test-dim", params, time_limit=60, env=env)
+        return built.ai_model
 
-    def test_level2_balanced_sonnet(self) -> None:
-        assert self._resolve(_MODEL_SONNET) == _MODEL_SONNET
-
-    def test_level3_thorough_opus(self) -> None:
-        assert self._resolve(_MODEL_OPUS) == _MODEL_OPUS
+    @pytest.mark.parametrize("requested", [_MODEL_HAIKU, _MODEL_SONNET, _MODEL_OPUS])
+    def test_requested_model_wins(self, requested: str) -> None:
+        assert self._resolve(requested) == requested
 
     def test_env_fallback_when_no_option(self) -> None:
         assert self._resolve(None, _MODEL_SONNET) == _MODEL_SONNET
@@ -199,10 +180,19 @@ class _StubJobManager:
 
 
 @pytest.fixture()
-def filesystem_provider_stub(tmp_path: Path):
-    """Return a (repo_path, reports_dir, stub_job_manager, provider) tuple."""
+def filesystem_provider_stub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Return a (repo_path, reports_dir, stub_job_manager, provider) tuple.
+
+    The model env vars are cleared first: ``build_eval_env`` starts from
+    ``os.environ`` when no env is passed, so a developer (or CI runner) with
+    ``SUBAGENT_MODEL`` exported would see it in ``captured_env`` and the
+    no-model case would fail for a reason that has nothing to do with the
+    chain under test.
+    """
     from quodeq.services.filesystem import FilesystemActionProvider
 
+    monkeypatch.delenv("SUBAGENT_MODEL", raising=False)
+    monkeypatch.delenv("QUODEQ_SUBAGENT_MODEL", raising=False)
     repo = tmp_path / "repo"
     repo.mkdir()
     stub = _StubJobManager()
@@ -214,27 +204,17 @@ class TestApiToSubprocessIntegration:
     """POST /api/evaluations with subagentModel should set SUBAGENT_MODEL
     in the env passed to the subprocess."""
 
-    def test_full_chain_sonnet(self, filesystem_provider_stub) -> None:
+    @pytest.mark.parametrize("requested", [_MODEL_SONNET, _MODEL_OPUS])
+    def test_full_chain_sets_subagent_model(self, filesystem_provider_stub, requested: str) -> None:
         from quodeq.services.base import EvaluationOptions
 
         repo, reports_dir, stub, provider = filesystem_provider_stub
         provider.start_evaluation(
             repo=str(repo),
             reports_dir=str(reports_dir),
-            options=EvaluationOptions(subagent_model=_MODEL_SONNET),
+            options=EvaluationOptions(subagent_model=requested),
         )
-        assert stub.captured_env["SUBAGENT_MODEL"] == _MODEL_SONNET
-
-    def test_full_chain_opus(self, filesystem_provider_stub) -> None:
-        from quodeq.services.base import EvaluationOptions
-
-        repo, reports_dir, stub, provider = filesystem_provider_stub
-        provider.start_evaluation(
-            repo=str(repo),
-            reports_dir=str(reports_dir),
-            options=EvaluationOptions(subagent_model=_MODEL_OPUS),
-        )
-        assert stub.captured_env["SUBAGENT_MODEL"] == _MODEL_OPUS
+        assert stub.captured_env["SUBAGENT_MODEL"] == requested
 
     def test_full_chain_no_model_no_env_key(self, filesystem_provider_stub) -> None:
         from quodeq.services.base import EvaluationOptions

@@ -115,20 +115,21 @@ describe('StandardsTable download error handling (#500)', () => {
       event.preventDefault();
     };
     window.addEventListener('unhandledrejection', handler);
+    try {
+      exportStandard.mockRejectedValue(new Error('network error'));
 
-    exportStandard.mockRejectedValue(new Error('network error'));
+      render(<StandardsTable grouped={{ custom: [STANDARD] }} actions={actions} />);
 
-    render(<StandardsTable grouped={{ custom: [STANDARD] }} actions={actions} />);
+      const downloadBtn = screen.getByRole('button', { name: /download my standard/i });
+      fireEvent.click(downloadBtn);
 
-    const downloadBtn = screen.getByRole('button', { name: /download my standard/i });
-    fireEvent.click(downloadBtn);
+      // Give the promise rejection a chance to propagate.
+      await new Promise((r) => setTimeout(r, 50));
 
-    // Give the promise rejection a chance to propagate.
-    await new Promise((r) => setTimeout(r, 50));
-
-    window.removeEventListener('unhandledrejection', handler);
-
-    expect(unhandledErrors).toHaveLength(0);
+      expect(unhandledErrors).toHaveLength(0);
+    } finally {
+      window.removeEventListener('unhandledrejection', handler);
+    }
   });
 
   it('surfaces the download error to the user when download fails', async () => {

@@ -63,6 +63,11 @@ class TestCacheReplayAppliesScopeGate:
             if ln.strip() and "_marker" not in ln
         ]
 
+    @classmethod
+    def _replayed_findings(cls, config: RunConfig) -> list[dict]:
+        """The findings the replay wrote to the run's security evidence file."""
+        return cls._findings_in((config.work_dir or config.src) / "security_evidence.jsonl")
+
     def _replay_all_hits(
         self, tmp_path: Path, cache, finding: dict,
         *, profile: tuple[bool, str, str] | None,
@@ -103,8 +108,7 @@ class TestCacheReplayAppliesScopeGate:
             profile=(False, "loopback", "distributed"),
         )
 
-        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
-        findings = self._findings_in(jsonl)
+        findings = self._replayed_findings(config)
         assert len(findings) == 1
         assert findings[0]["severity"] == "minor", (
             "a cache-replayed major S-AUT-3 finding must be capped to minor "
@@ -124,8 +128,7 @@ class TestCacheReplayAppliesScopeGate:
         )
         config = self._replay_all_hits(tmp_path, cache, finding, profile=None)
 
-        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
-        findings = self._findings_in(jsonl)
+        findings = self._replayed_findings(config)
         assert len(findings) == 1
         assert findings[0]["severity"] == "major", (
             "without a declared trust model the conservative default must "
@@ -151,8 +154,7 @@ class TestCacheReplayAppliesScopeGate:
             profile=(False, "loopback", "distributed"),
         )
 
-        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
-        findings = self._findings_in(jsonl)
+        findings = self._replayed_findings(config)
         assert len(findings) == 1
         assert findings[0]["severity"] == "minor", (
             "a cache-replayed critical S-AUT-3 finding naming no source must "
@@ -210,7 +212,6 @@ class TestCacheReplayAppliesScopeGate:
             profile=(False, "loopback", "single-host"),
         )
 
-        jsonl = (config.work_dir or config.src) / "security_evidence.jsonl"
-        replayed = self._findings_in(jsonl)
+        replayed = self._replayed_findings(config)
         assert [f["severity"] for f in replayed] == ["minor"]
         assert replayed[0]["scope_downgrade"]["rule"] == "single_host_topology"

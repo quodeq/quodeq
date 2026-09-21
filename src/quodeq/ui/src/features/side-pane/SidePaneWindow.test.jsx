@@ -7,6 +7,10 @@ beforeEach(() => {
   Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
 });
 
+afterEach(() => {
+  delete navigator.clipboard;
+});
+
 function makeSpec(overrides = {}) {
   return {
     id: 'w1',

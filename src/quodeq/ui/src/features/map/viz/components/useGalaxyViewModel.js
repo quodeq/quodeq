@@ -4,6 +4,7 @@ import { updateTooltip, handleCanvasClick, createKeyboardHandlers } from './gala
 import { computeLevelInfo, buildBreadcrumb } from './galaxyViewInfo.jsx';
 import { useGalaxyCamera } from './useGalaxyCamera.js';
 import { DEFAULT_CANVAS_W, DEFAULT_CANVAS_H } from '../core/galaxyTunables.js';
+import { useCanvasSize } from './galaxyCanvasSize.js';
 
 /* ── The scene: layout build + live-data refresh ── */
 
@@ -20,23 +21,6 @@ function useGalaxyScene({ dimensions, standardTypes }) {
   }, [dimensions, scene]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return scene;
-}
-
-/* ── Canvas box size, observed from the parent element ── */
-
-function useCanvasSize(canvasRef) {
-  const [size, setSize] = useState({ w: DEFAULT_CANVAS_W, h: DEFAULT_CANVAS_H });
-  useEffect(() => {
-    const el = canvasRef.current?.parentElement;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) setSize({ w: width, h: height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return size;
 }
 
 /* ── Every long-lived ref the nav/camera/event code shares, plus the

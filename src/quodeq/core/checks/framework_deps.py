@@ -16,6 +16,7 @@ one defect into dozens of findings and buries the single place to fix it.
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 from quodeq.core.checks._judgments import compliance, violation
@@ -98,6 +99,29 @@ def _direct_frameworks(
     return found
 
 
+def _traversable_targets(
+    edges: Iterable[ImportEdge],
+    index: _ImportIndex,
+    first_party: frozenset[str],
+    seen: set[str],
+) -> Iterator[tuple[str, ImportEdge]]:
+    """Yield ``(target file, edge)`` for the *edges* the traversal should follow.
+
+    An edge is followed when its top-level package is first-party, it resolves
+    to a known file, that file is not inner-layer and has not been visited.
+    Each yielded target is added to *seen* before it is handed out, so no file
+    is queued twice.
+    """
+    for edge in edges:
+        if top_level(edge.module) not in first_party:
+            continue
+        target = _resolve(edge.module, index.by_module)
+        if target is None or target in seen or is_inner_layer_path(target):
+            continue
+        seen.add(target)
+        yield target, edge
+
+
 def _transitive_frameworks(
     origin: str,
     index: _ImportIndex,
@@ -113,13 +137,7 @@ def _transitive_frameworks(
     found: dict[str, tuple[int, str]] = {}
     seen = {origin}
     queue: deque[tuple[str, int, list[str]]] = deque()
-    for edge in index.by_file.get(origin, ()):
-        if top_level(edge.module) not in first_party:
-            continue
-        target = _resolve(edge.module, index.by_module)
-        if target is None or target in seen or is_inner_layer_path(target):
-            continue
-        seen.add(target)
+    for target, edge in _traversable_targets(index.by_file.get(origin, ()), index, first_party, seen):
         queue.append((target, edge.line, [edge.module]))
 
     while queue:
@@ -128,13 +146,7 @@ def _transitive_frameworks(
         for package in _direct_frameworks(edges, framework_packages):
             if package not in found:
                 found[package] = (origin_line, " -> ".join([*chain, package]))
-        for edge in edges:
-            if top_level(edge.module) not in first_party:
-                continue
-            target = _resolve(edge.module, index.by_module)
-            if target is None or target in seen or is_inner_layer_path(target):
-                continue
-            seen.add(target)
+        for target, edge in _traversable_targets(edges, index, first_party, seen):
             queue.append((target, origin_line, [*chain, edge.module]))
     return found
 

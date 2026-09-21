@@ -62,27 +62,20 @@ function useAssistantCatalog(isOpen) {
   return catalog;
 }
 
+// The context value the drawer exposes. Everything the caller passes is
+// forwarded as-is except the few fields that are renamed or derived here, so
+// the long field list is spelled out at the call site only.
 function buildDrawerContextValue({
-  isOpen, open, close, toggle, closeActiveTab, closePanel,
-  openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
-  height, setHeight, maximized, toggleMaximized, setMaximized,
-  messages, turnActive, localError, stream, sessionId, sessionMeta,
-  webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled,
-  repoInfo, readOnly, workspace, refreshWorkspace,
-  catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation,
+  turnActive, localError, stream, sessionId, sessionMeta, ...passthrough
 }) {
   return {
-    isOpen, open, close, toggle, closeActiveTab, closePanel,
-    openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled,
-    height, setHeight, maximized, toggleMaximized, setMaximized,
-    messages, streaming: turnActive, error: localError || stream.error,
+    ...passthrough,
+    streaming: turnActive,
+    error: localError || stream.error,
     sessionReady: sessionId != null,
-    provider: sessionMeta.provider, model: sessionMeta.model,
-    webEnabled, toggleWebEnabled,
-    writeEnabled, toggleWriteEnabled, repoInfo, readOnly, workspace, refreshWorkspace,
+    provider: sessionMeta.provider,
+    model: sessionMeta.model,
     sessionId,
-    catalog, addLocalExchange,
-    startSession, sendMessage, stopTurn, resetConversation,
   };
 }
 

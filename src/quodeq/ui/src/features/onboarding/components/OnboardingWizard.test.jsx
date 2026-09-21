@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import OnboardingWizard from './OnboardingWizard.jsx';
@@ -15,6 +15,10 @@ vi.mock('../../../api/index.js', () => ({
 }));
 
 describe('OnboardingWizard', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
   it('renders Welcome when entry.startStep is omitted', () => {
     render(<OnboardingWizard entry={{ isFirstProject: true }} onClose={() => {}} onLaunch={() => {}} />);
     expect(screen.getByRole('heading', { name: /welcome to quodeq/i })).toBeInTheDocument();

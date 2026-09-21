@@ -114,11 +114,13 @@ class TestGetters:
         monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", "/custom/dir")
         assert utils.get_evaluations_dir() == os.path.abspath("/custom/dir")
 
-    def test_env_paths_are_normalized(self, monkeypatch):
-        # Operator-supplied paths get expanduser + abspath: '~' expands and
-        # '..' segments collapse instead of resolving at use time.
+    def test_evaluations_dir_collapses_dotdot_segments(self, monkeypatch):
+        # Operator-supplied paths get abspath: '..' segments collapse
+        # instead of resolving at use time.
         monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", "/custom/dir/../other")
         assert utils.get_evaluations_dir() == os.path.abspath("/custom/other")
+
+    def test_quodeq_dir_expands_a_leading_tilde(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_DIR", "~/quodeq-state")
         from quodeq.shared.env import get_quodeq_dir
         assert get_quodeq_dir() == Path.home() / "quodeq-state"
@@ -127,13 +129,19 @@ class TestGetters:
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         assert utils.get_anthropic_api_key() is None
 
-    def test_get_static_dist_default(self, monkeypatch):
-        monkeypatch.delenv("QUODEQ_STATIC_DIST", raising=False)
-        result = utils.get_static_dist()
-        # In dev checkout with pre-built UI, returns the bundled path; in CI returns None
-        if result is not None:
-            assert Path(result).is_dir()
-            assert (Path(result) / "index.html").is_file()
+    def test_get_static_dist_prefers_the_env_override(self):
+        assert utils.get_static_dist(env={"QUODEQ_STATIC_DIST": "/custom/static"}) == "/custom/static"
+
+    def test_get_static_dist_finds_the_user_level_cache(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        cache = tmp_path / ".quodeq" / "static"
+        cache.mkdir(parents=True)
+        (cache / "index.html").write_text("<html></html>")
+        assert utils.get_static_dist(env={}) == str(cache)
+
+    def test_get_static_dist_none_when_no_cache_or_override(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        assert utils.get_static_dist(env={}) is None
 
 
 class TestShowDiff:

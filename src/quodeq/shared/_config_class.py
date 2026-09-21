@@ -1,10 +1,17 @@
-"""Config dataclass for centralized configuration."""
+"""Config dataclass for centralized configuration.
+
+Single definition of :class:`Config`; :mod:`quodeq.shared._config` (the
+process-wide singleton) and :mod:`quodeq.shared.config_loader` both import
+it from here rather than keeping their own copy.
+"""
 from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
+
+from quodeq.shared.text_io import read_json
 
 
 @dataclass
@@ -42,11 +49,5 @@ class Config:
     @classmethod
     def from_file(cls, path: Path) -> Config:
         obj = cls()
-        try:
-            from quodeq.shared.utils import read_json
-            obj._data = read_json(path)
-        except (OSError, ValueError) as exc:
-            import logging
-            logging.getLogger(__name__).warning("Failed to load config from %s: %s", path, exc)
-            obj._data = {}
+        obj._data = read_json(path)
         return obj

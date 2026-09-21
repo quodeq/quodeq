@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
-import HelpHint from '../../../components/HelpHint.jsx';
-import { TimeLimitSetting, AdvancedAnalysisSettings, SUBAGENTS_HINT_REMOTE } from './ProviderSettings.jsx';
+import { MIN_SUBAGENTS } from '../../../constants.js';
+import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
+import { SettingsRowLabel, RemoteSubagentsRow } from './settingsRowParts.jsx';
+import { clampSubagentsTo } from './localApiSubagents.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
+
+// A cloud tab falls back to the minimum when the entry is unusable.
+const clampCloudSubagents = (raw) => clampSubagentsTo(raw, String(MIN_SUBAGENTS));
 
 const CLOUD_MODEL_HINTS = {
   openrouter: tRich('settings.cloudModelHintOpenrouter'),
@@ -14,16 +18,15 @@ const CLOUD_MODEL_HINTS = {
 function ModelRow({ hint, browseUrl, state, update, testing, testResult, runTest }) {
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label-row">
-          <span className="settings-label">{t('settings.modelLabel')}</span>
-          {hint && <HelpHint label={t('settings.modelHelpAria')}>{hint}</HelpHint>}
-        </span>
-        <span className="settings-description">
+      <SettingsRowLabel
+        label={t('settings.modelLabel')}
+        hint={hint}
+        hintAria={t('settings.modelHelpAria')}
+        description={<>
           {t('settings.typeModelIdDesc')}
           {browseUrl && <> <a href={browseUrl} target="_blank" rel="noopener noreferrer">{t('settings.browseModels')}</a></>}
-        </span>
-      </div>
+        </>}
+      />
       <div className="settings-budget-control">
         <input
           type="text"
@@ -51,30 +54,6 @@ function ModelRow({ hint, browseUrl, state, update, testing, testResult, runTest
   );
 }
 
-function SubagentsRow({ state, update, clampSubagents }) {
-  return (
-    <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label-row">
-          <span className="settings-label">{t('settings.maxParallelAgents')}</span>
-          <HelpHint label={t('settings.maxParallelAgentsHelpAria')}>{SUBAGENTS_HINT_REMOTE}</HelpHint>
-        </span>
-        <span className="settings-description">{t('settings.subagentsDescRemote')}</span>
-      </div>
-      <input
-        type="number"
-        className="settings-model-input"
-        min={MIN_SUBAGENTS}
-        max={MAX_SUBAGENTS}
-        value={state.subagents ?? ''}
-        onChange={(e) => update('subagents', e.target.value)}
-        onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }}
-        aria-label={t('settings.maxParallelAgents')}
-      />
-    </div>
-  );
-}
-
 export default function CloudProviderTab({ providerId, providerConfig, state, update }) {
   const { testProviderConnection } = useApi();
   const [testing, setTesting] = useState(false);
@@ -82,12 +61,6 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
 
   const browseUrl = providerConfig?.browse_url || '';
   const hint = CLOUD_MODEL_HINTS[providerId];
-
-  const clampSubagents = (raw) => {
-    const n = parseInt(raw, 10);
-    if (Number.isNaN(n)) return String(MIN_SUBAGENTS);
-    return String(Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, n)));
-  };
 
   const runTest = async () => {
     setTesting(true);
@@ -110,7 +83,7 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
     <>
       <ModelRow hint={hint} browseUrl={browseUrl} state={state} update={update} testing={testing} testResult={testResult} runTest={runTest} />
       <TimeLimitSetting state={state} update={update} providerType="cloud-api" />
-      <SubagentsRow state={state} update={update} clampSubagents={clampSubagents} />
+      <RemoteSubagentsRow state={state} update={update} clampSubagents={clampCloudSubagents} />
       <details className="settings-advanced">
         <summary className="settings-advanced-toggle">{t('settings.advanced')}</summary>
         <div className="settings-advanced-content">

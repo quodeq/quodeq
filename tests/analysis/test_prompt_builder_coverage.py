@@ -68,6 +68,23 @@ class TestLoadEvaluationRules:
         assert result == ""
 
 
+# Every placeholder the two prompt shapes fill. A template that omits one
+# would leave a literal "{{...}}" in the rendered prompt, so each test spells
+# out the full set; building it from these keeps the eight templates below
+# from drifting apart.
+_COMMON_SLOTS = (
+    "DISCIPLINE", "REPO_NAME", "DATE", "SOURCE_FILE_COUNT",
+    "ANALYSIS_GUIDANCE", "PROMPT_HASH", "SOURCE_MANIFEST", "EVALUATION_RULES",
+)
+_ANALYSIS_SLOTS = (*_COMMON_SLOTS, "DIMENSION", "STANDARDS_CHECKLIST", "DIMENSIONS")
+_CONSOLIDATED_SLOTS = (*_COMMON_SLOTS, "DIMENSION_LIST", "STANDARDS_CHECKLISTS")
+
+
+def _template(slots: tuple[str, ...], prefix: str = "") -> str:
+    """A template filling every slot in *slots*, after an optional *prefix*."""
+    return prefix + " ".join(f"{{{{{slot}}}}}" for slot in slots)
+
+
 # ---------------------------------------------------------------------------
 # build_analysis_prompt
 # ---------------------------------------------------------------------------
@@ -86,7 +103,7 @@ class TestBuildAnalysisPrompt:
         return PromptContext(**defaults)
 
     def test_basic_prompt_rendering(self):
-        template = "Analyze {{DISCIPLINE}} project {{REPO_NAME}} on {{DATE}} for {{DIMENSION}}. Files: {{SOURCE_FILE_COUNT}}. Standards: {{STANDARDS_CHECKLIST}}. Guidance: {{ANALYSIS_GUIDANCE}}. Dims: {{DIMENSIONS}}. Hash: {{PROMPT_HASH}}. Manifest: {{SOURCE_MANIFEST}}. Rules: {{EVALUATION_RULES}}."
+        template = _template(_ANALYSIS_SLOTS, "Analyze ")
         ctx = self._make_context()
         result = build_analysis_prompt(template, ctx)
         assert "python" in result
@@ -95,7 +112,7 @@ class TestBuildAnalysisPrompt:
         assert "security" in result
 
     def test_includes_previous_findings(self):
-        template = "Test {{DISCIPLINE}} {{REPO_NAME}} {{DATE}} {{DIMENSION}} {{SOURCE_FILE_COUNT}} {{STANDARDS_CHECKLIST}} {{ANALYSIS_GUIDANCE}} {{DIMENSIONS}} {{PROMPT_HASH}} {{SOURCE_MANIFEST}} {{EVALUATION_RULES}}"
+        template = _template(_ANALYSIS_SLOTS, "Test ")
         findings = [{"file": "a.py", "t": "violation", "req": "S-1", "line": 5, "reason": "Bad"}]
         ctx = self._make_context(previous_findings=findings)
         result = build_analysis_prompt(template, ctx)
@@ -103,13 +120,13 @@ class TestBuildAnalysisPrompt:
         assert "a.py" in result
 
     def test_no_standards_without_dir(self):
-        template = "Standards: {{STANDARDS_CHECKLIST}} {{DISCIPLINE}} {{REPO_NAME}} {{DATE}} {{DIMENSION}} {{SOURCE_FILE_COUNT}} {{ANALYSIS_GUIDANCE}} {{DIMENSIONS}} {{PROMPT_HASH}} {{SOURCE_MANIFEST}} {{EVALUATION_RULES}}"
+        template = _template(_ANALYSIS_SLOTS, "Standards: ")
         ctx = self._make_context(standards_dir=None)
         result = build_analysis_prompt(template, ctx)
         assert "No compiled standards" in result
 
     def test_extra_vars_substituted(self):
-        template = "Custom: {{MY_VAR}} {{DISCIPLINE}} {{REPO_NAME}} {{DATE}} {{DIMENSION}} {{SOURCE_FILE_COUNT}} {{STANDARDS_CHECKLIST}} {{ANALYSIS_GUIDANCE}} {{DIMENSIONS}} {{PROMPT_HASH}} {{SOURCE_MANIFEST}} {{EVALUATION_RULES}}"
+        template = _template(_ANALYSIS_SLOTS, "Custom: {{MY_VAR}} ")
         ctx = self._make_context(extra_vars={"MY_VAR": "hello"})
         result = build_analysis_prompt(template, ctx)
         assert "hello" in result
@@ -124,11 +141,12 @@ class TestBuildAnalysisPrompt:
             "principles": [{"name": "Auth", "requirements": [{"id": "S-1", "text": "Use tokens"}]}],
         }))
 
-        template = "Standards: {{STANDARDS_CHECKLIST}} {{DISCIPLINE}} {{REPO_NAME}} {{DATE}} {{DIMENSION}} {{SOURCE_FILE_COUNT}} {{ANALYSIS_GUIDANCE}} {{DIMENSIONS}} {{PROMPT_HASH}} {{SOURCE_MANIFEST}} {{EVALUATION_RULES}}"
+        template = _template(_ANALYSIS_SLOTS, "Standards: ")
         ctx = self._make_context(standards_dir=standards_dir)
         result = build_analysis_prompt(template, ctx)
-        # Should contain standards content (not the "no standards" sentinel)
-        assert "No compiled standards" not in result or "Auth" in result
+        # Must render the compiled principle, not fall back to the sentinel.
+        assert "No compiled standards" not in result
+        assert "Auth" in result
 
 
 # ---------------------------------------------------------------------------
@@ -136,57 +154,42 @@ class TestBuildAnalysisPrompt:
 # ---------------------------------------------------------------------------
 
 class TestBuildConsolidatedPrompt:
-    def test_basic_rendering(self):
-        template = "Dimensions: {{DIMENSION_LIST}}. Standards: {{STANDARDS_CHECKLISTS}}. {{DISCIPLINE}} {{REPO_NAME}} {{DATE}} {{SOURCE_FILE_COUNT}} {{ANALYSIS_GUIDANCE}} {{PROMPT_HASH}} {{SOURCE_MANIFEST}} {{EVALUATION_RULES}}"
-        ctx = PromptContext(
-            language="typescript",
-            repo_name="my-app",
+    @staticmethod
+    def _make_context(**kwargs) -> PromptContext:
+        defaults = dict(
+            language="python",
+            repo_name="test",
             date_str="2026-04-09",
             dimension="consolidated",
-            source_file_count=100,
+            source_file_count=10,
             dimensions_data={},
+        )
+        defaults.update(kwargs)
+        return PromptContext(**defaults)
+
+    def test_basic_rendering(self):
+        template = _template(_CONSOLIDATED_SLOTS, "Dimensions: ")
+        ctx = self._make_context(
+            language="typescript", repo_name="my-app", source_file_count=100,
         )
         result = build_consolidated_prompt(["security", "reliability"], ctx, template=template)
         assert "security, reliability" in result
         assert "typescript" in result
 
     def test_no_standards_without_dir(self):
-        template = "Standards: {{STANDARDS_CHECKLISTS}} {{DISCIPLINE}} {{REPO_NAME}} {{DATE}} {{DIMENSION_LIST}} {{SOURCE_FILE_COUNT}} {{ANALYSIS_GUIDANCE}} {{PROMPT_HASH}} {{SOURCE_MANIFEST}} {{EVALUATION_RULES}}"
-        ctx = PromptContext(
-            language="python",
-            repo_name="test",
-            date_str="2026-04-09",
-            dimension="consolidated",
-            source_file_count=10,
-            dimensions_data={},
-            standards_dir=None,
-        )
+        template = _template(_CONSOLIDATED_SLOTS, "Standards: ")
+        ctx = self._make_context(standards_dir=None)
         result = build_consolidated_prompt(["security"], ctx, template=template)
         assert "No compiled standards" in result
 
     def test_extra_vars(self):
-        template = "Custom: {{MY_VAR}} {{DISCIPLINE}} {{REPO_NAME}} {{DATE}} {{DIMENSION_LIST}} {{SOURCE_FILE_COUNT}} {{STANDARDS_CHECKLISTS}} {{ANALYSIS_GUIDANCE}} {{PROMPT_HASH}} {{SOURCE_MANIFEST}} {{EVALUATION_RULES}}"
-        ctx = PromptContext(
-            language="python",
-            repo_name="test",
-            date_str="2026-04-09",
-            dimension="consolidated",
-            source_file_count=10,
-            dimensions_data={},
-            extra_vars={"MY_VAR": "world"},
-        )
+        template = _template(_CONSOLIDATED_SLOTS, "Custom: {{MY_VAR}} ")
+        ctx = self._make_context(extra_vars={"MY_VAR": "world"})
         result = build_consolidated_prompt(["security"], ctx, template=template)
         assert "world" in result
 
     def test_loads_default_template_when_none(self):
-        ctx = PromptContext(
-            language="python",
-            repo_name="test",
-            date_str="2026-04-09",
-            dimension="consolidated",
-            source_file_count=10,
-            dimensions_data={},
-        )
+        ctx = self._make_context()
         # Should not raise — loads template from disk
         result = build_consolidated_prompt(["security"], ctx)
         assert isinstance(result, str)

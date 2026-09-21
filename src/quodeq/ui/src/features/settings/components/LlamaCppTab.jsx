@@ -1,10 +1,8 @@
 import { useApi } from '../../../api/ApiContext.jsx';
-import ServerStatusPill from '../../../components/ServerStatusPill.jsx';
+import { LocalApiTabLayout } from './LocalApiTabLayout.jsx';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { useLlamaCppModels } from '../hooks/useLlamaCppModels.js';
-import { useLocalApiConcurrencyTest } from '../hooks/useLocalApiConcurrencyTest.js';
-import { TimeLimitSetting } from './ProviderSettings.jsx';
-import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
+import { useLocalApiTabTest } from '../hooks/useLocalApiTabTest.js';
 import { useLlamaCppLog } from '../llamacpp-log/LlamaCppLogContext.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
@@ -47,45 +45,33 @@ export default function LlamaCppTab({ state, update }) {
   const llamacppLog = useLlamaCppLog();
   const { llamacppStatus, models, modelsError } = useLlamaCppModels({ state, update });
 
-  const { testing, testResult, testError: rawTestError, runTest: runConcurrencyTest } = useLocalApiConcurrencyTest(
-    () => testLlamacppConcurrency(state.model || (models[0]?.name ?? '')).catch((err) => {
+  const concurrency = useLocalApiTabTest({
+    probe: () => testLlamacppConcurrency(state.model || (models[0]?.name ?? '')).catch((err) => {
       console.warn('llama.cpp concurrency test failed', err);
       throw err;
     }),
-  );
-  const testError = rawTestError ? t('settings.concurrencyTestFailedLlamacpp') : null;
-  const runTest = async () => {
-    const result = await runConcurrencyTest();
-    if (result?.recommended) update('subagents', String(result.recommended));
-  };
+    errorKey: 'settings.concurrencyTestFailedLlamacpp',
+    update,
+  });
 
   return (
-    <>
-      <ServerStatusPill
-        status={llamacppStatus?.status ?? 'offline'}
-        address={llamacppStatus?.address}
-        offlineMessage={<span>{tRich('settings.llamacppOffline')}</span>}
-        onToggleConsole={
-          llamacppLog.available
-            ? () => (llamacppLog.open ? llamacppLog.closeLog() : llamacppLog.openLog())
-            : undefined
-        }
-        consoleOpen={llamacppLog.open}
-      />
-      {modelsError && <div className="settings-row"><span className="settings-error">{modelsError}</span></div>}
-      <LlamaCppModelRow models={models} />
-      <TimeLimitSetting state={state} update={update} providerType="local-api" />
-      <LocalApiAdvancedPanel
-        subagentsDescription={t('settings.llamacppSubagentsDesc')}
-        subagentsAriaLabel={t('settings.maxParallelAgents')}
-        state={state}
-        update={update}
-        testing={testing}
-        testDisabled={testing || !models.length}
-        onRunTest={runTest}
-        testResult={testResult}
-        testError={testError}
-      />
-    </>
+    <LocalApiTabLayout
+      serverStatus={llamacppStatus}
+      offlineMessage={<span>{tRich('settings.llamacppOffline')}</span>}
+      onToggleConsole={
+        llamacppLog.available
+          ? () => (llamacppLog.open ? llamacppLog.closeLog() : llamacppLog.openLog())
+          : undefined
+      }
+      consoleOpen={llamacppLog.open}
+      modelsError={modelsError}
+      modelRow={<LlamaCppModelRow models={models} />}
+      state={state}
+      update={update}
+      subagentsDescription={t('settings.llamacppSubagentsDesc')}
+      subagentsAriaLabel={t('settings.maxParallelAgents')}
+      testDisabled={concurrency.testing || !models.length}
+      concurrency={concurrency}
+    />
   );
 }

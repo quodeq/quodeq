@@ -39,6 +39,12 @@ _SNIPPETLESS = {
     "w": "two", "reason": "r",
 }
 _REPAIRED = {**_SNIPPETLESS, "snippet": "y = 2"}
+# Dropped WITH a snippet present: the failure is elsewhere, so a repair
+# re-ask cannot help and must not fire.
+_SNIPPET_PRESENT = {
+    "req": "C-3", "t": "violation", "file": "c.py", "line": 3,
+    "w": "bad", "snippet": "z",
+}
 
 
 def _payload(*findings: dict) -> str:
@@ -85,9 +91,7 @@ class TestSnippetless:
     def test_snippet_present_means_some_other_failure(self):
         # e.g. dropped for a missing reason: re-asking about the snippet
         # cannot help, so it must not trigger (or ride along on) a repair.
-        node = {"req": "C-3", "t": "violation", "file": "c.py", "line": 3,
-                "w": "bad", "snippet": "z"}
-        assert _snippetless([node]) == []
+        assert _snippetless([_SNIPPET_PRESENT]) == []
 
     def test_node_without_identity_fields_is_unrepairable(self):
         assert _snippetless([{"t": "violation", "line": 1, "w": "x"}]) == []
@@ -151,10 +155,8 @@ class TestFinishCallRepair:
     def test_unrepairable_drops_do_not_reask(self):
         # Dropped WITH a snippet present: the failure is elsewhere, and a
         # repair call would burn a model round-trip for nothing.
-        bad = {"req": "C-3", "t": "violation", "file": "c.py", "line": 3,
-               "w": "bad", "snippet": "z"}
         reask = MagicMock()
-        _finish_call("test-model", "stop", _payload(_GOOD, bad), 0.0, reask=reask)
+        _finish_call("test-model", "stop", _payload(_GOOD, _SNIPPET_PRESENT), 0.0, reask=reask)
         reask.assert_not_called()
 
     def test_kill_switch_disables_the_reask(self, monkeypatch):

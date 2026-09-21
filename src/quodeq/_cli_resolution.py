@@ -199,12 +199,13 @@ def _resolve_single_file(src: Path) -> tuple[Path, str | None]:
 def _override_manifest_single_file(language: str, single_file: str) -> SourceManifest:
     """Create a manifest covering exactly one source file."""
     ext = os.path.splitext(single_file)[1]
+    language_stats = {ext: 1} if ext else {}
     target = AnalysisTarget(
         name=single_file, language=language,
         source_files=[single_file], total_files=1,
-        language_stats={ext: 1} if ext else {},
+        language_stats=language_stats,
     )
-    return SourceManifest(targets=[target], total_files=1, language_stats={ext: 1} if ext else {})
+    return SourceManifest(targets=[target], total_files=1, language_stats=language_stats)
 
 
 def _require_standards_config(paths) -> bool:

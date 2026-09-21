@@ -1,6 +1,5 @@
-import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
-import HelpHint from '../../../components/HelpHint.jsx';
-import { TimeLimitSetting, SUBAGENTS_HINT_REMOTE } from './ProviderSettings.jsx';
+import { TimeLimitSetting } from './ProviderSettings.jsx';
+import { SettingsRowLabel, RemoteSubagentsRow } from './settingsRowParts.jsx';
 import { CliAdvancedPanel, CliModelInput } from './CliAdvancedPanel.jsx';
 import { useCliProviderTab } from '../hooks/useCliProviderTab.js';
 import { t } from '../../../strings/index.js';
@@ -15,38 +14,19 @@ export default function CliProviderTab({ providerId, state, update }) {
     <>
       {providerId === 'copilot' && <CopilotModelStatus />}
       <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label-row">
-            <span className="settings-label">{t('settings.modelLabel')}</span>
-            {hint && <HelpHint label={t('settings.modelHelpAria')}>{hint}</HelpHint>}
-          </span>
-          <span className="settings-description">{t('settings.pickModelYouWant')}</span>
-        </div>
+        <SettingsRowLabel
+          label={t('settings.modelLabel')}
+          hint={hint}
+          hintAria={t('settings.modelHelpAria')}
+          description={t('settings.pickModelYouWant')}
+        />
         <div className="settings-model-field">
           <CliModelInput providerId={providerId} value={state.model} onChange={(v) => update('model', v)} required />
           {!state.model && <span className="settings-model-hint">{t('settings.pickModelToStart')}</span>}
         </div>
       </div>
       <TimeLimitSetting state={state} update={update} providerType="cli" />
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label-row">
-            <span className="settings-label">{t('settings.maxParallelAgents')}</span>
-            <HelpHint label={t('settings.maxParallelAgentsHelpAria')}>{SUBAGENTS_HINT_REMOTE}</HelpHint>
-          </span>
-          <span className="settings-description">{t('settings.subagentsDescRemote')}</span>
-        </div>
-        <input
-          type="number"
-          className="settings-model-input"
-          min={MIN_SUBAGENTS}
-          max={MAX_SUBAGENTS}
-          value={state.subagents ?? ''}
-          onChange={(e) => update('subagents', e.target.value)}
-          onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }}
-          aria-label={t('settings.maxParallelAgents')}
-        />
-      </div>
+      <RemoteSubagentsRow state={state} update={update} clampSubagents={clampSubagents} />
       <CliAdvancedPanel
         providerId={providerId} state={state} update={update} analysisHint={analysisHint}
         power={power} setPower={setPower} persistPower={persistPower}

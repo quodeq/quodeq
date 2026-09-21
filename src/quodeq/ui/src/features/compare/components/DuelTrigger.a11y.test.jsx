@@ -26,10 +26,15 @@ describe('DuelTrigger accessibility (#6593)', () => {
     expect(screen.getAllByRole('menuitem')[0]).toHaveFocus();
   });
 
-  it('walks the candidates with the arrow keys, wrapping at the end', async () => {
+  it('ArrowUp from the first item wraps focus to the last', async () => {
     const user = await openWithEnter();
     await user.keyboard('{ArrowUp}');
     expect(screen.getAllByRole('menuitem')[targets.length - 1]).toHaveFocus();
+  });
+
+  it('ArrowDown from the last item wraps focus to the first', async () => {
+    const user = await openWithEnter();
+    await user.keyboard('{ArrowUp}');
     await user.keyboard('{ArrowDown}');
     expect(screen.getAllByRole('menuitem')[0]).toHaveFocus();
   });

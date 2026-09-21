@@ -1,10 +1,8 @@
 import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { useLlamacppServerStatus } from './useLlamacppServerStatus.js';
 import { settingsKeys } from '../../../api/queryKeys.js';
-import { t } from '../../../strings/index.js';
-import { useInvalidateOnOnline } from './useInvalidateOnOnline.js';
+import { useProviderModels } from './useProviderModels.js';
 
 const MODELS_KEY = settingsKeys.llamacppModels();
 
@@ -17,15 +15,12 @@ export function useLlamaCppModels({ state, update }) {
   const { getLlamacppModels } = useApi();
   const llamacppStatus = useLlamacppServerStatus();
 
-  const { data: models = [], error: modelsQueryError } = useQuery({
+  const { models, modelsError } = useProviderModels({
     queryKey: MODELS_KEY,
-    queryFn: () => getLlamacppModels(),
+    fetchModels: () => getLlamacppModels(),
+    errorKey: 'settings.llamacppLoadFailed',
+    serverStatus: llamacppStatus?.status,
   });
-  const modelsError = modelsQueryError
-    ? t('settings.llamacppLoadFailed')
-    : null;
-
-  useInvalidateOnOnline(llamacppStatus?.status, MODELS_KEY);
 
   // The model name comes from llama-server itself. Mirror it into provider
   // state so the analysis runner has a model to send.

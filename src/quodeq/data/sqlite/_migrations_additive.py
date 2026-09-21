@@ -13,31 +13,40 @@ def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
     ).fetchone() is not None
 
 
+def _add_findings_column(conn: sqlite3.Connection, column: str, decl: str) -> None:
+    """Add *column* (``ALTER TABLE findings ADD COLUMN <column> <decl>``) if it is missing.
+
+    Two guards, both of which every additive findings upgrade needs:
+
+    findings may not exist on DBs upgraded from very old (v1/v2) schemas that
+    only ever created a subset of tables -- only the fresh-DB DDL guarantees
+    it. The ALTER is skipped in that case (mirrors the dimension_scores guard
+    in _upgrade_v4_to_v5); a future caller needing the column gets the fresh
+    DDL.
+
+    Idempotency: the ALTER and the PRAGMA user_version bump in
+    apply_evaluation_schema commit separately (autocommit), so a crash in
+    between leaves the column added but the version unbumped. Re-running the
+    bare ALTER would then raise "duplicate column name: ..." -- a plain
+    OperationalError the scoring/dashboard read seams don't catch, permanently
+    bricking the run. Skip if the column already exists.
+    """
+    if not _table_exists(conn, "findings"):
+        return
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    if column not in columns:
+        conn.execute(f"ALTER TABLE findings ADD COLUMN {column} {decl}")
+
+
 def _upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
     """Add the provenance_downgrade column to findings (default 0, issue #656).
 
     Marks findings the deterministic provenance gate (#639) de-escalated from
     critical to major so the SQL projection and dashboard can surface it.
 
-    findings may not exist on DBs upgraded from very old (v1/v2) schemas that
-    only ever created a subset of tables -- only the fresh-DB DDL guarantees
-    it. Skip the ALTER in that case (mirrors the dimension_scores guard in
-    _upgrade_v4_to_v5); a future caller needing the column gets the fresh DDL.
-
-    Idempotency: the ALTER and the PRAGMA user_version bump in
-    apply_evaluation_schema commit separately (autocommit), so a crash in
-    between leaves the column added but the version still 5. Re-running the
-    bare ALTER would then raise "duplicate column name: provenance_downgrade"
-    -- a plain OperationalError the scoring/dashboard read seams don't catch,
-    permanently bricking the run. Skip if the column already exists.
+    Guards and idempotency: see :func:`_add_findings_column`.
     """
-    if not _table_exists(conn, "findings"):
-        return
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
-    if "provenance_downgrade" not in columns:
-        conn.execute(
-            "ALTER TABLE findings ADD COLUMN provenance_downgrade INTEGER NOT NULL DEFAULT 0"
-        )
+    _add_findings_column(conn, "provenance_downgrade", "INTEGER NOT NULL DEFAULT 0")
 
 
 def _upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
@@ -49,26 +58,9 @@ def _upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
     dashboard can surface WHICH rule waived the finding, not just that one
     did.
 
-    findings may not exist on DBs upgraded from very old (v1/v2) schemas that
-    only ever created a subset of tables -- only the fresh-DB DDL guarantees
-    it. Skip the ALTER in that case (mirrors the provenance_downgrade guard
-    in _upgrade_v5_to_v6); a future caller needing the column gets the fresh
-    DDL.
-
-    Idempotency: the ALTER and the PRAGMA user_version bump in
-    apply_evaluation_schema commit separately (autocommit), so a crash in
-    between leaves the column added but the version still 6. Re-running the
-    bare ALTER would then raise "duplicate column name: scope_downgrade_json"
-    -- a plain OperationalError the scoring/dashboard read seams don't catch,
-    permanently bricking the run. Skip if the column already exists.
+    Guards and idempotency: see :func:`_add_findings_column`.
     """
-    if not _table_exists(conn, "findings"):
-        return
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
-    if "scope_downgrade_json" not in columns:
-        conn.execute(
-            "ALTER TABLE findings ADD COLUMN scope_downgrade_json TEXT"
-        )
+    _add_findings_column(conn, "scope_downgrade_json", "TEXT")
 
 
 def _upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
@@ -93,15 +85,8 @@ def _upgrade_v8_to_v9(conn: sqlite3.Connection) -> None:
     """Add the violation_type_raw column to findings (default '').
 
     Stores the model's violation-type tag as emitted so the taxonomy report
-    can list unmapped tags per requirement. Skip when findings does not
-    exist (very old DBs, mirrors _upgrade_v5_to_v6) and when the column is
-    already present: the ALTER and the user_version bump commit separately,
-    so a crash between them must not brick the run on re-run.
+    can list unmapped tags per requirement.
+
+    Guards and idempotency: see :func:`_add_findings_column`.
     """
-    if not _table_exists(conn, "findings"):
-        return
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
-    if "violation_type_raw" not in columns:
-        conn.execute(
-            "ALTER TABLE findings ADD COLUMN violation_type_raw TEXT NOT NULL DEFAULT ''"
-        )
+    _add_findings_column(conn, "violation_type_raw", "TEXT NOT NULL DEFAULT ''")

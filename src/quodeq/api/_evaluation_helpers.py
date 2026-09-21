@@ -15,7 +15,7 @@ from flask import Response, request
 from quodeq.api.helpers import ClientMessageError, json_error
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.shared.env_resolve import resolve_env
-from quodeq.shared.repo import SCHEME_RE, looks_like_authority
+from quodeq.shared.repo import split_userinfo
 from quodeq.shared.utils import get_ai_cmd as _get_ai_cmd
 
 if TYPE_CHECKING:
@@ -109,18 +109,11 @@ def _sanitize_url(url: str) -> str:
     bounding the search by the first "/" would then hide the real "@" and
     let the whole credential through unmasked.
     """
-    match = SCHEME_RE.match(url)
-    if not match:
+    parts = split_userinfo(url)
+    if parts is None:
         return url
-    scheme = match.group(1)
-    rest = url[len(scheme):]
-    at_pos = rest.rfind("@")
-    if at_pos == -1:
-        return url
-    slash_pos = rest.find("/")
-    if -1 < slash_pos < at_pos and looks_like_authority(rest[:slash_pos]):
-        return url
-    return f"{scheme}***@{rest[at_pos + 1:]}"
+    scheme, after = parts
+    return f"{scheme}***@{after}"
 
 
 def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tuple[Response, int] | None:

@@ -24,7 +24,6 @@ describe('makeSocketOnOpen', () => {
     );
     // disableStdin must still be re-enabled even though reset() threw.
     expect(term.options.disableStdin).toBe(false);
-    warn.mockRestore();
   });
 
   it('re-enables input and writes the breathing-room line on success', () => {

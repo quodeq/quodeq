@@ -48,13 +48,27 @@ function makeLoadProjects({ listProjects, maxRetries, retryDelayMs, loadInFlight
   };
 }
 
-// Same load + boot-time selection resolution as the mount effect, for the
-// failure-state Retry action (and the reconnect re-arm): a retry that
-// succeeds must also migrate a stale stored selection, exactly like boot.
-function makeRetryLoadProjects({ loadProjects, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage }) {
+// Boot-time selection resolution against a freshly loaded list. A null list
+// means the load failed after retries, and must NOT force onboarding.
+function resolveSelectionFor(list, { selectedProject, selectedSource, handleProjectChange, onNoProjects, storage }) {
+  if (!list) return;
+  resolveInitialProject({
+    list,
+    currentProject: selectedProject,
+    currentSource: selectedSource,
+    onChangeProject: handleProjectChange,
+    onNoProjects,
+    storage,
+  });
+}
+
+// Same load + selection resolution as the mount effect, for the failure-state
+// Retry action (and the reconnect re-arm): a retry that succeeds must also
+// migrate a stale stored selection, exactly like boot.
+function makeRetryLoadProjects({ loadProjects, ...selection }) {
   return function retryLoadProjects() {
     return loadProjects().then((list) => {
-      if (list) resolveInitialProject({ list, currentProject: selectedProject, currentSource: selectedSource, onChangeProject: handleProjectChange, onNoProjects, storage });
+      resolveSelectionFor(list, selection);
       return list;
     });
   };
@@ -150,12 +164,10 @@ function useProjectBackgroundRefresh({ fields, listProjects, handleProjectChange
   useProjectWarmupPoll({ projects, projectsLoaded, projectsLoadFailed, loadProjects, summaryPollMs });
 }
 
-function useInitialProjectLoad({ loadProjects, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage }) {
+function useInitialProjectLoad({ loadProjects, ...selection }) {
   useEffect(() => {
     loadProjects().then((list) => {
-      // Array (possibly empty -> onboarding) on success; null when the load
-      // failed after retries -> do NOT force onboarding on a transient error.
-      if (list) resolveInitialProject({ list, currentProject: selectedProject, currentSource: selectedSource, onChangeProject: handleProjectChange, onNoProjects, storage });
+      resolveSelectionFor(list, selection);
     }).catch((err) => {
       // loadProjects already retries and never rejects; defense in depth.
       console.warn('[useProjectState] initial project load failed unexpectedly:', err);

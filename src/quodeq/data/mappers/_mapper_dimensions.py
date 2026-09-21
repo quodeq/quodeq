@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
-from quodeq.core.types.report import PrincipleGrade
 
 from ._mapper_helpers import (
     _bool,
@@ -14,7 +13,7 @@ from ._mapper_helpers import (
     _str,
 )
 from ._mapper_findings import _parse_finding_list
-from ._mapper_reports import _extract_totals, parse_principle_grade
+from ._mapper_reports import _extract_totals, _parse_principle_grades
 
 
 def parse_dimension_result(raw: dict[str, object]) -> DimensionResult:
@@ -24,10 +23,7 @@ def parse_dimension_result(raw: dict[str, object]) -> DimensionResult:
         msg = f"DimensionResult.dimension must be str, got {type(dim).__name__}"
         raise TypeError(msg)
 
-    principles_raw = raw.get("principles")
-    principles: list[PrincipleGrade] = []
-    if isinstance(principles_raw, list):
-        principles = [parse_principle_grade(p) for p in principles_raw if isinstance(p, dict)]
+    principles = _parse_principle_grades(raw)
 
     violations = _parse_finding_list(raw.get("violations"))
     compliance = _parse_finding_list(raw.get("compliance"))

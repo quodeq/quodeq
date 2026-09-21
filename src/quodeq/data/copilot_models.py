@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from quodeq.shared.env_resolve import resolve_env
@@ -84,6 +85,10 @@ async def _read_models(stdout: asyncio.StreamReader) -> list[str]:
 _CLEANUP_RETRIES = 5
 _CLEANUP_RETRY_DELAY_S = 0.1
 
+# Injectable in place of asyncio.create_subprocess_exec so tests can supply a
+# fake spawner instead of monkeypatching the asyncio module globally.
+ProcessFactory = Callable[..., Awaitable[asyncio.subprocess.Process]]
+
 
 async def _remove_scratch_dir(directory: str) -> None:
     """Best-effort removal of the discovery scratch dir. Never raises.
@@ -110,14 +115,17 @@ async def _remove_scratch_dir(directory: str) -> None:
             await asyncio.sleep(_CLEANUP_RETRY_DELAY_S)
 
 
-async def _query_models(env: dict[str, str], timeout_s: float) -> list[str]:
+async def _query_models(
+    env: dict[str, str], timeout_s: float, *, process_factory: ProcessFactory | None = None,
+) -> list[str]:
     # Not TemporaryDirectory: its __exit__ raises on the Windows handle race
     # documented on _remove_scratch_dir, and that must not outrank the result.
+    spawn = process_factory or asyncio.create_subprocess_exec
     directory = tempfile.mkdtemp(prefix="quodeq-copilot-models-")
     process = None
     try:
         async with asyncio.timeout(timeout_s):
-            process = await asyncio.create_subprocess_exec(
+            process = await spawn(
                 "copilot", "--headless", "--stdio", "--no-auto-update",
                 "--disable-builtin-mcps", "--no-custom-instructions", "--no-ask-user",
                 cwd=Path(directory), env=env, stdin=asyncio.subprocess.PIPE,
@@ -145,12 +153,24 @@ async def _query_models(env: dict[str, str], timeout_s: float) -> list[str]:
 
 
 def fetch_copilot_models(
-    *, env: dict[str, str] | None = None, timeout_s: float = _DISCOVERY_TIMEOUT_S,
+    *,
+    env: dict[str, str] | None = None,
+    timeout_s: float = _DISCOVERY_TIMEOUT_S,
+    process_factory: ProcessFactory | None = None,
 ) -> dict[str, object]:
-    """Return models or a logged discovery error, without sending a model prompt."""
+    """Return models or a logged discovery error, without sending a model prompt.
+
+    *process_factory* stands in for ``asyncio.create_subprocess_exec`` (same
+    signature); tests can inject a fake spawner instead of monkeypatching the
+    asyncio module.
+    """
     try:
         isolated_env = build_copilot_env(dict(resolve_env(env)))
-        return {"models": asyncio.run(_query_models(isolated_env, timeout_s))}
+        return {
+            "models": asyncio.run(
+                _query_models(isolated_env, timeout_s, process_factory=process_factory),
+            ),
+        }
     except TimeoutError:
         message = "Copilot model discovery timed out. Check your connection and retry."
         detail = message

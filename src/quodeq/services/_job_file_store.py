@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import threading
 import time
 from collections import deque
 from collections.abc import Mapping
@@ -19,7 +18,7 @@ from pathlib import Path
 # this module stays inside the SEP-06 logging boundary that _job_model.py
 # already carries a declared exemption for (see
 # tests/tools/test_logging_boundary.py's DECLARED_LOGGING_SITES).
-from quodeq.services._job_model import Job, JobStore, _MAX_LOG_LINES, _logger
+from quodeq.services._job_model import InMemoryJobStore, Job, JobStore, _MAX_LOG_LINES, _logger
 from quodeq.shared.env_resolve import resolve_env
 
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
@@ -90,12 +89,16 @@ def _job_from_json(data: dict) -> Job:
     )
 
 
-class FileJobStore:
+class FileJobStore(InMemoryJobStore):
     """Job store backed by per-job JSON files on disk.
 
     Jobs are stored as ``{persist_dir}/{job_id}.json``.  All existing files
     are loaded on init, and stale completed/failed/cancelled jobs older than
     24 hours are cleaned up automatically.
+
+    The in-memory dict, its lock, and the read-only ``get``/``list`` come
+    from :class:`InMemoryJobStore`; this store adds the disk write on every
+    mutation.
     """
 
     def __init__(self, persist_dir: Path | None = None) -> None:
@@ -103,26 +106,17 @@ class FileJobStore:
         self._persist_dir.mkdir(parents=True, exist_ok=True)
         # SECURITY: restrict directory to owner-only access
         os.chmod(self._persist_dir, 0o700)
-        self._jobs: dict[str, Job] = {}
-        self._lock = threading.Lock()
+        super().__init__()
         self._load_all()
         self._cleanup_stale()
 
     # -- JobStore protocol ---------------------------------------------------
-
-    def get(self, job_id: str) -> Job | None:
-        with self._lock:
-            return self._jobs.get(job_id)
 
     def put(self, job: Job) -> None:
         with self._lock:
             self._jobs[job.job_id] = job
             job_data = _job_to_json(job)
         self._write_data(job.job_id, job_data)
-
-    def list(self) -> list[Job]:
-        with self._lock:
-            return list(self._jobs.values())
 
     def delete(self, job_id: str) -> None:
         with self._lock:

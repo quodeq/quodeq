@@ -41,8 +41,8 @@ function makeFakeApi() {
 
 describe('HistoryPage — chart error boundary', () => {
   it('renders a fallback instead of crashing when the chart chunk fails to load', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const QC = withQueryClient();
     render(
       <QC>
@@ -74,7 +74,5 @@ describe('HistoryPage — chart error boundary', () => {
     expect(await screen.findByText('The chart could not be displayed.')).toBeInTheDocument();
     // The rest of the page (evaluations table) must still be usable.
     expect(screen.queryByTestId('history-chart-panel-placeholder')).not.toBeInTheDocument();
-    warn.mockRestore();
-    error.mockRestore();
   });
 });

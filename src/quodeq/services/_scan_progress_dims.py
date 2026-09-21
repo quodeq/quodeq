@@ -11,12 +11,13 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.data.fs.evidence_tally import FindingTally, IncrementalTally
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services._scan_progress_elapsed import _dim_elapsed_s
-from quodeq.services._scan_progress_types import DimProgressState, _DimCounts, _DimProgress, _ProgressContext
+from quodeq.services._scan_progress_types import DimProgressState, _DimProgress, _ProgressContext
 from quodeq.services.wiring import (
     count_active_agent_streams,
     dimension_evidence_file,
@@ -170,6 +171,23 @@ def _dim_state(
     return "pending"
 
 
+def _queue_file_counts(queue: dict) -> dict[str, int]:
+    """``{"taken": n, "total": n + pending}`` for a file-queue state dict.
+
+    ``taken`` is a list of batch entries ``[{"files": [...], "agent": ...,
+    "ts": ...}, ...]``. Match FileQueue.stats(): flatten the file counts
+    across batches so the number matches the heartbeat log. Entries that are
+    not dicts, and file lists that are not lists, count as nothing.
+    """
+    taken = 0
+    for entry in queue.get("taken") or []:
+        fs = entry.get("files") if isinstance(entry, dict) else None
+        if isinstance(fs, list):
+            taken += len(fs)
+    pending = len(queue.get("pending") or [])
+    return {"taken": taken, "total": taken + pending}
+
+
 def _consolidated_dim_progress(run_dir: Path) -> _DimProgress:
     """Progress row for a live consolidated (grouped) pass.
 
@@ -180,18 +198,12 @@ def _consolidated_dim_progress(run_dir: Path) -> _DimProgress:
     """
     evidence_dir = run_dir / "evidence"
     queue = read_queue_state(evidence_dir / "consolidated_queue.json") or {}
-    taken = 0
-    for entry in queue.get("taken") or []:
-        fs = entry.get("files") if isinstance(entry, dict) else None
-        if isinstance(fs, list):
-            taken += len(fs)
-    pending = len(queue.get("pending") or [])
     tally = live_tally(evidence_dir / "consolidated_evidence.jsonl",
                        suppressed=None, resolver=None, memo_key=("consolidated",))
     return _DimProgress(
         id="consolidated",
         state="running",
-        files={"taken": taken, "total": taken + pending},
+        files=_queue_file_counts(queue),
         violations=tally.violations,
         compliance=tally.compliance,
         duplicates=tally.duplicates,
@@ -202,17 +214,7 @@ def _consolidated_dim_progress(run_dir: Path) -> _DimProgress:
 
 def _dim_files_summary(queue: dict | None, d_state: DimProgressState, dim_estimates: dict, dim_id: str) -> dict:
     if queue is not None:
-        # `taken` is a list of batch entries [{"files": [...], "agent": ..., "ts": ...}, ...].
-        # Match FileQueue.stats(): flatten file counts across batches so the
-        # number matches the heartbeat log.
-        taken_entries = queue.get("taken") or []
-        taken = 0
-        for entry in taken_entries:
-            fs = entry.get("files") if isinstance(entry, dict) else None
-            if isinstance(fs, list):
-                taken += len(fs)
-        pending = len(queue.get("pending") or [])
-        return {"taken": taken, "total": taken + pending}
+        return _queue_file_counts(queue)
     if d_state == "pending":
         # Pending dims report 0 until the precomputed estimate lands.
         # The UI uses "any pending dim with total=0" as the signal to
@@ -249,20 +251,23 @@ def _dim_evidence_tally(dim_id: str, ctx: _ProgressContext, dismissed, deleted):
     )
 
 
-def _dim_counts(
-    dim_id: str, ctx: _ProgressContext, dismissed, deleted, d_state: DimProgressState, record: dict | None,
-) -> _DimCounts:
-    """Evidence tally, elapsed time, live agents and estimate counts for one dim."""
+def _dim_measurements(
+    dim_id: str, ctx: _ProgressContext, d_state: DimProgressState, record: dict | None,
+) -> dict[str, Any]:
+    """Elapsed time, live agents and estimate counts for one dim, as ``_DimProgress`` kwargs.
+
+    Returned as kwargs rather than as a second dataclass so the field names
+    and types are declared once, on ``_DimProgress`` itself.
+    """
     meta = ctx.dim_estimates.get(dim_id)
-    return _DimCounts(
-        tally=_dim_evidence_tally(dim_id, ctx, dismissed, deleted),
-        elapsed_s=_dim_elapsed_s(dim_id, ctx.run_dir, d_state, record),
-        active_agents=_active_agents(ctx.evidence_dir, dim_id) if d_state == "running" else 0,
-        estimate_reason=meta["reason"] if meta else None,
-        files_cached=meta["cached"] if meta else None,
-        files_project_total=meta["total"] if meta else None,
-        files_excluded=meta["excluded"] if meta else None,
-    )
+    return {
+        "elapsed_s": _dim_elapsed_s(dim_id, ctx.run_dir, d_state, record),
+        "active_agents": _active_agents(ctx.evidence_dir, dim_id) if d_state == "running" else 0,
+        "estimate_reason": meta["reason"] if meta else None,
+        "files_cached": meta["cached"] if meta else None,
+        "files_project_total": meta["total"] if meta else None,
+        "files_excluded": meta["excluded"] if meta else None,
+    }
 
 
 def _build_dim_progress(
@@ -275,8 +280,8 @@ def _build_dim_progress(
         has_evaluation=dimension_report_exists(ctx.run_dir / "evaluation", dim_id),
     )
     record = ctx.dim_records.get(dim_id) if isinstance(ctx.dim_records, dict) else None
-    counts = _dim_counts(dim_id, ctx, dismissed, deleted, d_state, record)
-    tally = counts.tally
+    tally = _dim_evidence_tally(dim_id, ctx, dismissed, deleted)
+    measurements = _dim_measurements(dim_id, ctx, d_state, record)
     return _DimProgress(
         id=dim_id,
         state=d_state,
@@ -286,11 +291,6 @@ def _build_dim_progress(
         duplicates=tally.duplicates,
         suppressed=tally.suppressed,
         quarantined=tally.quarantined,
-        elapsed_s=counts.elapsed_s,
-        active_agents=counts.active_agents,
-        estimate_reason=counts.estimate_reason,
         exit_reason=_dim_exit_reason(record),
-        files_cached=counts.files_cached,
-        files_project_total=counts.files_project_total,
-        files_excluded=counts.files_excluded,
+        **measurements,
     )

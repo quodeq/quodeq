@@ -111,6 +111,5 @@ describe('usePublishPolling', () => {
       expect.stringContaining('[usePublishPolling]'),
       expect.any(Error),
     );
-    warn.mockRestore();
   });
 });

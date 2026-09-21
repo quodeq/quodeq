@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from typing import NamedTuple
 
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
 
@@ -54,21 +55,43 @@ def _parse_major(version_str: str) -> int:
     return int(cleaned.split(".")[0])
 
 
-def _check_tool_version(cmd: list[str], tool_name: str, min_major: int, install_hint: str) -> None:
-    """Raise RuntimeError if *tool_name* is missing or below *min_major*."""
+class _VersionCheck(NamedTuple):
+    """Classified outcome of one tool's ``--version`` probe."""
+
+    status: str  # "ok", "missing" or "outdated"
+    version: str  # the reported version string, "" when the probe failed
+    error: Exception | None  # the probe failure, kept for exception chaining
+
+
+def _probe_tool_version(cmd: list[str], min_major: int) -> _VersionCheck:
+    """Run *cmd* and classify the version it reports against *min_major*.
+
+    A version string that cannot be parsed counts as ``"ok"``: the tool is
+    installed and there is nothing actionable to report about it.
+    """
     try:
         version_str = run_version_cmd(cmd)
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
-        raise RuntimeError(
-            f"{tool_name} {min_major}+ is required but not found.\n{install_hint}"
-        ) from exc
+        return _VersionCheck("missing", "", exc)
     try:
         major = _parse_major(version_str)
     except (ValueError, IndexError):
-        return
+        return _VersionCheck("ok", version_str, None)
     if major < min_major:
+        return _VersionCheck("outdated", version_str, None)
+    return _VersionCheck("ok", version_str, None)
+
+
+def _check_tool_version(cmd: list[str], tool_name: str, min_major: int, install_hint: str) -> None:
+    """Raise RuntimeError if *tool_name* is missing or below *min_major*."""
+    check = _probe_tool_version(cmd, min_major)
+    if check.status == "missing":
         raise RuntimeError(
-            f"{tool_name} {version_str} is below the minimum required version {min_major}.x.\n"
+            f"{tool_name} {min_major}+ is required but not found.\n{install_hint}"
+        ) from check.error
+    if check.status == "outdated":
+        raise RuntimeError(
+            f"{tool_name} {check.version} is below the minimum required version {min_major}.x.\n"
             f"{install_hint}"
         )
 
@@ -89,16 +112,11 @@ def _collect_tool_issue(cmd: list[str], tool_name: str, min_major: int) -> str |
     Used by aggregators that want to report every missing/outdated tool in
     a single error instead of failing fast on the first one.
     """
-    try:
-        version_str = run_version_cmd(cmd)
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    check = _probe_tool_version(cmd, min_major)
+    if check.status == "missing":
         return f"{tool_name} {min_major}+ not found on PATH"
-    try:
-        major = _parse_major(version_str)
-    except (ValueError, IndexError):
-        return None
-    if major < min_major:
-        return f"{tool_name} {version_str} is below the minimum required version {min_major}.x"
+    if check.status == "outdated":
+        return f"{tool_name} {check.version} is below the minimum required version {min_major}.x"
     return None
 
 

@@ -20,6 +20,11 @@
  */
 import { DEFAULT_PROJECT_SOURCE } from '../constants.js';
 
+// Stand-in job/run id for queries kept mounted with `enabled: false`:
+// react-query still wants a stable key, and routing the placeholder through
+// the factories below keeps it in the same cache subtree as the real entries.
+export const NO_JOB_ID = "_none_";
+
 export const evaluationKeys = {
   all: () => ["evaluation"],
   evaluation: (jobId) => ["evaluation", jobId],
@@ -28,27 +33,45 @@ export const evaluationKeys = {
   dimensions: (jobId) => ["evaluation", jobId, "dimensions"],
 };
 
+// The project-key layout: ["project", projectId, source, ...subkey]. Every
+// factory below and samePlaceholderScope's index reads go through these two,
+// so the layout is written once.
+const PROJECT_SCOPE = "project";
+const PROJECT_ID_INDEX = 1;
+const PROJECT_SOURCE_INDEX = 2;
+
+/**
+ * Build a project-scoped query key.
+ * @param {string} projectId
+ * @param {string} source 'local' | 'shared'
+ * @param {...*} subkey Trailing segments identifying the query within the project subtree.
+ * @returns {Array} ["project", projectId, source, ...subkey]
+ */
+function projectScope(projectId, source, ...subkey) {
+  return [PROJECT_SCOPE, projectId, source, ...subkey];
+}
+
 export const projectKeys = {
-  all: () => ["project"],
-  project: (projectId, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source],
-  scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "scores", asOf || "latest"],
-  dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "dashboard", run || "latest"],
-  runs: (projectId, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "runs"],
-  info: (projectId, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "info"],
+  all: () => [PROJECT_SCOPE],
+  project: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source),
+  scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "scores", asOf || "latest"),
+  dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dashboard", run || "latest"),
+  runs: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runs"),
+  info: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "info"),
   // Explorer (dimension detail) queries. Distinct from `scores`: that one is
   // GET /projects/<p>/scores?as_of= (full payload incl. trend/availableRuns),
   // runScores is the slim GET /projects/<p>/scores/<run> used for the rescore
   // merge. Both sit inside the project subtree on purpose, so every existing
   // mutation invalidation (dismiss/delete/formula reconcile) reaches them.
-  runScores: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "runScores", run || "latest"],
+  runScores: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runScores", run || "latest"),
   // Compare tab's slim per-project payload. Lives inside the project subtree
   // on purpose: dismiss/delete/formula invalidations must reach it, or the
   // fleet table would keep showing pre-dismissal scores.
-  compareSummary: (projectId, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "compareSummary"],
+  compareSummary: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "compareSummary"),
   // Per-project enabled-standards set, fetched by Compare so every row is
   // filtered to that project's own visible dimensions (as Overview does).
-  standardsVisibility: (projectId, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "standardsVisibility"],
-  dimensionEval: (projectId, run, dimension, source = DEFAULT_PROJECT_SOURCE) => ["project", projectId, source, "dimensionEval", run || "latest", dimension],
+  standardsVisibility: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "standardsVisibility"),
+  dimensionEval: (projectId, run, dimension, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dimensionEval", run || "latest", dimension),
 };
 
 /**
@@ -70,13 +93,13 @@ export const projectKeys = {
  *   placeholderData: (prev, prevQuery) =>
  *     samePlaceholderScope(prevQuery, projectId, source) ? prev : undefined
  *
- * Relies on the [scope, projectId, source, ...] layout the factories above
- * build; keep the two in step.
+ * Reads the project/source segments through the same index constants the
+ * factories above build with, so the layout is defined in one place.
  */
 export function samePlaceholderScope(previousQuery, projectId, source = DEFAULT_PROJECT_SOURCE) {
   const key = previousQuery?.queryKey;
   if (!Array.isArray(key)) return false;
-  return key[1] === projectId && key[2] === source;
+  return key[PROJECT_ID_INDEX] === projectId && key[PROJECT_SOURCE_INDEX] === source;
 }
 
 export const systemKeys = {

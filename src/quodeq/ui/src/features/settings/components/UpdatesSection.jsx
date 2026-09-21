@@ -5,6 +5,7 @@ import { useUpdateStatus } from '../../updates/useUpdateStatus.js';
 import { useSelfUpdate } from '../../updates/useSelfUpdate.js';
 import { openExternal } from '../../updates/openExternal.js';
 import { t } from '../../../strings/index.js';
+import { SettingsOnOffPills } from './settingsRowParts.jsx';
 
 function VersionRow({ available, status, current, checking, onCheck }) {
   return (
@@ -76,24 +77,7 @@ function AutoCheckRow({ auto, onToggle }) {
         <span className="settings-label">{t('settings.automaticChecks')}</span>
         <span className="settings-description">{t('settings.automaticChecksDesc')}</span>
       </div>
-      <div className="settings-pill-group">
-        <button
-          type="button"
-          className={`settings-pill${auto ? ' settings-pill--active' : ''}`}
-          onClick={() => onToggle(true)}
-          aria-pressed={auto}
-        >
-          {t('settings.on')}
-        </button>
-        <button
-          type="button"
-          className={`settings-pill${!auto ? ' settings-pill--active' : ''}`}
-          onClick={() => onToggle(false)}
-          aria-pressed={!auto}
-        >
-          {t('settings.off')}
-        </button>
-      </div>
+      <SettingsOnOffPills on={auto} onToggle={onToggle} />
     </div>
   );
 }

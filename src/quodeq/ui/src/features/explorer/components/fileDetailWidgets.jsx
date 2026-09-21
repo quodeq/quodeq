@@ -1,4 +1,8 @@
-import { t } from '../../../strings/index.js';
+import { headerRowKey } from './findingListRows.js';
+
+// Re-exported so the file-detail pane keeps importing its row widgets from
+// one module.
+export { LowConfidenceToggle } from '../../../components/LowConfidenceToggle.jsx';
 
 export function GroupHeader({ title, count }) {
   return (
@@ -6,23 +10,6 @@ export function GroupHeader({ title, count }) {
       <span className="violation-group-title" role="heading" aria-level={3}>{title}</span>
       <span className="violation-group-count">{count}</span>
     </div>
-  );
-}
-
-export function LowConfidenceToggle({ count, expanded, onToggle }) {
-  return (
-    <button
-      type="button"
-      className="violation-group-header low-confidence-group-header"
-      aria-expanded={expanded}
-      onClick={onToggle}
-    >
-      <span className="violation-group-title">{t('violations.lowConfidence')}</span>
-      <span className="violation-group-count">{count}</span>
-      <span className="low-confidence-group-hint">
-        {expanded ? t('violations.hideLikelyFp') : t('violations.showLikelyFp')}
-      </span>
-    </button>
   );
 }
 
@@ -45,8 +32,8 @@ export function itemKey(items) {
   return (i) => {
     const item = items[i];
     if (!item) return i;
-    if (item.kind === 'sev-header') return `h-${item.sev}`;
-    if (item.kind === 'compliance-header') return 'h-compliance';
+    const header = headerRowKey(item);
+    if (header) return header;
     if (item.kind === 'low-conf-toggle') return 'h-lowconf';
     if (item.kind === 'violation') {
       return `v-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;

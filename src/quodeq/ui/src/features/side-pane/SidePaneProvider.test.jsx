@@ -214,7 +214,7 @@ describe('SidePaneProvider', () => {
       expect(screen.getByRole('status')).toHaveTextContent('blocked: try again later');
     });
 
-    it('is exposed as part of the context value (no-op when called with empty)', () => {
+    it('is a no-op when called with an empty message', () => {
       function NoMessageProbe() {
         const { showToast } = useSidePane();
         return <button onClick={() => showToast('')}>fire-empty</button>;

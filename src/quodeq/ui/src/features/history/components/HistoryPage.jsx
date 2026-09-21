@@ -6,7 +6,8 @@ import { usePrefetchRun } from '../../dashboard/hooks/usePrefetchRun.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
-import { t, LOCALE } from '../../../strings/index.js';
+import { t } from '../../../strings/index.js';
+import { formatRunDateTime } from '../../../utils/formatters.js';
 import { PROJECT_SOURCE } from '../../../constants.js';
 import { useHistoryDeleteRun } from '../hooks/useHistoryDeleteRun.js';
 import { HistoryContent } from './HistoryContent.jsx';
@@ -21,16 +22,8 @@ export { assembleHistoryRows, visibleHistoryRows };
 function useHistoryRunNavLabel(trend, currentOverviewRun) {
   return useMemo(() => {
     const entry = (trend || []).find((r) => r.runId === currentOverviewRun);
-    if (entry?.dateISO) {
-      try {
-        const d = new Date(entry.dateISO);
-        return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
-      } catch (err) {
-        console.warn('[HistoryPage] date format failed:', err);
-        return entry.dateISO || '';
-      }
-    }
-    return entry?.dateLabel || currentOverviewRun;
+    if (!entry?.dateISO) return entry?.dateLabel || currentOverviewRun;
+    return formatRunDateTime(entry.dateISO, entry.dateISO, 'HistoryPage');
   }, [trend, currentOverviewRun]);
 }
 

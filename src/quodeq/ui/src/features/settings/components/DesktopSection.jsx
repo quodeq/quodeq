@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
+import { SettingsOnOffPills } from './settingsRowParts.jsx';
 
 function MenubarRow({ enabled, onToggle }) {
   return (
@@ -10,24 +11,7 @@ function MenubarRow({ enabled, onToggle }) {
         <span className="settings-label">{t('settings.menubarToggle')}</span>
         <span className="settings-description">{t('settings.menubarToggleDesc')}</span>
       </div>
-      <div className="settings-pill-group">
-        <button
-          type="button"
-          className={`settings-pill${enabled ? ' settings-pill--active' : ''}`}
-          onClick={() => onToggle(true)}
-          aria-pressed={enabled}
-        >
-          {t('settings.on')}
-        </button>
-        <button
-          type="button"
-          className={`settings-pill${!enabled ? ' settings-pill--active' : ''}`}
-          onClick={() => onToggle(false)}
-          aria-pressed={!enabled}
-        >
-          {t('settings.off')}
-        </button>
-      </div>
+      <SettingsOnOffPills on={enabled} onToggle={onToggle} />
     </div>
   );
 }

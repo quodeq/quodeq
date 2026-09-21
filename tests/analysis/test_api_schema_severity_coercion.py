@@ -65,11 +65,11 @@ class TestSeverityCoercion:
 
         assert _Finding.model_validate(node).severity.value == "minor"
 
-    def test_grounding_constraints_are_untouched(self):
+    @pytest.mark.parametrize("bad", [{"snippet": ""}, {"reason": ""}, {"line": 0}])
+    def test_grounding_constraints_are_untouched(self, bad):
         """Coercing severity must not soften the #305 grounding gate."""
-        for bad in ({"snippet": ""}, {"reason": ""}, {"line": 0}):
-            with pytest.raises(ValueError):
-                _Finding.model_validate({**_COMPLIANCE_FINDING, **bad})
+        with pytest.raises(ValueError):
+            _Finding.model_validate({**_COMPLIANCE_FINDING, **bad})
 
     def test_mixed_response_no_longer_loses_the_compliance_finding(self):
         """The live failure: violation kept, compliance dropped, in one response."""

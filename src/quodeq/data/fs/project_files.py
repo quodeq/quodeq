@@ -32,10 +32,8 @@ def repository_info_exists(project_dir: Path) -> bool:
     return (project_dir / REPOSITORY_INFO_FILENAME).exists()
 
 
-def read_repository_info(project_dir: Path) -> dict | None:
-    """Parsed ``repository_info.json``, or None when absent, corrupt, or
-    not a JSON object."""
-    path = project_dir / REPOSITORY_INFO_FILENAME
+def _read_json_object(path: Path) -> dict | None:
+    """Parsed JSON object at *path*, or None when absent, corrupt, or not an object."""
     if not path.exists():
         return None
     try:
@@ -43,6 +41,12 @@ def read_repository_info(project_dir: Path) -> dict | None:
     except (json.JSONDecodeError, OSError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def read_repository_info(project_dir: Path) -> dict | None:
+    """Parsed ``repository_info.json``, or None when absent, corrupt, or
+    not a JSON object."""
+    return _read_json_object(project_dir / REPOSITORY_INFO_FILENAME)
 
 
 def write_repository_info(project_dir: Path, data: dict) -> bool:
@@ -75,14 +79,7 @@ def write_scan_json(scan: ScanData, output_dir: Path) -> None:
 def read_scan_json(project_dir: Path) -> dict | None:
     """Parsed ``scan.json``, or None when absent, corrupt, or not a JSON
     object. Mirrors :func:`read_repository_info`'s contract."""
-    path = project_dir / SCAN_FILENAME
-    if not path.exists():
-        return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
-    return data if isinstance(data, dict) else None
+    return _read_json_object(project_dir / SCAN_FILENAME)
 
 
 def remove_project_dir(project_dir: Path) -> bool:

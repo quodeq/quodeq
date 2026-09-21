@@ -4,6 +4,7 @@ import { countBySeverity } from '../../../utils/severity.js';
 import { useExplorerQueries } from './useExplorerQueries.js';
 import { computeComplianceByPrinciple, buildEvalPrincipalFn } from '../../../utils/evalPrincipal.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { violationKey } from '../../../utils/violationKey.js';
 
 export { computeComplianceByPrinciple, buildEvalPrincipalFn };
 
@@ -46,12 +47,10 @@ function mergeRescoreIntoEval(prev, dimData) {
     return match ? { ...pg, score: match.score, grade: match.grade } : pg;
   });
   // Build set of dismissed violation keys for filtering
-  const rescViolationKeys = new Set(
-    (dimData.violations || []).map((v) => `${v.req || ''}|${v.file || ''}|${v.line || 0}`)
-  );
+  const rescViolationKeys = new Set((dimData.violations || []).map(violationKey));
   // Filter violations to only include those that survived rescore
   const filteredViolations = dimData.violations != null
-    ? (prev.violations || []).filter((v) => rescViolationKeys.has(`${v.req || ''}|${v.file || ''}|${v.line || 0}`))
+    ? (prev.violations || []).filter((v) => rescViolationKeys.has(violationKey(v)))
     : prev.violations;
   // Update totals
   const totals = dimData.totals ?? prev.totals;

@@ -54,6 +54,10 @@ describe('CompareDimensionView accessibility (#6521)', () => {
     renderView();
     const selected = screen.getByRole('tab', { selected: true });
     expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', selected.id);
+  });
+
+  it('contains the radar chart for the dimension', () => {
+    renderView();
     expect(screen.getByRole('tabpanel')).toContainElement(screen.getByRole('img', { name: /Radar chart/ }));
   });
 });

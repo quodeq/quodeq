@@ -2,9 +2,8 @@ import { useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 import { useSidePane, workspaceDiffSpec } from '../side-pane/index.js';
 import PanelSwitcher from '../drawer/PanelSwitcher.jsx';
 import Badge from '../../components/Badge.jsx';
-import {
-  ChevronDownIcon, GlobeIcon, MaximizeIcon, MinimizeIcon, PencilIcon, RotateCcwIcon,
-} from '../../components/CopyButton.jsx';
+import { GlobeIcon, PencilIcon, RotateCcwIcon } from '../../components/CopyButton.jsx';
+import { DrawerWindowControls } from '../../components/DrawerWindowControls.jsx';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
 import { providerSupportsWebTools } from '../../models/provider.js';
 import { t } from '../../strings/index.js';
@@ -94,19 +93,7 @@ function DrawerControls({ session, toggles, actions }) {
           <GlobeIcon />
         </button>
       )}
-      <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
-        aria-label={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}
-        aria-pressed={maximized}
-        title={maximized ? 'Restore' : 'Maximize'}>
-        {maximized ? <MinimizeIcon /> : <MaximizeIcon />}
-      </button>
-      {/* Chevron-down, NOT an ×: neither panel is killed by this. An
-          in-flight assistant turn keeps running server-side; reopening the
-          tab reattaches to it. */}
-      <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
-        aria-label={t('common.hideTab')} title={t('common.hideKeepsRunning')}>
-        <ChevronDownIcon />
-      </button>
+      <DrawerWindowControls maximized={maximized} onToggleMaximized={toggleMaximized} onHide={closeActiveTab} />
     </div>
   );
 }

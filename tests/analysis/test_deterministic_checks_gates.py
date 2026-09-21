@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from quodeq.core.evidence.model import Evidence
 from tests.analysis._deterministic_checks_fixtures import (  # noqa: F401 -- project/compiled are pytest fixtures
     SOURCES,
@@ -69,25 +71,34 @@ class TestSeverityGates:
     def _violation(self, evidence):
         return evidence.principles["Authentication"].violations[0]
 
-    def test_a_critical_naming_no_external_source_is_downgraded(
-        self, project, compiled, tmp_path, monkeypatch,
-    ):
-        """The provenance gate (#639) must reach a checker finding too."""
+    @pytest.fixture()
+    def _no_external_source_downgrade(self, project, compiled, tmp_path, monkeypatch):
+        """Apply a checker-reported critical with no external source and
+        collect the three sinks the provenance gate (#639) must reach:
+        the evidence object, the JSONL wire row, and the events-log payload."""
         self._checker(monkeypatch, severity="critical",
                       reason="Path is built from a caller-supplied value.")
 
         added, evidence, jsonl = self._apply(project, compiled, tmp_path)
 
+        wire = json.loads(jsonl.read_text(encoding="utf-8").splitlines()[0])
+        events = jsonl.parent.parent / "events.jsonl"
+        payload = json.loads(events.read_text(encoding="utf-8").splitlines()[0])["payload"]
+        return added, evidence, wire, payload
+
+    def test_no_external_source_downgrade_reaches_the_evidence(self, _no_external_source_downgrade):
+        added, evidence, _wire, _payload = _no_external_source_downgrade
         assert added == 1
         violation = self._violation(evidence)
         assert violation["severity"] == "major", "evidence drives the score"
         assert violation["provenance_downgrade"] is True
 
-        wire = json.loads(jsonl.read_text(encoding="utf-8").splitlines()[0])
+    def test_no_external_source_downgrade_reaches_the_jsonl_wire_row(self, _no_external_source_downgrade):
+        _added, _evidence, wire, _payload = _no_external_source_downgrade
         assert wire["severity"] == "major", "the JSONL is what the report reads"
 
-        events = jsonl.parent.parent / "events.jsonl"
-        payload = json.loads(events.read_text(encoding="utf-8").splitlines()[0])["payload"]
+    def test_no_external_source_downgrade_reaches_the_events_log(self, _no_external_source_downgrade):
+        _added, _evidence, _wire, payload = _no_external_source_downgrade
         assert payload["severity"] == "major", "the SQL projection reads events.jsonl"
         assert payload["provenance_downgrade"] is True
 
