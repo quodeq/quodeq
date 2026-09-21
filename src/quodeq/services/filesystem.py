@@ -24,7 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.types import ProjectEntry, ViolationSummary
+from quodeq.core.types import ViolationSummary
 from quodeq.core.types.job import JobSnapshot
 from quodeq.services import fs_reports, fs_projects
 from quodeq.services._evaluations_index import EvaluationsIndex
@@ -92,7 +92,7 @@ class FilesystemActionProvider(ActionProvider):
     ) -> None:
         self._reports_root = _resolve_reports_root(reports_root)
         self._compiled_dir = compiled_dir
-        self._jobs = job_manager or _default_job_manager(self._reports_root)
+        self._jobs = job_manager if job_manager is not None else _default_job_manager(self._reports_root)
         self._projects = ProjectsCache()
         self._evaluations = EvaluationsIndex(
             jobs=self._jobs,
@@ -213,10 +213,6 @@ class FilesystemActionProvider(ActionProvider):
     def get_project_info(self, reports_dir: str, project: str) -> dict[str, Any] | None:
         """Return a project's metadata (discipline, dimensions), or None if unregistered."""
         return fs_projects.get_project_info(reports_dir, project)
-
-    @staticmethod
-    def _build_project_list(reports_root: Path) -> list[ProjectEntry]:
-        return fs_projects.build_project_list(reports_root)
 
     # -- reports (delegate to fs_reports) ------------------------------
 

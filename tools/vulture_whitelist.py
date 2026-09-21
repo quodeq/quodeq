@@ -166,7 +166,6 @@ _.total_deduction  # core/types/scoring.py: Deductions field; read by name throu
 _.untracked_files  # core/types/scan.py: ScanData field; read by name through serialization or a dict key (9 refs).
 _.updated_at  # data/sqlite/run_index.py: RunRow field; read by name through serialization or a dict key (33 refs).
 _.violations_per100_files  # core/types/finding.py: Totals field; read by name through serialization or a dict key (19 refs).
-_.vroot  # config/_config_paths.py: ConfigPaths field; read by name through serialization or a dict key (2 refs).
 
 # Seams whose only caller lives in tests/, which this scan does not cover (src/quodeq is the scanned tree).
 _.RESUME_STYLE_EXEC  # assistant/adapters/cli_config.py: Referenced only from tests/, which this scan does not cover (2 refs).
@@ -211,7 +210,6 @@ _.wait_for_trip  # analysis/cache/failure_streak.py: Referenced only from tests/
 _.StandardReference  # core/types/standard.py: Referenced as a name or key elsewhere (4 refs outside the definition).
 _._CacheEraser  # services/_run_discard.py: structural Protocol used as an annotation and as the test injection seam.
 _._api_pid  # dashboard/_webview_window.py: Referenced as a name or key elsewhere (1 refs outside the definition).
-_._build_project_list  # services/filesystem.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._build_workdir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._coerce_unknown_severity  # analysis/_api_schema.py: pydantic field_validator; pydantic calls it by registration, not by name.
 _._color  # shared/_log_format.py: Referenced as a name or key elsewhere (1 refs outside the definition).
@@ -256,7 +254,7 @@ _.sync_source_to_workdir  # dashboard/_build_npm.py: Referenced as a name or key
 # Public re-export aliases. Importers name them; nothing in-package reads them.
 _.ENV_MAX_DURATION  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
 _.ENV_MAX_TURNS  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
-_.ENV_NO_CONSOLIDATE  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
+_.ENV_NO_CONSOLIDATE  # _cli_env.py: Public re-export alias kept for symmetry with the three siblings cli.py imports.
 _.ENV_POOL_BUDGET  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
 _.cli_env_int  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
 _.cli_environ  # _cli_env.py: Public re-export alias; importers name it, nothing in-package reads it.
