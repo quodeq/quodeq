@@ -15,7 +15,7 @@ src/quodeq/ui/src/features/map/viz/components/galaxyFolderScene.test.jsx:rootSta
 src/quodeq/ui/src/features/onboarding/onboarding.integration.test.jsx:walks Welcome → Repo & Scan → Provider → Standard & Launch and emits onLaunch
 src/quodeq/ui/src/features/terminal/useTerminalSessions.test.jsx:a burst of concurrent reconciles shares one fetch/create cycle and one re-render
 tests/analysis/test_command_builder.py:TestBuildAiCmdCodex.test_inlines_codex_mcp_config_arg_with_jsonl
-tests/analysis/test_copilot_provider.py:test_copilot_analysis_args_and_scoped_mcp
+tests/analysis/test_copilot_provider.py:test_copilot_command_line_flags
 tests/analysis/test_prompt_builder.py:TestBuildAnalysisPrompt.test_substitutes_all_variables
 tests/analysis/test_report_assembly_coverage.py:TestAssembleReportDict.test_basic_assembly
 tests/api/test_assistant_routes_turn_slots.py:test_stop_cancels_running_turn_and_frees_the_token
@@ -34,11 +34,9 @@ tests/data/fs/report_parser/test_cluster6_evidence_sqlite_batch.py:test_load_evi
 tests/data/sqlite/test_row_mappers.py:test_judgment_to_row_maps_required_fields
 tests/data/test_shared_repo_lock.py:test_refresh_waits_for_publish
 tests/integration/test_assistant_hidden_standards.py:test_hidden_standard_is_absent_from_every_general_answer
-tests/integration/test_copilot_cli_local.py:test_real_copilot_assistant_mcp_and_resume
 tests/services/test_dashboard_build_filtering.py:TestHistoryContextSlimming.test_history_keys_drop_finding_bodies_but_keep_scores
 tests/services/test_response_builders_seam.py:test_fake_reader_drives_full_response
 tests/services/test_runs_unit.py:test_ui_status_mapping
-tests/test_cli_coverage.py:TestParserAdditionalFlags.test_combined_flags
 tests/test_cli_coverage.py:TestParserAdditionalFlags.test_defaults
 tests/test_cli_env_injection.py:test_resolve_limits_reads_every_cap_from_the_injected_env
 tests/test_cli_run_config_phases.py:TestBuildAnalysisOptions.test_maps_resolved_locals_and_limits_onto_the_options
