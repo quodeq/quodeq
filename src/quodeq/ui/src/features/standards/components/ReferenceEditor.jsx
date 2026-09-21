@@ -168,7 +168,7 @@ function RefTypeSelect({ refData, typeOptions, onTypeChange, disabled }) {
       disabled={disabled}
       aria-label={t('standards.refTypeAria')}
     >
-      {typeOptions.map((t) => <option key={t} value={t}>{t.toUpperCase()}</option>)}
+      {typeOptions.map((opt) => <option key={opt} value={opt}>{opt.toUpperCase()}</option>)}
     </select>
   );
 }

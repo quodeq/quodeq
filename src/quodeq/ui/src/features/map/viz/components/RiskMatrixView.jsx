@@ -105,7 +105,7 @@ function BubbleNode({ point, px, py, br, entered, tip, setTip, onDrillDown, onFi
           role="button"
           aria-label={child.name || child.path}
           onMouseEnter={(e) => setTip({ x: e.clientX, y: e.clientY, child })}
-          onMouseMove={(e) => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
+          onMouseMove={(e) => setTip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null)}
           onMouseLeave={() => setTip(null)}
           onClick={() => onDrillDown?.(child.path)}
           onKeyDown={activateOnKey(() => onDrillDown?.(child.path))} />
@@ -115,7 +115,7 @@ function BubbleNode({ point, px, py, br, entered, tip, setTip, onDrillDown, onFi
           ariaLabel={t(riskBubbleKey(child.violations), { file: child.name || child.path, count: child.violations || 0 })}
           handlers={{
             onMouseEnter: (e) => setTip({ x: e.clientX, y: e.clientY, child }),
-            onMouseMove: (e) => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null),
+            onMouseMove: (e) => setTip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null),
             onMouseLeave: () => setTip(null),
             onClick: () => onFileClick?.(child),
             style: { cursor: onFileClick ? 'pointer' : 'default' },
@@ -217,7 +217,7 @@ function MatrixTooltip({ tip }) {
 export default function RiskMatrixView({ node, onDrillDown, onFileClick, showLabels = true }) {
   const [tip, setTip] = useState(null);
   const [entered, setEntered] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setEntered(true), ENTRANCE_DELAY_MS); return () => clearTimeout(t); }, []);
+  useEffect(() => { const timer = setTimeout(() => setEntered(true), ENTRANCE_DELAY_MS); return () => clearTimeout(timer); }, []);
 
   const { points, px, py, br } = useBubbleLayout(node);
 

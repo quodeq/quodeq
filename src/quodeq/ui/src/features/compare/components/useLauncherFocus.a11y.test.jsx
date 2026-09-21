@@ -35,7 +35,7 @@ function Launcher({ open, close, items = ITEMS, extra = false }) {
 const item = (name) => screen.getByRole('menuitem', { name });
 const trigger = () => screen.getByRole('button', { name: 'launch' });
 
-function open(close = vi.fn(), props = {}) {
+function openMenu(close = vi.fn(), props = {}) {
   const view = render(<Launcher open={false} close={close} {...props} />);
   trigger().focus();
   view.rerender(<Launcher open close={close} {...props} />);
@@ -44,43 +44,43 @@ function open(close = vi.fn(), props = {}) {
 
 describe('useLauncherFocus', () => {
   it('moves focus to the first menu item when the menu opens', () => {
-    open();
+    openMenu();
     expect(item('one')).toHaveFocus();
   });
 
   it('prefers the first option over any other focusable in the menu', () => {
-    open(vi.fn(), { extra: true });
+    openMenu(vi.fn(), { extra: true });
     expect(item('one')).toHaveFocus();
   });
 
   it('ArrowDown moves focus to the next item', () => {
-    open();
+    openMenu();
     fireEvent.keyDown(item('one'), { key: 'ArrowDown' });
     expect(item('two')).toHaveFocus();
   });
 
   it('ArrowUp from the first item wraps to the last', () => {
-    open();
+    openMenu();
     fireEvent.keyDown(item('one'), { key: 'ArrowUp' });
     expect(item('three')).toHaveFocus();
   });
 
   it('ArrowDown from the last item wraps to the first', () => {
-    open();
+    openMenu();
     item('three').focus();
     fireEvent.keyDown(item('three'), { key: 'ArrowDown' });
     expect(item('one')).toHaveFocus();
   });
 
   it('walks onto a focusable that is not one of the options', () => {
-    open(vi.fn(), { extra: true });
+    openMenu(vi.fn(), { extra: true });
     fireEvent.keyDown(item('one'), { key: 'ArrowUp' });
     expect(screen.getByRole('button', { name: 'clear' })).toHaveFocus();
   });
 
   it('Tab closes the menu and returns focus to the trigger', () => {
     const close = vi.fn();
-    open(close);
+    openMenu(close);
     fireEvent.keyDown(item('one'), { key: 'Tab' });
     expect(close).toHaveBeenCalled();
     expect(trigger()).toHaveFocus();
@@ -88,7 +88,7 @@ describe('useLauncherFocus', () => {
 
   it('Shift+Tab closes the menu and returns focus to the trigger', () => {
     const close = vi.fn();
-    open(close);
+    openMenu(close);
     fireEvent.keyDown(item('one'), { key: 'Tab', shiftKey: true });
     expect(close).toHaveBeenCalled();
     expect(trigger()).toHaveFocus();
@@ -96,7 +96,7 @@ describe('useLauncherFocus', () => {
 
   it('returns focus to the trigger when the menu closes', () => {
     const close = vi.fn();
-    const { rerender } = open(close);
+    const { rerender } = openMenu(close);
     expect(item('one')).toHaveFocus();
     rerender(<Launcher open={false} close={close} />);
     expect(trigger()).toHaveFocus();
@@ -104,7 +104,7 @@ describe('useLauncherFocus', () => {
 
   it('leaves focus alone when it moved outside the menu before closing', () => {
     const close = vi.fn();
-    const { rerender } = open(close);
+    const { rerender } = openMenu(close);
     const after = screen.getByRole('button', { name: 'after' });
     after.focus();
     rerender(<Launcher open={false} close={close} />);
@@ -113,7 +113,7 @@ describe('useLauncherFocus', () => {
 
   it('recovers focus when the open menu drops the focused option', () => {
     const close = vi.fn();
-    const { rerender } = open(close);
+    const { rerender } = openMenu(close);
     item('two').focus();
     rerender(<Launcher open close={close} items={['one', 'three']} />);
     expect(item('one')).toHaveFocus();

@@ -168,7 +168,7 @@ function PrincipleDetailBody({
   );
 }
 
-const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
+export default memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
   const { principleData, principle, score, grade, dimension, runId, dateLabel } = evalPrincipal;
   const { principleDescriptions } = useStandardDescriptions(dimension);
   const principleDescription = principleDescriptions[principle] || '';
@@ -216,5 +216,3 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
     />
   );
 });
-
-export default PrincipleDetailPage;

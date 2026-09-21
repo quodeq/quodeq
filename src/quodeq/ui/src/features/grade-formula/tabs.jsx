@@ -46,7 +46,7 @@ export function BoundariesTab({ draft, update }) {
       <span className="settings-description"> {t('gradeFormula.gradeLabelsDesc')}</span>
       <GradeBoundaryBar
         thresholds={draft.gradeThresholds}
-        onChange={(t) => update({ gradeThresholds: t })}
+        onChange={(next) => update({ gradeThresholds: next })}
       />
       <div style={{ marginTop: 14 }}>
         <span className="settings-label">{t('gradeFormula.severityFloors')}</span>

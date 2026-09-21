@@ -135,7 +135,7 @@ export default function GradeFormulaPage({ navigation }) {
 
   // Fall back to the first tab rather than indexing into undefined if `tab`
   // ever holds a value that doesn't match any TABS entry.
-  const ActiveBody = (TABS.find((t) => t.id === tab) ?? TABS[0]).Body;
+  const ActiveBody = (TABS.find((entry) => entry.id === tab) ?? TABS[0]).Body;
   return (
     <div className="settings-page settings-page--terminal">
       <TermHeader
