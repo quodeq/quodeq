@@ -9,6 +9,12 @@ import pytest
 from quodeq.data.copilot_models import fetch_copilot_models
 
 
+def _frame(response: dict) -> bytes:
+    """One JSON-RPC message as the CLI writes it: Content-Length header, then body."""
+    body = json.dumps(response).encode()
+    return f"Content-Length: {len(body)}\r\n\r\n".encode() + body
+
+
 @pytest.fixture
 def cli(tmp_path, monkeypatch):
     original = asyncio.create_subprocess_exec
@@ -16,8 +22,7 @@ def cli(tmp_path, monkeypatch):
     script = tmp_path / "fake_cli.py"
 
     def configure(response, *, delay=0, header=None, ignore_terminate=False):
-        body = json.dumps(response).encode()
-        frame = header if header is not None else f"Content-Length: {len(body)}\r\n\r\n".encode() + body
+        frame = header if header is not None else _frame(response)
         signal_setup = "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n" if ignore_terminate else ""
         script.write_text(
             "import sys,time,json,signal\n"
@@ -104,10 +109,10 @@ def test_rejects_invalid_rpc_frames(cli, header):
 
 def test_ignores_notifications_before_the_model_response(cli):
     configure, _, env = cli
-    frames = b""
-    for response in [{"jsonrpc": "2.0", "method": "status"}, result([{"id": "gpt-test"}])]:
-        body = json.dumps(response).encode()
-        frames += f"Content-Length: {len(body)}\r\n\r\n".encode() + body
+    frames = b"".join(
+        _frame(response)
+        for response in [{"jsonrpc": "2.0", "method": "status"}, result([{"id": "gpt-test"}])]
+    )
     configure({}, header=frames)
     assert fetch_copilot_models(env=env)["models"] == ["auto", "gpt-test"]
 

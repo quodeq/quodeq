@@ -9,11 +9,11 @@ def test_schema_version_is_pinned():
     assert SCHEMA_VERSION == 9
 
 
-# Findings table as it existed at SCHEMA_VERSION=5, before issue #656 added
-# the provenance_downgrade column. Used to verify the v5 -> v6 upgrade path.
-_V5_FINDINGS_DDL = """
-    PRAGMA user_version = 5;
-    CREATE TABLE findings (
+# The findings table at SCHEMA_VERSION=5, before issue #656 added
+# provenance_downgrade. Each later version adds exactly one column, so the
+# v6 and v7 shapes are built from this base rather than pasted out again --
+# a copy that drifted would test a table the product never wrote.
+_V5_COLUMNS = """
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         schema_version  INTEGER NOT NULL DEFAULT 1,
         practice_id     TEXT NOT NULL,
@@ -33,9 +33,31 @@ _V5_FINDINGS_DDL = """
         req_refs_json   TEXT,
         dedup_key       TEXT NOT NULL UNIQUE,
         confidence      INTEGER NOT NULL DEFAULT 100,
-        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
 """
+
+# The one column each upgrade adds, in version order.
+_PROVENANCE_DOWNGRADE_COLUMN = "        provenance_downgrade INTEGER NOT NULL DEFAULT 0,\n"
+_SCOPE_DOWNGRADE_COLUMN = "        scope_downgrade_json TEXT,\n"
+
+
+def _findings_ddl(version: int, added_columns: str = "") -> str:
+    """The findings table as it stood at *version*, plus that version's columns."""
+    return (
+        f"\n    PRAGMA user_version = {version};\n"
+        "    CREATE TABLE findings (" + _V5_COLUMNS.rstrip("\n") + "\n"
+        + added_columns
+        + "        created_at      TEXT NOT NULL DEFAULT (datetime('now'))\n"
+        "    );\n"
+    )
+
+
+_V5_FINDINGS_DDL = _findings_ddl(5)
+_V6_FINDINGS_DDL = _findings_ddl(6, _PROVENANCE_DOWNGRADE_COLUMN)
+_V7_FINDINGS_DDL = _findings_ddl(
+    7, _PROVENANCE_DOWNGRADE_COLUMN + _SCOPE_DOWNGRADE_COLUMN,
+)
+
+
 
 
 def test_fresh_db_has_provenance_downgrade_column_at_default_zero():
@@ -85,34 +107,6 @@ def test_upgrade_v5_to_v6_idempotent_when_column_already_present():
     assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
-# Findings table as it existed at SCHEMA_VERSION=6, before this fix added
-# the scope_downgrade_json column. Used to verify the v6 -> v7 upgrade path.
-_V6_FINDINGS_DDL = """
-    PRAGMA user_version = 6;
-    CREATE TABLE findings (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        schema_version  INTEGER NOT NULL DEFAULT 1,
-        practice_id     TEXT NOT NULL,
-        dimension       TEXT NOT NULL DEFAULT '',
-        requirement     TEXT,
-        verdict         TEXT NOT NULL CHECK (verdict IN ('violation','compliance','dismissed')),
-        severity        TEXT NOT NULL CHECK (severity IN ('critical','major','high','medium','low','minor')),
-        file            TEXT NOT NULL DEFAULT '',
-        line            INTEGER NOT NULL DEFAULT 0,
-        end_line        INTEGER NOT NULL DEFAULT 0,
-        title           TEXT NOT NULL DEFAULT '',
-        reason          TEXT NOT NULL DEFAULT '',
-        snippet         TEXT NOT NULL DEFAULT '',
-        violation_type  TEXT NOT NULL DEFAULT '',
-        context         TEXT NOT NULL DEFAULT '',
-        scope           TEXT NOT NULL DEFAULT '',
-        req_refs_json   TEXT,
-        dedup_key       TEXT NOT NULL UNIQUE,
-        confidence      INTEGER NOT NULL DEFAULT 100,
-        provenance_downgrade INTEGER NOT NULL DEFAULT 0,
-        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-"""
 
 
 def test_fresh_db_has_scope_downgrade_json_column_at_default_null():
@@ -161,35 +155,6 @@ def test_upgrade_v6_to_v7_idempotent_when_column_already_present():
     assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
-# Findings table as it existed at SCHEMA_VERSION=7, before this fix added
-# the idx_findings_req_file_line index. Used to verify the v7 -> v8 upgrade.
-_V7_FINDINGS_DDL = """
-    PRAGMA user_version = 7;
-    CREATE TABLE findings (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        schema_version  INTEGER NOT NULL DEFAULT 1,
-        practice_id     TEXT NOT NULL,
-        dimension       TEXT NOT NULL DEFAULT '',
-        requirement     TEXT,
-        verdict         TEXT NOT NULL CHECK (verdict IN ('violation','compliance','dismissed')),
-        severity        TEXT NOT NULL CHECK (severity IN ('critical','major','high','medium','low','minor')),
-        file            TEXT NOT NULL DEFAULT '',
-        line            INTEGER NOT NULL DEFAULT 0,
-        end_line        INTEGER NOT NULL DEFAULT 0,
-        title           TEXT NOT NULL DEFAULT '',
-        reason          TEXT NOT NULL DEFAULT '',
-        snippet         TEXT NOT NULL DEFAULT '',
-        violation_type  TEXT NOT NULL DEFAULT '',
-        context         TEXT NOT NULL DEFAULT '',
-        scope           TEXT NOT NULL DEFAULT '',
-        req_refs_json   TEXT,
-        dedup_key       TEXT NOT NULL UNIQUE,
-        confidence      INTEGER NOT NULL DEFAULT 100,
-        provenance_downgrade INTEGER NOT NULL DEFAULT 0,
-        scope_downgrade_json TEXT,
-        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-"""
 
 
 def _has_index(conn: sqlite3.Connection, name: str) -> bool:

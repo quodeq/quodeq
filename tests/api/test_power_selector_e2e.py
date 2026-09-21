@@ -191,27 +191,17 @@ class TestApiToSubprocessIntegration:
     """POST /api/evaluations with subagentModel should set SUBAGENT_MODEL
     in the env passed to the subprocess."""
 
-    def test_full_chain_sonnet(self, filesystem_provider_stub) -> None:
+    @pytest.mark.parametrize("requested", [_MODEL_SONNET, _MODEL_OPUS])
+    def test_full_chain_sets_subagent_model(self, filesystem_provider_stub, requested: str) -> None:
         from quodeq.services.base import EvaluationOptions
 
         repo, reports_dir, stub, provider = filesystem_provider_stub
         provider.start_evaluation(
             repo=str(repo),
             reports_dir=str(reports_dir),
-            options=EvaluationOptions(subagent_model=_MODEL_SONNET),
+            options=EvaluationOptions(subagent_model=requested),
         )
-        assert stub.captured_env["SUBAGENT_MODEL"] == _MODEL_SONNET
-
-    def test_full_chain_opus(self, filesystem_provider_stub) -> None:
-        from quodeq.services.base import EvaluationOptions
-
-        repo, reports_dir, stub, provider = filesystem_provider_stub
-        provider.start_evaluation(
-            repo=str(repo),
-            reports_dir=str(reports_dir),
-            options=EvaluationOptions(subagent_model=_MODEL_OPUS),
-        )
-        assert stub.captured_env["SUBAGENT_MODEL"] == _MODEL_OPUS
+        assert stub.captured_env["SUBAGENT_MODEL"] == requested
 
     def test_full_chain_no_model_no_env_key(self, filesystem_provider_stub) -> None:
         from quodeq.services.base import EvaluationOptions
