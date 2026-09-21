@@ -15,7 +15,9 @@ import { t, LOCALE } from '../../../strings/index.js';
 const BUTTON_ROW_GAP = '8px';
 const REPO_URL_PLACEHOLDER = 'https://github.com/org/repo';
 
-function n(x) {
+// Numbers get thousands separators for the reader's locale; anything else
+// (a placeholder dash, an unknown) passes through untouched.
+function formatCount(x) {
   return typeof x === 'number' ? x.toLocaleString(LOCALE) : x;
 }
 
@@ -53,9 +55,9 @@ export function DetectedLine({ scanData }) {
   const langs = detectedLanguages(scanData.languages);
   return (
     <div className="eval-detected-line">
-      {t('evaluate.detectedSourceFiles', { count: n(scanData.code_files) })}
+      {t('evaluate.detectedSourceFiles', { count: formatCount(scanData.code_files) })}
       {langs.map(({ name, count }) => (
-        <span key={name}> · {name} {n(count)}</span>
+        <span key={name}> · {name} {formatCount(count)}</span>
       ))}
     </div>
   );
@@ -104,8 +106,8 @@ function runBarLine1({ picked, scanFiles, isClean, budgetPart }) {
     picked === 1 ? t('evaluate.dimSingular', { count: picked }) : t('evaluate.dimPlural', { count: picked }),
     scanFiles != null
       ? (isClean
-          ? t('evaluate.filesFullRescan', { count: n(scanFiles) })
-          : t('evaluate.changedFilesThisRun', { count: n(scanFiles) }))
+          ? t('evaluate.filesFullRescan', { count: formatCount(scanFiles) })
+          : t('evaluate.changedFilesThisRun', { count: formatCount(scanFiles) }))
       : null,
     budgetPart,
   ].filter(Boolean).join(' · ');
@@ -127,7 +129,7 @@ export function RunBar({ disabled, canStart, handleScan, selectedDims, estimates
   const line1 = runBarLine1({ picked, scanFiles, isClean, budgetPart });
   const line2 = picked > 0
     ? (pickedSum != null
-        ? t('evaluate.fileAnalysesQueued', { count: n(pickedSum) })
+        ? t('evaluate.fileAnalysesQueued', { count: formatCount(pickedSum) })
         : t('evaluate.durationDepends'))
     : t('evaluate.pickOneDim');
 

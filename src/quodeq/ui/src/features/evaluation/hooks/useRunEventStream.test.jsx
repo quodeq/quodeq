@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRunEventStream } from "./useRunEventStream";
 import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 import { MockEventSource } from "../../../test-utils/MockEventSource.js";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 function renderStreamWithSpy(jobId) {
   const client = new QueryClient({

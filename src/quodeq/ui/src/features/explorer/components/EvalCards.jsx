@@ -17,7 +17,9 @@ const ANIM_MAX_DELAY_MS = 300;
 const TITLE_LINE_HEIGHT_PX = 18;
 const REASON_LINE_HEIGHT_PX = 20;
 
-function useFileInfo(file, fileLine, fileEndLine) {
+// Not a hook: it calls none. The file reference a card shows (`name:12-14`)
+// and the one it copies (`dir/name:12-14`), derived from one raw ref.
+function fileInfo(file, fileLine, fileEndLine) {
   const { filePath, line } = parseFileRef(file, fileLine);
   const filename = filePath ? filePath.split('/').pop() : null;
   const range = (fileEndLine && fileEndLine !== line) ? `${line}-${fileEndLine}` : line;
@@ -73,7 +75,7 @@ function ViolationDetail({ item }) {
 }
 
 export function EvalViolationCard({ v, principle, index, onDismiss }) {
-  const { filename, ref, display } = useFileInfo(v.file, v.line, v.endLine);
+  const { filename, ref, display } = fileInfo(v.file, v.line, v.endLine);
   return (
     <div
       className={`vdetail-row vdetail-row--terminal vdetail-row--${v.severity}`}
@@ -91,7 +93,7 @@ export function EvalViolationCard({ v, principle, index, onDismiss }) {
 }
 
 export function ComplianceCard({ c, principle, index }) {
-  const { filename, ref, display } = useFileInfo(c.file, c.line, c.endLine);
+  const { filename, ref, display } = fileInfo(c.file, c.line, c.endLine);
   return (
     <div
       className="vdetail-row vdetail-row--terminal vdetail-row--compliant"

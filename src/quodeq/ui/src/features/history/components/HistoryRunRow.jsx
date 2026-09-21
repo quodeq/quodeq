@@ -1,5 +1,9 @@
 import { scoreColorClass, gradeLabel, formatRunDate, formatRunTime } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
+import { deltaDirection } from '../utils/deltaDirection.js';
+
+const TREND_CLASS = { up: 'trend-up', down: 'trend-down', flat: '' };
+const TREND_ARROW = { up: '▲', down: '▼', flat: '—' };
 
 // History index status for a run that is still being evaluated: the row is
 // dimmed and not clickable until it lands.
@@ -13,12 +17,11 @@ const formatTime = (dateISO) => formatRunTime(dateISO, '', 'HistoryRunRow');
 
 function TrendBadge({ delta }) {
   if (delta == null) return <span className="history-trend">—</span>;
-  const sign = delta > 0 ? '+' : '';
-  const cls = delta > 0 ? 'trend-up' : delta < 0 ? 'trend-down' : '';
-  const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '—';
+  const direction = deltaDirection(delta);
+  const sign = direction === 'up' ? '+' : '';
   return (
-    <span className={`history-trend ${cls}`}>
-      {arrow} {sign}{delta.toFixed(1)}
+    <span className={`history-trend ${TREND_CLASS[direction]}`}>
+      {TREND_ARROW[direction]} {sign}{delta.toFixed(1)}
     </span>
   );
 }
