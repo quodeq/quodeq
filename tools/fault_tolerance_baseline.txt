@@ -10,12 +10,12 @@
 # introduced in the same change.
 src/quodeq/_cli_evaluate_finalize.py:71:broad-except
 src/quodeq/_cli_scoring.py:127:broad-except
-src/quodeq/analysis/_api_call.py:249:broad-except
+src/quodeq/analysis/_api_call.py:247:broad-except
 src/quodeq/analysis/_api_runner.py:99:broad-except
-src/quodeq/analysis/_loop_steps.py:131:broad-except
-src/quodeq/analysis/_loop_steps.py:174:broad-except
-src/quodeq/analysis/_loop_steps.py:176:broad-except
-src/quodeq/analysis/_loop_steps.py:100:broad-except
+src/quodeq/analysis/_loop_steps.py:139:broad-except
+src/quodeq/analysis/_loop_steps.py:182:broad-except
+src/quodeq/analysis/_loop_steps.py:184:broad-except
+src/quodeq/analysis/_loop_steps.py:108:broad-except
 src/quodeq/analysis/_loops.py:130:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:112:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:120:broad-except
@@ -66,8 +66,8 @@ src/quodeq/assistant/tools/_read_tools_scope.py:87:broad-except
 src/quodeq/assistant/tools/registry.py:66:broad-except
 src/quodeq/ci/cli.py:101:broad-except
 src/quodeq/cli.py:94:broad-except
-src/quodeq/config/ai_provider.py:244:broad-except
-src/quodeq/config/ai_provider.py:279:broad-except
+src/quodeq/config/ai_provider.py:256:broad-except
+src/quodeq/config/ai_provider.py:291:broad-except
 src/quodeq/context/_project_shape_io.py:60:broad-except
 src/quodeq/context/_project_shape_io.py:74:broad-except
 src/quodeq/context/_project_shape_io.py:91:broad-except

@@ -229,7 +229,7 @@ def _dispatch_fixed_mode(
         emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
         return run_per_dimension_loop(
             config, dimensions, ctx,
-            default_loop_deps(runner, on_dimension_done),
+            default_loop_deps(runner, on_dimension_done, SHARED_LOG),
         )
     if config.options.incremental:
         # Default path. AnalysisOptions.incremental defaults to True so
@@ -239,7 +239,7 @@ def _dispatch_fixed_mode(
         emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
         return run_incremental_loop(
             config, dimensions, ctx,
-            default_loop_deps(runner, on_dimension_done),
+            default_loop_deps(runner, on_dimension_done, SHARED_LOG),
             dim_counts=dim_counts,
         )
     return None
@@ -275,7 +275,7 @@ def _run_dimensions(
 
     return run_per_dimension_loop(
         config, dimensions, ctx,
-        default_loop_deps(runner, on_dimension_done),
+        default_loop_deps(runner, on_dimension_done, SHARED_LOG),
     )
 
 

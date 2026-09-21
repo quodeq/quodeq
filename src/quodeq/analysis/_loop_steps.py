@@ -29,7 +29,6 @@ from quodeq.analysis.runner_markers import emit_marker
 from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
 from quodeq.shared.constants import CC_PHASE_ANALYZING
-from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.dimensions_state_store import DimState
@@ -54,9 +53,10 @@ class LoopDeps:
 
 def default_loop_deps(
     runner: DimensionRunner, on_dimension_done: Callable[[str, Evidence], None] | None,
+    log: LogSink = NULL_LOG,
 ) -> LoopDeps:
-    """The dependency bundle production dimension loops are driven with."""
-    return LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=SHARED_LOG)
+    """The dependency bundle a dimension loop is driven with."""
+    return LoopDeps(runner=runner, on_dimension_done=on_dimension_done, log=log)
 
 
 @dataclass(frozen=True, slots=True)
