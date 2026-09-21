@@ -6,6 +6,12 @@ const MIN_WINDOW_RATIO = 0.1;
 // or keyboard resize has run.
 export const DEFAULT_SPLIT_RATIO = 0.5;
 
+// One ratio per divider: n windows have n-1 of them, each starting at an
+// even split. Rebuilt from scratch whenever the window count changes.
+function evenRatios(windowCount) {
+  return Array(Math.max(0, windowCount - 1)).fill(DEFAULT_SPLIT_RATIO);
+}
+
 /**
  * Drag-to-resize between stacked side-pane windows.
  *
@@ -23,9 +29,9 @@ export const DEFAULT_SPLIT_RATIO = 0.5;
 export function useInnerDividerDrag({ windowCount, containerRef, setResizingFlag, activeDragCleanupRef }) {
   // Per-resizer ratios: ratios[i] in [0,1] is the share of (weights[i] + weights[i+1])
   // that goes to weights[i]. Reset whenever the window count changes (structural reset).
-  const [ratios, setRatios] = useState(() => Array(Math.max(0, windowCount - 1)).fill(DEFAULT_SPLIT_RATIO));
+  const [ratios, setRatios] = useState(() => evenRatios(windowCount));
   useEffect(() => {
-    setRatios(Array(Math.max(0, windowCount - 1)).fill(DEFAULT_SPLIT_RATIO));
+    setRatios(evenRatios(windowCount));
   }, [windowCount]);
 
   const beginDrag = useDragLifecycle({ setResizingFlag, activeDragCleanupRef });
