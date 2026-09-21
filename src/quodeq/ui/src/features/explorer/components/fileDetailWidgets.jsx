@@ -28,6 +28,16 @@ export function estimateItemSize(items) {
   };
 }
 
+/** Identity of one finding row: dimension, file, line, principle and title. */
+function findingKey(prefix, v) {
+  return `${prefix}-${v.dimension || ''}:${v.file || ''}:${v.line ?? ''}:${v.principle || ''}:${v.title || ''}`;
+}
+
+/** Identity of one compliance row. No title: compliances do not carry one. */
+function complianceKey(c) {
+  return `c-${c.dimension || ''}:${c.file || ''}:${c.line ?? ''}:${c.principle || ''}`;
+}
+
 export function itemKey(items) {
   return (i) => {
     const item = items[i];
@@ -35,15 +45,9 @@ export function itemKey(items) {
     const header = headerRowKey(item);
     if (header) return header;
     if (item.kind === 'low-conf-toggle') return 'h-lowconf';
-    if (item.kind === 'violation') {
-      return `v-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
-    }
-    if (item.kind === 'low-conf-row') {
-      return `lc-${item.v.dimension || ''}:${item.v.file || ''}:${item.v.line ?? ''}:${item.v.principle || ''}:${item.v.title || ''}`;
-    }
-    if (item.kind === 'compliance') {
-      return `c-${item.c.dimension || ''}:${item.c.file || ''}:${item.c.line ?? ''}:${item.c.principle || ''}`;
-    }
+    if (item.kind === 'violation') return findingKey('v', item.v);
+    if (item.kind === 'low-conf-row') return findingKey('lc', item.v);
+    if (item.kind === 'compliance') return complianceKey(item.c);
     return i;
   };
 }
