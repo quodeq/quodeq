@@ -180,10 +180,19 @@ class _StubJobManager:
 
 
 @pytest.fixture()
-def filesystem_provider_stub(tmp_path: Path):
-    """Return a (repo_path, reports_dir, stub_job_manager, provider) tuple."""
+def filesystem_provider_stub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Return a (repo_path, reports_dir, stub_job_manager, provider) tuple.
+
+    The model env vars are cleared first: ``build_eval_env`` starts from
+    ``os.environ`` when no env is passed, so a developer (or CI runner) with
+    ``SUBAGENT_MODEL`` exported would see it in ``captured_env`` and the
+    no-model case would fail for a reason that has nothing to do with the
+    chain under test.
+    """
     from quodeq.services.filesystem import FilesystemActionProvider
 
+    monkeypatch.delenv("SUBAGENT_MODEL", raising=False)
+    monkeypatch.delenv("QUODEQ_SUBAGENT_MODEL", raising=False)
     repo = tmp_path / "repo"
     repo.mkdir()
     stub = _StubJobManager()
