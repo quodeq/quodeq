@@ -28,8 +28,8 @@ class TestBuildManifest:
 # ---------------------------------------------------------------------------
 
 class TestExecutePipeline:
-    @patch("quodeq.cli_evaluation.run")
-    @patch("quodeq.cli_evaluation.write_text")
+    @patch("quodeq._cli_pipeline_exec.run")
+    @patch("quodeq._cli_pipeline_exec.write_text")
     def test_evidence_only_success(self, mock_write, mock_run, tmp_path):
         from quodeq.cli import execute_pipeline
         evidence_dir = tmp_path / "evidence"
@@ -47,8 +47,8 @@ class TestExecutePipeline:
         assert result == 0
         mock_run.assert_called_once_with(config)
 
-    @patch("quodeq.cli_evaluation.run")
-    @patch("quodeq.cli_evaluation.write_text", side_effect=OSError("disk full"))
+    @patch("quodeq._cli_pipeline_exec.run")
+    @patch("quodeq._cli_pipeline_exec.write_text", side_effect=OSError("disk full"))
     def test_evidence_only_write_failure(self, mock_write, mock_run, tmp_path, capsys):
         from quodeq.cli import execute_pipeline
         evidence_dir = tmp_path / "evidence"
@@ -66,7 +66,7 @@ class TestExecutePipeline:
         assert result == 1
         assert "Failed to write" in capsys.readouterr().err
 
-    @patch("quodeq.cli_evaluation.run_full")
+    @patch("quodeq._cli_pipeline_exec.run_full")
     def test_full_pipeline_success(self, mock_run_full, tmp_path):
         from quodeq.cli import execute_pipeline
         evidence_dir = tmp_path / "evidence"
@@ -80,7 +80,7 @@ class TestExecutePipeline:
         result = execute_pipeline(args, config, evidence_dir, evaluation_dir)
         assert result == 0
 
-    @patch("quodeq.cli_evaluation.run_full")
+    @patch("quodeq._cli_pipeline_exec.run_full")
     def test_pipeline_analysis_error(self, mock_run_full, tmp_path, capsys):
         # AnalysisError propagates from execute_pipeline so that the outer
         # RunLifecycleContext can write state=failed.  The caller
@@ -106,8 +106,8 @@ class TestExecutePipeline:
 # ---------------------------------------------------------------------------
 
 class TestSaveManifest:
-    @patch("quodeq.cli_evaluation.manifest_to_dict")
-    @patch("quodeq.cli_evaluation.write_text")
+    @patch("quodeq._cli_pipeline_exec.manifest_to_dict")
+    @patch("quodeq._cli_pipeline_exec.write_text")
     def test_saves_when_manifest_exists(self, mock_write, mock_to_dict, tmp_path):
         from quodeq.cli import save_manifest
         manifest = MagicMock()
@@ -119,8 +119,8 @@ class TestSaveManifest:
         from quodeq.cli import save_manifest
         save_manifest(None, tmp_path)  # should not raise
 
-    @patch("quodeq.cli_evaluation.manifest_to_dict")
-    @patch("quodeq.cli_evaluation.write_text", side_effect=OSError("fail"))
+    @patch("quodeq._cli_pipeline_exec.manifest_to_dict")
+    @patch("quodeq._cli_pipeline_exec.write_text", side_effect=OSError("fail"))
     def test_os_error_silenced(self, mock_write, mock_to_dict, tmp_path):
         from quodeq.cli import save_manifest
         manifest = MagicMock()
