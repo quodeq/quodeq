@@ -36,6 +36,7 @@ def test_pool_exit_reason_defaults_to_done_on_natural_drain(tmp_path):
 def test_pool_exit_reason_time_limit_when_elapsed_exceeds_budget(tmp_path):
     pool = _build_pool(tmp_path, time_limit=1)  # 1-second budget
     # Make the loop sleep past the budget before returning.
+
     def _slow_loop(ctx):
         time.sleep(1.1)
     with patch("quodeq.analysis.subagents.pool.scout_loop", side_effect=_slow_loop), \
@@ -46,6 +47,7 @@ def test_pool_exit_reason_time_limit_when_elapsed_exceeds_budget(tmp_path):
 
 def test_pool_exit_reason_error_when_loop_raises(tmp_path):
     pool = _build_pool(tmp_path)
+
     def _raise(ctx):
         raise RuntimeError("boom")
     with patch("quodeq.analysis.subagents.pool.scout_loop", side_effect=_raise), \

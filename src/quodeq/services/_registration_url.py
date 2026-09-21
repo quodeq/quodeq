@@ -12,7 +12,6 @@ from quodeq.services.wiring import remote_origin_url_raw
 from quodeq.shared.repo import split_userinfo
 
 
-
 def _strip_credentials(url: str) -> str:
     """Remove embedded userinfo (``user:pass@`` / ``token@``) from *url*.
 

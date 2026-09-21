@@ -3,13 +3,16 @@ import json
 import pytest
 from quodeq.services.standards_library import StandardImportConflictError, StandardsLibraryClient
 
+
 class FakeHttpClient:
     def __init__(self, responses=None):
         self._responses = responses or {}
+
     def get_json(self, url, headers=None):
         if url in self._responses:
             return self._responses[url]
         raise ConnectionError(f"Not found: {url}")
+
 
 INDEX = {
     "version": 1,
@@ -23,12 +26,14 @@ STANDARD_DATA = {
     "weight": 1.0, "source": "Martin", "principles": [],
 }
 
+
 def test_fetch_index():
     http = FakeHttpClient({"https://example.com/index.json": INDEX})
     client = StandardsLibraryClient(base_url="https://example.com", http_client=http)
     index = client.fetch_index()
     assert len(index) == 1
     assert index[0]["id"] == "clean-arch"
+
 
 def test_fetch_index_rejects_non_object_body():
     # A library server answering with valid JSON that is not an object is a
@@ -53,6 +58,7 @@ def test_fetch_standard():
     client = StandardsLibraryClient(base_url="https://example.com", http_client=http)
     data = client.fetch_standard("standards/clean-arch.json")
     assert data["id"] == "clean-arch"
+
 
 def test_import_standard(tmp_path):
     http = FakeHttpClient({"https://example.com/standards/clean-arch.json": STANDARD_DATA})

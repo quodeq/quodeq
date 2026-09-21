@@ -178,8 +178,6 @@ def test_composer(body: str, needle: str, expected: bool) -> None:
 # --- memoization -------------------------------------------------------------
 
 
-
-
 @pytest.mark.parametrize("module, parser, matcher, body", [
     (_dp, "_gemfile_gems", "has_gemfile_gem", 'gem "rails"\ngem "rack"\n'),
     (_dp, "_mix_deps", "has_mix_dep", 'def deps, do: [{:phoenix, "~> 1.7"}]\n'),

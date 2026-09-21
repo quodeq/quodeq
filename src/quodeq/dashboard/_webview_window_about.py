@@ -94,12 +94,10 @@ def _build_about_credits() -> object | None:
         return None
     try:
         body = NSMutableAttributedString.alloc().init()
+
         def _append(text: str, link: str | None = None) -> None:
-            attrs = {}
-            if link:
-                url = NSURL.URLWithString_(link)
-                if url is not None:
-                    attrs = {"NSLink": url}
+            url = NSURL.URLWithString_(link) if link else None
+            attrs = {} if url is None else {"NSLink": url}
             fragment = NSAttributedString.alloc().initWithString_attributes_(text, attrs)
             body.appendAttributedString_(fragment)
         _append(_QUODEQ_WEBSITE, _QUODEQ_WEBSITE)

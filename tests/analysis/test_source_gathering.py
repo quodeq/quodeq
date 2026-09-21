@@ -116,6 +116,7 @@ class TestGatherSourceFiles:
         nm = tmp_path / "node_modules" / "pkg"; nm.mkdir(parents=True); (nm / "b.js").write_text("y")
         visited = []
         real_scandir = os.scandir
+
         def spy(path=".", *a, **k):
             visited.append(str(path)); return real_scandir(path, *a, **k)
         monkeypatch.setattr(os, "scandir", spy)

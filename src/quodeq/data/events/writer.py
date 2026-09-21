@@ -33,7 +33,7 @@ class EventLogWriter:
     def emit(self, event: BaseEvent) -> None:
         """
         Appends a single event to the JSONL log.
-        
+
         Args:
             event: An instance of a BaseEvent (or subclass).
         """

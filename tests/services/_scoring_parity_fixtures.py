@@ -31,6 +31,7 @@ def _dismiss_and_freeze_sql(project_dir: Path, run_dir: Path, finding: dict) -> 
     size = actions_log.stat().st_size if actions_log.is_file() else 0
     SQLiteStateStore(run_dir).save_actions_projected_size(size)
 
+
 _DIM = "performance"
 _RUN = "20260101T000000"
 

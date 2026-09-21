@@ -62,6 +62,7 @@ def _safe_int(value: str, default: int = 0) -> int:
     except (ValueError, TypeError):
         return default
 
+
 _log = logging.getLogger(__name__)
 
 # Re-export public API so existing imports keep working

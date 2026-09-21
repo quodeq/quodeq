@@ -26,6 +26,7 @@ def _seed_run_ctx(tmp_path, violations, *, dbname="assistant_run.db"):
         project_id="proj", reports_dir=eval_root,
     )
 
+
 _VALID_STANDARD = {
     "id": "api-errors", "name": "API Error Contract", "description": "d",
     "weight": 1.0, "source": "assistant",

@@ -24,6 +24,7 @@ _logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
 
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 

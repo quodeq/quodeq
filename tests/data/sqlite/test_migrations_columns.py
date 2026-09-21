@@ -3,6 +3,7 @@ import sqlite3
 from quodeq.data.sqlite._migrations import apply_evaluation_schema
 from quodeq.data.sqlite._schema import EVALUATION_DDL, SCHEMA_VERSION
 
+
 def test_schema_version_is_pinned():
     # The v5 baseline DDL and the per-version upgrade cases below target v9;
     # bumping SCHEMA_VERSION without extending them leaves the new path untested.
@@ -58,8 +59,6 @@ _V7_FINDINGS_DDL = _findings_ddl(
 )
 
 
-
-
 def test_fresh_db_has_provenance_downgrade_column_at_default_zero():
     conn = sqlite3.connect(":memory:")
     apply_evaluation_schema(conn)
@@ -107,8 +106,6 @@ def test_upgrade_v5_to_v6_idempotent_when_column_already_present():
     assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
-
-
 def test_fresh_db_has_scope_downgrade_json_column_at_default_null():
     conn = sqlite3.connect(":memory:")
     apply_evaluation_schema(conn)
@@ -153,8 +150,6 @@ def test_upgrade_v6_to_v7_idempotent_when_column_already_present():
     apply_evaluation_schema(conn)             # must not raise
 
     assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
-
-
 
 
 def _has_index(conn: sqlite3.Connection, name: str) -> bool:

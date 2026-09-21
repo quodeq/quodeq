@@ -79,6 +79,12 @@ extend-exclude = ["tests/fixtures/discipline_corpus"]
 # import placement, M-MDF-1 magic literals, M-ANA-5 missing API
 # documentation). Widen one rule at a time, with the tree clean for
 # that rule in the same PR, so the gate never grandfathers.
+#
+# E3xx and W29x are ruff preview rules. `explicit-preview-rules` keeps
+# preview opt-in per code: only the codes listed below are active, so a
+# ruff upgrade cannot switch on a whole preview family behind our back.
+preview = true
+explicit-preview-rules = true
 select = [
     "F401", "F841", "E402", "PLR2004", "C901", "ARG",
     # D1xx only: every public module, package, class, method and
@@ -86,6 +92,9 @@ select = [
     # (formatting, wording) are NOT selected -- they would churn the
     # existing docstrings without saying anything a reader needs.
     "D100", "D101", "D102", "D103", "D104",
+    # M-ANA-1 consistent layout: blank lines around defs/classes and no
+    # trailing or whitespace-only lines. All autofixable, whitespace only.
+    "E301", "E302", "E303", "E305", "E306", "W291", "W293",
 ]
 
 [tool.ruff.lint.mccabe]

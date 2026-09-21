@@ -43,6 +43,7 @@ class TestDispatchBypassesCacheOnCleanScan:
         )
 
         dispatched_files: list[str] = []
+
         def fake_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             files = sorted(cfg.options.incremental_file_filter or set())
             dispatched_files.extend(files)

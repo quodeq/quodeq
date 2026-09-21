@@ -18,6 +18,7 @@ _logger = logging.getLogger(__name__)
 class SharedSourceUnavailable(RuntimeError):
     """A shared-source session's clone is gone (repo disconnected)."""
 
+
 # ~/.quodeq/assistant.db is never pruned otherwise; a session older than this
 # is effectively dead (its worktree, if any, was reaped long before). 0
 # disables. Whole-session delete cascades to its messages/events/actions.

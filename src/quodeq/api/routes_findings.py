@@ -36,6 +36,7 @@ from quodeq.shared.validation import resolve_child_dir, validate_path_segment
 _logger = logging.getLogger(__name__)
 _MAX_FINDINGS_LIST_LIMIT = 5000
 
+
 def _invalid_body_fields(
     body: dict[str, Any],
     str_fields: tuple[str, ...],

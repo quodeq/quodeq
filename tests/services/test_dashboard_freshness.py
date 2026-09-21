@@ -38,6 +38,7 @@ class TestStatusAwareFetcher:
         ]
 
         call_count = {"running": 0, "done": 0}
+
         def fake_read(reports_root, project, run_id):
             if run_id == "r-running":
                 call_count["running"] += 1
@@ -90,6 +91,7 @@ class TestStatusAwareFetcher:
         ]
 
         calls = []
+
         def fake_read(reports_root, project, run_id):
             calls.append(run_id)
             return [_dim("security", "B", "7.0")]
@@ -175,6 +177,7 @@ class TestStaleCacheSelfHeal:
 
         # Fresh disk read should return all 3 dims.
         read_calls = []
+
         def fake_read(reports_root, project, run_id):
             read_calls.append(run_id)
             return [
@@ -228,6 +231,7 @@ class TestStaleCacheSelfHeal:
         cache[(tmp_path, "proj", "r-fresh", "")] = [_dim("security", "B", "7.0")]
 
         read_calls = []
+
         def fake_read(reports_root, project, run_id):
             read_calls.append(run_id)
             return [_dim("security", "B", "7.0")]

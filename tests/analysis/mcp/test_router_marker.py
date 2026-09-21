@@ -63,6 +63,7 @@ def test_router_accumulates_findings_per_file_then_drains_on_ok():
     from quodeq.analysis.mcp.enricher import CompiledContext
 
     calls: list[tuple[str, list[dict]]] = []
+
     def on_file_done(file: str, findings: list[dict]) -> None:
         calls.append((file, findings))
 
@@ -105,6 +106,7 @@ def test_router_discards_findings_on_mark_file_done_error():
     from quodeq.analysis.mcp.enricher import CompiledContext
 
     calls: list[tuple[str, list[dict]]] = []
+
     def on_file_done(file: str, findings: list[dict]) -> None:
         calls.append((file, findings))
 

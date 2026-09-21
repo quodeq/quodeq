@@ -13,7 +13,6 @@ from quodeq.core.evidence.parser import (
 from tests._evidence_helpers import _evidence_line
 
 
-
 # ---------------------------------------------------------------------------
 # parse_jsonl_to_evidence
 # ---------------------------------------------------------------------------

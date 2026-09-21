@@ -14,7 +14,6 @@ from tests.api._routes_project_list_fixtures import (  # noqa: F401 -- app/clien
 )
 
 
-
 class TestDeleteProject:
     def test_delete_requires_confirm(self, client):
         resp = client.delete("/api/projects/my-proj")

@@ -46,6 +46,7 @@ def test_swallows_oserror(tmp_path: Path, monkeypatch) -> None:
     """OSError during touch must not kill the thread."""
     errors: list[int] = []
     real_touch = Path.touch
+
     def raising_touch(self, *args, **kwargs):
         errors.append(1)
         if len(errors) <= 2:

@@ -6,7 +6,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-
 # tools/ is not on sys.path by default; add it
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "tools"))
 import check_imports  # noqa: E402

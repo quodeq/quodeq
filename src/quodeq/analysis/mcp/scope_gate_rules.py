@@ -88,6 +88,7 @@ _CROSS_PRINCIPAL_TERMS: frozenset[str] = frozenset({
     "hijack", "hijacking", "hijacked",
 })
 
+
 def _term_pattern(terms: frozenset[str] | set[str]) -> "re.Pattern[str]":
     """A case-insensitive alternation matching any of *terms* as a whole word.
 

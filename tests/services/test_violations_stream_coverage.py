@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 
 
-
 class TestTryParseTextLine:
     def test_non_json_line(self):
         from quodeq.services._violations_stream import _try_parse_text_line

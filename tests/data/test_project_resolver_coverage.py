@@ -114,6 +114,7 @@ class TestResolveProjectUuid:
         class FakeRepo:
             def load_index(self, reports_dir):
                 return dict(index_store)
+
             def save_index(self, reports_dir, index):
                 index_store.clear()
                 index_store.update(index)

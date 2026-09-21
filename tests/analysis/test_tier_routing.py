@@ -68,8 +68,6 @@ class TestBuildRunConfigAiModel:
         assert config.options.ai_model == "sonnet"
 
 
-
-
 class TestDimensionAnalysisModel:
     """_run_dimension_analysis should pass ai_model to AnalysisConfig."""
 
@@ -133,8 +131,6 @@ class TestDimensionAnalysisModel:
 
             assert analysis_config is not None
             assert analysis_config.ai_model is None
-
-
 
 
 class TestSubagentModelEnvVar:

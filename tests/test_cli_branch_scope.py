@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 
 
-
 def _make_git_repo(path: Path, branches: list[str] | None = None) -> None:
     """Create a minimal git repo with optional extra branches."""
     env = {

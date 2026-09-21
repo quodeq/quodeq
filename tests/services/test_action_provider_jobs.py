@@ -81,6 +81,7 @@ def test_markers_parsed_from_merged_stream() -> None:
     """Structured markers in stdout update job phase and dimensions."""
     marker_setup = '{"_cc": "setup", "dimensions": ["security", "performance"]}\n'
     marker_analyzing = '{"_cc": "analyzing", "dimension": "security"}\n'
+
     def spawn_impl(*_args, **_kwargs):
         return FakeProcess(
             stdout=marker_setup + marker_analyzing + "Report path: /r/proj/run1/evaluation\n",

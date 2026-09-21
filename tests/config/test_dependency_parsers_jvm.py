@@ -9,8 +9,6 @@ from quodeq.config._dependency_parsers import has_gradle_dependency, has_pom_xml
 # --- pom.xml -----------------------------------------------------------------
 
 
-
-
 @pytest.mark.parametrize("body, needle, expected", [
     # spring-boot artifactId substring match.
     (

@@ -21,6 +21,7 @@ def defaults_path(env: Mapping[str, str] | None = None) -> Path:
     raw = resolve_env(env).get("QUODEQ_DEFAULTS_PATH")
     return Path(raw) if raw else Path(__file__).resolve().parent / "defaults.json"
 
+
 # Derived constants (not URLs, safe to keep inline).
 ACTION_API_MODULE = "quodeq.api.app"
 

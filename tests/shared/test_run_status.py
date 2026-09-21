@@ -52,6 +52,7 @@ def test_atomic_write_uses_tmp_then_rename(tmp_path: Path, monkeypatch) -> None:
     """Readers never see a partial file: write_status must rename a complete tmp."""
     calls: list[str] = []
     real_replace = Path.replace
+
     def spy_replace(self, target):
         calls.append("replace")
         return real_replace(self, target)
@@ -150,6 +151,7 @@ def test_write_status_omits_provider_and_model_when_unset(tmp_path: Path) -> Non
 def test_concurrent_writes_no_partial_file(tmp_path: Path) -> None:
     """Two threads writing concurrently: each read sees a valid JSON document."""
     barrier = threading.Barrier(2)
+
     def worker(label: str) -> None:
         barrier.wait()
         for _ in range(50):

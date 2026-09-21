@@ -12,7 +12,6 @@ import pytest
 pytestmark = pytest.mark.usefixtures("restore_environ")
 
 
-
 # ---------------------------------------------------------------------------
 # run_pipeline_with_cleanup tests
 # ---------------------------------------------------------------------------

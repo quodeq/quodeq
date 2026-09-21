@@ -39,7 +39,6 @@ def test_windows_style_path_is_relativized():
     assert uri == "src/api/x.py"
 
 
-
 _SCHEMA_PATH = Path(__file__).parent / "fixtures" / "sarif-schema-2.1.0.json"
 
 

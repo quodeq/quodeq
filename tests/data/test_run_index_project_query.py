@@ -1,12 +1,14 @@
 from __future__ import annotations
 from quodeq.data.sqlite.run_index import open_index, list_runs_for_project
 
+
 def _insert(db, *, job_id, project, run_id, state, started_at):
     db.execute(
         "INSERT INTO runs (job_id, project_uuid, run_id, run_dir, state, "
         "started_at, updated_at, status_mtime) VALUES (?,?,?,?,?,?,?,?)",
         (job_id, project, run_id, f"/x/{run_id}", state, started_at, started_at, 0),
     )
+
 
 def test_list_runs_for_project_filters_and_orders(tmp_path):
     db = open_index(tmp_path / "index.db")
@@ -17,6 +19,7 @@ def test_list_runs_for_project_filters_and_orders(tmp_path):
     rows = list_runs_for_project(db, "P1", limit=None)
     assert [r.run_id for r in rows] == ["b", "a"]
     assert all(r.project_uuid == "P1" for r in rows)
+
 
 def test_list_runs_for_project_empty(tmp_path):
     db = open_index(tmp_path / "index.db")

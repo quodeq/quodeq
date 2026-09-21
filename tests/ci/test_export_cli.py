@@ -73,8 +73,6 @@ def test_handle_export_unknown_format_returns_error(tmp_path):
     assert code == 1
 
 
-
-
 def test_parser_export_sarif_args():
     parser = build_parser()
     args = parser.parse_args([

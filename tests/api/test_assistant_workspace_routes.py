@@ -108,6 +108,7 @@ def test_apply_claims_turn_slot_during_apply_and_releases(app, client, repo, mon
     from quodeq.assistant.worktree import WorktreeManager
     seen = {}
     orig = WorktreeManager.apply_to_repo
+
     def spy(self):
         seen["claimed"] = state.is_turn_claimed(sid)
         return orig(self)

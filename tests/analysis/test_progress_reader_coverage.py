@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 
 
-
 class TestIncrementalProgressReader:
     def _make_reader(self, tmp_path, stream_content="", jsonl_content=None):
         from quodeq.analysis.stream.progress_reader import IncrementalProgressReader

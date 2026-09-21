@@ -194,8 +194,6 @@ def _resolve_single_file(src: Path) -> tuple[Path, str | None]:
     return project_root, single_file
 
 
-
-
 def _override_manifest_single_file(language: str, single_file: str) -> SourceManifest:
     """Create a manifest covering exactly one source file."""
     ext = os.path.splitext(single_file)[1]

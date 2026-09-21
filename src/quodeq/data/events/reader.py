@@ -67,8 +67,8 @@ def _parse_event_line(
 class EventLogReader:
     """
     A streaming reader for the Quodeq Event Log (JSONL).
-    
-    Provides safe, memory-efficient iteration over events, with support 
+
+    Provides safe, memory-efficient iteration over events, with support
     for checkpointing to enable incremental processing.
     """
 
@@ -123,7 +123,7 @@ class EventLogReader:
                 last_ts = event.timestamp
         except (OSError, UnicodeDecodeError) as e:
             _logger.error(f"Failed to retrieve latest timestamp from {self.log_path}: {e}")
-        
+
         return last_ts
 
     def __repr__(self) -> str:

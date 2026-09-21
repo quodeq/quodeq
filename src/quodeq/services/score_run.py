@@ -33,6 +33,7 @@ from quodeq.services.wiring import (
 
 _logger = logging.getLogger(__name__)
 
+
 def _read_queue_files_count(queue_path: Path) -> int:
     """Sum of files dispatched across all batches in a dim's queue.json.
 

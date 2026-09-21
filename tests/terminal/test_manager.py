@@ -9,6 +9,7 @@ class _FakeBackend:
         self.resized = None
         self.killed = False
         self._queue = [b"welcome\n"]
+
     def spawn(self, *, cwd, cols, rows): self._alive = True; self.cwd = cwd
     def read(self, max_bytes=65536): return self._queue.pop(0) if self._queue else b""
     def write(self, data): self.written.append(data)

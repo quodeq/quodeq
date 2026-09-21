@@ -30,6 +30,7 @@ class TestPerDimLoopSafety:
 
         callback_calls: list[str] = []
         usability_raise_count = {"n": 0}
+
         def on_done(dim, _ev):
             callback_calls.append(dim)
             if dim == "usability" and usability_raise_count["n"] == 0:

@@ -27,6 +27,7 @@ class _LiveManager:
     """Stays alive; scrollback is a sync beacon proving the handler holds the lock."""
     def __init__(self):
         self._alive = True
+
     def ensure_session(self, *, cwd, cols, rows): self._alive = True
     def scrollback(self): return "ready\n"
     def read(self, max_bytes=65536): time.sleep(0.05); return ""
@@ -44,6 +45,7 @@ class _FlakyManager(_LiveManager):
     def __init__(self):
         super().__init__()
         self._calls = 0
+
     def ensure_session(self, *, cwd, cols, rows):
         self._calls += 1
         if self._calls == 1:
