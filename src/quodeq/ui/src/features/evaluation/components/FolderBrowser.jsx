@@ -133,7 +133,7 @@ async function navigateFolder(path, navigation, showFiles, browseDirectory) {
   setNavError(null);
   try {
     const result = await browseDirectory(path || '', { files: showFiles });
-    updateNavState({ data: result, path: result.current, pathInput: result.current, selectedFolder: result.current });
+    updateNavState({ data: result, pathInput: result.current, selectedFolder: result.current });
   } catch (err) {
     setNavError(apiErrorMessage(err, 'evaluate.folderLoadFailed'));
   } finally {
@@ -207,16 +207,14 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
 
 export default function FolderBrowser({ onSelect, onClose, title = t('evaluate.selectRepoFolderTitle'), confirmText = t('evaluate.useThisFolder'), showFiles = false, rootPath = null }) {
   const { browseDirectory } = useApi();
-  const [, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [navError, setNavError] = useState(null);
   const [selectedFolder, setSelectedFolder] = useState(null);
 
-  function updateNavState({ data: d, path: p, pathInput: pi, selectedFolder: sf }) {
+  function updateNavState({ data: d, pathInput: pi, selectedFolder: sf }) {
     if (d !== undefined) setData(d);
-    if (p !== undefined) setCurrentPath(p);
     if (pi !== undefined) setPathInput(pi);
     if (sf !== undefined) setSelectedFolder(sf);
   }

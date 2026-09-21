@@ -1,7 +1,7 @@
 // src/quodeq/ui/src/utils/reportBuilder/runBuilders.js
 import {
   formatDate, formatScore, buildViolationsSection, buildComplianceSection, groupBySeverity,
-  runSuffix, EMPTY_VALUE_PLACEHOLDER,
+  runSuffix, EMPTY_VALUE_PLACEHOLDER, formatPrincipleTable,
 } from './shared.js';
 import {
   buildDimensionSummaryTable,
@@ -9,7 +9,6 @@ import {
   buildCritMajorSection,
   buildOverviewSummarySection,
 } from './dimensionSummary.js';
-import { formatPrincipleTable } from './shared.js';
 
 /**
  * The full Markdown report for one dimension of one run.

@@ -87,7 +87,7 @@ function updateStarPositions(activeScene, frame, fly, refs) {
 function renderFrame(ctx, activeScene, frame, refs, alphas) {
   const { w2s } = frame;
   const { sceneAlpha, bloomAlpha } = alphas;
-  const { tc } = drawScene(ctx, activeScene, {
+  const { tc } = drawScene(ctx, {
     ...frame, mouseRef: refs.mouseRef, flyRef: refs.flyRef,
     focusedFolderRef: refs.focusedFolderRef, canvasRef: refs.canvasRef,
   });
@@ -99,7 +99,7 @@ function renderFrame(ctx, activeScene, frame, refs, alphas) {
   ctx.globalAlpha = effectiveAlpha;
 
   const curNode = refs.navRef.current.path[refs.navRef.current.path.length - 1];
-  drawNebula(ctx, curNode, tc, frame);
+  drawNebula(ctx, curNode, frame);
   drawStarfield(ctx, activeScene.bg, tc, frame);
   drawConstellationLines(ctx, activeScene, tc, w2s);
 

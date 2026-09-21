@@ -90,28 +90,6 @@ function makeSelectProjectAndRun({ setSelectedProject, setSelectedSource, setSel
   };
 }
 
-function buildProjectStateResult({
-  projects, projectsLoaded, projectsLoadFailed, retryLoadProjects, setProjects,
-  selectedProject, selectedSource, selectedRun, setSelectedRun, loadProjects,
-  handleProjectChange, handleRunChange, selectProjectAndRun,
-}) {
-  return {
-    projects,
-    projectsLoaded,
-    projectsLoadFailed,
-    retryLoadProjects,
-    setProjects,
-    selectedProject,
-    selectedSource,
-    selectedRun,
-    setSelectedRun,
-    loadProjects,
-    handleProjectChange,
-    handleRunChange,
-    selectProjectAndRun,
-  };
-}
-
 // Groups the hook's own useState/useRef declarations so useProjectState's
 // body stays under the function-length cap; still called unconditionally at
 // the top of the outer hook, so hook-order rules are unaffected.
@@ -219,9 +197,9 @@ export function useProjectState({
 
   useInitialProjectLoad({ loadProjects, selectedProject, selectedSource, handleProjectChange, onNoProjects, storage });
 
-  return buildProjectStateResult({
+  return {
     projects, projectsLoaded, projectsLoadFailed, retryLoadProjects, setProjects,
     selectedProject, selectedSource, selectedRun, setSelectedRun, loadProjects,
     handleProjectChange, handleRunChange, selectProjectAndRun,
-  });
+  };
 }

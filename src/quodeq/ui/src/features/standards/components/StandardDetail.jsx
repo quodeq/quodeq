@@ -63,7 +63,6 @@ function RootDetail({ standard, onUpdateField, editable, isNew }) {
     <div className="standard-root-detail">
       <SectionLabel marker="▶">{t('standards.standardLabel')}</SectionLabel>
       <NameField standard={standard} editable={editable} isNew={isNew} onUpdateField={onUpdateField} />
-      <input type="hidden" value={standard.id || ''} />
       <DescriptionField standard={standard} editable={editable} onUpdateField={onUpdateField} />
       <SourceField standard={standard} editable={editable} onUpdateField={onUpdateField} />
       {standard.managed && <p className="detail-managed-notice">{t('standards.managedNotice')}</p>}

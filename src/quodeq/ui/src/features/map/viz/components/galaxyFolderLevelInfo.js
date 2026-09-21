@@ -28,13 +28,12 @@ export function buildLevelInfo({ scene, currentNode, zoomedFileRef, navRef, proj
   const zf = zoomedFileRef.current;
   if (zf && zf.data) {
     const s = zf.data;
-    const sev = s.severity || {};
     return {
       title: s.name,
       lines: [
         { label: t('map.violations'), value: s.violations },
         { label: t('map.compliance'), value: s.compliance },
-        ...severityLines(sev, false),
+        ...severityLines(s.severity, false),
       ],
       hint: null,
       detailAction: () => { if (onFileClick) onFileClick(s._node); },
@@ -44,14 +43,13 @@ export function buildLevelInfo({ scene, currentNode, zoomedFileRef, navRef, proj
   const folderCount = scene.rootStars.filter(s => s.isFolder).length;
   const fileCount = scene.rootStars.filter(s => !s.isFolder).length;
   const rate = cn.complianceRate;
-  const cnSev = cn.severity || {};
   const isRoot = navRef.current.path.length <= 1;
   const lines = [
     { label: t('map.compliance'), value: (rate * 100).toFixed(0) + '%' },
     { label: t('map.contents'), value: folderCount + fileCount },
     { label: t('map.violations'), value: cn.violations },
   ];
-  if (cn.violations > 0) lines.push(...severityLines(cnSev, true));
+  if (cn.violations > 0) lines.push(...severityLines(cn.severity, true));
   return {
     title: isRoot ? (projectName || 'Project') : cn.name,
     lines,

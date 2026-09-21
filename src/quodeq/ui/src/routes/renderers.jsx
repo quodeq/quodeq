@@ -62,13 +62,11 @@ function EvaluateCase({ evaluation, selectedProject, projects, onGoToProjects, o
   const jobProjectInfo = job?.outputProject ? findProject(projects, job.outputProject) : null;
   const startedProjectInfo = startedProject ? findProject(projects, startedProject) : null;
   return (
-    <>
-      <EvaluateScreen
-        evaluation={{ job, jobError, liveViolations }}
-        context={{ selectedProject, projectInfo, jobProjectInfo, startedProjectInfo, preselectDims }}
-        actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
-      />
-    </>
+    <EvaluateScreen
+      evaluation={{ job, jobError, liveViolations }}
+      context={{ selectedProject, projectInfo, jobProjectInfo, startedProjectInfo, preselectDims }}
+      actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation, onGoToProjects, onGoToSettings }}
+    />
   );
 }
 

@@ -100,7 +100,7 @@ describe('galaxyFolderDraw value characterization', () => {
 
   it('drawScene paints the background gradient at the recorded radius', () => {
     const ctx = makeRecordingCtx(rec.log);
-    drawScene(ctx, makeScene(), { W: 800, H: 600, canvasRef: { current: null } });
+    drawScene(ctx, { W: 800, H: 600, canvasRef: { current: null } });
     expect(rec.log).toMatchSnapshot('scene-background-values');
   });
 
