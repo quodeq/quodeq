@@ -173,6 +173,11 @@ function EvaluateNav({ selectedSource, activeTab, handleNav }) {
   );
 }
 
+/** Rail label for the current project: display name, else name, else id. */
+function repoNameOf(projectInfo) {
+  return projectInfo?.displayName || projectInfo?.name || projectInfo?.id || null;
+}
+
 function ProjectsNav({ repoName, activeTab, handleNav }) {
   return (
     <nav className="sidebar-nav sidebar-block">
@@ -217,7 +222,7 @@ export default function Sidebar({
   inert = undefined,
 }) {
   const { isPinned, setPinned, handleTogglePin, handleNav } = useSidebarPin({ controlledPinned, onPinChange, onNavTab });
-  const repoName = projectInfo?.displayName || projectInfo?.name || projectInfo?.id || null;
+  const repoName = repoNameOf(projectInfo);
   const lastEvalStr = formatLastEval(lastEvalAt);
 
   return (
