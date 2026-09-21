@@ -49,8 +49,8 @@ def client(tmp_path: Path, project_root: Path, monkeypatch: pytest.MonkeyPatch):
         "STANDARDS_DIMENSIONS_FILE": str(dims),
     })
 
-    import quodeq.api.standards_overrides_routes as _mod
-    monkeypatch.setattr(_mod, "resolve_repo_root", lambda pid: str(project_root) if pid == "proj-1" else None)
+    import quodeq.api.standards_project as _guard
+    monkeypatch.setattr(_guard, "resolve_repo_root", lambda pid: str(project_root) if pid == "proj-1" else None)
 
     with app.test_client() as c:
         yield c
@@ -73,8 +73,8 @@ def client_without_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "STANDARDS_DIMENSIONS_FILE": str(dims),
     })
 
-    import quodeq.api.standards_overrides_routes as _mod
-    monkeypatch.setattr(_mod, "resolve_repo_root", lambda pid: None)
+    import quodeq.api.standards_project as _guard
+    monkeypatch.setattr(_guard, "resolve_repo_root", lambda pid: None)
 
     with app.test_client() as c:
         yield c
@@ -118,8 +118,8 @@ def client_with_custom(tmp_path: Path, project_root: Path, monkeypatch: pytest.M
         "STANDARDS_DIMENSIONS_FILE": str(dims),
     })
 
-    import quodeq.api.standards_overrides_routes as _mod
-    monkeypatch.setattr(_mod, "resolve_repo_root", lambda pid: str(project_root) if pid == "proj-1" else None)
+    import quodeq.api.standards_project as _guard
+    monkeypatch.setattr(_guard, "resolve_repo_root", lambda pid: str(project_root) if pid == "proj-1" else None)
 
     with app.test_client() as c:
         yield c

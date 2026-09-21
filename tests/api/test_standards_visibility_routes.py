@@ -41,9 +41,9 @@ def client(repo_root: Path, project_id: str, monkeypatch: pytest.MonkeyPatch):
     """
     app = create_app(test_config={"TESTING": True})
 
-    import quodeq.api.standards_visibility_routes as _mod
+    import quodeq.api.standards_project as _guard
     monkeypatch.setattr(
-        _mod, "resolve_repo_root",
+        _guard, "resolve_repo_root",
         lambda pid: str(repo_root) if pid == project_id else None,
     )
 

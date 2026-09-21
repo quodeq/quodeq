@@ -6,14 +6,11 @@ The override file lives inside the analyzed repository
 from __future__ import annotations
 
 import logging
-from http import HTTPStatus
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._assistant_helpers import resolve_repo_root
-from quodeq.api._constants import ERROR_CODE_BAD_REQUEST
-from quodeq.api.helpers import error_response, project_root_or_error
+from quodeq.api.standards_project import invalid_body, invalid_payload, project_root_or_error
 from quodeq.core.standards.overrides import validate_overrides
 from quodeq.services.standards_overrides import changed_dimensions, override_counts_by_dimension
 from quodeq.services.standards_prefs import (
@@ -24,14 +21,6 @@ from quodeq.services.standards_prefs import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _project_root_or_error(project_id: str) -> tuple[Path | None, Response | None]:
-    """Validate *project_id* and resolve its local repository root.
-
-    Returns ``(root, None)`` or ``(None, error_response)``.
-    """
-    return project_root_or_error(project_id, resolve_repo_root)
 
 
 def _declared_params(app: Flask) -> dict:
@@ -46,12 +35,6 @@ def _declared_params(app: Flask) -> dict:
     return {**collect_declared_params(evaluators_dir), **collect_declared_params(compiled_dir)}
 
 
-def _invalid_overrides_response(errors: list) -> Response:
-    resp = jsonify({"error": "Invalid overrides", "code": "invalid_overrides", "details": errors})
-    resp.status_code = HTTPStatus.BAD_REQUEST
-    return resp
-
-
 def _persist_overrides(root: Path, project_id: str, clean: dict) -> None:
     """Save *clean* to the project, or clear the file when nothing is left."""
     if not clean:
@@ -63,7 +46,7 @@ def _persist_overrides(root: Path, project_id: str, clean: dict) -> None:
 
 
 def _get_standards_overrides(app: Flask, project_id: str) -> Response:
-    root, err = _project_root_or_error(project_id)
+    root, err = project_root_or_error(project_id)
     if err is not None:
         return err
     compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
@@ -72,18 +55,16 @@ def _get_standards_overrides(app: Flask, project_id: str) -> Response:
 
 
 def _put_standards_overrides(app: Flask, project_id: str) -> Response:
-    root, err = _project_root_or_error(project_id)
+    root, err = project_root_or_error(project_id)
     if err is not None:
         return err
     payload = request.get_json(force=True)
     raw = payload.get("overrides") if isinstance(payload, dict) else None
     if raw is None:
-        return error_response(
-            'Body must be {"overrides": {...}}', HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST
-        )
+        return invalid_body('Body must be {"overrides": {...}}')
     clean, errors = validate_overrides(raw, _declared_params(app))
     if errors:
-        return _invalid_overrides_response(errors)
+        return invalid_payload("Invalid overrides", "invalid_overrides", errors)
     compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
     changed = changed_dimensions(compiled_dir, load_project_overrides(root), clean)
     dry_run = request.args.get("dryRun", "").lower() in ("1", "true")
