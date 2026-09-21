@@ -33,12 +33,12 @@ async function probeAltPort(port, baseUrl) {
   const tid = setTimeout(() => ac.abort(), HEALTH_CHECK_TIMEOUT_MS);
   try {
     const res = await fetch(`${baseUrl}:${port}${HEALTH_ENDPOINT}`, { signal: ac.signal });
-    clearTimeout(tid);
     return res.ok ? port : null;
   } catch (err) {
-    clearTimeout(tid);
     console.warn('[useServerHealth] alt-port probe failed:', err);
     return null;
+  } finally {
+    clearTimeout(tid);
   }
 }
 

@@ -27,7 +27,7 @@ export function createRateSampleStore({ windowMs = RATE_WINDOW_MS } = {}) {
    * Always keeps at least the newest sample (so a long stall still has a point).
    * @returns {Array<{t:number, taken:number}>} the job's (trimmed) buffer
    */
-  function recordRateSample(jobId, t, taken) {
+  function appendSample(jobId, t, taken) {
     let buf = byJob.get(jobId);
     if (!buf) { buf = []; byJob.set(jobId, buf); }
     buf.push({ t, taken });
@@ -36,7 +36,7 @@ export function createRateSampleStore({ windowMs = RATE_WINDOW_MS } = {}) {
   }
 
   /** The job's current sample buffer (empty array if none recorded yet). */
-  function getRateSamples(jobId) {
+  function readSamples(jobId) {
     return byJob.get(jobId) || [];
   }
 
@@ -45,7 +45,7 @@ export function createRateSampleStore({ windowMs = RATE_WINDOW_MS } = {}) {
     byJob.clear();
   }
 
-  return { recordRateSample, getRateSamples, reset };
+  return { recordRateSample: appendSample, getRateSamples: readSamples, reset };
 }
 
 /** The app-wide throughput store every production import shares. */

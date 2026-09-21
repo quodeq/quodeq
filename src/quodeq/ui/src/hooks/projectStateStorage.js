@@ -1,3 +1,7 @@
+/**
+ * useProjectState.js's localStorage read/write helpers and the boot-time
+ * selection-resolution logic.
+ */
 import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from '../constants.js';
 import { writeString } from '../adapters/storage.js';
 
@@ -7,8 +11,9 @@ export const DEFAULT_SOURCE = DEFAULT_PROJECT_SOURCE;
 export const VALID_SOURCES = Object.values(PROJECT_SOURCE);
 
 /**
- * useProjectState.js's localStorage read/write helpers and the boot-time
- * selection-resolution logic. Extracted verbatim.
+ * Set the selected project in React state and mirror it to storage. A storage
+ * failure (private browsing) is warned about, not thrown: the in-memory
+ * selection still stands for this session.
  */
 export function persistProject(setter, name, storage = localStorage) {
   setter(name);
@@ -62,9 +67,10 @@ export function resolveInitialProject({ list, currentProject, currentSource, onC
   // `list` here is always the *local* project list (loadProjects only ever
   // calls the local listProjects API). A restored shared selection can't be
   // validated against it, so it must not be treated as "missing" and reset
-  // to a local project + source 'local' — that would silently undo the
+  // to a local project + source 'local', which would silently undo the
   // user's shared selection on every restart. Leave it as restored; the
-  // shared clone itself is fetched/validated by Task 17's data hooks.
+  // shared clone itself is fetched and validated by the shared-project data
+  // hooks (useSharedProjects).
   if (currentSource === PROJECT_SOURCE.SHARED && current) return;
   if (list.length === 0) {
     if (onNoProjects) onNoProjects();

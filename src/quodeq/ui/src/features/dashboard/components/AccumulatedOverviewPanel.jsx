@@ -1,18 +1,5 @@
 import { useMemo, lazy, Suspense } from 'react';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
-const runHistoryPanelImport = () => import('./RunHistoryPanel.jsx');
-const RunHistoryPanel = lazy(runHistoryPanelImport);
-
-// Warm the chart chunk before the overview first mounts with data (called
-// from DashboardPage while the boot loader / skeleton is still up). The
-// dynamic import caches, so the lazy() above resolves without ever
-// committing its RunHistoryPanelPlaceholder fallback — otherwise a cold
-// boot pays a placeholder beat inside otherwise-real content.
-export function preloadRunHistoryPanel() {
-  runHistoryPanelImport().catch((err) => {
-    console.warn('[AccumulatedOverviewPanel] chart chunk preload failed:', err);
-  });
-}
 import RunHistoryPanelPlaceholder from './RunHistoryPanelPlaceholder.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
@@ -24,6 +11,20 @@ import { DEFAULT_SCORE_HISTORY_GRANULARITY } from '../../../constants.js';
 import { useAccumulatedComputations, computeAccumulatedStats } from '../hooks/useAccumulatedComputations.js';
 import { AccumulatedHeroSection } from './AccumulatedHeroSection.jsx';
 import { useAccumulatedReportSpec } from './accumulatedReportSpecs.jsx';
+
+const runHistoryPanelImport = () => import('./RunHistoryPanel.jsx');
+const RunHistoryPanel = lazy(runHistoryPanelImport);
+
+// Warm the chart chunk before the overview first mounts with data (called
+// from DashboardPage while the boot loader / skeleton is still up). The
+// dynamic import caches, so the lazy() above resolves without ever
+// committing its RunHistoryPanelPlaceholder fallback -- otherwise a cold
+// boot pays a placeholder beat inside otherwise-real content.
+export function preloadRunHistoryPanel() {
+  runHistoryPanelImport().catch((err) => {
+    console.warn('[AccumulatedOverviewPanel] chart chunk preload failed:', err);
+  });
+}
 
 export { useAccumulatedComputations, computeAccumulatedStats, AccumulatedHeroSection };
 

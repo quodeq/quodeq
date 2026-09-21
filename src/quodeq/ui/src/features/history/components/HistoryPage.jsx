@@ -47,18 +47,15 @@ function useHistoryLanguageSub(projectInfo) {
 function renderNoRowsEmptyState({
   selectedSource, loading, error, isFetching, isRefreshing, projectInfo, selectedProject, onNavigate, onRetry,
 }) {
-  if (loading) {
+  // A retry in flight (error still set, isFetching true) shows the loader
+  // rather than the error, so clicking Retry visibly does something.
+  if (loading || (error && isFetching)) {
     return <HistoryEmptyShell sub={t('overview.loading')}><LoadingEmptyContent /></HistoryEmptyShell>;
   }
   // A failed fetch with nothing to show must render as an error, not the
   // "no evaluations yet" empty state -- otherwise a 404/500/timeout tells
-  // the user their existing evaluations are gone. While a retry is in
-  // flight (error still set, isFetching true), show the loader instead so
-  // clicking Retry visibly does something.
+  // the user their existing evaluations are gone.
   if (error) {
-    if (isFetching) {
-      return <HistoryEmptyShell sub={t('overview.loading')}><LoadingEmptyContent /></HistoryEmptyShell>;
-    }
     return (
       <HistoryEmptyShell sub={t('violations.subError')}>
         <ErrorEmptyContent error={error} onRetry={onRetry} />

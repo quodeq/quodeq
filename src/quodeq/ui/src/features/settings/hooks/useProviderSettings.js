@@ -135,16 +135,15 @@ export default function useProviderSettings(providerId, defaults, { storage = lo
     setState(prev => ({ ...prev, [key]: String(value) }));
     const onPersistError = () => showToast(t('settings.persistError'));
     if (key === 'api-key') {
-      saveProviderApiKey(providerId, String(value), storage, { onPersistError }).then((ok) => {
+      // Fire and forget: saveProviderApiKey catches its own failures, reports
+      // them through onPersistError and resolves false, so there is nothing
+      // left here to reject.
+      void saveProviderApiKey(providerId, String(value), storage, { onPersistError }).then((ok) => {
         // Clear the field rather than parking the sentinel in live state:
         // state['api-key'] is passed to providers as a real credential (see
         // OmlxTab), and the sentinel is not one. Storage still records it,
         // which is what survives a reload.
         if (ok) setState(prev => ({ ...prev, [key]: '' }));
-      }).catch((err) => {
-        // saveProviderApiKey already catches internally and never rejects;
-        // this is defense in depth in case that contract ever changes.
-        console.warn('[useProviderSettings] unexpected error saving api key:', err);
       });
     } else {
       saveProviderSetting(providerId, key, value, storage, { onPersistError });

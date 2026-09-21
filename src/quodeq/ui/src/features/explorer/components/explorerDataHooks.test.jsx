@@ -216,16 +216,16 @@ describe('useExplorerData response handling', () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 300_000, staleTime: 60_000 } },
     });
-    const wrapper = ({ children }) => (
+    const sharedWrapper = ({ children }) => (
       <QueryClientProvider client={client}>
         <ApiProvider value={fakeApi}>{children}</ApiProvider>
       </QueryClientProvider>
     );
-    const first = renderHook(() => useExplorerData('proj', 'security', 'r1', null), { wrapper });
+    const first = renderHook(() => useExplorerData('proj', 'security', 'r1', null), { wrapper: sharedWrapper });
     await waitFor(() => expect(first.result.current.loading).toBe(false));
     first.unmount();
 
-    const second = renderHook(() => useExplorerData('proj', 'security', 'r1', null), { wrapper });
+    const second = renderHook(() => useExplorerData('proj', 'security', 'r1', null), { wrapper: sharedWrapper });
     expect(second.result.current.loading).toBe(false);
     expect(second.result.current.evalData).toBeTruthy();
   });

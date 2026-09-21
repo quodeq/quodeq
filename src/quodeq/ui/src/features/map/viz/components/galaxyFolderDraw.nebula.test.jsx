@@ -59,7 +59,7 @@ describe('galaxyFolderDraw nebula discs', () => {
 
   it('drawNebula paints one background disc plus four orbiting blobs', () => {
     const ctx = makeRecordingCtx(discs);
-    drawNebula(ctx, { complianceRate: 0.5 }, {}, { W: 800, H: 600, t: 12 });
+    drawNebula(ctx, { complianceRate: 0.5 }, { W: 800, H: 600, t: 12 });
     expect(discs).toHaveLength(5);
     expect(discs).toMatchSnapshot('scene-nebula-discs');
   });

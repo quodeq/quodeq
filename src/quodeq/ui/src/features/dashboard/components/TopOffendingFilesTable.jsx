@@ -16,7 +16,7 @@ function splitPath(filepath) {
     : { name: filepath, dir: '' };
 }
 
-const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onFileClick }) {
+export default memo(function TopOffendingFilesTable({ files, onFileClick }) {
   const list = files || [];
   if (list.length === 0) return null;
 
@@ -55,5 +55,3 @@ const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onF
     </GridTable>
   );
 });
-
-export default TopOffendingFilesTable;

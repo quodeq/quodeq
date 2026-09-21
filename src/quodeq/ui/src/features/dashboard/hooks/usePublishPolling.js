@@ -67,7 +67,11 @@ async function applyPublishSuccess(finishedProject, setters, { applyOptimisticPu
   await refreshListAfterCompletion();
 }
 
-function useCheckStatus({ getSharedStatus, mountedRef, stopPolling, applyOptimisticPublish, refreshListAfterCompletion, publishingProjectRef, setPublishState, setPublishError, setPublishErrorProject, setPublishingProjectBoth }) {
+function useCheckStatus({
+  getSharedStatus, mountedRef, stopPolling, applyOptimisticPublish,
+  refreshListAfterCompletion, publishingProjectRef, setPublishState,
+  setPublishError, setPublishErrorProject, setPublishingProjectBoth,
+}) {
   return useCallback(async () => {
     let data;
     try {

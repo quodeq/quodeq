@@ -15,7 +15,8 @@ export function openExternal(url) {
   const api = typeof window !== 'undefined' && window.pywebview && window.pywebview.api;
   if (api && typeof api.open_browser === 'function') {
     try {
-      api.open_browser(url); return;
+      api.open_browser(url);
+      return;
     } catch (err) {
       console.warn('[openExternal] pywebview open_browser failed, falling back to window.open:', err);
     }

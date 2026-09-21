@@ -20,7 +20,8 @@ export function TerminalTabStrip({ sessions, activeId, max, selectSession, close
           <span className="tty-tab-dot" aria-hidden="true" />
           <span className="tty-tab-name">{s.name}</span>
           <button type="button" className="tty-tab-close"
-            aria-label={`Close ${s.name}`} title={t('terminal.closeSession')}
+            aria-label={t('terminal.closeSessionNamed', { name: s.name })}
+            title={t('terminal.closeSession')}
             onClick={(e) => { e.stopPropagation(); closeSession(s.id); }}>
             <XIcon />
           </button>

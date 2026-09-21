@@ -47,19 +47,31 @@ export function newCueBatch() {
 /**
  * Queue one particle's ring arcs, at the orbit position drawParticles paints
  * it at (same angle/scale math as galaxyCore's). Nothing is drawn here.
+ *
+ * `p` is a particle in the compact schema galaxyCore's mkParticles emits:
+ * `os` orbit speed, `op` orbit phase, `or` orbit radius, `ec` eccentricity
+ * (x only, so the orbit reads as a tilted ellipse), `sz` size, `sev`
+ * severity, `col` colour. The names are short because a frame walks
+ * thousands of these.
+ *
+ * @param {Map} batch - the frame's collector, keyed severity|ring|width.
+ * @param {object} p - the particle.
+ * @param {{x: number, y: number}} sc - its star's screen centre.
+ * @param {number} scale - world-to-screen zoom.
+ * @param {number} t - the frame's time, which advances the orbit.
  */
 export function collectSeverityCue(batch, p, sc, scale, t) {
   const shape = starShapeFor(p.sev);
-  const sz = p.sz * scale;
-  if (shape === 'dot' || sz < CUE_MIN_PARTICLE_SIZE) return;
-  const a = t * p.os + p.op;
-  const px = sc.x + Math.cos(a) * p.or * p.ec * scale;
-  const py = sc.y + Math.sin(a) * p.or * scale;
-  const inner = Math.max(sz * CUE_RING_RADIUS_RATIO, CUE_RING_MIN_RADIUS);
+  const size = p.sz * scale;
+  if (shape === 'dot' || size < CUE_MIN_PARTICLE_SIZE) return;
+  const angle = t * p.os + p.op;
+  const px = sc.x + Math.cos(angle) * p.or * p.ec * scale;
+  const py = sc.y + Math.sin(angle) * p.or * scale;
+  const inner = Math.max(size * CUE_RING_RADIUS_RATIO, CUE_RING_MIN_RADIUS);
   const radii = shape === 'double-ring'
-    ? [inner, Math.max(sz * CUE_RING2_RADIUS_RATIO, inner + CUE_RING_GAP_MIN)]
+    ? [inner, Math.max(size * CUE_RING2_RADIUS_RATIO, inner + CUE_RING_GAP_MIN)]
     : [inner];
-  const lineWidth = Math.max(CUE_RING_WIDTH_MIN, sz * CUE_RING_WIDTH_RATIO);
+  const lineWidth = Math.max(CUE_RING_WIDTH_MIN, size * CUE_RING_WIDTH_RATIO);
   radii.forEach((r, ring) => {
     const key = `${p.sev}|${ring}|${lineWidth}`;
     let group = batch.get(key);

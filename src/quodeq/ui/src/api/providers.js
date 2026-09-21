@@ -32,7 +32,19 @@ export function checkCmdPath(clientId, path) {
   );
 }
 
-/** @returns {Promise<Object>} Connection test result for the provider */
+/**
+ * Round-trips one chat request against the provider so Settings can say
+ * "works" before an evaluation depends on it.
+ *
+ * @param {object} args
+ * @param {string} args.provider - provider id, e.g. 'openai', 'ollama'.
+ * @param {string} args.apiBase - base URL; required for the local providers,
+ *   optional elsewhere (the server falls back to the vendor default).
+ * @param {string} args.model - model id to send the probe request to.
+ * @param {string} args.apiKey - sent for this call only; the server does not
+ *   persist it here.
+ * @returns {Promise<Object>} Connection test result for the provider
+ */
 export function testProviderConnection({ provider, apiBase, model, apiKey }) {
   return request('/provider/test', {
     method: 'POST',

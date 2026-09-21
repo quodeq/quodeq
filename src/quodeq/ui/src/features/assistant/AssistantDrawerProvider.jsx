@@ -124,7 +124,14 @@ export function AssistantDrawerProvider({ children }) {
     webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled,
     repoInfo, readOnly, workspace, refreshWorkspace,
     catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation,
-  }), [isOpen, open, close, toggle, closeActiveTab, closePanel, openPanels, activeTab, openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized, toggleMaximized, messages, turnActive, stream.error, localError, sessionId, sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled, repoInfo, readOnly, workspace, refreshWorkspace, catalog, addLocalExchange, startSession, sendMessage, stopTurn, resetConversation]);
+  }), [
+    isOpen, open, close, toggle, closeActiveTab, closePanel, openPanels, activeTab,
+    openTab, selectTab, toggleTopbar, terminalEnabled, height, setHeight, maximized,
+    toggleMaximized, messages, turnActive, stream.error, localError, sessionId,
+    sessionMeta, webEnabled, toggleWebEnabled, writeEnabled, toggleWriteEnabled,
+    repoInfo, readOnly, workspace, refreshWorkspace, catalog, addLocalExchange,
+    startSession, sendMessage, stopTurn, resetConversation,
+  ]);
 
   return (
     <AssistantDrawerContext.Provider value={value}>

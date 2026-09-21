@@ -6,7 +6,6 @@ export const DEFAULT_MAX_SUBAGENTS = 5;
 export const DEFAULT_TIME_LIMIT_S = 600;
 export const MIN_SUBAGENTS = 1;
 export const MAX_SUBAGENTS = 10;
-export const DEFAULT_SUBAGENTS = 5;
 export const SUBAGENTS_STORAGE_KEY = 'cc-max-subagents';
 export const TIME_LIMIT_STORAGE_KEY = 'cc-time-limit';
 

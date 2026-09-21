@@ -1,5 +1,4 @@
 import { Component, useEffect, useMemo, useState, lazy, Suspense } from 'react';
-const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 import HistoryChartPanelPlaceholder from './HistoryChartPanelPlaceholder.jsx';
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
@@ -7,6 +6,9 @@ import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 import { EvaluationsTable } from './EvaluationsTable.jsx';
 import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
+
+// Deferred so the History page's first paint doesn't carry the chart library.
+const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
 // The lazy-loaded chart panel had no error boundary around its Suspense: a
 // chunk-load failure (offline, deploy skew) or a render throw inside the
@@ -85,8 +87,8 @@ function HistoryTopHeader({ trend, languageSub, selectedSource, availableRuns, r
   );
 }
 
-// The visible (non-hidden) rows + their deltas, derived from availableRuns
-// and trend. Extracted verbatim from HistoryContent's body.
+// The visible (non-hidden) rows plus their run-over-run deltas. Rows whose
+// run is in a hidden status (queued, cancelled) never reach the table.
 function useHistoryVisibleRows({ availableRuns, trend }) {
   const historyRows = useMemo(() => assembleHistoryRows(availableRuns, trend), [availableRuns, trend]);
   const statusByRunId = useMemo(() => {
@@ -94,20 +96,26 @@ function useHistoryVisibleRows({ availableRuns, trend }) {
     (availableRuns || []).forEach((r) => { if (r.runId) map.set(r.runId, r.status); });
     return map;
   }, [availableRuns]);
-  const isHiddenStatus = (runId) => HIDDEN_STATUSES.has(statusByRunId.get(runId));
   // Show every non-hidden run; off-screen rows are lazy-painted via CSS
   // `content-visibility: auto` on `.history-row` (see styles/history.css),
   // so there's no need for a "Load all" pagination toggle.
   const visible = useMemo(() => {
-    return historyRows.filter((entry) => !isHiddenStatus(entry.runId));
-  }, [historyRows, statusByRunId]);  // eslint-disable-line react-hooks/exhaustive-deps
+    return historyRows.filter((entry) => !HIDDEN_STATUSES.has(statusByRunId.get(entry.runId)));
+  }, [historyRows, statusByRunId]);
   const deltas = useMemo(() => computeDeltas(visible), [visible]);
   return { statusByRunId, visible, deltas };
 }
 
 /**
  * The History page's main (non-empty) content: chart, run navigator and the
- * evaluations table. Extracted verbatim from HistoryPage.jsx.
+ * evaluations table.
+ * @param {object} props
+ * @param {{trend: Array, selectedRunId: string, availableRuns: Array}} props.data
+ * @param {object} props.callbacks - row click/hover, run change and delete handlers.
+ * @param {object} props.runNav - the run navigator's prev/next/latest state.
+ * @param {string} props.languageSub - the header's language subtitle.
+ * @param {object} props.selectedSource - the project the rows belong to.
+ * @param {boolean} props.isRefreshing - dims the page while a refetch is in flight.
  */
 export function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource, isRefreshing }) {
   const { trend, selectedRunId, availableRuns } = data;
@@ -131,7 +139,7 @@ export function HistoryContent({ data, callbacks, runNav, languageSub, selectedS
 
       <ChartErrorBoundary>
         <Suspense fallback={<HistoryChartPanelPlaceholder />}>
-          <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
+          <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={onRunChange} />
         </Suspense>
       </ChartErrorBoundary>
 

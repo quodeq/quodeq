@@ -133,12 +133,21 @@ export function useAccumulatedComputations(data) {
     useVisibleFilteredTrends({ trend, dayTrend, periodTrend, granularity, accumulatedDimensions });
 
   const dimTrends = useDimTrends(filteredDimensions, filteredTrend, currentOverviewRun, granularity);
-  const filteredAccumulated = useMemo(() => filterAccumulatedByVisibleStandards(accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun), [accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun]);
-  const filteredStats = useMemo(() => computeAccumulatedStats(filteredDimensions, filteredPeriodTrend, currentOverviewRun), [filteredDimensions, filteredPeriodTrend, currentOverviewRun]);
+  const filteredAccumulated = useMemo(
+    () => filterAccumulatedByVisibleStandards(accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun),
+    [accumulated, visibleSet, filteredPeriodTrend, currentOverviewRun],
+  );
+  const filteredStats = useMemo(
+    () => computeAccumulatedStats(filteredDimensions, filteredPeriodTrend, currentOverviewRun),
+    [filteredDimensions, filteredPeriodTrend, currentOverviewRun],
+  );
 
   // Preserve today's "panel appears iff ≥2 days of data" behavior, regardless
   // of the chosen grouping — so the selector never disappears on collapse.
   const chartMountable = filteredDayTrend.length >= 2;
 
-  return { currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredTrend, filteredDimensions, filteredAccumulated, filteredStats, chartMountable, dimTrends };
+  return {
+    currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredTrend,
+    filteredDimensions, filteredAccumulated, filteredStats, chartMountable, dimTrends,
+  };
 }

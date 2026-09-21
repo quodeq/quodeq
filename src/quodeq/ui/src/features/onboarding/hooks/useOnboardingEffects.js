@@ -4,9 +4,16 @@ import { saveDraft } from './useWizardDraft.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 
 /**
- * OnboardingWizard.jsx's three boot/persist effects: the standards fetch,
- * the per-step draft save, and the preset-project resume scan fetch.
- * Extracted verbatim.
+ * The wizard's three boot/persist effects: fetch the standards list once,
+ * save a draft on every step transition, and fetch the scan for a preset
+ * project when the wizard is resumed into one.
+ * @param {object} args
+ * @param {object} args.wizard - useWizardState's bundle; its `state` drives
+ *   the draft save and its intents receive the fetched scan.
+ * @param {object} args.entry - how the wizard was opened (start step,
+ *   presetProjectId, isFirstProject).
+ * @param {(standards: Array) => void} args.setStandards - receives the
+ *   standards filtered to the user's visible set, or [] if the fetch fails.
  */
 export function useOnboardingEffects({ wizard, entry, setStandards }) {
   // Fetch standards once when the step that needs them is reachable.

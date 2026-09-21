@@ -6,9 +6,8 @@ import { shouldBounceToEvaluate, shouldRedirectToRemoteRepositories } from '../a
 import { buildAssistantActionAppliedHandler } from '../features/assistant/assistantAppBridge.js';
 import { ASSISTANT_ACTION_APPLIED_EVENT } from '../constants.js';
 
-// App.jsx's boot-time and navigation-guard effects, extracted verbatim (see
-// App.jsx history for the original inline effects and their rationale
-// comments, preserved below on each hook).
+// App.jsx's boot-time and navigation-guard effects. Each hook carries the
+// rationale for its own effect.
 
 /**
  * Bridges ASSISTANT_ACTION_APPLIED_EVENT window events into the
@@ -19,16 +18,23 @@ import { ASSISTANT_ACTION_APPLIED_EVENT } from '../constants.js';
 export function useAssistantActionAppliedEffect({
   applyDelta, bumpDismissRefresh, scheduleReconcileForApply, selectedProject,
 }) {
+  // The two cache-patch callbacks get a new identity on most renders. Reading
+  // them through a ref keeps the listener attached across those renders (a
+  // detach/attach cycle could drop an event that lands in between) while the
+  // handler still calls the current ones.
+  const patchRef = useRef({ applyDelta, bumpDismissRefresh });
+  patchRef.current = { applyDelta, bumpDismissRefresh };
+
   useEffect(() => {
     const handler = buildAssistantActionAppliedHandler({
-      applyDelta,
-      bumpDismissRefresh,
+      applyDelta: (...args) => patchRef.current.applyDelta(...args),
+      bumpDismissRefresh: (...args) => patchRef.current.bumpDismissRefresh(...args),
       scheduleDashboardReconcile: scheduleReconcileForApply,
       selectedProject,
     });
     window.addEventListener(ASSISTANT_ACTION_APPLIED_EVENT, handler);
     return () => window.removeEventListener(ASSISTANT_ACTION_APPLIED_EVENT, handler);
-  }, [scheduleReconcileForApply, selectedProject]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scheduleReconcileForApply, selectedProject]);
 }
 
 /**
@@ -123,11 +129,10 @@ export function useProjectScrollResetEffect(selectedProject) {
  * earliest point at which "the current project" is known, so it runs
  * before any newly-mounted page reads readVisibleStandardIds() for that
  * project. It migrates a pre-existing local selection up to the server on
- * first run and never throws (see hydrateVisibleStandardIds). Note: pages
- * already mounted with a memoized visible-standards Set (e.g. the sidebar
- * trend/accumulated filters below, keyed with empty deps) do not
- * recompute from this — that is a pre-existing limitation of those read
- * sites, not something this hydration fixes.
+ * first run and never throws (see hydrateVisibleStandardIds). Note: a page
+ * already mounted with a memoized visible-standards Set keyed on empty deps
+ * does not recompute from this. That is a limitation of those read sites, not
+ * something this hydration fixes.
  *
  * isStale guards a real race: switching A -> B before A's request resolves
  * must not let A's (now-stale) response overwrite B's selection in the

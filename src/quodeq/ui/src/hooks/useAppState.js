@@ -110,7 +110,12 @@ function useAppNavigation() {
     // repositories local/online tabs): history must not grow per flip.
     navReplace({ page, ...params });
   }
-  return { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPending, navPush, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun };
+  return {
+    serverConnected, setServerConnected, serverVersion, navStack, activePage,
+    navPending, navPush, navPop, navGoTo, navSwapAt, navReset, navTab,
+    projectBundle, handleNavigate, handleNavigateReplace, handleRunChange,
+    historySelectedRun, setHistorySelectedRun,
+  };
 }
 
 /**
@@ -182,6 +187,18 @@ export function resolveActiveTab(activePage) {
   return TAB_OVERVIEW;
 }
 
+// A display preference, not run data: the chosen bucket size survives a
+// project switch and a reload, so it is persisted on change rather than kept
+// beside the dashboard query.
+function useScoreHistoryGranularity() {
+  const [granularity, setGranularity] = useState(() => readScoreHistoryGranularity());
+  const onGranularityChange = useCallback((next) => {
+    setGranularity(next);
+    writeScoreHistoryGranularity(next);
+  }, []);
+  return { granularity, onGranularityChange };
+}
+
 /**
  * The app shell's whole state in one object: navigation stack, project
  * selection, dashboard/score data for the selected project and run, run
@@ -195,18 +212,19 @@ export function resolveActiveTab(activePage) {
  */
 export function useAppState() {
   const nav = useAppNavigation();
-  const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPending, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
+  const {
+    serverConnected, setServerConnected, serverVersion, navStack, activePage,
+    navPending, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle,
+    handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun,
+    setHistorySelectedRun,
+  } = nav;
   const {
     projects, projectsLoaded, projectsLoadFailed, retryLoadProjects, setProjects, selectedProject, selectedSource,
     selectedRun, setSelectedRun, loadProjects, handleProjectChange,
     selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
   } = projectBundle;
   const settings = useAppSettings();
-  const [granularity, setGranularity] = useState(() => readScoreHistoryGranularity());
-  const handleGranularityChange = useCallback((next) => {
-    setGranularity(next);
-    writeScoreHistoryGranularity(next);
-  }, []);
+  const { granularity, onGranularityChange } = useScoreHistoryGranularity();
   const isHistoryRun = activePage.page === 'history-run';
   const isHistoryTab = activePage.page === 'history';
   const effectiveRun = isHistoryRun ? historySelectedRun : selectedRun;
@@ -227,7 +245,7 @@ export function useAppState() {
     dailyRuns: buildPeriodRuns(availableRuns, dashboard?.trend || [], granularity),
     ...computeDerivedState(accumulated, dashboard, selectedProject, projects),
   }), [availableRuns, dashboard, accumulated, selectedProject, projects, granularity]);
-  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun, granularity);
+  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, setSelectedRun, granularity);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const prefetchHandlers = usePrefetchAdjacentRuns({ selectedProject, selectedSource, availableRuns: visibleDailyRuns, overviewRunIndex });
   const evalLifecycle = useEvaluationLifecycle({ navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun }, selectedProject });
@@ -247,6 +265,6 @@ export function useAppState() {
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile,
-    granularity, onGranularityChange: handleGranularityChange,
+    granularity, onGranularityChange,
   };
 }

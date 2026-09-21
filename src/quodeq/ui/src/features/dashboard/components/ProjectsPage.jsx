@@ -46,18 +46,21 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
   );
 }
 
+// Until the list has loaded there is no count to report, so the header says
+// "loading" rather than "0 repositories evaluated".
+function headerSub(projectsLoaded, count) {
+  if (!projectsLoaded) return t('overview.loading');
+  return count === 1
+    ? t('projects.reposEvaluatedOne', { count })
+    : t('projects.reposEvaluatedMany', { count });
+}
+
 function ProjectsPageHeader({ projectsLoaded, projects, isEmpty, onImportProject, onAddProject, isEvaluating }) {
   return (
     <div className="projects-page__header">
       <TermHeader
         name={t('projects.termName')}
-        sub={
-          projectsLoaded
-            ? (projects.length === 1
-                ? t('projects.reposEvaluatedOne', { count: projects.length })
-                : t('projects.reposEvaluatedMany', { count: projects.length }))
-            : t('overview.loading')
-        }
+        sub={headerSub(projectsLoaded, projects.length)}
       />
       {!isEmpty && (
         <div className="projects-page__header-actions">
@@ -213,6 +216,14 @@ function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
   return { shared, isEmpty, visibleEntries, cardsListCtx };
 }
 
+// The page has three mutually exclusive bodies. A function rather than a
+// ternary chain in the JSX, so each branch reads on its own line.
+function ProjectsPageContent({ projectsLoaded, isEmpty, emptyProps, bodyProps }) {
+  if (!projectsLoaded) return <LoadingScreen variant="inline" />;
+  if (isEmpty) return <EmptyProjectsCTA {...emptyProps} />;
+  return <ProjectsPageBody {...bodyProps} />;
+}
+
 export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
   const { onAddProject, onImportProject, onFiltersChange } = actions;
   const { shared, isEmpty, visibleEntries, cardsListCtx } = useProjectsCardsCtx({ projects, filters, selectedProject, actions });
@@ -227,19 +238,12 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
         onAddProject={onAddProject}
         isEvaluating={isEvaluating}
       />
-      {!projectsLoaded ? (
-        <LoadingScreen variant="inline" />
-      ) : isEmpty ? (
-        <EmptyProjectsCTA onAddProject={onAddProject} onImportProject={onImportProject} isEvaluating={isEvaluating} />
-      ) : (
-        <ProjectsPageBody
-          filters={filters}
-          onFiltersChange={onFiltersChange}
-          shared={shared}
-          visibleEntries={visibleEntries}
-          cardsListCtx={cardsListCtx}
-        />
-      )}
+      <ProjectsPageContent
+        projectsLoaded={projectsLoaded}
+        isEmpty={isEmpty}
+        emptyProps={{ onAddProject, onImportProject, isEvaluating }}
+        bodyProps={{ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }}
+      />
     </section>
   );
 }

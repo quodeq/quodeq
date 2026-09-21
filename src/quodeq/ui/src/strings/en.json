@@ -1394,6 +1394,7 @@
   "status.lost": "lost",
   "status.running": "running",
   "terminal.closeSession": "Close session",
+  "terminal.closeSessionNamed": "Close {name}",
   "terminal.copyOutput": "Copy terminal output",
   "terminal.copySelection": "Copy selection (or visible output)",
   "terminal.disconnected": "Terminal disconnected. Reconnecting…",

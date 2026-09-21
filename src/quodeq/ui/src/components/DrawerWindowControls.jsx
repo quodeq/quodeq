@@ -22,7 +22,7 @@ export function DrawerWindowControls({ maximized, onToggleMaximized, onHide }) {
       <button type="button" className="assistant-drawer-btn" onClick={onToggleMaximized}
         aria-label={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}
         aria-pressed={maximized}
-        title={maximized ? 'Restore' : 'Maximize'}>
+        title={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}>
         {maximized ? <MinimizeIcon /> : <MaximizeIcon />}
       </button>
       <button type="button" className="assistant-drawer-btn" onClick={onHide}

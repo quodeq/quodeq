@@ -24,7 +24,7 @@ const GRANULARITY_SUFFIX = {
 };
 
 
-function buildTrendData(trend, selectedRunId, granularity = 'day') {
+function buildTrendData(trend, granularity = 'day') {
   return [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
     const numericAverage = parseFloat(row.numericAverage);
     return {
@@ -89,7 +89,7 @@ function buildRunKbdItems(data, onBarClick) {
 export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick, granularity = 'day', onGranularityChange }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   // Hooks must run in the same order every render, so compute before any early return.
-  const data = useMemo(() => buildTrendData(trend, selectedRunId, granularity), [trend, selectedRunId, granularity]);
+  const data = useMemo(() => buildTrendData(trend, granularity), [trend, granularity]);
 
   // The parent only mounts this panel when there are ≥2 days of data, so an
   // empty trend shouldn't happen — but guard the truly-empty case. A single

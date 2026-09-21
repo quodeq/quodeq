@@ -59,6 +59,17 @@ function buildKbdItems({ data, onBarClick, selectedRunId }) {
   }));
 }
 
+/**
+ * One dimension's score over time as a bar chart, with a keyboard-reachable
+ * item per bar and a granularity switch.
+ * @param {Array} [props.trend] - the project's trend entries, newest first;
+ *   only the buckets that scored `dimension` are plotted.
+ * @param {string} props.dimension - the dimension name to plot.
+ * @param {string|null} [props.selectedRunId] - highlighted bar, if any.
+ * @param {(runId: string) => void} props.onBarClick
+ * @param {'day'|'week'|'month'} [props.granularity] - bucket size.
+ * @param {(g: string) => void} props.onGranularityChange
+ */
 export default function DimensionScoreHistoryPanel({ trend = [], dimension, selectedRunId = null, onBarClick, granularity = 'day', onGranularityChange }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const data = useMemo(() => buildDimensionData(trend, dimension, granularity, MAX), [trend, dimension, granularity]);
