@@ -7,6 +7,7 @@ tests/packaging/test_menubar_*.py files used).
 from __future__ import annotations
 
 import importlib
+import logging
 import sys
 import types
 from unittest.mock import MagicMock, patch
@@ -119,46 +120,43 @@ def test_start_uses_own_binary(monkeypatch) -> None:
     assert cmd == [sys.executable, "-m", "quodeq.dashboard", "--no-open", "--port", "7863"]
 
 
-def test_on_quit_logs_when_preference_set_fails(monkeypatch, caplog) -> None:
-    import logging
+def _raising(message: str):
+    """A stand-in that always raises, so the caller's fail-soft path runs."""
+    def boom(*_args, **_kwargs):
+        raise RuntimeError(message)
+    return boom
 
-    module, _, app = _make_app()
 
-    def boom(*a, **k):
-        raise RuntimeError("state write failed")
-
-    monkeypatch.setattr("quodeq.menubar.state.set_enabled", boom)
+def _assert_logs(monkeypatch, caplog, target: str, message: str, action, expected: str) -> None:
+    """Patch *target* to raise, run *action*, and assert the debug line landed."""
+    monkeypatch.setattr(target, _raising(message))
     with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
-        app._on_quit(None)
-    assert "could not disable menubar preference on quit" in caplog.text
+        action()
+    assert expected in caplog.text
+
+
+def test_on_quit_logs_when_preference_set_fails(monkeypatch, caplog) -> None:
+    _module, _, app = _make_app()
+    _assert_logs(
+        monkeypatch, caplog, "quodeq.menubar.state.set_enabled", "state write failed",
+        lambda: app._on_quit(None), "could not disable menubar preference on quit",
+    )
 
 
 def test_on_check_updates_logs_when_check_fails(monkeypatch, caplog) -> None:
-    import logging
-
-    module, _, app = _make_app()
-
-    def boom(*a, **k):
-        raise RuntimeError("update check failed")
-
-    monkeypatch.setattr("quodeq.update.checker.run_check", boom)
-    with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
-        app._on_check_updates(None)
-    assert "update check failed" in caplog.text
+    _module, _, app = _make_app()
+    _assert_logs(
+        monkeypatch, caplog, "quodeq.update.checker.run_check", "update check failed",
+        lambda: app._on_check_updates(None), "update check failed",
+    )
 
 
 def test_poll_logs_when_update_status_check_fails(monkeypatch, caplog) -> None:
-    import logging
-
-    module, _, app = _make_app()
-
-    def boom(*a, **k):
-        raise RuntimeError("status check failed")
-
-    monkeypatch.setattr("quodeq.update.checker.get_status", boom)
-    with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
-        app._poll(None)
-    assert "update availability check failed" in caplog.text
+    _module, _, app = _make_app()
+    _assert_logs(
+        monkeypatch, caplog, "quodeq.update.checker.get_status", "status check failed",
+        lambda: app._poll(None), "update availability check failed",
+    )
 
 
 def test_set_ui_state_running_enables_open_and_stop_only() -> None:
