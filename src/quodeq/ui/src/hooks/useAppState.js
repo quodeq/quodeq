@@ -26,41 +26,62 @@ export const KNOWN_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history', 'projec
 const PROJECT_TAB_COUNT = 4;
 export const PROJECT_TABS = KNOWN_TABS.slice(0, PROJECT_TAB_COUNT);
 
-function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
+// The accumulated dimensions all carry the same discipline and repository;
+// take the first non-empty of each and stop as soon as both are known.
+function findDimensionFacets(dims) {
+  let discipline = null, repository = null;
+  for (const d of dims) {
+    if (!discipline && d.discipline) discipline = d.discipline;
+    if (!repository && d.repository) repository = d.repository;
+    if (discipline && repository) break;
+  }
+  return { discipline, repository };
+}
+
+// Dimensions that did not scan source report no count, so the first one that
+// does is the run's file count.
+function firstSourceFileCount(dims) {
+  for (const d of dims) {
+    if (d.sourceFileCount) return d.sourceFileCount;
+  }
+  return null;
+}
+
+function buildHeaderMeta(accumulated, dashboard, selectedProject, projects) {
   const accDims = accumulated?.dimensions || [];
-  let headerMeta = null;
-  if (accDims.length > 0) {
-    let discipline = null, repository = null;
-    for (const d of accDims) {
-      if (!discipline && d.discipline) discipline = d.discipline;
-      if (!repository && d.repository) repository = d.repository;
-      if (discipline && repository) break;
-    }
-    const runDims = dashboard?.dimensions || [];
-    let totalFiles = null;
-    for (const d of runDims) {
-      if (d.sourceFileCount) { totalFiles = d.sourceFileCount; break; }
-    }
-    const projectMap = new Map(projects.map((p) => [p.id, p]));
-    const project = projectMap.get(selectedProject);
-    const languageStats = project?.languageStats ?? null;
-    headerMeta = { discipline, repository, totalFiles, languageStats };
-  }
+  if (accDims.length === 0) return null;
+  const { discipline, repository } = findDimensionFacets(accDims);
+  const totalFiles = firstSourceFileCount(dashboard?.dimensions || []);
+  const project = new Map(projects.map((p) => [p.id, p])).get(selectedProject);
+  return { discipline, repository, totalFiles, languageStats: project?.languageStats ?? null };
+}
 
-  let selectedDisplayName = selectedProject;
-  let selectedProjectParent = null;
-  let selectedProjectParentId = null;
-  if (selectedProject && projects.length) {
-    const projectById = new Map(projects.map((p) => [(p.id || p.name || p), p]));
-    const data = projectById.get(selectedProject);
-    const parentRef = data?.parent || null;
-    const parentData = parentRef ? projectById.get(parentRef) : null;
-    selectedDisplayName = data?.displayName || data?.name || selectedProject;
-    selectedProjectParent = parentData?.displayName || parentData?.name || parentRef;
-    selectedProjectParentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
-  }
+// Projects are keyed by id, but older entries only have a name, so both are
+// tried before falling back to the raw reference.
+function projectLabel(entry, fallback) {
+  return entry?.displayName || entry?.name || fallback;
+}
 
-  return { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId };
+function resolveSelectedProjectNames(selectedProject, projects) {
+  if (!selectedProject || !projects.length) {
+    return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };
+  }
+  const projectById = new Map(projects.map((p) => [(p.id || p.name || p), p]));
+  const data = projectById.get(selectedProject);
+  const parentRef = data?.parent || null;
+  const parentData = parentRef ? projectById.get(parentRef) : null;
+  return {
+    selectedDisplayName: projectLabel(data, selectedProject),
+    selectedProjectParent: projectLabel(parentData, parentRef),
+    selectedProjectParentId: parentData ? (parentData.id || parentData.name || parentRef) : null,
+  };
+}
+
+function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
+  return {
+    headerMeta: buildHeaderMeta(accumulated, dashboard, selectedProject, projects),
+    ...resolveSelectedProjectNames(selectedProject, projects),
+  };
 }
 
 function useProjects({ onNoProjects }) {

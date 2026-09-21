@@ -129,6 +129,17 @@ function drawDimParticles(ctx, principles, orbit) {
   });
 }
 
+/** Dimming applied to stars outside the focused cluster. */
+function clusterDimming(s, cam, nav) {
+  const inFocusedCluster = nav.clusterCx == null || (s._clusterCx === nav.clusterCx && s._clusterCy === nav.clusterCy);
+  return inFocusedCluster ? 1 : Math.max(UNFOCUSED_CLUSTER_MIN_ALPHA, 1 - (cam.z - 1) / 2);
+}
+
+/** Alpha for the selected star's own decorations as the camera zooms in. */
+function selectedZoomFade(camZ) {
+  return Math.max(0, 1 - (camZ - ZOOM_DIMENSION_LEVEL) / 2);
+}
+
 /** Draws one dimension star (glow, label, focus ring) and returns hover info when hit. */
 function drawOneDimStar(ctx, target, view, opts, tc) {
   const { scene, s, i } = target;
@@ -138,26 +149,23 @@ function drawOneDimStar(ctx, target, view, opts, tc) {
   const pulse = 1 + STAR.pulseAmplitude * Math.sin(t * STAR.pulseSpeed + s.pp);
   const isSelected = rDim === i;
   const sr = s.radius * pulse * cam.z * STAR.screenRadiusFraction;
-  // Dim stars not in the focused cluster
-  const inFocusedCluster = nav.clusterCx == null || (s._clusterCx === nav.clusterCx && s._clusterCy === nav.clusterCy);
-  const clusterDim = inFocusedCluster ? 1 : Math.max(UNFOCUSED_CLUSTER_MIN_ALPHA, 1 - (cam.z - 1) / 2);
+  const clusterDim = clusterDimming(s, cam, nav);
   // All dim-level decorations fade out once we zoom past galaxy level
   const dimFade = isSelected ? 1 : Math.max(0, 1 - (cam.z - ZOOM_DIMENSION_LEVEL) / DIM_FADE_SPAN) * clusterDim;
+  // Orbiting principle particles fade out as the principle planets fade in,
+  // and the label hides on the same curve once zoomed past galaxy level.
+  const decorAlpha = isSelected ? selectedZoomFade(cam.z) : dimFade;
 
-  // Principle particles orbiting this dimension — fade out as principle planets fade in
-  const particleAlpha = isSelected ? Math.max(0, 1 - (cam.z - ZOOM_DIMENSION_LEVEL) / 2) : dimFade;
-  drawDimParticles(ctx, scene.principles[i], { sc, cam, t, particleAlpha });
+  drawDimParticles(ctx, scene.principles[i], { sc, cam, t, particleAlpha: decorAlpha });
 
   drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: isSelected ? clusterDim : dimFade });
-  // Hide dimension label when zoomed past galaxy level
-  const labelAlpha = isSelected ? Math.max(0, 1 - (cam.z - ZOOM_DIMENSION_LEVEL) / 2) : dimFade;
-  if (showLabels && labelAlpha > MIN_VISIBLE_ALPHA) {
+  if (showLabels && decorAlpha > MIN_VISIBLE_ALPHA) {
     const fs = Math.min(cam.z, LABEL_SCALE_CAP);
     ctx.font = `600 ${Math.max(DIM_LABEL.fontMinPx, DIM_LABEL.fontPx * fs)}px ${CANVAS_FONT_FAMILY}`;
-    ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, LABEL_ALPHA * labelAlpha);
+    ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, LABEL_ALPHA * decorAlpha);
     ctx.fillText(s.name, sc.x, sc.y - sr - DIM_LABEL.offsetPx * fs);
     ctx.font = `${Math.max(DIM_LABEL.scoreFontMinPx, DIM_LABEL.scoreFontPx * fs)}px ${CANVAS_FONT_FAMILY}`;
-    ctx.fillStyle = rgba(tc.textMuted, DIM_LABEL.scoreAlpha * labelAlpha);
+    ctx.fillStyle = rgba(tc.textMuted, DIM_LABEL.scoreAlpha * decorAlpha);
     ctx.fillText(s.score.toFixed(1), sc.x, sc.y + sr + DIM_LABEL.scoreOffsetPx * fs);
   }
   // Keyboard focus ring (a11y, #675) — drawn at the dim's hit radius so it
@@ -218,8 +226,7 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
     // connection line
     ctx.beginPath(); ctx.moveTo(dsc.x, dsc.y); ctx.lineTo(sc.x, sc.y);
     ctx.strokeStyle = rgba(dim.col, PRINCIPLE.linkAlpha * pAlpha); ctx.lineWidth = PRINCIPLE.linkWidthPx; ctx.stroke();
-    // Violation/compliance particles — fade out on selected (large orbs take over), shrink on others
-    const particleFade = isSelectedPrin ? Math.max(0, 1 - (cam.z - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN) : 1;
+    const particleFade = principleParticleFade(cam.z, isSelectedPrin);
     // Non-selected: smaller particles but keep orbit wide so they don't collide with planet
     const cappedScale = Math.min(
       PRINCIPLE.siblingScaleCap,
@@ -229,8 +236,7 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
     const particleOrbitScale = isSelectedPrin ? pScale * PRINCIPLE.selectedParticleScale : pScale * Math.max(cappedScale, PRINCIPLE.siblingOrbitScaleMin);
     if (particleFade > MIN_VISIBLE_ALPHA) drawParticles(ctx, p.particles, { cx: sc.x, cy: sc.y, scale: particleOrbitScale, alpha: pAlpha * particleFade, t, drawScale: particleDrawScale });
     drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: p.col, alpha: pAlpha });
-    // Only fade labels/scores — hide on non-selected when zoomed into a principle
-    const prinLabelAlpha = isSelectedPrin ? Math.max(0, 1 - (cam.z - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN) : (nav.prin !== null ? Math.max(0, 1 - (cam.z - ZOOM_PRINCIPLE_LEVEL) / SIBLING_LABEL_FADE_SPAN) : 1);
+    const prinLabelAlpha = principleLabelAlpha(cam.z, isSelectedPrin, nav.prin !== null);
     if (showLabels && prinLabelAlpha > MIN_VISIBLE_ALPHA) {
       const la = pAlpha * prinLabelAlpha;
       ctx.font = `600 ${PRINCIPLE.labelFontPx}px ${CANVAS_FONT_FAMILY}`;
@@ -250,6 +256,20 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
     }
   });
   return newHovered;
+}
+
+/** Particle fade for one principle: the selected planet hands its particles
+ *  over to the large orbs as the camera zooms in; siblings keep theirs. */
+function principleParticleFade(camZ, isSelected) {
+  return isSelected ? Math.max(0, 1 - (camZ - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN) : 1;
+}
+
+/** Label alpha for one principle: the selected one fades as the camera zooms
+ *  into it, its siblings fade faster once any principle is selected. */
+function principleLabelAlpha(camZ, isSelected, anySelected) {
+  if (isSelected) return Math.max(0, 1 - (camZ - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN);
+  if (!anySelected) return 1;
+  return Math.max(0, 1 - (camZ - ZOOM_PRINCIPLE_LEVEL) / SIBLING_LABEL_FADE_SPAN);
 }
 
 /** Phase 5: violation/compliance orbs when zoomed deeply into a principle. */

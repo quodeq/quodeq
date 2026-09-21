@@ -25,6 +25,27 @@ function computeLiveBuckets(violationsBySeverity, dismissedSet) {
   return { lowConfidenceViolations: low, highConfidenceBySeverity: high, liveSevCounts: counts, liveTotal: total };
 }
 
+// Header + rows for each severity bucket the active filter lets through.
+function pushSeverityRows(arr, { highConfidenceBySeverity, activeFilter }) {
+  for (const sev of SEVERITY_ORDER) {
+    const bucket = highConfidenceBySeverity[sev] || [];
+    if (bucket.length === 0) continue;
+    if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) continue;
+    arr.push({ kind: 'sev-header', sev, count: bucket.length });
+    for (const v of bucket) arr.push({ kind: 'violation', v });
+  }
+}
+
+// The low-confidence toggle, plus its rows when expanded. Suppressed while a
+// severity filter is on: the low-confidence split cuts across severities.
+function pushLowConfidenceRows(arr, { activeFilter, lowConfidenceViolations, lowConfExpanded }) {
+  if (activeFilter && activeFilter !== 'all') return;
+  if (lowConfidenceViolations.length === 0) return;
+  arr.push({ kind: 'low-conf-toggle', count: lowConfidenceViolations.length, expanded: lowConfExpanded });
+  if (!lowConfExpanded) return;
+  for (const v of lowConfidenceViolations) arr.push({ kind: 'low-conf-row', v });
+}
+
 // Flatten everything into a single virtualizable items array. Mixing
 // headers + rows in one list lets us virtualize the whole page with one
 // scroller; React never holds more than ~30 row instances at once even on
@@ -35,19 +56,8 @@ function buildFileDetailItems({
 }) {
   const arr = [];
   if (showViolations) {
-    for (const sev of SEVERITY_ORDER) {
-      const bucket = highConfidenceBySeverity[sev] || [];
-      if (bucket.length === 0) continue;
-      if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) continue;
-      arr.push({ kind: 'sev-header', sev, count: bucket.length });
-      for (const v of bucket) arr.push({ kind: 'violation', v });
-    }
-    if ((!activeFilter || activeFilter === 'all') && lowConfidenceViolations.length > 0) {
-      arr.push({ kind: 'low-conf-toggle', count: lowConfidenceViolations.length, expanded: lowConfExpanded });
-      if (lowConfExpanded) {
-        for (const v of lowConfidenceViolations) arr.push({ kind: 'low-conf-row', v });
-      }
-    }
+    pushSeverityRows(arr, { highConfidenceBySeverity, activeFilter });
+    pushLowConfidenceRows(arr, { activeFilter, lowConfidenceViolations, lowConfExpanded });
   }
   if (showCompliance && totalCompliance > 0) {
     arr.push({ kind: 'compliance-header', count: totalCompliance });

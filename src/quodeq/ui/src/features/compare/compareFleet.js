@@ -64,6 +64,67 @@ function _buildRowDims(summary) {
 }
 
 /**
+ * Identity and origin. Remote (shared-repo) rows carry the prefixed
+ * fleet-unique key as `id`, while `sourceId` is the raw project id every API
+ * call and source-switching navigation needs. Local rows keep sourceId === id.
+ */
+function _rowIdentity(project, id) {
+  return {
+    id,
+    source: project.source === 'shared' ? 'shared' : 'local',
+    sourceId: project.sourceId || id,
+    remote: project.source === 'shared',
+    name: project.displayName || project.name || id,
+  };
+}
+
+/** File counts and the share of them the last run got through. */
+function _rowCoverage(project) {
+  const totalFiles = project.totalFiles ?? project.filesCount ?? null;
+  const analyzedFiles = project.analyzedFiles ?? null;
+  return {
+    lang: topLanguage(project.languageStats),
+    totalFiles,
+    analyzedFiles,
+    coveragePct: totalFiles && analyzedFiles != null
+      ? Math.round((analyzedFiles / totalFiles) * 100)
+      : null,
+  };
+}
+
+/** Score, grade, trend and violation counts off the compare summary. */
+function _rowScores(score, s, trend) {
+  return {
+    score,
+    grade: s?.overallGrade ?? null,
+    delta: trend.delta,
+    lastDelta: trend.lastDelta,
+    spark: trend.spark,
+    severity: s?.severity || { critical: 0, major: 0, minor: 0 },
+    totalViolations: s?.totalViolations ?? 0,
+    totalCompliance: s?.totalCompliance ?? 0,
+  };
+}
+
+/** When the project last ran, and whether that leaves the row stale. */
+function _rowFreshness(project, summary, now) {
+  const lastISO = summary?.lastRun?.dateISO || project.latestDate || null;
+  const commitsSince = summary?.commitsSinceLastRun ?? null;
+  const ageDays = lastISO ? daysBetween(lastISO, now) : null;
+  return { lastISO, stale: _deriveStaleness(commitsSince, ageDays), commitsSince };
+}
+
+/** Whether the row has arrived yet and whether it has anything to show. */
+function _rowStatus(project, summary, score) {
+  return {
+    hasRuns: (project.runsCount ?? 0) > 0 || (summary?.runsCount ?? 0) > 0,
+    loaded: summary !== undefined,
+    hasData: score != null,
+    dims: _buildRowDims(summary),
+  };
+}
+
+/**
  * One fleet-table row: a Project model joined with its compare summary.
  * `summary` may be undefined while the per-project query is in flight.
  */
@@ -71,44 +132,12 @@ export function buildRow(project, summary, now) {
   const id = project.id || project.name;
   const s = summary?.summary || null;
   const score = s?.numericAverage ?? null;
-  const lastISO = summary?.lastRun?.dateISO || project.latestDate || null;
-  const ageDays = lastISO ? daysBetween(lastISO, now) : null;
-  const commitsSince = summary?.commitsSinceLastRun ?? null;
-  const stale = _deriveStaleness(commitsSince, ageDays);
-  const totalFiles = project.totalFiles ?? project.filesCount ?? null;
-  const analyzedFiles = project.analyzedFiles ?? null;
-  const { delta, lastDelta, spark } = trendDelta(summary?.trend, now);
-  const dims = _buildRowDims(summary);
   return {
-    id,
-    // Remote (shared-repo) rows: `id` is the prefixed fleet-unique key, and
-    // `sourceId` is the raw project id every API call and source-switching
-    // navigation needs. Local rows keep sourceId === id.
-    source: project.source === 'shared' ? 'shared' : 'local',
-    sourceId: project.sourceId || id,
-    remote: project.source === 'shared',
-    name: project.displayName || project.name || id,
-    lang: topLanguage(project.languageStats),
-    totalFiles,
-    analyzedFiles,
-    coveragePct: totalFiles && analyzedFiles != null
-      ? Math.round((analyzedFiles / totalFiles) * 100)
-      : null,
-    score,
-    grade: s?.overallGrade ?? null,
-    delta,
-    lastDelta,
-    spark,
-    severity: s?.severity || { critical: 0, major: 0, minor: 0 },
-    totalViolations: s?.totalViolations ?? 0,
-    totalCompliance: s?.totalCompliance ?? 0,
-    lastISO,
-    stale,
-    commitsSince,
-    hasRuns: (project.runsCount ?? 0) > 0 || (summary?.runsCount ?? 0) > 0,
-    loaded: summary !== undefined,
-    hasData: score != null,
-    dims,
+    ..._rowIdentity(project, id),
+    ..._rowCoverage(project),
+    ..._rowScores(score, s, trendDelta(summary?.trend, now)),
+    ..._rowFreshness(project, summary, now),
+    ..._rowStatus(project, summary, score),
   };
 }
 

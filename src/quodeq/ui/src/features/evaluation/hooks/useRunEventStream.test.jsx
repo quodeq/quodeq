@@ -130,29 +130,16 @@ describe("useRunEventStream (cache-writer)", () => {
     expect(MockEventSource.last).toBeNull();
   });
 
-  it("invalidates project trend on terminal status (done)", () => {
+  // Every terminal state invalidates the same way; a new one is a row here.
+  it.each([
+    ["done", "job-term-1"],
+    ["failed", "job-term-2"],
+    ["cancelled", "job-term-3"],
+  ])("invalidates project trend on terminal status (%s)", (state, jobId) => {
     vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
-    const { invalidateSpy } = renderStreamWithSpy("job-term-1");
+    const { invalidateSpy } = renderStreamWithSpy(jobId);
     act(() => {
-      MockEventSource.last.emit("status", { state: "done" });
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
-  });
-
-  it("invalidates project trend on terminal status (failed)", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
-    const { invalidateSpy } = renderStreamWithSpy("job-term-2");
-    act(() => {
-      MockEventSource.last.emit("status", { state: "failed" });
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
-  });
-
-  it("invalidates project trend on terminal status (cancelled)", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
-    const { invalidateSpy } = renderStreamWithSpy("job-term-3");
-    act(() => {
-      MockEventSource.last.emit("status", { state: "cancelled" });
+      MockEventSource.last.emit("status", { state });
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
   });

@@ -27,6 +27,37 @@
  * @property {number|null}  analyzedFiles
  */
 
+import { fromFieldSpec } from './fieldSpec.js';
+
+/**
+ * Field table for {@link createProject}: output key -> [raw spelling(s), default].
+ */
+const PROJECT_FIELDS = {
+  name:            ['name', ''],
+  id:              ['id', null],
+  parent:          ['parent', null],
+  displayName:     ['displayName', null],
+  discipline:      ['discipline', null],
+  path:            ['path', null],
+  originUrl:       ['originUrl', null],
+  location:        ['location', null],
+  pathExists:      ['pathExists', null],
+  latestDate:      ['latestDate', null],
+  latestRunId:     ['latestRunId', null],
+  latestDoneRunId: ['latestDoneRunId', null],
+  latestGrade:     ['latestGrade', null],
+  summaryPending:  ['summaryPending', false],
+  latestScore:     ['latestScore', null],
+  runsCount:       ['runsCount', 0],
+  filesCount:      ['filesCount', null],
+  scopePath:       ['scopePath', null],
+  hasFingerprints: ['hasFingerprints', false],
+  languageStats:   ['languageStats', null],
+  scanDate:        ['scanDate', null],
+  totalFiles:      ['totalFiles', null],
+  analyzedFiles:   ['analyzedFiles', null],
+};
+
 /**
  * Create a canonical Project from a raw API object.
  *
@@ -35,29 +66,5 @@
  */
 export function createProject(raw) {
   if (!raw || typeof raw !== 'object') return raw;
-  return {
-    name:         raw.name ?? '',
-    id:           raw.id ?? null,
-    parent:       raw.parent ?? null,
-    displayName:  raw.displayName ?? null,
-    discipline:   raw.discipline ?? null,
-    path:         raw.path ?? null,
-    originUrl:    raw.originUrl ?? null,
-    location:     raw.location ?? null,
-    pathExists:   raw.pathExists ?? null,
-    latestDate:   raw.latestDate ?? null,
-    latestRunId:  raw.latestRunId ?? null,
-    latestDoneRunId: raw.latestDoneRunId ?? null,
-    latestGrade:  raw.latestGrade ?? null,
-    summaryPending: raw.summaryPending ?? false,
-    latestScore:  raw.latestScore ?? null,
-    runsCount:    raw.runsCount ?? 0,
-    filesCount:   raw.filesCount ?? null,
-    scopePath:    raw.scopePath ?? null,
-    hasFingerprints: raw.hasFingerprints ?? false,
-    languageStats: raw.languageStats ?? null,
-    scanDate:      raw.scanDate ?? null,
-    totalFiles:    raw.totalFiles ?? null,
-    analyzedFiles: raw.analyzedFiles ?? null,
-  };
+  return fromFieldSpec(raw, PROJECT_FIELDS);
 }

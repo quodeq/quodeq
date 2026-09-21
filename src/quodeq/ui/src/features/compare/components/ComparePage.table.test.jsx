@@ -25,6 +25,16 @@ import { PROJECTS, summary, renderPage, iso } from './_comparePage.fixtures.jsx'
  * split further into ComparePage.remote.test.jsx.
  */
 
+/**
+ * Drill into the security dimension. Several nodes render the text
+ * "security"; the last one is the fleet table's dimension cell, which is the
+ * one that navigates.
+ */
+async function drillIntoSecurity() {
+  const matches = await screen.findAllByText('security');
+  await userEvent.click(matches[matches.length - 1]);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
@@ -224,7 +234,7 @@ describe('ComparePage', () => {
     const onOpenProject = vi.fn();
     renderPage({ onOpenProjectDimension, onOpenProject });
     await screen.findByText('alpha');
-    await userEvent.click((await (async () => { const b = await screen.findAllByText('security'); return b[b.length - 1]; })()));
+    await drillIntoSecurity();
     await userEvent.click(await screen.findByText('leads the scope'));
     expect(onOpenProjectDimension).toHaveBeenCalledWith(
       expect.objectContaining({ runId: 'r2', dimName: 'Security' }),
@@ -243,7 +253,7 @@ describe('ComparePage', () => {
     const onOpenEvalPrincipal = vi.fn();
     renderPage({ onOpenEvalPrincipal });
     await screen.findByText('alpha');
-    await userEvent.click((await (async () => { const b = await screen.findAllByText('security'); return b[b.length - 1]; })()));
+    await drillIntoSecurity();
     // beta leads security (5.5 vs... alpha 7.0 leads actually) — click the
     // integrity lead entry, whoever it is, via its accessible title.
     const leads = await screen.findAllByTitle(/open integrity in/);
