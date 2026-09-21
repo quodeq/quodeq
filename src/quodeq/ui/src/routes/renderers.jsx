@@ -58,23 +58,44 @@ export function isSharedSource(selectedSource) {
 }
 
 /**
+ * Find a project in `projects` by the id-or-name key the app routes on.
+ *
+ * @param {Array|undefined} projects
+ * @param {string|undefined} key
+ * @returns {Object|null}
+ */
+export function findProject(projects, key) {
+  return projects?.find((p) => (p.id || p.name) === key) || null;
+}
+
+/**
+ * The onDismiss handler a detail route passes down, or undefined for a
+ * shared-source project (read-only, so the card hides its dismiss button
+ * rather than wiring a handler that must never fire).
+ *
+ * @param {Object} options Everything dismissWithReconcile needs, plus
+ *   `selectedSource` — the source the gate is read from.
+ * @returns {Function|undefined}
+ */
+export function makeDismissHandler({ selectedSource, ...rest }) {
+  if (isSharedSource(selectedSource)) return undefined;
+  return (violation) => dismissWithReconcile({ violation, ...rest });
+}
+
+/**
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
  * @returns {JSX.Element}
  */
 function EvaluateCase({ evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation, startedProject } = evaluation;
-  const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
+  const projectInfo = findProject(projects, selectedProject);
   // The in-progress card describes the running job's own project, which can
   // differ from the UI's global selection. Resolve it the same way so the
   // card label follows the job rather than the selection. Before the
   // report-path marker resolves outputProject, the project the job was
   // started for fills the gap; the global selection is never used.
-  const jobProjectInfo = job?.outputProject
-    ? (projects?.find(p => (p.id || p.name) === job.outputProject) || null)
-    : null;
-  const startedProjectInfo = startedProject
-    ? (projects?.find(p => (p.id || p.name) === startedProject) || null)
-    : null;
+  const jobProjectInfo = job?.outputProject ? findProject(projects, job.outputProject) : null;
+  const startedProjectInfo = startedProject ? findProject(projects, startedProject) : null;
   return (
     <>
       <EvaluateScreen
@@ -136,8 +157,8 @@ function renderEvalPrincipleDetail(params, props) {
       // The evalPrincipal's own project, NOT the global selection: a
       // cross-project entry (Compare's principle jump, a parent dimension's
       // fromProject) must dismiss into the project the finding belongs to.
-      onDismiss={isSharedSource(selectedSource) ? undefined : (v) => dismissWithReconcile({
-        violation: v,
+      onDismiss={makeDismissHandler({
+        selectedSource,
         fallbackDimension: evalPrincipal.dimension,
         runId: evalPrincipal.runId,
         explicitProject: evalPrincipal.project,
@@ -199,8 +220,8 @@ export const ROUTE_RENDERERS = {
       // from a cross-project explorer (fromProject) must dismiss into the
       // project the finding belongs to. Same identity rule as the
       // evalprinciple route — encoded once, in dismissWithReconcile.
-      onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : (v) => dismissWithReconcile({
-        violation: v,
+      onDismiss={makeDismissHandler({
+        selectedSource: props.navigation.selectedSource,
         runId: params.runId,
         explicitProject: params.fromProject,
         selectedProject: props.navigation.selectedProject,
@@ -216,8 +237,8 @@ export const ROUTE_RENDERERS = {
       principle={params.principle}
       dimension={params.dimension}
       // Same identity rule as the file and evalprinciple routes.
-      onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : (v) => dismissWithReconcile({
-        violation: v,
+      onDismiss={makeDismissHandler({
+        selectedSource: props.navigation.selectedSource,
         fallbackDimension: params.dimension,
         runId: params.runId,
         explicitProject: params.fromProject,

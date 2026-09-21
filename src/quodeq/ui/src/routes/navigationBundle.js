@@ -17,48 +17,49 @@ import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER } from '../features/onboard
  * mounting the whole App.
  */
 
-function makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects }) {
-  return () => {
+// Every navigation action is blocked while an evaluation runs: the guard
+// toasts the action's own "busy" message and swallows the click. Written once
+// so a change to the block (or its wording lookup) lands in one place.
+function guardedWhileEvaluating({ isEvaluating, showToast, busyKey }, action) {
+  return (...args) => {
     if (isEvaluating) {
-      showToast(t('evaluate.busyAddProject'));
+      showToast(t(busyKey));
       return;
     }
-    setWizardEntry({ startStep: STEP_REPO_SCAN, isFirstProject: projects.length === 0 });
+    action(...args);
   };
+}
+
+function makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects }) {
+  return guardedWhileEvaluating(
+    { isEvaluating, showToast, busyKey: 'evaluate.busyAddProject' },
+    () => setWizardEntry({ startStep: STEP_REPO_SCAN, isFirstProject: projects.length === 0 }),
+  );
 }
 
 function makeOnImportProject({ isEvaluating, showToast, handleImportProject }) {
-  return () => {
-    if (isEvaluating) {
-      showToast(t('evaluate.busyImportProject'));
-      return;
-    }
-    handleImportProject();
-  };
+  return guardedWhileEvaluating(
+    { isEvaluating, showToast, busyKey: 'evaluate.busyImportProject' },
+    () => handleImportProject(),
+  );
 }
 
 function makeOnTakeTour({ isEvaluating, showToast, setWizardEntry }) {
-  return () => {
-    if (isEvaluating) {
-      showToast(t('evaluate.busyStartTour'));
-      return;
-    }
-    setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: true });
-  };
+  return guardedWhileEvaluating(
+    { isEvaluating, showToast, busyKey: 'evaluate.busyStartTour' },
+    () => setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: true }),
+  );
 }
 
 function makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }) {
-  return (projectId) => {
-    if (isEvaluating) {
-      showToast(t('evaluate.busyResumeSetup'));
-      return;
-    }
-    setWizardEntry({
+  return guardedWhileEvaluating(
+    { isEvaluating, showToast, busyKey: 'evaluate.busyResumeSetup' },
+    (projectId) => setWizardEntry({
       startStep: STEP_PROVIDER,
       isFirstProject: false,
       presetProjectId: projectId,
-    });
-  };
+    }),
+  );
 }
 
 export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluating, showToast, setWizardEntry, sharedHasContent = false }) {
