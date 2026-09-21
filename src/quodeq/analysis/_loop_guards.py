@@ -14,6 +14,27 @@ from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
 
 
+def _tally_evidence_dir(run_dir: Path | None) -> tuple[int, int]:
+    """``(ok, error)`` file_done markers summed over one run's evidence files.
+
+    ``(0, 0)`` when there is no run dir or no evidence directory yet. Only
+    dispatch workers write these markers; cache replays write findings
+    without them, so the totals measure fresh progress this run made.
+    """
+    if run_dir is None:
+        return 0, 0
+    evidence_dir = Path(run_dir) / "evidence"
+    if not evidence_dir.is_dir():
+        return 0, 0
+    ok_total = 0
+    err_total = 0
+    for jsonl in evidence_dir.glob("*_evidence.jsonl"):
+        ok, err = _tally_markers(jsonl)
+        ok_total += ok
+        err_total += err
+    return ok_total, err_total
+
+
 def _count_ok_files(run_dir: Path | None) -> int:
     """Files successfully analysed by THIS run's workers, across all dims.
 
@@ -21,16 +42,7 @@ def _count_ok_files(run_dir: Path | None) -> int:
     replays write findings without markers. So this count measures fresh
     progress this run made, never carried-forward data.
     """
-    if run_dir is None:
-        return 0
-    evidence_dir = Path(run_dir) / "evidence"
-    if not evidence_dir.is_dir():
-        return 0
-    total = 0
-    for jsonl in evidence_dir.glob("*_evidence.jsonl"):
-        ok, _err = _tally_markers(jsonl)
-        total += ok
-    return total
+    return _tally_evidence_dir(run_dir)[0]
 
 
 def _raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> None:
@@ -171,15 +183,7 @@ def check_model_reachable(run_dir: Path | None, result: dict) -> None:
     """
     if run_dir is None or _count_findings(result) > 0:
         return
-    evidence_dir = run_dir / "evidence"
-    if not evidence_dir.is_dir():
-        return
-    ok_total = 0
-    err_total = 0
-    for jsonl in evidence_dir.glob("*_evidence.jsonl"):
-        ok, err = _tally_markers(jsonl)
-        ok_total += ok
-        err_total += err
+    ok_total, err_total = _tally_evidence_dir(run_dir)
     if ok_total == 0 and err_total > 0:
         raise EvaluationError(
             f"Model produced no analysis: all {err_total} dispatched file(s) failed "

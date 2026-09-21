@@ -109,23 +109,23 @@ def _dispatch_per_dim(
     log = deps.log
     run_dir = _run_dir_for(config)
 
-    def _incomplete(exc: BaseException | None = None) -> None:
+    def _skip(reason: str, exc: BaseException | None = None) -> None:
+        """Mark the dim INCOMPLETE and log the iteration as skipped for *reason*."""
         _safe_write_dim_state(
             run_dir, dimension,
             DimTransition(DimState.INCOMPLETE, reason=_interruption_reason(exc)), log=log,
         )
+        log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: {reason})")
 
     try:
         ev = deps.runner.run(config, dimension, idx, ctx, emit_log=True)
     except BrokenPipeError as exc:
         _silence_broken_stdout()
-        _incomplete(exc)
-        log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: broken pipe)")
+        _skip("broken pipe", exc)
         return None
     except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
         log.warning(f"[{idx}/{ctx.total}] {dimension} - failed: {exc}")
-        _incomplete(exc)
-        log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: {type(exc).__name__})")
+        _skip(type(exc).__name__, exc)
         return None
     except Exception as exc:  # noqa: BLE001
         # Don't let an exotic exception class drop the rest of the loop
@@ -134,12 +134,10 @@ def _dispatch_per_dim(
             f"[loop] {dimension} - unexpected exception "
             f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
         )
-        _incomplete(exc)
-        log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: unexpected)")
+        _skip("unexpected", exc)
         return None
     if ev is None:
-        _incomplete()
-        log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: ev=None)")
+        _skip("ev=None")
         return None
     return ev
 

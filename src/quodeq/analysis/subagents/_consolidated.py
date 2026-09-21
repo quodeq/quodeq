@@ -8,20 +8,18 @@ from typing import Any
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
+from quodeq.analysis.evidence_parser import evidence_parse_options
 from quodeq.core.evidence.model import Evidence
-from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import (
-    EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence_by_dimension)
-from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
+    EvidenceContext, parse_jsonl_to_evidence_by_dimension)
 from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
-from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
+from quodeq.analysis.prompts.builder import build_consolidated_prompt, prompt_context
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
 from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.analysis.runner_markers import cleanup_stream
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 
 @dataclass(frozen=True)
@@ -102,41 +100,14 @@ def _collect_consolidated_results(
     )
 
     return parse_jsonl_to_evidence_by_dimension(
-        merged_jsonl, ev_ctx, _parse_options(config, paths.compiled_dir),
-    )
-
-
-def _parse_options(config: "RunConfig", compiled_dir: "Path | None") -> EvidenceParseOptions:
-    """Production readers and log sinks for the consolidated evidence parse."""
-    return EvidenceParseOptions(
-        compiled_dir=compiled_dir,
-        evaluators_dir=config.evaluators_dir,
-        req_map_reader=read_req_to_principle_map,
-        refs_reader=load_compiled_refs,
-        cwe_url_template=cwe_url_template(),
-        on_quarantine=log_quarantined_findings,
-        on_malformed_line=log_malformed_jsonl_line,
+        merged_jsonl, ev_ctx, evidence_parse_options(config, paths.compiled_dir),
     )
 
 
 def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: AnalysisContext) -> str:
     """Build the consolidated prompt for multi-dimension analysis."""
     return build_consolidated_prompt(
-        dimensions=dimensions,
-        context=PromptContext(
-            language=config.language,
-            repo_name=str(config.src),
-            date_str=ctx.date_str,
-            dimension="consolidated",
-            source_file_count=config.source_file_count,
-            dimensions_data=ctx.dimensions_data,
-            standards_dir=config.standards_dir,
-            evaluators_dir=config.evaluators_dir,
-            manifest=config.manifest,
-            target=config.target,
-            work_dir=config.work_dir or config.src,
-            project_root=config.src,
-        ),
+        dimensions=dimensions, context=prompt_context(config, ctx, "consolidated"),
     )
 
 

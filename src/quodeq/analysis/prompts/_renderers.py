@@ -13,6 +13,21 @@ _logger = logging.getLogger(__name__)
 _NO_STANDARDS_FOR_DIM = "_No compiled standards for this dimension._"
 
 
+def _require_field(entry: dict, field: str, kind: str) -> object:
+    """``entry[field]``, or a ValueError naming the malformed *kind* of entry.
+
+    Compiled standards are the contract the prompt is built from: a
+    principle with no name, a requirement with no id or a dimension with no
+    id cannot be rendered, and failing here names the offending entry.
+    """
+    value = entry.get(field)
+    if value is None:
+        raise ValueError(
+            f"Malformed standards file: a {kind} is missing required {field!r}: {entry!r}"
+        )
+    return value
+
+
 def _load_dimension_data(
     compiled_dir: Path,
     dimension: str,
@@ -54,20 +69,12 @@ def render_compiled_standards(
         reqs = principle.get("requirements", [])
         if not reqs:
             continue
-        name = principle.get("name")
-        if name is None:
-            raise ValueError(
-                f"Malformed standards file: a principle is missing required 'name': {principle!r}"
-            )
+        name = _require_field(principle, "name", "principle")
         lines.append(f"### {name}")
         if principle.get("description"):
             lines.append(principle["description"])
         for req in reqs:
-            req_id = req.get("id")
-            if req_id is None:
-                raise ValueError(
-                    f"Malformed standards file: a requirement is missing required 'id': {req!r}"
-                )
+            req_id = _require_field(req, "id", "requirement")
             text = resolve_requirement_text(req, (overrides or {}).get(req_id))
             req_line = f"- **{req_id}**: {text}"
             if req.get("description"):
@@ -98,11 +105,7 @@ def render_compact_standards(
             continue
         requirements = []
         for r in reqs:
-            req_id = r.get("id")
-            if req_id is None:
-                raise ValueError(
-                    f"Malformed standards file: a requirement is missing required 'id': {r!r}"
-                )
+            req_id = _require_field(r, "id", "requirement")
             requirements.append({
                 "id": req_id,
                 "rule": resolve_requirement_text(r, (overrides or {}).get(req_id)),
@@ -119,11 +122,7 @@ def render_dimensions(dimensions_data: dict, dimension: str) -> str:
     applies = dimensions_data.get("applies", [])
     dim_entry = None
     for d in applies:
-        d_id = d.get("id")
-        if d_id is None:
-            raise ValueError(
-                f"Malformed standards file: a dimension is missing required 'id': {d!r}"
-            )
+        d_id = _require_field(d, "id", "dimension")
         if d_id == dimension:
             dim_entry = d
             break

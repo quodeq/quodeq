@@ -23,6 +23,21 @@ def describe_target(target: AnalysisTarget) -> str:
     return " ".join(parts)
 
 
+def _append_extension_breakdown(lines: list[str], language_stats: dict[str, int] | None) -> None:
+    """Append the extension-breakdown line, commonest first, when there are stats.
+
+    Nothing is appended for empty stats: the section would carry no
+    information and the prompt reads better without an empty heading.
+    """
+    if not language_stats:
+        return
+    breakdown = ", ".join(
+        f"{ext}: {count}" for ext, count in
+        sorted(language_stats.items(), key=lambda x: -x[1])[:_MAX_LANGUAGE_EXTENSIONS]
+    )
+    lines.append(f"**Extension breakdown:** {breakdown}")
+
+
 def render_target_prompt_context(
     target: AnalysisTarget,
     repo_total_files: int = 0,
@@ -42,12 +57,7 @@ def render_target_prompt_context(
             f"{describe_target(t)} ({t.total_files} files)" for t in other_targets
         )
         lines.append(f"**Other modules:** {others}")
-    if target.language_stats:
-        breakdown = ", ".join(
-            f"{ext}: {count}" for ext, count in
-            sorted(target.language_stats.items(), key=lambda x: -x[1])[:_MAX_LANGUAGE_EXTENSIONS]
-        )
-        lines.append(f"**Extension breakdown:** {breakdown}")
+    _append_extension_breakdown(lines, target.language_stats)
     return "\n".join(lines)
 
 
@@ -56,12 +66,7 @@ def _render_no_targets(manifest: SourceManifest) -> str:
         "**Project type:** Unknown",
         f"**Source files:** {manifest.total_files}",
     ]
-    if manifest.language_stats:
-        breakdown = ", ".join(
-            f"{ext}: {count}" for ext, count in
-            sorted(manifest.language_stats.items(), key=lambda x: -x[1])[:_MAX_LANGUAGE_EXTENSIONS]
-        )
-        lines.append(f"**Extension breakdown:** {breakdown}")
+    _append_extension_breakdown(lines, manifest.language_stats)
     return "\n".join(lines)
 
 
@@ -72,12 +77,7 @@ def _render_multi_target(manifest: SourceManifest) -> str:
         lines.append(f"- {describe_target(t)} ({t.total_files} files)")
     lines.append("")
     lines.append("Analyze each file according to its language and project type.")
-    if manifest.language_stats:
-        breakdown = ", ".join(
-            f"{ext}: {count}" for ext, count in
-            sorted(manifest.language_stats.items(), key=lambda x: -x[1])[:_MAX_LANGUAGE_EXTENSIONS]
-        )
-        lines.append(f"**Extension breakdown:** {breakdown}")
+    _append_extension_breakdown(lines, manifest.language_stats)
     return "\n".join(lines)
 
 
