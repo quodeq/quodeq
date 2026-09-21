@@ -56,6 +56,7 @@ dev = [
     "pytest-timeout==2.4.0",
     "pytest-xdist==3.8.0",
     "ruff==0.16.7",
+    "vulture==2.16",
 ]
 
 [project.scripts]
