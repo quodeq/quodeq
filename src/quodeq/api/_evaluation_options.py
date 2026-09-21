@@ -7,15 +7,14 @@ primitives, never the other way round.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import NamedTuple
 
 from quodeq.api._evaluation_helpers import coerce_int, resolve_clean_scan
 from quodeq.config.ai_provider import get_api_key_secure
-from quodeq.services.base import DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT
+from quodeq.services.base import (
+    DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT, EvaluationOptions,
+)
 from quodeq.shared.validation import validate_relative_scope
-
-if TYPE_CHECKING:
-    from quodeq.services.base import EvaluationOptions
 
 # Bounds for user-supplied evaluation parameters
 _MIN_SUBAGENTS = 1
@@ -75,9 +74,8 @@ def _parse_flags(body: dict) -> _Flags:
     )
 
 
-def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
+def _build_evaluation_options(payload: dict) -> EvaluationOptions:
     """Construct and validate EvaluationOptions from the request payload."""
-    from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
     limits = _parse_limits(payload)
     flags = _parse_flags(payload)
     context_size = coerce_int(payload.get("contextSize"), 0, "contextSize")

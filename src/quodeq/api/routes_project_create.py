@@ -173,6 +173,20 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
     return None
 
 
+def _resolve_create_project_source(parsed):
+    """Settle where the new project's checkout comes from.
+
+    Returns ``(clone_dest, None)`` once the request's repo is usable, or
+    ``(None, error_response)`` when it is not. URL repos need a destination
+    to clone into; local repos need a path that is not inside the reports
+    root.
+    """
+    if parsed.is_url:
+        return _resolve_create_project_clone_dest(parsed.ephemeral, parsed.clone_dest)
+    local_err = _validate_local_create_project_repo(parsed.repo, parsed.reports_root)
+    return (parsed.clone_dest, None) if local_err is None else (None, local_err)
+
+
 def _create_project(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Register a new project (clone + scan) without starting an evaluation.
 
@@ -182,20 +196,13 @@ def _create_project(provider: ActionProvider) -> Response | tuple[Response, int]
     or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
     ``ephemeral`` are ignored.
     """
-    data = request.get_json(silent=True) or {}
-    parsed, error = _parse_create_project_request(data)
+    parsed, error = _parse_create_project_request(request.get_json(silent=True) or {})
     if error is not None:
         return error
 
-    clone_dest = parsed.clone_dest
-    if parsed.is_url:
-        clone_dest, clone_err = _resolve_create_project_clone_dest(parsed.ephemeral, clone_dest)
-        if clone_err is not None:
-            return clone_err
-    else:
-        local_err = _validate_local_create_project_repo(parsed.repo, parsed.reports_root)
-        if local_err is not None:
-            return local_err
+    clone_dest, error = _resolve_create_project_source(parsed)
+    if error is not None:
+        return error
 
     spec = NewProjectSpec(
         repo=parsed.repo, discipline=parsed.discipline, scope_path=parsed.scope_path,

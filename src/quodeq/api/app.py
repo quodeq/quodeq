@@ -188,8 +188,7 @@ def _configure_request_handling(
     from quodeq.api._compression import configure_compression
     configure_compression(app)
     app.config["QUODEQ_API_KEY"] = api_key
-    from quodeq.shared.utils import get_action_api_host as _gah
-    app.config["QUODEQ_BIND_HOST"] = _gah(env)
+    app.config["QUODEQ_BIND_HOST"] = get_action_api_host(env)
     log_buffer, verbose = _configure_logging(app, env)
     _register_health_route(app, verbose)
     return log_buffer
@@ -225,25 +224,15 @@ def create_app(
     return app
 
 
-def main(env: dict[str, str] | None = None) -> None:
-    """Start the Flask development server using environment configuration."""
-    from quodeq.shared.text_io import configure_stdio_utf8
-    configure_stdio_utf8(env)
-    _env = resolve_env(env)
-    # SECURITY: API key read from environment. For hardened deployments,
-    # consider a secrets manager or platform keychain instead.
-    app = create_app(
-        static_dist=get_static_dist(env),
-        api_key=_env.get("QUODEQ_API_KEY"),
-        env=env,
-    )
+def _install_shutdown_handlers() -> None:
+    """Turn SIGTERM/SIGINT into a clean SystemExit.
 
-    # Evaluation subprocesses are spawned with start_new_session=True so they
-    # survive the API process dying. Intentionally do NOT kill them on API
-    # shutdown — otherwise launching a second dashboard (which calls
-    # _kill_stale_action_api on the first) would cascade and kill any scan in
-    # flight. Scans have their own lifecycle; use the UI cancel button or the
-    # DELETE endpoint for explicit stops.
+    Evaluation subprocesses are spawned with start_new_session=True so they
+    survive the API process dying, and are intentionally NOT killed here --
+    otherwise launching a second dashboard (which calls _kill_stale_action_api
+    on the first) would cascade and kill any scan in flight. Scans have their
+    own lifecycle; use the UI cancel button or the DELETE endpoint.
+    """
     def _handle_shutdown(_signum: int, _frame: object) -> None:
         raise SystemExit(0)
 
@@ -251,11 +240,14 @@ def main(env: dict[str, str] | None = None) -> None:
         signal.signal(signal.SIGTERM, _handle_shutdown)
     signal.signal(signal.SIGINT, _handle_shutdown)
 
-    # Warm the score caches in the background so the first requests after an
-    # upgrade hit warm or warming caches instead of recomputing inline. Also
-    # migrate and index the result cache once, off the request path, so
-    # estimates stop undercounting cached files after an upgrade.
-    # main() only: create_app callers (tests, embedding) stay thread-free.
+
+def _start_background_work() -> None:
+    """Warm the score caches and run cache maintenance off the request path.
+
+    After an upgrade the first requests would otherwise recompute inline and
+    estimates would undercount cached files. main() only: create_app callers
+    (tests, embedding) stay thread-free. Never blocks serving.
+    """
     try:
         from quodeq.api.routes_common import reports_dir  # noqa: PLC0415
         from quodeq.services.warmup import engine as warmup_engine  # noqa: PLC0415
@@ -264,9 +256,28 @@ def main(env: dict[str, str] | None = None) -> None:
         warmup_engine.start(reports_dir())
         start_cache_maintenance(log=SHARED_LOG)
     except Exception:  # pragma: no cover - warm-up must never block serving
-        logging.getLogger(__name__).warning("warm-up start failed", exc_info=True)
+        _logger.warning("warm-up start failed", exc_info=True)
 
+
+def _serve(app: Flask, env: dict[str, str] | None) -> None:
+    """Run the Flask development server on the configured host and port."""
     app.run(host=get_action_api_host(env), port=get_action_api_port(env), debug=False)
+
+
+def main(env: dict[str, str] | None = None) -> None:
+    """Start the Flask development server using environment configuration."""
+    from quodeq.shared.text_io import configure_stdio_utf8
+    configure_stdio_utf8(env)
+    # SECURITY: API key read from environment. For hardened deployments,
+    # consider a secrets manager or platform keychain instead.
+    app = create_app(
+        static_dist=get_static_dist(env),
+        api_key=resolve_env(env).get("QUODEQ_API_KEY"),
+        env=env,
+    )
+    _install_shutdown_handlers()
+    _start_background_work()
+    _serve(app, env)
 
 
 if __name__ == "__main__":

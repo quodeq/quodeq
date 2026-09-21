@@ -10,7 +10,6 @@ from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
-_KNOWN_BACKENDS = {"memory", "file"}
 _DEFAULT_RATE_LIMIT_FILE = str(default_rate_limit_path())
 
 

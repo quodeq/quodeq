@@ -6,6 +6,7 @@ run_events_generator.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from http import HTTPStatus
 from pathlib import Path
 
@@ -38,7 +39,6 @@ def register_run_events_routes(app: Flask) -> None:
             code = "GONE" if err == HTTPStatus.GONE else "NOT_FOUND"
             return jsonify({"error": "run unavailable", "code": code}), err
 
-        from datetime import datetime  # noqa: PLC0415
         last_event_id_raw = request.headers.get("Last-Event-ID", "")
         last_event_ts: datetime | None = None
         if last_event_id_raw:
