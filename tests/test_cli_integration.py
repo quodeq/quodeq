@@ -23,7 +23,11 @@ class TestRunPipelineWithCleanup:
     @patch("quodeq.cli_evaluation._save_manifest")
     @patch("quodeq.cli_evaluation.emit_marker")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=False)
-    def test_local_repo_no_cleanup(self, mock_url, mock_marker, mock_save, mock_config, mock_exec, tmp_path):
+    @patch("quodeq.cli_evaluation.cleanup_cloned_repo")
+    @patch("quodeq.cli_evaluation._cleanup_worktree")
+    def test_local_repo_no_cleanup(
+        self, mock_wt_cleanup, mock_cleanup, mock_url, mock_marker, mock_save, mock_config, mock_exec, tmp_path,
+    ):
         from quodeq.cli import run_pipeline_with_cleanup, ResolvedInputs
         evidence_dir = tmp_path / "proj-uuid" / "run-id" / "evidence"
         evaluation_dir = tmp_path / "proj-uuid" / "run-id" / "evaluation"
@@ -35,6 +39,8 @@ class TestRunPipelineWithCleanup:
             args, inputs, (tmp_path, evidence_dir, evaluation_dir)
         )
         assert result == 0
+        mock_cleanup.assert_not_called()
+        mock_wt_cleanup.assert_not_called()
 
     @patch("quodeq.cli_evaluation._execute_pipeline", return_value=0)
     @patch("quodeq.cli_evaluation._build_run_config")

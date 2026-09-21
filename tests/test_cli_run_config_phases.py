@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 
+import pytest
+
 class TestResolveLimits:
     """_resolve_limits owns every env/flag-derived cap _build_run_config needs."""
 
@@ -19,18 +21,26 @@ class TestResolveLimits:
         base.update(over)
         return argparse.Namespace(**base)
 
-    def test_cli_flags_win_over_env(self):
+    @pytest.fixture()
+    def _cli_over_env_limits(self):
         from quodeq._cli_run_config import _resolve_limits
 
-        limits = _resolve_limits(
+        return _resolve_limits(
             self._args(max_turns=10, max_duration=300, pool_budget=120, n_subagents=3),
             env={"QUODEQ_MAX_TURNS": "99", "QUODEQ_MAX_DURATION": "99"},
         )
 
+    def test_cli_flags_win_over_env(self, _cli_over_env_limits):
+        limits = _cli_over_env_limits
         assert limits.max_turns == 10
         assert limits.max_duration == 300
         assert limits.max_subagents == 3
         assert limits.time_limit == 120
+
+    def test_cli_flags_win_over_env_leaves_unrelated_defaults_untouched(self, _cli_over_env_limits):
+        """Unrelated caps must keep their defaults regardless of the
+        max_turns/max_duration/time_limit precedence exercised above."""
+        limits = _cli_over_env_limits
         assert limits.verify_findings is True
         assert limits.dry_run is False
         assert limits.dispatch_policy is not None

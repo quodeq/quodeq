@@ -256,9 +256,12 @@ class TestParserAdditionalFlags:
         assert args.no_prescan is False
         assert args.dimensions is None
 
-    def test_combined_flags(self):
+    @pytest.fixture()
+    def _combined_flags_args(self):
+        """Parse every flag together once; each parametrized case below
+        checks that one field survived the combination undisturbed."""
         parser = build_parser()
-        args = parser.parse_args([
+        return parser.parse_args([
             "evaluate", "/tmp/repo",
             "-l", "java", "-m", "grades", "-d", "security",
             "--no-prescan", "--evidence-only", "--no-verify",
@@ -268,19 +271,24 @@ class TestParserAdditionalFlags:
             "--branch", "develop", "--scope", "src/main",
             "-o", "/tmp/output",
         ])
-        assert args.language == "java"
-        assert args.mode == "grades"
-        assert args.dimensions == "security"
-        assert args.no_prescan is True
-        assert args.evidence_only is True
-        assert args.no_verify is True
-        assert args.max_turns == 100
-        assert args.max_duration == 600
-        assert args.n_subagents == 10
-        assert args.pool_budget == 200
-        assert args.no_consolidated is True
-        assert args.legacy_incremental is True
-        assert args.clean_scan is False
-        assert args.branch == "develop"
-        assert args.scope == "src/main"
-        assert args.output == "/tmp/output"
+
+    @pytest.mark.parametrize(("attr", "expected"), [
+        ("language", "java"),
+        ("mode", "grades"),
+        ("dimensions", "security"),
+        ("no_prescan", True),
+        ("evidence_only", True),
+        ("no_verify", True),
+        ("max_turns", 100),
+        ("max_duration", 600),
+        ("n_subagents", 10),
+        ("pool_budget", 200),
+        ("no_consolidated", True),
+        ("legacy_incremental", True),
+        ("clean_scan", False),
+        ("branch", "develop"),
+        ("scope", "src/main"),
+        ("output", "/tmp/output"),
+    ])
+    def test_combined_flags(self, _combined_flags_args, attr, expected):
+        assert getattr(_combined_flags_args, attr) == expected
