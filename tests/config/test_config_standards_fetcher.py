@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from quodeq.config.standards_fetcher import fetch_asvs_l1
+from quodeq.config.standards_fetcher import AsvsFetchSeams, fetch_asvs_l1
 
 
 def _asvs_payload() -> dict:
@@ -97,18 +97,20 @@ class TestFetchAsvsL1:
     def test_fetcher_seam_avoids_patching_urlopen(self, tmp_path: Path) -> None:
         """A fetcher callable can stand in for the real network fetch."""
         payload = json.dumps(_asvs_payload()).encode()
-        count = fetch_asvs_l1(tmp_path, skip_integrity=True, fetcher=lambda url: payload)
+        count = fetch_asvs_l1(
+            tmp_path, skip_integrity=True, seams=AsvsFetchSeams(fetcher=lambda url: payload),
+        )
         assert count == 1
 
     def test_clock_seam_controls_the_fetched_date(self, tmp_path: Path, _mock_urlopen) -> None:
         from datetime import date
 
-        fetch_asvs_l1(tmp_path, skip_integrity=True, clock=lambda: date(2020, 1, 1))
+        fetch_asvs_l1(tmp_path, skip_integrity=True, seams=AsvsFetchSeams(clock=lambda: date(2020, 1, 1)))
         out = json.loads((tmp_path / "asvs" / "level1.json").read_text())
         assert out["fetched"] == "2020-01-01"
 
     def test_env_seam_controls_the_asvs_version(self, tmp_path: Path, _mock_urlopen) -> None:
         """An env dict can select the ASVS version without patching os.environ."""
-        fetch_asvs_l1(tmp_path, skip_integrity=True, env={"QUODEQ_ASVS_VERSION": "9.9.9"})
+        fetch_asvs_l1(tmp_path, skip_integrity=True, seams=AsvsFetchSeams(env={"QUODEQ_ASVS_VERSION": "9.9.9"}))
         out = json.loads((tmp_path / "asvs" / "level1.json").read_text())
         assert out["source"] == "OWASP ASVS 9.9.9"
