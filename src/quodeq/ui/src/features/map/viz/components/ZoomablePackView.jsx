@@ -86,31 +86,42 @@ function useScreenCoords(circles, k, tx, ty) {
   [circles, k, tx, ty]);
 }
 
+/**
+ * Zoom out one level: focus the parent (or the root at the top) and report
+ * the path that is now current.
+ */
+function focusParent(focusNode, { setFocus, onDrillDown, prevPathRef }) {
+  const parent = focusNode?.parent;
+  setFocus(parent || null);
+  const parentPath = parent?.data?.path || '';
+  onDrillDown?.(parentPath);
+  prevPathRef.current = parentPath;
+}
+
+/** Drill into a folder circle and report the new current path. */
+function focusFolder(c, { setFocus, onDrillDown, prevPathRef }) {
+  setFocus(c);
+  const path = c.data.path || '';
+  onDrillDown?.(path);
+  prevPathRef.current = path;
+}
+
 function useFocusHandlers({ focusNode, setFocus, onFileClick, onDrillDown, prevPathRef }) {
   const handleClick = useCallback((e, c) => {
     e.stopPropagation();
+    const nav = { setFocus, onDrillDown, prevPathRef };
     const isFolder = !c.data.isFile && c.data.children?.length > 0;
     if (c.data.isFile) {
       onFileClick?.(c.data);
     } else if (isFolder && c !== focusNode) {
-      setFocus(c);
-      onDrillDown?.(c.data.path || '');
-      prevPathRef.current = c.data.path || '';
+      focusFolder(c, nav);
     } else if (c === focusNode) {
-      const parent = focusNode?.parent;
-      setFocus(parent || null);
-      const parentPath = parent?.data?.path || '';
-      onDrillDown?.(parentPath);
-      prevPathRef.current = parentPath;
+      focusParent(focusNode, nav);
     }
   }, [focusNode, onFileClick, onDrillDown]);
 
   const handleBgClick = useCallback(() => {
-    const parent = focusNode?.parent;
-    setFocus(parent || null);
-    const parentPath = parent?.data?.path || '';
-    onDrillDown?.(parentPath);
-    prevPathRef.current = parentPath;
+    focusParent(focusNode, { setFocus, onDrillDown, prevPathRef });
   }, [focusNode, onDrillDown]);
 
   return { handleClick, handleBgClick };
@@ -181,19 +192,42 @@ function PackLabels({ circles, screenCoords, focusNode, skipTransition }) {
 }
 
 /* ---- PackTooltip: tooltip ---- */
+/** Tooltip position, clamped so it never runs off the container edge. */
+function tooltipStyle(mousePos, containerRef) {
+  const el = containerRef.current;
+  return {
+    position: 'absolute',
+    left: Math.min(mousePos.current.x + TOOLTIP_OFFSET, (el?.offsetWidth || CONTAINER_FALLBACK_PX) - TOOLTIP_MAX_MARGIN),
+    top: Math.min(mousePos.current.y + TOOLTIP_OFFSET, (el?.offsetHeight || CONTAINER_FALLBACK_PX) - TOOLTIP_MAX_MARGIN_Y),
+    pointerEvents: 'none',
+    zIndex: 10,
+  };
+}
+
+/** Per-severity rows, shown only for a node that actually has violations. */
+function TooltipSeverityRows({ hd }) {
+  if (!(hd.violations > 0)) return null;
+  const sev = hd.severity || {};
+  return (
+    <>
+      {sev.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>{t('map.critical')}</span><span>{sev.critical}</span></div>}
+      {sev.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>{t('map.major')}</span><span>{sev.major}</span></div>}
+      {sev.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>{t('map.minor')}</span><span>{sev.minor}</span></div>}
+    </>
+  );
+}
+
 function PackTooltip({ circles, hover, mousePos, containerRef }) {
   if (hover === null || !circles[hover] || circles[hover].depth === 0) return null;
   const hd = circles[hover].data;
-  const sev = hd.severity || {};
+  const total = hd.violations + hd.compliance;
   return (
-    <div className="map-tooltip" style={{ position: 'absolute', left: Math.min(mousePos.current.x + TOOLTIP_OFFSET, (containerRef.current?.offsetWidth || CONTAINER_FALLBACK_PX) - TOOLTIP_MAX_MARGIN), top: Math.min(mousePos.current.y + TOOLTIP_OFFSET, (containerRef.current?.offsetHeight || CONTAINER_FALLBACK_PX) - TOOLTIP_MAX_MARGIN_Y), pointerEvents: 'none', zIndex: 10 }}>
+    <div className="map-tooltip" style={tooltipStyle(mousePos, containerRef)}>
       <div className="map-tooltip-title">{(hd.path || hd.name || '').replace(/\/$/, '')}</div>
       <div className="map-tooltip-row"><span>{t('map.violations')}</span><span>{hd.violations}</span></div>
-      {hd.violations > 0 && sev.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>{t('map.critical')}</span><span>{sev.critical}</span></div>}
-      {hd.violations > 0 && sev.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>{t('map.major')}</span><span>{sev.major}</span></div>}
-      {hd.violations > 0 && sev.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>{t('map.minor')}</span><span>{sev.minor}</span></div>}
+      <TooltipSeverityRows hd={hd} />
       <div className="map-tooltip-row"><span>{t('map.compliance')}</span><span>{hd.compliance}</span></div>
-      <div className="map-tooltip-row"><span>{t('map.rate')}</span><span>{(hd.violations + hd.compliance) > 0 ? ((hd.compliance / (hd.violations + hd.compliance)) * 100).toFixed(0) + '%' : '—'}</span></div>
+      <div className="map-tooltip-row"><span>{t('map.rate')}</span><span>{total > 0 ? ((hd.compliance / total) * 100).toFixed(0) + '%' : '—'}</span></div>
     </div>
   );
 }
