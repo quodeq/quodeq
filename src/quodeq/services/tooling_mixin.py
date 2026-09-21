@@ -17,6 +17,7 @@ from quodeq.services._browse_mixin import FsBrowseMixin
 from quodeq.services.wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.utils import get_anthropic_api_key, read_json
 
 _logger = logging.getLogger(__name__)
@@ -85,8 +86,18 @@ class FsToolingMixin(FsBrowseMixin):
     stay one class here so the provider keeps a single tooling collaborator.
     """
 
+    # Default AI CLI candidates. Override via the QUODEQ_AI_CLIENTS env var
+    # (comma-separated list of client IDs, e.g. "claude,codex").
+    _CLI_CANDIDATES = [
+        {"id": "claude", "label": "Claude"}, {"id": "codex", "label": "Codex"},
+        {"id": "gemini", "label": "Gemini"}, {"id": "copilot", "label": "GitHub Copilot"},
+    ]
+
     def __init__(self) -> None:
         self._model_fetchers: dict[str, Callable] = {}
+        # Bind the inherited browse half's sink: FsBrowseMixin cannot import a
+        # logger of its own (SEP-06), and a silent mkdir failure is unhelpful.
+        self._browse_log = SHARED_LOG
 
     def configure_model_fetchers(self) -> None:
         """Route the clients that have a richer model source than the CLI probe.

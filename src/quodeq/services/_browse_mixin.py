@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.report_parser import safe_read_dir
 from quodeq.services._browse_entries import readable_entries
 
@@ -18,7 +19,14 @@ _BROWSE_DIR_LIMIT = 500
 
 
 class FsBrowseMixin:
-    """Home-rooted directory browsing: the provider never leaves ``~``."""
+    """Home-rooted directory browsing: the provider never leaves ``~``.
+
+    The mkdir failure path is the only thing here with anything to say, so
+    the sink is a class attribute rather than a parameter on every method.
+    ``FsToolingMixin`` binds the production one; a bare mixin stays silent.
+    """
+
+    _browse_log: LogSink = NULL_LOG
 
     @staticmethod
     def _validate_browse_path(path: str | None) -> tuple[Path, dict[str, Any] | None]:
@@ -130,13 +138,6 @@ class FsBrowseMixin:
         except FileExistsError:
             return {"error": "Folder already exists", "error_code": "ALREADY_EXISTS"}
         except OSError as exc:
-            _logger.warning("Could not create folder %s: %s", name, exc)
+            self._browse_log.warning(f"Could not create folder {name}: {exc}")
             return {"error": "Could not create folder", "error_code": "MKDIR_FAILED"}
         return {"created": True, "path": str(target)}
-
-    # Default AI CLI candidates. Override via the QUODEQ_AI_CLIENTS env var
-    # (comma-separated list of client IDs, e.g. "claude,codex").
-    _CLI_CANDIDATES = [
-        {"id": "claude", "label": "Claude"}, {"id": "codex", "label": "Codex"},
-        {"id": "gemini", "label": "Gemini"}, {"id": "copilot", "label": "GitHub Copilot"},
-    ]
