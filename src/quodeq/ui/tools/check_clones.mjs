@@ -55,9 +55,11 @@ const HINT =
   'module) instead of copy-pasting. Regenerate the baseline only with ' +
   'justification: npm run lint:clones:update';
 
-// Revise DOWNWARD as clones are extracted into shared helpers; NEVER raise
-// without a justification reviewed in the PR that raises it.
-const TOTAL_CEILING = 91;
+// The baseline was burned to zero in maintainability cycle 3 (PR 5): every
+// grandfathered clone is now a shared helper. NEVER raise this without a
+// justification reviewed in the PR that raises it -- at zero, any new clone
+// has to be extracted, not absorbed.
+const TOTAL_CEILING = 0;
 
 /** Map a jscpd file name (relative to *baseDir*) to a repo-relative one. */
 function relative(name, baseDir, repoRoot) {

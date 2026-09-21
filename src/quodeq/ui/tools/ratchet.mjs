@@ -5,50 +5,13 @@
 // grandfathered so the gate runs green today while blocking NEW ones; the
 // baseline only shrinks, via the gate's --update command. Inline config is
 // disabled so an eslint-disable comment cannot waive a rule.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+//
+// The eslint pass, the baseline I/O and the counts comparison live in
+// tools/_ratchet_common.mjs, shared with tools/check_strings.mjs.
 import path from 'node:path';
-import { ESLint } from 'eslint';
-
-const UI_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-async function collectCounts(configPath, rules) {
-  const eslint = new ESLint({
-    cwd: UI_ROOT,
-    overrideConfigFile: configPath,
-    allowInlineConfig: false,
-  });
-  const results = await eslint.lintFiles(['src/**/*.jsx', 'src/**/*.js']);
-  const counts = {};
-  for (const r of results) {
-    const fatal = r.messages.filter((m) => m.fatal);
-    if (fatal.length > 0) {
-      throw new Error(`lint failed on ${r.filePath}: ${fatal[0].message}`);
-    }
-    const n = r.messages.filter((m) => rules.has(m.ruleId)).length;
-    if (n > 0) {
-      counts[path.relative(UI_ROOT, r.filePath).split(path.sep).join('/')] = n;
-    }
-  }
-  return counts;
-}
-
-function loadBaseline(baselinePath) {
-  if (!existsSync(baselinePath)) return {};
-  return JSON.parse(readFileSync(baselinePath, 'utf8'));
-}
-
-function writeBaseline(baselinePath, counts) {
-  const sorted = Object.fromEntries(
-    Object.entries(counts).sort(([a], [b]) => (a < b ? -1 : 1)),
-  );
-  writeFileSync(baselinePath, JSON.stringify(sorted, null, 2) + '\n', 'utf8');
-  return sorted;
-}
-
-function total(counts) {
-  return Object.values(counts).reduce((a, b) => a + b, 0);
-}
+import {
+  UI_ROOT, collectCounts, diffCounts, loadBaseline, total, writeBaseline, parseGateArgs,
+} from './_ratchet_common.mjs';
 
 /**
  * Runs one gate against process.argv (`--update` rewrites the baseline) and
@@ -68,17 +31,17 @@ function total(counts) {
 export async function runRatchet({ script, configPath, baselinePath, rules, ceiling, noun, found, hint, updateCommand }) {
   const config = path.join(UI_ROOT, configPath);
   const baselineFile = path.join(UI_ROOT, baselinePath);
-  const ruleSet = new Set(rules);
 
-  const args = process.argv.slice(2);
-  const update = args.includes('--update');
-  const unknown = args.filter((a) => a !== '--update');
-  if (unknown.length > 0) {
-    console.error(`Unknown argument(s): ${unknown.join(' ')}. Usage: ${script} [--update]`);
+  const { update, error } = parseGateArgs(process.argv.slice(2), script);
+  if (error) {
+    console.error(error);
     return 2;
   }
 
-  const counts = await collectCounts(config, ruleSet);
+  const counts = await collectCounts(rules, {
+    overrideConfigFile: config,
+    allowInlineConfig: false,
+  });
 
   if (update) {
     const written = writeBaseline(baselineFile, counts);
@@ -89,16 +52,7 @@ export async function runRatchet({ script, configPath, baselinePath, rules, ceil
   }
 
   const baseline = loadBaseline(baselineFile);
-  const grew = [];
-  const shrank = [];
-  for (const [file, count] of Object.entries(counts)) {
-    const allowed = baseline[file] ?? 0;
-    if (count > allowed) grew.push({ file, count, allowed });
-    else if (count < allowed) shrank.push({ file, count, allowed });
-  }
-  for (const [file, allowed] of Object.entries(baseline)) {
-    if (!(file in counts)) shrank.push({ file, count: 0, allowed });
-  }
+  const { grew, shrank } = diffCounts(counts, baseline);
   const baselineTotal = total(baseline);
   const overCeiling = baselineTotal > ceiling;
 
