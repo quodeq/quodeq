@@ -19,11 +19,11 @@ from pathlib import Path
 
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
-from quodeq.services._external_jobs import is_safe_run_segment
+from quodeq.services._external_jobs import _sync_external_run
 from quodeq.services.jobs import JobManager
 from quodeq.services._run_index_fs import (
     _external_job_is_complete, _merge_internal_jobs, _remove_run_directory,
-    _scan_reports_root_for_run, _sync_external_run_by_scan,
+    _scan_reports_root_for_run,
 )
 from quodeq.services._run_status_readers import build_job_snapshot
 from quodeq.services._run_status_readers import (  # noqa: F401 — re-export
@@ -146,30 +146,18 @@ class EvaluationsIndex:
         ``ext-`` ids resolve from the SQLite index after a scoped sync so
         stale runs get promoted to cancelled on this request.
         """
-        if not job_id.startswith("ext-"):
-            try:
-                internal = self._jobs.get_job(job_id) if hasattr(self._jobs, "get_job") else None
-            except TypeError:
-                internal = None
+        is_external = job_id.startswith("ext-")
+        if not is_external:
+            internal = self._in_memory_job(job_id)
             if internal is not None:
                 return internal
 
         reports_dir = self._coerce_reports_dir(reports_dir)
         db = self._open_index()
         try:
-            if job_id.startswith("ext-"):
-                run_id = job_id[len("ext-"):]
-                if not is_safe_run_segment(run_id):
+            if is_external:
+                if not _sync_external_run(db, job_id, reports_dir):
                     return None
-                known = _run_index.get_run(db, job_id)
-                # A blank run_dir falls through to the scan: Path("") is
-                # Path("."), whose is_dir() is True, so it would sync the
-                # process cwd as if it were the run.
-                run_dir = Path(known.run_dir) if known is not None and known.run_dir else None
-                if run_dir is not None and run_dir.is_dir():
-                    _run_index.sync_index_for_run(db, run_dir)
-                else:
-                    _sync_external_run_by_scan(db, reports_dir, run_id)
             else:
                 _run_index.sync_index(db, reports_dir)
             row = _run_index.get_run(db, job_id)
@@ -178,6 +166,13 @@ class EvaluationsIndex:
         if row is None:
             return None
         return self._run_row_to_snapshot(row)
+
+    def _in_memory_job(self, job_id: str) -> JobSnapshot | None:
+        """The live JobManager entry for *job_id*, if this store keeps one."""
+        try:
+            return self._jobs.get_job(job_id) if hasattr(self._jobs, "get_job") else None
+        except TypeError:
+            return None
 
     def promote_stale_to_cancelled(
         self, job_id: str, reports_dir: str | None = None,

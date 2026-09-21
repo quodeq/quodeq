@@ -211,9 +211,10 @@ def _repo_identity_matches(
     ``find_existing_project``).
     """
     data = read_repository_info(project_dir)
+    if data is None:
+        return False
     return (
-        data is not None
-        and data.get("name") == expected_name
+        data.get("name") == expected_name
         and data.get("path") == repo_resolved
         and (data.get("scopePath") or None) == (scope_path or None)
     )

@@ -1,39 +1,35 @@
 """JobManager's log/marker parsing and background process-monitoring behavior.
 
 Split from ``jobs.py`` to keep that file under the size ratchet's 300-line
-cap. ``_JobMonitorMixin`` is mixed into ``JobManager`` there; it expects
-``self._store``, ``self._lock``, ``self._reports_root``,
-``self._run_log_writers``, ``self._pre_marker_buffer``, ``self._log``,
-``self._processes``, ``self._on_job_complete``, and
-``self._job_timeout_cap_s_override`` to already be set by
-``JobManager.__init__`` -- all state ownership stays in ``jobs.py``, only
-these methods moved.
+cap. ``_JobMonitorMixin`` is mixed into ``JobManager`` there; the state it
+reads is declared on the class below and owned by ``JobManager.__init__``,
+which assigns every one of those attributes. Only the methods moved.
 
-Imported from ``jobs.py`` right before the ``JobManager`` class definition
-(after that module's own constants are already assigned), so the
-``from quodeq.services.jobs import ...`` below resolves against the
-already-initialized part of that (still-loading) module; no true cycle.
+The constants both modules need live in ``_job_model``, which imports
+neither, so nothing here imports ``jobs``.
 """
 from __future__ import annotations
 
 import json
 import subprocess
+import threading
 import time
 from datetime import datetime, timezone
-from typing import Iterable
+from pathlib import Path
+from typing import Any, Callable, Iterable
 
 from quodeq.services._job_log_tee import TeeContext, consume_stream, drain_pre_marker_buffer, tee_run_log
 from quodeq.services._job_model import (
-    Job, REPORT_PATH_RE, STATUS_CANCELLED, STATUS_DONE, STATUS_FAILED, STATUS_RUNNING,
-    _ANSI_RE, _CC_MARKER_PREFIX, _MAX_COMPLETED_JOBS,
+    Job, JobStore, REPORT_PATH_RE, STATUS_CANCELLED, STATUS_DONE, STATUS_FAILED, STATUS_RUNNING,
+    _ANSI_RE, _CC_MARKER_PREFIX, _DEADLINE_EXIT_REASONS, _EXIT_CODE_TIMEOUT,
+    _EXIT_REASON_DEADLINE, _MAX_COMPLETED_JOBS, _REPORT_PATH_MARKER,
+    _WATCHDOG_POLL_INTERVAL_S,
 )
 from quodeq.services._job_watchdog import run_status_exit_reason, watchdog_should_kill
-from quodeq.services.jobs import (
-    _DEADLINE_EXIT_REASONS, _EXIT_CODE_TIMEOUT, _EXIT_REASON_DEADLINE,
-    _REPORT_PATH_MARKER, _WATCHDOG_POLL_INTERVAL_S,
-)
+from quodeq.core.observability import LogSink
 from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
 from quodeq.shared.env import env_float
+from quodeq.shared.run_log import RunLogWriter
 from quodeq.shared.constants import (
     CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_DEADLINE_EXTENDED,
     CC_PHASE_REPORT_PATH, CC_PHASE_SCORING, CC_PHASE_SETUP,
@@ -41,6 +37,24 @@ from quodeq.shared.constants import (
 
 
 class _JobMonitorMixin:
+    """Log/marker parsing and process monitoring for ``JobManager``.
+
+    The attributes below are declared, not assigned: ``JobManager.__init__``
+    owns every one of them. Declaring them here is what makes this class
+    readable on its own and lets a type checker catch a rename on either
+    side.
+    """
+
+    _store: JobStore
+    _lock: threading.Lock
+    _reports_root: Path | None
+    _run_log_writers: dict[str, RunLogWriter]
+    _pre_marker_buffer: dict[str, list[str]]
+    _log: LogSink
+    _processes: dict[str, Any]
+    _on_job_complete: Callable[[str, Job], None] | None
+    _job_timeout_cap_s_override: float | None
+
     @staticmethod
     def _apply_marker(job: Job, line: str) -> None:
         """Parse a structured JSON marker and update job state."""

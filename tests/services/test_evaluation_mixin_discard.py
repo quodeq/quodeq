@@ -83,10 +83,3 @@ class TestScoreFailedEvaluation:
         m._jobs = MagicMock()
         m._jobs.get_job.return_value = None
         assert m.score_failed_evaluation("j1", "/reports") is False
-
-
-# ---------------------------------------------------------------------------
-# _score_completed_evidence
-# ---------------------------------------------------------------------------
-
-

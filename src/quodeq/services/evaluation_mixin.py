@@ -1,9 +1,10 @@
 """Mixin providing evaluation lifecycle methods for the filesystem provider.
 
-Split (Task 14): dispatch abstraction + CLI command building moved to
-``_evaluation_dispatch.py``, env-var building to ``_evaluation_env.py``, and
-the cancel-wait/discard machinery to ``_run_discard.py``. All are re-exported
-here — tests import ``SubprocessDispatcher``/``_build_evaluate_cmd`` and patch
+Split to stay under the file-size cap: the dispatch abstraction and CLI
+command building live in ``_evaluation_dispatch.py``, env-var building in
+``_evaluation_env.py``, and the cancel-wait/discard machinery in
+``_run_discard.py``. All are re-exported here — tests import
+``SubprocessDispatcher``/``_build_evaluate_cmd`` and patch
 ``_wait_for_terminal_status``/``_discard_run_state`` at this module's path.
 """
 
@@ -31,10 +32,6 @@ from quodeq.services._run_discard import (  # noqa: F401 — re-export
 if TYPE_CHECKING:
     from quodeq.services.jobs import JobManager
 
-_LOCATION_ONLINE = "online"
-_LOCATION_LOCAL = "local"
-
-
 def _run_ref(job: JobSnapshot) -> dict[str, str | None]:
     """The ``{"outputProject", "outputRunId"}`` payload the run-state helpers take."""
     return {"outputProject": job.output_project, "outputRunId": job.output_run_id}
@@ -43,11 +40,13 @@ def _run_ref(job: JobSnapshot) -> dict[str, str | None]:
 class FsEvaluationMixin:
     """Evaluation lifecycle collaborator: start, status, cancel, score.
 
-    Can be used as a standalone object (pass ``jobs`` to ``__init__``) or as a
-    mixin (set ``self._jobs`` on the host before calling any method).  The
-    ``get_status_fn`` hook lets a composing host override the status lookup so
-    that external-job IDs (``ext-`` prefix, resolved via SQLite) work correctly
-    inside ``cancel_evaluation`` without re-introducing MRO coupling.
+    Held as an attribute, not inherited: ``FilesystemActionProvider``
+    constructs one with its ``jobs`` and delegates to it, so the name's
+    "Mixin" suffix is historical. Setting ``self._jobs`` on a host before
+    calling any method still works. The ``get_status_fn`` hook lets the
+    composing host override the status lookup so that external-job IDs
+    (``ext-`` prefix, resolved via SQLite) work correctly inside
+    ``cancel_evaluation`` without re-introducing MRO coupling.
     """
 
     _jobs: "JobManager"
@@ -167,8 +166,8 @@ class FsEvaluationMixin:
 
         Uses ``self.get_evaluation_status`` rather than a bare
         ``self._jobs.get_job`` so that external runs (``ext-`` prefix) also
-        resolve correctly via the SQLite index (Plan B1 override on
-        ``FilesystemActionProvider``). Before this, ``get_job`` returned
+        resolve correctly via the SQLite index (``FilesystemActionProvider``
+        overrides the status lookup). Before this, ``get_job`` returned
         ``None`` for ``ext-`` ids and the scoring block was dead for them.
         ``score_completed_evidence`` is idempotent (skips dimensions whose
         report file already exists), so double-firing with the route-level

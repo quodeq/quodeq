@@ -1,4 +1,4 @@
-"""Tests for tooling_mixin.py: browse-path validation, directory/file listing and browse_repo."""
+"""Tests for _browse_mixin.py: browse-path validation, directory/file listing and browse_repo."""
 
 from __future__ import annotations
 
@@ -200,12 +200,11 @@ class TestBrowseRepoUsesTheListingHelpers:
     def test_reads_the_directory_once(self, browse_tree: Path, monkeypatch):
         """The single-pass traversal is the point of browse_repo; sharing the
         helpers must not cost a second scandir."""
-        import quodeq.services.tooling_mixin as tooling_mixin
+        from quodeq.data.fs.report_parser import safe_read_dir as real
 
         calls = []
-        real = tooling_mixin.safe_read_dir
         monkeypatch.setattr(
-            tooling_mixin, "safe_read_dir",
+            "quodeq.services._browse_mixin.safe_read_dir",
             lambda path: (calls.append(path), real(path))[1],
         )
 
