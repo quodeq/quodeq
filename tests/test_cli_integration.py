@@ -117,6 +117,16 @@ class TestWorktreeMocked:
 # ---------------------------------------------------------------------------
 
 class TestResolveEvaluationInputs:
+    @staticmethod
+    def _standing_config(mock_repo, mock_paths, tmp_path, *, config_present: bool = True):
+        """Point the repo and paths mocks at *tmp_path* with a standards config present."""
+        mock_repo.return_value = (tmp_path, None, None)
+        paths_obj = MagicMock()
+        paths_obj.detection_file.exists.return_value = config_present
+        paths_obj.dimensions_file.exists.return_value = config_present
+        mock_paths.return_value = paths_obj
+        return paths_obj
+
     @patch("quodeq._cli_resolution._resolve_repo", return_value=None)
     def test_returns_none_on_repo_failure(self, mock_repo):
         from quodeq.cli import resolve_evaluation_inputs
@@ -127,11 +137,7 @@ class TestResolveEvaluationInputs:
     @patch("quodeq._cli_resolution._resolve_repo")
     def test_returns_none_when_config_missing(self, mock_repo, mock_paths, tmp_path):
         from quodeq.cli import resolve_evaluation_inputs
-        mock_repo.return_value = (tmp_path, None, None)
-        paths_obj = MagicMock()
-        paths_obj.detection_file.exists.return_value = False
-        paths_obj.dimensions_file.exists.return_value = False
-        mock_paths.return_value = paths_obj
+        self._standing_config(mock_repo, mock_paths, tmp_path, config_present=False)
         args = argparse.Namespace(scope=None)
         result = resolve_evaluation_inputs(args)
         assert result is None
@@ -142,12 +148,8 @@ class TestResolveEvaluationInputs:
     @patch("quodeq._cli_resolution._resolve_repo")
     def test_returns_none_when_language_detection_fails(self, mock_repo, mock_paths, mock_lang, mock_manifest, tmp_path):
         from quodeq.cli import resolve_evaluation_inputs
-        mock_repo.return_value = (tmp_path, None, None)
+        self._standing_config(mock_repo, mock_paths, tmp_path)
         mock_lang.return_value = None
-        paths_obj = MagicMock()
-        paths_obj.detection_file.exists.return_value = True
-        paths_obj.dimensions_file.exists.return_value = True
-        mock_paths.return_value = paths_obj
         args = argparse.Namespace(scope=None, language=None)
         # Override mock_lang to return None for this test
         mock_lang.return_value = None
@@ -161,11 +163,7 @@ class TestResolveEvaluationInputs:
     @patch("quodeq._cli_resolution._resolve_repo")
     def test_success_path(self, mock_repo, mock_paths, mock_lang, mock_dims, mock_manifest, tmp_path):
         from quodeq.cli import resolve_evaluation_inputs
-        mock_repo.return_value = (tmp_path, None, None)
-        paths_obj = MagicMock()
-        paths_obj.detection_file.exists.return_value = True
-        paths_obj.dimensions_file.exists.return_value = True
-        mock_paths.return_value = paths_obj
+        self._standing_config(mock_repo, mock_paths, tmp_path)
         args = argparse.Namespace(scope=None, language="python", no_prescan=True)
         result = resolve_evaluation_inputs(args)
         assert result is not None
@@ -179,11 +177,7 @@ class TestResolveEvaluationInputs:
     @patch("quodeq._cli_resolution._resolve_repo")
     def test_scope_nonexistent(self, mock_repo, mock_paths, mock_lang, mock_dims, mock_manifest, tmp_path, capsys):
         from quodeq.cli import resolve_evaluation_inputs
-        mock_repo.return_value = (tmp_path, None, None)
-        paths_obj = MagicMock()
-        paths_obj.detection_file.exists.return_value = True
-        paths_obj.dimensions_file.exists.return_value = True
-        mock_paths.return_value = paths_obj
+        self._standing_config(mock_repo, mock_paths, tmp_path)
         args = argparse.Namespace(scope="nonexistent/path", language="python", no_prescan=True)
         result = resolve_evaluation_inputs(args)
         assert result is None
@@ -196,13 +190,9 @@ class TestResolveEvaluationInputs:
     @patch("quodeq._cli_resolution._resolve_repo")
     def test_scope_success(self, mock_repo, mock_paths, mock_lang, mock_dims, mock_manifest, tmp_path, capsys):
         from quodeq.cli import resolve_evaluation_inputs
-        mock_repo.return_value = (tmp_path, None, None)
         scope_dir = tmp_path / "src" / "backend"
         scope_dir.mkdir(parents=True)
-        paths_obj = MagicMock()
-        paths_obj.detection_file.exists.return_value = True
-        paths_obj.dimensions_file.exists.return_value = True
-        mock_paths.return_value = paths_obj
+        self._standing_config(mock_repo, mock_paths, tmp_path)
         args = argparse.Namespace(scope="src/backend", language="python", no_prescan=True)
         result = resolve_evaluation_inputs(args)
         assert result is not None
@@ -216,11 +206,7 @@ class TestResolveEvaluationInputs:
     @patch("quodeq._cli_resolution._resolve_repo")
     def test_invalid_dimensions_config(self, mock_repo, mock_paths, mock_lang, mock_dims, mock_manifest, tmp_path, capsys):
         from quodeq.cli import resolve_evaluation_inputs
-        mock_repo.return_value = (tmp_path, None, None)
-        paths_obj = MagicMock()
-        paths_obj.detection_file.exists.return_value = True
-        paths_obj.dimensions_file.exists.return_value = True
-        mock_paths.return_value = paths_obj
+        self._standing_config(mock_repo, mock_paths, tmp_path)
         args = argparse.Namespace(scope=None, language="python", no_prescan=True)
         result = resolve_evaluation_inputs(args)
         assert result is None

@@ -8,6 +8,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from quodeq.cli import (
+    cli_env_int,
+    no_verify,
+    resolve_language,
+    resolve_repo,
+    setup_run_dirs,
+    subagent_model,
+)
 from quodeq.cli_parser import build_parser
 
 
@@ -17,58 +25,46 @@ from quodeq.cli_parser import build_parser
 
 class TestEnvInt:
     def test_returns_default_when_unset(self):
-        from quodeq.cli import cli_env_int
         assert cli_env_int("NONEXISTENT_VAR_12345", 42, env={}) == 42
 
     def test_returns_parsed_int(self):
-        from quodeq.cli import cli_env_int
         assert cli_env_int("MY_VAR", 0, env={"MY_VAR": "100"}) == 100
 
     def test_returns_default_on_invalid(self):
-        from quodeq.cli import cli_env_int
         assert cli_env_int("MY_VAR", 7, env={"MY_VAR": "not_a_number"}) == 7
 
     def test_returns_none_default(self):
-        from quodeq.cli import cli_env_int
         assert cli_env_int("MISSING", None, env={}) is None
 
     def test_negative_value(self):
-        from quodeq.cli import cli_env_int
         assert cli_env_int("NEG", 0, env={"NEG": "-5"}) == -5
 
 
 class TestSubagentModel:
     def test_returns_none_when_unset(self):
-        from quodeq.cli import subagent_model
         assert subagent_model(env={}) is None
 
     def test_returns_model_string(self):
-        from quodeq.cli import subagent_model
         assert subagent_model(env={"SUBAGENT_MODEL": "gpt-4"}) == "gpt-4"
 
     def test_returns_none_for_empty_string(self):
-        from quodeq.cli import subagent_model
         assert subagent_model(env={"SUBAGENT_MODEL": ""}) is None
 
 
 class TestNoVerify:
     def test_false_by_default(self):
-        from quodeq.cli import no_verify
         args = argparse.Namespace(no_verify=False)
         assert no_verify(args, env={}) is False
 
     def test_true_from_flag(self):
-        from quodeq.cli import no_verify
         args = argparse.Namespace(no_verify=True)
         assert no_verify(args, env={}) is True
 
     def test_true_from_env(self):
-        from quodeq.cli import no_verify
         args = argparse.Namespace(no_verify=False)
         assert no_verify(args, env={"QUODEQ_NO_VERIFY": "1"}) is True
 
     def test_env_value_not_one(self):
-        from quodeq.cli import no_verify
         args = argparse.Namespace(no_verify=False)
         assert no_verify(args, env={"QUODEQ_NO_VERIFY": "0"}) is False
 
@@ -79,7 +75,6 @@ class TestNoVerify:
 
 class TestResolveRepo:
     def test_local_path_exists(self, tmp_path):
-        from quodeq.cli import resolve_repo
         repo_dir = tmp_path / "myrepo"
         repo_dir.mkdir()
         args = argparse.Namespace(repo=str(repo_dir), branch=None)
@@ -87,7 +82,6 @@ class TestResolveRepo:
         assert result == (repo_dir.resolve(), None, None)
 
     def test_local_path_not_exists(self, tmp_path, capsys):
-        from quodeq.cli import resolve_repo
         args = argparse.Namespace(repo=str(tmp_path / "nonexistent"), branch=None)
         result = resolve_repo(args)
         assert result is None
@@ -95,7 +89,6 @@ class TestResolveRepo:
 
     @patch("quodeq._cli_resolution.is_repo_url")
     def test_invalid_repo_url(self, mock_is_url, capsys):
-        from quodeq.cli import resolve_repo
         mock_is_url.side_effect = ValueError("Invalid URL")
         args = argparse.Namespace(repo="bad://url")
         result = resolve_repo(args)
@@ -105,7 +98,6 @@ class TestResolveRepo:
     @patch("quodeq._cli_resolution.is_repo_url", return_value=True)
     @patch("quodeq.data.fs.repo_handler.prepare_repository", side_effect=OSError("clone failed"))
     def test_remote_clone_failure(self, mock_prep, mock_is_url, capsys):
-        from quodeq.cli import resolve_repo
         args = argparse.Namespace(repo="https://github.com/x/y")
         result = resolve_repo(args)
         assert result is None
@@ -114,7 +106,6 @@ class TestResolveRepo:
     @patch("quodeq._cli_resolution.is_repo_url", return_value=True)
     @patch("quodeq.data.fs.repo_handler.prepare_repository")
     def test_remote_clone_success(self, mock_prep, mock_is_url, tmp_path):
-        from quodeq.cli import resolve_repo
         repo_dir = tmp_path / "cloned"
         repo_dir.mkdir()
         mock_prep.return_value = str(repo_dir)
@@ -123,7 +114,6 @@ class TestResolveRepo:
         assert result == (repo_dir.resolve(), None, None)
 
     def test_branch_creates_worktree(self, tmp_path):
-        from quodeq.cli import resolve_repo
         repo_dir = tmp_path / "myrepo"
         repo_dir.mkdir()
         worktree_dir = tmp_path / "wt"
@@ -136,7 +126,6 @@ class TestResolveRepo:
             mock_wt.assert_called_once()
 
     def test_branch_worktree_failure(self, tmp_path, capsys):
-        from quodeq.cli import resolve_repo
         repo_dir = tmp_path / "myrepo"
         repo_dir.mkdir()
         args = argparse.Namespace(repo=str(repo_dir), branch="bad-branch")
@@ -155,7 +144,6 @@ class TestSetupRunDirs:
     @patch("quodeq._cli_resolution.is_repo_url", return_value=False)
     @patch("quodeq.cli_evaluation.project_name_from_repo", return_value="myproject")
     def test_creates_directories(self, mock_name, mock_url, mock_uuid, tmp_path):
-        from quodeq.cli import setup_run_dirs
         output_dir = tmp_path / "output"
         src = tmp_path / "src"
         src.mkdir()
@@ -173,14 +161,12 @@ class TestSetupRunDirs:
 
 class TestResolveLanguage:
     def test_explicit_language(self, tmp_path):
-        from quodeq.cli import resolve_language
         args = argparse.Namespace(language="python")
         paths = MagicMock()
         result = resolve_language(args, tmp_path, paths)
         assert result == "python"
 
     def test_detection_file_missing(self, tmp_path):
-        from quodeq.cli import resolve_language
         args = argparse.Namespace(language=None)
         paths = MagicMock()
         paths.detection_file.exists.return_value = False
@@ -189,7 +175,6 @@ class TestResolveLanguage:
 
     @patch("quodeq._cli_resolution.validate_path_segment", side_effect=ValueError("bad"))
     def test_invalid_language_raises(self, mock_validate):
-        from quodeq.cli import resolve_language
         args = argparse.Namespace(language="../evil")
         with pytest.raises(ValueError):
             resolve_language(args, Path("/tmp"), MagicMock())
