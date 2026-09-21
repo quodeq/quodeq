@@ -1,4 +1,4 @@
-import SevBadge from '../../../components/terminal/SevBadge.jsx';
+import { ViolationsCellBody } from './severityCells.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CompareTrendLine from './CompareTrendLine.jsx';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
@@ -34,12 +34,7 @@ function ProjectRowStats({ row }) {
         className="compare-row__viol"
         title={t('compare.ratioTip', { pass: nf(row.totalCompliance), checks: nf(row.totalCompliance + row.totalViolations) })}
       >
-        <span className="compare-row__violTotal">{nf(row.totalViolations)}</span>
-        <span className="compare-row__sev">
-          <SevBadge level="critical" format="count-abbr" count={row.severity.critical} />
-          <SevBadge level="major" format="count-abbr" count={row.severity.major} />
-          <SevBadge level="minor" format="count-abbr" count={row.severity.minor} />
-        </span>
+        <ViolationsCellBody total={row.totalViolations} severity={row.severity} />
       </span>
       <span
         className="compare-row__ratio"

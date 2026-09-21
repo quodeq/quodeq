@@ -1,25 +1,7 @@
+import { DownloadGlyph, TrashGlyph } from '../../../../components/glyphs.jsx';
 import { t } from '../../../../strings/index.js';
 
-function DownloadIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-      <path d="M10 11v6M14 11v6" />
-      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-    </svg>
-  );
-}
+const ACTION_ICON_SIZE = 13;
 
 function DeleteConfirmRow({ name, onDelete, setConfirming }) {
   return (
@@ -71,8 +53,8 @@ export function CardFooter({ name, confirming, setConfirming, onDelete, onExport
     <>
       <div className="project-card-actions">
         <PublishButton action={action} isThisPublishing={isThisPublishing} publishDisabled={publishDisabled} onPublish={onPublish} name={name} />
-        <button type="button" className="project-delete-btn" title={t('projects.downloadReportsTitle')} aria-label={t('projects.downloadReportsTitle')} onClick={(e) => { e.stopPropagation(); onExport?.(name); }}><DownloadIcon /></button>
-        <button type="button" className="project-delete-btn" title={t('projects.deleteProjectTitle')} aria-label={t('projects.deleteProjectTitle')} onClick={(e) => { e.stopPropagation(); setConfirming(name); }}><TrashIcon /></button>
+        <button type="button" className="project-delete-btn" title={t('projects.downloadReportsTitle')} aria-label={t('projects.downloadReportsTitle')} onClick={(e) => { e.stopPropagation(); onExport?.(name); }}><DownloadGlyph size={ACTION_ICON_SIZE} /></button>
+        <button type="button" className="project-delete-btn" title={t('projects.deleteProjectTitle')} aria-label={t('projects.deleteProjectTitle')} onClick={(e) => { e.stopPropagation(); setConfirming(name); }}><TrashGlyph size={ACTION_ICON_SIZE} /></button>
       </div>
       {showError && <p className="inline-error project-card-footer-error" role="alert">{publishError}</p>}
     </>

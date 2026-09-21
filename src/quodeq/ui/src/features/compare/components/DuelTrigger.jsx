@@ -1,25 +1,24 @@
-import { useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { scoreColorClass } from '../../../utils/formatters.js';
+import { useState } from 'react';
 import { t } from '../../../strings/index.js';
-import { launcherMenuPos } from './compareLauncherMenu.js';
-import { useLauncherDismiss } from './useLauncherDismiss.js';
-import { useLauncherFocus } from './useLauncherFocus.js';
-import { score1 } from '../compareFormatters.js';
+import {
+  LauncherButton,
+  LauncherMenu,
+  LauncherRoot,
+  LauncherScore,
+  useLauncherPopover,
+} from './compareLauncherParts.jsx';
 
 
 function DuelTriggerMenu({ menuRef, pos, pinned, list, setPinned, pick }) {
-  return createPortal(
-    <span className="compare-dueltrigger__menu" role="menu" ref={menuRef} style={pos}>
+  return (
+    <LauncherMenu menuRef={menuRef} pos={pos}>
       {!pinned && (
         <span className="compare-dueltrigger__hint">{t('compare.duelPickA')}</span>
       )}
       {pinned && (
         <span className="compare-dueltrigger__pin">
           <span className="compare-dueltrigger__pinName">{pinned.name}</span>
-          <span className={`compare-dueltrigger__itemScore ${scoreColorClass(pinned.score)}`}>
-            {score1(pinned.score)}
-          </span>
+          <LauncherScore score={pinned.score} />
           <button
             type="button"
             className="compare-dueltrigger__unpin"
@@ -42,13 +41,10 @@ function DuelTriggerMenu({ menuRef, pos, pinned, list, setPinned, pick }) {
             {other.name}
             {other.remote && <span className="compare-row__remote">{t('compare.remoteTag')}</span>}
           </span>
-          <span className={`compare-dueltrigger__itemScore ${scoreColorClass(other.score)}`}>
-            {score1(other.score)}
-          </span>
+          <LauncherScore score={other.score} />
         </button>
       ))}
-    </span>,
-    document.body,
+    </LauncherMenu>
   );
 }
 
@@ -57,25 +53,13 @@ function DuelTriggerMenu({ menuRef, pos, pinned, list, setPinned, pick }) {
    action, no confirm step. With the scope at exactly two projects it
    skips the popover entirely and duels them directly. */
 export default function DuelTrigger({ targets, onStart, openDirect = null }) {
-  const [open, setOpen] = useState(false);
   const [pinned, setPinned] = useState(null);
-  const [pos, setPos] = useState(null);
-  const btnRef = useRef(null);
-  const menuRef = useRef(null);
+  const { open, pos, btnRef, menuRef, close, toggle } = useLauncherPopover({
+    onClose: () => setPinned(null),
+    openDirect,
+  });
 
   const list = targets.filter((other) => other.id !== pinned?.id);
-
-  const close = () => { setOpen(false); setPinned(null); };
-
-  const toggle = () => {
-    if (open) { close(); return; }
-    // Exactly-two scope: nothing to pick, duel them directly.
-    if (openDirect) { openDirect(); return; }
-    const at = launcherMenuPos(btnRef.current);
-    if (!at) return;
-    setPos(at);
-    setOpen(true);
-  };
 
   const pick = (other) => {
     if (!pinned) { setPinned(other); return; }
@@ -84,26 +68,18 @@ export default function DuelTrigger({ targets, onStart, openDirect = null }) {
     onStart(a, other.id);
   };
 
-  useLauncherDismiss(open, btnRef, menuRef, close);
-  // The menu is portaled to document.body, so Tab alone would never reach it.
-  useLauncherFocus(open, btnRef, menuRef, close);
-
   return (
-    <span className="compare-dueltrigger" onClick={(e) => e.stopPropagation()}>
-      <button
-        ref={btnRef}
-        type="button"
-        className="compare-dueltrigger__btn compare-dueltrigger__btn--launcher"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={t('compare.duelLaunchAria')}
-        onClick={toggle}
-      >
-        {t('compare.duelOpen')} {open ? '▾' : '▸'}
-      </button>
+    <LauncherRoot>
+      <LauncherButton
+        btnRef={btnRef}
+        open={open}
+        ariaLabel={t('compare.duelLaunchAria')}
+        label={t('compare.duelOpen')}
+        onToggle={toggle}
+      />
       {open && pos && (
         <DuelTriggerMenu menuRef={menuRef} pos={pos} pinned={pinned} list={list} setPinned={setPinned} pick={pick} />
       )}
-    </span>
+    </LauncherRoot>
   );
 }
