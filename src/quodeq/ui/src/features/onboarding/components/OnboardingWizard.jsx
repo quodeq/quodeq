@@ -8,8 +8,9 @@ import { OnboardingStepSwitch } from './OnboardingStepSwitch.jsx';
 import { t } from '../../../strings/index.js';
 import '../../../styles/onboarding.css';
 
-function visibleSteps(_currentStep, _isFirstProject, providerConfigured) {
-  // Welcome is excluded from numeric counter.
+// The steps the "step N of M" counter counts. Welcome is excluded, and the
+// provider step only appears while no provider is configured.
+function visibleSteps(providerConfigured) {
   const seen = [STEP_REPO_SCAN];
   if (!providerConfigured) seen.push(STEP_PROVIDER);
   seen.push(STEP_STANDARD_LAUNCH);
@@ -24,10 +25,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
   useOnboardingEffects({ wizard, entry, setStandards });
 
   const providerConfigured = Boolean(wizard.state.provider.id && wizard.state.provider.model);
-  const visible = useMemo(
-    () => visibleSteps(wizard.state.step, wizard.state.isFirstProject, providerConfigured),
-    [wizard.state.step, wizard.state.isFirstProject, providerConfigured],
-  );
+  const visible = useMemo(() => visibleSteps(providerConfigured), [providerConfigured]);
   const currentIndex = visible.indexOf(wizard.state.step) + 1;
 
   const {
