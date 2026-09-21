@@ -56,27 +56,39 @@ function ActionStatusBanner({ status }) {
   return null;
 }
 
-async function applyAction({ actionId, actionType, setStatus }) {
+// Apply and reject are the same state machine: pending while the request is
+// in flight, then a terminal status, and ERROR on any failure. `run` performs
+// the request and `done` is the status a success lands on.
+async function runCardAction({ setStatus, run, done, logLabel }) {
   setStatus(CARD_STATUS.PENDING);
   try {
-    const res = await applyAssistantAction(actionId);
-    notifyAssistantActionApplied({ actionType, scores: res?.result?.scores, delta: res?.result?.delta });
-    setStatus(CARD_STATUS.APPLIED);
+    await run();
+    setStatus(done);
   } catch (err) {
-    console.warn('[ActionPreviewCard] apply action failed:', err);
+    console.warn(logLabel, err);
     setStatus(CARD_STATUS.ERROR);
   }
 }
 
+async function applyAction({ actionId, actionType, setStatus }) {
+  await runCardAction({
+    setStatus,
+    run: async () => {
+      const res = await applyAssistantAction(actionId);
+      notifyAssistantActionApplied({ actionType, scores: res?.result?.scores, delta: res?.result?.delta });
+    },
+    done: CARD_STATUS.APPLIED,
+    logLabel: '[ActionPreviewCard] apply action failed:',
+  });
+}
+
 async function rejectAction({ actionId, setStatus }) {
-  setStatus(CARD_STATUS.PENDING);
-  try {
-    await rejectAssistantAction(actionId);
-    setStatus(CARD_STATUS.REJECTED);
-  } catch (err) {
-    console.warn('[ActionPreviewCard] reject action failed:', err);
-    setStatus(CARD_STATUS.ERROR);
-  }
+  await runCardAction({
+    setStatus,
+    run: () => rejectAssistantAction(actionId),
+    done: CARD_STATUS.REJECTED,
+    logLabel: '[ActionPreviewCard] reject action failed:',
+  });
 }
 
 function ActionCardButtons({ disabled, onApply, onReject }) {

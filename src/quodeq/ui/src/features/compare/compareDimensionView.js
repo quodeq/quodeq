@@ -3,6 +3,7 @@
  * compareModel.js — see compareModel.js for the module-level docs.
  */
 import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
+import { roundScore1 } from './compareFormatters.js';
 
 // Score scale: every dimension/principle score is 0-10.
 const MAX_SCORE = 10;
@@ -44,7 +45,7 @@ export function buildDimensionAttention(view) {
       .sort((a, b) => a.score - b.score);
     if (by.length < 2) continue;
     const worst = by[0];
-    const gap = Math.round((by[1].score - worst.score) * 10) / 10;
+    const gap = roundScore1(by[1].score - worst.score);
     if (gap < OUTLIER_GAP_THRESHOLD && worst.score >= OUTLIER_FLOOR_SCORE) continue;
     items.push({
       kind: 'outlier',
@@ -181,10 +182,10 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
     avg: mean(standings.map((s) => s.score)),
     delta: (() => {
       const ds = standings.map((s) => s.delta).filter((d) => d != null);
-      return ds.length ? Math.round(mean(ds) * 10) / 10 : null;
+      return ds.length ? roundScore1(mean(ds)) : null;
     })(),
     spread: lead && trail && lead !== trail
-      ? Math.round((lead.score - trail.score) * 10) / 10
+      ? roundScore1(lead.score - trail.score)
       : null,
     lead,
     trail,

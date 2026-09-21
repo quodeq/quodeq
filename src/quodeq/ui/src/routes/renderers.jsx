@@ -9,7 +9,7 @@
 import { lazy } from 'react';
 import EmptyState from '../components/EmptyState.jsx';
 import EmptyStateWithTour from '../features/onboarding/components/EmptyStateWithTour.jsx';
-import { dismissWithReconcile } from '../features/findings/dismissFlow.js';
+import { isSharedSource, findProject, makeDismissHandler } from './dismissWiring.js';
 import { t } from '../strings/index.js';
 import { buildEvalPrincipal, ViolationsRoute } from './violationsRoute.jsx';
 import { mapRoute } from './mapRoute.jsx';
@@ -30,11 +30,13 @@ const GradeFormulaPage = lazy(() => import('../features/grade-formula/GradeFormu
 const StandardsPage = lazy(() => import('../features/standards/StandardsPage.jsx'));
 const HelpPage = lazy(() => import('../features/help/components/HelpPage.jsx'));
 
-// buildEvalPrincipal, buildDashboardDataBundle and buildNavigationBundle are
-// re-exported below (their consumers -- App.jsx, this file's own route
-// renderers, and the tests that pin producer/consumer contracts -- all
-// import them from here) even though they now live in sibling modules; see
+// The source gate, the project lookup, buildEvalPrincipal,
+// buildDashboardDataBundle and buildNavigationBundle are re-exported below
+// (their consumers -- App.jsx, this file's own route renderers, and the tests
+// that pin producer/consumer contracts -- all import them from here) even
+// though they now live in sibling modules; see dismissWiring.js,
 // violationsRoute.jsx, dashboardDataBundle.js and navigationBundle.js.
+export { isSharedSource, findProject, makeDismissHandler };
 export { buildEvalPrincipal };
 export { buildDashboardDataBundle };
 export { buildNavigationBundle };
@@ -44,43 +46,6 @@ export { buildNavigationBundle };
 // hitting the "no analyzed projects yet" wall.
 const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula', 'compare'];
 const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history']);
-
-// Shared projects have no mutation route on the backend (dismiss is
-// local-only by design, and the same project id can exist in both local and
-// shared worlds by design — a dismiss POST for a shared project's id would
-// otherwise silently corrupt the LOCAL project's cache with shared-derived
-// deltas). Every route renderer below that injects onDismiss calls this
-// first: pass `undefined` for shared so the leaf components (EvalCards'
-// EvalViolationCard, FileDetailPage's ViolationCard) self-hide the dismiss
-// button rather than wiring up a handler that must never fire.
-export function isSharedSource(selectedSource) {
-  return selectedSource === 'shared';
-}
-
-/**
- * Find a project in `projects` by the id-or-name key the app routes on.
- *
- * @param {Array|undefined} projects
- * @param {string|undefined} key
- * @returns {Object|null}
- */
-export function findProject(projects, key) {
-  return projects?.find((p) => (p.id || p.name) === key) || null;
-}
-
-/**
- * The onDismiss handler a detail route passes down, or undefined for a
- * shared-source project (read-only, so the card hides its dismiss button
- * rather than wiring a handler that must never fire).
- *
- * @param {Object} options Everything dismissWithReconcile needs, plus
- *   `selectedSource` — the source the gate is read from.
- * @returns {Function|undefined}
- */
-export function makeDismissHandler({ selectedSource, ...rest }) {
-  if (isSharedSource(selectedSource)) return undefined;
-  return (violation) => dismissWithReconcile({ violation, ...rest });
-}
 
 /**
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
