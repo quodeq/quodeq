@@ -1,6 +1,7 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { gradeLetter, complianceRatio, extDisplayName } from '../../../utils/formatters.js';
-import { TermHeader, StatStrip, Stat } from '../../../components/terminal/index.js';
+import { TermHeader, Stat } from '../../../components/terminal/index.js';
+import { HeroPanel, ComplianceAndRatioStats, heroCardHandlers } from './heroSectionParts.jsx';
 import LastFetchedLine from '../../../components/LastFetchedLine.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import SeverityBadgeRow from './SeverityBadgeRow.jsx';
@@ -20,7 +21,7 @@ function buildLanguageSub(projectInfo) {
 
 function AccumulatedStatStrip({ scoreDisplay, scoreDelta, grade, customFormula, violations, compliance, totalChecks, ratio, handleViolations, handleCompliance, handleSeverity, severity }) {
   return (
-    <StatStrip cards>
+    <>
       <Stat
         label={t('overview.statScore')}
         value={scoreDisplay}
@@ -37,22 +38,17 @@ function AccumulatedStatStrip({ scoreDisplay, scoreDelta, grade, customFormula, 
         label={t('overview.statViolations')}
         value={violations}
         hint={<SeverityBadgeRow severity={severity} onSeverityClick={handleSeverity} />}
-        onClick={violations > 0 ? handleViolations : undefined}
+        onClick={handleViolations}
         ariaLabel={violations > 0 ? t('overview.showAllViolationsAria') : undefined}
       />
-      <Stat
-        label={t('overview.statCompliance')}
-        value={compliance}
-        hint={totalChecks > 0 ? t('overview.passingChecks', { count: totalChecks }) : null}
-        onClick={handleCompliance}
-        ariaLabel={compliance > 0 ? t('overview.showComplianceAria') : undefined}
+      <ComplianceAndRatioStats
+        compliance={compliance}
+        totalChecks={totalChecks}
+        ratio={ratio}
+        onCompliance={handleCompliance}
+        complianceAriaKey="overview.showComplianceAria"
       />
-      <Stat
-        label={t('overview.statRatio')}
-        value={ratio}
-        hint={t('overview.ratioHint')}
-      />
-    </StatStrip>
+    </>
   );
 }
 
@@ -66,20 +62,19 @@ export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, proj
   const totalChecks = violations + compliance;
   const ratio = complianceRatio(violations, compliance);
 
-  const handleViolations = onCardNavigate ? () => onCardNavigate('violations') : undefined;
-  const handleCompliance = onCardNavigate && compliance > 0 ? () => onCardNavigate('compliance') : undefined;
-  const handleSeverity = onCardNavigate ? (level) => onCardNavigate(level) : undefined;
+  const { handleViolations, handleCompliance, handleSeverity } = heroCardHandlers(onCardNavigate, { violations, compliance });
 
   return (
-    <section className="acc-eval-panel acc-eval-panel--terminal">
-      <div className="acc-eval-panel__top">
+    <HeroPanel
+      header={<>
         <TermHeader
           name={t('overview.termName')}
           sub={buildLanguageSub(projectInfo) || (lastDate ? t('overview.lastEvaluated', { date: lastDate }) : null)}
           badge={selectedSource === 'shared' ? <SharedReadOnlyBadge publishedBy={projectInfo?.publishedBy} /> : null}
         />
         <LastFetchedLine lastFetchedAt={projectInfo?.lastFetchedAt} />
-      </div>
+      </>}
+    >
       <AccumulatedStatStrip
         scoreDisplay={scoreDisplay}
         scoreDelta={scoreDelta}
@@ -94,6 +89,6 @@ export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, proj
         handleSeverity={handleSeverity}
         severity={summary?.severity}
       />
-    </section>
+    </HeroPanel>
   );
 }
