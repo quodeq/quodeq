@@ -6,6 +6,13 @@
  */
 import { t } from '../strings/index.js';
 
+/**
+ * @param {object} props
+ * @param {number} props.count  how many low-confidence findings are hidden
+ * @param {boolean} props.expanded  whether the group is currently open
+ * @param {() => void} props.onToggle
+ * @returns {JSX.Element}
+ */
 export function LowConfidenceToggle({ count, expanded, onToggle }) {
   return (
     <button

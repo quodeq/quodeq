@@ -7,7 +7,7 @@ import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import { t } from '../../../strings/index.js';
-import { formatRunDate, formatRunTime } from '../../../utils/formatters.js';
+import { formatRunDateTime } from '../../../utils/formatters.js';
 import { PROJECT_SOURCE } from '../../../constants.js';
 import { useHistoryDeleteRun } from '../hooks/useHistoryDeleteRun.js';
 import { HistoryContent } from './HistoryContent.jsx';
@@ -23,9 +23,7 @@ function useHistoryRunNavLabel(trend, currentOverviewRun) {
   return useMemo(() => {
     const entry = (trend || []).find((r) => r.runId === currentOverviewRun);
     if (!entry?.dateISO) return entry?.dateLabel || currentOverviewRun;
-    const date = formatRunDate(entry.dateISO, entry.dateISO, 'HistoryPage');
-    if (date === entry.dateISO) return date;
-    return `${date} ${formatRunTime(entry.dateISO, '', 'HistoryPage')}`;
+    return formatRunDateTime(entry.dateISO, entry.dateISO, 'HistoryPage');
   }, [trend, currentOverviewRun]);
 }
 

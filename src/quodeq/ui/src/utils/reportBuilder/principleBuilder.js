@@ -28,7 +28,6 @@ function buildPrincipleHeaderSection({ principle, dimension, score, grade, runId
   return lines;
 }
 
-
 /**
  * The full Markdown report for one principle. `severityFilter` narrows it to
  * what the user is currently looking at; 'compliance' drops the violations

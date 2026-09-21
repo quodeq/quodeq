@@ -9,6 +9,13 @@
 import { ChevronDownIcon, MaximizeIcon, MinimizeIcon } from './CopyButton.jsx';
 import { t } from '../strings/index.js';
 
+/**
+ * @param {object} props
+ * @param {boolean} props.maximized  whether the panel currently fills the window
+ * @param {() => void} props.onToggleMaximized
+ * @param {() => void} props.onHide  collapses the panel; does not stop its work
+ * @returns {JSX.Element}
+ */
 export function DrawerWindowControls({ maximized, onToggleMaximized, onHide }) {
   return (
     <>

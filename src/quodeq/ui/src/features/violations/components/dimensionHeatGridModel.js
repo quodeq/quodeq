@@ -34,7 +34,7 @@ export function comparator(col, dir) {
 // A fresh per-severity tally. Built rather than shared so each counter is
 // independent, and named so the dimension total and a principle's own counts
 // can never disagree on which severities exist.
-export function newSeverityCounts() {
+function newSeverityCounts() {
   return { critical: 0, major: 0, minor: 0 };
 }
 

@@ -148,6 +148,27 @@ export function formatRunDate(dateISO, fallback = '', where = 'dateFormatting') 
 }
 
 /**
+ * A run's date and time of day as "12 February 2026 14:05", the run
+ * navigator's label. One try around both halves: if either throws, the whole
+ * label falls back rather than showing half a date.
+ *
+ * @param {string|null|undefined} dateISO
+ * @param {string} [fallback=''] Returned for a missing or unformattable date.
+ * @param {string} [where='dateFormatting'] Names the caller in the warning.
+ * @returns {string}
+ */
+export function formatRunDateTime(dateISO, fallback = '', where = 'dateFormatting') {
+  if (!dateISO) return fallback;
+  try {
+    const d = new Date(dateISO);
+    return `${d.toLocaleDateString(LOCALE, DAY_LONG_MONTH_YEAR_OPTS)} ${d.toLocaleTimeString(LOCALE, HOUR_MINUTE_OPTS)}`;
+  } catch (err) {
+    console.warn(`[${where}] date format failed:`, err);
+    return fallback;
+  }
+}
+
+/**
  * A run's time of day as "14:05". Same fallback contract as formatRunDate.
  *
  * @param {string|null|undefined} dateISO

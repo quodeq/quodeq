@@ -25,6 +25,13 @@ const BASE_ICON_ATTRS = {
   'aria-hidden': 'true',
 };
 
+/**
+ * @param {object} props
+ * @param {number|string} props.size  rendered box in px
+ * @param {React.ReactNode} props.children  the paths that draw the glyph
+ * @param {object} props.overrides  any svg attribute overriding a default
+ * @returns {JSX.Element}
+ */
 export default function Icon({ size, children, ...overrides }) {
   return (
     <svg width={size} height={size} {...BASE_ICON_ATTRS} {...overrides}>
