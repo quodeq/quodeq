@@ -1,5 +1,5 @@
 import { StatStrip, Stat } from '../../../components/terminal/index.js';
-import SevBadge from '../../../components/terminal/SevBadge.jsx';
+import { SeverityCardHint } from './severityCells.jsx';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t } from '../../../strings/index.js';
 import { nf, score1 } from '../compareFormatters.js';
@@ -34,11 +34,7 @@ export default function CompareDimensionStatCards({ view }) {
         label={t('compare.cardViolations')}
         value={nf(view.violations)}
         hint={(
-          <span className="compare-card__sev">
-            <SevBadge level="critical" count={view.severity.critical} />
-            <SevBadge level="major" count={view.severity.major} />
-            <SevBadge level="minor" count={view.severity.minor} />
-          </span>
+          <SeverityCardHint severity={view.severity} />
         )}
       />
       <Stat

@@ -23,3 +23,8 @@ export const TOOLTIP_EST_H = 160;
 // world-space box scenes are laid out in.
 export const DEFAULT_CANVAS_W = 800;
 export const DEFAULT_CANVAS_H = 600;
+
+// Canvas has no CSS cascade, so every ctx.font assignment has to spell the
+// family out. Named here so a font change lands once instead of in each of
+// the ten label draws.
+export const CANVAS_FONT_FAMILY = '-apple-system,BlinkMacSystemFont,sans-serif';

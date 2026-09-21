@@ -7,8 +7,13 @@ import { LOCALE } from '../../strings/index.js';
 // zero score still renders a visible sliver instead of disappearing.
 export const MIN_BAR_HEIGHT_PCT = 15;
 
+// Scores are compared and shown at one decimal throughout the tab; rounding
+// in one place keeps a computed gap agreeing with the numbers it was derived
+// from.
+export const roundScore1 = (n) => Math.round(n * 10) / 10;
+
 export const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
-export const score1 = (s) => (s == null ? '—' : (Math.round(s * 10) / 10).toFixed(1));
+export const score1 = (s) => (s == null ? '—' : roundScore1(s).toFixed(1));
 export const signed1 = (g) => (g == null ? '—' : (g > 0 ? `+${g.toFixed(1)}` : g.toFixed(1)));
 
 // Short labels: the dimension tab bar and the matrix column headers speak

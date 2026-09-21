@@ -1,6 +1,7 @@
 import { memo, useMemo, useEffect } from 'react';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeLetter } from '../../../utils/formatters.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
+import { headerRowKey } from './findingListRows.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
@@ -51,8 +52,8 @@ function itemKey(items) {
   return (i) => {
     const item = items[i];
     if (!item) return i;
-    if (item.kind === 'sev-header') return `h-${item.sev}`;
-    if (item.kind === 'compliance-header') return 'h-compliance';
+    const header = headerRowKey(item);
+    if (header) return header;
     if (item.kind === 'violation') return `v-${item.v.file || ''}:${item.v.line ?? ''}:${item.idx}`;
     return `c-${item.c.file || ''}:${item.c.line ?? ''}:${item.idx}`;
   };

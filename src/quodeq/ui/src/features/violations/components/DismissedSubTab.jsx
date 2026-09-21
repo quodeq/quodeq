@@ -1,23 +1,11 @@
 import ContextBlock from '../../../components/ContextBlock.jsx';
+import { RefLinks } from '../../../components/findingDetail.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
-import { filterValidRefs } from '../../../utils/reqRefs.js';
 
 function dismissedLabel(d) {
   return d.principle || d.dimension || (d.req ?? '?');
-}
-
-function DismissedRefLinks({ reqRefs }) {
-  const valid = filterValidRefs(reqRefs);
-  if (valid.length === 0) return null;
-  return (
-    <span className="cwe-link-group">
-      {valid.map((r, i) => (
-        <a key={i} className="cwe-link" href={r.url} target="_blank" rel="noopener noreferrer">{r.label}</a>
-      ))}
-    </span>
-  );
 }
 
 function DismissedCard({ d, onRestore, onDelete }) {
@@ -40,7 +28,7 @@ function DismissedCard({ d, onRestore, onDelete }) {
             <div className="dismissed-detail-section">
               <div className="dismissed-detail-header">
                 <span className="dismissed-detail-label">{t('violations.reasonLabel')}</span>
-                <DismissedRefLinks reqRefs={d.reqRefs} />
+                <RefLinks reqRefs={d.reqRefs} />
               </div>
               <p className="dismissed-detail-title">{d.title}</p>
             </div>

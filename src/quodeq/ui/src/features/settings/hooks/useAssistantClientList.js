@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
-
-const DEFAULT_PROVIDER_ORDER = 50;
+import { sortClientsByProviderOrder } from './providerClientOrder.js';
 
 /**
  * AssistantProviderTabs.jsx's AI-client list fetch (sorted by
@@ -16,11 +15,7 @@ export function useAssistantClientList(providerConfigs) {
   useEffect(() => {
     getAiClients().then((data) => {
       const raw = data.clients || [];
-      const list = [...raw].sort((a, b) => {
-        const oa = providerConfigs?.[a.id]?.order ?? DEFAULT_PROVIDER_ORDER;
-        const ob = providerConfigs?.[b.id]?.order ?? DEFAULT_PROVIDER_ORDER;
-        return oa - ob;
-      });
+      const list = sortClientsByProviderOrder(raw, providerConfigs);
       setClients(list);
       setClientsError(null);
     }).catch(() => { setClients([]); setClientsError(t('settings.providersLoadFailed')); });

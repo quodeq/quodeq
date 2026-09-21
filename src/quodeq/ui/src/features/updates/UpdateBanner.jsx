@@ -12,6 +12,12 @@ const PHASE_STRINGS = {
   relaunching: 'updates.relaunching',
 };
 
+// Both update-state writes are best-effort: the banner still behaves
+// correctly if one fails, so the failure is logged rather than surfaced.
+function warnPersistFailed(e) {
+  console.warn('update-state persist failed:', e);
+}
+
 function ProgressBanner({ selfUpdate }) {
   return (
     <div className="update-banner" role="status">
@@ -59,7 +65,7 @@ export default function UpdateBanner() {
   // First-run disclosure: record that the user has been informed.
   useEffect(() => {
     if (status && status.disclosed === false) {
-      markUpdateDisclosed().catch((e) => console.warn('update-state persist failed:', e));
+      markUpdateDisclosed().catch(warnPersistFailed);
     }
   }, [status]);
 
@@ -70,7 +76,7 @@ export default function UpdateBanner() {
     setDismissed(true);
     // Optimistic dismiss: the banner simply reappears next launch if the
     // request failed, but log the failure so it is diagnosable.
-    dismissUpdate(status.latest).catch((e) => console.warn('update-state persist failed:', e));
+    dismissUpdate(status.latest).catch(warnPersistFailed);
   };
 
   return (

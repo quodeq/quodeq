@@ -1,7 +1,7 @@
 // src/quodeq/ui/src/utils/reportBuilder/runBuilders.js
 import {
-  formatDate, formatScore, buildViolationsSection, buildComplianceSection,
-  RUN_ID_DISPLAY_LENGTH, EMPTY_VALUE_PLACEHOLDER,
+  formatDate, formatScore, buildViolationsSection, buildComplianceSection, groupBySeverity,
+  runSuffix, EMPTY_VALUE_PLACEHOLDER,
 } from './shared.js';
 import {
   buildDimensionSummaryTable,
@@ -22,7 +22,7 @@ export function buildDimensionReport({ evalData, principleGrades, allViolations,
   const grade = overallGrade?.grade || EMPTY_VALUE_PLACEHOLDER;
   const compliance = evalData?.compliance || [];
   const date = dateLabel || formatDate();
-  const rid = runId ? ` · **Run:** ${runId.slice(0, RUN_ID_DISPLAY_LENGTH)}` : '';
+  const rid = runSuffix(runId);
 
   const lines = [];
   lines.push(`# ${dim} report`);
@@ -37,13 +37,31 @@ export function buildDimensionReport({ evalData, principleGrades, allViolations,
     lines.push('');
   }
 
-  lines.push(...buildViolationsSection(allViolations));
+  lines.push(...buildViolationsSection({ total: allViolations.length, bySeverity: groupBySeverity(allViolations) }));
   lines.push(...buildComplianceSection(compliance));
 
   if (evalData?.partial) {
     lines.push('> **Note:** Evaluation in progress. Results may be incomplete.');
     lines.push('');
   }
+
+  return lines.join('\n');
+}
+
+// The cross-dimension report body shared by the overview and run reports:
+// title, the date/run/score line, then the same four sections in the same
+// order. Only the header wording and where the numbers come from differ.
+function buildScoredReport({ title, dateLabel, rid, score, grade, summary, dimensions }) {
+  const lines = [];
+  lines.push(`# ${title}`);
+  lines.push('');
+  lines.push(`**Date:** ${dateLabel}${rid} · **Overall Score:** ${score} ${grade}`);
+  lines.push('');
+
+  lines.push(...buildDimensionSummaryTable(dimensions));
+  lines.push(...buildTopOffendingFiles(dimensions));
+  lines.push(...buildCritMajorSection(dimensions));
+  lines.push(...buildOverviewSummarySection(summary, dimensions));
 
   return lines.join('\n');
 }
@@ -56,23 +74,15 @@ export function buildDimensionReport({ evalData, principleGrades, allViolations,
  */
 export function buildOverviewReport(accumulated, accumulatedDimensions, projectName) {
   const summary = accumulated?.summary || {};
-  const score = formatScore(summary.numericAverage);
-  const grade = summary.overallGrade || EMPTY_VALUE_PLACEHOLDER;
-  const date = formatDate();
-  const project = projectName || 'Project';
-
-  const lines = [];
-  lines.push(`# ${project} report`);
-  lines.push('');
-  lines.push(`**Date:** ${date} · **Overall Score:** ${score} ${grade}`);
-  lines.push('');
-
-  lines.push(...buildDimensionSummaryTable(accumulatedDimensions));
-  lines.push(...buildTopOffendingFiles(accumulatedDimensions));
-  lines.push(...buildCritMajorSection(accumulatedDimensions));
-  lines.push(...buildOverviewSummarySection(summary, accumulatedDimensions));
-
-  return lines.join('\n');
+  return buildScoredReport({
+    title: `${projectName || 'Project'} report`,
+    dateLabel: formatDate(),
+    rid: '',
+    score: formatScore(summary.numericAverage),
+    grade: summary.overallGrade || EMPTY_VALUE_PLACEHOLDER,
+    summary,
+    dimensions: accumulatedDimensions,
+  });
 }
 
 /**
@@ -81,25 +91,14 @@ export function buildOverviewReport(accumulated, accumulatedDimensions, projectN
  * @returns {string}
  */
 export function buildRunReport({ dashboard, runSummary, projectName }) {
-  const dimensions = dashboard?.dimensions || [];
   const selectedRun = dashboard?.selectedRun || {};
-  const dateLabel = selectedRun.dateLabel || formatDate();
-  const runId = selectedRun.runId || '';
-  const score = formatScore(runSummary?.numericAverage);
-  const grade = runSummary?.overallGrade || EMPTY_VALUE_PLACEHOLDER;
-  const project = projectName || 'Run';
-  const ridSuffix = runId ? ` · **Run:** ${runId.slice(0, RUN_ID_DISPLAY_LENGTH)}` : '';
-
-  const lines = [];
-  lines.push(`# ${project} run report`);
-  lines.push('');
-  lines.push(`**Date:** ${dateLabel}${ridSuffix} · **Overall Score:** ${score} ${grade}`);
-  lines.push('');
-
-  lines.push(...buildDimensionSummaryTable(dimensions));
-  lines.push(...buildTopOffendingFiles(dimensions));
-  lines.push(...buildCritMajorSection(dimensions));
-  lines.push(...buildOverviewSummarySection(runSummary || {}, dimensions));
-
-  return lines.join('\n');
+  return buildScoredReport({
+    title: `${projectName || 'Run'} run report`,
+    dateLabel: selectedRun.dateLabel || formatDate(),
+    rid: runSuffix(selectedRun.runId || ''),
+    score: formatScore(runSummary?.numericAverage),
+    grade: runSummary?.overallGrade || EMPTY_VALUE_PLACEHOLDER,
+    summary: runSummary || {},
+    dimensions: dashboard?.dimensions || [],
+  });
 }

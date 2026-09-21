@@ -1,7 +1,6 @@
 {
   "src/features/assistant/MessageList.jsx": 1,
-  "src/features/compare/components/DimensionTrigger.jsx": 2,
-  "src/features/compare/components/DuelTrigger.jsx": 2,
+  "src/features/compare/components/compareLauncherParts.jsx": 2,
   "src/features/dashboard/components/DimensionGaugeCard.jsx": 1,
   "src/features/dashboard/components/projectCards/ProjectCard.jsx": 2,
   "src/features/dashboard/components/projectCards/ProjectPathContent.jsx": 4,

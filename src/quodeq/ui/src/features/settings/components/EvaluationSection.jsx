@@ -1,6 +1,7 @@
 import useLiveFeedSettings from '../hooks/useLiveFeedSettings.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
+import { SettingsPillTabs } from './settingsRowParts.jsx';
 
 export default function EvaluationSection() {
   const { newOnly, setNewOnly } = useLiveFeedSettings();
@@ -14,13 +15,11 @@ export default function EvaluationSection() {
             {t('settings.liveFindingsDesc')}
           </span>
         </div>
-        <div className="settings-pill-group" role="tablist">
-          {[{ v: true, l: t('settings.liveFindingsNewOnly') }, { v: false, l: t('evaluate.allCap') }].map(({ v, l }) => (
-            <button key={l} type="button" role="tab" aria-selected={newOnly === v}
-              className={`settings-pill${newOnly === v ? ' settings-pill--active' : ''}`}
-              onClick={() => setNewOnly(v)}>{l}</button>
-          ))}
-        </div>
+        <SettingsPillTabs
+          options={[{ v: true, l: t('settings.liveFindingsNewOnly') }, { v: false, l: t('evaluate.allCap') }]}
+          value={newOnly}
+          onChange={setNewOnly}
+        />
       </div>
     </section>
   );

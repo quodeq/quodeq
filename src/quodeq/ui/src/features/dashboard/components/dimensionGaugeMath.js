@@ -13,11 +13,16 @@ import { t, LOCALE } from '../../../strings/index.js';
  * `coveragePct` is null when there are no file counts (legacy runs);
  * in that case the footer renders the date only.
  */
+// Legacy runs carry no file counts at all, and a zero total would make the
+// percentage meaningless, so both are treated as "no coverage to report".
+function hasFileCounts(filesRead, sourceFileCount) {
+  return typeof filesRead === 'number'
+    && typeof sourceFileCount === 'number'
+    && sourceFileCount > 0;
+}
+
 export function computeCoverageInfo(filesRead, sourceFileCount, exitReason) {
-  const hasCounts =
-    typeof filesRead === 'number' &&
-    typeof sourceFileCount === 'number' &&
-    sourceFileCount > 0;
+  const hasCounts = hasFileCounts(filesRead, sourceFileCount);
   const coveragePct = hasCounts
     ? Math.round((filesRead / sourceFileCount) * 100)
     : null;
@@ -28,10 +33,7 @@ export function computeCoverageInfo(filesRead, sourceFileCount, exitReason) {
 }
 
 export function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
-  const hasCounts =
-    typeof filesRead === 'number' &&
-    typeof sourceFileCount === 'number' &&
-    sourceFileCount > 0;
+  const hasCounts = hasFileCounts(filesRead, sourceFileCount);
   const parts = [t('overview.partialRun')];
   if (hasCounts) {
     parts.push(t('overview.filesOf', { read: filesRead.toLocaleString(LOCALE), total: sourceFileCount.toLocaleString(LOCALE) }));

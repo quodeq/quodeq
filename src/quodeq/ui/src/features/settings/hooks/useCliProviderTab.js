@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { MIN_SUBAGENTS, MAX_SUBAGENTS, DEFAULT_SUBAGENTS } from '../../../constants.js';
+import { DEFAULT_SUBAGENTS } from '../../../constants.js';
+import { clampSubagentsTo } from '../components/localApiSubagents.js';
 import { STORAGE_KEY as POWER_KEY } from '../../evaluation/components/powerLevels.js';
 import { tRich } from '../../../strings/rich.jsx';
 import { readString, writeString } from '../../../adapters/storage.js';
@@ -57,11 +58,7 @@ export function useCliProviderTab({ providerId, state }) {
   const hint = MODEL_HINTS[providerId];
   const analysisHint = ANALYSIS_MODEL_HINTS[providerId];
 
-  const clampSubagents = (raw) => {
-    const n = parseInt(raw, 10);
-    if (Number.isNaN(n)) return String(DEFAULT_SUBAGENTS);
-    return String(Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, n)));
-  };
+  const clampSubagents = (raw) => clampSubagentsTo(raw, String(DEFAULT_SUBAGENTS));
 
   return { power, setPower, cmdPathError, validateCmdPath, persistPower, hint, analysisHint, clampSubagents };
 }

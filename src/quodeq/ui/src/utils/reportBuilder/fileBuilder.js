@@ -1,6 +1,6 @@
 // src/quodeq/ui/src/utils/reportBuilder/fileBuilder.js
 import { SEVERITY_ORDER } from '../formatters.js';
-import { formatDate, formatViolationEntry, buildComplianceSection } from './shared.js';
+import { formatDate, buildComplianceSection, buildViolationsSection, severityMatches, showsCompliance } from './shared.js';
 import { complianceRatio } from '../textFormatting.js';
 
 function buildFileSummarySection(file, totalViolations, totalCompliance) {
@@ -16,26 +16,10 @@ function buildFileSummarySection(file, totalViolations, totalCompliance) {
 }
 
 function buildFileViolationsSection(file, severityFilter) {
-  const lines = [];
-  const allViolations = SEVERITY_ORDER
-    .filter((sev) => !severityFilter || severityFilter === 'all' || severityFilter === sev)
-    .flatMap((sev) => file.violationsBySeverity?.[sev] || []);
-  lines.push(`## Violations (${allViolations.length})`);
-  lines.push('');
-  if (allViolations.length === 0) {
-    lines.push('No violations found.');
-    lines.push('');
-    return lines;
-  }
-  for (const sev of SEVERITY_ORDER) {
-    if (severityFilter && severityFilter !== 'all' && severityFilter !== sev) continue;
-    const vs = file.violationsBySeverity?.[sev] || [];
-    if (vs.length === 0) continue;
-    lines.push(`### ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${vs.length})`);
-    lines.push('');
-    for (const v of vs) lines.push(formatViolationEntry(v));
-  }
-  return lines;
+  const total = SEVERITY_ORDER
+    .filter((sev) => severityMatches(severityFilter, sev))
+    .reduce((n, sev) => n + (file.violationsBySeverity?.[sev] || []).length, 0);
+  return buildViolationsSection({ total, bySeverity: file.violationsBySeverity, severityFilter });
 }
 
 /**
@@ -58,10 +42,8 @@ export function buildFileReport(file, severityFilter) {
 
   lines.push(...buildFileSummarySection(file, totalViolations, totalCompliance));
 
-  const showCompliance = !severityFilter || severityFilter === 'all' || severityFilter === 'compliance';
-
   lines.push(...buildFileViolationsSection(file, severityFilter));
-  if (showCompliance) lines.push(...buildComplianceSection(file?.compliance || []));
+  if (showsCompliance(severityFilter)) lines.push(...buildComplianceSection(file?.compliance || []));
 
   return lines.join('\n');
 }

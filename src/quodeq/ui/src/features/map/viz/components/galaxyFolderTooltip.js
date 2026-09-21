@@ -1,5 +1,5 @@
 import { rgb } from '../core/galaxyCore.js';
-import { clampTooltipToViewport } from '../core/tooltipPlacement.js';
+import { pushSeverityRows, showTooltip } from './galaxyTooltipDom.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { countDescendants } from './galaxyFolderScene.js';
 import { t } from '../../../../strings/index.js';
@@ -39,9 +39,7 @@ export function createTooltipUpdater(refs) {
       rows.push(row(t('map.compliance'), d.compliance));
     }
     if (d.violations > 0) {
-      if (sev.critical) rows.push(row(t('map.critical'), sev.critical, 'var(--color-sev-critical-text)'));
-      if (sev.major) rows.push(row(t('map.major'), sev.major, 'var(--color-sev-major-text)'));
-      if (sev.minor) rows.push(row(t('map.minor'), sev.minor, 'var(--color-sev-minor-text)'));
+      pushSeverityRows(rows, row, sev.critical, sev.major, sev.minor);
     }
     const nameCol = rgb(d.col);
     const name = d.name;
@@ -51,10 +49,10 @@ export function createTooltipUpdater(refs) {
     // unassemblable in languages that order the clause differently.
     const hint = h.type === 'file' ? t('map.clickToZoomIn')
       : isFocused ? t('map.clickToEnterFolder') : t('map.clickToFocus');
-    el.innerHTML = `<div style="font-weight:600;color:${nameCol};margin-bottom:4px">${escapeHtml(name)}</div>${rows.join('')}<div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">${escapeHtml(hint)}</div>`;
-    el.style.display = 'block';
-    const { left, top } = clampTooltipToViewport(cx, cy, window.innerWidth, window.innerHeight);
-    el.style.left = left + 'px';
-    el.style.top = top + 'px';
+    showTooltip(
+      el,
+      `<div style="font-weight:600;color:${nameCol};margin-bottom:4px">${escapeHtml(name)}</div>${rows.join('')}<div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">${escapeHtml(hint)}</div>`,
+      cx, cy,
+    );
   };
 }

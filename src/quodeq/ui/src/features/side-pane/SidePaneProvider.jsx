@@ -101,6 +101,12 @@ function useNoticeState() {
   return { notice, showAtCapNotice, clearNotice, showToast };
 }
 
+// A spec with no id cannot be tracked, opened or closed, so every action
+// ignores it rather than pushing an unidentifiable window.
+function isOpenableSpec(spec) {
+  return Boolean(spec && spec.id);
+}
+
 function useWindowActions({ windows, setWindows, showAtCapNotice }) {
   const hasWindow = useCallback(
     (id) => windows.some((w) => w.id === id),
@@ -118,17 +124,17 @@ function useWindowActions({ windows, setWindows, showAtCapNotice }) {
   }, [windows, showAtCapNotice]);
 
   const addWindow = useCallback((spec) => {
-    if (!spec || !spec.id) return;
-    if (windows.some((w) => w.id === spec.id)) return;
+    if (!isOpenableSpec(spec)) return;
+    if (hasWindow(spec.id)) return;
     pushWithinCap(spec);
-  }, [windows, pushWithinCap]);
+  }, [hasWindow, pushWithinCap]);
 
   const removeWindow = useCallback((id) => {
     setWindows((prev) => prev.filter((w) => w.id !== id));
   }, []);
 
   const replaceWindow = useCallback((spec) => {
-    if (!spec || !spec.id) return;
+    if (!isOpenableSpec(spec)) return;
     setWindows((prev) => {
       const idx = prev.findIndex((w) => w.id === spec.id);
       if (idx === -1) return prev;
@@ -140,13 +146,13 @@ function useWindowActions({ windows, setWindows, showAtCapNotice }) {
   }, []);
 
   const toggleWindow = useCallback((spec) => {
-    if (!spec || !spec.id) return;
-    if (windows.some((w) => w.id === spec.id)) {
+    if (!isOpenableSpec(spec)) return;
+    if (hasWindow(spec.id)) {
       setWindows((prev) => prev.filter((w) => w.id !== spec.id));
       return;
     }
     pushWithinCap(spec);
-  }, [windows, pushWithinCap]);
+  }, [hasWindow, pushWithinCap]);
 
   const closeAll = useCallback(() => setWindows([]), []);
 

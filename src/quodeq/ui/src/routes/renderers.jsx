@@ -9,7 +9,7 @@
 import { lazy } from 'react';
 import EmptyState from '../components/EmptyState.jsx';
 import EmptyStateWithTour from '../features/onboarding/components/EmptyStateWithTour.jsx';
-import { dismissWithReconcile } from '../features/findings/dismissFlow.js';
+import { isSharedSource, findProject, makeDismissHandler } from './dismissWiring.js';
 import { t } from '../strings/index.js';
 import { buildEvalPrincipal, ViolationsRoute } from './violationsRoute.jsx';
 import { mapRoute } from './mapRoute.jsx';
@@ -30,11 +30,13 @@ const GradeFormulaPage = lazy(() => import('../features/grade-formula/GradeFormu
 const StandardsPage = lazy(() => import('../features/standards/StandardsPage.jsx'));
 const HelpPage = lazy(() => import('../features/help/components/HelpPage.jsx'));
 
-// buildEvalPrincipal, buildDashboardDataBundle and buildNavigationBundle are
-// re-exported below (their consumers -- App.jsx, this file's own route
-// renderers, and the tests that pin producer/consumer contracts -- all
-// import them from here) even though they now live in sibling modules; see
+// The source gate, the project lookup, buildEvalPrincipal,
+// buildDashboardDataBundle and buildNavigationBundle are re-exported below
+// (their consumers -- App.jsx, this file's own route renderers, and the tests
+// that pin producer/consumer contracts -- all import them from here) even
+// though they now live in sibling modules; see dismissWiring.js,
 // violationsRoute.jsx, dashboardDataBundle.js and navigationBundle.js.
+export { isSharedSource, findProject, makeDismissHandler };
 export { buildEvalPrincipal };
 export { buildDashboardDataBundle };
 export { buildNavigationBundle };
@@ -45,36 +47,20 @@ export { buildNavigationBundle };
 const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula', 'compare'];
 const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history']);
 
-// Shared projects have no mutation route on the backend (dismiss is
-// local-only by design, and the same project id can exist in both local and
-// shared worlds by design — a dismiss POST for a shared project's id would
-// otherwise silently corrupt the LOCAL project's cache with shared-derived
-// deltas). Every route renderer below that injects onDismiss calls this
-// first: pass `undefined` for shared so the leaf components (EvalCards'
-// EvalViolationCard, FileDetailPage's ViolationCard) self-hide the dismiss
-// button rather than wiring up a handler that must never fire.
-export function isSharedSource(selectedSource) {
-  return selectedSource === 'shared';
-}
-
 /**
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
  * @returns {JSX.Element}
  */
 function EvaluateCase({ evaluation, selectedProject, projects, onGoToProjects, onGoToSettings, preselectDims }) {
   const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation, startedProject } = evaluation;
-  const projectInfo = projects?.find(p => (p.id || p.name) === selectedProject) || null;
+  const projectInfo = findProject(projects, selectedProject);
   // The in-progress card describes the running job's own project, which can
   // differ from the UI's global selection. Resolve it the same way so the
   // card label follows the job rather than the selection. Before the
   // report-path marker resolves outputProject, the project the job was
   // started for fills the gap; the global selection is never used.
-  const jobProjectInfo = job?.outputProject
-    ? (projects?.find(p => (p.id || p.name) === job.outputProject) || null)
-    : null;
-  const startedProjectInfo = startedProject
-    ? (projects?.find(p => (p.id || p.name) === startedProject) || null)
-    : null;
+  const jobProjectInfo = job?.outputProject ? findProject(projects, job.outputProject) : null;
+  const startedProjectInfo = startedProject ? findProject(projects, startedProject) : null;
   return (
     <>
       <EvaluateScreen
@@ -136,8 +122,8 @@ function renderEvalPrincipleDetail(params, props) {
       // The evalPrincipal's own project, NOT the global selection: a
       // cross-project entry (Compare's principle jump, a parent dimension's
       // fromProject) must dismiss into the project the finding belongs to.
-      onDismiss={isSharedSource(selectedSource) ? undefined : (v) => dismissWithReconcile({
-        violation: v,
+      onDismiss={makeDismissHandler({
+        selectedSource,
         fallbackDimension: evalPrincipal.dimension,
         runId: evalPrincipal.runId,
         explicitProject: evalPrincipal.project,
@@ -199,8 +185,8 @@ export const ROUTE_RENDERERS = {
       // from a cross-project explorer (fromProject) must dismiss into the
       // project the finding belongs to. Same identity rule as the
       // evalprinciple route — encoded once, in dismissWithReconcile.
-      onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : (v) => dismissWithReconcile({
-        violation: v,
+      onDismiss={makeDismissHandler({
+        selectedSource: props.navigation.selectedSource,
         runId: params.runId,
         explicitProject: params.fromProject,
         selectedProject: props.navigation.selectedProject,
@@ -216,8 +202,8 @@ export const ROUTE_RENDERERS = {
       principle={params.principle}
       dimension={params.dimension}
       // Same identity rule as the file and evalprinciple routes.
-      onDismiss={isSharedSource(props.navigation.selectedSource) ? undefined : (v) => dismissWithReconcile({
-        violation: v,
+      onDismiss={makeDismissHandler({
+        selectedSource: props.navigation.selectedSource,
         fallbackDimension: params.dimension,
         runId: params.runId,
         explicitProject: params.fromProject,

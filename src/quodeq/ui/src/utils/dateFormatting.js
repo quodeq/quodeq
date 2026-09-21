@@ -118,3 +118,49 @@ export function formatPeriodLabel(entry, granularity = 'day') {
   }
   return fallback;
 }
+
+// The long forms the run views show: "12 February 2026" and "14:05". These
+// go through Date's own toLocale* methods rather than a cached Intl
+// formatter: an unparseable date renders as "Invalid Date" there instead of
+// throwing, which is what the run rows have always shown.
+const DAY_LONG_MONTH_YEAR_OPTS = { day: 'numeric', month: 'long', year: 'numeric' };
+const HOUR_MINUTE_OPTS = { hour: '2-digit', minute: '2-digit' };
+
+/**
+ * A run's date as "12 February 2026".
+ *
+ * Every caller renders an unparseable date as its own fallback rather than
+ * crashing a row, so a failure is logged and `fallback` returned.
+ *
+ * @param {string|null|undefined} dateISO
+ * @param {string} [fallback=''] Returned for a missing or unformattable date.
+ * @param {string} [where='dateFormatting'] Names the caller in the warning.
+ * @returns {string}
+ */
+export function formatRunDate(dateISO, fallback = '', where = 'dateFormatting') {
+  if (!dateISO) return fallback;
+  try {
+    return new Date(dateISO).toLocaleDateString(LOCALE, DAY_LONG_MONTH_YEAR_OPTS);
+  } catch (err) {
+    console.warn(`[${where}] date format failed:`, err);
+    return fallback;
+  }
+}
+
+/**
+ * A run's time of day as "14:05". Same fallback contract as formatRunDate.
+ *
+ * @param {string|null|undefined} dateISO
+ * @param {string} [fallback='']
+ * @param {string} [where='dateFormatting']
+ * @returns {string}
+ */
+export function formatRunTime(dateISO, fallback = '', where = 'dateFormatting') {
+  if (!dateISO) return fallback;
+  try {
+    return new Date(dateISO).toLocaleTimeString(LOCALE, HOUR_MINUTE_OPTS);
+  } catch (err) {
+    console.warn(`[${where}] time format failed:`, err);
+    return fallback;
+  }
+}

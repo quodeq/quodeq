@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../../strings/index.js';
 import { copyToClipboard } from '../../utils/clipboard.js';
+import { COPY_FEEDBACK_MS } from '../../components/CopyButton.jsx';
 
-const COPY_FEEDBACK_MS = 1500;
 // Defer mounting the body until the slide-in animation finishes (~220ms).
 // Otherwise the heavy markdown render happens mid-animation and stutters.
 const SLIDE_MS = 220;

@@ -2,6 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampSidePaneWidth } from '../paneWidthMath.js';
 import { useDragLifecycle } from './useDragLifecycle.js';
 
+// The pane's width lives in a CSS custom property during a drag: writing it
+// directly keeps the column following the cursor without a React commit per
+// frame. Written once per frame while dragging, then once more on release.
+function writePaneWidthVar(px) {
+  document.documentElement.style.setProperty('--side-pane-width', `${px}px`);
+}
+
 /**
  * Drag-to-resize for the side pane's outer edge, writing the width to the
  * `--side-pane-width` custom property as the pointer moves.
@@ -46,24 +53,25 @@ export function useOuterPaneDrag({ paneWidth, setPaneWidth }) {
     e.preventDefault();
     const startX = e.clientX;
     const startWidth = paneWidth;
+    // The viewport is captured for the move (one read per drag, not per
+    // frame) and re-read on release, so a resize mid-drag still commits a
+    // width that fits.
     const viewport = window.innerWidth;
+    const widthAt = (ev, viewportWidth) => clampSidePaneWidth(startWidth + (startX - ev.clientX), viewportWidth);
 
     let pendingNext = startWidth;
-    const apply = () => {
-      document.documentElement.style.setProperty('--side-pane-width', `${pendingNext}px`);
-    };
     setIsDragging(true);
     beginDrag({
       cursor: 'col-resize',
       onMove: (ev) => {
-        pendingNext = clampSidePaneWidth(startWidth + (startX - ev.clientX), viewport);
+        pendingNext = widthAt(ev, viewport);
       },
-      onFrame: apply,
+      onFrame: () => writePaneWidthVar(pendingNext),
       onEnd: (ev) => {
-        const finalWidth = clampSidePaneWidth(startWidth + (startX - ev.clientX), window.innerWidth);
+        const finalWidth = widthAt(ev, window.innerWidth);
         // Write final value to the var immediately so the column doesn't
         // jump on the next React commit; setPaneWidth then persists state.
-        document.documentElement.style.setProperty('--side-pane-width', `${finalWidth}px`);
+        writePaneWidthVar(finalWidth);
         setPaneWidth(finalWidth);
         setIsDragging(false);
       },

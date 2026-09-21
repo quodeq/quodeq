@@ -1,35 +1,20 @@
 import { useMemo, useState } from 'react';
-import {
-  ComposedChart,
-  Area,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  ReferenceLine,
-} from 'recharts';
-import { SectionLabel, PeriodSelect } from '../../../components/terminal/index.js';
 import { gradeLetter, formatPeriodLabel } from '../../../utils/formatters.js';
 import { extractDimensionPeriodSeries } from '../../../utils/dailyGrouping.js';
-import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
 import { t } from '../../../strings/index.js';
 import {
-  cssVar,
-  scoreBarColor,
-  refLineValues,
-  CHART_MARGIN,
-  SELECTED_BAR_OPACITY,
-  DESELECTED_BAR_OPACITY,
-  HOVER_STROKE_WIDTH,
-  REF_LINE_OPACITY_EVEN,
-  REF_LINE_OPACITY_ODD,
-} from '../../../components/scoreChartHelpers.js';
+  ScoreChartWithKeyboard,
+  ScoreHistoryPanelFrame,
+  computeScoreStats,
+  makeScoreTooltip,
+  periodOrDateLabel,
+  tooltipScore,
+} from '../../../components/scoreChartPanel.jsx';
 
 const MAX = 16;
 const CHART_HEIGHT = 160;
+const MAX_BAR_SIZE = 28;
+const MISSING_SCORE = '?';
 const GRANULARITY_SUFFIX = {
   day: t('granularity.dayAbbrev'),
   week: t('granularity.weekAbbrev'),
@@ -51,110 +36,25 @@ function buildDimensionData(trend, dimensionName, granularity, limit) {
   }));
 }
 
-function DimensionTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const entry = payload[0]?.payload;
-  if (!entry) return null;
-  const score = Number.isFinite(entry.numericAverage) ? entry.numericAverage.toFixed(1) : '?';
-  const grade = gradeLetter(entry.overallGrade);
-  return (
-    <div className="run-history-tooltip">
-      <span className="rht-date">{entry.periodLabel || entry.dateLabel}</span>
-      <span className="rht-score">{score} - {grade}</span>
-    </div>
-  );
-}
+const DimensionTooltip = makeScoreTooltip({
+  label: periodOrDateLabel,
+  missingScore: MISSING_SCORE,
+});
 
-function SelectedDot({ cx, cy, payload, selectedRunId }) {
-  if (payload?.runId !== selectedRunId) return null;
-  return <circle cx={cx} cy={cy} r={4} fill={cssVar('--color-chart-line')} stroke="white" strokeWidth={HOVER_STROKE_WIDTH} />;
-}
-
-function makeChartClickHandler(data, onBarClick) {
-  return (state) => {
-    const idx = state?.activeTooltipIndex;
-    if (idx == null) return;
-    const point = data[idx];
-    if (point?.runId) onBarClick?.(point);
-  };
-}
-
-// Not a React component: recharts' <Bar> finds its per-bar <Cell> colors by
-// inspecting props.children for elements whose *type* is Cell. That check
-// only looks at Bar's immediate JSX children, so a <Cell> nested inside a
-// custom component (e.g. <DimensionBarCells />) is invisible to it and Bar
-// falls back to its default fill (black). Calling this as a plain function
-// keeps the <Cell> elements themselves as Bar's direct children.
-function renderDimensionBarCells({ data, selectedRunId, hoveredIndex }) {
-  return data.map((entry, i) => (
-    <Cell
-      key={entry.runId ?? i}
-      fill={scoreBarColor(entry.numericAverage)}
-      opacity={entry.runId === selectedRunId ? SELECTED_BAR_OPACITY : DESELECTED_BAR_OPACITY}
-      stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
-      strokeWidth={hoveredIndex === i ? HOVER_STROKE_WIDTH : 0}
-    />
-  ));
-}
-
-function DimensionHistoryChart({ data, selectedRunId, hoveredIndex, setHoveredIndex, onBarClick }) {
-  const handleClick = makeChartClickHandler(data, onBarClick);
-  return (
-    <ResponsiveContainer width="100%" height="100%" minHeight={CHART_HEIGHT}>
-      <ComposedChart
-        data={data}
-        margin={CHART_MARGIN}
-        onMouseMove={(state) => setHoveredIndex(state?.activeTooltipIndex ?? null)}
-        onMouseLeave={() => setHoveredIndex(null)}
-        onClick={onBarClick ? handleClick : undefined}
-        style={onBarClick ? { cursor: 'pointer' } : undefined}
-      >
-        <defs>
-          <linearGradient id="dimScoreAreaGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={cssVar('--color-accent')} stopOpacity={0.08} />
-            <stop offset="100%" stopColor={cssVar('--color-accent')} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <XAxis dataKey="dateLabel" hide />
-        <YAxis domain={[0, 10]} hide />
-        <Tooltip cursor={false} isAnimationActive={false} offset={20} content={<DimensionTooltip />} />
-        {refLineValues([0, 10]).map((y, i) => (
-          <ReferenceLine key={y} y={y} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={i % 2 ? REF_LINE_OPACITY_ODD : REF_LINE_OPACITY_EVEN} />
-        ))}
-        <Area dataKey="numericAverage" type="monotone" fill="url(#dimScoreAreaGrad)" stroke="none" isAnimationActive={false} />
-        <Bar dataKey="numericAverage" radius={[0, 0, 0, 0]} maxBarSize={28} isAnimationActive={false}>
-          {renderDimensionBarCells({ data, selectedRunId, hoveredIndex })}
-        </Bar>
-        <Line
-          isAnimationActive={false}
-          dataKey="numericAverage"
-          type="monotone"
-          stroke={cssVar('--color-accent')}
-          strokeOpacity={0.9}
-          strokeWidth={2}
-          dot={<SelectedDot selectedRunId={selectedRunId} />}
-          activeDot={false}
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
-  );
-}
-
-function computeDimensionStats(data) {
-  const scores = data.map((d) => d.numericAverage).filter(Number.isFinite);
-  if (scores.length === 0) return null;
-  return {
-    min: Math.min(...scores),
-    max: Math.max(...scores),
-    avg: scores.reduce((s, n) => s + n, 0) / scores.length,
-  };
-}
+const CHART_PRESENTATION = {
+  height: CHART_HEIGHT,
+  fillHeight: true,
+  maxBarSize: MAX_BAR_SIZE,
+  gradientId: 'dimScoreAreaGrad',
+  tooltip: <DimensionTooltip />,
+  showSelectedDot: true,
+};
 
 function buildKbdItems({ data, onBarClick, selectedRunId }) {
   if (!onBarClick) return [];
   return data.map((d, i) => ({
     key: d.runId ?? i,
-    text: `${t('history.kbdRunItem', { date: d.dateLabel, score: Number.isFinite(d.numericAverage) ? d.numericAverage.toFixed(1) : '?', grade: gradeLetter(d.overallGrade) })}${d.runId === selectedRunId ? ` ${t('history.selectedSuffix')}` : ''}`,
+    text: `${t('history.kbdRunItem', { date: d.dateLabel, score: tooltipScore(d.numericAverage, MISSING_SCORE), grade: gradeLetter(d.overallGrade) })}${d.runId === selectedRunId ? ` ${t('history.selectedSuffix')}` : ''}`,
     onActivate: () => onBarClick(d),
   }));
 }
@@ -163,40 +63,28 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension, sele
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const data = useMemo(() => buildDimensionData(trend, dimension, granularity, MAX), [trend, dimension, granularity]);
 
-  const stats = useMemo(() => computeDimensionStats(data), [data]);
-
-  const suffix = GRANULARITY_SUFFIX[granularity] || GRANULARITY_SUFFIX.day;
+  const stats = useMemo(() => computeScoreStats(data), [data]);
 
   return (
-    <section className="run-history-panel run-history-panel--terminal panel" aria-label={t('explorer.dimScoreHistoryAria', { dimension })}>
-      <div className="run-history-panel__header">
-        <SectionLabel>{t('overview.scoreHistoryLabel')} · {data.length}{suffix}</SectionLabel>
-        <span className="run-history-panel__controls">
-          {onGranularityChange && <PeriodSelect value={granularity} onChange={onGranularityChange} />}
-          {stats && (
-            <span className="run-history-panel__stats">
-              {t('overview.minMaxAvg', { min: stats.min.toFixed(1), max: stats.max.toFixed(1), avg: stats.avg.toFixed(1) })}
-            </span>
-          )}
-        </span>
-      </div>
+    <ScoreHistoryPanelFrame
+      ariaLabel={t('explorer.dimScoreHistoryAria', { dimension })}
+      count={data.length}
+      suffix={GRANULARITY_SUFFIX[granularity] || GRANULARITY_SUFFIX.day}
+      granularity={granularity}
+      onGranularityChange={onGranularityChange}
+      stats={stats}
+    >
       {data.length === 0 ? (
         <div className="qd-history-empty">{t('explorer.noHistoryYet')}</div>
       ) : (
-        <div className="chart-with-kbd">
-          <DimensionHistoryChart
-            data={data}
-            selectedRunId={selectedRunId}
-            hoveredIndex={hoveredIndex}
-            setHoveredIndex={setHoveredIndex}
-            onBarClick={onBarClick}
-          />
-          <ChartKeyboardControls
-            label={t('explorer.dimScoreHistoryKbd', { dimension })}
-            items={buildKbdItems({ data, onBarClick, selectedRunId })}
-          />
-        </div>
+        <ScoreChartWithKeyboard
+          data={data}
+          chart={CHART_PRESENTATION}
+          interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onActivate: onBarClick }}
+          kbdLabel={t('explorer.dimScoreHistoryKbd', { dimension })}
+          kbdItems={buildKbdItems({ data, onBarClick, selectedRunId })}
+        />
       )}
-    </section>
+    </ScoreHistoryPanelFrame>
   );
 }

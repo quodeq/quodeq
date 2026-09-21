@@ -76,6 +76,21 @@ export function computePrincipleScore(rawScore, grade, violationCount, complianc
   return total > 0 ? (complianceCount / total) * 10 : NEUTRAL_SCORE;
 }
 
+/**
+ * A dimension's finding totals and its displayed score.
+ *
+ * Both the initial star build and the live-data update read the same three
+ * numbers off a dimension, with the same fallbacks: totals first, then the
+ * raw arrays, and the neutral score when overallScore does not parse.
+ */
+function dimStarTotals(dim) {
+  const violations = dim.totals?.violationCount || dim.violations?.length || 0;
+  const compliance = dim.totals?.complianceCount || dim.compliance?.length || 0;
+  const parsedScore = parseFloat(dim.overallScore);
+  const score = Number.isFinite(parsedScore) ? parsedScore : NEUTRAL_SCORE;
+  return { violations, compliance, score };
+}
+
 export const CONSTELLATION_LABELS = {
   builtin: t('map.constellationBuiltin'), quodeq: t('map.constellationQuodeq'), community: t('map.constellationCommunity'), custom: t('map.constellationCustom'), _default: '',
 };
@@ -99,10 +114,7 @@ function groupDimensionsByType(dimensions, standardTypes) {
 
 /** One dimension's star object, shared shape between the constellation and single-group layouts. */
 function buildDimStar(dim, extra) {
-  const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
-  const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
-  const parsedScore = parseFloat(dim.overallScore);
-  const score = Number.isFinite(parsedScore) ? parsedScore : NEUTRAL_SCORE;
+  const { violations: totalV, compliance: totalC, score } = dimStarTotals(dim);
   const radius = LAYOUT.dimRadiusBasePx + Math.sqrt(totalV + totalC) * LAYOUT.dimRadiusPerRootFinding;
   return {
     name: dim.dimension || 'Unknown',
@@ -247,10 +259,7 @@ export function updateSceneLiveData(scene, dimensions) {
   dimensions.forEach((dim, di) => {
     const star = scene.stars[di];
     if (!star) return;
-    const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
-    const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
-    const parsedScore = parseFloat(dim.overallScore);
-    const score = Number.isFinite(parsedScore) ? parsedScore : NEUTRAL_SCORE;
+    const { violations: totalV, compliance: totalC, score } = dimStarTotals(dim);
     star.violations = totalV;
     star.compliance = totalC;
     star.score = score;

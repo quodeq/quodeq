@@ -2,7 +2,12 @@ import { useMemo, useState } from 'react';
 import { STANDARD_TYPES, UNKNOWN_STANDARD_TYPE } from '../hooks/useStandards.js';
 import { useStandardRowModals } from '../hooks/useStandardRowModals.js';
 import { ICON_STAR_FILLED, ICON_STAR_OUTLINE } from '../../../constants/navigation.jsx';
+import Icon from '../../../components/Icon.jsx';
+import { DownloadGlyph, TrashGlyph } from '../../../components/glyphs.jsx';
 import { t } from '../../../strings/index.js';
+
+// The row-action glyph box, a step down from the sidebar rail's icons.
+const ROW_ICON_SIZE = 14;
 
 const BASE_LABELS = {
   [STANDARD_TYPES.BUILTIN]: t('standards.baseIso'),
@@ -77,38 +82,29 @@ function RowActions({ standard, isDeletable, isEditable, onOpen, onDuplicate, on
     <div className="standards-row-actions" onClick={(e) => e.stopPropagation()}>
       <button type="button" className="standards-row-action" onClick={onOpen} title={openLabel} aria-label={`${openLabel} ${standard.name}`}>
         {isEditable ? (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <Icon size={ROW_ICON_SIZE}>
             <path d="M12 20h9" />
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-          </svg>
+          </Icon>
         ) : (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <Icon size={ROW_ICON_SIZE}>
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
             <circle cx="12" cy="12" r="3" />
-          </svg>
+          </Icon>
         )}
       </button>
       <button type="button" className="standards-row-action" onClick={onDuplicate} title={t('standards.duplicate')} aria-label={`${t('standards.duplicate')} ${standard.name}`}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <Icon size={ROW_ICON_SIZE} strokeLinecap={null} strokeLinejoin={null}>
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
+        </Icon>
       </button>
       <button type="button" className="standards-row-action" onClick={onDownload} title={t('standards.download')} aria-label={`${t('standards.download')} ${standard.name}`}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="7 10 12 15 17 10" />
-          <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
+        <DownloadGlyph size={ROW_ICON_SIZE} square />
       </button>
       {isDeletable && (
         <button type="button" className="standards-row-action standards-row-action--danger" onClick={onDelete} title={t('violations.delete')} aria-label={`${t('violations.delete')} ${standard.name}`}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-            <path d="M10 11v6M14 11v6" />
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-          </svg>
+          <TrashGlyph size={ROW_ICON_SIZE} square />
         </button>
       )}
     </div>

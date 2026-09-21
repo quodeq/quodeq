@@ -1,9 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { useOllamaServerStatus } from './useOllamaServerStatus.js';
 import { settingsKeys } from '../../../api/queryKeys.js';
-import { t } from '../../../strings/index.js';
-import { useInvalidateOnOnline } from './useInvalidateOnOnline.js';
+import { useProviderModels } from './useProviderModels.js';
 
 const MODELS_KEY = settingsKeys.ollamaModels();
 
@@ -15,15 +13,12 @@ export function useOllamaModels() {
   const { getOllamaModels } = useApi();
   const ollamaStatus = useOllamaServerStatus();
 
-  const { data: models = [], error: modelsQueryError } = useQuery({
+  const { models, modelsError } = useProviderModels({
     queryKey: MODELS_KEY,
-    queryFn: () => getOllamaModels(),
+    fetchModels: () => getOllamaModels(),
+    errorKey: 'settings.ollamaModelsLoadFailed',
+    serverStatus: ollamaStatus?.status,
   });
-  const modelsError = modelsQueryError
-    ? t('settings.ollamaModelsLoadFailed')
-    : null;
-
-  useInvalidateOnOnline(ollamaStatus?.status, MODELS_KEY);
 
   return { ollamaStatus, models, modelsError };
 }

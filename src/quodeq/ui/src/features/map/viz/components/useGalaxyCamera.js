@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { drawFrame } from './galaxyViewDraw.js';
 import { CAMERA } from './galaxyTuning.js';
-import { easeInOutCubic, easeLagged } from './galaxyEasing.js';
+import { interpolateCamera } from './galaxyCameraLerp.js';
 
 const TRANSITION_DURATION_S = 0.8;
 
@@ -61,27 +61,6 @@ function updatePrinciplePositions(principles, dim, t) {
   });
 }
 
-function interpolateCamera(cam, tg, anim, frameCount) {
-  if (!anim && frameCount <= CAMERA.snapFrames) {
-    cam.x = tg.x; cam.y = tg.y; cam.z = tg.z;
-  } else if (!anim) {
-    cam.x += (tg.x - cam.x) * IDLE_LERP_FRACTION;
-    cam.y += (tg.y - cam.y) * IDLE_LERP_FRACTION;
-    cam.z += (tg.z - cam.z) * IDLE_LERP_FRACTION;
-  } else {
-    anim.t = Math.min(1, anim.t + CAMERA.frameStepS / TRANSITION_DURATION_S);
-    const ease = easeInOutCubic(anim.t);
-    const lagE = easeLagged(anim.t);
-    const posE = anim.out ? ease : lagE;
-    const zoomE = anim.out ? lagE : ease;
-    cam.x = anim.sx + (tg.x - anim.sx) * posE;
-    cam.y = anim.sy + (tg.y - anim.sy) * posE;
-    cam.z = anim.sz + (tg.z - anim.sz) * zoomE;
-    return anim.t >= 1;
-  }
-  return false;
-}
-
 // One animation-loop tick: advances star/camera positions, draws the frame,
 // and schedules the next tick. Extracted as a factory (built once per effect
 // run, called repeatedly via requestAnimationFrame) purely to keep the
@@ -114,7 +93,7 @@ function makeAnimationFrame({
     const tg = getTarget();
     const anim = animRef.current;
     frameCount.current++;
-    const done = interpolateCamera(cam, tg, anim, frameCount.current);
+    const done = interpolateCamera(cam, tg, anim, frameCount.current, TRANSITION_DURATION_S, IDLE_LERP_FRACTION);
     if (done) { animRef.current = null; prevNavRef.current = null; }
 
     const { hovered } = drawFrame(ctx, scene, cam, nav, {

@@ -21,22 +21,24 @@ import { DEFAULT_PROJECT_SOURCE } from "../../../constants.js";
 export function usePrefetchAdjacentRuns({ selectedProject, selectedSource = DEFAULT_PROJECT_SOURCE, availableRuns, overviewRunIndex }) {
   const { prefetchRun } = usePrefetchRun(selectedProject, selectedSource);
 
-  const onPrevHover = useCallback(() => {
-    const idx = Math.min(overviewRunIndex + 1, availableRuns.length - 1);
+  // Warm the run at `idx`, if there is one there. An index past either end of
+  // the list just means nothing to prefetch.
+  const prefetchAt = useCallback((idx) => {
     const runId = availableRuns[idx]?.runId;
-    if (runId) prefetchRun(runId);
-  }, [overviewRunIndex, availableRuns, prefetchRun]);
-
-  const onNextHover = useCallback(() => {
-    const idx = Math.max(overviewRunIndex - 1, 0);
-    const runId = availableRuns[idx]?.runId;
-    if (runId) prefetchRun(runId);
-  }, [overviewRunIndex, availableRuns, prefetchRun]);
-
-  const onLatestHover = useCallback(() => {
-    const runId = availableRuns[0]?.runId;
     if (runId) prefetchRun(runId);
   }, [availableRuns, prefetchRun]);
+
+  const onPrevHover = useCallback(() => {
+    prefetchAt(Math.min(overviewRunIndex + 1, availableRuns.length - 1));
+  }, [overviewRunIndex, availableRuns, prefetchAt]);
+
+  const onNextHover = useCallback(() => {
+    prefetchAt(Math.max(overviewRunIndex - 1, 0));
+  }, [overviewRunIndex, prefetchAt]);
+
+  const onLatestHover = useCallback(() => {
+    prefetchAt(0);
+  }, [prefetchAt]);
 
   return { onPrevHover, onNextHover, onLatestHover };
 }

@@ -2,7 +2,16 @@ import HelpHint from '../../../components/HelpHint.jsx';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 import { t } from '../../../strings/index.js';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
 import CopilotModelSelect from './CopilotModelSelect.jsx';
+
+// The three analysis tiers, in the order the panel lists them: the settings
+// field each writes and the key of the label beside its input.
+const ANALYSIS_TIERS = [
+  { field: 'model-fast', labelKey: 'settings.fast' },
+  { field: 'model-balanced', labelKey: 'settings.balanced' },
+  { field: 'model-thorough', labelKey: 'settings.thorough' },
+];
 
 // The one CLI provider whose models come from a live account lookup instead
 // of a free-text field.
@@ -39,17 +48,23 @@ function AnalysisModelsRow({ providerId, state, update, analysisHint }) {
   const placeholder = providerId === COPILOT_PROVIDER_ID ? t('settings.copilotInheritModel') : undefined;
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label-row">
-          <span className="settings-label">{t('settings.analysisModels')}</span>
-          {analysisHint && <HelpHint label={t('settings.analysisModelsHelpAria')}>{analysisHint}</HelpHint>}
-        </span>
-        <span className="settings-description">{t('settings.analysisModelsDesc')}</span>
-      </div>
+      <SettingsRowLabel
+        label={t('settings.analysisModels')}
+        hint={analysisHint}
+        hintAria={t('settings.analysisModelsHelpAria')}
+        description={t('settings.analysisModelsDesc')}
+      />
       <div className="settings-model-overrides">
-        <CliModelInput providerId={providerId} placeholder={placeholder} label={t('settings.fast')} value={state['model-fast']} onChange={(v) => update('model-fast', v)} />
-        <CliModelInput providerId={providerId} placeholder={placeholder} label={t('settings.balanced')} value={state['model-balanced']} onChange={(v) => update('model-balanced', v)} />
-        <CliModelInput providerId={providerId} placeholder={placeholder} label={t('settings.thorough')} value={state['model-thorough']} onChange={(v) => update('model-thorough', v)} />
+        {ANALYSIS_TIERS.map(({ field, labelKey }) => (
+          <CliModelInput
+            key={field}
+            providerId={providerId}
+            placeholder={placeholder}
+            label={t(labelKey)}
+            value={state[field]}
+            onChange={(v) => update(field, v)}
+          />
+        ))}
       </div>
     </div>
   );

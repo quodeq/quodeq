@@ -52,6 +52,19 @@ function useCopyApiRegistration(registerApi, sessionId, termRef) {
   }, [registerApi, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+// Fit xterm to its box and push the resulting size to the PTY. A failing fit
+// is logged and swallowed: a terminal at a slightly stale size still works,
+// and throwing here would take the whole effect (or observer) down. `where`
+// names the call site in the log.
+function fitAndResize(fit, term, resize, where) {
+  try {
+    fit.fit();
+    resize(term.cols, term.rows);
+  } catch (err) {
+    console.warn(`[TerminalSessionView] ${where} failed:`, err);
+  }
+}
+
 // The size must reach the PTY only once the socket is OPEN. The resize sent
 // during mount is dropped (socket still connecting), which would leave the
 // PTY at the backend's default 80x24 while xterm renders the real (smaller)
@@ -61,12 +74,7 @@ function useRefitOnOpen({ status, resize, rootRef, fitRef, termRef }) {
   useEffect(() => {
     const el = rootRef.current;
     if (status !== 'open' || !fitRef.current || !termRef.current || isHidden(el)) return;
-    try {
-      fitRef.current.fit();
-      resize(termRef.current.cols, termRef.current.rows);
-    } catch (err) {
-      console.warn('[TerminalSessionView] refit on open failed:', err);
-    }
+    fitAndResize(fitRef.current, termRef.current, resize, 'refit-on-open');
   }, [status, resize]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
@@ -82,11 +90,7 @@ function makeSessionSetup({ rootRef, termRef, fitRef, sessionId, send, resize, b
     // tab or backgrounded panel), fitting measures a 0x0 box (bogus PTY
     // size); the status-open and activation effects both fit once shown.
     if (!isHidden(rootRef.current)) {
-      try {
-        fit.fit(); resize(term.cols, term.rows);
-      } catch (err) {
-        console.warn('[TerminalSessionView] initial fit failed:', err);
-      }
+      fitAndResize(fit, term, resize, 'initial-fit');
     }
     // Fit ONCE after the size settles (FIT_DEBOUNCE_MS). ResizeObserver isn't
     // in JSDOM; guard so tests and any lacking environment don't crash.
@@ -98,11 +102,7 @@ function makeSessionSetup({ rootRef, termRef, fitRef, sessionId, send, resize, b
         // isHidden — a 0x0 fit drives the PTY to a bogus size and the shell
         // floods the prompt with cursor-position replies (the "14;3R…" garbage).
         if (isHidden(rootRef.current)) return;
-        try {
-          fit.fit(); resize(term.cols, term.rows);
-        } catch (err) {
-          console.warn('[TerminalSessionView] debounced fit failed:', err);
-        }
+        fitAndResize(fit, term, resize, 'debounced-fit');
       }, FIT_DEBOUNCE_MS);
     };
     box.ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleFit) : null;
@@ -152,11 +152,7 @@ function useRefitOnActivate({ active, resize, rootRef, fitRef, termRef }) {
   useEffect(() => {
     const el = rootRef.current;
     if (!active || !fitRef.current || !termRef.current || isHidden(el)) return;
-    try {
-      fitRef.current.fit(); resize(termRef.current.cols, termRef.current.rows);
-    } catch (err) {
-      console.warn('[TerminalSessionView] refit on activate failed:', err);
-    }
+    fitAndResize(fitRef.current, termRef.current, resize, 'refit-on-activate');
   }, [active, resize]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 

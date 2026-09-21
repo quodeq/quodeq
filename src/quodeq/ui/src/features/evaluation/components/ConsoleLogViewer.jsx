@@ -65,6 +65,17 @@ function hasActiveSelectionInside(el) {
   return el.contains(sel.anchorNode) || el.contains(sel.focusNode);
 }
 
+// Jump the viewport to the bottom, marking the move as ours so the scroll
+// listener does not read it as the user leaving the tail. A live selection
+// inside the log wins: scrolling would collapse it.
+function snapToBottom(el, programmaticScroll, lastScrollHeight) {
+  if (hasActiveSelectionInside(el)) return;
+  programmaticScroll.current = true;
+  el.scrollTop = el.scrollHeight;
+  lastScrollHeight.current = el.scrollHeight;
+  requestAnimationFrame(() => { programmaticScroll.current = false; });
+}
+
 function cleanLine(text) {
   if (text == null) return '';
   return String(text)
@@ -168,11 +179,7 @@ function makeScrollWatcherEffect({ scrollRef, contentRef, followRef, programmati
     el.addEventListener('scroll', onScroll, { passive: true });
     const snap = () => {
       if (!followRef.current) return;
-      if (hasActiveSelectionInside(el)) return;
-      programmaticScroll.current = true;
-      el.scrollTop = el.scrollHeight;
-      lastScrollHeight.current = el.scrollHeight;
-      requestAnimationFrame(() => { programmaticScroll.current = false; });
+      snapToBottom(el, programmaticScroll, lastScrollHeight);
     };
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(snap) : null;
     ro?.observe(el);
@@ -197,12 +204,7 @@ function useConsoleAutoScroll(logCount) {
 
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
-    if (!el) return;
-    if (hasActiveSelectionInside(el)) return;
-    programmaticScroll.current = true;
-    el.scrollTop = el.scrollHeight;
-    lastScrollHeight.current = el.scrollHeight;
-    requestAnimationFrame(() => { programmaticScroll.current = false; });
+    if (el) snapToBottom(el, programmaticScroll, lastScrollHeight);
   }, []);
 
   useEffect(() => {

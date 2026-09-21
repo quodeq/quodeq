@@ -4,7 +4,7 @@
  */
 export function stripPrinciplePrefix(reason, principle) {
   if (!reason || !principle) return reason;
-  for (const sep of [' — ', ' — ', ' - ']) {
+  for (const sep of [' — ', ' - ']) {
     if (reason.startsWith(principle + sep)) {
       return reason.slice(principle.length + sep.length);
     }
