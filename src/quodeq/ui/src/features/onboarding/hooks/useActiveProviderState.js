@@ -8,6 +8,10 @@ import { readString } from '../../../adapters/storage.js';
 // to feel live while the user picks; the picker is interactive and on screen.
 const ACTIVE_PROVIDER_POLL_MS = 400;
 
+// Nothing selected, or storage unavailable. Frozen so a caller cannot mutate
+// the shared object under the next reader.
+const NO_ACTIVE_PROVIDER = Object.freeze({ id: null, model: null, timeLimitS: null });
+
 /**
  * The provider the user has selected, with its model and time limit (0 meaning
  * unlimited, null meaning unset so the caller's default applies). All-null when
@@ -18,7 +22,7 @@ const ACTIVE_PROVIDER_POLL_MS = 400;
 export function readActiveProviderState() {
   try {
     const id = readString(ACTIVE_PROVIDER_KEY, null);
-    if (!id) return { id: null, model: null, timeLimitS: null };
+    if (!id) return NO_ACTIVE_PROVIDER;
     const model = readString(providerKey(id, 'model'), null);
     // ProviderTabs persists time-limit per provider as a stringified number of
     // seconds. Treat 0 as unlimited; missing key falls back to null so the
@@ -28,7 +32,7 @@ export function readActiveProviderState() {
     return { id, model, timeLimitS: Number.isFinite(timeLimitS) ? timeLimitS : null };
   } catch (err) {
     console.warn('[useActiveProviderState] could not read active provider state:', err);
-    return { id: null, model: null, timeLimitS: null };
+    return NO_ACTIVE_PROVIDER;
   }
 }
 

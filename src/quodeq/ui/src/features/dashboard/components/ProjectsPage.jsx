@@ -8,6 +8,7 @@ import { ProjectCard } from './projectCards/ProjectCard.jsx';
 import { ProjectCardGroup, useRelocateDialog } from './projectCards/ProjectCardGroup.jsx';
 import { OnlineCardFooter } from './projectCards/OnlineCardFooter.jsx';
 import { ProjectsToolbar } from './ProjectsToolbar.jsx';
+import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
 
 const EVAL_BLOCKED_TITLE = t('projects.evalBlockedTitle');
 
@@ -24,20 +25,18 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
       <div className="projects-empty__cta-row">
         <button
           type="button"
-          className={`term-btn term-btn--primary term-btn--filled projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
+          className={`term-btn term-btn--primary term-btn--filled projects-empty__cta-btn${evalBlockedClass(isEvaluating)}`}
           onClick={onAddProject}
-          aria-disabled={isEvaluating || undefined}
-          title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
+          {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE)}
         >
           <span aria-hidden="true">▸</span> {t('projects.addProject')}
         </button>
         {onImportProject && (
           <button
             type="button"
-            className={`projects-page__import-btn projects-empty__cta-btn${isEvaluating ? ' is-disabled' : ''}`}
+            className={`projects-page__import-btn projects-empty__cta-btn${evalBlockedClass(isEvaluating)}`}
             onClick={onImportProject}
-            aria-disabled={isEvaluating || undefined}
-            title={isEvaluating ? EVAL_BLOCKED_TITLE : t('projects.importTitle')}
+            {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE, t('projects.importTitle'))}
           >
             {t('projects.importProject')}
           </button>
@@ -65,11 +64,10 @@ function ProjectsPageHeader({ projectsLoaded, projects, isEmpty, onImportProject
           {onImportProject && (
             <button
               type="button"
-              className={`projects-page__import-btn${isEvaluating ? ' is-disabled' : ''}`}
+              className={`projects-page__import-btn${evalBlockedClass(isEvaluating)}`}
               onClick={onImportProject}
               aria-label={t('projects.importAria')}
-              aria-disabled={isEvaluating || undefined}
-              title={isEvaluating ? EVAL_BLOCKED_TITLE : t('projects.importTitle')}
+              {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE, t('projects.importTitle'))}
             >
               {t('projects.importProject')}
             </button>
@@ -77,11 +75,10 @@ function ProjectsPageHeader({ projectsLoaded, projects, isEmpty, onImportProject
           {onAddProject && (
             <button
               type="button"
-              className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${isEvaluating ? ' is-disabled' : ''}`}
+              className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${evalBlockedClass(isEvaluating)}`}
               onClick={onAddProject}
               aria-label={t('projects.addAria')}
-              aria-disabled={isEvaluating || undefined}
-              title={isEvaluating ? EVAL_BLOCKED_TITLE : undefined}
+              {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE)}
             >
               <span aria-hidden="true">▸</span> {t('projects.addProject')}
             </button>

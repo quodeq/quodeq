@@ -14,40 +14,42 @@ const CLI_SERVER_ID = { 'codex-cli': 'codex', 'claude-code': 'claude' };
 /** How long each detection probe waits before aborting its fetch. */
 export const PROBE_TIMEOUT_MS = 5000;
 
-async function detectCliProvider(id) {
-  const serverId = CLI_SERVER_ID[id] || id;
+// Every probe is a timed GET whose failure is "not detected", never an
+// error the caller has to handle: one unreachable provider must not fail the
+// whole detection pass. `read` turns a successful response into the probe's
+// own detected/defaultModel shape.
+async function probe(id, classification, url, read) {
+  const miss = { id, classification, detected: false, defaultModel: null };
   try {
-    const res = await fetch('/api/ai-clients', { method: 'GET', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-    if (!res.ok) return { id, classification: 'cli', detected: false, defaultModel: null };
-    const data = await res.json();
-    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === 'cli' && c.installed !== false);
-    return { id, classification: 'cli', detected, defaultModel: null };
+    const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    if (!res.ok) return miss;
+    return { id, classification, ...(await read(res)) };
   } catch (err) {
-    console.warn('[providerProbes] CLI provider probe failed:', err);
-    return { id, classification: 'cli', detected: false, defaultModel: null };
+    console.warn(`[providerProbes] ${classification} probe failed:`, err);
+    return miss;
   }
 }
 
+async function detectCliProvider(id) {
+  const serverId = CLI_SERVER_ID[id] || id;
+  return probe(id, 'cli', '/api/ai-clients', async (res) => {
+    const data = await res.json();
+    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === 'cli' && c.installed !== false);
+    return { detected, defaultModel: null };
+  });
+}
+
+// The only probe whose answer is the response status itself: a reachable
+// health endpoint means the daemon is up.
 async function detectOllamaDaemon() {
-  try {
-    const res = await fetch('/api/ollama/health', { method: 'GET', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-    return { id: 'ollama', classification: 'local-api', detected: res.ok, defaultModel: null };
-  } catch (err) {
-    console.warn('[providerProbes] Ollama daemon probe failed:', err);
-    return { id: 'ollama', classification: 'local-api', detected: false };
-  }
+  return probe('ollama', 'local-api', '/api/ollama/health', () => ({ detected: true, defaultModel: null }));
 }
 
 async function detectStoredCloudKey(providerId) {
-  try {
-    const res = await fetch(`/api/provider/key-status?provider=${encodeURIComponent(providerId)}`, { method: 'GET', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-    if (!res.ok) return { id: providerId, classification: 'cloud', detected: false, defaultModel: null };
+  return probe(providerId, 'cloud', `/api/provider/key-status?provider=${encodeURIComponent(providerId)}`, async (res) => {
     const data = await res.json();
-    return { id: providerId, classification: 'cloud', detected: Boolean(data.configured), defaultModel: null };
-  } catch (err) {
-    console.warn('[providerProbes] cloud key probe failed:', err);
-    return { id: providerId, classification: 'cloud', detected: false, defaultModel: null };
-  }
+    return { detected: Boolean(data.configured), defaultModel: null };
+  });
 }
 
 /**

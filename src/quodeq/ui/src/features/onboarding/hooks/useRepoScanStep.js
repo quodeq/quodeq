@@ -46,6 +46,13 @@ function makeTryResumeExisting({ getProjectInfo, getProjectScan, actions }) {
   };
 }
 
+// A repo that is already registered comes back as a 409 carrying the
+// existing project id: resuming it is the right answer, not a failure.
+async function resumedExisting(err, tryResumeExisting) {
+  if (err.status !== HTTP_STATUS.CONFLICT || !err.existingProjectId) return false;
+  return Boolean(await tryResumeExisting(err.existingProjectId));
+}
+
 /**
  * Builds the Repo & Scan submit handler. A URL branches into the clone-target
  * sub-step; a local path creates the project straight away. When the backend
@@ -68,10 +75,7 @@ export function makeHandleSubmit({ state, actions, createProject, setSubStep, se
       const { projectId, scanData } = await createProject({ repo });
       actions.succeedScan(projectId, scanData);
     } catch (err) {
-      if (err.status === HTTP_STATUS.CONFLICT && err.existingProjectId) {
-        const resumed = await tryResumeExisting(err.existingProjectId);
-        if (resumed) return;
-      }
+      if (await resumedExisting(err, tryResumeExisting)) return;
       actions.failScan({
         message: apiErrorMessage(err, 'onboarding.scanFailed'),
         status: err.status,
@@ -103,12 +107,9 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
       actions.succeedScan(projectId, scanData);
       setSubStep('input');
     } catch (err) {
-      if (err.status === HTTP_STATUS.CONFLICT && err.existingProjectId) {
-        const resumed = await tryResumeExisting(err.existingProjectId);
-        if (resumed) {
-          setSubStep('input');
-          return;
-        }
+      if (await resumedExisting(err, tryResumeExisting)) {
+        setSubStep('input');
+        return;
       }
       const message = friendlyCloneError(err);
       setCloneError(message);

@@ -2,13 +2,14 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
 import { removeKey } from '../../../adapters/storage.js';
 import { SKIPPED_KEY } from '../wizardSteps.js';
+import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
 
 function clearSkip() {
   removeKey(SKIPPED_KEY);
 }
 
 export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = null, isEvaluating = false }) {
-  const blockedTitle = isEvaluating ? t('onboarding.cannotAddWhileRunning') : undefined;
+  const blocked = evalBlockedProps(isEvaluating, t('onboarding.cannotAddWhileRunning'));
   // Both CTAs stay clickable while evaluating (aria-disabled, not disabled),
   // so each handler has to swallow the click itself before clearing the skip.
   const runAfterClearingSkip = (cb) => () => {
@@ -36,19 +37,17 @@ export default function EmptyStateWithTour({ onAdd, onTour, onBrowseRemote = nul
         )}
         <button
           type="button"
-          className={`${onBrowseRemote ? 'term-btn--secondary' : 'term-btn--primary'}${isEvaluating ? ' is-disabled' : ''}`}
+          className={`${onBrowseRemote ? 'term-btn--secondary' : 'term-btn--primary'}${evalBlockedClass(isEvaluating)}`}
           onClick={runAfterClearingSkip(onAdd)}
-          aria-disabled={isEvaluating || undefined}
-          title={blockedTitle}
+          {...blocked}
         >
           {t('onboarding.addProject')}
         </button>
         <button
           type="button"
-          className={`term-btn--secondary${isEvaluating ? ' is-disabled' : ''}`}
+          className={`term-btn--secondary${evalBlockedClass(isEvaluating)}`}
           onClick={runAfterClearingSkip(onTour)}
-          aria-disabled={isEvaluating || undefined}
-          title={blockedTitle}
+          {...blocked}
         >
           {t('onboarding.takeTour')}
         </button>
