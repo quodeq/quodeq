@@ -1,5 +1,5 @@
-import { scoreColorClass, gradeLabel } from '../../../utils/formatters.js';
-import { t, LOCALE } from '../../../strings/index.js';
+import { scoreColorClass, gradeLabel, formatRunDate, formatRunTime } from '../../../utils/formatters.js';
+import { t } from '../../../strings/index.js';
 
 // History index status for a run that is still being evaluated: the row is
 // dimmed and not clickable until it lands.
@@ -8,27 +8,8 @@ const IN_PROGRESS_ROW_STYLE = { opacity: 0.6, cursor: 'not-allowed' };
 // Stands in for any score the row cannot show yet or at all.
 const NO_VALUE = '—';
 
-function formatDate(dateISO) {
-  if (!dateISO) return '';
-  try {
-    const d = new Date(dateISO);
-    return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
-  } catch (err) {
-    console.warn('[HistoryRunRow] date format failed:', err);
-    return '';
-  }
-}
-
-function formatTime(dateISO) {
-  if (!dateISO) return '';
-  try {
-    const d = new Date(dateISO);
-    return d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
-  } catch (err) {
-    console.warn('[HistoryRunRow] time format failed:', err);
-    return '';
-  }
-}
+const formatDate = (dateISO) => formatRunDate(dateISO, '', 'HistoryRunRow');
+const formatTime = (dateISO) => formatRunTime(dateISO, '', 'HistoryRunRow');
 
 function TrendBadge({ delta }) {
   if (delta == null) return <span className="history-trend">—</span>;
