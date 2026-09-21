@@ -8,7 +8,7 @@ import threading
 import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Callable
+from typing import Callable, NamedTuple
 
 from quodeq.assistant.adapters._cli_command import (
     McpConfigRef, TurnArgvRequest, build_turn_argv)
@@ -18,7 +18,7 @@ from quodeq.assistant.adapters.cli_config import (
 )
 from quodeq.assistant.adapters._cli_spawn import (
     build_chat_env, external_sandbox_prefix, scratch_cwd, spawn_turn)
-from quodeq.assistant.adapters._cli_events import consume_stream_events
+from quodeq.assistant.adapters._cli_events import StreamOutcome, consume_stream_events
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.mcp import mcp_config
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
@@ -90,6 +90,33 @@ def _setup_mcp_config(cfg: CliTurnConfig, cli_cfg) -> McpConfigRef:
     return McpConfigRef(None, None)
 
 
+def _external_sandbox(cfg: CliTurnConfig, cwd: Path) -> tuple[list[str], object | None]:
+    """The OS-sandbox launcher prefix for this turn, and its cleanup handle.
+
+    codex needs its internal sandbox bypassed for MCP to work, so we wrap it
+    in an OS sandbox WE control that blocks writes outside the scratch cwd,
+    temp, ~/.codex and the assistant db (which draft_action writes).
+    """
+    db = str(cfg.db_path)
+    return external_sandbox_prefix(
+        writable_dirs=[str(cwd), str(Path.home() / ".codex"),
+                       *([str(cfg.worktree_dir)] if cfg.worktree_dir else [])],
+        writable_files=[db, db + "-wal", db + "-shm", db + "-journal"])
+
+
+def _arm_kill_guards(proc, session: CliTurnSession) -> threading.Timer:
+    """Wire the wall-clock timeout and the stop endpoint to the process tree.
+
+    The timer stops a hung or silent CLI from wedging the turn slot forever.
+    Cancelling the token kills the same tree, which EOFs stdout and lets the
+    turn unwind (it runs immediately if the stop already landed).
+    """
+    timer = threading.Timer(TURN_TIMEOUT_S, lambda: _kill_proc_tree(proc))
+    timer.start()
+    session.cancel.register_kill(lambda: _kill_proc_tree(proc))
+    return timer
+
+
 def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, session: CliTurnSession):
     """Build the sandboxed argv, spawn the CLI, and stream its output.
 
@@ -97,35 +124,33 @@ def _spawn_and_stream(cfg: CliTurnConfig, cli_cfg, spec, session: CliTurnSession
     first four feed ``_run_once``'s ``finally`` cleanup. *session* must
     carry resolved ``spawn_fn``/``cancel`` (``run_cli_turn`` fills them in).
     """
-    env = build_chat_env(provider=cfg.provider)
     cwd = scratch_cwd(cfg.scratch_base)
     argv = spec.argv
     sandbox_cleanup = None
     if cli_cfg.requires_external_sandbox:
-        # codex needs its internal sandbox bypassed for MCP to work; wrap it
-        # in an OS sandbox WE control that blocks writes outside the scratch
-        # cwd, temp, ~/.codex, and the assistant db (which draft_action writes).
-        db = str(cfg.db_path)
-        prefix, sandbox_cleanup = external_sandbox_prefix(
-            writable_dirs=[str(cwd), str(Path.home() / ".codex"),
-                           *([str(cfg.worktree_dir)] if cfg.worktree_dir else [])],
-            writable_files=[db, db + "-wal", db + "-shm", db + "-journal"])
+        prefix, sandbox_cleanup = _external_sandbox(cfg, cwd)
         argv = prefix + argv
-    proc = session.spawn_fn(argv, cwd=cwd, env=env)
-    # wall-clock guard: a hung/silent CLI can't wedge the turn slot forever
-    timer = threading.Timer(TURN_TIMEOUT_S, lambda: _kill_proc_tree(proc))
-    timer.start()
-    # Stop endpoint: cancelling the token kills the process tree, which
-    # EOFs stdout below and lets the turn unwind (runs immediately if the
-    # stop already landed).
-    session.cancel.register_kill(lambda: _kill_proc_tree(proc))
+    proc = session.spawn_fn(argv, cwd=cwd, env=build_chat_env(provider=cfg.provider))
+    timer = _arm_kill_guards(proc, session)
     stream_result = consume_stream_events(proc.stdout, session.emit, spec.session_id)
     return cwd, proc, timer, sandbox_cleanup, stream_result
 
 
-def _finalize_turn_result(proc, stream_result, *, repository: AssistantStore, session_id: str
-                          ) -> tuple[str, str | None, int, str | None, str | None]:
-    texts, errors, raw_errors, parsed_sid, partial_buf, saw_result = stream_result
+class TurnOutcome(NamedTuple):
+    """One completed CLI turn, as the retry/raise logic in run_cli_turn reads it."""
+
+    final: str
+    session_id: str | None
+    returncode: int
+    structured_error: str | None
+    raw_error: str | None
+
+
+def _finalize_turn_result(
+    proc, stream: StreamOutcome, *, repository: AssistantStore, session_id: str,
+) -> TurnOutcome:
+    """Reap the process and fold the stream into the turn's answer and errors."""
+    texts = stream.texts
     try:
         returncode = proc.wait(timeout=_REAPER_WAIT_S)
     except subprocess.TimeoutExpired:
@@ -133,28 +158,32 @@ def _finalize_turn_result(proc, stream_result, *, repository: AssistantStore, se
         returncode = proc.wait()
     # a turn killed mid-message (stop/timeout) streamed deltas that never
     # got their complete-message echo; they are the answer the user saw.
-    if partial_buf:
-        texts.append(partial_buf)
+    if stream.partial_buf:
+        texts.append(stream.partial_buf)
     # argv-append/result providers (claude) end with a `result` event that
     # echoes the complete answer, so the last text IS the whole reply.
     # streaming-only providers (codex) never send `result`; their answer is
     # the concatenation of every agent_message chunk, not just the last.
-    if saw_result:
+    if stream.saw_result:
         final = texts[-1] if texts else ""
     else:
         final = "\n\n".join(texts)
-    if parsed_sid:
-        repository.set_cli_session_id(session_id, parsed_sid)
+    if stream.session_id:
+        repository.set_cli_session_id(session_id, stream.session_id)
     # structured errors (error/turn.failed events) mean the turn genuinely
     # failed; raw stderr lines are often benign warnings. Keep them apart so
     # the caller can raise the former even when partial text was streamed.
-    structured_error = errors[0] if errors else None
-    raw_error = raw_errors[0] if raw_errors else None
-    return final, parsed_sid, returncode, structured_error, raw_error
+    return TurnOutcome(
+        final=final,
+        session_id=stream.session_id,
+        returncode=returncode,
+        structured_error=stream.errors[0] if stream.errors else None,
+        raw_error=stream.raw_errors[0] if stream.raw_errors else None,
+    )
 
 
 def _run_once(cfg: CliTurnConfig, cli_cfg, session: CliTurnSession, prompt: str,
-              new_session_id: str) -> tuple[str, str | None, int, str | None, str | None]:
+              new_session_id: str) -> TurnOutcome:
     mcp_config_ref = _setup_mcp_config(cfg, cli_cfg)
     resources = TurnResources()
     try:
@@ -196,7 +225,25 @@ def _inject_system_prompt(cli_cfg, config: CliTurnConfig, prior_session_id: str 
 
 def run_cli_turn(*, messages: list[dict], config: CliTurnConfig,
                  session: CliTurnSession) -> str:
-    """Run one assistant turn through the provider CLI; return the session id."""
+    """Run one assistant turn through the provider CLI and return its answer.
+
+    Args:
+        messages: The conversation so far; the last user message is the
+            prompt, and the whole transcript is replayed if the turn has to
+            be rebuilt.
+        config: Provider, paths and prompt blocks for this turn.
+        session: The repository, emit callback and cancel token, plus the
+            prior CLI session id to resume from (None starts fresh).
+
+    Returns:
+        The assistant's answer text.
+
+    Raises:
+        TurnCancelled: The stop endpoint fired; the partial answer rides on
+            the exception.
+        RuntimeError: The CLI reported a structured error or produced no
+            output at all.
+    """
     session = replace(session, spawn_fn=session.spawn_fn or spawn_turn,
                       cancel=session.cancel or CancelToken())
     if session.cancel.cancelled:  # stop landed before the turn even spawned
@@ -204,27 +251,26 @@ def run_cli_turn(*, messages: list[dict], config: CliTurnConfig,
     cli_cfg = load_cli_chat_config(config.provider)
     prompt = _inject_system_prompt(cli_cfg, config, session.prior_session_id,
                                    _latest_user(messages))
-    final, _sid, _rc, structured_error, raw_error = _run_once(
-        config, cli_cfg, session, prompt, str(uuid.uuid4()))
+    outcome = _run_once(config, cli_cfg, session, prompt, str(uuid.uuid4()))
     # A stopped turn is neither a failure nor a rebuild trigger: the kill
     # leaves empty/partial output and often a nonzero exit, all of which the
     # paths below would misread (rebuilding would RERUN the turn the user
     # just stopped). Unwind with whatever text already streamed.
     if session.cancel.cancelled:
-        raise TurnCancelled(final)
+        raise TurnCancelled(outcome.final)
     # rebuild from the full transcript when a resumed turn came back empty, or
     # when it reported a structured failure (a partial answer before an explicit
     # error is not trustworthy). A non-empty answer with only a benign non-zero
     # exit is still success.
-    if session.prior_session_id is not None and (final == "" or structured_error):
+    if session.prior_session_id is not None and (outcome.final == "" or outcome.structured_error):
         session.emit({"type": "warning", "message": "session rebuilt"})
-        final, _sid, _rc, structured_error, raw_error = _run_once(
+        outcome = _run_once(
             config, cli_cfg, replace(session, prior_session_id=None),
             _full_transcript(messages), str(uuid.uuid4()))
         if session.cancel.cancelled:
-            raise TurnCancelled(final)
-    if structured_error:
-        raise RuntimeError(structured_error)
-    if final == "":
-        raise RuntimeError(raw_error or "CLI produced no output")
-    return final
+            raise TurnCancelled(outcome.final)
+    if outcome.structured_error:
+        raise RuntimeError(outcome.structured_error)
+    if outcome.final == "":
+        raise RuntimeError(outcome.raw_error or "CLI produced no output")
+    return outcome.final

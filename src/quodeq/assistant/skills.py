@@ -12,6 +12,7 @@ from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
+
 def skills_directory(env: Mapping[str, str] | None = None) -> Path:
     """Directory the builtin skill packs are read from.
 
@@ -21,6 +22,7 @@ def skills_directory(env: Mapping[str, str] | None = None) -> Path:
     """
     raw = resolve_env(env).get("QUODEQ_ASSISTANT_SKILLS_DIR")
     return Path(raw) if raw else Path(__file__).resolve().parent.parent / "data" / "assistant" / "skills"
+
 
 # Names the client answers locally; a skill file may never shadow them.
 RESERVED_COMMANDS: tuple[tuple[str, str], ...] = (

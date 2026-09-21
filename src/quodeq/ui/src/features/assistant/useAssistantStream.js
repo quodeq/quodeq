@@ -50,8 +50,12 @@ function withRevealedChunk(prev, chunk, startNewBubble) {
 // scheduleFlush, finishTurn and endTurn are mutually recursive over the same
 // refs -- they only make sense as one closure set, bound once per effect run.
 function createTurnRevealer({ pending, raf, timer, turnBoundary, endPending, setMessages, setStreaming, onDoneRef }) {
-  const finishTurn = () => { endPending.current = false; setStreaming(false);
-    turnBoundary.current = true; onDoneRef.current?.(); };
+  const finishTurn = () => {
+    endPending.current = false;
+    setStreaming(false);
+    turnBoundary.current = true;
+    onDoneRef.current?.();
+  };
   const drain = (all) => {
     if (raf.current != null) { cancelAnimationFrame(raf.current); raf.current = null; }
     if (timer.current != null) { clearTimeout(timer.current); timer.current = null; }
@@ -125,12 +129,33 @@ function makeFrameHandlers({ revealer, append, beginContent, setError, endPendin
   };
 }
 
+// Everything one session's stream needs, built once when the stream opens:
+// the reveal machinery, the inactivity guard, the first-content gate and the
+// frame dispatch table. They close over the same refs, so they are built
+// together rather than assembled at the call site.
+function buildStreamPipeline({
+  pending, raf, timer, turnBoundary, endPending, inactivity,
+  setMessages, setStreaming, setError, onDoneRef,
+}) {
+  const revealer = createTurnRevealer({
+    pending, raf, timer, turnBoundary, endPending, setMessages, setStreaming, onDoneRef,
+  });
+  const resetInactivity = createInactivityGuard({ inactivity, setError, endTurn: revealer.endTurn });
+  const append = (msg) => setMessages((prev) => [...prev, msg]);
+  const beginContent = createContentGate({ turnBoundary, setError, setStreaming });
+  const handlers = makeFrameHandlers({ revealer, append, beginContent, setError, endPending });
+  return { revealer, resetInactivity, handlers };
+}
+
 export function useAssistantStream(sessionId, { onDone } = {}) {
   const [messages, setMessages] = useState([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState(null);
-  const pending = useRef(''); const raf = useRef(null); const timer = useRef(null);
-  const inactivity = useRef(null); const onDoneRef = useRef(onDone);
+  const pending = useRef('');
+  const raf = useRef(null);
+  const timer = useRef(null);
+  const inactivity = useRef(null);
+  const onDoneRef = useRef(onDone);
   // Set when the turn's `done` arrived while text was still being revealed:
   // the turn ends when the drain empties instead of force-flushing the rest.
   const endPending = useRef(false);
@@ -145,14 +170,17 @@ export function useAssistantStream(sessionId, { onDone } = {}) {
 
   useEffect(() => {
     if (!sessionId) { setStreaming(false); return undefined; }
-    setMessages([]); setError(null); setStreaming(true); pending.current = '';
-    turnBoundary.current = false; endPending.current = false;
+    setMessages([]);
+    setError(null);
+    setStreaming(true);
+    pending.current = '';
+    turnBoundary.current = false;
+    endPending.current = false;
 
-    const revealer = createTurnRevealer({ pending, raf, timer, turnBoundary, endPending, setMessages, setStreaming, onDoneRef });
-    const resetInactivity = createInactivityGuard({ inactivity, setError, endTurn: revealer.endTurn });
-    const append = (msg) => setMessages((prev) => [...prev, msg]);
-    const beginContent = createContentGate({ turnBoundary, setError, setStreaming });
-    const handlers = makeFrameHandlers({ revealer, append, beginContent, setError, endPending });
+    const { revealer, resetInactivity, handlers } = buildStreamPipeline({
+      pending, raf, timer, turnBoundary, endPending, inactivity,
+      setMessages, setStreaming, setError, onDoneRef,
+    });
 
     const es = new EventSource(assistantEventsUrl(sessionId, 0));
     es.onmessage = (e) => {

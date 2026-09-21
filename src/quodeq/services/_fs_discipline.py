@@ -1,7 +1,7 @@
 """Language-stat and discipline-inference helpers for the filesystem action
 provider.
 
-Split out of _fs_metadata.py (Task 13). ``_has_fingerprints`` logs via the
+Split out of _fs_metadata.py. ``_has_fingerprints`` logs via the
 ``_fs_metadata`` facade's logger (looked up at call time, deferred to avoid
 a circular import) rather than creating its own ``logging.getLogger`` here --
 tests assert the warning under the "quodeq.services._fs_metadata" logger

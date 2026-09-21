@@ -14,6 +14,7 @@ from quodeq.services.wiring import (
 _HTTP_TIMEOUT_S = 30
 _HASH_PREFIX_LEN = 16
 
+
 class StandardImportConflictError(ValueError):
     """Raised when a standard with the same ID already exists locally from
     a different origin. The only genuine business-logic conflict raised by
@@ -22,11 +23,13 @@ class StandardImportConflictError(ValueError):
     is a transport/parse failure, not a conflict, and stays a plain
     ``ValueError`` so callers can tell the two apart by type."""
 
+
 class HttpClient(Protocol):
     """Transport seam for the library client, so tests can answer without a network."""
     def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any:
         """Fetch *url* and return the decoded JSON body."""
         ...
+
 
 class UrllibJsonClient:
     """``HttpClient`` over ``urllib`` with a default-verified TLS context."""
@@ -36,6 +39,7 @@ class UrllibJsonClient:
         ctx = ssl.create_default_context()
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S, context=ctx) as resp:
             return json.loads(resp.read())
+
 
 class StandardsLibraryClient:
     """Read side of a remote standards library: index, fetch, and import-to-disk.

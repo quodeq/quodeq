@@ -188,7 +188,6 @@ def test_all_insufficient_overall():
 # --- params threading through run_scoring ------------------------------------
 
 
-
 def test_run_scoring_with_strict_params_lowers_scores():
     """The same evidence scores lower when severity weights are raised."""
     from quodeq.core.scoring.engine import run_scoring

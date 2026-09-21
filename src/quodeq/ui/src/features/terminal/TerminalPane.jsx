@@ -7,14 +7,8 @@ import TerminalHeader from './TerminalHeader.jsx';
 import { LockIcon } from '../../components/CopyButton.jsx';
 import { t } from '../../strings/index.js';
 
-/**
- * The terminal panel: header, session tab strip, one TerminalSessionView per
- * server-side session, and a status bar. Each session is its own shell with
- * its own history; inactive sessions are hidden (display:none), never
- * unmounted, so their buffers and PTY sockets survive tab switches. The
- * whole panel likewise stays mounted while backgrounded behind the assistant
- * panel — `active` only gates fitting/focus in the views.
- */
+// The panel's footer line: shell, session count and the localhost-only
+// padlock.
 function TerminalStatusBar({ shell, sessions, activeSession }) {
   return (
     <div className="tty-statusbar">
@@ -79,6 +73,15 @@ function useCopySupport(activeId) {
   return { registerApi, handleCopy };
 }
 
+/**
+ * The terminal panel: header, session tab strip, one TerminalSessionView per
+ * server-side session, and a status bar. Each session is its own shell with
+ * its own history; inactive sessions are hidden (display:none), never
+ * unmounted, so their buffers and PTY sockets survive tab switches. The whole
+ * panel likewise stays mounted while backgrounded behind the assistant panel.
+ * @param {boolean} active - whether the panel is the frontmost drawer tab.
+ *   It only gates fitting and focus inside the views; nothing unmounts.
+ */
 export default function TerminalPane({ active }) {
   const { reason, checked, shell } = useTerminalPaneStatus();
 

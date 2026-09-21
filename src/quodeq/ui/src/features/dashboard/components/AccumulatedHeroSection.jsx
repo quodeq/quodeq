@@ -52,42 +52,53 @@ function AccumulatedStatStrip({ scoreDisplay, scoreDelta, grade, customFormula, 
   );
 }
 
-export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, projectInfo, onCardNavigate, selectedSource, customFormula = false }) {
-  const summary = accumulated?.summary;
+/** Numbers the stat strip shows, read off the accumulated summary. */
+function accumulatedStats(summary) {
   const scoreNum = parseFloat(summary?.numericAverage);
-  const scoreDisplay = isNaN(scoreNum) ? '—' : scoreNum.toFixed(1);
-  const grade = summary?.overallGrade;
   const violations = summary?.totalViolations || 0;
   const compliance = summary?.totalCompliance || 0;
-  const totalChecks = violations + compliance;
-  const ratio = complianceRatio(violations, compliance);
+  return {
+    scoreDisplay: isNaN(scoreNum) ? '—' : scoreNum.toFixed(1),
+    grade: summary?.overallGrade,
+    violations,
+    compliance,
+    totalChecks: violations + compliance,
+    ratio: complianceRatio(violations, compliance),
+    severity: summary?.severity,
+  };
+}
 
-  const { handleViolations, handleCompliance, handleSeverity } = heroCardHandlers(onCardNavigate, { violations, compliance });
+/** Sub-line under the term header: the language mix, else the last run date. */
+function heroSubLine(projectInfo, lastDate) {
+  return buildLanguageSub(projectInfo)
+    || (lastDate ? t('overview.lastEvaluated', { date: lastDate }) : null);
+}
+
+export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, projectInfo, onCardNavigate, selectedSource, customFormula = false }) {
+  const stats = accumulatedStats(accumulated?.summary);
+  const { handleViolations, handleCompliance, handleSeverity } = heroCardHandlers(
+    onCardNavigate,
+    { violations: stats.violations, compliance: stats.compliance },
+  );
 
   return (
     <HeroPanel
       header={<>
         <TermHeader
           name={t('overview.termName')}
-          sub={buildLanguageSub(projectInfo) || (lastDate ? t('overview.lastEvaluated', { date: lastDate }) : null)}
+          sub={heroSubLine(projectInfo, lastDate)}
           badge={selectedSource === 'shared' ? <SharedReadOnlyBadge publishedBy={projectInfo?.publishedBy} /> : null}
         />
         <LastFetchedLine lastFetchedAt={projectInfo?.lastFetchedAt} />
       </>}
     >
       <AccumulatedStatStrip
-        scoreDisplay={scoreDisplay}
+        {...stats}
         scoreDelta={scoreDelta}
-        grade={grade}
         customFormula={customFormula}
-        violations={violations}
-        compliance={compliance}
-        totalChecks={totalChecks}
-        ratio={ratio}
         handleViolations={handleViolations}
         handleCompliance={handleCompliance}
         handleSeverity={handleSeverity}
-        severity={summary?.severity}
       />
     </HeroPanel>
   );

@@ -85,7 +85,7 @@ describe('galaxyFolderDraw smoke coverage (pre-refactor baseline)', () => {
   it('drawScene fills the background and returns theme colors', () => {
     const ctx = makeMockCtx(calls);
     const refs = makeRefs();
-    const { tc } = drawScene(ctx, makeScene(), {
+    const { tc } = drawScene(ctx, {
       W: 800, H: 600, t: 0, cam: { x: 0, y: 0, z: 1 }, w2s: makeW2s(),
       showLabels: true, mouseRef: refs.mouseRef, flyRef: refs.flyRef,
       focusedFolderRef: refs.focusedFolderRef, canvasRef: refs.canvasRef,
@@ -100,7 +100,7 @@ describe('galaxyFolderDraw smoke coverage (pre-refactor baseline)', () => {
     const scene = makeScene();
     const tc = { text: { r: 1, g: 1, b: 1 }, textMuted: { r: 1, g: 1, b: 1 } };
     const frame = { W: 800, H: 600, t: 0 };
-    expect(() => drawNebula(ctx, scene.rootStars[0], tc, frame)).not.toThrow();
+    expect(() => drawNebula(ctx, scene.rootStars[0], frame)).not.toThrow();
     expect(() => drawStarfield(ctx, scene.bg, tc, frame)).not.toThrow();
     expect(() => drawConstellationLines(ctx, scene, tc, makeW2s())).not.toThrow();
     expect(calls.length).toBeGreaterThan(0);

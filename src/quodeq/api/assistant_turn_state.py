@@ -1,6 +1,6 @@
 """Per-app assistant turn/SSE-stream registry.
 
-Split out of assistant_routes.py (Task 10): the ``AssistantTurnState`` class
+Split out of assistant_routes.py: the ``AssistantTurnState`` class
 and the request-context shims the workspace routes use to claim/release the
 same per-session turn slot as a /messages turn.
 """

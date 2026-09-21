@@ -41,10 +41,9 @@ def _backlog_counts(
 
     Returns None (keep the configured order) when the estimates are missing,
     don't cover every dimension, aren't all ``incremental``, or carry a
-    count that isn't an int. ``estimates`` is also checked for being a real
-    mapping: several pipeline tests patch the producer with a Mock.
+    count that isn't an int.
     """
-    if not isinstance(estimates, dict) or not estimates:
+    if not estimates:
         return None
     counts: dict[str, int] = {}
     for dim in dimensions:

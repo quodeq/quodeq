@@ -37,7 +37,15 @@ function NameField({ standard, editable, isNew, onUpdateField }) {
   };
   return (
     <FormGroup id="std-name" label={t('standards.colName')}>
-      <input id="std-name" className="form-input" value={standard.name || ''} onChange={handleNameChange} disabled={!editable} placeholder={t('standards.namePlaceholder')} autoFocus={isNew} />
+      <input
+        id="std-name"
+        className="form-input"
+        value={standard.name || ''}
+        onChange={handleNameChange}
+        disabled={!editable}
+        placeholder={t('standards.namePlaceholder')}
+        autoFocus={isNew}
+      />
     </FormGroup>
   );
 }
@@ -45,7 +53,15 @@ function NameField({ standard, editable, isNew, onUpdateField }) {
 function DescriptionField({ standard, editable, onUpdateField }) {
   return (
     <FormGroup id="std-description" label={t('standards.descriptionLabel')}>
-      <textarea id="std-description" className="form-textarea" value={standard.description || ''} onChange={(e) => onUpdateField(['description'], e.target.value)} disabled={!editable} placeholder={t('standards.describeStandardPlaceholder')} rows={DESCRIPTION_ROWS} />
+      <textarea
+        id="std-description"
+        className="form-textarea"
+        value={standard.description || ''}
+        onChange={(e) => onUpdateField(['description'], e.target.value)}
+        disabled={!editable}
+        placeholder={t('standards.describeStandardPlaceholder')}
+        rows={DESCRIPTION_ROWS}
+      />
     </FormGroup>
   );
 }
@@ -53,7 +69,14 @@ function DescriptionField({ standard, editable, onUpdateField }) {
 function SourceField({ standard, editable, onUpdateField }) {
   return (
     <FormGroup id="std-source" label={t('standards.sourceLabel')}>
-      <input id="std-source" className="form-input" value={standard.source || ''} onChange={(e) => onUpdateField(['source'], e.target.value)} disabled={!editable} placeholder={t('standards.sourcePlaceholder')} />
+      <input
+        id="std-source"
+        className="form-input"
+        value={standard.source || ''}
+        onChange={(e) => onUpdateField(['source'], e.target.value)}
+        disabled={!editable}
+        placeholder={t('standards.sourcePlaceholder')}
+      />
     </FormGroup>
   );
 }
@@ -63,7 +86,6 @@ function RootDetail({ standard, onUpdateField, editable, isNew }) {
     <div className="standard-root-detail">
       <SectionLabel marker="▶">{t('standards.standardLabel')}</SectionLabel>
       <NameField standard={standard} editable={editable} isNew={isNew} onUpdateField={onUpdateField} />
-      <input type="hidden" value={standard.id || ''} />
       <DescriptionField standard={standard} editable={editable} onUpdateField={onUpdateField} />
       <SourceField standard={standard} editable={editable} onUpdateField={onUpdateField} />
       {standard.managed && <p className="detail-managed-notice">{t('standards.managedNotice')}</p>}

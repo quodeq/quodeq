@@ -179,20 +179,39 @@ function buildDoneTail({ takenFiles, overallPct, excludedFiles, clockPart }) {
   return <>{t('evaluate.doneCount', { count: takenFiles, pct: overallPct })}{excludedFiles > 0 && <> · {t('evaluate.excludedSizeCap', { count: excludedFiles })}</>}{clockPart}</>;
 }
 
+// The four shapes buildSummary picks between. Each stays on one line because
+// a line break inside JSX text changes the rendered whitespace.
+function coverageLine({ totalFiles, tail }) {
+  return <>{t('evaluate.targetsPrefix')} <strong>{totalFiles}</strong> {t('evaluate.changedFilesSuffix')} · {tail}</>;
+}
+
+function cleanScanLine({ totalFiles, tail }) {
+  return <>{t('evaluate.reanalyzesPrefix')} <strong>{totalFiles}</strong> {t('evaluate.filesLabel')} · {tail}</>;
+}
+
+function incrementalLine({ takenFiles, totalFiles, overallPct, isRunning, inlineLabel, clockPart }) {
+  return <><strong>{t('evaluate.countOf', { taken: takenFiles, total: totalFiles })}</strong> {t('evaluate.checksLabel')} · {overallPct}%{isRunning && inlineLabel && <> · {inlineLabel}</>}{clockPart}</>;
+}
+
+function preparingLine({ isRunning, inlineLabel }) {
+  return <><strong>{t('evaluate.preparing')}</strong>{isRunning && inlineLabel && <> · {inlineLabel}</>}</>;
+}
+
 export function buildSummary({ showCoverage, totalFiles, takenFiles, overallPct, excludedFiles, scanMode, isRunning, progress, elapsedS, runBudgetS, overrun }) {
   const inlineLabel = buildInlineLabel(progress);
   const clockPart = buildClockPart({ isRunning, runBudgetS, overrun, elapsedS });
-  if (showCoverage) {
-    return totalFiles > 0
-      ? <>{t('evaluate.targetsPrefix')} <strong>{totalFiles}</strong> {t('evaluate.changedFilesSuffix')} · {buildDoneTail({ takenFiles, overallPct, excludedFiles, clockPart })}</>
-      : <>{t('evaluate.nothingNew')}{clockPart}</>;
-  }
-  if (totalFiles > 0) {
-    return scanMode === SCAN_MODE.CLEAN
-      ? <>{t('evaluate.reanalyzesPrefix')} <strong>{totalFiles}</strong> {t('evaluate.filesLabel')} · {buildDoneTail({ takenFiles, overallPct, excludedFiles, clockPart })}</>
-      : <><strong>{t('evaluate.countOf', { taken: takenFiles, total: totalFiles })}</strong> {t('evaluate.checksLabel')} · {overallPct}%{isRunning && inlineLabel && <> · {inlineLabel}</>}{clockPart}</>;
-  }
-  return <><strong>{t('evaluate.preparing')}</strong>{isRunning && inlineLabel && <> · {inlineLabel}</>}</>;
+  const tail = () => buildDoneTail({ takenFiles, overallPct, excludedFiles, clockPart });
+
+  // `> 0`, not `!== 0`: an absent or non-finite count reads as "nothing to
+  // report yet" too, and would otherwise fall through to a line that renders
+  // it verbatim.
+  const hasFiles = totalFiles > 0;
+
+  if (showCoverage && !hasFiles) return <>{t('evaluate.nothingNew')}{clockPart}</>;
+  if (showCoverage) return coverageLine({ totalFiles, tail: tail() });
+  if (!hasFiles) return preparingLine({ isRunning, inlineLabel });
+  if (scanMode === SCAN_MODE.CLEAN) return cleanScanLine({ totalFiles, tail: tail() });
+  return incrementalLine({ takenFiles, totalFiles, overallPct, isRunning, inlineLabel, clockPart });
 }
 
 // The full card body (everything ScanProgress renders once a jobId exists).

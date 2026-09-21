@@ -5,7 +5,7 @@ the checks here are intentionally paranoid: every member is checked for path
 traversal, absolute paths, symlinks, special files, oversize entries, and
 zip-bomb compression ratios before a single byte is extracted.
 
-Split out of import_project.py (Task 9).
+Split out of import_project.py.
 """
 from __future__ import annotations
 

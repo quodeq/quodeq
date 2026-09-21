@@ -130,6 +130,7 @@ def test_diff_from_forces_clean_scan_internally(tmp_path):
     repo.mkdir()
 
     import subprocess
+
     def run_git(cmd):
         subprocess.run(cmd, cwd=str(repo), check=True, capture_output=True)
 

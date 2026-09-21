@@ -10,6 +10,10 @@ from __future__ import annotations
 import logging
 import sys
 from collections.abc import MutableMapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import subprocess
 
 from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig

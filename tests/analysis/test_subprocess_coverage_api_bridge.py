@@ -26,7 +26,7 @@ class TestRunApiAnalysisBridge:
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              pytest.raises(Exception, match="No model configured"):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
+            _run_api_analysis_bridge(tmp_path, stream, cfg, {})
 
     def test_raises_when_no_api_base(self, tmp_path):
         stream = tmp_path / "stream.json"
@@ -35,7 +35,7 @@ class TestRunApiAnalysisBridge:
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              pytest.raises(Exception, match="No API base URL configured"):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
+            _run_api_analysis_bridge(tmp_path, stream, cfg, {})
 
     def test_empty_queue_writes_complete_marker_and_preserves_shared_jsonl(self, tmp_path):
         """Empty queue: write the per-agent stream 'complete' marker, but
@@ -56,7 +56,7 @@ class TestRunApiAnalysisBridge:
         provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
+            _run_api_analysis_bridge(tmp_path, stream, cfg, {})
 
         assert "complete" in stream.read_text()
         assert jsonl.read_text() == '{"t":"violation","p":"X","file":"a.py","line":1}\n'
@@ -72,7 +72,7 @@ class TestRunApiAnalysisBridge:
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
              patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
+            _run_api_analysis_bridge(tmp_path, stream, cfg, {})
             mock_api.assert_called_once()
             assert stream.read_text().strip() != ""
 
@@ -95,7 +95,7 @@ class TestRunApiAnalysisBridge:
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
              patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
+            _run_api_analysis_bridge(tmp_path, stream, cfg, {})
 
         assert mock_api.call_args.kwargs["config"].n_subagents == 3
 
@@ -111,7 +111,7 @@ class TestRunApiAnalysisBridge:
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
              patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
+            _run_api_analysis_bridge(tmp_path, stream, cfg, {})
 
         assert mock_api.call_args.kwargs["config"].n_subagents == 1
 
@@ -149,7 +149,7 @@ class TestRunApiAnalysisBridge:
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
              patch("quodeq.analysis._api_batch.assemble_api_prompt", return_value="prompt") as mock_assemble, \
              patch("quodeq.analysis._api_runner.run_api_analysis"):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg, {})
+            _run_api_analysis_bridge(tmp_path, stream, cfg, {})
 
         mock_assemble.assert_called_once()
         trust_model = mock_assemble.call_args.kwargs["project"].trust_model

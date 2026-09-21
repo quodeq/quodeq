@@ -85,7 +85,6 @@ def test_validated_path_rejects_dotdot_in_raw_path(tmp_path: Path):
 # ---------------------------------------------------------------------------
 
 
-
 @pytest.mark.parametrize("raw", ["0", "-5", "abc", ""])
 def test_rate_limit_window_falls_back_on_invalid_env(raw):
     assert _rate_limit_window(env={"QUODEQ_RATE_LIMIT_WINDOW": raw}) == _DEFAULT_RATE_LIMIT_WINDOW

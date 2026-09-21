@@ -1,20 +1,8 @@
 import { useEffect } from 'react';
 import { focusables, restoreFocus } from '../../../utils/a11y.js';
 
-/**
- * Focus mechanics for the duel and dimension launcher popovers, the other
- * half of useLauncherDismiss (which owns Escape and outside pointer/scroll).
- *
- * Both menus are portaled to document.body, so they sit at the very end of
- * the document, disconnected from their trigger. Tab from the trigger would
- * walk past every remaining page control instead of entering the menu, which
- * leaves a keyboard-only user unable to reach the options at all (U-ACC-3).
- * So the menu takes focus itself when it opens, ArrowDown/ArrowUp walk it
- * (wrapping at both ends, over every focusable so the duel menu's unpin
- * button is reachable too), and Tab in either direction means "leave the
- * menu": it closes and hands focus back to the trigger, the one place from
- * which tabbing onward follows the visible order again.
- */
+// Focus mechanics for the duel and dimension launcher popovers, the other
+// half of useLauncherDismiss (which owns Escape and outside pointer/scroll).
 const ARROW_STEP = { ArrowDown: 1, ArrowUp: -1 };
 const MENUITEM_SELECTOR = '[role="menuitem"]';
 
@@ -49,6 +37,25 @@ function launcherKeydown(menu, btn, close) {
   };
 }
 
+/**
+ * Keeps keyboard focus inside a launcher popover for as long as it is open.
+ *
+ * Both menus are portaled to document.body, so they sit at the very end of
+ * the document, disconnected from their trigger. Tab from the trigger would
+ * walk past every remaining page control instead of entering the menu, which
+ * leaves a keyboard-only user unable to reach the options at all. So the menu
+ * takes focus itself when it opens, ArrowDown/ArrowUp walk it (wrapping at
+ * both ends, over every focusable so the duel menu's unpin button is
+ * reachable too), and Tab in either direction means "leave the menu": it
+ * closes and hands focus back to the trigger, the one place from which
+ * tabbing onward follows the visible order again.
+ *
+ * @param {boolean} open - drives the whole effect; only `open` is in the
+ *   dependency list, so changing the refs or `close` mid-open is ignored.
+ * @param {{current: HTMLElement|null}} btnRef - the trigger focus returns to.
+ * @param {{current: HTMLElement|null}} menuRef - the portaled menu root.
+ * @param {() => void} close - called when Tab asks to leave the menu.
+ */
 export function useLauncherFocus(open, btnRef, menuRef, close) {
   useEffect(() => {
     const menu = menuRef.current;

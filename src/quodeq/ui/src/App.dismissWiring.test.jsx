@@ -47,7 +47,7 @@ describe('buildEvalPrincipal', () => {
   });
 });
 
-// Task 19 — read-only gating for shared projects. Shared projects have no
+// Read-only gating for shared projects. Shared projects have no
 // mutation route on the backend (dismiss/restore/delete/evaluate are
 // local-only by design, and a shared project's id can collide with a local
 // one). These pin the source-gating contract at the seams App.jsx actually

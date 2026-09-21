@@ -47,8 +47,6 @@ def test_rule_id_joins_dimension_and_principle_slug():
     assert _rule_id("reliability", "Fault Tolerance") == "reliability/fault-tolerance"
 
 
-
-
 def test_cwe_tags_extracts_github_form_from_req_refs():
     refs = [
         {"label": "CWE-390", "url": "https://cwe.mitre.org/data/definitions/390.html"},

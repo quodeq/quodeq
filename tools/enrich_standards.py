@@ -47,7 +47,7 @@ _UNKNOWN_PREFIX = "X-XXX"
 def _load_json_or_exit(path: Path, what: str) -> dict:
     """Parse the JSON at *path*, or exit with a message naming *what*."""
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding=_TEXT_ENCODING))
     except (OSError, json.JSONDecodeError) as exc:
         raise SystemExit(f"Cannot load {what} {path}: {exc}") from exc
 

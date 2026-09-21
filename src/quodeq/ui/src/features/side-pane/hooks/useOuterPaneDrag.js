@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { clampSidePaneWidth } from '../paneWidthMath.js';
 import { useDragLifecycle } from './useDragLifecycle.js';
 
@@ -11,41 +11,18 @@ function writePaneWidthVar(px) {
 
 /**
  * Drag-to-resize for the side pane's outer edge, writing the width to the
- * `--side-pane-width` custom property as the pointer moves.
+ * `--side-pane-width` custom property as the pointer moves. The shared
+ * resizing flag and cleanup slot come from usePaneDragPlumbing, which the
+ * inner divider drag reads too.
  *
- * Also owns the plumbing the inner divider drag shares: the container ref it
- * reaches into, the `data-pane-resizing` flag setter, and the active-drag
- * cleanup ref both drags register into so unmount always runs whichever
- * cleanup is live.
- *
- * While a drag is live it sets `data-pane-resizing` on the document root,
- * which CSS uses to suppress the column-width transition — without it the
- * pane edge lags the cursor and the main column reflows on every move. Any
- * drag still active at unmount is cleaned up.
+ * @param {object} args
+ * @param {number} args.paneWidth - the committed width a drag starts from.
+ * @param {(px: number) => void} args.setPaneWidth - commits the released width.
+ * @param {(on: boolean) => void} args.setResizingFlag
+ * @param {object} args.activeDragCleanupRef
+ * @returns {{isDragging: boolean, onOuterDividerPointerDown: Function}}
  */
-export function useOuterPaneDrag({ paneWidth, setPaneWidth }) {
-  // While dragging either divider, set data-pane-resizing on the document
-  // root. The flag is read by a CSS rule on .app-shell__body that suppresses
-  // its `transition: grid-template-columns 220ms ease` — without that, every
-  // pointermove kicks off a fresh 220ms animation of the column width, so
-  // the pane edge lags the cursor and the heavy main column reflows mid-
-  // animation many times per drag step.
-  const containerRef = useRef(null);
-  const setResizingFlag = useCallback((on) => {
-    const root = document.documentElement;
-    if (on) root.dataset.paneResizing = 'true';
-    else delete root.dataset.paneResizing;
-  }, []);
-
-  // Holds the cleanup function for the active drag, if any.
-  // Set on pointer-down, cleared on pointer-up or unmount.
-  const activeDragCleanupRef = useRef(null);
-
-  // Run any active drag cleanup on unmount to remove leaked window listeners.
-  useEffect(() => {
-    return () => { activeDragCleanupRef.current?.(); };
-  }, []);
-
+export function useOuterPaneDrag({ paneWidth, setPaneWidth, setResizingFlag, activeDragCleanupRef }) {
   const beginDrag = useDragLifecycle({ setResizingFlag, activeDragCleanupRef });
 
   const [isDragging, setIsDragging] = useState(false);
@@ -78,5 +55,5 @@ export function useOuterPaneDrag({ paneWidth, setPaneWidth }) {
     });
   }, [paneWidth, setPaneWidth, beginDrag]);
 
-  return { containerRef, setResizingFlag, activeDragCleanupRef, isDragging, onOuterDividerPointerDown };
+  return { isDragging, onOuterDividerPointerDown };
 }

@@ -60,8 +60,8 @@ it('click calls unverifyFinding and removes the chip', async () => {
   await waitFor(() => expect(screen.queryByRole('button', { name: /verified/i })).toBeNull());
 });
 
-// Shared projects have no unverify route on the backend (Task 19's
-// verifiedFindingsContext already no-ops unverify for `source="shared"`).
+// Shared projects have no unverify route on the backend
+// (verifiedFindingsContext already no-ops unverify for `source="shared"`).
 // The chip must still surface the badge (read-only), but as a
 // non-interactive element so there's no dead-end click affordance.
 it('renders a non-interactive chip (no button role, no click) when source is shared', async () => {

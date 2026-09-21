@@ -14,6 +14,20 @@ _TYPE_VIOLATION = "violation"
 _TYPE_COMPLIANCE = "compliance"
 
 
+def _fatal_provider_error(data: dict) -> tuple[str, str] | None:
+    """The (message, reason) of a provider error that should abort the run.
+
+    None for a stream event that carries no error, or an error the fatal
+    classifier does not recognise as worth stopping for.
+    """
+    error = copilot_error(data)
+    if not error:
+        return None
+    message, reason = error
+    reason = reason or classify_fatal_provider_message(message)
+    return (message, reason) if reason else None
+
+
 class IncrementalProgressReader:
     """Reads new bytes from stream/JSONL files since last check."""
 
@@ -54,15 +68,11 @@ class IncrementalProgressReader:
     def _consume_stream_lines(self, lines: list[str]) -> None:
         for line in lines:
             data = parse_stream_event(line)
-            if data is not None:
-                self._seen_files.update(extract_files_from_event(data))
-                if isinstance(data, dict) and self.provider_error is None:
-                    error = copilot_error(data)
-                    if error:
-                        message, reason = error
-                        reason = reason or classify_fatal_provider_message(message)
-                        if reason:
-                            self.provider_error = (message, reason)
+            if data is None:
+                continue
+            self._seen_files.update(extract_files_from_event(data))
+            if isinstance(data, dict) and self.provider_error is None:
+                self.provider_error = _fatal_provider_error(data)
 
     def _read_jsonl(self) -> None:
         if self._jsonl_file is None or not self._jsonl_file.exists():

@@ -31,6 +31,7 @@ def _make_lock_ops() -> tuple:
     """Return (lock_fn, unlock_fn) for the current platform."""
     if sys.platform == "win32":
         import msvcrt
+
         def _lock(fd: int, timeout_s: float | None = None) -> None:
             # Read at call time, not as a default arg: tests monkeypatch the
             # module constant to keep the contention case fast.
@@ -45,10 +46,12 @@ def _make_lock_ops() -> tuple:
                     if time.monotonic() >= deadline:
                         raise
                     time.sleep(_WIN_LOCK_RETRY_INTERVAL_S)
+
         def _unlock(fd: int) -> None:
             msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
     else:
         import fcntl
+
         def _lock(fd: int, timeout_s: float | None = None) -> None:
             # Read at call time, not as a default arg: tests monkeypatch the
             # module constant to keep the contention case fast.
@@ -71,6 +74,7 @@ def _make_lock_ops() -> tuple:
                             f"Timed out waiting for file lock after {timeout_s}s",
                         ) from None
                     time.sleep(_UNIX_LOCK_RETRY_INTERVAL_S)
+
         def _unlock(fd: int) -> None:
             fcntl.flock(fd, fcntl.LOCK_UN)
     return _lock, _unlock

@@ -47,7 +47,7 @@ function makeMockCtx(calls) {
       addColorStop: vi.fn(),
     })),
   };
-  for (const m of methods.filter(m => m !== 'createRadialGradient')) {
+  for (const m of methods.filter((name) => name !== 'createRadialGradient')) {
     ctx[m] = vi.fn(() => { calls.push(m); });
   }
   // Record createRadialGradient too

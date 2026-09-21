@@ -29,14 +29,14 @@ function noticeFor(d) {
 export default function useGradeFormula(projectId, thresholdsStore = defaultGradeThresholdsStore) {
   const {
     saved, draft, isCustom, defaults, preview, busy, error, partialNotice,
-    debounceRef, loadedRef, invalidateScoreQueries,
+    debounceRef, loaded, invalidateScoreQueries,
     adoptServerFormula, beginRequest, endRequest, failWith, notePartialRescore,
     updateDraft, showPreview,
   } = useGradeFormulaState();
 
   const isDirty = saved && draft && JSON.stringify(saved) !== JSON.stringify(draft);
 
-  const { requestPreview, update } = useGradePreview({ projectId, draft, updateDraft, showPreview, debounceRef, loadedRef });
+  const { requestPreview, update } = useGradePreview({ projectId, draft, updateDraft, showPreview, debounceRef, loaded });
 
   // Apply and reset differ only in which endpoint they call, what they log
   // and what they return; everything the server sends back is adopted the

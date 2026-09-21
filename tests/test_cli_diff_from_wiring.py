@@ -15,6 +15,7 @@ def _make_repo_with_diff(tmp_path: Path) -> Path:
     """One-file repo with main + feature branch that adds changed.py."""
     repo = tmp_path / "repo"
     repo.mkdir()
+
     def run(cmd: list[str]) -> None:
         subprocess.run(cmd, cwd=str(repo), check=True, capture_output=True)
     run(["git", "init", "-q", "-b", "main"])
@@ -89,6 +90,7 @@ def test_run_evaluate_fails_fast_on_unknown_diff_ref(tmp_path: Path, capsys) -> 
 
     repo = tmp_path / "repo"
     repo.mkdir()
+
     def run(cmd: list[str]) -> None:
         subprocess.run(cmd, cwd=str(repo), check=True, capture_output=True)
     run(["git", "init", "-q", "-b", "main"])

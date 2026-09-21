@@ -72,9 +72,9 @@ class TestBuildRouterContext:
         assert ctx is None
 
     def test_resolves_declared_trust_model_from_work_dir(self, tmp_path):
-        """C2: _api_runner.py:464 (``trust_model = resolve_trust_model(work_dir)
-        if work_dir is not None else None``) is one of three live wiring
-        points for the declared trust model. Nothing failed when a reviewer
+        """``_build_router_context``'s ``resolve_trust_model(work_dir)`` call
+        is one of three live wiring points for the declared trust model.
+        Nothing failed when a reviewer
         set all three to None at once and the full suite stayed green -- this
         closes that gap by exercising _build_router_context directly against
         a real declared profile, using a compiled_dir/dimension combination
@@ -174,13 +174,16 @@ class TestRunApiAnalysisAppend:
 
 
 # ---------------------------------------------------------------------------
-# Fix A (#2340): cache root in _api_runner honours QUODEQ_CACHE_ROOT
+# Cache root in _api_runner honours QUODEQ_CACHE_ROOT
 # ---------------------------------------------------------------------------
 
 class TestApiRunnerCacheRootEnv:
     def test_cache_root_honours_quodeq_cache_root_env(self, tmp_path, monkeypatch):
-        """QUODEQ_CACHE_ROOT must propagate to the cache_writer built inside
-        run_api_analysis so all three call sites agree on the same root."""
+        """QUODEQ_CACHE_ROOT must move the default cache root.
+
+        This pins the resolver every cache-writer call site goes through;
+        it does not call run_api_analysis itself.
+        """
         monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path))
         # default_cache_root() should now return tmp_path / "results"
         from quodeq.analysis.cache.local import default_cache_root

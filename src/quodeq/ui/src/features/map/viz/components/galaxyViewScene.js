@@ -1,80 +1,34 @@
 import {
-  TAU, scoreRGB, seedHash, seededRng, gradeToScore, mkParticles,
+  TAU, scoreRGB, seedHash, seededRng, mkParticles,
   mkBackgroundStars, NEUTRAL_SCORE, RNG_MIDPOINT,
 } from '../core/galaxyCore.js';
 import {
   computeClusterPositions, buildMSTLines, applyRepulsionAndRecenter,
   buildSharedFileConnections, computeMaxExtent,
 } from './galaxyViewLayout.js';
+import {
+  groupByPrinciple, buildGradeLookup, countSeverities, computePrincipleScore, buildPrinciples,
+} from './galaxyPrincipleStars.js';
 import { t } from '../../../../strings/index.js';
 
+// Re-exported: the principle helpers were defined here before the principle
+// level moved to its own module, and callers still reach them through the
+// scene's surface.
+export {
+  groupByPrinciple, buildGradeLookup, countSeverities, computePrincipleScore,
+} from './galaxyPrincipleStars.js';
 
-// Scene geometry, in world units. Radii and orbit distances grow with the
-// square root of a node's finding count, so one huge dimension widens the
-// layout instead of swamping it. `dimParticle` is the dot that stands in
-// for a principle while the camera is still at dimension level.
+
+// Dimension- and cluster-level geometry, in world units. Radii and spreads
+// grow with the square root of a node's finding count, so one huge dimension
+// widens the layout instead of swamping it. The principle level carries its
+// own tuning in galaxyPrincipleStars.js.
 const LAYOUT = Object.freeze({
   dimRadiusBasePx: 3, dimRadiusPerRootFinding: 0.4, dimRingJitterSpanPx: 40,
   clusterSpreadFraction: 0.5, clusterBaseSpreadFraction: 0.3,
   clusterCentreMultiplier: 1.8, clusterSpreadPerDimPx: 12,
   starDistFractionMin: 0.3, starDistFractionRange: 0.45, starDistMinPx: 40,
-  prinRadiusBasePx: 6, prinRadiusPerRootFinding: 1.5,
-  prinOrbitMinPx: 25, prinOrbitSpanPx: 35, prinOrbitJitterPx: 5,
-  dimParticleOrbitBasePx: 12, dimParticleOrbitPerRootFinding: 1.5,
-  dimParticleSpeedMin: 0.02, dimParticleSpeedRange: 0.05,
-  dimParticleSizeBasePx: 0.8, dimParticleSizePerRootFinding: 0.15,
-  dimParticleEccentricityBase: 0.9, dimParticleEccentricityRange: 0.1,
 });
-
-/** Group violations and compliance by principle name, returning { [principleName]: { violations, compliance } } */
-export function groupByPrinciple(dim) {
-  const groups = {};
-  for (const v of (dim.violations || [])) {
-    const key = v.principle || '(ungrouped)';
-    if (!groups[key]) groups[key] = { violations: [], compliance: [] };
-    groups[key].violations.push(v);
-  }
-  for (const c of (dim.compliance || [])) {
-    const key = c.principle || '(ungrouped)';
-    if (!groups[key]) groups[key] = { violations: [], compliance: [] };
-    groups[key].compliance.push(c);
-  }
-  return groups;
-}
-
-/** Build a lookup from principle name to { grade, score } from dim.principles array */
-export function buildGradeLookup(dim) {
-  const lookup = {};
-  for (const p of (dim.principles || [])) {
-    const key = p.name || p.principle || '';
-    if (key) lookup[key] = { grade: p.grade, score: p.score };
-  }
-  return lookup;
-}
-
-/** Count severity levels from a violations array, returning { critical, major, minor } */
-export function countSeverities(violations) {
-  let critical = 0, major = 0, minor = 0;
-  for (const v of violations) {
-    if (v.severity === 'critical') critical++;
-    else if (v.severity === 'major') major++;
-    else minor++;
-  }
-  return { critical, major, minor };
-}
-
-/** Compute a principle's score from raw data, grade, or violation ratio */
-export function computePrincipleScore(rawScore, grade, violationCount, complianceCount) {
-  // A finite numeric score -- including 0 -- is a real score. Checking
-  // `if (rawScore)` first would treat 0 as absent and fall through to the
-  // grade/ratio chain below, inconsistent with buildDimStar/
-  // updateSceneLiveData, which already keep a 0 overallScore as-is.
-  const parsed = parseFloat(rawScore);
-  if (Number.isFinite(parsed)) return parsed;
-  if (grade) return gradeToScore(grade);
-  const total = violationCount + complianceCount;
-  return total > 0 ? (complianceCount / total) * 10 : NEUTRAL_SCORE;
-}
 
 /**
  * A dimension's finding totals and its displayed score.
@@ -179,68 +133,36 @@ function buildSingleGroupLayout(dimensions, rng) {
   }));
 }
 
-/** Level 1: principles per dimension. */
-function buildPrinciples(dimensions) {
-  const principles = {};
-  dimensions.forEach((dim, di) => {
-    const groups = groupByPrinciple(dim);
-    const gradeLookup = buildGradeLookup(dim);
-    const prinList = Object.entries(groups).map(([name, g]) => ({
-      name,
-      grade: gradeLookup[name]?.grade || null,
-      score: gradeLookup[name]?.score || null,
-      violations: g.violations,
-      compliance: g.compliance,
-    }));
-    const pRng = seededRng(seedHash('prin:' + (dim.dimension || di)));
-    principles[di] = prinList.map((p, pi) => {
-      const pv = p.violations.length;
-      const pc = p.compliance.length;
-      const pScore = computePrincipleScore(p.score, p.grade, pv, pc);
-      const radius = LAYOUT.prinRadiusBasePx + Math.sqrt(pv + pc) * LAYOUT.prinRadiusPerRootFinding;
-      const sev = countSeverities(p.violations);
-      return {
-        name: p.name,
-        grade: p.grade,
-        score: pScore,
-        rawScore: p.score,
-        violations: pv, compliance: pc,
-        radius, col: scoreRGB(pScore),
-        ba: (pi / (prinList.length || 1)) * TAU - Math.PI / 2,
-        od: LAYOUT.prinOrbitMinPx + (pi / (prinList.length || 1)) * LAYOUT.prinOrbitSpanPx + pRng() * LAYOUT.prinOrbitJitterPx,
-        pp: pRng() * TAU,
-        ...sev,
-        x: 0, y: 0,
-        particles: mkParticles(sev.critical, sev.major, sev.minor, radius),
-        _rawViolations: p.violations,
-        _rawCompliance: p.compliance,
-        dimParticle: {
-          col: scoreRGB(pScore),
-          or: LAYOUT.dimParticleOrbitBasePx + Math.sqrt(pv + pc) * LAYOUT.dimParticleOrbitPerRootFinding,
-          os: (LAYOUT.dimParticleSpeedMin + pRng() * LAYOUT.dimParticleSpeedRange) * (pRng() > RNG_MIDPOINT ? 1 : -1),
-          op: pRng() * TAU,
-          sz: LAYOUT.dimParticleSizeBasePx + Math.sqrt(pv + pc) * LAYOUT.dimParticleSizePerRootFinding,
-          ec: LAYOUT.dimParticleEccentricityBase + pRng() * LAYOUT.dimParticleEccentricityRange,
-          tp: pRng() * TAU,
-        },
-      };
-    });
-  });
-  return principles;
+// The dimension stars, and the constellations holding them when the
+// standards carry types worth grouping by. Both layouts share the scene's
+// seeded RNG, so a given set of dimension names always lands the same way.
+function buildStarLayout(dimensions, standardTypes, { W, H, rng }) {
+  const { dimGroups, groupKeys, useConstellations } = groupDimensionsByType(dimensions, standardTypes);
+  if (!useConstellations) {
+    return { stars: buildSingleGroupLayout(dimensions, rng), constellations: [] };
+  }
+  const spread = Math.min(W, H) * LAYOUT.clusterSpreadFraction;
+  const baseClusterSpread = Math.min(W, H) * LAYOUT.clusterBaseSpreadFraction;
+  return buildConstellationLayout({ dimGroups, groupKeys, spread, baseClusterSpread, rng });
 }
 
+/**
+ * Lay out the whole galaxy: one cluster per dimension, its principles in
+ * orbit, and the background starfield. Positions are seeded from the
+ * dimension names, so the same project always renders the same sky.
+ * @param {Array} dimensions - accumulated per-dimension scores and findings.
+ * @param {number} W - canvas width in px.
+ * @param {number} H - canvas height in px.
+ * @param {Object} standardTypes - dimension id -> standard type, which decides
+ *   whether dimensions are grouped into constellations.
+ * @returns {object} the scene: `stars`, `principles`, `connections`,
+ *   `constellations`, `bg` and the `_maxExtent` the camera fits to.
+ */
 export function buildScene(dimensions, W, H, standardTypes) {
   const dimFingerprint = dimensions.map(d => d.dimension || '').sort().join('|');
   const rng = seededRng(seedHash('galaxy:' + dimFingerprint));
 
-  const { dimGroups, groupKeys, useConstellations } = groupDimensionsByType(dimensions, standardTypes);
-
-  const spread = Math.min(W, H) * LAYOUT.clusterSpreadFraction;
-  const baseClusterSpread = Math.min(W, H) * LAYOUT.clusterBaseSpreadFraction;
-
-  const { stars, constellations } = useConstellations
-    ? buildConstellationLayout({ dimGroups, groupKeys, spread, baseClusterSpread, rng })
-    : { stars: buildSingleGroupLayout(dimensions, rng), constellations: [] };
+  const { stars, constellations } = buildStarLayout(dimensions, standardTypes, { W, H, rng });
 
   const principles = buildPrinciples(dimensions);
   stars.forEach((s, i) => { s.principleCount = (principles[i] || []).length; });

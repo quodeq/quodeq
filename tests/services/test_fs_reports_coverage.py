@@ -5,7 +5,6 @@ import json
 from unittest.mock import patch
 
 
-
 class TestEnrichWithCoverage:
     def test_no_scan_file(self, tmp_path):
         from quodeq.services.fs_reports import _enrich_with_coverage

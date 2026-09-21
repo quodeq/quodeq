@@ -176,7 +176,6 @@ class TestWeightAsMultiplier:
 # --- ScoringParams threading -------------------------------------------------
 
 
-
 def test_violation_base_with_custom_k():
     params = dataclasses.replace(DEFAULT_PARAMS, base_k=0.5)
     # wv for 1 critical = 4.0 → base = 10/(1+0.5*4) = 3.333...

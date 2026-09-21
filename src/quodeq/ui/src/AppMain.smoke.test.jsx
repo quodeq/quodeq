@@ -8,7 +8,7 @@ import { SidePaneProvider } from './features/side-pane/index.js';
 import { AssistantDrawerProvider } from './features/assistant/AssistantDrawerProvider.jsx';
 
 // Closes the coverage hole this class of bug slipped through: App.jsx's
-// render tree was extracted into AppMain.jsx (Task 24.5b), and a prop
+// render tree was extracted into AppMain.jsx, and a prop
 // builder (buildTopBarProps) dropped a rename along the way -- a bare
 // `onToggleTheme,` object-literal shorthand with no `onToggleTheme` binding
 // in scope, instead of `onToggleTheme: toggleTheme,`. Nothing in the repo

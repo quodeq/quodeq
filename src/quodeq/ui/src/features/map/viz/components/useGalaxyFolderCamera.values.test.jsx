@@ -17,7 +17,7 @@ const rec = vi.hoisted(() => ({ frames: [], alphas: [] }));
 
 vi.mock('./galaxyFolderDraw.js', () => ({
   drawScene: () => ({ tc: { text: {}, textMuted: {} } }),
-  drawNebula: (_ctx, _n, _tc, frame) => rec.frames.push({ t: frame.t, cam: { ...frame.cam } }),
+  drawNebula: (_ctx, _n, frame) => rec.frames.push({ t: frame.t, cam: { ...frame.cam } }),
   drawStarfield: () => {},
   drawConstellationLines: () => {},
   drawStars: () => ({ pendingLabels: [], newHovered: null }),

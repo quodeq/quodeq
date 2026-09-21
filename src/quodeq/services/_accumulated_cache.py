@@ -1,6 +1,6 @@
 """The process-lived walk cache and the per-call accumulated-view LRU cache.
 
-Split (Task 14) out of ``accumulated.py``. The walk-cache globals
+Split out of ``accumulated.py``. The walk-cache globals
 (``_WALK_CACHE``/``_WALK_CACHE_LOCK``) are process-wide shared mutable state:
 ``accumulated.py`` re-exports the OBJECTS themselves (not copies), so tests
 reaching in directly via ``clear_accumulated_process_cache`` see the same

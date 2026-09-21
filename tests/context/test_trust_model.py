@@ -226,8 +226,8 @@ def test_deeply_nested_package_json_degrades(tmp_path):
     # Same RecursionError overflow as the declared-side fix, but reached
     # through detection: detect_shape parses package.json via _read_json,
     # whose except json.JSONDecodeError does not catch RecursionError (a
-    # RuntimeError subclass). _detected_fields must degrade this too, not
-    # just the declared-profile path.
+    # RuntimeError subclass). _detected_multi_tenant must degrade this too,
+    # not just the declared-profile path.
     (tmp_path / "package.json").write_text(
         "[" * 80000 + "]" * 80000, encoding="utf-8")
     assert resolve_trust_model(tmp_path) == CONSERVATIVE

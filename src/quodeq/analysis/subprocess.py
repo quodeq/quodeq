@@ -55,13 +55,6 @@ from quodeq.shared.utils import sanitize_sensitive
 from quodeq.shared.utils import get_ai_cmd
 
 
-def _safe_int(value: str, default: int = 0) -> int:
-    """Convert string to int, returning *default* on failure."""
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return default
-
 _log = logging.getLogger(__name__)
 
 # Re-export public API so existing imports keep working
@@ -190,10 +183,10 @@ def _resolve_provider_config(
 
 
 def _run_api_analysis_bridge(
-    work_dir: Path, _prompt: str, stream_file: Path, cfg: AnalysisConfig,
+    work_dir: Path, stream_file: Path, cfg: AnalysisConfig,
     env: Mapping[str, str],
 ) -> None:
-    """Run analysis via direct API call (new behavior).
+    """Run analysis for an api provider by calling the model directly.
 
     Builds its own prompt using assemble_api_prompt() instead of the CLI
     prompt, which contains MCP tool-use instructions that confuse API models.
@@ -227,7 +220,6 @@ def run_analysis(
     provider_type = _get_provider_type(ai_cmd)
 
     if provider_type == "api":
-        _run_api_analysis_bridge(work_dir, prompt, stream_file, cfg,
-                                 process_environment(env))
+        _run_api_analysis_bridge(work_dir, stream_file, cfg, process_environment(env))
     else:
         _run_cli_analysis(work_dir, prompt, stream_file, cfg)

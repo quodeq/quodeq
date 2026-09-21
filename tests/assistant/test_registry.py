@@ -53,9 +53,6 @@ def test_openai_tools_shape_and_duplicate_rejected():
         pass
 
 
-
-
-
 def _ctx(tmp_path, **kw):
     return ToolContext(
         repository=AssistantRepository(tmp_path / "assistant.db"),

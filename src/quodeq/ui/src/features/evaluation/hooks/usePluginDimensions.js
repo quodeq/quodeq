@@ -43,28 +43,28 @@ export function createDimensionCache() {
   let cachePromise = null;
   let refreshPromise = null;
   function load(listPlugins, listStandards) {
-      if (cachePromise) return cachePromise;
-      cachePromise = Promise.all([
-        listPlugins().catch(() => []),
-        listStandards().catch(() => []),
-      ]).then(([plugins, standards]) => {
-        const seen = deduplicateDimensions(plugins, standards);
-        cachedDimensions = [...seen.values()];
-        return cachedDimensions;
-      }).catch((err) => {
-        console.warn('Failed to load dimensions:', err);
-        cachePromise = null; // allow retry on next mount
-        // Surface the failure instead of swallowing it to `[]` -- the only
-        // production caller (usePluginDimensions below) has its own
-        // .catch() that sets dimLoadError, which never fired while this
-        // resolved unconditionally. listPlugins/listStandards already
-        // degrade individually (see the per-call .catch above), so this
-        // only rejects on a genuinely unexpected failure (e.g. malformed
-        // plugin/standard data breaking dedup) -- worth surfacing rather
-        // than silently showing an empty dimension list.
-        throw err;
-      });
-      return cachePromise;
+    if (cachePromise) return cachePromise;
+    cachePromise = Promise.all([
+      listPlugins().catch(() => []),
+      listStandards().catch(() => []),
+    ]).then(([plugins, standards]) => {
+      const seen = deduplicateDimensions(plugins, standards);
+      cachedDimensions = [...seen.values()];
+      return cachedDimensions;
+    }).catch((err) => {
+      console.warn('Failed to load dimensions:', err);
+      cachePromise = null; // allow retry on next mount
+      // Surface the failure instead of swallowing it to `[]` -- the only
+      // production caller (usePluginDimensions below) has its own
+      // .catch() that sets dimLoadError, which never fired while this
+      // resolved unconditionally. listPlugins/listStandards already
+      // degrade individually (see the per-call .catch above), so this
+      // only rejects on a genuinely unexpected failure (e.g. malformed
+      // plugin/standard data breaking dedup) -- worth surfacing rather
+      // than silently showing an empty dimension list.
+      throw err;
+    });
+    return cachePromise;
   }
   function invalidate() {
     cachedDimensions = null;

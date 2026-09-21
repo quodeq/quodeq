@@ -53,22 +53,31 @@ function FolderFileItems({ files, selectedFolder, setSelectedFolder }) {
   ));
 }
 
+/** The click hints, shown only when the listing has something in it. */
+function FolderListHint({ directories, files }) {
+  const hasDirs = directories.length > 0;
+  const hasFiles = files.length > 0;
+  if (!hasDirs && !hasFiles) return null;
+  return (
+    <div className="folder-browser-hint">
+      {hasDirs && t('evaluate.clickToSelectHint')}
+      {hasDirs && hasFiles && ' · '}
+      {hasFiles && t('evaluate.clickFileHint')}
+    </div>
+  );
+}
+
 function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigate, showFiles }) {
   const files = showFiles ? (data?.files || []) : [];
   const directories = data?.directories || [];
+  const isEmpty = directories.length === 0 && files.length === 0;
   return (
     <>
       {navError && <p className="inline-error" role="alert">{navError}</p>}
-      {!navError && directories.length === 0 && files.length === 0 && (
+      {!navError && isEmpty && (
         <p className="empty-folder">{t('evaluate.noItemsInDir')}</p>
       )}
-      {!navError && (directories.length > 0 || files.length > 0) && (
-        <div className="folder-browser-hint">
-          {directories.length > 0 && t('evaluate.clickToSelectHint')}
-          {directories.length > 0 && files.length > 0 && ' · '}
-          {files.length > 0 && t('evaluate.clickFileHint')}
-        </div>
-      )}
+      {!navError && <FolderListHint directories={directories} files={files} />}
       <FolderDirItems directories={directories} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} navigate={navigate} />
       <FolderFileItems files={files} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} />
     </>
@@ -133,7 +142,7 @@ async function navigateFolder(path, navigation, showFiles, browseDirectory) {
   setNavError(null);
   try {
     const result = await browseDirectory(path || '', { files: showFiles });
-    updateNavState({ data: result, path: result.current, pathInput: result.current, selectedFolder: result.current });
+    updateNavState({ data: result, pathInput: result.current, selectedFolder: result.current });
   } catch (err) {
     setNavError(apiErrorMessage(err, 'evaluate.folderLoadFailed'));
   } finally {
@@ -207,16 +216,14 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
 
 export default function FolderBrowser({ onSelect, onClose, title = t('evaluate.selectRepoFolderTitle'), confirmText = t('evaluate.useThisFolder'), showFiles = false, rootPath = null }) {
   const { browseDirectory } = useApi();
-  const [, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [navError, setNavError] = useState(null);
   const [selectedFolder, setSelectedFolder] = useState(null);
 
-  function updateNavState({ data: d, path: p, pathInput: pi, selectedFolder: sf }) {
+  function updateNavState({ data: d, pathInput: pi, selectedFolder: sf }) {
     if (d !== undefined) setData(d);
-    if (p !== undefined) setCurrentPath(p);
     if (pi !== undefined) setPathInput(pi);
     if (sf !== undefined) setSelectedFolder(sf);
   }

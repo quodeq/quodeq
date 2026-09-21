@@ -1,6 +1,6 @@
 """Small metadata-reading primitives for the filesystem action provider.
 
-Split out of _fs_metadata.py (Task 13): the leaf reads (scan summary, path
+Split out of _fs_metadata.py: the leaf reads (scan summary, path
 existence, project metadata extraction, repository info) that
 ``_compute_summary`` and the project-entry builders assemble into a project
 card.

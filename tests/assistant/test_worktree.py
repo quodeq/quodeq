@@ -188,8 +188,6 @@ def test_commit_all_returns_committed(manager):
     assert manager.commit_all("m") is True
 
 
-
-
 def _store(tmp_path):
     store = AssistantRepository(tmp_path / "assistant.db")
     store.create_session(session_id="s1", provider="ollama",

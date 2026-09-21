@@ -5,7 +5,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Generator, List, Optional
+from collections.abc import Generator
 
 from quodeq.core.events.models import BaseEvent, EVENT_MODEL_MAP, EventType
 from quodeq.data.events.codec import EventDecodeError, event_from_dict
@@ -15,8 +15,8 @@ _logger = logging.getLogger(__name__)
 
 
 def _parse_event_line(
-    line: str, log_path: Path, line_num: int, since_timestamp: Optional[datetime],
-) -> Optional[BaseEvent]:
+    line: str, log_path: Path, line_num: int, since_timestamp: datetime | None,
+) -> BaseEvent | None:
     """Parse+decode one JSONL line into an event, or None if it should be
     skipped (a warning/error is already logged for every skip)."""
     try:
@@ -67,8 +67,8 @@ def _parse_event_line(
 class EventLogReader:
     """
     A streaming reader for the Quodeq Event Log (JSONL).
-    
-    Provides safe, memory-efficient iteration over events, with support 
+
+    Provides safe, memory-efficient iteration over events, with support
     for checkpointing to enable incremental processing.
     """
 
@@ -76,7 +76,7 @@ class EventLogReader:
         self.log_path = log_path
 
     def stream(
-        self, since_timestamp: Optional[datetime] = None, from_offset: int = 0,
+        self, since_timestamp: datetime | None = None, from_offset: int = 0,
     ) -> Generator[BaseEvent, None, None]:
         """
         Iterate over events in the log.
@@ -109,11 +109,11 @@ class EventLogReader:
                 if event is not None:
                     yield event
 
-    def read_all(self, since_timestamp: Optional[datetime] = None) -> List[BaseEvent]:
+    def read_all(self, since_timestamp: datetime | None = None) -> list[BaseEvent]:
         """Convenience method to read all available events into a list."""
         return list(self.stream(since_timestamp=since_timestamp))
 
-    def get_latest_timestamp(self) -> Optional[datetime]:
+    def get_latest_timestamp(self) -> datetime | None:
         """
         Scans the log to find the timestamp of the very last event.
         """
@@ -123,7 +123,7 @@ class EventLogReader:
                 last_ts = event.timestamp
         except (OSError, UnicodeDecodeError) as e:
             _logger.error(f"Failed to retrieve latest timestamp from {self.log_path}: {e}")
-        
+
         return last_ts
 
     def __repr__(self) -> str:

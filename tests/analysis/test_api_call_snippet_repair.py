@@ -209,7 +209,7 @@ class TestCallApiRepairRoundTrip:
     def test_repair_call_failure_is_not_lossy(self):
         import httpx
 
-        findings, lossy, client = self._run([
+        findings, lossy, _client = self._run([
             self._response(_payload(_GOOD, _SNIPPETLESS)),
             httpx.ReadTimeout("boom"),
         ])

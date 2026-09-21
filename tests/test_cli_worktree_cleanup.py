@@ -11,7 +11,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-
 class TestCreateWorktreeCleanupOnFailure:
     """Ensure _create_worktree fully cleans up on the failure path."""
 

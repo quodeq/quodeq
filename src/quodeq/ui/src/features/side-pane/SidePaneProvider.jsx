@@ -31,8 +31,8 @@ const AT_CAP_MESSAGE = t('sidePane.atCap', { max: MAX_WINDOWS });
 export function SidePaneToast({ notice, onDismiss }) {
   useEffect(() => {
     if (!notice) return undefined;
-    const t = setTimeout(onDismiss, NOTICE_DISMISS_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(onDismiss, NOTICE_DISMISS_MS);
+    return () => clearTimeout(timer);
   }, [notice, onDismiss]);
   if (!notice) return null;
   function handleDismissClick(e) {

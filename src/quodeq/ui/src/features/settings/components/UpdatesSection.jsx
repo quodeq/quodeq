@@ -7,17 +7,21 @@ import { openExternal } from '../../updates/openExternal.js';
 import { t } from '../../../strings/index.js';
 import { SettingsOnOffPills } from './settingsRowParts.jsx';
 
+// Up to date, an update waiting, or a security update waiting.
+function versionDescription({ available, status, current }) {
+  if (!available) return t('settings.upToDate', { version: current });
+  return status.is_security
+    ? t('settings.updateAvailableSecurity', { current, latest: status.latest })
+    : t('settings.updateAvailable', { current, latest: status.latest });
+}
+
 function VersionRow({ available, status, current, checking, onCheck }) {
   return (
     <div className="settings-row">
       <div className="settings-row-label">
         <span className="settings-label">{t('settings.versionLabel')}</span>
         <span className="settings-description">
-          {available
-            ? (status.is_security
-                ? t('settings.updateAvailableSecurity', { current, latest: status.latest })
-                : t('settings.updateAvailable', { current, latest: status.latest }))
-            : t('settings.upToDate', { version: current })}
+          {versionDescription({ available, status, current })}
         </span>
       </div>
       <button type="button" className="settings-pill" onClick={onCheck} disabled={checking}>
@@ -34,14 +38,17 @@ const PHASE_STRINGS = {
   relaunching: 'updates.relaunching',
 };
 
+// An in-flight update reports its phase; a failed one says so; a build that
+// ships an install command shows the command itself. Otherwise it is the
+// plain "download" prompt.
+function updateDescription(status, selfUpdate) {
+  if (selfUpdate.active) return t(PHASE_STRINGS[selfUpdate.phase], { percent: selfUpdate.percent });
+  if (selfUpdate.failed) return t('updates.selfUpdateFailed', { version: status.latest });
+  return status.action_command || t('settings.downloadNewBuild');
+}
+
 function UpdateAvailableRow({ status, selfUpdate }) {
-  const description = selfUpdate.active
-    ? t(PHASE_STRINGS[selfUpdate.phase], { percent: selfUpdate.percent })
-    : selfUpdate.failed
-      ? t('updates.selfUpdateFailed', { version: status.latest })
-      : status.action_command
-        ? status.action_command
-        : t('settings.downloadNewBuild');
+  const description = updateDescription(status, selfUpdate);
   return (
     <div className="settings-row">
       <div className="settings-row-label">

@@ -45,7 +45,7 @@ export function buildAssistantActionAppliedHandler({
     if (event.detail.delta) {
       try {
         applyDelta(
-          event.detail.delta?.project || selectedProject,
+          event.detail.delta.project || selectedProject,
           event.detail.scores,
           event.detail.delta,
         );

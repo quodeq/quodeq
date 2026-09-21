@@ -10,7 +10,7 @@ from quodeq.analysis.stream.progress_reader import IncrementalProgressReader
 from quodeq.shared import cancellation
 from quodeq.shared.process_kill import terminate_process as _terminate_process
 from quodeq.shared.logging import log_warning
-from quodeq.shared.utils import sanitize_sensitive as _sanitize_stderr
+from quodeq.shared.utils import sanitize_sensitive
 
 
 class AnalysisError(ProviderError):
@@ -43,7 +43,7 @@ def _run_with_heartbeat(
             if reader.provider_error:
                 message, reason = reader.provider_error
                 _terminate_process(process)
-                raise FatalProviderError(_sanitize_stderr(message), reason=reason)
+                raise FatalProviderError(sanitize_sensitive(message), reason=reason)
             if config.heartbeat_callback:
                 config.heartbeat_callback(elapsed, progress)
             if config.max_duration is not None and elapsed >= config.max_duration:
@@ -67,7 +67,7 @@ def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
         stderr_text = ""
         if stream_err.exists():
             try:
-                stderr_text = _sanitize_stderr(stream_err.read_text(encoding="utf-8").strip())
+                stderr_text = sanitize_sensitive(stream_err.read_text(encoding="utf-8").strip())
             except (OSError, UnicodeDecodeError):
                 stderr_text = "(stderr unreadable)"
         message = (

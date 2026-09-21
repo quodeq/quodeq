@@ -7,7 +7,7 @@ import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
 
-// Task 7: one merged local+shared list, no tabs. The local list renders
+// One merged local+shared list, no tabs. The local list renders
 // unconditionally; the shared list layers in once useSharedProjects resolves
 // (cached-first, see that hook's own tests), so every render touches the API
 // -- an ApiProvider is required from here on regardless of project count.
@@ -162,7 +162,7 @@ describe('ProjectsPage — publish action (local cards)', () => {
     }
   });
 
-  // Audit C4 regression lock (final whole-branch review + Task 6): the old
+  // Audit C4 regression lock: the old
   // fix routed post-publish completion through ProjectsPage's own effect
   // calling shared.refresh() -- a full remote git fetch that can take up to
   // 30s -- so the PUBLISHED badge/no-button state lagged behind the
@@ -172,7 +172,7 @@ describe('ProjectsPage — publish action (local cards)', () => {
   // the shared list cache the instant the job reports 'done' (see
   // usePublish.js's applyOptimisticPublish), synchronously before its own
   // authoritative re-list call even starts. Since useSharedProjects reads
-  // that SAME cache entry (sharedKeys.list(), unified in Task 5), the badge
+  // that SAME cache entry (sharedKeys.list()), the badge
   // and the button both flip in that same render -- proven here by holding
   // the authoritative re-list open and asserting the card has already
   // flipped before it resolves.

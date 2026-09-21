@@ -12,7 +12,6 @@ import pytest
 pytestmark = pytest.mark.usefixtures("restore_environ")
 
 
-
 # ---------------------------------------------------------------------------
 # run_pipeline_with_cleanup tests
 # ---------------------------------------------------------------------------
@@ -149,16 +148,13 @@ class TestResolveEvaluationInputs:
         assert result is None
 
     @patch("quodeq._cli_resolution._build_manifest", return_value=None)
-    @patch("quodeq._cli_resolution._resolve_language", return_value="python")
+    @patch("quodeq._cli_resolution._resolve_language", return_value=None)
     @patch("quodeq._cli_resolution.default_paths")
     @patch("quodeq._cli_resolution._resolve_repo")
     def test_returns_none_when_language_detection_fails(self, mock_repo, mock_paths, mock_lang, mock_manifest, tmp_path):
         from quodeq.cli import resolve_evaluation_inputs
         self._standing_config(mock_repo, mock_paths, tmp_path)
-        mock_lang.return_value = None
         args = argparse.Namespace(scope=None, language=None)
-        # Override mock_lang to return None for this test
-        mock_lang.return_value = None
         result = resolve_evaluation_inputs(args)
         assert result is None
 

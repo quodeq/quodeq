@@ -26,9 +26,12 @@ from quodeq.data.fs.report_parser.external_pid import (  # noqa: F401 — re-exp
     is_safe_run_segment,
     resolve_external_pid,
 )
-from quodeq.services._run_index_fs import _scan_reports_root_for_run
+from quodeq.services._run_index_fs import (
+    _scan_reports_root_for_run, _sync_external_run_by_scan,
+)
 from quodeq.shared.env import env_float
 from quodeq.shared.process import is_pid_alive
+from quodeq.data.sqlite import run_index as _run_index
 
 _logger = logging.getLogger(__name__)
 
@@ -121,3 +124,22 @@ def cancel_external_run(
     if _wait_for_exit(control, pid, _SETTLE_WAIT_S):
         return True
     return not control.pid_alive(pid)
+
+
+def _sync_external_run(db, job_id: str, reports_dir: Path) -> bool:
+    """Bring the index row for an external run up to date; False if the id is unsafe.
+
+    Prefers the run directory the index already knows. A blank run_dir falls
+    through to the scan: ``Path("")`` is ``Path(".")``, whose ``is_dir()`` is
+    True, so it would sync the process cwd as if it were the run.
+    """
+    run_id = job_id[len("ext-"):]
+    if not is_safe_run_segment(run_id):
+        return False
+    known = _run_index.get_run(db, job_id)
+    run_dir = Path(known.run_dir) if known is not None and known.run_dir else None
+    if run_dir is not None and run_dir.is_dir():
+        _run_index.sync_index_for_run(db, run_dir)
+    else:
+        _sync_external_run_by_scan(db, reports_dir, run_id)
+    return True

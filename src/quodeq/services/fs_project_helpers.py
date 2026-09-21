@@ -1,6 +1,6 @@
 """Project-building helpers for the filesystem action provider.
 
-Split (Task 13): parent-detection and the max-projects-listed limit moved to
+Split: parent-detection and the max-projects-listed limit moved to
 _fs_project_parents.py, re-exported here for fs_projects.py's import.
 """
 
@@ -211,9 +211,10 @@ def _repo_identity_matches(
     ``find_existing_project``).
     """
     data = read_repository_info(project_dir)
+    if data is None:
+        return False
     return (
-        data is not None
-        and data.get("name") == expected_name
+        data.get("name") == expected_name
         and data.get("path") == repo_resolved
         and (data.get("scopePath") or None) == (scope_path or None)
     )

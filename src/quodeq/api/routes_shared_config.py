@@ -1,6 +1,6 @@
 """Config/status/lifecycle routes for the shared results repository.
 
-Split out of routes_shared.py (Task 9): status, config PUT/DELETE, refresh,
+Split out of routes_shared.py: status, config PUT/DELETE, refresh,
 and the local project-publish route.
 """
 from __future__ import annotations
@@ -91,7 +91,7 @@ def shared_config_put() -> Response | tuple[Response, int]:
 def shared_config_delete() -> Response:
     """Disconnect from the shared repository and drop the local clone."""
     # Ordering + locking business rule lives in
-    # services/shared_repo.disconnect_shared_repo (Task 20).
+    # services/shared_repo.disconnect_shared_repo.
     disconnect_shared_repo(log=SHARED_LOG)
     return jsonify({"configured": False})
 

@@ -19,6 +19,7 @@ class ReviewOptions:
     baseline_available: bool = True
     artifact_url: str | None = None
 
+
 # Markdown and HTML control characters that untrusted finding text may carry.
 _MD_SPECIAL = re.compile(r"([\\`*_#\[\]<>|~])")
 # A list item ("- ", "+ ", "1. ", "2) ") or a thematic break ("---") only

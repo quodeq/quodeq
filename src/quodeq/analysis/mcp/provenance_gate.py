@@ -91,6 +91,7 @@ OPERATOR_CONTROLLED_TERMS: frozenset[str] = frozenset({
     "environment variable", "env var", "env variable",
 })
 
+
 # Whole-word/phrase pattern; longer phrases first so they win in the alternation.
 # Trailing ``s?`` tolerates plurals ("header" -> "headers") without enumerating
 # every plural form.

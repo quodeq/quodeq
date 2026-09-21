@@ -1,6 +1,6 @@
 """Staging logic for publishing a project into the shared results repo.
 
-Split out of shared_publish.py (Task 12): pure file-copy/merge operations
+Split out of shared_publish.py: pure file-copy/merge operations
 plus stage_project's one exception, a `git config user.name` read (see
 audit finding C1). Invariants (spec):
 - only completed runs (state == "done") are published

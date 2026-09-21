@@ -5,7 +5,6 @@ import json
 from unittest.mock import MagicMock, patch
 
 
-
 class TestParseFindingLine:
     def test_empty_line(self):
         from quodeq.analysis.subagents._verify_io import _parse_finding_line
@@ -58,6 +57,7 @@ class TestLoadPreviousFindings:
         from quodeq.analysis.subagents._verify_io import _load_previous_findings
         p = tmp_path / "findings.jsonl"
         p.write_text("data")
+
         def _raise(path):
             raise OSError("read error")
         result = _load_previous_findings(p, open_fn=_raise)

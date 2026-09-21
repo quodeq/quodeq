@@ -162,7 +162,7 @@ class TestSizeAwareBatching:
             # mapping IS the environment it sees, so an empty one would mean
             # "nothing set" rather than "fall back to the process".
             _run_api_analysis_bridge(
-                src, "prompt", tmp_path / "a1.stream", cfg,
+                src, tmp_path / "a1.stream", cfg,
                 {"QUODEQ_MAX_API_PROMPT_CHARS": "150"},
             )
 

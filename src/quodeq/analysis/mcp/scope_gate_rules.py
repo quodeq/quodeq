@@ -88,6 +88,7 @@ _CROSS_PRINCIPAL_TERMS: frozenset[str] = frozenset({
     "hijack", "hijacking", "hijacked",
 })
 
+
 def _term_pattern(terms: frozenset[str] | set[str]) -> "re.Pattern[str]":
     """A case-insensitive alternation matching any of *terms* as a whole word.
 
@@ -184,9 +185,10 @@ def _cross_principal_rule_applies(model: TrustModel, req: str | None, prose: str
     launches the process, and carry no attacker reading here even when the
     finding's premise is cross-principal.
     """
+    if model.multi_tenant or not model.relaxes_remote():
+        return False
     return bool(
-        not model.multi_tenant and model.relaxes_remote()
-        and req in _CROSS_PRINCIPAL_REQS
+        req in _CROSS_PRINCIPAL_REQS
         and _CROSS_PATTERN.search(prose)
         and not names_external_source(prose)
     )
@@ -217,9 +219,10 @@ def _loopback_transport_rule_applies(model: TrustModel, req: str | None, prose: 
     which is the same-principal story regardless of how many tenants the
     product serves.
     """
+    if not model.relaxes_remote():
+        return False
     return bool(
-        model.relaxes_remote()
-        and req in _TRANSPORT_REQS
+        req in _TRANSPORT_REQS
         and _TRANSPORT_PATTERN.search(prose)
         and not _OUTBOUND_PATTERN.search(prose)
     )

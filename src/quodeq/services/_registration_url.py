@@ -2,7 +2,7 @@
 before a remote URL is persisted or echoed, and read a local clone's
 origin remote (already stripped).
 
-Split out of project_registration.py (Task 12).
+Split out of project_registration.py.
 """
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from pathlib import Path
 
 from quodeq.services.wiring import remote_origin_url_raw
 from quodeq.shared.repo import split_userinfo
-
 
 
 def _strip_credentials(url: str) -> str:

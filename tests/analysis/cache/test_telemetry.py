@@ -83,6 +83,7 @@ class TestCacheStatsMarker:
             ))
 
         markers: list[tuple] = []
+
         def fake_emit(phase, **kwargs):
             markers.append((phase, kwargs))
 
@@ -116,10 +117,12 @@ class TestCacheStatsMarker:
         ))
 
         markers: list[tuple] = []
+
         def fake_emit(phase, **kwargs):
             markers.append((phase, kwargs))
 
         from quodeq.core.evidence.model import Evidence
+
         def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
@@ -159,10 +162,12 @@ class TestCacheStatsMarker:
         config.options.incremental = False  # clean scan
 
         markers: list[tuple] = []
+
         def fake_emit(phase, **kwargs):
             markers.append((phase, kwargs))
 
         from quodeq.core.evidence.model import Evidence
+
         def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
@@ -202,6 +207,7 @@ class TestCacheStatsMarker:
             ))
 
         captured = []
+
         def fake_emit(phase, **kwargs):
             captured.append((phase, kwargs))
 

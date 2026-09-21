@@ -6,14 +6,20 @@ import { abbrevDim } from '../utils/dimAbbrev.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { activateOnKey, isActivationKey } from '../../../utils/a11y.js';
 import { PARTIAL_STATUSES } from './historyRowAssembly.js';
+import { deltaDirection } from '../utils/deltaDirection.js';
+
+const DELTA_SIGN = { up: '+', down: '-', flat: '' };
+const DELTA_CLASS = {
+  up: 'history-delta history-delta--up',
+  down: 'history-delta history-delta--down',
+  flat: 'history-delta',
+};
 
 const NOT_READY_MESSAGE = t('history.notReadyMessage');
 
-/**
- * The History table (header row + evaluation rows), plus its row-level
- * subcomponents and formatting helpers, extracted verbatim from
- * HistoryPage.jsx.
- */
+// Splits an ISO timestamp into the row's two-line date/time cell. A
+// malformed timestamp degrades to the caller's fallback label rather than
+// throwing mid-render.
 function formatDateParts(dateISO, fallbackLabel) {
   if (!dateISO) return { date: fallbackLabel || '', time: '' };
   try {
@@ -63,10 +69,9 @@ function formatDimSummary(entry) {
 
 function DeltaText({ delta }) {
   if (delta == null) return <span className="history-delta history-delta--muted">—</span>;
-  const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
-  const cls = delta > 0 ? 'history-delta history-delta--up' : delta < 0 ? 'history-delta history-delta--down' : 'history-delta';
+  const direction = deltaDirection(delta);
   const abs = Math.abs(delta);
-  return <span className={cls}>{sign}{trimTrailingZero(abs)}</span>;
+  return <span className={DELTA_CLASS[direction]}>{DELTA_SIGN[direction]}{trimTrailingZero(abs)}</span>;
 }
 
 /**

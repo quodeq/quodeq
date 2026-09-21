@@ -26,41 +26,62 @@ export const KNOWN_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history', 'projec
 const PROJECT_TAB_COUNT = 4;
 export const PROJECT_TABS = KNOWN_TABS.slice(0, PROJECT_TAB_COUNT);
 
-function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
+// The accumulated dimensions all carry the same discipline and repository;
+// take the first non-empty of each and stop as soon as both are known.
+function findDimensionFacets(dims) {
+  let discipline = null, repository = null;
+  for (const d of dims) {
+    if (!discipline && d.discipline) discipline = d.discipline;
+    if (!repository && d.repository) repository = d.repository;
+    if (discipline && repository) break;
+  }
+  return { discipline, repository };
+}
+
+// Dimensions that did not scan source report no count, so the first one that
+// does is the run's file count.
+function firstSourceFileCount(dims) {
+  for (const d of dims) {
+    if (d.sourceFileCount) return d.sourceFileCount;
+  }
+  return null;
+}
+
+function buildHeaderMeta(accumulated, dashboard, selectedProject, projects) {
   const accDims = accumulated?.dimensions || [];
-  let headerMeta = null;
-  if (accDims.length > 0) {
-    let discipline = null, repository = null;
-    for (const d of accDims) {
-      if (!discipline && d.discipline) discipline = d.discipline;
-      if (!repository && d.repository) repository = d.repository;
-      if (discipline && repository) break;
-    }
-    const runDims = dashboard?.dimensions || [];
-    let totalFiles = null;
-    for (const d of runDims) {
-      if (d.sourceFileCount) { totalFiles = d.sourceFileCount; break; }
-    }
-    const projectMap = new Map(projects.map((p) => [p.id, p]));
-    const project = projectMap.get(selectedProject);
-    const languageStats = project?.languageStats ?? null;
-    headerMeta = { discipline, repository, totalFiles, languageStats };
-  }
+  if (accDims.length === 0) return null;
+  const { discipline, repository } = findDimensionFacets(accDims);
+  const totalFiles = firstSourceFileCount(dashboard?.dimensions || []);
+  const project = new Map(projects.map((p) => [p.id, p])).get(selectedProject);
+  return { discipline, repository, totalFiles, languageStats: project?.languageStats ?? null };
+}
 
-  let selectedDisplayName = selectedProject;
-  let selectedProjectParent = null;
-  let selectedProjectParentId = null;
-  if (selectedProject && projects.length) {
-    const projectById = new Map(projects.map((p) => [(p.id || p.name || p), p]));
-    const data = projectById.get(selectedProject);
-    const parentRef = data?.parent || null;
-    const parentData = parentRef ? projectById.get(parentRef) : null;
-    selectedDisplayName = data?.displayName || data?.name || selectedProject;
-    selectedProjectParent = parentData?.displayName || parentData?.name || parentRef;
-    selectedProjectParentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
-  }
+// Projects are keyed by id, but older entries only have a name, so both are
+// tried before falling back to the raw reference.
+function projectLabel(entry, fallback) {
+  return entry?.displayName || entry?.name || fallback;
+}
 
-  return { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId };
+function resolveSelectedProjectNames(selectedProject, projects) {
+  if (!selectedProject || !projects.length) {
+    return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };
+  }
+  const projectById = new Map(projects.map((p) => [(p.id || p.name || p), p]));
+  const data = projectById.get(selectedProject);
+  const parentRef = data?.parent || null;
+  const parentData = parentRef ? projectById.get(parentRef) : null;
+  return {
+    selectedDisplayName: projectLabel(data, selectedProject),
+    selectedProjectParent: projectLabel(parentData, parentRef),
+    selectedProjectParentId: parentData ? (parentData.id || parentData.name || parentRef) : null,
+  };
+}
+
+function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
+  return {
+    headerMeta: buildHeaderMeta(accumulated, dashboard, selectedProject, projects),
+    ...resolveSelectedProjectNames(selectedProject, projects),
+  };
 }
 
 function useProjects({ onNoProjects }) {
@@ -110,7 +131,12 @@ function useAppNavigation() {
     // repositories local/online tabs): history must not grow per flip.
     navReplace({ page, ...params });
   }
-  return { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPending, navPush, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun };
+  return {
+    serverConnected, setServerConnected, serverVersion, navStack, activePage,
+    navPending, navPush, navPop, navGoTo, navSwapAt, navReset, navTab,
+    projectBundle, handleNavigate, handleNavigateReplace, handleRunChange,
+    historySelectedRun, setHistorySelectedRun,
+  };
 }
 
 /**
@@ -182,6 +208,18 @@ export function resolveActiveTab(activePage) {
   return TAB_OVERVIEW;
 }
 
+// A display preference, not run data: the chosen bucket size survives a
+// project switch and a reload, so it is persisted on change rather than kept
+// beside the dashboard query.
+function useScoreHistoryGranularity() {
+  const [granularity, setGranularity] = useState(() => readScoreHistoryGranularity());
+  const onGranularityChange = useCallback((next) => {
+    setGranularity(next);
+    writeScoreHistoryGranularity(next);
+  }, []);
+  return { granularity, onGranularityChange };
+}
+
 /**
  * The app shell's whole state in one object: navigation stack, project
  * selection, dashboard/score data for the selected project and run, run
@@ -195,18 +233,19 @@ export function resolveActiveTab(activePage) {
  */
 export function useAppState() {
   const nav = useAppNavigation();
-  const { serverConnected, setServerConnected, serverVersion, navStack, activePage, navPending, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle, handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
+  const {
+    serverConnected, setServerConnected, serverVersion, navStack, activePage,
+    navPending, navPop, navGoTo, navSwapAt, navReset, navTab, projectBundle,
+    handleNavigate, handleNavigateReplace, handleRunChange, historySelectedRun,
+    setHistorySelectedRun,
+  } = nav;
   const {
     projects, projectsLoaded, projectsLoadFailed, retryLoadProjects, setProjects, selectedProject, selectedSource,
     selectedRun, setSelectedRun, loadProjects, handleProjectChange,
     selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject,
   } = projectBundle;
   const settings = useAppSettings();
-  const [granularity, setGranularity] = useState(() => readScoreHistoryGranularity());
-  const handleGranularityChange = useCallback((next) => {
-    setGranularity(next);
-    writeScoreHistoryGranularity(next);
-  }, []);
+  const { granularity, onGranularityChange } = useScoreHistoryGranularity();
   const isHistoryRun = activePage.page === 'history-run';
   const isHistoryTab = activePage.page === 'history';
   const effectiveRun = isHistoryRun ? historySelectedRun : selectedRun;
@@ -227,7 +266,7 @@ export function useAppState() {
     dailyRuns: buildPeriodRuns(availableRuns, dashboard?.trend || [], granularity),
     ...computeDerivedState(accumulated, dashboard, selectedProject, projects),
   }), [availableRuns, dashboard, accumulated, selectedProject, projects, granularity]);
-  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun, granularity);
+  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, setSelectedRun, granularity);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const prefetchHandlers = usePrefetchAdjacentRuns({ selectedProject, selectedSource, availableRuns: visibleDailyRuns, overviewRunIndex });
   const evalLifecycle = useEvaluationLifecycle({ navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun }, selectedProject });
@@ -247,6 +286,6 @@ export function useAppState() {
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile,
-    granularity, onGranularityChange: handleGranularityChange,
+    granularity, onGranularityChange,
   };
 }

@@ -42,6 +42,12 @@ def _tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
 
 
 def sse_line(data: str, event: str | None = None, event_id: int | None = None) -> str:
+    """Render one server-sent-event frame: optional id and event, then data.
+
+    The trailing blank line is what makes the browser dispatch the event, so
+    every frame this module writes goes through here rather than being
+    assembled at the call site.
+    """
     parts = []
     if event_id is not None:
         parts.append(f"id: {event_id}\n")

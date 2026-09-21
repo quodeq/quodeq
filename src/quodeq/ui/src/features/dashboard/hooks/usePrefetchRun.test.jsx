@@ -124,7 +124,7 @@ describe('usePrefetchRun', () => {
     expect(getProjectScores).not.toHaveBeenCalled();
   });
 
-  // Task 17: source-aware fetch selection.
+  // Source-aware fetch selection.
   describe('source-aware fetch selection', () => {
     it("warms the LOCAL cache slot and calls the local fetchers when source is 'local' (default)", async () => {
       const { result } = renderHook(() => usePrefetchRun('p1', 'local'), { wrapper: makeWrapper(queryClient) });

@@ -7,7 +7,7 @@ import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
 
-// Task 7: one merged local+shared list, no tabs. The local list renders
+// One merged local+shared list, no tabs. The local list renders
 // unconditionally; the shared list layers in once useSharedProjects resolves
 // (cached-first, see that hook's own tests), so every render touches the API
 // -- an ApiProvider is required from here on regardless of project count.

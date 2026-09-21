@@ -15,9 +15,15 @@ export { starShapeFor } from './galaxyFolderCues.js';
 export { drawStarfield } from './galaxyStarfield.js';
 
 /**
- * Draw all scene elements to the canvas context.
+ * Paint the canvas background gradient and return the theme colours every
+ * other draw helper in this module reads. The scene itself is not consulted:
+ * the background depends only on size and theme.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{W: number, H: number, canvasRef: object}} params - frame size plus
+ *   the canvas ref the theme colours are resolved against.
+ * @returns {{tc: object}} the resolved theme colours.
  */
-export function drawScene(ctx, activeScene, params) {
+export function drawScene(ctx, params) {
   const { W, H, canvasRef } = params;
   const tc = getThemeColors(canvasRef.current?.parentElement);
 
@@ -56,10 +62,15 @@ function drawNebulaBlobs(ctx, spec, centre, radius, col, alpha) {
 }
 
 /**
- * Draw background nebula for the current folder's compliance score.
- * `frame` is the per-frame bundle renderFrame builds: { W, H, t, ... }.
+ * Draw the background nebula for the current folder's compliance score. The
+ * colour comes from the score, not the theme, so no theme colours are needed.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{complianceRate: number}|null} curNode - the folder being viewed;
+ *   a null node draws nothing.
+ * @param {{W: number, H: number, t: number}} frame - the per-frame bundle
+ *   renderFrame builds.
  */
-export function drawNebula(ctx, curNode, tc, frame) {
+export function drawNebula(ctx, curNode, frame) {
   if (!curNode) return;
   const { W, H, t } = frame;
   const nbCol = scoreRGB((curNode.complianceRate || 0) * 10);

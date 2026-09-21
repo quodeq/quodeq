@@ -1,6 +1,6 @@
 """Slim rescore payload and default-run resolution for mutation deltas.
 
-Split (Task 14) out of ``mutation_rescore.py``. ``mutation_rescore.py`` is a
+Split out of ``mutation_rescore.py``. ``mutation_rescore.py`` is a
 DECLARED_LOGGING_SITES entry (still imports stdlib ``logging``); this sibling
 originally avoided a new logging import, routing ``_rescore_run``'s failure
 log through an injected ``LogSink`` instead. Task C6 (usability sweep) added

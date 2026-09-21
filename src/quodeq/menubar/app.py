@@ -156,8 +156,8 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
 
     def _find_running_port(self) -> int | None:
         """Find the running dashboard port (delegates to cached helper)."""
-        result = _find_running_port_cached(self._ports, self._port_cache.get("last_known"), self._port_cache)
-        return result
+        return _find_running_port_cached(
+            self._ports, self._port_cache.get("last_known"), self._port_cache)
 
     def _set_ui_state(self, running: bool) -> None:
         """Toggle menu items between running and stopped states."""

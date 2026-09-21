@@ -17,6 +17,7 @@ from functools import lru_cache
 # once, not once per discipline rule that probes it.
 _PARSE_CACHE_MAX = 64
 
+
 def _json_dep_names(
     content: str, keys: tuple[str, ...], *, include_lists: bool = True,
 ) -> frozenset[str]:

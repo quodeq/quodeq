@@ -7,8 +7,7 @@ import { useDismissedFindings } from '../components/useDismissedFindings.js';
 /**
  * Fresh tab click (tabKey changed) drops the cached file-tree path so the
  * user lands at the root, then re-reads the (possibly just-reset) cache and
- * fires the mount/round-trip refresh. Extracted from ViolationsPage.jsx
- * verbatim.
+ * fires the mount/round-trip refresh.
  */
 export function useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh }) {
   // Round-tripping through a file detail does NOT change tabKey, so the
@@ -37,8 +36,9 @@ export function useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh })
 }
 
 /**
- * ViolationsPage.jsx's dismissed-findings + file-tree-path + derived-summary
- * state. Extracted verbatim.
+ * The Violations page's dismissed-findings, file-tree path and derived
+ * summary state: the visible dimensions, their rolled-up counts, and the
+ * currently browsed path (cached per project so a round trip resumes there).
  */
 export function useViolationsData({ accumulatedDimensions, selectedProject, onReconcile, initialFilePath, dismissRefreshKey, selectedSource }) {
   const [fileCurrentPath, _setFileCurrentPath] = useState(initialFilePath);
@@ -95,9 +95,10 @@ function countDistinctViolationField(dimensions, field) {
 }
 
 /**
- * Composes the two hooks above the way ViolationsPage.jsx's body used to
- * inline them back to back: the tab-key-reset cache read feeds
- * useViolationsData's initialFilePath.
+ * The Violations page's whole state in one call: the tab-key reset runs
+ * first, and the cached path it reads back seeds useViolationsData's
+ * initialFilePath. Order matters, which is why they are composed here rather
+ * than called side by side at the page.
  */
 export function useViolationsPageState({ tabKey, selectedProject, onRefresh, onReconcile, accumulatedDimensions, dismissRefreshKey, selectedSource }) {
   const cached = useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh });

@@ -184,6 +184,7 @@ class TestNoWatcherWhenNoMisses:
         # Track Thread() instantiations.
         original_thread = threading.Thread
         threads_created: list[threading.Thread] = []
+
         def tracking_thread(*args, **kwargs):
             t = original_thread(*args, **kwargs)
             threads_created.append(t)

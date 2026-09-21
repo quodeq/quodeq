@@ -1,4 +1,5 @@
 import { t } from '../../../strings/index.js';
+import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
 const MODE_OPTIONS = [
   { value: 'system',   label: t('settings.themeModeSystem') },
@@ -15,8 +16,6 @@ const FAMILY_OPTIONS = [
   { value: 'deckard',   label: 'Deckard' },
   { value: 'galadriel', label: 'Galadriel' },
 ];
-
-import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
 export default function AppearanceSection({ themeMode, themeFamily, onApplyMode, onApplyFamily }) {
   return (

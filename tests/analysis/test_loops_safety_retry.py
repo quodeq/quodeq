@@ -108,6 +108,7 @@ class TestProductionBugRegression:
             return _FakeEvidence(files_read=979 if dim == "usability" else 22)
 
         usability_first_call = {"done": False}
+
         def scoring_callback(dim, _ev):
             # In production, this callback writes evaluation/{dim}.json AND
             # logs to stdout — the latter dies once the dashboard parent pipe

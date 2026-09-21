@@ -65,8 +65,6 @@ def _classify_dimension(
         buckets.prev_run_latest_map[dim_name] = dim
 
 
-
-
 def _strip_findings(dimensions: list[DimensionResult]) -> list[DimensionResult]:
     """Drop the violation/compliance bodies, keeping every scalar field.
 

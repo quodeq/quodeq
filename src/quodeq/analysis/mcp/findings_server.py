@@ -3,8 +3,11 @@
 Protocol: JSON-RPC 2.0 over stdio, newline-delimited JSON (no Content-Length).
 No external dependencies.
 
-This module is the entry point.  Core logic lives in:
-- ``router``  -- FindingsRouter and data types
+This module is the entry point. Core logic lives in:
+- ``args`` -- the command line the pipeline spawns the server with
+- ``dispatch`` -- JSON-RPC message loop and method table
+- ``router`` -- FindingsRouter and data types
+- ``enricher`` -- standards lookup, code snippets, precedent and severity gates
 - ``ref_scoring`` -- reference selection helpers
 """
 from __future__ import annotations
@@ -68,7 +71,8 @@ def main() -> None:
     if not sa.findings_file:
         sys.stderr.write(
             "Error: findings output path is required.\n"
-            "Usage: mcp_findings.py <findings_file> [--compiled-dir DIR --dimension DIM]"
+            "Usage: python -m quodeq.analysis.mcp.findings_server <findings_file>"
+            " [--compiled-dir DIR --dimension DIM]"
             " [--queue PATH --agent-id ID]\n"
             "Provide the path where findings JSONL should be written.\n"
         )
@@ -108,9 +112,10 @@ def _resolve_dimension_cache_writer(server_args: ServerArgs):
     When ``server_args.dimension`` is set, the cache writer becomes mandatory:
     a findings_server scoped to a dimension MUST have ``--cache-root`` and
     ``--model-id`` so each ok marker writes the cache entry synchronously.
-    Silent degradation to watcher-only is the failure mode the Phase 1 audit
-    warned against -- argparse-level enforcement comes in Task 7; this check
-    is defense-in-depth.
+    Degrading silently to watcher-only is the dangerous failure: the run
+    looks healthy while every dimension it scoped comes back cold on the
+    next scan. argparse cannot express the dependency, so the check lives
+    here.
     """
     if not server_args.dimension:
         return None

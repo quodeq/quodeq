@@ -1,7 +1,7 @@
 """Scan-related helpers for project registration: a fresh zero-run
 scan_data fallback shape, and scanning a scoped project's parent.
 
-Split out of project_registration.py (Task 12).
+Split out of project_registration.py.
 """
 from __future__ import annotations
 

@@ -47,10 +47,10 @@ function HeatGridHead({ sortCol, sortDir, handleSort }) {
   );
 }
 
-function HeatGridRow({ row, i, onDimensionClick, onPrincipleClick, onCellClick }) {
+function HeatGridRow({ row, onDimensionClick, onPrincipleClick, onCellClick }) {
   const isDim = row.type === 'dimension';
   return (
-    <tr key={`${row.type}-${row.name}-${i}`} className={isDim ? 'heat-grid-dim-row' : undefined}>
+    <tr className={isDim ? 'heat-grid-dim-row' : undefined}>
       <td>
         <div
           className="heat-grid-file clickable"
@@ -93,7 +93,7 @@ export default function DimensionHeatGridView({ dimensions, onDimensionClick, on
         <HeatGridHead sortCol={sortCol} sortDir={sortDir} handleSort={handleSort} />
         <tbody>
           {rows.map((row, i) => (
-            <HeatGridRow key={`${row.type}-${row.name}-${i}`} row={row} i={i} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} onCellClick={onCellClick} />
+            <HeatGridRow key={`${row.type}-${row.name}-${i}`} row={row} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} onCellClick={onCellClick} />
           ))}
         </tbody>
       </table>

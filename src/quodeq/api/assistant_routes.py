@@ -1,6 +1,6 @@
 """HTTP surface for the embedded assistant (sessions, turns, SSE, actions).
 
-Split (Task 10) into four route modules plus this thin orchestrator:
+Split into four route modules plus this thin orchestrator:
   - assistant_turn_state.py: ``AssistantTurnState`` and the request-context
     turn-claim shims the workspace routes use.
   - assistant_session_routes.py: create session + skills/actions catalog.

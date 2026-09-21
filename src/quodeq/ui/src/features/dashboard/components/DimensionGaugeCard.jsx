@@ -130,6 +130,24 @@ function DimensionScoreBody({ scoreDisplay, gradeWord, ringColor, dashOffset, vi
 }
 
 /**
+ * Ring geometry and colour for one dimension's score. A dimension with no
+ * parsable score draws an empty muted ring and no grade word.
+ */
+function computeGaugeRing(overallScore) {
+  const { value: scoreDisplay } = splitScore(overallScore);
+  const scoreNum = parseFloat(overallScore);
+  const hasScore = !Number.isNaN(scoreNum);
+  const pct = hasScore ? Math.max(0, Math.min(scoreNum / 10, 1)) : 0;
+  const label = hasScore ? scoreToGradeLabel(scoreNum) : null;
+  return {
+    scoreDisplay,
+    gradeWord: label ? label.toUpperCase() : null,
+    ringColor: hasScore ? scoreGradeColorVar(scoreNum) : 'var(--color-text-muted)',
+    dashOffset: RING_CIRC * (1 - pct),
+  };
+}
+
+/**
  * @param {object}   props
  * @param {object}   props.item                - dimension entry (dashboard shape)
  * @param {number|string|null} [props.delta]   - trend delta (parent-provided)
@@ -139,28 +157,19 @@ function DimensionScoreBody({ scoreDisplay, gradeWord, ringColor, dashOffset, vi
  * @param {string}   [props.selectedRunId]     - forwarded to click handler for run overview
  */
 function computeGaugeCardDerived({ item, evaluatedToday, dateLabel, selectedRunId }) {
-  const { value: scoreDisplay } = splitScore(item.overallScore);
-  const scoreNum = parseFloat(item.overallScore);
-  const hasScore = !Number.isNaN(scoreNum);
-  const pct = hasScore ? Math.max(0, Math.min(scoreNum / 10, 1)) : 0;
-  const label = hasScore ? scoreToGradeLabel(scoreNum) : null;
-  const gradeWord = label ? label.toUpperCase() : null;
-  const ringColor = hasScore ? scoreGradeColorVar(scoreNum) : 'var(--color-text-muted)';
-  const dashOffset = RING_CIRC * (1 - pct);
-
   const violationCount = item.totals?.violationCount ?? 0;
   const complianceCount = item.totals?.complianceCount ?? 0;
-  const ratio = complianceRatio(violationCount, complianceCount);
-  const sev = item.totals?.severity || {};
-
-  const staleClass = evaluatedToday ? '' : 'dim-gauge-card--stale';
-  const dateText = item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId);
   const coverage = computeCoverageInfo(item.filesRead, item.sourceFileCount, item.exitReason);
-  const partialTooltip = coverage.isPartial ? buildPartialTooltip(coverage) : undefined;
 
   return {
-    scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev,
-    staleClass, dateText, coverage, partialTooltip,
+    ...computeGaugeRing(item.overallScore),
+    violationCount,
+    ratio: complianceRatio(violationCount, complianceCount),
+    sev: item.totals?.severity || {},
+    staleClass: evaluatedToday ? '' : 'dim-gauge-card--stale',
+    dateText: item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId),
+    coverage,
+    partialTooltip: coverage.isPartial ? buildPartialTooltip(coverage) : undefined,
   };
 }
 

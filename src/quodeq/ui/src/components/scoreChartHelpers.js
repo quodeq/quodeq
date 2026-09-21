@@ -19,7 +19,7 @@ export function createCssVarStore({ doc = typeof document !== 'undefined' ? docu
   const cache = new Map();
   let observer = null;
 
-  function cssVar(name, fallback = '') {
+  function readCssVar(name, fallback = '') {
     if (cache.has(name)) return cache.get(name);
     if (!doc) return fallback;
     const val = getComputedStyle(doc.documentElement).getPropertyValue(name).trim();
@@ -43,7 +43,7 @@ export function createCssVarStore({ doc = typeof document !== 'undefined' ? docu
     observer = null;
   }
 
-  return { cssVar, clear, observe, disconnect };
+  return { cssVar: readCssVar, clear, observe, disconnect };
 }
 
 /** The app-wide cache every production chart panel shares. */

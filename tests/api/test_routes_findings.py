@@ -150,7 +150,6 @@ class TestRestoreEndpoint:
         assert data["code"] == "MISSING_PARAM"
         assert "error" in data
 
-
     def test_restore_returns_200_with_scores_envelope(self, client, tmp_path):
         project_dir = tmp_path / "my-project"
         project_dir.mkdir()

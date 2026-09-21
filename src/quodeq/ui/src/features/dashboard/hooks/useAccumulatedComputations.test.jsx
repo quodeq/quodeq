@@ -23,7 +23,6 @@ describe('computeAccumulatedStats', () => {
       { dimension: undefined },
       { dimension: 'clean-arch' },
     ];
-    expect(() => computeAccumulatedStats(dims, null, null)).not.toThrow();
     const { sorted } = computeAccumulatedStats(dims, null, null);
     expect(sorted).toHaveLength(3);
     // Missing names sort first (empty-string fallback).

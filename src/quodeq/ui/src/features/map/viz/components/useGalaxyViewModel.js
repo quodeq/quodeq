@@ -29,8 +29,10 @@ function useGalaxyScene({ dimensions, standardTypes }) {
 function useGalaxyNavRefs() {
   const savedNavRef = useRef(null);
   const savedCamRef = useRef(null);
-  const hasSavedDeep = savedNavRef.current && savedNavRef.current.depth > 0;
-  const navRef = useRef(hasSavedDeep ? { ...savedNavRef.current } : { depth: 0, dim: null, prin: null });
+  // savedNavRef was created on the line above, so its value is still null
+  // on the one render where useRef's argument is read: nav always starts at
+  // the root and a saved depth is restored later, by the camera effect.
+  const navRef = useRef({ depth: 0, dim: null, prin: null });
   const animRef = useRef(null);
   const [navVersion, setNavVersion] = useState(0);
   const mouseRef = useRef({ x: -1, y: -1 });

@@ -54,7 +54,9 @@ export function useGradeFormulaState() {
   // than let the mismatch look like a bug.
   const [partialNotice, setPartialNotice] = useState(null);
   const debounceRef = useRef(null);
-  const loadedRef = useRef(false); // true once the initial GET has populated draft
+  // State, not a ref: useGradePreview's trigger effect depends on it, and a
+  // ref would never re-run that effect when the initial GET lands.
+  const [loaded, setLoaded] = useState(false);
   const queryClient = useQueryClient();
 
   const intents = useFormulaIntents({
@@ -75,7 +77,7 @@ export function useGradeFormulaState() {
       .then((d) => {
         setDefaults(d.defaults);
         adoptServerFormula(d.current, d.isCustom);
-        loadedRef.current = true;
+        setLoaded(true);
       })
       .catch(() => setError(t('gradeFormula.loadFailed')));
   }, [adoptServerFormula]);
@@ -85,6 +87,6 @@ export function useGradeFormulaState() {
 
   return {
     saved, draft, isCustom, defaults, preview, busy, error, partialNotice,
-    debounceRef, loadedRef, invalidateScoreQueries, ...intents,
+    debounceRef, loaded, invalidateScoreQueries, ...intents,
   };
 }

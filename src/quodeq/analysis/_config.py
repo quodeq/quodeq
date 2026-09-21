@@ -42,7 +42,7 @@ class AnalysisConfig:
     work_dir: Path | None = None
     context_size: int = 0
     # Optional ``RunConfig`` carrier so the API path can build a per-file
-    # cache writer (Task 3.5). ``None`` keeps legacy callers (no cache
+    # cache writer. ``None`` keeps legacy callers (no cache
     # writes) working. The import stays under TYPE_CHECKING (annotations are
     # lazy via ``from __future__ import annotations``) so ``run_types`` can
     # import this module at runtime without a cycle.
@@ -55,7 +55,7 @@ class _AgentParams:
     queue_path: Path | None = None
     agent_id: str = ""
     work_dir: Path | None = None
-    # Phase 1.5 (Task 3.5): cache fingerprint inputs propagated to
+    # Cache fingerprint inputs propagated to
     # ``findings_server.py`` so the subprocess writes cache entries with the
     # same keys as ``classify_files_via_cache``. ``None`` resolves to
     # ``"unknown"`` / ``""`` at emit time.

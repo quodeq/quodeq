@@ -1,7 +1,7 @@
 """Internal sync logic for the SQLite run index.
 
-Upserts rows from status.json (Plan A runs) or synthesizes from legacy
-filesystem signals (pre-Plan-A runs). Promotes stale non-terminal runs to
+Upserts rows from status.json, or synthesizes from legacy filesystem
+signals for runs old enough to predate it. Promotes stale non-terminal runs to
 cancelled based on heartbeat mtime + PID liveness.
 """
 from __future__ import annotations
@@ -59,7 +59,7 @@ def _heartbeat_mtime(run_dir: Path) -> float | None:
     path = run_dir / HEARTBEAT_FILENAME
     try:
         return path.stat().st_mtime
-    except (OSError, FileNotFoundError):
+    except OSError:
         return None
 
 
@@ -73,7 +73,7 @@ def _heartbeat_iso(run_dir: Path) -> str | None:
 def _status_mtime_ns(run_dir: Path) -> int:
     try:
         return (run_dir / STATUS_FILENAME).stat().st_mtime_ns
-    except (OSError, FileNotFoundError):
+    except OSError:
         return 0
 
 

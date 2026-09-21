@@ -48,7 +48,6 @@ def run_version_cmd(cmd: list[str]) -> str:
     return result.stdout.strip()
 
 
-
 def _parse_major(version_str: str) -> int:
     """Extract the major version number from a version string like 'v20.11.0' or '10.2.0'."""
     cleaned = version_str.lstrip("v")

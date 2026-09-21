@@ -52,6 +52,7 @@ def test_version_folds_visible_dims_only_when_given():
 def test_cached_accumulated_miss_then_hit(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     calls = []
+
     def compute():
         calls.append(1)
         return {"dimensions": [], "summary": {"x": 1}}
@@ -133,6 +134,7 @@ def test_cached_accumulated_not_cacheable_serves_without_persisting(tmp_path, mo
     """
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     calls = []
+
     def compute():
         calls.append(1)
         return {"dimensions": [], "summary": {"partial": True}}
@@ -147,6 +149,7 @@ def test_cached_accumulated_not_cacheable_serves_without_persisting(tmp_path, mo
 def test_cached_accumulated_cacheable_true_persists(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     calls = []
+
     def compute():
         calls.append(1)
         return {"dimensions": [], "summary": {"x": 1}}
@@ -164,6 +167,7 @@ def test_cached_accumulated_kill_switch(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
     calls = []
+
     def compute():
         calls.append(1); return {"y": 2}
     assert cached_accumulated("proj", "v1", compute) == {"y": 2}

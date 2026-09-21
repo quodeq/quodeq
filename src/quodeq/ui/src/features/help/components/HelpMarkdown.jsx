@@ -90,15 +90,25 @@ function Figure({ body }) {
   return <HelpFigure caption={caption} alt={alt} srcDark={srcDark} srcLight={srcLight} />;
 }
 
+/**
+ * Title of a Tip callout: the blockquote's leading bold run, when it has one.
+ * remark hands that run either as the paragraph's only child or as the first
+ * of several, so both shapes are tried.
+ */
+function tipTitle(head) {
+  const inner = head?.props?.children;
+  const strong = inner?.props?.type === 'strong'
+    ? inner
+    : (Array.isArray(inner) ? inner[0] : inner);
+  return strong?.props?.children ?? null;
+}
+
 const COMPONENTS = {
   // A blockquote is the Tip callout. The leading bold run is its title.
   blockquote({ children }) {
     const nodes = Array.isArray(children) ? children.filter((c) => c !== '\n') : [children];
     const [head, ...rest] = nodes;
-    const strong = head?.props?.children?.props?.type === 'strong'
-      ? head.props.children
-      : (Array.isArray(head?.props?.children) ? head.props.children[0] : head?.props?.children);
-    const title = strong?.props?.children ?? null;
+    const title = tipTitle(head);
     return (
       <aside className="help-tip" role="note">
         {title && <div className="help-tip__title">{title}</div>}

@@ -6,7 +6,7 @@ import { SidePaneProvider } from '../../side-pane/index.js';
 // Split from DashboardPage.test.jsx: the no-runs -> first-run transition
 // (P5-T2).
 
-// P5-T2: the no-runs -> first-run transition. Task 7 removed the redundant
+// P5-T2: the no-runs -> first-run transition. The redundant
 // eval-completion refetch, but the sequence "No evaluations yet" -> (dashboard
 // key changes to the new run) -> loader -> content still had two bugs: a
 // window-refocus/background refetch of an empty project used to render a

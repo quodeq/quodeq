@@ -235,7 +235,6 @@ def test_cross_principal_evaluated_before_sourceless_path():
 # --- integration: wired into FindingEnricher.enrich ------------------------
 
 
-
 def _enricher(model):
     return FindingEnricher(CompiledContext(dimension="security", trust_model=model))
 

@@ -1,5 +1,5 @@
 /**
- * Tests for StandardEditor override state wiring (Task 9).
+ * Tests for StandardEditor override state wiring.
  * Covers: managed-standard Save enabled when override drafted;
  * handleChangeParam(null) clears an entry; customized badge count.
  *

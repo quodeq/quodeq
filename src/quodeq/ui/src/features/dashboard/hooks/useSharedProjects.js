@@ -1,3 +1,48 @@
+/**
+ * Shared-repo status and project list for the merged Projects page (one list,
+ * no tabs -- see ProjectsPage.jsx). Feeds the shared-only cards, the toolbar's
+ * SyncedIndicator, and -- through useMergedProjects -- every local card's
+ * chips and action. It wraps the shared-repo API client (getSharedStatus,
+ * sharedListProjects, connectShared, refreshShared, pullSharedProject) behind
+ * two react-query queries (`sharedKeys.status()`, `sharedKeys.list()`) plus a
+ * small coalescing refresh.
+ *
+ * This module is the app's single source of shared status/list data: usePublish
+ * and Settings' SharedRepoSection read, and on their own mutations invalidate,
+ * these SAME cache entries, so a connect, disconnect, publish or refresh
+ * anywhere is reflected everywhere through one cache rather than three
+ * independently fetched copies that used to drift apart.
+ *
+ * Cached-first mount: the list query's `queryFn` always passes
+ * `refresh: false`, so the UI renders instantly from whatever the server has
+ * cached and never blocks on a synchronous git fetch. Once that cached render
+ * lands, a background `refresh()` kicks off automatically, exactly once, to
+ * revalidate against the remote. Every other re-list (after connect, after a
+ * publish job completes, or the explicit toolbar refresh button) also passes
+ * `refresh: false`; `refreshShared()` is what triggers the real remote fetch.
+ *
+ * Error handling has two tiers. A failed *initial* load (status, or the first
+ * list once configured, i.e. before either has ever produced data) surfaces
+ * `error`, since there is nothing to show yet. A failed *refresh* of an
+ * already-loaded page does NOT blank the view: it flags `stale` so the
+ * toolbar's SyncedIndicator can show "synced <time> ago - stale" over the
+ * still-valid last-known listing.
+ *
+ * `lastSynced` seeds from the STATUS payload, which the server reports on
+ * every /status response, so a list-only failure still shows when the repo
+ * last synced instead of "not synced yet"; once the list has its own
+ * envelope, that value overrides it.
+ *
+ * `refresh()` coalesces rather than drops: a call arriving while one is
+ * already running does not start a second POST, it marks the run pending and
+ * is satisfied by exactly one more round once the current one settles, no
+ * matter how many calls stack up. Both the POST and the follow-up re-list
+ * invalidate `sharedKeys.all()`, not just the list, so `refresh()` doubles as
+ * the retry affordance behind the toolbar's "sync failed - retry" state even
+ * when the original failure was the status fetch itself: a stuck
+ * `configured=false` with no data would otherwise never get another chance,
+ * because a disabled list query never fetches on its own.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
@@ -6,58 +51,8 @@ import { t } from '../../../strings/index.js';
 import { useCoalescedRefresh } from './useCoalescedRefresh.js';
 import { useSharedActions } from './useSharedActions.js';
 
-/**
- * useSharedProjects — shared-repo status + project list for the merged
- * Projects page (one list, no tabs -- see ProjectsPage.jsx). Feeds
- * shared-only cards, the toolbar's SyncedIndicator, and -- via
- * useMergedProjects -- every local card's chips/action. Wraps the Task 15
- * shared-repo API client (getSharedStatus, sharedListProjects,
- * connectShared, refreshShared, pullSharedProject) behind two react-query
- * queries (`sharedKeys.status()`, `sharedKeys.list()`) plus a small
- * coalescing refresh.
- *
- * This is the single source of shared status/list data in the app now:
- * usePublish and Settings' SharedRepoSection read (and, on their own
- * mutations, invalidate) these SAME cache entries, so a connect, disconnect,
- * publish, or refresh anywhere in the app is reflected everywhere else
- * through one cache instead of three independently-fetched copies that used
- * to drift apart (audit C6).
- *
- * Cached-first mount: the list query's `queryFn` always passes
- * `refresh: false`, so the UI renders instantly from whatever the server
- * already has cached, never blocking on a synchronous git fetch. Once that
- * cached render lands (the list query's first success), a background
- * `refresh()` kicks off automatically -- exactly once -- to revalidate
- * against the remote, via `refreshShared()`. Every other re-list (after
- * connect, after a publish job completes, or the explicit toolbar refresh
- * button) also passes `refresh: false`; `refreshShared()` is what triggers
- * the real remote fetch.
- *
- * Error handling has two tiers: a failed *initial* load (status, or the
- * first list once configured -- i.e. before either has ever produced data)
- * surfaces `error` since there's nothing to show yet. A failed *refresh* of
- * an already-loaded page does NOT blank the view -- it flags `stale` so the
- * toolbar's SyncedIndicator can show "synced <time> ago · stale" over the
- * still-valid last-known listing.
- *
- * `lastSynced` seeds from the STATUS payload -- the server reports it on
- * every /status response -- so a list-only failure still shows when the
- * repo last synced instead of "not synced yet" (audit B2); once the list
- * has its own envelope, that value overrides it.
- *
- * `refresh()` coalesces rather than drops: a call that arrives while one is
- * already running doesn't start a second POST immediately -- it marks the
- * run as pending and is satisfied by exactly one more round once the
- * current one settles, no matter how many calls stack up in the meantime
- * (audit C3 groundwork; the old in-flight guard used to just silently
- * ignore the repeat call, which is how a post-publish refresh could get
- * dropped on the floor). Both the POST and the follow-up re-list run again
- * invalidating `sharedKeys.all()` -- not just the list -- so `refresh()`
- * doubles as the retry affordance behind the toolbar's "sync failed ·
- * retry" state even when the ORIGINAL failure was the status fetch itself
- * (audit A2): a stuck `configured=false` with no data would otherwise never
- * get another chance, since a disabled list query never fetches on its own.
- */
+// One refresh round: POST, then let the caller re-list. Failures keep the
+// page's data and flag it stale instead of rejecting.
 function makeRefreshCore({ refreshShared, queryClient, setStaleOverride }) {
   return async () => {
     try {
@@ -81,6 +76,34 @@ function makeRefreshCore({ refreshShared, queryClient, setStaleOverride }) {
   };
 }
 
+/**
+ * Message for an INITIAL load failure, meaning no data has ever landed for
+ * that query. A background refresh failure after data already exists is
+ * `stale`, not `error`, so it never blanks an already-working view.
+ */
+function deriveSharedError({ statusQuery, listQuery, configured }) {
+  if (statusQuery.isError && statusQuery.data === undefined) {
+    return statusQuery.error?.message || t('projects.sharedStatusFailed');
+  }
+  if (configured && listQuery.isError && listQuery.data === undefined) {
+    return listQuery.error?.message || t('projects.sharedStatusFailed');
+  }
+  return null;
+}
+
+/**
+ * Freshness flags. `loading` holds until BOTH the status query and (when
+ * configured) the list query have settled at least once. isLoading, not
+ * isPending, is "no data yet AND actively fetching", so an unconfigured
+ * repo's never-run list query does not hold it true forever.
+ */
+function deriveSharedFreshness({ statusQuery, listQuery, configured, staleOverride }) {
+  return {
+    stale: staleOverride || !!listQuery.data?.stale,
+    loading: statusQuery.isLoading || (configured && listQuery.isLoading),
+  };
+}
+
 function deriveSharedProjectsState({ statusQuery, listQuery, configured, staleOverride }) {
   const url = statusQuery.data?.url ?? null;
   // Gated on `configured`, not just read off listQuery.data: the list query
@@ -91,24 +114,13 @@ function deriveSharedProjectsState({ statusQuery, listQuery, configured, staleOv
   // after disconnect, final whole-branch review).
   const projects = configured ? (listQuery.data?.projects || []) : [];
   const lastSynced = listQuery.data?.lastSynced ?? statusQuery.data?.lastSynced ?? null;
-  const stale = staleOverride || !!listQuery.data?.stale;
-  // loading: true until BOTH the status query and (when configured) the
-  // list query have settled at least once. isLoading (not isPending) is
-  // "no data yet AND actively fetching" -- a disabled query is never
-  // isLoading, so an unconfigured repo's never-run list query doesn't hold
-  // this true forever.
-  const loading = statusQuery.isLoading || (configured && listQuery.isLoading);
-  // error: only for an INITIAL load failure (no data has ever landed for
-  // that query) -- a background refresh failure after data already exists
-  // is `stale`, not `error`, so it never blanks an already-working view.
-  const statusFailedInitial = statusQuery.isError && statusQuery.data === undefined;
-  const listFailedInitial = configured && listQuery.isError && listQuery.data === undefined;
-  const error = statusFailedInitial
-    ? (statusQuery.error?.message || t('projects.sharedStatusFailed'))
-    : listFailedInitial
-      ? (listQuery.error?.message || t('projects.sharedStatusFailed'))
-      : null;
-  return { url, projects, lastSynced, stale, loading, error };
+  return {
+    url,
+    projects,
+    lastSynced,
+    ...deriveSharedFreshness({ statusQuery, listQuery, configured, staleOverride }),
+    error: deriveSharedError({ statusQuery, listQuery, configured }),
+  };
 }
 
 // Background revalidate: fires once, the first time the cached list lands

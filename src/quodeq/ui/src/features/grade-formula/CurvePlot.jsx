@@ -32,20 +32,20 @@ export default function CurvePlot({ baseK, ceilScale, thresholds }) {
   const zone = `${ceilPath} L ${basePath.slice(2).split(' L ').reverse().join(' L ')} Z`;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width={W} role="img" aria-label={t('gradeFormula.scoreCurves')}>
-      {thresholds.map(([t]) => (
+      {thresholds.map(([score]) => (
         <line
-          key={t}
+          key={score}
           x1={PAD_L}
-          y1={y(t)}
+          y1={y(score)}
           x2={W - PAD_R}
-          y2={y(t)}
+          y2={y(score)}
           stroke="var(--color-border)"
           strokeWidth="1"
         />
       ))}
-      {thresholds.map(([t]) => (
-        <text key={`t${t}`} x="2" y={y(t) + TICK_LABEL_Y_OFFSET} fontSize="9" fill="var(--color-text-muted)">
-          {t}
+      {thresholds.map(([score]) => (
+        <text key={`t${score}`} x="2" y={y(score) + TICK_LABEL_Y_OFFSET} fontSize="9" fill="var(--color-text-muted)">
+          {score}
         </text>
       ))}
       <line x1={PAD_L} y1={PAD_T} x2={PAD_L} y2={H - PAD_B} stroke="var(--color-border)" />

@@ -6,4 +6,4 @@ src/quodeq/api/routes_project_scan.py:142:analysis
 src/quodeq/ci/review.py:138:cli_evaluation
 src/quodeq/data/fs/repo_clone.py:19:context
 src/quodeq/llm_bridge/_providers.py:4:analysis
-src/quodeq/services/tooling_mixin.py:14:analysis
+src/quodeq/services/tooling_mixin.py:15:analysis

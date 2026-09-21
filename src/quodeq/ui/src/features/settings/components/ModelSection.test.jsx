@@ -46,7 +46,7 @@ describe('ModelSection — finding #214 (availableClients undefined)', () => {
   });
 });
 
-// Cluster 19 — handleModelChange had no try/catch at all, so a throwing
+// handleModelChange had no try/catch at all, so a throwing
 // storage.setItem (e.g. QuotaExceededError in private browsing) would escape
 // this React onChange handler.
 describe('ModelSection — handleModelChange storage guard', () => {

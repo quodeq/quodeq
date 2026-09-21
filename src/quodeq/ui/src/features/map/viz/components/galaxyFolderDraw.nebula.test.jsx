@@ -49,6 +49,17 @@ function makeFolderStar() {
   };
 }
 
+// The two folder-star cases differ only in the frame time and the zoom; the
+// scene and the rest of the draw options are the same in both.
+function drawOneFolderStar(ctx, { t, z }) {
+  drawStars(ctx, { rootStars: [makeFolderStar()], lines: [], bg: [] }, {
+    t, cam: { x: 0, y: 0, z }, w2s: (x, y) => ({ x, y }), showLabels: false,
+    mouseRef: { current: { x: -1, y: -1 } }, flyRef: { current: null },
+    focusedFolderRef: { current: null }, animRef: { current: null },
+    tc: { text: { r: 1, g: 1, b: 1 }, textMuted: { r: 1, g: 1, b: 1 } },
+  });
+}
+
 describe('galaxyFolderDraw nebula discs', () => {
   let discs;
 
@@ -59,32 +70,20 @@ describe('galaxyFolderDraw nebula discs', () => {
 
   it('drawNebula paints one background disc plus four orbiting blobs', () => {
     const ctx = makeRecordingCtx(discs);
-    drawNebula(ctx, { complianceRate: 0.5 }, {}, { W: 800, H: 600, t: 12 });
+    drawNebula(ctx, { complianceRate: 0.5 }, { W: 800, H: 600, t: 12 });
     expect(discs).toHaveLength(5);
     expect(discs).toMatchSnapshot('scene-nebula-discs');
   });
 
   it('a folder star paints its cluster nebula plus three blobs, zoomed in', () => {
     const ctx = makeRecordingCtx(discs);
-    const scene = { rootStars: [makeFolderStar()], lines: [], bg: [] };
-    drawStars(ctx, scene, {
-      t: 7, cam: { x: 0, y: 0, z: 4 }, w2s: (x, y) => ({ x, y }), showLabels: false,
-      mouseRef: { current: { x: -1, y: -1 } }, flyRef: { current: null },
-      focusedFolderRef: { current: null }, animRef: { current: null },
-      tc: { text: { r: 1, g: 1, b: 1 }, textMuted: { r: 1, g: 1, b: 1 } },
-    });
+    drawOneFolderStar(ctx, { t: 7, z: 4 });
     expect(discs).toMatchSnapshot('folder-nebula-discs-zoomed');
   });
 
   it('a folder star paints the same blob ring when zoomed out', () => {
     const ctx = makeRecordingCtx(discs);
-    const scene = { rootStars: [makeFolderStar()], lines: [], bg: [] };
-    drawStars(ctx, scene, {
-      t: 3, cam: { x: 0, y: 0, z: 1 }, w2s: (x, y) => ({ x, y }), showLabels: false,
-      mouseRef: { current: { x: -1, y: -1 } }, flyRef: { current: null },
-      focusedFolderRef: { current: null }, animRef: { current: null },
-      tc: { text: { r: 1, g: 1, b: 1 }, textMuted: { r: 1, g: 1, b: 1 } },
-    });
+    drawOneFolderStar(ctx, { t: 3, z: 1 });
     expect(discs).toMatchSnapshot('folder-nebula-discs-zoomed-out');
   });
 });

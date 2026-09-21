@@ -39,7 +39,7 @@ function ViolationCardMarkup({ v, filename, display, refText, onDismiss }) {
   );
 }
 
-const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
+export default memo(function ViolationCard({ v, onDismiss }) {
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
   const range = (v.endLine && v.endLine !== line) ? `${line}-${v.endLine}` : line;
@@ -47,5 +47,3 @@ const ViolationCard = memo(function ViolationCard({ v, onDismiss }) {
   const display = line != null ? `${filename}:${range}` : filename;
   return <ViolationCardMarkup v={v} filename={filename} display={display} refText={refText} onDismiss={onDismiss} />;
 });
-
-export default ViolationCard;

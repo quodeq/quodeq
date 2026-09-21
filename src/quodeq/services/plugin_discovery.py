@@ -62,13 +62,6 @@ def _get_plugin_cache() -> _PluginCache:
         return _plugin_cache
 
 
-def reset_plugin_cache() -> None:
-    """Reset the module-level plugin cache. Useful for test isolation."""
-    global _plugin_cache
-    with _plugin_cache_lock:
-        _plugin_cache = None
-
-
 def _discover_from_detection(detection_file: Path, dimensions_file: Path) -> list[PluginInfo]:
     """Build plugin info from universal detection.json + dimensions.json."""
     try:

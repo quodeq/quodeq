@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT } from '../../../constants.js';
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
@@ -138,10 +138,13 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
     }
   }, []);
 
-  const setEnabled = useCallback(makeSetEnabled(storage, setState, broadcast), [storage, broadcast]);
-  const setMode = useCallback(makeSetMode(storage, setState, broadcast), [storage, broadcast]);
-  const setActiveProvider = useCallback(makeSetActiveProvider(storage, setState, broadcast), [storage, broadcast]);
-  const setModel = useCallback(makeSetModel(storage, setState, broadcast), [storage, broadcast]);
+  // useMemo, not useCallback: the factories must run only when their inputs
+  // change, where useCallback(factory(...), deps) rebuilds the closure every
+  // render and then throws it away.
+  const setEnabled = useMemo(() => makeSetEnabled(storage, setState, broadcast), [storage, broadcast]);
+  const setMode = useMemo(() => makeSetMode(storage, setState, broadcast), [storage, broadcast]);
+  const setActiveProvider = useMemo(() => makeSetActiveProvider(storage, setState, broadcast), [storage, broadcast]);
+  const setModel = useMemo(() => makeSetModel(storage, setState, broadcast), [storage, broadcast]);
 
   useProviderChangeSync(storage, setState);
 

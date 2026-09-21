@@ -148,6 +148,7 @@ def test_get_scores_raw_uses_sql_when_grades_present(tmp_path: Path, monkeypatch
 
     # Monkeypatch legacy rescore to raise so we prove it is NOT called.
     import quodeq.services.rescore as legacy_rescore_mod  # noqa: PLC0415
+
     def boom(*a, **kw):  # noqa: ANN001
         raise AssertionError("legacy rescore should not be called when SQL has grades")
     monkeypatch.setattr(legacy_rescore_mod, "rescore_dimensions", boom)

@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 NO_GUIDANCE = "_No additional guidance._"
 NO_STANDARDS = "_No compiled standards available._"
 NO_STANDARDS_FOR_DIM = "_No compiled standards for this dimension._"
-STANDARDS_READ_ERROR = "_Could not read compiled standards._"
 
 # Template placeholder names
 TPL_DISCIPLINE = "DISCIPLINE"

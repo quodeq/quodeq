@@ -16,7 +16,6 @@ pytestmark = pytest.mark.usefixtures("restore_environ")
 _SHA256_HEX_LEN = 64
 
 
-
 class TestComputeSourceHash:
     def test_hashes_source_files(self, tmp_path):
         src = tmp_path / "src"

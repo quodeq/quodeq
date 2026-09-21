@@ -10,7 +10,7 @@ import { t } from '../../../strings/index.js';
  */
 export function computeHistoryChartStats(trend) {
   const scores = trend
-    .map((t) => parseFloat(t.runNumericAverage ?? t.numericAverage))
+    .map((point) => parseFloat(point.runNumericAverage ?? point.numericAverage))
     .filter((n) => !Number.isNaN(n));
   return {
     latest: scores[0],

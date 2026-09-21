@@ -78,7 +78,7 @@ describe('useProjectState — source-aware project selection', () => {
     // The boot-time resolution effect only ever loads the *local* project
     // list. A restored shared selection must not be validated against it
     // (and silently reverted to the first local project + source 'local') —
-    // shared clones are resolved by Task 17's data hooks, not here.
+    // shared clones are resolved by the data hooks, not here.
     listProjects.mockResolvedValue([{ id: 'local-a', name: 'Local A' }]);
     const storage = makeMemoryStorage({ quodeq_selected_project: 'shared-xyz', quodeq_selected_source: 'shared' });
     const onNoProjects = vi.fn();

@@ -151,46 +151,60 @@ function RadialVertices({ points, plotted, principles, angles, outerRadius, onPr
 /* Labels — name and score share an anchor point on a label ring just
    outside the plot. Score is always rendered on the line below the name
    via a tspan(dy), so the two never collide regardless of axis angle. */
+/** Click/keyboard wiring for one label; absent entirely when not actionable. */
+function labelInteraction(name, actionable, handleClick, handleKey) {
+  if (!actionable) return {};
+  return { role: 'button', tabIndex: 0, onClick: handleClick(name), onKeyDown: handleKey(name) };
+}
+
+/** One axis label: the principle name wrapped over lines, score below it. */
+function RadialLabel({ p, angle, outerRadius, actionable, handleClick, handleKey }) {
+  const [x, y] = polar(angle, outerRadius + LABEL_OFFSET);
+  const isInsuf = !p.hasEvidence;
+  const cosA = Math.cos(angle);
+  const anchor = cosA > LABEL_ANCHOR_COS_THRESHOLD ? 'start' : cosA < -LABEL_ANCHOR_COS_THRESHOLD ? 'end' : 'middle';
+  const lines = wrapLines(p.name.toUpperCase().split(/\s+/), LABEL_MAX_CHARS_PER_LINE);
+  return (
+    <g
+      {...labelInteraction(p.name, actionable && !isInsuf, handleClick, handleKey)}
+      className={`qd-radial__label-group${isInsuf ? ' qd-radial__label-group--insuf' : ''}`}
+    >
+      <text
+        className={`qd-radial__lab${isInsuf ? ' qd-radial__lab--insuf' : ''}`}
+        x={x}
+        y={y}
+        textAnchor={anchor}
+      >
+        {lines.map((line, li) => (
+          <tspan key={li} x={x} dy={li === 0 ? 0 : '1.15em'}>{line}</tspan>
+        ))}
+        <tspan
+          className={`qd-radial__lab-sub${isInsuf ? ' qd-radial__lab-sub--insuf' : ''}`}
+          x={x}
+          dy="1.25em"
+          style={isInsuf ? undefined : { fill: scoreGradeColorVar(p.score) }}
+        >
+          {isInsuf ? 'insufficient' : p.score?.toFixed(1)}
+        </tspan>
+      </text>
+    </g>
+  );
+}
+
 function RadialLabels({ principles, angles, outerRadius, onPrincipleClick, handleClick, handleKey }) {
   return (
     <>
-      {principles.map((p, i) => {
-        const [x, y] = polar(angles[i], outerRadius + LABEL_OFFSET);
-        const isInsuf = !p.hasEvidence;
-        const cosA = Math.cos(angles[i]);
-        const anchor = cosA > LABEL_ANCHOR_COS_THRESHOLD ? 'start' : cosA < -LABEL_ANCHOR_COS_THRESHOLD ? 'end' : 'middle';
-        const words = p.name.toUpperCase().split(/\s+/);
-        const lines = wrapLines(words, LABEL_MAX_CHARS_PER_LINE);
-        return (
-          <g
-            key={`lab-${i}`}
-            role={onPrincipleClick && !isInsuf ? 'button' : undefined}
-            tabIndex={onPrincipleClick && !isInsuf ? 0 : undefined}
-            onClick={onPrincipleClick && !isInsuf ? handleClick(p.name) : undefined}
-            onKeyDown={onPrincipleClick && !isInsuf ? handleKey(p.name) : undefined}
-            className={`qd-radial__label-group${isInsuf ? ' qd-radial__label-group--insuf' : ''}`}
-          >
-            <text
-              className={`qd-radial__lab${isInsuf ? ' qd-radial__lab--insuf' : ''}`}
-              x={x}
-              y={y}
-              textAnchor={anchor}
-            >
-              {lines.map((line, li) => (
-                <tspan key={li} x={x} dy={li === 0 ? 0 : '1.15em'}>{line}</tspan>
-              ))}
-              <tspan
-                className={`qd-radial__lab-sub${isInsuf ? ' qd-radial__lab-sub--insuf' : ''}`}
-                x={x}
-                dy="1.25em"
-                style={isInsuf ? undefined : { fill: scoreGradeColorVar(p.score) }}
-              >
-                {isInsuf ? 'insufficient' : p.score?.toFixed(1)}
-              </tspan>
-            </text>
-          </g>
-        );
-      })}
+      {principles.map((p, i) => (
+        <RadialLabel
+          key={`lab-${i}`}
+          p={p}
+          angle={angles[i]}
+          outerRadius={outerRadius}
+          actionable={!!onPrincipleClick}
+          handleClick={handleClick}
+          handleKey={handleKey}
+        />
+      ))}
     </>
   );
 }

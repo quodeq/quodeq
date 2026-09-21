@@ -33,6 +33,7 @@ class TestWiring:
         config, src = _setup(tmp_path, {"a.py": "x"})
 
         called = {"hit": False}
+
         def fake_cache(config, dim_id, idx, ctx, opts):
             called["hit"] = True
             return _make_dummy_evidence(files_read=1)

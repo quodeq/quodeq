@@ -9,6 +9,7 @@ from quodeq.terminal.sessions import TerminalSessionRegistry
 class _FakeManager:
     def __init__(self):
         self.killed = False; self._alive = False; self.ensured = None
+
     def ensure_session(self, *, cwd, cols, rows): self._alive = True; self.ensured = (cwd, cols, rows)
     def scrollback(self): return "hi\n"
     def read(self, max_bytes=65536): return ""
@@ -128,6 +129,7 @@ def test_session_kill_unknown_is_404(app):
 class _ResizeRecorder:
     def __init__(self):
         self.calls = []
+
     def resize(self, cols, rows):
         self.calls.append((cols, rows))
 

@@ -142,6 +142,23 @@ def _dispatch_per_dim(
     return ev
 
 
+def _run_one_dimension(
+    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext, run: _LoopRun,
+) -> Evidence | None:
+    """Take one dimension through RUNNING -> analysis -> finalized.
+
+    Returns None when the dimension was skipped; ``_dispatch_per_dim`` has
+    already written its INCOMPLETE state and logged the reason.
+    """
+    run_dir = _run_dir_for(config)
+    _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=run.deps.log)
+    ev = _dispatch_per_dim(config, dimension, idx, ctx, run.deps)
+    if ev is None:
+        return None
+    _finalize_dim_result(run_dir, dimension, ev, run)
+    return ev
+
+
 def run_per_dimension_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext, deps: LoopDeps,
 ) -> dict[str, Evidence]:
@@ -159,14 +176,9 @@ def run_per_dimension_loop(
         log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
         if _loop_should_stop(config, dimension, log):
             break
-        run_dir = _run_dir_for(config)
-        _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=log)
-        ev = _dispatch_per_dim(config, dimension, idx, ctx, deps)
-        if ev is None:
+        if _run_one_dimension(config, dimension, idx, ctx, run) is None:
             skipped_count += 1
             continue
-        # ev is set - dim succeeded analytically.
-        _finalize_dim_result(run_dir, dimension, ev, run)
         log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev=set)")
     log.info(
         f"[loop] per-dimension finished: processed {len(result)} of {len(dimensions)} dim(s) "

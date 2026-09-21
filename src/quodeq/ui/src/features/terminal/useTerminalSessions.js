@@ -16,17 +16,6 @@ function readStoredActive() {
   return readString(ACTIVE_SESSION_KEY);
 }
 
-/**
- * Client side of the session tab strip. The SERVER owns the canonical session
- * list (sessions survive page reloads and drawer closes); this hook reconciles
- * local state against it instead of persisting its own copy:
- *  - on mount: fetch the list, creating one session if it's empty (the panel
- *    never shows zero tabs);
- *  - on 'gone' sockets or a Settings restart (kill-all): refetch, drop stale
- *    ids, recreate one session if everything died;
- *  - on tab activation: refetch lazily so the status bar's cwd stays fresh
- *    without polling.
- */
 // The network round-trip: list, creating one session first when the list is
 // empty and the caller asked for that. Throws when the server is unreachable.
 async function fetchSessionList({ listTerminalSessions, createTerminalSession, createIfEmpty }) {
@@ -120,6 +109,19 @@ function makeSelectSession({ setActiveId, reconcile }) {
   };
 }
 
+/**
+ * Client side of the session tab strip. The SERVER owns the canonical session
+ * list (sessions survive page reloads and drawer closes); this hook reconciles
+ * local state against it instead of persisting its own copy:
+ *  - on mount: fetch the list, creating one session if it's empty (the panel
+ *    never shows zero tabs);
+ *  - on 'gone' sockets or a Settings restart (kill-all): refetch, drop stale
+ *    ids, recreate one session if everything died;
+ *  - on tab activation: refetch lazily so the status bar's cwd stays fresh
+ *    without polling.
+ * @param {{enabled: boolean}} args - `enabled` is false while the drawer is
+ *   closed, which stops every fetch and socket this hook would otherwise open.
+ */
 export function useTerminalSessions({ enabled }) {
   const { listTerminalSessions, createTerminalSession, killTerminalSession } = useApi();
   const [sessions, setSessions] = useState([]);

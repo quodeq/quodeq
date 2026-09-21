@@ -29,7 +29,7 @@ def serialize_finding_event(judgment_dict: dict[str, Any]) -> str:
     """Return the SSE data: payload for an `event: finding` frame.
 
     judgment_dict is the row dict returned by SqliteFindingsRepository.list_*
-    converted via _judgment_as_dict (see Task 3).
+    converted via _judgment_as_dict.
     """
     return json.dumps(judgment_dict, separators=(",", ":"))
 

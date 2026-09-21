@@ -234,11 +234,10 @@ class TestStartJobTimeLimit:
 def test_list_jobs_warns_on_deprecated_reports_root_kwarg(tmp_path):
     """Passing reports_root= to list_jobs emits DeprecationWarning and is ignored.
 
-    External runs have been served via the SQLite index since Plan B1/B2;
-    this kwarg was left for transitional compat and should stop being used.
+    External runs have been served via the SQLite index for some time; this
+    kwarg was left for transitional compat and should stop being used.
     """
     import warnings
-    from quodeq.services.jobs import JobManager, InMemoryJobStore
 
     mgr = JobManager(job_store=InMemoryJobStore())
 

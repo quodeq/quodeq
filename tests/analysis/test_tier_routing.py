@@ -68,8 +68,6 @@ class TestBuildRunConfigAiModel:
         assert config.options.ai_model == "sonnet"
 
 
-
-
 class TestDimensionAnalysisModel:
     """_run_dimension_analysis should pass ai_model to AnalysisConfig."""
 
@@ -135,8 +133,6 @@ class TestDimensionAnalysisModel:
             assert analysis_config.ai_model is None
 
 
-
-
 class TestSubagentModelEnvVar:
     """Subagent model env vars should be standardized."""
 
@@ -154,5 +150,3 @@ class TestSubagentModelEnvVar:
 
     def test_pool_launcher_returns_none_when_unset(self):
         assert _default_subagent_model(env={}) is None
-    # Removed _fast_model tests: the verify-pool that needed a fast model
-    # for its yes/no verification dispatch is gone (B6.2b).

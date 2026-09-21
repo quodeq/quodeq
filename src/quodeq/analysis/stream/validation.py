@@ -20,6 +20,29 @@ def _has_content(stream_file: Path) -> bool:
     return stream_file.exists() and stream_file.stat().st_size > 0
 
 
+def _event_servers(event: dict) -> list | None:
+    """The MCP server list an init event advertises, in either provider dialect."""
+    if event.get("type") == "session.mcp_servers_loaded":
+        return copilot_event_data(event).get("servers", [])
+    return event.get("mcp_servers", [])
+
+
+def _findings_server_status(servers: list, stream_file: Path, log: LogSink) -> str | None:
+    """The status string the findings server reports, or None if it is absent.
+
+    A findings entry whose status is not a string is logged and skipped, so a
+    later, well-formed entry can still answer.
+    """
+    for srv in servers:
+        if not (isinstance(srv, dict) and srv.get("name") == _MCP_SERVER_NAME):
+            continue
+        status = srv.get("status")
+        if isinstance(status, str):
+            return status
+        log.debug(f"Invalid MCP server status in {stream_file}")
+    return None
+
+
 def get_mcp_status(stream_file: Path, *, log: LogSink = NULL_LOG) -> str | None:
     """Return MCP server status from the stream init event, or None if unavailable."""
     if not _has_content(stream_file):
@@ -28,20 +51,14 @@ def get_mcp_status(stream_file: Path, *, log: LogSink = NULL_LOG) -> str | None:
         with open_text(stream_file) as f:
             for line in f:
                 d = json.loads(line)
-                if not isinstance(d, dict):
-                    continue
-                servers = d.get("mcp_servers", [])
-                if d.get("type") == "session.mcp_servers_loaded":
-                    servers = copilot_event_data(d).get("servers", [])
+                servers = _event_servers(d) if isinstance(d, dict) else None
                 if not isinstance(servers, list):
-                    log.debug(f"Invalid MCP server list in {stream_file}")
+                    if isinstance(d, dict):
+                        log.debug(f"Invalid MCP server list in {stream_file}")
                     continue
-                for srv in servers:
-                    if isinstance(srv, dict) and srv.get("name") == _MCP_SERVER_NAME:
-                        status = srv.get("status")
-                        if isinstance(status, str):
-                            return status
-                        log.debug(f"Invalid MCP server status in {stream_file}")
+                status = _findings_server_status(servers, stream_file, log)
+                if status is not None:
+                    return status
     except (json.JSONDecodeError, OSError) as exc:
         log.debug(f"Failed to read MCP status from {stream_file}: {exc}")
     return None

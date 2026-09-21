@@ -87,7 +87,7 @@ describe('useAccumulatedComputations selectedDayDimNames (multi-run day)', () =>
   });
 });
 
-// Task 19 — the Overview page header shows a "remote · read-only" chip
+// The Overview page header shows a "remote · read-only" chip
 // (+ publisher sub line where available) for shared projects, and nothing
 // extra for local ones.
 describe('AccumulatedHeroSection shared read-only chip', () => {

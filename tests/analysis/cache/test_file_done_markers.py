@@ -6,7 +6,7 @@ from quodeq.analysis.cache.dimension_helpers import group_findings_by_file
 
 
 def _write_jsonl(path: Path, lines: list[dict]) -> None:
-    path.write_text("".join(json.dumps(l) + "\n" for l in lines))
+    path.write_text("".join(json.dumps(line) + "\n" for line in lines))
 
 
 class TestGroupFindingsByFile:

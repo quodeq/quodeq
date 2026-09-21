@@ -23,11 +23,6 @@ class ConfigPaths:
     evaluators_dir: Path = field(default_factory=_default_evaluators_dir)
 
     @property
-    def vroot(self) -> Path:
-        """Return the versioned root path (currently identical to root)."""
-        return self.root
-
-    @property
     def disciplines_conf(self) -> Path:
         """Return the path to the disciplines configuration file."""
         return self.root / "config" / "disciplines.conf"

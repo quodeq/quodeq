@@ -6,7 +6,7 @@ Behavior is unchanged: rescore the referenced run when possible, otherwise
 kick a background projection so the mutation still lands in SQL. Distinct
 from ``services/rescore.py``, which is the in-memory grade recompute engine.
 
-Split (Task 14): per-project locks + the project-wide projection sweep moved
+Split: per-project locks + the project-wide projection sweep moved
 to ``_mutation_projection.py``; the slim rescore payload + default-run
 resolution moved to ``_mutation_scoring.py``. Both are re-exported here —
 ``ProjectLockRegistry``/``_DEFAULT_PROJECT_LOCKS`` and ``_project_all_runs``

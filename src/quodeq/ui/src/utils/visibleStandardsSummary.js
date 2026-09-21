@@ -1,7 +1,13 @@
 import { countBySeverity } from './severity.js';
 
 /**
- * Compute summary stats from a filtered dimensions array.
+ * Roll a dimensions array up into the counts the page headers show. Callers
+ * pass the ALREADY filtered list, so hiding a standard changes the totals.
+ *
+ * @param {Array<{violations: Array, compliance: Array}>} dimensions
+ * @returns {{totalViolations: number, totalCompliance: number, severity: Object}}
+ *   `severity` carries one key per bucket severity.js defines, always present
+ *   and zeroed, so callers never have to guard a missing severity.
  */
 export function computeSummaryFromDimensions(dimensions) {
   let totalViolations = 0;

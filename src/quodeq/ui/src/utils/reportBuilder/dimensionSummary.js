@@ -8,6 +8,8 @@ const MAX_TOP_FILES = 15;
  * The per-dimension score/grade/counts table, or no lines when no dimension
  * has been evaluated.
  *
+ * @param {Array<{dimension: string, overallScore: number, overallGrade: string,
+ *   violations: Array, compliance: Array}>} accumulatedDimensions
  * @returns {string[]}
  */
 export function buildDimensionSummaryTable(accumulatedDimensions) {
@@ -33,6 +35,8 @@ export function buildDimensionSummaryTable(accumulatedDimensions) {
  * The worst-offending-files table across every dimension, capped at
  * MAX_TOP_FILES rows.
  *
+ * @param {Array<{violations: Array}>} accumulatedDimensions - files are keyed
+ *   by each violation's `file`, so a file counts once across all dimensions.
  * @returns {string[]}
  */
 export function buildTopOffendingFiles(accumulatedDimensions) {
@@ -65,6 +69,7 @@ export function buildTopOffendingFiles(accumulatedDimensions) {
  * The critical-and-major section, grouped by dimension. Always returns a
  * heading, saying so explicitly when there is nothing at those severities.
  *
+ * @param {Array<{dimension: string, violations: Array}>} accumulatedDimensions
  * @returns {string[]}
  */
 export function buildCritMajorSection(accumulatedDimensions) {
@@ -96,6 +101,9 @@ export function buildCritMajorSection(accumulatedDimensions) {
  * The headline counts (dimensions, violations by severity, compliance and
  * the compliance ratio) that close an overview report.
  *
+ * @param {{severity: Object, totalViolations: number, totalCompliance: number}} summary
+ *   the already-rolled-up counts.
+ * @param {Array} accumulatedDimensions - used only for the dimension count.
  * @returns {string[]}
  */
 export function buildOverviewSummarySection(summary, accumulatedDimensions) {

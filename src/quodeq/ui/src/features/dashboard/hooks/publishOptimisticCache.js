@@ -17,6 +17,15 @@ export function buildPublishedAtMap(list) {
 }
 
 /**
+ * One merged field: `local`'s value when it has one, else whatever the
+ * existing cache entry already had, else the fallback. Keeps a merge from
+ * regressing good data with an undefined.
+ */
+function carryOver(local, existing, field, fallback) {
+  return local?.[field] ?? existing?.[field] ?? fallback;
+}
+
+/**
  * Upserts the just-published project into the shared list cache's `projects`
  * array, merging over any existing entry with the same id (audit C3/C4).
  * `local` is the LOCAL project object the publish() call was made with (see
@@ -33,15 +42,15 @@ export function upsertPublishedProject(projects, id, local) {
   const merged = {
     ...existing,
     id,
-    name: local?.name ?? existing?.name ?? id,
+    name: carryOver(local, existing, 'name', id),
     publishedAt: Date.now(),
     publishedBy: null, // backend's published.json is authoritative; the UI
     // shows "published <relative time>" regardless (see PublishedMeta/
     // LocalPublishedMeta -- both render gracefully with no publishedBy).
     source: 'shared',
-    latestRunId: local?.latestRunId ?? existing?.latestRunId ?? null,
-    latestDoneRunId: local?.latestDoneRunId ?? existing?.latestDoneRunId ?? null,
-    originUrl: local?.originUrl ?? existing?.originUrl ?? null,
+    latestRunId: carryOver(local, existing, 'latestRunId', null),
+    latestDoneRunId: carryOver(local, existing, 'latestDoneRunId', null),
+    originUrl: carryOver(local, existing, 'originUrl', null),
   };
   if (idx === -1) return [...projects, merged];
   const next = [...projects];

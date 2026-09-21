@@ -34,6 +34,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache._classify import (
@@ -54,8 +55,14 @@ from quodeq.analysis.cache._key_provenance import (
 )
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
 
-# CachePersistProvenance/CachePersistTarget live in _persist_watcher.py
-# (which imports from here); referenced below only as annotations.
+if TYPE_CHECKING:
+    # _persist_watcher imports from this module, so a runtime import here
+    # would close the cycle. These two names are annotations only.
+    from quodeq.analysis.cache._persist_watcher import (
+        CachePersistProvenance,
+        CachePersistTarget,
+    )
+
 _logger = logging.getLogger(__name__)
 
 
@@ -144,6 +151,57 @@ def _build_cache_entry_for_file(
     )
 
 
+@dataclass(frozen=True)
+class _EntryStamps:
+    """The values every cache entry written in one pass shares."""
+
+    model_id: str
+    version: str
+    provenance: CachePersistProvenance
+
+
+def _cache_entry_for(
+    config: RunConfig, dimension: str, classify: ClassifyResult,
+    stamps: _EntryStamps, state: DispatchJsonlState, file_path: str,
+) -> tuple[str, CacheEntry] | None:
+    """The (key, entry) pair to store for *file_path*, or None when unkeyed."""
+    key = classify.miss_keys.get(file_path)
+    if key is None:
+        _logger.debug("persist_dispatch_results: no key for %s; skipping", file_path)
+        return None
+    entry_target = CacheEntryTarget(
+        file_path=file_path, key=key,
+        model_id=stamps.model_id, version=stamps.version,
+        content_hash=classify.miss_hashes.get(file_path, ""),
+        content_stamp=classify.miss_stamps.get(file_path),
+    )
+    return key, _build_cache_entry_for_file(
+        config, dimension, entry_target, state.grouped, stamps.provenance,
+    )
+
+
+def _persist_ok_files(
+    config: RunConfig, dimension: str, classify: ClassifyResult,
+    state: DispatchJsonlState, target: CachePersistTarget,
+    provenance: CachePersistProvenance,
+) -> None:
+    """Store a cache entry for every dirty miss that carries an ok marker."""
+    ok_files = state.ok_files()
+    stamps = _EntryStamps(
+        model_id=_model_id_from(config), version=quodeq_version(), provenance=provenance,
+    )
+    for file_path in classify.misses:
+        if file_path not in ok_files or file_path not in state.dirty:
+            continue
+        keyed = _cache_entry_for(config, dimension, classify, stamps, state, file_path)
+        if keyed is None:
+            continue
+        target.cache.put(*keyed)
+    # A raising put keeps dirty for the next tick. A put that fails silently
+    # (LocalFileBackend swallows OSError) is redone by the final full re-read.
+    state.dirty.clear()
+
+
 def persist_dispatch_results(
     config: RunConfig, dimension: str, *, classify: ClassifyResult,
     provenance: CachePersistProvenance, target: CachePersistTarget,
@@ -165,23 +223,4 @@ def persist_dispatch_results(
     state = target.state if target.state is not None else DispatchJsonlState()
     if not _advance_or_warn(state, target.jsonl_path, include_tail=one_shot):
         return
-    ok_files = state.ok_files()
-    model_id = _model_id_from(config)
-    version = quodeq_version()
-    for f in classify.misses:
-        if f not in ok_files or f not in state.dirty:
-            continue
-        key = classify.miss_keys.get(f)
-        if key is None:
-            _logger.debug("persist_dispatch_results: no key for %s; skipping", f)
-            continue
-        entry_target = CacheEntryTarget(
-            file_path=f, key=key, model_id=model_id, version=version,
-            content_hash=classify.miss_hashes.get(f, ""),
-            content_stamp=classify.miss_stamps.get(f),
-        )
-        entry = _build_cache_entry_for_file(config, dimension, entry_target, state.grouped, provenance)
-        target.cache.put(key, entry)
-    # A raising put keeps dirty for the next tick. A put that fails silently
-    # (LocalFileBackend swallows OSError) is redone by the final full re-read.
-    state.dirty.clear()
+    _persist_ok_files(config, dimension, classify, state, target, provenance)

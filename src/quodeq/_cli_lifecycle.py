@@ -20,9 +20,12 @@ import argparse
 import logging
 import os
 import time
+import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterator
 
 from quodeq.analysis.run_lifecycle import RunLifecycleContext
 from quodeq.analysis.errors import (
@@ -62,8 +65,6 @@ class LifecycleHooks:
 
 def _setup_run_dirs(args: argparse.Namespace, src: Path, hooks: LifecycleHooks) -> tuple[Path, Path, Path]:
     """Resolve project UUID and create evidence/evaluation directories."""
-    import uuid
-
     reports_root = Path(args.output)
     reports_root.mkdir(parents=True, exist_ok=True)
 
@@ -99,8 +100,9 @@ def _record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig
     """Tag the lifecycle with exit_reason='deadline' if the run's
     --max-duration was reached before natural completion.
 
-    The loops at ``analysis/_loops.py:156, 273`` break out of dim iteration
-    silently when ``time.monotonic() >= deadline_at`` — they don't raise.
+    A run that outlives its budget stops silently: the subagent pool simply
+    declines to spawn more agents once ``deadline_at`` has passed, and the
+    dimension loop then runs out of work. Nothing raises.
     Without this hook, a deadline-truncated run finalizes with
     ``exit_reason=null``, indistinguishable from a clean completion. The
     dashboard then can't render the "Partial" badge.
@@ -134,11 +136,9 @@ def _record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> Non
 # Pipeline execution wrapper
 # ---------------------------------------------------------------------------
 
-def _install_run_log_handler(run_dir: Path) -> tuple[object, logging.Handler, logging.Logger]:
-    """Install a per-run log handler so every log_info lands in run.log.
-
-    Returns (writer, handler, logger) so the caller can uninstall/close them.
-    """
+@contextmanager
+def _run_log_handler(run_dir: Path) -> Iterator[None]:
+    """Route every ``quodeq`` log record into the run's run.log for the block."""
     from quodeq.shared.run_log import RunLogHandler, RunLogWriter
 
     writer = RunLogWriter(run_dir)
@@ -146,7 +146,11 @@ def _install_run_log_handler(run_dir: Path) -> tuple[object, logging.Handler, lo
     handler.setFormatter(logging.Formatter("%(message)s"))
     logger_root = logging.getLogger("quodeq")
     logger_root.addHandler(handler)
-    return writer, handler, logger_root
+    try:
+        yield
+    finally:
+        logger_root.removeHandler(handler)
+        writer.close()
 
 
 def _cleanup_run_artifacts(
@@ -181,7 +185,6 @@ def _apply_time_budget(args: argparse.Namespace, lifecycle: "RunLifecycleContext
     if budget_s is not None:
         lifecycle.set_time_limit(budget_s)
     if budget_s is not None and budget_s > 0:
-        from datetime import datetime, timedelta, timezone
         deadline_iso = (datetime.now(timezone.utc) + timedelta(seconds=budget_s)).isoformat()
         lifecycle.set_deadline(deadline_iso)
         config.options.on_deadline_extended = lifecycle.set_deadline
@@ -203,10 +206,7 @@ def _run_lifecycle_body(
     paths: RunLifecyclePaths, hooks: LifecycleHooks,
 ) -> int:
     """Run the lifecycle-tracked pipeline; always clean up run artifacts on exit."""
-    # Resolve dimensions list for status.json metadata.
-    # Defensively coerce to a real list — config may be a Mock in tests.
-    _raw_dims = getattr(getattr(config, "options", None), "dimensions", None)
-    dimensions_list: list[str] = list(_raw_dims) if isinstance(_raw_dims, list) else []
+    dimensions_list: list[str] = list(config.options.dimensions or [])
 
     try:
         ai_provider = get_ai_cmd()
@@ -235,8 +235,34 @@ def _run_lifecycle_body(
                 _cleanup_run_artifacts(paths.pid_file, args, inputs, hooks)
     except (AnalysisError, EvaluationError) as exc:
         # RunLifecycleContext.__exit__ has already written state=failed.
-        log_error(f"{exc}")
+        log_error(str(exc))
         return 1
+
+
+def _announce_run(
+    inputs: ResolvedInputs, evidence_dir: Path, evaluation_dir: Path, hooks: LifecycleHooks,
+) -> None:
+    """Publish the report path to the log and the marker stream, and save the manifest."""
+    log_info(f"Report path: {evaluation_dir}")
+    run_dir = evaluation_dir.parent
+    hooks.emit_marker(
+        CC_PHASE_REPORT_PATH, project=run_dir.parent.name, runId=run_dir.name,
+    )
+    hooks.save_manifest(inputs.manifest, evidence_dir)
+
+
+def _write_pid_file(run_dir: Path) -> Path:
+    """Write the run's .pid so the dashboard can detect and cancel this external run.
+
+    Best-effort: a failure only costs cancel-by-filesystem, not the run.
+    """
+    pid_file = run_dir / ".pid"
+    try:
+        pid_file.write_text(str(os.getpid()), encoding="utf-8")
+    except OSError as exc:
+        _logger.debug(
+            "pid file write failed; cancel-by-filesystem is unavailable for this run: %s", exc)
+    return pid_file
 
 
 def _run_pipeline_with_cleanup(
@@ -244,35 +270,17 @@ def _run_pipeline_with_cleanup(
 ) -> int:
     """Set up directories, build config, run the pipeline, and clean up cloned repos."""
     _reports_root, evidence_dir, evaluation_dir = paths
-    log_info(f"Report path: {evaluation_dir}")
     run_dir = evaluation_dir.parent
-    run_id = run_dir.name
-    project_uuid = run_dir.parent.name
-    hooks.emit_marker(CC_PHASE_REPORT_PATH, project=project_uuid, runId=run_id)
-    hooks.save_manifest(inputs.manifest, evidence_dir)
-
-    # Write a .pid file so the dashboard can detect and cancel this external run
-    pid_file = run_dir / ".pid"
-    try:
-        pid_file.write_text(str(os.getpid()), encoding="utf-8")
-    except OSError as exc:
-        _logger.debug(
-            "pid file write failed; cancel-by-filesystem is unavailable for this run: %s", exc)
-
-    config = hooks.build_run_config(args, inputs=inputs, evidence_dir=evidence_dir, run_dir=run_dir)
-
-    writer, handler, logger_root = _install_run_log_handler(run_dir)
+    _announce_run(inputs, evidence_dir, evaluation_dir, hooks)
 
     lifecycle_paths = RunLifecyclePaths(
         evidence_dir=evidence_dir,
         evaluation_dir=evaluation_dir,
         run_dir=run_dir,
-        run_id=run_id,
-        pid_file=pid_file,
+        run_id=run_dir.name,
+        pid_file=_write_pid_file(run_dir),
     )
+    config = hooks.build_run_config(args, inputs=inputs, evidence_dir=evidence_dir, run_dir=run_dir)
 
-    try:
+    with _run_log_handler(run_dir):
         return _run_lifecycle_body(args, inputs, config, lifecycle_paths, hooks)
-    finally:
-        logger_root.removeHandler(handler)
-        writer.close()

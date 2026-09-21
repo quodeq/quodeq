@@ -40,7 +40,7 @@ from quodeq.shared._security import SENSITIVE_PATTERNS, sanitize_sensitive
 # Re-exports — Config loading
 # ---------------------------------------------------------------------------
 
-from quodeq.shared._config import Config, ACTION_API_MODULE, _get_config  # noqa: F401
+from quodeq.shared._config import ACTION_API_MODULE, Config, _get_config
 
 # ---------------------------------------------------------------------------
 # Platform detection
@@ -80,7 +80,7 @@ __all__ = [
     # Security helpers (re-exported from _security.py)
     "SENSITIVE_PATTERNS", "sanitize_sensitive",
     # Config
-    "Config", "ACTION_API_MODULE",
+    "Config", "ACTION_API_MODULE", "_get_config",
     # Platform
     "IS_WIN32",
     # Repo URL helpers

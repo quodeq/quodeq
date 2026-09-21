@@ -1,7 +1,7 @@
 """One-shot-per-process assistant cleanup: reap leaked worktrees, prune old
 sessions; and the shared-source-gone error type build_tool_context raises.
 
-Split out of _assistant_helpers.py (Task 10).
+Split out of _assistant_helpers.py.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ _logger = logging.getLogger(__name__)
 
 class SharedSourceUnavailable(RuntimeError):
     """A shared-source session's clone is gone (repo disconnected)."""
+
 
 # ~/.quodeq/assistant.db is never pruned otherwise; a session older than this
 # is effectively dead (its worktree, if any, was reaped long before). 0

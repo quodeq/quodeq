@@ -83,6 +83,9 @@ export default [
       // offenders are grandfathered in the baseline; new ones split the
       // function.
       'complexity': ['error', { max: 15 }],
+      // M-ANA-4: an inner binding that reuses an outer name makes the reader
+      // check which one a line means. Rename the inner one.
+      'no-shadow': 'error',
     },
   },
   {

@@ -1,6 +1,6 @@
 """Per-dimension steps shared by the dimension loops.
 
-Split out of ``_loops.py`` (Task 22, M-MOD-6). This module imports only
+Split out of ``_loops.py`` (M-MOD-6). This module imports only
 downward (``_loop_state``, ``runner_markers``, ``run_types``, ``dimension_runner``,
 core/data/shared) and never imports back from ``_loops`` -- ``_loops.py``
 imports it at the top instead. ``_loop_should_stop`` and ``_finalize_dim_result``

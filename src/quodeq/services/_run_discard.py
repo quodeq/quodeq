@@ -1,6 +1,6 @@
 """Discard-on-cancel: wait for a terminal status, then wipe run scratch state.
 
-Split (Task 14) out of ``evaluation_mixin.py``. Re-exported there for
+Split out of ``evaluation_mixin.py``. Re-exported there for
 backward compatibility — ``FsEvaluationMixin.cancel_evaluation`` calls
 ``_wait_for_terminal_status``/``_discard_run_state`` as bare module-global
 names so ``unittest.mock.patch("quodeq.services.evaluation_mixin.<name>")``

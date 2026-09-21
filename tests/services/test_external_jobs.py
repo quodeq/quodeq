@@ -77,7 +77,7 @@ def _force_cleanup(proc: subprocess.Popen) -> None:
         return
     try:
         os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-    except (OSError, ProcessLookupError):
+    except OSError:
         pass
     try:
         proc.wait(timeout=budget(5))

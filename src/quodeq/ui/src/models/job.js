@@ -22,6 +22,32 @@
  * @property {string|null}   aiModel        - Model this job is actually using
  */
 
+import { fromFieldSpec } from './fieldSpec.js';
+
+/**
+ * Field table for {@link createJob}: output key -> [raw spelling(s), default].
+ */
+const JOB_FIELDS = {
+  jobId:            ['jobId', ''],
+  status:           ['status', 'running'],
+  phase:            ['phase', null],
+  currentDimension: ['currentDimension', null],
+  outputProject:    ['outputProject', null],
+  outputRunId:      ['outputRunId', null],
+  repo:             ['repo', null],
+  dimensions:       ['dimensions', null],
+  logs:             ['logs', () => []],
+  startedAt:        ['startedAt', null],
+  endedAt:          ['endedAt', null],
+  deadlineAt:       ['deadlineAt', null],
+  exitCode:         ['exitCode', null],
+  error:            ['error', null],
+  exitReason:       ['exitReason', null],
+  source:           ['source', 'internal'],
+  aiProvider:       ['aiProvider', null],
+  aiModel:          ['aiModel', null],
+};
+
 /**
  * Create a canonical Job from a raw API object.
  *
@@ -31,24 +57,9 @@
 export function createJob(raw) {
   if (!raw || typeof raw !== 'object') return raw;
   return {
-    jobId:            raw.jobId ?? '',
-    status:           raw.status ?? 'running',
-    phase:            raw.phase ?? null,
-    currentDimension: raw.currentDimension ?? null,
-    outputProject:    raw.outputProject ?? null,
-    outputRunId:      raw.outputRunId ?? null,
-    repo:             raw.repo ?? null,
-    dimensions:       raw.dimensions ?? null,
-    logs:             raw.logs ?? [],
-    startedAt:        raw.startedAt ?? null,
-    endedAt:          raw.endedAt ?? null,
-    deadlineAt:       raw.deadlineAt ?? null,
-    exitCode:         raw.exitCode ?? null,
-    error:            raw.error ?? null,
-    exitReason:       raw.exitReason ?? null,
-    source:           raw.source ?? 'internal',
-    aiProvider:       raw.aiProvider ?? null,
-    aiModel:          raw.aiModel ?? null,
-    timeLimitS:       typeof raw.timeLimitS === 'number' ? raw.timeLimitS : null,
+    ...fromFieldSpec(raw, JOB_FIELDS),
+    // Not a `??` default: anything non-numeric (including a string seconds
+    // count) is dropped rather than carried through.
+    timeLimitS: typeof raw.timeLimitS === 'number' ? raw.timeLimitS : null,
   };
 }

@@ -7,7 +7,6 @@ and permission rules (managed/builtin/collision).
 """
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -29,8 +28,17 @@ def _write_and_load_detail(store: StandardsStore, path: Path, payload: dict) -> 
     return build_detail(store.read(path))
 
 
+_ID_PATH_TOKENS = ("/", "\\", "..")
+"""Anything that would let a standard id escape the evaluators directory.
+
+``os.sep`` needs no separate clause: it is ``/`` or ``\\`` on every platform
+Python runs on, and both are already listed.
+"""
+
+
 def _validate_id(standard_id: str) -> None:
-    if not standard_id or "/" in standard_id or "\\" in standard_id or ".." in standard_id or os.sep in standard_id:
+    """Reject an empty id, or one that could traverse out of the standards dir."""
+    if not standard_id or any(token in standard_id for token in _ID_PATH_TOKENS):
         raise ValueError(f"Invalid standard ID: {standard_id}")
 
 

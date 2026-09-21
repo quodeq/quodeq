@@ -29,15 +29,15 @@ export default function PanelSwitcher() {
   };
   return (
     <div className="drawer-switch" role="tablist">
-      {openPanels.map((t) => {
-        const m = meta[t];
-        if (!m) return null;
+      {openPanels.map((panelId) => {
+        const panelMeta = meta[panelId];
+        if (!panelMeta) return null;
         return (
-          <button key={t} type="button" role="tab" aria-selected={t === active}
-            aria-label={m.label} title={m.label}
-            className={`drawer-switch-btn${t === active ? ' drawer-switch-btn--active' : ''}`}
-            onClick={() => selectTab(t)}>
-            {m.icon}
+          <button key={panelId} type="button" role="tab" aria-selected={panelId === active}
+            aria-label={panelMeta.label} title={panelMeta.label}
+            className={`drawer-switch-btn${panelId === active ? ' drawer-switch-btn--active' : ''}`}
+            onClick={() => selectTab(panelId)}>
+            {panelMeta.icon}
           </button>
         );
       })}

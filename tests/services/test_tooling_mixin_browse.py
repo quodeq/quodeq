@@ -1,12 +1,14 @@
-"""Tests for tooling_mixin.py: browse-path validation, directory/file listing and browse_repo."""
+"""Tests for _browse_mixin.py: browse-path validation, directory/file listing and browse_repo."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from quodeq.services.tooling_mixin import FsToolingMixin
+from quodeq.shared.log_sink import SHARED_LOG
 
 
 # ---------------------------------------------------------------------------
@@ -200,12 +202,11 @@ class TestBrowseRepoUsesTheListingHelpers:
     def test_reads_the_directory_once(self, browse_tree: Path, monkeypatch):
         """The single-pass traversal is the point of browse_repo; sharing the
         helpers must not cost a second scandir."""
-        import quodeq.services.tooling_mixin as tooling_mixin
+        from quodeq.data.fs.report_parser import safe_read_dir as real
 
         calls = []
-        real = tooling_mixin.safe_read_dir
         monkeypatch.setattr(
-            tooling_mixin, "safe_read_dir",
+            "quodeq.services._browse_mixin.safe_read_dir",
             lambda path: (calls.append(path), real(path))[1],
         )
 
@@ -234,3 +235,49 @@ class TestListingHelpersAcceptPreReadEntries:
         files = FsToolingMixin._list_files(tmp_path, entries)
 
         assert [f["name"] for f in files] == ["keep.py"]
+
+
+class TestBrowseMkdirFailure:
+    """The mkdir error branches return a payload; none of them may raise."""
+
+    def test_os_error_returns_mkdir_failed_and_warns(self, tmp_path: Path, monkeypatch):
+        """A permission failure must come back as MKDIR_FAILED, not propagate.
+
+        Pins the sink too: the warning is the only trace of why the call
+        failed, and an unbound one would turn this branch into a NameError
+        that reaches the route.
+        """
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        def _denied(self, *args, **kwargs):
+            raise PermissionError(13, "Permission denied")
+
+        monkeypatch.setattr(Path, "mkdir", _denied)
+        mixin = FsToolingMixin()
+        warnings: list[str] = []
+        mixin._browse_log = SimpleNamespace(warning=warnings.append)
+
+        result = mixin.browse_mkdir(str(tmp_path), "new-folder")
+
+        assert result == {"error": "Could not create folder", "error_code": "MKDIR_FAILED"}
+        assert warnings == ["Could not create folder new-folder: [Errno 13] Permission denied"]
+
+    def test_the_production_mixin_binds_a_real_sink(self):
+        """A bare FsBrowseMixin is silent; the tooling mixin must not be."""
+        assert FsToolingMixin()._browse_log is SHARED_LOG
+
+    def test_existing_folder_returns_already_exists(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        (tmp_path / "taken").mkdir()
+
+        result = FsToolingMixin().browse_mkdir(str(tmp_path), "taken")
+
+        assert result == {"error": "Folder already exists", "error_code": "ALREADY_EXISTS"}
+
+    def test_creates_the_folder_when_nothing_is_in_the_way(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        result = FsToolingMixin().browse_mkdir(str(tmp_path), "fresh")
+
+        assert result == {"created": True, "path": str(tmp_path / "fresh")}
+        assert (tmp_path / "fresh").is_dir()

@@ -60,7 +60,7 @@ function RunFileViolations({ runTopFiles, onFileClick }) {
 function useTrendDeltas(dashboard) {
   return useMemo(() => {
     const currentRunId = dashboard?.selectedRun?.runId;
-    const entry = (dashboard?.trend || []).find((t) => t.runId === currentRunId);
+    const entry = (dashboard?.trend || []).find((item) => item.runId === currentRunId);
     if (!entry?.dimensionDetails) return {};
     const lookup = {};
     for (const d of entry.dimensionDetails) {

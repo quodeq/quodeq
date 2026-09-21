@@ -82,17 +82,11 @@ export function clearPrepareCache() {
   _segmentCache.clear();
 }
 
-/**
- * Measure the natural (unwrapped) width of a single-line text.
- * Uses a cached `prepareWithSegments` under the hood since `measureNaturalWidth`
- * needs the segmented form.
- *
- * @param {string} text
- * @param {string} font
- * @returns {number} width in px
- */
 const _segmentCache = new Map();
 const SEGMENT_CACHE_LIMIT = 512;
+
+// The segmented form measureNaturalWidth needs, cached and LRU-evicted: the
+// fit* truncators measure the same string many times per binary search.
 function prepareSegments(text, font) {
   const key = cacheKey(text, font);
   const cached = _segmentCache.get(key);

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -160,7 +161,6 @@ def test_cleanup_handle_race_does_not_discard_the_models(cli, monkeypatch):
     WinError 32. That exception used to fire after the model list already
     existed and turned a successful discovery into COPILOT_MODELS_UNAVAILABLE.
     Cleanup must retry past the transient failure and still remove the dir."""
-    import shutil
 
     configure, calls, env = cli
     configure(result([{"id": "gpt-test"}]))
@@ -209,7 +209,6 @@ def test_process_factory_seam_avoids_monkeypatching_asyncio(tmp_path):
 def test_cleanup_never_outranks_the_result_even_when_it_keeps_failing(cli, monkeypatch):
     """If the handle outlives every retry, the scratch dir is left to the OS
     temp cleaner; the discovery result must still come through untouched."""
-    import shutil
 
     configure, calls, env = cli
     configure(result([{"id": "gpt-test"}]))

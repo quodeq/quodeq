@@ -1,7 +1,7 @@
 """Git-side operations for publish_project: clone prep, the staged-diff
 commit, push, and the rebase-fallback retry loop.
 
-Split out of shared_publish.py (Task 12). `run_git` is looked up on the
+Split out of shared_publish.py. `run_git` is looked up on the
 `quodeq.services.shared_publish` facade at call time (via `_run_git`
 below), rather than imported directly here, for two reasons: it avoids a
 circular import (shared_publish.py imports functions from this module),

@@ -11,6 +11,7 @@ from quodeq.shared.logging import log_info
 
 from quodeq.dashboard._build_hash import _SYNC_ITEMS
 
+
 def _npm_install_timeout_s(env: Mapping[str, str] | None = None) -> int:
     """Seconds allowed for ``npm ci``; ``QUODEQ_NPM_INSTALL_TIMEOUT_S`` overrides."""
     return int(resolve_env(env).get("QUODEQ_NPM_INSTALL_TIMEOUT_S", "300"))

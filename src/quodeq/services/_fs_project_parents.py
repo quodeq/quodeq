@@ -1,6 +1,6 @@
 """Parent-detection helpers for the filesystem action provider.
 
-Split out of fs_project_helpers.py (Task 13): auto-detecting a local
+Split out of fs_project_helpers.py: auto-detecting a local
 project's parent by longest-path-prefix match, plus the max-projects-listed
 env-backed limit. Both are re-exported from fs_project_helpers.py, which
 fs_projects.py imports them from.

@@ -116,10 +116,11 @@ class TestWatchdogDeadlineKill:
 class TestRunStatusDeadlineFallback:
     """The analysis side can exit on its own after recording a deadline.
 
-    The loops in analysis/_loops.py break out at the deadline without the
-    watchdog ever firing; if the process then exits nonzero, the run's
-    status.json exit_reason is the only signal that this was a time-limit
-    exit rather than a real failure.
+    Past the deadline the subagent pool stops spawning agents and the
+    dimension loop runs out of work, so the run can end without the watchdog
+    ever firing. If the process then exits nonzero, the run's status.json
+    exit_reason is the only signal that this was a time-limit exit rather
+    than a real failure.
     """
 
     def _manager(self, tmp_path: Path) -> tuple[JobManager, Job]:

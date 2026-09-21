@@ -32,6 +32,7 @@ def test_syncs_started_at_and_is_mtime_gated(tmp_path, monkeypatch):
         calls = {"n": 0}
         import quodeq.data.sqlite.run_index as ri
         real = ri._upsert_from_status
+
         def counting(*a, **k):
             calls["n"] += 1
             return real(*a, **k)

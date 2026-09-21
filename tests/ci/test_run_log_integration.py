@@ -56,6 +56,7 @@ def test_pipeline_installs_and_removes_run_log_handler(tmp_path: Path, monkeypat
 
         # During pipeline, a RunLogHandler must be attached to the quodeq logger.
         attached: list[bool] = []
+
         def _spy(*a, **k):
             attached.append(any(isinstance(h, RunLogHandler) for h in logger.handlers))
             return 0

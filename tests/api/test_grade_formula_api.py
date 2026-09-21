@@ -27,6 +27,7 @@ def _client_with_apply_to_all_runs(apply_to_all_runs):
     register_grade_formula_routes(app, apply_to_all_runs=apply_to_all_runs)
     return app.test_client()
 
+
 # State-changing requests require a matching Origin header (CSRF guard in
 # api/security.py). The test client's default host is "localhost".
 _ORIGIN = {"Origin": "http://localhost"}

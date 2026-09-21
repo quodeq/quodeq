@@ -73,11 +73,6 @@ class SourceManifest:
     language_stats: dict[str, int] = field(default_factory=dict)
     skipped_untracked: int = 0
 
-    def add_target(self, target: AnalysisTarget) -> None:
-        """Add an analysis target to this manifest."""
-        self.targets.append(target)
-        self.total_files = sum(t.total_files for t in self.targets)
-
     # --- backward-compat properties (delegate to primary target) ---
 
     @property
@@ -86,7 +81,6 @@ class SourceManifest:
         if not self.targets:
             return None
         return max(self.targets, key=lambda t: t.total_files)
-
 
     @property
     def language(self) -> str:

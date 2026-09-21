@@ -26,6 +26,8 @@ export function checkForUpdates() {
 
 /**
  * Silences the notice for one version; a later release notifies again.
+ * @param {string} version - the release being dismissed, not the running one.
+ * @returns {Promise<Object>} the updated status payload.
  */
 export function dismissUpdate(version) {
   return request('/update/dismiss', { method: 'POST', body: JSON.stringify({ version }) });
@@ -33,6 +35,8 @@ export function dismissUpdate(version) {
 
 /**
  * Turns the periodic background update check on or off.
+ * @param {boolean} enabled
+ * @returns {Promise<Object>} the updated settings payload.
  */
 export function setUpdateAutoCheck(enabled) {
   return request(SETTINGS_PATH, { method: 'POST', body: JSON.stringify({ auto_check_enabled: enabled }) });

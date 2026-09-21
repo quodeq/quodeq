@@ -22,9 +22,17 @@ from quodeq.core.observability import NULL_LOG, LogSink
 
 _PRECEDENT_DOWNWEIGHT = 25
 
-# Sentinel distinguishing "the caller didn't supply a score" from an
-# explicit `None` (a batch score that came back empty).
-UNSET_SCORE: float | None = object()  # type: ignore[assignment]
+
+class _UnsetScore:
+    """Type of :data:`UNSET_SCORE`; it exists only so the sentinel has one."""
+
+
+#: Distinguishes "the caller didn't supply a score" from an explicit ``None``
+#: (a batch score that came back empty).
+UNSET_SCORE = _UnsetScore()
+
+#: A semantic precedent score, no score, or "the caller didn't run the lookup".
+MaybeScore = float | None | _UnsetScore
 
 
 def _semantic_eligible(finding: dict[str, object]) -> bool:
@@ -70,7 +78,7 @@ def apply_precedent_downweight(
     finding: dict[str, object],
     fingerprints: set[str] | None,
     corpus: PrecedentCorpus | None = None,
-    *, score: float | None = UNSET_SCORE, log: LogSink = NULL_LOG,
+    *, score: MaybeScore = UNSET_SCORE, log: LogSink = NULL_LOG,
 ) -> str | None:
     """Drop confidence to ~25 when this finding matches a prior dismissal.
 
@@ -87,13 +95,12 @@ def apply_precedent_downweight(
     tier: str | None = "exact" if matched else None
 
     if not matched and corpus is not None and text is not None:
-        if score is UNSET_SCORE:
-            score = corpus.match(text)
-        if score is not None and score >= corpus.threshold:
+        similarity = corpus.match(text) if isinstance(score, _UnsetScore) else score
+        if similarity is not None and similarity >= corpus.threshold:
             matched = True
             tier = "semantic"
             log.debug(
-                f"Semantic precedent match ({score:.3f}) for "
+                f"Semantic precedent match ({similarity:.3f}) for "
                 f"{finding.get('file')}:{finding.get('line')}"
             )
 

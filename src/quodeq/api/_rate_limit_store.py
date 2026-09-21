@@ -12,6 +12,7 @@ from quodeq.api._rate_limit_config import (
     _rate_limit_window,
 )
 
+
 @runtime_checkable
 class RateLimitStore(Protocol):
     """Abstraction for rate-limit state storage.

@@ -2,7 +2,7 @@
 
 Touches ``{run_dir}/.heartbeat`` every *interval* seconds. The file's
 mtime is the liveness signal consumed by the dashboard's stale-detection
-logic (separate module in Plan B).
+logic (a separate module).
 
 Design: daemon thread so a Python interpreter exit during SIGKILL/power-
 off does not prevent shutdown.

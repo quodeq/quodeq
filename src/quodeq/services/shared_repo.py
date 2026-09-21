@@ -30,7 +30,7 @@ from quodeq.services.shared_settings import SharedSettings, read_settings, write
 def disconnect_shared_repo(*, log: LogSink = NULL_LOG) -> None:
     """Disconnect the configured shared repository, removing its clone from disk.
 
-    Moved verbatim from the DELETE /api/shared/config route body (Task 20)
+    Moved verbatim from the DELETE /api/shared/config route body
     -- the ordering below is load-bearing (see
     test_delete_config_removes_cache_dir and
     test_delete_config_waits_for_clone_lock) and must not be reordered.

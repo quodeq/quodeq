@@ -72,6 +72,7 @@ def _index_row(entry: CacheEntry) -> tuple[str, str, str, str, str, str]:
     return (entry.key, entry.file_content_hash, entry.dimension, entry.params_hash,
             entry.file_path, entry.created_at)
 
+
 def _remove_dir(entry_dir: Path) -> bool:
     try:
         shutil.rmtree(entry_dir)
@@ -80,12 +81,14 @@ def _remove_dir(entry_dir: Path) -> bool:
         _logger.debug("cache maintenance: failed to remove %s: %s", entry_dir, exc)
         return False
 
+
 def _read_entry(entry_path: Path) -> CacheEntry | None:
     try:
         return CacheEntry.from_json(entry_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, TypeError, KeyError, ValueError) as exc:
         _logger.debug("cache maintenance: skipping unreadable entry %s: %s", entry_path, exc)
         return None
+
 
 @dataclass(frozen=True, slots=True)
 class _MigrationPass:
@@ -99,6 +102,7 @@ class _MigrationPass:
         if self.batch and self.backend.index is not None:
             self.backend.index.record_many(self.batch)
         self.batch.clear()
+
 
 def _migrate_v3(
     entry: CacheEntry, entry_dir: Path, run: _MigrationPass,
@@ -128,6 +132,7 @@ def _migrate_v3(
     run.batch.append(_index_row(new_entry))
     _remove_dir(entry_dir)
     return 1, 0, new_key
+
 
 def migrate_entries(
     root: Path, *, standards_dir: Path | None, backend: LocalFileBackend | None = None,
@@ -169,6 +174,7 @@ def migrate_entries(
         removed=removed, skipped=skipped,
     )
 
+
 def collect_legacy_entries(root: Path, *, min_schema: int) -> int:
     """Delete every entry whose ``schema_version`` is below *min_schema*.
 
@@ -187,6 +193,7 @@ def collect_legacy_entries(root: Path, *, min_schema: int) -> int:
         if isinstance(schema, int) and schema < min_schema and _remove_dir(entry_path.parent):
             removed += 1
     return removed
+
 
 def _acquire_lock(lock: Path) -> bool:
     """Create *lock* exclusively. A lock older than STALE_LOCK_S is taken over."""
@@ -214,6 +221,7 @@ def _acquire_lock(lock: Path) -> bool:
             fh.write(str(os.getpid()))
         return True
     return False
+
 
 def _release_lock(lock: Path) -> None:
     try:

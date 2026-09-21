@@ -1,7 +1,7 @@
 import { SevBadge } from '../../../components/terminal/index.js';
 
 // Shared by AccumulatedHeroSection and RunHeroSection -- byte-identical
-// markup/behavior in both, deduped into one component (Task 22).
+// markup/behavior in both, deduped into one component.
 export default function SeverityBadgeRow({ severity, onSeverityClick }) {
   const sev = severity || {};
   if (!(sev.critical || sev.major || sev.minor)) return null;

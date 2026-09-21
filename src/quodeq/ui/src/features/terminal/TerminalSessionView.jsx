@@ -200,13 +200,6 @@ function computeOverlay(status) {
   }[status];
 }
 
-/**
- * One shell session: an xterm instance bound to one server-side PTY over its
- * own WebSocket. Lives as long as the session exists — an inactive session
- * tab hides this view with display:none but never unmounts it, so the buffer
- * and socket survive tab switches (both between sessions and between the
- * drawer's panels). Unmounting is the disposal path when a session is closed.
- */
 // Reset the screen on every (re)connect before the server replays
 // scrollback, so a reconnect to a still-alive backend repaints history
 // instead of appending a duplicate copy under it. Also re-enable input
@@ -228,6 +221,19 @@ export function makeSocketOnOpen(termRef) {
   };
 }
 
+/**
+ * One shell session: an xterm instance bound to one server-side PTY over its
+ * own WebSocket. Lives as long as the session exists: an inactive session tab
+ * hides this view with display:none but never unmounts it, so the buffer and
+ * socket survive tab switches (both between sessions and between the drawer's
+ * panels). Unmounting is the disposal path when a session is closed.
+ * @param {string} sessionId - the server-side session this view is bound to.
+ * @param {boolean} active - frontmost tab; gates fitting and focus only.
+ * @param {boolean} live - whether the drawer is open, so the socket may connect.
+ * @param {() => void} onGone - called when the server reports the PTY is gone.
+ * @param {(api: object) => void} registerApi - hands the parent this view's
+ *   imperative handles (focus, fit, paste).
+ */
 export default function TerminalSessionView({ sessionId, active, live, onGone, registerApi }) {
   const rootRef = useRef(null);
   const termRef = useRef(null);

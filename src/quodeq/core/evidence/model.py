@@ -86,10 +86,6 @@ def classify_confidence_level(
     return "low"
 
 
-_VALID_VERDICTS = frozenset({"violation", "compliance", "dismissed"})
-_VALID_SEVERITIES = frozenset({"critical", "high", "medium", "low", "minor"})
-
-
 @dataclass
 class PrincipleEvidence:
     """Aggregated evidence for a single practice/principle."""

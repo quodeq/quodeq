@@ -14,7 +14,7 @@ hard-reset racing a stage/commit/push can tear a commit or contend on
 ensure_shared_clone, publish_project) one process-wide lock per clone path.
 Readers (published_meta, sync_shared_index, the read-only /api/shared/*
 route mirrors) are deliberately NOT serialized against this lock -- full
-reader serialization is deferred. Torn reads are bounded instead by Task 2's
+reader serialization is deferred. Torn reads are bounded instead by the
 atomic meta writes (published.json via tmp+rename): a reader can see a
 project that is one publish stale, never a half-written published.json.
 """

@@ -1,12 +1,15 @@
 /**
- * Run all detection probes and return a normalized result list. Each entry:
- *   { id, classification: 'cli' | 'local-api' | 'cloud', detected, defaultModel? }
+ * Onboarding's provider detection probes. Every probe is a timed GET against
+ * the local backend; none of them import from the settings feature. A probe
+ * that resolves returns
+ *   { id, classification: 'cli' | 'local-api' | 'cloud', detected, defaultModel }
+ * and `runDetection` fans them out in parallel. A probe that rejects outright
+ * (rather than reporting a miss) is reported as a bare `{ detected: false }`
+ * with no id, so callers must key off `detected` before reading the rest.
  *
- * Concrete probes are imported from the existing settings feature where
- * available. If a probe doesn't exist yet, a stub returns `{ detected: false }`
- * and a TODO points to the right file. The hook's tests mock this whole
- * module's `runDetection` export, so this file's correctness is exercised
- * end-to-end at integration-test time (Task 18) rather than in isolation.
+ * The onboarding hook's tests mock this module's `runDetection` export, so the
+ * probes themselves are covered by the integration tests rather than in
+ * isolation.
  */
 
 // Onboarding-side IDs differ from the server's ai_providers.json IDs.

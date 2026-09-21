@@ -63,6 +63,7 @@ def test_rescore_dimensions_uses_saved_params(formula_path, monkeypatch):
     from quodeq.services.suppression_keys import SuppressionKeys
 
     seen = {}
+
     def fake_load():
         seen["called"] = True
         return dataclasses.replace(DEFAULT_PARAMS, base_k=0.3)

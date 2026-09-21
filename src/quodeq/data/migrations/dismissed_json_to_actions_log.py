@@ -64,7 +64,6 @@ def _fold_legacy_entries(writer: ActionLogWriter, entries: list) -> int:
             count += 1
         except Exception:
             _logger.exception("Failed to migrate dismissed entry: %s", entry)
-            continue
     return count
 
 

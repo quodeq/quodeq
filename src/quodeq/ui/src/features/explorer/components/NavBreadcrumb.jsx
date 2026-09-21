@@ -19,6 +19,26 @@ const PAGE_LABELS = {
   help: t('explorer.helpCrumb'),
 };
 
+/**
+ * Per-page crumb label: `[read, fallback]`. `read` pulls whatever that page's
+ * stack entry carries; when it comes back empty the fallback label is used.
+ * Pages whose crumb is just their tab name live in PAGE_LABELS instead.
+ */
+const ENTRY_LABELS = {
+  run:           [(e) => e.label || e.runId, t('explorer.runFallback')],
+  'history-run': [(e) => e.dateLabel || e.runId, t('explorer.runFallback')],
+  explorer:      [(e) => e.dimension?.toLowerCase(), t('explorer.dimensionFallback')],
+  violation:     [(e) => e.label || e.principle?.name, t('explorer.violationFallback')],
+  file:          [(e) => e.label || e.file?.path, t('explorer.fileFallback')],
+  principle:     [(e) => e.label, t('explorer.principleFallback')],
+  evalprinciple: [(e) => e.label || e.principleName, t('explorer.principleFallback')],
+  finding:       [(e) => e.label, t('explorer.findingFallback')],
+  // Fleet entry reads "compare"; a drill-down entry carries its dimension so
+  // the crumb trail reads compare / security, and a head-to-head entry reads
+  // compare / duel.
+  compare:       [(e) => (e.duel ? t('compare.crumbDuel') : e.dimension?.toLowerCase()), t('explorer.compareFallback')],
+};
+
 export function labelFor(entry) {
   // A map drill-down entry carries its folder path (see App.jsx's map
   // renderer): the crumb shows the folder name, so the trail reads
@@ -27,26 +47,14 @@ export function labelFor(entry) {
   if (entry.page === 'map' && entry.path) {
     return entry.path.split('/').filter(Boolean).pop() || t('explorer.mapCrumb');
   }
-  if (PAGE_LABELS[entry.page]) return PAGE_LABELS[entry.page];
-  switch (entry.page) {
-    case 'run':           return entry.label || entry.runId || t('explorer.runFallback');
-    case 'history-run':   return entry.dateLabel || entry.runId || t('explorer.runFallback');
-    case 'explorer':      return entry.dimension
-      ? entry.dimension.toLowerCase()
-      : t('explorer.dimensionFallback');
-    case 'violation':     return entry.label || entry.principle?.name || t('explorer.violationFallback');
-    case 'file':          return entry.label || entry.file?.path || t('explorer.fileFallback');
-    case 'principle':     return entry.label || t('explorer.principleFallback');
-    case 'evalprinciple': return entry.label || entry.principleName || t('explorer.principleFallback');
-    case 'finding':       return entry.label || t('explorer.findingFallback');
-    // Fleet entry reads "compare"; a drill-down entry carries its dimension
-    // so the crumb trail reads compare › security, and a head-to-head entry
-    // reads compare › duel.
-    case 'compare':       return entry.duel
-      ? t('compare.crumbDuel')
-      : entry.dimension ? entry.dimension.toLowerCase() : t('explorer.compareFallback');
-    default:              return entry.label || entry.page;
-  }
+  // hasOwn, not a plain lookup: `entry.page` comes off a stack entry, so a
+  // page named 'constructor' or 'toString' would otherwise hit Object's
+  // prototype and be treated as a label spec.
+  if (Object.hasOwn(PAGE_LABELS, entry.page) && PAGE_LABELS[entry.page]) return PAGE_LABELS[entry.page];
+  if (!Object.hasOwn(ENTRY_LABELS, entry.page)) return entry.label || entry.page;
+  const spec = ENTRY_LABELS[entry.page];
+  const [read, fallback] = spec;
+  return read(entry) || fallback;
 }
 
 /** Build the crumb list: project root (if any) + one entry per stack level. */

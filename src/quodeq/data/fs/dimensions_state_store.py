@@ -24,6 +24,7 @@ _logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
 
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -38,7 +39,7 @@ def read_dimensions(run_dir: Path) -> dict[str, Any]:
     path = run_dir / FILENAME
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return {"schema_version": SCHEMA_VERSION, "dimensions": {}}
 
 

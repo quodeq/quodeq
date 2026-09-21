@@ -53,6 +53,7 @@ def test_loop_runs_first_dim_then_skips_remaining(monkeypatch):
     ctx = MagicMock(total=3)
 
     ev = MagicMock()
+
     def fake_process(_cfg, _dim, _idx, _ctx, *, emit_log=True):
         # First dim runs, consumes the budget, then deadline passes
         fake_now[0] = deadline + 0.01

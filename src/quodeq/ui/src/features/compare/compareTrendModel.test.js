@@ -95,11 +95,11 @@ test('monotonePath: duplicate-timestamp guard (dx[i] || 1) avoids a div-by-zero 
   );
 });
 
-test('monotonePath: output is identical to the reference implementation for a larger series', () => {
+test('monotonePath: a 50-point series starts at the first point and emits one curve per pair', () => {
   const pts = Array.from({ length: 50 }, (_, i) => [i * 10, Math.sin(i) * 5 + 10]);
   const result = monotonePath(pts);
-  // Locks in exact output before the accumulation-strategy refactor —
-  // any change to the produced path string (not just its build cost) fails this.
+  // Shape check, not an exact-output lock: the start command and the
+  // one-C-segment-per-pair structure are what callers depend on.
   assert.ok(result.startsWith('M0.0,10.0'));
   assert.ok(result.includes(' C'));
   assert.equal(result.split(' C').length - 1, 49); // one C-segment per point pair
