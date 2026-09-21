@@ -13,6 +13,11 @@ _ARGS_SUMMARY_MAX_CHARS = 80  # display truncation width for a tool call's args/
 
 
 def parse_line(line: str) -> dict | None:
+    """One stream line as an event dict, or None if it is not a JSON object.
+
+    Providers interleave non-JSON stderr chatter with the event stream, so a
+    None here means "not an event", not "malformed event".
+    """
     line = line.strip()
     if not line:
         return None
@@ -66,6 +71,13 @@ def _message_blocks(event: dict) -> object:
 
 
 def assistant_text(event: dict) -> list[str]:
+    """The complete assistant text *event* carries, across the CLI dialects.
+
+    claude sends `assistant` messages and a final `result`; codex sends
+    `item.completed` agent_message items; copilot sends assistant messages
+    of its own shape. Empty list for an event that carries no complete text
+    (deltas go through ``partial_text``).
+    """
     etype = event.get("type")
     if etype == EVENT_TYPE_ASSISTANT_MESSAGE:
         return texts_from_copilot(event)
@@ -136,6 +148,7 @@ def tool_use_details(event: dict) -> list[dict]:
 
 
 def tool_uses(event: dict) -> list[str]:
+    """Just the tool names from *event*, for callers that skip the args summary."""
     return [d["name"] for d in tool_use_details(event)]
 
 
@@ -156,6 +169,11 @@ def _nested_error_message(value) -> str | None:
 
 
 def error_message(event: dict) -> str | None:
+    """The message of a structured failure event, or None for a normal event.
+
+    Covers copilot's error events, claude's `error` and codex's
+    `turn.failed`, unwrapping the JSON-in-a-string form each can use.
+    """
     error = copilot_error(event)
     if error:
         return error[0]
@@ -167,6 +185,7 @@ def error_message(event: dict) -> str | None:
 
 
 def session_id(event: dict) -> str | None:
+    """The CLI session/thread id *event* announces, under any dialect's spelling."""
     sid = event.get("session_id") or event.get("thread_id") or event.get("sessionId")
     if not sid and event.get("type") == "session.start":
         sid = copilot_event_data(event).get("sessionId")

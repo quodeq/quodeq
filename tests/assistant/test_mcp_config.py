@@ -41,8 +41,8 @@ def test_codex_mcp_config_arg_escapes_special_chars():
     assert "/x y/a\\b.db" in server["args"]
 
 
-def test_unregister_cli_mcp_acquires_lock_and_clears_key(monkeypatch):
-    """Public unregister must serialize under _lock and drop the registered key."""
+def test_unregister_cli_mcp_removes_under_the_lock(monkeypatch):
+    """Public unregister must serialize under _lock while it runs `mcp remove`."""
     calls = []
     held = {"during": False}
 
@@ -51,12 +51,10 @@ def test_unregister_cli_mcp_acquires_lock_and_clears_key(monkeypatch):
         calls.append(a[0])
 
     monkeypatch.setattr(mcp_config.subprocess, "run", _fake_run)
-    mcp_config._registered.add("codex:quodeq-assistant")
 
     mcp_config.unregister_cli_mcp("codex")
 
     assert held["during"] is True  # lock held while removing
-    assert "codex:quodeq-assistant" not in mcp_config._registered
     assert calls == [["codex", "mcp", "remove", "quodeq-assistant"]]
 
 

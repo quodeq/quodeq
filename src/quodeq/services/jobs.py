@@ -28,10 +28,14 @@ from quodeq.services._job_model import (
     STATUS_DONE,
     STATUS_FAILED,
     STATUS_RUNNING,
-    _MAX_COMPLETED_JOBS,  # noqa: F401 — re-export (patch/import target)
+    _DEADLINE_EXIT_REASONS,
+    _EXIT_CODE_TIMEOUT,
+    _MAX_COMPLETED_JOBS,
+    _WATCHDOG_POLL_INTERVAL_S,
     mark_spawn_failed,
     new_job,
 )
+from quodeq.services._job_monitor_mixin import _JobMonitorMixin
 from quodeq.services._job_file_store import (
     FileJobStore,
     create_job_store,
@@ -43,17 +47,15 @@ __all__ = [
     "Job", "JobLaunchOptions", "JobProcessSeams", "JobStore", "InMemoryJobStore",
     "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager",
     "STATUS_RUNNING", "STATUS_CANCELLED", "STATUS_DONE", "STATUS_FAILED",
+    # Owned by _job_model (which _job_monitor_mixin also reads them from) and
+    # re-exported here: tests import and patch them at this module's path.
+    "_DEADLINE_EXIT_REASONS", "_EXIT_CODE_TIMEOUT", "_MAX_COMPLETED_JOBS",
+    "_WATCHDOG_POLL_INTERVAL_S",
 ]
 
-_REPORT_PATH_MARKER = "Report path:"
 _EXIT_CODE_SPAWN_FAILURE = -1
-_EXIT_CODE_TIMEOUT = -9
 _DEFAULT_LIST_LIMIT = 100
 
-# Watchdog polls process state every N seconds and re-checks deadline_at,
-# which only lands in job state after the analyzing_start marker — so a
-# blocking wait(timeout=full_budget) at spawn time can't see it.
-_WATCHDOG_POLL_INTERVAL_S = 1.0
 # Grace window past deadline_at before the kill. The watchdog exists to
 # reap HUNG runs, never to cut loaded agents: past the deadline the pool
 # stops dispatching and in-flight model calls drain. The longest
@@ -61,21 +63,6 @@ _WATCHDOG_POLL_INTERVAL_S = 1.0
 # subagent, realistically up to 3), so the grace must exceed that or a
 # healthy drain gets SIGTERMed and the batch's work is lost.
 _WATCHDOG_DEADLINE_GRACE_S = 1800
-
-# status.json exit reasons that mean "the run hit its time budget" — the
-# user's own setting doing its job, not an error. Jobs ending this way are
-# marked cancelled (already in the salvage-scoring trigger list in
-# api/_evaluation_routes.py) with exit_reason set, so the evaluate header
-# renders "time limit reached" instead of FAILED.
-_DEADLINE_EXIT_REASONS = ("deadline", "time_limit")
-_EXIT_REASON_DEADLINE = "deadline"
-
-# Log/marker parsing and background process monitoring: split into
-# _job_monitor_mixin.py to keep this file under 300 lines. Imported here
-# (after the constants above, before the class) so that module's
-# `from quodeq.services.jobs import ...` resolves against this
-# already-initialized part of this (still-loading) module.
-from quodeq.services._job_monitor_mixin import _JobMonitorMixin  # noqa: E402
 
 
 class JobManager(_JobMonitorMixin, _JobCapacityMixin):

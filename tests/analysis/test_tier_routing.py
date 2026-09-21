@@ -150,5 +150,3 @@ class TestSubagentModelEnvVar:
 
     def test_pool_launcher_returns_none_when_unset(self):
         assert _default_subagent_model(env={}) is None
-    # Removed _fast_model tests: the verify-pool that needed a fast model
-    # for its yes/no verification dispatch is gone (B6.2b).

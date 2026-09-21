@@ -17,7 +17,6 @@ _SERVER_NAME = "quodeq-assistant"
 _SERVER_MODULE = ["-m", "quodeq.assistant.mcp.server"]
 _REGISTER_TIMEOUT_S = 10
 _lock = threading.Lock()
-_registered: set[str] = set()
 
 
 def _server_argv(server_args: list[str]) -> list[str]:
@@ -53,8 +52,13 @@ def codex_mcp_config_arg(server_args: list[str]) -> str:
 
 
 def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True) -> None:
-    """Register the assistant MCP server with the CLI ``cmd``."""
-    key = f"{cmd}:{_SERVER_NAME}"
+    """Register the assistant MCP server with the CLI ``cmd``.
+
+    Unregisters first so a stale entry from an earlier session cannot shadow
+    this one's *server_args*. *separator* inserts the ``--`` that some CLIs
+    need before the server argv. Raises RuntimeError when the CLI rejects the
+    registration or is missing.
+    """
     with _lock:
         _unregister_locked(cmd)
         register_cmd = [cmd, "mcp", "add", _SERVER_NAME]
@@ -65,18 +69,15 @@ def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True
             subprocess.run(register_cmd, check=True, capture_output=True, timeout=_REGISTER_TIMEOUT_S)
         except (OSError, subprocess.SubprocessError) as exc:
             raise RuntimeError(f"Could not register the quodeq assistant MCP server with {cmd}: {exc}") from exc
-        _registered.add(key)
 
 
 def _unregister_locked(cmd: str) -> None:
     """Remove the server from a CLI's registry. Caller must hold `_lock`."""
-    key = f"{cmd}:{_SERVER_NAME}"
     try:
         subprocess.run([cmd, "mcp", "remove", _SERVER_NAME],
                        check=False, capture_output=True, timeout=_REGISTER_TIMEOUT_S)
     except (OSError, subprocess.SubprocessError) as exc:
         _logger.debug("MCP server unregister via %s failed: %s", cmd, exc)
-    _registered.discard(key)
 
 
 def unregister_cli_mcp(cmd: str) -> None:

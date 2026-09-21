@@ -24,8 +24,9 @@ from quodeq.analysis.prompts.template import load_template
 from quodeq.context.path_role import Role, path_role
 from tests.analysis._provenance_gate_support import discover_cases
 
-RULES = Path("src/quodeq/data/prompts/evaluation_rules.md").read_text()
-COMPASS = Path("src/quodeq/data/prompts/compass.md").read_text()
+_PROMPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "quodeq" / "data" / "prompts"
+RULES = (_PROMPTS_DIR / "evaluation_rules.md").read_text(encoding="utf-8")
+COMPASS = (_PROMPTS_DIR / "compass.md").read_text(encoding="utf-8")
 
 _CASES = discover_cases()
 _INTERNAL_CASES = [c for c in _CASES if c.expected["provenance"] == "internal"]
@@ -103,7 +104,7 @@ def test_api_prompt_renders_provenance_gate_end_to_end(tmp_path):
 
     The existing tests only prove the compass.md producer path carries the
     rubric. ``assemble_api_prompt`` is the prompt the ollama/api provider path
-    actually sends (``subprocess.py:_run_api_analysis_bridge``); it loads the
+    actually sends (``subprocess.py``'s API bridge); it loads the
     rules itself via ``load_evaluation_rules``, a separate seam that could
     regress independently. This is the structural backstop for the live
     behavioral matrix.

@@ -78,44 +78,52 @@ def _whitelist_principle(principle: dict) -> dict:
     return cleaned
 
 
-def validate_import(data: dict) -> dict:
-    """Validate and sanitize an imported evaluator.
+def _identity_errors(data: dict) -> list[str]:
+    """Complaints about the evaluator's own id and name.
 
-    Returns ``{"valid": True, "errors": [], "data": sanitized_dict}``
-    on success, or ``{"valid": False, "errors": [...], "data": None}``
-    on failure.
+    The id becomes a path segment, so it may not carry separators or
+    parent-traversal.
     """
     errors: list[str] = []
-
     if not isinstance(data.get("id"), str) or not data["id"]:
         errors.append("Missing required field: id")
     else:
         sid = data["id"]
         if "/" in sid or "\\" in sid or ".." in sid:
             errors.append(f"Invalid id: {sid!r} (must not contain /, \\, or ..)")
-
     if not isinstance(data.get("name"), str) or not data["name"]:
         errors.append("Missing required field: name")
+    return errors
 
+
+def _one_principle_errors(index: int, principle: object) -> list[str]:
+    """Complaints about the principle at *index*, named by position for the user."""
+    if not isinstance(principle, dict):
+        return [f"Principle {index} must be an object"]
+    errors: list[str] = []
+    if not isinstance(principle.get("name"), str) or not principle["name"]:
+        errors.append(f"Principle {index} missing required field: name")
+    if "requirements" not in principle:
+        errors.append(f"Principle {index} missing required field: requirements")
+    elif not isinstance(principle["requirements"], list):
+        errors.append(f"Principle {index} field 'requirements' must be a list")
+    return errors
+
+
+def _principle_errors(data: dict) -> list[str]:
+    """Complaints about the principles list and each principle in it."""
     if "principles" not in data:
-        errors.append("Missing required field: principles")
-    elif not isinstance(data["principles"], list):
-        errors.append("Field 'principles' must be a list")
-    else:
-        for i, p in enumerate(data["principles"]):
-            if not isinstance(p, dict):
-                errors.append(f"Principle {i} must be an object")
-                continue
-            if not isinstance(p.get("name"), str) or not p["name"]:
-                errors.append(f"Principle {i} missing required field: name")
-            if "requirements" not in p:
-                errors.append(f"Principle {i} missing required field: requirements")
-            elif not isinstance(p["requirements"], list):
-                errors.append(f"Principle {i} field 'requirements' must be a list")
+        return ["Missing required field: principles"]
+    if not isinstance(data["principles"], list):
+        return ["Field 'principles' must be a list"]
+    errors: list[str] = []
+    for i, p in enumerate(data["principles"]):
+        errors.extend(_one_principle_errors(i, p))
+    return errors
 
-    if errors:
-        return {"valid": False, "errors": errors, "data": None}
 
+def _sanitized(data: dict) -> dict:
+    """*data* reduced to the allowed keys, with every text field truncated."""
     cleaned = {k: data[k] for k in _ALLOWED_TOP if k in data}
     _truncate_field(cleaned, "name", _MAX_NAME)
     _truncate_field(cleaned, "description", _MAX_DESCRIPTION)
@@ -123,8 +131,20 @@ def validate_import(data: dict) -> dict:
         cleaned["principles"] = [
             _whitelist_principle(p) for p in cleaned["principles"] if isinstance(p, dict)
         ]
+    return cleaned
 
-    return {"valid": True, "errors": [], "data": cleaned}
+
+def validate_import(data: dict) -> dict:
+    """Validate and sanitize an imported evaluator.
+
+    Returns ``{"valid": True, "errors": [], "data": sanitized_dict}``
+    on success, or ``{"valid": False, "errors": [...], "data": None}``
+    on failure.
+    """
+    errors = _identity_errors(data) + _principle_errors(data)
+    if errors:
+        return {"valid": False, "errors": errors, "data": None}
+    return {"valid": True, "errors": [], "data": _sanitized(data)}
 
 
 def _match_patterns(text: str, patterns: Sequence[re.Pattern]) -> list[re.Match]:

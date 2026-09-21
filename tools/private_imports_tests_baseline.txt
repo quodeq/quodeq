@@ -627,7 +627,7 @@ tests/assistant/test_tools_write.py:5:private-name:quodeq.assistant.worktree._ru
 tests/assistant/test_worktree.py:3:private-name:quodeq.assistant.worktree._run
 tests/assistant/test_worktree_rows.py:5:private-module:quodeq.data.sqlite._assistant_schema.ASSISTANT_SCHEMA_VERSION
 tests/assistant/test_write_flow_e2e.py:7:private-name:quodeq.assistant.worktree._run
-tests/ci/_lifecycle_helpers.py:30:private-name:quodeq.analysis.cache.dimension_runner._compute_files_read
+tests/ci/_lifecycle_helpers.py:44:private-name:quodeq.analysis.cache.dimension_runner._compute_files_read
 tests/ci/test_cli.py:82:private-name:quodeq.ci.cli._handle_report
 tests/ci/test_env_seams_t5.py:6:private-name:quodeq.ci.cli._resolve_report_token
 tests/ci/test_env_seams_t5.py:7:private-name:quodeq.ci.reporter._DEFAULT_GITHUB_API
@@ -798,9 +798,9 @@ tests/dashboard/test_process_coverage.py:27:private-name:quodeq.dashboard._proce
 tests/dashboard/test_process_coverage.py:32:private-name:quodeq.dashboard._process._get_pid_file
 tests/dashboard/test_process_coverage.py:37:private-name:quodeq.dashboard._process._get_pid_file
 tests/dashboard/test_process_coverage.py:58:private-name:quodeq.dashboard._process._kill_stale_action_api
-tests/dashboard/test_reload_url_guard.py:6:private-name:quodeq.dashboard._webview_window._download_via_dialog
-tests/dashboard/test_reload_url_guard.py:6:private-name:quodeq.dashboard._webview_window._is_safe_reload_url
-tests/dashboard/test_reload_url_guard.py:6:private-name:quodeq.dashboard._webview_window._make_on_reload
+tests/dashboard/test_reload_url_guard.py:7:private-name:quodeq.dashboard._webview_window._download_via_dialog
+tests/dashboard/test_reload_url_guard.py:7:private-name:quodeq.dashboard._webview_window._is_safe_reload_url
+tests/dashboard/test_reload_url_guard.py:7:private-name:quodeq.dashboard._webview_window._make_on_reload
 tests/dashboard/test_server_coverage.py:100:private-name:quodeq.dashboard._server._ensure_action_api
 tests/dashboard/test_server_coverage.py:113:private-name:quodeq.dashboard._server._ensure_action_api_forced
 tests/dashboard/test_server_coverage.py:120:private-name:quodeq.dashboard._server._ensure_action_api_forced
@@ -1137,7 +1137,7 @@ tests/services/test_job_model_serialization.py:6:private-module:quodeq.services.
 tests/services/test_job_model_serialization.py:7:private-name:quodeq.services._job_file_store._job_from_json
 tests/services/test_job_model_serialization.py:7:private-name:quodeq.services._job_file_store._job_to_json
 tests/services/test_job_monitor_phase_constants.py:24:private-module:quodeq.services._job_model.Job
-tests/services/test_job_monitor_phase_constants.py:62:private-module:quodeq.services._job_monitor_mixin
+tests/services/test_job_monitor_phase_constants.py:63:private-module:quodeq.services._job_monitor_mixin
 tests/services/test_jobs_deadline_exit.py:21:private-module:quodeq.services._job_model.InMemoryJobStore
 tests/services/test_jobs_deadline_exit.py:21:private-module:quodeq.services._job_model.Job
 tests/services/test_jobs_deadline_exit.py:25:private-name:quodeq.services._job_file_store._job_from_json
@@ -1202,8 +1202,8 @@ tests/services/test_scoring_view_predicates.py:176:private-name:quodeq.services.
 tests/services/test_scoring_view_predicates.py:180:private-name:quodeq.services.scoring_view._resolution._is_trustworthy_eval
 tests/services/test_shared_publish_git_error_truncation.py:10:private-name:quodeq.services._publish_git._commit_staged_changes
 tests/services/test_shared_publish_git_error_truncation.py:10:private-name:quodeq.services._publish_git._push_with_rebase_fallback
-tests/services/test_shared_publish_phases.py:11:private-name:quodeq.services.shared_publish._commit_and_push
-tests/services/test_shared_publish_phases.py:11:private-name:quodeq.services.shared_publish._prepare_workspace
+tests/services/test_shared_publish_phases.py:12:private-name:quodeq.services.shared_publish._commit_and_push
+tests/services/test_shared_publish_phases.py:12:private-name:quodeq.services.shared_publish._prepare_workspace
 tests/services/test_standards_io_coverage.py:8:private-module:quodeq.services._standards_io.build_builtin_detail
 tests/services/test_standards_io_coverage.py:8:private-module:quodeq.services._standards_io.build_builtin_meta
 tests/services/test_standards_io_coverage.py:8:private-module:quodeq.services._standards_io.build_custom_meta

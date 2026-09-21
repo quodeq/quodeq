@@ -19,6 +19,22 @@ from typing import TYPE_CHECKING, Callable, Protocol, runtime_checkable
 from quodeq.core.types import JobSnapshot
 from quodeq.shared.constants import CC_MARKER_KEY
 
+_REPORT_PATH_MARKER = "Report path:"
+_EXIT_CODE_TIMEOUT = -9
+
+# Watchdog polls process state every N seconds and re-checks deadline_at,
+# which only lands in job state after the analyzing_start marker -- so a
+# blocking wait(timeout=full_budget) at spawn time can't see it.
+_WATCHDOG_POLL_INTERVAL_S = 1.0
+
+# status.json exit reasons that mean "the run hit its time budget" -- the
+# user's own setting doing its job, not an error. Jobs ending this way are
+# marked cancelled (already in the salvage-scoring trigger list in
+# api/_evaluation_routes.py) with exit_reason set, so the evaluate header
+# renders "time limit reached" instead of FAILED.
+_DEADLINE_EXIT_REASONS = ("deadline", "time_limit")
+_EXIT_REASON_DEADLINE = "deadline"
+
 if TYPE_CHECKING:
     import subprocess
 

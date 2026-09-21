@@ -126,6 +126,26 @@ def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
     return args
 
 
+def _attached_git_repo(tool_ctx: ToolContext) -> bool:
+    """True when the session has a local git checkout the assistant may write to."""
+    return tool_ctx.repo_root is not None and (tool_ctx.repo_root / ".git").exists()
+
+
+def _write_is_grantable(request: TurnRequest, tool_ctx: ToolContext) -> bool:
+    """True when every server-side condition for write access holds.
+
+    The client's write_enabled flag is necessary but never sufficient: the
+    session must not be read-only, it must have a local git repo attached,
+    and the provider's tool wiring must be per-invocation isolated.
+    """
+    return bool(
+        request.write_enabled
+        and not tool_ctx.read_only
+        and _attached_git_repo(tool_ctx)
+        and write_safe_provider(request.provider)
+    )
+
+
 def _resolve_write_grant(request: TurnRequest, repository: AssistantStore,
                           tool_ctx: ToolContext, web_tools_on: bool) -> _TurnGrants:
     """Server-derived write grant, mirror of web_tools_on: the client flag
@@ -134,10 +154,7 @@ def _resolve_write_grant(request: TurnRequest, repository: AssistantStore,
     ensures the session worktree exists and points tool_ctx at it. Returns
     a _TurnGrants bundling that tool_ctx, write_on, and the caller-supplied
     web_tools_on."""
-    write_on = (request.write_enabled and not tool_ctx.read_only
-                and tool_ctx.repo_root is not None
-                and (tool_ctx.repo_root / ".git").exists()
-                and write_safe_provider(request.provider))
+    write_on = _write_is_grantable(request, tool_ctx)
     if write_on:
         manager = ensure_session_worktree(
             repository, repo_root=tool_ctx.repo_root,

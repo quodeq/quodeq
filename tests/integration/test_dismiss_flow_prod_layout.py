@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+from quodeq.core.events.models import Judgment, JudgmentCreatedEvent
 from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
@@ -20,7 +20,7 @@ from quodeq.services.dismissed import dismiss_finding, dismissed_keys, load_dism
 
 def _seed_finding(run_dir: Path, *, req: str, file: str, line: int, dimension: str = "Security") -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
-    EventLogWriter(run_dir / "events.jsonl").emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+    EventLogWriter(run_dir / "events.jsonl").emit(JudgmentCreatedEvent(payload=Judgment(
         practice_id="P1", verdict="violation", dimension=dimension,
         file=file, line=line, reason="r", req=req, severity="high",
     )))

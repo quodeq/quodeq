@@ -109,9 +109,7 @@ def run_events_generator(
 
     tick_seconds overrides QUODEQ_SSE_TICK_MS for tests (0.0 drains a single
     tick without sleeping). heartbeat_seconds overrides the 15s :keepalive
-    interval for tests. No per-stream resources persist between ticks today
-    (every helper opens/closes its own file handle), so the finally is a
-    no-op reserved for a future longer-lived resource.
+    interval for tests.
     """
     sleep_s = tick_seconds if tick_seconds is not None else (_tick_ms() / 1000.0)
     heartbeat_s = heartbeat_seconds if heartbeat_seconds is not None else _HEARTBEAT_S
@@ -119,27 +117,24 @@ def run_events_generator(
     last_emit_at = time.monotonic()
     yield ":keepalive\n\n"
 
-    try:
-        while True:
-            frames, terminal_state, state = _format_tick_frames(run_dir, state)
-            for frame in frames:
-                yield frame
-                last_emit_at = time.monotonic()
+    while True:
+        frames, terminal_state, state = _format_tick_frames(run_dir, state)
+        for frame in frames:
+            yield frame
+            last_emit_at = time.monotonic()
 
-            # Terminal status closes the stream. Score updates no longer flow
-            # through SSE — mutations ride on their HTTP response instead.
-            if terminal_state:
-                yield _done_frame(terminal_state)
-                return
+        # Terminal status closes the stream. Score updates no longer flow
+        # through SSE — mutations ride on their HTTP response instead.
+        if terminal_state:
+            yield _done_frame(terminal_state)
+            return
 
-            if time.monotonic() - last_emit_at >= heartbeat_s:
-                yield ":keepalive\n\n"
-                last_emit_at = time.monotonic()
+        if time.monotonic() - last_emit_at >= heartbeat_s:
+            yield ":keepalive\n\n"
+            last_emit_at = time.monotonic()
 
-            if sleep_s > 0:
-                time.sleep(sleep_s)
-            else:
-                # tick_seconds=0.0 means "drain once and exit" for tests.
-                return
-    finally:
-        pass
+        if sleep_s > 0:
+            time.sleep(sleep_s)
+        else:
+            # tick_seconds=0.0 means "drain once and exit" for tests.
+            return

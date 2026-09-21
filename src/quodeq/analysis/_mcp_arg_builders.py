@@ -76,14 +76,13 @@ def _build_agent_params(config: AnalysisConfig, work_dir: Path | None) -> _Agent
         queue_path=config.queue_path,
         agent_id=config.agent_id,
         work_dir=config.work_dir or work_dir,
-        # Phase 1.5 (Task 3.5): propagate cache fingerprint inputs through the
-        # config-file path too. Without this, the JSON-config MCP variant
-        # would still emit defaults and the CLI cache writes would diverge
-        # from classify_files_via_cache keys.
+        # The cache fingerprint inputs travel the config-file path too:
+        # without them the JSON-config MCP variant emits defaults and its
+        # cache writes diverge from the classify_files_via_cache keys.
         model_id=_resolve_model_id(config),
         language=_resolve_language(config),
-        # Final-review fix: the standards ROOT, not compiled_dir -- see
-        # _resolve_standards_dir and _AgentParams.standards_dir.
+        # The standards ROOT, not compiled_dir -- see _resolve_standards_dir
+        # and _AgentParams.standards_dir.
         standards_dir=_resolve_standards_dir(config),
     )
 
@@ -196,8 +195,8 @@ def _resolve_model_id(config: AnalysisConfig) -> str:
 def _resolve_language(config: AnalysisConfig) -> str:
     """Return the RunConfig language for cache fingerprints, or "" if unset.
 
-    Empty string is the Task 5 contract for "language not provided"; it
-    must round-trip through the subprocess unchanged.
+    The empty string, not None, is what "language not provided" looks like
+    on the wire; it must round-trip through the subprocess unchanged.
     """
     rc = config.run_config
     if rc is not None:

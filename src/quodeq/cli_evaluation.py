@@ -5,9 +5,11 @@ setup, RunLifecycleContext wiring, cleanup) lives in ``_cli_lifecycle.py``;
 env/argv helpers in ``_cli_env.py``; suppression-aware score printing lives
 in ``_cli_scoring.py``; run_evaluate's --diff-from resolution and post-run
 consolidation/SARIF finalization live in ``_cli_evaluate_finalize.py``;
-``_build_run_config``'s phase helpers live in ``_cli_run_config.py``. The
-lifecycle helpers receive this module's patchable names as a
-``LifecycleHooks`` bundle built here at call time (see ``_lifecycle_hooks``).
+``_build_run_config``'s phase helpers live in ``_cli_run_config.py``;
+``_execute_pipeline`` and ``_save_manifest`` live in
+``_cli_pipeline_exec.py``. The lifecycle helpers receive this module's
+patchable names as a ``LifecycleHooks`` bundle built here at call time
+(see ``_lifecycle_hooks``).
 
 Patch targets — patch a name where the code that calls it looks it up, not
 where it happens to be re-exported:
@@ -17,6 +19,9 @@ where it happens to be re-exported:
   ``is_repo_url``, ``project_name_from_repo``, ``emit_marker``,
   ``cleanup_cloned_repo``, ``resolve_project_uuid`` and the ``evidence_rescore``
   pair.
+- Read by ``_cli_pipeline_exec``: ``run``, ``run_full``, ``write_text``,
+  ``load_params``, ``manifest_to_dict``. Patch
+  ``quodeq._cli_pipeline_exec.<name>``.
 - Read by ``_cli_run_config``: ``_env_int``, ``_no_verify``,
   ``_resolve_time_limit``, ``default_dispatch_policy``, ``expand_dimension_aliases``,
   ``AnalysisOptions``. Patch ``quodeq._cli_run_config.<name>``; patching them
@@ -28,26 +33,21 @@ where it happens to be re-exported:
 from __future__ import annotations
 
 import argparse
-import json
-import logging
 from pathlib import Path
 from typing import NamedTuple
 
 from quodeq.config.paths import default_paths
-from quodeq.analysis.runner import RunConfig, run
-from quodeq.analysis.scoring_pipeline import run_full
+from quodeq.analysis.runner import RunConfig
 from quodeq.services.evidence_rescore import (  # noqa: F401 — facade patch targets
     rescore_dimension_from_evidence, score_dimension_from_evidence,
 )
-from quodeq.services.grade_formula import load_params
 from quodeq.data.fs.project_resolver import resolve_project_uuid  # facade patch target
 from quodeq.shared.logging import log_error, log_info, log_warning
-from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo, write_text  # is_repo_url/project_name_from_repo/get_ai_model are facade patch targets
+from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo  # facade patch targets
 from quodeq.data.fs.repo_handler import cleanup_cloned_repo  # facade patch target
 from quodeq.analysis.runner_markers import emit_marker  # facade patch target
 from quodeq.analysis.prereqs import check_evaluate_prereqs
 from quodeq.analysis.diff_resolver import resolve_diff_files  # facade patch target
-from quodeq.analysis.manifest_serialization import manifest_to_dict
 
 # Re-export resolution / lifecycle / scoring helpers — keep the public API stable
 from quodeq._cli_env import (  # noqa: F401 — _ENV_*/_env_int/_no_verify re-exported for quodeq.cli
@@ -73,60 +73,7 @@ from quodeq._cli_scoring import (  # noqa: F401
 from quodeq._cli_evaluate_finalize import (  # noqa: F401
     _apply_diff_from, _finalize_run_evaluate, _write_sarif_if_requested,
 )
-
-_logger = logging.getLogger(__name__)
-
-
-# Pipeline execution
-def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
-    """Execute the evidence/scoring pipeline and print results.
-
-    Three modes: scoring (default, run_full → scored evaluation/<dim>.json
-    reports), --evidence-only (run() → merged <language>_evidence.json, no
-    scoring), PR diff / skip_scoring (run() → per-dimension JSONL only, no
-    merged json, no scoring).
-
-    Domain errors (AnalysisError, EvaluationError) are intentionally *not*
-    caught here — they propagate to _run_pipeline_with_cleanup so that
-    RunLifecycleContext.__exit__ can write state=failed before the error is
-    mapped to exit code 1.
-    """
-    if args.evidence_only or config.options.skip_scoring:
-        label = "PR diff" if config.options.skip_scoring else "evidence collection"
-        log_info(f"Starting {label} (this may take several minutes per dimension)...")
-        evidence = run(config)
-        if config.options.skip_scoring:
-            # PR diff mode: per-dimension JSONL is already written by the pipeline.
-            # No merged whole-repo artifact — PR reviews consume the JSONL directly.
-            log_info(f"PR diff evaluation complete — evidence written to {evidence_dir}/")
-        else:
-            # --evidence-only: write the merged whole-repo Evidence JSON.
-            out_file = evidence_dir / f"{config.language}_evidence.json"
-            try:
-                write_text(out_file, json.dumps(evidence.to_evidence_dict(), indent=2))
-            except OSError as exc:
-                log_error(f"Failed to write evidence file {out_file}: {exc}")
-                return 1
-            log_info(f"Evidence written to {out_file}")
-        return 0
-
-    log_info("Starting evaluation (this may take several minutes per dimension)...")
-    scores = run_full(config, evaluation_dir, mode=args.mode)
-    log_info(f"Report path: {evaluation_dir}/")
-    log_info(f"Reports written to {evaluation_dir}/")
-    run_dir = evaluation_dir.parent
-    project_dir = run_dir.parent
-    _print_scores(scores, run_dir, project_dir, load_params())
-    return 0
-
-
-def _save_manifest(manifest, evidence_dir: Path) -> None:
-    """Save manifest for debugging (best-effort)."""
-    if manifest and evidence_dir:
-        try:
-            write_text(evidence_dir / "manifest.json", json.dumps(manifest_to_dict(manifest), indent=2))
-        except OSError as exc:
-            _logger.debug("Could not write manifest: %s", exc)
+from quodeq._cli_pipeline_exec import _execute_pipeline, _save_manifest
 
 
 class _RunConfigLocals(NamedTuple):
@@ -171,7 +118,10 @@ def _resolve_run_config_locals(
     )
 
 
-def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evidence_dir: Path, run_dir: Path | None = None, env: dict[str, str] | None = None) -> RunConfig:
+def _build_run_config(
+    args: argparse.Namespace, *, inputs: ResolvedInputs, evidence_dir: Path,
+    run_dir: Path | None = None, env: dict[str, str] | None = None,
+) -> RunConfig:
     """Assemble a RunConfig from CLI args and resolved inputs."""
     standards_dir = default_paths().standards_dir
     dimensions_filter = _dimensions_filter(args)
@@ -222,8 +172,11 @@ def _run_pipeline_with_cleanup(
     return _cli_lifecycle._run_pipeline_with_cleanup(args, inputs, paths, _lifecycle_hooks())
 
 
-def run_evaluate(args: argparse.Namespace) -> int:
-    """Run the evaluation pipeline."""
+def _check_evaluate_args(args: argparse.Namespace) -> int | None:
+    """Warn on deprecated flags and reject bad combinations or missing prereqs.
+
+    Returns an exit code when the run cannot proceed, None when it can.
+    """
     # --incremental is a deprecated no-op alias; incremental is already the default.
     if getattr(args, "legacy_incremental", False):
         log_warning(
@@ -246,6 +199,14 @@ def run_evaluate(args: argparse.Namespace) -> int:
         except RuntimeError as exc:
             log_error(f"Error: {exc}")
             return 1
+    return None
+
+
+def run_evaluate(args: argparse.Namespace) -> int:
+    """Run the evaluation pipeline."""
+    early_exit = _check_evaluate_args(args)
+    if early_exit is not None:
+        return early_exit
 
     inputs = _resolve_evaluation_inputs(args)
     if inputs is None:
@@ -258,6 +219,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
     try:
         paths = _setup_run_dirs(args, inputs.src)
     except Exception:
+        # Leave no worktree behind: the next run would refuse to re-create it.
         if inputs.worktree_dir and inputs.worktree_origin:
             _cleanup_worktree(inputs.worktree_origin, inputs.worktree_dir)
         raise

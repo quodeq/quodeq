@@ -13,12 +13,10 @@ requires recomputing and re-pinning every count in this file.
 from __future__ import annotations
 
 import json
-from collections import Counter
 from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.mcp.provenance_gate import apply_provenance_gate
 from quodeq.analysis.mcp.scope_gate import apply_scope_gate
 from quodeq.context.trust_model import CONSERVATIVE
 
@@ -85,35 +83,13 @@ def test_the_one_real_bug_survives():
     pytest.skip("unbounded-read finding not in this run")
 
 
-def test_replay_chains_provenance_then_scope_on_criticals():
-    """Every other test in this module calls apply_scope_gate directly on
-    findings already labeled major, so the ordinary finding-sink pipeline
-    (apply_provenance_gate runs first and guards the critical bar; only what
-    survives it can ever reach apply_scope_gate as major) is never exercised
-    end to end. Chain both gates, in production order, over the run's real
-    criticals and observe what actually happens.
+def test_fixture_run_has_no_critical_violations():
+    """Pin the fixture's "Known limitation": this run produced zero criticals.
 
-    This fixture's run (see the fixture README's "Known limitation") has
-    zero critical findings, so the loop below is empty and every count is
-    trivially zero -- a real replay outcome for this data, not the richer
-    2-stay-critical/2-become-major split the original pinned run showed.
-    Re-pin non-zero counts once the fixture is regenerated from a run that
-    has criticals.
+    The chained replay this module was meant to exercise -- apply_provenance_gate
+    first, guarding the critical bar, then apply_scope_gate on whatever survives
+    as major -- needs a run that actually has criticals. Asserting it against
+    this fixture would loop over an empty list and pass on nothing. Re-derive
+    that test here once the fixture is regenerated from a run with criticals.
     """
-    criticals = _violations("critical")
-    assert len(criticals) == 0, "fixture drifted; re-derive the expected counts"
-
-    provenance_hits = 0
-    scope_hits = 0
-    end_severities = Counter()
-    for v in criticals:
-        f = _finding(v, "critical")
-        if apply_provenance_gate(f):
-            provenance_hits += 1
-        if apply_scope_gate(f, LOCAL):
-            scope_hits += 1
-        end_severities[f["severity"]] += 1
-
-    assert provenance_hits == 0, end_severities
-    assert scope_hits == 0, end_severities
-    assert end_severities == Counter(), end_severities
+    assert _violations("critical") == []

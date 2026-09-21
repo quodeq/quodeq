@@ -38,6 +38,42 @@ from quodeq.services.tooling_mixin import FsToolingMixin
 from quodeq.shared.log_sink import SHARED_LOG
 
 
+def _resolve_reports_root(reports_root: Path | None) -> Path:
+    """The run-reports root, defaulting to the configured evaluations dir."""
+    if reports_root is not None:
+        return reports_root
+    from quodeq.shared.env import get_evaluations_dir
+    return Path(get_evaluations_dir())
+
+
+def _resolve_index_db_path(index_db_path: Path | None) -> Path:
+    """The run-index database path, defaulting to the configured location."""
+    if index_db_path is not None:
+        return index_db_path
+    from quodeq.shared.env import get_index_db_path
+    return Path(get_index_db_path())
+
+
+def _default_job_manager(reports_root: Path) -> JobManager:
+    """A JobManager wired to the post-run hook.
+
+    Only built when the caller injects none: an injected manager comes with
+    its own on-complete wiring, and we do not mutate externally-owned state.
+    """
+    return JobManager(
+        reports_root=reports_root,
+        on_job_complete=PostRunHook(reports_root=reports_root),
+        log=SHARED_LOG,
+    )
+
+
+def _default_tooling() -> FsToolingMixin:
+    """The tooling collaborator, with the Claude model fetcher registered."""
+    tooling = FsToolingMixin()
+    tooling.configure_model_fetchers()
+    return tooling
+
+
 class FilesystemActionProvider(ActionProvider):
     """Filesystem-backed action provider — thin coordinator.
 
@@ -54,33 +90,15 @@ class FilesystemActionProvider(ActionProvider):
         index_db_path: Path | None = None,
         reports_root: Path | None = None,
     ) -> None:
-        if reports_root is None:
-            from quodeq.shared.env import get_evaluations_dir
-            reports_root = Path(get_evaluations_dir())
-        if index_db_path is None:
-            from quodeq.shared.env import get_index_db_path
-            index_db_path = Path(get_index_db_path())
-        self._reports_root = reports_root
+        self._reports_root = _resolve_reports_root(reports_root)
         self._compiled_dir = compiled_dir
-
-        # When a JobManager is injected (tests, alternative wiring), the caller
-        # owns the on-complete wiring — we don't mutate externally-owned state.
-        if job_manager is not None:
-            self._jobs = job_manager
-        else:
-            self._jobs = JobManager(
-                reports_root=reports_root,
-                on_job_complete=PostRunHook(reports_root=reports_root),
-                log=SHARED_LOG,
-            )
-
+        self._jobs = job_manager or _default_job_manager(self._reports_root)
         self._projects = ProjectsCache()
         self._evaluations = EvaluationsIndex(
             jobs=self._jobs,
-            index_db_path=index_db_path,
-            reports_root=reports_root,
+            index_db_path=_resolve_index_db_path(index_db_path),
+            reports_root=self._reports_root,
         )
-
         # Evaluation collaborator: receives a get_status_fn so cancel_evaluation
         # resolves ext- job IDs via EvaluationsIndex without MRO coupling.
         self._eval_handler = FsEvaluationMixin(
@@ -88,10 +106,7 @@ class FilesystemActionProvider(ActionProvider):
             get_status_fn=lambda job_id, reports_dir=None:
                 self._evaluations.get_status(job_id, reports_dir=reports_dir),
         )
-
-        # Tooling collaborator: register Claude model fetcher after construction.
-        self._tooling = FsToolingMixin()
-        self._tooling.configure_model_fetchers()
+        self._tooling = _default_tooling()
 
     # -- evaluations (delegate to EvaluationsIndex) ---------------------
 

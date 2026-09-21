@@ -21,7 +21,6 @@ import json
 import logging
 import urllib.request
 from collections.abc import Mapping
-import urllib.error
 
 from quodeq.llm_bridge._ollama import (
     DEFAULT_MEMORY_FRACTION,
@@ -34,9 +33,10 @@ _log = logging.getLogger(__name__)
 
 _TIMEOUT_S = 3
 #: Everything a probe against a llama-server may raise: the socket/HTTP
-#: layer (URLError/ConnectionRefusedError/OSError) and a body that is not
-#: the JSON we expect (ValueError, which json.JSONDecodeError subclasses).
-_TRANSPORT_ERRORS = (urllib.error.URLError, ConnectionRefusedError, OSError, ValueError)
+#: layer (OSError, which urllib's URLError and ConnectionRefusedError both
+#: subclass) and a body that is not the JSON we expect (ValueError, which
+#: json.JSONDecodeError subclasses).
+_TRANSPORT_ERRORS = (OSError, ValueError)
 
 
 def _default_base_url(env: Mapping[str, str] | None = None) -> str:

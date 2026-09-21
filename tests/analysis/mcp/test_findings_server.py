@@ -160,10 +160,10 @@ def test_build_router_wires_the_strict_dismissed_reader(tmp_path: Path, monkeypa
 
 
 class TestBuildCompiledContextResolvesTrustModel:
-    """C2: findings_server.py:47 (``trust_model = resolve_trust_model(work_dir)
-    if work_dir is not None else None``) is one of three live wiring points
-    for the declared trust model. Nothing failed when a reviewer set all
-    three to None at once and the full suite stayed green -- these tests
+    """``_build_compiled_context``'s ``resolve_trust_model(work_dir)`` call is
+    one of three live wiring points for the declared trust model. Nothing
+    failed when a reviewer set all three to None at once and the full suite
+    stayed green -- these tests
     close that gap by exercising ``_build_compiled_context`` directly against
     a real declared profile, so they fail if that line is ever neutered.
     """

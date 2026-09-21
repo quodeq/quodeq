@@ -25,9 +25,9 @@ That per-field fallback is deliberately ASYMMETRIC between the axes.
 ``multi_tenant`` is a property a manifest can genuinely evidence -- a CLI's
 own entry point is real proof it has one caller. Network exposure is not: a
 loopback Flask app and a hosted one are byte-identical on disk, the same
-point made two paragraphs up. So ``_detected_fields`` may fill
-``multi_tenant``, but its exposure slot is always ``None`` -- detection is
-never allowed to waive a remote-reachability finding by itself. A Rust
+point made two paragraphs up. So ``_detected_multi_tenant`` is the only
+detection step, and it fills ``multi_tenant`` alone -- detection is never
+allowed to waive a remote-reachability finding by itself. A Rust
 ``axum`` service with only a ``main.rs``, a Django app that merely lists
 ``pyinstaller`` in a dev extra, or an Express service with ``electron`` in
 ``devDependencies`` all detect as desktop/CLI today; none of them may get
@@ -159,27 +159,16 @@ def _declared_fields(data: dict) -> tuple[bool | None, str | None, str | None]:
     return multi_tenant, exposure, topology
 
 
-def _detected_fields(project_root: Path) -> tuple[bool | None, str | None]:
-    """Derive ``multi_tenant`` from manifest detection. Exposure is NEVER
-    detected -- the second element of the returned tuple is always ``None``.
+def _detected_multi_tenant(project_root: Path) -> bool | None:
+    """Derive ``multi_tenant`` from manifest detection; None when unknown.
 
-    Whether an untrusted party can open a socket to this process is a
-    deployment fact no manifest can prove: a loopback Flask app and a hosted
-    one are byte-identical on disk (see this module's own docstring). Filling
-    ``network_exposure`` from detection would let any project that merely
-    RESEMBLES a desktop app or single-user CLI on disk get its security
-    findings waived without a human declaring anything -- see the module
-    docstring for the four real hosted services (axum, chi, Django+pyinstaller,
-    Express+electron) that detect as desktop/CLI today. Only
-    ``.quodeq/project-profile.json``, via :func:`resolve_trust_model`, may set
-    that axis.
-
-    ``multi_tenant`` alone is safe to infer: a CLI's own entry point is real
-    evidence of a single caller. ``LIBRARY`` still maps to unknown on
-    purpose -- ``_shape_irrelevant_to_hosted_service`` treats libraries as
-    non-hosted, which is sound for concurrency findings and wrong here: a
-    library's paths may be fed from an HTTP request in the consuming
-    application, and the author cannot know.
+    This is the only trust axis detection may fill -- see the module
+    docstring for why exposure and topology are declaration-only. A CLI's
+    own entry point is real evidence of a single caller. ``LIBRARY`` still
+    maps to unknown on purpose: ``_shape_irrelevant_to_hosted_service``
+    treats libraries as non-hosted, which is sound for concurrency findings
+    and wrong here, because a library's paths may be fed from an HTTP
+    request in the consuming application and the author cannot know.
     """
     try:
         shape = detect_shape(project_root)
@@ -195,14 +184,14 @@ def _detected_fields(project_root: Path) -> tuple[bool | None, str | None]:
         # scan. project_shape.py itself is out of scope for this fix; this
         # catch is deliberately wide as the boundary that must not leak.
         _logger.warning("Project shape detection failed for %s: %s", project_root, exc)
-        return None, None
+        return None
     if shape.deployment is Deployment.WEB_SERVICE:
-        return True, None
+        return True
     if shape.deployment is Deployment.DESKTOP:
-        return False, None
+        return False
     if shape.deployment is Deployment.CLI and shape.is_single_user:
-        return False, None
-    return None, None
+        return False
+    return None
 
 
 def resolve_trust_model(project_root: Path | str | None) -> TrustModel:
@@ -214,15 +203,13 @@ def resolve_trust_model(project_root: Path | str | None) -> TrustModel:
         return CONSERVATIVE
     root = Path(project_root)
     declared_tenant, declared_exposure, declared_topology = _declared_fields(_read_profile(root))
-    detected_tenant, detected_exposure = _detected_fields(root)
-
     multi_tenant = declared_tenant
     if multi_tenant is None:
-        multi_tenant = detected_tenant
+        multi_tenant = _detected_multi_tenant(root)
     if multi_tenant is None:
         multi_tenant = CONSERVATIVE.multi_tenant
 
-    exposure = declared_exposure or detected_exposure or CONSERVATIVE.network_exposure
+    exposure = declared_exposure or CONSERVATIVE.network_exposure
     topology = declared_topology or CONSERVATIVE.deployment_topology
     return TrustModel(
         multi_tenant=multi_tenant,

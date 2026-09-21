@@ -27,6 +27,8 @@ _TRUSTED_SHELL_DIRS = frozenset({
     "/opt/homebrew/bin", "/opt/homebrew/sbin",
 })
 _READ_TIMEOUT_S = 0.5
+# killpg sends SIGKILL, so the child should be reaped at once; bound it anyway.
+_REAP_TIMEOUT_S = 2
 # May be absent on unusual builds; guarded at the call site.
 _TIOCSCTTY = getattr(termios, "TIOCSCTTY", None)
 
@@ -151,9 +153,11 @@ class UnixPty:
             # Reap the killed child so it doesn't linger as a zombie (killpg
             # sends SIGKILL, so this returns promptly; bound it regardless).
             try:
-                self._proc.wait(timeout=2)
+                self._proc.wait(timeout=_REAP_TIMEOUT_S)
             except subprocess.TimeoutExpired as exc:
-                _logger.debug("pty child did not exit within 2s after kill: %s", exc)
+                _logger.debug(
+                    "pty child did not exit within %ss after kill: %s",
+                    _REAP_TIMEOUT_S, exc)
         if self._selector is not None:
             try:
                 self._selector.close()

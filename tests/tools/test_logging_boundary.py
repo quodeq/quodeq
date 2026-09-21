@@ -121,7 +121,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'services/scoring/_rescoring.py': _out_of_scope('Accumulated-rescore machinery for the scoring reader'),
     'services/scoring/_scores_raw.py': _out_of_scope('Single-run scores: SQL-backed with a JSON-eval-file fallback - own logger (quodeq.services.scoring._scores_raw), no longer threaded from the package facade (M-MOD-3 import-cycle fix)'),
     'services/shared_publish.py': _out_of_scope('Staging logic for publishing a project into the shared results repo'),
-    'services/tooling_mixin.py': _out_of_scope('Mixin providing repo browsing and AI client discovery for the filesystem provider'),
+    'services/tooling_mixin.py': _out_of_scope("AI-client and model discovery for the filesystem provider; also binds the inherited browse half's LogSink"),
     'services/violations.py': _out_of_scope('Violation resolution and aggregation for the filesystem action provider'),
 }
 

@@ -8,10 +8,13 @@ import subprocess
 
 import pytest
 
+import quodeq.services.shared_publish as shared_publish
 from quodeq.services.shared_publish import (
     PublishError,
     _commit_and_push,
     _prepare_workspace,
+    clone_lock,
+    stage_project,
 )
 from tests.services._shared_publish_git_fixtures import (  # noqa: F401 -- _git_identity is a pytest fixture
     _bare_origin,
@@ -50,8 +53,6 @@ class TestPrepareWorkspace:
     def test_holds_the_clone_lock_for_the_body(self, tmp_path):
         """The lock is an RLock held across the whole yielded body, so a
         re-entrant acquire on this thread must succeed while inside."""
-        from quodeq.services.shared_publish import clone_lock
-
         url = _bare_origin(tmp_path)
         root = _local_project(tmp_path)
 
@@ -66,7 +67,6 @@ class TestCommitAndPush:
         root = _local_project(tmp_path)
 
         with _prepare_workspace("proj-uuid-1", url, root, None) as (project_dir, repo):
-            from quodeq.services.shared_publish import stage_project
             count = stage_project(project_dir, repo / "evaluations" / "proj-uuid-1")
             _commit_and_push(repo, "proj-uuid-1", count)
 
@@ -77,8 +77,6 @@ class TestCommitAndPush:
         assert "evaluations/proj-uuid-1/repository_info.json" in listing
 
     def test_raises_publish_error_when_git_add_fails(self, tmp_path, monkeypatch):
-        import quodeq.services.shared_publish as shared_publish
-
         url = _bare_origin(tmp_path)
         root = _local_project(tmp_path)
 

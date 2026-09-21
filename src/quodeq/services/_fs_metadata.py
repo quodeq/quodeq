@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
+from quodeq.services._accumulated_data import _has_valid_score
 from quodeq.services.wiring import RunInfo, read_run_data, summarize_dimensions
 from quodeq.services._fs_project_primitives import _local_repo_root
 from quodeq.services._fs_project_primitives import (  # noqa: F401 — re-export
@@ -61,7 +62,6 @@ def _select_accumulated_dims(
     evidence, not the newest run's.
     """
     from quodeq.services.scoring_view import select_default_view_runs  # noqa: PLC0415
-    from quodeq.services._accumulated_data import _has_valid_score  # noqa: PLC0415
 
     project_dir = reports_root / entry_name
     view_runs = select_default_view_runs(runs)
@@ -71,20 +71,30 @@ def _select_accumulated_dims(
     for run in view_runs:
         dims = read_run_data(reports_root, entry_name, run.run_id)
         for d in dims:
-            # Same trust gate as the accumulated Overview (_has_valid_score):
-            # skip a coverage-0 stub so the card falls through to a real
-            # older run instead of showing the stub's inflated grade. Hidden
-            # standards are skipped entirely: the Overview headline excludes
-            # them, and a dimension the user cannot see must not move the
-            # grade.
-            if (d.dimension and d.dimension.lower() in visible_set
-                    and d.dimension not in latest_by_dim and _has_valid_score(d)):
+            if _is_first_visible_score(d, visible_set, latest_by_dim):
                 latest_by_dim[d.dimension] = d
                 validate_path_segment(run.run_id)
                 run_dir_by_dim[d.dimension] = project_dir / run.run_id
             if files_count is None and d.source_file_count:
                 files_count = d.source_file_count
     return latest_by_dim, run_dir_by_dim, files_count
+
+
+def _is_first_visible_score(d, visible_set: set, latest_by_dim: dict) -> bool:
+    """True when *d* is the newest scorable run of a dimension the user can see.
+
+    Same trust gate as the accumulated Overview (``_has_valid_score``): a
+    coverage-0 stub is skipped so the card falls through to a real older run
+    instead of showing the stub's inflated grade. Hidden standards are
+    skipped entirely -- the Overview headline excludes them, and a dimension
+    the user cannot see must not move the grade.
+    """
+    return bool(
+        d.dimension
+        and d.dimension.lower() in visible_set
+        and d.dimension not in latest_by_dim
+        and _has_valid_score(d)
+    )
 
 
 def _apply_dismiss_delete_rescore(

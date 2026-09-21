@@ -112,6 +112,14 @@ def _model_arg(cfg: CliChatConfig, model: str | None) -> str | None:
 
 
 def build_turn_argv(cfg: CliChatConfig, request: TurnArgvRequest) -> CliTurnSpec:
+    """Assemble the provider CLI's argv for one turn.
+
+    Ordering is not free: codex's ``resume <id>`` has to sit immediately
+    after the subcommand, and the prompt (flag or positional, per
+    *cfg.prompt_style*) goes last. Returns the argv together with the
+    session id the turn will use and whether that id must be parsed back
+    out of the stream.
+    """
     argv: list[str] = [cfg.cmd]
     if cfg.cmd_subcommand:
         argv.append(cfg.cmd_subcommand)

@@ -27,20 +27,29 @@ from quodeq.services._publish_git import (
     _push_with_rebase_fallback,
     _prepare_clone,
 )
-from quodeq.services._publish_staging import stage_project
-from quodeq.services._publish_staging import (  # noqa: F401 — re-export
+from quodeq.services._publish_staging import (
     copy_run,
     list_completed_runs,
     merge_actions_log,
+    stage_project,
 )
 from quodeq.services.wiring import (
     MARKER_FILENAME,
     bootstrap_repo_layout,
     clone_lock,
+    ensure_shared_clone,
     run_git,
 )
-from quodeq.services.wiring import ensure_shared_clone  # noqa: F401 — re-export/patch target
 from quodeq.shared.validation import validate_path_segment
+
+__all__ = [
+    "GIT_ERROR_SNIPPET_MAX_CHARS", "PublishError", "PublishStatus",
+    "get_publish_status", "publish_project", "start_publish",
+    # Re-exported so callers and tests keep reaching them at this module's
+    # path; ``ensure_shared_clone`` is also a patch target.
+    "clone_lock", "copy_run", "ensure_shared_clone", "list_completed_runs",
+    "merge_actions_log", "stage_project",
+]
 
 logger = logging.getLogger(__name__)
 

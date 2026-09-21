@@ -11,7 +11,13 @@ _PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 
 
 def render_template(template: str, values: dict[str, str]) -> str:
-    """Replace ``{{KEY}}`` placeholders in a template string with the given values."""
+    """Replace ``{{KEY}}`` placeholders in *template* with *values*.
+
+    A placeholder with no matching key is left in the output verbatim rather
+    than blanked, so a missing value shows up in the rendered prompt instead
+    of silently disappearing; those keys are also logged at warning level.
+    Keys that appear only in substituted content are not re-expanded.
+    """
     def _replace(match: re.Match) -> str:
         key = match.group(1)
         if key in values:

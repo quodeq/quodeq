@@ -39,13 +39,13 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Skip rebuilding the UI; use cached build (error if none exists)")
     parser.add_argument("--reinstall", action="store_true",
                         help="Force reinstallation of UI dependencies and full rebuild")
-    parser.add_argument("--dev", action="store_true", default=False,
+    parser.add_argument("--dev", action="store_true",
                         help=argparse.SUPPRESS)
     parser.add_argument("--open", action=argparse.BooleanOptionalAction, default=True,
                         help="Open the dashboard in a browser after starting (default: %(default)s)")
-    parser.add_argument("--browser", action="store_true", default=False,
+    parser.add_argument("--browser", action="store_true",
                         help="Open in browser instead of native window")
-    parser.add_argument("--verbose", action="store_true", default=False,
+    parser.add_argument("--verbose", action="store_true",
                         help="Show API request logs in console")
     return parser
 

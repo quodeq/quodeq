@@ -6,7 +6,7 @@ spawn/cleanup/finalize halves of the turn stay there.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import IO, Callable, NamedTuple
 
 from quodeq.assistant.adapters import _stream
 from quodeq.assistant.adapters._linereader import iter_lines
@@ -79,7 +79,20 @@ def _handle_stream_event(event: dict, state: _StreamState) -> None:
         state.session_id = sid
 
 
-def consume_stream_events(stdout, emit: Callable[[dict], None], parsed_sid: str | None):
+class StreamOutcome(NamedTuple):
+    """What one pass over the CLI's event stream leaves for the turn to finish."""
+
+    texts: list[str]
+    errors: list[str]
+    raw_errors: list[str]
+    session_id: str | None
+    partial_buf: str
+    saw_result: bool
+
+
+def consume_stream_events(
+    stdout: IO[str] | None, emit: Callable[[dict], None], parsed_sid: str | None,
+) -> StreamOutcome:
     """Drain the CLI's event stream, emitting token/tool_call frames as they
     arrive. Returns the raw pieces ``_finalize_turn_result`` assembles.
     """
@@ -92,5 +105,8 @@ def consume_stream_events(stdout, emit: Callable[[dict], None], parsed_sid: str 
                 state.raw_errors.append(raw)
             continue
         _handle_stream_event(event, state)
-    return (state.texts, state.errors, state.raw_errors, state.session_id,
-            state.partial_buf, state.saw_result)
+    return StreamOutcome(
+        texts=state.texts, errors=state.errors, raw_errors=state.raw_errors,
+        session_id=state.session_id, partial_buf=state.partial_buf,
+        saw_result=state.saw_result,
+    )

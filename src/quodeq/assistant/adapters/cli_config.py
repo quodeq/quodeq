@@ -45,7 +45,12 @@ class CliChatConfig:
 
 
 def load_cli_chat_config(provider_id: str) -> CliChatConfig:
-    """Return ``provider_id``'s CLI chat config; raise KeyError if unknown."""
+    """Return ``provider_id``'s CLI chat contract from the provider catalog.
+
+    Every field the catalog leaves out falls back to the claude-shaped
+    default, so a provider entry only has to name where it differs. Raises
+    KeyError when the catalog has no such provider.
+    """
     catalog = get_provider_configs()
     if provider_id not in catalog:
         raise KeyError(f"unknown provider: {provider_id}")

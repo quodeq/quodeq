@@ -20,13 +20,6 @@ from quodeq.shared.copilot import build_copilot_env
 _ALLOWED_ENV_KEYS = frozenset({
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "TMPDIR", "TZ",
 })
-# Kept for readability/back-compat with anything still referencing the concept
-# of "sensitive keys" conceptually; the allowlist above is what's enforced.
-SENSITIVE_ENV_KEYS = frozenset({
-    "QUODEQ_API_KEY", "DATABASE_URL", "SECRET_KEY",
-    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY",
-})
-
 _DANGEROUS_VALUES = ("bypassPermissions",)
 # Permission-skip flags that are NEVER acceptable in an assistant spawn.
 _DANGEROUS_FLAGS = (
@@ -59,8 +52,7 @@ def build_chat_env(env: dict | None = None, *, provider: str | None = None) -> d
     source = resolve_env(env)
     if provider == "copilot":
         return build_copilot_env(source)
-    result = {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}
-    return result
+    return {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}
 
 
 def scratch_cwd(base: Path) -> Path:

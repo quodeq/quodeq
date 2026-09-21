@@ -59,7 +59,7 @@ def _heartbeat_mtime(run_dir: Path) -> float | None:
     path = run_dir / HEARTBEAT_FILENAME
     try:
         return path.stat().st_mtime
-    except (OSError, FileNotFoundError):
+    except OSError:
         return None
 
 
@@ -73,7 +73,7 @@ def _heartbeat_iso(run_dir: Path) -> str | None:
 def _status_mtime_ns(run_dir: Path) -> int:
     try:
         return (run_dir / STATUS_FILENAME).stat().st_mtime_ns
-    except (OSError, FileNotFoundError):
+    except OSError:
         return 0
 
 
