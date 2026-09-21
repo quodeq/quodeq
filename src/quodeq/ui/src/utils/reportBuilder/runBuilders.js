@@ -13,6 +13,14 @@ import {
 /**
  * The full Markdown report for one dimension of one run.
  *
+ * @param {object} args
+ * @param {{dimension: string, compliance: Array, partial: boolean}} args.evalData
+ * @param {Array} args.principleGrades - rows of the principle-scores table;
+ *   an empty array drops the section.
+ * @param {Array} args.allViolations - grouped by severity for the report.
+ * @param {{score: number, grade: string}} args.overallGrade
+ * @param {string} [args.dateLabel] - defaults to today.
+ * @param {string} [args.runId] - shown beside the date when present.
  * @returns {string}
  */
 export function buildDimensionReport({ evalData, principleGrades, allViolations, overallGrade, dateLabel, runId }) {
@@ -69,6 +77,9 @@ function buildScoredReport({ title, dateLabel, rid, score, grade, summary, dimen
  * The full Markdown report for a project's accumulated scores, across every
  * dimension.
  *
+ * @param {{score: number, grade: string, summary: Object}} accumulated
+ * @param {Array} accumulatedDimensions - per-dimension scores and findings.
+ * @param {string} projectName - the report's title.
  * @returns {string}
  */
 export function buildOverviewReport(accumulated, accumulatedDimensions, projectName) {
@@ -87,6 +98,10 @@ export function buildOverviewReport(accumulated, accumulatedDimensions, projectN
 /**
  * The full Markdown report for a single run, dimension by dimension.
  *
+ * @param {object} args
+ * @param {object} args.dashboard - the run's dashboard payload.
+ * @param {object} args.runSummary - the run's header numbers.
+ * @param {string} args.projectName - the report's title.
  * @returns {string}
  */
 export function buildRunReport({ dashboard, runSummary, projectName }) {

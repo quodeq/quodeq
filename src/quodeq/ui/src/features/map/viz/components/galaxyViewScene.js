@@ -229,6 +229,18 @@ function buildPrinciples(dimensions) {
   return principles;
 }
 
+/**
+ * Lay out the whole galaxy: one cluster per dimension, its principles in
+ * orbit, and the background starfield. Positions are seeded from the
+ * dimension names, so the same project always renders the same sky.
+ * @param {Array} dimensions - accumulated per-dimension scores and findings.
+ * @param {number} W - canvas width in px.
+ * @param {number} H - canvas height in px.
+ * @param {Object} standardTypes - dimension id -> standard type, which decides
+ *   whether dimensions are grouped into constellations.
+ * @returns {object} the scene: `rootStars`, `bg` and the layout metadata the
+ *   draw and camera helpers read.
+ */
 export function buildScene(dimensions, W, H, standardTypes) {
   const dimFingerprint = dimensions.map(d => d.dimension || '').sort().join('|');
   const rng = seededRng(seedHash('galaxy:' + dimFingerprint));
