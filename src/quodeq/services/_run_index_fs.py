@@ -1,6 +1,6 @@
 """Run-index housekeeping: directory removal, fallback scan, liveness, merge.
 
-Split (Task 14 fix round) out of ``_evaluations_index.py``. Nothing patches
+Split out of ``_evaluations_index.py``. Nothing patches
 these directly (verified: no test reaches ``EvaluationsIndex`` internals by
 name) so they move as plain free functions — no re-export required, callers
 are ``EvaluationsIndex`` methods only. ``_evaluations_index.py`` is a

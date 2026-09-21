@@ -31,10 +31,10 @@ def _findings_server_args(
         args.extend(["--agent-id", ap.agent_id])
     if ap.work_dir:
         args.extend(["--work-dir", str(ap.work_dir.resolve())])
-    # Phase 1.5 (Task 3.5): cache fingerprint inputs (cache_root + model_id +
+    # Cache fingerprint inputs (cache_root + model_id +
     # language) MUST be emitted on every spawn so the subprocess writes cache
     # entries with the same keys as classify_files_via_cache. Defaults match
-    # cache.dimension_helpers._model_id_from ('unknown') and Task 5's
+    # cache.dimension_helpers._model_id_from ('unknown') and the
     # language-unset contract ('').
     args.extend([
         "--cache-root", str(_default_cache_root()),

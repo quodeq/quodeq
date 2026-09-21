@@ -1,6 +1,6 @@
 """Per-project projection locks and the project-wide SQL projection sweep.
 
-Split (Task 14) out of ``mutation_rescore.py``. ``mutation_rescore.py`` is a
+Split out of ``mutation_rescore.py``. ``mutation_rescore.py`` is a
 DECLARED_LOGGING_SITES entry (still imports stdlib ``logging``); this sibling
 does not add a new logging import, so ``_project_all_runs`` accepts an
 injected ``LogSink`` and, when none is passed, deferred-imports the facade's

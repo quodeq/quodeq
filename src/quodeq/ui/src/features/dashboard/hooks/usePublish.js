@@ -30,7 +30,7 @@ import { useApplyOptimisticPublish } from './publishOptimisticCache.js';
  * whether THIS hook's own observer, in isolation, would trigger it.
  *
  * The publish trigger and its job-progress polling live here rather than in
- * a component per the Task 20 design: a single publish job is global to the
+ * a component: a single publish job is global to the
  * whole app (one project publishing at a time, enforced server-side), so
  * "is anything publishing right now" has to be state shared by every local
  * card's button, not something any one card owns. Polling during a RUNNING

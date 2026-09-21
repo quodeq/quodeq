@@ -1,7 +1,7 @@
 """Internal sync logic for the SQLite run index.
 
-Upserts rows from status.json (Plan A runs) or synthesizes from legacy
-filesystem signals (pre-Plan-A runs). Promotes stale non-terminal runs to
+Upserts rows from status.json, or synthesizes from legacy filesystem
+signals for runs old enough to predate it. Promotes stale non-terminal runs to
 cancelled based on heartbeat mtime + PID liveness.
 """
 from __future__ import annotations

@@ -146,7 +146,7 @@ describe('buildAssistantActionAppliedHandler', () => {
 });
 
 describe('Assistant drawer close on shared project switch', () => {
-  // Task 19: shared projects have no mutation routes (dismiss/verify are
+  // Shared projects have no mutation routes (dismiss/verify are
   // local-only). The drawer must close when switching to shared to prevent
   // writes to the local store under a shared project's id. The effect in
   // App.jsx guards both drawer close AND session re-bind on selectedSource.

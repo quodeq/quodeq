@@ -1,7 +1,7 @@
 """One-shot-per-process assistant cleanup: reap leaked worktrees, prune old
 sessions; and the shared-source-gone error type build_tool_context raises.
 
-Split out of _assistant_helpers.py (Task 10).
+Split out of _assistant_helpers.py.
 """
 from __future__ import annotations
 

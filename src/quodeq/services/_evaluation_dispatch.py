@@ -1,6 +1,6 @@
 """Evaluation dispatch: the subprocess-launch abstraction and CLI command builder.
 
-Split (Task 14) out of ``evaluation_mixin.py``: ``EvaluationDispatcher`` is the
+Split out of ``evaluation_mixin.py``: ``EvaluationDispatcher`` is the
 injection seam for how an evaluation command actually gets run (the default
 ``SubprocessDispatcher`` spawns it via ``JobManager``); ``_build_evaluate_cmd``
 turns an ``EvaluationOptions`` into the CLI argv. Re-exported by

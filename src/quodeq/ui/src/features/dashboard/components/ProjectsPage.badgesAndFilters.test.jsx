@@ -7,7 +7,7 @@ import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
 
-// Task 7: one merged local+shared list, no tabs. The local list renders
+// One merged local+shared list, no tabs. The local list renders
 // unconditionally; the shared list layers in once useSharedProjects resolves
 // (cached-first, see that hook's own tests), so every render touches the API
 // -- an ApiProvider is required from here on regardless of project count.
@@ -98,7 +98,7 @@ describe('ProjectsPage — initial loading gate (P4)', () => {
   });
 });
 
-// Task 7: tabs are gone. Local and shared projects render together in one
+// Tabs are gone. Local and shared projects render together in one
 // list, filtered/sorted via a controlled toolbar (state lives in the nav
 // stack, see actions.onFiltersChange).
 describe('ProjectsPage — merged list, no tabs', () => {

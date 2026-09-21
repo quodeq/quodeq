@@ -36,7 +36,7 @@ export function computeProjectTree(projects) {
 // id/name so ProjectCard can read `project.publishedAt` uniformly. Belt
 // and suspenders with `entry.shared?.publishedAt` below (the merged
 // entry already carries it too, since usePublish and useSharedProjects
-// share the same sharedKeys.list() cache entry -- see Task 5) but this
+// share the same sharedKeys.list() cache entry) but this
 // keeps LocalPublishedMeta's prop stable even for callers that only ever
 // look at `project.publishedAt` directly.
 function useProjectsWithPublished(projects, sharedConfigured, publishedAtByProject) {
@@ -112,7 +112,7 @@ function useFilteredEntries(locationFilteredEntries, query, children) {
 
 // Cached-first shared sync (see useSharedProjects.js's own doc comment for
 // the full contract) plus publish action + job-progress polling for local
-// cards (Task 20). usePublish only fetches shared status/list (both with
+// cards. usePublish only fetches shared status/list (both with
 // refresh:false, so this never forces a real git fetch) when there's
 // actually something to decorate: at least one local card. Hooks run
 // unconditionally either way; only the internal effect is gated.

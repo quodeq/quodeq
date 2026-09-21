@@ -120,7 +120,7 @@ describe('usePrincipleData', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 17: useExplorerData source-aware fetch selection. A shared-source
+// useExplorerData source-aware fetch selection. A shared-source
 // selection must read dimension eval + run scores from the shared-repo
 // mirror endpoints, never the local ones.
 // ---------------------------------------------------------------------------

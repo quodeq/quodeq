@@ -1,6 +1,6 @@
 """Subprocess environment building for evaluation runs.
 
-Split (Task 14) out of ``evaluation_mixin.py``: ``build_eval_env`` is a free
+Split out of ``evaluation_mixin.py``: ``build_eval_env`` is a free
 function; ``FsEvaluationMixin._build_eval_env`` (kept in ``evaluation_mixin.py``
 for its existing callers/tests) is a thin static-method delegate to it. The
 ``get_ai_cmd``/``get_ai_model`` fallback lookups stay in ``evaluation_mixin.py``

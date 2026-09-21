@@ -1,6 +1,6 @@
 """SSE event-frame generator for the assistant turn stream.
 
-Split out of _assistant_helpers.py (Task 10). ``_POLL_SECONDS``/``_IDLE_LIMIT``
+Split out of _assistant_helpers.py. ``_POLL_SECONDS``/``_IDLE_LIMIT``
 are looked up on the ``_assistant_helpers`` facade at call time (rather than
 read as this module's own globals) so tests patching
 "quodeq.api._assistant_helpers._POLL_SECONDS"/"_IDLE_LIMIT" keep working

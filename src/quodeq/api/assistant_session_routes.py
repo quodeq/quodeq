@@ -1,6 +1,6 @@
 """Session lifecycle routes for the embedded assistant: create + catalog.
 
-Split out of assistant_routes.py (Task 10). The provider lookup and the
+Split out of assistant_routes.py. The provider lookup and the
 shared-clone gate are injected by the registrar (``SessionGates``): they live
 in ``assistant_routes`` so tests patching
 "quodeq.api.assistant_routes.get_provider_configs"/"read_settings"/

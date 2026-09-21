@@ -7,7 +7,7 @@ thin GET-only delegation to the same service functions the local
 ``/api/projects/...`` routes use, pointed at the shared clone's evaluations
 root (via ``_with_shared_root``) instead of the local reports directory.
 
-Split (Task 9) into four modules plus this thin orchestrator:
+Split into four modules plus this thin orchestrator:
   - routes_shared_common.py: ``_with_shared_root``, ``_validate_segment``,
     ``_shared_project_dir``, shared by the three registrars below.
   - routes_shared_config.py: status / config PUT-DELETE / refresh / publish.

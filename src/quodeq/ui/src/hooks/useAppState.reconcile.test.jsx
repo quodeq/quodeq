@@ -28,7 +28,7 @@ vi.mock('./useServerHealth.js', () => ({
   useServerHealth: () => [true, vi.fn(), null],
 }));
 
-// Task 2 (stacked on Task 1's scheduleDashboardReconcile): the Overview's
+// Stacked on scheduleDashboardReconcile: the Overview's
 // useDashboard observer is mounted at the app root and never remounts on tab
 // navigation, and the desktop pywebview window never fires the focus-refetch
 // a browser tab gets on refocus. useOverviewReturnReconcile is the second

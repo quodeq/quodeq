@@ -1,6 +1,6 @@
 """Drafted-action lifecycle routes for the embedded assistant: apply, reject.
 
-Split out of assistant_routes.py (Task 10).
+Split out of assistant_routes.py.
 """
 from __future__ import annotations
 

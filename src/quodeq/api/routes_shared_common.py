@@ -2,7 +2,7 @@
 
 ``_with_shared_root`` and ``_validate_segment`` are used by the config, pull,
 and read-only mirror route registrars alike; ``_shared_project_dir`` by the
-pull route and two of the mirrors. Split out of routes_shared.py (Task 9) so
+pull route and two of the mirrors. Split out of routes_shared.py so
 those registrars can share one implementation instead of three copies.
 """
 from __future__ import annotations
@@ -36,7 +36,7 @@ def _with_shared_root(fn):
     the clone hasn't been fetched yet at all, else the wrapped view runs with
     ``eval_root`` (the shared clone's evaluations directory) injected as a
     keyword argument, with the score cache transparently scoped to this
-    clone's own cache DB (Task 9) so its rows never mix with the local
+    clone's own cache DB so its rows never mix with the local
     clone's cache. Views that also declare a ``url`` parameter get the
     configured remote; the rest are not handed one.
 
@@ -86,7 +86,7 @@ def _with_shared_root(fn):
 
 
 def _validate_segment(*segments: str) -> tuple[Response, int] | None:
-    """Shared-route path-segment guard (Task 7 precedent).
+    """Shared-route path-segment guard.
 
     Every shared mirror that takes a project/run/dimension segment validates
     it here, even where the local route it mirrors relies solely on the

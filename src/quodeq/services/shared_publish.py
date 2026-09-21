@@ -1,7 +1,7 @@
 """Publish a project into the shared results repo, plus the background
 publish-job status tracker.
 
-Split (Task 12) into two sibling modules plus this thin orchestrator:
+Split into two sibling modules plus this thin orchestrator:
   - _publish_staging.py: pure file-copy/merge staging (list_completed_runs,
     copy_run, merge_actions_log, stage_project).
   - _publish_git.py: the git-side steps (clone prep, staged-diff commit,

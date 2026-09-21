@@ -1,6 +1,6 @@
 """Accumulated (cross-run) view logic for the filesystem action provider.
 
-Split (Task 14): the walk-cache globals and per-call LRU cache config moved
+Split: the walk-cache globals and per-call LRU cache config moved
 to ``_accumulated_cache.py``; trend/severity/score aggregation (including the
 wire-serialization call that builds the response payload) moved to
 ``_accumulated_aggregate.py``. Both are re-exported here — the walk-cache

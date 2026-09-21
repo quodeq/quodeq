@@ -1,6 +1,6 @@
 """Trend, severity, and score aggregation for the accumulated (cross-run) view.
 
-Split (Task 14) out of ``accumulated.py``. ``_build_accumulated_response`` is
+Split out of ``accumulated.py``. ``_build_accumulated_response`` is
 the module's ``to_camel_dict`` wire-serialization call site — moving it here
 requires (and got) an update to ``DECLARED_WIRE_BOUNDARIES`` in
 ``tests/tools/test_serialization_boundary.py``.

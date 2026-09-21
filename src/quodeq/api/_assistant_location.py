@@ -1,7 +1,7 @@
 """Session-scope resolution: run/repo-root lookups for the create-session and
 tool-context routes, all jailed to the evaluations root or the shared clone.
 
-Split out of _assistant_helpers.py (Task 10). ``get_evaluations_dir`` is
+Split out of _assistant_helpers.py. ``get_evaluations_dir`` is
 looked up on the ``_assistant_helpers`` facade at call time (rather than
 imported directly here) so tests patching
 "quodeq.api._assistant_helpers.get_evaluations_dir" keep working after the

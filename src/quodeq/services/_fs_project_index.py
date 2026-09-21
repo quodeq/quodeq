@@ -1,6 +1,6 @@
 """Lightweight project index + windowed hydration, for pagination.
 
-Split out (Task 5, quality-cycle2) so a paginated request can slice the
+Split out so a paginated request can slice the
 project set *before* the expensive per-project hydration
 (``_build_project_entry``) runs, instead of after.
 

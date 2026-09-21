@@ -1,7 +1,7 @@
 """Legacy in-place rescoring: recompute a dimension's grade from its
 filtered Finding lists when no run-evidence basis is available.
 
-Split out of rescore.py (Task 12). This is the fallback path only --
+Split out of rescore.py. This is the fallback path only --
 _rescore_from_evidence in rescore.py is preferred whenever a run's
 `<dim>_evidence.jsonl` is available.
 """

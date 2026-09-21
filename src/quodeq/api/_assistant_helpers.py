@@ -1,6 +1,6 @@
 """Request plumbing for assistant routes: repo/context construction, busy check.
 
-Split (Task 10) into three modules plus this thin facade:
+Split into three modules plus this thin facade:
   - _assistant_hygiene.py: ``run_assistant_hygiene``, ``_session_ttl_days``,
     ``SharedSourceUnavailable``.
   - _assistant_location.py: ``resolve_run_location``,

@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ProjectPathContent } from './ProjectPathContent.jsx';
 
-// Cluster 25: the copy control used to call navigator.clipboard.writeText
+// The copy control used to call navigator.clipboard.writeText
 // directly, bypassing the safe copyToClipboard wrapper (no .catch at all).
 // It must now route through copyToClipboard.
 

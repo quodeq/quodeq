@@ -1,7 +1,7 @@
 """register_project's two steps: resolve the project's identity/slot, then
 materialize it on disk and scan.
 
-Split out of ``project_registration.py`` (Task 22, M-MOD-6): that module sits
+Split out of ``project_registration.py`` (M-MOD-6): that module sits
 at the 300-line size ratchet, so these steps live here instead. This module
 imports only downward (``wiring``, ``_fs_clone``, ``fs_scan``,
 ``_registration_scan``, ``_registration_url``, ``shared``) and never imports

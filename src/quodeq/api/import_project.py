@@ -6,7 +6,7 @@ traversal, absolute paths, symlinks, special files, oversize entries, and
 zip-bomb compression ratios before a single byte is extracted (see
 _import_validation.py and _import_extract.py for the checks themselves).
 
-Split (Task 9) into three collaborator modules plus this orchestrator:
+Split into three collaborator modules plus this orchestrator:
   - _import_validation.py: archive/member/manifest/repo-info validation.
   - _import_identity.py: identity-collision detection and index updates.
   - _import_extract.py: ``_safe_extract``, the hardened extraction step.

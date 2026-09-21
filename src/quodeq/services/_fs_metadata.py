@@ -1,6 +1,6 @@
 """Metadata and detection helpers for the filesystem action provider.
 
-Split (Task 13) into two sibling modules plus this orchestrator:
+Split into two sibling modules plus this orchestrator:
   - _fs_project_primitives.py: leaf metadata reads (_read_scan_summary,
     _check_path_exists, _extract_project_metadata, _read_repo_info,
     _local_repo_root).

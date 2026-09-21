@@ -4,7 +4,7 @@ Finding (self-eval, Time Behaviour, major): ``find_existing_project`` did a
 linear directory scan with a ``repository_info.json`` read per project
 instead of an indexed lookup.
 
-Mirrors performance-cycle1 Task 4's import-identity index
+Mirrors the import-identity index
 (``api/_import_identity.py`` + ``data/fs/project_index.py``): index-first
 lookup, directory-walk fallback for entries the index doesn't have yet (a
 project created before this index existed, or an index write that failed),

@@ -106,7 +106,7 @@ def _build_mcp_server_args(
     wd = config.work_dir or work_dir
     if wd:
         mcp_args.extend(["--work-dir", str(wd.resolve())])
-    # Phase 1.5 (Task 3.5): pass cache fingerprint inputs so findings_server
+    # Pass cache fingerprint inputs so findings_server
     # can write cache entries synchronously on each mark_file_done(ok). These
     # MUST match classify_files_via_cache's inputs so CLI- and API-path keys
     # agree for the same project state. See cache_writer.build_cache_writer

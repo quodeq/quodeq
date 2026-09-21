@@ -12,10 +12,9 @@ Identifiers keep their own names: a test file called
 (if at all) by whoever owns them, and a string that is data (a log
 message, an API payload, a UI label) is behaviour, not prose.
 
-Marked xfail until PR 6 Tasks 2-3 rewrite the labelled comments, the same
-way the private-import gate landed red-then-green. When it passes, delete
-the marker -- `strict=True` makes an unexpected pass a failure, so the
-marker cannot outlive the cleanup silently.
+Landed red at 95 hits and cleared in the same PR, the same way the
+private-import gate did. The tree is at zero now, so a new label fails
+here rather than being grandfathered.
 """
 from __future__ import annotations
 
@@ -23,8 +22,6 @@ import io
 import re
 import tokenize
 from pathlib import Path
-
-import pytest
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "quodeq"
 SKIP_DIRS = frozenset({"node_modules", "dist", "generated", "__pycache__", "static"})
@@ -152,7 +149,6 @@ def test_label_pattern_matches_the_three_shapes():
     assert LABEL.findall("tasks 4, planning, clustered") == []
 
 
-@pytest.mark.xfail(strict=True, reason="PR 6 Tasks 2-3 clear the labels")
 def test_no_planning_labels_in_src_prose():
     hits = collect_labels()
     assert hits == [], (

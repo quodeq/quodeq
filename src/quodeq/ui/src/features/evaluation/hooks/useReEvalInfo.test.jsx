@@ -3,7 +3,7 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { useReEvalInfo } from './useReEvalInfo.js';
 
 /**
- * Cluster 18 (frontend silent-catch / status-conflation): a fetch failure
+ * Frontend silent-catch / status-conflation: a fetch failure
  * here used to be either surfaced only when there was no initialInfo
  * fallback, or -- on a later refresh/explicit retry() with a fallback
  * present -- completely silent (no error state, no console trace).

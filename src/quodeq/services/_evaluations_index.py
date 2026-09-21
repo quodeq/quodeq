@@ -6,7 +6,7 @@ Owns the read-side query path for evaluations: ``list``, ``get_status``,
 ``ActionProvider`` methods on ``FilesystemActionProvider`` are 1-line
 delegates to an instance of this class.
 
-Split (Task 14, + fix round): status.json readers, the terminal-state check,
+Split: status.json readers, the terminal-state check,
 and ``RunRow`` -> ``JobSnapshot`` assembly live in ``_run_status_readers.py``
 (re-exported — tests import readers directly); directory-removal,
 filesystem-fallback-scan, and external-job liveness (none patched by any

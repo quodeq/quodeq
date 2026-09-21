@@ -1,6 +1,6 @@
 """Safe extraction of validated zip members onto disk.
 
-Split out of import_project.py (Task 9). ``_safe_extract`` runs after
+Split out of import_project.py. ``_safe_extract`` runs after
 ``_import_validation._validate_archive`` has already rejected traversal,
 symlinks, and oversize members; it still double-checks each target path
 before writing, as a second line of defense.

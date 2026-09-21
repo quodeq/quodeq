@@ -7,7 +7,7 @@ import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
 
-// Task 7: one merged local+shared list, no tabs. The local list renders
+// One merged local+shared list, no tabs. The local list renders
 // unconditionally; the shared list layers in once useSharedProjects resolves
 // (cached-first, see that hook's own tests), so every render touches the API
 // -- an ApiProvider is required from here on regardless of project count.
@@ -204,7 +204,7 @@ describe('ProjectsPage — SyncedIndicator: "not synced yet" and unconfigured hi
   });
 });
 
-// Task 7: pending grade chip while a project summary is computing.
+// Pending grade chip while a project summary is computing.
 describe('ProjectsPage — pending grade chip', () => {
   it('shows a pending placeholder chip while the summary is computing', async () => {
     const projects = [{ id: 'a', name: 'proj-a', location: 'local', summaryPending: true }];

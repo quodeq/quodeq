@@ -175,7 +175,7 @@ describe("useProjectScores", () => {
     expect(fakeApi.getProjectScores).not.toHaveBeenCalled();
   });
 
-  // Task 17: source-aware fetch selection. A shared-source selection must
+  // Source-aware fetch selection. A shared-source selection must
   // read from the shared-repo mirror endpoints, never the local ones.
   describe("source-aware fetch selection", () => {
     it("calls getProjectScores (not sharedGetProjectScores) when selectedSource is 'local' (default)", async () => {

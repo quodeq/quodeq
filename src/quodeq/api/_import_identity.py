@@ -1,6 +1,6 @@
 """Project-identity helpers for import: collision detection and index updates.
 
-Split out of import_project.py (Task 9).
+Split out of import_project.py.
 """
 from __future__ import annotations
 

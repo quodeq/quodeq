@@ -1,6 +1,6 @@
 """status.json readers for index-served run snapshots.
 
-Split (Task 14) out of ``_evaluations_index.py``: external (``ext-``) runs
+Split out of ``_evaluations_index.py``: external (``ext-``) runs
 are not tracked by JobManager, so their dashboard-facing fields (dimensions,
 deadline, provider/model, time limit) are read straight from disk. All five
 readers, plus ``build_job_snapshot`` which assembles a ``JobSnapshot`` from

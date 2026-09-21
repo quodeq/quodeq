@@ -3,7 +3,7 @@
 Extracted from ``evaluation_mixin`` so the API layer has a public entry
 point instead of importing private helpers.
 
-Split (Task 12) into two sibling modules plus this orchestrator:
+Split into two sibling modules plus this orchestrator:
   - _registration_url.py: credential-stripping and origin-remote reads.
   - _registration_scan.py: the zero-run scan fallback and parent-project scan.
 """

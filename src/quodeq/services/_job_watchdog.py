@@ -1,6 +1,6 @@
 """Watchdog decision logic for JobManager._monitor_process.
 
-Split out of jobs.py (Task 13) as free functions. ``JobManager``'s own
+Split out of jobs.py as free functions. ``JobManager``'s own
 ``_watchdog_should_kill``/``_run_status_exit_reason`` methods become thin
 delegates that call these, passing in the collaborators (store,
 reports_root, cap) the instance already owns.
@@ -10,7 +10,7 @@ reports_root, cap) the instance already owns.
 it directly: tests monkeypatch ``quodeq.services.jobs._WATCHDOG_DEADLINE_GRACE_S``
 to shrink the grace window, and a top-level import here would bind its own
 copy and silently escape that patch. The same deferred pattern is used for
-``_publish_git.py``'s lookups of ``shared_publish.run_git`` (Task 12).
+``_publish_git.py``'s lookups of ``shared_publish.run_git``.
 """
 from __future__ import annotations
 

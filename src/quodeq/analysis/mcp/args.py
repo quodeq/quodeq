@@ -91,7 +91,7 @@ def parse_args(argv: list[str] | None = None) -> ServerArgs:
     if not result.findings_file:
         result.findings_file = get_findings_file() or ""
 
-    # Task 3.5: enforce --cache-root and --model-id are present when
+    # Enforce --cache-root and --model-id are present when
     # --dimension is set. Defense-in-depth alongside _build_router's
     # runtime check — fail at parse time, not construction time, so
     # subprocesses spawned without the cache args exit cleanly before

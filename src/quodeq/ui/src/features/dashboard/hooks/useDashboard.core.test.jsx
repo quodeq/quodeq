@@ -215,7 +215,7 @@ describe("useDashboard scheduleDashboardReconcile (debounced active reconcile)",
   });
 });
 
-// Task 17: source-aware fetch selection. selectedSource picks which
+// Source-aware fetch selection. selectedSource picks which
 // endpoint family (local vs shared-repo mirror) backs every query this hook
 // issues, and it must never leak into the wrong fetcher.
 describe("useDashboard source-aware fetch selection", () => {
