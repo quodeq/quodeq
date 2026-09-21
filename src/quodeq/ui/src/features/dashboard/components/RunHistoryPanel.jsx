@@ -1,15 +1,15 @@
 import { useState, useMemo } from 'react';
-import { gradeLetter, formatPeriodLabel } from '../../../utils/formatters.js';
-import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
+import { formatPeriodLabel } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import { granularityLabel } from '../../../strings/labels.js';
 import {
-  ScoreHistoryChart,
+  ScoreChartWithKeyboard,
   ScoreHistoryPanelFrame,
-  ScoreTooltipCard,
   computeScoreStats,
+  makeScoreTooltip,
+  periodOrDateLabel,
   tooltipScore,
-} from '../../../components/scoreChartParts.jsx';
+} from '../../../components/scoreChartPanel.jsx';
 
 const MAX_CHART_RUNS = 20;
 const CHART_HEIGHT = 160;
@@ -43,27 +43,29 @@ function buildTrendData(trend, selectedRunId, granularity = 'day') {
 // the line comparable across runs. The cost is that a point refreshed by 1 of
 // 7 dimensions looks identical to one backed by a full sweep, so say when the
 // refresh was partial. A complete scan needs no annotation.
-export function RunHistoryTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const entry = payload[0]?.payload;
-  if (!entry) return null;
-  const refreshed = entry.dimensionsCount;
-  const total = entry.accumulatedDimensionsCount;
-  const partial = Number.isFinite(refreshed) && Number.isFinite(total) && refreshed < total;
-  return (
-    <ScoreTooltipCard
-      label={entry.periodLabel || entry.dateLabel}
-      score={tooltipScore(entry.numericAverage, MISSING_SCORE)}
-      grade={gradeLetter(entry.overallGrade)}
-    >
-      {partial && (
-        <span className="rht-coverage">
-          {t('history.partialRefresh', { count: refreshed, total })}
-        </span>
-      )}
-    </ScoreTooltipCard>
-  );
-}
+export const RunHistoryTooltip = makeScoreTooltip({
+  label: periodOrDateLabel,
+  missingScore: MISSING_SCORE,
+  extra: (entry) => {
+    const refreshed = entry.dimensionsCount;
+    const total = entry.accumulatedDimensionsCount;
+    if (!Number.isFinite(refreshed) || !Number.isFinite(total) || refreshed >= total) return null;
+    return (
+      <span className="rht-coverage">
+        {t('history.partialRefresh', { count: refreshed, total })}
+      </span>
+    );
+  },
+});
+
+const CHART_PRESENTATION = {
+  height: CHART_HEIGHT,
+  fillHeight: true,
+  maxBarSize: MAX_BAR_SIZE,
+  gradientId: 'scoreAreaGrad',
+  tooltip: <RunHistoryTooltip />,
+  showSelectedDot: true,
+};
 
 // Keyboard-only equivalent of the chart's mouse click: one focusable button
 // per run, mirroring DimensionScoreHistoryPanel's own ChartKeyboardControls
@@ -107,25 +109,18 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBa
       stats={hasChart ? computeScoreStats(data) : null}
     >
       {hasChart ? (
-        <div className="chart-with-kbd">
-          <ScoreHistoryChart
-            data={data}
-            height={CHART_HEIGHT}
-            fillHeight
-            maxBarSize={MAX_BAR_SIZE}
-            gradientId="scoreAreaGrad"
-            tooltip={<RunHistoryTooltip />}
-            showSelectedDot
-            hoveredIndex={hoveredIndex}
-            setHoveredIndex={setHoveredIndex}
-            selectedRunId={selectedRunId}
-            onActivate={onBarClick ? (point) => onBarClick(point.runId) : undefined}
-          />
-          <ChartKeyboardControls
-            label={t('dashboard.runHistoryKbdLabel')}
-            items={buildRunKbdItems(data, onBarClick)}
-          />
-        </div>
+        <ScoreChartWithKeyboard
+          data={data}
+          chart={CHART_PRESENTATION}
+          interaction={{
+            hoveredIndex,
+            setHoveredIndex,
+            selectedRunId,
+            onActivate: onBarClick ? (point) => onBarClick(point.runId) : undefined,
+          }}
+          kbdLabel={t('dashboard.runHistoryKbdLabel')}
+          kbdItems={buildRunKbdItems(data, onBarClick)}
+        />
       ) : (
         <p className="run-history-panel__sparse">{t('overview.sparseTrend', { period: granularityLabel(granularity) })}</p>
       )}

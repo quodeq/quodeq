@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react';
 import { gradeLetter, formatPeriodLabel } from '../../../utils/formatters.js';
 import { extractDimensionPeriodSeries } from '../../../utils/dailyGrouping.js';
-import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
 import { t } from '../../../strings/index.js';
 import {
-  ScoreHistoryChart,
+  ScoreChartWithKeyboard,
   ScoreHistoryPanelFrame,
-  ScoreTooltipCard,
   computeScoreStats,
+  makeScoreTooltip,
+  periodOrDateLabel,
   tooltipScore,
-} from '../../../components/scoreChartParts.jsx';
+} from '../../../components/scoreChartPanel.jsx';
 
 const MAX = 16;
 const CHART_HEIGHT = 160;
@@ -36,18 +36,19 @@ function buildDimensionData(trend, dimensionName, granularity, limit) {
   }));
 }
 
-function DimensionTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const entry = payload[0]?.payload;
-  if (!entry) return null;
-  return (
-    <ScoreTooltipCard
-      label={entry.periodLabel || entry.dateLabel}
-      score={tooltipScore(entry.numericAverage, MISSING_SCORE)}
-      grade={gradeLetter(entry.overallGrade)}
-    />
-  );
-}
+const DimensionTooltip = makeScoreTooltip({
+  label: periodOrDateLabel,
+  missingScore: MISSING_SCORE,
+});
+
+const CHART_PRESENTATION = {
+  height: CHART_HEIGHT,
+  fillHeight: true,
+  maxBarSize: MAX_BAR_SIZE,
+  gradientId: 'dimScoreAreaGrad',
+  tooltip: <DimensionTooltip />,
+  showSelectedDot: true,
+};
 
 function buildKbdItems({ data, onBarClick, selectedRunId }) {
   if (!onBarClick) return [];
@@ -76,25 +77,13 @@ export default function DimensionScoreHistoryPanel({ trend = [], dimension, sele
       {data.length === 0 ? (
         <div className="qd-history-empty">{t('explorer.noHistoryYet')}</div>
       ) : (
-        <div className="chart-with-kbd">
-          <ScoreHistoryChart
-            data={data}
-            height={CHART_HEIGHT}
-            fillHeight
-            maxBarSize={MAX_BAR_SIZE}
-            gradientId="dimScoreAreaGrad"
-            tooltip={<DimensionTooltip />}
-            showSelectedDot
-            hoveredIndex={hoveredIndex}
-            setHoveredIndex={setHoveredIndex}
-            selectedRunId={selectedRunId}
-            onActivate={onBarClick}
-          />
-          <ChartKeyboardControls
-            label={t('explorer.dimScoreHistoryKbd', { dimension })}
-            items={buildKbdItems({ data, onBarClick, selectedRunId })}
-          />
-        </div>
+        <ScoreChartWithKeyboard
+          data={data}
+          chart={CHART_PRESENTATION}
+          interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onActivate: onBarClick }}
+          kbdLabel={t('explorer.dimScoreHistoryKbd', { dimension })}
+          kbdItems={buildKbdItems({ data, onBarClick, selectedRunId })}
+        />
       )}
     </ScoreHistoryPanelFrame>
   );

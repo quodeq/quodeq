@@ -1,12 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { gradeLetter } from '../../../utils/formatters.js';
-import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
 import { t } from '../../../strings/index.js';
-import {
-  ScoreHistoryChart,
-  ScoreTooltipCard,
-  tooltipScore,
-} from '../../../components/scoreChartParts.jsx';
+import { ScoreChartWithKeyboard, makeScoreTooltip } from '../../../components/scoreChartPanel.jsx';
 import { HISTORY_CHART_HEIGHT } from '../../../components/scoreChartHelpers.js';
 import { computeHistoryChartStats, buildHistoryKbdItems } from './historyChartStats.js';
 import { DATA_THEME_ATTR } from '../../../constants.js';
@@ -38,18 +32,18 @@ function buildTrendData(trend, selectedRunId) {
   });
 }
 
-function RunHistoryTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const entry = payload[0]?.payload;
-  if (!entry) return null;
-  return (
-    <ScoreTooltipCard
-      label={entry.dateLabel}
-      score={tooltipScore(entry.numericAverage, MISSING_SCORE)}
-      grade={gradeLetter(entry.overallGrade)}
-    />
-  );
-}
+// The History tab plots individual runs, so a point is always labelled by
+// its own date rather than a period bucket.
+const RunHistoryTooltip = makeScoreTooltip({
+  label: (entry) => entry.dateLabel,
+  missingScore: MISSING_SCORE,
+});
+
+const CHART_PRESENTATION = {
+  height: CHART_HEIGHT,
+  maxBarSize: MAX_BAR_SIZE,
+  tooltip: <RunHistoryTooltip />,
+};
 
 export default function HistoryChartPanel({ trend = [], selectedRunId = null, onBarClick }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -82,19 +76,18 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
           {t('history.latestAvgMinMax', { latest: fmt(latest), avg: fmt(avg), min: fmt(min), max: fmt(max) })}
         </span>
       </div>
-      <div className="chart-with-kbd">
-        <ScoreHistoryChart
-          data={data}
-          height={CHART_HEIGHT}
-          maxBarSize={MAX_BAR_SIZE}
-          tooltip={<RunHistoryTooltip />}
-          hoveredIndex={hoveredIndex}
-          setHoveredIndex={setHoveredIndex}
-          selectedRunId={selectedRunId}
-          onActivate={onBarClick ? (point) => onBarClick(point.runId) : undefined}
-        />
-        <ChartKeyboardControls label={t('history.kbdRunsLabel')} items={kbdItems} />
-      </div>
+      <ScoreChartWithKeyboard
+        data={data}
+        chart={CHART_PRESENTATION}
+        interaction={{
+          hoveredIndex,
+          setHoveredIndex,
+          selectedRunId,
+          onActivate: onBarClick ? (point) => onBarClick(point.runId) : undefined,
+        }}
+        kbdLabel={t('history.kbdRunsLabel')}
+        kbdItems={kbdItems}
+      />
     </section>
   );
 }

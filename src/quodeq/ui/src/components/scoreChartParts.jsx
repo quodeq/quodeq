@@ -8,9 +8,8 @@
  * only in the tooltip, whether they fill an area under the line, whether the
  * selected point gets a dot, and how tall the chart is. Those are props.
  *
- * The panel chrome (section, header, period selector, stats line) is
- * ScoreHistoryPanelFrame below; the numbers behind the stats line are
- * computeScoreStats.
+ * The panel chrome around it — header, period selector, stats line, tooltip
+ * cards and the keyboard-controls pairing — is scoreChartPanel.jsx.
  */
 import {
   ComposedChart,
@@ -24,8 +23,6 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
-import { SectionLabel, PeriodSelect } from './terminal/index.js';
-import { t } from '../strings/index.js';
 import {
   cssVar,
   scoreBarColor,
@@ -46,31 +43,6 @@ const TREND_LINE_STROKE_WIDTH = 2;
 const TREND_LINE_OPACITY = 0.9;
 const AREA_TOP_OPACITY = 0.08;
 const TOOLTIP_OFFSET = 20;
-
-/**
- * One tooltip card: the point's date on top, its score and grade below, plus
- * anything else the panel wants to add underneath.
- */
-export function ScoreTooltipCard({ label, score, grade, children }) {
-  return (
-    <div className="run-history-tooltip">
-      <span className="rht-date">{label}</span>
-      <span className="rht-score">{score} - {grade}</span>
-      {children}
-    </div>
-  );
-}
-
-/**
- * The point's score to one decimal, or `fallback` when it never scored.
- *
- * @param {number} value
- * @param {string} fallback
- * @returns {string}
- */
-export function tooltipScore(value, fallback) {
-  return Number.isFinite(value) ? value.toFixed(1) : fallback;
-}
 
 /**
  * The dot marking the selected run on the trend line. Renders nothing for
@@ -201,48 +173,5 @@ export function ScoreHistoryChart({
         />
       </ComposedChart>
     </ResponsiveContainer>
-  );
-}
-
-/**
- * Min, max and mean of the finite scores in `data`, or null when none of the
- * points carries a score.
- *
- * @param {Array<{numericAverage: number}>} data
- * @returns {{min: number, max: number, avg: number}|null}
- */
-export function computeScoreStats(data) {
-  const scores = data.map((d) => d.numericAverage).filter(Number.isFinite);
-  if (scores.length === 0) return null;
-  return {
-    min: Math.min(...scores),
-    max: Math.max(...scores),
-    avg: scores.reduce((s, n) => s + n, 0) / scores.length,
-  };
-}
-
-/**
- * The panel a score-history chart sits in: the section, the "SCORE HISTORY ·
- * N<suffix>" label, the period selector when the panel can change granularity
- * and the min/max/avg line when there are scores to summarise.
- */
-export function ScoreHistoryPanelFrame({
-  ariaLabel, count, suffix, granularity, onGranularityChange, stats, children,
-}) {
-  return (
-    <section className="run-history-panel run-history-panel--terminal panel" aria-label={ariaLabel}>
-      <div className="run-history-panel__header">
-        <SectionLabel>{t('overview.scoreHistoryLabel')} · {count}{suffix}</SectionLabel>
-        <span className="run-history-panel__controls">
-          {onGranularityChange && <PeriodSelect value={granularity} onChange={onGranularityChange} />}
-          {stats && (
-            <span className="run-history-panel__stats">
-              {t('overview.minMaxAvg', { min: stats.min.toFixed(1), max: stats.max.toFixed(1), avg: stats.avg.toFixed(1) })}
-            </span>
-          )}
-        </span>
-      </div>
-      {children}
-    </section>
   );
 }
