@@ -40,10 +40,14 @@ class TestResolveLimits:
     def test_cli_flags_win_over_env_leaves_unrelated_defaults_untouched(self, _cli_over_env_limits):
         """Unrelated caps must keep their defaults regardless of the
         max_turns/max_duration/time_limit precedence exercised above."""
+        from quodeq.shared.utils import get_ai_cmd
+
         limits = _cli_over_env_limits
         assert limits.verify_findings is True
         assert limits.dry_run is False
-        assert limits.dispatch_policy is not None
+        # No AI_CMD/AI_PROVIDER/QUODEQ_AI_CMD in the fixture's env, so the
+        # dispatch policy's ai_cmd must be the real configured default.
+        assert limits.dispatch_policy.ai_cmd == get_ai_cmd({})
 
     def test_env_fills_in_unset_caps(self):
         from quodeq._cli_run_config import _resolve_limits

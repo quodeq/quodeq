@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quodeq.core.events.models import FindingDismissed, FindingDismissedEvent
+from quodeq.data.actions_log import ActionLogWriter
 from quodeq.services.violation_context import ViolationContext
 from quodeq.services.violations import (
     _ResolveOptions,
@@ -28,11 +30,14 @@ def test_suppression_keys_reads_project_dismissed_and_deleted(tmp_path: Path) ->
     (project_dir / "deleted.json").write_text(json.dumps([
         {"dimension": "testdim", "principle": "Clear Naming", "file": "src/app.py"},
     ]))
+    ActionLogWriter(project_dir).emit(FindingDismissedEvent(payload=FindingDismissed(
+        req="S-CON-1", file="src/dismissed.py", line=7, fingerprint=None,
+    )))
 
     keys = _suppression_keys(base)
 
     assert keys.deleted == {("testdim", "Clear Naming", "src/app.py")}
-    assert keys.dismissed.entries == ()
+    assert ("S-CON-1", "src/dismissed.py", 7) in keys.dismissed.lines
 
 
 def test_suppression_keys_empty_when_project_has_no_state(tmp_path: Path) -> None:

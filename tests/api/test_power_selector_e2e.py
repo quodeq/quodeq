@@ -148,23 +148,25 @@ class TestRunnerModelResolution:
     """The runner builds AnalysisConfig.ai_model from options → env → default."""
 
     def _resolve(self, subagent_model: str | None = None, env_model: str | None = None) -> str:
-        """Exercise the model-resolution precedence with the same function and
-        formula ``_pool_launcher._build_pool_config`` uses in production:
-        ``config.options.subagent_model or subagent_model_override(env) or
-        config.options.ai_model``. ``subagent_model_override`` is the public
-        function ``_pool_launcher._default_subagent_model`` itself calls (the
-        real production seam, checking SUBAGENT_MODEL then
-        QUODEQ_SUBAGENT_MODEL); ``ai_model`` is set to the haiku constant here
-        to stand in for whatever default the caller configured, since
-        AnalysisOptions itself has no built-in default.
+        """Exercise the model-resolution precedence by calling the real
+        ``_pool_launcher._build_pool_config`` production function, so a
+        regression at its ``config.options.subagent_model or
+        _default_subagent_model(env) or config.options.ai_model`` line fails
+        these tests. ``ai_model`` is set to the haiku constant here to stand
+        in for whatever default the caller configured, since AnalysisOptions
+        itself has no built-in default.
         """
-        from quodeq.config.analysis_env import subagent_model_override
-        from quodeq.analysis.runner import AnalysisOptions
-        opts = AnalysisOptions(subagent_model=subagent_model, ai_model=_MODEL_HAIKU)
-        with patch.dict(os.environ, {"SUBAGENT_MODEL": env_model} if env_model else {}, clear=False):
-            if not env_model:
-                os.environ.pop("SUBAGENT_MODEL", None)
-            return opts.subagent_model or subagent_model_override() or opts.ai_model
+        from quodeq.analysis.runner import AnalysisOptions, RunConfig
+        from quodeq.analysis.subagents._pool_launcher import LaunchPoolParams, _build_pool_config
+
+        config = RunConfig(
+            src=Path("."), language="python",
+            options=AnalysisOptions(subagent_model=subagent_model, ai_model=_MODEL_HAIKU),
+        )
+        params = LaunchPoolParams(evidence_dir=Path("."), queue_path=Path("queue.json"), prompt="p")
+        env = {"SUBAGENT_MODEL": env_model} if env_model else {}
+        built = _build_pool_config(config, "test-dim", params, time_limit=60, env=env)
+        return built.ai_model
 
     def test_level1_fast_haiku(self) -> None:
         assert self._resolve(_MODEL_HAIKU) == _MODEL_HAIKU
