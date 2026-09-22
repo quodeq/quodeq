@@ -2,8 +2,6 @@
 
 from importlib.metadata import version as _pkg_version, PackageNotFoundError
 
-from quodeq.services.base import ActionProvider
-
 try:
     __version__: str | None = _pkg_version("quodeq")
 except PackageNotFoundError:

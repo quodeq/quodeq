@@ -9,13 +9,15 @@ from __future__ import annotations
 
 from http import HTTPStatus
 from pathlib import Path
+from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error
 from quodeq.api.routes_common import reports_dir
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
+    params_error,
     params_from_dict,
     params_to_dict,
     validate_params,
@@ -24,21 +26,24 @@ from quodeq.services import grade_formula
 from quodeq.shared.validation import validate_path_segment
 
 
+def _invalid_input(message: str) -> tuple[Response, int]:
+    return json_error(message, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+
+
 def _parse_params(data: dict) -> tuple:
     """Returns (params, None) or (None, (response, status)) on validation error."""
+    err = params_error(data or {})
+    if err is not None:
+        return None, _invalid_input(err)
     try:
         params = params_from_dict(data or {})
-    except (TypeError, ValueError, KeyError, AttributeError) as exc:
-        body, status = error_response(
-            f"Malformed params: {exc}", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
-        )
-        return None, (jsonify(body), status)
+    except (TypeError, ValueError, KeyError, AttributeError):
+        # Unreachable once params_error passed; kept as a safety net with a
+        # constant message so nothing here can ever echo exception text.
+        return None, _invalid_input("Malformed params")
     errors = validate_params(params)
     if errors:
-        body, status = error_response(
-            "; ".join(errors), HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
-        )
-        return None, (jsonify(body), status)
+        return None, _invalid_input("; ".join(errors))
     return params, None
 
 
@@ -56,7 +61,10 @@ def _state_payload(result: "grade_formula.ApplyResult | None" = None) -> dict:
     return payload
 
 
-def register_grade_formula_routes(app: Flask) -> None:
+def register_grade_formula_routes(
+    app: Flask,
+    apply_to_all_runs: Callable[[Path], grade_formula.ApplyResult] = grade_formula.apply_to_all_runs,
+) -> None:
     """Register grade formula endpoints."""
 
     @app.get("/api/grade-formula")
@@ -69,13 +77,18 @@ def register_grade_formula_routes(app: Flask) -> None:
         if err:
             return err
         grade_formula.save_params(params)
-        result = grade_formula.apply_to_all_runs(Path(reports_dir()))
+        result = apply_to_all_runs(Path(reports_dir()))
         return jsonify(_state_payload(result=result))
 
     @app.delete("/api/grade-formula")
-    def delete_grade_formula() -> Response:
+    def delete_grade_formula() -> Response | tuple[Response, int]:
+        if request.args.get("confirm") != "true":
+            return json_error(
+                "Use ?confirm=true to confirm resetting the grade formula and rescoring every run",
+                HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
+            )
         grade_formula.reset_params()
-        result = grade_formula.apply_to_all_runs(Path(reports_dir()))
+        result = apply_to_all_runs(Path(reports_dir()))
         return jsonify(_state_payload(result=result))
 
     @app.post("/api/grade-formula/preview")
@@ -85,18 +98,16 @@ def register_grade_formula_routes(app: Flask) -> None:
         try:
             validate_path_segment(project)
         except ValueError:
-            body, status = error_response(
+            return json_error(
                 "Invalid project", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
             )
-            return jsonify(body), status
         params, err = _parse_params(payload.get("params") or {})
         if err:
             return err
         result = grade_formula.preview_scores(Path(reports_dir()), project, params)
         if result is None:
-            body, status = error_response(
+            return json_error(
                 "No evaluation with an event log found for this project",
                 HTTPStatus.NOT_FOUND, "NOT_FOUND",
             )
-            return jsonify(body), status
         return jsonify(result)

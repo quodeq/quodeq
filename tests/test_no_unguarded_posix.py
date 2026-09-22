@@ -22,21 +22,32 @@ _PATTERNS = re.compile(
 
 # Known, already-handled sites (src-relative "path.py:LINE"). Audited 2026-05-30.
 _ALLOWLIST: set[str] = {
-    # os.killpg(os.getpgid(pid)) lives in the `else` of `if sys.platform ==
-    # "win32"` (the win32 branch uses taskkill /F /T). POSIX-only by design.
-    "analysis/_process.py:35",
+    # kill_tree POSIX branch, in the else of `if sys.platform == "win32"`
+    # (win32 uses taskkill /F /T). Hoisted from analysis/_process.py so
+    # services/ and analysis/ can share one implementation.
+    "shared/process_kill.py:32",
     # kill_proc_tree POSIX branch, in the else of `if sys.platform == "win32"`
     # (win32 uses taskkill /F /T). Hoisted from assistant to shared.
-    "shared/_process_kill.py:37",
+    "shared/process_kill.py:69",
     # pgrep / ps are wrapped in `except (OSError, ...)` -> returns _UNKNOWN, so
     # on Windows (FileNotFoundError) resource sampling degrades gracefully.
-    "shared/resource_sampler.py:41",
-    "shared/resource_sampler.py:57",
+    "shared/resource_sampler.py:44",
+    "shared/resource_sampler.py:60",
     # child_cwd's macOS branch: only reached when `platform == "darwin"` and
     # wrapped in `except (..., subprocess.SubprocessError)`, so Windows never
     # runs it and a missing lsof degrades to None. Used to resolve clickable
     # terminal links against the shell's live cwd.
-    "terminal/links.py:80",
+    "terminal/links.py:81",
+    # quodeq/menubar/ is darwin-only by construction: control.is_supported()
+    # gates every spawn on sys.platform == "darwin", and app/_app_lifecycle
+    # only run inside the rumps process that spawn starts. lsof/killpg/pkill/ps
+    # are therefore never reached on Windows, and each call is wrapped to
+    # degrade gracefully anyway. The ps call in _is_quodeq_process only sees
+    # pids from find_pids_on_port, which returns [] off-darwin.
+    "menubar/_process.py:83",
+    "menubar/_process.py:95",
+    "menubar/_app_lifecycle.py:157",
+    "menubar/_app_lifecycle.py:169",
 }
 
 

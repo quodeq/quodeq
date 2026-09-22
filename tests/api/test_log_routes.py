@@ -43,7 +43,74 @@ def test_logs_page_returns_html():
     assert resp.status_code == 200
     assert b"<!DOCTYPE html>" in resp.data
     assert b"Quodeq" in resp.data
+    # The poller now lives in the externalized script (CSP fix: an inline
+    # <script> is blocked by the script-src 'self' policy in api/security.py).
+    assert b"/logs.js" in resp.data
+
+
+def test_logs_js_polls_the_api_logs_endpoint():
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/logs.js")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("application/javascript")
     assert b"/api/logs" in resp.data
+    # The placeholder must be templated to a real number, not left literal.
+    assert b"{{POLL_INTERVAL_MS}}" not in resp.data
+
+
+def test_logs_js_caps_the_dom_with_max_lines():
+    """A tab left open for hours must not grow #logs without bound: the
+    poller trims the oldest lines past MAX_LINES."""
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/logs.js")
+    assert resp.status_code == 200
+    text = resp.data.decode("utf-8")
+    assert "MAX_LINES" in text
+    assert "removeChild" in text
+
+
+def test_logs_page_has_aria_live_log_region():
+    """New lines must be announced to assistive tech (finding 7329)."""
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/logs")
+    assert resp.status_code == 200
+    text = resp.data.decode("utf-8")
+    assert 'role="log"' in text
+    assert 'aria-live="polite"' in text
+
+
+def test_logs_page_has_a_status_region():
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/logs")
+    assert resp.status_code == 200
+    text = resp.data.decode("utf-8")
+    assert 'id="log-status"' in text
+    assert 'role="status"' in text
+
+
+def test_logs_js_reports_a_stalled_poll():
+    """A failed poll must show a visible status, not just console.warn
+    (finding 7334); the next successful poll clears it."""
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/logs.js")
+    assert resp.status_code == 200
+    text = resp.data.decode("utf-8")
+    assert "console.warn" in text
+    assert "log-status" in text
+    assert "retrying" in text
+
+
+def test_logs_css_served():
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/logs.css")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/css")
 
 
 @pytest.mark.parametrize("logger_name", ["werkzeug", "quodeq.api"])
@@ -53,3 +120,28 @@ def test_logs_suppressed_by_default(logger_name):
     lgr = logging.getLogger(logger_name)
     assert len(lgr.handlers) == 1
     assert lgr.propagate is False
+
+
+def test_logs_assets_are_read_once_at_registration():
+    """logs.html/css/js are cached at import time, not re-read per request."""
+    from unittest.mock import patch
+    from quodeq.api._log_routes import _PAGES_DIR
+
+    app = create_app()
+    client = app.test_client()
+
+    real_read_text = type(_PAGES_DIR).read_text
+    call_count = {"n": 0}
+
+    def counting_read_text(self, *a, **kw):
+        if self.parent == _PAGES_DIR:
+            call_count["n"] += 1
+        return real_read_text(self, *a, **kw)
+
+    with patch("pathlib.Path.read_text", counting_read_text):
+        client.get("/logs")
+        client.get("/logs")
+        client.get("/logs.css")
+        client.get("/logs.js")
+
+    assert call_count["n"] == 0, "static assets must be cached, not re-read per request"

@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.1.0
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -125,3 +125,50 @@ jobs:
         # New strings go in src/strings/en.json via t(); shrunk counts are locked
         # in with `npm run lint:strings:update`.
         run: npm run lint:strings
+
+      - name: Check UI file/function sizes (size ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on files/functions over 300/50 lines outside the grandfather
+        # list in tools/size_grandfather.mjs, or a grandfather list that grew
+        # past its committed ceiling.
+        run: npm run lint:size
+
+      - name: Check UI unused bindings and parameter counts (hygiene ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on unused imports/variables or functions with more than 5
+        # parameters beyond the per-file counts in tools/hygiene_baseline.json,
+        # or a baseline total above its committed ceiling. Shrunk counts are
+        # locked in with `npm run lint:hygiene:update`.
+        run: npm run lint:hygiene
+
+      - name: Check UI magic numbers (magic ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on unexplained numeric literals in production code beyond the
+        # per-file counts in tools/magic_baseline.json, or a baseline total
+        # above its committed ceiling. Shrunk counts are locked in with
+        # `npm run lint:magic:update`.
+        run: npm run lint:magic
+
+      - name: Check UI accessibility (a11y ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on eslint-plugin-jsx-a11y violations in production code beyond
+        # the per-file counts in tools/a11y_baseline.json, or a baseline total
+        # above its committed ceiling. Shrunk counts are locked in with
+        # `npm run lint:a11y:update`.
+        run: npm run lint:a11y
+
+      - name: Check UI fault tolerance (fault ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on swallowed catches, floating promises, raw web storage access
+        # or unguarded lookup dereferences in production code beyond the
+        # per-file counts in tools/fault_baseline.json, or a baseline total
+        # above its committed ceiling. Shrunk counts are locked in with
+        # `npm run lint:fault:update`.
+        run: npm run lint:fault
+
+      - name: Check UI duplication (clone ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on jscpd-detected copy-paste duplication beyond the spans in
+        # tools/clones_baseline.json, or a baseline above its committed
+        # ceiling. Shrunk entries are locked in with `npm run lint:clones:update`.
+        run: npm run lint:clones

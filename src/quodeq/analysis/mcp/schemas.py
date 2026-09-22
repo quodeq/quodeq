@@ -5,6 +5,26 @@ for ``report_finding``, ``get_next_files``, and ``mark_file_done``.
 """
 from __future__ import annotations
 
+# report_finding's "t" and "severity" enums -- the gates in this package
+# (scope_gate.py, provenance_gate.py, precedent_downweight.py, enricher.py)
+# read and write the same finding dict, so they import these rather than
+# retyping the values the schema declares valid.
+FINDING_TYPE_VIOLATION = "violation"
+FINDING_TYPE_COMPLIANCE = "compliance"
+SEVERITY_CRITICAL = "critical"
+SEVERITY_MAJOR = "major"
+SEVERITY_MINOR = "minor"
+
+# mark_file_done's "status" vocabulary. router.py writes these into the JSONL
+# file_done markers; _loop_guards.py reads them back to count analysed vs
+# abandoned files, so both sides import these rather than retyping them.
+FILE_DONE_STATUS_OK = "ok"
+FILE_DONE_STATUS_ERROR = "error"
+# Accepted by the router but deliberately absent from the tool schema's enum
+# below: "skipped" is written by the server for files the worker could never
+# dispatch, not something a worker is told to report.
+FILE_DONE_STATUS_SKIPPED = "skipped"
+
 REPORT_FINDING_NAME = "report_finding"
 REPORT_FINDING_DESC = (
     "Report a code quality finding (violation or compliance). "
@@ -14,12 +34,12 @@ REPORT_FINDING_SCHEMA = {
     "type": "object",
     "properties": {
         "req": {"type": "string", "description": "Requirement ID from the standards checklist (e.g. 'M-MOD-1', 'S-CON-3'). Server auto-fills principle name and dimension from this."},
-        "t": {"type": "string", "enum": ["violation", "compliance"], "description": "Finding type"},
+        "t": {"type": "string", "enum": [FINDING_TYPE_VIOLATION, FINDING_TYPE_COMPLIANCE], "description": "Finding type"},
         "file": {"type": "string", "description": "File path relative to repo root"},
         "line": {"type": "integer", "description": "Line number"},
         "end_line": {"type": "integer", "description": "Last line of the violation pattern (omit if single line)"},
         "scope": {"type": "string", "enum": ["file", "class", "module"], "description": "Set when the finding affects an entire file/class/module rather than specific lines"},
-        "severity": {"type": "string", "enum": ["critical", "major", "minor"], "description": "Severity level"},
+        "severity": {"type": "string", "enum": [SEVERITY_CRITICAL, SEVERITY_MAJOR, SEVERITY_MINOR], "description": "Severity level"},
         "vt": {"type": "string", "description": "Violation type taxonomy code: a short, stable, kebab-case class of the violation (e.g. 'code-injection', 'hardcoded-secret', 'missing-error-handling'). Reuse the exact same code for every finding of the same kind."},
         "w": {"type": "string", "description": "Short description of the finding"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},
@@ -59,7 +79,7 @@ MARK_FILE_DONE_SCHEMA = {
     "type": "object",
     "properties": {
         "file": {"type": "string", "description": "Repo-relative file path that was just analysed"},
-        "status": {"type": "string", "enum": ["ok", "error"], "description": "ok if analysis completed, error if abandoned"},
+        "status": {"type": "string", "enum": [FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR], "description": "ok if analysis completed, error if abandoned"},
         "reason": {"type": "string", "description": "Short stable code when status=error: token_limit | parse_error | retry_exhausted | subprocess_error | timeout"},
     },
     "required": ["file", "status"],

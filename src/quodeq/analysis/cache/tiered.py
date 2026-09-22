@@ -27,6 +27,10 @@ class TieredCache:
         self._remote = remote
 
     def get(self, key: str) -> CacheEntry | None:
+        """Return the local hit, else try remote and warm the local tier with it.
+
+        A failing remote read is logged and reported as a miss.
+        """
         if hit := self._local.get(key):
             return hit
         if self._remote is None:
@@ -42,6 +46,7 @@ class TieredCache:
         return hit
 
     def put(self, key: str, entry: CacheEntry) -> None:
+        """Write *entry* locally, then mirror it to remote best-effort."""
         self._local.put(key, entry)
         if self._remote is None:
             return
@@ -51,6 +56,7 @@ class TieredCache:
             _logger.warning("remote cache put failed for %s: %s", key, exc)
 
     def has(self, key: str) -> bool:
+        """Report presence in either tier. A failing remote probe counts as absent."""
         if self._local.has(key):
             return True
         if self._remote is None:
@@ -62,6 +68,7 @@ class TieredCache:
             return False
 
     def delete(self, key: str) -> None:
+        """Drop *key* from both tiers. A failing remote delete is logged, not raised."""
         self._local.delete(key)
         if self._remote is None:
             return
@@ -71,4 +78,5 @@ class TieredCache:
             _logger.warning("remote cache delete failed for %s: %s", key, exc)
 
     def stats(self) -> CacheStats:
+        """Return the local tier's stats. The remote tier is not counted."""
         return self._local.stats()

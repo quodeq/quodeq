@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useWizardState } from './useWizardState.js';
+import { useWizardState, reducer } from './useWizardState.js';
 
 describe('useWizardState', () => {
   it('initial state for fresh user starts at welcome with isFirstProject=true', () => {
@@ -59,5 +59,13 @@ describe('useWizardState', () => {
     act(() => result.current.toggleStandard('std-a'));
     act(() => result.current.toggleStandard('std-a'));
     expect(result.current.state.standardIds.size).toBe(0);
+  });
+
+  it('leaves the state alone for a prototype-named action type', () => {
+    const { result } = renderHook(() => useWizardState());
+    const state = result.current.state;
+    expect(reducer(state, { type: 'constructor' })).toBe(state);
+    expect(reducer(state, { type: 'toString' })).toBe(state);
+    expect(reducer(state, { type: 'nope' })).toBe(state);
   });
 });

@@ -13,15 +13,20 @@ import { exitReasonLabel, isTimeLimitExit } from '../../../models/exitReason.js'
 import { t } from '../../../strings/index.js';
 import { jobStatusLabel } from '../../../strings/labels.js';
 
-const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
-const TERMINAL_STATES = new Set(['done', 'completed', 'failed', 'cancelled', 'lost']);
+const STATUS = {
+  RUNNING: 'running', DONE: 'done', COMPLETED: 'completed',
+  FAILED: 'failed', CANCELLED: 'cancelled', LOST: 'lost',
+};
+const TERMINAL_STATES = new Set([
+  STATUS.DONE, STATUS.COMPLETED, STATUS.FAILED, STATUS.CANCELLED, STATUS.LOST,
+]);
 
 // A cancelled/failed job whose run hit its time budget is not an error:
 // the header must agree with the coverage banner below it, which already
 // says "time limit reached" from the run's status.json. Done runs keep
 // their "complete" header; the banner tells the truncation story there.
 function isTimeLimitEnd(status, exitReason) {
-  return (status === 'cancelled' || status === STATUS.FAILED) && isTimeLimitExit(exitReason);
+  return (status === STATUS.CANCELLED || status === STATUS.FAILED) && isTimeLimitExit(exitReason);
 }
 
 function termNameForStatus(status, exitReason) {
@@ -100,7 +105,7 @@ function JobIdentityStrip({ job, projectLabel }) {
   );
 }
 
-export default function EvaluationStatus({ job, jobProjectInfo, startedProjectInfo, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
+export default function EvaluationStatus({ job, jobProjectInfo, startedProjectInfo, liveViolations = {}, onDismiss, onCancel }) {
   const { newOnly } = useLiveFeedSettings();
   // Filter ONCE, above both consumers. JobStatStrip derives its violations
   // cell from the same object the feed lists, so filtering in each child
@@ -110,10 +115,10 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
     const next = {};
     let hidden = 0;
     for (const [dim, vs] of Object.entries(liveViolations || {})) {
-      // The SSE stream (VITE_USE_SSE_EVENTS) writes raw wire payloads
-      // straight into the findings cache with no violation-model mapping,
-      // so those entries carry snake_case `carried_forward` instead of
-      // `carriedForward`. Accept both spellings here.
+      // Both cache writers normalise through createViolation now, so entries
+      // carry `carriedForward`. The snake_case spelling stays accepted: the
+      // SSE stream (VITE_USE_SSE_EVENTS) used to write raw wire payloads
+      // here, and an entry written before this must not read as fresh.
       const fresh = (vs || []).filter((v) => !(v.carriedForward ?? v.carried_forward));
       hidden += (vs || []).length - fresh.length;
       if (fresh.length) next[dim] = fresh;
@@ -137,7 +142,7 @@ export default function EvaluationStatus({ job, jobProjectInfo, startedProjectIn
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobIdentityStrip job={job} projectLabel={projectLabel} />
       <JobStatStrip job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
-      <ScanProgress job={job} hasEvaluations={hasEvaluations} />
+      <ScanProgress job={job} />
       <LiveViolationsFeed job={job} liveViolations={shown} hiddenCarriedCount={hiddenCarriedCount} />
     </div>
   );

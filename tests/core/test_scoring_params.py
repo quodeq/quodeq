@@ -1,6 +1,7 @@
 """Tests for the ScoringParams model, validation, and serialization."""
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -8,8 +9,8 @@ import pytest
 
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
-    ScoringParams,
     dimension_weighted_average,
+    params_error,
     params_from_dict,
     params_to_dict,
     validate_params,
@@ -66,20 +67,17 @@ def test_validate_accepts_defaults():
     ("floor_minor", 11.0, "floor_minor"),
 ])
 def test_validate_rejects_out_of_range(field, value, fragment):
-    import dataclasses
     bad = dataclasses.replace(DEFAULT_PARAMS, **{field: value})
     errors = validate_params(bad)
     assert any(fragment in e for e in errors)
 
 
 def test_validate_rejects_floor_minor_below_floor_major():
-    import dataclasses
     bad = dataclasses.replace(DEFAULT_PARAMS, floor_minor=2.0, floor_major=3.0)
     assert any("floor_minor" in e for e in validate_params(bad))
 
 
 def test_validate_rejects_non_decreasing_thresholds():
-    import dataclasses
     bad = dataclasses.replace(DEFAULT_PARAMS, grade_thresholds=(
         (9.0, "Exemplary"), (9.5, "Good"), (5.0, "Adequate"), (3.0, "Poor"),
     ))
@@ -87,7 +85,6 @@ def test_validate_rejects_non_decreasing_thresholds():
 
 
 def test_validate_rejects_renamed_threshold_labels():
-    import dataclasses
     bad = dataclasses.replace(DEFAULT_PARAMS, grade_thresholds=(
         (9.0, "Amazing"), (7.0, "Good"), (5.0, "Adequate"), (3.0, "Poor"),
     ))
@@ -95,7 +92,6 @@ def test_validate_rejects_renamed_threshold_labels():
 
 
 def test_validate_rejects_nonpositive_severity_weight():
-    import dataclasses
     bad = dataclasses.replace(
         DEFAULT_PARAMS, severity_weight={"critical": 4.0, "major": 0.0, "minor": 0.25},
     )
@@ -103,14 +99,12 @@ def test_validate_rejects_nonpositive_severity_weight():
 
 
 def test_dimension_weighted_average_disabled_is_plain_mean():
-    import dataclasses
     params = dataclasses.replace(DEFAULT_PARAMS, dimension_weights_enabled=False)
     pairs = [("security", 8.0), ("performance", 6.0)]
     assert dimension_weighted_average(pairs, params) == 7.0
 
 
 def test_dimension_weighted_average_enabled_weights_by_dimension():
-    import dataclasses
     # Default weights are all 1.0; set explicit per-dimension weights to
     # exercise the weighting math.
     params = dataclasses.replace(
@@ -124,7 +118,6 @@ def test_dimension_weighted_average_enabled_weights_by_dimension():
 
 
 def test_dimension_weighted_average_unknown_dimension_defaults_to_1():
-    import dataclasses
     params = dataclasses.replace(
         DEFAULT_PARAMS,
         dimension_weights_enabled=True,
@@ -140,15 +133,41 @@ def test_dimension_weighted_average_empty_returns_none():
 
 
 def test_mappings_are_read_only():
-    import pytest as _pytest
-    with _pytest.raises(TypeError):
+    with pytest.raises(TypeError):
         DEFAULT_PARAMS.dimension_weights["security"] = 9.9  # type: ignore[index]
-    with _pytest.raises(TypeError):
+    with pytest.raises(TypeError):
         DEFAULT_PARAMS.severity_weight["critical"] = 9.9  # type: ignore[index]
 
 
 def test_replace_does_not_alias_default_mappings():
-    import dataclasses
     copy = dataclasses.replace(DEFAULT_PARAMS, base_k=0.3)
     assert copy.dimension_weights is not DEFAULT_PARAMS.dimension_weights
     assert copy.severity_weight is not DEFAULT_PARAMS.severity_weight
+
+
+def test_params_error_none_for_valid_payload():
+    assert params_error(params_to_dict(DEFAULT_PARAMS)) is None
+    assert params_error({}) is None
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("baseK", "abc"),
+        ("severityWeight", 5),
+        ("gradeThresholds", [[1.0]]),
+        ("dimensionWeights", {"security": "heavy"}),
+    ],
+)
+def test_params_error_names_the_offending_key_only(key, value):
+    payload = params_to_dict(DEFAULT_PARAMS)
+    payload[key] = value
+    assert params_error(payload) == f"Malformed params: {key}"
+    # The raising path still fails on the same payload; the checker never
+    # echoes its text, only our own key name.
+    with pytest.raises((TypeError, ValueError, KeyError, AttributeError)):
+        params_from_dict(payload)
+
+
+def test_params_error_non_mapping_is_malformed_without_detail():
+    assert params_error(["not", "a", "dict"]) == "Malformed params"

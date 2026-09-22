@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 import os
 from pathlib import Path
-
-import pytest
 
 
 def _make_git_repo(path: Path, branches: list[str] | None = None) -> None:
@@ -37,12 +34,12 @@ def _make_git_repo(path: Path, branches: list[str] | None = None) -> None:
 
 class TestCreateWorktree:
     def test_creates_worktree_for_branch(self, tmp_path: Path) -> None:
-        from quodeq.cli import _create_worktree
+        from quodeq.cli import create_worktree
         repo = tmp_path / "repo"
         repo.mkdir()
         _make_git_repo(repo, branches=["feature/test"])
 
-        wt = _create_worktree(repo, "feature/test")
+        wt = create_worktree(repo, "feature/test")
         try:
             assert wt is not None
             assert wt.is_dir()
@@ -54,19 +51,19 @@ class TestCreateWorktree:
                 subprocess.run(["git", "-C", str(repo), "worktree", "remove", str(wt), "--force"], capture_output=True)
 
     def test_returns_none_for_nonexistent_branch(self, tmp_path: Path) -> None:
-        from quodeq.cli import _create_worktree
+        from quodeq.cli import create_worktree
         repo = tmp_path / "repo"
         repo.mkdir()
         _make_git_repo(repo)
 
-        wt = _create_worktree(repo, "nonexistent-branch")
+        wt = create_worktree(repo, "nonexistent-branch")
         assert wt is None
 
     def test_fetches_missing_branch_from_origin(self, tmp_path: Path) -> None:
         """Online repos are registered via a single-branch shallow clone, so a
         branch evaluation targets a branch the clone doesn't have yet; it must
         be fetched from origin instead of failing."""
-        from quodeq.cli import _create_worktree
+        from quodeq.cli import create_worktree
         origin = tmp_path / "origin"
         origin.mkdir()
         _make_git_repo(origin, branches=["feature/other"])
@@ -76,7 +73,7 @@ class TestCreateWorktree:
             capture_output=True, check=True,
         )
 
-        wt = _create_worktree(clone, "feature/other")
+        wt = create_worktree(clone, "feature/other")
         try:
             assert wt is not None
             assert (wt / "branch_file.txt").read_text() == "from feature/other"
@@ -87,16 +84,16 @@ class TestCreateWorktree:
 
 class TestCleanupWorktree:
     def test_removes_worktree(self, tmp_path: Path) -> None:
-        from quodeq.cli import _create_worktree, _cleanup_worktree
+        from quodeq.cli import create_worktree, cleanup_worktree
         repo = tmp_path / "repo"
         repo.mkdir()
         _make_git_repo(repo, branches=["feature/cleanup"])
 
-        wt = _create_worktree(repo, "feature/cleanup")
+        wt = create_worktree(repo, "feature/cleanup")
         assert wt is not None
         assert wt.is_dir()
 
-        _cleanup_worktree(repo, wt)
+        cleanup_worktree(repo, wt)
         assert not wt.exists()
 
 

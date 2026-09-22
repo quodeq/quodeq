@@ -1,8 +1,30 @@
 import logging
 
+import pytest
+
 from quodeq.api._log_buffer import LogBuffer
 
 _TEST_MAX_LINES = 3
+
+
+@pytest.fixture()
+def bound_log_buffer():
+    """Yield a function that creates a LogBuffer and attaches its handler to
+    a named logger. Teardown detaches every handler it attached, even if the
+    test body fails an assertion first."""
+    created = []
+
+    def _bind(name, level):
+        buf = LogBuffer(max_lines=10)
+        logger = logging.getLogger(name)
+        logger.addHandler(buf.handler)
+        logger.setLevel(level)
+        created.append((logger, buf.handler))
+        return buf, logger
+
+    yield _bind
+    for logger, handler in created:
+        logger.removeHandler(handler)
 
 
 def test_append_and_get_lines():
@@ -53,16 +75,12 @@ def test_monotonic_index():
     assert indices == [2, 3, 4]
 
 
-def test_handler_captures_log_records():
-    buf = LogBuffer(max_lines=10)
-    logger = logging.getLogger("test_handler_capture")
-    logger.addHandler(buf.handler)
-    logger.setLevel(logging.INFO)
+def test_handler_captures_log_records(bound_log_buffer):
+    buf, logger = bound_log_buffer("test_handler_capture", logging.INFO)
     logger.info("hello from logger")
     result = buf.get_lines()
     assert len(result["lines"]) == 1
     assert "hello from logger" in result["lines"][0]["line"]
-    logger.removeHandler(buf.handler)
 
 
 def test_clear():
@@ -73,3 +91,25 @@ def test_clear():
     result = buf.get_lines()
     assert len(result["lines"]) == 0
     assert result["total"] == 0
+
+
+def test_append_defaults_level_to_info():
+    buf = LogBuffer(max_lines=10)
+    buf.append("line one")
+    result = buf.get_lines()
+    assert result["lines"][0]["level"] == "INFO"
+
+
+def test_append_records_given_level():
+    buf = LogBuffer(max_lines=10)
+    buf.append("uh oh", level="ERROR")
+    result = buf.get_lines()
+    assert result["lines"][0]["level"] == "ERROR"
+
+
+def test_handler_captures_record_level(bound_log_buffer):
+    buf, logger = bound_log_buffer("test_handler_capture_level", logging.WARNING)
+    logger.warning("uh oh from logger")
+    result = buf.get_lines()
+    assert len(result["lines"]) == 1
+    assert result["lines"][0]["level"] == "WARNING"

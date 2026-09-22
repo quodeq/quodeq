@@ -62,4 +62,10 @@ def register_scores_routes(app: Flask) -> None:
         except FileNotFoundError:
             body, status = error_response("Run not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
+        except Exception:
+            _logger.exception("Unexpected error fetching run scores for project %s run %s", project, run_id)
+            body, status = error_response(
+                "could not read run scores", HTTPStatus.INTERNAL_SERVER_ERROR, "SCORES_READ_FAILED"
+            )
+            return jsonify(body), status
         return jsonify(result)

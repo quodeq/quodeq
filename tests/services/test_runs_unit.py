@@ -1,6 +1,9 @@
 from __future__ import annotations
-from quodeq.services._runs_unit import _ui_status, _row_to_run_entry
+from quodeq.services.runs_unit import _ui_status, _row_to_run_entry
 from quodeq.data.sqlite.run_index import RunRow
+from quodeq.services import runs_unit as ru
+from quodeq.data.sqlite.run_index import open_index
+
 
 def _row(run_id="r1", state="done", started_at="2026-01-02T03:04:05Z"):
     return RunRow(
@@ -9,6 +12,7 @@ def _row(run_id="r1", state="done", started_at="2026-01-02T03:04:05Z"):
         updated_at=started_at, finalized_at=None, heartbeat_at=None, pid=None,
         exit_reason=None, status_mtime=0,
     )
+
 
 def test_ui_status_mapping():
     assert _ui_status("done") == "complete"
@@ -22,6 +26,7 @@ def test_ui_status_mapping():
     assert _ui_status("finalizing") == "in_progress"
     assert _ui_status("weird-unknown") == "complete"
 
+
 def test_row_to_run_entry_shape_is_camel_and_score_placeholders():
     entry = _row_to_run_entry(_row(run_id="abc", state="done"))
     assert entry["runId"] == "abc"
@@ -33,13 +38,12 @@ def test_row_to_run_entry_shape_is_camel_and_score_placeholders():
     assert not any("_" in k for k in entry)
 
 
-from quodeq.services import _runs_unit as ru
-
 class _Dim:
     def __init__(self, dimension, overall_score, overall_grade):
         self.dimension = dimension
         self.overall_score = overall_score
         self.overall_grade = overall_grade
+
 
 def test_fill_scores_averages_dimensions(monkeypatch, tmp_path):
     monkeypatch.setattr(ru, "read_run_scalars",
@@ -50,8 +54,10 @@ def test_fill_scores_averages_dimensions(monkeypatch, tmp_path):
     assert entry["overallScore"] == 7.0
     assert entry["overallGrade"] is not None
 
+
 def test_fill_scores_skips_in_progress(monkeypatch, tmp_path):
     called = False
+
     def _boom(*a, **k):
         nonlocal called
         called = True
@@ -62,14 +68,13 @@ def test_fill_scores_skips_in_progress(monkeypatch, tmp_path):
     assert called is False
     assert entry["overallScore"] is None
 
+
 def test_fill_scores_tolerates_read_error(monkeypatch, tmp_path):
     monkeypatch.setattr(ru, "read_run_scalars", lambda *a, **k: (_ for _ in ()).throw(OSError("gone")))
     entry = ru._row_to_run_entry(_row(run_id="r1", state="done"))
     ru._fill_scores(entry, tmp_path, "P", "r1")
     assert entry["overallScore"] is None
 
-
-from quodeq.data.sqlite.run_index import open_index
 
 def test_build_runs_unit_end_to_end(monkeypatch, tmp_path):
     db_path = tmp_path / "index.db"

@@ -3,6 +3,11 @@ import CurvePlot from './CurvePlot.jsx';
 import GradeBoundaryBar from './GradeBoundaryBar.jsx';
 import { t } from '../../strings/index.js';
 
+/**
+ * Per-severity weight sliders, plus the critical-to-minor ratio they imply.
+ * @param {object} props.draft - the draft formula being edited.
+ * @param {(patch: object) => void} props.update - merges a patch into the draft.
+ */
 export function SeverityTab({ draft, update }) {
   const w = draft.severityWeight;
   const setW = (sev) => (v) => update({ severityWeight: { ...w, [sev]: v } });
@@ -22,6 +27,11 @@ export function SeverityTab({ draft, update }) {
   );
 }
 
+/**
+ * The scoring-curve sliders next to a live plot of the curve they produce.
+ * @param {object} props.draft - the draft formula being edited.
+ * @param {(patch: object) => void} props.update - merges a patch into the draft.
+ */
 export function CurveTab({ draft, update }) {
   return (
     <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -39,6 +49,11 @@ export function CurveTab({ draft, update }) {
   );
 }
 
+/**
+ * The grade-letter boundaries bar and the per-severity score floors.
+ * @param {object} props.draft - the draft formula being edited.
+ * @param {(patch: object) => void} props.update - merges a patch into the draft.
+ */
 export function BoundariesTab({ draft, update }) {
   return (
     <div>
@@ -46,22 +61,28 @@ export function BoundariesTab({ draft, update }) {
       <span className="settings-description"> {t('gradeFormula.gradeLabelsDesc')}</span>
       <GradeBoundaryBar
         thresholds={draft.gradeThresholds}
-        onChange={(t) => update({ gradeThresholds: t })}
+        onChange={(next) => update({ gradeThresholds: next })}
       />
       <div style={{ marginTop: 14 }}>
         <span className="settings-label">{t('gradeFormula.severityFloors')}</span>
         <ParamSlider label={t('gradeFormula.minorOnly')} value={draft.floorMinor} min={0} max={10} step={0.5}
           hint={t('gradeFormula.hintFloorMinor')}
-          onChange={(v) => update({ floorMinor: Math.max(v, draft.floorMajor) })} />
+          onChange={(v) => update({ floorMinor: v })} />
         <ParamSlider label={t('gradeFormula.floorMajor')} value={draft.floorMajor} min={0} max={10} step={0.5}
           hint={t('gradeFormula.hintFloorMajor')}
-          onChange={(v) => update({ floorMajor: Math.min(v, draft.floorMinor) })} />
+          onChange={(v) => update({ floorMajor: v })} />
         <span className="settings-description">{t('gradeFormula.criticalNoFloor')}</span>
       </div>
     </div>
   );
 }
 
+/**
+ * The per-dimension weights and the toggle that decides whether they apply at
+ * all (off means a plain mean across dimensions).
+ * @param {object} props.draft - the draft formula being edited.
+ * @param {(patch: object) => void} props.update - merges a patch into the draft.
+ */
 export function DimensionsTab({ draft, update }) {
   const enabled = draft.dimensionWeightsEnabled;
   const weights = draft.dimensionWeights;

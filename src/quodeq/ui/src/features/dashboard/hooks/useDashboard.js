@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
 import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
 import { isFrozenRun } from '../../../models/runRules.js';
 import { t } from '../../../strings/index.js';
+import { useDashboardInvalidation } from './useDashboardInvalidation.js';
+import { STALE_TIME_MS } from '../../../hooks/queryDefaults.js';
 
 const EMPTY_TREND = [];
 
@@ -32,52 +34,34 @@ const EMPTY_TREND = [];
  * not via SSE. ``refreshDashboard`` is what the dismiss handlers call to
  * trigger a refetch of the accumulated (cross-run) dashboard payload.
  */
-export function useDashboard({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
-  const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
-  const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
-  const queryClient = useQueryClient();
-  const projectKey = selectedProject || "_none_";
-  const keepInScope = useCallback(
-    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
-    [projectKey, selectedSource],
-  );
-
-  // Shared projects aren't in the LOCAL projects list DashboardPage otherwise
-  // reads projectInfo from, and a shared selection's id can collide with an
-  // unrelated local project (e.g. after a clone-on-add pull) -- looking it up
-  // there would silently bleed the local twin's languageStats/publishedBy/etc.
-  // into a shared Overview. Fetch the shared project's own info instead, keyed
-  // by source so switching sources never serves the other source's cache.
-  const sharedProjectInfoQuery = useQuery({
+// Shared projects aren't in the LOCAL projects list DashboardPage otherwise
+// reads projectInfo from, and a shared selection's id can collide with an
+// unrelated local project (e.g. after a clone-on-add pull) -- looking it up
+// there would silently bleed the local twin's languageStats/publishedBy/etc.
+// into a shared Overview. Fetch the shared project's own info instead, keyed
+// by source so switching sources never serves the other source's cache.
+function buildSharedProjectInfoQueryConfig({ projectKey, selectedSource, sharedGetProjectInfo, selectedProject }) {
+  return {
     queryKey: projectKeys.info(projectKey, selectedSource),
     queryFn: () => sharedGetProjectInfo(selectedProject),
     enabled: selectedSource === "shared" && !!selectedProject,
-  });
+  };
+}
 
-  const {
-    scores,
-    latestScores,
-    loading: scoresLoading,
-    error: scoresError,
-    scoresPending,
-    availableRuns,
-  } = useProjectScores({ selectedProject, selectedRun, selectedSource, keepPlaceholder });
-
-  // A completed historical run is immutable on disk: its payload only changes
-  // through explicit user actions (dismiss, delete, verify, grade formula,
-  // run deletion), and every one of those invalidates the project query
-  // subtree — which forces a refetch regardless of staleTime. Freezing the
-  // query here removes the routine time-based background refetch (and the
-  // dashboard-refreshing dim flash) on re-entering a run view. The rule
-  // itself (including why an unknown run counts as frozen) lives in
-  // models/runRules.js.
-  const frozenRun = isFrozenRun(selectedRun, availableRuns);
-
-  const dashboardQuery = useQuery({
+// A completed historical run is immutable on disk: its payload only changes
+// through explicit user actions (dismiss, delete, verify, grade formula,
+// run deletion), and every one of those invalidates the project query
+// subtree — which forces a refetch regardless of staleTime. Freezing the
+// query here removes the routine time-based background refetch (and the
+// dashboard-refreshing dim flash) on re-entering a run view. The rule
+// itself (including why an unknown run counts as frozen) lives in
+// models/runRules.js.
+function buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fetchDashboard, selectedProject, frozenRun, keepPlaceholder, keepInScope }) {
+  return {
     queryKey: projectKeys.dashboard(projectKey, selectedRun, selectedSource),
     queryFn: () => fetchDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
-    staleTime: frozenRun ? Infinity : 60_000,
+    staleTime: frozenRun ? Infinity : STALE_TIME_MS,
     // Keep showing the previous run's data while a new run loads — instant
     // perceived navigation. isFetching toggles true during the background
     // fetch, which the page reads to show a subtle indicator.
@@ -86,109 +70,13 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     // real loading state instead of parking the old project's overview on
     // screen (see samePlaceholderScope).
     placeholderData: keepPlaceholder ? keepInScope : undefined,
-  });
+  };
+}
 
-  // Trend to use for payloads that lack their own (older cached payloads /
-  // the grade-formula early-return path). Memoized on its own: scores and
-  // latestScores get new object identities on every refetch/resolution even
-  // when the trend array they carry hasn't changed, and dashboardWithTrend
-  // below needs a stable reference here to avoid busting its own memo.
-  // EMPTY_TREND is a module-level constant so the `|| []` default doesn't
-  // itself mint a fresh identity every render.
-  const fallbackTrend = useMemo(
-    () => scores?.trend || latestScores?.trend || EMPTY_TREND,
-    [scores, latestScores],
-  );
-
-  const dashboardWithTrend = useMemo(() => {
-    if (!dashboardQuery.data) return null;
-    // The dashboard payload carries its OWN cache-backed, dismiss-adjusted
-    // trend that is byte-identical to scores.trend (tests/services/
-    // test_scoring_parity.py pins every read path to the same per-run score).
-    // Return the payload UNCHANGED when it has one: the scoped scores query
-    // resolves a beat AFTER the dashboard query, and folding scores.trend in
-    // then would mint a new `dashboard` object identity. RunOverviewPanel
-    // memoizes every derived value on the whole dashboard object and has a fade
-    // animation, so a new identity re-renders the panel and replays the fade —
-    // the run-detail entry "flicker". Fall back to the scores trend only when
-    // the payload lacks one (older cached payloads / the grade-formula
-    // early-return path).
-    if (dashboardQuery.data.trend?.length) return dashboardQuery.data;
-    return { ...dashboardQuery.data, trend: fallbackTrend };
-  }, [dashboardQuery.data, fallbackTrend]);
-
-  const refreshDashboard = useCallback(() => {
-    if (!selectedProject) return;
-    // Mark project queries stale but DON'T trigger an immediate refetch.
-    // The dashboard payload is 10-20 MB on large projects (one run's full
-    // violation + compliance arrays × multiple dimensions); refetching on
-    // every dismiss froze the UI for 1-3 s while the browser parsed the
-    // JSON and React re-rendered. The dismiss POST already returned the
-    // rescored run for the active page (PrincipleDetail / FileDetail /
-    // FindingDetail) to apply locally — the dashboard rollup just needs
-    // to be eventually-correct, which React Query handles automatically:
-    // ``refetchType: 'none'`` marks the cache stale, the next mount
-    // refetches naturally on navigation.
-    queryClient.invalidateQueries({
-      queryKey: projectKeys.project(selectedProject, selectedSource),
-      refetchType: 'none',
-    });
-  }, [queryClient, selectedProject, selectedSource]);
-
-  // Force-refresh variant for when fresh data is genuinely expected NOW and the
-  // user is parked on a mounted observer that won't otherwise refetch — namely
-  // when an evaluation finishes. Unlike ``refreshDashboard`` (refetchType:'none',
-  // used by the high-frequency dismiss path to avoid re-pulling the 10-20 MB
-  // payload), this uses the default refetchType:'active' so the always-mounted
-  // Overview observer actually refetches. Without it, a freshly-completed run
-  // leaves the Overview showing the stale pre-run payload (empty "No
-  // evaluations yet" state) until the user switches projects and back, which is
-  // the only other action that re-subscribes the observer to its query key.
-  const refreshDashboardActive = useCallback(() => {
-    if (!selectedProject) return;
-    queryClient.invalidateQueries({
-      queryKey: projectKeys.project(selectedProject, selectedSource),
-    });
-  }, [queryClient, selectedProject, selectedSource]);
-
-  // Debounced counterpart to refreshDashboardActive, for the high-frequency
-  // suppression mutations (dismiss/restore/delete). refreshDashboard's
-  // refetchType:'none' leaves the Overview's always-mounted observer showing
-  // stale data until the user switches projects and back -- fine for a single
-  // dismiss (the mutation response already patched the visible page's local
-  // scores via applyMutationDelta), but restore-all/delete-all return a
-  // payload the delta gates can't apply (scores:null, delta.isLatest:false),
-  // so the Overview stays wrong indefinitely. The pywebview desktop window
-  // also never fires the focus-refetch a browser tab would get on refocus,
-  // so there's no other path back to fresh data short of an app switch.
-  // Debounce coalesces rapid multi-dismiss/restore bursts into one refetch of
-  // the (potentially 10-20 MB) dashboard payload instead of one per action.
-  const reconcileTimer = useRef(null);
-  const scheduleDashboardReconcile = useCallback(() => {
-    if (!selectedProject) return;
-    // Mark-stale NOW, synchronously, before the timer is (re)armed. The
-    // timer is a single shared ref, cleared on unmount and re-armed by the
-    // next schedule call; if the ACTIVE refetch below ever gets dropped
-    // (unmount) or fires against a stale closure (the project switched
-    // before the 1200ms elapsed, so it invalidates the old project's now
-    // inactive queries -- a harmless no-op), this mark-stale has already
-    // happened, so the mutation degrades to refreshDashboard's
-    // mark-stale-only semantics and a remount or Overview-return still
-    // self-heals.
-    queryClient.invalidateQueries({
-      queryKey: projectKeys.project(selectedProject, selectedSource),
-      refetchType: 'none',
-    });
-    if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
-    reconcileTimer.current = setTimeout(() => {
-      reconcileTimer.current = null;
-      queryClient.invalidateQueries({
-        queryKey: projectKeys.project(selectedProject, selectedSource),
-      });
-    }, 1200);
-  }, [queryClient, selectedProject, selectedSource]);
-  useEffect(() => () => clearTimeout(reconcileTimer.current), []);
-
+function buildDashboardResult({
+  dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresError,
+  availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, sharedProjectInfoQuery,
+}) {
   return {
     dashboard: dashboardWithTrend,
     accumulated: scores?.accumulated || null,
@@ -216,4 +104,82 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = "l
     scheduleDashboardReconcile,
     sharedProjectInfo: sharedProjectInfoQuery.data || null,
   };
+}
+
+// The dashboard payload carries its OWN cache-backed, dismiss-adjusted
+// trend that is byte-identical to scores.trend (tests/services/
+// test_scoring_parity.py pins every read path to the same per-run score).
+// Return the payload UNCHANGED when it has one: the scoped scores query
+// resolves a beat AFTER the dashboard query, and folding scores.trend in
+// then would mint a new `dashboard` object identity. RunOverviewPanel
+// memoizes every derived value on the whole dashboard object and has a fade
+// animation, so a new identity re-renders the panel and replays the fade —
+// the run-detail entry "flicker". Fall back to the scores trend only when
+// the payload lacks one (older cached payloads / the grade-formula
+// early-return path).
+// Trend to use for payloads that lack their own (older cached payloads /
+// the grade-formula early-return path). Memoized on its own (by the caller):
+// scores and latestScores get new object identities on every
+// refetch/resolution even when the trend array they carry hasn't changed,
+// and dashboardWithTrend needs a stable reference here to avoid busting its
+// own memo. EMPTY_TREND is a module-level constant so the `|| []` default
+// doesn't itself mint a fresh identity every render.
+function computeFallbackTrend(scores, latestScores) {
+  return scores?.trend || latestScores?.trend || EMPTY_TREND;
+}
+
+function mergeTrendIntoDashboard(dashboardData, fallbackTrend) {
+  if (!dashboardData) return null;
+  if (dashboardData.trend?.length) return dashboardData;
+  return { ...dashboardData, trend: fallbackTrend };
+}
+
+/**
+ * The Overview's data for one project and run: the dashboard payload, the
+ * accumulated and per-run scores, the available runs, loading/error state,
+ * and the refresh/reconcile handles for invalidating it after a mutation.
+ *
+ * Local and shared projects go through the same shape; `selectedSource` picks
+ * the route. `keepPlaceholder` shows the previous run's data during a swap,
+ * which History turns off because flashing a neighbouring run is misleading
+ * there. Placeholders never cross a project or source boundary.
+ */
+export function useDashboard({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
+  const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
+  const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
+  const queryClient = useQueryClient();
+  const projectKey = selectedProject || "_none_";
+  const keepInScope = useCallback(
+    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
+    [projectKey, selectedSource],
+  );
+
+  const sharedProjectInfoQuery = useQuery(buildSharedProjectInfoQueryConfig({ projectKey, selectedSource, sharedGetProjectInfo, selectedProject }));
+
+  const {
+    scores,
+    latestScores,
+    loading: scoresLoading,
+    error: scoresError,
+    scoresPending,
+    availableRuns,
+  } = useProjectScores({ selectedProject, selectedRun, selectedSource, keepPlaceholder });
+
+  const frozenRun = isFrozenRun(selectedRun, availableRuns);
+
+  const dashboardQuery = useQuery(buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fetchDashboard, selectedProject, frozenRun, keepPlaceholder, keepInScope }));
+
+  const fallbackTrend = useMemo(() => computeFallbackTrend(scores, latestScores), [scores, latestScores]);
+
+  const dashboardWithTrend = useMemo(
+    () => mergeTrendIntoDashboard(dashboardQuery.data, fallbackTrend),
+    [dashboardQuery.data, fallbackTrend],
+  );
+
+  const { refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile } = useDashboardInvalidation({ queryClient, selectedProject, selectedSource });
+
+  return buildDashboardResult({
+    dashboardWithTrend, scores, latestScores, dashboardQuery, scoresLoading, scoresPending, scoresError,
+    availableRuns, refreshDashboard, refreshDashboardActive, scheduleDashboardReconcile, sharedProjectInfoQuery,
+  });
 }

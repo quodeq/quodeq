@@ -3,9 +3,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from quodeq.llm_bridge._embeddings import (
+from quodeq.llm_bridge.embeddings import (
     BATCH_TIMEOUT,
     QUERY_TIMEOUT,
+    EmbeddingAvailabilityCache,
+    EmbeddingEndpoint,
     _client_kwargs,
     _v1_base,
     embed_texts,
@@ -46,10 +48,13 @@ def _fresh_cache():
     reset_embedding_availability_cache()
 
 
+_ENDPOINT = EmbeddingEndpoint(base_url="http://x")
+
+
 def test_embed_texts_preserves_order() -> None:
     fake = _FakeClient([[1.0, 0.0], [0.0, 1.0]])
     out = embed_texts(
-        ["a", "b"], model="m", base_url="http://x", client_factory=lambda: fake,
+        ["a", "b"], model="m", endpoint=_ENDPOINT, client_factory=lambda: fake,
     )
     assert out == [[1.0, 0.0], [0.0, 1.0]]
     assert fake.requests == [{"model": "m", "input": ["a", "b"]}]
@@ -58,13 +63,13 @@ def test_embed_texts_preserves_order() -> None:
 def test_embed_texts_empty_input_short_circuits() -> None:
     def boom():
         raise AssertionError("factory must not be called for empty input")
-    assert embed_texts([], model="m", base_url="http://x", client_factory=boom) == []
+    assert embed_texts([], model="m", endpoint=_ENDPOINT, client_factory=boom) == []
 
 
 def test_embed_texts_count_mismatch_raises() -> None:
     fake = _FakeClient([[1.0]])
     with pytest.raises(RuntimeError, match="mismatch"):
-        embed_texts(["a", "b"], model="m", base_url="http://x", client_factory=lambda: fake)
+        embed_texts(["a", "b"], model="m", endpoint=_ENDPOINT, client_factory=lambda: fake)
 
 
 def test_availability_uses_lister_and_caches() -> None:
@@ -88,6 +93,22 @@ def test_availability_missing_model() -> None:
 
 def test_availability_permissive_for_non_ollama_base() -> None:
     assert embedding_model_available("anything", "http://lan-box:8080")
+
+
+def test_availability_cache_is_bounded_and_treats_false_as_a_hit() -> None:
+    """Capacity is wired through to the shared LRU (whose eviction order is
+    pinned in tests/shared/test_lru.py); a cached False is a hit, not a miss."""
+    cache = EmbeddingAvailabilityCache(max_entries=1)
+    cache.set(("m1", "u"), False)
+    assert cache.get(("m1", "u")) is False
+    cache.set(("m2", "u"), True)
+    assert cache.get(("m1", "u")) is None    # evicted at capacity
+    assert cache.get(("m2", "u")) is True
+
+
+def test_availability_cache_rejects_zero_capacity() -> None:
+    with pytest.raises(ValueError):
+        EmbeddingAvailabilityCache(max_entries=0)
 
 
 def test_timeout_profiles_are_short() -> None:

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, waitFor, act } from '@testing-library/react';
-import React from 'react';
+import { render, waitFor, act, fireEvent } from '@testing-library/react';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import AssistantProviderTabs from './AssistantProviderTabs.jsx';
@@ -10,11 +9,17 @@ const CLIENTS = [
   { id: 'ollama', label: 'Ollama', type: 'local-api', installed: true },
 ];
 
+const CLIENTS_WITH_UNINSTALLED = [
+  { id: 'claude', label: 'Claude', type: 'cli', installed: true },
+  { id: 'ollama', label: 'Ollama', type: 'local-api', installed: false },
+];
+
 const fakeApi = {
   getAiClients: vi.fn().mockResolvedValue({ clients: CLIENTS }),
   getOllamaModels: vi.fn().mockResolvedValue([{ name: 'gemma4:26b' }]),
   getLlamacppModels: vi.fn().mockResolvedValue([]),
   getOmlxModels: vi.fn().mockResolvedValue([]),
+  getClientModels: vi.fn().mockResolvedValue({ models: ['auto', 'gpt-test'] }),
 };
 
 const providerConfigs = {
@@ -89,6 +94,37 @@ describe('AssistantProviderTabs', () => {
     expect(container.querySelector('select')).toBeNull();
   });
 
+  function withCopilot() {
+    fakeApi.getAiClients.mockResolvedValueOnce({ clients: [
+      ...CLIENTS, { id: 'copilot', label: 'GitHub Copilot', type: 'cli', installed: true },
+    ] });
+    localStorage.setItem('cc-assistant-mode', 'custom');
+    localStorage.setItem('cc-assistant-active-provider', 'copilot');
+    return renderPanel();
+  }
+
+  it('renders the Copilot provider pill', async () => {
+    const { findByText } = await withCopilot();
+    expect(await findByText('GitHub Copilot')).toBeTruthy();
+  });
+
+  it('offers Copilot account models', async () => {
+    const { findByRole } = await withCopilot();
+    expect(await findByRole('option', { name: 'gpt-test' })).toBeTruthy();
+  });
+
+  it('hides the Copilot login instructions once account models are available', async () => {
+    const { queryByText, findByText } = await withCopilot();
+    await findByText('GitHub Copilot');
+    expect(queryByText('COPILOT_HOME="$HOME/.quodeq/copilot" copilot login')).toBeNull();
+  });
+
+  it('changing the Copilot model leaves the active provider untouched', async () => {
+    const { getByLabelText } = await withCopilot();
+    fireEvent.change(getByLabelText('Assistant model'), { target: { value: 'gpt-test' } });
+    expect(localStorage.getItem('cc-active-provider')).toBe('claude');
+  });
+
   it('custom mode with an ollama provider renders a model dropdown', async () => {
     localStorage.setItem('cc-assistant-mode', 'custom');
     localStorage.setItem('cc-assistant-active-provider', 'ollama');
@@ -98,5 +134,17 @@ describe('AssistantProviderTabs', () => {
       expect([...opts].some((o) => o.value === 'gemma4:26b')).toBe(true);
     });
     expect(fakeApi.getOllamaModels).toHaveBeenCalled();
+  });
+
+  it('clicking an uninstalled provider pill does not switch the active provider', async () => {
+    fakeApi.getAiClients.mockResolvedValueOnce({ clients: CLIENTS_WITH_UNINSTALLED });
+    localStorage.setItem('cc-assistant-mode', 'custom');
+    const { findByText } = await renderPanel();
+    const ollamaPill = await findByText('Ollama');
+    fireEvent.click(ollamaPill);
+    // Still on the originally active provider (claude) — the pill for
+    // ollama never becomes selected since it's not installed.
+    expect(ollamaPill.closest('button')).toHaveAttribute('aria-selected', 'false');
+    expect(localStorage.getItem('cc-assistant-active-provider')).not.toBe('ollama');
   });
 });

@@ -41,7 +41,7 @@ class TestPureParsers:
     def test_text_extractors_cover_the_event_types(self):
         from quodeq.core.stream.events import TEXT_EXTRACTORS
 
-        assert set(TEXT_EXTRACTORS) == {"assistant", "result", "item.completed"}
+        assert set(TEXT_EXTRACTORS) == {"assistant", "result", "item.completed", "assistant.message"}
         assert TEXT_EXTRACTORS["result"]({"result": "done"}) == ["done"]
 
 
@@ -99,5 +99,6 @@ def test_violation_services_no_longer_import_analysis():
     import quodeq.services._violations_stream as vs
 
     for mod in (vs, vj):
-        src = open(mod.__file__).read()
+        with open(mod.__file__, encoding="utf-8") as fh:
+            src = fh.read()
         assert "quodeq.analysis" not in src, mod.__name__

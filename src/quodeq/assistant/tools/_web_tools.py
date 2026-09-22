@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import time
 from html.parser import HTMLParser
+from http import HTTPStatus
 from urllib.parse import parse_qs, urlparse
 
 import httpx
 
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.shared.url_validation import validate_url_safe
 
 _SEARCH_URL = "https://html.duckduckgo.com/html/"
@@ -26,6 +27,8 @@ _MAX_FETCH_BYTES = 2 * 1024 * 1024
 _MAX_FETCH_SECONDS = 60.0  # total budget: read=30.0 is per-read-op, so a slow
 # drip (1 byte per 29s) would otherwise wedge the turn thread indefinitely
 _MAX_TEXT_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON headroom
+_MAX_TITLE_CHARS = 300  # per search result; keeps _MAX_RESULTS results well under the fence
+_MAX_SNIPPET_CHARS = 500  # per search result, same budget
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 
 
@@ -46,6 +49,7 @@ class _DdgResultParser(HTMLParser):
         self._target: str | None = None   # "title" | "snippet" while inside one
         self._container: str | None = None
         self._depth = 0
+        self._parts: list[str] = []
 
     def handle_starttag(self, tag, attrs):
         if self._target is not None:
@@ -57,19 +61,30 @@ class _DdgResultParser(HTMLParser):
             url = _decode_ddg_href(dict(attrs).get("href") or "")
             self.results.append({"title": "", "url": url, "snippet": ""})
             self._target, self._container, self._depth = "title", tag, 1
+            self._parts = []
         elif "result__snippet" in classes and self.results:
             self._target, self._container, self._depth = "snippet", tag, 1
+            self._parts = []
 
     def handle_endtag(self, tag):
         if self._target is None or tag != self._container:
             return
         self._depth -= 1
         if self._depth == 0:
+            self._flush()
             self._target = None
 
     def handle_data(self, data):
         if self._target and self.results:
-            self.results[-1][self._target] += data
+            self._parts.append(data)
+
+    def _flush(self) -> None:
+        if self._target and self.results:
+            self.results[-1][self._target] = "".join(self._parts)
+
+    def close(self) -> None:
+        super().close()  # feeds any buffered trailing data through handle_data first
+        self._flush()  # an unterminated target tag still yields its accumulated text
 
 
 def _search_web(query: str, max_results: int = 5) -> dict:
@@ -86,14 +101,14 @@ def _search_web(query: str, max_results: int = 5) -> dict:
                          headers={"User-Agent": _USER_AGENT}, timeout=_TIMEOUT)
     except httpx.HTTPError as exc:
         raise ToolError(f"web search failed: {exc}") from exc
-    if resp.status_code != 200:
+    if resp.status_code != HTTPStatus.OK:
         raise ToolError(f"web search unavailable right now (HTTP {resp.status_code}); "
                         "try fetch_url with a known URL instead")
     parser = _DdgResultParser()
     parser.feed(resp.text)
     parser.close()  # convert_charrefs buffers a trailing run near a bare &
-    results = [{"title": r["title"].strip()[:300], "url": r["url"],
-                "snippet": " ".join(r["snippet"].split())[:500]}
+    results = [{"title": r["title"].strip()[:_MAX_TITLE_CHARS], "url": r["url"],
+                "snippet": " ".join(r["snippet"].split())[:_MAX_SNIPPET_CHARS]}
                for r in parser.results if r["url"].startswith("http")]
     if not results:
         raise ToolError("web search returned no results; the search service may be "
@@ -113,7 +128,7 @@ class _TextExtractor(HTMLParser):
         self._chunks: list[str] = []
         self._skip_depth = 0
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag, _attrs):
         if tag in self._SKIP:
             self._skip_depth += 1
         elif tag in self._BLOCK:
@@ -133,52 +148,53 @@ class _TextExtractor(HTMLParser):
         return "\n".join(line for line in collapsed if line)
 
 
-def _fetch_url(url: str) -> dict:
-    if not isinstance(url, str):
-        raise ToolError("url must be a string")
-    try:
-        validate_url_safe(url)
-    except ValueError as exc:
-        raise ToolError(str(exc)) from exc
+def _fetch_url_redirect_payload(url: str, resp) -> dict | None:
+    if resp.status_code not in _REDIRECT_STATUSES:
+        return None
+    return {"url": url, "status": resp.status_code,
+            "redirect_to": resp.headers.get("location", ""),
+            "note": "redirect not followed; call fetch_url with "
+                    "redirect_to to follow it"}
+
+
+def _validate_fetch_response(url: str, resp) -> str:
+    """Raise ToolError for a non-200 or unsupported content type; else return
+    the lowercased content-type."""
+    if resp.status_code != HTTPStatus.OK:
+        raise ToolError(f"could not fetch {url}: HTTP {resp.status_code}")
+    content_type = resp.headers.get("content-type", "").lower()
+    # reject known-binary types before reading the body; empty
+    # content-type falls through to the texty default
+    is_texty = ("text/" in content_type or "json" in content_type
+                or "xml" in content_type or content_type == "")
+    if not is_texty:
+        raise ToolError(f"unsupported content type {content_type!r}; only "
+                        "HTML, text, JSON and XML pages can be fetched")
+    return content_type
+
+
+def _read_fetch_body(url: str, resp) -> tuple[bytes, bool]:
+    """Stream the response body up to _MAX_FETCH_BYTES within
+    _MAX_FETCH_SECONDS. Returns (body, hit_byte_cap)."""
+    deadline = time.monotonic() + _MAX_FETCH_SECONDS
+    parts: list[bytes] = []
+    received = 0
     hit_byte_cap = False
-    try:
-        with httpx.stream("GET", url, headers={"User-Agent": _USER_AGENT},
-                          timeout=_TIMEOUT, follow_redirects=False) as resp:
-            if resp.status_code in _REDIRECT_STATUSES:
-                return {"url": url, "status": resp.status_code,
-                        "redirect_to": resp.headers.get("location", ""),
-                        "note": "redirect not followed; call fetch_url with "
-                                "redirect_to to follow it"}
-            if resp.status_code != 200:
-                raise ToolError(f"could not fetch {url}: HTTP {resp.status_code}")
-            content_type = resp.headers.get("content-type", "").lower()
-            # reject known-binary types before reading the body; empty
-            # content-type falls through to the texty default
-            is_texty = ("text/" in content_type or "json" in content_type
-                        or "xml" in content_type or content_type == "")
-            if not is_texty:
-                raise ToolError(f"unsupported content type {content_type!r}; only "
-                                "HTML, text, JSON and XML pages can be fetched")
-            deadline = time.monotonic() + _MAX_FETCH_SECONDS
-            parts: list[bytes] = []
-            received = 0
-            # no chunk_size: it would route through httpx's ByteChunker, which
-            # buffers sub-chunk_size drips and starves the deadline check below
-            for chunk in resp.iter_bytes():
-                if time.monotonic() > deadline:
-                    raise ToolError(f"could not fetch {url}: exceeded "
-                                    f"{int(_MAX_FETCH_SECONDS)}s time budget")
-                parts.append(chunk)
-                received += len(chunk)
-                if received >= _MAX_FETCH_BYTES:
-                    hit_byte_cap = True
-                    break
-            body = b"".join(parts)[:_MAX_FETCH_BYTES]
-            encoding = resp.encoding or "utf-8"
-    # InvalidURL is NOT an HTTPError subclass: a malformed-but-SSRF-passing URL
-    # (e.g. embedded tab) must fail readably, not as "failed internally"
-    except (httpx.HTTPError, httpx.InvalidURL) as exc:
-        raise ToolError(f"could not fetch {url}: {exc}") from exc
+    # no chunk_size: it would route through httpx's ByteChunker, which
+    # buffers sub-chunk_size drips and starves the deadline check below
+    for chunk in resp.iter_bytes():
+        if time.monotonic() > deadline:
+            raise ToolError(f"could not fetch {url}: exceeded "
+                            f"{int(_MAX_FETCH_SECONDS)}s time budget")
+        parts.append(chunk)
+        received += len(chunk)
+        if received >= _MAX_FETCH_BYTES:
+            hit_byte_cap = True
+            break
+    return b"".join(parts)[:_MAX_FETCH_BYTES], hit_byte_cap
+
+
+def _decode_fetch_body(body: bytes, encoding: str, content_type: str) -> str:
     try:
         text = body.decode(encoding, errors="replace")
     except (LookupError, UnicodeError):
@@ -190,6 +206,30 @@ def _fetch_url(url: str) -> dict:
         extractor.feed(text)
         extractor.close()  # flush the trailing buffered text run
         text = extractor.text()
+    return text
+
+
+def _fetch_url(url: str) -> dict:
+    if not isinstance(url, str):
+        raise ToolError("url must be a string")
+    try:
+        validate_url_safe(url)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
+    try:
+        with httpx.stream("GET", url, headers={"User-Agent": _USER_AGENT},
+                          timeout=_TIMEOUT, follow_redirects=False) as resp:
+            redirect = _fetch_url_redirect_payload(url, resp)
+            if redirect is not None:
+                return redirect
+            content_type = _validate_fetch_response(url, resp)
+            body, hit_byte_cap = _read_fetch_body(url, resp)
+            encoding = resp.encoding or "utf-8"
+    # InvalidURL is NOT an HTTPError subclass: a malformed-but-SSRF-passing URL
+    # (e.g. embedded tab) must fail readably, not as "failed internally"
+    except (httpx.HTTPError, httpx.InvalidURL) as exc:
+        raise ToolError(f"could not fetch {url}: {exc}") from exc
+    text = _decode_fetch_body(body, encoding, content_type)
     return {"url": url, "status": 200, "content_type": content_type,
             "text": text[:_MAX_TEXT_CHARS],
             "truncated": hit_byte_cap or len(text) > _MAX_TEXT_CHARS}

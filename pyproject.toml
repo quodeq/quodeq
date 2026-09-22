@@ -1,6 +1,6 @@
 [project]
 name = "quodeq"
-version = "1.10.1"
+version = "1.11.0"
 description = "Source code quality evaluation platform powered by AI"
 readme = "README.md"
 license = "MIT"
@@ -34,10 +34,14 @@ dependencies = [
     "openai>=2.44.0,<4",
     "httpx>=0.28.1,<0.29",
     "packaging>=26.2,<27",
+    "keyring>=25.5.0,<26",
     # Imported unguarded by quodeq.core.events.models; previously present only
     # because openai depends on it. Declared so it cannot vanish underneath us.
     "pydantic>=2.13.4,<3",
     'pywinpty>=3.0.5,<4 ; sys_platform == "win32"',
+    # Built-in menu bar icon (quodeq.menubar); pure Python over the
+    # pyobjc-Cocoa stack pywebview already pulls in on macOS.
+    'rumps>=0.4,<0.5 ; sys_platform == "darwin"',
 ]
 
 [project.urls]
@@ -51,6 +55,8 @@ dev = [
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
     "pytest-xdist==3.8.0",
+    "ruff==0.16.7",
+    "vulture==2.16",
 ]
 
 [project.scripts]
@@ -61,6 +67,61 @@ strict = true
 python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
+
+[tool.ruff]
+target-version = "py312"
+src = ["src", "tests", "tools"]
+# Third-party repos vendored as an evaluator test corpus; not our code.
+extend-exclude = ["tests/fixtures/discipline_corpus"]
+
+[tool.ruff.lint]
+# Deliberately narrow. Each rule here maps to a maintainability
+# violation type the self-eval flags (M-ANA-10 dead code, M-ANA-9
+# import placement, M-MDF-1 magic literals, M-ANA-5 missing API
+# documentation). Widen one rule at a time, with the tree clean for
+# that rule in the same PR, so the gate never grandfathers.
+#
+# E3xx and W29x are ruff preview rules. `explicit-preview-rules` keeps
+# preview opt-in per code: only the codes listed below are active, so a
+# ruff upgrade cannot switch on a whole preview family behind our back.
+preview = true
+explicit-preview-rules = true
+select = [
+    "F401", "F821", "F841", "E402", "PLR2004", "C901", "ARG",
+    # D1xx only: every public module, package, class, method and
+    # function carries a docstring. The other pydocstyle families
+    # (formatting, wording) are NOT selected -- they would churn the
+    # existing docstrings without saying anything a reader needs.
+    "D100", "D101", "D102", "D103", "D104",
+    # M-ANA-1 consistent layout: blank lines around defs/classes and no
+    # trailing or whitespace-only lines. All autofixable, whitespace only.
+    "E301", "E302", "E303", "E305", "E306", "W291", "W293",
+]
+
+[tool.ruff.lint.mccabe]
+# M-MOD-1 cyclomatic complexity; 15 is the standard's default ceiling.
+max-complexity = 15
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+# Re-export blocks placed after the accessors they depend on; moving
+# them to the top would create an import cycle with the _env_* modules.
+"src/quodeq/shared/env.py" = ["E402"]
+"src/quodeq/shared/utils.py" = ["E402"]
+# Standalone scripts that insert the repo root into sys.path first.
+"tools/*.py" = ["E402"]
+# Tests assert literal expectations; the literal is the contract.
+# D1xx gates the public API, which is src/quodeq only: a test module is
+# not importable surface, and a docstring on every test function would
+# be noise rather than documentation.
+# ARG: fakes, stubs and monkeypatch replacements have to match the
+# signature they stand in for, so an unused parameter there is the
+# point, not dead code.
+"tests/**" = ["PLR2004", "ARG", "D100", "D101", "D102", "D103", "D104"]
+# Standalone scripts outside the layer rules, and likewise not API.
+"tools/**" = ["PLR2004", "D100", "D101", "D102", "D103", "D104"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

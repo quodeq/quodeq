@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidePaneProvider } from '../../side-pane/index.js';
@@ -53,13 +53,10 @@ function renderWithProviders(ui) {
 }
 
 describe('EvalLogProvider', () => {
-  let originalEventSource;
   beforeEach(() => {
-    originalEventSource = globalThis.EventSource;
-    globalThis.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.instances = [];
   });
-  afterEach(() => { globalThis.EventSource = originalEventSource; });
 
   it('initial state: no active job, dock empty', () => {
     renderWithProviders(<Probe />);
@@ -130,6 +127,42 @@ describe('EvalLogProvider', () => {
       // useJobLogStream batches via rAF + 50ms timer; drain it.
       act(() => { vi.runAllTimers(); });
       expect(screen.getByTestId('body')).toHaveTextContent('hello world');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('renders the terminal line from terminalState once the stream reaches "done" -- the hook itself no longer appends it to logs', () => {
+    vi.useFakeTimers();
+    try {
+      function ProbeWithRender() {
+        const { openLog } = useEvalLog();
+        const { windows } = useSidePane();
+        const body = windows[0]?.render?.() ?? null;
+        return (
+          <div>
+            <button onClick={() => openLog('job-x', 'Run X')}>open</button>
+            <div data-testid="body">{body}</div>
+          </div>
+        );
+      }
+      render(
+        <SidePaneProvider>
+          <EvalLogProvider>
+            <ProbeWithRender />
+          </EvalLogProvider>
+        </SidePaneProvider>
+      );
+      fireEvent.click(screen.getByText('open'));
+      const es = MockEventSource.instances[0];
+      act(() => { es.emit('message', { data: 'hello world' }); });
+      act(() => { vi.runAllTimers(); });
+      expect(screen.getByTestId('body')).not.toHaveTextContent('evaluation cancelled');
+
+      act(() => { (es.listeners.done || []).forEach((fn) => fn({ data: 'cancelled' })); });
+      // Rendered by EvalLogPaneBody from terminalState, not baked into logs[].
+      expect(screen.getByTestId('body')).toHaveTextContent('hello world');
+      expect(screen.getByTestId('body')).toHaveTextContent('evaluation cancelled');
     } finally {
       vi.useRealTimers();
     }

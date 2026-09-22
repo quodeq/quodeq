@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import PackCircles from './PackCircles.jsx';
 
@@ -51,10 +51,10 @@ describe('PackCircles keyboard accessibility (#2056)', () => {
     expect(circle).toHaveAttribute('role', 'button');
   });
 
-  it('folder circle has aria-label with the node name', () => {
+  it('folder circle has aria-label with the node name and its state (6574)', () => {
     renderPackCircles();
     const circle = document.querySelector('circle');
-    expect(circle).toHaveAttribute('aria-label', 'src');
+    expect(circle).toHaveAttribute('aria-label', 'src, no violations');
   });
 
   it('Enter key on folder circle fires handleClick', () => {

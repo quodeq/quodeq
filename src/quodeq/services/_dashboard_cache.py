@@ -8,7 +8,6 @@ path still resolves.
 """
 from __future__ import annotations
 
-import os
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -16,15 +15,23 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.core.types import DimensionResult
-from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.shared.env_resolve import resolve_env
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class DashboardCacheConfig:
-    """Optional cache overrides for build_dashboard (mirrors AccumulatedCacheConfig)."""
+    """Run-dimension cache settings for the dashboard fetchers.
+
+    ``cache``/``lock``/``max_size`` are optional overrides of the module-level
+    shared cache (mirrors AccumulatedCacheConfig); tests pass them to isolate
+    state. ``version`` scopes the cache key to the project's suppression state
+    so a dismiss/delete invalidates warmed entries.
+    """
     cache: OrderedDict[tuple, list[DimensionResult]] | None = None
     lock: threading.Lock | None = None
     max_size: int | None = None
+    version: str = ""
 
 
 _DEFAULT_RUN_DIM_CACHE_MAX = 256
@@ -35,23 +42,44 @@ def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
     if override is not None:
         return override
     try:
-        return int((env or os.environ).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+        return int(resolve_env(env).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
     except (ValueError, TypeError):
         return _DEFAULT_RUN_DIM_CACHE_MAX
 
 
-# Module-level shared cache for run-dimension data. Without this, every
-# dashboard request used a fresh cache (created in _make_run_dimension_fetcher
-# below), so re-fetching the same project's history (which collect_stale_dimensions
-# / _collect_previous_scores / build_accumulated_trend all walk) cost ~750ms
-# per request even on warm calls. The shared cache eliminates the cross-request
-# I/O without compromising the per-request consistency guarantees (the cache
-# is keyed by (reports_root, project, run_id, suppression_version) so a
-# dismiss/delete produces a new key and never serves a pre-suppression score,
-# and runs are immutable once finalized).
-#
-# Tests that need isolation can pass an explicit DashboardCacheConfig.
-_SHARED_RUN_DIM_CACHE, _SHARED_RUN_DIM_LOCK = OrderedDict(), threading.Lock()
+class DimensionCache:
+    """Thread-safe LRU-eligible store of run-dimension data (dict+lock+clear).
+
+    Without a shared cache, every dashboard request used a fresh one (built
+    fresh in ``make_run_dimension_fetcher`` below), so re-fetching the same
+    project's history (which ``collect_stale_dimensions`` /
+    ``_collect_previous_scores`` / ``build_accumulated_trend`` all walk) cost
+    ~750ms per request even on warm calls. The shared cache eliminates the
+    cross-request I/O without compromising the per-request consistency
+    guarantees (the cache is keyed by
+    ``(reports_root, project, run_id, suppression_version)`` so a
+    dismiss/delete produces a new key and never serves a pre-suppression
+    score, and runs are immutable once finalized).
+
+    Instantiable so tests get isolated caches; production shares the
+    module-default instance below.
+    """
+
+    def __init__(self) -> None:
+        self.data: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
+        self.lock = threading.Lock()
+
+    def clear(self) -> None:
+        with self.lock:
+            self.data.clear()
+
+    def keys(self) -> list[tuple]:
+        """Return a snapshot list of the cache's current keys, under lock."""
+        with self.lock:
+            return list(self.data.keys())
+
+
+_shared_dimension_cache = DimensionCache()
 
 
 def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
@@ -65,39 +93,39 @@ def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]],
     return OrderedDict(), threading.Lock()
 
 
-def clear_shared_dimension_cache() -> None:
-    """Drop all cached run-dimension data (e.g. after a formula change)."""
-    with _SHARED_RUN_DIM_LOCK:
-        _SHARED_RUN_DIM_CACHE.clear()
+def clear_shared_dimension_cache(cache: DimensionCache | None = None) -> None:
+    """Drop all cached run-dimension data (e.g. after a formula change).
+
+    Clears *cache*, defaulting to the module-wide instance production
+    shares (the dashboard and the grade-formula-change hook).
+    """
+    (cache or _shared_dimension_cache).clear()
 
 
-def _make_run_dimension_fetcher(
+def make_run_dimension_fetcher(
     reports_root: Path,
     project: str,
-    cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
-    lock: threading.Lock | None = None,
-    max_size: int | None = None,
-    version: str = "",
+    config: DashboardCacheConfig | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a cached fetcher for run dimension data (LRU, bounded).
 
     Defaults to the module-level shared cache so reads of the same run's
-    dimensions across requests reuse work. *version* scopes the cache key to the
-    project's suppression state so a dismiss/delete invalidates it. Tests pass
-    explicit cache/lock to isolate state.
+    dimensions across requests reuse work. ``config.version`` scopes the cache
+    key to the project's suppression state so a dismiss/delete invalidates it.
+    Tests pass an explicit cache/lock to isolate state.
     """
-    return make_lru_dimension_fetcher(
-        reports_root,
-        project,
-        cache if cache is not None else _SHARED_RUN_DIM_CACHE,
-        lock if lock is not None else _SHARED_RUN_DIM_LOCK,
-        max_size if max_size is not None else _run_dim_cache_max(),
-        version=version,
+    cc = config if config is not None else DashboardCacheConfig()
+    ctx = DimensionCacheContext(
+        cache=cc.cache if cc.cache is not None else _shared_dimension_cache.data,
+        lock=cc.lock if cc.lock is not None else _shared_dimension_cache.lock,
+        max_size=cc.max_size if cc.max_size is not None else _run_dim_cache_max(),
     )
+    return make_lru_dimension_fetcher(reports_root, project, ctx, version=cc.version)
 
 
 __all__ = [
     "DashboardCacheConfig",
+    "DimensionCache",
     "clear_shared_dimension_cache",
     "create_dimension_cache",
 ]

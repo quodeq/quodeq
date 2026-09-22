@@ -15,4 +15,5 @@ from quodeq.data.fs.standards_prefs import (  # noqa: F401 — re-exported API
     load_project_overrides,
     load_visible_standard_ids,
     save_visible_standard_ids,
+    visibility_is_default,
 )

@@ -9,7 +9,7 @@ const DEFAULT_WEIGHTS = [['critical', '4.0'], ['major', '1.5'], ['minor', '0.25'
 export default function GradeFormulaCurveFigure() {
   return (
     <div className="gf-curve-figure">
-      <svg viewBox="0 0 320 96" preserveAspectRatio="none">
+      <svg viewBox="0 0 320 96" preserveAspectRatio="none" role="img" aria-label={t('help.gradeCurveFigureAria')}>
         <line x1="0" y1="88" x2="320" y2="88" stroke="var(--color-border)" strokeWidth="1" />
         <path
           d="M0,4 C80,8 160,26 240,46 C280,56 310,60 320,62"

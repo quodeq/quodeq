@@ -34,7 +34,7 @@ from tests._timeouts import budget
 # Subprocess waits up to 120 s inside these tests; give pytest-timeout
 # enough room above that to avoid double-killing a still-cleaning-up
 # process.
-pytestmark = pytest.mark.timeout(180)
+pytestmark = [pytest.mark.timeout(180), pytest.mark.usefixtures("restore_environ")]
 
 # ---------------------------------------------------------------------------
 # Helpers

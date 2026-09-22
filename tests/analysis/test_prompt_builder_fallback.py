@@ -1,6 +1,6 @@
 import json
-from pathlib import Path
 from quodeq.analysis.prompts.builder import _load_dimension_data
+
 
 def test_load_dimension_data_from_compiled(tmp_path):
     compiled = tmp_path / "compiled"
@@ -10,11 +10,13 @@ def test_load_dimension_data_from_compiled(tmp_path):
     assert result is not None
     assert result["id"] == "security"
 
+
 def test_load_dimension_data_fallback_to_evaluators(tmp_path):
     compiled = tmp_path / "compiled"
     compiled.mkdir()
     result = _load_dimension_data(compiled, "nonexistent", evaluators_dir=tmp_path / "evals")
     assert result is None
+
 
 def test_load_dimension_data_custom_evaluator(tmp_path):
     compiled = tmp_path / "compiled"

@@ -6,6 +6,7 @@ import random
 import time
 import urllib.error
 import urllib.request
+from http import HTTPStatus
 
 from quodeq.shared.logging import log_info
 
@@ -24,7 +25,7 @@ def action_api_healthy(base_url: str) -> bool:
     url = f"{base_url}/api/health"
     try:
         with urllib.request.urlopen(url, timeout=_HEALTH_CHECK_TIMEOUT_S) as response:
-            if response.status != 200:
+            if response.status != HTTPStatus.OK:
                 return False
             payload = json.loads(response.read().decode("utf-8"))
             return payload.get("ok") is True

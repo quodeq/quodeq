@@ -1,29 +1,113 @@
-"""Job data model, store protocol, and in-memory store implementation."""
+"""Job data model, store protocol, and in-memory store implementation.
+
+JSON serialization (``_job_to_json``/``_job_from_json``) and the disk-backed
+``FileJobStore``/``create_job_store`` live in ``_job_file_store.py`` -- split
+out to keep this module under the size ratchet's 300-line cap, and
+re-exported from here.
+"""
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import threading
-import time
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-from typing import Protocol, runtime_checkable
-
-from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Callable, Protocol, runtime_checkable
 
 from quodeq.core.types import JobSnapshot
 from quodeq.shared.constants import CC_MARKER_KEY
+
+_REPORT_PATH_MARKER = "Report path:"
+_EXIT_CODE_TIMEOUT = -9
+
+# Watchdog polls process state every N seconds and re-checks deadline_at,
+# which only lands in job state after the analyzing_start marker -- so a
+# blocking wait(timeout=full_budget) at spawn time can't see it.
+_WATCHDOG_POLL_INTERVAL_S = 1.0
+
+# status.json exit reasons that mean "the run hit its time budget" -- the
+# user's own setting doing its job, not an error. Jobs ending this way are
+# marked cancelled (already in the salvage-scoring trigger list in
+# api/_evaluation_routes.py) with exit_reason set, so the evaluate header
+# renders "time limit reached" instead of FAILED.
+_DEADLINE_EXIT_REASONS = ("deadline", "time_limit")
+_EXIT_REASON_DEADLINE = "deadline"
+
+if TYPE_CHECKING:
+    import subprocess
+
+    from quodeq.services._external_jobs import ProcessControl
+
+# Canonical job status strings. They live here, with the Job they describe,
+# so both jobs.py (which re-exports them for its importers) and the mixins
+# it composes can import them without reaching back into jobs.py.
+STATUS_RUNNING = "running"
+STATUS_CANCELLED = "cancelled"
+STATUS_DONE = "done"
+STATUS_FAILED = "failed"
 
 _MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
 _CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
-_CONSUME_BATCH_SIZE = 1
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
+
+
+@dataclass(frozen=True, slots=True)
+class JobLaunchOptions:
+    """How ``JobManager.start_job`` spawns a command and what it records on the job.
+
+    ``cwd``/``env`` go to the subprocess; ``ai_provider``, ``ai_model`` and
+    ``time_limit_s`` are stored on the job so status readers (progress route,
+    UI) can report the run's client and budget.
+    """
+    cwd: str | None = None
+    env: dict[str, str] | None = None
+    ai_provider: str | None = None
+    ai_model: str | None = None
+    time_limit_s: int | None = None
+
+
+def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: str) -> "Job":
+    """A fresh job record for *cmd*, started now, carrying *launch*'s run metadata."""
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    return Job(
+        job_id=job_id,
+        status=status,
+        command=cmd,
+        started_at=datetime.now(timezone.utc).isoformat(),
+        ended_at=None,
+        exit_code=None,
+        ai_provider=launch.ai_provider,
+        ai_model=launch.ai_model,
+        time_limit_s=launch.time_limit_s,
+    )
+
+
+def mark_spawn_failed(job: "Job", exc: BaseException, *, status: str, exit_code: int) -> None:
+    """Close *job* as failed-to-start: terminal status, end time, exit code and a log line."""
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    job.status = status
+    job.ended_at = datetime.now(timezone.utc).isoformat()
+    job.exit_code = exit_code
+    job.logs.append(f"Failed to start process: {exc}")
+
+
+@dataclass(frozen=True, slots=True)
+class JobProcessSeams:
+    """Injection points for how ``JobManager`` spawns, probes and caps subprocesses.
+
+    Every field defaults to the production collaborator: ``subprocess.Popen``,
+    the signal-based ``ProcessControl``, and the ``QUODEQ_JOB_TIMEOUT_S``
+    env var for the hard duration cap.
+    """
+    spawn_impl: Callable[..., subprocess.Popen] | None = None
+    process_control: ProcessControl | None = None
+    job_timeout_cap_s: float | None = None
 
 
 @dataclass
@@ -161,186 +245,3 @@ class InMemoryJobStore:
 
 
 _logger = logging.getLogger(__name__)
-
-def _default_persist_dir() -> Path:
-    """Read persist dir from env at call time for lazy configuration.
-
-    Resolution: QUODEQ_JOB_PERSIST_DIR, else ``run/jobs`` next to the index
-    DB (mirroring get_score_cache_path, so the test suite's
-    QUODEQ_INDEX_DB_PATH override auto-isolates this store too), which
-    itself defaults to ``~/.quodeq``. Hardcoding the home fallback here let
-    pytest runs write fake jobs into the developer's real dashboard.
-    """
-    explicit = os.environ.get("QUODEQ_JOB_PERSIST_DIR")
-    if explicit:
-        return Path(explicit)
-    from quodeq.shared._env import get_index_db_path
-    return Path(get_index_db_path()).parent / "run" / "jobs"
-_STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
-
-
-def _job_to_json(job: Job) -> dict:
-    """Serialize a Job to a JSON-safe dict (no Process objects)."""
-    return {
-        "job_id": job.job_id,
-        "status": job.status,
-        "command": job.command,
-        "started_at": job.started_at,
-        "ended_at": job.ended_at,
-        "exit_code": job.exit_code,
-        "logs": list(job.logs),
-        "output_project": job.output_project,
-        "output_run_id": job.output_run_id,
-        "phase": job.phase,
-        "deadline_at": job.deadline_at,
-        "current_dimension": job.current_dimension,
-        "dimensions": job.dimensions,
-        "ai_provider": job.ai_provider,
-        "ai_model": job.ai_model,
-        "time_limit_s": job.time_limit_s,
-        "exit_reason": job.exit_reason,
-    }
-
-
-def _job_from_json(data: dict) -> Job:
-    """Deserialize a Job from a JSON dict."""
-    logs: deque[str] = deque(data.get("logs", []), maxlen=_MAX_LOG_LINES)
-    return Job(
-        job_id=data["job_id"],
-        status=data["status"],
-        command=data.get("command", []),
-        started_at=data.get("started_at", ""),
-        ended_at=data.get("ended_at"),
-        exit_code=data.get("exit_code"),
-        logs=logs,
-        output_project=data.get("output_project"),
-        output_run_id=data.get("output_run_id"),
-        phase=data.get("phase"),
-        deadline_at=data.get("deadline_at"),
-        current_dimension=data.get("current_dimension"),
-        dimensions=data.get("dimensions"),
-        ai_provider=data.get("ai_provider"),
-        ai_model=data.get("ai_model"),
-        time_limit_s=data.get("time_limit_s"),
-        exit_reason=data.get("exit_reason"),
-    )
-
-
-class FileJobStore:
-    """Job store backed by per-job JSON files on disk.
-
-    Jobs are stored as ``{persist_dir}/{job_id}.json``.  All existing files
-    are loaded on init, and stale completed/failed/cancelled jobs older than
-    24 hours are cleaned up automatically.
-    """
-
-    def __init__(self, persist_dir: Path | None = None) -> None:
-        self._persist_dir = persist_dir or _default_persist_dir()
-        self._persist_dir.mkdir(parents=True, exist_ok=True)
-        # SECURITY: restrict directory to owner-only access
-        os.chmod(self._persist_dir, 0o700)
-        self._jobs: dict[str, Job] = {}
-        self._lock = threading.Lock()
-        self._load_all()
-        self._cleanup_stale()
-
-    # -- JobStore protocol ---------------------------------------------------
-
-    def get(self, job_id: str) -> Job | None:
-        with self._lock:
-            return self._jobs.get(job_id)
-
-    def put(self, job: Job) -> None:
-        with self._lock:
-            self._jobs[job.job_id] = job
-            job_data = _job_to_json(job)
-        self._write_data(job.job_id, job_data)
-
-    def list(self) -> list[Job]:
-        with self._lock:
-            return list(self._jobs.values())
-
-    def delete(self, job_id: str) -> None:
-        with self._lock:
-            self._jobs.pop(job_id, None)
-            path = self._persist_dir / f"{job_id}.json"
-            path.unlink(missing_ok=True)
-
-    # -- persistence helpers -------------------------------------------------
-
-    def _write(self, job: Job) -> None:
-        """Write a single job to disk. Caller must hold the lock."""
-        self._write_data(job.job_id, _job_to_json(job))
-
-    def _write_data(self, job_id: str, data: dict) -> None:
-        """Write pre-serialized job data to disk. Does NOT require the lock."""
-        path = self._persist_dir / f"{job_id}.json"
-        tmp = path.with_suffix(".tmp")
-        try:
-            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            # SECURITY: restrict job files to owner-only read/write
-            os.chmod(tmp, 0o600)
-            tmp.replace(path)
-            os.chmod(path, 0o600)
-        except OSError:
-            _logger.warning("Failed to persist job %s", job_id, exc_info=True)
-            tmp.unlink(missing_ok=True)
-
-    def _load_all(self) -> None:
-        """Load every .json file in the persist dir."""
-        for path in self._persist_dir.glob("*.json"):
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                job = _job_from_json(data)
-                # Jobs that were 'running' when the server went down lose
-                # their monitor thread, but the subprocess itself was
-                # spawned start_new_session=True and usually survives — the
-                # run may well still be alive and writing status.json. Mark
-                # the job 'lost' (tracking gone), NOT 'failed': the merged
-                # evaluations list then yields to the truthful ext- index
-                # row for the same run, which can still track and cancel it.
-                if job.status == "running":
-                    job.status = "lost"
-                    job.exit_code = None
-                    # Stamp an end time or _cleanup_stale (which only prunes
-                    # jobs with ended_at) keeps the flipped job forever.
-                    if not job.ended_at:
-                        job.ended_at = datetime.now(timezone.utc).isoformat()
-                    self._jobs[job.job_id] = job
-                    self._write(job)
-                else:
-                    self._jobs[job.job_id] = job
-            except (json.JSONDecodeError, KeyError, OSError):
-                _logger.warning("Skipping corrupt job file %s", path, exc_info=True)
-
-    def _cleanup_stale(self) -> None:
-        """Remove completed/failed/cancelled jobs older than 24 hours."""
-        now = time.time()
-        stale_ids: list[str] = []
-        for job in self._jobs.values():
-            if job.status == "running":
-                continue
-            if not job.ended_at:
-                continue
-            try:
-                ended = datetime.fromisoformat(job.ended_at)
-                if ended.tzinfo is None:
-                    ended = ended.replace(tzinfo=timezone.utc)
-                age = now - ended.timestamp()
-                if age > _STALE_JOB_AGE_S:
-                    stale_ids.append(job.job_id)
-            except (ValueError, TypeError):
-                continue
-        for jid in stale_ids:
-            _logger.info("Cleaning up stale job %s", jid)
-            self._jobs.pop(jid, None)
-            (self._persist_dir / f"{jid}.json").unlink(missing_ok=True)
-
-
-def create_job_store() -> JobStore:
-    """Create the default job store.
-
-    Returns a ``FileJobStore`` that persists jobs to ``~/.quodeq/run/jobs/``
-    so that job state survives server restarts.
-    """
-    return FileJobStore()

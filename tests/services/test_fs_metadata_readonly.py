@@ -6,12 +6,14 @@ upgrade. Misses now report pending; the warm-up engine fills the cache.
 """
 from __future__ import annotations
 
+import json
+import logging
 from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.fs.report_parser._run_info import RunInfo
-from quodeq.services._fs_metadata import _read_accumulated_summary, warm_project_summary
+from quodeq.services._fs_metadata import _compute_summary, _read_accumulated_summary, warm_project_summary
 
 
 def _project(tmp_path: Path, name: str = "proj") -> Path:
@@ -129,3 +131,19 @@ def test_kill_switch_keeps_inline_compute(tmp_path, monkeypatch):
         grade, score, files, pending = _read_accumulated_summary(
             tmp_path, "proj", _runs(), DEFAULT_PARAMS)
     assert (grade, score, files, pending) == ("A", 9.0, 3, False)
+
+
+def test_metadata_read_failure_is_logged(caplog, tmp_path):
+    """A malformed/unreadable run/triage file must not fail silently: the
+    card falls back to an empty summary, but an operator needs a trace to
+    diagnose which project's data is broken."""
+    with patch(
+        "quodeq.services._fs_metadata._select_accumulated_dims",
+        side_effect=json.JSONDecodeError("Expecting value", "doc", 0),
+    ), caplog.at_level(logging.WARNING):
+        result = _compute_summary(tmp_path, "proj", [], DEFAULT_PARAMS, set())
+    assert result == {"grade": None, "score": None, "files": None}
+    assert any(
+        "metadata" in r.message.lower() or "triage" in r.message.lower()
+        for r in caplog.records
+    )

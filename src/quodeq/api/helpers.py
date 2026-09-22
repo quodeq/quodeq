@@ -6,12 +6,127 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, jsonify, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
+
+from quodeq.api._constants import ERROR_CODE_BAD_REQUEST
+from quodeq.shared.errors import ClientMessageError  # noqa: F401 -- re-export for api modules
 
 
 def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
     """Build a standardized error response tuple for Flask endpoints."""
     return {"error": message, "code": code}, status
+
+
+def json_error(message: str, status: int, code: str) -> tuple[Response, int]:
+    """``error_response`` already jsonified, as a ``(Response, status)`` tuple.
+
+    For the handlers annotated to return a ``Response``: one call replaces
+    the ``body, status = error_response(...)`` plus
+    ``return jsonify(body), status`` pair that stood at a hundred-odd sites.
+    """
+    body, status_code = error_response(message, status, code)
+    return jsonify(body), status_code
+
+
+def _json_object_or_error(
+    code: str = ERROR_CODE_BAD_REQUEST,
+) -> dict[str, Any] | tuple[dict[str, Any], int]:
+    """Return the request's JSON object body, or a 400 error tuple.
+
+    A bare ``request.get_json(force=True)`` raises on an unparseable body
+    (answering with Werkzeug's default HTML 400 page) and hands back a list
+    for ``[]``, whose ``.get`` then raises AttributeError and answers 500.
+    The POST handlers share this so a non-JSON and a non-object body both
+    come back through their own ``{"error", "code"}`` shape.
+    """
+    payload = request.get_json(force=True, silent=True)
+    if payload is None:
+        return error_response("request body must be JSON", HTTPStatus.BAD_REQUEST, code)
+    if not isinstance(payload, dict):
+        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, code)
+    return payload
+
+
+def _path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
+    """Return the request body's stripped ``path``, or a 400 error tuple.
+
+    Shared by PATCH /api/projects/<project>/path and POST /api/scan so both
+    refuse a non-string ``path`` the same way instead of raising
+    AttributeError on ``.strip()`` and answering 500. An absent ``path``
+    gives ``""``: each route keeps its own required-field message.
+    """
+    raw = data.get("path", "")
+    if not isinstance(raw, str):
+        return error_response("path must be a string", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+    return raw.strip()
+
+
+_MIN_PAGE_LIMIT = 1
+_DEFAULT_PAGE_OFFSET = 0
+
+
+def _page_int(args, name: str, default: int, minimum: int, kind: str, code: str) -> int | tuple[dict[str, Any], int]:
+    """Parse one paging query parameter for :func:`page_params`.
+
+    An absent parameter keeps *default*. A present value that fails
+    ``int()``, or is below *minimum*, comes back as a ready
+    ``error_response`` result naming the parameter, what was received and
+    what is valid.
+    """
+    raw = args.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        # TypeError: request.args only ever holds str, but a direct call
+        # with a list or other non-str value must answer the same 400.
+        return error_response(f"{name} must be {kind}, got {raw!r}", HTTPStatus.BAD_REQUEST, code)
+    if value < minimum:
+        return error_response(f"{name} must be {kind}, got {value!r}", HTTPStatus.BAD_REQUEST, code)
+    return value
+
+
+def page_params(
+    args,
+    *,
+    default_limit: int,
+    default_offset: int = _DEFAULT_PAGE_OFFSET,
+    min_limit: int = _MIN_PAGE_LIMIT,
+    code: str = "INVALID_INPUT",
+) -> tuple[int, int] | tuple[dict[str, Any], int]:
+    """Parse and validate ``limit``/``offset`` for a paginated route.
+
+    Returns ``(limit, offset)``, or an ``error_response`` result whose first
+    element is a dict, which is how callers tell the two apart. Every
+    paginated route shares one rule: an absent parameter keeps the route's
+    default, and a parameter that IS present but is not an integer or is
+    below its minimum answers 400 naming the parameter, instead of silently
+    substituting the default the way ``request.args.get(..., type=int)``
+    did.
+
+    *min_limit* is 0 for the routes where ``limit=0`` is the "no limit"
+    sentinel, and *code* covers the modules whose error codes are
+    lower-case. A route's own upper cap stays a clamp in the route: asking
+    for more than it serves is not an error.
+    """
+    limit_kind = "a positive integer" if min_limit > 0 else "a non-negative integer"
+    limit = _page_int(args, "limit", default_limit, min_limit, limit_kind, code)
+    if isinstance(limit, tuple):
+        return limit
+    offset = _page_int(args, "offset", default_offset, 0, "a non-negative integer", code)
+    if isinstance(offset, tuple):
+        return offset
+    return limit, offset
+
+
+def _sanitize_for_log(value: str) -> str:
+    """Remove CR/LF from a value before including it in a log message.
+
+    Prevents log forging when client-supplied values contain embedded
+    newlines that would create fake log entries.
+    """
+    return value.replace("\r", "").replace("\n", "")
 
 
 _BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
@@ -67,7 +182,7 @@ def validate_evaluation_payload(payload: dict[str, Any]) -> str | None:
         elif not isinstance(dims, str):
             invalid.append("dimensions (must be a string or array of strings)")
 
-    str_fields = ("discipline", "aiCmd", "aiModel", "subagentModel")
+    str_fields = ("discipline", "aiCmd", "aiCmdPath", "aiModel", "subagentModel")
     for field in str_fields:
         value = payload.get(field)
         if value is not None and not isinstance(value, str):

@@ -6,27 +6,45 @@ import logging
 import os
 import tempfile
 import threading
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 from quodeq.api._rate_limit_config import _rate_limit_max, _rate_limit_window, default_rate_limit_path
+from quodeq.core.utils.file_lock import lock_file, unlock_file
 
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_PATH = str(default_rate_limit_path())
 
+# This lock is taken from a Flask before_request hook, so its wait budget
+# has to be short enough that contention never pins an HTTP worker thread.
+# The shared file_lock default (60s, sized for the subagent pool's batch
+# workload) would do exactly that, so the request path passes its own.
+_LOCK_TIMEOUT_S = 1.5
+
 
 class FileRateLimitStore:
-    """Rate-limit store backed by a JSON file.
+    """Rate-limit store backed by a JSON file, with a short in-memory cache.
 
     Lets the workers of a single-machine deployment share rate-limit state
-    through a common file without Redis. NOTE: the ``threading.Lock`` below
-    only serializes access within a SINGLE process; under multiple worker
-    processes the file read-modify-write can still interleave, so the counts
-    are best-effort (a concurrent burst may slip a few requests past the
-    limit) rather than strictly exact across processes. Not recommended for
-    high-throughput production use; add OS-level file locking
-    (``fcntl.flock``) if exact cross-process enforcement is required.
+    through a common file without Redis. The ``threading.Lock`` below only
+    serializes access within a SINGLE process; ``check_and_record()`` -- the
+    actual enforcement path -- additionally takes a cross-process OS file
+    lock (a ``.lock`` sidecar next to the data file, via ``file_lock``) and
+    reloads fresh from disk inside it, so concurrent worker processes cannot
+    interleave the read-modify-write and cannot each act on a stale
+    in-memory snapshot. ``record()``/``check()`` are not on the enforcement
+    path and stay best-effort, cached, cross-process-racy by design.
+
+    The in-memory cache (TTL ``_CACHE_TTL_S``) still governs ``record()``/
+    ``check()``: another process's write may take up to ``_CACHE_TTL_S``
+    seconds to become visible there, and an allowed request recorded
+    in-memory but not yet flushed to disk is lost if this process is killed
+    before the next flush.
     """
+
+    _CACHE_TTL_S = 1.0
 
     def __init__(
         self,
@@ -38,6 +56,16 @@ class FileRateLimitStore:
         self._lock = threading.Lock()
         self._window = window if window is not None else _rate_limit_window()
         self._max_requests = max_requests if max_requests is not None else _rate_limit_max()
+        self._cache: dict[str, list[float]] | None = None
+        self._cache_loaded_at = 0.0
+        # None means "never flushed yet" -- distinct from 0.0, which a caller
+        # legitimately passes as `now` (several tests use a t=0 baseline).
+        # Using 0.0 as the initial sentinel would make the first flush's
+        # due-check (`now - self._last_flush >= self._CACHE_TTL_S`) evaluate
+        # to False whenever the caller's first `now` is also near 0, silently
+        # skipping the "always flush on cold start" guarantee.
+        self._last_flush: float | None = None
+        self._dirty = False
 
     def _load(self) -> dict[str, list[float]]:
         try:
@@ -69,15 +97,45 @@ class FileRateLimitStore:
             _logger.warning("Failed to write rate-limit file %s", self._path)
             try:
                 os.unlink(tmp_name)
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("temp rate-limit file %s not removed: %s", tmp_name, exc)
+
+    def _cache_for(self, now: float) -> dict[str, list[float]]:
+        """Return the in-memory cache, refilling from disk if stale. Caller
+        must hold self._lock."""
+        stale = self._cache is None or now - self._cache_loaded_at >= self._CACHE_TTL_S
+        if stale:
+            if self._cache is not None and self._dirty:
+                # A reload discards self._cache and replaces it wholesale.
+                # If it still holds writes from this process that were never
+                # flushed (the flush TTL hadn't elapsed yet), persist them
+                # first -- otherwise the reload silently drops them, even
+                # with no crash involved. This keeps the "within-process
+                # writes are never lost" guarantee independent of how the
+                # reload TTL and the flush TTL happen to line up.
+                self._save(self._cache)
+                self._last_flush = now
+                self._dirty = False
+            self._cache = self._load()
+            self._cache_loaded_at = now
+        return self._cache
+
+    def _flush(self, now: float, *, force: bool) -> None:
+        """Persist the in-memory cache if forced or the flush TTL elapsed.
+        Caller must hold self._lock."""
+        if not self._dirty:
+            return
+        if force or self._last_flush is None or now - self._last_flush >= self._CACHE_TTL_S:
+            self._save(self._cache)
+            self._last_flush = now
+            self._dirty = False
 
     def record(self, ip: str, now: float) -> None:
         """Record a request from *ip* at time *now*."""
         if not ip:
             return
         with self._lock:
-            data = self._load()
+            data = self._cache_for(now)
             timestamps = data.get(ip, [])
             timestamps.append(now)
             pruned = [t for t in timestamps if now - t < self._window]
@@ -85,11 +143,87 @@ class FileRateLimitStore:
                 data[ip] = pruned
             else:
                 data.pop(ip, None)
-            self._save(data)
+            self._dirty = True
+            self._flush(now, force=False)
 
     def check(self, ip: str, now: float) -> bool:
         """Return True if *ip* has exceeded the rate limit."""
         with self._lock:
-            data = self._load()
+            data = self._cache_for(now)
             timestamps = [t for t in data.get(ip, []) if now - t < self._window]
             return len(timestamps) >= self._max_requests
+
+    @contextmanager
+    def _cross_process_lock(self) -> Iterator[None]:
+        """Hold an exclusive OS lock on the ``.lock`` sidecar next to the
+        data file. Locking the sidecar rather than the data file itself
+        matters because _save() replaces the data file via os.replace() on
+        every write, which would orphan a lock held on the old inode."""
+        lock_path = self._path.with_suffix(self._path.suffix + ".lock")
+        try:
+            lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        except OSError:
+            _logger.warning("Failed to create rate-limit dir %s", lock_path.parent)
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
+        locked_ok = False
+        try:
+            lock_file(fd, _LOCK_TIMEOUT_S)
+            locked_ok = True
+            yield
+        finally:
+            if locked_ok:
+                unlock_file(fd)
+            os.close(fd)
+
+    def check_and_record(self, ip: str, now: float) -> bool:
+        """Same contract as check()+record(). This is the enforcement path,
+        so it takes the cross-process OS lock and reloads fresh from disk
+        for its decision instead of trusting the TTL cache -- a cached read
+        would let two processes each act on their own stale snapshot within
+        the same lock-free TTL window, even under a perfect file lock.
+
+        The cross-process lock is best-effort, like _load()/_save(): an
+        unwritable lock directory (OSError) or a contended lock that never
+        frees (TimeoutError) degrades to in-process-only enforcement with a
+        warning. This runs inside a before_request hook, so letting either
+        propagate would turn a degraded rate-limit store into an HTTP 500
+        on every single request.
+        """
+        if not ip:
+            return False
+        with self._lock, ExitStack() as stack:
+            try:
+                stack.enter_context(self._cross_process_lock())
+            except (OSError, TimeoutError) as exc:
+                _logger.warning(
+                    "Rate-limit cross-process lock unavailable (%s); "
+                    "falling back to in-process-only enforcement", exc,
+                )
+            return self._check_and_record_locked(ip, now)
+
+    def _check_and_record_locked(self, ip: str, now: float) -> bool:
+        """check_and_record()'s read-modify-write. Caller holds self._lock and,
+        when it could be taken, the cross-process lock."""
+        if self._cache is not None and self._dirty:
+            # Mirror _cache_for()'s protection: this instance may hold
+            # writes from a prior record() call that were buffered in
+            # memory but not yet flushed (the flush TTL hadn't elapsed).
+            # Reloading from disk and then overwriting it below would
+            # silently discard them from both disk and memory.
+            self._save(self._cache)
+            self._last_flush = now
+            self._dirty = False
+        data = self._load()
+        timestamps = [t for t in data.get(ip, []) if now - t < self._window]
+        limited = len(timestamps) >= self._max_requests
+        if not limited:
+            timestamps.append(now)
+            data[ip] = timestamps
+            self._save(data)
+            self._last_flush = now
+            self._dirty = False
+        # Keep this process's fast path (record()/check()) warm with the
+        # state we just confirmed on disk, win or lose.
+        self._cache = data
+        self._cache_loaded_at = now
+        return limited

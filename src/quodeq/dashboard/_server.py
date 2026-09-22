@@ -9,31 +9,35 @@ import sys
 import threading
 import typing
 import webbrowser
+from collections.abc import MutableMapping
 from pathlib import Path
 
-from quodeq.dashboard._api_health import ApiConfig, action_api_healthy
+from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._config import DashboardConfig
-from quodeq.dashboard._networking import (
-    _MAX_PORT_SCAN_TRIES,
-    _allow_plaintext_http,
-    _is_port_open,
-    _local_hosts,
-)
+from quodeq.dashboard._networking import _MAX_PORT_SCAN_TRIES, _allow_plaintext_http
 from quodeq.dashboard._frozen import subprocess_cmd
-from quodeq.dashboard._process import (
-    _PROCESS_WAIT_TIMEOUT_S,
-    _spawn_and_wait_local,
-    _wait_for_process,
+from quodeq.dashboard._probes import ApiProbes, NativeShell
+from quodeq.dashboard._process import _PROCESS_WAIT_TIMEOUT_S, _wait_for_process
+from quodeq.dashboard._webview_token import (
+    _ENV_WEBVIEW_TOKEN,
+    _get_webview_token,
+    _warn_reused_api_token_mismatch,
+    spawn_window_with_token,
 )
+from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
+_logger = logging.getLogger(__name__)
 _HTTP_SCHEME = "http"
 
 
-def _guard_plaintext_http(host: str, allow_plaintext: bool | None = None) -> None:
+def _guard_plaintext_http(
+    host: str, allow_plaintext: bool | None = None, *, probes: ApiProbes | None = None,
+) -> None:
     """Refuse plaintext HTTP to a non-local host unless explicitly opted in."""
-    if host in _local_hosts():
+    probes = probes or ApiProbes()
+    if host in probes.local_hosts():
         return
     if _allow_plaintext_http(allow_plaintext):
         logging.getLogger(__name__).warning(
@@ -52,16 +56,28 @@ def _ensure_action_api(
     start_port: int,
     max_tries: int = _MAX_PORT_SCAN_TRIES,
     api_config: ApiConfig | None = None,
+    *,
+    probes: ApiProbes | None = None,
+    env: MutableMapping[str, str] | None = None,
 ) -> tuple[str, subprocess.Popen | None]:
+    """Find a free port and start (or reuse) the action API on it.
+
+    *env* is where this launch's webview token is published for the API
+    subprocess to inherit; it defaults to ``os.environ``, which is the only
+    mapping ``probes.spawn`` passes on by default.
+    """
+    probes = probes or ApiProbes()
     cfg = api_config or ApiConfig()
-    _guard_plaintext_http(host, cfg.allow_plaintext)
+    _guard_plaintext_http(host, cfg.allow_plaintext, probes=probes)
     for port in range(start_port, start_port + max_tries):
         base_url = f"{_HTTP_SCHEME}://{host}:{port}"
-        if _is_port_open(host, port):
-            if action_api_healthy(base_url):
+        if probes.is_port_open(host, port):
+            if probes.api_healthy(base_url):
+                _warn_reused_api_token_mismatch(base_url)
                 return base_url, None
             continue
-        return _spawn_and_wait_local(port, base_url, cfg)
+        resolve_env_mut(env)[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
+        return probes.spawn(port, base_url, cfg)
     raise RuntimeError("Unable to find a free port for Action API.")
 
 
@@ -70,36 +86,41 @@ def _ensure_action_api_forced(
     port: int,
     static_dist: Path | None = None,
     evaluations_dir: str | None = None,
+    *,
+    probes: ApiProbes | None = None,
+    env: MutableMapping[str, str] | None = None,
 ) -> tuple[str, subprocess.Popen | None]:
-    _guard_plaintext_http(host)
+    """Start (or reuse) the action API on exactly *port*.
+
+    *env* is where this launch's webview token is published; see
+    :func:`_ensure_action_api`.
+    """
+    probes = probes or ApiProbes()
+    _guard_plaintext_http(host, probes=probes)
     base_url = f"http://{host}:{port}"
-    if _is_port_open(host, port):
-        if action_api_healthy(base_url):
+    if probes.is_port_open(host, port):
+        if probes.api_healthy(base_url):
+            _warn_reused_api_token_mismatch(base_url)
             return base_url, None
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
-    return _spawn_and_wait_local(
+    resolve_env_mut(env)[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
+    return probes.spawn(
         port, base_url, ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir),
     )
 
 
-def _serve_and_wait(
-    action_api_url: str,
-    action_api_process: subprocess.Popen | None,
-    config: DashboardConfig,
-) -> None:
-    """Open window or browser, register signal handlers, and block until exit."""
-    log_success(f"Dashboard running at {action_api_url}")
+def _stop_children_for(action_api_process: subprocess.Popen | None) -> None:
+    if action_api_process and action_api_process.poll() is None:
+        action_api_process.terminate()
+        try:
+            action_api_process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            action_api_process.kill()
 
-    def _stop_children() -> None:
-        if action_api_process and action_api_process.poll() is None:
-            action_api_process.terminate()
-            try:
-                action_api_process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
-            except subprocess.TimeoutExpired:
-                action_api_process.kill()
 
+def _make_tstp_handler(stop_children: typing.Callable) -> typing.Callable:
     def _handle_tstp(_signum, _frame) -> None:
-        _stop_children()
+        stop_children()
         # Ctrl+Z sends SIGTSTP to the whole foreground process group, so a
         # wrapper like `uv run quodeq dashboard` is also stopped at this
         # point. We're about to exit, but if we leave the wrapper in the
@@ -109,36 +130,109 @@ def _serve_and_wait(
         # sees us exit, and tears itself down cleanly.
         try:
             os.kill(os.getppid(), signal.SIGCONT)
-        except OSError:
-            pass
+        except OSError as exc:
+            _logger.debug("SIGTSTP handling failed: %s", exc)
         sys.exit(0)
+    return _handle_tstp
 
-    if hasattr(signal, "SIGTSTP"):
-        signal.signal(signal.SIGTSTP, _handle_tstp)
 
+def _make_term_handler(stop_children: typing.Callable) -> typing.Callable:
     def _handle_term(_signum, _frame) -> None:
         # Without this the API child outlives a `kill`/logout of the dashboard
         # and keeps holding its port, so the next launch scans past it and the
         # orphan lingers until it's found by hand. Only KeyboardInterrupt and
         # SIGTSTP used to reach _stop_children.
-        _stop_children()
+        stop_children()
         sys.exit(0)
+    return _handle_term
 
-    signal.signal(signal.SIGTERM, _handle_term)
+
+def _register_serve_signal_handlers(stop_children: typing.Callable) -> None:
+    if hasattr(signal, "SIGTSTP"):
+        signal.signal(signal.SIGTSTP, _make_tstp_handler(stop_children))
+    signal.signal(signal.SIGTERM, _make_term_handler(stop_children))
+
+
+def _serve_and_wait(
+    action_api_url: str,
+    action_api_process: subprocess.Popen | None,
+    config: DashboardConfig,
+    *, shell: NativeShell | None = None,
+) -> None:
+    """Open window or browser, register signal handlers, and block until exit."""
+    log_success(f"Dashboard running at {action_api_url}")
+    stop_children = lambda: _stop_children_for(action_api_process)  # noqa: E731
+    _register_serve_signal_handlers(stop_children)
 
     if config.build.use_native and config.build.open_browser:
-        _serve_native(action_api_url, action_api_process, _stop_children)
+        _serve_native(action_api_url, action_api_process, stop_children, shell=shell)
     elif config.build.open_browser:
         webbrowser.open(action_api_url)
-        _serve_blocking(action_api_process, _stop_children)
+        _serve_blocking(action_api_process, stop_children)
     else:
-        _serve_blocking(action_api_process, _stop_children)
+        _serve_blocking(action_api_process, stop_children)
+
+
+def _linux_webview_fallback(
+    action_api_url: str, action_api_process: subprocess.Popen | None,
+    shell: NativeShell, stop_children: typing.Callable, serve_blocking: typing.Callable,
+) -> None:
+    logging.getLogger(__name__).warning(
+        "pywebview's Linux GTK+/WebKit backend is missing — "
+        "falling back to opening the dashboard in your browser. "
+        "Install 'python3-gi' and 'gir1.2-webkit2-4.1' (Debian/Ubuntu) "
+        "or 'python3-gobject' + 'webkit2gtk4.1' (Fedora/Arch) to get the native window.",
+    )
+    shell.open_browser(action_api_url)
+    serve_blocking(action_api_process, stop_children)
+
+
+def _try_focus_existing_instance(instance, stop_children: typing.Callable) -> bool:
+    """Return True when an existing window was focused (caller should stop);
+    False when there is none reachable (caller should open a new window).
+
+    Focus, not send_reload(action_api_url): stop_children (called by the
+    caller after we return True) kills the API that URL names, so handing it
+    to the running window would point it at a server about to die. It keeps
+    the backend it already has. (The runner's pre-spawn hand-off normally
+    catches this case before any API exists; this is the late-race fallback
+    for an instance that appeared since.)
+    """
+    # Probe rather than acquire: the *window* process owns the reload socket,
+    # because it is the only one that can act on a reload. Binding it here
+    # would leave the child unable to bind, its listener dead, and every
+    # relaunch's reload dropped into a socket nobody reads.
+    if not instance.probe_existing():
+        return False
+    try:
+        instance.send_focus()
+    except (ConnectionRefusedError, OSError):
+        # The instance answered the probe but died before the send. Fall
+        # through and open our own window; its try_acquire clears the
+        # now-stale socket.
+        logging.getLogger(__name__).warning("Could not reach existing instance — opening new window")
+        return False
+    stop_children()
+    return True
+
+
+def _open_webview_log():
+    # Route webview stderr to a log file (not DEVNULL) so a platform import
+    # failure or GTK error is actually recoverable from ~/.quodeq/run/.
+    webview_log_path = Path.home() / ".quodeq" / "run" / "webview.log"
+    try:
+        webview_log_path.parent.mkdir(parents=True, exist_ok=True)
+        return webview_log_path.open("a", encoding="utf-8")
+    except OSError:
+        return subprocess.DEVNULL
 
 
 def _serve_native(
     action_api_url: str,
     action_api_process: subprocess.Popen | None,
     stop_children: typing.Callable,
+    *, shell: NativeShell | None = None,
+    serve_blocking: typing.Callable[..., None] | None = None,
 ) -> None:
     """Open a PyWebView native window with single-instance support.
 
@@ -148,66 +242,31 @@ def _serve_native(
     of silently dying after spawning a webview subprocess that immediately
     crashes on import.
     """
-    try:
-        import webview  # noqa: F401
-    except ImportError:
+    shell = shell or NativeShell()
+    serve_blocking = serve_blocking or _serve_blocking
+
+    if not shell.webview_importable():
         raise RuntimeError(
             "pywebview is not installed. "
             "Try reinstalling with 'pip install --upgrade quodeq' or use --browser."
         )
 
-    if sys.platform.startswith("linux") and not _linux_webview_backend_available():
-        logging.getLogger(__name__).warning(
-            "pywebview's Linux GTK+/WebKit backend is missing — "
-            "falling back to opening the dashboard in your browser. "
-            "Install 'python3-gi' and 'gir1.2-webkit2-4.1' (Debian/Ubuntu) "
-            "or 'python3-gobject' + 'webkit2gtk4.1' (Fedora/Arch) to get the native window.",
-        )
-        webbrowser.open(action_api_url)
-        _serve_blocking(action_api_process, stop_children)
+    if sys.platform.startswith("linux") and not shell.linux_backend_available():
+        _linux_webview_fallback(action_api_url, action_api_process, shell, stop_children, serve_blocking)
         return
 
-    from quodeq.dashboard._instance import InstanceController
-
-    instance = InstanceController()
-
-    # Probe rather than acquire: the *window* process owns the reload socket,
-    # because it is the only one that can act on a reload. Binding it here
-    # would leave the child unable to bind, its listener dead, and every
-    # relaunch's reload dropped into a socket nobody reads.
-    # Focus, not send_reload(action_api_url): stop_children below kills the API
-    # that URL names, so handing it to the running window would point it at a
-    # server about to die. It keeps the backend it already has. (The runner's
-    # pre-spawn hand-off normally catches this case before any API exists;
-    # this is the late-race fallback for an instance that appeared since.)
-    if instance.probe_existing():
-        try:
-            instance.send_focus()
-        except (ConnectionRefusedError, OSError):
-            # The instance answered the probe but died before the send. Fall
-            # through and open our own window; its try_acquire clears the
-            # now-stale socket.
-            logging.getLogger(__name__).warning("Could not reach existing instance — opening new window")
-        else:
-            stop_children()
-            return
+    instance = shell.make_instance()
+    if _try_focus_existing_instance(instance, stop_children):
+        return
 
     # Pass Flask PID so the webview process can kill it on window close.
     api_pid = str(action_api_process.pid) if action_api_process else ""
+    webview_stderr = _open_webview_log()
 
-    # Route webview stderr to a log file (not DEVNULL) so a platform import
-    # failure or GTK error is actually recoverable from ~/.quodeq/run/.
-    webview_log_path = Path.home() / ".quodeq" / "run" / "webview.log"
-    try:
-        webview_log_path.parent.mkdir(parents=True, exist_ok=True)
-        webview_stderr = webview_log_path.open("a", encoding="utf-8")
-    except OSError:
-        webview_stderr = subprocess.DEVNULL
-
-    subprocess.Popen(
+    # The launch token goes over stdin inside here, never argv.
+    spawn_window_with_token(
+        shell.spawn_window,
         subprocess_cmd("webview", [action_api_url, str(instance.sock_path), api_pid]),
-        start_new_session=True,
-        stdout=subprocess.DEVNULL,
         stderr=webview_stderr,
     )
 
@@ -216,25 +275,7 @@ def _serve_native(
     # and the user can still reach the dashboard in their browser. Without
     # this block the whole `quodeq dashboard` command returned immediately
     # after spawning the detached webview child and the API was torn down.
-    _serve_blocking(action_api_process, stop_children)
-
-
-def _linux_webview_backend_available() -> bool:
-    """Return True if pywebview's GTK backend can actually load on Linux.
-
-    pywebview-on-Linux needs PyGObject + WebKit2GTK; neither is a pip
-    dependency of the `pywebview` wheel. Importing the GTK backend is the
-    only reliable probe — a successful `import webview` only proves the
-    Python package installed, not that its Linux backend is usable.
-    """
-    try:
-        import gi  # type: ignore[import-untyped]
-        gi.require_version("WebKit2", "4.1")
-        from gi.repository import WebKit2  # noqa: F401
-        return True
-    except (ImportError, ValueError):
-        # ValueError: "Namespace WebKit2 not available"
-        return False
+    serve_blocking(action_api_process, stop_children)
 
 
 # Public alias for cross-module use within the dashboard package
@@ -254,6 +295,6 @@ def _serve_blocking(
         else:
             signal.pause()
     except KeyboardInterrupt:
-        pass
+        _logger.debug("serve loop stopped by KeyboardInterrupt")
     finally:
         stop_children()

@@ -1,6 +1,8 @@
 import ContextBlock from '../../../components/ContextBlock.jsx';
+import { RefLinks } from '../../../components/findingDetail.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
+import { confirmDialog } from '../../../utils/confirmDialog.js';
 
 function dismissedLabel(d) {
   return d.principle || d.dimension || (d.req ?? '?');
@@ -26,16 +28,7 @@ function DismissedCard({ d, onRestore, onDelete }) {
             <div className="dismissed-detail-section">
               <div className="dismissed-detail-header">
                 <span className="dismissed-detail-label">{t('violations.reasonLabel')}</span>
-                {(() => {
-                  const urlRefs = (d.reqRefs || []).filter((r) => r.url && /^https?:\/\//.test(r.url));
-                  return urlRefs.length > 0 && (
-                    <span className="cwe-link-group">
-                      {urlRefs.map((r, i) => (
-                        <a key={i} className="cwe-link" href={r.url} target="_blank" rel="noopener noreferrer">{r.label}</a>
-                      ))}
-                    </span>
-                  );
-                })()}
+                <RefLinks reqRefs={d.reqRefs} />
               </div>
               <p className="dismissed-detail-title">{d.title}</p>
             </div>
@@ -46,7 +39,7 @@ function DismissedCard({ d, onRestore, onDelete }) {
               <p className="dismissed-detail-text">{d.reason}</p>
             </div>
           )}
-          <ContextBlock context={d.context} snippet={d.snippet} scope={d.scope} line={d.line} endLine={d.endLine} />
+          <ContextBlock context={d.context} snippet={d.snippet} scope={d.scope} line={d.line} />
         </div>
       )}
     </div>
@@ -70,7 +63,16 @@ export default function DismissedSubTab({ dismissed, onRestore, onRestoreAll, on
               </button>
             )}
             {onDeleteAll && (
-              <button type="button" className="delete-btn" onClick={onDeleteAll}>
+              <button type="button" className="delete-btn"
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: t('violations.deleteAllConfirmTitle'),
+                    message: t('violations.deleteAllConfirmMessage'),
+                    variant: 'danger',
+                  });
+                  if (!ok) return;
+                  onDeleteAll();
+                }}>
                 {t('violations.deleteAll')}
               </button>
             )}

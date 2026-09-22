@@ -1,50 +1,51 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { generateRequirementId } from '../utils.js';
-import { deepClone } from '../../../utils/deepClone.js';
+import {
+  addPrincipleToStandard, removePrincipleFromStandard,
+  addRequirementToStandard, removeRequirementFromStandard, updateStandardField,
+} from '../standardTreeModel.js';
 import { STANDARD_TYPES } from './useStandards.js';
 import { t } from '../../../strings/index.js';
 
+// addPrinciple/addRequirement call setSelectedNode from INSIDE the
+// setStandard updater (a pre-existing bug — fires twice under StrictMode);
+// removePrinciple/removeRequirement call it OUTSIDE, right after setStandard,
+// since their target never depends on `prev`. Both placements are preserved
+// exactly as they were before this move — not purity-fixed here; see
+// standardTreeModel.js's docstring.
 function useTreeMutations(setStandard, setDirty, setSelectedNode) {
   const addPrinciple = useCallback(() => {
     setStandard((prev) => {
-      const next = deepClone(prev);
-      next.principles.push({ name: '', description: '', requirements: [] });
-      setSelectedNode({ type: 'principle', index: next.principles.length - 1 });
-      return next;
+      const { standard, selectedNode } = addPrincipleToStandard(prev);
+      setSelectedNode(selectedNode);
+      return standard;
     });
     setDirty(true);
   }, [setStandard, setDirty]);
 
   const removePrinciple = useCallback((index) => {
-    setStandard((prev) => {
-      const next = deepClone(prev);
-      next.principles.splice(index, 1);
-      return next;
-    });
+    // setSelectedNode is called OUTSIDE the updater here, matching the
+    // original exactly (its value never depended on `prev`, so it was never
+    // inside the updater to begin with — don't relocate it).
+    setStandard((prev) => removePrincipleFromStandard(prev, index).standard);
     setDirty(true);
     setSelectedNode({ type: 'root' });
   }, [setStandard, setDirty]);
 
   const addRequirement = useCallback((principleIndex) => {
     setStandard((prev) => {
-      const next = deepClone(prev);
-      const principle = next.principles[principleIndex];
-      const seq = (principle.requirements?.length || 0) + 1;
-      const autoId = generateRequirementId(next.id, principle.name, seq);
-      principle.requirements.push({ id: autoId, text: '', description: '', refs: [] });
-      setSelectedNode({ type: 'requirement', principleIndex, reqIndex: principle.requirements.length - 1 });
-      return next;
+      const { standard, selectedNode } = addRequirementToStandard(prev, principleIndex);
+      setSelectedNode(selectedNode);
+      return standard;
     });
     setDirty(true);
   }, [setStandard, setDirty]);
 
   const removeRequirement = useCallback((principleIndex, reqIndex) => {
-    setStandard((prev) => {
-      const next = deepClone(prev);
-      next.principles[principleIndex].requirements.splice(reqIndex, 1);
-      return next;
-    });
+    // setSelectedNode is called OUTSIDE the updater here too, matching the
+    // original: its value only depends on the passed-in principleIndex, so
+    // it never needed to read `prev` inside the updater.
+    setStandard((prev) => removeRequirementFromStandard(prev, principleIndex, reqIndex).standard);
     setDirty(true);
     setSelectedNode({ type: 'principle', index: principleIndex });
   }, [setStandard, setDirty]);
@@ -52,21 +53,15 @@ function useTreeMutations(setStandard, setDirty, setSelectedNode) {
   return { addPrinciple, removePrinciple, addRequirement, removeRequirement };
 }
 
-function useStandardMutations(standard, setStandard, setDirty, standardId, isNew, { createStandard, updateStandard }) {
+function useStandardMutations(standard, setStandard, setDirty, isNew, { createStandard, updateStandard }) {
   const [selectedNode, setSelectedNode] = useState(null);
 
-  // Deep clone is required here to ensure React detects state changes via
+  // updateStandardField deep-clones so React detects state changes via
   // referential inequality across the entire nested standard tree (principles
   // -> requirements). The tree is small (typically <50 nodes), so JSON
   // round-trip cost is negligible.
   const updateField = useCallback((path, value) => {
-    setStandard((prev) => {
-      const next = deepClone(prev);
-      let target = next;
-      for (let i = 0; i < path.length - 1; i++) target = target[path[i]];
-      target[path[path.length - 1]] = value;
-      return next;
-    });
+    setStandard((prev) => updateStandardField(prev, path, value));
     setDirty(true);
   }, [setStandard, setDirty]);
 
@@ -86,6 +81,14 @@ function useStandardMutations(standard, setStandard, setDirty, standardId, isNew
   return { selectedNode, setSelectedNode, updateField, ...tree, save };
 }
 
+/**
+ * The standard editor's document and edit actions: field updates, the
+ * principle/requirement tree, the selected node, and save.
+ *
+ * With `isNew` it starts from a blank custom standard instead of fetching.
+ * `editable` is false for managed standards, which the UI renders read-only.
+ * `dirty` tracks unsaved edits.
+ */
 export function useStandardDetail(standardId, isNew) {
   const { getStandard, createStandard, updateStandard } = useApi();
   const [standard, setStandard] = useState(null);
@@ -93,7 +96,7 @@ export function useStandardDetail(standardId, isNew) {
   const [error, setError] = useState(null);
   const [dirty, setDirty] = useState(false);
 
-  const mutations = useStandardMutations(standard, setStandard, setDirty, standardId, isNew, { createStandard, updateStandard });
+  const mutations = useStandardMutations(standard, setStandard, setDirty, isNew, { createStandard, updateStandard });
 
   useEffect(() => {
     if (isNew) {

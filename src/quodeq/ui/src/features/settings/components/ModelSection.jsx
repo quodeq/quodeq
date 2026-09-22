@@ -11,21 +11,51 @@ const MODEL_LEVEL_THOROUGH = 3;
 
 export { AI_MODEL_STORAGE_KEY, AI_CMD_STORAGE_KEY };
 
+function ClientPillGroup({ clients, value, onApply }) {
+  return clients.map(({ id, label }) => (
+    <button
+      key={id}
+      type="button"
+      role="radio"
+      aria-checked={value === id}
+      className={`settings-pill${value === id ? ' settings-pill--active' : ''}`}
+      onClick={() => onApply(id)}
+    >
+      {label}
+    </button>
+  ));
+}
+
+function ClientSelectorDetecting() {
+  return (
+    <div className="settings-row settings-row--last">
+      <div className="settings-row-label">
+        <span className="settings-label">{t('settings.clientLabel')}</span>
+        <span className="settings-description">{t('settings.detecting')}</span>
+      </div>
+    </div>
+  );
+}
+
+function NoProvidersDetected() {
+  return (
+    <div className="settings-row settings-row--last settings-install-guide">
+      <div className="settings-row-label">
+        <span className="settings-label">{t('settings.noProvidersDetected')}</span>
+        <span className="settings-description">
+          {t('settings.noProvidersDetectedDesc')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function ClientSelector({ aiCmd = {}, availableClients }) {
   const { value, onApply } = aiCmd;
-  if (availableClients == null) {
-    return (
-      <div className="settings-row settings-row--last">
-        <div className="settings-row-label">
-          <span className="settings-label">{t('settings.clientLabel')}</span>
-          <span className="settings-description">{t('settings.detecting')}</span>
-        </div>
-      </div>
-    );
-  }
+  const cliClients = useMemo(() => (availableClients ?? []).filter((c) => c.type === 'cli' || !c.type), [availableClients]);
+  const apiClients = useMemo(() => (availableClients ?? []).filter((c) => c.type === 'api'), [availableClients]);
 
-  const cliClients = useMemo(() => availableClients.filter((c) => c.type === 'cli' || !c.type), [availableClients]);
-  const apiClients = useMemo(() => availableClients.filter((c) => c.type === 'api'), [availableClients]);
+  if (availableClients == null) return <ClientSelectorDetecting />;
 
   return (
     <>
@@ -34,49 +64,26 @@ function ClientSelector({ aiCmd = {}, availableClients }) {
           <span className="settings-label">{t('settings.clientLabel')}</span>
           <span className="settings-description">{t('settings.clientDesc')}</span>
         </div>
-        <div className="settings-pill-group">
-          {cliClients.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              className={`settings-pill${value === id ? ' settings-pill--active' : ''}`}
-              onClick={() => onApply(id)}
-            >
-              {label}
-            </button>
-          ))}
-          {apiClients.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              className={`settings-pill${value === id ? ' settings-pill--active' : ''}`}
-              onClick={() => onApply(id)}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.clientPillsAria')}>
+          <ClientPillGroup clients={cliClients} value={value} onApply={onApply} />
+          <ClientPillGroup clients={apiClients} value={value} onApply={onApply} />
         </div>
       </div>
-      {cliClients.length === 0 && apiClients.length === 0 && (
-        <div className="settings-row settings-row--last settings-install-guide">
-          <div className="settings-row-label">
-            <span className="settings-label">{t('settings.noProvidersDetected')}</span>
-            <span className="settings-description">
-              {t('settings.noProvidersDetectedDesc')}
-            </span>
-          </div>
-        </div>
-      )}
+      {cliClients.length === 0 && apiClients.length === 0 && <NoProvidersDetected />}
     </>
   );
 }
 
 function handleModelChange(level, value, setter, storageKey = `${MODEL_STORAGE_PREFIX}${level}`, storage = localStorage) {
   setter(value);
-  if (value) {
-    storage.setItem(storageKey, value);
-  } else {
-    storage.removeItem(storageKey);
+  try {
+    if (value) {
+      storage.setItem(storageKey, value);
+    } else {
+      storage.removeItem(storageKey);
+    }
+  } catch (err) {
+    console.warn('[ModelSection] Could not persist model override to storage:', err);
   }
 }
 

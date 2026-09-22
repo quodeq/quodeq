@@ -38,7 +38,7 @@ def test_post_projects_url_with_clone_dest_returns_real_scan(client, tmp_path):
     parent = tmp_path / "code"
     parent.mkdir()
 
-    def fake_register(repo, discipline, reports_dir, scope_path=None, **kw):
+    def fake_register(reports_dir, spec, **kw):
         uuid = "test-uuid"
         d = Path(reports_dir) / uuid
         d.mkdir(parents=True, exist_ok=True)
@@ -66,9 +66,9 @@ def test_post_projects_url_with_clone_dest_returns_real_scan(client, tmp_path):
 
 
 def test_post_projects_url_ephemeral_skips_clone_dest(client, tmp_path):
-    def fake_register(repo, discipline, reports_dir, scope_path=None, **kw):
-        assert kw.get("ephemeral") is True
-        assert kw.get("clone_dest") is None
+    def fake_register(reports_dir, spec, **kw):
+        assert spec.ephemeral is True
+        assert spec.clone_dest is None
         uuid = "ephemeral-uuid"
         d = Path(reports_dir) / uuid
         d.mkdir(parents=True, exist_ok=True)
@@ -97,7 +97,7 @@ def test_post_projects_rejects_metadata_endpoint_ssrf(client):
     with 400 and never reaches git clone."""
     clone_calls = []
     with patch(
-        "quodeq.services.project_registration.run_git_clone",
+        "quodeq.services._project_registration_steps.run_git_clone",
         side_effect=lambda url, dest: clone_calls.append(url),
     ):
         resp = client.post(

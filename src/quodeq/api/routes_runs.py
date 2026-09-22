@@ -10,14 +10,15 @@ from flask import Flask, Response, jsonify
 from quodeq.api._http_cache import conditional_json
 from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
-from quodeq.services._runs_unit import build_runs_unit
-from quodeq.shared._env import get_index_db_path
+from quodeq.services.runs_unit import build_runs_unit
+from quodeq.shared.env import get_index_db_path
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
 
 def register_runs_routes(app: Flask) -> None:
+    """Bind GET /api/projects/<project>/runs."""
     @app.get("/api/projects/<project>/runs")
     def project_runs(project: str) -> Response | tuple[Response, int]:
         try:

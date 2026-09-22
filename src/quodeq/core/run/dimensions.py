@@ -12,6 +12,12 @@ FILENAME = "dimensions.json"
 
 
 class DimState(str, enum.Enum):
+    """The states one dimension passes through inside a run.
+
+    ``DONE`` and ``INCOMPLETE`` are terminal: a dimension that finished or
+    gave up is never restarted within the same run.
+    """
+
     PENDING = "pending"
     RUNNING = "running"
     DONE = "done"
@@ -27,7 +33,7 @@ _ALLOWED: dict[DimState, frozenset[DimState]] = {
 
 
 class IllegalDimTransitionError(RuntimeError):
-    pass
+    """Raised by ``validate_dim_transition`` for a move the state machine forbids."""
 
 
 def validate_dim_transition(dimension: str, prev: DimState, dst: DimState) -> None:

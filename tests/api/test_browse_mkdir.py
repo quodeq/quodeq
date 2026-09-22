@@ -72,3 +72,17 @@ def test_mkdir_parent_not_found_returns_404(app_client):
     with _patch_home(home):
         resp = c.post("/api/browse/mkdir", json={"path": str(home / "nonexistent"), "name": "child"}, headers=_ORIGIN)
     assert resp.status_code == 404
+
+
+def test_mkdir_null_path_returns_400_not_500(app_client):
+    c, home = app_client
+    with _patch_home(home):
+        resp = c.post("/api/browse/mkdir", json={"path": None, "name": "child"}, headers=_ORIGIN)
+    assert resp.status_code == 400
+
+
+def test_mkdir_json_array_body_returns_400_not_500(app_client):
+    c, home = app_client
+    with _patch_home(home):
+        resp = c.post("/api/browse/mkdir", json=["not", "an", "object"], headers=_ORIGIN)
+    assert resp.status_code == 400

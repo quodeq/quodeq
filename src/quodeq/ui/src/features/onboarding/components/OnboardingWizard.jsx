@@ -1,119 +1,36 @@
-import { useEffect, useMemo, useState } from 'react';
-import { registerProject, listStandards, getProjectInfo } from '../../../api/index.js';
+import { useMemo, useState } from 'react';
+import { registerProject, getProjectInfo } from '../../../api/index.js';
 import { useWizardState } from '../hooks/useWizardState.js';
-import { saveDraft, clearDraft } from '../hooks/useWizardDraft.js';
-import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
-import WelcomeStep from './steps/WelcomeStep.jsx';
-import RepoScanStep from './steps/RepoScanStep.jsx';
-import ProviderStep from './steps/ProviderStep.jsx';
-import StandardLaunchStep from './steps/StandardLaunchStep.jsx';
+import { useOnboardingEffects } from '../hooks/useOnboardingEffects.js';
+import { useOnboardingWizardHandlers } from '../hooks/useOnboardingWizardHandlers.js';
+import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
+import { OnboardingStepSwitch } from './OnboardingStepSwitch.jsx';
 import { t } from '../../../strings/index.js';
 import '../../../styles/onboarding.css';
 
-const STEP_ORDER = ['welcome', 'repo-scan', 'provider', 'standard-launch'];
-const SKIPPED_STEPS_KEY = 'quodeq_onboarding_skipped';
-
-function visibleSteps(_currentStep, _isFirstProject, providerConfigured) {
-  // Welcome is excluded from numeric counter.
-  const seen = ['repo-scan'];
-  if (!providerConfigured) seen.push('provider');
-  seen.push('standard-launch');
+// The steps the "step N of M" counter counts. Welcome is excluded, and the
+// provider step only appears while no provider is configured.
+function visibleSteps(providerConfigured) {
+  const seen = [STEP_REPO_SCAN];
+  if (!providerConfigured) seen.push(STEP_PROVIDER);
+  seen.push(STEP_STANDARD_LAUNCH);
   return seen;
 }
 
 export default function OnboardingWizard({ entry, onClose, onLaunch }) {
-  const initialStep = entry.startStep || 'welcome';
+  const initialStep = entry.startStep || STEP_WELCOME;
   const wizard = useWizardState({ initial: { step: initialStep, isFirstProject: entry.isFirstProject ?? true } });
   const [standards, setStandards] = useState([]);
 
-  // Fetch standards once when the step that needs them is reachable.
-  // Filter to the user's visible-standards setting so the picker matches
-  // what's enabled in the Standards tab. Lowercase both sides because the
-  // default list and the storage payload use lowercase ids.
-  useEffect(() => {
-    const visibleSet = new Set(readVisibleStandardIds().map((id) => (id || '').toLowerCase()));
-    listStandards()
-      .then((all) => setStandards(all.filter((s) => visibleSet.has((s.id || '').toLowerCase()))))
-      .catch(() => setStandards([]));
-  }, []);
-
-  // Persist a draft on every step transition or relevant state change.
-  useEffect(() => {
-    saveDraft({
-      step: wizard.state.step,
-      repo: wizard.state.repo,
-      providerSelection: wizard.state.provider,
-      providerView: wizard.state.providerView,
-      standardIds: Array.from(wizard.state.standardIds),
-      totalTimeLimitS: wizard.state.totalTimeLimitS,
-    });
-  }, [wizard.state.step, wizard.state.repo, wizard.state.provider, wizard.state.providerView, wizard.state.standardIds, wizard.state.totalTimeLimitS]);
-
-  useEffect(() => {
-    if (!entry.presetProjectId) return;
-    // Fetch the project's scan data so the resume flow shows the same summary.
-    fetch(`/api/projects/${encodeURIComponent(entry.presetProjectId)}/scan`)
-      .then((res) => res.ok ? res.json() : null)
-      .then((scan) => {
-        if (!scan) return;
-        wizard.succeedScan(entry.presetProjectId, scan);
-      })
-      .catch(() => { /* tolerate scan fetch failure */ });
-  }, [entry.presetProjectId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useOnboardingEffects({ wizard, entry, setStandards });
 
   const providerConfigured = Boolean(wizard.state.provider.id && wizard.state.provider.model);
-  const visible = useMemo(
-    () => visibleSteps(wizard.state.step, wizard.state.isFirstProject, providerConfigured),
-    [wizard.state.step, wizard.state.isFirstProject, providerConfigured],
-  );
+  const visible = useMemo(() => visibleSteps(providerConfigured), [providerConfigured]);
   const currentIndex = visible.indexOf(wizard.state.step) + 1;
 
-  function handleSkipWelcome() {
-    try { localStorage.setItem(SKIPPED_STEPS_KEY, 'true'); } catch { /* ignore */ }
-    clearDraft();
-    onClose({ saved: false });
-  }
-
-  function handleSavedExit() {
-    clearDraft();
-    onClose({ saved: true, projectId: wizard.state.projectId });
-  }
-
-  function handleClose() {
-    if (wizard.state.repoScanSubState === 'scanned') {
-      handleSavedExit();
-    } else {
-      clearDraft();
-      onClose({ saved: false });
-    }
-  }
-
-  function handleLaunch(standardIds) {
-    wizard.startLaunch();
-    clearDraft();
-    onLaunch({
-      projectId: wizard.state.projectId,
-      repo: wizard.state.repo.value,
-      scopePath: wizard.state.repo.scopePath || null,
-      branch: wizard.state.repo.branch || null,
-      provider: wizard.state.provider,
-      standardIds,
-      totalTimeLimitS: wizard.state.totalTimeLimitS,
-    });
-  }
-
-  function nextStep() {
-    const i = STEP_ORDER.indexOf(wizard.state.step);
-    let next = STEP_ORDER[i + 1] || wizard.state.step;
-    // Auto-skip Provider if already configured.
-    if (next === 'provider' && providerConfigured) next = 'standard-launch';
-    wizard.goToStep(next);
-  }
-
-  function prevStep() {
-    const i = STEP_ORDER.indexOf(wizard.state.step);
-    if (i > 0) wizard.goToStep(STEP_ORDER[i - 1]);
-  }
+  const {
+    handleSkipWelcome, handleClose, handleLaunch, nextStep, prevStep,
+  } = useOnboardingWizardHandlers({ wizard, onClose, onLaunch, providerConfigured });
 
   return (
     <div className="onboarding-wizard" role="dialog" aria-modal="true" aria-label={t('onboarding.dialogAria')}>
@@ -125,46 +42,18 @@ export default function OnboardingWizard({ entry, onClose, onLaunch }) {
           </svg>
         </button>
 
-        {wizard.state.step === 'welcome' && (
-          <WelcomeStep onStart={() => wizard.goToStep('repo-scan')} onSkip={handleSkipWelcome} />
-        )}
-
-        {wizard.state.step === 'repo-scan' && (
-          <RepoScanStep
-            state={wizard.state}
-            actions={wizard}
-            createProject={registerProject}
-            getProjectInfo={getProjectInfo}
-            onContinue={nextStep}
-            onCancel={handleSavedExit}
-            stepIndex={currentIndex}
-            stepTotal={visible.length}
-          />
-        )}
-
-        {wizard.state.step === 'provider' && (
-          <ProviderStep
-            state={wizard.state}
-            actions={wizard}
-            onContinue={nextStep}
-            onBack={prevStep}
-            stepIndex={currentIndex}
-            stepTotal={visible.length}
-          />
-        )}
-
-        {wizard.state.step === 'standard-launch' && (
-          <StandardLaunchStep
-            state={wizard.state}
-            actions={wizard}
-            standards={standards}
-            onLaunch={handleLaunch}
-            onCancel={handleSavedExit}
-            onBack={prevStep}
-            stepIndex={currentIndex}
-            stepTotal={visible.length}
-          />
-        )}
+        <OnboardingStepSwitch
+          wizard={wizard}
+          standards={standards}
+          currentIndex={currentIndex}
+          visibleCount={visible.length}
+          createProject={registerProject}
+          getProjectInfo={getProjectInfo}
+          nextStep={nextStep}
+          prevStep={prevStep}
+          handleSkipWelcome={handleSkipWelcome}
+          handleLaunch={handleLaunch}
+        />
       </div>
     </div>
   );

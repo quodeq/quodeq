@@ -7,7 +7,7 @@ from pathlib import Path
 _INDEX_CACHE_MAX = 64
 
 
-class _IndexCache:
+class IndexCache:
     """Thread-safe mtime-based cache for the project index file (bounded)."""
 
     def __init__(self) -> None:
@@ -36,10 +36,10 @@ class _IndexCache:
 
 
 # Module-level singleton for mtime-based project index caching.
-# Thread-safe via internal locking (_IndexCache._lock).  Bounded to
+# Thread-safe via internal locking (IndexCache._lock).  Bounded to
 # _INDEX_CACHE_MAX entries to prevent unbounded memory growth.
 # Call index_cache.clear() (or clear_index_cache()) in tests for isolation.
-index_cache = _IndexCache()
+index_cache = IndexCache()
 
 
 def clear_index_cache() -> None:

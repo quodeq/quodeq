@@ -7,19 +7,120 @@ already hold the parsed data should use the pure functions directly.
 """
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
 from quodeq.core.standards.refs import (
-    _load_compiled_data,
+    extract_refs,
     extract_requirement_checks,
     extract_requirements,
-    load_compiled_refs,
 )
+from quodeq.core.taxonomy import EMPTY_TAXONOMY, Taxonomy, TaxonomyError, extract_taxonomy
 from quodeq.core.utils.io import read_json
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
+
+
+def known_dimension_ids(
+    compiled_dir: str | Path | None, evaluators_dir: str | Path | None = None,
+) -> frozenset[str]:
+    """Return the dimension ids actually installed on disk.
+
+    A dimension is "known" when a same-named ``<id>.json`` file sits
+    directly inside *compiled_dir* (built-in, compiled standards) or
+    *evaluators_dir* (custom, user-imported standards) -- the two places a
+    standard's definition can live. The set is rebuilt from a directory
+    listing every call rather than cached, so a newly imported custom
+    standard is recognised immediately.
+
+    Listing is the point, not joining: a traversal segment or absolute path
+    never matches a real directory entry, so there is nothing to sanitise --
+    the caller compares the candidate dimension against this set before
+    building any path from it.
+    """
+    ids: set[str] = set()
+    for directory in (compiled_dir, evaluators_dir):
+        if not directory:
+            continue
+        path = Path(directory)
+        if not path.is_dir():
+            continue
+        ids.update(p.stem for p in path.glob("*.json"))
+    return frozenset(ids)
+
+
+def is_known_dimension(
+    dimension: str | None,
+    compiled_dir: str | Path | None,
+    evaluators_dir: str | Path | None = None,
+) -> bool:
+    """True if *dimension* names a standard actually installed on disk.
+
+    Comparison is case-insensitive, matching every other place dimension ids
+    are compared in this codebase (see
+    ``core.standards.visibility.normalize_ids``): older eval payloads and
+    request values may carry ``"Security"`` where a fresh compile writes
+    ``security.json``, and both must be recognised as the same dimension.
+    """
+    if not dimension:
+        return False
+    known_lower = {d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir)}
+    return dimension.lower() in known_lower
+
+
+def _load_compiled_data(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None, *, known: frozenset[str] | None = None,
+) -> dict | None:
+    """Load raw compiled standards JSON from *compiled_dir*. Returns None on error.
+
+    Falls back to *evaluators_dir* for custom evaluators when provided.
+
+    *dimension* is request-reachable (routed here from the action API's
+    per-dimension endpoints), so it is checked against
+    :func:`is_known_dimension` (or the pre-listed *known*, from a ``_multi``
+    loader) before it ever reaches a path join. A dimension outside that
+    installed set is treated the same as one with no compiled data at all:
+    this returns ``None`` rather than raising, matching every other failure
+    mode in this function.
+    """
+    if not dimension:
+        return None
+    if compiled_dir or evaluators_dir:
+        is_known = (dimension.lower() in known if known is not None
+                    else is_known_dimension(dimension, compiled_dir, evaluators_dir))
+        if not is_known:
+            _logger.warning("Rejected unknown dimension for compiled standards lookup: %r", dimension)
+            return None
+    if compiled_dir:
+        path = Path(compiled_dir) / f"{dimension}.json"
+        if path.is_file():
+            try:
+                return read_json(path)
+            except (OSError, ValueError, UnicodeDecodeError) as exc:
+                _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
+                return None
+    if evaluators_dir:
+        evaluators_path = evaluators_dir / f"{dimension}.json"
+        if evaluators_path.is_file():
+            try:
+                return read_json(evaluators_path)
+            except (OSError, ValueError, UnicodeDecodeError):
+                return None
+    return None
+
+
+def load_compiled_refs(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None, *, known: frozenset[str] | None = None,
+) -> dict[str, list[dict]]:
+    """Load ``{req_id: [{label, url, ...}, ...]}`` from compiled standards on disk."""
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir, known=known)
+    if not data:
+        return {}
+    return extract_refs(data)
 
 
 def load_compiled_refs_multi(
@@ -27,9 +128,10 @@ def load_compiled_refs_multi(
     evaluators_dir: Path | None = None,
 ) -> dict[str, list[dict]]:
     """Load refs for multiple dimensions, merging into a single lookup."""
+    known = frozenset(d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir)) if (compiled_dir or evaluators_dir) else None
     merged: dict[str, list[dict]] = {}
     for dim in dimensions:
-        merged.update(load_compiled_refs(compiled_dir, dim, evaluators_dir=evaluators_dir))
+        merged.update(load_compiled_refs(compiled_dir, dim, evaluators_dir=evaluators_dir, known=known))
     return merged
 
 
@@ -39,12 +141,14 @@ def load_compiled_requirements_multi(
     overrides: dict[str, dict] | None = None,
 ) -> dict[str, dict]:
     """Load requirements for multiple dimensions, merging into a single lookup."""
+    known = frozenset(d.lower() for d in known_dimension_ids(compiled_dir, evaluators_dir)) if (compiled_dir or evaluators_dir) else None
     merged: dict[str, dict] = {}
     for dim in dimensions:
         merged.update(load_compiled_requirements(
             compiled_dir, dim,
             evaluators_dir=evaluators_dir,
             overrides=overrides,
+            known=known,
         ))
     return merged
 
@@ -52,7 +156,7 @@ def load_compiled_requirements_multi(
 def load_compiled_requirements(
     compiled_dir: str | Path | None, dimension: str | None,
     evaluators_dir: Path | None = None,
-    overrides: dict[str, dict] | None = None,
+    overrides: dict[str, dict] | None = None, *, known: frozenset[str] | None = None,
 ) -> dict[str, dict]:
     """Load {req_id: {principle, text}} from compiled standards on disk.
 
@@ -63,10 +167,28 @@ def load_compiled_requirements(
     to the pure :func:`extract_requirements`.  Used by the MCP server to
     auto-fill principle name and requirement text from the requirement ID.
     """
-    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir, known=known)
     if not data:
         return {}
     return extract_requirements(data, overrides=overrides)
+
+
+def load_taxonomy(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None,
+) -> Taxonomy:
+    """Load the dimension's violation-type taxonomy; EMPTY_TAXONOMY when absent.
+
+    A malformed `violation_types` block is logged and treated as absent.
+    """
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    if not data:
+        return EMPTY_TAXONOMY
+    try:
+        return extract_taxonomy(data)
+    except TaxonomyError as exc:
+        _logger.warning("Ignoring taxonomy for %s: %s", dimension, exc)
+        return EMPTY_TAXONOMY
 
 
 def load_requirement_checks(
@@ -85,10 +207,40 @@ def load_requirement_checks(
     return extract_requirement_checks(data)
 
 
+def read_req_to_principle_map(directory: Path, dimension: str) -> dict[str, str] | None:
+    """Read ``<directory>/<dimension>.json`` into a req-id → principle-name map.
+
+    The file-reading half of ``core.evidence._req_mapping``: core injects this
+    as its ``req_map_reader`` so evidence grouping never touches the
+    filesystem itself. The contract is an empty map on any missing, unreadable
+    or malformed input so callers stay permissive, never a crash.
+    """
+    if directory is None or not directory.is_dir():
+        return {}
+    path = directory / f"{dimension}.json"
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        mapping: dict[str, str] = {}
+        for principle in data.get("principles", []):
+            pname = principle.get("name", "")
+            for req in principle.get("requirements", []):
+                rid = req.get("id", "")
+                if rid and pname:
+                    mapping[rid] = pname
+        return mapping
+    except (OSError, ValueError, AttributeError, TypeError):
+        # AttributeError/TypeError: a valid-JSON-but-non-dict payload (a list
+        # or null at the top level, or non-dict principle/requirement items)
+        # makes .get() raise.
+        return {}
+
+
 def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:
     """Return ``{req_id: [{label, url}, ...]}`` for every requirement's refs.
 
-    Was a passthrough in ``core/evidence/_refs``; it belongs with the other
+    Was a passthrough in ``core/evidence/refs``; it belongs with the other
     disk loaders so the core layer performs no file access.
     """
     return load_compiled_refs(str(compiled_dir), dimension)

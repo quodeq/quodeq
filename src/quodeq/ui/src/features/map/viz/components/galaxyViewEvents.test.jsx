@@ -28,7 +28,7 @@ describe('handleCanvasClick', () => {
     const w2s = (x, y) => ({ x, y });
 
     expect(() =>
-      handleCanvasClick(e, refs, scene, size, navigateTo, startTransition, saveNav, w2s)
+      handleCanvasClick(e, refs, { scene, size, navigateTo, startTransition, saveNav, w2s })
     ).not.toThrow();
   });
 });

@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -10,6 +9,12 @@ import { ApiProvider } from '../../../api/ApiContext.jsx';
 // tests exercise only the table (the part with the delete-button gating).
 vi.mock('./HistoryChartPanel.jsx', () => ({
   default: () => null,
+}));
+
+// The delete handler reports failures through the side pane's toast; these
+// tests never reach a failure, so a bare stub keeps them provider-free.
+vi.mock('../../side-pane/SidePaneContext.jsx', () => ({
+  useSidePane: () => ({ showToast: vi.fn() }),
 }));
 
 // Shared-repo runs have no delete route on the backend (mutation is

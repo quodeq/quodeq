@@ -27,7 +27,14 @@ import gradeFormulaLight from '../../../assets/help/grade-formula.light.webp';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 
-const FIGURES = { GradeFormulaCurveFigure, ScoreGroupingFigure };
+// `informative: true` means the figure's own svg already carries an
+// accessible name (role="img"/aria-label) that must reach the accessibility
+// tree, so HelpFigure must not wrap it in aria-hidden. Figures default to
+// decorative (informative: false / omitted), described only by the caption.
+const FIGURES = {
+  GradeFormulaCurveFigure: { Component: GradeFormulaCurveFigure, informative: true },
+  ScoreGroupingFigure: { Component: ScoreGroupingFigure },
+};
 const IMAGES = { gradeFormulaDark, gradeFormulaLight };
 
 // Registry lookups must consider OWN keys only. A plain object inherits from
@@ -48,6 +55,9 @@ const ICONS = {
     </svg>
   ),
 };
+
+const ICON_PREFIX = 'icon:';
+const TAG_PREFIX = 'tag:';
 
 function badgeLabel(kind) {
   return kind === 'compliance'
@@ -72,11 +82,25 @@ function parseFigure(body) {
 function Figure({ body }) {
   const { component, caption, alt, srcDark, srcLight } = parseFigure(body);
   if (component && component !== 'image') {
-    const Inner = pick(FIGURES, component);
-    if (!Inner) return null;
-    return <HelpFigure caption={caption}><Inner /></HelpFigure>;
+    const entry = pick(FIGURES, component);
+    if (!entry) return null;
+    const { Component: Inner, informative } = entry;
+    return <HelpFigure caption={caption} informative={informative}><Inner /></HelpFigure>;
   }
   return <HelpFigure caption={caption} alt={alt} srcDark={srcDark} srcLight={srcLight} />;
+}
+
+/**
+ * Title of a Tip callout: the blockquote's leading bold run, when it has one.
+ * remark hands that run either as the paragraph's only child or as the first
+ * of several, so both shapes are tried.
+ */
+function tipTitle(head) {
+  const inner = head?.props?.children;
+  const strong = inner?.props?.type === 'strong'
+    ? inner
+    : (Array.isArray(inner) ? inner[0] : inner);
+  return strong?.props?.children ?? null;
 }
 
 const COMPONENTS = {
@@ -84,10 +108,7 @@ const COMPONENTS = {
   blockquote({ children }) {
     const nodes = Array.isArray(children) ? children.filter((c) => c !== '\n') : [children];
     const [head, ...rest] = nodes;
-    const strong = head?.props?.children?.props?.type === 'strong'
-      ? head.props.children
-      : (Array.isArray(head?.props?.children) ? head.props.children[0] : head?.props?.children);
-    const title = strong?.props?.children ?? null;
+    const title = tipTitle(head);
     return (
       <aside className="help-tip" role="note">
         {title && <div className="help-tip__title">{title}</div>}
@@ -115,9 +136,9 @@ const COMPONENTS = {
   code({ inline: isInline, className, children }) {
     const text = String(children ?? '');
     if (isInline !== false && !className) {
-      if (text.startsWith('icon:')) return pick(ICONS, text.slice(5)) ?? null;
-      if (text.startsWith('tag:')) {
-        const kind = text.slice(4);
+      if (text.startsWith(ICON_PREFIX)) return pick(ICONS, text.slice(ICON_PREFIX.length)) ?? null;
+      if (text.startsWith(TAG_PREFIX)) {
+        const kind = text.slice(TAG_PREFIX.length);
         return <span className={`severity-tag ${kind}`}>{badgeLabel(kind)}</span>;
       }
       return <code>{children}</code>;

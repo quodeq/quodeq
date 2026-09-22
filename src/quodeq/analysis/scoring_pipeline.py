@@ -2,16 +2,20 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from quodeq.core.scoring.constants import MAX_SCORE
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.analysis.report import write_dimension_report
 from quodeq.analysis.runner import RunConfig, run_per_dimension
-from quodeq.analysis._runner_markers import cleanup_stream
+from quodeq.analysis.runner_markers import cleanup_stream
 from quodeq.services.grade_formula import load_params
+
+if TYPE_CHECKING:
+    from quodeq.core.evidence.model import Evidence
 
 _NUMERICAL_MODE = "numerical"
 _NA_LABEL = "N/A"
-_MAX_SCORE = 10
 
 
 def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -> dict:
@@ -33,7 +37,7 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -
         overall = scores.overall
         if mode == _NUMERICAL_MODE:
             val = overall.weighted_score if overall else None
-            results[dimension] = f"{val}/{_MAX_SCORE}" if val is not None else _NA_LABEL
+            results[dimension] = f"{val}/{MAX_SCORE}" if val is not None else _NA_LABEL
         else:
             results[dimension] = (overall.weighted_grade if overall else None) or _NA_LABEL
 

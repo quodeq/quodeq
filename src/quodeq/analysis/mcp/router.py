@@ -8,6 +8,7 @@ import io
 import json
 import logging
 import sys
+from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
 if sys.platform != "win32":
@@ -18,6 +19,10 @@ from quodeq.analysis.mcp.enricher import (
     FileReader,
     FindingEnricher,
 )
+from quodeq.analysis.mcp.schemas import (
+    FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_OK, FILE_DONE_STATUS_SKIPPED,
+)
+from quodeq.shared.log_sink import SHARED_LOG
 from typing import TYPE_CHECKING, TextIO
 
 if TYPE_CHECKING:
@@ -36,7 +41,9 @@ class DeduplicationStore(Protocol):
     """
 
     def __contains__(self, key: tuple) -> bool: ...
-    def add(self, key: tuple) -> None: ...
+    def add(self, key: tuple) -> None:
+        """Record *key* as seen so the next finding with it is dropped."""
+        ...
 
 
 def _locked_write(fh: TextIO, line: str) -> None:
@@ -95,14 +102,13 @@ class FindingsRouter:
         self,
         output_fh: TextIO,
         context: CompiledContext | None = None,
-        seen_store: DeduplicationStore | None = None,
         file_reader: FileReader | None = None,
         event_log: "EventLogWriter | None" = None,
         on_file_done: "Callable[[str, list[dict]], None] | None" = None,
     ):
         self._fh = output_fh
-        self._enricher = FindingEnricher(context or CompiledContext(), file_reader)
-        self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
+        self._enricher = FindingEnricher(context or CompiledContext(), file_reader, log=SHARED_LOG)
+        self._seen: DeduplicationStore = set()
         self._event_log: EventLogWriter | None = event_log
         self._on_file_done: "Callable[[str, list[dict]], None] | None" = on_file_done
         self._findings_by_file: dict[str, list[dict]] = {}
@@ -116,7 +122,33 @@ class FindingsRouter:
         self._seen.add(key)
 
         finding = self._enricher.enrich(args)
+        self._finish_finding(finding)
+        return f"Finding #{self.counter} recorded.", False
 
+    def receive_many(self, findings: list[dict]) -> list[dict]:
+        """Process a batch of findings (typically one file's), enriched with
+        one precedent lookup instead of one embedding call per finding.
+
+        Same dedup/write/event/counter contract as `receive`: a finding whose
+        dedup key was already seen (including an earlier one in this same
+        batch) is skipped. Returns the enriched dicts for every finding that
+        was written, in order.
+        """
+        pending: list[dict] = []
+        for args in findings:
+            key = self._enricher.dedup_key(args)
+            if key in self._seen:
+                continue
+            self._seen.add(key)
+            pending.append(args)
+
+        results = self._enricher.enrich_many(pending)
+        for finding in results:
+            self._finish_finding(finding)
+        return results
+
+    def _finish_finding(self, finding: dict) -> None:
+        """Write, event-emit, and file-track one already-enriched finding."""
         line = json.dumps(finding) + "\n"
         _locked_write(self._fh, line)
         if self._event_log is not None:
@@ -124,7 +156,6 @@ class FindingsRouter:
         if self._on_file_done is not None:
             self._findings_by_file.setdefault(finding["file"], []).append(finding)
         self.counter += 1
-        return f"Finding #{self.counter} recorded.", False
 
     def _emit_event(self, finding: dict) -> None:
         """Emit a JudgmentCreatedEvent to the event log. Never raises."""
@@ -155,9 +186,11 @@ class FindingsRouter:
             at all (API size cap / missing on disk) — an explicit record that
             the file was considered, not a transient failure to retry loudly.
         """
-        if status not in ("ok", "error", "skipped"):
+        allowed = (FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_SKIPPED)
+        if status not in allowed:
+            names = ", ".join(repr(s) for s in allowed)
             raise ValueError(
-                f"mark_file_done: status must be 'ok', 'error', or 'skipped', got {status!r}"
+                f"mark_file_done: status must be one of {names}, got {status!r}"
             )
         payload: dict = {"_marker": "file_done", "file": file, "status": status}
         if reason is not None:
@@ -166,7 +199,7 @@ class FindingsRouter:
         _locked_write(self._fh, line)
         if self._on_file_done is not None:
             accumulated = self._findings_by_file.pop(file, [])
-            if status == "ok":
+            if status == FILE_DONE_STATUS_OK:
                 try:
                     self._on_file_done(file, accumulated)
                 except Exception:  # noqa: BLE001 — callback failure must never lose the ok marker
@@ -174,3 +207,19 @@ class FindingsRouter:
                         "FindingsRouter: on_file_done callback raised for %s", file,
                         exc_info=True,
                     )
+
+
+def write_skip_markers(jsonl_file: Path, skipped: list[str], reason: str) -> None:
+    """Append ``file_done: skipped`` markers for taken-but-undispatched files.
+
+    Invariant: every file taken from a queue must end with a marker. A
+    silent drop leaves the file uncached, so every incremental run re-queues
+    and re-drops it — the dim never converges (the perpetual-97% bug).
+    ``skipped`` (unlike ``error``) does not feed the failure-streak breaker
+    or the post-run reachability guard.
+    """
+    jsonl_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(jsonl_file, "a", encoding="utf-8") as fh:
+        router = FindingsRouter(fh)
+        for f in skipped:
+            router.mark_file_done(file=f, status="skipped", reason=reason)

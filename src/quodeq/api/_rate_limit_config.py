@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.shared._env import env_int
+from quodeq.shared.env import env_int
 
 _DEFAULT_RATE_LIMIT_WINDOW = 60
 # 60/min was too tight for the dashboard's bulk-dismiss UX — burst-dismissing

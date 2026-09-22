@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useTransition } from 'react';
+import { toHistoryEntry, handlePopState } from './navHistoryEntry.js';
 
 const DEFAULT_PAGE = 'overview';
 
@@ -15,55 +16,33 @@ const defaultHistoryAdapter = {
  *
  * Returns { navStack, activePage, navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab }.
  */
-function isScalar(v) {
-  return v == null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
-}
 
-/**
- * History state carries only scalars (and arrays of scalars, e.g.
- * preselectDims); object payloads stay in React state and `entriesByIndex`.
- * pushState structured-clones its argument synchronously on the main thread,
- * and entries like evalprinciple/file carry a run's whole findings graph —
- * cloning that inside the click handler froze navigation for seconds before
- * React could even schedule a render (and risks the browser's history-state
- * size cap, which would abort the handler mid-click).
- */
-function toHistoryEntry(entry) {
-  const light = {};
-  for (const [k, v] of Object.entries(entry)) {
-    if (isScalar(v) || (Array.isArray(v) && v.every(isScalar))) light[k] = v;
-  }
-  return light;
-}
-
-function handlePopState(e, setNavStack, entriesByIndex) {
-  const targetIndex = e.state?.navIndex ?? 0;
-  setNavStack((prev) => {
-    if (targetIndex < prev.length - 1) {
-      return prev.slice(0, targetIndex + 1);
-    }
-    if (targetIndex >= prev.length && e.state?.entry) {
-      // Forward: the full entry (with its object payload) lives in
-      // entriesByIndex; the history-state copy is the scalar-only fallback
-      // for entries pushed before a reload.
-      const entry = entriesByIndex.get(targetIndex) || e.state.entry;
-      return [...prev.slice(0, targetIndex), entry];
-    }
-    return prev;
-  });
-}
-
-function createNavActions(setNavStack, navStackRef, history, entriesByIndex, startNavTransition) {
-  function rememberEntry(index, entry) {
+function makeRememberEntry(entriesByIndex) {
+  return function rememberEntry(index, entry) {
     entriesByIndex.set(index, entry);
     // pushState/swap truncated the browser's forward history — entries past
     // this index are unreachable now.
     for (const k of [...entriesByIndex.keys()]) {
       if (k > index) entriesByIndex.delete(k);
     }
-  }
+  };
+}
 
-  function navPush(entry) {
+// Swap the top entry in place: browser history must NOT grow, or Back has
+// to unwind every flip. Same purity rule as navPush (#363): state +
+// history as two sequential statements, never inside the updater.
+function makeReplaceTop(navStackRef, entriesByIndex, history) {
+  return function replaceTop(entry, setStack) {
+    const prev = navStackRef.current;
+    const next = [...prev.slice(0, -1), entry];
+    setStack(next);
+    entriesByIndex.set(next.length - 1, entry);
+    history.replaceState({ navIndex: next.length - 1, entry: toHistoryEntry(entry) }, '');
+  };
+}
+
+function makeNavPush(setNavStack, navStackRef, history, rememberEntry, startNavTransition) {
+  return function navPush(entry) {
     const next = [...navStackRef.current, entry];
     // Transition, not a plain set: a detail page can take hundreds of ms to
     // render (pretext layout effects per card, and the WebKit webview is
@@ -77,37 +56,11 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex, sta
     });
     rememberEntry(next.length - 1, entry);
     history.pushState({ navIndex: next.length - 1, entry: toHistoryEntry(entry) }, '');
-  }
+  };
+}
 
-  function navPop() {
-    history.back();
-  }
-
-  function replaceTop(entry, setStack) {
-    // Swap the top entry in place: browser history must NOT grow, or Back has
-    // to unwind every flip. Same purity rule as navPush (#363): state +
-    // history as two sequential statements, never inside the updater.
-    const prev = navStackRef.current;
-    const next = [...prev.slice(0, -1), entry];
-    setStack(next);
-    entriesByIndex.set(next.length - 1, entry);
-    history.replaceState({ navIndex: next.length - 1, entry: toHistoryEntry(entry) }, '');
-  }
-
-  function navReplace(entry) {
-    // In-place view-state changes on the SAME screen (repositories tab flips,
-    // typed filters). Plain set, never a transition: this state can be driven
-    // by controlled inputs, and rendering keystrokes at transition priority
-    // makes typing lag.
-    replaceTop(entry, setNavStack);
-  }
-
-  function navGoTo(index) {
-    const steps = navStackRef.current.length - 1 - index;
-    if (steps > 0) history.go(-steps);
-  }
-
-  function navSwapAt(index, entry) {
+function makeNavSwapAt({ setNavStack, navStackRef, history, rememberEntry, replaceTop, startNavTransition }) {
+  return function navSwapAt(index, entry) {
     // Lateral move within one level of the path (the breadcrumb's sibling
     // menus): replace the entry at `index` and drop everything deeper.
     // Same shape as navTab: truncate state synchronously, then walk browser
@@ -130,9 +83,11 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex, sta
     });
     rememberEntry(index, entry);
     history.go(-stepsBack);
-  }
+  };
+}
 
-  function navReset() {
+function makeNavReset(setNavStack, navStackRef, history, rememberEntry, startNavTransition) {
+  return function navReset() {
     const stepsBack = navStackRef.current.length - 1;
     // Overview on a large project renders heavy too; same transition.
     startNavTransition(() => {
@@ -140,9 +95,11 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex, sta
     });
     rememberEntry(0, { page: DEFAULT_PAGE });
     if (stepsBack > 0) history.go(-stepsBack);
-  }
+  };
+}
 
-  function navTab(page, params = {}) {
+function makeNavTab(setNavStack, navStackRef, history, rememberEntry, startNavTransition) {
+  return function navTab(page, params = {}) {
     const prev = navStackRef.current;
     const stepsBack = prev.length - 1;
     const prevKey = prev.length === 1 && prev[0].page === page ? (prev[0]._tabKey || 0) : 0;
@@ -156,11 +113,43 @@ function createNavActions(setNavStack, navStackRef, history, entriesByIndex, sta
     });
     rememberEntry(0, entry);
     if (stepsBack > 0) history.go(-stepsBack);
-  }
+  };
+}
+
+function createNavActions(setNavStack, navStackRef, history, entriesByIndex, startNavTransition) {
+  const rememberEntry = makeRememberEntry(entriesByIndex);
+  const replaceTop = makeReplaceTop(navStackRef, entriesByIndex, history);
+  const navPush = makeNavPush(setNavStack, navStackRef, history, rememberEntry, startNavTransition);
+  const navPop = () => history.back();
+  // In-place view-state changes on the SAME screen (repositories tab flips,
+  // typed filters). Plain set, never a transition: this state can be driven
+  // by controlled inputs, and rendering keystrokes at transition priority
+  // makes typing lag.
+  const navReplace = (entry) => replaceTop(entry, setNavStack);
+  const navGoTo = (index) => {
+    const steps = navStackRef.current.length - 1 - index;
+    if (steps > 0) history.go(-steps);
+  };
+  const navSwapAt = makeNavSwapAt({ setNavStack, navStackRef, history, rememberEntry, replaceTop, startNavTransition });
+  const navReset = makeNavReset(setNavStack, navStackRef, history, rememberEntry, startNavTransition);
+  const navTab = makeNavTab(setNavStack, navStackRef, history, rememberEntry, startNavTransition);
 
   return { navPush, navPop, navReplace, navGoTo, navSwapAt, navReset, navTab };
 }
 
+/**
+ * The app's navigation stack, kept in sync with browser history so back and
+ * forward work.
+ *
+ * Pushes render in a transition, so `navPending` is the caller's cue to show
+ * progress. Object payloads stay in a per-index map rather than in history
+ * state (see toHistoryEntry), and every navigation resets the main column's
+ * scroll.
+ *
+ * `historyAdapter` is injectable for tests.
+ *
+ * @returns {{navStack: object[], activePage: object, navPending: boolean, navPush: Function, navPop: Function, navReplace: Function, navGoTo: Function, navSwapAt: Function, navReset: Function, navTab: Function}}
+ */
 export function useNavStack({ historyAdapter } = {}) {
   const history = historyAdapter || defaultHistoryAdapter;
   const [navStack, setNavStack] = useState([{ page: DEFAULT_PAGE }]);

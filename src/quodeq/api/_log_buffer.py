@@ -6,6 +6,7 @@ import re
 import threading
 from collections import deque
 from datetime import datetime, timezone
+from http import HTTPStatus
 
 _DEFAULT_MAX_LINES = 500
 
@@ -54,13 +55,14 @@ class LogBuffer:
         """Return a logging.Handler that feeds into this buffer."""
         return self._handler
 
-    def append(self, line: str) -> None:
-        """Add a log line to the buffer."""
+    def append(self, line: str, level: str = "INFO") -> None:
+        """Add a log line to the buffer, tagged with its severity level."""
         with self._lock:
             self._entries.append({
                 "index": self._index,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "line": line,
+                "level": level,
             })
             self._index += 1
 
@@ -91,6 +93,11 @@ def _path_no_query(path: str) -> str:
     return path.split("?", 1)[0]
 
 
+def _is_success_or_redirect(status: int) -> bool:
+    """2xx/3xx: the poll or request succeeded, so the access line adds nothing."""
+    return HTTPStatus.OK <= status < HTTPStatus.BAD_REQUEST
+
+
 def _is_noisy_werkzeug_access(record: logging.LogRecord) -> bool:
     if record.name != "werkzeug":
         return False
@@ -101,7 +108,7 @@ def _is_noisy_werkzeug_access(record: logging.LogRecord) -> bool:
         status = int(m.group(1))
     except ValueError:
         return False
-    return 200 <= status < 400
+    return _is_success_or_redirect(status)
 
 
 def _is_noisy_poll(record: logging.LogRecord) -> bool:
@@ -123,7 +130,7 @@ def _is_noisy_poll(record: logging.LogRecord) -> bool:
             status = int(status_m.group(1))
         except ValueError:
             return False
-        return 200 <= status < 400
+        return _is_success_or_redirect(status)
     return False
 
 
@@ -135,8 +142,17 @@ class _BufferHandler(logging.Handler):
         self._buffer = buffer
 
     def emit(self, record: logging.LogRecord) -> None:
-        if _is_noisy_poll(record):
-            return
-        if _is_noisy_werkzeug_access(record):
-            return
-        self._buffer.append(self.format(record))
+        try:
+            if _is_noisy_poll(record):
+                return
+            if _is_noisy_werkzeug_access(record):
+                return
+            self._buffer.append(self.format(record), level=record.levelname)
+        except (ValueError, TypeError, KeyError):
+            # A malformed format string or mismatched args must not reach the
+            # code that logged; the stdlib contract for a failing handler is
+            # handleError, which reports to stderr and never raises. Both
+            # noise-filter helpers above call record.getMessage(), which can
+            # raise the same way self.format(record) can, so they need the
+            # same guard.
+            self.handleError(record)

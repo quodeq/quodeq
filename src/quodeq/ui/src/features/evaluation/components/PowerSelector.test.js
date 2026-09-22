@@ -37,21 +37,21 @@ test('LEVELS are ordered 1, 2, 3', () => {
 });
 
 test('level 1 maps to haiku default', () => {
-  const l = getLevels(null).find(l => l.level === 1);
-  assert.equal(l.model, 'haiku');
-  assert.equal(l.label, 'Fast');
+  const level = getLevels(null).find((entry) => entry.level === 1);
+  assert.equal(level.model, 'haiku');
+  assert.equal(level.label, 'Fast');
 });
 
 test('level 2 maps to sonnet default', () => {
-  const l = getLevels(null).find(l => l.level === 2);
-  assert.equal(l.model, 'sonnet');
-  assert.equal(l.label, 'Balanced');
+  const level = getLevels(null).find((entry) => entry.level === 2);
+  assert.equal(level.model, 'sonnet');
+  assert.equal(level.label, 'Balanced');
 });
 
 test('level 3 maps to opus default', () => {
-  const l = getLevels(null).find(l => l.level === 3);
-  assert.equal(l.model, 'opus');
-  assert.equal(l.label, 'Thorough');
+  const level = getLevels(null).find((entry) => entry.level === 3);
+  assert.equal(level.model, 'opus');
+  assert.equal(level.label, 'Thorough');
 });
 
 test('every level has a non-empty model string', () => {

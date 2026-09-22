@@ -2,13 +2,15 @@
 
 This is the only module that knows how to convert between the LLM wire format,
 the canonical Judgment, the read-side Finding view, and the API response dict.
-SQL row mapping lives in data/sqlite/_row_mappers.py.
+SQL row mapping lives in data/sqlite/row_mappers.py.
 """
 from __future__ import annotations
 
 from typing import Any
 
-from quodeq.core.events.models import Judgment
+from quodeq.core.constants import FULL_CONFIDENCE
+from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
+from quodeq.core.finding_coercions import coerce_scope_downgrade
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.req_ref import ReqRef
 
@@ -33,21 +35,6 @@ def _safe_int(value: Any, default: int) -> int:
         return default
 
 
-def _coerce_scope_downgrade(raw: Any) -> dict[str, str] | None:
-    """Coerce a wire value to the scope-gate marker shape.
-
-    The marker is always ``{"rule": str, "from": str, "to": str}`` when the
-    gate stamps it (see scope_gate.py). Anything else -- missing, wrong
-    type, or a dict with non-string values -- is dropped rather than raised,
-    mirroring wire_dict_to_judgment's documented never-raises contract.
-    """
-    if not isinstance(raw, dict):
-        return None
-    if not all(isinstance(v, str) for v in raw.values()):
-        return None
-    return raw
-
-
 def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
     """Lift a short-key LLM/FindingsRouter wire dict into a Judgment.
 
@@ -64,20 +51,21 @@ def wire_dict_to_judgment(d: dict[str, Any]) -> Judgment:
         line=_safe_int(d.get("line") or 0, 0),
         end_line=d.get("end_line"),
         snippet=d.get("snippet"),
-        severity=d.get("severity") or "medium",
-        # The taxonomy travels as 'vt' on the JSONL wire (see evidence/_jsonl.py);
+        severity=d.get("severity") or DEFAULT_SEVERITY,
+        # The taxonomy travels as 'vt' on the JSONL wire (see evidence/jsonl.py);
         # accept the long key too so both spellings survive this seam.
         violation_type=d.get("vt") or d.get("violation_type"),
+        violation_type_raw=d.get("vt_raw") or None,
         reason=d.get("reason") or "",
         title=d.get("w"),
         context=d.get("context"),
         scope=d.get("scope"),
-        confidence=_safe_int(d.get("confidence") if d.get("confidence") is not None else 100, 100),
+        confidence=_safe_int(d.get("confidence") if d.get("confidence") is not None else FULL_CONFIDENCE, FULL_CONFIDENCE),
         req=d.get("req"),
         req_refs=_coerce_req_refs(d.get("req_refs")),
         cwe=d.get("cwe"),
         provenance_downgrade=bool(d.get("provenance_downgrade")),
-        scope_downgrade=_coerce_scope_downgrade(d.get("scope_downgrade")),
+        scope_downgrade=coerce_scope_downgrade(d.get("scope_downgrade")),
         carried_forward=bool(d.get("carried_forward")),
     )
 
@@ -105,6 +93,7 @@ def judgment_to_finding(j: Judgment, *, dismissed: bool = False) -> Finding:
         context=j.context,
         dimension=j.dimension,
         violation_type=j.violation_type,
+        violation_type_raw=j.violation_type_raw,
         scope=j.scope,
         confidence=j.confidence,
         provenance_downgrade=j.provenance_downgrade,

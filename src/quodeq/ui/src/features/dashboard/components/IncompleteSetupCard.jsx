@@ -4,6 +4,11 @@ import { registerProject } from '../../../api/index.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { writeString } from '../../../adapters/storage.js';
+import { LAST_CLONE_ROOT_STORAGE_KEY } from '../../../constants.js';
+
+// repository_info.json value written by the pre-clone registration flow: the
+// project exists only as a remote URL, with no local checkout yet.
+const LEGACY_ONLINE_LOCATION = 'online';
 
 /**
  * Surfaces a "Complete setup" CTA on the project view for legacy projects
@@ -17,7 +22,7 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  if (!projectInfo || projectInfo.location !== 'online') return null;
+  if (!projectInfo || projectInfo.location !== LEGACY_ONLINE_LOCATION) return null;
   const repoUrl = projectInfo.path || projectInfo.repo || '';
 
   async function handleSubmit({ cloneDest, ephemeral }) {
@@ -26,7 +31,7 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
     try {
       const result = await registerProject({ repo: repoUrl, cloneDest, ephemeral });
       if (cloneDest) {
-        writeString('quodeq.lastCloneRoot', cloneDest);
+        writeString(LAST_CLONE_ROOT_STORAGE_KEY, cloneDest);
       }
       onComplete?.(result);
     } catch (err) {

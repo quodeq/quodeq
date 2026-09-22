@@ -1,0 +1,76 @@
+"""Data shapes for live scan progress.
+
+Split from ``scan_progress.py`` (into its own module rather than folded into
+``_scan_progress_dims.py``) so both that module and the ``scan_progress.py``
+facade can import them without a cycle. ``_ProgressContext`` lives here for
+the same reason: both ``scan_progress.py`` and ``_scan_progress_dims.py``
+build or consume it.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Literal
+
+# A dimension's live progress state, computed by _scan_progress_dims._dim_state
+# and threaded through _dim_files_summary/_dim_counts/_dim_elapsed_s. Distinct
+# from the persisted DimState in core.run.dimensions (dimensions.json's
+# RUNNING/DONE/INCOMPLETE/PENDING machinery): this is the derived display
+# state the live-progress UI reads.
+DimProgressState = Literal["done", "running", "pending"]
+
+
+@dataclass(frozen=True)
+class _ProgressContext:
+    """Run-level scalars gathered once per tick, threaded through the
+    progress builders instead of re-passed as individual positional args."""
+    run_dir: Path
+    status: dict
+    state: str
+    is_terminal: bool
+    total_elapsed_s: float | None
+    run_budget_s: int | None
+    project_files: int
+    dim_estimates: dict[str, Any]
+    dim_records: dict
+    dim_ids: list[str]
+    evidence_dir: Path
+    evaluators_dir: Path | None
+    compiled_dir: Path | None
+
+
+@dataclass
+class _DimProgress:
+    id: str
+    state: DimProgressState
+    files: dict
+    violations: int = 0
+    compliance: int = 0
+    duplicates: int = 0
+    suppressed: int = 0  # re-found findings already dismissed/deleted in the dashboard
+    quarantined: int = 0  # findings whose principle is not in the dimension's standard
+    elapsed_s: float | None = None
+    active_agents: int = 0
+    estimate_reason: str | None = None  # see _dim_estimates module docstring
+    exit_reason: str | None = None
+    files_cached: int | None = None        # files already analyzed in previous runs
+    files_project_total: int | None = None  # all dispatchable source files for this dim
+    files_excluded: int | None = None       # files the provider can never dispatch (size cap)
+
+
+@dataclass
+class _ScanProgress:
+    job_id: str
+    state: str
+    phase: str | None
+    current_dimension: str | None
+    project_files: int
+    total_elapsed_s: float | None
+    # The time limit is one deadline for the whole run, shared across all
+    # selected dimensions — never a per-dimension allowance.
+    budget_s: int | None = None
+    # Run-level exit_reason from status.json (e.g. "provider_fatal",
+    # "failure_streak"). Lets the UI say WHY a failed run stopped instead of
+    # only that it did.
+    exit_reason: str | None = None
+    dimensions: list[_DimProgress] = field(default_factory=list)

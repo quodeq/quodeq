@@ -11,6 +11,54 @@ const GRADE_COLOR_VARS = [
 ];
 const MIN_GAP = 0.5;
 
+function clampToNextValue(dividerIdx, live, rawValue) {
+  const lo = (dividerIdx === 0 ? 0 : live[dividerIdx - 1]) + MIN_GAP;
+  const hi = (dividerIdx === live.length - 1 ? 10 : live[dividerIdx + 1]) - MIN_GAP;
+  return Math.round(Math.min(hi, Math.max(lo, rawValue)) * 10) / 10;
+}
+
+function applyAscValue(thresholds, live, dividerIdx, value, onChange) {
+  const nextAsc = [...live];
+  nextAsc[dividerIdx] = value;
+  const desc = [...nextAsc].reverse();
+  onChange(thresholds.map(([, label], i) => [desc[i], label]));
+}
+
+// Keeps the latest ascending values in a ref so the pointermove closure reads
+// fresh clamps across re-renders during one continuous drag (avoids stale-closure
+// clamps from the asc captured at the drag's start).
+function makeStartDrag({ barRef, ascRef, thresholds, onChange }) {
+  return (dividerIdx) => (downEvent) => {
+    if (downEvent.currentTarget.closest('fieldset[disabled]')) return;
+    downEvent.preventDefault();
+    const rect = barRef.current.getBoundingClientRect();
+    const move = (e) => {
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const live = ascRef.current;
+      const rawValue = ((clientX - rect.left) / rect.width) * 10;
+      const value = clampToNextValue(dividerIdx, live, rawValue);
+      applyAscValue(thresholds, live, dividerIdx, value, onChange);
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+  };
+}
+
+function makeStepKey({ ascRef, thresholds, onChange }) {
+  return (dividerIdx, delta) => {
+    const live = ascRef.current;
+    const next = clampToNextValue(dividerIdx, live, live[dividerIdx] + delta);
+    if (next === live[dividerIdx]) return;
+    applyAscValue(thresholds, live, dividerIdx, next, onChange);
+  };
+}
+
 /**
  * Segmented 0-10 bar; thresholds = [[9,'Exemplary'],[7,..],[5,..],[3,..]]
  * (descending). Dragging divider i moves the ascending boundary i.
@@ -22,49 +70,11 @@ export default function GradeBoundaryBar({ thresholds = [], onChange }) {
   const asc = [...thresholds].map(([t]) => t).reverse();
   const edges = [0, ...asc, 10];
 
-  // Keep the latest ascending values in a ref so the pointermove closure reads
-  // fresh clamps across re-renders during one continuous drag (avoids stale-closure
-  // clamps from the asc captured at the drag's start).
   const ascRef = useRef(asc);
   ascRef.current = asc;
 
-  const startDrag = (dividerIdx) => (downEvent) => {
-    if (downEvent.currentTarget.closest('fieldset[disabled]')) return;
-    downEvent.preventDefault();
-    const rect = barRef.current.getBoundingClientRect();
-    const move = (e) => {
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const live = ascRef.current;
-      let value = ((clientX - rect.left) / rect.width) * 10;
-      const lo = (dividerIdx === 0 ? 0 : live[dividerIdx - 1]) + MIN_GAP;
-      const hi = (dividerIdx === live.length - 1 ? 10 : live[dividerIdx + 1]) - MIN_GAP;
-      value = Math.round(Math.min(hi, Math.max(lo, value)) * 10) / 10;
-      const nextAsc = [...live];
-      nextAsc[dividerIdx] = value;
-      const desc = [...nextAsc].reverse();
-      onChange(thresholds.map(([, label], i) => [desc[i], label]));
-    };
-    const stop = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', stop);
-      window.removeEventListener('pointercancel', stop);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', stop);
-    window.addEventListener('pointercancel', stop);
-  };
-
-  const stepKey = (dividerIdx, delta) => {
-    const live = ascRef.current;
-    const lo = (dividerIdx === 0 ? 0 : live[dividerIdx - 1]) + MIN_GAP;
-    const hi = (dividerIdx === live.length - 1 ? 10 : live[dividerIdx + 1]) - MIN_GAP;
-    const next = Math.round(Math.min(hi, Math.max(lo, live[dividerIdx] + delta)) * 10) / 10;
-    if (next === live[dividerIdx]) return;
-    const nextAsc = [...live];
-    nextAsc[dividerIdx] = next;
-    const desc = [...nextAsc].reverse();
-    onChange(thresholds.map(([, label], i) => [desc[i], label]));
-  };
+  const startDrag = makeStartDrag({ barRef, ascRef, thresholds, onChange });
+  const stepKey = makeStepKey({ ascRef, thresholds, onChange });
 
   return (
     <div>

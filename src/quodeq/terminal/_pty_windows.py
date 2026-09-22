@@ -1,11 +1,15 @@
 """Windows ConPTY backend via pywinpty. Only imported on win32 (see backend.py)."""
 from __future__ import annotations
 
-import os
+import logging
 import shutil
 import time
 
 from winpty import PtyProcess  # type: ignore[import-untyped]
+
+from quodeq.shared.env_resolve import resolve_env
+
+_logger = logging.getLogger(__name__)
 
 # When no output is buffered, pywinpty's read returns immediately with an empty
 # string. Sleep briefly on empty so the reader thread doesn't hot-spin the CPU
@@ -16,7 +20,7 @@ _EMPTY_READ_SLEEP_S = 0.05
 
 
 def resolve_shell(env: dict[str, str] | None = None) -> str:
-    src = env if env is not None else os.environ
+    src = resolve_env(env)
     for cand in ("pwsh", "powershell"):
         found = shutil.which(cand)
         if found:
@@ -31,7 +35,7 @@ class WindowsPty:
         self._proc: PtyProcess | None = None
 
     def spawn(self, *, cwd: str, cols: int, rows: int) -> None:
-        env = dict(self._env if self._env is not None else os.environ)
+        env = dict(resolve_env(self._env))
         for k in ("QUODEQ_API_KEY", "QUODEQ_ACTION_API_HOST", "QUODEQ_ACTION_API_PORT"):
             env.pop(k, None)
         self._proc = PtyProcess.spawn(self._cmd, cwd=cwd, env=env, dimensions=(rows, cols))
@@ -49,7 +53,7 @@ class WindowsPty:
         return data.encode("utf-8", "replace")
 
     def write(self, data: bytes) -> None:
-        if self._proc is not None:
+        if self._proc is not None and self._proc.isalive():
             self._proc.write(data.decode("utf-8", "replace"))
 
     def resize(self, cols: int, rows: int) -> None:
@@ -69,4 +73,4 @@ class WindowsPty:
             try:
                 self._proc.terminate(force=True)
             except Exception:
-                pass
+                _logger.warning("failed to terminate PTY process", exc_info=True)

@@ -28,7 +28,7 @@ def _make_git_repo(path: Path) -> None:
 
 def test_scan_project_collects_files(tmp_path: Path) -> None:
     """Scan should list all files and count them, splitting out code files."""
-    from quodeq.services._fs_scan import scan_project
+    from quodeq.services.fs_scan import scan_project
     project_dir = tmp_path / "repo"
     project_dir.mkdir()
     (project_dir / "app.py").write_text("print('hi')")
@@ -45,7 +45,7 @@ def test_scan_project_collects_files(tmp_path: Path) -> None:
 
 def test_scan_project_code_files_excludes_non_source(tmp_path: Path) -> None:
     """code_files should count only extensions in the analysable source set."""
-    from quodeq.services._fs_scan import scan_project
+    from quodeq.services.fs_scan import scan_project
     project_dir = tmp_path / "repo"
     project_dir.mkdir()
     (project_dir / "app.kt").write_text("fun main() {}")
@@ -60,7 +60,7 @@ def test_scan_project_code_files_excludes_non_source(tmp_path: Path) -> None:
 
 def test_scan_project_lists_branches(tmp_path: Path) -> None:
     """Scan should detect git branches."""
-    from quodeq.services._fs_scan import scan_project
+    from quodeq.services.fs_scan import scan_project
     project_dir = tmp_path / "repo"
     project_dir.mkdir()
     _make_git_repo(project_dir)
@@ -71,7 +71,7 @@ def test_scan_project_lists_branches(tmp_path: Path) -> None:
 
 def test_scan_project_detects_modules(tmp_path: Path) -> None:
     """Scan should list top-level directories as modules."""
-    from quodeq.services._fs_scan import scan_project
+    from quodeq.services.fs_scan import scan_project
     project_dir = tmp_path / "repo"
     project_dir.mkdir()
     (project_dir / "src").mkdir()
@@ -85,7 +85,7 @@ def test_scan_project_detects_modules(tmp_path: Path) -> None:
 
 def test_scan_project_writes_json(tmp_path: Path) -> None:
     """Scan should write scan.json to reports directory when given one."""
-    from quodeq.services._fs_scan import scan_project
+    from quodeq.services.fs_scan import scan_project
     project_dir = tmp_path / "repo"
     project_dir.mkdir()
     (project_dir / "app.py").write_text("pass")
@@ -101,7 +101,7 @@ def test_scan_project_writes_json(tmp_path: Path) -> None:
 
 def test_scan_project_no_git(tmp_path: Path) -> None:
     """Scan should work without a git repo — branches list empty."""
-    from quodeq.services._fs_scan import scan_project
+    from quodeq.services.fs_scan import scan_project
     project_dir = tmp_path / "repo"
     project_dir.mkdir()
     (project_dir / "main.py").write_text("pass")

@@ -124,6 +124,7 @@ def test_validate_relative_scope_accepts(ok):
 
 def test_walk_and_group_ignores_escaping_scope(tmp_path):
     from quodeq.analysis.manifest_build import _walk_and_group
+    from quodeq.analysis.manifest_models import ManifestWalkSpec
 
     outside = tmp_path / "outside"
     outside.mkdir()
@@ -132,8 +133,8 @@ def test_walk_and_group_ignores_escaping_scope(tmp_path):
     src.mkdir()
     (src / "main.py").write_text("y = 2\n")
 
-    files_by_lang, _, _ = _walk_and_group(
-        src, {".py": "python"}, set(), [], scope_path="../outside",
+    files_by_lang, _, _, _ = _walk_and_group(
+        src, ManifestWalkSpec({".py": "python"}, set(), []), scope_path="../outside",
     )
     all_files = [f for files in files_by_lang.values() for f in files]
     assert not any("secret" in f for f in all_files)
@@ -142,6 +143,7 @@ def test_walk_and_group_ignores_escaping_scope(tmp_path):
 
 def test_walk_and_group_ignores_symlink_scope_escape(tmp_path):
     from quodeq.analysis.manifest_build import _walk_and_group
+    from quodeq.analysis.manifest_models import ManifestWalkSpec
 
     outside = tmp_path / "outside"
     outside.mkdir()
@@ -151,8 +153,8 @@ def test_walk_and_group_ignores_symlink_scope_escape(tmp_path):
     (src / "main.py").write_text("y = 2\n")
     (src / "link").symlink_to(outside)
 
-    files_by_lang, _, _ = _walk_and_group(
-        src, {".py": "python"}, set(), [], scope_path="link",
+    files_by_lang, _, _, _ = _walk_and_group(
+        src, ManifestWalkSpec({".py": "python"}, set(), []), scope_path="link",
     )
     all_files = [f for files in files_by_lang.values() for f in files]
     assert not any("secret" in f for f in all_files)
@@ -160,14 +162,15 @@ def test_walk_and_group_ignores_symlink_scope_escape(tmp_path):
 
 def test_walk_and_group_valid_scope_still_narrows(tmp_path):
     from quodeq.analysis.manifest_build import _walk_and_group
+    from quodeq.analysis.manifest_models import ManifestWalkSpec
 
     src = tmp_path / "repo"
     (src / "sub").mkdir(parents=True)
     (src / "root.py").write_text("a = 1\n")
     (src / "sub" / "inner.py").write_text("b = 2\n")
 
-    files_by_lang, _, _ = _walk_and_group(
-        src, {".py": "python"}, set(), [], scope_path="sub",
+    files_by_lang, _, _, _ = _walk_and_group(
+        src, ManifestWalkSpec({".py": "python"}, set(), []), scope_path="sub",
     )
     all_files = [f for files in files_by_lang.values() for f in files]
     assert any("inner.py" in f for f in all_files)

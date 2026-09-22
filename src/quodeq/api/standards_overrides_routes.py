@@ -6,23 +6,16 @@ The override file lives inside the analyzed repository
 from __future__ import annotations
 
 import logging
-from http import HTTPStatus
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._assistant_helpers import resolve_repo_root
-from quodeq.api.helpers import error_response
-from quodeq.shared.validation import validate_path_segment
-from quodeq.core.standards.overrides import (
-    OVERRIDES_RELPATH,
-    dimension_params,
-    validate_overrides,
-)
+from quodeq.api.standards_project import invalid_body, invalid_payload, project_root_or_error
+from quodeq.core.standards.overrides import validate_overrides
+from quodeq.services.standards_overrides import changed_dimensions, override_counts_by_dimension
 from quodeq.services.standards_prefs import (
     clear_project_overrides,
     collect_declared_params,
-    iter_compiled_standards,
     load_project_overrides,
     save_project_overrides,
 )
@@ -30,103 +23,63 @@ from quodeq.services.standards_prefs import (
 logger = logging.getLogger(__name__)
 
 
-def _counts(overrides: dict, compiled_dir: Path) -> dict[str, int]:
-    """Per-dimension count of overridden requirements, keyed by compiled id."""
-    dim_by_req: dict[str, str] = {}
-    for stem, data in iter_compiled_standards(compiled_dir):
-        for principle in data.get("principles", []):
-            for req in principle.get("requirements", []):
-                if req.get("id"):
-                    dim_by_req[req["id"]] = data.get("id", stem)
-    counts: dict[str, int] = {}
-    for req_id in overrides:
-        dim = dim_by_req.get(req_id)
-        if dim:
-            counts[dim] = counts.get(dim, 0) + 1
-    return counts
+def _declared_params(app: Flask) -> dict:
+    """Every overridable parameter declared by compiled and custom standards.
+
+    Duplicated custom standards keep the original requirement IDs, so both
+    dirs may declare the same req-id with identical specs — merging is safe;
+    compiled declarations win on collision (dict-update order: evaluators first).
+    """
+    compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
+    evaluators_dir = Path(app.config["STANDARDS_EVALUATORS_DIR"])
+    return {**collect_declared_params(evaluators_dir), **collect_declared_params(compiled_dir)}
 
 
-def _changed_dimensions(compiled_dir: Path, current: dict, proposed: dict) -> list[str]:
-    """Dimensions whose non-default effective params differ between the
-    current overrides file and the proposed mapping. A changed dimension is
-    exactly one whose cache keys will shift, so this is the invalidation
-    impact surfaced to the user before saving.
+def _persist_overrides(root: Path, project_id: str, clean: dict) -> None:
+    """Save *clean* to the project, or clear the file when nothing is left."""
+    if not clean:
+        clear_project_overrides(root)
+        logger.info("standards.overrides cleared project=%s", project_id)
+        return
+    save_project_overrides(root, clean)
+    logger.info("standards.overrides saved project=%s reqs=%d", project_id, len(clean))
 
-    Scans only the compiled dir, mirroring dimension_params_state (which reads
-    only compiled/<dimension>.json), so custom evaluator-dir standards—whose
-    cache keys never shift on override change—are symmetrically never reported."""
-    changed: list[str] = []
-    for stem, data in iter_compiled_standards(compiled_dir):
-        try:
-            _, before = dimension_params(data, current)
-            _, after = dimension_params(data, proposed)
-        except (AttributeError, TypeError):
-            # A shape-invalid params block (spec not a dict, "params" not a
-            # mapping, etc.) raises AttributeError/TypeError out of
-            # dimension_params -- same degrade-and-skip as an unreadable or
-            # unparseable compiled file, so a bad file never 500s the PUT.
-            continue
-        if before != after:
-            changed.append(data.get("id", stem))
-    return changed
+
+def _get_standards_overrides(app: Flask, project_id: str) -> Response:
+    root, err = project_root_or_error(project_id)
+    if err is not None:
+        return err
+    compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
+    overrides = load_project_overrides(root)
+    return jsonify({"overrides": overrides, "counts": override_counts_by_dimension(overrides, compiled_dir)})
+
+
+def _put_standards_overrides(app: Flask, project_id: str) -> Response:
+    root, err = project_root_or_error(project_id)
+    if err is not None:
+        return err
+    payload = request.get_json(force=True)
+    raw = payload.get("overrides") if isinstance(payload, dict) else None
+    if raw is None:
+        return invalid_body('Body must be {"overrides": {...}}')
+    clean, errors = validate_overrides(raw, _declared_params(app))
+    if errors:
+        return invalid_payload("Invalid overrides", "invalid_overrides", errors)
+    compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
+    changed = changed_dimensions(compiled_dir, load_project_overrides(root), clean)
+    dry_run = request.args.get("dryRun", "").lower() in ("1", "true")
+    if not dry_run:
+        _persist_overrides(root, project_id, clean)
+    return jsonify({"overrides": clean, "changedDimensions": changed})
 
 
 def register_overrides_routes(app: Flask) -> None:
     """Register GET/PUT endpoints for per-project standards threshold overrides."""
 
-    def _repo_root(project_id: str) -> Path | None:
-        root = resolve_repo_root(project_id)
-        return Path(root) if root else None
-
     @app.get("/api/projects/<project_id>/standards-overrides")
     def get_standards_overrides(project_id: str) -> Response:
-        try:
-            validate_path_segment(project_id)
-        except ValueError:
-            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, "bad_request")
-        root = _repo_root(project_id)
-        if root is None:
-            return error_response("Project has no local repository", HTTPStatus.NOT_FOUND, "not_found")
-        compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
-        overrides = load_project_overrides(root)
-        return jsonify({"overrides": overrides, "counts": _counts(overrides, compiled_dir)})
+        return _get_standards_overrides(app, project_id)
 
     @app.put("/api/projects/<project_id>/standards-overrides")
     def put_standards_overrides(project_id: str) -> Response:
-        try:
-            validate_path_segment(project_id)
-        except ValueError:
-            return error_response("Invalid project id", HTTPStatus.BAD_REQUEST, "bad_request")
-        root = _repo_root(project_id)
-        if root is None:
-            return error_response("Project has no local repository", HTTPStatus.NOT_FOUND, "not_found")
-        payload = request.get_json(force=True)
-        raw = payload.get("overrides") if isinstance(payload, dict) else None
-        if raw is None:
-            return error_response(
-                'Body must be {"overrides": {...}}', HTTPStatus.BAD_REQUEST, "bad_request"
-            )
-        compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
-        evaluators_dir = Path(app.config["STANDARDS_EVALUATORS_DIR"])
-        # Merge compiled (managed) params with custom-standards params.
-        # Duplicated custom standards keep the original requirement IDs, so both
-        # dirs may declare the same req-id with identical specs — merging is safe;
-        # compiled declarations win on collision (dict-update order: evaluators first).
-        declared = {**collect_declared_params(evaluators_dir), **collect_declared_params(compiled_dir)}
-        clean, errors = validate_overrides(raw, declared)
-        if errors:
-            resp = jsonify({"error": "Invalid overrides", "code": "invalid_overrides", "details": errors})
-            resp.status_code = HTTPStatus.BAD_REQUEST
-            return resp
-        current = load_project_overrides(root)
-        changed = _changed_dimensions(compiled_dir, current, clean)
-        dry_run = request.args.get("dryRun", "").lower() in ("1", "true")
-        if dry_run:
-            return jsonify({"overrides": clean, "changedDimensions": changed})
-        if not clean:
-            clear_project_overrides(root)
-            logger.info("standards.overrides cleared project=%s", project_id)
-            return jsonify({"overrides": {}, "changedDimensions": changed})
-        save_project_overrides(root, clean)
-        logger.info("standards.overrides saved project=%s reqs=%d", project_id, len(clean))
-        return jsonify({"overrides": clean, "changedDimensions": changed})
+        return _put_standards_overrides(app, project_id)

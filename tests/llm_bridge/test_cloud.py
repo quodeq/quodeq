@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 from quodeq.llm_bridge._cloud import check_cloud_connection
 

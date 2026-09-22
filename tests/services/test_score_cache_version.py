@@ -1,5 +1,4 @@
 import dataclasses
-from pathlib import Path
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.services.score_cache import score_cache_version
@@ -16,7 +15,8 @@ def test_stable_for_same_inputs(tmp_path, monkeypatch):
 
 
 def test_changes_when_dismissals_change(tmp_path, monkeypatch):
-    pd = tmp_path / "proj"; pd.mkdir()
+    pd = tmp_path / "proj"
+    pd.mkdir()
     monkeypatch.setattr("quodeq.services.score_cache.deleted_keys", lambda _p: set())
     monkeypatch.setattr("quodeq.services.score_cache.dismissed_keys", lambda _p: {("R1", "a.py", 1)})
     v1 = score_cache_version(pd, DEFAULT_PARAMS)
@@ -32,7 +32,8 @@ def test_changes_when_writer_epoch_changes(tmp_path, monkeypatch):
     repair for runs whose partial (in-progress) scalar set was persisted before
     the write-guard existed. They miss on the next build and are rebuilt fresh.
     """
-    pd = tmp_path / "proj"; pd.mkdir()
+    pd = tmp_path / "proj"
+    pd.mkdir()
     monkeypatch.setattr("quodeq.services.score_cache.dismissed_keys", lambda _p: set())
     monkeypatch.setattr("quodeq.services.score_cache.deleted_keys", lambda _p: set())
     v1 = score_cache_version(pd, DEFAULT_PARAMS)
@@ -42,7 +43,8 @@ def test_changes_when_writer_epoch_changes(tmp_path, monkeypatch):
 
 
 def test_changes_when_params_change(tmp_path, monkeypatch):
-    pd = tmp_path / "proj"; pd.mkdir()
+    pd = tmp_path / "proj"
+    pd.mkdir()
     monkeypatch.setattr("quodeq.services.score_cache.dismissed_keys", lambda _p: set())
     monkeypatch.setattr("quodeq.services.score_cache.deleted_keys", lambda _p: set())
     v1 = score_cache_version(pd, DEFAULT_PARAMS)

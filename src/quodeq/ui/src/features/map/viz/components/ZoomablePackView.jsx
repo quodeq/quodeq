@@ -3,7 +3,9 @@ import { hierarchy, pack } from 'd3-hierarchy';
 import { nodeSize } from '../core/mapColors.js';
 import PackInfoPanel from './PackInfoPanel.jsx';
 import PackCircles from './PackCircles.jsx';
+import MapLegend from './MapLegend.jsx';
 import { t } from '../../../../strings/index.js';
+import { LABEL_GAP_PX } from './viewLabels.js';
 
 const BASE_SIZE = 600;
 const PAD = 20;
@@ -14,6 +16,11 @@ const LABEL_FONT_DIVISOR = 4;
 const TOOLTIP_OFFSET = 16;
 const TOOLTIP_MAX_MARGIN = 180;
 const TOOLTIP_MAX_MARGIN_Y = 160;
+// Gap d3-pack leaves between a circle and its parent, in layout units.
+const PACK_PADDING = 6;
+// Container size assumed while the element has not been measured yet, so
+// the tooltip still clamps to something sane on the first hover.
+const CONTAINER_FALLBACK_PX = 300;
 
 /* ---- usePackLayout: d3 pack layout computation ---- */
 function usePackLayout(node, viewMode) {
@@ -23,30 +30,27 @@ function usePackLayout(node, viewMode) {
       .sum((d) => (d.children?.length ? 0 : Math.max(1, nodeSize(d, viewMode))))
       .sort((a, b) => (b.value || 0) - (a.value || 0));
     if (!r.value) return { root: r, circles: [] };
-    pack().size([BASE_SIZE, BASE_SIZE]).padding(6)(r);
+    pack().size([BASE_SIZE, BASE_SIZE]).padding(PACK_PADDING)(r);
     return { root: r, circles: r.descendants().filter((c) => c.r > 0) };
   }, [node, viewMode]);
 }
 
-/* ---- useFocusManager: focus state and click handling ---- */
-function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, onFileClick }) {
-  const [focus, setFocus] = useState(null);
-  const skipTransition = useRef(true);
+function useFocusResetSync(resetKey, setFocus) {
   const prevResetKey = useRef(resetKey);
-  const prevPath = useRef(null);
-
   useEffect(() => {
     if (resetKey !== prevResetKey.current) {
       prevResetKey.current = resetKey;
       setFocus(null);
     }
   }, [resetKey]);
+}
 
-  // Sync focus to currentPath
+// Sync focus to currentPath
+function useFocusPathSync({ currentPath, circles, setFocus, skipTransition, prevPathRef }) {
   useEffect(() => {
-    if (currentPath === prevPath.current) return;
-    const isMount = prevPath.current === null;
-    prevPath.current = currentPath;
+    if (currentPath === prevPathRef.current) return;
+    const isMount = prevPathRef.current === null;
+    prevPathRef.current = currentPath;
     if (!currentPath) {
       if (!isMount) skipTransition.current = true;
       setFocus(null);
@@ -60,58 +64,72 @@ function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, on
       }
     }
   }, [currentPath, circles]);
+}
 
-  // Enable transitions after first paint
-  useEffect(() => {
-    requestAnimationFrame(() => { skipTransition.current = false; });
-  }, []);
-
-  const focusNode = focus || root;
-
-  const { k, tx, ty } = useMemo(() => {
+function useFocusTransform(focusNode) {
+  return useMemo(() => {
     if (!focusNode) return { k: 1, tx: 0, ty: 0 };
     const k = BASE_SIZE / (focusNode.r * 2);
     const tx = BASE_SIZE / 2 - focusNode.x * k;
     const ty = BASE_SIZE / 2 - focusNode.y * k;
     return { k, tx, ty };
   }, [focusNode]);
+}
 
-  const screenCoords = useMemo(() =>
+function useScreenCoords(circles, k, tx, ty) {
+  return useMemo(() =>
     circles.map(c => ({
       cx: c.x * k + tx,
       cy: c.y * k + ty,
       r: c.r * k,
     })),
   [circles, k, tx, ty]);
+}
 
+/**
+ * Zoom out one level: focus the parent (or the root at the top) and report
+ * the path that is now current.
+ */
+function focusParent(focusNode, { setFocus, onDrillDown, prevPathRef }) {
+  const parent = focusNode?.parent;
+  setFocus(parent || null);
+  const parentPath = parent?.data?.path || '';
+  onDrillDown?.(parentPath);
+  prevPathRef.current = parentPath;
+}
+
+/** Drill into a folder circle and report the new current path. */
+function focusFolder(c, { setFocus, onDrillDown, prevPathRef }) {
+  setFocus(c);
+  const path = c.data.path || '';
+  onDrillDown?.(path);
+  prevPathRef.current = path;
+}
+
+function useFocusHandlers({ focusNode, setFocus, onFileClick, onDrillDown, prevPathRef }) {
   const handleClick = useCallback((e, c) => {
     e.stopPropagation();
+    const nav = { setFocus, onDrillDown, prevPathRef };
     const isFolder = !c.data.isFile && c.data.children?.length > 0;
     if (c.data.isFile) {
       onFileClick?.(c.data);
     } else if (isFolder && c !== focusNode) {
-      setFocus(c);
-      onDrillDown?.(c.data.path || '');
-      prevPath.current = c.data.path || '';
+      focusFolder(c, nav);
     } else if (c === focusNode) {
-      const parent = focusNode?.parent;
-      setFocus(parent || null);
-      const parentPath = parent?.data?.path || '';
-      onDrillDown?.(parentPath);
-      prevPath.current = parentPath;
+      focusParent(focusNode, nav);
     }
   }, [focusNode, onFileClick, onDrillDown]);
 
   const handleBgClick = useCallback(() => {
-    const parent = focusNode?.parent;
-    setFocus(parent || null);
-    const parentPath = parent?.data?.path || '';
-    onDrillDown?.(parentPath);
-    prevPath.current = parentPath;
+    focusParent(focusNode, { setFocus, onDrillDown, prevPathRef });
   }, [focusNode, onDrillDown]);
 
-  // Pre-categorize circles
-  const { folderIndices, fileIndices } = useMemo(() => {
+  return { handleClick, handleBgClick };
+}
+
+// Pre-categorize circles
+function useCircleIndices(circles) {
+  return useMemo(() => {
     const fi = [], fli = [];
     circles.forEach((c, i) => {
       const d = c.data;
@@ -121,6 +139,27 @@ function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, on
     });
     return { folderIndices: fi, fileIndices: fli };
   }, [circles]);
+}
+
+/* ---- useFocusManager: focus state and click handling ---- */
+function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, onFileClick }) {
+  const [focus, setFocus] = useState(null);
+  const skipTransition = useRef(true);
+  const prevPathRef = useRef(null);
+
+  useFocusResetSync(resetKey, setFocus);
+  useFocusPathSync({ currentPath, circles, setFocus, skipTransition, prevPathRef });
+
+  // Enable transitions after first paint
+  useEffect(() => {
+    requestAnimationFrame(() => { skipTransition.current = false; });
+  }, []);
+
+  const focusNode = focus || root;
+  const { k, tx, ty } = useFocusTransform(focusNode);
+  const screenCoords = useScreenCoords(circles, k, tx, ty);
+  const { handleClick, handleBgClick } = useFocusHandlers({ focusNode, setFocus, onFileClick, onDrillDown, prevPathRef });
+  const { folderIndices, fileIndices } = useCircleIndices(circles);
 
   return { focusNode, k, tx, ty, screenCoords, handleClick, handleBgClick, skipTransition, folderIndices, fileIndices };
 }
@@ -135,7 +174,7 @@ function PackLabels({ circles, screenCoords, focusNode, skipTransition }) {
     return (
       <text
         key={'lbl-' + (d.path || i)}
-        x={sc.cx} y={sc.cy - sc.r - 4}
+        x={sc.cx} y={sc.cy - sc.r - LABEL_GAP_PX}
         textAnchor="middle" dominantBaseline="auto"
         style={{
           fontSize: Math.min(LABEL_FONT_MAX, Math.max(LABEL_FONT_MIN, sc.r / LABEL_FONT_DIVISOR)),
@@ -153,31 +192,45 @@ function PackLabels({ circles, screenCoords, focusNode, skipTransition }) {
 }
 
 /* ---- PackTooltip: tooltip ---- */
-function PackTooltip({ circles, hover, mousePos, containerRef }) {
-  if (hover === null || !circles[hover] || circles[hover].depth === 0) return null;
-  const hd = circles[hover].data;
+/** Tooltip position, clamped so it never runs off the container edge. */
+function tooltipStyle(mousePos, containerRef) {
+  const el = containerRef.current;
+  return {
+    position: 'absolute',
+    left: Math.min(mousePos.current.x + TOOLTIP_OFFSET, (el?.offsetWidth || CONTAINER_FALLBACK_PX) - TOOLTIP_MAX_MARGIN),
+    top: Math.min(mousePos.current.y + TOOLTIP_OFFSET, (el?.offsetHeight || CONTAINER_FALLBACK_PX) - TOOLTIP_MAX_MARGIN_Y),
+    pointerEvents: 'none',
+    zIndex: 10,
+  };
+}
+
+/** Per-severity rows, shown only for a node that actually has violations. */
+function TooltipSeverityRows({ hd }) {
+  if (!(hd.violations > 0)) return null;
   const sev = hd.severity || {};
   return (
-    <div className="map-tooltip" style={{ position: 'absolute', left: Math.min(mousePos.current.x + TOOLTIP_OFFSET, (containerRef.current?.offsetWidth || 300) - TOOLTIP_MAX_MARGIN), top: Math.min(mousePos.current.y + TOOLTIP_OFFSET, (containerRef.current?.offsetHeight || 300) - TOOLTIP_MAX_MARGIN_Y), pointerEvents: 'none', zIndex: 10 }}>
-      <div className="map-tooltip-title">{(hd.path || hd.name || '').replace(/\/$/, '')}</div>
-      <div className="map-tooltip-row"><span>{t('map.violations')}</span><span>{hd.violations}</span></div>
-      {hd.violations > 0 && sev.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>{t('map.critical')}</span><span>{sev.critical}</span></div>}
-      {hd.violations > 0 && sev.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>{t('map.major')}</span><span>{sev.major}</span></div>}
-      {hd.violations > 0 && sev.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>{t('map.minor')}</span><span>{sev.minor}</span></div>}
-      <div className="map-tooltip-row"><span>{t('map.compliance')}</span><span>{hd.compliance}</span></div>
-      <div className="map-tooltip-row"><span>{t('map.rate')}</span><span>{(hd.violations + hd.compliance) > 0 ? ((hd.compliance / (hd.violations + hd.compliance)) * 100).toFixed(0) + '%' : '—'}</span></div>
-    </div>
+    <>
+      {sev.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>{t('map.critical')}</span><span>{sev.critical}</span></div>}
+      {sev.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>{t('map.major')}</span><span>{sev.major}</span></div>}
+      {sev.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>{t('map.minor')}</span><span>{sev.minor}</span></div>}
+    </>
   );
 }
 
-/* ---- PackLegend: color legend ---- */
-const LEGEND_ITEMS = [
-  { color: 'var(--color-grade-top-text)', label: 'Exemplary' },
-  { color: 'var(--color-grade-high-text)', label: 'Good' },
-  { color: 'var(--color-grade-mid-text)', label: 'Adequate' },
-  { color: 'var(--color-grade-low-text)', label: 'Poor' },
-  { color: 'var(--color-grade-bottom-text)', label: 'Critical' },
-];
+function PackTooltip({ circles, hover, mousePos, containerRef }) {
+  if (hover === null || !circles[hover] || circles[hover].depth === 0) return null;
+  const hd = circles[hover].data;
+  const total = hd.violations + hd.compliance;
+  return (
+    <div className="map-tooltip" style={tooltipStyle(mousePos, containerRef)}>
+      <div className="map-tooltip-title">{(hd.path || hd.name || '').replace(/\/$/, '')}</div>
+      <div className="map-tooltip-row"><span>{t('map.violations')}</span><span>{hd.violations}</span></div>
+      <TooltipSeverityRows hd={hd} />
+      <div className="map-tooltip-row"><span>{t('map.compliance')}</span><span>{hd.compliance}</span></div>
+      <div className="map-tooltip-row"><span>{t('map.rate')}</span><span>{total > 0 ? ((hd.compliance / total) * 100).toFixed(0) + '%' : '—'}</span></div>
+    </div>
+  );
+}
 
 /* ---- Main orchestrator ---- */
 export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileClick, showLabels = true, resetKey = 0, currentPath = '' }) {
@@ -216,13 +269,7 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
       </svg>
       <PackTooltip circles={circles} hover={hover} mousePos={mousePos} containerRef={containerRef} />
       <PackInfoPanel focusNode={focusNode} root={root} onFileClick={onFileClick} />
-      <div style={{ position: 'absolute', bottom: 8, left: 12, display: 'flex', gap: 14, fontSize: 11, color: 'var(--color-text-muted)', zIndex: 2 }}>
-        {LEGEND_ITEMS.map(({ color, label }) => (
-          <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />{label}
-          </span>
-        ))}
-      </div>
+      <MapLegend />
     </div>
   );
 }

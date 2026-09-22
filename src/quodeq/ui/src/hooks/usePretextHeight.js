@@ -1,3 +1,10 @@
+import { useState, useLayoutEffect } from 'react';
+import { measureText, cssFontFromElement } from '../utils/pretext.js';
+
+const DEFAULT_LINE_HEIGHT = 18;
+// Fallback line-height multiplier when the computed style has none.
+const LINE_HEIGHT_MULTIPLIER = 1.5;
+
 /**
  * usePretextHeight — measure the rendered height of a multiline text block
  * at the ref'd element's current width, without actually rendering anywhere.
@@ -23,11 +30,6 @@
  *   element's computed font.
  * @returns {{ height: number, lineCount: number }}
  */
-import { useState, useLayoutEffect } from 'react';
-import { measureText, cssFontFromElement } from '../utils/pretext.js';
-
-const DEFAULT_LINE_HEIGHT = 18;
-
 export default function usePretextHeight(ref, text, options = {}) {
   const [size, setSize] = useState({ height: 0, lineCount: 0 });
 
@@ -48,7 +50,7 @@ export default function usePretextHeight(ref, text, options = {}) {
           lineHeight = parsed;
         } else {
           const fontSize = parseFloat(cs.fontSize);
-          if (!Number.isNaN(fontSize) && fontSize > 0) lineHeight = fontSize * 1.5;
+          if (!Number.isNaN(fontSize) && fontSize > 0) lineHeight = fontSize * LINE_HEIGHT_MULTIPLIER;
         }
       }
       if (!lineHeight) lineHeight = DEFAULT_LINE_HEIGHT;

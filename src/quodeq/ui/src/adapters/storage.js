@@ -16,8 +16,9 @@ function backend(storage) {
   if (storage !== undefined) return storage;
   try {
     return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    return null; // access itself can throw when cookies/storage are blocked
+  } catch (err) {
+    console.warn('[storage] localStorage access blocked:', err); // cookies/storage blocked
+    return null;
   }
 }
 
@@ -28,7 +29,8 @@ export function readString(key, fallback = null, storage) {
   try {
     const raw = s.getItem(key);
     return raw === null ? fallback : raw;
-  } catch {
+  } catch (err) {
+    console.warn(`[storage] could not read "${key}":`, err);
     return fallback;
   }
 }
@@ -40,8 +42,9 @@ export function writeString(key, value, storage) {
   try {
     s.setItem(key, String(value));
     return true;
-  } catch {
-    return false; // private mode, quota exceeded — non-fatal by design
+  } catch (err) {
+    console.warn(`[storage] could not write "${key}" (private mode or quota exceeded):`, err);
+    return false; // non-fatal by design
   }
 }
 
@@ -51,7 +54,8 @@ export function readJSON(key, fallback = null, storage) {
   if (raw === null) return fallback;
   try {
     return JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    console.warn(`[storage] could not parse JSON for "${key}":`, err);
     return fallback;
   }
 }
@@ -61,8 +65,9 @@ export function writeJSON(key, value, storage) {
   let raw;
   try {
     raw = JSON.stringify(value);
-  } catch {
-    return false; // cyclic or otherwise unserializable
+  } catch (err) {
+    console.warn('[storage] could not serialize value to JSON (cyclic or unserializable):', err);
+    return false;
   }
   if (raw === undefined) return false;
   return writeString(key, raw, storage);
@@ -74,7 +79,7 @@ export function removeKey(key, storage) {
   if (!s) return;
   try {
     s.removeItem(key);
-  } catch {
-    /* storage unavailable — nothing to clean up */
+  } catch (err) {
+    console.warn(`[storage] could not remove "${key}":`, err); // nothing to clean up
   }
 }

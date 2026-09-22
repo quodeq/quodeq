@@ -1,9 +1,15 @@
 import { useMemo, useState } from 'react';
 import HeatGridCells from '../../../components/HeatGridCells.jsx';
+import { buildRows } from './dimensionHeatGridModel.js';
+import { activateOnKey } from '../../../utils/a11y.js';
 import { t } from '../../../strings/index.js';
 
-const DEFAULT_SEVERITY = 'minor';
 const PRINCIPLE_INDENT_PX = 24;
+
+function ariaSort(isActive, sortDir) {
+  if (!isActive) return 'none';
+  return sortDir === 'asc' ? 'ascending' : 'descending';
+}
 
 const COLUMNS = [
   { id: 'name', label: t('violations.colDimensionPrinciple'), align: 'left' },
@@ -14,107 +20,52 @@ const COLUMNS = [
   { id: 'health', label: t('violations.colHealth') },
 ];
 
-function getSortValue(row, col) {
-  switch (col) {
-    case 'name': return row.name || '';
-    case 'critical': return row.severity.critical;
-    case 'major': return row.severity.major;
-    case 'minor': return row.severity.minor;
-    case 'violations': return row.violations;
-    case 'health': return row.complianceRate;
-    default: return 0;
-  }
+function HeatGridHead({ sortCol, sortDir, handleSort }) {
+  return (
+    <thead>
+      <tr>
+        {COLUMNS.map((col) => (
+          <th
+            key={col.id}
+            className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`}
+            aria-sort={ariaSort(sortCol === col.id, sortDir)}
+          >
+            {/* A real <button> so sorting is reachable from the keyboard (a <th>
+                is not focusable). It fills the cell and looks like plain header
+                text: see `.heat-grid-th-sort > button` in styles/map.css. */}
+            <button
+              type="button"
+              aria-label={t('violations.sortByAria', { column: col.label })}
+              onClick={() => handleSort(col.id)}
+            >
+              {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+            </button>
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
 }
 
-function comparator(col, dir) {
-  return (a, b) => {
-    const va = getSortValue(a, col);
-    const vb = getSortValue(b, col);
-    if (col === 'name') {
-      return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
-    }
-    const diff = dir === 'asc' ? va - vb : vb - va;
-    return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
-  };
-}
-
-function newPrincipleEntry() {
-  return { violations: 0, compliance: 0, severity: { critical: 0, major: 0, minor: 0 }, violationItems: [], complianceItems: [] };
-}
-
-function buildPrincipleRow(name, data, dim) {
-  const total = data.violations + data.compliance;
-  return {
-    type: 'principle',
-    name,
-    violations: data.violations,
-    compliance: data.compliance,
-    severity: data.severity,
-    complianceRate: total > 0 ? data.compliance / total : 0,
-    dimension: dim.dimension,
-    raw: dim,
-    principleObj: {
-      principle: name, dimension: dim.dimension, total: data.violations,
-      critical: data.severity.critical, major: data.severity.major, minor: data.severity.minor,
-      violations: data.violationItems, compliance: data.complianceItems,
-    },
-  };
-}
-
-function buildDimensionGroup(dim) {
-  const violations = dim.violations || [];
-  const compliance = dim.compliance || [];
-  if (violations.length === 0 && compliance.length === 0) return null;
-
-  const dimSev = { critical: 0, major: 0, minor: 0 };
-  const principleMap = new Map();
-
-  for (const v of violations) {
-    const sev = (v.severity || DEFAULT_SEVERITY).toLowerCase();
-    if (dimSev[sev] !== undefined) dimSev[sev]++;
-    const pName = v.principle || '(unknown)';
-    if (!principleMap.has(pName)) principleMap.set(pName, newPrincipleEntry());
-    const p = principleMap.get(pName);
-    p.violations++;
-    if (p.severity[sev] !== undefined) p.severity[sev]++;
-    p.violationItems.push(v);
-  }
-
-  for (const c of compliance) {
-    const pName = c.principle || '(unknown)';
-    if (!principleMap.has(pName)) principleMap.set(pName, newPrincipleEntry());
-    principleMap.get(pName).compliance++;
-    principleMap.get(pName).complianceItems.push(c);
-  }
-
-  const dimTotal = violations.length + compliance.length;
-  const dimRow = {
-    type: 'dimension', name: dim.dimension, violations: violations.length,
-    compliance: compliance.length, severity: dimSev,
-    complianceRate: dimTotal > 0 ? compliance.length / dimTotal : 0, raw: dim,
-  };
-
-  const principles = Array.from(principleMap.entries())
-    .map(([name, data]) => buildPrincipleRow(name, data, dim));
-
-  return { dimRow, principles };
-}
-
-function flattenAndSort(groups, sortCol, sortDir) {
-  const cmp = comparator(sortCol, sortDir);
-  groups.sort((a, b) => cmp(a.dimRow, b.dimRow));
-  const rows = [];
-  for (const g of groups) {
-    rows.push(g.dimRow);
-    g.principles.sort(cmp);
-    rows.push(...g.principles);
-  }
-  return rows;
-}
-
-function buildRows(dimensions, sortCol, sortDir) {
-  const groups = dimensions.map(buildDimensionGroup).filter(Boolean);
-  return flattenAndSort(groups, sortCol, sortDir);
+function HeatGridRow({ row, onDimensionClick, onPrincipleClick, onCellClick }) {
+  const isDim = row.type === 'dimension';
+  return (
+    <tr className={isDim ? 'heat-grid-dim-row' : undefined}>
+      <td>
+        <div
+          className="heat-grid-file clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj)}
+          onKeyDown={activateOnKey(() => isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj))}
+          style={isDim ? undefined : { paddingLeft: PRINCIPLE_INDENT_PX }}
+        >
+          {row.name}
+        </div>
+      </td>
+      <HeatGridCells row={row} onCellClick={onCellClick} variant="flat" />
+    </tr>
+  );
 }
 
 export default function DimensionHeatGridView({ dimensions, onDimensionClick, onPrincipleClick, onCellClick }) {
@@ -139,36 +90,11 @@ export default function DimensionHeatGridView({ dimensions, onDimensionClick, on
   return (
     <div className="heat-grid-wrap heat-grid-wrap--flat">
       <table className="heat-grid heat-grid--flat">
-        <thead>
-          <tr>
-            {COLUMNS.map((col) => (
-              <th key={col.id} className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`} onClick={() => handleSort(col.id)}>
-                {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        <HeatGridHead sortCol={sortCol} sortDir={sortDir} handleSort={handleSort} />
         <tbody>
-          {rows.map((row, i) => {
-            const isDim = row.type === 'dimension';
-            return (
-              <tr key={`${row.type}-${row.name}-${i}`} className={isDim ? 'heat-grid-dim-row' : undefined}>
-                <td>
-                  <div
-                    className="heat-grid-file clickable"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj)}
-                    onKeyDown={(e) => e.key === 'Enter' && (isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj))}
-                    style={isDim ? undefined : { paddingLeft: PRINCIPLE_INDENT_PX }}
-                  >
-                    {row.name}
-                  </div>
-                </td>
-                <HeatGridCells row={row} onCellClick={onCellClick} variant="flat" />
-              </tr>
-            );
-          })}
+          {rows.map((row, i) => (
+            <HeatGridRow key={`${row.type}-${row.name}-${i}`} row={row} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} onCellClick={onCellClick} />
+          ))}
         </tbody>
       </table>
     </div>

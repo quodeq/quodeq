@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from quodeq.api._rate_limit_file_store import FileRateLimitStore
 

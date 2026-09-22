@@ -12,28 +12,31 @@ Their symbols are re-exported below so existing import paths keep resolving.
 """
 from __future__ import annotations
 
-import threading
-from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import DimensionResult
 
-from quodeq.data.fs.report_parser.grades import summarize_dimensions
-from quodeq.data.fs.report_parser.runs import RunInfo, list_runs, read_run_data
+from quodeq.services.deleted import deleted_keys
 from quodeq.services.scoring_view import is_eligible_for_default_view
-from quodeq.services.dismissed import filter_dismissed_from_dimensions
+from quodeq.services.dismissed import dismissed_keys, filter_dismissed_from_dimensions
+from quodeq.services.wiring import (
+    RunInfo,
+    list_runs,
+    load_suppression_rules,
+    read_run_data,
+    summarize_dimensions,
+)
+from quodeq.services.rescore import rescore_dimension
+from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
-from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 from quodeq.services._dashboard_cache import (  # noqa: F401
     DashboardCacheConfig,
     _DEFAULT_RUN_DIM_CACHE_MAX,
-    _make_run_dimension_fetcher,
+    make_run_dimension_fetcher,
     _run_dim_cache_max,
-    _SHARED_RUN_DIM_CACHE,
-    _SHARED_RUN_DIM_LOCK,
     clear_shared_dimension_cache,
     create_dimension_cache,
 )
@@ -46,12 +49,13 @@ from quodeq.services._dashboard_history import (  # noqa: F401
     _compute_dashboard_payload,
     _enrich_dimensions_with_trend,
     _max_history_runs,
+    _read_run_exit_reason,
 )
 from quodeq.services._dashboard_response import (  # noqa: F401
+    _DimensionAnnotations,
     _attach_dismissed_count_to_dim,
     _attach_exit_reason_to_dim,
     _build_dashboard_result,
-    _read_run_exit_reason,
     _slim_history_dim,
 )
 
@@ -68,16 +72,12 @@ def _rescore_run_dimensions(
     """Apply the project-wide dismiss/delete rescore to a run's dimensions.
 
     Identity when the project has no active dismissals/deletions. Otherwise each
-    dimension passes through the same ``_rescore_dimension`` transform the
+    dimension passes through the same ``rescore_dimension`` transform the
     accumulated view and the per-run explorer use, so every read path reports
     the identical dismiss-adjusted score/grade. *run_id* is the run the *dims*
     were read from: its directory is passed as the evidence basis so a touched
     dimension is re-scored from that run's own evidence, not the legacy formula.
     """
-    from quodeq.services.deleted import deleted_keys  # noqa: PLC0415
-    from quodeq.services.dismissed import dismissed_keys  # noqa: PLC0415
-    from quodeq.services.rescore import _rescore_dimension  # noqa: PLC0415
-
     validate_path_segment(project)
     project_dir = reports_root / project
     dismissed = dismissed_keys(project_dir)
@@ -88,21 +88,15 @@ def _rescore_run_dimensions(
         return dims
     validate_path_segment(run_id)
     run_dir = project_dir / run_id
-    return [
-        _rescore_dimension(d, dismissed, deleted, params=params, run_dir=run_dir,
-                           rules=rules)
-        for d in dims
-    ]
+    keys = SuppressionKeys(dismissed, deleted, rules)
+    return [rescore_dimension(d, keys, params=params, run_dir=run_dir) for d in dims]
 
 
 def _make_status_aware_fetcher(
     reports_root: Path,
     project: str,
     runs: list[RunInfo],
-    cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
-    lock: threading.Lock | None = None,
-    max_size: int | None = None,
-    version: str = "",
+    config: DashboardCacheConfig | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a fetcher that reads in-progress runs fresh, never from cache.
 
@@ -112,10 +106,7 @@ def _make_status_aware_fetcher(
     PID-liveness check that status.json alone can't see), so a run whose
     process is still alive reads fresh even before its state flips.
     """
-    cached = _make_run_dimension_fetcher(
-        reports_root, project,
-        cache=cache, lock=lock, max_size=max_size, version=version,
-    )
+    cached = make_run_dimension_fetcher(reports_root, project, config)
     status_by_id = {r.run_id: r.status for r in runs}
 
     def fetch(run_id: str) -> list[DimensionResult]:
@@ -144,7 +135,7 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     in_progress and cancelled runs are skipped: the overview waits for a
     run to terminate cleanly before promoting it to the default
     landing-page view. The eligibility predicate is the shared
-    ``dim_resolution.is_eligible_for_default_view`` rule, used by both
+    ``scoring_view.is_eligible_for_default_view`` rule, used by both
     this call site and ``accumulated._compute_result``. Keeping them on
     the same predicate is what prevents the "headline says one thing,
     cards say another" inconsistency users hit when the two filters
@@ -180,48 +171,24 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     return selected_run, selected_index
 
 
-def build_dashboard(
-    reports_dir: str,
-    project: str,
-    run: str,
-    *,
-    cache_config: DashboardCacheConfig | None = None,
-    params: ScoringParams | None = None,
-) -> dict[str, Any]:
-    """Build a full dashboard response for *project* at *run*.
+def _resolve_selected_dims(
+    reports_root: Path, project: str, project_dir: Path,
+    selected_run: RunInfo, params: ScoringParams,
+) -> tuple[list[DimensionResult], dict[str, int], dict[str, int]]:
+    """Read the selected run's raw dims, rescore them, and compute the
+    dismissed/suppressed violation counts. ``read_run_data`` overlays the
+    run's SQL grade tables, but those grades only reflect dismissals
+    projected into THIS run and NOT project-wide dismissals/deletions that
+    accrued later -- so the raw selected-run score can disagree with the
+    accumulated overview. Rescore the selected run's dimensions with the
+    SAME project-wide ``rescore_dimension`` transform the accumulated view
+    and the per-run explorer use, so every path reports the identical
+    dismiss-adjusted score/grade AND drops the dismissed + deleted
+    violations from the counts. ``read_run_data`` stays the dimension source
+    here (a stable seam other callers and tests inject through).
 
-    Pass *cache_config* to override the module-level LRU cache.
-
-    When *params* is None, the saved grade-formula params are loaded once
-    here and threaded through the run-level summary, SQL grade override, and
-    trend so the dashboard rollup honours the user's custom formula.
+    Returns (selected_dims, dismissed_counts, suppressed_counts).
     """
-    if params is None:
-        from quodeq.services import grade_formula  # noqa: PLC0415
-        params = grade_formula.load_params()
-    cc = cache_config or DashboardCacheConfig()
-    reports_root = Path(reports_dir)
-    runs = list_runs(reports_root, project)
-    if not runs:
-        return {
-            "project": project,
-            "selectedRun": None,
-            "dimensions": [],
-            "summary": {},
-            "trend": [],
-        }
-
-    selected_run, selected_index = _resolve_selected_run(runs, run)
-    # ``read_run_data`` overlays the run's SQL grade tables, but those grades
-    # only reflect dismissals projected into THIS run and NOT project-wide
-    # dismissals/deletions that accrued later -- so the raw selected-run score
-    # can disagree with the accumulated overview. Rescore the selected run's
-    # dimensions with the SAME project-wide ``_rescore_dimension`` transform the
-    # accumulated view and the per-run explorer use, so every path reports the
-    # identical dismiss-adjusted score/grade AND drops the dismissed + deleted
-    # violations from the counts. ``read_run_data`` stays the dimension source
-    # here (a stable seam other callers and tests inject through).
-    project_dir = reports_root / project
     raw_dims = read_run_data(reports_root, project, selected_run.run_id)
     # ``dismissedCount`` reports how many of the scan's re-found violations were
     # hidden by the *dismissed* filter specifically (deletions are a separate,
@@ -240,19 +207,77 @@ def build_dashboard(
         (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
         for d in selected_dims
     }
+    return selected_dims, dismissed_counts, suppressed_counts
+
+
+def _resolve_params(params: ScoringParams | None) -> ScoringParams:
+    """Return *params*, or the saved grade-formula params when None."""
+    if params is not None:
+        return params
+    from quodeq.services import grade_formula  # noqa: PLC0415
+    return grade_formula.load_params()
+
+
+def _select_run(
+    reports_root: Path, project: str, runs: list[RunInfo], run: str, params: ScoringParams,
+) -> tuple[_SelectedRunContext, _DimensionAnnotations]:
+    """Resolve the requested run and rescore its dimensions.
+
+    Returns the selected-run context alongside the per-dimension annotations
+    (exit reason, dismissed and suppressed counts) measured on those same
+    dimensions.
+    """
+    selected_run, selected_index = _resolve_selected_run(runs, run)
+    selected_dims, dismissed_counts, suppressed_counts = _resolve_selected_dims(
+        reports_root, project, reports_root / project, selected_run, params,
+    )
     ctx = _SelectedRunContext(
         run=selected_run,
         index=selected_index,
         dimensions=selected_dims,
         summary=summarize_dimensions(selected_dims, params),
+        runs=runs,
     )
-    payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc, params)
-    exit_reason = _read_run_exit_reason(reports_root, project, selected_run.run_id)
-    return _build_dashboard_result(
-        project, runs, selected_run, payload,
-        exit_reason=exit_reason, dismissed_counts=dismissed_counts,
+    annotations = _DimensionAnnotations(
+        exit_reason=_read_run_exit_reason(reports_root, project, selected_run.run_id),
+        dismissed_counts=dismissed_counts,
         suppressed_counts=suppressed_counts,
     )
+    return ctx, annotations
+
+
+def build_dashboard(
+    reports_dir: str,
+    project: str,
+    run: str,
+    *,
+    cache_config: DashboardCacheConfig | None = None,
+    params: ScoringParams | None = None,
+) -> dict[str, Any]:
+    """Build a full dashboard response for *project* at *run*.
+
+    Pass *cache_config* to override the module-level LRU cache.
+
+    When *params* is None, the saved grade-formula params are loaded once
+    here and threaded through the run-level summary, SQL grade override, and
+    trend so the dashboard rollup honours the user's custom formula.
+    """
+    params = _resolve_params(params)
+    cc = cache_config or DashboardCacheConfig()
+    reports_root = Path(reports_dir)
+    runs = list_runs(reports_root, project)
+    if not runs:
+        return {
+            "project": project,
+            "selectedRun": None,
+            "dimensions": [],
+            "summary": {},
+            "trend": [],
+        }
+
+    ctx, annotations = _select_run(reports_root, project, runs, run, params)
+    payload = _compute_dashboard_payload(reports_root, project, ctx, cc, params)
+    return _build_dashboard_result(project, runs, ctx.run, payload, annotations)
 
 
 __all__ = [

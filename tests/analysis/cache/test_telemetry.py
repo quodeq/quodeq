@@ -13,11 +13,11 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig, _AnalysisContext
 from quodeq.analysis.cache import (
     CacheEntry, LocalFileBackend, build_cache_key_for_file,
 )
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 
 
@@ -83,16 +83,17 @@ class TestCacheStatsMarker:
             ))
 
         markers: list[tuple] = []
+
         def fake_emit(phase, **kwargs):
             markers.append((phase, kwargs))
 
         with patch(
-            "quodeq.analysis.cache.dimension_runner.emit_marker",
+            "quodeq.analysis.cache._dimension_context.emit_marker",
             new=fake_emit,
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache),
             )
 
         cache_stats = [(p, kw) for p, kw in markers if p == "cache_stats"]
@@ -116,11 +117,13 @@ class TestCacheStatsMarker:
         ))
 
         markers: list[tuple] = []
+
         def fake_emit(phase, **kwargs):
             markers.append((phase, kwargs))
 
         from quodeq.core.evidence.model import Evidence
-        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             jsonl.write_text(
@@ -133,15 +136,12 @@ class TestCacheStatsMarker:
             )
 
         with patch(
-            "quodeq.analysis.cache.dimension_runner.emit_marker",
+            "quodeq.analysis.cache._dimension_context.emit_marker",
             new=fake_emit,
-        ), patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=fake_dispatch,
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=fake_dispatch),
             )
 
         cache_stats = [(p, kw) for p, kw in markers if p == "cache_stats"]
@@ -162,11 +162,13 @@ class TestCacheStatsMarker:
         config.options.incremental = False  # clean scan
 
         markers: list[tuple] = []
+
         def fake_emit(phase, **kwargs):
             markers.append((phase, kwargs))
 
         from quodeq.core.evidence.model import Evidence
-        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks):
+
+        def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             jsonl.write_text('{"file": "a.py", "line": 1}\n')
@@ -177,15 +179,12 @@ class TestCacheStatsMarker:
             )
 
         with patch(
-            "quodeq.analysis.cache.dimension_runner.emit_marker",
+            "quodeq.analysis.cache._dimension_context.emit_marker",
             new=fake_emit,
-        ), patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=fake_dispatch,
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=fake_dispatch),
             )
 
         cache_stats = [(p, kw) for p, kw in markers if p == "cache_stats"]
@@ -208,16 +207,17 @@ class TestCacheStatsMarker:
             ))
 
         captured = []
+
         def fake_emit(phase, **kwargs):
             captured.append((phase, kwargs))
 
         with patch(
-            "quodeq.analysis.cache.dimension_runner.emit_marker",
+            "quodeq.analysis.cache._dimension_context.emit_marker",
             new=fake_emit,
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache),
             )
 
         # Round-trip the cache_stats payload through JSON.

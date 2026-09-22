@@ -14,6 +14,8 @@
  * @property {number}        violationCount
  * @property {number}        complianceCount
  * @property {SeverityTally} severity
+ * @property {number|null}   [violationsPer100Files] - violations per 100 files
+ *   read; null when nothing was read.
  *
  * @typedef {Object} Dimension
  * @property {string}        dimension
@@ -58,11 +60,41 @@ import { createPrinciple, createPrincipleGrade } from './principle.js';
  */
 export function createDimension(raw) {
   if (!raw || typeof raw !== 'object') return raw;
+  return { ...raw, ...canonicalFindings(raw) };
+}
+
+// The violations/compliance/principles mapping both the dashboard Dimension
+// and the DimensionEval apply, with an absent key coerced to an empty list.
+function canonicalFindings(raw) {
+  return {
+    violations: createViolations(raw.violations),
+    compliance: createViolations(raw.compliance),
+    principles: (raw.principles || []).map(createPrinciple),
+  };
+}
+
+/**
+ * Create a Dimension from a slim scores payload (getRunScores/getCompareSummary
+ * and their shared-repo mirrors), preserving the presence/absence of
+ * violations/compliance/principles instead of coercing an absent key to `[]`.
+ *
+ * mergeRescoreIntoEval (explorerDataHooks.js) treats `violations != null` as a
+ * tri-state: when the slim payload OMITS violations, prior violations are kept
+ * as-is; when present (even `[]`), they're used to filter. createDimension's
+ * unconditional `[]` coercion would collapse that distinction and silently
+ * wipe every violation whenever a slim payload omits the key -- so this
+ * factory only maps a field when it's actually an array.
+ *
+ * @param {Object} raw
+ * @returns {Dimension}
+ */
+export function createSlimDimension(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
   return {
     ...raw,
-    violations:  createViolations(raw.violations),
-    compliance:  createViolations(raw.compliance),
-    principles:  (raw.principles || []).map(createPrinciple),
+    violations: Array.isArray(raw.violations) ? createViolations(raw.violations) : raw.violations,
+    compliance: Array.isArray(raw.compliance) ? createViolations(raw.compliance) : raw.compliance,
+    principles: Array.isArray(raw.principles) ? raw.principles.map(createPrinciple) : raw.principles,
   };
 }
 
@@ -76,9 +108,7 @@ export function createDimensionEval(raw) {
   if (!raw || typeof raw !== 'object') return raw;
   return {
     ...raw,
-    violations:      createViolations(raw.violations),
-    compliance:      createViolations(raw.compliance),
-    principles:      (raw.principles || []).map(createPrinciple),
+    ...canonicalFindings(raw),
     principleGrades: (raw.principleGrades || []).map(createPrincipleGrade),
   };
 }

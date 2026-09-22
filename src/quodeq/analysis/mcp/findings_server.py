@@ -3,8 +3,11 @@
 Protocol: JSON-RPC 2.0 over stdio, newline-delimited JSON (no Content-Length).
 No external dependencies.
 
-This module is the entry point.  Core logic lives in:
-- ``router``  -- FindingsRouter and data types
+This module is the entry point. Core logic lives in:
+- ``args`` -- the command line the pipeline spawns the server with
+- ``dispatch`` -- JSON-RPC message loop and method table
+- ``router`` -- FindingsRouter and data types
+- ``enricher`` -- standards lookup, code snippets, precedent and severity gates
 - ``ref_scoring`` -- reference selection helpers
 """
 from __future__ import annotations
@@ -18,10 +21,15 @@ from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import read_message, dispatch as _dispatch
 from quodeq.data.fs.standards_loader import load_compiled_refs as _load_compiled_refs
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
+from quodeq.services.precedent_dismiss import precedent_match_hook
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_requirements as _load_compiled_requirements
 from quodeq.data.fs.standards_prefs import load_project_overrides
+from quodeq.data.sqlite.findings_queries import (
+    dismissed_source_stamp,
+    read_dismissed_snippets_strict,
+)
 
 # Re-export public API so existing imports keep working.
 from quodeq.analysis.mcp.enricher import CompiledContext, FileReader  # noqa: F401
@@ -63,7 +71,8 @@ def main() -> None:
     if not sa.findings_file:
         sys.stderr.write(
             "Error: findings output path is required.\n"
-            "Usage: mcp_findings.py <findings_file> [--compiled-dir DIR --dimension DIM]"
+            "Usage: python -m quodeq.analysis.mcp.findings_server <findings_file>"
+            " [--compiled-dir DIR --dimension DIM]"
             " [--queue PATH --agent-id ID]\n"
             "Provide the path where findings JSONL should be written.\n"
         )
@@ -92,6 +101,57 @@ def main() -> None:
     except OSError as exc:
         sys.stderr.write(f"Cannot open findings file {sa.findings_file}: {exc}\n")
         sys.exit(1)
+    except RuntimeError as exc:
+        sys.stderr.write(f"Error: {exc}\n")
+        sys.exit(1)
+
+
+def _resolve_dimension_cache_writer(server_args: ServerArgs):
+    """Build the per-file synchronous cache writer, or None when undimensioned.
+
+    When ``server_args.dimension`` is set, the cache writer becomes mandatory:
+    a findings_server scoped to a dimension MUST have ``--cache-root`` and
+    ``--model-id`` so each ok marker writes the cache entry synchronously.
+    Degrading silently to watcher-only is the dangerous failure: the run
+    looks healthy while every dimension it scoped comes back cold on the
+    next scan. argparse cannot express the dependency, so the check lives
+    here.
+    """
+    if not server_args.dimension:
+        return None
+    if not server_args.cache_root or not server_args.model_id:
+        raise RuntimeError(
+            "findings_server requires --cache-root and --model-id when "
+            "--dimension is set; got cache_root=%r, model_id=%r"
+            % (server_args.cache_root, server_args.model_id),
+        )
+    from quodeq.analysis.cache.cache_writer import (  # noqa: PLC0415
+        CacheWriterSpec,
+        build_cache_writer,
+    )
+    from quodeq.config.paths import default_paths  # noqa: PLC0415
+    src_root = Path(server_args.work_dir) if server_args.work_dir else Path.cwd()
+    # NOTE: standards_dir must be the standards ROOT (parent of
+    # "compiled/"), not server_args.compiled_dir. build_cache_writer /
+    # dimension_params_state append "compiled/<dim>.json" themselves;
+    # passing compiled_dir here double-appends "compiled" and the
+    # params-fingerprint lookup silently misses, keying every entry
+    # under the default-thresholds key. --standards-dir is None when
+    # not supplied by the caller (back-compat: no params fingerprint).
+    standards_dir = Path(server_args.standards_dir) if server_args.standards_dir else None
+    spec = CacheWriterSpec(
+        cache_root=Path(server_args.cache_root),
+        src_root=src_root,
+        standards_dir=standards_dir,
+        dimension=server_args.dimension,
+        model_id=server_args.model_id,
+        language=server_args.language or "",
+        # This subprocess is its own composition root: no RunConfig
+        # crosses the process boundary, so resolve the same default the
+        # parent's RunConfig.prompts_dir carries.
+        prompts_dir=default_paths().prompts_dir,
+    )
+    return build_cache_writer(spec)
 
 
 def _build_router(
@@ -104,47 +164,21 @@ def _build_router(
     The findings_path is `<run_dir>/evidence/<dim>_evidence.jsonl`, so the run
     directory is its grandparent and the project directory its great-grandparent.
     The event log lives at `<run_dir>/events.jsonl`.
-
-    When ``server_args.dimension`` is set, the cache writer becomes mandatory:
-    a findings_server scoped to a dimension MUST have ``--cache-root`` and
-    ``--model-id`` so each ok marker writes the cache entry synchronously.
-    Silent degradation to watcher-only is the failure mode the Phase 1 audit
-    warned against -- argparse-level enforcement comes in Task 7; this check
-    is defense-in-depth.
     """
     run_dir = Path(findings_path).parent.parent
     project_dir = run_dir.parent
-    ctx.precedent_fingerprints = load_precedent_fingerprints(project_dir)
+    # The strict reader raises on a failed open, so the per-run memo skips the
+    # run instead of remembering it as having no dismissals.
+    ctx.precedent_fingerprints = load_precedent_fingerprints(
+        project_dir, read_dismissed=read_dismissed_snippets_strict,
+        source_stamp=dismissed_source_stamp,
+    )
     ctx.precedent_corpus = load_precedent_corpus(project_dir, run_dir)
+    ctx.on_precedent_match = precedent_match_hook(project_dir)
     from quodeq.data.events.writer import EventLogWriter  # noqa: PLC0415
     event_log = EventLogWriter(run_dir / "events.jsonl")
 
-    cache_writer = None
-    if server_args.dimension:
-        if not server_args.cache_root or not server_args.model_id:
-            raise RuntimeError(
-                "findings_server requires --cache-root and --model-id when "
-                "--dimension is set; got cache_root=%r, model_id=%r"
-                % (server_args.cache_root, server_args.model_id),
-            )
-        from quodeq.analysis.cache.cache_writer import build_cache_writer  # noqa: PLC0415
-        src_root = Path(server_args.work_dir) if server_args.work_dir else Path.cwd()
-        # NOTE: standards_dir must be the standards ROOT (parent of
-        # "compiled/"), not server_args.compiled_dir. build_cache_writer /
-        # dimension_params_state append "compiled/<dim>.json" themselves;
-        # passing compiled_dir here double-appends "compiled" and the
-        # params-fingerprint lookup silently misses, keying every entry
-        # under the default-thresholds key. --standards-dir is None when
-        # not supplied by the caller (back-compat: no params fingerprint).
-        standards_dir = Path(server_args.standards_dir) if server_args.standards_dir else None
-        cache_writer = build_cache_writer(
-            cache_root=Path(server_args.cache_root),
-            src_root=src_root,
-            standards_dir=standards_dir,
-            dimension=server_args.dimension,
-            model_id=server_args.model_id,
-            language=server_args.language or "",
-        )
+    cache_writer = _resolve_dimension_cache_writer(server_args)
 
     return FindingsRouter(
         findings_fh, context=ctx, event_log=event_log,

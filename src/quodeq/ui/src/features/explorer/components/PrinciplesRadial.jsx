@@ -14,13 +14,31 @@
  */
 import { scoreGradeColorVar } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
-const RING_LEVELS = [0.2, 0.4, 0.6, 0.8, 1.0]; // fraction of max
+// Ring levels, as a fraction of the outer radius (fifths).
+const RING_LEVEL_1 = 0.2;
+const RING_LEVEL_2 = 0.4;
+const RING_LEVEL_3 = 0.6;
+const RING_LEVEL_4 = 0.8;
+const RING_LEVEL_5 = 1.0;
+const RING_LEVELS = [RING_LEVEL_1, RING_LEVEL_2, RING_LEVEL_3, RING_LEVEL_4, RING_LEVEL_5]; // fraction of max
+// Where the insufficient-evidence marker sits, as a fraction of the outer
+// radius. Not a ring level: it happens to coincide with the innermost ring
+// today, but it marks "no score to plot", not a score of 2/10.
+const INSUFFICIENT_DOT_RADIUS_FRACTION = 0.2;
 const LABEL_OFFSET = 18;     // svg units beyond the outer ring (name baseline)
 const VERT_RADIUS = 3.2;
 const INSUF_RADIUS = 3.0;
 // Horizontal padding around the plot so long principle names don't clip.
 const VIEWBOX_PAD_X = 140;
 const VIEWBOX_PAD_Y = 24;
+// Text-anchor flips once a label's angle leans far enough left/right that
+// centering it on the axis would read off-balance.
+const LABEL_ANCHOR_COS_THRESHOLD = 0.2;
+// Coarse character budget per wrapped label line.
+const LABEL_MAX_CHARS_PER_LINE = 14;
+// A polygon needs at least 3 plotted vertices to read as a filled shape
+// (see the module doc comment's edge cases).
+const MIN_FILLED_POLYGON_POINTS = 3;
 
 function axisAngles(n) {
   // First axis at 12 o'clock, then clockwise.
@@ -49,80 +67,51 @@ function wrapLines(words, maxChars) {
   return lines.length ? lines : [''];
 }
 
-export default function PrinciplesRadial({
-  principles = [],
-  scaleMax = 10,
-  size = 400,
-  outerRadius = 200,
-  onPrincipleClick,
-}) {
-  const n = principles.length;
-  const angles = axisAngles(n);
-
-  const plotted = principles
-    .map((p, i) => ({ ...p, idx: i, angle: angles[i] }))
-    .filter((p) => p.hasEvidence && p.score != null && !Number.isNaN(parseFloat(p.score)));
-
-  const points = plotted.map((p) => {
-    const r = (Math.max(0, Math.min(p.score, scaleMax)) / scaleMax) * outerRadius;
-    return polar(p.angle, r);
-  });
-
-  const polylineFill = plotted.length >= 3
-    ? 'color-mix(in srgb, var(--color-accent) 18%, transparent)'
-    : 'none';
-  const isClosed = plotted.length >= 3 && plotted.length === principles.length;
-  const showPolyline = plotted.length >= 2;
-
-  const half = size / 2;
-  const viewBox = `${-half - VIEWBOX_PAD_X} ${-half - VIEWBOX_PAD_Y} ${size + VIEWBOX_PAD_X * 2} ${size + VIEWBOX_PAD_Y * 2}`;
-
-  const handleClick = (name) => () => onPrincipleClick && onPrincipleClick(name);
-  const handleKey = (name) => (e) => {
-    if ((e.key === 'Enter' || e.key === ' ') && onPrincipleClick) {
-      e.preventDefault();
-      onPrincipleClick(name);
-    }
-  };
-
+function RadialRings({ angles, outerRadius }) {
   return (
-    <svg
-      className="qd-radial__svg"
-      viewBox={viewBox}
-      preserveAspectRatio="xMidYMid meet"
-      width="100%"
-      role="img"
-      aria-label={t('explorer.principlesRadial')}
-    >
-      {/* Rings */}
-      <g>
-        {RING_LEVELS.map((lvl, idx) => (
-          <polygon
-            key={idx}
-            className="qd-radial__ring"
-            points={ringPoints(angles, lvl * outerRadius)}
-            fill="none"
-          />
-        ))}
-      </g>
-      {/* Axes */}
-      <g>
-        {angles.map((a, idx) => {
-          const [x, y] = polar(a, outerRadius);
-          return <line key={idx} className="qd-radial__axis" x1="0" y1="0" x2={x} y2={y} />;
-        })}
-      </g>
-      {/* Polyline (3+ filled, 2 open, 1 or 0 absent) */}
-      {showPolyline && (
-        <polyline
-          className="qd-radial__poly"
-          fill={polylineFill}
-          points={(isClosed ? [...points, points[0]] : points)
-            .map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`)
-            .join(' ')}
+    <g>
+      {RING_LEVELS.map((lvl, idx) => (
+        <polygon
+          key={idx}
+          className="qd-radial__ring"
+          points={ringPoints(angles, lvl * outerRadius)}
+          fill="none"
         />
-      )}
-      {/* Plotted vertices */}
+      ))}
+    </g>
+  );
+}
+
+function RadialAxes({ angles, outerRadius }) {
+  return (
+    <g>
+      {angles.map((a, idx) => {
+        const [x, y] = polar(a, outerRadius);
+        return <line key={idx} className="qd-radial__axis" x1="0" y1="0" x2={x} y2={y} />;
+      })}
+    </g>
+  );
+}
+
+/* Polyline (3+ filled, 2 open, 1 or 0 absent) */
+function RadialPolyline({ showPolyline, points, isClosed, polylineFill }) {
+  if (!showPolyline) return null;
+  return (
+    <polyline
+      className="qd-radial__poly"
+      fill={polylineFill}
+      points={(isClosed ? [...points, points[0]] : points)
+        .map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`)
+        .join(' ')}
+    />
+  );
+}
+
+/* Plotted vertices, plus a small dashed marker near centre for each
+ * insufficient-evidence axis. */
+function RadialVertices({ points, plotted, principles, angles, outerRadius, onPrincipleClick, handleClick, handleKey }) {
+  return (
+    <>
       {points.map(([x, y], idx) => {
         const name = plotted[idx].name;
         return (
@@ -141,10 +130,9 @@ export default function PrinciplesRadial({
           />
         );
       })}
-      {/* Insufficient axis markers (small dashed dot near centre) */}
       {principles.map((p, i) => {
         if (p.hasEvidence) return null;
-        const [x, y] = polar(angles[i], outerRadius * 0.2);
+        const [x, y] = polar(angles[i], outerRadius * INSUFFICIENT_DOT_RADIUS_FRACTION);
         return (
           <circle
             key={`insuf-${i}`}
@@ -156,46 +144,139 @@ export default function PrinciplesRadial({
           />
         );
       })}
-      {/* Labels — name and score share an anchor point on a label ring just
-          outside the plot. Score is always rendered on the line below the name
-          via a tspan(dy), so the two never collide regardless of axis angle. */}
-      {principles.map((p, i) => {
-        const [x, y] = polar(angles[i], outerRadius + LABEL_OFFSET);
-        const isInsuf = !p.hasEvidence;
-        const cosA = Math.cos(angles[i]);
-        const anchor = cosA > 0.2 ? 'start' : cosA < -0.2 ? 'end' : 'middle';
-        const words = p.name.toUpperCase().split(/\s+/);
-        const lines = wrapLines(words, 14);
-        return (
-          <g
-            key={`lab-${i}`}
-            role={onPrincipleClick && !isInsuf ? 'button' : undefined}
-            tabIndex={onPrincipleClick && !isInsuf ? 0 : undefined}
-            onClick={onPrincipleClick && !isInsuf ? handleClick(p.name) : undefined}
-            onKeyDown={onPrincipleClick && !isInsuf ? handleKey(p.name) : undefined}
-            className={`qd-radial__label-group${isInsuf ? ' qd-radial__label-group--insuf' : ''}`}
-          >
-            <text
-              className={`qd-radial__lab${isInsuf ? ' qd-radial__lab--insuf' : ''}`}
-              x={x}
-              y={y}
-              textAnchor={anchor}
-            >
-              {lines.map((line, li) => (
-                <tspan key={li} x={x} dy={li === 0 ? 0 : '1.15em'}>{line}</tspan>
-              ))}
-              <tspan
-                className={`qd-radial__lab-sub${isInsuf ? ' qd-radial__lab-sub--insuf' : ''}`}
-                x={x}
-                dy="1.25em"
-                style={isInsuf ? undefined : { fill: scoreGradeColorVar(p.score) }}
-              >
-                {isInsuf ? 'insufficient' : p.score?.toFixed(1)}
-              </tspan>
-            </text>
-          </g>
-        );
-      })}
+    </>
+  );
+}
+
+/* Labels — name and score share an anchor point on a label ring just
+   outside the plot. Score is always rendered on the line below the name
+   via a tspan(dy), so the two never collide regardless of axis angle. */
+/** Click/keyboard wiring for one label; absent entirely when not actionable. */
+function labelInteraction(name, actionable, handleClick, handleKey) {
+  if (!actionable) return {};
+  return { role: 'button', tabIndex: 0, onClick: handleClick(name), onKeyDown: handleKey(name) };
+}
+
+/** One axis label: the principle name wrapped over lines, score below it. */
+function RadialLabel({ p, angle, outerRadius, actionable, handleClick, handleKey }) {
+  const [x, y] = polar(angle, outerRadius + LABEL_OFFSET);
+  const isInsuf = !p.hasEvidence;
+  const cosA = Math.cos(angle);
+  const anchor = cosA > LABEL_ANCHOR_COS_THRESHOLD ? 'start' : cosA < -LABEL_ANCHOR_COS_THRESHOLD ? 'end' : 'middle';
+  const lines = wrapLines(p.name.toUpperCase().split(/\s+/), LABEL_MAX_CHARS_PER_LINE);
+  return (
+    <g
+      {...labelInteraction(p.name, actionable && !isInsuf, handleClick, handleKey)}
+      className={`qd-radial__label-group${isInsuf ? ' qd-radial__label-group--insuf' : ''}`}
+    >
+      <text
+        className={`qd-radial__lab${isInsuf ? ' qd-radial__lab--insuf' : ''}`}
+        x={x}
+        y={y}
+        textAnchor={anchor}
+      >
+        {lines.map((line, li) => (
+          <tspan key={li} x={x} dy={li === 0 ? 0 : '1.15em'}>{line}</tspan>
+        ))}
+        <tspan
+          className={`qd-radial__lab-sub${isInsuf ? ' qd-radial__lab-sub--insuf' : ''}`}
+          x={x}
+          dy="1.25em"
+          style={isInsuf ? undefined : { fill: scoreGradeColorVar(p.score) }}
+        >
+          {isInsuf ? 'insufficient' : p.score?.toFixed(1)}
+        </tspan>
+      </text>
+    </g>
+  );
+}
+
+function RadialLabels({ principles, angles, outerRadius, onPrincipleClick, handleClick, handleKey }) {
+  return (
+    <>
+      {principles.map((p, i) => (
+        <RadialLabel
+          key={`lab-${i}`}
+          p={p}
+          angle={angles[i]}
+          outerRadius={outerRadius}
+          actionable={!!onPrincipleClick}
+          handleClick={handleClick}
+          handleKey={handleKey}
+        />
+      ))}
+    </>
+  );
+}
+
+/** Everything derived from the principles list + dimensions: the plotted
+ * (evidenced) subset, their world points, polyline fill/closed/visibility,
+ * and the SVG viewBox. */
+function computeRadialLayout(principles, angles, scaleMax, outerRadius, size) {
+  const plotted = principles
+    .map((p, i) => ({ ...p, idx: i, angle: angles[i] }))
+    .filter((p) => p.hasEvidence && p.score != null && !Number.isNaN(parseFloat(p.score)));
+
+  const points = plotted.map((p) => {
+    const r = (Math.max(0, Math.min(p.score, scaleMax)) / scaleMax) * outerRadius;
+    return polar(p.angle, r);
+  });
+
+  const polylineFill = plotted.length >= MIN_FILLED_POLYGON_POINTS
+    ? 'color-mix(in srgb, var(--color-accent) 18%, transparent)'
+    : 'none';
+  const isClosed = plotted.length >= MIN_FILLED_POLYGON_POINTS && plotted.length === principles.length;
+  const showPolyline = plotted.length >= 2;
+
+  const half = size / 2;
+  const viewBox = `${-half - VIEWBOX_PAD_X} ${-half - VIEWBOX_PAD_Y} ${size + VIEWBOX_PAD_X * 2} ${size + VIEWBOX_PAD_Y * 2}`;
+
+  return { plotted, points, polylineFill, isClosed, showPolyline, viewBox };
+}
+
+function makeRadialHandlers(onPrincipleClick) {
+  const handleClick = (name) => () => onPrincipleClick && onPrincipleClick(name);
+  const handleKey = (name) => (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && onPrincipleClick) {
+      e.preventDefault();
+      onPrincipleClick(name);
+    }
+  };
+  return { handleClick, handleKey };
+}
+
+export default function PrinciplesRadial({
+  principles = [],
+  scaleMax = 10,
+  size = 400,
+  outerRadius = 200,
+  onPrincipleClick,
+}) {
+  const angles = axisAngles(principles.length);
+  const { plotted, points, polylineFill, isClosed, showPolyline, viewBox } =
+    computeRadialLayout(principles, angles, scaleMax, outerRadius, size);
+  const { handleClick, handleKey } = makeRadialHandlers(onPrincipleClick);
+
+  return (
+    <svg
+      className="qd-radial__svg"
+      viewBox={viewBox}
+      preserveAspectRatio="xMidYMid meet"
+      width="100%"
+      role="img"
+      aria-label={t('explorer.principlesRadial')}
+    >
+      <RadialRings angles={angles} outerRadius={outerRadius} />
+      <RadialAxes angles={angles} outerRadius={outerRadius} />
+      <RadialPolyline showPolyline={showPolyline} points={points} isClosed={isClosed} polylineFill={polylineFill} />
+      <RadialVertices
+        points={points} plotted={plotted} principles={principles} angles={angles} outerRadius={outerRadius}
+        onPrincipleClick={onPrincipleClick} handleClick={handleClick} handleKey={handleKey}
+      />
+      <RadialLabels
+        principles={principles} angles={angles} outerRadius={outerRadius}
+        onPrincipleClick={onPrincipleClick} handleClick={handleClick} handleKey={handleKey}
+      />
     </svg>
   );
 }

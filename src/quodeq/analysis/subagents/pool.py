@@ -15,12 +15,12 @@ from quodeq.analysis.subagents._pool_models import (
     _AGENT_ID_PREFIX,
     _HEARTBEAT_JOIN_TIMEOUT_S,
 )
-from quodeq.analysis.subagents._pool_scaling import compute_scale_up
 from quodeq.analysis.subagents._pool_worker import WorkerContext, build_agent_config, run_single_agent
 from quodeq.analysis.subagents.file_queue import WorkQueue
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig
-from quodeq.core.evidence._req_mapping import build_principle_resolver
+from quodeq.core.evidence.req_mapping import build_principle_resolver
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 
@@ -67,9 +67,6 @@ class SubagentPool:
 
     def _build_agent_config(self, idx: int) -> tuple[AnalysisConfig, Path, Path]:
         return build_agent_config(idx, self._base_config, self._worker_ctx)
-
-    def _compute_scale_up(self, remaining: int) -> int:
-        return compute_scale_up(remaining, self._n, self._base_config.max_files_per_agent)
 
     def _run_single(self, idx: int) -> SubagentResult:
         return run_single_agent(
@@ -119,6 +116,7 @@ class SubagentPool:
                 self._dimension_key,
                 getattr(run_config, "evaluators_dir", None),
                 self._base_config.compiled_dir,
+                req_map_reader=read_req_to_principle_map,
             ),
         )
         hb = threading.Thread(
@@ -127,55 +125,75 @@ class SubagentPool:
         hb.start()
         return stop, hb
 
-    def run(self) -> list[SubagentResult]:
-        """Launch agents in parallel, returning a SubagentResult per agent."""
-        self.exit_reason = "done"
-        max_dur = self._base_config.time_limit if self._base_config.time_limit is not None else DEFAULT_TIME_LIMIT
-        pool_start = time.monotonic()
+    def _log_launch(self) -> None:
         if self._scout_first:
             log_info(f"[{self._phase}] Launching scout agent for {self._dimension_key} (max {self._n} agents)")
         else:
             log_info(f"[{self._phase}] Launching {self._n} agents for {self._dimension_key}")
-        results: list[SubagentResult] = []
+
+    def _reset_run_state(self) -> None:
         self._finished.clear()
         self._futures.clear()
         self._next_idx = 0
+
+    def _run_loops(self, results: list[SubagentResult], max_dur: int, pool_start: float) -> None:
+        """Drive the scout or immediate dispatch loop on a fresh executor."""
+        with ThreadPoolExecutor(max_workers=self._n) as pool:
+            ctx = LoopContext(
+                futures=self._futures, finished=self._finished, results=results,
+                max_duration=max_dur, pool_start=pool_start,
+                n_agents=self._n,
+                queue=self._queue, queue_path=self._queue_path,
+                shared_jsonl_path=self._shared_jsonl_path(),
+                evidence_dir=self._evidence_dir, dimension_key=self._dimension_key,
+                submit_fn=lambda: self._submit_agent(pool),
+                deadline_at=self._base_config.deadline_at,
+            )
+            if self._scout_first:
+                scout_loop(ctx)
+            else:
+                immediate_loop(ctx)
+
+    def _run_with_heartbeat(self, results: list[SubagentResult], max_dur: int, pool_start: float) -> None:
+        """Run the loops with the heartbeat thread alive; mark errors on the way out."""
         stop, hb = self._start_heartbeat()
         try:
-            with ThreadPoolExecutor(max_workers=self._n) as pool:
-                ctx = LoopContext(
-                    futures=self._futures, finished=self._finished, results=results,
-                    max_duration=max_dur, pool_start=pool_start,
-                    n_agents=self._n,
-                    queue=self._queue, queue_path=self._queue_path,
-                    shared_jsonl_path=self._shared_jsonl_path(),
-                    evidence_dir=self._evidence_dir, dimension_key=self._dimension_key,
-                    submit_fn=lambda: self._submit_agent(pool),
-                    max_files_per_agent=self._base_config.max_files_per_agent,
-                    deadline_at=self._base_config.deadline_at,
-                )
-                if self._scout_first:
-                    scout_loop(ctx)
-                else:
-                    immediate_loop(ctx)
+            self._run_loops(results, max_dur, pool_start)
         except BaseException:
             self.exit_reason = "error"
             raise
         finally:
             stop.set()
             hb.join(timeout=_HEARTBEAT_JOIN_TIMEOUT_S)
-        # If we got here without an exception, decide between "done" and "time_limit".
+
+    def _record_exit_reason(self, max_dur: int, pool_start: float) -> None:
+        """Without an exception, decide between "done" and "time_limit"."""
         elapsed = time.monotonic() - pool_start
         if max_dur > 0 and elapsed >= max_dur:
             self.exit_reason = "time_limit"
+
+    def run(self) -> list[SubagentResult]:
+        """Launch agents in parallel, returning a SubagentResult per agent."""
+        self.exit_reason = "done"
+        max_dur = self._base_config.time_limit if self._base_config.time_limit is not None else DEFAULT_TIME_LIMIT
+        pool_start = time.monotonic()
+        self._log_launch()
+        results: list[SubagentResult] = []
+        self._reset_run_state()
+        self._run_with_heartbeat(results, max_dur, pool_start)
+        self._record_exit_reason(max_dur, pool_start)
         succeeded = sum(1 for r in results if r.success)
         log_info(f"Subagent pool done: {succeeded}/{self._next_idx} agents ran, {succeeded} succeeded")
         return results
 
     @staticmethod
     def deduplicate_jsonl(jsonl_path: Path) -> int:
+        """Rewrite *jsonl_path* without duplicate findings. Returns the number
+        of lines dropped."""
         return deduplicate_jsonl(jsonl_path)
 
     @staticmethod
     def merge_jsonl(results: list[SubagentResult], output: Path) -> Path:
+        """Concatenate every agent's JSONL into *output*, deduplicating as it
+        goes. Returns *output*."""
         return merge_jsonl((r.jsonl_file for r in results), output)

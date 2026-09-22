@@ -1,24 +1,16 @@
+"""Tests for the run.log tee in JobManager._consume_stream: markers, wiring, batch boundaries, cleanup."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from quodeq.services.jobs import JobManager, STATUS_RUNNING
-from quodeq.services._job_model import Job, _CONSUME_BATCH_SIZE
-
-
-def _make_job(job_id: str) -> Job:
-    return Job(
-        job_id=job_id,
-        status=STATUS_RUNNING,
-        command=["x"],
-        started_at="2026-04-20T00:00:00+00:00",
-        ended_at=None,
-        exit_code=None,
-    )
+from quodeq.services.jobs import JobManager
+from quodeq.services._job_log_tee import TeeContext, drain_pre_marker_buffer
+from tests.services._jobs_run_log_fixtures import _make_job
 
 
 def test_consume_stream_tees_to_run_log(tmp_path: Path) -> None:
@@ -163,8 +155,8 @@ def test_set_reports_root_updates_job_manager(tmp_path: Path) -> None:
 def test_batch_boundary_all_lines_in_run_log_in_order(tmp_path: Path) -> None:
     """All 100 lines appear in run.log in order even when marker is mid-stream.
 
-    This exercises the batch boundary: with _CONSUME_BATCH_SIZE lines flushed
-    per batch, the marker may land in the middle of a batch.  The final
+    This exercises the batch boundary: lines are flushed in per-read batches,
+    so the marker may land in the middle of a batch.  The final
     _drain_pre_marker_buffer call must ensure no buffered lines are lost.
     """
     project = "proj-batch"
@@ -226,3 +218,39 @@ def test_consume_stream_cleans_up_on_unexpected_exception(tmp_path: Path) -> Non
     # Writer and buffer must be cleaned up regardless.
     assert "job-exc" not in jm._run_log_writers
     assert "job-exc" not in jm._pre_marker_buffer
+
+
+# ---------------------------------------------------------------------------
+# Cluster 10: drain_pre_marker_buffer's writer.write() calls must not raise
+# ---------------------------------------------------------------------------
+
+def test_drain_pre_marker_buffer_survives_broken_pipe(tmp_path: Path) -> None:
+    """A BrokenPipeError out of writer.write() during the final drain must be
+    logged and swallowed, not raised -- mirrors the (IOError, BrokenPipeError)
+    handling in _read_and_tee_loop two functions up in this module."""
+    job_id = "job-drain"
+    run_dir = tmp_path / "proj-drain" / "run-drain"
+    run_dir.mkdir(parents=True)
+
+    store = MagicMock()
+    store.get.return_value = SimpleNamespace(output_project="proj-drain", output_run_id="run-drain")
+    log = MagicMock()
+    ctx = TeeContext(
+        store=store,
+        reports_root=tmp_path,
+        run_log_writers={},
+        pre_marker_buffer={job_id: ["buffered-1", "buffered-2"]},
+        log=log,
+        flush_batch=MagicMock(),
+    )
+
+    with patch("quodeq.services._job_log_tee.RunLogWriter") as MockWriter:
+        writer = MockWriter.return_value
+        writer.write.side_effect = BrokenPipeError("pipe closed")
+
+        drain_pre_marker_buffer(job_id, ctx)  # must not raise
+
+    log.warning.assert_called_once()
+    assert job_id in log.warning.call_args[0][0]
+    # Buffer is still cleared even though the write failed.
+    assert ctx.pre_marker_buffer[job_id] == []

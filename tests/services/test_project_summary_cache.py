@@ -25,6 +25,7 @@ def test_read_accumulated_summary_is_cached(monkeypatch, tmp_path):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "score_cache.db"))
 
     calls = {"n": 0}
+
     def _read(root, proj, run_id):
         calls["n"] += 1
         return [DimensionResult(dimension="security", overall_score="7.0/10",

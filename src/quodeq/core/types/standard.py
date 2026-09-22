@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True, slots=True)
 class StandardReference:
+    """An external citation backing a requirement. ``url`` is absent for book refs."""
+
     type: str          # "cwe" | "book" | "url" | "custom"
     label: str
     url: str | None = None

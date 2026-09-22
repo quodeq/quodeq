@@ -12,7 +12,7 @@ one character apart.
 """
 from __future__ import annotations
 
-from quodeq.core.evidence._req_mapping import PrincipleResolver, normalize_req_id
+from quodeq.core.evidence.req_mapping import PrincipleResolver, normalize_req_id
 
 CANONICAL = ("CLEA-DEP-01", "CLEA-DEP-05", "CLEA-TES-02", "CLEA-SEP-03", "CLEA-ENT-02")
 
@@ -77,3 +77,19 @@ class TestResolverUsesTheFold:
     def test_no_standard_stays_permissive(self):
         permissive = PrincipleResolver(req_to_principle={}, canonical=frozenset())
         assert permissive.resolve("ANYTHING-1") == "ANYTHING-1"
+
+    def test_canonical_id_tuple_is_built_once(self, monkeypatch):
+        """resolve() runs once per judgment; the fold's id tuple must not be rebuilt per call."""
+        import quodeq.core.evidence.req_mapping as mod
+        seen: list[object] = []
+
+        def spy(raw, canonical_ids):
+            seen.append(canonical_ids)
+            return normalize_req_id(raw, canonical_ids)
+
+        monkeypatch.setattr(mod, "normalize_req_id", spy)
+        resolver = self._resolver()
+        assert resolver.resolve("CLEa-DEP-05") == "Dependency Rule"
+        assert resolver.resolve("SEP-03") == "Separation of Concerns"
+        assert len(seen) == 2
+        assert seen[0] is seen[1]

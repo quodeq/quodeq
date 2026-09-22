@@ -77,3 +77,46 @@ class TestCleanupClonedRepo:
 
         assert project.exists()
         assert (tmp_path / "home").exists()
+
+
+class TestCloneRepo:
+    """The bare git-clone invocation (services keep retry + error mapping)."""
+
+    def test_invokes_git_with_pinned_env_and_timeout(self, tmp_path):
+        from quodeq.data.fs.repo_clone import clone_repo
+
+        with patch("quodeq.data.fs.repo_clone.subprocess.run") as run:
+            clone_repo(
+                "https://github.com/user/repo",
+                tmp_path / "dest",
+                ["--single-branch"],
+                timeout_s=42,
+            )
+
+        run.assert_called_once()
+        args, kwargs = run.call_args
+        assert args[0] == [
+            "git", "clone", "--progress", "--single-branch", "--",
+            "https://github.com/user/repo", str(tmp_path / "dest"),
+        ]
+        assert kwargs["timeout"] == 42
+        assert kwargs["check"] is True
+        # LFS smudge skipped + locale pinned to C so stderr keeps the
+        # English markers the services classify on.
+        assert kwargs["env"]["GIT_LFS_SKIP_SMUDGE"] == "1"
+        assert kwargs["env"]["LC_ALL"] == "C"
+        assert kwargs["env"]["LANG"] == "C"
+
+    def test_failures_propagate_unchanged(self, tmp_path):
+        import subprocess
+
+        from quodeq.data.fs.repo_clone import clone_repo
+
+        err = subprocess.CalledProcessError(128, "git", stderr=b"boom")
+        with patch("quodeq.data.fs.repo_clone.subprocess.run", side_effect=err):
+            try:
+                clone_repo("https://x/y", tmp_path / "d", [], timeout_s=1)
+            except subprocess.CalledProcessError as exc:
+                assert exc is err
+            else:
+                raise AssertionError("CalledProcessError was swallowed")

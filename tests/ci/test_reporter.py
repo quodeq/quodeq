@@ -1,6 +1,5 @@
 import json
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 def test_load_evaluation_reports(tmp_path):
@@ -89,7 +88,7 @@ def test_build_review_payload():
 
 
 def test_build_review_payload_passes_through_artifact_url():
-    from quodeq.ci.reporter import build_review_payload
+    from quodeq.ci.reporter import ReviewOptions, build_review_payload
 
     reports = [{
         "dimension": "security",
@@ -99,12 +98,12 @@ def test_build_review_payload_passes_through_artifact_url():
         "totals": {"violationCount": 0, "severity": {}},
     }]
     url = "https://x"
-    payload = build_review_payload(reports, artifact_url=url)
+    payload = build_review_payload(reports, options=ReviewOptions(artifact_url=url))
     assert url in payload["body"]
 
 
 def test_build_review_payload_passes_through_baseline_available_false():
-    from quodeq.ci.reporter import build_review_payload
+    from quodeq.ci.reporter import ReviewOptions, build_review_payload
 
     reports = [{
         "dimension": "security",
@@ -113,7 +112,7 @@ def test_build_review_payload_passes_through_baseline_available_false():
         "violations": [],
         "totals": {"violationCount": 0, "severity": {}},
     }]
-    payload = build_review_payload(reports, baseline_available=False)
+    payload = build_review_payload(reports, options=ReviewOptions(baseline_available=False))
     assert "no baseline" in payload["body"].lower()
 
 

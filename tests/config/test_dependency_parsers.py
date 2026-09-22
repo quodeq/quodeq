@@ -1,13 +1,18 @@
-"""Unit tests for structured manifest parsers.
+"""Unit tests for structured manifest parsers: Python, JS, Rust, Go, PHP, and memoization.
 
 The corpus in ``test_discipline_corpus.py`` exercises happy paths through the
 full ``DisciplineRegistry``. These tests cover edge cases — malformed input,
 manifest dialects, name normalization — directly against the parser functions.
+JVM manifests live in test_dependency_parsers_jvm.py; Gemfile, mix.exs,
+pubspec.yaml and Project.toml in test_dependency_parsers_scripting.py.
 """
 from __future__ import annotations
 
 import pytest
 
+from quodeq.config import _dependency_parsers as _dp
+from quodeq.config import _dependency_parsers_compiled as _dpc
+from quodeq.config import _dependency_parsers_python as _dpp
 from quodeq.config._dependency_parsers import (
     has_cargo_dependency,
     has_composer_dependency,
@@ -170,170 +175,35 @@ def test_composer(body: str, needle: str, expected: bool) -> None:
     assert has_composer_dependency(body, needle) is expected
 
 
-# --- pom.xml -----------------------------------------------------------------
+# --- memoization -------------------------------------------------------------
 
 
-from quodeq.config._dependency_parsers import (
-    has_gemfile_gem, has_gradle_dependency, has_julia_dependency,
-    has_mix_dep, has_pom_xml_dependency, has_pubspec_dependency,
-)
-
-
-@pytest.mark.parametrize("body, needle, expected", [
-    # spring-boot artifactId substring match.
+@pytest.mark.parametrize("module, parser, matcher, body", [
+    (_dp, "_gemfile_gems", "has_gemfile_gem", 'gem "rails"\ngem "rack"\n'),
+    (_dp, "_mix_deps", "has_mix_dep", 'def deps, do: [{:phoenix, "~> 1.7"}]\n'),
+    (_dp, "_pubspec_deps", "has_pubspec_dependency", "name: x\ndependencies:\n  http: ^1.0.0\n"),
+    (_dp, "_julia_deps", "has_julia_dependency", 'name = "X"\n[deps]\nDataFrames = "0"\n'),
+    # The sibling modules hold the heavily probed manifests (pyproject and
+    # requirements 6 probes, gradle 5, package.json and go.mod 4, pom 3).
+    (_dpp, "_pyproject_dep_names", "has_pyproject_dependency", '[project]\nname="x"\ndependencies=["flask"]\n'),
+    (_dpp, "_requirements_txt_names", "has_requirements_txt_dependency", "flask>=3\n"),
+    (_dpc, "_package_json_names", "has_package_json_dependency", '{"dependencies":{"vue":"^3"}}'),
+    (_dpc, "_cargo_dep_names", "has_cargo_dependency", '[dependencies]\nserde = "1"\n'),
+    (_dpc, "_go_mod_modules", "has_go_mod_module", "module x\nrequire github.com/gofiber/fiber v2.0.0\n"),
+    (_dpc, "_composer_dep_names", "has_composer_dependency", '{"require":{"symfony/console":"^7"}}'),
     (
-        "<project>"
-        "<dependencies><dependency>"
-        "<groupId>org.springframework.boot</groupId>"
-        "<artifactId>spring-boot-starter-web</artifactId>"
-        "</dependency></dependencies></project>",
-        "spring-boot", True,
+        _dpc, "_pom_coords", "has_pom_xml_dependency",
+        "<project><dependencies><dependency><groupId>io.quarkus</groupId>"
+        "<artifactId>quarkus-resteasy</artifactId></dependency></dependencies></project>",
     ),
-    # io.quarkus exact groupId.
-    (
-        "<project>"
-        "<dependencies><dependency>"
-        "<groupId>io.quarkus</groupId>"
-        "<artifactId>quarkus-resteasy</artifactId>"
-        "</dependency></dependencies></project>",
-        "io.quarkus", True,
-    ),
-    # Description text must NOT match (chunk-9 regression).
-    (
-        "<project>"
-        "<description>migrating off spring-boot to quarkus</description>"
-        "<dependencies><dependency>"
-        "<groupId>io.quarkus</groupId>"
-        "<artifactId>quarkus-resteasy</artifactId>"
-        "</dependency></dependencies></project>",
-        "spring-boot", False,
-    ),
-    # Maven default namespace is stripped.
-    (
-        '<project xmlns="http://maven.apache.org/POM/4.0.0">'
-        "<dependencies><dependency>"
-        "<groupId>org.springframework.boot</groupId>"
-        "<artifactId>spring-boot-starter</artifactId>"
-        "</dependency></dependencies></project>",
-        "spring-boot", True,
-    ),
-    # Empty content → no match.
-    ("not <xml", "anything", False),
+    (_dpc, "_gradle_searchable", "has_gradle_dependency", 'implementation("io.ktor:ktor-server-core:2.3.0")'),
 ])
-def test_pom_xml(body: str, needle: str, expected: bool) -> None:
-    assert has_pom_xml_dependency(body, needle) is expected
-
-
-# --- Gradle (Groovy / Kotlin DSL) -------------------------------------------
-
-
-@pytest.mark.parametrize("body, needle, expected", [
-    # Groovy DSL.
-    ('implementation "org.springframework.boot:spring-boot-starter-web:3.2.0"', "spring-boot", True),
-    # Kotlin DSL.
-    ('implementation("io.ktor:ktor-server-core:2.3.0")', "io.ktor", True),
-    # Plugins block.
-    ('plugins { id "org.springframework.boot" version "3.2.0" }', "org.springframework.boot", True),
-    # // line comment must NOT match.
-    ('// migrating off org.springframework.boot\nplugins { id "kotlin" }', "org.springframework.boot", False),
-    # /* block comment */ must NOT match.
-    (
-        '/* fall-back: io.ktor used to be here */\nplugins { id "kotlin" }',
-        "io.ktor", False,
-    ),
-    # Mixed: comment FP-bait + real dep — should still match the real dep.
-    (
-        '// notes about io.ktor\nimplementation("io.ktor:ktor-server-core:2.3.0")',
-        "io.ktor", True,
-    ),
-])
-def test_gradle(body: str, needle: str, expected: bool) -> None:
-    assert has_gradle_dependency(body, needle) is expected
-
-
-# --- Gemfile -----------------------------------------------------------------
-
-
-@pytest.mark.parametrize("body, needle, expected", [
-    ('gem "rails"\n', "rails", True),
-    ("gem 'sinatra'\n", "sinatra", True),
-    ('gem "rails", "~> 7.1"\n', "rails", True),
-    # Comment-only mention does NOT match.
-    ('# we used to use rails\ngem "rack"\n', "rails", False),
-    # Derived gem name doesn't match the parent name (exact match).
-    ('gem "rails-controller-testing"\n', "rails", False),
-    ('gem "rails-controller-testing"\n', "rails-controller-testing", True),
-    # Multiple gems.
-    ('gem "rack"\ngem "sinatra"\n', "sinatra", True),
-])
-def test_gemfile(body: str, needle: str, expected: bool) -> None:
-    assert has_gemfile_gem(body, needle) is expected
-
-
-# --- mix.exs -----------------------------------------------------------------
-
-
-@pytest.mark.parametrize("body, needle, expected", [
-    ('def deps, do: [{:phoenix, "~> 1.7"}]\n', "phoenix", True),
-    ('def deps, do: [{:phoenix, "~> 1.7"}, {:ecto, "~> 3.0"}]\n', "ecto", True),
-    # Only declared as comment — no match.
-    ('# was using phoenix\ndef deps, do: [{:plug, "~> 1.0"}]\n', "phoenix", False),
-    # Underscored atom names allowed.
-    ('def deps, do: [{:tesla_otel, "~> 1.0"}]\n', "tesla_otel", True),
-])
-def test_mix_exs(body: str, needle: str, expected: bool) -> None:
-    assert has_mix_dep(body, needle) is expected
-
-
-# --- pubspec.yaml ------------------------------------------------------------
-
-
-@pytest.mark.parametrize("body, needle, expected", [
-    (
-        "name: x\ndependencies:\n  flutter:\n    sdk: flutter\n",
-        "flutter", True,
-    ),
-    (
-        "name: x\ndev_dependencies:\n  flutter_test:\n    sdk: flutter\n",
-        "flutter_test", True,
-    ),
-    # description containing 'flutter' must NOT match.
-    (
-        'name: x\ndescription: "a flutter-style framework"\ndependencies:\n  http: ^1.0.0\n',
-        "flutter", False,
-    ),
-    # Comments stripped.
-    (
-        "# flutter is great\nname: x\ndependencies:\n  http: ^1.0.0\n",
-        "flutter", False,
-    ),
-    # Nested values (sdk: flutter under flutter:) do NOT contribute to matches at outer level.
-    (
-        "name: x\ndependencies:\n  http:\n    version: ^1.0.0\n",
-        "http", True,
-    ),
-])
-def test_pubspec(body: str, needle: str, expected: bool) -> None:
-    assert has_pubspec_dependency(body, needle) is expected
-
-
-# --- Project.toml (Julia) ----------------------------------------------------
-
-
-@pytest.mark.parametrize("body, needle, expected", [
-    (
-        'name = "X"\n[deps]\nDataFrames = "00000000-0000-0000-0000-000000000000"\n',
-        "DataFrames", True,
-    ),
-    (
-        'name = "X"\n[deps]\nDataFrames = "00000000-0000-0000-0000-000000000000"\n',
-        "Plots", False,
-    ),
-    # Case-insensitive lookup.
-    (
-        'name = "X"\n[deps]\nDataFrames = "00000000-0000-0000-0000-000000000000"\n',
-        "dataframes", True,
-    ),
-])
-def test_julia_project_toml(body: str, needle: str, expected: bool) -> None:
-    assert has_julia_dependency(body, needle) is expected
+def test_manifest_is_parsed_once_per_content(module, parser: str, matcher: str, body: str) -> None:
+    """Discipline rules probe one manifest once per rule: parse it once, not per needle."""
+    parse = getattr(module, parser)
+    match = getattr(module, matcher)
+    parse.cache_clear()
+    assert match(body, "nothing-declared") is False
+    assert match(body, "also-missing") is False
+    info = parse.cache_info()
+    assert (info.misses, info.hits) == (1, 1)

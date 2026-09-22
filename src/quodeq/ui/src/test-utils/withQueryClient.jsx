@@ -8,7 +8,6 @@
  * The fresh client uses retry: false and gcTime: 0 for determinism —
  * tests don't share cache state and failing queries fail fast.
  */
-import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiProvider } from "../api/ApiContext.jsx";
 

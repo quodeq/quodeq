@@ -7,9 +7,9 @@ check that can take a run down is worse than a check that does not exist.
 """
 from __future__ import annotations
 
-import json
+import dataclasses
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from quodeq.analysis.checks.registry import CHECKERS, CheckContext
@@ -18,8 +18,12 @@ from quodeq.analysis.mcp.scope_gate import SCOPE_DOWNGRADE_MARKER
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.core.events.models import Judgment, JudgmentCreatedEvent
-from quodeq.core.evidence._jsonl import judgment_to_dict
-from quodeq.core.evidence._req_mapping import build_principle_resolver
+from quodeq.core.evidence.jsonl import judgment_to_dict
+from quodeq.core.evidence.req_mapping import build_principle_resolver
+from quodeq.data.fs.import_graph import build_import_graph
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
+from quodeq.data.fs.stream_files import append_jsonl_rows
+from quodeq.data.fs.symbol_uses import build_symbol_uses
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.data.fs.standards_loader import load_requirement_checks
 
@@ -51,8 +55,12 @@ def deterministic_judgments(
     if not declared:
         return []
 
+    # Composition point: the fs-backed builders are injected here so
+    # CheckContext itself never imports the data.fs adapters.
     context = CheckContext(root=Path(root), source_files=tuple(source_files),
-                           dimension=dimension)
+                           dimension=dimension,
+                           graph_builder=build_import_graph,
+                           symbol_uses_builder=build_symbol_uses)
     out: list[Judgment] = []
     for name in sorted(declared):
         checker = CHECKERS.get(name)
@@ -74,7 +82,7 @@ def deterministic_judgments(
 def _to_wire(j: Judgment) -> dict:
     """Serialize a Judgment into the short-key JSONL row an LLM would have written.
 
-    Symmetric with ``core/evidence/_jsonl.parse_jsonl_line`` so a deterministic
+    Symmetric with ``core/evidence/jsonl.parse_jsonl_line`` so a deterministic
     finding re-reads exactly like any other: p=practice_id, t=verdict,
     d=dimension, w=title, vt=violation_type.
     """
@@ -148,7 +156,7 @@ def _gate(j: Judgment, trust_model: TrustModel | None) -> tuple[Judgment, dict]:
         update["provenance_downgrade"] = True
     if row.get(SCOPE_DOWNGRADE_MARKER):
         update["scope_downgrade"] = row[SCOPE_DOWNGRADE_MARKER]
-    return j.model_copy(update=update), row
+    return dataclasses.replace(j, **update), row
 
 
 def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> None:
@@ -164,12 +172,7 @@ def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> N
     even though both markers now also live on the ``Judgment`` itself for
     the events.jsonl mirror below.
     """
-    try:
-        with jsonl_path.open("a", encoding="utf-8") as out:
-            for row in rows:
-                out.write(json.dumps(row) + "\n")
-    except OSError:
-        _logger.warning("checks: could not append to %s", jsonl_path, exc_info=True)
+    append_jsonl_rows(jsonl_path, rows)
 
     from quodeq.data.events.writer import EventLogWriter
 
@@ -181,25 +184,41 @@ def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> N
         _logger.warning("checks: could not mirror findings to the event log", exc_info=True)
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class CheckScope:
+    """What one deterministic-check pass covers: the project (``root``,
+    ``source_files``) and the standard it is judged against (``dimension``,
+    its ``compiled_dir`` and the optional ``evaluators_dir`` overlay).
+    """
+
+    root: Path
+    source_files: Sequence[str]
+    dimension: str
+    compiled_dir: Path | None
+    evaluators_dir: Path | None = None
+
+
 def apply_deterministic_checks(
     evidence: Evidence,
+    scope: CheckScope,
     *,
-    root: Path,
-    source_files: Sequence[str],
-    dimension: str,
-    compiled_dir: Path | None,
     jsonl_path: Path | None,
-    evaluators_dir: Path | None = None,
     trust_model: TrustModel | None = None,
+    persist_fn: Callable[[Path, list[Judgment], list[dict]], None] | None = None,
 ) -> int:
-    """Run *dimension*'s checkers and fold the findings into *evidence*.
+    """Run ``scope.dimension``'s checkers and fold the findings into *evidence*.
 
     Returns how many findings were added. The evidence is updated before
     anything is written, so a persistence failure costs the run's record of
     these findings but never the score the user is shown for this run.
+
+    *persist_fn* injects the persistence sink (same signature as
+    :func:`_persist`, the default): callers can substitute their own
+    writer without this module touching it.
     """
+    dimension, compiled_dir, evaluators_dir = scope.dimension, scope.compiled_dir, scope.evaluators_dir
     judgments = deterministic_judgments(
-        root=root, source_files=source_files, dimension=dimension,
+        root=scope.root, source_files=scope.source_files, dimension=dimension,
         compiled_dir=compiled_dir, evaluators_dir=evaluators_dir,
     )
     if not judgments:
@@ -216,10 +235,11 @@ def apply_deterministic_checks(
         gated.append(judgment)
         rows.append(row)
 
-    resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir)
+    resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir,
+                                        req_map_reader=read_req_to_principle_map)
     added = _merge_into_evidence(evidence, gated, resolver)
     if added and jsonl_path is not None:
-        _persist(jsonl_path, gated, rows)
+        (persist_fn or _persist)(jsonl_path, gated, rows)
     return added
 
 
@@ -260,13 +280,15 @@ def apply_checks_for_run(config, dimension: str, evidence: Evidence) -> int:
         # keeps apply_scope_gate's no-op explicit -- resolve_trust_model would
         # degrade to CONSERVATIVE on None, which is a different statement.
         trust_model = resolve_trust_model(config.src) if config.src is not None else None
-        return apply_deterministic_checks(
-            evidence,
+        scope = CheckScope(
             root=Path(config.src),
             source_files=source_files,
             dimension=dimension,
             compiled_dir=(Path(standards_dir) / "compiled") if standards_dir else None,
             evaluators_dir=config.evaluators_dir,
+        )
+        return apply_deterministic_checks(
+            evidence, scope,
             jsonl_path=Path(evidence_dir) / f"{dimension}_evidence.jsonl",
             trust_model=trust_model,
         )

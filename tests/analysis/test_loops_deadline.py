@@ -2,7 +2,7 @@
 import time
 from unittest.mock import MagicMock
 
-from quodeq.analysis._loops import run_per_dimension_loop
+from quodeq.analysis._loops import LoopDeps, run_per_dimension_loop
 
 
 def _mk_config(deadline_at):
@@ -33,7 +33,7 @@ def test_loop_skips_all_dims_when_deadline_already_past():
 
     result = run_per_dimension_loop(
         config, ["a", "b", "c"], ctx,
-        runner=runner,
+        LoopDeps(runner=runner),
     )
 
     assert runner.run.call_count == 0
@@ -45,7 +45,7 @@ def test_loop_runs_first_dim_then_skips_remaining(monkeypatch):
     fake_now = [time.monotonic()]
 
     monkeypatch.setattr(
-        "quodeq.analysis._loops.time.monotonic",
+        "quodeq.analysis._loop_steps.time.monotonic",
         lambda: fake_now[0],
     )
 
@@ -53,6 +53,7 @@ def test_loop_runs_first_dim_then_skips_remaining(monkeypatch):
     ctx = MagicMock(total=3)
 
     ev = MagicMock()
+
     def fake_process(_cfg, _dim, _idx, _ctx, *, emit_log=True):
         # First dim runs, consumes the budget, then deadline passes
         fake_now[0] = deadline + 0.01
@@ -61,7 +62,7 @@ def test_loop_runs_first_dim_then_skips_remaining(monkeypatch):
 
     result = run_per_dimension_loop(
         config, ["a", "b", "c"], ctx,
-        runner=runner,
+        LoopDeps(runner=runner),
     )
 
     assert runner.run.call_count == 1
@@ -77,7 +78,7 @@ def test_loop_runs_all_dims_when_no_deadline():
 
     result = run_per_dimension_loop(
         config, ["a", "b"], ctx,
-        runner=runner,
+        LoopDeps(runner=runner),
     )
 
     assert runner.run.call_count == 2

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from quodeq.core.types import JobSnapshot, ViolationSummary
-from quodeq.shared.constants import (  # noqa: F401 — re-export for backward compat
+from quodeq.shared.constants import (  # re-export for backward compat
     DEFAULT_MAX_SUBAGENTS,
     DEFAULT_TIME_LIMIT,
 )
@@ -19,6 +19,7 @@ class EvaluationOptions:
     dimensions: str = ""
     numerical: bool = False
     ai_cmd: str | None = None
+    ai_cmd_path: str | None = None
     ai_model: str | None = None
     subagent_model: str | None = None
     verify_findings: bool = True
@@ -33,11 +34,57 @@ class EvaluationOptions:
     provider_api_base: str = ""
 
 
+@dataclass(frozen=True)
+class NewProjectSpec:
+    """Request-boundary-validated inputs for registering a new project.
+
+    The route builds this after its own request-boundary checks (repo-URL
+    shape, cloneDest containment under home, local-path allowlist); the
+    provider's ``create_project`` owns everything from here on (duplicate
+    detection, clone + scan, rollback on failure). ``register_project`` takes
+    the same spec; a local path needs only ``repo`` and ``discipline``.
+    """
+    repo: str
+    discipline: str | None
+    scope_path: str | None = None
+    clone_dest: str | None = None
+    ephemeral: bool = False
+
+
+@dataclass(frozen=True)
+class CreateProjectResult:
+    """Outcome of ``ProjectActions.create_project``.
+
+    ``status`` drives the route's HTTP translation:
+    created | duplicate | invalid_repo | clone_failed | internal_error.
+    """
+    status: str
+    project_id: str | None = None
+    scan_data: dict | None = None
+    existing_project_id: str | None = None
+    message: str = ""
+    clone_error_kind: str | None = None
+
+
 class ProjectActions(Protocol):
     """Methods for project listing and metadata."""
 
-    def list_projects(self, reports_dir: str) -> dict:
-        """Return a dict with a 'projects' list for the given reports directory."""
+    def list_projects(self, reports_dir: str, *, offset: int = 0, limit: int = 0) -> dict:
+        """Return a dict with a 'projects' list for the given reports directory.
+
+        *offset*/*limit* (both default 0, meaning "no pagination") request a
+        single page; implementations may hydrate only that page's projects
+        instead of the whole set (see ``ProjectsCache``).
+        """
+        ...
+
+    def create_project(self, reports_dir: str, spec: NewProjectSpec) -> CreateProjectResult:
+        """Register (clone if needed + scan) a new project.
+
+        Owns duplicate detection, the clone/scan attempt, rollback of any
+        partial project directory on failure, and the scan.json readback
+        (with a zero-run fallback). See NewProjectSpec/CreateProjectResult.
+        """
         ...
 
     def get_project_info(self, reports_dir: str, project: str) -> dict:
@@ -128,6 +175,13 @@ class ToolingActions(Protocol):
 
     def browse_repo(self, path: str | None) -> dict:
         """List directories at the given path for repository browsing."""
+        ...
+
+    def browse_mkdir(self, parent: str, name: str) -> dict:
+        """Create subdirectory *name* under *parent* (jailed to the home dir).
+
+        Returns ``{"created": True, "path": ...}`` or an
+        ``{"error", "error_code"}`` payload the route maps to HTTP."""
         ...
 
     def get_ai_clients(self) -> dict:

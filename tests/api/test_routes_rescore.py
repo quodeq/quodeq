@@ -1,5 +1,4 @@
 """Tests for the /api/rescore endpoint."""
-import json
 import os
 from unittest.mock import patch, MagicMock
 
@@ -26,10 +25,27 @@ def test_rescore_requires_project(client):
     assert "project" in data.get("error", "").lower()
 
 
-@patch("quodeq.api.routes_rescore.read_run_data")
-@patch("quodeq.api.routes_rescore.list_runs")
-@patch("quodeq.api.routes_rescore.load_dismissed_keys")
-@patch("quodeq.api.routes_rescore.rescore_dimensions")
+def test_rescore_missing_project_message_names_the_fix(client):
+    """Finding 6209: the message must say how to fix it, not just what's wrong."""
+    resp = client.get("/api/rescore")
+    assert resp.status_code == 400
+    data = resp.get_json()
+    assert data["code"] == "MISSING_PARAM"
+    assert "?project=" in data["error"]
+
+
+def test_register_rescore_routes_has_a_docstring_with_usage_example():
+    """Finding 6208: register_rescore_routes needs a docstring with a usage example."""
+    from quodeq.api.routes_rescore import register_rescore_routes
+    doc = register_rescore_routes.__doc__
+    assert doc is not None
+    assert "?project=" in doc
+
+
+@patch("quodeq.services.rescore_run.read_run_data")
+@patch("quodeq.services.rescore_run.list_runs")
+@patch("quodeq.services.rescore_run.load_dismissed_keys")
+@patch("quodeq.services.rescore_run.rescore_dimensions")
 def test_rescore_returns_rescored_data(mock_rescore, mock_dismissed, mock_list_runs, mock_read_run, tmp_path, client):
     # The route resolves both the project and the run against the directory
     # listing, so the evaluations root has to actually contain them. list_runs

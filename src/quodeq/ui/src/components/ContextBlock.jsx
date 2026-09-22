@@ -2,8 +2,8 @@
  * Renders surrounding code context with VS Code-style line numbers and
  * highlighted violation lines. Falls back to snippet display if no
  * context is available. Shows a scope badge when scope is provided.
- * The "See more/less" toggle only applies to the highlighted (affected) lines.
- * The surrounding context lines (before/after) are always visible.
+ * A single "See code" / "See <scope>" bar collapses the whole block;
+ * nothing renders until it's expanded.
  *
  * Pretext integration:
  *   The `<pre>` block's height and widest-line width are pre-computed with
@@ -15,8 +15,8 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { measureWidth, cssFontFromElement } from '../utils/pretext.js';
 import { isHighlightedLine, stripHighlightMarker } from '../utils/codeMarker.js';
+import { t } from '../strings/index.js';
 
-const MAX_HIGHLIGHTED_COLLAPSED = 10;
 const CONTEXT_PADDING = 5;
 const CODE_LINE_HEIGHT = 18; // must match terminal.css .ctx-line line-height
 const CODE_PRE_VPAD = 16;    // matches .term-code / .scope-bar-code vertical padding
@@ -26,7 +26,11 @@ function renderLine(raw, lineNum, isHighlighted) {
   const display = isHighlighted ? stripHighlightMarker(raw) : raw;
   return (
     <div key={lineNum} className={`ctx-line${isHighlighted ? ' ctx-line--hl' : ''}`}>
-      <span className="ctx-gutter">{lineNum}</span>
+      <span className="ctx-gutter">
+        {isHighlighted && <span className="sr-only">{t('context.violationLineMarker')}</span>}
+        <span aria-hidden="true" className="context-line__marker">{isHighlighted ? '▸' : ''}</span>
+        {lineNum}
+      </span>
       <span className="ctx-code">{display}</span>
     </div>
   );
@@ -112,7 +116,32 @@ function useCodeLayout(raw) {
   }, [raw]);
 }
 
-export default function ContextBlock({ context, snippet, scope, line, endLine }) {
+function splitContextLines(ctxLines, startLineNum) {
+  const before = [];
+  const highlighted = [];
+  const after = [];
+  let pastHighlighted = false;
+  for (let i = 0; i < ctxLines.length; i++) {
+    const isHl = isHighlightedLine(ctxLines[i]);
+    const entry = { raw: ctxLines[i], lineNum: startLineNum + i };
+    if (isHl) { pastHighlighted = true; highlighted.push(entry); }
+    else if (!pastHighlighted) before.push(entry);
+    else after.push(entry);
+  }
+  return { before, highlighted, after };
+}
+
+function renderContextLines(ctxLines, line) {
+  const startLineNum = Math.max(1, (line || 1) - CONTEXT_PADDING);
+  const { before, highlighted, after } = splitContextLines(ctxLines, startLineNum);
+  return [
+    ...before.map((l) => renderLine(l.raw, l.lineNum, false)),
+    ...highlighted.map((l) => renderLine(l.raw, l.lineNum, true)),
+    ...after.map((l) => renderLine(l.raw, l.lineNum, false)),
+  ];
+}
+
+export default function ContextBlock({ context, snippet, scope, line }) {
   const [expanded, setExpanded] = useState(false);
   const toggle = () => setExpanded((e) => !e);
 
@@ -131,23 +160,7 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
   }
 
   if (context) {
-    const startLineNum = Math.max(1, (line || 1) - CONTEXT_PADDING);
-    const before = [];
-    const highlighted = [];
-    const after = [];
-    let pastHighlighted = false;
-    for (let i = 0; i < ctxLines.length; i++) {
-      const isHl = isHighlightedLine(ctxLines[i]);
-      const entry = { raw: ctxLines[i], lineNum: startLineNum + i };
-      if (isHl) { pastHighlighted = true; highlighted.push(entry); }
-      else if (!pastHighlighted) before.push(entry);
-      else after.push(entry);
-    }
-    const rendered = [
-      ...before.map((l) => renderLine(l.raw, l.lineNum, false)),
-      ...highlighted.map((l) => renderLine(l.raw, l.lineNum, true)),
-      ...after.map((l) => renderLine(l.raw, l.lineNum, false)),
-    ];
+    const rendered = renderContextLines(ctxLines, line);
     return (
       <ScopeBar label="See code" lineCount={ctxLines.length} expanded={expanded} onToggle={toggle}>
         <CodeBlockPre renderedLines={rendered} codeLines={ctxLines} />

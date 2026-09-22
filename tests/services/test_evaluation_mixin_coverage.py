@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
+
+from quodeq.core.types.job import JobSnapshot
 
 
 class TestScoreCompletedEvidence:
@@ -20,6 +20,11 @@ class TestScoreCompletedEvidence:
         })  # evidence dir doesn't exist, returns early
 
     def test_scores_completed_dimension(self, tmp_path):
+        """Real injection: score_run holds import-time bindings for parser/
+        scorer/reporter, so patching their DEFINITION modules (the old
+        approach) never reached them and write_dimension_report ran for
+        real against MagicMock args. Injecting via the ``parser``/``scorer``/
+        ``reporter`` kwargs actually intercepts the calls."""
         from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
         proj_dir = tmp_path / "proj" / "run1"
         evidence_dir = proj_dir / "evidence"
@@ -35,13 +40,25 @@ class TestScoreCompletedEvidence:
 
         mock_evidence = MagicMock()
         mock_scores = {"security": 75}
+        fake_params = object()  # sentinel: prove the value threaded through is
+        # what load_params() returned, not a self-referential readback of the
+        # mock's own recorded call (fake_scorer.call_args.kwargs["params"]
+        # always equals itself regardless of what score_completed_evidence
+        # actually passed).
+        fake_parser = MagicMock(return_value=mock_evidence)
+        fake_scorer = MagicMock(return_value=mock_scores)
+        fake_reporter = MagicMock()
 
-        with patch("quodeq.core.evidence.parser.parse_jsonl_to_evidence", return_value=mock_evidence), \
-             patch("quodeq.core.scoring.engine.score_evidence", return_value=mock_scores), \
-             patch("quodeq.analysis.report.write_dimension_report"):
-            _score_completed_evidence(str(tmp_path), {
-                "outputProject": "proj", "outputRunId": "run1"
-            })
+        with patch("quodeq.services.score_run.load_params", return_value=fake_params):
+            _score_completed_evidence(
+                str(tmp_path), {"outputProject": "proj", "outputRunId": "run1"},
+                parser=fake_parser, scorer=fake_scorer, reporter=fake_reporter,
+            )
+
+        fake_parser.assert_called_once()
+        assert fake_parser.call_args.args[0] == jsonl
+        fake_scorer.assert_called_once_with(mock_evidence, mode="numerical", params=fake_params)
+        fake_reporter.assert_called_once_with(mock_evidence, mock_scores, "security", eval_dir)
 
     def test_skips_already_scored(self, tmp_path):
         from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
@@ -58,11 +75,12 @@ class TestScoreCompletedEvidence:
         # Already scored
         (eval_dir / "security.json").write_text("{}")
 
-        with patch("quodeq.core.evidence.parser.parse_jsonl_to_evidence") as mock_parse:
-            _score_completed_evidence(str(tmp_path), {
-                "outputProject": "proj", "outputRunId": "run1"
-            })
-            mock_parse.assert_not_called()
+        fake_parser = MagicMock()
+        _score_completed_evidence(
+            str(tmp_path), {"outputProject": "proj", "outputRunId": "run1"},
+            parser=fake_parser,
+        )
+        fake_parser.assert_not_called()
 
     def test_skips_empty_jsonl(self, tmp_path):
         from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
@@ -76,11 +94,12 @@ class TestScoreCompletedEvidence:
         queue = evidence_dir / "security_queue.json"
         queue.write_text("[]")
 
-        with patch("quodeq.core.evidence.parser.parse_jsonl_to_evidence") as mock_parse:
-            _score_completed_evidence(str(tmp_path), {
-                "outputProject": "proj", "outputRunId": "run1"
-            })
-            mock_parse.assert_not_called()
+        fake_parser = MagicMock()
+        _score_completed_evidence(
+            str(tmp_path), {"outputProject": "proj", "outputRunId": "run1"},
+            parser=fake_parser,
+        )
+        fake_parser.assert_not_called()
 
     def test_skips_no_queue_file(self, tmp_path):
         from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
@@ -93,11 +112,12 @@ class TestScoreCompletedEvidence:
         jsonl.write_text("data\n")
         # No queue file
 
-        with patch("quodeq.core.evidence.parser.parse_jsonl_to_evidence") as mock_parse:
-            _score_completed_evidence(str(tmp_path), {
-                "outputProject": "proj", "outputRunId": "run1"
-            })
-            mock_parse.assert_not_called()
+        fake_parser = MagicMock()
+        _score_completed_evidence(
+            str(tmp_path), {"outputProject": "proj", "outputRunId": "run1"},
+            parser=fake_parser,
+        )
+        fake_parser.assert_not_called()
 
     def test_handles_scoring_exception(self, tmp_path):
         from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
@@ -111,10 +131,12 @@ class TestScoreCompletedEvidence:
         queue = evidence_dir / "dim_queue.json"
         queue.write_text("[]")
 
-        with patch("quodeq.core.evidence.parser.parse_jsonl_to_evidence", side_effect=ValueError("parse fail")):
-            _score_completed_evidence(str(tmp_path), {
-                "outputProject": "proj", "outputRunId": "run1"
-            })  # should not raise
+        fake_parser = MagicMock(side_effect=ValueError("parse fail"))
+        _score_completed_evidence(
+            str(tmp_path), {"outputProject": "proj", "outputRunId": "run1"},
+            parser=fake_parser,
+        )  # should not raise
+        fake_parser.assert_called_once()
 
     def test_handles_none_evidence(self, tmp_path):
         from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
@@ -128,12 +150,14 @@ class TestScoreCompletedEvidence:
         queue = evidence_dir / "dim_queue.json"
         queue.write_text("[]")
 
-        with patch("quodeq.core.evidence.parser.parse_jsonl_to_evidence", return_value=None), \
-             patch("quodeq.core.scoring.engine.score_evidence") as mock_score:
-            _score_completed_evidence(str(tmp_path), {
-                "outputProject": "proj", "outputRunId": "run1"
-            })
-            mock_score.assert_not_called()
+        fake_parser = MagicMock(return_value=None)
+        fake_scorer = MagicMock()
+        _score_completed_evidence(
+            str(tmp_path), {"outputProject": "proj", "outputRunId": "run1"},
+            parser=fake_parser, scorer=fake_scorer,
+        )
+        fake_parser.assert_called_once()
+        fake_scorer.assert_not_called()
 
 
 class TestFsEvaluationMixinMethods:
@@ -176,20 +200,35 @@ class TestFsEvaluationMixinMethods:
 
     def test_score_failed_evaluation_wrong_status(self):
         mixin = self._make_mixin()
-        job = {"status": "running"}
+        job = JobSnapshot(job_id="job-1", status="running")
         mixin._jobs.get_job.return_value = job
         result = mixin.score_failed_evaluation("job-1", "/tmp/reports")
         assert result is False
 
     def test_score_failed_evaluation_success(self):
         mixin = self._make_mixin()
-        job = MagicMock()
-        job.get.return_value = "failed"
-        job.__getitem__ = MagicMock()
+        job = JobSnapshot(job_id="job-1", status="failed", output_project="proj", output_run_id="run1")
         mixin._jobs.get_job.return_value = job
-        with patch("quodeq.services.evaluation_mixin.score_completed_evidence"):
+        mock_score = MagicMock()
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence", mock_score):
             result = mixin.score_failed_evaluation("job-1", "/tmp/reports")
             assert result is True
+            # Verify score_completed_evidence was called with a dict, not the JobSnapshot
+            mock_score.assert_called_once_with("/tmp/reports", {
+                "outputProject": "proj",
+                "outputRunId": "run1",
+            })
+
+    def test_score_failed_evaluation_no_output_ids(self):
+        mixin = self._make_mixin()
+        job = JobSnapshot(job_id="job-1", status="failed")
+        mixin._jobs.get_job.return_value = job
+        mock_score = MagicMock()
+        with patch("quodeq.services.evaluation_mixin.score_completed_evidence", mock_score):
+            result = mixin.score_failed_evaluation("job-1", "/tmp/reports")
+            assert result is True
+            # Verify score_completed_evidence was NOT called when output_project/run_id are missing
+            mock_score.assert_not_called()
 
     def test_dispatcher_default(self):
         mixin = self._make_mixin()

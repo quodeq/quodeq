@@ -16,12 +16,10 @@ a follow-up PR. Surface defined now so call sites have a target import.
 from __future__ import annotations
 
 from collections import defaultdict
-from pathlib import Path
 from typing import Iterable
 
 from quodeq.data.fs.report_parser import RunInfo
 
-from ._models import BucketView, RunSummary
 from ._states import is_successful_run
 
 

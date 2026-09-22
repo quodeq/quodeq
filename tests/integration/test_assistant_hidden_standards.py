@@ -18,7 +18,7 @@ tests/assistant/test_registry.py and tests/assistant/test_tools_read.py.
 
 No `@pytest.mark.integration` marker: nothing here spawns a real subprocess
 or needs an external resource (accumulated report data is monkeypatched at
-the same `_fs_reports.get_accumulated` seam tests/assistant/test_tools_overview.py
+the same `fs_reports.get_accumulated` seam tests/assistant/test_tools_overview.py
 and test_tools_read.py already use; everything else is tmp_path + sqlite),
 matching every other file already in tests/integration/ (see e.g. the module
 docstrings of test_assistant_end_to_end.py and test_assistant_cli_end_to_end.py):
@@ -82,17 +82,17 @@ def _build_registry(tmp_path, repo_root, monkeypatch):
     than hand-setting the tuple.
 
     get_overview/get_scores read accumulated data through
-    `services._fs_reports.get_accumulated`; that function's own filesystem
+    `services.fs_reports.get_accumulated`; that function's own filesystem
     behaviour is covered elsewhere (services tests), so it is monkeypatched
     here exactly as tests/assistant/test_tools_overview.py and
     test_tools_read.py's `acc_ctx` already do -- this test's job is the
     hidden-standards wiring on top of it, not re-proving accumulation.
     """
     monkeypatch.setattr(
-        "quodeq.assistant.tools._overview._fs_reports.get_accumulated",
+        "quodeq.assistant.tools._overview.get_accumulated",
         lambda *a: _ACCUMULATED)
     monkeypatch.setattr(
-        "quodeq.assistant.tools._read_tools._fs_reports.get_accumulated",
+        "quodeq.assistant.tools._read_tools.fs_reports.get_accumulated",
         lambda *a: _ACCUMULATED)
     repo = AssistantRepository(tmp_path / "assistant.db")
     repo.create_session(session_id="s1", provider="ollama")

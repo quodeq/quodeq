@@ -1,9 +1,16 @@
-import json
+"""Tests for quodeq.ci.review_builder."""
+from __future__ import annotations
+
+from quodeq.ci.review_builder import (
+    ReviewOptions,
+    build_review_summary,
+    classify_violations,
+    determine_verdict,
+    violation_to_comment,
+)
 
 
 def test_violation_to_review_comment():
-    from quodeq.ci.review_builder import violation_to_comment
-
     violation = {
         "file": "src/auth/login.py",
         "line": 42,
@@ -21,8 +28,6 @@ def test_violation_to_review_comment():
 
 
 def test_violation_without_line_becomes_file_level():
-    from quodeq.ci.review_builder import violation_to_comment
-
     violation = {
         "file": "src/api/handler.py",
         "line": None,
@@ -38,8 +43,6 @@ def test_violation_without_line_becomes_file_level():
 
 
 def test_build_review_summary():
-    from quodeq.ci.review_builder import build_review_summary
-
     report = {
         "dimension": "security",
         "overallScore": "7.5/10",
@@ -49,13 +52,11 @@ def test_build_review_summary():
             "severity": {"critical": 1, "major": 2, "minor": 2},
         },
     }
-    summary = build_review_summary([report], [], [], duration_seconds=134)
+    summary = build_review_summary([report], [], [], options=ReviewOptions(duration_seconds=134))
     assert "7.5/10" in summary
 
 
 def test_determine_verdict_critical():
-    from quodeq.ci.review_builder import determine_verdict
-
     violations = [{"severity": "critical"}]
     assert determine_verdict(violations) == "REQUEST_CHANGES"
 
@@ -64,14 +65,11 @@ def test_determine_verdict_no_violations():
     # GitHub Actions' default token cannot submit APPROVE reviews
     # (HTTP 422 "not permitted to approve"), so zero-violation runs
     # post a COMMENT review instead.
-    from quodeq.ci.review_builder import determine_verdict
 
     assert determine_verdict([]) == "COMMENT"
 
 
 def test_determine_verdict_minor_only():
-    from quodeq.ci.review_builder import determine_verdict
-
     violations = [{"severity": "minor"}, {"severity": "low"}]
     assert determine_verdict(violations) == "COMMENT"
 
@@ -80,8 +78,6 @@ def test_determine_verdict_minor_only():
 
 
 def test_classify_violations_matches_by_snippet():
-    from quodeq.ci.review_builder import classify_violations
-
     current = [
         {"file": "a.py", "line": 10, "snippet": "eval(user_input)", "severity": "critical"},
         {"file": "a.py", "line": 20, "snippet": "exec(data)", "severity": "high"},
@@ -97,8 +93,6 @@ def test_classify_violations_matches_by_snippet():
 
 
 def test_classify_violations_normalizes_whitespace():
-    from quodeq.ci.review_builder import classify_violations
-
     # Leading/trailing and internal repeated whitespace should collapse to same string
     current = [{"file": "a.py", "snippet": "  eval(   user_input   )  "}]
     baseline = [{"file": "a.py", "snippet": "eval(   user_input   )"}]
@@ -108,8 +102,6 @@ def test_classify_violations_normalizes_whitespace():
 
 
 def test_classify_violations_different_files_are_different():
-    from quodeq.ci.review_builder import classify_violations
-
     current = [{"file": "a.py", "snippet": "eval(x)"}]
     baseline = [{"file": "b.py", "snippet": "eval(x)"}]
     new, existing = classify_violations(current, baseline)
@@ -118,8 +110,6 @@ def test_classify_violations_different_files_are_different():
 
 
 def test_classify_violations_empty_baseline():
-    from quodeq.ci.review_builder import classify_violations
-
     current = [{"file": "a.py", "snippet": "eval(x)"}]
     new, existing = classify_violations(current, [])
     assert len(new) == 1
@@ -127,70 +117,54 @@ def test_classify_violations_empty_baseline():
 
 
 def test_violation_to_comment_shows_new_prefix():
-    from quodeq.ci.review_builder import violation_to_comment
-
     v = {"file": "a.py", "line": 10, "title": "SQL injection", "severity": "critical", "snippet": "x"}
     comment = violation_to_comment(v, status="new")
     assert "NEW" in comment["body"]
 
 
 def test_violation_to_comment_shows_existing_prefix():
-    from quodeq.ci.review_builder import violation_to_comment
-
     v = {"file": "a.py", "line": 10, "title": "SQL injection", "severity": "critical", "snippet": "x"}
     comment = violation_to_comment(v, status="existing")
     assert "Pre-existing" in comment["body"]
 
 
 def test_determine_verdict_ignores_existing_critical():
-    from quodeq.ci.review_builder import determine_verdict
-
     # Only new violations are passed in (existing ones are excluded upstream)
     new_violations = [{"severity": "minor"}]
     assert determine_verdict(new_violations) == "COMMENT"
 
 
 def test_build_review_summary_shows_new_and_existing_counts():
-    from quodeq.ci.review_builder import build_review_summary
-
     reports = [{"dimension": "security", "overallScore": "7.5/10", "overallGrade": "B"}]
     new = [{"severity": "critical"}, {"severity": "minor"}]
     existing = [{"severity": "minor"}]
-    summary = build_review_summary(reports, new, existing, duration_seconds=60)
+    summary = build_review_summary(reports, new, existing, options=ReviewOptions(duration_seconds=60))
     assert "2 new" in summary.lower() or "2 New" in summary or "**2 new**" in summary
     assert "1 pre-existing" in summary.lower() or "1 Pre-existing" in summary or "**1 pre-existing**" in summary
 
 
 def test_build_review_summary_shows_no_baseline_note_when_unavailable():
-    from quodeq.ci.review_builder import build_review_summary
-
     reports = [{"dimension": "security", "overallScore": "8/10", "overallGrade": "A"}]
-    summary = build_review_summary(reports, [], [], baseline_available=False)
+    summary = build_review_summary(reports, [], [], options=ReviewOptions(baseline_available=False))
     summary_lower = summary.lower()
     assert "no baseline" in summary_lower or "baseline not available" in summary_lower
 
 
 def test_build_review_summary_no_baseline_note_when_available():
-    from quodeq.ci.review_builder import build_review_summary
-
     reports = [{"dimension": "security", "overallScore": "8/10", "overallGrade": "A"}]
-    summary = build_review_summary(reports, [], [], baseline_available=True)
+    summary = build_review_summary(reports, [], [], options=ReviewOptions(baseline_available=True))
     assert "no baseline" not in summary.lower()
 
 
 def test_build_review_summary_includes_artifact_link():
-    from quodeq.ci.review_builder import build_review_summary
-
     reports = [{"dimension": "security", "overallScore": "8/10", "overallGrade": "A"}]
     url = "https://example.com/run/123"
-    summary = build_review_summary(reports, [], [], artifact_url=url)
+    summary = build_review_summary(reports, [], [], options=ReviewOptions(artifact_url=url))
     assert url in summary
     assert "Download full report" in summary
 
 
 def test_build_review_summary_no_artifact_link_when_not_provided():
-    from quodeq.ci.review_builder import build_review_summary
-
     reports = [{"dimension": "security", "overallScore": "8/10", "overallGrade": "A"}]
     summary = build_review_summary(reports, [], [])
     assert "Download full report" not in summary
@@ -206,33 +180,27 @@ def test_build_review_summary_no_artifact_link_when_not_provided():
 
 
 def test_diff_mode_suppresses_per_dimension_score_line():
-    from quodeq.ci.review_builder import build_review_summary
-
     reports = [{"dimension": "pr-diff", "violations": [],
                 "overallScore": "N/A", "overallGrade": "N/A"}]
-    summary = build_review_summary(reports, [], [], baseline_available=False)
+    summary = build_review_summary(reports, [], [], options=ReviewOptions(baseline_available=False))
     # The confusing "Pr-Diff: N/A (N/A)" line must not appear.
     assert "Pr-Diff: N/A" not in summary
     assert "N/A (N/A)" not in summary
 
 
 def test_diff_mode_suppresses_no_baseline_note():
-    from quodeq.ci.review_builder import build_review_summary
-
     reports = [{"dimension": "pr-diff", "violations": [],
                 "overallScore": "N/A", "overallGrade": "N/A"}]
-    summary = build_review_summary(reports, [], [], baseline_available=False)
+    summary = build_review_summary(reports, [], [], options=ReviewOptions(baseline_available=False))
     # The "No baseline available" note is wrong-framed in diff mode.
     assert "No baseline available" not in summary
 
 
 def test_diff_mode_uses_diff_phrasing_for_violation_count():
-    from quodeq.ci.review_builder import build_review_summary
-
     reports = [{"dimension": "pr-diff", "violations": [],
                 "overallScore": "N/A", "overallGrade": "N/A"}]
     new = [{"severity": "high"}, {"severity": "minor"}]
-    summary = build_review_summary(reports, new, [], baseline_available=False)
+    summary = build_review_summary(reports, new, [], options=ReviewOptions(baseline_available=False))
     # In diff mode there's no baseline, so "NEW vs. PR" framing is meaningless.
     # Use "found in PR diff" phrasing instead.
     assert "found in PR diff" in summary
@@ -244,14 +212,13 @@ def test_summary_lists_outside_diff_findings_and_counts_only_in_diff():
     and the headline count + severity breakdown reflect only the in-diff
     (inline-anchorable) violations, so the number shown matches the inline
     comments posted."""
-    from quodeq.ci.review_builder import build_review_summary
 
     reports = [{"dimension": "pr-diff", "violations": [],
                 "overallScore": "N/A", "overallGrade": "N/A"}]
     in_diff = {"file": "src/a.py", "line": 10, "severity": "high", "title": "in-diff issue"}
     outside = {"file": "tests/t.py", "line": 37, "severity": "minor", "title": "f-string DDL"}
     summary = build_review_summary(
-        reports, [in_diff, outside], [], baseline_available=False,
+        reports, [in_diff, outside], [], options=ReviewOptions(baseline_available=False),
         outside_diff_violations=[outside],
     )
     # Headline + severity reflect the in-diff finding only.
@@ -267,23 +234,21 @@ def test_summary_lists_outside_diff_findings_and_counts_only_in_diff():
 def test_summary_no_outside_section_when_all_in_diff():
     """Backward compat: with no out-of-diff findings, no extra section appears
     and the count is unchanged."""
-    from quodeq.ci.review_builder import build_review_summary
 
     reports = [{"dimension": "pr-diff", "violations": [],
                 "overallScore": "N/A", "overallGrade": "N/A"}]
     new = [{"file": "src/a.py", "line": 10, "severity": "high", "title": "x"}]
-    summary = build_review_summary(reports, new, [], baseline_available=False)
+    summary = build_review_summary(reports, new, [], options=ReviewOptions(baseline_available=False))
     assert "1 violation(s) found in PR diff" in summary
     assert "outside the changed lines" not in summary
 
 
 def test_scored_mode_preserves_existing_summary_shape():
     """Regression guard: scored reports still get the old framing."""
-    from quodeq.ci.review_builder import build_review_summary
 
     reports = [{"dimension": "security", "overallScore": "7.5/10", "overallGrade": "B"}]
     summary = build_review_summary(reports, [{"severity": "high"}], [],
-                                   baseline_available=False)
+                                   options=ReviewOptions(baseline_available=False))
     # Per-dimension score line present
     assert "Security" in summary and "7.5/10" in summary
     # "No baseline" note present (it's a genuine signal in scored mode)

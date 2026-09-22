@@ -1,6 +1,6 @@
 """Tests for Standards API read and write endpoints."""
 import json
-from pathlib import Path
+import sys
 import pytest
 from quodeq.api.app import create_app
 
@@ -8,6 +8,7 @@ _TEST_STANDARD_PAYLOAD = {
     "id": "my-std", "name": "My Standard", "description": "Test standard",
     "weight": 1.0, "source": "Test", "principles": [],
 }
+
 
 @pytest.fixture()
 def dirs(tmp_path):
@@ -25,6 +26,7 @@ def dirs(tmp_path):
     }))
     return {"evaluators": evaluators, "compiled": compiled, "dimensions": dims}
 
+
 @pytest.fixture()
 def client(dirs):
     app = create_app(test_config={
@@ -36,6 +38,7 @@ def client(dirs):
     with app.test_client() as c:
         yield c
 
+
 # Read endpoints
 def test_list_standards(client):
     resp = client.get("/api/standards")
@@ -44,6 +47,7 @@ def test_list_standards(client):
     assert isinstance(data, list)
     assert any(s["id"] == "security" for s in data)
 
+
 def test_get_standard_detail(client):
     resp = client.get("/api/standards/security")
     assert resp.status_code == 200
@@ -51,9 +55,11 @@ def test_get_standard_detail(client):
     assert data["id"] == "security"
     assert "principles" in data
 
+
 def test_get_standard_not_found(client):
     resp = client.get("/api/standards/nonexistent")
     assert resp.status_code == 404
+
 
 # Write endpoints
 def test_create_standard(client):
@@ -63,26 +69,31 @@ def test_create_standard(client):
     assert data["id"] == "my-std"
     assert data["type"] == "custom"
 
+
 def test_update_standard(client):
     client.post("/api/standards", json={"id": "upd-std", "name": "Original", "description": "", "weight": 1.0, "source": "", "principles": []}, headers={"Origin": "http://localhost"})
     resp = client.put("/api/standards/upd-std", json={"id": "upd-std", "name": "Updated", "description": "", "weight": 1.0, "source": "", "principles": []}, headers={"Origin": "http://localhost"})
     assert resp.status_code == 200
     assert resp.get_json()["name"] == "Updated"
 
+
 def test_delete_standard(client):
     client.post("/api/standards", json={"id": "del-std", "name": "Delete Me", "description": "", "weight": 1.0, "source": "", "principles": []}, headers={"Origin": "http://localhost"})
     resp = client.delete("/api/standards/del-std", headers={"Origin": "http://localhost"})
     assert resp.status_code == 204
 
+
 def test_delete_builtin_forbidden(client):
     resp = client.delete("/api/standards/security", headers={"Origin": "http://localhost"})
     assert resp.status_code == 403
+
 
 def test_duplicate_standard(client):
     client.post("/api/standards", json={"id": "src-std", "name": "Source", "description": "", "weight": 1.0, "source": "", "principles": []}, headers={"Origin": "http://localhost"})
     resp = client.post("/api/standards/src-std/duplicate", json={"newId": "copy-std"}, headers={"Origin": "http://localhost"})
     assert resp.status_code == 201
     assert resp.get_json()["id"] == "copy-std"
+
 
 # Import endpoint
 def test_import_standard_success(client):
@@ -99,10 +110,12 @@ def test_import_standard_success(client):
     assert body["status"] == "imported"
     assert body["detail"]["id"] == "imported"
 
+
 def test_import_standard_invalid_schema(client):
     payload = {"data": {"name": "No ID"}}
     resp = client.post("/api/standards/import", json=payload, headers={"Origin": "http://localhost"})
     assert resp.status_code == 400
+
 
 def test_import_standard_conflict(client):
     create_payload = {"id": "existing", "name": "Existing", "description": "", "weight": 1.0, "source": "", "principles": []}
@@ -114,6 +127,7 @@ def test_import_standard_conflict(client):
     assert body["status"] == "conflict"
     assert "existing" in body
 
+
 def test_import_standard_force_overwrite(client):
     create_payload = {"id": "overwrite-me", "name": "Original", "description": "", "weight": 1.0, "source": "", "principles": []}
     client.post("/api/standards", json=create_payload, headers={"Origin": "http://localhost"})
@@ -121,6 +135,7 @@ def test_import_standard_force_overwrite(client):
     resp = client.post("/api/standards/import", json=import_payload, headers={"Origin": "http://localhost"})
     assert resp.status_code == 201
     assert resp.get_json()["detail"]["name"] == "Overwritten"
+
 
 def test_import_standard_with_warnings(client):
     payload = {
@@ -135,6 +150,131 @@ def test_import_standard_with_warnings(client):
     body = resp.get_json()
     assert len(body["warnings"]) >= 1
 
+
 def test_import_standard_missing_data(client):
     resp = client.post("/api/standards/import", json={}, headers={"Origin": "http://localhost"})
     assert resp.status_code == 400
+
+
+# Log sanitization tests
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the id is written into a filename on disk; \\n/\\r are invalid "
+    "path characters on Windows (unrelated to the log-sanitization behavior "
+    "under test here)",
+)
+@pytest.mark.parametrize(("raw_id", "logged_id"), [
+    ("test-id\nFAKE_LOG_ENTRY", "test-idFAKE_LOG_ENTRY"),
+    ("test-id\rFAKE_ENTRY", "test-idFAKE_ENTRY"),
+])
+def test_import_standard_log_sanitization_strips_line_breaks(client, caplog, raw_id, logged_id):
+    import logging
+    caplog.set_level(logging.INFO, logger="quodeq.api.standards_import_routes")
+    payload = {"data": {"id": raw_id, "name": "Test", "principles": []}}
+    resp = client.post("/api/standards/import", json=payload, headers={"Origin": "http://localhost"})
+    assert resp.status_code == 201
+    for record in caplog.records:
+        msg = record.getMessage()
+        if "standards.import" in msg and "id=" in msg:
+            assert "\n" not in msg
+            assert "\r" not in msg
+            assert logged_id in msg
+
+
+class _FakeLibraryHttpClient:
+    """Minimal HttpClient stand-in for StandardsLibraryClient, mirroring
+    tests/services/test_standards_library.py's FakeHttpClient."""
+
+    def __init__(self, responses=None, raise_exc=None):
+        self._responses = responses or {}
+        self._raise_exc = raise_exc
+
+    def get_json(self, url, headers=None):
+        if self._raise_exc is not None:
+            raise self._raise_exc
+        if url in self._responses:
+            return self._responses[url]
+        raise ConnectionError(f"Not found: {url}")
+
+
+def _library_client(dirs, monkeypatch, http_client):
+    from quodeq.services.standards_library import StandardsLibraryClient
+    library = StandardsLibraryClient(base_url="https://example.com", http_client=http_client)
+    monkeypatch.setattr("quodeq.api.standards_routes._get_library_client", lambda app_instance: library)
+    return create_app(test_config={
+        "TESTING": True,
+        "STANDARDS_EVALUATORS_DIR": str(dirs["evaluators"]),
+        "STANDARDS_COMPILED_DIR": str(dirs["compiled"]),
+        "STANDARDS_DIMENSIONS_FILE": str(dirs["dimensions"]),
+    })
+
+
+def test_import_from_library_conflict_returns_409(dirs, monkeypatch):
+    # A standard with the same ID already exists locally from a different origin.
+    existing = {
+        "id": "clean-arch", "name": "Clean Architecture", "description": "",
+        "weight": 1.0, "source": "", "principles": [],
+        "origin": "other-repo/clean-arch.json", "managed": False, "type": "custom",
+    }
+    dirs["evaluators"].joinpath("clean-arch.json").write_text(json.dumps(existing))
+    remote_standard = {
+        "id": "clean-arch", "name": "Clean Architecture", "description": "Test",
+        "weight": 1.0, "source": "Martin", "principles": [],
+    }
+    http = _FakeLibraryHttpClient({"https://example.com/standards/clean-arch.json": remote_standard})
+    app = _library_client(dirs, monkeypatch, http)
+    with app.test_client() as c:
+        resp = c.post(
+            "/api/standards/library/import",
+            json={"file": "standards/clean-arch.json"},
+            headers={"Origin": "http://localhost"},
+        )
+    assert resp.status_code == 409
+    body = resp.get_json()
+    assert body["code"] == "conflict"
+
+
+def test_import_from_library_malformed_json_returns_502_not_conflict(dirs, monkeypatch):
+    # The "server" returns a body that fails JSON decoding -- a
+    # transport/parse failure, not a business-logic conflict.
+    malformed_json_error = json.JSONDecodeError("Expecting value", "not json", 0)
+    http = _FakeLibraryHttpClient(raise_exc=malformed_json_error)
+    app = _library_client(dirs, monkeypatch, http)
+    with app.test_client() as c:
+        resp = c.post(
+            "/api/standards/library/import",
+            json={"file": "standards/clean-arch.json"},
+            headers={"Origin": "http://localhost"},
+        )
+    assert resp.status_code == 502
+    body = resp.get_json()
+    assert body["code"] == "import_error"
+    assert body["code"] != "conflict"
+
+
+def test_import_from_library_log_sanitization_file(dirs, caplog, monkeypatch):
+    from unittest.mock import MagicMock
+    import logging
+    caplog.set_level(logging.INFO, logger="quodeq.api.standards_import_routes")
+    mock_library = MagicMock()
+    mock_library.import_standard.return_value = None
+
+    def get_mock_library(app_instance):
+        return mock_library
+    monkeypatch.setattr("quodeq.api.standards_routes._get_library_client", get_mock_library)
+    app = create_app(test_config={
+        "TESTING": True,
+        "STANDARDS_EVALUATORS_DIR": str(dirs["evaluators"]),
+        "STANDARDS_COMPILED_DIR": str(dirs["compiled"]),
+        "STANDARDS_DIMENSIONS_FILE": str(dirs["dimensions"]),
+    })
+    with app.test_client() as c:
+        payload = {"file": "test-file\nFAKE_LOG_ENTRY\rCAR_RETURN"}
+        resp = c.post("/api/standards/library/import", json=payload, headers={"Origin": "http://localhost"})
+        assert resp.status_code == 201
+        for record in caplog.records:
+            msg = record.getMessage()
+            if "standards.import_from_library" in msg and "file=" in msg:
+                assert "\n" not in msg
+                assert "\r" not in msg
+                assert "test-fileFAKE_LOG_ENTRYCAR_RETURN" in msg

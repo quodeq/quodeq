@@ -1,4 +1,5 @@
 import { t } from '../../../strings/index.js';
+import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
 const MODE_OPTIONS = [
   { value: 'system',   label: t('settings.themeModeSystem') },
@@ -16,8 +17,6 @@ const FAMILY_OPTIONS = [
   { value: 'galadriel', label: 'Galadriel' },
 ];
 
-import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
-
 export default function AppearanceSection({ themeMode, themeFamily, onApplyMode, onApplyFamily }) {
   return (
     <section className="panel settings-section">
@@ -29,14 +28,15 @@ export default function AppearanceSection({ themeMode, themeFamily, onApplyMode,
           <span className="settings-label">{t('settings.modeLabel')}</span>
           <span className="settings-description">{t('settings.modeDesc')}</span>
         </div>
-        <div className="settings-pill-group">
+        <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.appearanceGroupAria')}>
           {MODE_OPTIONS.map(({ value, label }) => (
             <button
               key={value}
               type="button"
+              role="radio"
+              aria-checked={themeMode === value}
               className={`settings-pill${themeMode === value ? ' settings-pill--active' : ''}`}
               onClick={() => onApplyMode(value)}
-              aria-pressed={themeMode === value}
             >
               {label}
             </button>

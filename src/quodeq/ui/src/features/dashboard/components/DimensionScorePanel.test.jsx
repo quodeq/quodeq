@@ -32,4 +32,15 @@ describe('DimensionScorePanel', () => {
     const { container } = render(<DimensionScorePanel dimensions={DIMS} dimTrends={dimTrends} />);
     expect(container.querySelector('.trend-badge')).toBeNull();
   });
+
+  it('sorts safely when a row is missing dimension, without throwing', () => {
+    const dims = [
+      { dimension: 'security', overallScore: '5.0' },
+      { overallScore: '3.0' }, // missing dimension
+      { dimension: 'maintainability', overallScore: '8.0' },
+    ];
+    const { container } = render(<DimensionScorePanel dimensions={dims} />);
+    const labels = [...container.querySelectorAll('.dim-score-label')].map((el) => el.textContent);
+    expect(labels).toEqual(['', 'maintainability', 'security']);
+  });
 });

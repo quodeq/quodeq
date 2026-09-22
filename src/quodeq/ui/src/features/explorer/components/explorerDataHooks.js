@@ -1,9 +1,12 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useApi } from '../../../api/ApiContext.jsx';
-import { projectKeys, samePlaceholderScope } from '../../../api/queryKeys.js';
+import { useState, useMemo, useCallback } from 'react';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { countBySeverity } from '../../../utils/severity.js';
+import { useExplorerQueries } from './useExplorerQueries.js';
+import { computeComplianceByPrinciple, buildEvalPrincipalFn } from '../../../utils/evalPrincipal.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { violationKey } from '../../../utils/violationKey.js';
+
+export { computeComplianceByPrinciple, buildEvalPrincipalFn };
 
 export function computeAllViolations(evalData) {
   if (!evalData) return [];
@@ -21,31 +24,6 @@ export function computeAllViolations(evalData) {
 
 export function computeSeverityCounts(allViolations) {
   return countBySeverity(allViolations);
-}
-
-export function computeComplianceByPrinciple(evalData) {
-  const map = new Map();
-  for (const c of (evalData?.compliance || [])) {
-    if (!map.has(c.principle)) map.set(c.principle, []);
-    map.get(c.principle).push(c);
-  }
-  return map;
-}
-
-export function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, runId, dateLabel = '') {
-  const principlesByName = new Map((evalData.principles || []).map((p) => [p.name, p]));
-  const gradesByPrinciple = new Map((evalData.principleGrades || []).map((p) => [p.principle, p]));
-  return function buildEvalPrincipal(principleId) {
-    const principleData = principlesByName.get(principleId);
-    const pg = gradesByPrinciple.get(principleId);
-    return {
-      principle: principleId, score: pg?.score || null, grade: pg?.grade || null,
-      dimension: evalData.dimension || '',
-      project: project || '', runId: runId || '', dateLabel: dateLabel || '',
-      principleData, dimViolations: principleData?.violations || [],
-      dimCompliance: complianceByPrinciple.get(principleId) || [],
-    };
-  };
 }
 
 function useDerivedExplorerStats(evalData, allViolations) {
@@ -69,12 +47,10 @@ function mergeRescoreIntoEval(prev, dimData) {
     return match ? { ...pg, score: match.score, grade: match.grade } : pg;
   });
   // Build set of dismissed violation keys for filtering
-  const rescViolationKeys = new Set(
-    (dimData.violations || []).map((v) => `${v.req || ''}|${v.file || ''}|${v.line || 0}`)
-  );
+  const rescViolationKeys = new Set((dimData.violations || []).map(violationKey));
   // Filter violations to only include those that survived rescore
   const filteredViolations = dimData.violations != null
-    ? (prev.violations || []).filter((v) => rescViolationKeys.has(`${v.req || ''}|${v.file || ''}|${v.line || 0}`))
+    ? (prev.violations || []).filter((v) => rescViolationKeys.has(violationKey(v)))
     : prev.violations;
   // Update totals
   const totals = dimData.totals ?? prev.totals;
@@ -107,37 +83,7 @@ function mergeRescoreIntoEval(prev, dimData) {
  * refetches after user actions exactly like the Overview does.
  */
 export function useExplorerData(project, dimension, runId, refreshSignal, selectedSource = 'local') {
-  const { getDimensionEval, getRunScores, sharedGetDimensionEval, sharedGetRunScores } = useApi();
-  const fetchDimensionEval = selectedSource === 'shared' ? sharedGetDimensionEval : getDimensionEval;
-  const fetchRunScores = selectedSource === 'shared' ? sharedGetRunScores : getRunScores;
-  const queryClient = useQueryClient();
-  const projectKey = project || '_none_';
-  // Reuse the previous payload only within this project+source subtree —
-  // run-navigator swaps keep the page up with an isFetching dim, a project
-  // switch drops to the real LoadingScreen (see samePlaceholderScope).
-  const keepInScope = useCallback(
-    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
-    [projectKey, selectedSource],
-  );
-
-  const evalQuery = useQuery({
-    queryKey: projectKeys.dimensionEval(projectKey, runId, dimension, selectedSource),
-    queryFn: () => fetchDimensionEval(project, runId, dimension),
-    enabled: !!project && !!dimension,
-    staleTime: 60_000,
-    placeholderData: keepInScope,
-  });
-
-  // The rescore side. Non-fatal by design: if it errors, the page renders
-  // the unrescored eval (the old fetchAndRescore caught and dropped scores
-  // errors the same way).
-  const scoresQuery = useQuery({
-    queryKey: projectKeys.runScores(projectKey, runId, selectedSource),
-    queryFn: () => fetchRunScores(project, runId),
-    enabled: !!project,
-    staleTime: 60_000,
-    placeholderData: keepInScope,
-  });
+  const { evalQuery, scoresQuery } = useExplorerQueries(project, dimension, runId, refreshSignal, selectedSource);
 
   const evalData = useMemo(() => {
     const data = evalQuery.data ?? null;
@@ -146,22 +92,13 @@ export function useExplorerData(project, dimension, runId, refreshSignal, select
     return dimData ? mergeRescoreIntoEval(data, dimData) : data;
   }, [evalQuery.data, scoresQuery.data, dimension]);
 
-  // refreshSignal (the dashboard payload identity) flips after external
-  // changes; re-pull the rescore data then, like the old effect did.
-  const initialRef = useRef(refreshSignal);
-  useEffect(() => {
-    if (refreshSignal === initialRef.current) return;
-    if (!project || !runId) return;
-    queryClient.invalidateQueries({ queryKey: projectKeys.runScores(projectKey, runId, selectedSource) });
-  }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Loading gates on BOTH queries so the first paint never shows pre-rescore
   // grades that visibly correct themselves a beat later (the old code
   // Promise.all'd the two fetches for the same reason). isLoading is false
   // once cached data exists, so Back-navigation skips the LoadingScreen.
   const loading = evalQuery.isLoading || scoresQuery.isLoading;
   const isFetching = evalQuery.isFetching || scoresQuery.isFetching;
-  const error = evalQuery.isError ? (evalQuery.error?.message || String(evalQuery.error)) : null;
+  const error = evalQuery.isError ? apiErrorMessage(evalQuery.error, 'explorer.loadFailed') : null;
 
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);

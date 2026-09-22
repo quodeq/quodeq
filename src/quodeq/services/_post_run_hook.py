@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from quodeq.services._ephemeral_cleanup import maybe_cleanup_after_job
+from quodeq.services.ephemeral_cleanup import maybe_cleanup_after_job
 
 _logger = logging.getLogger(__name__)
 
@@ -32,9 +32,16 @@ class PostRunHook:
         if not project_uuid:
             return
         reports = Path(self._reports_root) if self._reports_root is not None else _default_reports_root()
-        self.cleanup_clone(project_uuid, reports)
         try:
-            self.project_events(job_id, job, reports)
+            self.cleanup_clone(project_uuid, reports)
+        except Exception:
+            _logger.warning(
+                "Post-run cleanup failed for job %s — ephemeral clone may be left behind",
+                job_id,
+                exc_info=True,
+            )
+        try:
+            self.project_events(job, reports)
         except Exception:
             _logger.warning(
                 "Post-run projection failed for job %s — State Store may be incomplete",
@@ -45,7 +52,7 @@ class PostRunHook:
     @staticmethod
     def cleanup_clone(project_uuid: str, reports_root: Path) -> None:
         """Delete the ephemeral clone (if any) for *project_uuid*."""
-        from quodeq.shared._env import get_clones_dir
+        from quodeq.shared.env import get_clones_dir
         maybe_cleanup_after_job(
             reports_root=Path(reports_root),
             project_uuid=project_uuid,
@@ -53,7 +60,7 @@ class PostRunHook:
         )
 
     @staticmethod
-    def project_events(job_id: str, job: Any, reports_root: Path) -> None:
+    def project_events(job: Any, reports_root: Path) -> None:
         """Project ``events.jsonl`` into ``evaluation.db`` for the run.
 
         No-op when the run has no events log. Raises on projection failure.
@@ -75,5 +82,5 @@ class PostRunHook:
 
 
 def _default_reports_root() -> Path:
-    from quodeq.shared._env import get_evaluations_dir
+    from quodeq.shared.env import get_evaluations_dir
     return Path(get_evaluations_dir())

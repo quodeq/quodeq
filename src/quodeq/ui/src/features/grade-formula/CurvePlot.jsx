@@ -1,12 +1,16 @@
 import { t } from '../../strings/index.js';
+import { baseCurve, ceilingCurve } from './curveMath.js';
 const W = 220;
 const H = 130;
 const PAD_L = 26;
 const PAD_T = 12;
 const PAD_B = 15;
-const PLOT_W = W - PAD_L - 6;
+const PAD_R = 6;
+const PLOT_W = W - PAD_L - PAD_R;
 const PLOT_H = H - PAD_T - PAD_B;
 const MAX_WV = 40;
+// Nudges the threshold tick label down so it sits centered on its gridline.
+const TICK_LABEL_Y_OFFSET = 3;
 
 const x = (wv) => PAD_L + (wv / MAX_WV) * PLOT_W;
 const y = (score) => PAD_T + ((10 - score) / 10) * PLOT_H;
@@ -21,31 +25,31 @@ function pathFor(fn) {
 
 /** Base + ceiling curves with the compliance-lift zone shaded between them. */
 export default function CurvePlot({ baseK, ceilScale, thresholds }) {
-  const base = (wv) => (wv === 0 ? 10 : 10 / (1 + baseK * wv));
-  const ceiling = (wv) => (wv === 0 ? 10 : 10 - Math.log2(1 + wv) * ceilScale);
+  const base = (wv) => baseCurve(wv, baseK);
+  const ceiling = (wv) => ceilingCurve(wv, ceilScale);
   const basePath = pathFor(base);
   const ceilPath = pathFor(ceiling);
   const zone = `${ceilPath} L ${basePath.slice(2).split(' L ').reverse().join(' L ')} Z`;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width={W} role="img" aria-label={t('gradeFormula.scoreCurves')}>
-      {thresholds.map(([t]) => (
+      {thresholds.map(([score]) => (
         <line
-          key={t}
+          key={score}
           x1={PAD_L}
-          y1={y(t)}
-          x2={W - 6}
-          y2={y(t)}
+          y1={y(score)}
+          x2={W - PAD_R}
+          y2={y(score)}
           stroke="var(--color-border)"
           strokeWidth="1"
         />
       ))}
-      {thresholds.map(([t]) => (
-        <text key={`t${t}`} x="2" y={y(t) + 3} fontSize="9" fill="var(--color-text-muted)">
-          {t}
+      {thresholds.map(([score]) => (
+        <text key={`t${score}`} x="2" y={y(score) + TICK_LABEL_Y_OFFSET} fontSize="9" fill="var(--color-text-muted)">
+          {score}
         </text>
       ))}
       <line x1={PAD_L} y1={PAD_T} x2={PAD_L} y2={H - PAD_B} stroke="var(--color-border)" />
-      <line x1={PAD_L} y1={H - PAD_B} x2={W - 6} y2={H - PAD_B} stroke="var(--color-border)" />
+      <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="var(--color-border)" />
       <path d={zone} fill="var(--color-accent)" opacity="0.12" />
       <path
         d={ceilPath}

@@ -15,11 +15,12 @@ from pathlib import Path
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types.finding import Finding
 from quodeq.data.fs.grade_formula_store import load_params
-from quodeq.data.sqlite._row_mappers import row_to_finding
+from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 from quodeq.core.scoring.projector_scoring import (
     GRADE_ALGO_VERSION,
+    PrincipleGradeScale,
     compute_dimension_score,
     compute_principle_grade,
 )
@@ -71,6 +72,31 @@ def _dict_row(cursor, row):
     return {col[0]: row[i] for i, col in enumerate(cursor.description)}
 
 
+def _grade_all_principles(
+    violations_by: dict[tuple[str, str], list[Finding]],
+    compliance_by: dict[tuple[str, str], list[Finding]],
+    dismissed_counts: dict[tuple[str, str], int],
+    source_file_count: int,
+    params: ScoringParams,
+) -> tuple[list[tuple[str, dict]], dict[str, list[dict]]]:
+    """Compute per-principle grades: flat rows (for persistence) plus the
+    same grades grouped by dimension (for the dimension-score rollup)."""
+    scale = PrincipleGradeScale(source_file_count=source_file_count, params=params)
+    principle_grades_by_dim: dict[str, list[dict]] = {}
+    principle_rows: list[tuple[str, dict]] = []
+    for dim, principle_id in sorted(set(violations_by) | set(compliance_by)):
+        grade = compute_principle_grade(
+            principle_id=principle_id,
+            findings=violations_by.get((dim, principle_id), []),
+            compliance=compliance_by.get((dim, principle_id), []),
+            dismissed_count=dismissed_counts.get((dim, principle_id), 0),
+            scale=scale,
+        )
+        principle_grades_by_dim.setdefault(dim, []).append(grade)
+        principle_rows.append((dim, grade))
+    return principle_rows, principle_grades_by_dim
+
+
 def compute_run_grades(
     run_dir: Path, params: ScoringParams,
 ) -> tuple[list[tuple[str, dict]], list[dict]]:
@@ -104,19 +130,9 @@ def compute_run_grades(
         bucket.setdefault(key, []).append(f)
 
     # Compute per-principle grades, group results by dimension.
-    principle_grades_by_dim: dict[str, list[dict]] = {}
-    principle_rows: list[tuple[str, dict]] = []
-    for dim, principle_id in sorted(set(violations_by) | set(compliance_by)):
-        grade = compute_principle_grade(
-            principle_id=principle_id,
-            findings=violations_by.get((dim, principle_id), []),
-            compliance=compliance_by.get((dim, principle_id), []),
-            dismissed_count=dismissed_counts.get((dim, principle_id), 0),
-            source_file_count=source_file_count,
-            params=params,
-        )
-        principle_grades_by_dim.setdefault(dim, []).append(grade)
-        principle_rows.append((dim, grade))
+    principle_rows, principle_grades_by_dim = _grade_all_principles(
+        violations_by, compliance_by, dismissed_counts, source_file_count, params,
+    )
 
     dimension_rows = [
         compute_dimension_score(dimension=dim, principle_grades=p_grades, params=params)

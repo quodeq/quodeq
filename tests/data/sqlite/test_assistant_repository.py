@@ -1,3 +1,4 @@
+from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
@@ -22,7 +23,8 @@ def test_create_and_get_session(tmp_path):
 
 def test_create_session_stores_project_id(tmp_path):
     repo = _repo(tmp_path)
-    repo.create_session(session_id="s1", provider="ollama", project_id="selectives")
+    repo.create_session(session_id="s1", provider="ollama",
+                        scope=SessionScope(project_id="selectives"))
     assert repo.get_session("s1")["project_id"] == "selectives"
 
 
@@ -188,3 +190,31 @@ def test_connect_uses_wal_with_normal_sync(tmp_path):
     with repo._connect() as conn:
         assert conn.execute("PRAGMA journal_mode").fetchone()["journal_mode"].lower() == "wal"
         assert conn.execute("PRAGMA synchronous").fetchone()["synchronous"] == 1  # 1 == NORMAL
+
+
+def test_reuses_one_connection_across_calls(tmp_path):
+    from unittest.mock import patch
+    import sqlite3
+
+    repo = _repo(tmp_path)
+    connect_calls = {"n": 0}
+    real_connect = sqlite3.connect
+
+    def counting_connect(*a, **kw):
+        connect_calls["n"] += 1
+        return real_connect(*a, **kw)
+
+    with patch("sqlite3.connect", counting_connect):
+        repo.create_session(session_id="s1", provider="ollama")
+        repo.add_message("s1", "user", "hi")
+        repo.add_message("s1", "assistant", "hello")
+        repo.append_event("s1", {"type": "delta", "text": "x"})
+
+    assert connect_calls["n"] == 1, "expected one pooled connection, not one per call"
+
+
+def test_pooled_connection_survives_across_repository_instance_lifetime(tmp_path):
+    repo = _repo(tmp_path)
+    repo.create_session(session_id="s1", provider="ollama")
+    repo.add_message("s1", "user", "hi")
+    assert repo.list_messages("s1") == [{"role": "user", "content": "hi"}]

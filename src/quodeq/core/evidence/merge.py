@@ -4,11 +4,10 @@ from __future__ import annotations
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
 
 
-def merge_evidence(
-    evidence_list: list[Evidence], source_file_count: int, src: str, language: str,
-    module: str = "",
-) -> Evidence:
-    """Merge per-dimension Evidence objects into a single Evidence."""
+def _merge_principles(
+    evidence_list: list[Evidence], source_file_count: int,
+) -> tuple[dict[str, PrincipleEvidence], int, int]:
+    """Return (merged_principles, total_files_read, total_dismissed)."""
     merged_principles: dict[str, PrincipleEvidence] = {}
     total_files_read = 0
     total_dismissed = 0
@@ -28,27 +27,41 @@ def merge_evidence(
     for pe in merged_principles.values():
         pe.compute_metrics(source_file_count=source_file_count)
 
-    coverage_pct = compute_coverage_pct(total_files_read, source_file_count)
+    return merged_principles, total_files_read, total_dismissed
 
-    # Inherit module from the first evidence object if not explicitly provided
-    if not module and evidence_list:
-        module = evidence_list[0].module
 
-    # Pick exit_reason: any non-"done" reason wins (incomplete dominates done),
-    # otherwise the first non-None value, otherwise None. Mirrors how the UI
-    # treats anything-not-done as partial.
+def _resolve_exit_reason(evidence_list: list[Evidence]) -> str | None:
+    """Any non-"done" reason wins (incomplete dominates done), otherwise the
+    first non-None value, otherwise None. Mirrors how the UI treats
+    anything-not-done as partial."""
     incomplete = next(
         (ev.exit_reason for ev in evidence_list
          if ev.exit_reason and ev.exit_reason != "done"),
         None,
     )
     if incomplete is not None:
-        merged_exit_reason: str | None = incomplete
-    else:
-        merged_exit_reason = next(
-            (ev.exit_reason for ev in evidence_list if ev.exit_reason is not None),
-            None,
-        )
+        return incomplete
+    return next(
+        (ev.exit_reason for ev in evidence_list if ev.exit_reason is not None),
+        None,
+    )
+
+
+def merge_evidence(
+    evidence_list: list[Evidence], source_file_count: int, src: str, language: str,
+    module: str = "",
+) -> Evidence:
+    """Merge per-dimension Evidence objects into a single Evidence."""
+    merged_principles, total_files_read, total_dismissed = _merge_principles(
+        evidence_list, source_file_count,
+    )
+    coverage_pct = compute_coverage_pct(total_files_read, source_file_count)
+
+    # Inherit module from the first evidence object if not explicitly provided
+    if not module and evidence_list:
+        module = evidence_list[0].module
+
+    merged_exit_reason = _resolve_exit_reason(evidence_list)
 
     merged = Evidence(
         repository=src,

@@ -1,6 +1,5 @@
 """Tests for StandardsService — list and read standards."""
 import json
-from pathlib import Path
 import pytest
 from quodeq.services.standards import StandardsService
 
@@ -115,10 +114,12 @@ def test_create_standard(service, evaluators_dir):
     assert not detail.managed
     assert (evaluators_dir / "my-standard.json").is_file()
 
+
 def test_create_standard_duplicate_id_raises(service, evaluators_dir):
     _write_custom(evaluators_dir, CUSTOM_STANDARD)
     with pytest.raises(ValueError, match="already exists"):
         service.create_standard({"id": "clean-arch", "name": "Dup", "description": "", "weight": 1.0, "source": "", "principles": []})
+
 
 def test_update_standard(service, evaluators_dir):
     _write_custom(evaluators_dir, CUSTOM_STANDARD)
@@ -126,16 +127,19 @@ def test_update_standard(service, evaluators_dir):
     detail = service.update_standard("clean-arch", updated)
     assert detail.name == "Updated Name"
 
+
 def test_update_managed_raises(service, evaluators_dir):
     managed = {**CUSTOM_STANDARD, "id": "managed-one", "managed": True, "type": "community"}
     _write_custom(evaluators_dir, managed)
     with pytest.raises(PermissionError, match="managed"):
         service.update_standard("managed-one", {**managed, "name": "Hacked"})
 
+
 def test_delete_standard(service, evaluators_dir):
     _write_custom(evaluators_dir, CUSTOM_STANDARD)
     service.delete_standard("clean-arch")
     assert not (evaluators_dir / "clean-arch.json").is_file()
+
 
 def test_delete_managed_raises(service, evaluators_dir):
     managed = {**CUSTOM_STANDARD, "id": "managed-one", "managed": True}
@@ -143,9 +147,11 @@ def test_delete_managed_raises(service, evaluators_dir):
     with pytest.raises(PermissionError, match="managed"):
         service.delete_standard("managed-one")
 
+
 def test_delete_builtin_raises(service):
     with pytest.raises(PermissionError, match="built-in"):
         service.delete_standard("security")
+
 
 def test_duplicate_standard(service, evaluators_dir):
     _write_custom(evaluators_dir, CUSTOM_STANDARD)
@@ -154,6 +160,7 @@ def test_duplicate_standard(service, evaluators_dir):
     assert detail.type == "custom"
     assert not detail.managed
     assert (evaluators_dir / "clean-arch-copy.json").is_file()
+
 
 def test_duplicate_builtin(service, compiled_dir):
     compiled_dir.joinpath("security.json").write_text(json.dumps({

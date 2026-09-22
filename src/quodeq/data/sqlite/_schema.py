@@ -1,9 +1,9 @@
 """DDL strings for evaluation.db. Constants only — no logic."""
 from __future__ import annotations
 
-EVALUATION_DDL = """
-PRAGMA user_version = 7;
+SCHEMA_VERSION = 9
 
+_DDL_BODY = """
 CREATE TABLE findings (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     schema_version  INTEGER NOT NULL DEFAULT 1,
@@ -25,6 +25,9 @@ CREATE TABLE findings (
     reason          TEXT NOT NULL DEFAULT '',
     snippet         TEXT NOT NULL DEFAULT '',
     violation_type  TEXT NOT NULL DEFAULT '',
+    -- The model's violation-type tag as emitted, before taxonomy mapping
+    -- (spec 2026-09-15). '' for legacy rows and deterministic-checker findings.
+    violation_type_raw TEXT NOT NULL DEFAULT '',
     context         TEXT NOT NULL DEFAULT '',
     scope           TEXT NOT NULL DEFAULT '',
     req_refs_json   TEXT,
@@ -51,6 +54,7 @@ CREATE INDEX idx_findings_verdict     ON findings(verdict);
 CREATE INDEX idx_findings_file        ON findings(file);
 CREATE INDEX idx_findings_requirement ON findings(requirement);
 CREATE INDEX idx_findings_practice    ON findings(practice_id);
+CREATE INDEX idx_findings_req_file_line ON findings(requirement, file, line);
 
 CREATE VIRTUAL TABLE findings_fts USING fts5(
     reason, snippet,
@@ -103,4 +107,4 @@ CREATE TABLE principle_grades (
 CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
 """
 
-SCHEMA_VERSION = 7
+EVALUATION_DDL = f"PRAGMA user_version = {SCHEMA_VERSION};\n" + _DDL_BODY

@@ -2,99 +2,23 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections import Counter
-from fnmatch import fnmatchcase
 from pathlib import Path
 
-from quodeq.analysis._ignore import is_ignored, load_ignore_patterns
-from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
+from quodeq.analysis._ignore import load_ignore_patterns
+from quodeq.analysis.manifest_build_scope import _build_multi_scope_manifest
+from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
+from quodeq.analysis.manifest_targets import (
+    _MIN_FILES_PER_TARGET,
+    WalkCounts,
+    _build_targets_from_matches,
+    _iter_source_files,
+    target_name,
+)
 from quodeq.config.discipline_registry import DisciplineRegistry
+from quodeq.data.git_cli import list_tracked_files
 
 _logger = logging.getLogger(__name__)
-
-_MIN_FILES_PER_TARGET = 3
-_UNKNOWN_LANG = "unknown"
-
-
-def _deepest_scope(rel_path: str, scope_paths: list[str]) -> str | None:
-    """Return the most-specific scope (by path depth) that contains *rel_path*.
-
-    Used when partitioning files across subprojects in a monorepo. ``"."`` matches
-    any file as a fallback. Returns ``None`` only when *scope_paths* is empty or
-    contains no scope that covers the file (i.e. no ``"."`` and no ancestor scope).
-    """
-    best: str | None = None
-    best_depth = -1
-    for scope in scope_paths:
-        if scope == ".":
-            depth = 0
-        else:
-            prefix = scope + "/"
-            if rel_path != scope and not rel_path.startswith(prefix):
-                continue
-            depth = scope.count("/") + 1
-        if depth > best_depth:
-            best = scope
-            best_depth = depth
-    return best
-
-
-def _matches_skip_pattern(rel_path: str, skip_patterns: list[str]) -> bool:
-    """Return True when *rel_path* (POSIX, relative to the scan root) matches a
-    skip_patterns glob from detection.json. fnmatch's ``*`` crosses directory
-    separators, so ``*.min.js`` excludes matching files at any depth — the same
-    semantics as .quodeqignore patterns.
-    """
-    return any(fnmatchcase(rel_path, pat) for pat in skip_patterns)
-
-
-def target_name(language: str, category: str | None) -> str:
-    """Build a filesystem-safe target name: '{language}_{category}' or bare '{language}'."""
-    if category:
-        return f"{language}_{category}"
-    return language
-
-
-def _build_targets_from_matches(
-    registry: DisciplineRegistry,
-    matches: list[str],
-    files_by_lang: dict[str, list[str]],
-    ext_counts_by_lang: dict[str, Counter],
-    scope_path: str = "",
-) -> list[AnalysisTarget]:
-    """Construct AnalysisTargets from a precomputed match list, consuming languages."""
-    targets: list[AnalysisTarget] = []
-    claimed_languages: set[str] = set()
-    for match_name in matches:
-        rule = registry.disciplines.get(match_name)
-        if rule is None or rule.language is None:
-            continue
-        lang = rule.language
-        if lang in claimed_languages:
-            continue
-        lang_files = files_by_lang.get(lang, [])
-        if len(lang_files) < _MIN_FILES_PER_TARGET:
-            continue
-        claimed_languages.add(lang)
-        topics = list(rule.suggested_topics) if rule.suggested_topics else []
-        ext_counts = ext_counts_by_lang.get(lang, Counter())
-        targets.append(AnalysisTarget(
-            name=target_name(lang, rule.category),
-            language=lang,
-            category=rule.category,
-            frameworks=topics,
-            source_files=sorted(lang_files),
-            total_files=len(lang_files),
-            language_stats=dict(ext_counts),
-            scope_path=scope_path,
-        ))
-
-    for lang in claimed_languages:
-        files_by_lang.pop(lang, None)
-        ext_counts_by_lang.pop(lang, None)
-
-    return targets
 
 
 def _build_targets_from_disciplines(
@@ -111,183 +35,54 @@ def _build_targets_from_disciplines(
     return _build_targets_from_matches(registry, matches, files_by_lang, ext_counts_by_lang)
 
 
-def _prune_ignored_dirs(
-    src: Path, dirpath: str, dirnames: list[str], ignore_patterns: list[str],
-) -> None:
-    """Drop directories matching an ignore pattern so they are never descended."""
-    dirnames[:] = [
-        d for d in dirnames
-        if not is_ignored(
-            os.path.relpath(os.path.join(dirpath, d), src).replace(os.sep, "/"),
-            ignore_patterns,
-        )
-    ]
+def _resolve_walk_root(src: Path, scope_path: str | None) -> Path:
+    """The directory to walk: *src*, or the contained *scope_path* under it.
+
+    Containment mirrors the CLI --scope guard (_cli_resolution): a scope that
+    resolves outside the repo (traversal segments or a symlink) must not widen
+    the walk; fall back to the full repo.
+    """
+    if not scope_path:
+        return src
+    candidate = src / scope_path
+    if candidate.is_dir() and candidate.resolve().is_relative_to(src.resolve()):
+        return candidate
+    return src
 
 
 def _walk_and_group(
-    src: Path, ext_map: dict[str, str], skip_dirs: set[str],
-    skip_patterns: list[str],
-    scope_path: str | None = None,
-    ignore_patterns: list[str] | None = None,
-) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter]]:
+    src: Path, walk: ManifestWalkSpec, scope_path: str | None = None,
+) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter], int]:
     """Walk *src* (or a scoped subdirectory) once, grouping files by language.
 
     When *scope_path* is given (relative to *src*), only files under that
     subdirectory are included.  Relative paths in the result are still
     expressed relative to *src* so callers see the same format regardless.
-    *ignore_patterns* (.quodeqignore) are anchored at *src*, not the scope.
-    """
-    walk_root = src
-    if scope_path:
-        candidate = src / scope_path
-        # Containment mirrors the CLI --scope guard (_cli_resolution): a
-        # scope that resolves outside the repo (traversal segments or a
-        # symlink) must not widen the walk; fall back to the full repo.
-        if candidate.is_dir() and candidate.resolve().is_relative_to(src.resolve()):
-            walk_root = candidate
+    *walk.ignore_patterns* (.quodeqignore) are anchored at *src*, not the scope.
 
-    ignore_patterns = ignore_patterns or []
+    The fourth element is how many files the git-tracked filter skipped.
+    """
     files_by_lang: dict[str, list[str]] = {}
     ext_counts: Counter[str] = Counter()
     ext_counts_by_lang: dict[str, Counter] = {}
-    all_extensions = set(ext_map.keys())
-    for dirpath, dirnames, filenames in os.walk(walk_root):
-        dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
-        if ignore_patterns:
-            _prune_ignored_dirs(src, dirpath, dirnames, ignore_patterns)
-        for fname in filenames:
-            suffix = os.path.splitext(fname)[1]
-            if suffix in all_extensions:
-                # Normalize to POSIX separators so manifest paths are consistent
-                # across platforms — downstream consumers and scope-prefix
-                # matching all assume "/".
-                rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
-                if _matches_skip_pattern(rel, skip_patterns):
-                    continue
-                if ignore_patterns and is_ignored(rel, ignore_patterns):
-                    continue
-                lang = ext_map.get(suffix, _UNKNOWN_LANG)
-                files_by_lang.setdefault(lang, []).append(rel)
-                ext_counts[suffix] += 1
-                ext_counts_by_lang.setdefault(lang, Counter())[suffix] += 1
-    return files_by_lang, ext_counts, ext_counts_by_lang
-
-
-def _walk_and_partition_by_scope(
-    src: Path, ext_map: dict[str, str], skip_dirs: set[str],
-    skip_patterns: list[str], scope_paths: list[str],
-    ignore_patterns: list[str] | None = None,
-) -> tuple[
-    dict[str, dict[str, list[str]]],
-    Counter[str],
-    dict[str, dict[str, Counter]],
-]:
-    """Walk *src* once, bucketing files by their owning subproject scope.
-
-    Each file is assigned to the deepest scope path that contains it. Files outside
-    every scope are dropped — they don't belong to any classified subproject and
-    shouldn't appear in any target. Callers that must not lose unclassified source
-    pass ``"."`` among *scope_paths* as a catch-all (see _build_multi_scope_manifest).
-    """
-    ignore_patterns = ignore_patterns or []
-    files_by_scope_lang: dict[str, dict[str, list[str]]] = {s: {} for s in scope_paths}
-    ext_counts_overall: Counter[str] = Counter()
-    ext_counts_by_scope_lang: dict[str, dict[str, Counter]] = {s: {} for s in scope_paths}
-    all_extensions = set(ext_map.keys())
-    for dirpath, dirnames, filenames in os.walk(src):
-        dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
-        if ignore_patterns:
-            _prune_ignored_dirs(src, dirpath, dirnames, ignore_patterns)
-        for fname in filenames:
-            suffix = os.path.splitext(fname)[1]
-            if suffix not in all_extensions:
-                continue
-            # Match the POSIX-style scope_paths from detect_matches_recursive
-            # so prefix matching works on Windows.
-            rel = os.path.relpath(os.path.join(dirpath, fname), src).replace(os.sep, "/")
-            if _matches_skip_pattern(rel, skip_patterns):
-                continue
-            if ignore_patterns and is_ignored(rel, ignore_patterns):
-                continue
-            owner = _deepest_scope(rel, scope_paths)
-            if owner is None:
-                continue
-            lang = ext_map.get(suffix, _UNKNOWN_LANG)
-            files_by_scope_lang[owner].setdefault(lang, []).append(rel)
-            ext_counts_overall[suffix] += 1
-            ext_counts_by_scope_lang[owner].setdefault(lang, Counter())[suffix] += 1
-    return files_by_scope_lang, ext_counts_overall, ext_counts_by_scope_lang
-
-
-def _build_multi_scope_manifest(
-    src: Path,
-    ext_map: dict[str, str],
-    skip_dirs: set[str],
-    skip_patterns: list[str],
-    registry: DisciplineRegistry,
-    sub_results: list[tuple[str, list[str]]],
-    ignore_patterns: list[str] | None = None,
-) -> SourceManifest:
-    """Produce a manifest with one target group per detected subproject scope."""
-    scope_paths = [rel for rel, _ in sub_results]
-    matches_by_scope = {rel: matches for rel, matches in sub_results}
-    if "." not in matches_by_scope:
-        # No rule classified the repo root, but source can still live outside every
-        # detected subproject — e.g. a Kotlin Multiplatform repo where only
-        # ``iosApp/`` matches (via *.xcodeproj) while the Gradle/Kotlin root does
-        # not. Without a catch-all root scope those files are dropped and the
-        # manifest comes back with no targets, which downstream reads as "no
-        # source files". "." is depth 0 in _deepest_scope, so it only claims files
-        # no more specific scope owns, and _MIN_FILES_PER_TARGET still keeps a
-        # handful of stray root files from becoming a target.
-        scope_paths.append(".")
-        matches_by_scope["."] = []
-    files_by_scope, ext_counts_overall, ext_counts_by_scope_lang = _walk_and_partition_by_scope(
-        src, ext_map, skip_dirs, skip_patterns, scope_paths,
-        ignore_patterns=ignore_patterns,
-    )
-
-    targets: list[AnalysisTarget] = []
-    for scope in scope_paths:
-        lang_files = files_by_scope[scope]
-        ext_counts_by_lang = ext_counts_by_scope_lang[scope]
-        framework_targets = _build_targets_from_matches(
-            registry, matches_by_scope[scope], lang_files, ext_counts_by_lang,
-            scope_path=scope,
-        )
-        targets.extend(framework_targets)
-        for lang, files in lang_files.items():
-            if len(files) < _MIN_FILES_PER_TARGET:
-                continue
-            targets.append(AnalysisTarget(
-                name=target_name(lang, None),
-                language=lang,
-                source_files=sorted(files),
-                total_files=len(files),
-                language_stats=dict(ext_counts_by_lang.get(lang, Counter())),
-                scope_path=scope,
-            ))
-
-    targets.sort(key=lambda t: t.total_files, reverse=True)
-    total = sum(t.total_files for t in targets)
-    return SourceManifest(
-        targets=targets, total_files=total, language_stats=dict(ext_counts_overall),
-    )
+    counts = WalkCounts()
+    walk_root = _resolve_walk_root(src, scope_path)
+    for rel, suffix, lang in _iter_source_files(src, walk_root, walk, counts):
+        files_by_lang.setdefault(lang, []).append(rel)
+        ext_counts[suffix] += 1
+        ext_counts_by_lang.setdefault(lang, Counter())[suffix] += 1
+    return files_by_lang, ext_counts, ext_counts_by_lang, counts.skipped_untracked
 
 
 def _build_single_scope_manifest(
     src: Path,
-    ext_map: dict[str, str],
-    skip_dirs: set[str],
-    skip_patterns: list[str],
+    walk: ManifestWalkSpec,
     disciplines_conf: Path | None,
     scope_path: str | None,
-    ignore_patterns: list[str] | None = None,
 ) -> SourceManifest:
     """Legacy single-scope path: walk once at the (optionally scoped) root."""
-    files_by_lang, ext_counts, ext_counts_by_lang = _walk_and_group(
-        src, ext_map, skip_dirs, skip_patterns, scope_path=scope_path,
-        ignore_patterns=ignore_patterns,
+    files_by_lang, ext_counts, ext_counts_by_lang, skipped = _walk_and_group(
+        src, walk, scope_path=scope_path,
     )
     all_source_files_count = sum(len(f) for f in files_by_lang.values())
 
@@ -317,7 +112,39 @@ def _build_single_scope_manifest(
         targets=targets,
         total_files=all_source_files_count,
         language_stats=dict(ext_counts),
+        skipped_untracked=skipped,
     )
+
+
+def _resolve_registry_and_scopes(
+    src: Path, disciplines_conf: Path | None,
+) -> tuple[DisciplineRegistry | None, list[tuple[str, list[str]]] | None]:
+    """Load the discipline registry (if any) and, when it classifies more
+    than the repo root alone, its recursive subproject scopes.
+
+    Returns ``(registry, sub_results)`` where *sub_results* is ``None`` when
+    there is no registry, or when the registry classifies only a single
+    root-level project — both cases mean the caller should take the legacy
+    single-scope path.
+    """
+    registry: DisciplineRegistry | None = None
+    if disciplines_conf and disciplines_conf.exists():
+        try:
+            registry = DisciplineRegistry.from_file(disciplines_conf)
+        except (ValueError, OSError) as exc:
+            _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
+            return None, None
+
+    if registry is None:
+        return None, None
+
+    sub_results = registry.detect_matches_recursive(src)
+    is_single_root = (
+        not sub_results or (len(sub_results) == 1 and sub_results[0][0] == ".")
+    )
+    if is_single_root:
+        return registry, None
+    return registry, sub_results
 
 
 def build_manifest(
@@ -343,37 +170,46 @@ def build_manifest(
 
     A ``.quodeqignore`` file at *src* adds repo-local exclusions on top of the
     built-in skip_dirs (see quodeq.analysis._ignore for the pattern syntax).
+
+    When *src* sits in a git work tree, only the files git tracks are scanned:
+    a scratch file that no branch can reach must not move a score, and the
+    same commit has to produce the same manifest in anyone's checkout. The
+    tracked set is resolved once here, per run, so the walk never shells out.
+    Outside a work tree, or when git cannot answer, every file is scanned,
+    exactly as before. What the filter dropped is reported on the manifest as
+    ``skipped_untracked`` and logged once, so a run that scores fewer files
+    than the reader can see says why.
     """
-    ext_map: dict[str, str] = detection.get("extensions", {})
-    skip_dirs = set(detection.get("skip_dirs", []))
-    skip_patterns: list[str] = detection.get("skip_patterns", [])
-    ignore_patterns = load_ignore_patterns(src)
-
-    if scope_path is not None:
-        return _build_single_scope_manifest(
-            src, ext_map, skip_dirs, skip_patterns, disciplines_conf, scope_path,
-            ignore_patterns=ignore_patterns,
-        )
-
-    registry: DisciplineRegistry | None = None
-    if disciplines_conf and disciplines_conf.exists():
-        try:
-            registry = DisciplineRegistry.from_file(disciplines_conf)
-        except (ValueError, OSError) as exc:
-            _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
-
-    if registry is not None:
-        sub_results = registry.detect_matches_recursive(src)
-        is_single_root = (
-            not sub_results or (len(sub_results) == 1 and sub_results[0][0] == ".")
-        )
-        if not is_single_root:
-            return _build_multi_scope_manifest(
-                src, ext_map, skip_dirs, skip_patterns, registry, sub_results,
-                ignore_patterns=ignore_patterns,
-            )
-
-    return _build_single_scope_manifest(
-        src, ext_map, skip_dirs, skip_patterns, disciplines_conf, None,
-        ignore_patterns=ignore_patterns,
+    walk = ManifestWalkSpec(
+        ext_map=detection.get("extensions", {}),
+        skip_dirs=set(detection.get("skip_dirs", [])),
+        skip_patterns=detection.get("skip_patterns", []),
+        ignore_patterns=load_ignore_patterns(src),
+        tracked_files=list_tracked_files(src),
     )
+    manifest = _dispatch_manifest_build(src, walk, disciplines_conf, scope_path)
+    skipped = manifest.skipped_untracked
+    if skipped:
+        _logger.info(
+            "Skipped %d untracked file%s under %s (only what git tracks is scored)",
+            skipped, "" if skipped == 1 else "s", src,
+        )
+    return manifest
+
+
+def _dispatch_manifest_build(
+    src: Path,
+    walk: ManifestWalkSpec,
+    disciplines_conf: Path | None,
+    scope_path: str | None,
+) -> SourceManifest:
+    """Pick the single- or multi-scope builder for this run. See build_manifest."""
+    if scope_path is not None:
+        return _build_single_scope_manifest(src, walk, disciplines_conf, scope_path)
+
+    registry, sub_results = _resolve_registry_and_scopes(src, disciplines_conf)
+    if sub_results is not None:
+        assert registry is not None  # sub_results is only set alongside a loaded registry
+        return _build_multi_scope_manifest(src, walk, registry, sub_results)
+
+    return _build_single_scope_manifest(src, walk, disciplines_conf, None)

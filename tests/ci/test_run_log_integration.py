@@ -34,7 +34,7 @@ def test_run_log_captures_log_info_during_pipeline(tmp_path: Path, monkeypatch) 
 
 def test_pipeline_installs_and_removes_run_log_handler(tmp_path: Path, monkeypatch) -> None:
     """_run_pipeline_with_cleanup must install RunLogHandler on entry and remove on exit."""
-    import quodeq._cli_evaluation as cli
+    import quodeq.cli_evaluation as cli
     from quodeq.shared.run_log import RunLogHandler
 
     logger = logging.getLogger("quodeq")
@@ -52,10 +52,11 @@ def test_pipeline_installs_and_removes_run_log_handler(tmp_path: Path, monkeypat
         evaluation_dir.mkdir(parents=True)
         import argparse
         args = argparse.Namespace(repo="local")
-        inputs = type("I", (), {"src": tmp_path, "language": "python", "manifest": None, "dims_data": None})()
+        inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
 
         # During pipeline, a RunLogHandler must be attached to the quodeq logger.
         attached: list[bool] = []
+
         def _spy(*a, **k):
             attached.append(any(isinstance(h, RunLogHandler) for h in logger.handlers))
             return 0

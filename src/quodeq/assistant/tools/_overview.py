@@ -3,20 +3,61 @@
 The run-scoped tools in ``_read_tools`` read a single ``run_dir``. On the
 overview the user sees the *accumulated* view aggregated across recent runs,
 so there is no single run to read. ``get_overview`` fills that gap by calling
-``services._fs_reports.get_accumulated`` (assistant→services is a legal
-import) and trimming the payload to what a chat needs.
+``quodeq.services.get_accumulated`` (assistant→services is a legal import)
+and trimming the payload to what a chat needs.
 """
 from __future__ import annotations
 
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_entries_visible
-from quodeq.services import _fs_reports
+from quodeq.services import get_accumulated
 from quodeq.services.scoring import rescore_accumulated
 
 # Severity buckets recomputed for the filtered summary. Unknown/missing
 # severities are ignored rather than added as a fourth bucket.
 _SEVERITY_BUCKETS = ("critical", "major", "minor")
+
+
+def _build_filtered_summary(payload: dict, kept: list[dict], hidden: list) -> dict:
+    """Build the overview summary dict, recomputed when standards are hidden.
+
+    When nothing is hidden, the baked summary fields are passed through.
+    When some are hidden, overallGrade/numericAverage are omitted and counts
+    are recomputed from *kept* only.
+    """
+    summary = payload.get("summary", {}) or {}
+    if not hidden:
+        return {
+            "overallGrade": summary.get("overallGrade"),
+            "numericAverage": summary.get("numericAverage"),
+            "totalViolations": summary.get("totalViolations"),
+            "dimensionCount": summary.get("dimensionCount"),
+            "severity": summary.get("severity"),
+        }
+    # overallGrade/numericAverage are deliberately absent. The Overview
+    # derives them from the filtered TREND in the browser
+    # (ui/src/utils/scoreFiltering.js), not from these dimensions, so any
+    # value computed here could contradict the number on screen -- the
+    # divergence this filtering exists to prevent. Counts are exact, so
+    # they are recomputed rather than dropped.
+    severity = {bucket: 0 for bucket in _SEVERITY_BUCKETS}
+    total = 0
+    for d in kept:
+        for v in (d.get("violations") or []):
+            total += 1
+            level = (v.get("severity") or "").lower()
+            if level in severity:
+                severity[level] += 1
+    return {
+        "totalViolations": total,
+        "dimensionCount": len(kept),
+        "severity": severity,
+        "note": ("overall grade and average omitted: they cover all "
+                 "standards, including the ones hidden from this project's "
+                 "dashboard. Quote the per-dimension scores instead, or "
+                 "point the user at the Overview."),
+    }
 
 
 def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
@@ -26,7 +67,7 @@ def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
             "Call get_context to confirm scope, then ask the user to open a "
             "project overview."
         )
-    payload = _fs_reports.get_accumulated(str(ctx.reports_dir), ctx.project_id, as_of)
+    payload = get_accumulated(str(ctx.reports_dir), ctx.project_id, as_of)
     if payload is None:
         raise ToolError(f"no accumulated data for project: {ctx.project_id}")
     # Project-wide dismiss/delete rescore: the raw accumulated payload keeps
@@ -47,39 +88,7 @@ def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
         }
         for d in kept
     ]
-    summary = payload.get("summary", {}) or {}
-    if not hidden:
-        out_summary = {
-            "overallGrade": summary.get("overallGrade"),
-            "numericAverage": summary.get("numericAverage"),
-            "totalViolations": summary.get("totalViolations"),
-            "dimensionCount": summary.get("dimensionCount"),
-            "severity": summary.get("severity"),
-        }
-    else:
-        # overallGrade/numericAverage are deliberately absent. The Overview
-        # derives them from the filtered TREND in the browser
-        # (ui/src/utils/scoreFiltering.js), not from these dimensions, so any
-        # value computed here could contradict the number on screen -- the
-        # divergence this filtering exists to prevent. Counts are exact, so
-        # they are recomputed rather than dropped.
-        severity = {bucket: 0 for bucket in _SEVERITY_BUCKETS}
-        total = 0
-        for d in kept:
-            for v in (d.get("violations") or []):
-                total += 1
-                level = (v.get("severity") or "").lower()
-                if level in severity:
-                    severity[level] += 1
-        out_summary = {
-            "totalViolations": total,
-            "dimensionCount": len(kept),
-            "severity": severity,
-            "note": ("overall grade and average omitted: they cover all "
-                     "standards, including the ones hidden from this project's "
-                     "dashboard. Quote the per-dimension scores instead, or "
-                     "point the user at the Overview."),
-        }
+    out_summary = _build_filtered_summary(payload, kept, hidden)
     return {
         "project": payload.get("project"),
         "dimensions": dimensions,

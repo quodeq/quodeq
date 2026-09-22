@@ -14,16 +14,16 @@ by weighting the grade with ``confidence``.
 """
 from __future__ import annotations
 
-from quodeq.analysis._report_constants import _COMPLIANCE_FIELDS, _VIOLATION_FIELDS
-from quodeq.core.scoring._principle import compute_tallies
+from quodeq.analysis._report_constants import COMPLIANCE_FIELDS, VIOLATION_FIELDS
+from quodeq.core.scoring.principle import compute_tallies
 from quodeq.core.types.finding import Finding
 from quodeq.core.scoring.projector_scoring import compute_principle_grade
 
 
 def test_confidence_absent_from_scored_fields():
     """Structural guard: confidence is not among the fields scoring reads."""
-    assert "confidence" not in _VIOLATION_FIELDS
-    assert "confidence" not in _COMPLIANCE_FIELDS
+    assert "confidence" not in VIOLATION_FIELDS
+    assert "confidence" not in COMPLIANCE_FIELDS
 
 
 def _v(severity: str, reason: str, confidence: int) -> dict:

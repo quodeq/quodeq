@@ -2,10 +2,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 
 from quodeq.config.paths import default_paths
+from quodeq.core.observability import NULL_LOG, LogSink
+
+_logger = logging.getLogger(__name__)
 
 _LANG_ALIASES = {"typescript": "javascript", "jsx": "javascript", "tsx": "javascript", "kotlin": "java"}
 
@@ -19,6 +23,7 @@ class ScoringInputs:
     git_scores: dict[str, float]
     prev_violations: dict[str, int]
     max_prev_violations: int
+    log: LogSink = NULL_LOG
 
 
 @lru_cache(maxsize=1)
@@ -27,7 +32,8 @@ def load_priority_config() -> dict:
     config_path = default_paths().root / "config" / "file_priority.json"
     try:
         return json.loads(config_path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, PermissionError, json.JSONDecodeError):
+    except (FileNotFoundError, PermissionError, json.JSONDecodeError) as exc:
+        _logger.warning("Failed to load file_priority.json, using defaults: %s", exc)
         return {}
 
 

@@ -1,6 +1,6 @@
 """Project threshold overrides fold into the standards fingerprint.
 
-``_hash_standards`` hashes the compiled standards JSON, which is shared
+``hash_standards`` hashes the compiled standards JSON, which is shared
 across projects and does NOT change when a project tunes a numeric
 threshold via ``.quodeq/standards-overrides.json``. Without folding the
 overrides in, tuning ``max_lines`` 50 -> 60 and re-running reuses cached
@@ -43,10 +43,10 @@ def _write_overrides(project_root: Path, text: str) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _clear_fingerprint_caches():
-    fingerprint._hash_standards.cache_clear()
-    yield
-    fingerprint._hash_standards.cache_clear()
+def _clear_fingerprint_caches(monkeypatch):
+    # Fresh HashCache per test: isolation via injection (swapping the
+    # module-default instance), not a cache_clear() attribute hook.
+    monkeypatch.setattr(fingerprint, "_hash_cache", fingerprint.HashCache())
 
 
 @pytest.fixture
@@ -68,25 +68,25 @@ def test_changing_override_value_changes_fingerprint(standards_dir, project_root
         project_root,
         '{"version": 1, "overrides": {"M-ANA-2": {"max_lines": 50}}}',
     )
-    before = fingerprint._hash_standards(standards_dir, DIM, project_root)
+    before = fingerprint.hash_standards(standards_dir, DIM, project_root)
 
     _write_overrides(
         project_root,
         '{"version": 1, "overrides": {"M-ANA-2": {"max_lines": 600}}}',
     )
-    after = fingerprint._hash_standards(standards_dir, DIM, project_root)
+    after = fingerprint.hash_standards(standards_dir, DIM, project_root)
 
     assert before is not None and after is not None
     assert before != after
 
 
 def test_overrides_presence_changes_fingerprint_vs_baseline(standards_dir, project_root):
-    baseline = fingerprint._hash_standards(standards_dir, DIM)
+    baseline = fingerprint.hash_standards(standards_dir, DIM)
     _write_overrides(
         project_root,
         '{"version": 1, "overrides": {"M-ANA-2": {"max_lines": 60}}}',
     )
-    overridden = fingerprint._hash_standards(standards_dir, DIM, project_root)
+    overridden = fingerprint.hash_standards(standards_dir, DIM, project_root)
 
     assert baseline is not None and overridden is not None
     assert overridden != baseline
@@ -96,8 +96,8 @@ def test_absent_overrides_file_leaves_fingerprint_unchanged(standards_dir, proje
     # Load-bearing backward compatibility: entries written before the
     # override-aware hash carry the plain compiled-JSON hash. A project
     # with no overrides file must keep producing that exact value.
-    baseline = fingerprint._hash_standards(standards_dir, DIM)
-    with_root = fingerprint._hash_standards(standards_dir, DIM, project_root)
+    baseline = fingerprint.hash_standards(standards_dir, DIM)
+    with_root = fingerprint.hash_standards(standards_dir, DIM, project_root)
     assert with_root == baseline
 
 
@@ -106,8 +106,8 @@ def test_unchanged_overrides_file_keeps_fingerprint_stable(standards_dir, projec
         project_root,
         '{"version": 1, "overrides": {"M-ANA-2": {"max_lines": 60}}}',
     )
-    first = fingerprint._hash_standards(standards_dir, DIM, project_root)
-    second = fingerprint._hash_standards(standards_dir, DIM, project_root)
+    first = fingerprint.hash_standards(standards_dir, DIM, project_root)
+    second = fingerprint.hash_standards(standards_dir, DIM, project_root)
     assert first == second
 
 
@@ -119,13 +119,13 @@ def test_formatting_only_rewrite_keeps_fingerprint(standards_dir, project_root):
         project_root,
         '{"version": 1, "overrides": {"M-ANA-2": {"max_lines": 60}}}',
     )
-    before = fingerprint._hash_standards(standards_dir, DIM, project_root)
+    before = fingerprint.hash_standards(standards_dir, DIM, project_root)
 
     reordered = json.dumps(
         {"overrides": {"M-ANA-2": {"max_lines": 60}}, "version": 1}, indent=4,
     )
     _write_overrides(project_root, reordered)
-    after = fingerprint._hash_standards(standards_dir, DIM, project_root)
+    after = fingerprint.hash_standards(standards_dir, DIM, project_root)
 
     assert after == before
 
@@ -133,9 +133,9 @@ def test_formatting_only_rewrite_keeps_fingerprint(standards_dir, project_root):
 def test_malformed_overrides_treated_as_absent(standards_dir, project_root):
     # Analysis ignores a malformed file (load_project_overrides -> {});
     # the fingerprint must agree with what analysis actually uses.
-    baseline = fingerprint._hash_standards(standards_dir, DIM)
+    baseline = fingerprint.hash_standards(standards_dir, DIM)
     _write_overrides(project_root, "{not json")
-    assert fingerprint._hash_standards(standards_dir, DIM, project_root) == baseline
+    assert fingerprint.hash_standards(standards_dir, DIM, project_root) == baseline
 
 
 def test_missing_compiled_standard_still_none(tmp_path: Path, project_root):
@@ -143,4 +143,4 @@ def test_missing_compiled_standard_still_none(tmp_path: Path, project_root):
         project_root,
         '{"version": 1, "overrides": {"M-ANA-2": {"max_lines": 60}}}',
     )
-    assert fingerprint._hash_standards(tmp_path / "nostd", DIM, project_root) is None
+    assert fingerprint.hash_standards(tmp_path / "nostd", DIM, project_root) is None

@@ -1,47 +1,57 @@
 """Command-line interface for Quodeq evaluation and dashboard commands.
 
-Heavy evaluation logic lives in ``quodeq._cli_evaluation``; this module
-re-exports every public and private name so that existing ``from quodeq.cli
-import …`` statements continue to work unchanged.
+Heavy evaluation logic lives in ``quodeq.cli_evaluation`` and its siblings;
+this module re-exports their entry points under public spellings, so
+``from quodeq.cli import …`` never has to name an underscore. The underscore
+originals are still importable from the module that defines them.
 """
 
 from __future__ import annotations
 
+import logging
 import sys
 from typing import Callable
 
-from quodeq.cli_parser import build_parser  # noqa: F401 — re-export
+from quodeq.cli_parser import build_parser  # re-export
 from quodeq.update.checker import check_async, get_status, set_settings
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 
-# Re-export everything from _cli_evaluation so existing imports
-# (including tests doing ``from quodeq.cli import _env_int``) keep working.
-from quodeq._cli_evaluation import (  # noqa: F401 — public re-exports
-    ResolvedInputs,
-    _ENV_MAX_TURNS,
-    _ENV_MAX_DURATION,
-    _ENV_POOL_BUDGET,
-    _build_manifest,
-    _build_run_config,
-    _cleanup_worktree,
-    _create_worktree,
-    _env_int,
-    _execute_pipeline,
-    _filter_manifest_by_scope,
-    _no_verify,
-    _override_manifest_single_file,
-    _resolve_evaluation_inputs,
-    _resolve_language,
-    _resolve_repo,
-    _resolve_scope,
-    _resolve_single_file,
-    _run_pipeline_with_cleanup,
-    _save_manifest,
-    _setup_run_dirs,
-    _subagent_model,
-    run_evaluate,
+# Re-export the evaluation entry points under their public spellings. The
+# underscore originals stay importable from the module that owns them.
+from quodeq._cli_env import (  # noqa: F401 — public re-exports
+    ENV_MAX_DURATION,
+    ENV_MAX_TURNS,
+    ENV_POOL_BUDGET,
+    _environ,
+    cli_env_int,
+    cli_environ,
+    no_verify,
+    subagent_model,
 )
+from quodeq._cli_resolution import (  # noqa: F401 — public re-exports
+    ResolvedInputs,
+    build_cli_manifest,
+    cleanup_worktree,
+    create_worktree,
+    filter_manifest_by_scope,
+    override_manifest_single_file,
+    resolve_evaluation_inputs,
+    resolve_language,
+    resolve_repo,
+    resolve_scope,
+    resolve_single_file,
+)
+from quodeq.cli_evaluation import (  # noqa: F401 — public re-exports
+    build_run_config,
+    execute_pipeline,
+    run_evaluate,
+    run_pipeline_with_cleanup,
+    save_manifest,
+    setup_run_dirs,
+)
+
+_logger = logging.getLogger(__name__)
 
 
 _COMMAND_HANDLERS: dict[str, Callable] = {
@@ -56,10 +66,8 @@ def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> Non
     Fail-silent — never raises. Also kicks a throttled background check so the
     NEXT invocation has fresh data.
     """
-    import os
-
     out = stream if stream is not None else sys.stdout
-    environ = env if env is not None else os.environ
+    environ = _environ(env)
     try:
         if not getattr(out, "isatty", lambda: False)():
             return
@@ -84,9 +92,7 @@ def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> Non
                 file=out,
             )
     except Exception:  # pragma: no cover - defensive
-        import logging
-
-        logging.getLogger(__name__).debug("update notice failed", exc_info=True)
+        _logger.debug("update notice failed", exc_info=True)
 
 
 def _install_broken_pipe_guard() -> None:
@@ -113,8 +119,9 @@ def _install_broken_pipe_guard() -> None:
                 devnull = _os.open(_os.devnull, _os.O_WRONLY)
                 _os.dup2(devnull, _sys.stdout.fileno())
                 _os.dup2(devnull, _sys.stderr.fileno())
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug(
+                    "could not redirect stdio to devnull after BrokenPipeError: %s", exc)
             return  # swallow
         previous_hook(exc_type, exc_value, traceback)
 
@@ -123,7 +130,7 @@ def _install_broken_pipe_guard() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate subcommand handler."""
-    from quodeq.shared._io import configure_stdio_utf8
+    from quodeq.shared.text_io import configure_stdio_utf8
     configure_stdio_utf8()
     _install_broken_pipe_guard()
     load_env_file(default_paths())

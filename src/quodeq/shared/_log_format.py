@@ -2,20 +2,22 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
+from collections.abc import Mapping
+
+from quodeq.shared.env_resolve import resolve_env
 
 _LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
 logging.addLevelName(_LOG_SUCCESS, "SUCCESS")
 
 
-def _should_use_color(env: dict[str, str] | None = None) -> bool:
+def _should_use_color(env: Mapping[str, str] | None = None) -> bool:
     """Determine whether ANSI color codes should be emitted.
 
     *env* overrides ``os.environ`` when provided, making the check
     testable without environment mutation.
     """
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     return not environ.get("NO_COLOR") and environ.get("TERM") != "dumb"
 
 

@@ -3,19 +3,16 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
-from quodeq.analysis.subprocess import AnalysisConfig
-from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
 from quodeq.analysis.runner import AnalysisOptions, RunConfig
 from quodeq.analysis.manifest import SourceManifest, AnalysisTarget
 
-# See test_adaptive_scaling_integration.py for the Windows skip rationale.
+# See test_scout_burst_integration.py for the Windows skip rationale.
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
     reason="SubagentPool FileQueue lock path needs Windows-specific work",
@@ -135,3 +132,19 @@ class TestConsolidatedIntegration:
         maint = result[_TEST_DIM_MAINTAINABILITY]
         maint_v = sum(len(pe.violations) for pe in maint.principles.values())
         assert maint_v == 1
+
+    def test_injected_log_sink_sees_consolidated_line(self, tmp_path, recording_log):
+        """[49]: log lines go through the injected LogSink, not a module
+        import. The default (no sink) stays silent."""
+        config, ctx = _make_consolidated_config(tmp_path)
+
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis", _consolidated_run_analysis):
+            process_consolidated_dimensions(
+                config, [_TEST_DIM_SECURITY, _TEST_DIM_MAINTAINABILITY], ctx,
+                log=recording_log,
+            )
+
+        assert any(
+            m.startswith("Consolidated analysis:")
+            for m in recording_log.info_messages
+        )

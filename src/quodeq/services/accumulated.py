@@ -1,182 +1,54 @@
-"""Accumulated (cross-run) view logic for the filesystem action provider."""
+"""Accumulated (cross-run) view logic for the filesystem action provider.
+
+Split: the walk-cache globals and per-call LRU cache config moved
+to ``_accumulated_cache.py``; trend/severity/score aggregation (including the
+wire-serialization call that builds the response payload) moved to
+``_accumulated_aggregate.py``. Both are re-exported here — the walk-cache
+globals are shared mutable state, so this module imports the OBJECTS (not
+copies) to keep identity intact for tests that reach in directly
+(``clear_accumulated_process_cache``).
+"""
 from __future__ import annotations
 
-import threading
-from collections import OrderedDict
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.scoring.internals import score_to_grade_label
-from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
-from quodeq.core.types import DimensionResult, to_camel_dict
-from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
+from quodeq.core.types import DimensionResult
+from quodeq.core.utils.io import resolve_child_dir
 from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.scoring_view import select_default_view_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
-from quodeq.services._fs_projects import find_children as _find_children
-from quodeq.data.fs.report_parser.grades import calculate_trend, most_frequent_grade, parse_numeric_score
-from quodeq.data.fs.report_parser.runs import RunInfo, list_runs
-from quodeq.shared.utils import _env_int
+from quodeq.services.wiring import (
+    RunInfo,
+    find_children as _find_children,
+    list_runs,
+)
 
 # Re-export so existing external imports keep working.
-from quodeq.services._accumulated_data import _read_all_run_data  # noqa: F401
+from quodeq.services._accumulated_data import _read_all_run_data
 from quodeq.services._accumulated_data import make_slim_run_fetcher
 
-_DEFAULT_ACC_CACHE_MAX = 256
-
-# Entries in the walk cache are findings-free (kilobytes), not full run reads
-# (megabytes), so this bound covers several projects' entire run history and
-# still costs a few MB. Set QUODEQ_ACC_WALK_CACHE_MAX=0 to disable.
-_DEFAULT_WALK_CACHE_MAX = 2048
-
-# Process-lived so consecutive as-of selections on the Overview score-history
-# chart reuse the walk. Their run sets overlap in all but a run or two; a
-# per-call cache made every newly-selected day re-read the whole history.
-_WALK_CACHE: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
-_WALK_CACHE_LOCK = threading.Lock()
-
-
-def clear_accumulated_process_cache() -> None:
-    """Drop the process-lived walk cache. For tests and cache kill switches."""
-    with _WALK_CACHE_LOCK:
-        _WALK_CACHE.clear()
-
-
-def _walk_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
-    """Return the walk-cache size limit (entries)."""
-    if override is not None:
-        return override
-    return _env_int("QUODEQ_ACC_WALK_CACHE_MAX", _DEFAULT_WALK_CACHE_MAX, env=env)
-
-
-def numeric_average(
-    dimensions: list[DimensionResult],
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> float | None:
-    """Compute the average numeric score from a list of DimensionResult objects."""
-    pairs = [
-        (d.dimension, score)
-        for d, score in ((d, parse_numeric_score(d.overall_score)) for d in dimensions if d.overall_score)
-        if score is not None
-    ]
-    return dimension_weighted_average(pairs, params)
-
-
-def _compute_accumulated_trends(
-    all_dimensions: list[DimensionResult],
-    prev_occurrence: dict[str, DimensionResult],
-) -> list[DimensionResult]:
-    result: list[DimensionResult] = []
-    for dim in all_dimensions:
-        dim_name = dim.dimension
-        previous = prev_occurrence.get(dim_name) if dim_name else None
-        trend = calculate_trend(
-            dim.overall_score,
-            previous.overall_score if previous else None,
-        )
-        result.append(replace(
-            dim,
-            trend=trend,
-            previous_run_id=previous.run_id if previous else None,
-            previous_score=previous.overall_score if previous else None,
-        ))
-    return result
-
-
-def _aggregate_severity_counts(all_dimensions: list[DimensionResult]) -> dict[str, int]:
-    """Sum violation/compliance counts and severity buckets across dimensions."""
-    total_violations = total_compliance = critical = major = minor = 0
-    for dim in all_dimensions:
-        totals = dim.totals
-        if totals:
-            total_violations += totals.violation_count
-            total_compliance += totals.compliance_count
-            critical += totals.severity.critical
-            major += totals.severity.major
-            minor += totals.severity.minor
-    return {
-        "totalViolations": total_violations, "totalCompliance": total_compliance,
-        "critical": critical, "major": major, "minor": minor,
-    }
-
-
-def _compute_accumulated_scores(
-    all_dimensions: list[DimensionResult], prev_run_latest: list[DimensionResult],
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> tuple[float | None, float | None]:
-    return (
-        numeric_average(all_dimensions, params),
-        (numeric_average(prev_run_latest, params) if prev_run_latest else None),
-    )
-
-
-@dataclass(frozen=True)
-class _AccumulatedResult:
-    all_dimensions: list[DimensionResult]
-    dimensions_with_trend: list[DimensionResult]
-    severity: dict[str, int]
-    avg_score: float | None
-    prev_avg_score: float | None
-
-
-def _build_accumulated_response(
-    project: str, result: _AccumulatedResult,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> dict[str, Any]:
-    return {
-        "project": project,
-        "dimensions": [to_camel_dict(d) for d in result.dimensions_with_trend],
-        "summary": {
-            "overallGrade": (
-                score_to_grade_label(result.avg_score, params=params) if result.avg_score is not None
-                else most_frequent_grade([d.overall_grade for d in result.all_dimensions if d.overall_grade])
-            ),
-            "numericAverage": result.avg_score,
-            "previousNumericAverage": result.prev_avg_score,
-            "totalViolations": result.severity["totalViolations"],
-            "totalCompliance": result.severity["totalCompliance"],
-            "dimensionCount": len(result.dimensions_with_trend),
-            "severity": {
-                "critical": result.severity["critical"],
-                "major": result.severity["major"],
-                "minor": result.severity["minor"],
-            },
-        },
-    }
-
-def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
-    """Create the default accumulated-view LRU cache and its lock."""
-    return OrderedDict(), threading.Lock()
-
-
-def _acc_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
-    """Return the accumulated-view cache size limit."""
-    if override is not None:
-        return override
-    return _env_int("QUODEQ_ACC_CACHE_MAX", _DEFAULT_ACC_CACHE_MAX, env=env)
-
-
-@dataclass
-class AccumulatedCacheConfig:
-    """Optional cache parameters for compute_accumulated."""
-    cache: OrderedDict[tuple, list[DimensionResult]] = field(default_factory=OrderedDict)
-    cache_lock: threading.Lock = field(default_factory=threading.Lock)
-    cache_max: int | None = None
-
-
-def _resolve_cache(
-    cache_config: AccumulatedCacheConfig | None,
-) -> tuple[OrderedDict, threading.Lock, int]:
-    """Resolve cache, lock, and max-size from *cache_config* or module defaults."""
-    if cache_config is not None:
-        return (
-            cache_config.cache,
-            cache_config.cache_lock,
-            cache_config.cache_max if cache_config.cache_max is not None else _acc_dim_cache_max(),
-        )
-    cache, lock = create_accumulated_cache()
-    return cache, lock, _acc_dim_cache_max()
+from quodeq.services._accumulated_cache import (  # noqa: F401 — re-export
+    AccumulatedCacheConfig,
+    _WALK_CACHE,
+    _WALK_CACHE_LOCK,
+    _acc_dim_cache_max,
+    _resolve_cache,
+    _walk_cache_max,
+    clear_accumulated_process_cache,
+    create_accumulated_cache,
+)
+from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.services._accumulated_aggregate import (  # noqa: F401 — re-export
+    _AccumulatedResult,
+    _aggregate_severity_counts,
+    _build_accumulated_response,
+    _compute_accumulated_scores,
+    _compute_accumulated_trends,
+    numeric_average,
+)
 
 
 def _compute_result(
@@ -209,15 +81,13 @@ def _compute_result(
     return _build_accumulated_for_runs(reports_root, project, eligible_run_infos, cache_config, params)
 
 
-def _build_accumulated_for_runs(
+def _load_run_dimensions(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> _AccumulatedResult:
-    """Read run data and assemble the accumulated result for *run_infos*."""
-    runs = [r.run_id for r in run_infos]
+) -> tuple[dict[str, DimensionResult], dict[str, DimensionResult], list[DimensionResult]]:
     _cache, _lock, _max = _resolve_cache(cache_config)
-    get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
+    ctx = DimensionCacheContext(cache=_cache, lock=_lock, max_size=_max)
+    get_run_data = make_lru_dimension_fetcher(reports_root, project, ctx)
     # A caller-supplied cache_config asks for per-call isolation, so it backs the
     # walk too; otherwise the walk runs off the shared process cache.
     if cache_config is not None:
@@ -227,36 +97,61 @@ def _build_accumulated_for_runs(
     get_run_slim = make_slim_run_fetcher(
         reports_root, project, walk_cache, walk_lock, walk_max,
     )
-    latest_by_dim, prev_occurrence, prev_run_latest = _read_all_run_data(
-        reports_root, project, run_infos, runs, get_run_data, get_run_slim=get_run_slim,
+    return _read_all_run_data(
+        reports_root, project, run_infos, get_run_data, get_run_slim=get_run_slim,
     )
-    project_dir = reports_root / project
+
+
+def _suppress_run_dimensions(
+    latest_by_dim: dict[str, DimensionResult], project_dir: Path,
+) -> list[DimensionResult]:
     all_dims = filter_dismissed_from_dimensions(list(latest_by_dim.values()), project_dir)
-    all_dims = filter_deleted_from_dimensions(all_dims, project_dir)
+    return filter_deleted_from_dimensions(all_dims, project_dir)
+
+
+def _build_accumulated_for_runs(
+    reports_root: Path, project: str, run_infos: list[RunInfo],
+    cache_config: AccumulatedCacheConfig | None,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> _AccumulatedResult:
+    """Read run data and assemble the accumulated result for *run_infos*."""
+    latest_by_dim, prev_occurrence, prev_run_latest = _load_run_dimensions(
+        reports_root, project, run_infos, cache_config,
+    )
+    all_dims = _suppress_run_dimensions(latest_by_dim, reports_root / project)
     dims_with_trend = _compute_accumulated_trends(all_dims, prev_occurrence)
     severity = _aggregate_severity_counts(all_dims)
     avg, prev_avg = _compute_accumulated_scores(all_dims, prev_run_latest, params)
     return _AccumulatedResult(all_dims, dims_with_trend, severity, avg, prev_avg)
 
 
-def _compute_parent_accumulated(
-    reports_root: Path,
-    children: list[str],
-    parent_id: str,
-    cache_config: AccumulatedCacheConfig | None,
-    extra_dims: list[DimensionResult] | None = None,
-    params: ScoringParams = DEFAULT_PARAMS,
-) -> dict[str, Any] | None:
-    """Merge latest findings from all children (and optional own dims) and score.
+_MAX_CHILD_RUNS_CONSIDERED = 50  # per-child run cap when merging into a parent's accumulated view
 
-    *extra_dims* are dimensions from the parent's own runs, included when the
+
+@dataclass(frozen=True, slots=True)
+class _ParentScope:
+    """A parent project's id, its scoped child projects, and its own dimensions.
+
+    ``extra_dims`` are dimensions from the parent's own runs, present when the
     parent has both its own evaluation runs and scoped children.
     """
-    all_dims: list[DimensionResult] = list(extra_dims) if extra_dims else []
+    parent_id: str
+    children: list[str]
+    extra_dims: list[DimensionResult] | None = None
+
+
+def _compute_parent_accumulated(
+    reports_root: Path,
+    scope: _ParentScope,
+    cache_config: AccumulatedCacheConfig | None,
+    params: ScoringParams = DEFAULT_PARAMS,
+) -> dict[str, Any] | None:
+    """Merge latest findings from all children (and optional own dims) and score."""
+    all_dims: list[DimensionResult] = list(scope.extra_dims) if scope.extra_dims else []
     # Track which child each dimension came from
     dim_source: dict[str, str] = {}  # dimension_name -> child_project_id
-    for child in children:
-        child_runs = list_runs(reports_root, child, limit=50)
+    for child in scope.children:
+        child_runs = list_runs(reports_root, child, limit=_MAX_CHILD_RUNS_CONSIDERED)
         if not child_runs:
             continue
         result = _compute_result(reports_root, child, child_runs, cache_config, params)
@@ -268,7 +163,7 @@ def _compute_parent_accumulated(
     severity = _aggregate_severity_counts(all_dims)
     avg, _ = _compute_accumulated_scores(all_dims, [], params)
     merged_result = _AccumulatedResult(all_dims, all_dims, severity, avg, None)
-    response = _build_accumulated_response(parent_id, merged_result, params)
+    response = _build_accumulated_response(scope.parent_id, merged_result, params)
     # Tag each dimension with its source child project for navigation
     for dim_dict in response.get("dimensions", []):
         dim_name = dim_dict.get("dimension", "")
@@ -290,7 +185,10 @@ def compute_accumulated(
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
     reports_root = Path(reports_dir)
-    if not (reports_root / project).exists():
+    # *project* comes from the request path. Resolve it against the directory
+    # listing instead of joining it onto reports_root, so a traversal or
+    # absolute segment cannot probe for paths outside the reports tree.
+    if resolve_child_dir(reports_root, project) is None:
         return None
     all_run_infos = list_runs(reports_root, project)
     if as_of:
@@ -304,7 +202,9 @@ def compute_accumulated(
 
     # Pure parent (no own runs) — aggregate children only
     if not all_run_infos and children:
-        return _compute_parent_accumulated(reports_root, children, project, cache_config, params=params)
+        return _compute_parent_accumulated(
+            reports_root, _ParentScope(project, children), cache_config, params,
+        )
 
     # Has own runs — check if also has children to merge
     own_result = _compute_result(reports_root, project, all_run_infos, cache_config, params)
@@ -313,7 +213,6 @@ def compute_accumulated(
 
     # Has both own runs AND children — merge everything
     return _compute_parent_accumulated(
-        reports_root, children, project, cache_config,
-        extra_dims=own_result.all_dimensions,
-        params=params,
+        reports_root, _ParentScope(project, children, own_result.all_dimensions),
+        cache_config, params,
     )

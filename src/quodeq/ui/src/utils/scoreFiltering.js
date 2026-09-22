@@ -11,6 +11,48 @@ import { countBySeverity } from './severity.js';
 
 const roundOneDecimal = (n) => Math.round(n * 10) / 10;
 
+// Mean of the scores that are present, rounded to one decimal. null when
+// nothing is left after dropping the missing ones.
+function meanScore(scores) {
+  const present = scores.filter((s) => s != null);
+  if (present.length === 0) return null;
+  return roundOneDecimal(present.reduce((a, b) => a + b, 0) / present.length);
+}
+
+// The entry's dimensionDetails narrowed to the visible set.
+function visibleDetailsOf(entry, visibleSet) {
+  return (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
+}
+
+// Record each visible dimension score on `accByDim` as that dimension's
+// latest known value. Returns whether this entry contributed any.
+function foldVisibleScores(accByDim, entry, visibleSet) {
+  let hasVisible = false;
+  for (const d of (entry.dimensionDetails || [])) {
+    const dimId = (d.dimension || '').toLowerCase();
+    if (visibleSet.has(dimId) && d.score != null) {
+      accByDim[dimId] = d.score;
+      hasVisible = true;
+    }
+  }
+  return hasVisible;
+}
+
+// One entry projected onto the visible set: details and dimensions narrowed,
+// run average recomputed from what is left, accumulated average as walked.
+function projectEntry(entry, visibleSet, accAvg) {
+  const details = visibleDetailsOf(entry, visibleSet);
+  const dims = (entry.dimensions || []).filter((d) => visibleSet.has(d.toLowerCase()));
+  return {
+    ...entry,
+    numericAverage: accAvg,
+    runNumericAverage: meanScore(details.map((d) => d.score)),
+    dimensionDetails: details,
+    dimensions: dims,
+    dimensionsCount: dims.length,
+  };
+}
+
 /**
  * Filter trend entries to only include visible dimensions and recompute averages.
  *
@@ -26,25 +68,11 @@ export function filterTrendByVisibleStandards(trend, visibleSet) {
   const accByRun = new Map();
   const rawReversed = [...trend].reverse(); // oldest first
   for (const entry of rawReversed) {
-    for (const d of (entry.dimensionDetails || [])) {
-      const dimId = (d.dimension || '').toLowerCase();
-      if (visibleSet.has(dimId) && d.score != null) {
-        accByDim[dimId] = d.score;
-      }
-    }
-    const accScores = Object.values(accByDim).filter((s) => s != null);
-    const accAvg = accScores.length > 0 ? roundOneDecimal(accScores.reduce((a, b) => a + b, 0) / accScores.length) : null;
-    accByRun.set(entry.runId, accAvg);
+    foldVisibleScores(accByDim, entry, visibleSet);
+    accByRun.set(entry.runId, meanScore(Object.values(accByDim)));
   }
   return trend
-    .map((entry) => {
-      const accAvg = accByRun.get(entry.runId) ?? null;
-      const visibleDetails = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
-      const runScores = visibleDetails.map((d) => d.score).filter((s) => s != null);
-      const runAvg = runScores.length > 0 ? roundOneDecimal(runScores.reduce((a, b) => a + b, 0) / runScores.length) : null;
-      const dims = (entry.dimensions || []).filter((d) => visibleSet.has(d.toLowerCase()));
-      return { ...entry, numericAverage: accAvg, runNumericAverage: runAvg, dimensionDetails: visibleDetails, dimensions: dims, dimensionsCount: dims.length };
-    })
+    .map((entry) => projectEntry(entry, visibleSet, accByRun.get(entry.runId) ?? null))
     .filter((entry) => entry.dimensionDetails.length > 0);
 }
 
@@ -72,34 +100,15 @@ export function filterTrendByVisibleStandardsDaily(trend, periodTrend, visibleSe
     // cards deliberately exclude in-progress runs — a partial score here
     // makes the headline disagree with the cards mid-scan.
     if (!isBucketEligible(entry)) continue;
-    let hasVisible = false;
-    for (const d of (entry.dimensionDetails || [])) {
-      const dimId = (d.dimension || '').toLowerCase();
-      if (visibleSet.has(dimId) && d.score != null) {
-        accByDim[dimId] = d.score;
-        hasVisible = true;
-      }
-    }
-    if (hasVisible) {
-      const accScores = Object.values(accByDim).filter((s) => s != null);
-      const accAvg = accScores.length > 0 ? roundOneDecimal(accScores.reduce((a, b) => a + b, 0) / accScores.length) : null;
-      const key = bucketKey(entry.dateISO, granularity);
-      accByKey.set(key, accAvg);
-      visibleKeys.add(key);
-    }
+    if (!foldVisibleScores(accByDim, entry, visibleSet)) continue;
+    const key = bucketKey(entry.dateISO, granularity);
+    accByKey.set(key, meanScore(Object.values(accByDim)));
+    visibleKeys.add(key);
   }
   // Match period entries by bucket key, only include periods with visible evaluations
   return periodTrend
     .filter((entry) => visibleKeys.has(bucketKey(entry.dateISO, granularity)))
-    .map((entry) => {
-      const key = bucketKey(entry.dateISO, granularity);
-      const accAvg = accByKey.get(key) ?? null;
-      const details = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
-      const runScores = details.map((d) => d.score).filter((s) => s != null);
-      const runAvg = runScores.length > 0 ? roundOneDecimal(runScores.reduce((a, b) => a + b, 0) / runScores.length) : null;
-      const dims = (entry.dimensions || []).filter((d) => visibleSet.has(d.toLowerCase()));
-      return { ...entry, numericAverage: accAvg, runNumericAverage: runAvg, dimensionDetails: details, dimensions: dims, dimensionsCount: dims.length };
-    });
+    .map((entry) => projectEntry(entry, visibleSet, accByKey.get(bucketKey(entry.dateISO, granularity)) ?? null));
 }
 
 /**

@@ -1,13 +1,9 @@
 """Tests for the power-selector (subagent_model) plumbing across the backend stack."""
 from __future__ import annotations
 
-import json
-import os
-import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from quodeq.services.base import EvaluationOptions
 from quodeq.analysis.runner import AnalysisOptions
@@ -64,9 +60,9 @@ class TestEvaluationMixinSubagentModel:
         from quodeq.services.filesystem import FilesystemActionProvider
 
         class StubJobs:
-            def start_job(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None, time_limit_s=None):
+            def start_job(self, cmd, launch=None):
                 captured["cmd"] = cmd
-                captured["env"] = env
+                captured["env"] = launch.env
                 return {"jobId": "test"}
 
         return FilesystemActionProvider(job_manager=StubJobs())
@@ -173,7 +169,7 @@ class TestApiRouteSubagentModel:
         client = app.test_client()
 
         with patch("pathlib.Path.home", new=classmethod(lambda cls: tmp_path)):
-            response = client.post("/api/evaluations", json={
+            client.post("/api/evaluations", json={
                 "repo": str(tmp_path),
             }, headers={"Origin": "http://localhost"})
         assert captured.get("options") is not None

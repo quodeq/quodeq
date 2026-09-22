@@ -1,22 +1,30 @@
 """npm install and build execution, source syncing, and directory helpers."""
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.logging import log_info
 
 from quodeq.dashboard._build_hash import _SYNC_ITEMS
 
-_NPM_INSTALL_TIMEOUT_S = int(os.environ.get("QUODEQ_NPM_INSTALL_TIMEOUT_S", "300"))
-_NPM_BUILD_TIMEOUT_S = int(os.environ.get("QUODEQ_NPM_BUILD_TIMEOUT_S", "600"))
+
+def _npm_install_timeout_s(env: Mapping[str, str] | None = None) -> int:
+    """Seconds allowed for ``npm ci``; ``QUODEQ_NPM_INSTALL_TIMEOUT_S`` overrides."""
+    return int(resolve_env(env).get("QUODEQ_NPM_INSTALL_TIMEOUT_S", "300"))
 
 
-def _quodeq_dir(env: dict[str, str] | None = None) -> Path:
+def _npm_build_timeout_s(env: Mapping[str, str] | None = None) -> int:
+    """Seconds allowed for ``npm run build``; ``QUODEQ_NPM_BUILD_TIMEOUT_S`` overrides."""
+    return int(resolve_env(env).get("QUODEQ_NPM_BUILD_TIMEOUT_S", "600"))
+
+
+def _quodeq_dir(env: Mapping[str, str] | None = None) -> Path:
     """Return the base Quodeq directory, overridable via QUODEQ_DIR env var."""
-    return Path((env if env is not None else os.environ).get("QUODEQ_DIR", str(Path.home() / ".quodeq")))
+    return Path(resolve_env(env).get("QUODEQ_DIR", str(Path.home() / ".quodeq")))
 
 
 def _build_workdir() -> Path:
@@ -59,8 +67,14 @@ def sync_source_to_workdir(source_dir: Path, workdir: Path) -> None:
             shutil.copy2(src_item, dst_item)
 
 
-def run_npm_build(workdir: Path, static_dir: Path) -> None:
-    """Run npm install (if needed) and npm run build."""
+def run_npm_build(
+    workdir: Path, static_dir: Path, env: Mapping[str, str] | None = None,
+) -> None:
+    """Run npm install (if needed) and npm run build.
+
+    *env* is the mapping the build's timeouts are read from and the base of
+    the child process's environment; it defaults to ``os.environ``.
+    """
     npm = shutil.which("npm")
     if npm is None:
         raise FileNotFoundError(
@@ -71,12 +85,21 @@ def run_npm_build(workdir: Path, static_dir: Path) -> None:
     # Use `npm ci` to enforce lockfile-pinned installs (refuses to mutate
     # package-lock.json, errors if it's out of sync). `_SYNC_ITEMS` in
     # `_build_hash.py` copies package-lock.json into the workdir before this
-    # runs, so a lockfile is always present.
-    subprocess.run([npm, "ci"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
+    # runs, so a lockfile is always present. `--no-audit` skips the live,
+    # uncached POST to the npm advisories endpoint, which is purely
+    # informational here (it never fails the install) but can single-handedly
+    # blow past the timeout on slow networks.
+    subprocess.run(
+        [npm, "ci", "--no-audit"], cwd=str(workdir), check=True,
+        timeout=_npm_install_timeout_s(env),
+    )
 
     log_info("Building web UI...")
-    env = {**os.environ, "QUODEQ_BUILD_OUTDIR": str(static_dir)}
-    subprocess.run([npm, "run", "build"], cwd=str(workdir), check=True, timeout=_NPM_BUILD_TIMEOUT_S, env=env)
+    build_env = {**resolve_env(env), "QUODEQ_BUILD_OUTDIR": str(static_dir)}
+    subprocess.run(
+        [npm, "run", "build"], cwd=str(workdir), check=True,
+        timeout=_npm_build_timeout_s(env), env=build_env,
+    )
 
 
 def resolve_dev_source() -> Path:

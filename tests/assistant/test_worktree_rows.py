@@ -1,13 +1,15 @@
 import sqlite3
 import time
 
+from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite._assistant_schema import ASSISTANT_SCHEMA_VERSION
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
 def _store(tmp_path):
     store = AssistantRepository(tmp_path / "assistant.db")
-    store.create_session(session_id="s1", provider="ollama", project_id="proj")
+    store.create_session(session_id="s1", provider="ollama",
+                         scope=SessionScope(project_id="proj"))
     return store
 
 

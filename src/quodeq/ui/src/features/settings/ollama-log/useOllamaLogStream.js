@@ -1,39 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useProviderLogStream } from '../hooks/useProviderLogStream.js';
 
-const URL = '/api/ollama/logs/stream';
-const MAX_LINES = 5000;
+const STREAM_PATH = '/api/ollama/logs/stream';
 
+/**
+ * Live tail of the local Ollama server's log.
+ * @param {boolean} active - opens the stream while true and closes it when it
+ *   goes false, so a hidden panel holds no connection.
+ * @returns {{logs: Array, status: string}} `logs` is the rolling buffer the
+ *   panel renders; `status` is the stream's connection state.
+ */
 export function useOllamaLogStream(active) {
-  const [logs, setLogs] = useState([]);
-  const [status, setStatus] = useState('idle');
-
-  useEffect(() => {
-    if (!active) {
-      setLogs([]);
-      setStatus('idle');
-      return undefined;
-    }
-    setLogs([]);
-    setStatus('streaming');
-    const es = new EventSource(URL);
-
-    es.onmessage = (e) => {
-      setLogs((prev) => {
-        const next = prev.length >= MAX_LINES ? prev.slice(prev.length - MAX_LINES + 1) : prev;
-        return [...next, e.data];
-      });
-    };
-    es.addEventListener('done', () => {
-      setStatus('done');
-      es.close();
-    });
-    es.onerror = () => {
-      const READYSTATE_CLOSED = 2;
-      if (es.readyState === READYSTATE_CLOSED) setStatus('error');
-    };
-
-    return () => { es.close(); };
-  }, [active]);
-
-  return { logs, status };
+  return useProviderLogStream(STREAM_PATH, active);
 }

@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -115,6 +114,7 @@ class TestResolveProjectUuid:
         class FakeRepo:
             def load_index(self, reports_dir):
                 return dict(index_store)
+
             def save_index(self, reports_dir, index):
                 index_store.clear()
                 index_store.update(index)

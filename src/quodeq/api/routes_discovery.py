@@ -1,82 +1,78 @@
 """Discovery routes: AI clients, plugins, and filesystem browsing."""
 from __future__ import annotations
 
-import logging
 from http import HTTPStatus
-from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
-from quodeq.core.types import to_camel_dict
+from quodeq.api._evaluation_helpers import ai_cmd_path_error
+from quodeq.api.helpers import json_error
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
 from quodeq.services.plugin_discovery import discover_plugins
 
-_logger = logging.getLogger(__name__)
-
-# Error keyword returned by browse_repo when the path exists but is not a directory.
-_BROWSE_NOT_A_DIR_KEYWORD = "not a directory"
+# Provider browse error codes -> (HTTP status, API error code, safe message).
+# Keyed by error_code (not message substring) so the frozen response bodies
+# stay exact regardless of the provider's internal wording. .get() defaults
+# to the same 404 triple browse_repo returns for an unrecognized code.
+_BROWSE_ERROR_MAP = {
+    "PATH_OUTSIDE_BOUNDARY": (HTTPStatus.FORBIDDEN, "FORBIDDEN", "Path must be within the user's home directory"),
+    "PATH_NOT_DIRECTORY": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT", "Path is not a directory"),
+    "PATH_NOT_FOUND": (HTTPStatus.NOT_FOUND, "INVALID_INPUT", "Path not found or not accessible"),
+}
+_BROWSE_ERROR_DEFAULT = (HTTPStatus.NOT_FOUND, "INVALID_INPUT", "Path not found or not accessible")
 
 
 def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle GET /api/browse."""
     path = request.args.get("path")
-    if path:
-        resolved = Path(path).resolve()
-        home = Path.home().resolve()
-        if not resolved.is_relative_to(home):
-            body, status = error_response(
-                "Path must be within the user's home directory",
-                HTTPStatus.FORBIDDEN,
-                "FORBIDDEN",
-            )
-            return jsonify(body), status
     include_files = request.args.get("files", "").lower() in ("1", "true")
     payload = provider.browse_repo(path, include_files=include_files)
     if "error" in payload:
-        raw_error = payload["error"]
-        is_not_dir = _BROWSE_NOT_A_DIR_KEYWORD in raw_error.lower()
-        browse_status = HTTPStatus.BAD_REQUEST if is_not_dir else HTTPStatus.NOT_FOUND
-        safe_msg = "Path is not a directory" if is_not_dir else "Path not found or not accessible"
-        body, status = error_response(safe_msg, browse_status, "INVALID_INPUT")
-        return jsonify(body), status
+        http_status, code, safe_msg = _BROWSE_ERROR_MAP.get(
+            payload.get("error_code"), _BROWSE_ERROR_DEFAULT,
+        )
+        return json_error(safe_msg, http_status, code)
     return jsonify(payload)
 
 
-def _handle_browse_mkdir() -> Response | tuple[Response, int]:
-    """Handle POST /api/browse/mkdir — create a new subdirectory."""
-    data = request.get_json(silent=True) or {}
-    parent = data.get("path", "").strip()
-    name = data.get("name", "").strip()
-    if not parent or not name:
-        body, status = error_response("path and name are required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
-    if "/" in name or "\\" in name or name in (".", ".."):
-        body, status = error_response("Invalid folder name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-        return jsonify(body), status
-    resolved = Path(parent).resolve()
-    home = Path.home().resolve()
-    if not resolved.is_relative_to(home):
-        body, status = error_response(
-            "Path must be within the user's home directory",
-            HTTPStatus.FORBIDDEN,
-            "FORBIDDEN",
+# Provider mkdir error codes -> (HTTP status, API error code). The messages
+# come through verbatim from the provider so the responses stay identical to
+# when this handler did the filesystem work itself.
+_MKDIR_ERROR_MAP = {
+    "MISSING_FIELDS": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT"),
+    "INVALID_NAME": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT"),
+    "PATH_OUTSIDE_BOUNDARY": (HTTPStatus.FORBIDDEN, "FORBIDDEN"),
+    "PARENT_NOT_FOUND": (HTTPStatus.NOT_FOUND, "NOT_FOUND"),
+    "ALREADY_EXISTS": (HTTPStatus.CONFLICT, "CONFLICT"),
+    "MKDIR_FAILED": (HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR"),
+}
+
+
+def _handle_browse_mkdir(provider: ActionProvider) -> Response | tuple[Response, int]:
+    """Handle POST /api/browse/mkdir — create a new subdirectory.
+
+    Validation and the mkdir itself live in the provider (mirroring
+    ``_handle_browse``); this handler only shapes the HTTP response.
+    Body fields are type-checked before ``.strip()`` so a null or
+    non-string value (or a non-object body) is treated as missing
+    rather than raising an unhandled 500.
+    """
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
+    parent = data.get("path")
+    parent = parent.strip() if isinstance(parent, str) else ""
+    name = data.get("name")
+    name = name.strip() if isinstance(name, str) else ""
+    payload = provider.browse_mkdir(parent, name)
+    if "error" in payload:
+        http_status, code = _MKDIR_ERROR_MAP.get(
+            payload.get("error_code"),
+            (HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR"),
         )
-        return jsonify(body), status
-    if not resolved.is_dir():
-        body, status = error_response("Parent path not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
-    target = resolved / name
-    try:
-        target.mkdir(parents=False, exist_ok=False)
-    except FileExistsError:
-        body, status = error_response("Folder already exists", HTTPStatus.CONFLICT, "CONFLICT")
-        return jsonify(body), status
-    except OSError as exc:
-        _logger.warning("Could not create folder %s: %s", name, exc)
-        body, status = error_response("Could not create folder", HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR")
-        return jsonify(body), status
-    return jsonify({"created": True, "path": str(target)})
+        return json_error(payload["error"], http_status, code)
+    return jsonify(payload)
 
 
 def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
@@ -87,8 +83,26 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(provider.get_ai_clients())
 
     @app.get("/api/ai-clients/<client_id>/models")
-    def client_models(client_id: str) -> Response:
-        return jsonify(provider.get_client_models(client_id))
+    def client_models(client_id: str) -> Response | tuple[Response, int]:
+        payload = provider.get_client_models(client_id)
+        if "error" in payload:
+            return json_error(payload["error"], HTTPStatus.SERVICE_UNAVAILABLE, payload["error_code"])
+        return jsonify(payload)
+
+    @app.get("/api/ai-clients/<client_id>/cmd-path-check")
+    def client_cmd_path_check(client_id: str) -> Response:
+        """Eager check for the Settings command override field.
+
+        Same rules as the aiCmdPath validation on POST /api/evaluations,
+        returned as data so the UI can flag a bad value when it is typed
+        instead of when a start fails.
+        """
+        reason = ai_cmd_path_error(client_id, request.args.get("path"))
+        return jsonify({
+            "ok": reason is None,
+            "error": reason,
+            "code": None if reason is None else "INVALID_INPUT",
+        })
 
     @app.get("/api/plugins")
     def plugins() -> Response:
@@ -100,4 +114,4 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.post("/api/browse/mkdir")
     def browse_mkdir() -> Response | tuple[Response, int]:
-        return _handle_browse_mkdir()
+        return _handle_browse_mkdir(provider)

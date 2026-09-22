@@ -1,0 +1,167 @@
+"""Environment-based configuration accessors.
+
+Numeric helpers and the ports/keys/urls accessors stay here; AI-provider,
+filesystem-path, sqlite-DB, and embedding accessors live in the four
+siblings below and are re-exported so every existing import path
+(``from quodeq.shared.env import <name>``, including this project-wide
+fan-in's many call sites) keeps working unchanged.
+
+``_sanitized_env_path`` lives in the leaf module ``_env_sanitize.py`` (not
+defined here) so ``env_paths.py``/``_env_db.py`` can import it without a
+cycle back through this module -- see that module's docstring.
+"""
+from __future__ import annotations
+
+import logging
+import os
+from collections.abc import Callable
+from typing import TypeVar
+
+from quodeq.shared._config import _get_config
+from quodeq.shared._env_sanitize import _sanitized_env_path  # noqa: F401 — re-export
+
+
+def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
+    """Read an environment variable as an int, warn and return *default* on failure."""
+    return env_int(var, default, env=env)
+
+
+_NumberT = TypeVar("_NumberT", int, float)
+
+
+def _env_number(
+    var: str,
+    default: _NumberT,
+    kind: Callable[[str], _NumberT],
+    minimum: _NumberT | None,
+    env: dict[str, str] | None,
+) -> _NumberT:
+    """Read an env var through *kind*; warn and return *default* on failure.
+
+    When *minimum* is given, parsed values below it also fall back to *default*.
+    """
+    raw = (os.environ if env is None else env).get(var)
+    if raw is not None:
+        log = logging.getLogger(__name__)
+        try:
+            value = kind(raw)
+        except ValueError:
+            log.warning(
+                "Invalid %s=%r (expected %s), using default %r",
+                var, raw, "integer" if kind is int else "number", default,
+            )
+        else:
+            if minimum is not None and value < minimum:
+                log.warning(
+                    "Out-of-range %s=%r (minimum %r), using default %r",
+                    var, raw, minimum, default,
+                )
+            else:
+                return value
+    return default
+
+
+def env_int(
+    var: str,
+    default: int,
+    *,
+    minimum: int | None = None,
+    env: dict[str, str] | None = None,
+) -> int:
+    """Read an env var as an int; warn and return *default* on parse failure.
+
+    When *minimum* is given, parsed values below it also fall back to *default*.
+    """
+    return _env_number(var, default, int, minimum, env)
+
+
+def env_float(
+    var: str,
+    default: float,
+    *,
+    minimum: float | None = None,
+    env: dict[str, str] | None = None,
+) -> float:
+    """Read an env var as a float; warn and return *default* on parse failure.
+
+    When *minimum* is given, parsed values below it also fall back to *default*.
+    """
+    return _env_number(var, default, float, minimum, env)
+
+
+def get_action_api_port(env: dict[str, str] | None = None) -> int:
+    """Return the action API port from environment or default."""
+    return _env_int("QUODEQ_ACTION_API_PORT", _get_config()["action_api_port"], env=env)
+
+
+def get_action_api_host(env: dict[str, str] | None = None) -> str:
+    """Return the action API host from environment or default."""
+    return (os.environ if env is None else env).get("QUODEQ_ACTION_API_HOST", _get_config()["default_host"])
+
+
+def get_dashboard_port(env: dict[str, str] | None = None) -> int:
+    """Return the dashboard preview port from environment or default."""
+    return _env_int("QUODEQ_DASHBOARD_PORT", _get_config()["dashboard_port"], env=env)
+
+
+def get_anthropic_api_key(env: dict[str, str] | None = None) -> str | None:
+    """Return the Anthropic API key from environment, or None."""
+    return (os.environ if env is None else env).get("ANTHROPIC_API_KEY") or None
+
+
+def get_asvs_url(env: dict[str, str] | None = None) -> str:
+    """Return the OWASP ASVS JSON URL from environment or default."""
+    return (os.environ if env is None else env).get("QUODEQ_ASVS_URL", _get_config()["asvs_url"])
+
+
+def get_github_search_url(env: dict[str, str] | None = None) -> str:
+    """Return the GitHub repository search URL from environment or default."""
+    return (os.environ if env is None else env).get("QUODEQ_GITHUB_SEARCH_URL", _get_config()["github_search_url"])
+
+
+def get_github_raw_base_url(env: dict[str, str] | None = None) -> str:
+    """Return the GitHub raw content base URL from environment or default."""
+    return (os.environ if env is None else env).get("QUODEQ_GITHUB_RAW_BASE_URL", _get_config()["github_raw_base_url"])
+
+
+# ---------------------------------------------------------------------------
+# Re-exports -- AI provider/CLI selection
+# ---------------------------------------------------------------------------
+from quodeq.shared._env_ai import (  # noqa: F401 — re-export
+    get_ai_cmd,
+    get_ai_cmd_path,
+    get_ai_model,
+    get_ai_provider,
+)
+
+# ---------------------------------------------------------------------------
+# Re-exports -- filesystem paths
+# ---------------------------------------------------------------------------
+from quodeq.shared.env_paths import (  # noqa: F401 — re-export
+    get_clones_dir,
+    get_evaluations_dir,
+    get_findings_file,
+    get_grade_formula_path,
+    get_quodeq_dir,
+    get_static_dist,
+)
+
+# ---------------------------------------------------------------------------
+# Re-exports -- sqlite DB paths and kill switches
+# ---------------------------------------------------------------------------
+from quodeq.shared._env_db import (  # noqa: F401 — re-export
+    get_index_db_path,
+    get_score_cache_path,
+    score_cache_disabled,
+    sqlite_disabled,
+)
+
+# ---------------------------------------------------------------------------
+# Re-exports -- semantic precedent embeddings
+# ---------------------------------------------------------------------------
+from quodeq.shared._env_embeddings import (  # noqa: F401 — re-export
+    get_embedding_base_url,
+    get_embedding_model,
+    get_precedent_similarity_threshold,
+    semantic_precedents_enabled,
+)

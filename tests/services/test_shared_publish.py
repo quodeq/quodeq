@@ -100,7 +100,7 @@ def test_stage_project_copies_info_actions_and_done_runs(tmp_path):
 
 
 def test_stage_project_copies_scan_json_when_present(tmp_path):
-    """Finding 3 regression: _fs_reports._enrich_with_coverage and the
+    """Finding 3 regression: fs_reports._enrich_with_coverage and the
     project-card coverage reader consume <project>/scan.json (totalFiles
     etc.); stage_project's allowlist previously dropped it, so a published
     clone's dashboard/card never showed coverage data."""

@@ -1,17 +1,14 @@
-"""Tests for _cache.py — LRU dimension cache with inflight coordination."""
+"""Tests for cache.py — LRU dimension cache with inflight coordination."""
 
 from __future__ import annotations
 
 import threading
 from collections import OrderedDict
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
-
-from quodeq.core.types import DimensionResult
-from quodeq.services._cache import (
-    _CacheContext,
+from quodeq.services.cache import (
+    DimensionCacheContext,
     _cache_lookup,
     _cache_store,
     _fetch_and_store,
@@ -20,18 +17,7 @@ from quodeq.services._cache import (
     make_lru_dimension_fetcher,
 )
 from tests._timeouts import budget
-
-
-def _make_dim(name: str = "security") -> DimensionResult:
-    return DimensionResult(dimension=name)
-
-
-def _make_ctx(max_size: int = 10) -> _CacheContext:
-    return _CacheContext(
-        cache=OrderedDict(),
-        lock=threading.Lock(),
-        max_size=max_size,
-    )
+from tests.services._cache_fixtures import _make_ctx, _make_dim
 
 
 # ---------------------------------------------------------------------------
@@ -88,18 +74,18 @@ class TestCacheStore:
 
 
 class TestFetchDimensionsFromDisk:
-    @patch("quodeq.services._cache.read_run_data")
+    @patch("quodeq.services.cache.read_run_data")
     def test_returns_data(self, mock_read):
         mock_read.return_value = [_make_dim()]
         result = _fetch_dimensions_from_disk(Path("/r"), "proj", "run1")
         assert len(result) == 1
 
-    @patch("quodeq.services._cache.read_run_data", side_effect=OSError("disk err"))
+    @patch("quodeq.services.cache.read_run_data", side_effect=OSError("disk err"))
     def test_returns_empty_on_error(self, mock_read):
         result = _fetch_dimensions_from_disk(Path("/r"), "proj", "run1")
         assert result == []
 
-    @patch("quodeq.services._cache.read_run_data", side_effect=ValueError("bad data"))
+    @patch("quodeq.services.cache.read_run_data", side_effect=ValueError("bad data"))
     def test_handles_value_error(self, mock_read):
         assert _fetch_dimensions_from_disk(Path("/r"), "proj", "run1") == []
 
@@ -134,7 +120,7 @@ class TestWaitForInflight:
 
 
 class TestFetchAndStore:
-    @patch("quodeq.services._cache.read_run_data")
+    @patch("quodeq.services.cache.read_run_data")
     def test_stores_and_notifies(self, mock_read):
         ctx = _make_ctx()
         key = (Path("/r"), "proj", "run1")
@@ -148,7 +134,7 @@ class TestFetchAndStore:
         assert event.is_set()
         assert key not in ctx.inflight
 
-    @patch("quodeq.services._cache.read_run_data", return_value=[])
+    @patch("quodeq.services.cache.read_run_data", return_value=[])
     def test_empty_data_not_cached(self, mock_read):
         ctx = _make_ctx()
         key = (Path("/r"), "proj", "run1")
@@ -164,12 +150,13 @@ class TestFetchAndStore:
 
 
 class TestMakeLruDimensionFetcher:
-    @patch("quodeq.services._cache.read_run_data")
+    @patch("quodeq.services.cache.read_run_data")
     def test_fetches_and_caches(self, mock_read):
         mock_read.return_value = [_make_dim()]
         cache = OrderedDict()
         lock = threading.Lock()
-        fetcher = make_lru_dimension_fetcher(Path("/r"), "proj", cache, lock, 10)
+        ctx = DimensionCacheContext(cache=cache, lock=lock, max_size=10)
+        fetcher = make_lru_dimension_fetcher(Path("/r"), "proj", ctx)
         result = fetcher("run1")
         assert len(result) == 1
         # Second call should use cache (no additional read_run_data call)
@@ -177,7 +164,7 @@ class TestMakeLruDimensionFetcher:
         assert len(result2) == 1
         assert mock_read.call_count == 1
 
-    @patch("quodeq.services._cache.read_run_data")
+    @patch("quodeq.services.cache.read_run_data")
     def test_concurrent_access(self, mock_read):
         """Two threads requesting the same key — only one disk read."""
         call_count = {"n": 0}
@@ -193,7 +180,8 @@ class TestMakeLruDimensionFetcher:
         mock_read.side_effect = slow_read
         cache = OrderedDict()
         lock = threading.Lock()
-        fetcher = make_lru_dimension_fetcher(Path("/r"), "proj", cache, lock, 10)
+        ctx = DimensionCacheContext(cache=cache, lock=lock, max_size=10)
+        fetcher = make_lru_dimension_fetcher(Path("/r"), "proj", ctx)
 
         results = [None, None]
 
@@ -214,125 +202,3 @@ class TestMakeLruDimensionFetcher:
         assert results[1] is not None
         # Only one disk read should have occurred
         assert call_count["n"] == 1
-
-
-# ---------------------------------------------------------------------------
-# Self-healing guards: every caller inherits them from the base factory
-# ---------------------------------------------------------------------------
-
-
-def _write_eval_files(tmp_path: Path, run_id: str, dims: tuple[str, ...]) -> None:
-    eval_dir = tmp_path / "proj" / run_id / "evaluation"
-    eval_dir.mkdir(parents=True, exist_ok=True)
-    for d in dims:
-        (eval_dir / f"{d}.json").write_text("{}", encoding="utf-8")
-
-
-def _write_status(tmp_path: Path, run_id: str, state: str) -> None:
-    run_dir = tmp_path / "proj" / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "status.json").write_text(f'{{"state": "{state}"}}', encoding="utf-8")
-
-
-class TestSelfHealingGuards:
-    """A request landing mid-run must never freeze a partial dim list.
-
-    Regression: three scoring read paths built this fetcher without the
-    dashboard's staleness guards, so a /scores request that fired while only
-    security.json was on disk froze a 1-dim entry in the shared process LRU;
-    after the run completed, the accumulated rescore read that entry, rescored
-    only security, and persisted the half-rescored payload forever.
-    """
-
-    def test_stale_entry_evicted_when_disk_count_differs(self, tmp_path):
-        _write_eval_files(tmp_path, "r1", ("flexibility", "reliability", "security"))
-        full = [_make_dim("flexibility"), _make_dim("reliability"), _make_dim("security")]
-        reader_calls = []
-
-        def reader(reports_root, project, run_id):
-            reader_calls.append(run_id)
-            return full
-
-        cache = OrderedDict()
-        # Poisoned entry: cached while only 1 of 3 dims was on disk.
-        cache[(tmp_path, "proj", "r1", "")] = [_make_dim("security")]
-        fetcher = make_lru_dimension_fetcher(
-            tmp_path, "proj", cache, threading.Lock(), 10, reader=reader,
-        )
-
-        result = fetcher("r1")
-        assert len(result) == 3
-        assert reader_calls == ["r1"]
-        # The healed entry is cached; no further reads.
-        assert len(fetcher("r1")) == 3
-        assert reader_calls == ["r1"]
-
-    def test_entry_without_disk_anchor_is_trusted(self, tmp_path):
-        """No evaluation/ dir on disk (test stubs, mocked paths) -> no eviction."""
-        cache = OrderedDict()
-        seeded = [_make_dim("security")]
-        cache[(tmp_path, "proj", "r1", "")] = seeded
-        fetcher = make_lru_dimension_fetcher(
-            tmp_path, "proj", cache, threading.Lock(), 10,
-            reader=lambda *a: pytest.fail("reader must not run on a trusted hit"),
-        )
-        assert fetcher("r1") is seeded
-
-    def test_in_progress_run_reads_fresh_and_is_not_cached(self, tmp_path):
-        _write_status(tmp_path, "r1", "running")
-        _write_eval_files(tmp_path, "r1", ("security",))
-        reader_calls = []
-
-        def reader(reports_root, project, run_id):
-            reader_calls.append(run_id)
-            return [_make_dim("security")]
-
-        cache = OrderedDict()
-        fetcher = make_lru_dimension_fetcher(
-            tmp_path, "proj", cache, threading.Lock(), 10, reader=reader,
-        )
-        fetcher("r1")
-        fetcher("r1")
-        assert reader_calls == ["r1", "r1"]  # disk read both times
-        assert cache == {}  # nothing frozen mid-run
-
-    def test_terminal_run_is_cached(self, tmp_path):
-        _write_status(tmp_path, "r1", "done")
-        _write_eval_files(tmp_path, "r1", ("security",))
-        reader_calls = []
-
-        def reader(reports_root, project, run_id):
-            reader_calls.append(run_id)
-            return [_make_dim("security")]
-
-        fetcher = make_lru_dimension_fetcher(
-            tmp_path, "proj", OrderedDict(), threading.Lock(), 10, reader=reader,
-        )
-        fetcher("r1")
-        fetcher("r1")
-        assert reader_calls == ["r1"]  # second call served from cache
-
-
-def test_make_lru_dimension_fetcher_uses_custom_reader():
-    """A custom reader is invoked instead of read_run_data, and results cache."""
-    import threading
-    from collections import OrderedDict
-
-    from quodeq.core.types import DimensionResult
-    from quodeq.services._cache import make_lru_dimension_fetcher
-
-    calls: list[str] = []
-
-    def fake_reader(reports_root, project, run_id):
-        calls.append(run_id)
-        return [DimensionResult(dimension="security", overall_score="9.0/10", overall_grade="Good")]
-
-    fetcher = make_lru_dimension_fetcher(
-        Path("/reports"), "proj", OrderedDict(), threading.Lock(), 8, reader=fake_reader,
-    )
-    result = fetcher("r1")
-    result_again = fetcher("r1")  # served from cache, reader not called twice
-
-    assert [d.overall_score for d in result] == ["9.0/10"]
-    assert result_again == result
-    assert calls == ["r1"]  # cached: reader ran exactly once

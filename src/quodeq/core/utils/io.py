@@ -2,7 +2,7 @@
 
 These live in core (stdlib-only, no outward imports) so domain modules like
 the evidence parser and standards loader can use them without reaching into
-``shared/``. ``shared/_io.py`` re-exports them for the rest of the codebase.
+``shared/``. ``shared/text_io.py`` re-exports them for the rest of the codebase.
 """
 from __future__ import annotations
 
@@ -45,14 +45,48 @@ def read_json(path: Path) -> dict[str, Any]:
     return data
 
 
-def validate_path_segment(*segments: str) -> None:
-    """Raise ValueError if any segment contains path traversal or separator characters."""
+def path_segment_error(*segments: str) -> str | None:
+    """Return an error message for the first segment containing path
+    traversal or separator characters, else None. Message text mirrors
+    :func:`validate_path_segment` exactly."""
     for seg in segments:
         if ".." in seg or "/" in seg or "\\" in seg or "\0" in seg:
-            raise ValueError(
+            return (
                 f"Invalid path segment: {seg!r}. "
                 f"Use only alphanumeric characters, hyphens, underscores, and dots."
             )
+    return None
+
+
+def validate_path_segment(*segments: str) -> None:
+    """Raise ValueError if any segment contains path traversal or separator characters."""
+    err = path_segment_error(*segments)
+    if err is not None:
+        raise ValueError(err)
+
+
+def _match_child_entry(entry: os.DirEntry, root: str | Path, name: str) -> str | None:
+    """Given a scandir *entry* whose name already matches *name*, return its
+    path if it is a real directory, else None (including the symlinked-dir
+    case, which logs a warning before returning None)."""
+    if entry.is_dir(follow_symlinks=False):
+        return entry.path
+    if entry.is_symlink() and entry.is_dir():
+        # The exact case a user hits after relocating a data dir
+        # and leaving a symlink behind: the name they asked for is
+        # right there in the listing, but resolution refuses it.
+        # Without this line the refusal is indistinguishable from
+        # "no such project/run" — the UI just renders empty.
+        _logger.warning(
+            "Not following symlinked directory %s -> %s: symlinks "
+            "are excluded from path resolution by policy. Replace "
+            "the symlink with a real directory (or move the data "
+            "back) to make %r visible again.",
+            os.path.join(str(root), name),
+            os.path.realpath(entry.path),
+            name,
+        )
+    return None
 
 
 def resolve_child_dir(root: str | Path, name: str) -> str | None:
@@ -89,28 +123,24 @@ def resolve_child_dir(root: str | Path, name: str) -> str | None:
             for entry in entries:
                 if entry.name != name:
                     continue
-                if entry.is_dir(follow_symlinks=False):
-                    return entry.path
-                if entry.is_symlink() and entry.is_dir():
-                    # The exact case a user hits after relocating a data dir
-                    # and leaving a symlink behind: the name they asked for is
-                    # right there in the listing, but resolution refuses it.
-                    # Without this line the refusal is indistinguishable from
-                    # "no such project/run" — the UI just renders empty.
-                    _logger.warning(
-                        "Not following symlinked directory %s -> %s: symlinks "
-                        "are excluded from path resolution by policy. Replace "
-                        "the symlink with a real directory (or move the data "
-                        "back) to make %r visible again.",
-                        os.path.join(str(root), name),
-                        os.path.realpath(entry.path),
-                        name,
-                    )
                 # Names are unique within a directory — nothing else can match.
-                return None
+                return _match_child_entry(entry, root, name)
     except OSError:
         return None
     return None
+
+
+def is_within(candidate: str | Path, root: str | Path) -> bool:
+    """True when *candidate* resolves to *root* or somewhere under it.
+
+    Same realpath form as ``contained_path`` (see its docstring for why),
+    but a predicate: callers that branch on containment use this; callers
+    that need the safe path use ``contained_path``. Never raises: realpath
+    is non-strict, so a missing candidate is judged by its lexical target.
+    """
+    real = os.path.realpath(str(candidate))
+    root_real = os.path.realpath(str(root))
+    return real == root_real or real.startswith(root_real + os.sep)
 
 
 def contained_path(candidate: str | Path, root: str | Path) -> str:
@@ -133,11 +163,9 @@ def contained_path(candidate: str | Path, root: str | Path) -> str:
        raises leaves the original tainted value flowing to the sink, so no
        amount of checking inside it registers as a barrier.
     """
-    real = os.path.realpath(str(candidate))
-    root_real = os.path.realpath(str(root))
-    if real != root_real and not real.startswith(root_real + os.sep):
+    if not is_within(candidate, root):
         raise ValueError(
             f"Path escapes its root directory: {candidate!r} is not inside {root!r}. "
             "Ensure the path has no '..' segments or symlinks leaving the root."
         )
-    return real
+    return os.path.realpath(str(candidate))

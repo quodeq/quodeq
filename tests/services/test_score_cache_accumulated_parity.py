@@ -1,6 +1,5 @@
 """Differential + correctness for the accumulated cache: identical to direct,
 run-set invalidation, and parent-project cache bypass."""
-from pathlib import Path
 
 import pytest
 
@@ -55,6 +54,7 @@ def test_parent_project_bypasses_cache(tmp_path, monkeypatch):
     (child / "repository_info.json").write_text('{"parent": "parent"}', encoding="utf-8")
 
     import quodeq.services.scoring as scoring
+
     def boom(*a, **k):
         raise AssertionError("accumulated cache used for a parent project")
     deps = scoring.ScoringDeps(cached_accumulated=boom)

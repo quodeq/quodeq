@@ -1,0 +1,231 @@
+"""Internal sync logic for the SQLite run index.
+
+Upserts rows from status.json, or synthesizes from legacy filesystem
+signals for runs old enough to predate it. Promotes stale non-terminal runs to
+cancelled based on heartbeat mtime + PID liveness.
+"""
+from __future__ import annotations
+
+import dataclasses
+import logging
+import sqlite3
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+from quodeq.shared.process import is_pid_alive as _is_pid_alive
+from quodeq.shared.run_heartbeat import HEARTBEAT_FILENAME
+from quodeq.data.fs.run_status_store import (
+    RunState,
+    RunStatus,
+    STATUS_FILENAME,
+    TERMINAL_STATES,
+    UnsupportedSchemaError,
+    read_status,
+    write_status,
+)
+from quodeq.data.sqlite._index_sync_promote import (
+    force_promote_to_cancelled_stale,  # noqa: F401 — re-export
+)
+
+_logger = logging.getLogger(__name__)
+
+_TERMINAL_STATE_VALUES = {s.value for s in TERMINAL_STATES}
+_KNOWN_STATE_VALUES = {s.value for s in RunState}
+
+_UPSERT_SQL = """
+INSERT INTO runs (
+    job_id, project_uuid, run_id, run_dir, state, phase, current_dimension,
+    started_at, updated_at, finalized_at, heartbeat_at, pid, exit_reason, status_mtime
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(job_id) DO UPDATE SET
+    project_uuid=excluded.project_uuid,
+    run_id=excluded.run_id,
+    run_dir=excluded.run_dir,
+    state=excluded.state,
+    phase=excluded.phase,
+    current_dimension=excluded.current_dimension,
+    started_at=excluded.started_at,
+    updated_at=excluded.updated_at,
+    finalized_at=excluded.finalized_at,
+    heartbeat_at=excluded.heartbeat_at,
+    pid=excluded.pid,
+    exit_reason=excluded.exit_reason,
+    status_mtime=excluded.status_mtime
+"""
+
+
+def _heartbeat_mtime(run_dir: Path) -> float | None:
+    path = run_dir / HEARTBEAT_FILENAME
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return None
+
+
+def _heartbeat_iso(run_dir: Path) -> str | None:
+    m = _heartbeat_mtime(run_dir)
+    if m is None:
+        return None
+    return datetime.fromtimestamp(m, tz=timezone.utc).isoformat(timespec="seconds")
+
+
+def _status_mtime_ns(run_dir: Path) -> int:
+    try:
+        return (run_dir / STATUS_FILENAME).stat().st_mtime_ns
+    except OSError:
+        return 0
+
+
+def _upsert_from_status(
+    db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
+) -> None:
+    """Read status.json + heartbeat, upsert the row."""
+    try:
+        status = read_status(run_dir)
+    except UnsupportedSchemaError:
+        _logger.warning("skipping run %s: status schema newer than supported", run_dir)
+        return
+    if status is None:
+        return
+    job_id = status.get("job_id") or f"ext-{run_id}"
+    db.execute(
+        _UPSERT_SQL,
+        (
+            job_id,
+            project_uuid,
+            run_id,
+            str(run_dir),
+            status.get("state", "running"),
+            status.get("phase"),
+            status.get("current_dimension"),
+            status.get("started_at", ""),
+            status.get("updated_at", ""),
+            status.get("finalized_at"),
+            _heartbeat_iso(run_dir),
+            status.get("pid"),
+            status.get("exit_reason"),
+            _status_mtime_ns(run_dir),
+        ),
+    )
+
+
+def _sync_legacy_run(
+    db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
+) -> None:
+    """Synthesize a row from filesystem signals for pre-Plan-A runs (no status.json)."""
+    scan_path = run_dir / "scan.json"
+    pid_path = run_dir / ".pid"
+    manifest_path = run_dir / "evidence" / "manifest.json"
+    if not manifest_path.exists():
+        return  # not a real run
+
+    state: str
+    exit_reason: str | None
+
+    if scan_path.exists():
+        state, exit_reason = "done", None
+    elif pid_path.exists():
+        try:
+            pid = int(pid_path.read_text(encoding="utf-8").strip())
+            alive = _is_pid_alive(pid)
+        except (OSError, ValueError):
+            alive = False
+        if alive:
+            state, exit_reason = "running", None
+        else:
+            state, exit_reason = "cancelled", "stale_legacy_pid_dead"
+    else:
+        state, exit_reason = "cancelled", "stale_legacy_no_pid"
+
+    job_id = f"ext-{run_id}"
+    try:
+        started_ts = manifest_path.stat().st_mtime
+    except OSError:
+        started_ts = time.time()
+    started_iso = datetime.fromtimestamp(started_ts, tz=timezone.utc).isoformat(timespec="seconds")
+
+    db.execute(
+        _UPSERT_SQL,
+        (
+            job_id, project_uuid, run_id, str(run_dir),
+            state, None, None,
+            started_iso, started_iso, started_iso if state in _TERMINAL_STATE_VALUES else None,
+            None, None, exit_reason,
+            0,
+        ),
+    )
+
+
+def _delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
+    """Remove non-terminal rows whose ``run_dir`` no longer exists on disk.
+
+    Without this sweep, an orphan row (e.g. left by a crashed test, a manually
+    deleted run dir, or a partial cleanup) stays as ``running`` forever:
+    ``_check_stale_and_promote`` reads ``.heartbeat`` from ``run_dir``, and an
+    unreadable heartbeat (no dir) provides no liveness signal, so the row is
+    never promoted. Terminal rows are left alone — users may prune old dirs
+    to save disk and the index is their only record.
+    """
+    placeholders = ", ".join("?" for _ in _TERMINAL_STATE_VALUES)
+    rows = db.execute(
+        f"SELECT job_id, run_dir FROM runs WHERE state NOT IN ({placeholders})",
+        tuple(_TERMINAL_STATE_VALUES),
+    ).fetchall()
+    orphan_ids = [job_id for job_id, run_dir in rows if not Path(run_dir).is_dir()]
+    if not orphan_ids:
+        return 0
+    db.executemany("DELETE FROM runs WHERE job_id = ?", [(j,) for j in orphan_ids])
+    return len(orphan_ids)
+
+
+def _check_stale_and_promote(
+    db: sqlite3.Connection, run_dir: Path, *,
+    project_uuid: str, run_id: str, stale_seconds: int = 30,
+) -> bool:
+    """Promote non-terminal runs with dead heartbeat + dead PID to cancelled.
+
+    Returns True if a promotion occurred. Writes status.json back to disk
+    (via run_status.write_status) so the terminal state is durable across
+    dashboard sessions.
+    """
+    try:
+        status = read_status(run_dir)
+    except UnsupportedSchemaError:
+        return False
+    if status is None:
+        return False
+    state = status.get("state")
+    if state in _TERMINAL_STATE_VALUES:
+        return False
+
+    heartbeat_mtime = _heartbeat_mtime(run_dir)
+    heartbeat_stale = heartbeat_mtime is None or (time.time() - heartbeat_mtime) > stale_seconds
+
+    pid = status.get("pid")
+    pid_alive = isinstance(pid, int) and _is_pid_alive(pid)
+
+    if heartbeat_stale and not pid_alive:
+        # from_status_dict needs a known "state"; fall back if status.json
+        # omits it, or holds a value that isn't a valid RunState (either way
+        # discarded by the override below). deadline_at/ai_provider/ai_model
+        # carry forward unchanged, so the dashboard and filesystem snapshot
+        # builder keep seeing them.
+        if status.get("state") not in _KNOWN_STATE_VALUES:
+            status["state"] = RunState.RUNNING.value
+        base = RunStatus.from_status_dict(status)
+        new_status = dataclasses.replace(
+            base,
+            state=RunState.CANCELLED,
+            job_id=status.get("job_id", f"ext-{run_id}"),
+            pid=pid if isinstance(pid, int) else None,
+            exit_reason="stale_detected",
+            finalized_at=None,
+            time_limit_s=None,
+        )
+        write_status(run_dir, new_status)
+        with db:
+            _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+        return True
+
+    return False

@@ -1,6 +1,5 @@
 from pathlib import Path
-import pytest
-from quodeq.services._ephemeral_cleanup import delete_ephemeral_clone, sweep_orphaned_clones
+from quodeq.services.ephemeral_cleanup import delete_ephemeral_clone, sweep_orphaned_clones
 
 
 def test_delete_ephemeral_clone_removes_directory(tmp_path):

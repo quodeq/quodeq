@@ -1,8 +1,7 @@
 import subprocess
 import sys
-import time
 
-from quodeq.shared._process_kill import kill_proc_tree
+from quodeq.shared.process_kill import kill_proc_tree
 from tests._timeouts import budget
 
 
@@ -18,6 +17,7 @@ def test_kill_proc_tree_kills_a_real_process():
 def test_kill_proc_tree_tolerates_a_fake_proc():
     class FakeProc:
         pid = None
+
         def __init__(self): self.killed = False
         def kill(self): self.killed = True
     fake = FakeProc()

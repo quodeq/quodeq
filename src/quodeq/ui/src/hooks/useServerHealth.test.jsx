@@ -11,7 +11,7 @@ import { useServerHealth, altPortCandidates } from './useServerHealth.js';
 
 describe('useServerHealth', () => {
   beforeEach(() => {
-    globalThis.fetch = vi.fn();
+    vi.stubGlobal('fetch', vi.fn());
   });
   afterEach(() => {
     vi.restoreAllMocks();

@@ -8,6 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { BASE } from '../../../api/request.js';
 
 const POLL_MS = 2000;
 const MAX_LINES = 5000;
@@ -35,9 +36,15 @@ export function useServerLogPoll(active) {
     enabled: !!active,
     queryFn: async () => {
       const since = sinceRef.current;
-      const url = '/api/logs' + (since >= 0 ? `?since=${since}` : '');
+      const url = `${BASE}/logs` + (since >= 0 ? `?since=${since}` : '');
       const r = await fetch(url);
-      if (!r.ok) return null;
+      if (!r.ok) {
+        // Distinct from the fetch()-throw path swallowed below: an HTTP
+        // error status resolves normally, so it needs its own trace or it
+        // is indistinguishable from "no new log lines."
+        console.warn(`Server log poll failed: HTTP ${r.status}`);
+        return null;
+      }
       const data = await r.json();
       if (!data || !data.lines) return null;
       if (data.lines.length) {

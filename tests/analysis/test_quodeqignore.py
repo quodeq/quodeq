@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis._diff_resolver import resolve_diff_files
+from quodeq.analysis.diff_resolver import resolve_diff_files
 from quodeq.analysis._ignore import IGNORE_FILENAME, is_ignored, load_ignore_patterns
 from quodeq.analysis.manifest import build_manifest
 

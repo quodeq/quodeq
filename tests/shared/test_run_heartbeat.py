@@ -3,7 +3,6 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-import pytest
 
 from quodeq.shared.run_heartbeat import HeartbeatThread, HEARTBEAT_FILENAME
 from tests._timeouts import budget
@@ -47,6 +46,7 @@ def test_swallows_oserror(tmp_path: Path, monkeypatch) -> None:
     """OSError during touch must not kill the thread."""
     errors: list[int] = []
     real_touch = Path.touch
+
     def raising_touch(self, *args, **kwargs):
         errors.append(1)
         if len(errors) <= 2:

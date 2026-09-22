@@ -8,6 +8,7 @@ import {
   dismissUpdate,
   setUpdateAutoCheck,
   markUpdateDisclosed,
+  startSelfUpdate,
 } from './index.js';
 
 beforeEach(() => { request.mockClear(); });
@@ -37,6 +38,11 @@ describe('update api', () => {
       method: 'POST',
       body: JSON.stringify({ auto_check_enabled: false }),
     });
+  });
+
+  it('startSelfUpdate POSTs /update/selfupdate', () => {
+    startSelfUpdate();
+    expect(request).toHaveBeenCalledWith('/update/selfupdate', { method: 'POST' });
   });
 
   it('markUpdateDisclosed POSTs disclosed', () => {

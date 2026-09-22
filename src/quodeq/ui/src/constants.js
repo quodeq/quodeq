@@ -6,7 +6,6 @@ export const DEFAULT_MAX_SUBAGENTS = 5;
 export const DEFAULT_TIME_LIMIT_S = 600;
 export const MIN_SUBAGENTS = 1;
 export const MAX_SUBAGENTS = 10;
-export const DEFAULT_SUBAGENTS = 5;
 export const SUBAGENTS_STORAGE_KEY = 'cc-max-subagents';
 export const TIME_LIMIT_STORAGE_KEY = 'cc-time-limit';
 
@@ -25,6 +24,18 @@ export function providerKey(providerId, setting) {
   return `cc-${providerId}-${setting}`;
 }
 
+// Written under providerKey(id, 'api-key') instead of the raw credential once
+// the backend confirms it stored one, so "configured" survives a reload
+// without the key itself ever going back into localStorage. Lives here, next
+// to providerKey, because both the settings hook that writes it and the
+// evaluation payload builder that must refuse to forward it need it.
+// Named without "key"/"secret"/"token": CodeQL's clear-text-storage rule
+// classifies a value as sensitive from its identifier, so the old
+// API_KEY_CONFIGURED_SENTINEL made every localStorage write reachable from
+// this module read as a credential leak (4 high false positives, including
+// on files that never touch it).
+export const PROVIDER_CONFIGURED_MARKER = '•configured•';
+
 // Fired (same-tab) whenever any provider setting is written — the analysis
 // active-provider or a per-provider model. The assistant gate listens for it
 // so that in Default mode (which mirrors the analysis provider/model) the
@@ -38,6 +49,24 @@ export function notifyProviderSettingsChanged() {
   }
 }
 
+// Fired (same-tab) whenever the set of standards or their per-project
+// visibility changes. Screens that hold the merged dimension list (the
+// Evaluate picker) listen so a starred, created, imported or duplicated
+// standard shows up without a page reload. `detail.reason` says how much
+// moved: VISIBILITY (refilter the cached list) or LIST (refetch it).
+export const STANDARDS_CHANGED_EVENT = 'quodeq:standards-changed';
+export const STANDARDS_CHANGED_REASON = Object.freeze({ VISIBILITY: 'visibility', LIST: 'list' });
+
+export function notifyStandardsChanged(reason) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(STANDARDS_CHANGED_EVENT, { detail: { reason } }));
+  }
+}
+
+// Last directory a repo was cloned into: offered as the default clone
+// target by onboarding and by the dashboard's complete-setup card.
+export const LAST_CLONE_ROOT_STORAGE_KEY = 'quodeq.lastCloneRoot';
+
 export const VISIBLE_STANDARDS_STORAGE_KEY = 'quodeq-visible-standards';
 export const DEFAULT_VISIBLE_STANDARDS = [
   'security', 'reliability', 'maintainability', 'performance', 'usability', 'flexibility',
@@ -46,3 +75,37 @@ export const DEFAULT_VISIBLE_STANDARDS = [
 export const SCORE_HISTORY_GRANULARITY_STORAGE_KEY = 'quodeq-score-history-granularity';
 export const SCORE_HISTORY_GRANULARITIES = ['day', 'week', 'month'];
 export const DEFAULT_SCORE_HISTORY_GRANULARITY = 'day';
+
+// Where a selected project's data lives: this machine's evaluations or the
+// shared repository mirror. Wire value and the cache-key segment (queryKeys).
+export const PROJECT_SOURCE = Object.freeze({ LOCAL: 'local', SHARED: 'shared' });
+// What every source-taking factory and hook falls back to when none is passed.
+export const DEFAULT_PROJECT_SOURCE = PROJECT_SOURCE.LOCAL;
+
+// Fired (same-tab) by the assistant's ActionPreviewCard after a successful
+// apply, with { actionType, scores, delta } as detail. App-level effects and
+// the verified-findings context listen so caches converge like a manual dismiss.
+export const ASSISTANT_ACTION_APPLIED_EVENT = 'quodeq:assistant-action-applied';
+
+export function notifyAssistantActionApplied(detail) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(ASSISTANT_ACTION_APPLIED_EVENT, { detail }));
+  }
+}
+
+// <html> attribute carrying the applied theme; every theme CSS selector keys on it.
+export const DATA_THEME_ATTR = 'data-theme';
+// OS dark-mode media query, consulted whenever the theme mode is 'system'.
+export const PREFERS_DARK_QUERY = '(prefers-color-scheme: dark)';
+// Mobile layout breakpoint. Mirrors the 900px @media rules in terminal.css,
+// assistant.css, standards.css, help.css and base.css; change them together.
+const MOBILE_BREAKPOINT_PX = 900;
+export const MOBILE_BREAKPOINT_QUERY = `(max-width: ${MOBILE_BREAKPOINT_PX}px)`;
+// Third-party contract: pywebview dispatches this on window once its JS
+// bridge is injected. Never rename.
+export const PYWEBVIEW_READY_EVENT = 'pywebviewready';
+
+// HTTP status codes the UI branches on by name (a 409 collision, a 404
+// gone-missing). Not a full status enum, only the codes callers compare
+// against res.status / err.status.
+export const HTTP_STATUS = Object.freeze({ CONFLICT: 409, NOT_FOUND: 404 });

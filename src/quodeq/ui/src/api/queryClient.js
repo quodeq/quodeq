@@ -12,11 +12,16 @@
  */
 import { QueryClient } from "@tanstack/react-query";
 
+// gcTime: 5min (library default) — kept long enough for screen-back
+// navigation (see docstring above).
+const GC_TIME_MINUTES = 5;
+const MINUTE_MS = 60_000;
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      gcTime: 5 * 60_000,
+      gcTime: GC_TIME_MINUTES * MINUTE_MS,
       retry: 1,
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,

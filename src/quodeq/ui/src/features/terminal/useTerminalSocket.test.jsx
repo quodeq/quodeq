@@ -4,6 +4,10 @@ import { useTerminalSocket } from './useTerminalSocket.js';
 
 class MockWS {
   static instances = [];
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
   constructor(url) { this.url = url; this.sent = []; this.readyState = 0; MockWS.instances.push(this);
     this.onopen = null; this.onmessage = null; this.onclose = null; }
   send(d) { this.sent.push(d); }
@@ -12,7 +16,7 @@ class MockWS {
   _msg(data) { this.onmessage && this.onmessage({ data }); }
   _drop(code) { this.readyState = 3; this.onclose && this.onclose({ code }); }
 }
-beforeEach(() => { MockWS.instances = []; globalThis.WebSocket = MockWS; });
+beforeEach(() => { MockWS.instances = []; vi.stubGlobal('WebSocket', MockWS); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 it('reconnects (new socket) when restartKey changes', () => {

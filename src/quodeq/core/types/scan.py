@@ -18,3 +18,7 @@ class ScanData:
     # Subset of total_files whose extension is recognised as analysable
     # source code (matches the language ext-map used by the evaluation).
     code_files: int = 0
+    # Files present on disk that git does not track, and so that the
+    # evaluation will not score (#1207). Excluded from every count above;
+    # reported so the wizard can explain a total smaller than the directory.
+    untracked_files: int = 0

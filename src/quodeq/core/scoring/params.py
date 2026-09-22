@@ -1,6 +1,6 @@
 """Tunable scoring parameters for the Q² formula.
 
-The Q² constants in ``_constants.py`` remain the canonical defaults; this
+The Q² constants in ``constants.py`` remain the canonical defaults; this
 module wraps them in an immutable, validated, serializable object so the
 formula can run with user overrides without any global mutation.
 """
@@ -10,13 +10,14 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
-from quodeq.core.scoring._constants import (
+from quodeq.core.scoring.constants import (
     _BASE_K,
     _CEIL_SCALE,
     _GRADE_THRESHOLDS,
     _LIFT_COMPRESS,
     _SEVERITY_GRADE_FLOOR,
     _SEVERITY_WEIGHT,
+    MAX_SCORE,
 )
 
 # Canonical grade labels: positions are fixed, only the numeric boundaries move.
@@ -118,6 +119,29 @@ def params_from_dict(data: Mapping[str, Any]) -> ScoringParams:
     )
 
 
+_COERCION_ERRORS = (TypeError, ValueError, KeyError, AttributeError)
+
+
+def params_error(data: object) -> str | None:
+    """Return ``"Malformed params: <key>"`` naming the first known key whose
+    value :func:`params_from_dict` cannot coerce, ``"Malformed params"`` when
+    *data* is not a mapping at all, else ``None``.
+
+    Names only our own key (from the defaults' key set), never the coercion
+    failure text, so the message is safe to return to an HTTP client.
+    """
+    if not isinstance(data, Mapping):
+        return "Malformed params"
+    for key in params_to_dict(DEFAULT_PARAMS):
+        if key not in data:
+            continue
+        try:
+            params_from_dict({key: data[key]})
+        except _COERCION_ERRORS:
+            return f"Malformed params: {key}"
+    return None
+
+
 def validate_params(params: ScoringParams) -> list[str]:
     """Return a list of human-readable validation errors (empty = valid)."""
     errors: list[str] = []
@@ -140,7 +164,7 @@ def validate_params(params: ScoringParams) -> list[str]:
     values = [t for t, _ in params.grade_thresholds]
     if any(b >= a for a, b in zip(values, values[1:])):
         errors.append(f"grade thresholds must be strictly decreasing, got {values}")
-    if any(not (0.0 < t < 10.0) for t in values):
+    if any(not (0.0 < t < MAX_SCORE) for t in values):
         errors.append(f"grade thresholds must be within (0, 10), got {values}")
     for dim, w in params.dimension_weights.items():
         if not (_DIMENSION_WEIGHT_RANGE[0] <= w <= _DIMENSION_WEIGHT_RANGE[1]):

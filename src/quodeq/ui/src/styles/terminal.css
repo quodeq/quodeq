@@ -828,7 +828,11 @@ button.term-sev-badge--clickable:focus-visible {
 }
 .vlive-detail--terminal .ctx-line {
   display: grid;
-  grid-template-columns: 48px 1fr;
+  /* 66px gutter, not 48: five digits of 12px JetBrains Mono are 36px and the
+     violation marker sits in the first 14px of the same column. Must match
+     the width on .ctx-gutter in evaluation.css, which applies here too, or
+     the gutter box overhangs the code column. */
+  grid-template-columns: 66px 1fr;
   padding: 0 var(--term-space-2);
   line-height: 18px;
 }
@@ -1538,6 +1542,9 @@ button.term-sev-badge--clickable:focus-visible {
   flex: 1 1 auto;
   min-height: 0;
   transition: grid-template-columns 220ms ease;
+  /* Containing block for the boot loader (.loading-screen--shell), which
+     covers this whole row and nothing above it. */
+  position: relative;
 }
 /* While the user is dragging the side-pane divider, the column width
    tracks the cursor every pointermove via the --side-pane-width CSS var.

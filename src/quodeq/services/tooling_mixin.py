@@ -1,28 +1,32 @@
-"""Mixin providing repo browsing and AI client discovery for the filesystem provider."""
+"""AI-client and model discovery for the filesystem provider.
+
+Repo browsing lives in ``_browse_mixin.py`` and is inherited from there."""
 
 from __future__ import annotations
 
 import json
-import os
+import logging
 import platform as _platform_module
 import shutil
-import subprocess
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
-
 from typing import Any, Callable
 
-from quodeq.analysis._provider_cache import get_provider_configs
-from quodeq.data.fs.report_parser import safe_read_dir
+from quodeq.analysis.provider_cache import get_provider_configs
+from quodeq.services._browse_mixin import FsBrowseMixin
+from quodeq.services.wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.utils import get_anthropic_api_key, read_json
+
+_logger = logging.getLogger(__name__)
 
 _CLI_MODEL_TIMEOUT_S = 8
 _CLI_OUTPUT_IGNORE_PREFIXES = {"#", "=", "-", "[", "("}
 _ANTHROPIC_API_TIMEOUT_S = 8
-_BROWSE_DIR_LIMIT = 500
+_CUSTOM_PROVIDER_ID = "custom"  # user-defined endpoint; excluded from the client-discovery list
+_DEFAULT_CLIENT_SORT_ORDER = 50  # ai_providers.json's "order" default when unset
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _AI_DEFAULTS_PATH = _PACKAGE_ROOT / "config" / "ai_defaults.json"
 
@@ -38,23 +42,15 @@ def _load_fallback_claude_models() -> list[str]:
 
 def _fetch_anthropic_models(api_key: str) -> list[str] | None:
     """Fetch model list from the Anthropic API. Returns None on failure."""
-    try:
-        req = urllib.request.Request(
-            get_anthropic_api_url(),
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": get_anthropic_api_version(),
-            },
-        )
-        with urllib.request.urlopen(req, timeout=_ANTHROPIC_API_TIMEOUT_S) as resp:
-            data = json.loads(resp.read())
-        models = [m["id"] for m in data.get("data", []) if m.get("id")]
-        return models if models else None
-    except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, ValueError):
-        return None
+    return fetch_anthropic_models(
+        api_key,
+        url=get_anthropic_api_url(),
+        version=get_anthropic_api_version(),
+        timeout_s=_ANTHROPIC_API_TIMEOUT_S,
+    )
 
 
-_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "gemini"})
+_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "gemini", "copilot"})
 
 
 def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
@@ -64,7 +60,7 @@ def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
     config.  *env* overrides ``os.environ`` when provided, making the
     function testable without environment mutation.
     """
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     if "QUODEQ_AI_CLIENTS" in environ:
         return frozenset(environ["QUODEQ_AI_CLIENTS"].split(","))
     # Include API providers from config alongside default CLI tools
@@ -82,118 +78,34 @@ def _platform_matches(requires: str) -> bool:
     return True
 
 
-class FsToolingMixin:
-    """Mixin for browse_repo and AI client discovery methods."""
+class FsToolingMixin(FsBrowseMixin):
+    """AI-client and model discovery, plus the repo browsing it inherits.
 
-    def __init__(self) -> None:
-        self._model_fetchers: dict[str, Callable] = {}
-
-    @staticmethod
-    def _validate_browse_path(path: str | None) -> tuple[Path, dict[str, Any] | None]:
-        """Resolve and validate a browse path. Returns (target, error_or_None)."""
-        target = Path(path) if path else Path.home()
-        target = target.resolve()
-        if not target.is_relative_to(Path.home()):
-            return target, {"error": "Path outside allowed boundary", "error_code": "PATH_OUTSIDE_BOUNDARY"}
-        if not target.exists():
-            return target, {"error": "Path not found", "error_code": "PATH_NOT_FOUND", "path": str(target)}
-        if not target.is_dir():
-            return target, {"error": "Path is not a directory", "error_code": "PATH_NOT_DIRECTORY", "path": str(target)}
-        return target, None
-
-    @staticmethod
-    def _list_directories(target: Path) -> list[dict[str, Any]]:
-        """List readable non-hidden subdirectories of *target*."""
-        directories = []
-        for entry in safe_read_dir(target):
-            if entry.name.startswith(".") or not entry.is_dir():
-                continue
-            entry_path = target / entry.name
-            if not os.access(entry_path, os.R_OK):
-                continue
-            directories.append({
-                "name": entry.name,
-                "path": str(entry_path),
-                "isGitRepo": (entry_path / ".git").exists(),
-            })
-        directories.sort(key=lambda item: item["name"])
-        return directories
-
-    @staticmethod
-    def _list_files(target: Path) -> list[dict[str, Any]]:
-        """List readable non-hidden source files in *target*."""
-        files: list[dict[str, Any]] = []
-        for entry in safe_read_dir(target):
-            if entry.name.startswith(".") or not entry.is_file():
-                continue
-            entry_path = target / entry.name
-            if not os.access(entry_path, os.R_OK):
-                continue
-            files.append({
-                "name": entry.name,
-                "path": str(entry_path),
-            })
-        files.sort(key=lambda item: item["name"])
-        return files
-
-    @staticmethod
-    def _build_browse_response(target: Path, directories: list[dict[str, Any]], files: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-        """Assemble a browse_repo response from a validated target and directory list."""
-        truncated = len(directories) > _BROWSE_DIR_LIMIT
-        if truncated:
-            directories = directories[:_BROWSE_DIR_LIMIT]
-        parent = target.parent if target.parent != target else None
-        response: dict[str, Any] = {
-            "current": str(target),
-            "parent": str(parent) if parent else None,
-            "directories": directories,
-            "isGitRepo": (target / ".git").exists(),
-            "truncated": truncated,
-        }
-        if files is not None:
-            response["files"] = files
-        return response
-
-    def browse_repo(self, path: str | None, include_files: bool = False) -> dict[str, Any]:
-        """List directories (and optionally files) at the given path.
-
-        Single-pass traversal: iterates directory entries once to collect both
-        directories and files, avoiding redundant filesystem scans.
-        """
-        target, error = self._validate_browse_path(path)
-        if error is not None:
-            return error
-        directories: list[dict[str, Any]] = []
-        files: list[dict[str, Any]] | None = [] if include_files else None
-        for entry in safe_read_dir(target):
-            if entry.name.startswith("."):
-                continue
-            entry_path = target / entry.name
-            if not os.access(entry_path, os.R_OK):
-                continue
-            if entry.is_dir():
-                directories.append({
-                    "name": entry.name,
-                    "path": str(entry_path),
-                    "isGitRepo": (entry_path / ".git").exists(),
-                })
-            elif include_files and entry.is_file():
-                files.append({
-                    "name": entry.name,
-                    "path": str(entry_path),
-                })
-        directories.sort(key=lambda item: item["name"])
-        if files is not None:
-            files.sort(key=lambda item: item["name"])
-        return self._build_browse_response(target, directories, files)
+    Held as an attribute by ``FilesystemActionProvider``, not inherited by
+    it. Browsing lives in ``FsBrowseMixin`` (``_browse_mixin.py``); the two
+    stay one class here so the provider keeps a single tooling collaborator.
+    """
 
     # Default AI CLI candidates. Override via the QUODEQ_AI_CLIENTS env var
     # (comma-separated list of client IDs, e.g. "claude,codex").
     _CLI_CANDIDATES = [
-        {"id": "claude", "label": "Claude"},
-        {"id": "codex", "label": "Codex"},
-        {"id": "gemini", "label": "Gemini"},
+        {"id": "claude", "label": "Claude"}, {"id": "codex", "label": "Codex"},
+        {"id": "gemini", "label": "Gemini"}, {"id": "copilot", "label": "GitHub Copilot"},
     ]
+
+    def __init__(self) -> None:
+        self._model_fetchers: dict[str, Callable] = {}
+        # Bind the inherited browse half's sink: FsBrowseMixin cannot import a
+        # logger of its own (SEP-06), and a silent mkdir failure is unhelpful.
+        self._browse_log = SHARED_LOG
+
+    def configure_model_fetchers(self) -> None:
+        """Route the clients that have a richer model source than the CLI probe.
+
+        Opt-in rather than done in ``__init__``: a bare mixin (tests, callers
+        that register their own fetchers) keeps the plain CLI behaviour.
+        """
+        self._model_fetchers["claude"] = self._get_claude_models
 
     def get_ai_clients(self, env: dict[str, str] | None = None) -> dict[str, list[dict[str, str]]]:
         """Return available AI clients (CLI tools that are installed + API providers).
@@ -201,7 +113,7 @@ class FsToolingMixin:
         *env* overrides ``os.environ`` when provided, making the method
         testable without environment mutation.
         """
-        environ = env if env is not None else os.environ
+        environ = resolve_env(env)
         clients: list[dict[str, str]] = []
 
         # CLI tools: only include if installed
@@ -220,7 +132,7 @@ class FsToolingMixin:
         # reads awkwardly (e.g. "Llamacpp" instead of "llama.cpp").
         api_label_overrides = {"llamacpp": "llama.cpp"}
         for provider_id, cfg in provider_configs.items():
-            if cfg.get("type") == "api" and provider_id != "custom":
+            if cfg.get("type") == "api" and provider_id != _CUSTOM_PROVIDER_ID:
                 requires = cfg.get("requires_platform", "")
                 if requires and not _platform_matches(requires):
                     continue
@@ -233,27 +145,18 @@ class FsToolingMixin:
                     })
 
         # Sort by 'order' field from ai_providers.json
-        clients.sort(key=lambda c: provider_configs.get(c["id"], {}).get("order", 50))
+        clients.sort(key=lambda c: provider_configs.get(c["id"], {}).get("order", _DEFAULT_CLIENT_SORT_ORDER))
 
         return {"clients": clients}
 
-    def _get_cli_models(self, client_id: str, env: dict[str, str] | None = None) -> dict[str, list[str]]:
+    def _get_cli_models(self, client_id: str, env: dict[str, str] | None = None) -> dict[str, Any]:
         if client_id not in get_allowed_client_ids(env=env):
             return {"models": []}
         if not client_id.isalnum():
             return {"models": []}
-        if not shutil.which(client_id):
-            return {"models": []}
-        try:
-            result = subprocess.run(
-                [client_id, "/models"],
-                capture_output=True,
-                text=True, encoding="utf-8",
-                timeout=_CLI_MODEL_TIMEOUT_S,
-            )
-            output = result.stdout if result.returncode == 0 else ""
-        except (subprocess.TimeoutExpired, OSError):
-            return {"models": []}
+        if client_id == "copilot":
+            return fetch_copilot_models(env=env)
+        output = run_cli_models_command(client_id, timeout_s=_CLI_MODEL_TIMEOUT_S)
         models = []
         for line in output.splitlines():
             token = line.strip().split()[0] if line.strip() else ""
@@ -261,7 +164,7 @@ class FsToolingMixin:
                 models.append(token)
         return {"models": models}
 
-    def get_client_models(self, client_id: str) -> dict[str, list[str]]:
+    def get_client_models(self, client_id: str) -> dict[str, Any]:
         """Return available models for a specific AI client."""
         fetcher = self._model_fetchers.get(client_id, self._get_cli_models)
         return fetcher(client_id)

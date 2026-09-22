@@ -10,7 +10,7 @@ import { bucketKey } from '../utils/dailyGrouping.js';
  * @param granularity - period granularity ('day' | 'week' | 'month'); determines
  *   which period buckets are considered visible, matching the chart's bucketing.
  */
-export function useVisibleRuns(dailyRuns, dashboard, activePage, setSelectedRun, granularity = 'day') {
+export function useVisibleRuns(dailyRuns, dashboard, setSelectedRun, granularity = 'day') {
   const visibleDailyRuns = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
     const trendEntries = dashboard?.trend || [];

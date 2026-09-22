@@ -1,4 +1,4 @@
-"""Periodic cache persistence during dispatch (B5e).
+"""Periodic cache persistence during dispatch (B5e): watcher lifecycle.
 
 When a dimension runs, the dispatch can take minutes. If the user
 cancels mid-dim, the previous design lost cache entries for files that
@@ -13,67 +13,25 @@ The watcher runs in process_dimension_with_cache:
   2. Periodically calls persist_dispatch_results during dispatch
   3. Stops after dispatch returns (including exceptions)
   4. Final persist on stop is best-effort; failures don't propagate
+
+Tick incrementality and the final full re-read live in
+test_periodic_persist_ticks.py.
 """
 from __future__ import annotations
 
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig, _AnalysisContext
 from quodeq.analysis.cache import LocalFileBackend, build_cache_key_for_file
-from quodeq.analysis.cache.dimension_runner import process_dimension_with_cache
-from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
+from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
+from tests.analysis.cache.conftest import _make_callbacks, _make_ctx
 
-
-def _make_manifest(file_names: list[str]) -> SourceManifest:
-    target = AnalysisTarget(
-        name="t", language="python", source_files=sorted(file_names),
-        total_files=len(file_names),
-        language_stats={"py": len(file_names)},
-    )
-    return SourceManifest(targets=[target], total_files=len(file_names))
-
-
-def _setup(tmp_path: Path, contents: dict[str, str]) -> RunConfig:
-    src = tmp_path / "src"
-    src.mkdir(exist_ok=True)
-    for n, t in contents.items():
-        (src / n).write_text(t)
-    return RunConfig(
-        src=src, language="python", standards_dir=None,
-        work_dir=tmp_path / "work",
-        options=AnalysisOptions(subagent_model="test-model"),
-        manifest=_make_manifest(sorted(contents.keys())),
-    )
-
-
-def _make_ctx() -> _AnalysisContext:
-    from quodeq.analysis._dimensions import DimensionsConfig
-    return _AnalysisContext(
-        dimensions_data=DimensionsConfig(dimensions={}),
-        date_str="2026-01-01", template="", subagent_template="", total=1,
-    )
-
-
-def _make_callbacks():
-    from quodeq.analysis._dimension_steps import (
-        _build_dimension_prompt, _parse_dimension_evidence, _run_dimension_analysis,
-    )
-    from quodeq.analysis.subagents.runner import DimensionCallbacks
-    return DimensionCallbacks(
-        build_prompt=_build_dimension_prompt,
-        run_analysis=_run_dimension_analysis,
-        parse_evidence=_parse_dimension_evidence,
-    )
-
-
-@pytest.fixture
-def cache(tmp_path: Path) -> LocalFileBackend:
-    return LocalFileBackend(root=tmp_path / "cache")
+from ._periodic_persist_helpers import _setup
 
 
 # ============================================================
@@ -92,7 +50,7 @@ class TestWatcherStartsAndStops:
 
         # The fake dispatcher writes a finding to JSONL, then sleeps long enough
         # that the watcher (with a tiny interval) ticks at least once.
-        def slow_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+        def slow_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             jsonl.write_text(
@@ -106,22 +64,72 @@ class TestWatcherStartsAndStops:
                 principles={},
             )
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=slow_dispatcher,
-        ), patch(
-            "quodeq.analysis.cache.dimension_runner._PERSIST_INTERVAL_S", 0.05,
-        ):
-            process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
-            )
+        process_dimension_with_cache(
+            config, "security", 1, _make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=slow_dispatcher, persist_interval_s=0.05),
+        )
 
         # Final state: cache entry exists (final persist after dispatch).
         key = build_cache_key_for_file(config, "a.py", "security")
         entry = cache.get(key)
         assert entry is not None
         assert any(f.get("w") == "found" for f in entry.findings)
+
+
+class TestHashInputsHoistedOncePerDispatch:
+    def test_hash_functions_called_once_not_per_tick(
+        self, tmp_path: Path, cache: LocalFileBackend,
+    ):
+        """standards_hash/params_hash/prompts_hash are dispatch-constant and
+        must be computed once at watcher start, not recomputed on every
+        persist tick — regression test for the redundant per-tick hashing
+        hoisted out of persist_dispatch_results."""
+        config = _setup(tmp_path, {"a.py": "x"})
+        config = replace(config, standards_dir=tmp_path / "standards")
+        from quodeq.core.evidence.model import Evidence
+
+        def slow_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
+            jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
+            jsonl.parent.mkdir(parents=True, exist_ok=True)
+            jsonl.write_text(
+                '{"file": "a.py", "line": 1, "t": "violation", "w": "found"}\n'
+                + '{"_marker": "file_done", "file": "a.py", "status": "ok"}\n'
+            )
+            time.sleep(0.3)  # several persist ticks at the tiny interval below
+            return Evidence(
+                repository="", language="python", date="2026-01-01",
+                source_file_count=1, files_read=1, coverage_pct=100.0,
+                principles={},
+            )
+
+        mock_hash_standards = MagicMock(return_value="std-hash")
+        mock_params_state = MagicMock(return_value=("params-hash", {}))
+        mock_hash_prompts = MagicMock(return_value="prompts-hash")
+
+        with (
+            patch(
+                "quodeq.analysis.cache._persist_watcher.hash_standards",
+                mock_hash_standards,
+            ),
+            patch(
+                "quodeq.analysis.cache._persist_watcher.dimension_params_state",
+                mock_params_state,
+            ),
+            patch(
+                "quodeq.analysis.cache._persist_watcher._hash_prompts_combined",
+                mock_hash_prompts,
+            ),
+        ):
+            process_dimension_with_cache(
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=slow_dispatcher, persist_interval_s=0.05),
+            )
+
+        # Multiple ticks (~0.3s / 0.05s interval) plus the final persist all
+        # reuse the same precomputed values — one call each for the dispatch.
+        assert mock_hash_standards.call_count == 1
+        assert mock_params_state.call_count == 1
+        assert mock_hash_prompts.call_count == 1
 
 
 class TestWatcherSurvivesDispatchException:
@@ -133,7 +141,7 @@ class TestWatcherSurvivesDispatchException:
         the findings are complete. The next run will re-dispatch."""
         config = _setup(tmp_path, {"a.py": "x"})
 
-        def crashing_dispatcher(cfg, dim_id, idx, ctx, callbacks):
+        def crashing_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             jsonl = cfg.work_dir / f"{dim_id}_evidence.jsonl"
             jsonl.parent.mkdir(parents=True, exist_ok=True)
             # Write partial findings with no ok marker (worker died mid-file).
@@ -142,17 +150,11 @@ class TestWatcherSurvivesDispatchException:
             )
             raise RuntimeError("simulated cancel")
 
-        with patch(
-            "quodeq.analysis.cache.dimension_runner.process_dimension_with_subagents",
-            new=crashing_dispatcher,
-        ), patch(
-            "quodeq.analysis.cache.dimension_runner._PERSIST_INTERVAL_S", 60.0,
-        ):
-            with pytest.raises(RuntimeError, match="simulated cancel"):
-                process_dimension_with_cache(
-                    config, "security", 1, _make_ctx(), _make_callbacks(),
-                    cache=cache,
-                )
+        with pytest.raises(RuntimeError, match="simulated cancel"):
+            process_dimension_with_cache(
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=crashing_dispatcher, persist_interval_s=60.0),
+            )
 
         # No ok marker emitted → orphaned findings must NOT be cached.
         key = build_cache_key_for_file(config, "a.py", "security")
@@ -182,6 +184,7 @@ class TestNoWatcherWhenNoMisses:
         # Track Thread() instantiations.
         original_thread = threading.Thread
         threads_created: list[threading.Thread] = []
+
         def tracking_thread(*args, **kwargs):
             t = original_thread(*args, **kwargs)
             threads_created.append(t)
@@ -193,8 +196,8 @@ class TestNoWatcherWhenNoMisses:
             new=tracking_thread,
         ):
             process_dimension_with_cache(
-                config, "security", 1, _make_ctx(), _make_callbacks(),
-                cache=cache,
+                config, "security", 1, _make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache),
             )
 
         # All-hits path → no watcher thread started.

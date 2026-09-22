@@ -14,20 +14,20 @@ hard-reset racing a stage/commit/push can tear a commit or contend on
 ensure_shared_clone, publish_project) one process-wide lock per clone path.
 Readers (published_meta, sync_shared_index, the read-only /api/shared/*
 route mirrors) are deliberately NOT serialized against this lock -- full
-reader serialization is deferred. Torn reads are bounded instead by Task 2's
+reader serialization is deferred. Torn reads are bounded instead by the
 atomic meta writes (published.json via tmp+rename): a reader can see a
 project that is one publish stale, never a half-written published.json.
 """
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import os
 import shutil
 import stat
 import subprocess
 import threading
+from collections.abc import Mapping
 from pathlib import Path
 
 # Re-exported so the api layer can validate a shared-repo URL without
@@ -36,6 +36,7 @@ from pathlib import Path
 # not api -> data). services/evaluation_mixin.py imports the same function
 # straight from quodeq.data.fs.repo_validation for the same reason.
 from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
+from quodeq.shared.env_resolve import resolve_env
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +67,8 @@ def remove_clone_dir(path: Path | str) -> None:
     shutil.rmtree(path, onexc=_clear_readonly_and_retry)
 
 
-def _git_env() -> dict[str, str]:
-    """Environment for git subprocess calls.
+def _git_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Environment for git subprocess calls, layered over *env*.
 
     GIT_LFS_SKIP_SMUDGE avoids pulling LFS blobs we don't need. GIT_TERMINAL_PROMPT=0
     stops git from blocking on an interactive credential or passphrase prompt, since
@@ -79,17 +80,27 @@ def _git_env() -> dict[str, str]:
     the call only dies at the run_git timeout. ssh remotes need the host in
     known_hosts and the key in an agent (or use an https remote instead).
     """
-    return {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"}
+    return {**resolve_env(env), "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"}
 
 
 def run_git(
-    args: list[str], *, cwd: Path | None = None, timeout: int = _DEFAULT_GIT_TIMEOUT_S
+    args: list[str], *, cwd: Path | None = None, timeout: int = _DEFAULT_GIT_TIMEOUT_S,
+    env: Mapping[str, str] | None = None,
 ) -> tuple[bool, str]:
+    """Run a git command and return ``(ok, output)``.
+
+    *output* is the merged stdout+stderr of a git command that actually ran,
+    which is safe to surface to a caller. A process that never ran (git
+    missing, the timeout fired) is logged server-side and reported as a
+    generic reason instead, since its exception text can carry local paths and
+    errno detail. Never raises. stdin is closed, so git can never block on a
+    prompt.
+    """
     try:
         proc = subprocess.run(
             ["git", *args],
             cwd=str(cwd) if cwd else None,
-            env=_git_env(),
+            env=_git_env(env),
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
@@ -99,26 +110,37 @@ def run_git(
         )
         return proc.returncode == 0, (proc.stdout or "") + (proc.stderr or "")
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, str(exc)
+        # Unlike a failed git command (whose stdout/stderr is safe, expected
+        # user-facing text -- see refresh_shared_clone's docstring), this
+        # branch only fires for process-launch failures (git missing, a
+        # timeout). str(exc) there can include local details (the resolved
+        # command line, filesystem errno text) that callers surface straight
+        # into HTTP error responses, so keep it out of the returned reason
+        # and log it server-side instead.
+        logger.warning("run_git: %s failed to launch/complete: %s", args, exc)
+        return False, "git command failed to run"
 
 
-def _cache_base(env: dict | None = None) -> Path:
-    e = env if env is not None else os.environ
+def _cache_base(env: Mapping[str, str] | None = None) -> Path:
+    e = resolve_env(env)
     base = e.get(_CACHE_ENV)
     root = Path(base) if base else Path.home() / ".quodeq" / "cache"
     return root / "shared"
 
 
-def shared_cache_dir(url: str, env: dict | None = None) -> Path:
+def shared_cache_dir(url: str, env: Mapping[str, str] | None = None) -> Path:
+    """Per-remote cache directory, named by a 16-char digest of *url*."""
     digest = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()[:16]
     return _cache_base(env) / digest
 
 
-def shared_repo_path(url: str, env: dict | None = None) -> Path:
+def shared_repo_path(url: str, env: Mapping[str, str] | None = None) -> Path:
+    """Clone directory for *url*. Also the key ``clone_lock`` locks on."""
     return shared_cache_dir(url, env) / "repo"
 
 
-def shared_evaluations_root(url: str, env: dict | None = None) -> Path:
+def shared_evaluations_root(url: str, env: Mapping[str, str] | None = None) -> Path:
+    """The clone's evaluations/ tree, laid out like the local evaluations dir."""
     return shared_repo_path(url, env) / "evaluations"
 
 
@@ -126,7 +148,7 @@ _CLONE_LOCKS: dict[str, threading.RLock] = {}
 _CLONE_LOCKS_GUARD = threading.Lock()
 
 
-def clone_lock(url: str, env: dict | None = None) -> threading.RLock:
+def clone_lock(url: str, env: Mapping[str, str] | None = None) -> threading.RLock:
     """Process-wide reentrant lock serializing git mutations on one clone.
 
     Keyed by the clone's resolved path (shared_repo_path), so any two
@@ -142,7 +164,13 @@ def clone_lock(url: str, env: dict | None = None) -> threading.RLock:
         return _CLONE_LOCKS.setdefault(key, threading.RLock())
 
 
-def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
+def ensure_shared_clone(url: str, env: Mapping[str, str] | None = None) -> Path | None:
+    """Return the clone path for *url*, cloning it once if it is not there yet.
+
+    None when the clone failed; the half-written directory is removed so the
+    next call starts clean. Keeps run_git's 300s default, unlike
+    ``refresh_shared_clone`` -- a first clone can legitimately take minutes.
+    """
     with clone_lock(url, env):
         repo = shared_repo_path(url, env)
         if (repo / ".git").exists():
@@ -159,8 +187,40 @@ def ensure_shared_clone(url: str, env: dict | None = None) -> Path | None:
 _DEFAULT_REFRESH_TIMEOUT_S = 30
 
 
+def _refresh_missing_clone(url: str, env: Mapping[str, str] | None) -> tuple[bool, str]:
+    if ensure_shared_clone(url, env) is not None:
+        return True, ""
+    reason = f"could not clone the repository, check that git can access {url}"
+    logger.warning("refresh_shared_clone: %s", reason)
+    return False, reason
+
+
+def _fetch_and_reset_clone(url: str, repo: Path, timeout: int) -> tuple[bool, str]:
+    # Unshallowing only applies to NEW clones: ensure_shared_clone stopped
+    # passing --depth 1 in a prior fix, but a shared-clone cache directory
+    # created back when it still did stays shallow forever otherwise --
+    # ensure_shared_clone early-returns because `.git` already exists, and a
+    # plain `fetch origin HEAD` does not unshallow a repo on its own. If
+    # `.git/shallow` is present, try `git fetch --unshallow origin` first; a
+    # failure there (network hiccup, odd remote) is not fatal -- fall through
+    # to the plain fetch below, and a later refresh call retries the unshallow.
+    if (repo / ".git" / "shallow").exists():
+        run_git(["fetch", "--unshallow", "origin"], cwd=repo, timeout=timeout)
+    ok, out = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout)
+    if not ok:
+        reason = out.strip()[:200]
+        logger.warning("refresh_shared_clone: fetch failed for %s: %s", url, reason)
+        return False, reason
+    ok, out = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout)
+    if not ok:
+        reason = out.strip()[:200]
+        logger.warning("refresh_shared_clone: reset failed for %s: %s", url, reason)
+        return False, reason
+    return True, ""
+
+
 def refresh_shared_clone(
-    url: str, env: dict | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S
+    url: str, env: Mapping[str, str] | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S
 ) -> tuple[bool, str]:
     """Fetch + hard-reset the clone to the remote's HEAD.
 
@@ -183,15 +243,6 @@ def refresh_shared_clone(
     affect ensure_shared_clone's own (still 300s) clone timeout -- an
     initial clone can legitimately take much longer than a refresh.
 
-    Unshallowing only applies to NEW clones: ensure_shared_clone stopped
-    passing --depth 1 in a prior fix, but a shared-clone cache directory
-    created back when it still did stays shallow forever otherwise --
-    ensure_shared_clone early-returns because `.git` already exists, and a
-    plain `fetch origin HEAD` does not unshallow a repo on its own. If
-    `.git/shallow` is present, try `git fetch --unshallow origin` first; a
-    failure there (network hiccup, odd remote) is not fatal -- fall through
-    to the plain fetch below, and a later refresh call retries the unshallow.
-
     Runs entirely under clone_lock (audit finding C2): without it, this
     fetch + hard-reset can interleave with an in-flight publish_project's
     stage/commit/push on the same clone directory, tearing a commit or
@@ -200,27 +251,15 @@ def refresh_shared_clone(
     with clone_lock(url, env):
         repo = shared_repo_path(url, env)
         if not (repo / ".git").exists():
-            if ensure_shared_clone(url, env) is not None:
-                return True, ""
-            reason = f"could not clone the repository, check that git can access {url}"
-            logger.warning("refresh_shared_clone: %s", reason)
-            return False, reason
-        if (repo / ".git" / "shallow").exists():
-            run_git(["fetch", "--unshallow", "origin"], cwd=repo, timeout=timeout)
-        ok, out = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout)
-        if not ok:
-            reason = out.strip()[:200]
-            logger.warning("refresh_shared_clone: fetch failed for %s: %s", url, reason)
-            return False, reason
-        ok, out = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout)
-        if not ok:
-            reason = out.strip()[:200]
-            logger.warning("refresh_shared_clone: reset failed for %s: %s", url, reason)
-            return False, reason
-        return True, ""
+            return _refresh_missing_clone(url, env)
+        return _fetch_and_reset_clone(url, repo, timeout)
 
 
-def last_synced_at(url: str, env: dict | None = None) -> float | None:
+def last_synced_at(url: str, env: Mapping[str, str] | None = None) -> float | None:
+    """Unix mtime of the clone's last fetch, or None when it was never cloned.
+
+    Falls back to HEAD when FETCH_HEAD is absent (cloned, never refreshed).
+    """
     repo = shared_repo_path(url, env)
     for name in ("FETCH_HEAD", "HEAD"):
         candidate = repo / ".git" / name
@@ -231,138 +270,22 @@ def last_synced_at(url: str, env: dict | None = None) -> float | None:
     return None
 
 
-MARKER_FILENAME = "quodeq.json"
-FORMAT_NAME = "quodeq-shared-evaluations"
-FORMAT_VERSION = 1
-PUBLISHED_META_FILENAME = "published.json"
-
-_GITIGNORE_CONTENT = "**/evaluation.db\n*.log\n"
-
-
-def check_repo_format(repo_root: Path) -> str:
-    marker = repo_root / MARKER_FILENAME
-    if marker.exists():
-        try:
-            data = json.loads(marker.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-            return "foreign"
-
-        # Marker JSON must be a dict; if not, it's foreign.
-        if not isinstance(data, dict):
-            return "foreign"
-
-        if data.get("format") != FORMAT_NAME:
-            return "foreign"
-
-        # Try to parse version as int; if it fails or is non-numeric, unsupported.
-        try:
-            version = int(data.get("version", 0))
-        except (ValueError, TypeError):
-            return "unsupported_version"
-
-        if version > FORMAT_VERSION:
-            return "unsupported_version"
-        return "ok"
-
-    try:
-        entries = [p for p in repo_root.iterdir() if p.name != ".git"]
-    except OSError:
-        return "foreign"
-    return "empty" if not entries else "foreign"
-
-
-def bootstrap_repo_layout(repo_root: Path) -> None:
-    marker_content = json.dumps({"format": FORMAT_NAME, "version": FORMAT_VERSION}) + "\n"
-    (repo_root / MARKER_FILENAME).write_text(marker_content, encoding="utf-8")
-    (repo_root / ".gitignore").write_text(_GITIGNORE_CONTENT, encoding="utf-8")
-    evaluations = repo_root / "evaluations"
-    evaluations.mkdir(exist_ok=True)
-    (evaluations / ".gitkeep").write_text("", encoding="utf-8")
-
-
-def shared_index_db_path(url: str, env: dict | None = None) -> Path:
-    return shared_cache_dir(url, env) / "index.db"
-
-
-def shared_score_cache_path(url: str, env: dict | None = None) -> Path:
-    return shared_cache_dir(url, env) / "score_cache.db"
-
-
-def sync_shared_index(url: str, env: dict | None = None) -> None:
-    from quodeq.data.sqlite.run_index import open_index, sync_index
-
-    root = shared_evaluations_root(url, env)
-    if not root.is_dir():
-        return
-    db = open_index(shared_index_db_path(url, env))
-    try:
-        sync_index(db, root)
-    finally:
-        db.close()
-
-
-def read_state(url: str, env: dict | None = None) -> str:
-    """State of the local shared clone: ok | empty | foreign |
-    unsupported_version | missing. "empty" (cloned, never published into)
-    is servable -- routes return an empty listing for it."""
-    repo = shared_repo_path(url, env)
-    if not (repo / ".git").exists():
-        return "missing"
-    return check_repo_format(repo)
-
-
-def _read_published_json(entry: Path) -> dict | None:
-    """Read <entry>/published.json, validating both keys.
-
-    Returns None on any failure (missing file, bad JSON, wrong shape) so the
-    caller can fall back to the git-log-derived legacy path -- never raises.
-    """
-    try:
-        data = json.loads((entry / PUBLISHED_META_FILENAME).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    by = data.get("publishedBy")
-    at = data.get("publishedAt")
-    if not isinstance(by, str) or not by:
-        return None
-    if not isinstance(at, int) or isinstance(at, bool):
-        return None
-    return {"publishedBy": by, "publishedAt": at}
-
-
-def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:
-    """Attribution per published project: who published it, and when.
-
-    Prefers the published.json written by stage_project at publish time
-    (see shared_publish.py). Falls back to the legacy git-log-derived
-    lookup for project dirs published before that file existed. The
-    fallback is only correct because the clone is full history (no
-    --depth) -- a shallow clone made `git log -1 -- path` return the tip
-    commit for every path, misattributing every project except the most
-    recently pushed one (audit finding C1).
-    """
-    repo = shared_repo_path(url, env)
-    root = shared_evaluations_root(url, env)
-    result: dict[str, dict] = {}
-    if not root.is_dir():
-        return result
-    for entry in sorted(root.iterdir()):
-        if not entry.is_dir():
-            continue
-        meta = _read_published_json(entry)
-        if meta is not None:
-            result[entry.name] = meta
-            continue
-        ok, out = run_git(
-            ["log", "-1", "--format=%an|%ct", "--", f"evaluations/{entry.name}"],
-            cwd=repo,
-        )
-        if ok and "|" in out:
-            author, _, ts = out.strip().rpartition("|")
-            try:
-                result[entry.name] = {"publishedBy": author, "publishedAt": int(ts)}
-            except ValueError:
-                continue
-    return result
+# Re-exported: format/bootstrap, index sync, and publish attribution moved to
+# shared_repo_meta.py to keep this module under 300 lines. Placed at the
+# bottom (not the top) of this file so run_git / shared_cache_dir /
+# shared_evaluations_root / shared_repo_path -- which shared_repo_meta.py
+# imports back from here -- are already defined on this (still-initializing)
+# module by the time that import runs; no true cycle.
+from quodeq.data.fs.shared_repo_meta import (  # noqa: F401, E402
+    FORMAT_NAME,
+    FORMAT_VERSION,
+    MARKER_FILENAME,
+    PUBLISHED_META_FILENAME,
+    bootstrap_repo_layout,
+    check_repo_format,
+    published_meta,
+    read_state,
+    shared_index_db_path,
+    shared_score_cache_path,
+    sync_shared_index,
+)

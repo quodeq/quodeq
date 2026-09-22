@@ -5,19 +5,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
+from quodeq.analysis.evidence_parser import evidence_parse_options
 from quodeq.core.evidence.model import Evidence
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
-from quodeq.analysis.subagents.file_queue import FileQueue
-from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
+from quodeq.core.evidence.parser import (
+    EvidenceContext, parse_jsonl_to_evidence_by_dimension)
+from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
+from quodeq.analysis.prompts.builder import build_consolidated_prompt, prompt_context
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
-from quodeq.analysis.subagents._source_files import _list_source_files
-from quodeq.analysis._runner_markers import cleanup_stream
-from quodeq.shared.logging import log_info, log_warning
+from quodeq.analysis.subagents.source_files import list_source_files
+from quodeq.analysis.runner_markers import cleanup_stream
+from quodeq.core.observability import NULL_LOG, LogSink
 
 
 @dataclass(frozen=True)
@@ -31,7 +33,7 @@ class _ConsolidatedPaths:
 class _ConsolidatedRunContext:
     """Grouped context for consolidated result collection."""
     dimensions: list[str]
-    ctx: Any
+    ctx: AnalysisContext
     results: list[Any]
     files: list[str]
     exit_reason: str | None = None
@@ -59,6 +61,7 @@ def _build_consolidated_config(
 
 def _collect_consolidated_results(
     config: "RunConfig", run_ctx: _ConsolidatedRunContext, paths: _ConsolidatedPaths,
+    *, log: LogSink = NULL_LOG,
 ) -> dict[str, Evidence]:
     """Deduplicate and parse consolidated results into per-dimension Evidence."""
     merged_jsonl = paths.evidence_dir / "consolidated_evidence.jsonl"
@@ -76,8 +79,11 @@ def _collect_consolidated_results(
     if queue_path.exists():
         try:
             analyzed |= set(FileQueue(queue_path).all_taken_files())
-        except (OSError, ValueError, KeyError):
-            pass
+        except (OSError, ValueError, KeyError, FileQueueError) as exc:
+            # FileQueueError (a RuntimeError) is what the queue raises for a
+            # corrupt or wrong-shaped file; the other three cover an unreadable
+            # file and a malformed "taken" entry.
+            log.warning(f"Could not read taken files from consolidated queue {queue_path}: {exc}")
 
     # V2 cache owns incremental state via per-file entries written
     # during dispatch; the V1 per-dimension fingerprint write is no
@@ -94,43 +100,29 @@ def _collect_consolidated_results(
     )
 
     return parse_jsonl_to_evidence_by_dimension(
-        merged_jsonl, ev_ctx, compiled_dir=paths.compiled_dir,
-        evaluators_dir=config.evaluators_dir,
+        merged_jsonl, ev_ctx, evidence_parse_options(config, paths.compiled_dir),
     )
 
 
-def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
+def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: AnalysisContext) -> str:
     """Build the consolidated prompt for multi-dimension analysis."""
     return build_consolidated_prompt(
-        dimensions=dimensions,
-        context=PromptContext(
-            language=config.language,
-            repo_name=str(config.src),
-            date_str=ctx.date_str,
-            dimension="consolidated",
-            source_file_count=config.source_file_count,
-            dimensions_data=ctx.dimensions_data,
-            standards_dir=config.standards_dir,
-            evaluators_dir=config.evaluators_dir,
-            manifest=config.manifest,
-            target=config.target,
-            work_dir=config.work_dir or config.src,
-            project_root=config.src,
-        ),
+        dimensions=dimensions, context=prompt_context(config, ctx, "consolidated"),
     )
 
 
 def process_consolidated_dimensions(
-    config: "RunConfig", dimensions: list[str], ctx: Any,
+    config: "RunConfig", dimensions: list[str], ctx: AnalysisContext,
+    *, log: LogSink = NULL_LOG,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     evidence_dir = config.work_dir or config.src
 
     # 1. List source files
-    files, extensions, _excluded = _list_source_files(config, dimensions[0])
+    files, extensions, _excluded = list_source_files(config, dimensions[0])
     if not files:
-        log_warning("No source files for consolidated analysis")
+        log.warning("No source files for consolidated analysis")
         return {}
 
     # 2. Build consolidated prompt and create file queue
@@ -138,7 +130,7 @@ def process_consolidated_dimensions(
     files_per_agent = _compute_files_per_agent(len(files))
     queue_path = evidence_dir / "consolidated_queue.json"
     FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
-    log_info(f"Consolidated analysis: {len(files)} files, {len(dimensions)} dimensions, max {config.options.max_subagents} agents")
+    log.info(f"Consolidated analysis: {len(files)} files, {len(dimensions)} dimensions, max {config.options.max_subagents} agents")
 
     # 3. Build config and launch pool
     base_ac = _build_consolidated_config(config, dimensions, files_per_agent, compiled_dir=compiled_dir)
@@ -158,4 +150,6 @@ def process_consolidated_dimensions(
         dimensions=dimensions, ctx=ctx, results=results, files=files,
         exit_reason=pool.exit_reason,
     )
-    return _collect_consolidated_results(config, run_context, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir))
+    return _collect_consolidated_results(
+        config, run_context, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir), log=log,
+    )

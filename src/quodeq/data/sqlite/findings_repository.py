@@ -7,7 +7,7 @@ from typing import Any
 
 from quodeq.core.types.finding import Finding
 from quodeq.data.projection.projector import Projector
-from quodeq.data.sqlite._row_mappers import (
+from quodeq.data.sqlite.row_mappers import (
     finding_dict_to_row,
     row_to_finding,
 )
@@ -17,12 +17,12 @@ _INSERT_SQL = """
 INSERT OR IGNORE INTO findings (
     schema_version, practice_id, dimension, requirement, verdict, severity,
     file, line, end_line, title, reason, snippet,
-    violation_type, context, scope, req_refs_json, dedup_key, confidence,
+    violation_type, violation_type_raw, context, scope, req_refs_json, dedup_key, confidence,
     provenance_downgrade, scope_downgrade_json
 ) VALUES (
     :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
     :file, :line, :end_line, :title, :reason, :snippet,
-    :violation_type, :context, :scope, :req_refs_json, :dedup_key, :confidence,
+    :violation_type, :violation_type_raw, :context, :scope, :req_refs_json, :dedup_key, :confidence,
     :provenance_downgrade, :scope_downgrade_json
 )
 """
@@ -30,7 +30,7 @@ INSERT OR IGNORE INTO findings (
 _SELECT_COLUMNS = (
     "id, practice_id, dimension, requirement, verdict, severity, "
     "file, line, end_line, title, reason, snippet, "
-    "violation_type, context, scope, req_refs_json, confidence, "
+    "violation_type, violation_type_raw, context, scope, req_refs_json, confidence, "
     "provenance_downgrade, scope_downgrade_json"
 )
 
@@ -74,6 +74,10 @@ class SqliteFindingsRepository:
         self._ensure_fresh()
 
     def insert_finding(self, finding: dict[str, Any]) -> bool:
+        """Insert into ``findings``; INSERT OR IGNORE on the dedup key.
+
+        Returns False when the row already existed. Does not project.
+        """
         row = finding_dict_to_row(finding)
         with open_evaluation_db(self._run_dir) as conn:
             cur = conn.execute(_INSERT_SQL, row)
@@ -81,6 +85,10 @@ class SqliteFindingsRepository:
             return cur.rowcount == 1
 
     def list_by_dimension(self, dimension: str) -> list[Finding]:
+        """One indexed SELECT over ``findings``, ordered by insertion id.
+
+        Projects first, so the rows reflect the current event log.
+        """
         self._ensure_fresh()
         with open_evaluation_db(self._run_dir) as conn:
             conn.row_factory = _dict_row
@@ -105,6 +113,10 @@ class SqliteFindingsRepository:
         return [row_to_finding(r) for r in rows]
 
     def count_by_dimension(self) -> dict[str, int]:
+        """Return ``COUNT(*) GROUP BY dimension``, dismissed rows included.
+
+        Dimensions with no findings are absent from the dict rather than zero.
+        """
         self._ensure_fresh()
         with open_evaluation_db(self._run_dir) as conn:
             rows = conn.execute(
@@ -155,6 +167,10 @@ class SqliteFindingsRepository:
         return [row_to_finding(r) for r in rows]
 
     def set_verdict(self, *, practice_id: str, file: str, line: int, verdict: str) -> int:
+        """One UPDATE keyed on (practice_id, file, line). Returns rows affected.
+
+        Several findings can share that tuple; all of them get *verdict*.
+        """
         with open_evaluation_db(self._run_dir) as conn:
             cur = conn.execute(
                 "UPDATE findings SET verdict = ? "

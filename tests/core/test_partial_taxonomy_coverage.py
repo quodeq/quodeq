@@ -16,7 +16,7 @@ coverage just groups more precisely).
 """
 from __future__ import annotations
 
-from quodeq.core.scoring._principle import compute_tallies
+from quodeq.core.scoring.principle import compute_tallies
 from quodeq.core.types.finding import Finding
 from quodeq.core.scoring.projector_scoring import compute_principle_grade
 

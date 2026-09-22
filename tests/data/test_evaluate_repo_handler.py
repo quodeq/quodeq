@@ -16,7 +16,13 @@ def test_is_repo_url():
 
 
 def test_prepare_repository_url_uses_cache(monkeypatch, tmp_path: Path):
-    """A URL routes through the persistent online cache."""
+    """A URL routes through the persistent online cache.
+
+    The online cache (``context/online_cache.py``) is a separate
+    collaborator from ``GitCloneClient`` — not exercised at all here since
+    the cache "clone" succeeds on the first try — so this test still
+    stubs the real ``subprocess.run`` rather than injecting a client.
+    """
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
     monkeypatch.delenv("QUODEQ_DISABLE_ONLINE_CACHE", raising=False)
 
@@ -39,14 +45,14 @@ def test_prepare_repository_legacy_tempdir_when_cache_disabled(monkeypatch):
     """`QUODEQ_DISABLE_ONLINE_CACHE=1` keeps the old mkdtemp behavior."""
     monkeypatch.setenv("QUODEQ_DISABLE_ONLINE_CACHE", "1")
 
-    def fake_run(cmd, check, **kwargs):
-        dest = Path(cmd[-1])
-        dest.mkdir(parents=True, exist_ok=True)
+    from quodeq.data.fs.repo_clone import GitCloneClient
 
-    monkeypatch.setattr("subprocess.run", fake_run)
+    class _FakeClient(GitCloneClient):
+        def clone_legacy(self, repo_input, dest, *, timeout_s):
+            dest.mkdir(parents=True, exist_ok=True)
 
     url = "https://example.com/my-repo.git"
-    dest = prepare_repository(url)
+    dest = prepare_repository(url, client=_FakeClient())
     assert Path(dest).name == "my-repo"
 
 
@@ -56,33 +62,39 @@ def test_prepare_repository_falls_back_when_cache_clone_fails(monkeypatch, tmp_p
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
     monkeypatch.delenv("QUODEQ_DISABLE_ONLINE_CACHE", raising=False)
 
-    call_count = {"n": 0}
+    from quodeq.data.fs.repo_clone import GitCloneClient
 
     def fake_run(cmd, check, **kwargs):
-        call_count["n"] += 1
-        # First (cache) clone fails, second (legacy) clone succeeds.
-        if call_count["n"] == 1:
-            raise subprocess.CalledProcessError(128, cmd)
-        dest = Path(cmd[-1])
-        dest.mkdir(parents=True, exist_ok=True)
+        # Only the online cache's own clone attempt reaches real
+        # subprocess.run now; the legacy fallback below goes through the
+        # injected GitCloneClient instead.
+        raise subprocess.CalledProcessError(128, cmd)
 
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    dest = prepare_repository("https://example.com/repo.git")
+    legacy_calls = {"n": 0}
+
+    class _FakeClient(GitCloneClient):
+        def clone_legacy(self, repo_input, dest, *, timeout_s):
+            legacy_calls["n"] += 1
+            dest.mkdir(parents=True, exist_ok=True)
+
+    dest = prepare_repository("https://example.com/repo.git", client=_FakeClient())
     assert Path(dest).exists()
-    assert call_count["n"] == 2
+    assert legacy_calls["n"] == 1
 
 
 def test_prepare_repository_clone_failure_raises_when_cache_disabled(monkeypatch):
     monkeypatch.setenv("QUODEQ_DISABLE_ONLINE_CACHE", "1")
 
-    def fake_run(cmd, check, **kwargs):
-        raise subprocess.CalledProcessError(128, cmd)
+    from quodeq.data.fs.repo_clone import GitCloneClient
 
-    monkeypatch.setattr("subprocess.run", fake_run)
+    class _FailingClient(GitCloneClient):
+        def clone_legacy(self, repo_input, dest, *, timeout_s):
+            raise subprocess.CalledProcessError(128, ["git", "clone"])
 
     with pytest.raises(subprocess.CalledProcessError):
-        prepare_repository("https://example.com/bad-repo.git")
+        prepare_repository("https://example.com/bad-repo.git", client=_FailingClient())
 
 
 def test_cleanup_preserves_cached_clones(monkeypatch, tmp_path):

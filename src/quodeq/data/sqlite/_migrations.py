@@ -3,6 +3,13 @@ from __future__ import annotations
 
 import sqlite3
 
+from quodeq.data.sqlite._migrations_additive import (
+    _upgrade_v5_to_v6,
+    _upgrade_v6_to_v7,
+    _upgrade_v7_to_v8,
+    _upgrade_v8_to_v9,
+)
+from quodeq.data.sqlite._migrations_ddl import _V4_REBUILD_DDL
 from quodeq.data.sqlite._schema import EVALUATION_DDL, SCHEMA_VERSION
 
 
@@ -62,24 +69,10 @@ def _upgrade_v2_to_v3(conn: sqlite3.Connection) -> None:
     """)
 
 
-def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
-    """Allow 'major' in the findings.severity CHECK constraint.
+def _recover_v4_rebuild_state(conn: sqlite3.Connection) -> None:
+    """Normalise findings/findings_old_v3 before ``_upgrade_v3_to_v4`` rebuilds.
 
-    The v3 schema's CHECK only permitted ``critical/high/medium/low/minor``.
-    The scoring engine and event log emit ``major`` for the middle severity
-    bucket, so ``INSERT OR IGNORE`` silently dropped every major finding —
-    making principle scores look correct only as long as no critical was
-    dismissed. After dismissing all criticals the score jumped to 10.0
-    because the DB had no remaining violations.
-
-    SQLite cannot ALTER a CHECK in place, so rebuild the table. Existing
-    rows (all of which already pass the new, wider CHECK by construction)
-    copy over unchanged, then the FTS5 index and triggers are recreated.
-
-    Note: ``user_version`` is bumped by ``apply_evaluation_schema`` after
-    this function returns.
-
-    Recovery: this rebuild renames ``findings`` -> ``findings_old_v3`` before
+    Recovery: the rebuild renames ``findings`` -> ``findings_old_v3`` before
     recreating it. If a previous attempt was interrupted partway, the DB is
     left in a half-migrated state that would brick every subsequent open:
     either ``findings`` is already gone (the rename below would raise "no such
@@ -106,100 +99,26 @@ def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
         # original name so the rebuild runs against the complete data.
         conn.execute("ALTER TABLE findings_old_v3 RENAME TO findings")
 
-    conn.executescript("""
-        -- Drop triggers and FTS index that reference the old table by name.
-        DROP TRIGGER IF EXISTS findings_ai;
-        DROP TRIGGER IF EXISTS findings_ad;
-        DROP TRIGGER IF EXISTS findings_au;
-        DROP TABLE IF EXISTS findings_fts;
 
-        ALTER TABLE findings RENAME TO findings_old_v3;
+def _invalidate_projection_checkpoint(conn: sqlite3.Connection) -> None:
+    """Clear the projection checkpoint/size after the v3->v4 findings rebuild.
 
-        CREATE TABLE findings (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            schema_version  INTEGER NOT NULL DEFAULT 1,
-            practice_id     TEXT NOT NULL,
-            dimension       TEXT NOT NULL DEFAULT '',
-            requirement     TEXT,
-            verdict         TEXT NOT NULL CHECK (verdict IN ('violation','compliance','dismissed')),
-            severity        TEXT NOT NULL CHECK (severity IN ('critical','major','high','medium','low','minor')),
-            file            TEXT NOT NULL DEFAULT '',
-            line            INTEGER NOT NULL DEFAULT 0,
-            end_line        INTEGER NOT NULL DEFAULT 0,
-            title           TEXT NOT NULL DEFAULT '',
-            reason          TEXT NOT NULL DEFAULT '',
-            snippet         TEXT NOT NULL DEFAULT '',
-            violation_type  TEXT NOT NULL DEFAULT '',
-            context         TEXT NOT NULL DEFAULT '',
-            scope           TEXT NOT NULL DEFAULT '',
-            req_refs_json   TEXT,
-            dedup_key       TEXT NOT NULL UNIQUE,
-            confidence      INTEGER NOT NULL DEFAULT 100,
-            created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-        );
+    Invalidating them forces the next ensure_projected call to treat the DB
+    as "never projected" and trigger a full rebuild. The old schema's CHECK
+    constraint silently dropped every ``major`` severity finding at insert
+    time, so the existing rows are incomplete — the wider CHECK alone won't
+    bring those findings back, but a fresh rebuild from events.jsonl will.
 
-        INSERT INTO findings (
-            id, schema_version, practice_id, dimension, requirement, verdict,
-            severity, file, line, end_line, title, reason, snippet,
-            violation_type, context, scope, req_refs_json, dedup_key,
-            confidence, created_at
-        )
-        SELECT
-            id, schema_version, practice_id, dimension, requirement, verdict,
-            severity, file, line, end_line, title, reason, snippet,
-            violation_type, context, scope, req_refs_json, dedup_key,
-            confidence, created_at
-        FROM findings_old_v3;
+    We don't truncate the findings table here: the rebuild path
+    (engine.rebuild) calls clear_all() before re-inserting, so doing it now
+    would be redundant. Leaving the existing rows in place also keeps the
+    migration non-destructive for callers that never trigger a re-read.
 
-        DROP TABLE findings_old_v3;
-
-        CREATE INDEX idx_findings_dimension   ON findings(dimension);
-        CREATE INDEX idx_findings_severity    ON findings(severity);
-        CREATE INDEX idx_findings_verdict     ON findings(verdict);
-        CREATE INDEX idx_findings_file        ON findings(file);
-        CREATE INDEX idx_findings_requirement ON findings(requirement);
-        CREATE INDEX idx_findings_practice    ON findings(practice_id);
-
-        CREATE VIRTUAL TABLE findings_fts USING fts5(
-            reason, snippet,
-            content='findings', content_rowid='id', tokenize='porter'
-        );
-
-        -- Backfill FTS for any rows copied over.
-        INSERT INTO findings_fts(rowid, reason, snippet)
-            SELECT id, reason, snippet FROM findings;
-
-        CREATE TRIGGER findings_ai AFTER INSERT ON findings BEGIN
-            INSERT INTO findings_fts(rowid, reason, snippet)
-            VALUES (new.id, new.reason, new.snippet);
-        END;
-        CREATE TRIGGER findings_ad AFTER DELETE ON findings BEGIN
-            INSERT INTO findings_fts(findings_fts, rowid, reason, snippet)
-            VALUES ('delete', old.id, old.reason, old.snippet);
-        END;
-        CREATE TRIGGER findings_au AFTER UPDATE ON findings BEGIN
-            INSERT INTO findings_fts(findings_fts, rowid, reason, snippet)
-            VALUES ('delete', old.id, old.reason, old.snippet);
-            INSERT INTO findings_fts(rowid, reason, snippet)
-            VALUES (new.id, new.reason, new.snippet);
-        END;
-    """)
-    # Invalidate the projection checkpoint and projected-log size so the next
-    # ensure_projected call treats the DB as "never projected" and triggers a
-    # full rebuild. The old schema's CHECK constraint silently dropped every
-    # ``major`` severity finding at insert time, so the existing rows are
-    # incomplete — the wider CHECK alone won't bring those findings back, but
-    # a fresh rebuild from events.jsonl will.
-    #
-    # We don't truncate the findings table here: the rebuild path
-    # (engine.rebuild) calls clear_all() before re-inserting, so doing it now
-    # would be redundant. Leaving the existing rows in place also keeps the
-    # migration non-destructive for callers that never trigger a re-read.
-    #
-    # run_meta may not exist on DBs upgraded from very old (v1/v2) schemas —
-    # the per-version upgrade scripts never created it, only the fresh-DB DDL
-    # does. Skip gracefully in that case; without a checkpoint, ensure_projected
-    # rebuilds from scratch anyway.
+    run_meta may not exist on DBs upgraded from very old (v1/v2) schemas —
+    the per-version upgrade scripts never created it, only the fresh-DB DDL
+    does. Skip gracefully in that case; without a checkpoint, ensure_projected
+    rebuilds from scratch anyway.
+    """
     has_run_meta = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_meta'"
     ).fetchone() is not None
@@ -208,6 +127,28 @@ def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
             "DELETE FROM run_meta WHERE key IN "
             "('projection_checkpoint', 'projection_event_log_size', 'actions_log_projected_size')"
         )
+
+
+def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
+    """Allow 'major' in the findings.severity CHECK constraint.
+
+    The v3 schema's CHECK only permitted ``critical/high/medium/low/minor``.
+    The scoring engine and event log emit ``major`` for the middle severity
+    bucket, so ``INSERT OR IGNORE`` silently dropped every major finding —
+    making principle scores look correct only as long as no critical was
+    dismissed. After dismissing all criticals the score jumped to 10.0
+    because the DB had no remaining violations.
+
+    SQLite cannot ALTER a CHECK in place, so rebuild the table. Existing
+    rows (all of which already pass the new, wider CHECK by construction)
+    copy over unchanged, then the FTS5 index and triggers are recreated.
+
+    Note: ``user_version`` is bumped by ``apply_evaluation_schema`` after
+    this function returns.
+    """
+    _recover_v4_rebuild_state(conn)
+    conn.executescript(_V4_REBUILD_DDL)
+    _invalidate_projection_checkpoint(conn)
 
 
 def _upgrade_v4_to_v5(conn: sqlite3.Connection) -> None:
@@ -237,70 +178,6 @@ def _upgrade_v4_to_v5(conn: sqlite3.Connection) -> None:
             conn.execute("ALTER TABLE dimension_scores ADD COLUMN exit_reason TEXT")
 
 
-def _upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
-    """Add the provenance_downgrade column to findings (default 0, issue #656).
-
-    Marks findings the deterministic provenance gate (#639) de-escalated from
-    critical to major so the SQL projection and dashboard can surface it.
-
-    findings may not exist on DBs upgraded from very old (v1/v2) schemas that
-    only ever created a subset of tables -- only the fresh-DB DDL guarantees
-    it. Skip the ALTER in that case (mirrors the dimension_scores guard in
-    _upgrade_v4_to_v5); a future caller needing the column gets the fresh DDL.
-
-    Idempotency: the ALTER and the PRAGMA user_version bump in
-    apply_evaluation_schema commit separately (autocommit), so a crash in
-    between leaves the column added but the version still 5. Re-running the
-    bare ALTER would then raise "duplicate column name: provenance_downgrade"
-    -- a plain OperationalError the scoring/dashboard read seams don't catch,
-    permanently bricking the run. Skip if the column already exists.
-    """
-    has_findings = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='findings'"
-    ).fetchone() is not None
-    if not has_findings:
-        return
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
-    if "provenance_downgrade" not in columns:
-        conn.execute(
-            "ALTER TABLE findings ADD COLUMN provenance_downgrade INTEGER NOT NULL DEFAULT 0"
-        )
-
-
-def _upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
-    """Add the scope_downgrade_json column to findings (default NULL).
-
-    Marks findings the deterministic scope gate de-escalated from major to
-    minor per the declared trust model, as a JSON-encoded {"rule", "from",
-    "to"} dict (mirroring req_refs_json's shape) so the SQL projection and
-    dashboard can surface WHICH rule waived the finding, not just that one
-    did.
-
-    findings may not exist on DBs upgraded from very old (v1/v2) schemas that
-    only ever created a subset of tables -- only the fresh-DB DDL guarantees
-    it. Skip the ALTER in that case (mirrors the provenance_downgrade guard
-    in _upgrade_v5_to_v6); a future caller needing the column gets the fresh
-    DDL.
-
-    Idempotency: the ALTER and the PRAGMA user_version bump in
-    apply_evaluation_schema commit separately (autocommit), so a crash in
-    between leaves the column added but the version still 6. Re-running the
-    bare ALTER would then raise "duplicate column name: scope_downgrade_json"
-    -- a plain OperationalError the scoring/dashboard read seams don't catch,
-    permanently bricking the run. Skip if the column already exists.
-    """
-    has_findings = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='findings'"
-    ).fetchone() is not None
-    if not has_findings:
-        return
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
-    if "scope_downgrade_json" not in columns:
-        conn.execute(
-            "ALTER TABLE findings ADD COLUMN scope_downgrade_json TEXT"
-        )
-
-
 _UPGRADES = {
     1: _upgrade_v1_to_v2,
     2: _upgrade_v2_to_v3,
@@ -308,6 +185,8 @@ _UPGRADES = {
     4: _upgrade_v4_to_v5,
     5: _upgrade_v5_to_v6,
     6: _upgrade_v6_to_v7,
+    7: _upgrade_v7_to_v8,
+    8: _upgrade_v8_to_v9,
 }
 
 

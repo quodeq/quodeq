@@ -40,20 +40,22 @@ describe('SeverityTab', () => {
 });
 
 describe('BoundariesTab floor sliders', () => {
-  it('clamps floorMinor so it can not drop below floorMajor', () => {
+  // Clamping itself now lives in gradeFormulaRules.clampFloors, exercised by
+  // gradeFormulaRules.test.js (pure function) and useGradeFormula.test.jsx
+  // (the update() funnel that applies it). These sliders just forward the
+  // raw value -- pin that they don't (re)implement the clamp themselves.
+  it('floorMinor slider forwards the raw value to update, unclamped', () => {
     const update = vi.fn();
     render(<BoundariesTab draft={baseDraft()} update={update} />);
-    // floorMajor is 5; dragging floorMinor down to 3 must clamp up to 5.
     fireEvent.change(screen.getByLabelText('minor only'), { target: { value: '3' } });
-    expect(update).toHaveBeenCalledWith({ floorMinor: 5 });
+    expect(update).toHaveBeenCalledWith({ floorMinor: 3 });
   });
 
-  it('clamps floorMajor so it can not rise above floorMinor', () => {
+  it('floorMajor slider forwards the raw value to update, unclamped', () => {
     const update = vi.fn();
     render(<BoundariesTab draft={baseDraft()} update={update} />);
-    // floorMinor is 8; pushing floorMajor up to 10 must clamp down to 8.
     fireEvent.change(screen.getByLabelText('major'), { target: { value: '10' } });
-    expect(update).toHaveBeenCalledWith({ floorMajor: 8 });
+    expect(update).toHaveBeenCalledWith({ floorMajor: 10 });
   });
 });
 

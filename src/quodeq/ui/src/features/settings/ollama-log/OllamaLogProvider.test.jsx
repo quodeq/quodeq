@@ -45,14 +45,11 @@ function renderWithProviders(ui) {
 }
 
 describe('OllamaLogProvider', () => {
-  let originalEventSource;
   beforeEach(() => {
-    originalEventSource = globalThis.EventSource;
-    globalThis.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.instances = [];
   });
   afterEach(() => {
-    globalThis.EventSource = originalEventSource;
     vi.restoreAllMocks();
   });
 

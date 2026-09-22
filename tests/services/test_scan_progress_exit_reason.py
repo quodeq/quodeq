@@ -4,8 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.core.types import to_camel_dict
 from quodeq.services.scan_progress import build_scan_progress
+from quodeq.shared.serialization import to_camel_dict
 
 
 def _make_run(tmp_path: Path) -> Path:

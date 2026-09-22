@@ -1,42 +1,24 @@
-"""Tests for jobs.py — JobManager logic (spawn failures, cancellation, eviction, markers)."""
+"""Tests for jobs.py: JobManager lifecycle (spawn failure, cancel, shutdown, get/list/delete, time limit)."""
 
 from __future__ import annotations
 
-import io
-import json
 import subprocess
-import threading
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from quodeq.core.types import JobSnapshot
 from quodeq.services._job_model import InMemoryJobStore, Job
 from quodeq.services.jobs import (
+    JobLaunchOptions,
     JobManager,
+    JobProcessSeams,
     STATUS_RUNNING,
     STATUS_CANCELLED,
     STATUS_DONE,
     STATUS_FAILED,
     _EXIT_CODE_SPAWN_FAILURE,
-    _EXIT_CODE_TIMEOUT,
 )
 from tests._timeouts import budget
-
-
-class FakeProcess:
-    """Minimal subprocess mock."""
-
-    def __init__(self, stdout="", returncode=0, pid=12345):
-        self.stdout = io.StringIO(stdout)
-        self._returncode = returncode
-        self.pid = pid
-
-    def wait(self, timeout=None):
-        return self._returncode
-
-    def kill(self):
-        pass
 
 
 def _wait_for_job(manager: JobManager, job_id: str, timeout: float = 5.0) -> JobSnapshot | None:
@@ -65,21 +47,44 @@ class TestStartJobSpawnFailure:
         def bad_spawn(*args, **kwargs):
             raise OSError("No such file")
 
-        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
         snap = mgr.start_job(["nonexistent"])
         assert snap.status == STATUS_FAILED
         assert snap.exit_code == _EXIT_CODE_SPAWN_FAILURE
         assert snap.error is not None
-        assert "No such file" in snap.error
 
     def test_returns_failed_snapshot_on_subprocess_error(self):
         def bad_spawn(*args, **kwargs):
             raise subprocess.SubprocessError("spawn fail")
 
-        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
         snap = mgr.start_job(["bad"])
         assert snap.status == STATUS_FAILED
         assert snap.exit_code == _EXIT_CODE_SPAWN_FAILURE
+
+    def test_spawn_failure_returns_friendly_error_not_raw_exception(self):
+        def bad_spawn(*args, **kwargs):
+            raise OSError(2, "No such file or directory", "/some/internal/path")
+
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
+        snap = mgr.start_job(["nonexistent"])
+
+        assert snap.error == "Failed to start the evaluation process. Check the server logs for details."
+        assert "/some/internal/path" not in snap.error
+
+    def test_spawn_failure_still_logs_raw_detail_server_side(self):
+        store = InMemoryJobStore()
+        log = MagicMock()
+
+        def bad_spawn(*args, **kwargs):
+            raise OSError(2, "No such file or directory", "/some/internal/path")
+
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=store, log=log)
+        snap = mgr.start_job(["nonexistent"])
+
+        job = store.get(snap.job_id)
+        assert any("/some/internal/path" in line for line in job.logs)
+        assert any("/some/internal/path" in call.args[0] for call in log.error.call_args_list)
 
 
 # ---------------------------------------------------------------------------
@@ -213,392 +218,26 @@ class TestStartJobTimeLimit:
 
         # Spawn-failure path avoids threads; time_limit_s is set before spawn
         # so it must survive into the failure snapshot too.
-        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
-        snap = mgr.start_job(["cmd"], time_limit_s=600)
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
+        snap = mgr.start_job(["cmd"], JobLaunchOptions(time_limit_s=600))
         assert snap.time_limit_s == 600
 
     def test_time_limit_zero_carried(self):
         def bad_spawn(*args, **kwargs):
             raise OSError("boom")
 
-        mgr = JobManager(spawn_impl=bad_spawn, job_store=InMemoryJobStore())
-        snap = mgr.start_job(["cmd"], time_limit_s=0)
+        mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
+        snap = mgr.start_job(["cmd"], JobLaunchOptions(time_limit_s=0))
         assert snap.time_limit_s == 0
-
-
-# ---------------------------------------------------------------------------
-# _apply_marker
-# ---------------------------------------------------------------------------
-
-
-class TestApplyMarker:
-    def _make_job(self):
-        return Job("j1", "running", [], "now", None, None)
-
-    def test_setup_marker(self):
-        job = self._make_job()
-        line = json.dumps({"_cc": "setup", "dimensions": ["sec", "perf"]})
-        JobManager._apply_marker(job, line)
-        assert job.phase == "setup"
-        assert job.dimensions == ["sec", "perf"]
-
-    def test_analyzing_marker(self):
-        job = self._make_job()
-        line = json.dumps({"_cc": "analyzing", "dimension": "security"})
-        JobManager._apply_marker(job, line)
-        assert job.phase == "analyzing"
-        assert job.current_dimension == "security"
-
-    def test_scoring_marker(self):
-        job = self._make_job()
-        line = json.dumps({"_cc": "scoring", "dimension": "perf"})
-        JobManager._apply_marker(job, line)
-        assert job.phase == "scoring"
-        assert job.current_dimension == "perf"
-
-    def test_report_path_marker(self):
-        job = self._make_job()
-        line = json.dumps({"_cc": "report_path", "project": "myproj", "runId": "r1"})
-        JobManager._apply_marker(job, line)
-        assert job.output_project == "myproj"
-        assert job.output_run_id == "r1"
-
-    def test_report_path_marker_missing_fields(self):
-        job = self._make_job()
-        line = json.dumps({"_cc": "report_path"})
-        JobManager._apply_marker(job, line)
-        assert job.output_project is None
-
-    def test_invalid_json_ignored(self):
-        job = self._make_job()
-        JobManager._apply_marker(job, "not json")
-        assert job.phase is None
-
-
-# ---------------------------------------------------------------------------
-# _append_log
-# ---------------------------------------------------------------------------
-
-
-class TestAppendLog:
-    def test_empty_line_ignored(self):
-        mgr = JobManager(job_store=InMemoryJobStore())
-        job = Job("j1", "running", [], "now", None, None)
-        mgr._append_log(job, "")
-        assert len(job.logs) == 0
-
-    def test_marker_line_not_in_logs(self):
-        mgr = JobManager(job_store=InMemoryJobStore())
-        job = Job("j1", "running", [], "now", None, None)
-        marker = json.dumps({"_cc": "setup", "dimensions": ["sec"]})
-        mgr._append_log(job, marker)
-        assert len(job.logs) == 0
-        assert job.phase == "setup"
-
-    def test_ansi_stripped(self):
-        mgr = JobManager(job_store=InMemoryJobStore())
-        job = Job("j1", "running", [], "now", None, None)
-        mgr._append_log(job, "\x1b[32mhello\x1b[0m")
-        assert job.logs[0] == "hello"
-
-    def test_fallback_report_path_extraction(self):
-        mgr = JobManager(job_store=InMemoryJobStore())
-        job = Job("j1", "running", [], "now", None, None)
-        mgr._append_log(job, "Report path: /r/my-project/run123/evaluation")
-        assert job.output_project == "my-project"
-        assert job.output_run_id == "run123"
-
-    def test_fallback_report_path_skipped_if_already_set(self):
-        mgr = JobManager(job_store=InMemoryJobStore())
-        job = Job("j1", "running", [], "now", None, None, output_project="already")
-        mgr._append_log(job, "Report path: /r/other/run2/evaluation")
-        assert job.output_project == "already"  # not overwritten
-
-
-# ---------------------------------------------------------------------------
-# _consume_stream
-# ---------------------------------------------------------------------------
-
-
-class TestConsumeStream:
-    def test_none_stream(self):
-        mgr = JobManager(job_store=InMemoryJobStore())
-        mgr._consume_stream("j1", None)  # should not raise
-
-    def test_consumes_lines(self):
-        store = InMemoryJobStore()
-        job = Job("j1", "running", [], "now", None, None)
-        store.put(job)
-        mgr = JobManager(job_store=store)
-        stream = io.StringIO("line1\nline2\n")
-        mgr._consume_stream("j1", stream)
-        assert "line1" in job.logs
-        assert "line2" in job.logs
-
-    def test_stops_if_job_removed(self):
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        # Job not in store — _flush_batch should return False
-        stream = io.StringIO("line1\n")
-        mgr._consume_stream("j1", stream)  # should not raise
-
-
-# ---------------------------------------------------------------------------
-# _evict_completed_jobs
-# ---------------------------------------------------------------------------
-
-
-class TestEvictCompletedJobs:
-    def test_evicts_excess(self):
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        from quodeq.services._job_model import _MAX_COMPLETED_JOBS
-        # Add more than _MAX_COMPLETED_JOBS done jobs
-        for i in range(_MAX_COMPLETED_JOBS + 5):
-            store.put(Job(f"j{i}", "done", [], "now", "later", 0))
-        mgr._evict_completed_jobs()
-        remaining = store.list()
-        assert len(remaining) == _MAX_COMPLETED_JOBS
-
-    def test_running_not_evicted(self):
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        store.put(Job("running1", "running", [], "now", None, None))
-        store.put(Job("done1", "done", [], "now", "later", 0))
-        mgr._evict_completed_jobs()
-        assert store.get("running1") is not None
-
-
-# ---------------------------------------------------------------------------
-# _monitor_process
-# ---------------------------------------------------------------------------
-
-
-class TestMonitorProcess:
-    def test_successful_completion(self):
-        store = InMemoryJobStore()
-        done_event = threading.Event()
-
-        def on_complete(jid, job):
-            done_event.set()
-
-        mgr = JobManager(job_store=store, on_job_complete=on_complete)
-        job = Job("j1", STATUS_RUNNING, ["echo"], "now", None, None)
-        store.put(job)
-        proc = FakeProcess(stdout="", returncode=0)
-        mgr._processes["j1"] = proc
-        mgr._monitor_process("j1", proc)
-        assert job.status == STATUS_DONE
-        assert job.exit_code == 0
-        assert done_event.is_set()
-
-    def test_failed_completion(self):
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
-        store.put(job)
-        proc = FakeProcess(returncode=1)
-        mgr._processes["j1"] = proc
-        mgr._monitor_process("j1", proc)
-        assert job.status == STATUS_FAILED
-        assert job.exit_code == 1
-
-    def test_cancelled_job_not_overwritten(self):
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        job = Job("j1", STATUS_CANCELLED, ["cmd"], "now", "later", None)
-        store.put(job)
-        proc = FakeProcess(returncode=0)
-        mgr._processes["j1"] = proc
-        mgr._monitor_process("j1", proc)
-        assert job.status == STATUS_CANCELLED  # not overwritten
-
-    def test_callback_error_does_not_crash(self):
-        store = InMemoryJobStore()
-
-        def bad_callback(jid, job):
-            raise RuntimeError("callback boom")
-
-        mgr = JobManager(job_store=store, on_job_complete=bad_callback)
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
-        store.put(job)
-        proc = FakeProcess(returncode=0)
-        mgr._processes["j1"] = proc
-        mgr._monitor_process("j1", proc)  # should not raise
-        assert job.status == STATUS_DONE
-
-    def test_env_cap_kills_process(self, monkeypatch):
-        """When QUODEQ_JOB_TIMEOUT_S is set, the watchdog kills past that cap
-        even if no deadline_at was set on the job.
-        """
-        from quodeq.services import jobs as jobs_mod
-        monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
-        # Group-wide terminate would signal a real pid; stub it to the fake's kill.
-        monkeypatch.setattr(jobs_mod, "_terminate_process", lambda p: p.kill())
-
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
-        store.put(job)
-
-        proc = _NeverExitsProcess()
-        mgr._processes["j1"] = proc
-        mgr._monitor_process("j1", proc)
-
-        assert proc.killed is True
-        assert job.exit_code == _EXIT_CODE_TIMEOUT
-        # Watchdog kills are time-budget exits, not failures: the header
-        # renders them as "time limit reached" via the exit_reason.
-        assert job.status == STATUS_CANCELLED
-        assert job.exit_reason == "deadline"
-
-    def test_no_cap_no_deadline_does_not_kill(self, monkeypatch):
-        """With no QUODEQ_JOB_TIMEOUT_S and no deadline_at, the watchdog must
-        never preemptively kill — the user did not opt into a time cap.
-        """
-        from quodeq.services import jobs as jobs_mod
-        monkeypatch.delenv("QUODEQ_JOB_TIMEOUT_S", raising=False)
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
-
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
-        store.put(job)
-
-        # Process exits cleanly after a few poll cycles.
-        proc = _ExitsAfter(returncode=0, exits_after_n_polls=3)
-        mgr._processes["j1"] = proc
-        mgr._monitor_process("j1", proc)
-
-        assert proc.killed is False
-        assert job.exit_code == 0
-        assert job.status == STATUS_DONE
-
-    def test_deadline_in_future_does_not_kill(self, monkeypatch):
-        """Job with deadline_at in the future is not killed by the watchdog."""
-        from datetime import datetime, timedelta, timezone
-        from quodeq.services import jobs as jobs_mod
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
-
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None, deadline_at=future)
-        store.put(job)
-
-        proc = _ExitsAfter(returncode=0, exits_after_n_polls=3)
-        mgr._processes["j1"] = proc
-        mgr._monitor_process("j1", proc)
-
-        assert proc.killed is False
-        assert job.status == STATUS_DONE
-
-    def test_deadline_past_plus_grace_kills(self, monkeypatch):
-        """Job whose deadline_at has passed (plus the grace window) is killed."""
-        from datetime import datetime, timedelta, timezone
-        from quodeq.services import jobs as jobs_mod
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_DEADLINE_GRACE_S", 0.02)
-        # The watchdog must terminate the whole process tree, not just the
-        # parent PID; patch it to the stub's own kill so the loop can break.
-        monkeypatch.setattr(jobs_mod, "_terminate_process", lambda p: p.kill())
-
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        past = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None, deadline_at=past)
-        store.put(job)
-
-        proc = _NeverExitsProcess()
-        mgr._processes["j1"] = proc
-        mgr._monitor_process("j1", proc)
-
-        assert proc.killed is True
-        assert job.exit_code == _EXIT_CODE_TIMEOUT
-        # Deadline kill = the user's own time budget doing its job.
-        assert job.status == STATUS_CANCELLED
-        assert job.exit_reason == "deadline"
-
-    def test_watchdog_kill_terminates_the_process_tree(self, monkeypatch):
-        """The watchdog must kill the process GROUP, not just the parent PID.
-
-        The subprocess is spawned start_new_session=True, so a bare
-        process.kill() SIGKILLs only the parent — the subagent pool + AI-CLI
-        children are orphaned (token/CPU leak) and can keep writing into the
-        abandoned run dir. Every other kill path goes through
-        _terminate_process (group-wide, TERM->grace->KILL); the watchdog
-        must too.
-        """
-        from quodeq.services import jobs as jobs_mod
-        monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
-        calls = []
-
-        def fake_terminate(p):
-            calls.append(p)
-            p.kill()  # let the stub's wait() start returning so the loop ends
-
-        monkeypatch.setattr(jobs_mod, "_terminate_process", fake_terminate)
-
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
-        store.put(job)
-        proc = _NeverExitsProcess()
-        mgr._processes["j1"] = proc
-        mgr._monitor_process("j1", proc)
-
-        assert calls == [proc], "watchdog kill must go through _terminate_process"
-        assert job.exit_code == _EXIT_CODE_TIMEOUT
-        assert job.status == STATUS_CANCELLED
-
-
-class _NeverExitsProcess:
-    """Subprocess stub: every wait(timeout=...) raises TimeoutExpired until killed."""
-    pid = 123
-
-    def __init__(self):
-        self.stdout = io.StringIO("")
-        self.killed = False
-
-    def wait(self, timeout=None):
-        if self.killed:
-            return -9
-        raise subprocess.TimeoutExpired(cmd="cmd", timeout=timeout)
-
-    def kill(self):
-        self.killed = True
-
-
-class _ExitsAfter:
-    """Subprocess stub that raises TimeoutExpired N times, then returns cleanly."""
-    pid = 124
-
-    def __init__(self, returncode: int, exits_after_n_polls: int):
-        self.stdout = io.StringIO("")
-        self._returncode = returncode
-        self._remaining = exits_after_n_polls
-        self.killed = False
-
-    def wait(self, timeout=None):
-        if self._remaining <= 0:
-            return self._returncode
-        self._remaining -= 1
-        raise subprocess.TimeoutExpired(cmd="cmd", timeout=timeout)
-
-    def kill(self):
-        self.killed = True
 
 
 def test_list_jobs_warns_on_deprecated_reports_root_kwarg(tmp_path):
     """Passing reports_root= to list_jobs emits DeprecationWarning and is ignored.
 
-    External runs have been served via the SQLite index since Plan B1/B2;
-    this kwarg was left for transitional compat and should stop being used.
+    External runs have been served via the SQLite index for some time; this
+    kwarg was left for transitional compat and should stop being used.
     """
     import warnings
-    from quodeq.services.jobs import JobManager, InMemoryJobStore
 
     mgr = JobManager(job_store=InMemoryJobStore())
 
@@ -617,34 +256,3 @@ def test_list_jobs_warns_on_deprecated_reports_root_kwarg(tmp_path):
         and "reports_root" in str(w.message)
         for w in caught
     ), f"expected DeprecationWarning about reports_root, got: {[str(w.message) for w in caught]}"
-
-
-class TestEvictionOrder:
-    def test_evicts_oldest_completed_first(self):
-        """Eviction beyond _MAX_COMPLETED_JOBS must drop the OLDEST jobs.
-
-        The victims used to be taken in store-iteration order, so a store
-        wedged with old junk (crash leftovers, test pollution) could evict
-        the user's newest real runs while the junk survived.
-        """
-        from quodeq.services.jobs import _MAX_COMPLETED_JOBS
-
-        store = InMemoryJobStore()
-        mgr = JobManager(job_store=store)
-        total = _MAX_COMPLETED_JOBS + 3
-        # Insert NEWEST first so naive iteration-order eviction picks the
-        # newest as victims and the test goes red.
-        for i in reversed(range(total)):
-            store.put(Job(
-                f"j{i:03d}", "done", ["echo"],
-                "2026-01-01T00:00:00+00:00",
-                f"2026-01-01T00:{i // 60:02d}:{i % 60:02d}+00:00", 0,
-            ))
-        mgr._evict_completed_jobs()
-        remaining = {j.job_id for j in store.list()}
-        assert len(remaining) == _MAX_COMPLETED_JOBS
-        # j000..j002 have the oldest ended_at values and must be the victims.
-        assert "j000" not in remaining
-        assert "j001" not in remaining
-        assert "j002" not in remaining
-        assert f"j{total - 1:03d}" in remaining

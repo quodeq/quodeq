@@ -6,7 +6,8 @@ while the finding dicts carried practiceId, so the filter sat inert). Every
 reader that has to answer "would the dashboard hide this finding?" should
 build its keys here rather than re-deriving them:
 
-- dismissed: ``(req, file, line)``           -- one finding, exact line
+- dismissed: ``(req, file, snippet fingerprint)``, line for snippet-less
+  findings -- one finding, wherever it moves (``core.finding_identity``)
 - deleted:   ``(dimension, principle, file)`` -- whole principle in a file
 
 Evidence rows carry ``p`` (a req ID for custom evaluators, otherwise the
@@ -17,23 +18,22 @@ applies when it builds the scored report.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
 from quodeq.config.paths import default_paths
+from quodeq.core.dismissals import DismissedKeys
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.suppression_keys import (  # noqa: F401 — re-exported API
-    _coerce_line,
+from quodeq.services.suppression_keys import (  # re-exported API
+    FindingRef,
     is_deleted,
     is_dismissed,
 )
 from quodeq.shared.validation import validate_path_segment
-from quodeq.data.fs.suppression_rules import (  # noqa: F401 — re-exported API
-    load_suppression_rules,
-)
+from quodeq.services.wiring import load_suppression_rules  # re-exported API
+from quodeq.services.wiring import read_req_to_principle_map
 
 _TYPE_VIOLATION = "violation"
 
@@ -43,7 +43,8 @@ class SuppressionMatcher:
     """Immutable view of one dimension's suppression state."""
 
     dimension: str
-    dismissed: frozenset = frozenset()
+    # The project's DismissedKeys; a bare {(req, file, line)} set is accepted too.
+    dismissed: DismissedKeys | frozenset = frozenset()
     deleted: frozenset = frozenset()
     rules: tuple = ()
     req_to_principle: Mapping[str, str] = field(default_factory=dict)
@@ -70,8 +71,9 @@ class SuppressionMatcher:
         if not raw:
             return False
         file = row.get("file") or ""
-        if is_dismissed(self.dismissed, req=row.get("req"), principle=raw,
-                        file=file, line=row.get("line"), rules=self.rules):
+        ref = FindingRef(req=row.get("req"), principle=raw, file=file,
+                         line=row.get("line"), snippet=row.get("snippet"))
+        if is_dismissed(self.dismissed, ref, rules=self.rules):
             return True
         return is_deleted(self.deleted, dimension=self.dimension,
                           principle=self.principle_for(raw), file=file)
@@ -90,39 +92,23 @@ def load_req_to_principle(
     if not evaluators_dir.is_dir():
         return {}
     validate_path_segment(dimension)
-    path = evaluators_dir / f"{dimension}.json"
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return {}  # valid JSON but not an object: degrade, don't crash
-        mapping: dict[str, str] = {}
-        for p in data.get("principles", []):
-            pname = p.get("name", "")
-            for req in p.get("requirements", []):
-                rid = req.get("id", "")
-                if rid and pname:
-                    mapping[rid] = pname
-        return mapping
-    except (OSError, ValueError):
-        return {}
+    return read_req_to_principle_map(evaluators_dir, dimension) or {}
 
 
-def project_suppressions(project_dir: Path) -> tuple[frozenset, frozenset]:
-    """Read a project's ``(dismissed, deleted)`` key sets.
+def project_suppressions(project_dir: Path) -> tuple[DismissedKeys, frozenset]:
+    """Read a project's ``(dismissed, deleted)`` suppression state.
 
     Read fresh on every call. The live-progress reader polls this once per
     tick, and a dismiss landing mid-scan has to show up on the next one -- a
     memo keyed on anything coarser than the file contents would freeze the
     counts for the rest of the run.
     """
-    return frozenset(dismissed_keys(project_dir)), frozenset(deleted_keys(project_dir))
+    return dismissed_keys(project_dir), frozenset(deleted_keys(project_dir))
 
 
 def build_matcher(
     dimension: str,
-    dismissed: frozenset,
+    dismissed: DismissedKeys | frozenset,
     deleted: frozenset,
     *,
     evaluators_dir: Path | None = None,

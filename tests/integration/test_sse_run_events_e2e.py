@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -15,7 +14,7 @@ from quodeq.data.events.writer import EventLogWriter
 
 
 @pytest.fixture
-def app(tmp_path: Path) -> Flask:
+def app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Flask:
     app = Flask(__name__)
     provider = MagicMock()
     run_dir = tmp_path / "run-e2e"
@@ -24,7 +23,7 @@ def app(tmp_path: Path) -> Flask:
     app.config["_provider"] = provider
     app.config["_run_dir"] = run_dir
     register_run_events_routes(app)
-    os.environ["QUODEQ_SSE_TICK_MS"] = "0"  # drain-once mode for fast tests
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")  # drain-once mode for fast tests
     return app
 
 
@@ -121,10 +120,11 @@ def test_e2e_reconnect_with_last_event_id_skips_emitted_findings(app: Flask):
 
 def test_e2e_pending_run_emits_pending_status(app: Flask):
     run_dir: Path = app.config["_run_dir"]
-    (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
+    (run_dir / "status.json").write_text(json.dumps({"state": "pending"}))
 
     client = app.test_client()
     resp = client.get("/api/evaluations/j/events")
     frames = _parse_sse_frames(resp.get_data(as_text=True))
     status_frames = [f for f in frames if f["event"] == "status"]
     assert len(status_frames) >= 1
+    assert json.loads(status_frames[0]["data"])["state"] == "pending"

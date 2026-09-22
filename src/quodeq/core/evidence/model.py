@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 # Re-exported for backward compatibility with callers that still import
 # Judgment from this module.
-from quodeq.core.events.models import Judgment as Judgment  # noqa: F401
+from quodeq.core.events.models import Judgment as Judgment
 
 DEFAULT_WEIGHT = "Medium (x2)"
 _HIGH_CONFIDENCE_THRESHOLD = 10  # minimum total instances for "high" confidence
@@ -32,6 +32,18 @@ def compute_coverage_pct(files_read: int, source_file_count: int) -> float:
     if source_file_count > 0:
         return round(files_read / source_file_count * PERCENT_SCALE, 1)
     return 0.0
+
+
+def violations_per_100_files(count: int, files_read: int | None) -> float | None:
+    """Violations per 100 files read, one decimal; None when nothing was read.
+
+    Volume next to the grade: the grade deducts per distinct violation type,
+    so this is what shows a bucket shrinking between runs (taxonomy spec
+    2026-09-15, section 5).
+    """
+    if not files_read or files_read <= 0:
+        return None
+    return round(100.0 * count / files_read, 1)
 
 
 def classify_confidence_level(
@@ -72,10 +84,6 @@ def classify_confidence_level(
     if total >= medium_threshold:
         return "medium"
     return "low"
-
-
-_VALID_VERDICTS = frozenset({"violation", "compliance", "dismissed"})
-_VALID_SEVERITIES = frozenset({"critical", "high", "medium", "low", "minor"})
 
 
 @dataclass

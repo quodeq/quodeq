@@ -131,6 +131,7 @@ def test_extract_requirements_applies_overrides():
     from quodeq.core.standards.refs import extract_requirements
     data = {"principles": [{"name": "Analyzability", "requirements": [REQ]}]}
     plain = extract_requirements(data)
+    assert extract_requirements(data, overrides={}) == plain
     tuned = extract_requirements(data, overrides={"M-ANA-2": {"max_lines": 60}})
     assert plain["M-ANA-2"]["text"] == "Functions MUST NOT exceed 50 lines"
     assert tuned["M-ANA-2"]["text"] == "Functions MUST NOT exceed 60 lines"

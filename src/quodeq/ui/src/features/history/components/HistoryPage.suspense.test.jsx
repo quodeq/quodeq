@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -9,6 +8,12 @@ import { ApiProvider } from '../../../api/ApiContext.jsx';
 // Never resolves, so the lazy HistoryChartPanel stays suspended and the
 // Suspense fallback (HistoryChartPanelPlaceholder) is what ends up on screen.
 vi.mock('./HistoryChartPanel.jsx', () => new Promise(() => {}));
+
+// The delete handler reports failures through the side pane's toast; this
+// test never reaches a failure, so a bare stub keeps it provider-free.
+vi.mock('../../side-pane/SidePaneContext.jsx', () => ({
+  useSidePane: () => ({ showToast: vi.fn() }),
+}));
 
 const trend = [
   {

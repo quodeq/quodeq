@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Callable
 
@@ -22,49 +23,62 @@ CERT_DIMENSIONS = {"reliability"}
 
 _ASVS_FILE = "asvs/level1.json"
 _WCAG_FILE = "wcag/level_a.json"
+_CISQ_DIR = "cisq"
+_CERT_DIR = "cert"
 
 _logger = logging.getLogger(__name__)
 
 
+def _each_req(index: dict[str, list[dict]]) -> Iterator[dict]:
+    """Yield every requirement in *index*, across all practices."""
+    for reqs in index.values():
+        yield from reqs
+
+
+def _load_standards_json(path: Path, label: str) -> dict | None:
+    """Read a standards JSON file, or None if it's absent or unreadable."""
+    if not path.exists():
+        return None
+    try:
+        return _read_json(path)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        _logger.warning("Skipping %s refs: %s", label, exc)
+        return None
+
+
 def attach_cwe_refs(index: dict[str, list[dict]], cwe_db: object | None, get_cwe_name: Callable[..., str]) -> None:
     """Add a CWE ref for each CWE ID referenced by a requirement."""
-    for reqs in index.values():
-        for req in reqs:
-            for cwe_id in req["_cwe_ids"]:
-                name = get_cwe_name(cwe_db, cwe_id) if cwe_db else f"CWE-{cwe_id}"
-                req["refs"].append({
-                    "source": "cwe",
-                    "id": str(cwe_id),
-                    "name": name,
-                    "url": f"https://cwe.mitre.org/data/definitions/{cwe_id}.html",
-                })
+    for req in _each_req(index):
+        for cwe_id in req["_cwe_ids"]:
+            name = get_cwe_name(cwe_db, cwe_id) if cwe_db else f"CWE-{cwe_id}"
+            req["refs"].append({
+                "source": "cwe",
+                "id": str(cwe_id),
+                "name": name,
+                "url": f"https://cwe.mitre.org/data/definitions/{cwe_id}.html",
+            })
 
 
 def attach_cisq_refs(index: dict[str, list[dict]], standards_dir: Path, dimension: str) -> None:
     """Attach CISQ cross-references to requirements whose CWEs appear in CISQ."""
     if dimension not in CISQ_DIMENSIONS:
         return
-    cisq_file = standards_dir / "cisq" / f"{dimension}.json"
-    if not cisq_file.exists():
-        return
-    try:
-        cisq_data = _read_json(cisq_file)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        _logger.warning("Skipping CISQ refs for %s: %s", dimension, exc)
+    cisq_file = standards_dir / _CISQ_DIR / f"{dimension}.json"
+    cisq_data = _load_standards_json(cisq_file, f"CISQ for {dimension}")
+    if cisq_data is None:
         return
     cisq_lookup = {c["id"]: c for c in cisq_data.get("cwes", [])}
-    for reqs in index.values():
-        for req in reqs:
-            seen: set[int] = set()
-            for cwe_id in req["_cwe_ids"]:
-                if cwe_id in cisq_lookup and cwe_id not in seen:
-                    seen.add(cwe_id)
-                    req["refs"].append({
-                        "source": "cisq",
-                        "id": None,
-                        "name": cisq_lookup[cwe_id]["requirement"],
-                        "url": _CISQ_MAIN_URL,
-                    })
+    for req in _each_req(index):
+        seen: set[int] = set()
+        for cwe_id in req["_cwe_ids"]:
+            if cwe_id in cisq_lookup and cwe_id not in seen:
+                seen.add(cwe_id)
+                req["refs"].append({
+                    "source": "cisq",
+                    "id": None,
+                    "name": cisq_lookup[cwe_id]["requirement"],
+                    "url": _CISQ_MAIN_URL,
+                })
 
 
 def _collect_asvs_refs_for_req(req: dict, asvs_by_cwe: dict[int, list[dict]]) -> None:
@@ -88,20 +102,25 @@ def attach_asvs_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     if dimension != "security":
         return
     asvs_file = standards_dir / _ASVS_FILE
-    if not asvs_file.exists():
-        return
-    try:
-        asvs_data = _read_json(asvs_file)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        _logger.warning("Skipping ASVS refs: %s", exc)
+    asvs_data = _load_standards_json(asvs_file, "ASVS")
+    if asvs_data is None:
         return
     asvs_by_cwe: dict[int, list[dict]] = {}
     for r in asvs_data.get("requirements", []):
         for cwe_id in r.get("cwe", []):
             asvs_by_cwe.setdefault(cwe_id, []).append(r)
-    for reqs in index.values():
-        for req in reqs:
-            _collect_asvs_refs_for_req(req, asvs_by_cwe)
+    for req in _each_req(index):
+        _collect_asvs_refs_for_req(req, asvs_by_cwe)
+
+
+def _cert_ref(rule: dict) -> dict:
+    """The ref entry a CERT rule contributes to a requirement."""
+    return {
+        "source": "cert",
+        "id": rule["id"],
+        "name": rule["name"],
+        "url": rule.get("source_url", _CERT_MAIN_URL),
+    }
 
 
 def _collect_cert_refs_for_req(
@@ -113,35 +132,21 @@ def _collect_cert_refs_for_req(
         for rule in cert_by_cwe.get(cwe_id, []):
             if rule["id"] not in seen:
                 seen.add(rule["id"])
-                req["refs"].append({
-                    "source": "cert",
-                    "id": rule["id"],
-                    "name": rule["name"],
-                    "url": rule.get("source_url", _CERT_MAIN_URL),
-                })
+                req["refs"].append(_cert_ref(rule))
     for cert_id in req["_cert_ids"]:
         if cert_id not in seen and cert_id in cert_by_id:
             rule = cert_by_id[cert_id]
             seen.add(cert_id)
-            req["refs"].append({
-                "source": "cert",
-                "id": rule["id"],
-                "name": rule["name"],
-                "url": rule.get("source_url", _CERT_MAIN_URL),
-            })
+            req["refs"].append(_cert_ref(rule))
 
 
 def attach_cert_refs(index: dict[str, list[dict]], standards_dir: Path, dimension: str) -> None:
     """Attach CERT cross-references via CWE matching and explicit cert fields."""
     if dimension not in CERT_DIMENSIONS:
         return
-    cert_file = standards_dir / "cert" / f"{dimension}.json"
-    if not cert_file.exists():
-        return
-    try:
-        cert_data = _read_json(cert_file)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        _logger.warning("Skipping CERT refs for %s: %s", dimension, exc)
+    cert_file = standards_dir / _CERT_DIR / f"{dimension}.json"
+    cert_data = _load_standards_json(cert_file, f"CERT for {dimension}")
+    if cert_data is None:
         return
     cert_by_cwe: dict[int, list[dict]] = {}
     cert_by_id: dict[str, dict] = {}
@@ -149,9 +154,8 @@ def attach_cert_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
         cert_by_id[rule["id"]] = rule
         for cwe_id in rule.get("cwe", []):
             cert_by_cwe.setdefault(cwe_id, []).append(rule)
-    for reqs in index.values():
-        for req in reqs:
-            _collect_cert_refs_for_req(req, cert_by_cwe, cert_by_id)
+    for req in _each_req(index):
+        _collect_cert_refs_for_req(req, cert_by_cwe, cert_by_id)
 
 
 def attach_wcag_refs(index: dict[str, list[dict]], standards_dir: Path, dimension: str) -> None:
@@ -159,24 +163,19 @@ def attach_wcag_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     if dimension not in WCAG_DIMENSIONS:
         return
     wcag_file = standards_dir / _WCAG_FILE
-    if not wcag_file.exists():
-        return
-    try:
-        wcag_data = _read_json(wcag_file)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        _logger.warning("Skipping WCAG refs: %s", exc)
+    wcag_data = _load_standards_json(wcag_file, "WCAG")
+    if wcag_data is None:
         return
     wcag_lookup = {c["id"]: c for c in wcag_data.get("criteria", [])}
-    for reqs in index.values():
-        for req in reqs:
-            seen: set[str] = set()
-            for wcag_id in req["_wcag_ids"]:
-                if wcag_id in wcag_lookup and wcag_id not in seen:
-                    seen.add(wcag_id)
-                    c = wcag_lookup[wcag_id]
-                    req["refs"].append({
-                        "source": "wcag22",
-                        "id": wcag_id,
-                        "name": c["name"],
-                        "url": c.get("url", _WCAG22_MAIN_URL),
-                    })
+    for req in _each_req(index):
+        seen: set[str] = set()
+        for wcag_id in req["_wcag_ids"]:
+            if wcag_id in wcag_lookup and wcag_id not in seen:
+                seen.add(wcag_id)
+                c = wcag_lookup[wcag_id]
+                req["refs"].append({
+                    "source": "wcag22",
+                    "id": wcag_id,
+                    "name": c["name"],
+                    "url": c.get("url", _WCAG22_MAIN_URL),
+                })

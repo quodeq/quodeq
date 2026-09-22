@@ -18,12 +18,12 @@ class StubJobs:
     def __init__(self):
         self.captured: dict = {}
 
-    def start_job(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None, time_limit_s=None):
+    def start_job(self, cmd, launch=None):
         self.captured["cmd"] = cmd
-        self.captured["cwd"] = cwd
-        self.captured["env"] = env
-        self.captured["ai_provider"] = ai_provider
-        self.captured["ai_model"] = ai_model
+        self.captured["cwd"] = launch.cwd
+        self.captured["env"] = launch.env
+        self.captured["ai_provider"] = launch.ai_provider
+        self.captured["ai_model"] = launch.ai_model
         return {"jobId": "test"}
 
 
@@ -223,6 +223,14 @@ def test_get_evaluation_status_external_surfaces_deadline_at(tmp_path: Path) -> 
     assert snapshot.job_id == f"ext-{run_id}"
     assert snapshot.deadline_at == deadline_iso
     assert snapshot.source == "external"
+
+
+def test_default_provider_resolves_reports_root_from_env_once_at_construction(monkeypatch, tmp_path):
+    """reports_root env fallback happens in FilesystemActionProvider.__init__,
+    not lazily inside EvaluationsIndex on first use."""
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path / "envreports"))
+    provider = FilesystemActionProvider(index_db_path=tmp_path / "idx.db")
+    assert provider._evaluations._reports_root == tmp_path / "envreports"
 
 
 def test_get_evaluation_status_external_handles_missing_deadline(tmp_path: Path) -> None:

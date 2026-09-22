@@ -8,21 +8,31 @@ callers and patch targets are unchanged.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
+from quodeq.core.evidence.model import violations_per_100_files
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
+from quodeq.core.scoring.dimension_summary import build_dimension_summary
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types.report import PrincipleGrade
-from quodeq.core.types.dimension import DimensionResult, DimensionSummary, GradeBreakdown
-from quodeq.services.dashboard import _make_run_dimension_fetcher
+from quodeq.core.types.dimension import DimensionResult
+from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.ports import GradeTablesReader
+from quodeq.services.wiring import (
+    SQLiteStateStore,
+    load_suppression_rules,
+    read_active_findings,
+    row_to_finding,
+)
 from quodeq.services.rescore import rescore_dimensions
-from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
+from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
+from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
-from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 
 def _severity_bucket(severity: str) -> str:
@@ -45,7 +55,7 @@ def _severity_bucket(severity: str) -> str:
 
 
 def _build_totals_from_findings(
-    violations: list[Finding], compliance_count: int,
+    violations: list[Finding], compliance_count: int, files_read: int | None = None,
 ) -> Totals:
     """Build a Totals dataclass from a list of active (non-dismissed) violations."""
     critical = major = minor = unknown = 0
@@ -63,6 +73,7 @@ def _build_totals_from_findings(
         violation_count=len(violations),
         compliance_count=compliance_count,
         severity=SeverityTally(critical=critical, major=major, minor=minor, unknown=unknown),
+        violations_per100_files=violations_per_100_files(len(violations), files_read),
     )
 
 
@@ -90,7 +101,10 @@ def _build_dimension_dict(
         for p in p_rows
     ]
 
-    totals = _build_totals_from_findings(violations, compliance_count=len(compliance))
+    files_read = dim_row.get("files_read")
+    totals = _build_totals_from_findings(
+        violations, compliance_count=len(compliance), files_read=files_read,
+    )
 
     dim = DimensionResult(
         dimension=dim_row["dimension"],
@@ -100,27 +114,27 @@ def _build_dimension_dict(
         violations=violations,
         compliance=compliance,
         totals=totals,
+        files_read=files_read,
     )
     return to_camel_dict(dim)
 
 
 def _build_summary_from_dim_dicts(
     dim_dicts: list[dict], params: ScoringParams = DEFAULT_PARAMS,
+    *, score_pairs: list[tuple[str | None, float]],
 ) -> dict:
     """Build a camelCase summary dict from a list of dimension camelCase dicts.
 
-    Mirrors ``summarize_dimensions`` logic but works directly on the already-
-    serialised dicts produced by ``_build_dimension_dict``.
+    Same shape as ``summarize_dimensions`` but working directly on the
+    already-serialised dicts produced by ``_build_dimension_dict``. The
+    grade fallback is deliberately NOT shared: a tied vote resolves here on
+    ``Counter`` insertion order (first grade seen wins) and there on grade
+    rank, because only the parser side has the rank table. *score_pairs* are
+    the raw (dimension, score) floats -- the caller already has them before
+    they get formatted into the ``overallScore`` display strings, so no
+    parsing back out of ``"7.5/10"`` is needed here.
     """
     overall_grades = [d["overallGrade"] for d in dim_dicts if d.get("overallGrade")]
-    score_pairs: list[tuple[str | None, float]] = []
-    for d in dim_dicts:
-        s = d.get("overallScore")
-        if s and isinstance(s, str) and "/" in s:
-            try:
-                score_pairs.append((d.get("dimension"), float(s.split("/")[0])))
-            except ValueError:
-                pass
 
     numeric_average = dimension_weighted_average(score_pairs, params)
 
@@ -132,36 +146,35 @@ def _build_summary_from_dim_dicts(
     else:
         overall_grade = None
 
-    grade_counts: dict[str, int] = {}
-    for g in overall_grades:
-        grade_counts[g] = grade_counts.get(g, 0) + 1
-
-    summary = DimensionSummary(
-        dimensions_count=len(dim_dicts),
-        overall_grade=overall_grade,
-        numeric_average=numeric_average,
-        grade_breakdown=[
-            GradeBreakdown(grade=grade, count=count)
-            for grade, count in sorted(grade_counts.items(), key=lambda item: (-item[1], item[0]))
-        ],
+    summary = build_dimension_summary(
+        len(dim_dicts), overall_grades, overall_grade, numeric_average,
     )
     return to_camel_dict(summary)
 
 
+def _default_grade_tables_reader(run_dir: Path) -> GradeTablesReader:
+    """Composition fallback: the concrete SQLite state store.
+
+    The public caller (``scoring.get_scores_raw``) passes ``store_factory``
+    explicitly; this default keeps direct callers of the facade helper
+    working without repeating the concrete store at every call site.
+    """
+    return SQLiteStateStore(run_dir)
+
+
 def _build_response_from_grade_tables(
     run_dir: Path, params: ScoringParams = DEFAULT_PARAMS,
+    store_factory: Callable[[Path], GradeTablesReader] | None = None,
 ) -> dict:
     """Build the full scores response from SQL grade tables + findings.
 
-    Reads dimension_scores and principle_grades from the state store, reads
-    active (non-dismissed) findings from the findings table, and assembles
-    the same camelCase dict shape as the legacy rescore path.
+    Reads dimension_scores and principle_grades from the grade-tables reader
+    built by *store_factory* (the SQLite state store by default), reads
+    active (non-dismissed) findings via the adapter-side
+    ``read_active_findings``, and assembles the same camelCase dict shape as
+    the legacy rescore path.
     """
-    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
-    from quodeq.data.sqlite.connection import open_evaluation_db  # noqa: PLC0415
-    from quodeq.data.sqlite._row_mappers import row_to_finding  # noqa: PLC0415
-
-    store = SQLiteStateStore(run_dir)
+    store = (store_factory or _default_grade_tables_reader)(run_dir)
     dim_rows = store.read_dimension_scores()
     p_rows = store.read_principle_grades()
 
@@ -170,25 +183,10 @@ def _build_response_from_grade_tables(
     for p in p_rows:
         p_rows_by_dim.setdefault(p["dimension"], []).append(p)
 
-    # Read active findings grouped by dimension and verdict.
-    _SELECT_ACTIVE = (
-        "SELECT id, practice_id, dimension, requirement, verdict, severity, "
-        "file, line, end_line, title, reason, snippet, violation_type, context, "
-        "scope, req_refs_json, confidence, provenance_downgrade, "
-        "scope_downgrade_json "
-        "FROM findings WHERE verdict != 'dismissed' ORDER BY id"
-    )
-
-    def _dict_row(cursor, row):  # noqa: ANN001
-        return {col[0]: row[i] for i, col in enumerate(cursor.description)}
-
+    # Active findings grouped by dimension and verdict.
     violations_by_dim: dict[str, list[Finding]] = {}
     compliance_by_dim: dict[str, list[Finding]] = {}
-    with open_evaluation_db(run_dir) as conn:
-        conn.row_factory = _dict_row
-        rows = conn.execute(_SELECT_ACTIVE).fetchall()
-
-    for row in rows:
+    for row in read_active_findings(run_dir):
         f = row_to_finding(row)
         dim = f.dimension or ""
         if f.verdict == "violation":
@@ -197,6 +195,7 @@ def _build_response_from_grade_tables(
             compliance_by_dim.setdefault(dim, []).append(f)
 
     dim_dicts = []
+    score_pairs: list[tuple[str | None, float]] = []
     for dim_row in dim_rows:
         dim_name = dim_row["dimension"]
         dim_dicts.append(_build_dimension_dict(
@@ -205,8 +204,10 @@ def _build_response_from_grade_tables(
             violations_by_dim.get(dim_name, []),
             compliance_by_dim.get(dim_name, []),
         ))
+        if dim_row.get("score") is not None:
+            score_pairs.append((dim_row["dimension"], float(dim_row["score"])))
 
-    summary = _build_summary_from_dim_dicts(dim_dicts, params=params)
+    summary = _build_summary_from_dim_dicts(dim_dicts, params=params, score_pairs=score_pairs)
     return {"dimensions": dim_dicts, "summary": summary}
 
 
@@ -228,16 +229,16 @@ def _build_response_from_eval_files(
     path, so callers (UI dismiss handlers) don't need to branch.
     """
     validate_path_segment(project, run_id)
-    d = deps or _NO_DEPS
-    base_fetcher = _make_run_dimension_fetcher(reports_root, project)
+    d = deps or NO_DEPS
+    base_fetcher = make_run_dimension_fetcher(reports_root, project)
     project_dir = reports_root / project
     dismissed = (d.dismissed_keys or dismissed_keys)(project_dir)
     deleted = (d.deleted_keys or deleted_keys)(project_dir)
 
     dims = base_fetcher(run_id)
     rescored = rescore_dimensions(
-        dims, dismissed, deleted, params=params, run_dir=project_dir / run_id,
-        rules=load_suppression_rules(project_dir))
+        dims, SuppressionKeys(dismissed, deleted, load_suppression_rules(project_dir)),
+        params=params, run_dir=project_dir / run_id)
     return {
         "dimensions": rescored.get("dimensions", []),
         "summary": rescored.get("summary", {}),

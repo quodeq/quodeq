@@ -2,13 +2,13 @@
 
 The class this closes (issue #1046): a marker is an additive field outside the
 core finding schema, threaded by hand through a chain of serializers, and **no
-boundary raises when one is missed**. ``_VIOLATION_FIELDS`` is a strict whitelist
+boundary raises when one is missed**. ``VIOLATION_FIELDS`` is a strict whitelist
 that silently drops unknown keys; ``build_finding`` returns only fields it names.
 A gap is invisible -- no error, no warning, just a finding that forgot why it was
 downgraded.
 
 It has happened once per marker that exists: ``carried_forward`` on the report
-path, ``provenance_downgrade`` in ``_VIOLATION_FIELDS`` and ``build_finding``
+path, ``provenance_downgrade`` in ``VIOLATION_FIELDS`` and ``build_finding``
 (#1044), and ``scope_downgrade`` reaching the per-dim JSONL but never
 ``events.jsonl``. Three instances of one bug, each found and fixed alone.
 
@@ -19,7 +19,7 @@ after someone notices a finding lost its explanation.
 
 The boundaries, and why each is here rather than covered by the round trip:
 
-* ``_VIOLATION_FIELDS`` / ``build_finding`` -- the two ends of the
+* ``VIOLATION_FIELDS`` / ``build_finding`` -- the two ends of the
   ``evaluation/<dim>.json`` path. The round trip covers both, but a direct
   assertion names WHICH end broke instead of just that something did.
 * ``Finding`` / ``FindingSpec`` -- the in-memory carrier. A marker with no field
@@ -37,8 +37,8 @@ import json
 import pytest
 
 from quodeq.analysis._report_assembly import build_report_json
-from quodeq.analysis._report_constants import _VIOLATION_FIELDS
-from quodeq.analysis._report_findings import _flatten_findings
+from quodeq.analysis._report_constants import VIOLATION_FIELDS
+from quodeq.analysis._report_findings import flatten_findings
 from quodeq.core.events.models import Judgment
 from quodeq.core.finding_builder import FindingSpec
 from quodeq.core.finding_markers import PERSISTED_MARKERS
@@ -60,8 +60,8 @@ def _violation(marker=None) -> dict:
 @pytest.mark.parametrize("marker", PERSISTED_MARKERS, ids=lambda m: m.name)
 class TestMarkerSurvivesPersistence:
     def test_listed_in_violation_fields(self, marker):
-        """_flatten_findings copies ONLY these keys into evaluation/<dim>.json."""
-        assert marker.name in _VIOLATION_FIELDS
+        """flatten_findings copies ONLY these keys into evaluation/<dim>.json."""
+        assert marker.name in VIOLATION_FIELDS
 
     def test_carried_by_finding(self, marker):
         assert marker.name in Finding.__dataclass_fields__
@@ -75,10 +75,10 @@ class TestMarkerSurvivesPersistence:
         Not redundant with the report path: a marker can clear every other
         boundary and still never reach the SQL projection or the dashboard.
         """
-        assert marker.name in Judgment.model_fields
+        assert marker.name in Judgment.__dataclass_fields__
 
     def test_survives_the_write_whitelist(self, marker):
-        flattened = _flatten_findings([_violation(marker)], "P1", _VIOLATION_FIELDS)
+        flattened = flatten_findings([_violation(marker)], "P1", VIOLATION_FIELDS)
         assert flattened[0][marker.name] == marker.sample
 
     def test_read_back_by_build_finding(self, marker):
@@ -110,6 +110,6 @@ class TestMarkerSurvivesPersistence:
         Guards the other direction: a boundary that defaults to the sample
         value instead of an empty one would pass every test above.
         """
-        flattened = _flatten_findings([_violation()], "P1", _VIOLATION_FIELDS)
+        flattened = flatten_findings([_violation()], "P1", VIOLATION_FIELDS)
         assert marker.name not in flattened[0]
         assert getattr(build_finding(_violation(), include_severity=True), marker.name) != marker.sample

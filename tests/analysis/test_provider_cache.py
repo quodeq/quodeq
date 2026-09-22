@@ -2,12 +2,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest.mock import patch
 
-import pytest
 
-from quodeq.analysis._provider_cache import _ProviderConfigCache, get_provider_configs
+from quodeq.analysis.provider_cache import _ProviderConfigCache, get_provider_configs
 
 _OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
 

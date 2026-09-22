@@ -1,23 +1,35 @@
 import { useState, useCallback, useEffect } from 'react';
+import { readString, writeString } from '../../../adapters/storage.js';
 
 export const NEW_FINDINGS_ONLY_KEY = 'cc-eval-new-findings-only';
 const CHANGE_EVENT = 'live-feed-settings-changed';
+// How the boolean is encoded in localStorage. Read and write must agree, so
+// both go through these rather than spelling the strings out twice.
+const STORED_ON = 'true';
+const STORED_OFF = 'false';
+const STORAGE_EVENT = 'storage';
 
 function loadNewOnly(storage) {
   // On by default: only an explicit opt-out ('false') shows findings
   // carried forward from the incremental cache.
-  return storage.getItem(NEW_FINDINGS_ONLY_KEY) !== 'false';
+  return readString(NEW_FINDINGS_ONLY_KEY, null, storage) !== STORED_OFF;
 }
 
+/**
+ * Whether the live findings feed hides findings carried forward from the
+ * incremental cache. On unless explicitly turned off.
+ *
+ * Writes are broadcast so the Settings screen and the evaluation screen stay
+ * in sync within one window. `storage` is injectable for tests.
+ *
+ * @returns {{newOnly: boolean, setNewOnly: (value: boolean) => void}}
+ */
 export default function useLiveFeedSettings({ storage = localStorage } = {}) {
   const [newOnly, setNewOnlyState] = useState(() => loadNewOnly(storage));
 
   const setNewOnly = useCallback((value) => {
-    try {
-      storage.setItem(NEW_FINDINGS_ONLY_KEY, value ? 'true' : 'false');
-    } catch (err) {
-      console.warn('[useLiveFeedSettings] could not persist:', err);
-    }
+    const ok = writeString(NEW_FINDINGS_ONLY_KEY, value ? STORED_ON : STORED_OFF, storage);
+    if (!ok) console.warn('[useLiveFeedSettings] could not persist new-findings-only setting');
     setNewOnlyState(value);
     // A 'storage' event does not fire in the tab that wrote the value, so
     // the Settings page and the evaluation screen need this to stay in
@@ -29,10 +41,10 @@ export default function useLiveFeedSettings({ storage = localStorage } = {}) {
     if (typeof window === 'undefined') return undefined;
     const onChange = () => setNewOnlyState(loadNewOnly(storage));
     window.addEventListener(CHANGE_EVENT, onChange);
-    window.addEventListener('storage', onChange);
+    window.addEventListener(STORAGE_EVENT, onChange);
     return () => {
       window.removeEventListener(CHANGE_EVENT, onChange);
-      window.removeEventListener('storage', onChange);
+      window.removeEventListener(STORAGE_EVENT, onChange);
     };
   }, [storage]);
 

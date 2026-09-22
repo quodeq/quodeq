@@ -9,14 +9,17 @@ analysis layer.
 from __future__ import annotations
 
 import json
-import os
+from collections.abc import Mapping
 from pathlib import Path
+
+from quodeq.shared.env_resolve import resolve_env
 
 _DEFAULT_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
 
 
-def _providers_path() -> Path:
-    return Path(os.environ.get("QUODEQ_AI_PROVIDERS_PATH", str(_DEFAULT_PATH)))
+def providers_path(env: Mapping[str, str] | None = None) -> Path:
+    """Path of ``ai_providers.json``; ``QUODEQ_AI_PROVIDERS_PATH`` overrides the bundled file."""
+    return Path(resolve_env(env).get("QUODEQ_AI_PROVIDERS_PATH", str(_DEFAULT_PATH)))
 
 
 def provider_env_exports(
@@ -34,7 +37,7 @@ def provider_env_exports(
     if not provider_id:
         return {}
     try:
-        configs = json.loads(_providers_path().read_text(encoding="utf-8"))
+        configs = json.loads(providers_path().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return {}
     cfg = configs.get(provider_id)

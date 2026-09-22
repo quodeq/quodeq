@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.cache import LocalFileBackend
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
@@ -169,3 +169,28 @@ def test_classify_stash_isolated_per_dimension(tmp_path: Path, cache: LocalFileB
     sec_key = next(iter(sec_result.miss_keys.values()))
     flex_key = next(iter(flex_result.miss_keys.values()))
     assert sec_key != flex_key
+
+
+def test_classify_cache_accessor_returns_named_stash(tmp_path: Path, cache: LocalFileBackend):
+    """``RunConfig.classify_cache`` names the stashed pair instead of
+    making callers index the tuple by position.
+    """
+    src = tmp_path / "src"
+    files = _write_files(src, {"a.py": "x"})
+    config = _make_config(src)
+    config._classify_cache = {}
+
+    result = classify_files_via_cache(config, "security", files, cache)
+
+    stash = config.classify_cache("security")
+    assert stash is not None
+    assert stash.files == tuple(files)
+    assert stash.result is result
+
+
+def test_classify_cache_accessor_none_when_absent(tmp_path: Path):
+    """No stash dict, or no entry for the dim, reads as None."""
+    config = _make_config(tmp_path / "src")
+    assert config.classify_cache("security") is None
+    config._classify_cache = {}
+    assert config.classify_cache("security") is None

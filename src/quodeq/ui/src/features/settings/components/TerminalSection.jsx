@@ -2,6 +2,8 @@ import useTerminalSettings from '../hooks/useTerminalSettings.js';
 import { killTerminal } from '../../../api/terminal.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
+import { confirmDialog } from '../../../utils/confirmDialog.js';
+import { SettingsPillTabs } from './settingsRowParts.jsx';
 
 export default function TerminalSection() {
   const { enabled, setEnabled } = useTerminalSettings();
@@ -11,7 +13,13 @@ export default function TerminalSection() {
   // Only dispatch on kill SUCCESS: on failure the server keeps the live PTY and
   // a reconnect would reattach to the same shell — a fake restart — so we skip
   // the clear+reconnect and surface the failure instead.
-  const restart = () => {
+  const restart = async () => {
+    const ok = await confirmDialog({
+      title: t('settings.restartTerminalConfirmTitle'),
+      message: t('settings.restartTerminalConfirmMessage'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     killTerminal()
       .then(() => window.dispatchEvent(new Event('quodeq:terminal-restart')))
       .catch((err) => { console.warn('Terminal restart: kill failed, not reconnecting', err); });
@@ -26,13 +34,11 @@ export default function TerminalSection() {
             {t('settings.terminalEnableDesc')}
           </span>
         </div>
-        <div className="settings-pill-group" role="tablist">
-          {[{ v: true, l: t('settings.on') }, { v: false, l: t('settings.off') }].map(({ v, l }) => (
-            <button key={l} type="button" role="tab" aria-selected={enabled === v}
-              className={`settings-pill${enabled === v ? ' settings-pill--active' : ''}`}
-              onClick={() => setEnabled(v)}>{l}</button>
-          ))}
-        </div>
+        <SettingsPillTabs
+          options={[{ v: true, l: t('settings.on') }, { v: false, l: t('settings.off') }]}
+          value={enabled}
+          onChange={setEnabled}
+        />
       </div>
       {enabled && (
         <div className="settings-row settings-row--last">

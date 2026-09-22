@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.core.types import JobSnapshot
-from quodeq.services.jobs import JobManager
+from quodeq.services.jobs import JobManager, JobProcessSeams
 from tests._timeouts import budget
 
 _FAKE_REPORT_PATH = "Report path: /app/reports/sample-project/20260220/evaluation"
@@ -33,7 +33,7 @@ def _make_manager_with_event(spawn_impl, job_id_holder: list) -> tuple[JobManage
         if not job_id_holder or jid == job_id_holder[0]:
             done.set()
 
-    manager = JobManager(spawn_impl=spawn_impl, on_job_complete=_on_complete)
+    manager = JobManager(JobProcessSeams(spawn_impl=spawn_impl), on_job_complete=_on_complete)
     return manager, done
 
 
@@ -81,6 +81,7 @@ def test_markers_parsed_from_merged_stream() -> None:
     """Structured markers in stdout update job phase and dimensions."""
     marker_setup = '{"_cc": "setup", "dimensions": ["security", "performance"]}\n'
     marker_analyzing = '{"_cc": "analyzing", "dimension": "security"}\n'
+
     def spawn_impl(*_args, **_kwargs):
         return FakeProcess(
             stdout=marker_setup + marker_analyzing + "Report path: /r/proj/run1/evaluation\n",
@@ -128,9 +129,9 @@ def test_start_evaluation_forwards_provider_and_model(tmp_path: Path) -> None:
     captured: dict = {}
 
     class _SpyDispatcher:
-        def dispatch(self, cmd, *, cwd=None, env=None, ai_provider=None, ai_model=None, time_limit_s=None):
-            captured["ai_provider"] = ai_provider
-            captured["ai_model"] = ai_model
+        def dispatch(self, cmd, launch=None):
+            captured["ai_provider"] = launch.ai_provider
+            captured["ai_model"] = launch.ai_model
             return JobSnapshot(job_id="job-1", status="running")
 
     mixin = FsEvaluationMixin()

@@ -10,6 +10,7 @@ import { useJobLogStream } from './useJobLogStream.js';
 
 class MockEventSource {
   static instances = [];
+  static CLOSED = 2;
   constructor(url) {
     this.url = url;
     this.listeners = {};
@@ -31,7 +32,7 @@ class MockEventSource {
     if (name === 'message' && this._onmessage) this._onmessage(event);
     (this.listeners[name] || []).forEach((fn) => fn(event));
   }
-  close() { this.closed = true; this.readyState = 2; }
+  close() { this.closed = true; this.readyState = MockEventSource.CLOSED; }
 }
 
 function Probe({ jobId }) {
@@ -45,15 +46,12 @@ function Probe({ jobId }) {
 }
 
 describe('#549 useJobLogStream inactivity timer', () => {
-  let originalEventSource;
   beforeEach(() => {
     vi.useFakeTimers();
-    originalEventSource = globalThis.EventSource;
-    globalThis.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.instances = [];
   });
   afterEach(() => {
-    globalThis.EventSource = originalEventSource;
     vi.useRealTimers();
     vi.restoreAllMocks();
   });

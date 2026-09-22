@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from quodeq.ci.export_cli import handle_export
+from quodeq.cli_parser import build_parser
 
 
 def _write_report(eval_dir: Path, dimension: str, violations: list[dict]) -> None:
@@ -70,9 +71,6 @@ def test_handle_export_missing_dir_returns_error(tmp_path, capsys):
 def test_handle_export_unknown_format_returns_error(tmp_path):
     code = handle_export(_args(export_format="xml", evaluation_dir=str(tmp_path), output="x"))
     assert code == 1
-
-
-from quodeq.cli_parser import build_parser
 
 
 def test_parser_export_sarif_args():

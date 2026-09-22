@@ -1,29 +1,33 @@
 """Ollama log-stream route — SSE tail of ~/.ollama/logs/server.log."""
 from __future__ import annotations
 
-import os
 import sys
+from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._sse_log_helpers import sse_tail_generator
+from quodeq.shared.env_resolve import resolve_env
 
 
-def _ollama_log_path() -> Path | None:
+def _ollama_log_path(env: Mapping[str, str] | None = None) -> Path | None:
     """Return the platform's Ollama server log path, or None if not present.
 
     Resolution order:
       1. ``QUODEQ_OLLAMA_LOG`` env var (explicit override for non-default installs)
       2. macOS / Linux: ~/.ollama/logs/server.log
       3. Windows: %LOCALAPPDATA%/Ollama/server.log
+
+    *env* overrides both lookups and defaults to ``os.environ``.
     """
-    override = os.environ.get("QUODEQ_OLLAMA_LOG")
+    environ = resolve_env(env)
+    override = environ.get("QUODEQ_OLLAMA_LOG")
     if override:
         return Path(override)
     if sys.platform == "win32":
-        local_app = os.environ.get("LOCALAPPDATA")
+        local_app = environ.get("LOCALAPPDATA")
         if not local_app:
             return None
         return Path(local_app) / "Ollama" / "server.log"
@@ -46,15 +50,18 @@ def _is_gin_line(line: str) -> bool:
     return True
 
 
-def register_ollama_log_routes(app: Flask) -> None:
+def register_ollama_log_routes(app: Flask, env: Mapping[str, str] | None = None) -> None:
     """Register the /api/ollama/logs/stream SSE endpoint.
 
     Auth: inherits protection from the global before_request hook.
+
+    *env* is captured once here, at app-creation time, rather than read per
+    request; ``None`` keeps the per-request lookup against ``os.environ``.
     """
 
     @app.get("/api/ollama/logs/stream")
     def stream_ollama_logs() -> Response | tuple[Response, int]:
-        log_path = _ollama_log_path()
+        log_path = _ollama_log_path(env)
         if log_path is None or not log_path.exists():
             return (
                 jsonify({

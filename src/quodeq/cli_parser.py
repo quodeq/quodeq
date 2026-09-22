@@ -40,16 +40,9 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
-    """Register arguments for the evaluate subcommand."""
-    parser.add_argument("repo", help="Path or URL to the repository")
-    parser.add_argument(
-        "-l", "--language", default=None, help="Language (overrides auto-detection)"
-    )
-    _add_output_args(parser)
-    parser.add_argument(
-        "--no-prescan", action="store_true", help="Skip source-file counting"
-    )
+def _add_evaluate_run_args(parser: argparse.ArgumentParser) -> None:
+    """Register evaluate arguments that control HOW a run executes (dimensions,
+    turns/duration/subagent budgets, verification, consolidation, incremental)."""
     parser.add_argument(
         "-d", "--dimensions", default=None,
         help="Comma-separated dimensions to evaluate (default: all)",
@@ -90,6 +83,11 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "--incremental", action="store_true", dest="legacy_incremental",
         help=argparse.SUPPRESS,
     )
+
+
+def _add_evaluate_scope_args(parser: argparse.ArgumentParser) -> None:
+    """Register evaluate arguments that narrow WHAT gets analyzed (branch,
+    scope, dry-run, diff-from)."""
     parser.add_argument(
         "--branch", default=None,
         help="Git branch to analyze (creates a temporary worktree)",
@@ -113,6 +111,10 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
             "Produces evidence only — no scored evaluation reports."
         ),
     )
+
+
+def _add_evaluate_sarif_args(parser: argparse.ArgumentParser) -> None:
+    """Register evaluate arguments controlling optional SARIF output."""
     parser.add_argument(
         "--sarif",
         default=None,
@@ -133,22 +135,23 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Build the top-level argument parser with all subcommands."""
-    parser = argparse.ArgumentParser(prog="quodeq")
-    subparsers = parser.add_subparsers(dest="command")
-
-    dashboard_parser = subparsers.add_parser("dashboard", help="Run the dashboard")
-    dashboard_parser.set_defaults(handler_command="dashboard")
-
-    evaluate_parser = subparsers.add_parser(
-        "evaluate", help="Run evaluation (auto-detects language)",
-        epilog=_EVALUATE_EPILOG,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
+    """Register arguments for the evaluate subcommand."""
+    parser.add_argument("repo", help="Path or URL to the repository")
+    parser.add_argument(
+        "-l", "--language", default=None, help="Language (overrides auto-detection)"
     )
-    _add_evaluate_args(evaluate_parser)
-    evaluate_parser.set_defaults(handler_command="evaluate")
+    _add_output_args(parser)
+    parser.add_argument(
+        "--no-prescan", action="store_true", help="Skip source-file counting"
+    )
+    _add_evaluate_run_args(parser)
+    _add_evaluate_scope_args(parser)
+    _add_evaluate_sarif_args(parser)
 
+
+def _add_ci_subcommand(subparsers) -> None:
+    """Register the `ci report` subcommand."""
     ci_parser = subparsers.add_parser("ci", help="CI integration commands")
     ci_sub = ci_parser.add_subparsers(dest="ci_action")
     report_parser = ci_sub.add_parser("report", help="Post evaluation results as PR review")
@@ -181,6 +184,9 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+
+def _add_export_subcommand(subparsers) -> None:
+    """Register the `export sarif` subcommand."""
     export_parser = subparsers.add_parser("export", help="Export findings in machine-readable formats")
     export_parser.set_defaults(handler_command="export")
     export_sub = export_parser.add_subparsers(dest="export_format")
@@ -196,6 +202,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Include code snippets (off by default; snippets leave the machine when uploaded).",
     )
 
+
+def _add_review_subcommand(subparsers) -> None:
+    """Register the `review` subcommand."""
     review_parser = subparsers.add_parser(
         "review",
         help="Run Quodeq locally and post findings as a PR review (uses gh CLI)",
@@ -228,5 +237,26 @@ def build_parser() -> argparse.ArgumentParser:
         dest="dry_run",
         help="Build the review but do not post it",
     )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build the top-level argument parser with all subcommands."""
+    parser = argparse.ArgumentParser(prog="quodeq")
+    subparsers = parser.add_subparsers(dest="command")
+
+    dashboard_parser = subparsers.add_parser("dashboard", help="Run the dashboard")
+    dashboard_parser.set_defaults(handler_command="dashboard")
+
+    evaluate_parser = subparsers.add_parser(
+        "evaluate", help="Run evaluation (auto-detects language)",
+        epilog=_EVALUATE_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_evaluate_args(evaluate_parser)
+    evaluate_parser.set_defaults(handler_command="evaluate")
+
+    _add_ci_subcommand(subparsers)
+    _add_export_subcommand(subparsers)
+    _add_review_subcommand(subparsers)
 
     return parser

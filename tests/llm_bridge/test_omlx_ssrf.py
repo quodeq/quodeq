@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from quodeq.llm_bridge import _omlx
+from quodeq.llm_bridge import omlx
 
 
 _UNSAFE_URLS = [
@@ -23,8 +23,8 @@ _UNSAFE_URLS = [
 @pytest.mark.parametrize("bad_url", _UNSAFE_URLS)
 def test_get_omlx_status_rejects_unsafe_base_url(bad_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[object] = []
-    monkeypatch.setattr(_omlx.urllib.request, "urlopen", lambda *a, **k: calls.append(1))
-    result = _omlx.get_omlx_status(base_url=bad_url)
+    monkeypatch.setattr(omlx.urllib.request, "urlopen", lambda *a, **k: calls.append(1))
+    result = omlx.get_omlx_status(base_url=bad_url)
     assert calls == [], f"urlopen should not be called for unsafe URL {bad_url!r}"
     assert result["running"] is False
     assert "error" in result
@@ -33,9 +33,9 @@ def test_get_omlx_status_rejects_unsafe_base_url(bad_url: str, monkeypatch: pyte
 @pytest.mark.parametrize("bad_url", _UNSAFE_URLS)
 def test_list_omlx_models_rejects_unsafe_base_url(bad_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[object] = []
-    monkeypatch.setattr(_omlx.urllib.request, "urlopen", lambda *a, **k: calls.append(1))
-    monkeypatch.setattr(_omlx, "_list_model_dirs", lambda: [])
-    result = _omlx.list_omlx_models(base_url=bad_url)
+    monkeypatch.setattr(omlx.urllib.request, "urlopen", lambda *a, **k: calls.append(1))
+    monkeypatch.setattr(omlx, "_list_model_dirs", lambda: [])
+    result = omlx.list_omlx_models(base_url=bad_url)
     assert calls == [], f"urlopen should not be called for unsafe URL {bad_url!r}"
     # Falls back to _list_model_dirs, which returns []
     assert result == []
@@ -49,8 +49,8 @@ def test_get_omlx_status_allows_localhost(monkeypatch: pytest.MonkeyPatch) -> No
         calls.append(req)
         raise ConnectionRefusedError("nobody home")
 
-    monkeypatch.setattr(_omlx.urllib.request, "urlopen", fake_urlopen)
-    result = _omlx.get_omlx_status(base_url="http://localhost:8000")
+    monkeypatch.setattr(omlx.urllib.request, "urlopen", fake_urlopen)
+    result = omlx.get_omlx_status(base_url="http://localhost:8000")
     assert len(calls) == 1, "urlopen should have been called for localhost"
     assert result["running"] is False  # connection refused, but guard passed
 
@@ -63,7 +63,7 @@ def test_list_omlx_models_allows_localhost(monkeypatch: pytest.MonkeyPatch) -> N
         calls.append(req)
         raise ConnectionRefusedError("nobody home")
 
-    monkeypatch.setattr(_omlx.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setattr(_omlx, "_list_model_dirs", lambda: [])
-    _omlx.list_omlx_models(base_url="http://localhost:8000")
+    monkeypatch.setattr(omlx.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(omlx, "_list_model_dirs", lambda: [])
+    omlx.list_omlx_models(base_url="http://localhost:8000")
     assert len(calls) == 1, "urlopen should have been called for localhost"

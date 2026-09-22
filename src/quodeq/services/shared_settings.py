@@ -8,29 +8,35 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.shared.env_resolve import resolve_env
 
 _FILENAME = "shared.json"
 
 
 @dataclass
 class SharedSettings:
+    """Contents of shared.json. ``url`` is the shared results repo, None when unconfigured."""
+
     url: str | None = None
 
 
-def shared_settings_path(env: dict | None = None) -> Path:
+def shared_settings_path(env: Mapping[str, str] | None = None) -> Path:
     """Resolve the path to the shared settings file.
 
     Honors QUODEQ_DIR environment variable if set, otherwise uses ~/.quodeq.
     """
-    e = env if env is not None else os.environ
+    e = resolve_env(env)
     base = e.get("QUODEQ_DIR")
     root = Path(base) if base else Path.home() / ".quodeq"
     return root / _FILENAME
 
 
-def read_settings(env: dict | None = None) -> SharedSettings:
+def read_settings(env: Mapping[str, str] | None = None) -> SharedSettings:
     """Read the shared settings file, returning empty settings if missing or corrupt."""
     path = shared_settings_path(env=env)
     try:
@@ -48,7 +54,9 @@ def read_settings(env: dict | None = None) -> SharedSettings:
     return settings
 
 
-def write_settings(settings: SharedSettings, env: dict | None = None) -> None:
+def write_settings(
+    settings: SharedSettings, env: Mapping[str, str] | None = None, *, log: LogSink = NULL_LOG,
+) -> None:
     """Write shared settings atomically to disk, fail-silent on error."""
     path = shared_settings_path(env=env)
     try:
@@ -56,8 +64,8 @@ def write_settings(settings: SharedSettings, env: dict | None = None) -> None:
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(json.dumps(asdict(settings)), encoding="utf-8")
         os.replace(tmp, path)
-    except OSError:
+    except OSError as exc:
         # Fail-soft: not worth a 500 on the config routes. A lost write is
         # not silent, status reads come from this file, so the UI shows
         # whatever was actually persisted.
-        pass
+        log.debug(f"shared settings write failed (fail-soft): {exc}")

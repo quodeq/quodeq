@@ -2,17 +2,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import pytest
 
 from quodeq.core.evidence.parser import (
     EvidenceContext,
+    EvidenceParseOptions,
     parse_jsonl_to_evidence,
 )
 
 from tests._evidence_helpers import _evidence_line
-
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +233,7 @@ class TestParseJsonlToEvidence:
                 language="python", repository="test", date_str="2026-03-11",
                 source_file_count=10, files_read=5,
             ),
-            compiled_dir=None,  # no compiled dir — refs come from JSONL
+            EvidenceParseOptions(compiled_dir=None),  # no compiled dir — refs come from JSONL
         )
 
         v = ev.principles["Confidentiality"].violations[0]

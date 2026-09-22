@@ -5,8 +5,6 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 
 # tools/ is not on sys.path by default; add it
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "tools"))
@@ -47,6 +45,6 @@ class TestCheckFileWarning:
         """Readable files with no violations must not produce any stderr output."""
         clean_path = tmp_path / "clean.py"
         clean_path.write_text("x = 1\n", encoding="utf-8")
-        result = check_imports.check_file(clean_path, "core")
+        check_imports.check_file(clean_path, "core")
         captured = capsys.readouterr()
         assert captured.err == ""

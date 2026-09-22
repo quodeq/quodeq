@@ -1,14 +1,12 @@
 """GET /api/evaluations/<id> surfaces the per-dim state map."""
 from __future__ import annotations
-import json
-import os
 import tempfile
 from pathlib import Path
 
 import pytest
 
 from quodeq.api.app import create_app
-from quodeq.services.base import ActionProvider, EvaluationOptions
+from quodeq.services.base import ActionProvider
 from quodeq.services._job_model import JobSnapshot
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 

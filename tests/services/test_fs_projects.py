@@ -1,21 +1,18 @@
-"""Tests for _fs_projects.py — project listing, path updates, deletion."""
+"""Tests for fs_projects.py — project listing (find_children, parent/child sets, build_project_list, index)."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
-from quodeq.services._fs_projects import (
-    find_children,
+from quodeq.services._fs_project_index import build_project_index
+from quodeq.services.fs_projects import (
     _build_parent_child_sets,
     build_project_list,
-    update_project_path,
-    delete_project,
-    get_project_info,
 )
+from quodeq.services.wiring import find_children
 
 
 # ---------------------------------------------------------------------------
@@ -75,21 +72,26 @@ class TestBuildParentChildSets:
         (tmp_path / "standalone" / "repository_info.json").write_text(
             json.dumps({"name": "standalone"})
         )
-        parents, subs = _build_parent_child_sets(tmp_path, ["child1", "standalone"])
+        parents, subs, info_by_name = _build_parent_child_sets(tmp_path, ["child1", "standalone"])
         assert parents == {"parent-uuid"}
         assert subs == {"child1"}
+        assert "child1" in info_by_name
+        assert "standalone" in info_by_name
+        assert info_by_name["child1"]["parent"] == "parent-uuid"
 
     def test_empty_dirs(self, tmp_path: Path):
-        parents, subs = _build_parent_child_sets(tmp_path, [])
+        parents, subs, info_by_name = _build_parent_child_sets(tmp_path, [])
         assert parents == set()
         assert subs == set()
+        assert info_by_name == {}
 
     def test_corrupt_json_skipped(self, tmp_path: Path):
         (tmp_path / "bad").mkdir()
         (tmp_path / "bad" / "repository_info.json").write_text("{{{")
-        parents, subs = _build_parent_child_sets(tmp_path, ["bad"])
+        parents, subs, info_by_name = _build_parent_child_sets(tmp_path, ["bad"])
         assert parents == set()
         assert subs == set()
+        assert "bad" not in info_by_name
 
 
 # ---------------------------------------------------------------------------
@@ -121,218 +123,119 @@ class TestBuildProjectList:
         (tmp_path / "junk-dir").mkdir()
         assert build_project_list(tmp_path) == []
 
-
-# ---------------------------------------------------------------------------
-# update_project_path
-# ---------------------------------------------------------------------------
-
-
-class TestUpdateProjectPath:
-    def _setup_project(self, tmp_path: Path, info: dict | None = None):
-        reports = tmp_path / "reports"
-        proj = reports / "proj-uuid"
-        proj.mkdir(parents=True)
-        data = info or {"name": "test", "path": "/old/path", "location": "local"}
-        (proj / "repository_info.json").write_text(json.dumps(data))
-        return str(reports), "proj-uuid"
-
-    def test_update_local_path(self, tmp_path: Path):
-        reports_dir, project = self._setup_project(tmp_path)
-        new_dir = tmp_path / "new_repo"
-        new_dir.mkdir()
-        result = update_project_path(reports_dir, project, str(new_dir))
-        assert result is True
-        info = json.loads((Path(reports_dir) / project / "repository_info.json").read_text())
-        assert info["path"] == str(new_dir.resolve())
-        assert info["location"] == "local"
-
-    @patch("quodeq.data.fs.repo_handler.is_valid_repo_url", return_value=True)
-    def test_update_url_path(self, mock_valid, tmp_path: Path):
-        reports_dir, project = self._setup_project(tmp_path)
-        result = update_project_path(reports_dir, project, "https://github.com/org/repo.git")
-        assert result is True
-        info = json.loads((Path(reports_dir) / project / "repository_info.json").read_text())
-        assert info["location"] == "online"
-
-    @patch("quodeq.data.fs.repo_handler.is_valid_repo_url", return_value=False)
-    def test_rejects_invalid_url(self, mock_valid, tmp_path: Path):
-        reports_dir, project = self._setup_project(tmp_path)
-        assert update_project_path(reports_dir, project, "https://bad") is False
-
-    def test_rejects_path_traversal(self, tmp_path: Path):
-        reports_dir, project = self._setup_project(tmp_path)
-        assert update_project_path(reports_dir, project, "/tmp/../etc/passwd") is False
-
-    def test_rejects_nonexistent_dir(self, tmp_path: Path):
-        reports_dir, project = self._setup_project(tmp_path)
-        assert update_project_path(reports_dir, project, "/nonexistent/path") is False
-
-    def test_rejects_missing_info_file(self, tmp_path: Path):
-        reports = tmp_path / "reports"
-        proj = reports / "proj-uuid"
-        proj.mkdir(parents=True)
-        # No repository_info.json
-        assert update_project_path(str(reports), "proj-uuid", str(tmp_path)) is False
-
-    def test_rejects_traversal_outside_reports(self, tmp_path: Path):
-        reports = tmp_path / "reports"
-        reports.mkdir()
-        # Try to escape reports dir
-        assert update_project_path(str(reports), "../escape", str(tmp_path)) is False
-
-
-# ---------------------------------------------------------------------------
-# delete_project
-# ---------------------------------------------------------------------------
-
-
-class TestDeleteProject:
-    def test_delete_simple_project(self, tmp_path: Path):
-        reports = tmp_path / "reports"
-        proj = reports / "proj-uuid"
-        proj.mkdir(parents=True)
-        (proj / "data.json").write_text("{}")
-        assert delete_project(str(reports), "proj-uuid") is True
-        assert not proj.exists()
-
-    def test_delete_nonexistent(self, tmp_path: Path):
-        reports = tmp_path / "reports"
-        reports.mkdir()
-        assert delete_project(str(reports), "nope") is False
-
-    def test_cascade_deletes_children(self, tmp_path: Path):
-        reports = tmp_path / "reports"
-        parent = reports / "parent-uuid"
-        child = reports / "child-uuid"
-        parent.mkdir(parents=True)
-        child.mkdir(parents=True)
-        (child / "repository_info.json").write_text(json.dumps({"parent": "parent-uuid"}))
-        assert delete_project(str(reports), "parent-uuid") is True
-        assert not parent.exists()
-        assert not child.exists()
-
-    def test_rejects_traversal(self, tmp_path: Path):
-        reports = tmp_path / "reports"
-        reports.mkdir()
-        assert delete_project(str(reports), "../escape") is False
-
-
-# ---------------------------------------------------------------------------
-# get_project_info
-# ---------------------------------------------------------------------------
-
-
-class TestGetProjectInfo:
-    def test_returns_info(self, tmp_path: Path):
-        proj = tmp_path / "proj-uuid"
-        proj.mkdir()
-        (proj / "repository_info.json").write_text(json.dumps({
-            "name": "test",
-            "discipline": "software",
-            "location": "local",
+    def test_reads_repository_info_once_per_directory(self, tmp_path: Path):
+        # Regression test: ensure build_project_list() reads repository_info.json
+        # at most once per directory, not multiple times (deduplication).
+        proj1 = tmp_path / "proj1-uuid"
+        proj1.mkdir()
+        (proj1 / "repository_info.json").write_text(json.dumps({
+            "name": "proj1",
             "path": str(tmp_path),
+            "location": "local",
         }))
-        with patch("quodeq.services._fs_projects._list_available_dimensions_for_discipline", return_value=["sec"]):
-            with patch("quodeq.services._fs_projects._has_fingerprints", return_value=False):
-                result = get_project_info(str(tmp_path), "proj-uuid")
-        assert result is not None
-        assert result["name"] == "test"
-        assert result["discipline"] == "software"
-        assert result["availableDimensions"] == ["sec"]
-        assert result["hasFingerprints"] is False
-
-    def test_returns_none_for_missing(self, tmp_path: Path):
-        assert get_project_info(str(tmp_path), "nope") is None
-
-    def test_returns_none_for_corrupt_json(self, tmp_path: Path):
-        proj = tmp_path / "proj-uuid"
-        proj.mkdir()
-        (proj / "repository_info.json").write_text("not json")
-        assert get_project_info(str(tmp_path), "proj-uuid") is None
-
-    def test_path_missing_detection(self, tmp_path: Path):
-        proj = tmp_path / "proj-uuid"
-        proj.mkdir()
-        (proj / "repository_info.json").write_text(json.dumps({
-            "name": "test",
-            "location": "online",
-            "path": "/local/path",  # Not a URL
+        proj2 = tmp_path / "proj2-uuid"
+        proj2.mkdir()
+        (proj2 / "repository_info.json").write_text(json.dumps({
+            "name": "proj2",
+            "path": str(tmp_path),
+            "location": "local",
+            "parent": "parent-uuid",
         }))
-        with patch("quodeq.services._fs_projects._list_available_dimensions_for_discipline", return_value=[]):
-            with patch("quodeq.services._fs_projects._has_fingerprints", return_value=False):
-                with patch("quodeq.services._fs_projects._infer_discipline", return_value=None):
-                    result = get_project_info(str(tmp_path), "proj-uuid")
-        assert result is not None
-        assert result["pathMissing"] is True
 
-    def test_traversal_rejected(self, tmp_path: Path):
-        result = get_project_info(str(tmp_path), "../escape")
-        assert result is None
+        call_count: dict[str, int] = {}
 
+        with patch("quodeq.services.fs_projects.read_repository_info") as mock_read:
+            with patch("quodeq.services.fs_project_helpers.read_repository_info") as mock_read_helpers:
+                def side_effect(path):
+                    dir_name = path.name
+                    call_count[dir_name] = call_count.get(dir_name, 0) + 1
+                    if path.is_dir() and (path / "repository_info.json").exists():
+                        return json.loads((path / "repository_info.json").read_text())
+                    return None
 
-# ---------------------------------------------------------------------------
-# ProjectEntry.origin_url
-# ---------------------------------------------------------------------------
+                mock_read.side_effect = side_effect
+                mock_read_helpers.side_effect = side_effect
+                build_project_list(tmp_path)
 
-
-def test_project_entry_carries_origin_url(tmp_path):
-    from quodeq.core.types import to_camel_dict
-
-    proj = tmp_path / "p1"
-    run = proj / "run-1"
-    run.mkdir(parents=True)
-    (proj / "repository_info.json").write_text(
-        json.dumps({"name": "p1", "originUrl": "https://github.com/example/p1.git"})
-    )
-    (run / "status.json").write_text(json.dumps({"schema_version": 2, "state": "done"}))
-
-    entries = build_project_list(tmp_path)
-    entry = next(e for e in entries if e.id == "p1")
-    assert entry.origin_url == "https://github.com/example/p1.git"
-    assert to_camel_dict(entry)["originUrl"] == "https://github.com/example/p1.git"
+        # Each directory should be read at most once
+        assert call_count.get("proj1-uuid", 0) <= 1, f"proj1-uuid read {call_count.get('proj1-uuid', 0)} times"
+        assert call_count.get("proj2-uuid", 0) <= 1, f"proj2-uuid read {call_count.get('proj2-uuid', 0)} times"
 
 
 # ---------------------------------------------------------------------------
-# ProjectEntry.latest_done_run_id
+# Cluster 10: _build_one fail-soft (one bad project dir must not fail the
+# whole listing)
 # ---------------------------------------------------------------------------
 
 
-def _make_run(proj: Path, run_id: str, *, state: str | None) -> None:
-    """Create a manifest-bearing run directory, optionally with a status.json state."""
-    run = proj / run_id
-    (run / "evidence").mkdir(parents=True)
-    (run / "evidence" / "manifest.json").write_text("{}")
-    if state is not None:
-        (run / "status.json").write_text(json.dumps({"schema_version": 2, "state": state}))
+class TestBuildProjectListFailSoft:
+    def test_one_bad_project_dir_is_skipped_not_fatal(self, tmp_path: Path, caplog):
+        """A project whose entry build raises is logged and skipped; every
+        other project still comes back -- mirrors score_run.py's
+        _score_one_dimension fail-soft handling."""
+        good = tmp_path / "good-uuid"
+        good.mkdir()
+        (good / "repository_info.json").write_text(json.dumps({
+            "name": "good", "path": str(tmp_path), "location": "local",
+        }))
+        bad = tmp_path / "bad-uuid"
+        bad.mkdir()
+        (bad / "repository_info.json").write_text(json.dumps({
+            "name": "bad", "path": str(tmp_path), "location": "local",
+        }))
+
+        import quodeq.services.fs_projects as mod
+        real_build = mod._build_project_entry
+
+        def side_effect(reports_root, entry_name, runs, options, **kwargs):
+            if entry_name == "bad-uuid":
+                raise OSError("simulated disk error reading bad-uuid")
+            return real_build(reports_root, entry_name, runs, options, **kwargs)
+
+        with patch("quodeq.services.fs_projects._build_project_entry", side_effect=side_effect):
+            with caplog.at_level("WARNING", logger="quodeq.services.fs_projects"):
+                entries = build_project_list(tmp_path)
+
+        ids = {e.id for e in entries}
+        assert ids == {"good-uuid"}
+        assert any("bad-uuid" in r.message for r in caplog.records)
 
 
-def test_latest_done_run_id_is_newest_done_run_not_newest_run(tmp_path: Path):
-    # Publish run A (done). Run B is newer but cancelled. latestRunId must
-    # still reflect B (any status), but latestDoneRunId must fall back to A --
-    # otherwise the shared-vs-local comparison could never converge once a
-    # later run fails or is cancelled.
-    proj = tmp_path / "p1"
-    proj.mkdir()
-    (proj / "repository_info.json").write_text(json.dumps({"name": "p1"}))
-    _make_run(proj, "20260301", state="done")
-    _make_run(proj, "20260302", state="cancelled")
-
-    entries = build_project_list(tmp_path)
-    entry = next(e for e in entries if e.id == "p1")
-    assert entry.latest_run_id == "20260302"
-    assert entry.latest_done_run_id == "20260301"
+# ---------------------------------------------------------------------------
+# build_project_index
+# ---------------------------------------------------------------------------
 
 
-def test_latest_done_run_id_absent_when_no_done_runs(tmp_path: Path):
-    from quodeq.core.types import to_camel_dict
+class TestBuildProjectIndex:
+    def test_reads_repository_info_once_per_directory(self, tmp_path: Path, monkeypatch):
+        # The parent/child pass already parses every record; the entry pass
+        # must reuse it instead of re-reading the same file (finding 5451).
+        for name, extra in (("proj1-uuid", {}), ("proj2-uuid", {"parent": "parent-uuid"})):
+            proj = tmp_path / name
+            proj.mkdir()
+            (proj / "repository_info.json").write_text(json.dumps({
+                "name": name, "path": str(tmp_path), "location": "local", **extra,
+            }))
 
-    proj = tmp_path / "p2"
-    proj.mkdir()
-    (proj / "repository_info.json").write_text(json.dumps({"name": "p2"}))
-    _make_run(proj, "20260301", state="cancelled")
+        reads: dict[str, int] = {}
+        real_read_text = Path.read_text
 
-    entries = build_project_list(tmp_path)
-    entry = next(e for e in entries if e.id == "p2")
-    assert entry.latest_run_id == "20260301"
-    assert entry.latest_done_run_id is None
-    assert "latestDoneRunId" not in to_camel_dict(entry)
+        def counting_read_text(self, *args, **kwargs):
+            if self.name == "repository_info.json":
+                reads[self.parent.name] = reads.get(self.parent.name, 0) + 1
+            return real_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", counting_read_text)
+        entries = build_project_index(tmp_path)
+
+        assert {e.id for e in entries} == {"proj1-uuid", "proj2-uuid"}
+        assert reads == {"proj1-uuid": 1, "proj2-uuid": 1}
+
+    def test_registered_dir_with_corrupt_record_is_still_listed(self, tmp_path: Path):
+        # A corrupt repository_info.json still marks a registered project;
+        # the index lists it with fallback metadata rather than dropping it.
+        proj = tmp_path / "bad-uuid"
+        proj.mkdir()
+        (proj / "repository_info.json").write_text("{not json")
+        entries = build_project_index(tmp_path)
+        assert [e.id for e in entries] == ["bad-uuid"]

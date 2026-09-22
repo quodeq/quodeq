@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import OnboardingWizard from './OnboardingWizard.jsx';
@@ -11,9 +11,14 @@ vi.mock('../../../api/index.js', () => ({
   registerProject: vi.fn().mockResolvedValue({ projectId: 'uuid-9', scanData: { total_files: 7, languages: { py: 7 }, branches: ['main'], modules: [] } }),
   listStandards: vi.fn().mockResolvedValue([{ id: 'std-a', name: 'Security 101', description: 'Common checks' }]),
   getProjectInfo: vi.fn().mockResolvedValue({ id: 'uuid-9', runsCount: 0 }),
+  getProjectScan: vi.fn().mockResolvedValue({ total_files: 7, languages: { py: 7 }, branches: ['main'], modules: [] }),
 }));
 
 describe('OnboardingWizard', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
   it('renders Welcome when entry.startStep is omitted', () => {
     render(<OnboardingWizard entry={{ isFirstProject: true }} onClose={() => {}} onLaunch={() => {}} />);
     expect(screen.getByRole('heading', { name: /welcome to quodeq/i })).toBeInTheDocument();

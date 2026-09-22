@@ -1,123 +1,82 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import {
-  getGradeFormula, saveGradeFormula, resetGradeFormula, previewGradeFormula,
-} from '../../api/index.js';
-import { projectKeys } from '../../api/queryKeys.js';
-import { setGradeThresholds } from '../../utils/gradeThresholds.js';
+import { useCallback } from 'react';
+import { saveGradeFormula, resetGradeFormula } from '../../api/index.js';
+import { defaultGradeThresholdsStore } from '../../utils/gradeThresholds.js';
+import { useGradeFormulaState } from './hooks/useGradeFormulaState.js';
+import { useGradePreview } from './hooks/useGradePreview.js';
 import { t } from '../../strings/index.js';
 
-const PREVIEW_DEBOUNCE_MS = 250;
+// Singular and plural are separate whole sentences, not a stem plus an "s":
+// the verb agreement moves too ("shows" vs "show"), and plenty of languages
+// inflect more of the sentence than English does.
+function noticeFor(d) {
+  return d.failed > 0
+    ? t(d.failed === 1 ? 'gradeFormula.partialRescoreOne' : 'gradeFormula.partialRescoreMany', { count: d.failed })
+    : null;
+}
 
 /**
  * Grade-formula editor state: server params, dirty draft, debounced preview.
  * projectId: project used for the live preview (may be null).
+ * thresholdsStore: grade-thresholds store apply/reset push the applied
+ * boundaries into; defaults to the app-wide store, injectable so tests
+ * don't leak grading state into the rest of the process.
+ *
+ * Split into hooks/useGradeFormulaState.js (server/draft/preview/busy/error
+ * state + the initial load) and hooks/useGradePreview.js (the debounced
+ * preview request + update()) -- this file composes the two and owns
+ * apply/resetToDefaults.
  */
-export default function useGradeFormula(projectId) {
-  const [saved, setSaved] = useState(null);     // params dict as saved server-side
-  const [draft, setDraft] = useState(null);     // params dict being edited
-  const [isCustom, setIsCustom] = useState(false);
-  const [defaults, setDefaults] = useState(null);
-  const [preview, setPreview] = useState(null); // {before, after} or null
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  // Set when an apply/reset rescored some runs but not all (a locked/corrupt
-  // evaluation.db). Those runs keep the OLD formula's grades, so warn rather
-  // than let the mismatch look like a bug.
-  const [partialNotice, setPartialNotice] = useState(null);
-  const debounceRef = useRef(null);
-  const loadedRef = useRef(false); // true once the initial GET has populated draft
-  const queryClient = useQueryClient();
-
-  // Applying or resetting the formula rewrites the SQL grade tables for every
-  // run across every project (server-side apply_to_all_runs), so the cached
-  // dashboard / accumulated-scores / project-card queries are now stale. Drop
-  // the whole `project` subtree (scores + dashboard + runs) so they refetch.
-  const invalidateScoreQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: projectKeys.all() });
-  }, [queryClient]);
-
-  useEffect(() => {
-    getGradeFormula()
-      .then((d) => {
-        setSaved(d.current); setDraft(d.current);
-        setDefaults(d.defaults); setIsCustom(d.isCustom);
-        loadedRef.current = true;
-      })
-      .catch(() => setError(t('gradeFormula.loadFailed')));
-  }, []);
-
-  // Clear any pending debounced preview on unmount.
-  useEffect(() => () => clearTimeout(debounceRef.current), []);
+export default function useGradeFormula(projectId, thresholdsStore = defaultGradeThresholdsStore) {
+  const {
+    saved, draft, isCustom, defaults, preview, busy, error, partialNotice,
+    debounceRef, loaded, invalidateScoreQueries,
+    adoptServerFormula, beginRequest, endRequest, failWith, notePartialRescore,
+    updateDraft, showPreview,
+  } = useGradeFormulaState();
 
   const isDirty = saved && draft && JSON.stringify(saved) !== JSON.stringify(draft);
 
-  const requestPreview = useCallback((params) => {
-    if (!projectId) return;
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      previewGradeFormula(projectId, params)
-        .then(setPreview)
-        .catch(() => setPreview(null));
-    }, PREVIEW_DEBOUNCE_MS);
-  }, [projectId]);
+  const { requestPreview, update } = useGradePreview({ projectId, draft, updateDraft, showPreview, debounceRef, loaded });
 
-  // Fire the preview once both the draft (post-load) and the project are known.
-  // update() handles every subsequent change, so this effect only needs to run
-  // when the draft first loads (loadedRef flips) or the project changes.
-  useEffect(() => {
-    if (loadedRef.current && draft && projectId) requestPreview(draft);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, loadedRef.current]);
-
-  const update = useCallback((patch) => {
-    setDraft((prev) => {
-      const next = { ...prev, ...patch };
-      requestPreview(next);
-      return next;
-    });
-  }, [requestPreview]);
-
-  // Singular and plural are separate whole sentences, not a stem plus an
-  // "s": the verb agreement moves too ("shows" vs "show"), and plenty of
-  // languages inflect more of the sentence than English does.
-  const noticeFor = (d) => (d.failed > 0
-    ? t(d.failed === 1 ? 'gradeFormula.partialRescoreOne' : 'gradeFormula.partialRescoreMany', { count: d.failed })
-    : null);
-
-  const apply = useCallback(async () => {
-    setBusy(true); setError(null); setPartialNotice(null);
+  // Apply and reset differ only in which endpoint they call, what they log
+  // and what they return; everything the server sends back is adopted the
+  // same way. `run` performs the write and returns the formula payload.
+  const submitFormula = useCallback(async (run, failureKey, logLabel) => {
+    beginRequest();
     try {
-      const d = await saveGradeFormula(draft);
-      setSaved(d.current); setDraft(d.current); setIsCustom(d.isCustom);
-      setGradeThresholds(d.current.gradeThresholds);
-      setPartialNotice(noticeFor(d));
+      const d = await run();
+      adoptServerFormula(d.current, d.isCustom);
+      thresholdsStore.set(d.current.gradeThresholds);
+      notePartialRescore(noticeFor(d));
       invalidateScoreQueries();
       requestPreview(d.current);
-      return d.applied;
-    } catch {
-      setError(t('gradeFormula.applyFailed'));
+      return d;
+    } catch (err) {
+      console.warn(logLabel, err);
+      failWith(t(failureKey));
       return null;
     } finally {
-      setBusy(false);
+      endRequest();
     }
-  }, [draft, requestPreview, invalidateScoreQueries]);
+  }, [requestPreview, invalidateScoreQueries, thresholdsStore,
+      beginRequest, endRequest, failWith, adoptServerFormula, notePartialRescore]);
+
+  const apply = useCallback(async () => {
+    const d = await submitFormula(
+      () => saveGradeFormula(draft),
+      'gradeFormula.applyFailed',
+      '[useGradeFormula] apply failed:',
+    );
+    return d ? d.applied : null;
+  }, [draft, submitFormula]);
 
   const resetToDefaults = useCallback(async () => {
-    setBusy(true); setError(null); setPartialNotice(null);
-    try {
-      const d = await resetGradeFormula();
-      setSaved(d.current); setDraft(d.current); setIsCustom(d.isCustom);
-      setGradeThresholds(d.current.gradeThresholds);
-      setPartialNotice(noticeFor(d));
-      invalidateScoreQueries();
-      requestPreview(d.current);
-    } catch {
-      setError(t('gradeFormula.resetFailed'));
-    } finally {
-      setBusy(false);
-    }
-  }, [requestPreview, invalidateScoreQueries]);
+    await submitFormula(
+      resetGradeFormula,
+      'gradeFormula.resetFailed',
+      '[useGradeFormula] reset failed:',
+    );
+  }, [submitFormula]);
 
   return { draft, defaults, isCustom, isDirty, preview, busy, error, partialNotice, update, apply, resetToDefaults };
 }

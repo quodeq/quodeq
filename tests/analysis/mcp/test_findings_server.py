@@ -1,9 +1,13 @@
 """Verify the MCP findings server wires EventLogWriter into FindingsRouter."""
 import io
 import json
+import sys
 from pathlib import Path
 
-from quodeq.analysis.mcp.findings_server import _build_compiled_context, _build_router
+import pytest
+
+import quodeq.analysis.mcp.findings_server as findings_server_module
+from quodeq.analysis.mcp.findings_server import _build_compiled_context, _build_router, main
 from quodeq.analysis.mcp.enricher import CompiledContext
 from quodeq.analysis.mcp.args import ServerArgs
 from quodeq.core.events.models import EventType
@@ -69,10 +73,20 @@ def test_build_router_sets_corpus_none_when_flag_off(tmp_path: Path, monkeypatch
     assert ctx.precedent_corpus is None
 
 
-def test_build_router_degrades_when_flag_on_but_no_embedder(tmp_path: Path, monkeypatch):
-    from quodeq.llm_bridge._embeddings import reset_embedding_availability_cache
+@pytest.fixture()
+def _reset_embedding_availability_cache():
+    """Reset the module-level embedding-availability cache before and after
+    the test, so a dead-embedder probe here can't leak into later tests."""
+    from quodeq.llm_bridge.embeddings import reset_embedding_availability_cache
 
     reset_embedding_availability_cache()
+    yield
+    reset_embedding_availability_cache()
+
+
+def test_build_router_degrades_when_flag_on_but_no_embedder(
+    tmp_path: Path, monkeypatch, _reset_embedding_availability_cache,
+):
     monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
     monkeypatch.setenv("QUODEQ_EMBEDDING_BASE_URL", "http://127.0.0.1:1")  # nothing listens
 
@@ -116,11 +130,40 @@ def test_build_router_wires_load_precedent_corpus_with_project_and_run_dir(
     assert ctx.precedent_corpus is sentinel
 
 
+def test_build_router_wires_the_strict_dismissed_reader(tmp_path: Path, monkeypatch):
+    """Same reason as the api-runner root: a failed DB open swallowed into []
+    would be memoized as "no dismissals" for that run, so the reader handed to
+    load_precedent_fingerprints must be the raising variant."""
+    from quodeq.data.sqlite.findings_queries import (
+        dismissed_source_stamp, read_dismissed_snippets_strict,
+    )
+
+    seams: dict = {}
+
+    def fake_load_precedent_fingerprints(project_dir, **kwargs):
+        seams.update(kwargs)
+        return {"fp"}
+
+    monkeypatch.setattr(
+        findings_server_module, "load_precedent_fingerprints",
+        fake_load_precedent_fingerprints,
+    )
+    findings_path = tmp_path / "project" / "run-1" / "evidence" / "security_evidence.jsonl"
+    findings_path.parent.mkdir(parents=True)
+    ctx = CompiledContext()
+
+    _build_router(io.StringIO(), findings_path, ctx, ServerArgs())
+
+    assert seams["read_dismissed"] is read_dismissed_snippets_strict
+    assert seams["source_stamp"] is dismissed_source_stamp
+    assert ctx.precedent_fingerprints == {"fp"}
+
+
 class TestBuildCompiledContextResolvesTrustModel:
-    """C2: findings_server.py:47 (``trust_model = resolve_trust_model(work_dir)
-    if work_dir is not None else None``) is one of three live wiring points
-    for the declared trust model. Nothing failed when a reviewer set all
-    three to None at once and the full suite stayed green -- these tests
+    """``_build_compiled_context``'s ``resolve_trust_model(work_dir)`` call is
+    one of three live wiring points for the declared trust model. Nothing
+    failed when a reviewer set all three to None at once and the full suite
+    stayed green -- these tests
     close that gap by exercising ``_build_compiled_context`` directly against
     a real declared profile, so they fail if that line is ever neutered.
     """
@@ -152,22 +195,98 @@ class TestBuildCompiledContextResolvesTrustModel:
         assert ctx.trust_model is None
 
 
-def test_build_router_emits_findings_to_jsonl_and_event_log(tmp_path: Path):
+@pytest.fixture()
+def _received_finding(tmp_path: Path):
+    """Build a router and feed it one finding; return (fh, tmp_path, dup, events_log)."""
     findings_path = tmp_path / "run-1" / "evidence" / "timeliness_evidence.jsonl"
     findings_path.parent.mkdir(parents=True)
     fh = io.StringIO()
     router = _build_router(fh, findings_path, CompiledContext(), ServerArgs())
 
-    msg, dup = router.receive({
+    _msg, dup = router.receive({
         "p": "P1", "file": "x.py", "line": 1, "t": "violation",
         "severity": "medium", "d": "dim", "reason": "r", "snippet": "s",
         "w": "title",
     })
 
-    assert dup is False
-    assert fh.getvalue().count("\n") == 1
     events_log = tmp_path / "run-1" / "events.jsonl"
+    return fh, dup, events_log
+
+
+def test_build_router_reports_the_finding_as_not_a_duplicate(_received_finding):
+    _fh, dup, _events_log = _received_finding
+    assert dup is False
+
+
+def test_build_router_writes_one_jsonl_line_for_the_finding(_received_finding):
+    fh, _dup, _events_log = _received_finding
+    assert fh.getvalue().count("\n") == 1
+
+
+def test_build_router_emits_one_judgment_created_event(_received_finding):
+    _fh, _dup, events_log = _received_finding
     assert events_log.exists()
     events = EventLogReader(events_log).read_all()
     assert len(events) == 1
     assert events[0].event_type == EventType.JUDGMENT_CREATED
+
+
+def test_missing_cache_root_prints_clean_error_not_traceback(capsys, monkeypatch, tmp_path):
+    """_resolve_dimension_cache_writer raises a bare RuntimeError when
+    --dimension is set without --cache-root/--model-id. parse_args() already
+    rejects that combination at the CLI layer (args.py), so the only way to
+    reach _build_router with such a ServerArgs is a caller that builds one
+    directly -- which is exactly why _resolve_dimension_cache_writer's check
+    exists as defense-in-depth. main() must still turn that RuntimeError
+    into a clean exit instead of a raw traceback."""
+    sa = ServerArgs()
+    findings_path = tmp_path / "run-1" / "evidence" / "performance_evidence.jsonl"
+    findings_path.parent.mkdir(parents=True)
+    sa.findings_file = str(findings_path)
+    sa.dimension = "performance"
+    # cache_root / model_id intentionally left unset.
+
+    monkeypatch.setattr(findings_server_module, "parse_args", lambda: sa)
+    monkeypatch.setattr(sys, "argv", ["findings_server"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+
+    assert exc_info.value.code == 1
+    err = capsys.readouterr().err
+    assert "Traceback" not in err
+    assert "Error:" in err
+
+
+def test_build_router_auto_dismisses_a_cross_file_precedent_match(tmp_path: Path):
+    """#1208: the same requirement and code dismissed in one file is dismissed
+    in another file the moment the router receives it, through the project
+    action log, so it leaves the score the way a manual dismissal does."""
+    from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+    from quodeq.data.events.writer import EventLogWriter
+    from quodeq.data.projection.projector import Projector
+    from quodeq.services.dismissed import dismiss_finding, dismissed_keys
+    from quodeq.services.precedent_dismiss import PRECEDENT_REASON
+
+    project_dir = tmp_path / "project"
+    run_dir = project_dir / "r1"
+    run_dir.mkdir(parents=True)
+    log = run_dir / "events.jsonl"
+    EventLogWriter(log).emit(JudgmentCreatedEvent(payload=JudgmentPayload(
+        practice_id="P1", verdict="violation", dimension="Security",
+        file="auth.py", line=1, reason="r", req="S-CON-1", snippet="password = 'secret'",
+    )))
+    dismiss_finding(project_dir, {"req": "S-CON-1", "file": "auth.py", "line": 1})
+    Projector().ensure_projected(log, run_dir, project_dir=project_dir)
+    findings_path = project_dir / "run-1" / "evidence" / "security_evidence.jsonl"
+    findings_path.parent.mkdir(parents=True)
+
+    router = _build_router(io.StringIO(), findings_path, CompiledContext(), ServerArgs())
+    router.receive({
+        "p": "P1", "t": "violation", "req": "S-CON-1", "w": "Hardcoded credential",
+        "file": "other.py", "line": 7, "snippet": "password = 'secret'",
+    })
+
+    state = dismissed_keys(project_dir)
+    assert state.matches(req="S-CON-1", file="other.py", line=7, snippet="password = 'secret'")
+    assert next(e for e in state.entries if e.file == "other.py").reason == PRECEDENT_REASON

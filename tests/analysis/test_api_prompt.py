@@ -1,11 +1,10 @@
 """Tests for API runner prompt assembly."""
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
+from quodeq.analysis.api_prompt_assembly import ProjectBrief, assemble_api_prompt
 
 
 @pytest.fixture()
@@ -26,10 +25,8 @@ class TestAssembleApiPrompt:
 
     def test_includes_source_files(self, src_dir, standards_text):
         prompt = assemble_api_prompt(
-            source_files=[src_dir / "main.py", src_dir / "utils.py"],
-            standards_text=standards_text,
-            dimension="maintainability",
-            repo_name="test-repo",
+            source_files=[src_dir / "main.py", src_dir / "utils.py"], standards_text=standards_text, dimension="maintainability",
+            project=ProjectBrief(name="test-repo"),
         )
         assert "main.py" in prompt
         assert "def hello():" in prompt
@@ -38,29 +35,23 @@ class TestAssembleApiPrompt:
 
     def test_includes_standards(self, src_dir, standards_text):
         prompt = assemble_api_prompt(
-            source_files=[src_dir / "main.py"],
-            standards_text=standards_text,
-            dimension="security",
-            repo_name="test-repo",
+            source_files=[src_dir / "main.py"], standards_text=standards_text, dimension="security",
+            project=ProjectBrief(name="test-repo"),
         )
         assert "M-MOD-1" in prompt
         assert "S-CON-3" in prompt
 
     def test_includes_dimension(self, src_dir, standards_text):
         prompt = assemble_api_prompt(
-            source_files=[src_dir / "main.py"],
-            standards_text=standards_text,
-            dimension="security",
-            repo_name="test-repo",
+            source_files=[src_dir / "main.py"], standards_text=standards_text, dimension="security",
+            project=ProjectBrief(name="test-repo"),
         )
         assert "security" in prompt.lower()
 
     def test_includes_json_schema(self, src_dir, standards_text):
         prompt = assemble_api_prompt(
-            source_files=[src_dir / "main.py"],
-            standards_text=standards_text,
-            dimension="maintainability",
-            repo_name="test-repo",
+            source_files=[src_dir / "main.py"], standards_text=standards_text, dimension="maintainability",
+            project=ProjectBrief(name="test-repo"),
         )
         assert '"req"' in prompt
         assert '"severity"' in prompt
@@ -68,10 +59,8 @@ class TestAssembleApiPrompt:
 
     def test_schema_offers_vt_taxonomy_field(self, src_dir, standards_text):
         prompt = assemble_api_prompt(
-            source_files=[src_dir / "main.py"],
-            standards_text=standards_text,
-            dimension="security",
-            repo_name="test-repo",
+            source_files=[src_dir / "main.py"], standards_text=standards_text, dimension="security",
+            project=ProjectBrief(name="test-repo"),
         )
         assert '"vt"' in prompt
         assert "code-injection" in prompt  # concrete example anchors the format
@@ -89,10 +78,8 @@ class TestAssembleApiPrompt:
         precedes the file content transitively guards the rules block too.
         """
         prompt = assemble_api_prompt(
-            source_files=[src_dir / "main.py"],
-            standards_text=standards_text,
-            dimension="security",
-            repo_name="test-repo",
+            source_files=[src_dir / "main.py"], standards_text=standards_text, dimension="security",
+            project=ProjectBrief(name="test-repo"),
         )
         task_idx = prompt.index("## Your Task")
         schema_idx = prompt.index("Each finding must be a JSON object")
@@ -104,19 +91,15 @@ class TestAssembleApiPrompt:
     def test_handles_unreadable_file_gracefully(self, src_dir, standards_text):
         missing = src_dir / "gone.py"
         prompt = assemble_api_prompt(
-            source_files=[missing, src_dir / "main.py"],
-            standards_text=standards_text,
-            dimension="maintainability",
-            repo_name="test-repo",
+            source_files=[missing, src_dir / "main.py"], standards_text=standards_text, dimension="maintainability",
+            project=ProjectBrief(name="test-repo"),
         )
         assert "def hello():" in prompt
 
     def test_returns_string(self, src_dir, standards_text):
         prompt = assemble_api_prompt(
-            source_files=[src_dir / "main.py"],
-            standards_text=standards_text,
-            dimension="maintainability",
-            repo_name="test-repo",
+            source_files=[src_dir / "main.py"], standards_text=standards_text, dimension="maintainability",
+            project=ProjectBrief(name="test-repo"),
         )
         assert isinstance(prompt, str)
         assert len(prompt) > 0
@@ -126,11 +109,8 @@ class TestAssembleApiPrompt:
         tests_dir.mkdir()
         (tests_dir / "test_main.py").write_text("def test_x():\n    assert True\n")
         prompt = assemble_api_prompt(
-            source_files=[tests_dir / "test_main.py"],
-            standards_text=standards_text,
-            dimension="maintainability",
-            repo_name="test-repo",
-            repo_root=tmp_path,
+            source_files=[tests_dir / "test_main.py"], standards_text=standards_text, dimension="maintainability",
+            project=ProjectBrief(name="test-repo", root=tmp_path),
         )
         assert "tests/test_main.py (role: test)" in prompt
 
@@ -139,11 +119,8 @@ class TestAssembleApiPrompt:
         src.mkdir()
         (src / "server.py").write_text("def hello():\n    pass\n")
         prompt = assemble_api_prompt(
-            source_files=[src / "server.py"],
-            standards_text=standards_text,
-            dimension="maintainability",
-            repo_name="test-repo",
-            repo_root=tmp_path,
+            source_files=[src / "server.py"], standards_text=standards_text, dimension="maintainability",
+            project=ProjectBrief(name="test-repo", root=tmp_path),
         )
         assert "(role:" not in prompt
 
@@ -155,11 +132,8 @@ class TestAssembleApiPrompt:
         src.mkdir()
         (src / "main.py").write_text("def main():\n    pass\n")
         prompt = assemble_api_prompt(
-            source_files=[src / "main.py"],
-            standards_text=standards_text,
-            dimension="performance",
-            repo_name="test-repo",
-            repo_root=tmp_path,
+            source_files=[src / "main.py"], standards_text=standards_text, dimension="performance",
+            project=ProjectBrief(name="test-repo", root=tmp_path),
         )
         assert "## Project Shape" in prompt
         assert "deployment=desktop" in prompt
@@ -174,11 +148,8 @@ class TestAssembleApiPrompt:
         src.mkdir()
         (src / "main.py").write_text("def main():\n    pass\n")
         prompt = assemble_api_prompt(
-            source_files=[src / "main.py"],
-            standards_text=standards_text,
-            dimension="performance",
-            repo_name="test-repo",
-            repo_root=tmp_path,
+            source_files=[src / "main.py"], standards_text=standards_text, dimension="performance",
+            project=ProjectBrief(name="test-repo", root=tmp_path),
         )
         assert "## Project Shape" not in prompt
         assert "{{PROJECT_SHAPE}}" not in prompt

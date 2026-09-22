@@ -16,10 +16,11 @@ from quodeq.core.events.models import (
     FindingVerified,
     FindingVerifiedEvent,
 )
-from quodeq.data.actions_log import ActionLogWriter, read_action_events
+from quodeq.data.ports.actions_log import ActionLog
+from quodeq.services.wiring import ActionLogWriter, read_action_events
 
 
-def verify_finding(project_dir: Path, finding: dict) -> None:
+def verify_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> None:
     """Append a FindingVerified event to project_dir/actions.jsonl."""
     payload = FindingVerified(
         req=str(finding.get("req", "")),
@@ -27,21 +28,40 @@ def verify_finding(project_dir: Path, finding: dict) -> None:
         line=int(finding.get("line", 0)),
         note=finding.get("note"),
     )
-    ActionLogWriter(project_dir).emit(FindingVerifiedEvent(payload=payload))
+    log = writer or ActionLogWriter(project_dir)
+    log.emit(FindingVerifiedEvent(payload=payload))
 
 
-def unverify_finding(project_dir: Path, finding: dict) -> None:
+def unverify_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> None:
     """Append a FindingUnverified event to project_dir/actions.jsonl."""
     payload = FindingUnverified(
         req=str(finding.get("req", "")),
         file=str(finding.get("file", "")),
         line=int(finding.get("line", 0)),
     )
-    ActionLogWriter(project_dir).emit(FindingUnverifiedEvent(payload=payload))
+    log = writer or ActionLogWriter(project_dir)
+    log.emit(FindingUnverifiedEvent(payload=payload))
 
 
-def verified_entries(project_dir: Path) -> list[dict]:
-    """Net verified badges: replay of VERIFIED/UNVERIFIED events in order."""
+def verified_entries(
+    project_dir: Path,
+    *,
+    offset: int = 0,
+    limit: int | None = None,
+) -> list[dict]:
+    """Net verified badges: replay of VERIFIED/UNVERIFIED events in order.
+
+    Args:
+        project_dir: The project directory.
+        offset: The number of entries to skip (default 0, clamped to >= 0).
+        limit: The maximum number of entries to return. None means all entries.
+               If provided, limit is not clamped by this function; the caller
+               is responsible for enforcing any hard maximum (e.g., via the API
+               route handler).
+
+    Returns:
+        A list of verified badge dicts, sliced by offset/limit.
+    """
     if not project_dir.is_dir():
         return []
     entries: dict[tuple, dict] = {}
@@ -59,4 +79,10 @@ def verified_entries(project_dir: Path) -> list[dict]:
         elif event.event_type == EventType.FINDING_UNVERIFIED:
             p = event.payload
             entries.pop((str(p.req or ""), str(p.file or ""), int(p.line or 0)), None)
-    return list(entries.values())
+    items = list(entries.values())
+
+    if offset <= 0 and limit is None:
+        return items
+    start = max(0, offset)
+    end = start + limit if limit is not None and limit >= 0 else None
+    return items[start:end]

@@ -31,7 +31,7 @@ export function useDashboardScrollElement() {
  * shell or a jsdom test) it degrades to a plain fully-rendered list rather
  * than rendering nothing.
  */
-export default function VirtualList({ items, scrollElement, estimateSize, getItemKey, renderItem, overscan = 6 }) {
+export default function VirtualList({ items, scrollElement, estimateSize, getItemKey, renderItem, overscan = 6, label }) {
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollElement,
@@ -42,9 +42,9 @@ export default function VirtualList({ items, scrollElement, estimateSize, getIte
 
   if (!scrollElement) {
     return (
-      <div className="vlive-violations-virtual">
+      <div className="vlive-violations-virtual" role="list" aria-label={label}>
         {items.map((item, i) => (
-          <div key={getItemKey(i)}>{renderItem(item)}</div>
+          <div key={getItemKey(i)} role="listitem">{renderItem(item)}</div>
         ))}
       </div>
     );
@@ -54,7 +54,12 @@ export default function VirtualList({ items, scrollElement, estimateSize, getIte
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
-    <div className="vlive-violations-virtual" style={{ position: 'relative', width: '100%', height: totalSize }}>
+    <div
+      className="vlive-violations-virtual"
+      role="list"
+      aria-label={label}
+      style={{ position: 'relative', width: '100%', height: totalSize }}
+    >
       {virtualItems.map((virtualRow) => {
         const item = items[virtualRow.index];
         if (!item) return null;
@@ -63,6 +68,9 @@ export default function VirtualList({ items, scrollElement, estimateSize, getIte
             key={virtualRow.key}
             data-index={virtualRow.index}
             ref={virtualizer.measureElement}
+            role="listitem"
+            aria-setsize={items.length}
+            aria-posinset={virtualRow.index + 1}
             style={{
               position: 'absolute',
               top: 0,

@@ -1,10 +1,11 @@
 """Tests for model tier routing through the analysis pipeline."""
 from __future__ import annotations
-from unittest.mock import MagicMock
-from pathlib import Path
-import pytest
+from unittest.mock import MagicMock, patch
 
-from quodeq.analysis._types import AnalysisOptions
+from quodeq.analysis.run_types import RunConfig, AnalysisOptions, _AnalysisContext
+from quodeq.analysis._dimension_steps import _run_dimension_analysis
+from quodeq.analysis._config import AnalysisConfig
+from quodeq.analysis.subagents._pool_launcher import _default_subagent_model
 
 
 class TestAnalysisOptionsAiModel:
@@ -43,34 +44,28 @@ class TestBuildRunConfigAiModel:
         return inputs
 
     def test_reads_ai_model_from_env(self, tmp_path):
-        from quodeq.cli import _build_run_config
+        from quodeq.cli import build_run_config
         args = self._make_args()
         inputs = self._make_inputs(tmp_path)
         env = {"AI_MODEL": "qwen3.5:9b"}
-        config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
+        config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
         assert config.options.ai_model == "qwen3.5:9b"
 
     def test_ai_model_none_when_not_set(self, tmp_path):
-        from quodeq.cli import _build_run_config
+        from quodeq.cli import build_run_config
         args = self._make_args()
         inputs = self._make_inputs(tmp_path)
         env = {}
-        config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
+        config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
         assert config.options.ai_model is None
 
     def test_subagent_model_used_as_fallback(self, tmp_path):
-        from quodeq.cli import _build_run_config
+        from quodeq.cli import build_run_config
         args = self._make_args()
         inputs = self._make_inputs(tmp_path)
         env = {"SUBAGENT_MODEL": "sonnet"}
-        config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
+        config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path, env=env)
         assert config.options.ai_model == "sonnet"
-
-
-from unittest.mock import patch
-from quodeq.analysis._types import RunConfig, AnalysisOptions, _AnalysisContext
-from quodeq.analysis._dimension_steps import _run_dimension_analysis
-from quodeq.analysis._config import AnalysisConfig
 
 
 class TestDimensionAnalysisModel:
@@ -138,9 +133,6 @@ class TestDimensionAnalysisModel:
             assert analysis_config.ai_model is None
 
 
-from quodeq.analysis.subagents._pool_launcher import _default_subagent_model
-
-
 class TestSubagentModelEnvVar:
     """Subagent model env vars should be standardized."""
 
@@ -158,5 +150,3 @@ class TestSubagentModelEnvVar:
 
     def test_pool_launcher_returns_none_when_unset(self):
         assert _default_subagent_model(env={}) is None
-    # Removed _fast_model tests: the verify-pool that needed a fast model
-    # for its yes/no verification dispatch is gone (B6.2b).

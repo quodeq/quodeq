@@ -30,6 +30,7 @@ def fallback_contract(tools: list[dict]) -> str:
         return FALLBACK_CONTRACT
     return FALLBACK_CONTRACT + "\n\n# Available tools\n" + "\n".join(lines)
 
+
 _JSON_BLOCK = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 
 

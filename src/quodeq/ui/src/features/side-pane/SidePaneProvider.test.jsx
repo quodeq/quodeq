@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -22,6 +21,7 @@ function Probe() {
       <button onClick={() => addWindow(spec('d'))}>add-d</button>
       <button onClick={() => removeWindow('a')}>remove-a</button>
       <button onClick={() => toggleWindow(spec('a'))}>toggle-a</button>
+      <button onClick={() => toggleWindow(spec('d'))}>toggle-d</button>
       <button onClick={closeAll}>close-all</button>
     </div>
   );
@@ -85,8 +85,20 @@ describe('SidePaneProvider', () => {
     fireEvent.click(screen.getByText('add-a'));
     fireEvent.click(screen.getByText('add-b'));
     fireEvent.click(screen.getByText('add-c'));
-    expect(screen.queryByRole('status')).toBeNull();
+    // The live region is always mounted (announce-on-change), so "no toast"
+    // means an empty region, not a missing one.
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     fireEvent.click(screen.getByText('add-d'));
+    expect(screen.getByRole('status')).toHaveTextContent(/3 panels/i);
+  });
+
+  it('toggleWindow hits the same cap and toast as addWindow', () => {
+    render(<SidePaneProvider><Probe /></SidePaneProvider>);
+    fireEvent.click(screen.getByText('add-a'));
+    fireEvent.click(screen.getByText('add-b'));
+    fireEvent.click(screen.getByText('add-c'));
+    fireEvent.click(screen.getByText('toggle-d'));
+    expect(screen.getByTestId('state')).toHaveTextContent('open:a,b,c');
     expect(screen.getByRole('status')).toHaveTextContent(/3 panels/i);
   });
 
@@ -195,12 +207,14 @@ describe('SidePaneProvider', () => {
 
     it('renders a toast with the given message when fired', () => {
       render(<SidePaneProvider><ToastProbe /></SidePaneProvider>);
-      expect(screen.queryByText('blocked: try again later')).toBeNull();
+      expect(document.querySelector('.side-pane-toast')).toBeNull();
       fireEvent.click(screen.getByText('fire'));
-      expect(screen.getByText('blocked: try again later')).toBeInTheDocument();
+      // The message is in the visible shell and in the live region beside it.
+      expect(document.querySelector('.side-pane-toast')).toHaveTextContent('blocked: try again later');
+      expect(screen.getByRole('status')).toHaveTextContent('blocked: try again later');
     });
 
-    it('is exposed as part of the context value (no-op when called with empty)', () => {
+    it('is a no-op when called with an empty message', () => {
       function NoMessageProbe() {
         const { showToast } = useSidePane();
         return <button onClick={() => showToast('')}>fire-empty</button>;
@@ -208,8 +222,8 @@ describe('SidePaneProvider', () => {
       render(<SidePaneProvider><NoMessageProbe /></SidePaneProvider>);
       // No throw, no toast rendered
       fireEvent.click(screen.getByText('fire-empty'));
-      // The toast role is "status" — assert none exists.
-      expect(screen.queryByRole('status')).toBeNull();
+      expect(document.querySelector('.side-pane-toast')).toBeNull();
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
     });
   });
 });

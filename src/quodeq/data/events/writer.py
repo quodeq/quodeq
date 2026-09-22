@@ -1,13 +1,11 @@
+"""Append-only JSONL writer for the run event log."""
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
-from typing import Union
-
-from pydantic import BaseModel
 
 from quodeq.core.events.models import BaseEvent
+from quodeq.data.events.codec import event_to_json
 from quodeq.data.locking import get_file_lock
 
 
@@ -15,11 +13,12 @@ _logger = logging.getLogger(__name__)
 
 
 class EventLogWriter:
-    """
-    Thread-safe, append-only writer for the Quodeq Event Log (JSONL).
-    
-    This class is the sole authority for writing events to the immutable 
-    source of truth in the Core layer.
+    """Thread-safe, append-only writer for the Quodeq Event Log (JSONL).
+
+    Data-layer adapter: the sole writer of ``events.jsonl``, the immutable
+    source of truth. The event TYPES it serializes are core
+    (``core/events/models.py``); the file mechanics (locking, append, flush)
+    live here in ``data/events/``.
     """
 
     def __init__(self, log_path: Path):
@@ -34,7 +33,7 @@ class EventLogWriter:
     def emit(self, event: BaseEvent) -> None:
         """
         Appends a single event to the JSONL log.
-        
+
         Args:
             event: An instance of a BaseEvent (or subclass).
         """
@@ -43,7 +42,7 @@ class EventLogWriter:
                 # Apply an exclusive lock on the file before writing.
                 self._lock.acquire(f)
                 try:
-                    line = event.model_dump_json()
+                    line = event_to_json(event)
                     f.write(line + "\n")
                     f.flush()  # Ensure it hits the OS buffer
                 finally:

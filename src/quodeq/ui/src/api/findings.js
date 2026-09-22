@@ -37,7 +37,8 @@ export async function dismissFinding(projectId, finding) {
 /**
  * Restore a dismissed finding (include in scoring again).
  * @param {string} projectId - Project identifier
- * @param {object} finding - Finding key: { req, file, line }
+ * @param {object} finding - Finding key: { req, file, line, fingerprint? }
+ *   (fingerprint comes from the dismissed listing and names the entry exactly)
  * @returns {Promise<object>} Server response
  */
 export async function restoreFinding(projectId, finding) {
@@ -92,7 +93,10 @@ export async function deleteFinding(projectId, finding) {
  * @returns {Promise<{ok: boolean, deleted: number}>} Server response
  */
 export async function deleteAllFindings(projectId) {
-  return request('/findings/delete-all', {
+  // Caller (useDismissedFindings) already runs a confirmDialog before this
+  // is invoked, so confirm=true here just satisfies the API's own gate.
+  // Same pattern as deleteProject in ./projects.js.
+  return request('/findings/delete-all?confirm=true', {
     method: 'POST',
     body: JSON.stringify({ project: projectId }),
   });

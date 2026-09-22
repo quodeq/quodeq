@@ -1,4 +1,4 @@
-"""Tests for the API runner."""
+"""Tests for the API runner: JSONL evidence writing and the file_done marker contract."""
 from __future__ import annotations
 
 import json
@@ -10,114 +10,14 @@ import pytest
 
 pytest.importorskip("openai", reason="requires the openai SDK")
 
-from quodeq.analysis._api_runner import (
-    run_api_analysis, ApiRunnerConfig,
-    _build_router_context,
-    _call_api, _parse_findings, _Finding, _FindingType, _Severity, _LOCAL_TIMEOUT,
+from quodeq.analysis._api_call import _LOCAL_TIMEOUT
+from quodeq.analysis._api_runner import ApiAnalysisRequest, _call_api, run_api_analysis
+
+from ._api_runner_helpers import (
+    _make_findings_json,
+    _mock_raw_client,
+    _mock_raw_client_finish,
 )
-
-
-def _mock_raw_client_finish(content: str, finish_reason: str) -> MagicMock:
-    """Mock client whose single choice carries an explicit finish_reason."""
-    msg = MagicMock(content=content)
-    choice = MagicMock(message=msg, finish_reason=finish_reason)
-    response = MagicMock(choices=[choice])
-    client = MagicMock()
-    client.chat.completions.create.return_value = response
-    return client
-
-
-def _make_findings_json(*findings_data) -> str:
-    """Build a JSON string of findings from (req, t, file, line, severity, w) tuples."""
-    findings = []
-    for req, t, file, line, severity, w in findings_data:
-        findings.append({
-            "req": req, "t": t, "file": file, "line": line,
-            "severity": severity, "w": w,
-            "snippet": f"line for {req}",
-            "reason": f"Test reason for {req}",
-        })
-    return json.dumps({"findings": findings})
-
-
-def _mock_raw_client(content: str) -> MagicMock:
-    """Build a mock that mimics the raw OpenAI client context manager returning a response."""
-    msg = MagicMock(content=content)
-    choice = MagicMock(message=msg)
-    response = MagicMock(choices=[choice])
-    client = MagicMock()
-    client.chat.completions.create.return_value = response
-    return client
-
-
-@pytest.fixture()
-def api_config():
-    return ApiRunnerConfig(
-        model="test-model",
-        api_base="http://localhost:8000/v1",
-        api_key="test-key",
-    )
-
-
-class TestResolveTimeout:
-    """The read budget scales with the subagent count on local providers.
-
-    Local servers serve one request per loaded model, so with N subagents a
-    queued request waits up to (N-1) inferences before its own starts. A fixed
-    read budget times out queued-but-healthy calls, burning the whole budget
-    for zero findings and feeding the failure-streak breaker.
-    """
-
-    def test_local_single_agent_keeps_default(self):
-        from quodeq.analysis._api_runner import _resolve_timeout
-        cfg = ApiRunnerConfig(model="m", api_base="http://localhost:11434/v1")
-        assert _resolve_timeout(cfg, is_openai=False) == _LOCAL_TIMEOUT
-
-    def test_local_read_budget_scales_with_subagents(self):
-        from quodeq.analysis._api_runner import _resolve_timeout
-        cfg = ApiRunnerConfig(
-            model="m", api_base="http://localhost:11434/v1", n_subagents=3,
-        )
-        t = _resolve_timeout(cfg, is_openai=False)
-        assert t.read == _LOCAL_TIMEOUT.read * 3
-        assert t.connect == _LOCAL_TIMEOUT.connect
-        assert t.write == _LOCAL_TIMEOUT.write
-        assert t.pool == _LOCAL_TIMEOUT.pool
-
-    def test_cloud_budget_ignores_subagents(self):
-        from quodeq.analysis._api_runner import _resolve_timeout, _CLOUD_TIMEOUT
-        cfg = ApiRunnerConfig(
-            model="m", api_base="https://api.openai.com/v1", n_subagents=3,
-        )
-        assert _resolve_timeout(cfg, is_openai=True) == _CLOUD_TIMEOUT
-
-    def test_env_override_wins(self, monkeypatch):
-        from quodeq.analysis._api_runner import _resolve_timeout
-        monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "900")
-        cfg = ApiRunnerConfig(
-            model="m", api_base="http://localhost:11434/v1", n_subagents=2,
-        )
-        assert _resolve_timeout(cfg, is_openai=False).read == 900.0
-
-    def test_env_override_garbage_is_ignored(self, monkeypatch):
-        from quodeq.analysis._api_runner import _resolve_timeout
-        monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "soon")
-        cfg = ApiRunnerConfig(
-            model="m", api_base="http://localhost:11434/v1", n_subagents=2,
-        )
-        assert _resolve_timeout(cfg, is_openai=False).read == _LOCAL_TIMEOUT.read * 2
-
-    def test_call_api_passes_scaled_timeout_to_client(self):
-        cfg = ApiRunnerConfig(
-            model="m", api_base="http://localhost:8000/v1",
-            api_key="k", n_subagents=2,
-        )
-        raw_client = _mock_raw_client('{"findings":[]}')
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
-            mock_oa.return_value.__enter__.return_value = raw_client
-            _call_api("prompt", cfg)
-        timeout = mock_oa.call_args.kwargs["timeout"]
-        assert timeout.read == _LOCAL_TIMEOUT.read * 2
 
 
 class TestRunApiAnalysis:
@@ -131,9 +31,12 @@ class TestRunApiAnalysis:
         )
         raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
-            run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
+            run_api_analysis(
+                request=ApiAnalysisRequest(prompt="test prompt", jsonl_file=jsonl_file),
+                config=api_config,
+            )
 
         assert jsonl_file.exists()
         lines = [ln for ln in jsonl_file.read_text().strip().split("\n") if ln]
@@ -147,9 +50,12 @@ class TestRunApiAnalysis:
         jsonl_file = tmp_path / "evidence.jsonl"
         raw_client = _mock_raw_client('{"findings":[]}')
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
-            run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
+            run_api_analysis(
+                request=ApiAnalysisRequest(prompt="test prompt", jsonl_file=jsonl_file),
+                config=api_config,
+            )
 
             mock_oa.assert_called_once_with(
                 base_url="http://localhost:8000/v1",
@@ -162,9 +68,12 @@ class TestRunApiAnalysis:
         jsonl_file = tmp_path / "evidence.jsonl"
         raw_client = _mock_raw_client('{"findings":[]}')
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
-            run_api_analysis(prompt="test prompt", jsonl_file=jsonl_file, config=api_config)
+            run_api_analysis(
+                request=ApiAnalysisRequest(prompt="test prompt", jsonl_file=jsonl_file),
+                config=api_config,
+            )
 
         assert jsonl_file.exists()
         # Only markers (if any), no findings
@@ -177,11 +86,14 @@ class TestRunApiAnalysis:
         content = _make_findings_json(("X-1", "violation", "app.py", 1, "minor", "test"))
         raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="test", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=["src/myproject/app.py"],
+                request=ApiAnalysisRequest(
+                    prompt="test", jsonl_file=jsonl_file,
+                    source_file_paths=["src/myproject/app.py"],
+                ),
+                config=api_config,
             )
 
         lines = [json.loads(ln) for ln in jsonl_file.read_text().splitlines() if ln.strip()]
@@ -190,7 +102,7 @@ class TestRunApiAnalysis:
         assert findings[0]["file"] == "src/myproject/app.py"
 
     def test_client_disables_sdk_retries(self, tmp_path, api_config):
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             client = MagicMock()
             client.chat.completions.create.return_value = MagicMock(
                 choices=[MagicMock(message=MagicMock(content='{"findings":[]}'))]
@@ -198,184 +110,6 @@ class TestRunApiAnalysis:
             mock_oa.return_value.__enter__.return_value = client
             _call_api("prompt", api_config)
         assert mock_oa.call_args.kwargs["max_retries"] == 0
-
-
-def _create_kwargs(cfg):
-    raw_client = _mock_raw_client('{"findings":[]}')
-    with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
-        mock_oa.return_value.__enter__.return_value = raw_client
-        _call_api("prompt", cfg)
-    return raw_client.chat.completions.create.call_args.kwargs
-
-
-class TestExtraBodyThinkingControls:
-    """Ollama only honours `reasoning_effort`; `chat_template_kwargs` is a
-    llama.cpp/vLLM convention it silently ignores. Both must go out to local
-    providers or Gemma-style thinking loops blow the read timeout."""
-
-    def test_local_sends_both_thinking_knobs(self, api_config):
-        extra = _create_kwargs(api_config)["extra_body"]
-        assert extra["reasoning_effort"] == "none"
-        assert extra["chat_template_kwargs"] == {"enable_thinking": False}
-
-    def test_openai_sends_only_reasoning_effort(self):
-        cfg = ApiRunnerConfig(
-            model="gpt", api_base="https://api.openai.com/v1", api_key="k",
-        )
-        extra = _create_kwargs(cfg)["extra_body"]
-        assert extra["reasoning_effort"] == "none"
-        assert "chat_template_kwargs" not in extra
-
-
-class TestLocalOutputCap:
-    """Local calls get a default max_tokens so a runaway generation is bounded
-    by output budget, not only by the wall-clock read timeout."""
-
-    def test_local_gets_default_cap(self, api_config):
-        kwargs = _create_kwargs(api_config)
-        assert kwargs["max_tokens"] == 8192
-
-    def test_env_override_and_zero_disables(self, api_config, monkeypatch):
-        monkeypatch.setenv("QUODEQ_MAX_OUTPUT_TOKENS", "4096")
-        assert _create_kwargs(api_config)["max_tokens"] == 4096
-        monkeypatch.setenv("QUODEQ_MAX_OUTPUT_TOKENS", "0")
-        assert "max_tokens" not in _create_kwargs(api_config)
-
-    def test_explicit_config_wins(self):
-        cfg = ApiRunnerConfig(
-            model="m", api_base="http://localhost:8000/v1", api_key="k",
-            max_tokens=123,
-        )
-        assert _create_kwargs(cfg)["max_tokens"] == 123
-
-    def test_openai_uncapped_by_default(self):
-        cfg = ApiRunnerConfig(
-            model="gpt", api_base="https://api.openai.com/v1", api_key="k",
-        )
-        assert "max_tokens" not in _create_kwargs(cfg)
-
-
-class TestOllamaCtxNoopWarning:
-    """Ollama's /v1 endpoint ignores num_ctx (top-level and nested options),
-    so a configured context size silently does nothing there. Users must hear
-    about it once instead of debugging truncated context."""
-
-    @pytest.fixture(autouse=True)
-    def _reset_warn_cache(self):
-        from quodeq.analysis._api_runner import _warn_ollama_ctx_noop
-        _warn_ollama_ctx_noop.cache_clear()
-        yield
-        _warn_ollama_ctx_noop.cache_clear()
-
-    def test_warns_once_for_ollama_base(self, caplog):
-        cfg = ApiRunnerConfig(
-            model="m", api_base="http://localhost:11434/v1", api_key="k",
-            context_size=32768,
-        )
-        with caplog.at_level("WARNING"):
-            _create_kwargs(cfg)
-            _create_kwargs(cfg)
-        hits = [r for r in caplog.records if "OLLAMA_CONTEXT_LENGTH" in r.message]
-        assert len(hits) == 1
-
-    def test_silent_for_non_ollama_base(self, caplog):
-        cfg = ApiRunnerConfig(
-            model="m", api_base="http://localhost:8000/v1", api_key="k",
-            context_size=32768,
-        )
-        with caplog.at_level("WARNING"):
-            extra = _create_kwargs(cfg)["extra_body"]
-        assert extra["num_ctx"] == 32768
-        assert not [r for r in caplog.records if "OLLAMA_CONTEXT_LENGTH" in r.message]
-
-    def test_silent_without_context_size(self, api_config, caplog):
-        with caplog.at_level("WARNING"):
-            _create_kwargs(api_config)
-        assert not [r for r in caplog.records if "OLLAMA_CONTEXT_LENGTH" in r.message]
-
-
-class TestParserDropAccounting:
-    """Every finding-shaped object the model emits but we can't keep must be
-    counted, so a systemic loss is visible in the logs instead of silent."""
-
-    def test_counts_finding_missing_req_as_dropped(self):
-        # A finding-shaped object missing the required `req`. Today it is
-        # silently recursed away and NOT counted; it must count as dropped.
-        raw = json.dumps({"findings": [
-            {"t": "violation", "file": "a.py", "line": 5, "w": "x",
-             "snippet": "code", "reason": "bad"},  # no req
-        ]})
-        findings, dropped = _parse_findings(raw)
-        assert findings == []
-        assert dropped == 1
-
-    def test_does_not_count_non_finding_noise(self):
-        # A stray container/noise object that does not look like a finding
-        # must NOT inflate the dropped count.
-        valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
-                 "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
-        raw = '{"note": "analysis complete"}' + json.dumps({"findings": [valid]})
-        findings, dropped = _parse_findings(raw)
-        assert len(findings) == 1
-        assert dropped == 0
-
-    def test_recovers_real_findings_nested_in_finding_shaped_wrapper(self):
-        # A wrapper that happens to share >=2 finding field names (severity,
-        # reason) but NESTS a real finding must not have that finding swallowed.
-        # Counting the wrapper as a drop AND stopping recursion would lose it.
-        valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
-                 "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
-        raw = json.dumps({"severity": "major", "reason": "run summary", "items": [valid]})
-        findings, dropped = _parse_findings(raw)
-        assert len(findings) == 1
-        assert findings[0]["req"] == "R1"
-        assert dropped == 0
-
-
-class TestFindingVtTaxonomy:
-    """The optional 'vt' taxonomy code must survive _Finding validation, or
-    every fresh API run scores with taxonomy_used=False (free-text reason
-    grouping counts near-duplicates as distinct types and depresses scores)."""
-
-    _BASE = {
-        "req": "S-CON-3", "t": "violation", "file": "src/a.py", "line": 3,
-        "severity": "critical", "w": "eval usage",
-        "snippet": "eval(x)", "reason": "Direct code injection via eval.",
-    }
-
-    def test_vt_survives_validate_and_dump(self):
-        dumped = _Finding.model_validate({**self._BASE, "vt": "code-injection"}).model_dump()
-        assert dumped["vt"] == "code-injection"
-
-    def test_vt_defaults_to_none_when_absent(self):
-        dumped = _Finding.model_validate(self._BASE).model_dump()
-        assert dumped["vt"] is None
-
-
-class TestTruncationDetection:
-    """A length-truncated response is incomplete: mark the call lossy so the
-    file re-dispatches instead of being cached as a clean analysis."""
-
-    def test_truncated_response_is_lossy(self, api_config):
-        content = _make_findings_json(
-            ("R1", "violation", "a.py", 5, "minor", "x"),
-        )
-        client = _mock_raw_client_finish(content, "length")
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
-            mock_oa.return_value.__enter__.return_value = client
-            _findings, was_lossy = _call_api("prompt", api_config)
-        assert was_lossy is True
-
-    def test_complete_response_is_not_lossy(self, api_config):
-        content = _make_findings_json(
-            ("R1", "violation", "a.py", 5, "minor", "x"),
-        )
-        client = _mock_raw_client_finish(content, "stop")
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
-            mock_oa.return_value.__enter__.return_value = client
-            findings, was_lossy = _call_api("prompt", api_config)
-        assert was_lossy is False
-        assert len(findings) == 1
 
 
 class TestMarkerContract:
@@ -404,11 +138,14 @@ class TestMarkerContract:
         content = _make_findings_json(("M-MOD-1", "violation", "src/a.py", 5, "major", "x"))
         raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=["src/a.py", "src/b.py", "src/c.py"],
+                request=ApiAnalysisRequest(
+                    prompt="t", jsonl_file=jsonl_file,
+                    source_file_paths=["src/a.py", "src/b.py", "src/c.py"],
+                ),
+                config=api_config,
             )
 
         lines = self._read_jsonl(jsonl_file)
@@ -422,11 +159,14 @@ class TestMarkerContract:
         jsonl_file = tmp_path / "evidence.jsonl"
         raw_client = _mock_raw_client('{"findings":[]}')
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=["src/clean.py"],
+                request=ApiAnalysisRequest(
+                    prompt="t", jsonl_file=jsonl_file,
+                    source_file_paths=["src/clean.py"],
+                ),
+                config=api_config,
             )
 
         lines = self._read_jsonl(jsonl_file)
@@ -449,11 +189,14 @@ class TestMarkerContract:
         raw_client = MagicMock()
         raw_client.chat.completions.create.side_effect = httpx.ReadTimeout("timeout")
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=["src/a.py", "src/b.py"],
+                request=ApiAnalysisRequest(
+                    prompt="t", jsonl_file=jsonl_file,
+                    source_file_paths=["src/a.py", "src/b.py"],
+                ),
+                config=api_config,
             )
 
         lines = self._read_jsonl(jsonl_file)
@@ -471,11 +214,14 @@ class TestMarkerContract:
         content = _make_findings_json(("X-1", "violation", "a.py", 1, "minor", "x"))
         raw_client = _mock_raw_client_finish(content, "length")
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=["src/a.py"],
+                request=ApiAnalysisRequest(
+                    prompt="t", jsonl_file=jsonl_file,
+                    source_file_paths=["src/a.py"],
+                ),
+                config=api_config,
             )
 
         lines = self._read_jsonl(jsonl_file)
@@ -493,184 +239,15 @@ class TestMarkerContract:
         content = _make_findings_json(("X-1", "violation", "a.py", 1, "minor", "x"))
         raw_client = _mock_raw_client(content)
 
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
+        with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
             run_api_analysis(
-                prompt="t", jsonl_file=jsonl_file, config=api_config,
-                source_file_paths=None,
+                request=ApiAnalysisRequest(
+                    prompt="t", jsonl_file=jsonl_file, source_file_paths=None,
+                ),
+                config=api_config,
             )
 
         lines = self._read_jsonl(jsonl_file)
         assert self._markers(lines) == []
         assert len(self._findings_only(lines)) == 1
-
-
-class TestSyncCacheWrite:
-    """API path wires build_cache_writer into FindingsRouter so each
-    ``mark_file_done(status='ok')`` triggers a synchronous cache.put.
-
-    Closes the 30s polling window between watcher ticks: after this, the
-    API runner's in-process router writes its per-file cache entry on disk
-    BEFORE returning from ``mark_file_done``. SIGKILL between the JSONL
-    marker and the cache put cannot lose the work.
-    """
-
-    def test_api_path_writes_cache_synchronously_when_file_done_ok(
-        self, tmp_path, api_config, monkeypatch,
-    ):
-        """After router processes findings + mark_file_done(file=F, status='ok')
-        in the API path, a cache entry for F exists on disk under cache_root.
-        """
-        from quodeq.analysis._types import AnalysisOptions, RunConfig
-
-        src_root = tmp_path / "src"
-        src_root.mkdir()
-        (src_root / "Foo.kt").write_text("class Foo")
-
-        # default_cache_root() honours QUODEQ_CACHE_ROOT (Fix A, #2419/#2340),
-        # so redirect via that env var to keep this test self-contained.
-        fake_cache_base = tmp_path / "cache"
-        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(fake_cache_base))
-        cache_root = fake_cache_base / "results"
-
-        run_config = RunConfig(
-            src=src_root,
-            language="kotlin",
-            standards_dir=None,
-            work_dir=src_root,
-            options=AnalysisOptions(subagent_model="sonnet"),
-        )
-
-        jsonl_file = tmp_path / "evidence.jsonl"
-        content = _make_findings_json(("M-MOD-1", "violation", "Foo.kt", 1, "minor", "x"))
-        raw_client = _mock_raw_client(content)
-
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
-            mock_oa.return_value.__enter__.return_value = raw_client
-            run_api_analysis(
-                prompt="t",
-                jsonl_file=jsonl_file,
-                config=api_config,
-                source_file_paths=["Foo.kt"],
-                run_config=run_config,
-                dim_id="flexibility",
-            )
-
-        entries = list(cache_root.rglob("entry.json"))
-        assert len(entries) == 1, (
-            f"Expected synchronous cache write on file_done='ok'. "
-            f"Found {len(entries)} entries under {cache_root}."
-        )
-
-
-class TestDropStatsRecording:
-    """_call_api feeds the per-run drop-ratio accumulator (issue #606).
-
-    The per-call WARNING already counts dropped findings; recording the same
-    (dropped, kept) pair into ``_drop_stats`` lets the run loop surface ONE
-    aggregate signal instead of N scattered lines.
-    """
-
-    @pytest.fixture(autouse=True)
-    def _reset_accumulator(self):
-        from quodeq.analysis import _drop_stats
-        _drop_stats.consume()
-        yield
-        _drop_stats.consume()
-
-    def test_call_with_malformed_finding_records_drop_and_kept(self, api_config):
-        from quodeq.analysis import _drop_stats
-        valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
-                 "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
-        malformed = {"t": "violation", "file": "b.py", "line": 1, "w": "y",
-                     "snippet": "code", "reason": "bad"}  # no req -> dropped
-        content = json.dumps({"findings": [valid, malformed]})
-        client = _mock_raw_client(content)
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
-            mock_oa.return_value.__enter__.return_value = client
-            _call_api("prompt", api_config)
-        stats = _drop_stats.consume()
-        assert stats.dropped == 1
-        assert stats.kept == 1
-
-    def test_failed_call_records_nothing(self, api_config):
-        from quodeq.analysis import _drop_stats
-        client = MagicMock()
-        client.chat.completions.create.side_effect = httpx.ReadTimeout("timeout")
-        with patch("quodeq.analysis._api_runner.openai.OpenAI") as mock_oa:
-            mock_oa.return_value.__enter__.return_value = client
-            _call_api("prompt", api_config)
-        assert _drop_stats.consume().parsed == 0
-
-
-class TestApiRunnerConfig:
-    """ApiRunnerConfig dataclass."""
-
-    def test_defaults(self):
-        cfg = ApiRunnerConfig(model="test", api_base="http://localhost/v1")
-        assert cfg.api_key == ""
-        assert cfg.temperature == 0.1
-        assert cfg.max_tokens is None
-
-    def test_custom_values(self):
-        cfg = ApiRunnerConfig(
-            model="gpt-4o",
-            api_base="https://api.openai.com/v1",
-            api_key="sk-...",
-            temperature=0.0,
-            max_tokens=4096,
-        )
-        assert cfg.temperature == 0.0
-        assert cfg.max_tokens == 4096
-
-
-class TestBuildRouterContextCorpus:
-    """`_build_router_context` wires precedent_corpus (env-gated, never raises)."""
-
-    def test_corpus_none_when_flag_off(self, tmp_path, monkeypatch):
-        monkeypatch.delenv("QUODEQ_SEMANTIC_PRECEDENTS", raising=False)
-
-        ctx = _build_router_context(
-            tmp_path, "security", None, tmp_path, tmp_path / "run-1",
-        )
-
-        assert ctx is not None
-        assert ctx.precedent_corpus is None
-
-    def test_corpus_degrades_when_flag_on_but_no_embedder(self, tmp_path, monkeypatch):
-        from quodeq.llm_bridge._embeddings import reset_embedding_availability_cache
-
-        reset_embedding_availability_cache()
-        monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
-        monkeypatch.setenv("QUODEQ_EMBEDDING_BASE_URL", "http://127.0.0.1:1")  # nothing listens
-
-        ctx = _build_router_context(
-            tmp_path, "security", None, tmp_path, tmp_path / "run-1",
-        )
-
-        assert ctx is not None
-        assert ctx.precedent_corpus is None
-
-    def test_wires_load_precedent_corpus_with_project_and_run_dir(self, tmp_path, monkeypatch):
-        """Proves `_build_router_context` actually calls load_precedent_corpus
-        with (project_dir, run_dir) and stores its return value -- the
-        None-when-flag-off test above passes trivially against the
-        CompiledContext field default, so this closes that gap."""
-        import quodeq.analysis._api_runner as api_runner_module
-
-        sentinel = object()
-        calls = []
-
-        def fake_load_precedent_corpus(project_dir, run_dir):
-            calls.append((project_dir, run_dir))
-            return sentinel
-
-        monkeypatch.setattr(
-            api_runner_module, "load_precedent_corpus", fake_load_precedent_corpus,
-        )
-
-        run_dir = tmp_path / "run-1"
-        ctx = _build_router_context(tmp_path, "security", None, tmp_path, run_dir)
-
-        assert calls == [(tmp_path, run_dir)]
-        assert ctx.precedent_corpus is sentinel

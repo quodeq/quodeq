@@ -4,9 +4,13 @@ from __future__ import annotations
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from quodeq.api.app import create_app, _default_provider
+import pytest
+
+# The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
+# restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
+pytestmark = pytest.mark.usefixtures("restore_environ")
 
 
 class _StubProvider:
@@ -131,3 +135,61 @@ class TestMainFunction:
             mock_create.assert_called_once()
             mock_run.assert_called_once()
             assert mock_signal.called, "main() should install signal handlers"
+
+    def test_main_forwards_env_to_configure_stdio_utf8(self, monkeypatch):
+        """main()'s *env* must reach configure_stdio_utf8, not just
+        create_app -- otherwise stdio setup silently reads os.environ even
+        when the caller injected an isolated mapping."""
+        mock_configure = MagicMock()
+        with patch("quodeq.api.app.create_app") as mock_create, \
+             patch("quodeq.api.app.signal.signal"), \
+             patch("quodeq.shared.text_io.configure_stdio_utf8", mock_configure):
+            mock_app = MagicMock()
+            mock_app.config = {"_provider": MagicMock()}
+            mock_create.return_value = mock_app
+            from quodeq.api.app import main
+            injected_env = {"QUODEQ_API_KEY": "test-key"}
+            main(env=injected_env)
+            mock_configure.assert_called_once_with(injected_env)
+
+
+class TestRateLimitStoreFactory:
+    def test_defaults_to_in_memory_stores(self, monkeypatch):
+        """With no backend configured and no caller store, both the API and
+        the evaluation store are in-memory."""
+        from quodeq.api.app import _build_rate_limit_store
+        from quodeq.api._rate_limit import InMemoryRateLimitStore
+
+        monkeypatch.delenv("QUODEQ_RATE_LIMIT_BACKEND", raising=False)
+
+        store, eval_store = _build_rate_limit_store()
+
+        assert isinstance(store, InMemoryRateLimitStore)
+        assert isinstance(eval_store, InMemoryRateLimitStore)
+        assert store is not eval_store
+
+    def test_env_parameter_overrides_the_ambient_backend(self, monkeypatch):
+        """The env is injected, not read off os.environ: an explicit mapping
+        wins over a backend configured in the process environment."""
+        from quodeq.api.app import _build_rate_limit_store
+        from quodeq.api._rate_limit import InMemoryRateLimitStore
+
+        monkeypatch.setenv("QUODEQ_RATE_LIMIT_BACKEND", "file")
+
+        # create_rate_limit_store does `os.environ if env is None else env`:
+        # an injected mapping is used as-is, only None reads the process env.
+        store, _ = _build_rate_limit_store(env={"QUODEQ_RATE_LIMIT_BACKEND": "memory"})
+
+        assert isinstance(store, InMemoryRateLimitStore)
+
+    def test_caller_supplied_store_is_used_for_the_api_limiter(self):
+        """A caller-supplied store replaces the API limiter but never the
+        evaluation limiter, which keeps its own window/max."""
+        from quodeq.api.app import _build_rate_limit_store
+
+        supplied = MagicMock()
+
+        store, eval_store = _build_rate_limit_store(supplied)
+
+        assert store is supplied
+        assert eval_store is not supplied

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from quodeq.analysis._analysis_context import _load_custom_dimensions
 
+
 def test_traversal_evaluator_id_is_skipped(tmp_path: Path):
     (tmp_path / "evil.json").write_text(json.dumps({"id": "../../etc/passwd"}), encoding="utf-8")
     (tmp_path / "slash.json").write_text(json.dumps({"id": "a/b"}), encoding="utf-8")

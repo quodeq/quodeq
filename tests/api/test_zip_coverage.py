@@ -1,9 +1,9 @@
 """Tests for quodeq.api.zip — zip export helpers."""
 from __future__ import annotations
 
+import logging
 import os
 import zipfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -31,6 +31,33 @@ class TestMaxZipSizeBytes:
         from quodeq.api.zip import _max_zip_size_bytes
         result = _max_zip_size_bytes(env={})
         assert result == 500 * 1024 * 1024
+
+    def test_invalid_env_logs_warning_naming_the_variable(self, caplog):
+        from quodeq.api.zip import _max_zip_size_bytes
+        with caplog.at_level(logging.WARNING, logger="quodeq.api.zip"):
+            result = _max_zip_size_bytes(env={"QUODEQ_MAX_ZIP_SIZE_MB": "bogus"})
+        assert result == 500 * 1024 * 1024
+        messages = [r.getMessage() for r in caplog.records]
+        assert any(
+            "QUODEQ_MAX_ZIP_SIZE_MB" in m and "bogus" in m and "500" in m for m in messages
+        )
+
+    def test_missing_env_stays_silent(self, caplog):
+        from quodeq.api.zip import _max_zip_size_bytes
+        with caplog.at_level(logging.WARNING, logger="quodeq.api.zip"):
+            _max_zip_size_bytes(env={})
+        assert caplog.records == []
+
+
+class TestZipSizeLimitError:
+    def test_public_message_matches_str(self):
+        # _ZipSizeLimitError.__init__ passes the same text to super().__init__
+        # and to public_message, so the two stay in lockstep; the route must
+        # still read public_message (never str(exc)) per
+        # tests/api/test_no_exception_echo.py's zero baseline.
+        from quodeq.api.zip import _ZipSizeLimitError
+        exc = _ZipSizeLimitError("boom, see remediation")
+        assert exc.public_message == str(exc) == "boom, see remediation"
 
 
 class TestBuildProjectZip:
@@ -141,7 +168,7 @@ class TestExportProjectZip:
                 assert status == 404
 
     def test_project_too_large(self, tmp_path):
-        from quodeq.api.zip import export_project_zip
+        from quodeq.api.zip import export_project_zip, _ZipSizeLimitError
         from flask import Flask
         project = tmp_path / "big"
         project.mkdir()
@@ -149,11 +176,61 @@ class TestExportProjectZip:
 
         app = Flask(__name__)
         with app.app_context():
-            with patch("quodeq.api.zip._build_project_zip", side_effect=ValueError("too big")):
+            with patch(
+                "quodeq.api.zip._build_project_zip",
+                side_effect=_ZipSizeLimitError("too big, see remediation"),
+            ):
                 resp = export_project_zip("big", str(tmp_path))
-                if isinstance(resp, tuple):
-                    _, status = resp
-                    assert status == 413
+                assert isinstance(resp, tuple)
+                response, status = resp
+                assert status == 413
+                assert response.get_json()["error"] == "too big, see remediation"
+
+    def test_project_too_large_keeps_the_limit_error_message(self, tmp_path):
+        """The response body must keep _ZipLimits' own message (MB figure +
+        remediation), not the generic "Project too large to export" text."""
+        from quodeq.api.zip import export_project_zip
+        from flask import Flask
+        project = tmp_path / "big"
+        project.mkdir()
+        (project / "file.txt").write_text("x" * 1000)
+
+        app = Flask(__name__)
+        with app.app_context():
+            with patch("quodeq.api.zip._max_zip_size_bytes", return_value=10):
+                resp = export_project_zip("big", str(tmp_path))
+                assert isinstance(resp, tuple)
+                response, status = resp
+                assert status == 413
+                message = response.get_json()["error"]
+                assert "MB" in message
+                assert "QUODEQ_MAX_ZIP_SIZE_MB" in message
+                assert message != "Project too large to export"
+
+    def test_other_value_error_answers_a_coded_json_body(self, tmp_path, monkeypatch):
+        """zipfile raises ValueErrors of its own (for example "ZIP does not
+        support timestamps before 1980" from zf.write under the default
+        strict_timestamps=True). Those must get the same coded JSON body as an
+        OSError, not Flask's default 500 HTML page with no code."""
+        from quodeq.api.zip import export_project_zip
+        from flask import Flask
+        project = tmp_path / "proj"
+        project.mkdir()
+        (project / "file.txt").write_text("x")
+
+        def _raise_value_error(*_args, **_kwargs):
+            raise ValueError("x")
+
+        monkeypatch.setattr(zipfile.ZipFile, "write", _raise_value_error)
+        app = Flask(__name__)
+        with app.app_context():
+            resp = export_project_zip("proj", str(tmp_path))
+        assert isinstance(resp, tuple)
+        response, status = resp
+        assert status == 500
+        body = response.get_json()
+        assert body["code"] == "EXPORT_ERROR"
+        assert "x" != body["error"], "the exception text must not be echoed"
 
     def test_os_error(self, tmp_path):
         from quodeq.api.zip import export_project_zip

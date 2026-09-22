@@ -11,12 +11,13 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
 import { t } from '../../../strings/index.js';
+import { DATA_THEME_ATTR, PROJECT_SOURCE } from '../../../constants.js';
 
 // data-theme attr for forcing the viz dark while the app is light: keep the
 // active theme family, swap the mode suffix. Attribute values: absent =
 // daruma family in system mode; otherwise 'light' | 'dark' | '<family>-<mode>'.
 function getDarkThemeAttr() {
-  const attr = document.documentElement.getAttribute('data-theme') || '';
+  const attr = document.documentElement.getAttribute(DATA_THEME_ATTR) || '';
   const family = attr.replace(/-?(dark|light)$/, '') || 'daruma';
   return family === 'daruma' ? 'dark' : `${family}-dark`;
 }
@@ -128,12 +129,12 @@ function MapBreadcrumb({ path, onNavigate, projectName }) {
 
 function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }) {
   const appIsDark = useThemeIsDark();
-  const { vizStyle, viewMode, galaxyMode, setGalaxyMode } = vizState;
+  const { vizStyle, viewMode, galaxyMode } = vizState;
   const { node, fullTree, currentPath, onPathChange } = treeState;
   const { onDrillDown, onFileClick, onNavigate, onBreadcrumbNav } = callbacks;
   const { showLabels, setShowLabels, darkMode, setDarkMode, breadcrumb, resetKey, projectName, standardTypes } = display;
   return (
-    <div className="map-viz-container" {...(darkMode && !appIsDark ? { 'data-theme': getDarkThemeAttr() } : {})}>
+    <div className="map-viz-container" {...(darkMode && !appIsDark ? { [DATA_THEME_ATTR]: getDarkThemeAttr() } : {})}>
       {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} projectName={projectName} />}
       <div className="map-viz-toggles">
         <label className="map-label-toggle">
@@ -149,8 +150,8 @@ function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }
       </div>
       {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
       {vizStyle === 'zoompack' && <ZoomablePackView node={fullTree} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} currentPath={currentPath} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={fullTree} currentPath={currentPath} onPathChange={onPathChange} onFileClick={onFileClick} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={fullTree} currentPath={currentPath} onPathChange={onPathChange} onFileClick={onFileClick} showLabels={showLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} />}
     </div>
   );
 }
@@ -164,9 +165,99 @@ function MapEmpty({ sub, children, refreshing }) {
   );
 }
 
+function MapLoadingState() {
+  return (
+    <MapEmpty sub="loading…">
+      <LoadingScreen variant="inline" />
+    </MapEmpty>
+  );
+}
+
+function MapErrorState({ error, onRetry }) {
+  return (
+    <MapEmpty sub="error">
+      <EmptyState
+        title={t('map.projectLoadFailed')}
+        description={error}
+        actionLabel="Retry"
+        onAction={() => onRetry?.()}
+      />
+    </MapEmpty>
+  );
+}
+
+function MapNoEvaluationsState({ selectedSource, selectedProject, projectName, isRefreshing, onNavigate }) {
+  // Shared projects are read-only in the app -- evaluations only ever run
+  // locally, so "Start evaluation" has nowhere useful to send a
+  // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
+  // precedent this mirrors).
+  if (selectedSource === PROJECT_SOURCE.SHARED) {
+    return (
+      <MapEmpty sub={t('map.subNoEvaluations')} refreshing={isRefreshing}>
+        <EmptyState
+          title={t('map.noCompletedEvaluation')}
+          description={t('map.noCompletedRemote')}
+        />
+      </MapEmpty>
+    );
+  }
+  return (
+    <MapEmpty sub={t('map.subNoEvaluations')} refreshing={isRefreshing}>
+      <EmptyState
+        title={t('map.noEvaluationsYet')}
+        description={t('map.runEvaluationDesc', { project: projectName || selectedProject })}
+        actionLabel={t('map.startEvaluation')}
+        onAction={() => onNavigate?.('evaluate')}
+      />
+    </MapEmpty>
+  );
+}
+
+// A failed fetch with nothing to show must render as an error, not the
+// "no evaluations yet" empty state -- otherwise a 404/500/timeout tells
+// the user their existing evaluations are gone. While a retry is in
+// flight (error still set, isFetching true), show the loader instead so
+// clicking Retry visibly does something.
+function MapNoDimensionsState({ loading, error, isFetching, selectedSource, selectedProject, projectName, isRefreshing, onNavigate, onRetry }) {
+  if (loading) return <MapLoadingState />;
+  if (error) return isFetching ? <MapLoadingState /> : <MapErrorState error={error} onRetry={onRetry} />;
+  return (
+    <MapNoEvaluationsState
+      selectedSource={selectedSource} selectedProject={selectedProject} projectName={projectName}
+      isRefreshing={isRefreshing} onNavigate={onNavigate}
+    />
+  );
+}
+
+function MapNoProjectsState({ onNavigate }) {
+  return (
+    <MapEmpty sub={t('map.subNoProjects')}>
+      <EmptyState
+        title={t('map.noProjectsYet')}
+        description={t('map.addProjectDesc')}
+        actionLabel={t('map.addProject')}
+        onAction={() => onNavigate?.('projects')}
+      />
+    </MapEmpty>
+  );
+}
+
+function MapNoProjectSelectedState({ onNavigate }) {
+  return (
+    <MapEmpty sub={t('map.subNoProjectSelected')}>
+      <EmptyState
+        title={t('map.noProjectSelected')}
+        description={t('map.pickProjectDesc')}
+        actionLabel={t('map.chooseProject')}
+        onAction={() => onNavigate?.('projects')}
+      />
+    </MapEmpty>
+  );
+}
+
 export default function MapPage(props) {
   const { data = {}, callbacks = {} } = props;
-  const { projects = [], projectsLoaded, selectedProject, selectedSource = 'local', projectName, loading, isFetching, error } = data;
+  const { projects = [], projectsLoaded, selectedProject, selectedSource = PROJECT_SOURCE.LOCAL, projectName, loading, isFetching, error } = data;
   const { onNavigate, onRetry } = callbacks;
 
   // Call the hook unconditionally to keep hook order stable across renders.
@@ -175,86 +266,16 @@ export default function MapPage(props) {
   const state = useMapPageState(props);
 
   if (!projectsLoaded) return <LoadingScreen />;
-  if (projects.length === 0 && selectedSource !== 'shared') {
-    return (
-      <MapEmpty sub={t('map.subNoProjects')}>
-        <EmptyState
-          title={t('map.noProjectsYet')}
-          description={t('map.addProjectDesc')}
-          actionLabel={t('map.addProject')}
-          onAction={() => onNavigate?.('projects')}
-        />
-      </MapEmpty>
-    );
-  }
-  if (!selectedProject) {
-    return (
-      <MapEmpty sub={t('map.subNoProjectSelected')}>
-        <EmptyState
-          title={t('map.noProjectSelected')}
-          description={t('map.pickProjectDesc')}
-          actionLabel={t('map.chooseProject')}
-          onAction={() => onNavigate?.('projects')}
-        />
-      </MapEmpty>
-    );
-  }
+  if (projects.length === 0 && selectedSource !== PROJECT_SOURCE.SHARED) return <MapNoProjectsState onNavigate={onNavigate} />;
+  if (!selectedProject) return <MapNoProjectSelectedState onNavigate={onNavigate} />;
   const isRefreshing = isFetching && !loading;
   if (state.allDimensions.length === 0) {
-    if (loading) {
-      return (
-        <MapEmpty sub="loading…">
-          <LoadingScreen variant="inline" />
-        </MapEmpty>
-      );
-    }
-    // A failed fetch with nothing to show must render as an error, not the
-    // "no evaluations yet" empty state -- otherwise a 404/500/timeout tells
-    // the user their existing evaluations are gone. While a retry is in
-    // flight (error still set, isFetching true), show the loader instead so
-    // clicking Retry visibly does something.
-    if (error) {
-      if (isFetching) {
-        return (
-          <MapEmpty sub="loading…">
-            <LoadingScreen variant="inline" />
-          </MapEmpty>
-        );
-      }
-      return (
-        <MapEmpty sub="error">
-          <EmptyState
-            title={t('map.projectLoadFailed')}
-            description={error}
-            actionLabel="Retry"
-            onAction={() => onRetry?.()}
-          />
-        </MapEmpty>
-      );
-    }
-    // Shared projects are read-only in the app -- evaluations only ever run
-    // locally, so "Start evaluation" has nowhere useful to send a
-    // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
-    // precedent this mirrors).
-    if (selectedSource === 'shared') {
-      return (
-        <MapEmpty sub={t('map.subNoEvaluations')} refreshing={isRefreshing}>
-          <EmptyState
-            title={t('map.noCompletedEvaluation')}
-            description={t('map.noCompletedRemote')}
-          />
-        </MapEmpty>
-      );
-    }
     return (
-      <MapEmpty sub={t('map.subNoEvaluations')} refreshing={isRefreshing}>
-        <EmptyState
-          title={t('map.noEvaluationsYet')}
-          description={t('map.runEvaluationDesc', { project: projectName || selectedProject })}
-          actionLabel={t('map.startEvaluation')}
-          onAction={() => onNavigate?.('evaluate')}
-        />
-      </MapEmpty>
+      <MapNoDimensionsState
+        loading={loading} error={error} isFetching={isFetching} selectedSource={selectedSource}
+        selectedProject={selectedProject} projectName={projectName} isRefreshing={isRefreshing}
+        onNavigate={onNavigate} onRetry={onRetry}
+      />
     );
   }
 
@@ -267,7 +288,7 @@ export default function MapPage(props) {
         <TermHeader
           name="map"
           sub={`${viol} violation${viol !== 1 ? 's' : ''} · ratio ${ratio}`}
-          badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
+          badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
         />
         <MapControls viewState={state.viewState} galaxyState={state.galaxyState} dimensionState={state.dimensionState} />
       </div>

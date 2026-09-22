@@ -9,6 +9,7 @@ the concrete default preserved.
 from __future__ import annotations
 
 import threading
+import time
 from types import SimpleNamespace
 
 from quodeq.data.projection.engine import ProjectionEngine
@@ -96,15 +97,37 @@ def test_projector_rebuild_decision_via_injected_store(tmp_path):
     assert [c[0] for c in engine.calls] == ["rebuild", "update"]
 
 
-def test_ensure_lock_registry_shares_and_clears(tmp_path):
+def test_ensure_lock_registry_serializes_concurrent_acquires_for_same_dir(tmp_path):
     from quodeq.data.projection.projector import EnsureLockRegistry
 
     reg = EnsureLockRegistry()
-    a = reg.lock_for(tmp_path)
-    assert reg.lock_for(tmp_path) is a
-    assert isinstance(a, type(threading.Lock()))
-    reg.clear()
-    assert reg.lock_for(tmp_path) is not a
+    order = []
+
+    def worker(tag):
+        with reg.acquire(tmp_path):
+            order.append(f"{tag}-enter")
+            time.sleep(0.01)
+            order.append(f"{tag}-exit")
+
+    t1 = threading.Thread(target=worker, args=("a",))
+    t2 = threading.Thread(target=worker, args=("b",))
+    t1.start()
+    time.sleep(0.002)  # let t1 win the race to acquire first
+    t2.start()
+    t1.join()
+    t2.join()
+
+    # Whichever thread entered first must have exited before the other entered.
+    assert order[1] == order[0].replace("enter", "exit")
+
+
+def test_ensure_lock_registry_drops_entry_after_release(tmp_path):
+    from quodeq.data.projection.projector import EnsureLockRegistry
+
+    reg = EnsureLockRegistry()
+    with reg.acquire(tmp_path):
+        assert len(reg._locks) == 1
+    assert len(reg._locks) == 0, "registry must not keep growing after release"
 
 
 def test_ensure_projected_uses_injected_locks_and_store(tmp_path):
@@ -118,9 +141,9 @@ def test_ensure_projected_uses_injected_locks_and_store(tmp_path):
             super().__init__()
             self.asked = []
 
-        def lock_for(self, run_dir):
+        def acquire(self, run_dir):
             self.asked.append(run_dir)
-            return super().lock_for(run_dir)
+            return super().acquire(run_dir)
 
     store = _FakeStore()
     store.projected_size = log.stat().st_size  # fresh -> early no-op return

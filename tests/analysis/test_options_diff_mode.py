@@ -1,7 +1,7 @@
 """Tests for diff-mode fields on AnalysisOptions."""
 from __future__ import annotations
 
-from quodeq.analysis._types import AnalysisOptions
+from quodeq.analysis.run_types import AnalysisOptions
 
 
 def test_diff_from_defaults_to_none() -> None:

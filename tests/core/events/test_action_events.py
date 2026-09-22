@@ -10,6 +10,7 @@ from quodeq.core.events.models import (
     FindingUndismissed,
     FindingUndismissedEvent,
 )
+from quodeq.data.events.codec import event_to_json
 
 
 def test_finding_dismissed_payload_required_fields():
@@ -42,8 +43,25 @@ def test_event_model_map_includes_new_events():
 
 def test_finding_dismissed_event_round_trips_through_json():
     event = FindingDismissedEvent(payload=FindingDismissed(req="R1", file="a.py", line=10, reason="x"))
-    line = event.model_dump_json()
+    line = event_to_json(event)
     data = json.loads(line)
     assert data["event_type"] == "FINDING_DISMISSED"
     assert data["payload"]["req"] == "R1"
     assert data["payload"]["reason"] == "x"
+    assert data["payload"]["fingerprint"] is None
+
+
+def test_fingerprint_round_trips_and_legacy_lines_decode_without_it():
+    from quodeq.data.events.codec import event_from_dict
+
+    event = FindingDismissedEvent(payload=FindingDismissed(
+        req="R1", file="a.py", line=10, fingerprint="ab" * 32))
+    decoded = event_from_dict(FindingDismissedEvent, json.loads(event_to_json(event)))
+    assert decoded.payload.fingerprint == "ab" * 32
+
+    legacy = {
+        "event_id": str(event.event_id), "timestamp": "2026-07-24T10:00:00Z",
+        "event_type": "FINDING_UNDISMISSED",
+        "payload": {"req": "R1", "file": "a.py", "line": 10},
+    }
+    assert event_from_dict(FindingUndismissedEvent, legacy).payload.fingerprint is None

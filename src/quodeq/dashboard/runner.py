@@ -8,22 +8,26 @@ Sub-modules:
 from __future__ import annotations
 
 import logging
-import os
+import sys
+from collections.abc import MutableMapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import subprocess
 
 from quodeq.dashboard._api_health import ApiConfig
-from quodeq.dashboard._build import maybe_build_ui
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
-from quodeq.dashboard._networking import _choose_ui_port, _is_port_open
-from quodeq.dashboard._process import _kill_stale_action_api
+from quodeq.dashboard._networking import _choose_ui_port
+from quodeq.dashboard._probes import ApiProbes, DashboardHooks
 from quodeq.dashboard import _server as _server_mod
 from quodeq.dashboard._server import (
     _ensure_action_api,
     _ensure_action_api_forced,
 )
+from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.paths import resolve_path
-from quodeq.shared.prereqs import check_dashboard_dev_prereqs
 
 __all__ = [
     "BuildConfig",
@@ -48,8 +52,11 @@ def validate_paths(config: DashboardConfig) -> None:
         raise FileNotFoundError("Static dist missing index.html. Run without --no-build to build.")
 
 
-def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
+def _resolve_paths_and_build(
+    config: DashboardConfig, *, hooks: DashboardHooks | None = None,
+) -> DashboardConfig:
     """Resolve paths, check prerequisites, build UI if needed, choose a free port."""
+    hooks = hooks or DashboardHooks()
     reports_dir = resolve_path(str(config.reports_dir))
     repo_root = resolve_path(str(config.repo_root))
 
@@ -58,16 +65,16 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
         log_warning(f"Port {config.server.port} is in use. Using {chosen_port} instead.")
 
     if config.build.dev:
-        check_dashboard_dev_prereqs()
-        static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall, dev=True)
+        hooks.check_prereqs()
+        static_dist = hooks.build_ui(config.build.no_build, config.build.reinstall, dev=True)
     elif not config.static_dist_defaulted:
         user_provided_dist = resolve_path(str(config.static_dist))
         if (user_provided_dist / "index.html").exists():
             static_dist = user_provided_dist
         else:
-            static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
+            static_dist = hooks.build_ui(config.build.no_build, config.build.reinstall)
     else:
-        static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
+        static_dist = hooks.build_ui(config.build.no_build, config.build.reinstall)
 
     return DashboardConfig(
         server=ServerConfig(
@@ -86,23 +93,29 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
 
 def _start_action_api(
     config: DashboardConfig,
-    action_api_host: str,
-    action_api_port: int,
     api_config: ApiConfig,
+    *,
+    probes: ApiProbes | None = None,
+    hooks: DashboardHooks | None = None,
 ) -> tuple[str, "subprocess.Popen | None"]:
     """Resolve and start the action API, returning (url, process).
 
-    Handles both forced-port and auto-scan modes, including killing stale
-    processes when not in forced mode.
+    The API host and port come from ``config.server``: the host falls back to
+    the configured default, the port to the UI port. Handles both forced-port
+    and auto-scan modes, including killing stale processes when not in forced
+    mode.
     """
+    hooks = hooks or DashboardHooks()
+    action_api_host = config.server.api_host or _get_default_host()
+    action_api_port = config.server.api_port or config.server.port
     if config.server.api_forced:
         return _ensure_action_api_forced(
             action_api_host, action_api_port, static_dist=api_config.static_dist,
-            evaluations_dir=api_config.evaluations_dir,
+            evaluations_dir=api_config.evaluations_dir, probes=probes,
         )
-    _kill_stale_action_api(action_api_host, action_api_port)
+    hooks.kill_stale(action_api_host, action_api_port)
     return _ensure_action_api(
-        action_api_host, action_api_port, api_config=api_config,
+        action_api_host, action_api_port, api_config=api_config, probes=probes,
     )
 
 
@@ -134,6 +147,40 @@ def _handed_off_to_running_instance(config: DashboardConfig) -> bool:
     return True
 
 
+def _maybe_spawn_menubar() -> None:
+    """Launch the menu bar icon when the preference is on. Fail-soft.
+
+    Only a real dashboard launch calls this; direct --_api invocations and
+    the Settings toggle (PUT /api/menubar) have their own paths.
+    """
+    try:
+        from quodeq.menubar import control, state
+
+        if control.is_supported() and state.is_enabled():
+            control.spawn()
+    except Exception:
+        logging.getLogger(__name__).debug("menubar spawn skipped", exc_info=True)
+
+
+def _prepare_frozen_macos_launch() -> bool:
+    """Packaged-app housekeeping before anything spawns. Fail-silent.
+
+    Cleans staging leftovers from an interrupted self-update, then offers the
+    move-to-Applications prompt when running from the DMG or a translocated
+    path. True means the app relaunched from /Applications: exit this process.
+    """
+    if not (getattr(sys, "frozen", False) and sys.platform == "darwin"):
+        return False
+    try:
+        from quodeq.update import first_launch, selfupdate
+
+        selfupdate.cleanup_stale_staging()
+        return first_launch.offer_move_to_applications()
+    except Exception:  # pragma: no cover - defensive
+        logging.getLogger(__name__).debug("frozen macOS app preparation failed", exc_info=True)
+        return False
+
+
 def _kick_update_check() -> None:
     """Fire a throttled, non-blocking update check. Fail-silent — never delays launch."""
     try:
@@ -141,38 +188,73 @@ def _kick_update_check() -> None:
 
         check_async()
     except Exception:  # pragma: no cover - defensive
-        pass
+        logging.getLogger(__name__).debug("async update check failed", exc_info=True)
 
 
-def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) -> int:
-    """Start the dashboard: resolve paths, launch the action API, and serve until exit.
-
-    *env* overrides ``os.environ`` when provided (useful for testing).
-    """
-    config = _resolve_paths_and_build(config)
-    validate_paths(config)
-
-    if env is not None:
-        environ = env.copy()
-    else:
-        environ = os.environ
+def _resolve_environ(
+    config: DashboardConfig, env: MutableMapping[str, str] | None,
+) -> MutableMapping[str, str]:
+    """Apply config-derived variables to *env* (``os.environ`` by default) and return it."""
+    environ: MutableMapping[str, str] = resolve_env_mut(env)
     if config.build.verbose:
         environ["QUODEQ_VERBOSE"] = "1"
+    return environ
 
-    if _handed_off_to_running_instance(config):
-        return 0
 
+def _log_startup_banner(config: DashboardConfig) -> None:
     log_info("Starting dashboard...")
     log_info(f"Reports: {config.reports_dir}")
     log_info(f"Static:  {config.static_dist}")
     log_info(f"Port:    {config.server.port}")
 
-    action_api_host = config.server.api_host or _get_default_host()
-    action_api_port = config.server.api_port or config.server.port
+
+def _start_action_api_for(
+    config: DashboardConfig, probes: ApiProbes | None, hooks: DashboardHooks,
+) -> tuple[str, "subprocess.Popen | None"]:
     api_config = ApiConfig(static_dist=config.static_dist, evaluations_dir=str(config.reports_dir))
-    action_api_url, action_api_process = _start_action_api(config, action_api_host, action_api_port, api_config)
+    ensure_api = hooks.ensure_api or _start_action_api
+    return ensure_api(config, api_config, probes=probes, hooks=hooks)
 
+
+def _prepare_launch(
+    config: DashboardConfig, env: dict[str, str] | None, hooks: DashboardHooks,
+) -> DashboardConfig:
+    """Resolve paths and build the UI, validate them, and apply the environment."""
+    config = _resolve_paths_and_build(config, hooks=hooks)
+    validate_paths(config)
+    _resolve_environ(config, env)
+    return config
+
+
+def _launch_preempted(config: DashboardConfig) -> bool:
+    """True when this process should exit before starting a server of its own."""
+    return _prepare_frozen_macos_launch() or _handed_off_to_running_instance(config)
+
+
+def _start_background_tasks() -> None:
     _kick_update_check()
+    _maybe_spawn_menubar()
 
+
+def run_dashboard(
+    config: DashboardConfig,
+    env: dict[str, str] | None = None,
+    *,
+    probes: ApiProbes | None = None,
+    hooks: DashboardHooks | None = None,
+) -> int:
+    """Start the dashboard: resolve paths, launch the action API, and serve until exit.
+
+    *env* overrides ``os.environ`` when provided (useful for testing).
+    *probes* and *hooks* are injection seams for tests: each defaults to the
+    production collaborators of the same name (see ``dashboard/_probes.py``).
+    """
+    hooks = hooks or DashboardHooks()
+    config = _prepare_launch(config, env, hooks)
+    if _launch_preempted(config):
+        return 0
+    _log_startup_banner(config)
+    action_api_url, action_api_process = _start_action_api_for(config, probes, hooks)
+    _start_background_tasks()
     _server_mod.serve_and_wait(action_api_url, action_api_process, config)
     return 0

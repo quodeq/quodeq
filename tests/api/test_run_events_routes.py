@@ -42,6 +42,27 @@ def test_route_returns_404_for_unknown_job(app: Flask):
     assert resp.status_code in (404, 410)
 
 
+def test_unresolvable_job_reports_gone_code_not_not_found(app: Flask):
+    """finding 6509: job_id resolves to no run dir -> 410, and the JSON
+    ``code`` field must say GONE, not the hardcoded NOT_FOUND that used
+    to be returned regardless of the actual HTTP status."""
+    client = app.test_client()
+    resp = client.get("/api/evaluations/bogus/events")
+    assert resp.status_code == 410
+    assert resp.get_json()["code"] == "GONE"
+
+
+def test_unsupported_provider_reports_not_found_code():
+    """A provider that doesn't implement get_log_run_dir at all is a
+    different failure than a cleaned-up run -- code stays NOT_FOUND."""
+    bare_app = Flask(__name__)
+    bare_app.config["_provider"] = object()
+    register_run_events_routes(bare_app)
+    resp = bare_app.test_client().get("/api/evaluations/job-1/events")
+    assert resp.status_code == 404
+    assert resp.get_json()["code"] == "NOT_FOUND"
+
+
 def test_route_returns_text_event_stream(app: Flask):
     run_dir: Path = app.config["_run_dir"]
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
@@ -52,9 +73,8 @@ def test_route_returns_text_event_stream(app: Flask):
     assert resp.headers.get("Cache-Control") == "no-cache"
 
 
-def test_route_emits_status_event_for_running_run(app: Flask):
-    import os
-    os.environ["QUODEQ_SSE_TICK_MS"] = "0"
+def test_route_emits_status_event_for_running_run(app: Flask, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")
     run_dir: Path = app.config["_run_dir"]
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
     client = app.test_client()
@@ -64,9 +84,8 @@ def test_route_emits_status_event_for_running_run(app: Flask):
     assert "event: done" in body
 
 
-def test_route_honors_last_event_id_header(app: Flask):
-    import os
-    os.environ["QUODEQ_SSE_TICK_MS"] = "0"
+def test_route_honors_last_event_id_header(app: Flask, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("QUODEQ_SSE_TICK_MS", "0")
     run_dir: Path = app.config["_run_dir"]
     (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
 

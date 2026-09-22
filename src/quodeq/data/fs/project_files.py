@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import shutil
 from pathlib import Path
 
 from quodeq.core.types.scan import ScanData
@@ -20,10 +21,19 @@ REPOSITORY_INFO_FILENAME = "repository_info.json"
 SCAN_FILENAME = "scan.json"
 
 
-def read_repository_info(project_dir: Path) -> dict | None:
-    """Parsed ``repository_info.json``, or None when absent, corrupt, or
-    not a JSON object."""
-    path = project_dir / REPOSITORY_INFO_FILENAME
+def repository_info_exists(project_dir: Path) -> bool:
+    """True when ``repository_info.json`` exists.
+
+    Pure presence probe — an unreadable record still marks the directory
+    as a registered project, so callers that only need "is this a
+    project?" must not fold it into :func:`read_repository_info`'s
+    None-on-corrupt contract.
+    """
+    return (project_dir / REPOSITORY_INFO_FILENAME).exists()
+
+
+def _read_json_object(path: Path) -> dict | None:
+    """Parsed JSON object at *path*, or None when absent, corrupt, or not an object."""
     if not path.exists():
         return None
     try:
@@ -31,6 +41,12 @@ def read_repository_info(project_dir: Path) -> dict | None:
     except (json.JSONDecodeError, OSError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def read_repository_info(project_dir: Path) -> dict | None:
+    """Parsed ``repository_info.json``, or None when absent, corrupt, or
+    not a JSON object."""
+    return _read_json_object(project_dir / REPOSITORY_INFO_FILENAME)
 
 
 def write_repository_info(project_dir: Path, data: dict) -> bool:
@@ -43,8 +59,33 @@ def write_repository_info(project_dir: Path, data: dict) -> bool:
     return True
 
 
+def read_scan_total_files(project_dir: Path) -> int:
+    """``total_files`` from ``scan.json``; 0 when absent, corrupt, or non-int."""
+    try:
+        data = json.loads((project_dir / SCAN_FILENAME).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return 0
+    raw = data.get("total_files") if isinstance(data, dict) else None
+    return int(raw) if isinstance(raw, int) else 0
+
+
 def write_scan_json(scan: ScanData, output_dir: Path) -> None:
     """Persist scan data as ``scan.json``, creating *output_dir* if needed."""
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(dataclasses.asdict(scan), indent=2)
     (output_dir / SCAN_FILENAME).write_text(payload, encoding="utf-8")
+
+
+def read_scan_json(project_dir: Path) -> dict | None:
+    """Parsed ``scan.json``, or None when absent, corrupt, or not a JSON
+    object. Mirrors :func:`read_repository_info`'s contract."""
+    return _read_json_object(project_dir / SCAN_FILENAME)
+
+
+def remove_project_dir(project_dir: Path) -> bool:
+    """Remove *project_dir* and everything under it. False on failure."""
+    try:
+        shutil.rmtree(project_dir)
+    except OSError:
+        return False
+    return True

@@ -35,8 +35,8 @@ export const GROUP_PLAN_OUTPUT = [
 
 export const FIX_HINTS = {
   // Maintainability
-  'M-ANA-1': 'Split file or extract code to a new module to reduce line count below 300',
-  'M-ANA-2': 'Extract a helper function to bring the function under 50 lines',
+  'M-ANA-1': 'Split the file or extract code to a new module to bring it under the line limit',
+  'M-ANA-2': 'Extract a helper function to bring the function under the line limit',
   'M-ANA':   'Improve code clarity — reduce nesting, add structure, simplify control flow',
   'M-MOD-1': 'Reduce callees by extracting a helper that groups related calls',
   'M-MOD-4': 'Group related parameters into an object or dataclass (max 5)',

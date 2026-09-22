@@ -20,6 +20,8 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
+import { runEventsUrl } from "../../../api/evaluations.js";
+import { createViolation } from "../../../models/violation.js";
 
 // Cap the per-job findings array so a long-running scan with tens of thousands
 // of findings does not grow the React Query cache without bound. The dashboard
@@ -41,6 +43,69 @@ function appendBoundedFinding(prev, data) {
   return [...prev, data];
 }
 
+function wireRunEventSource({ source, jobId, writeCache, queryClient }) {
+  source.addEventListener("status", (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      writeCache(evaluationKeys.status(jobId), data);
+      if (data && TERMINAL_STATES.has(data.state)) {
+        // Run just hit a terminal state -- the trend's view of this run is
+        // about to flip from "in-progress / partial" to "terminal / final".
+        // Invalidate the project subtree so the History row rerenders against
+        // the freshly-fetched trend instead of staying on the SSE-fed live
+        // dim cache for an unbounded time.
+        queryClient.invalidateQueries({ queryKey: projectKeys.all() });
+      }
+    } catch (err) {
+      // malformed frame; reconnect handles recovery via Last-Event-ID
+      console.warn("[useRunEventStream] could not parse status frame:", err);
+    }
+  });
+
+  source.addEventListener("dimension-completed", (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      writeCache(
+        evaluationKeys.dimensions(jobId),
+        (prev = {}) => ({ ...prev, [data.dimension]: data }),
+      );
+    } catch (err) {
+      console.warn("[useRunEventStream] could not parse dimension-completed frame:", err);
+    }
+  });
+
+  source.addEventListener("finding", (e) => {
+    try {
+      // Normalised on the way in, so the cache holds one shape whichever
+      // path filled it. The frame is snake_case straight off the payload
+      // (practice_id, carried_forward), unlike the REST paths. Merged onto
+      // the raw frame rather than replacing it, so id/verdict/confidence,
+      // which the model does not carry, survive for other readers.
+      const raw = JSON.parse(e.data);
+      const data = { ...raw, ...createViolation(raw) };
+      writeCache(
+        evaluationKeys.findings(jobId),
+        (prev = []) => appendBoundedFinding(prev, data),
+      );
+    } catch (err) {
+      console.warn("[useRunEventStream] could not parse finding frame:", err);
+    }
+  });
+
+  source.addEventListener("done", () => {
+    source.close();
+  });
+}
+
+/**
+ * Subscribes to a run's SSE stream and writes status, dimensions and findings
+ * straight into the query caches, so the screens reading those keys update
+ * without polling.
+ *
+ * No-op when the job id is absent or SSE is disabled (VITE_USE_SSE_EVENTS),
+ * in which case the polling queries cover it. The stream is closed on unmount
+ * and when the run finishes.
+ */
 export function useRunEventStream(jobId) {
   const queryClient = useQueryClient();
 
@@ -49,56 +114,17 @@ export function useRunEventStream(jobId) {
     if (!jobId) return undefined;
 
     const writeCache = (key, updater) => {
-      queryClient.cancelQueries({ queryKey: key });
+      // Fire-and-forget by design (see file-level comment): the setQueryData
+      // write below must not wait on the cancel. Still log a rejection
+      // instead of letting it vanish as an unhandled promise rejection.
+      queryClient.cancelQueries({ queryKey: key }).catch((err) => {
+        console.warn('[useRunEventStream] cancelQueries failed:', err);
+      });
       queryClient.setQueryData(key, updater);
     };
 
-    const source = new EventSource(`/api/evaluations/${jobId}/events`);
-
-    source.addEventListener("status", (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        writeCache(evaluationKeys.status(jobId), data);
-        if (data && TERMINAL_STATES.has(data.state)) {
-          // Run just hit a terminal state -- the trend's view of this run is
-          // about to flip from "in-progress / partial" to "terminal / final".
-          // Invalidate the project subtree so the History row rerenders against
-          // the freshly-fetched trend instead of staying on the SSE-fed live
-          // dim cache for an unbounded time.
-          queryClient.invalidateQueries({ queryKey: projectKeys.all() });
-        }
-      } catch {
-        // ignore malformed frames; reconnect handles recovery via Last-Event-ID
-      }
-    });
-
-    source.addEventListener("dimension-completed", (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        writeCache(
-          evaluationKeys.dimensions(jobId),
-          (prev = {}) => ({ ...prev, [data.dimension]: data }),
-        );
-      } catch {
-        // ignore
-      }
-    });
-
-    source.addEventListener("finding", (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        writeCache(
-          evaluationKeys.findings(jobId),
-          (prev = []) => appendBoundedFinding(prev, data),
-        );
-      } catch {
-        // ignore
-      }
-    });
-
-    source.addEventListener("done", () => {
-      source.close();
-    });
+    const source = new EventSource(runEventsUrl(jobId));
+    wireRunEventSource({ source, jobId, writeCache, queryClient });
 
     return () => source.close();
   }, [jobId, queryClient]);

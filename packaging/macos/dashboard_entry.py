@@ -37,6 +37,11 @@ def main() -> int:
             webview_main()
             return 0
 
+        if flag == "--_menubar":
+            from quodeq.menubar.app import main as menubar_main
+            menubar_main()
+            return 0
+
         if flag == "--_evaluate":
             # Rewrite argv so the CLI sees [prog, "evaluate", ...args]
             sys.argv = [sys.argv[0]] + sys.argv[2:]

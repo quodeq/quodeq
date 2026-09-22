@@ -1,13 +1,13 @@
 """Read scored dimensions for a single run from disk, with an LRU cache."""
 from __future__ import annotations
 
-import os
 import threading
 from collections import OrderedDict
 from pathlib import Path
 
 from quodeq.core.types import DimensionResult
-from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.shared.env_resolve import resolve_env
 
 _FALLBACK_CACHE_MAX = 256
 
@@ -24,20 +24,22 @@ def _resolve_cache_max(env: dict[str, str] | None = None) -> int:
     Env-injection seam (not an import-time constant) so tests and callers
     can vary the ceiling without reloading the module.
     """
-    raw = (env if env is not None else os.environ).get("QUODEQ_DEFAULT_CACHE_MAX", "")
+    raw = resolve_env(env).get("QUODEQ_DEFAULT_CACHE_MAX", "")
     return int(raw) if raw.isdigit() and int(raw) > 0 else _FALLBACK_CACHE_MAX
 
 
 def get_run_dimensions(
     reports_root: Path, project: str, run_id: str,
-    *, cache: OrderedDict | None = None,
-    cache_lock: threading.Lock | None = None,
-    cache_max: int | None = None,
+    *, ctx: DimensionCacheContext | None = None,
     env: dict[str, str] | None = None,
 ) -> list[DimensionResult]:
-    """Return dimension data for a single run, using the shared LRU cache."""
-    c = cache if cache is not None else _cache
-    lk = cache_lock if cache_lock is not None else _cache_lock
-    ceiling = cache_max if cache_max is not None else _resolve_cache_max(env)
-    fetcher = make_lru_dimension_fetcher(reports_root, project, c, lk, ceiling)
+    """Return dimension data for a single run, using the shared LRU cache.
+
+    *ctx* replaces the module-level cache, lock and ceiling with the caller's
+    own; without it the ceiling comes from ``QUODEQ_DEFAULT_CACHE_MAX`` in
+    *env* (``os.environ`` when None).
+    """
+    if ctx is None:
+        ctx = DimensionCacheContext(cache=_cache, lock=_cache_lock, max_size=_resolve_cache_max(env))
+    fetcher = make_lru_dimension_fetcher(reports_root, project, ctx)
     return fetcher(run_id)

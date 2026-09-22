@@ -8,18 +8,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
+from quodeq.analysis._loops import LoopDeps, run_incremental_loop, run_per_dimension_loop
 from quodeq.core.evidence.model import Evidence
 from quodeq.shared import cancellation
-
-
-@pytest.fixture(autouse=True)
-def _reset_cancel():
-    cancellation.reset()
-    yield
-    cancellation.reset()
 
 
 def _mk_config(tmp_path):
@@ -56,14 +47,14 @@ def _trip_on_first(calls):
     return fake_run
 
 
-@patch("quodeq.analysis._loops.emit_marker", lambda *a, **k: None)
+@patch("quodeq.analysis._loop_steps.emit_marker", lambda *a, **k: None)
 def test_incremental_loop_breaks_after_cancellation(tmp_path):
     calls: list[str] = []
     runner = MagicMock()
     runner.run.side_effect = _trip_on_first(calls)
     run_incremental_loop(
-        _mk_config(tmp_path), ["security", "flexibility", "usability"],
-        _mk_ctx(), runner=runner,
+        _mk_config(tmp_path), ["security", "flexibility", "usability"], _mk_ctx(),
+        LoopDeps(runner=runner),
     )
     assert calls == ["security"], "loop must stop after run-wide cancellation"
 
@@ -73,7 +64,7 @@ def test_per_dimension_loop_breaks_after_cancellation(tmp_path):
     runner = MagicMock()
     runner.run.side_effect = _trip_on_first(calls)
     run_per_dimension_loop(
-        _mk_config(tmp_path), ["security", "flexibility", "usability"],
-        _mk_ctx(), runner=runner,
+        _mk_config(tmp_path), ["security", "flexibility", "usability"], _mk_ctx(),
+        LoopDeps(runner=runner),
     )
     assert calls == ["security"], "loop must stop after run-wide cancellation"

@@ -51,7 +51,7 @@ def test_full_coverage_is_complete():
     deps = scoring.ScoringDeps(
         dismissed_keys=lambda pdir: {("R1", "a.py", 1)},
         deleted_keys=lambda pdir: set(),
-        rescore_runs_by_dimension=lambda dims, root, project, dismissed, deleted=None, params=None: {
+        rescore_runs_by_dimension=lambda dims, root, project, keys, params=None: {
             "security": {"overallScore": "7.5/10", "overallGrade": "Good"},
             "performance": {"overallScore": "8.2/10", "overallGrade": "Good"},
         },
@@ -70,7 +70,7 @@ def test_partial_coverage_is_flagged_incomplete():
     deps = scoring.ScoringDeps(
         dismissed_keys=lambda pdir: {("R1", "a.py", 1)},
         deleted_keys=lambda pdir: set(),
-        rescore_runs_by_dimension=lambda dims, root, project, dismissed, deleted=None, params=None: {
+        rescore_runs_by_dimension=lambda dims, root, project, keys, params=None: {
             "security": {"overallScore": "7.5/10", "overallGrade": "Good"},
         },
         recompute_summary=lambda dims, summary, params=None: summary,

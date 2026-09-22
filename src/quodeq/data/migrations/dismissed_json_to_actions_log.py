@@ -27,12 +27,51 @@ _logger = logging.getLogger(__name__)
 #: (not actions.jsonl's) is what makes the migration idempotent.
 MIGRATION_MARKER = ".dismissed_migrated"
 
-# One lock per project so a concurrent first read + first write can't double-fold.
-_migration_locks: dict[Path, threading.Lock] = defaultdict(threading.Lock)
+
+class _MigrationLocks:
+    """One lock per project so a concurrent first read + first write can't double-fold."""
+
+    def __init__(self) -> None:
+        self._locks: dict[Path, threading.Lock] = defaultdict(threading.Lock)
+
+    def for_project(self, project_dir: Path) -> threading.Lock:
+        return self._locks[project_dir]
+
+    def reset(self) -> None:
+        self._locks.clear()
 
 
-def migrate_if_needed(project_dir: Path) -> int:
-    """Fold dismissed.json into actions.jsonl exactly once. Returns count migrated."""
+#: Process-wide default; pass ``locks=`` to migrate_if_needed to isolate a test.
+_DEFAULT_LOCKS = _MigrationLocks()
+
+
+def _fold_legacy_entries(writer: ActionLogWriter, entries: list) -> int:
+    """Emit a FindingDismissed event for each legacy dismissed.json entry.
+
+    Tolerant per-entry: a malformed entry is logged and skipped rather than
+    aborting the whole fold.
+    """
+    count = 0
+    for entry in entries:
+        try:
+            payload = FindingDismissed(
+                req=str(entry.get("req", "")),
+                file=str(entry.get("file", "")),
+                line=int(entry.get("line", 0)),
+                reason=None,
+            )
+            writer.emit(FindingDismissedEvent(payload=payload))
+            count += 1
+        except Exception:
+            _logger.exception("Failed to migrate dismissed entry: %s", entry)
+    return count
+
+
+def migrate_if_needed(project_dir: Path, locks: _MigrationLocks | None = None) -> int:
+    """Fold dismissed.json into actions.jsonl exactly once. Returns count migrated.
+
+    *locks* overrides the process-wide lock table (``_DEFAULT_LOCKS``).
+    """
     marker = project_dir / MIGRATION_MARKER
     if marker.exists():
         return 0
@@ -43,7 +82,7 @@ def migrate_if_needed(project_dir: Path) -> int:
         # the two cheap exists() checks above keep this path negligible.
         return 0
 
-    with _migration_locks[project_dir]:
+    with (locks or _DEFAULT_LOCKS).for_project(project_dir):
         if marker.exists():  # another thread won the race
             return 0
 
@@ -58,20 +97,7 @@ def migrate_if_needed(project_dir: Path) -> int:
             return 0
 
         writer = ActionLogWriter(project_dir)
-        count = 0
-        for entry in entries:
-            try:
-                payload = FindingDismissed(
-                    req=str(entry.get("req", "")),
-                    file=str(entry.get("file", "")),
-                    line=int(entry.get("line", 0)),
-                    reason=None,
-                )
-                writer.emit(FindingDismissedEvent(payload=payload))
-                count += 1
-            except Exception:
-                _logger.exception("Failed to migrate dismissed entry: %s", entry)
-                continue
+        count = _fold_legacy_entries(writer, entries)
 
         # Mark last: a crash mid-fold leaves the marker absent so the next call
         # re-folds. Re-folding only appends duplicate FindingDismissed events,

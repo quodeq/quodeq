@@ -1,32 +1,15 @@
 """Prompt construction for subagent analysis."""
 from __future__ import annotations
 
-from typing import Any
-
-from quodeq.analysis._types import RunConfig
-from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
+from quodeq.analysis.prompts.builder import build_analysis_prompt, prompt_context
 
 
 def _build_subagent_prompt(
-    config: RunConfig, dim_id: str, ctx: Any,
+    config: RunConfig, dim_id: str, ctx: AnalysisContext,
     inline_findings: list[dict] | None = None,
 ) -> str:
     """Build the prompt for subagent analysis, optionally including previous findings."""
     return build_analysis_prompt(
-        ctx.subagent_template,
-        PromptContext(
-            language=config.language,
-            repo_name=str(config.src),
-            date_str=ctx.date_str,
-            dimension=dim_id,
-            source_file_count=config.source_file_count,
-            dimensions_data=ctx.dimensions_data,
-            standards_dir=config.standards_dir,
-            evaluators_dir=config.evaluators_dir,
-            manifest=config.manifest,
-            target=config.target,
-            work_dir=config.work_dir or config.src,
-            previous_findings=inline_findings or [],
-            project_root=config.src,
-        ),
+        ctx.subagent_template, prompt_context(config, ctx, dim_id, inline_findings),
     )

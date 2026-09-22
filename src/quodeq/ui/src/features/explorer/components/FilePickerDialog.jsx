@@ -1,6 +1,39 @@
 import { useState, useMemo } from 'react';
 import { t } from '../../../strings/index.js';
 
+function FilePickerList({ filtered, selectedFile, onSelect, onClose, search }) {
+  return (
+    <ul className="file-picker-list" role="listbox">
+      <li
+        className={`file-picker-item ${!selectedFile ? 'active' : ''}`}
+        role="option"
+        aria-selected={!selectedFile}
+        tabIndex={0}
+        onClick={() => { onSelect(''); onClose(); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(''); onClose(); } }}
+      >
+        {t('explorer.allFilesNoFilter')}
+      </li>
+      {filtered.map((file) => (
+        <li
+          key={file}
+          className={`file-picker-item ${selectedFile === file ? 'active' : ''}`}
+          role="option"
+          aria-selected={selectedFile === file}
+          tabIndex={0}
+          onClick={() => { onSelect(file); onClose(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(file); onClose(); } }}
+        >
+          {file}
+        </li>
+      ))}
+      {filtered.length === 0 && (
+        <li className="file-picker-empty">{t('explorer.noFilesMatch', { query: search })}</li>
+      )}
+    </ul>
+  );
+}
+
 export default function FilePickerDialog({ files, selectedFile, onSelect, onClose }) {
   const [search, setSearch] = useState('');
 
@@ -25,34 +58,7 @@ export default function FilePickerDialog({ files, selectedFile, onSelect, onClos
           aria-label={t('explorer.searchFilesAria')}
           autoFocus
         />
-        <ul className="file-picker-list" role="listbox">
-          <li
-            className={`file-picker-item ${!selectedFile ? 'active' : ''}`}
-            role="option"
-            aria-selected={!selectedFile}
-            tabIndex={0}
-            onClick={() => { onSelect(''); onClose(); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(''); onClose(); } }}
-          >
-            {t('explorer.allFilesNoFilter')}
-          </li>
-          {filtered.map((file) => (
-            <li
-              key={file}
-              className={`file-picker-item ${selectedFile === file ? 'active' : ''}`}
-              role="option"
-              aria-selected={selectedFile === file}
-              tabIndex={0}
-              onClick={() => { onSelect(file); onClose(); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(file); onClose(); } }}
-            >
-              {file}
-            </li>
-          ))}
-          {filtered.length === 0 && (
-            <li className="file-picker-empty">{t('explorer.noFilesMatch', { query: search })}</li>
-          )}
-        </ul>
+        <FilePickerList filtered={filtered} selectedFile={selectedFile} onSelect={onSelect} onClose={onClose} search={search} />
       </div>
     </div>
   );

@@ -46,7 +46,7 @@ describe('usePrefetchAdjacentRuns', () => {
     expect(prefetchRun).toHaveBeenCalledWith('r3');
   });
 
-  // Task 17: source-aware fetch selection. The underlying usePrefetchRun
+  // Source-aware fetch selection. The underlying usePrefetchRun
   // hook must be constructed with the caller's selectedSource so hover
   // prefetches never warm the wrong source's cache slot.
   describe('source-aware fetch selection', () => {

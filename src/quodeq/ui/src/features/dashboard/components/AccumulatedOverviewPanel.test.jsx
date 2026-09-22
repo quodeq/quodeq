@@ -34,12 +34,12 @@ describe('AccumulatedHeroSection custom-formula warning', () => {
   const ACC = { summary: { numericAverage: 5, overallGrade: 'Adequate', totalViolations: 3, totalCompliance: 1 } };
 
   it('marks the score when a tuned formula produced it', () => {
-    render(<AccumulatedHeroSection accumulated={ACC} accumulatedDimensions={DIMS} customFormula />);
+    render(<AccumulatedHeroSection accumulated={ACC} customFormula />);
     expect(screen.getByText(/custom formula/i)).toBeInTheDocument();
   });
 
   it('says nothing when the shipped formula produced it', () => {
-    render(<AccumulatedHeroSection accumulated={ACC} accumulatedDimensions={DIMS} customFormula={false} />);
+    render(<AccumulatedHeroSection accumulated={ACC} customFormula={false} />);
     expect(screen.queryByText(/custom formula/i)).not.toBeInTheDocument();
   });
 });
@@ -87,7 +87,7 @@ describe('useAccumulatedComputations selectedDayDimNames (multi-run day)', () =>
   });
 });
 
-// Task 19 — the Overview page header shows a "remote · read-only" chip
+// The Overview page header shows a "remote · read-only" chip
 // (+ publisher sub line where available) for shared projects, and nothing
 // extra for local ones.
 describe('AccumulatedHeroSection shared read-only chip', () => {
@@ -95,8 +95,6 @@ describe('AccumulatedHeroSection shared read-only chip', () => {
     accumulated: { summary: { numericAverage: 7 } },
     scoreDelta: null,
     lastDate: null,
-    accumulatedDimensions: [],
-    projectName: 'proj1',
     projectInfo: null,
     onCardNavigate: undefined,
   };

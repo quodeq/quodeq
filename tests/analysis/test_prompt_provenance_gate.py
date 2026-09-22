@@ -14,20 +14,22 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
+from quodeq.analysis.api_prompt_assembly import ProjectBrief, assemble_api_prompt
 from quodeq.analysis.mcp.provenance_gate import (
     EXTERNAL_SOURCE_TERMS,
     OPERATOR_CONTROLLED_TERMS,
 )
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
-from quodeq.analysis.prompts._template import load_template
+from quodeq.analysis.prompts.template import load_template
 from quodeq.context.path_role import Role, path_role
 from tests.analysis._provenance_gate_support import discover_cases
 
-RULES = Path("src/quodeq/data/prompts/evaluation_rules.md").read_text()
-COMPASS = Path("src/quodeq/data/prompts/compass.md").read_text()
+_PROMPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "quodeq" / "data" / "prompts"
+RULES = (_PROMPTS_DIR / "evaluation_rules.md").read_text(encoding="utf-8")
+COMPASS = (_PROMPTS_DIR / "compass.md").read_text(encoding="utf-8")
 
 _CASES = discover_cases()
+_INTERNAL_CASES = [c for c in _CASES if c.expected["provenance"] == "internal"]
 _CASE_IDS = [c.name for c in _CASES]
 
 
@@ -38,6 +40,22 @@ def test_rules_define_provenance_selfcheck():
     assert "attacker-controlled" in lower
     # The gate must name the escape hatch for provably-internal values.
     assert "hardening gap" in lower
+
+
+def test_rules_carve_out_constant_interpolated_sql():
+    """Issue #1200: constant-only SQL interpolation is not injection (S-INT-2).
+
+    The security dimension repeatedly filed four sites as major injection where
+    the only interpolated value is a module constant (a column list) or a
+    generated run of placeholder markers, with every caller value bound. There
+    is no deterministic SQL checker to teach, so the rubric carries the rule.
+    """
+    lower = RULES.lower()
+    assert "placeholder markers" in lower
+    assert "parameter list" in lower
+    # A PRAGMA value cannot be a bound parameter, so interpolation is the only
+    # option available and must not read as a finding either.
+    assert "pragma" in lower
 
 
 def test_rules_show_internal_input_examples():
@@ -86,44 +104,58 @@ def test_api_prompt_renders_provenance_gate_end_to_end(tmp_path):
 
     The existing tests only prove the compass.md producer path carries the
     rubric. ``assemble_api_prompt`` is the prompt the ollama/api provider path
-    actually sends (``subprocess.py:_run_api_analysis_bridge``); it loads the
-    rules itself via ``_load_evaluation_rules``, a separate seam that could
+    actually sends (``subprocess.py``'s API bridge); it loads the
+    rules itself via ``load_evaluation_rules``, a separate seam that could
     regress independently. This is the structural backstop for the live
     behavioral matrix.
     """
     src = tmp_path / "sample.py"
     src.write_text("def f(x):\n    return open(x)\n", encoding="utf-8")
     prompt = assemble_api_prompt(
-        source_files=[src],
-        standards_text="",
-        dimension="security",
-        repo_name="sample",
-        repo_root=tmp_path,
+        source_files=[src], standards_text="", dimension="security",
+        project=ProjectBrief(name="sample", root=tmp_path),
     ).lower()
     assert "provenance" in prompt
     assert "attacker-controlled" in prompt
 
 
-def test_fixture_matrix_is_well_formed():
+class TestFixtureMatrixIsWellFormed:
     """Guardrail: a misconfigured fixtures dir must fail loudly, not pass zero cases.
 
     Mirrors tests/config/test_discipline_corpus.py. Requires both provenance
     classes AND both dimensions to be represented, so a discovery-glob bug that
-    silently drops half the matrix is caught here in normal CI.
+    silently drops half the matrix is caught here in normal CI. Each test below
+    checks one property of the discovered matrix.
     """
-    assert _CASES, "no provenance-gate fixtures discovered"
-    internal = [c for c in _CASES if c.expected["provenance"] == "internal"]
-    external = [c for c in _CASES if c.expected["provenance"] == "external"]
-    operator = [c for c in _CASES if c.expected["provenance"] == "operator"]
-    assert len(internal) >= 4, f"expected >=4 internal FP fixtures, got {len(internal)}"
-    assert any(c.expected["dimension"] == "reliability" for c in external), "no reliability external control"
-    assert any(c.expected["dimension"] == "security" for c in external), "no security external control"
-    assert operator, "no operator-controlled fixture: the argv/env tier is unguarded"
-    assert all(c.expected["expectation"] != "stays_critical" for c in operator), \
-        "an operator-controlled fixture expects critical; that is the bug this tier exists to prevent"
-    for case in _CASES:
+
+    def test_fixtures_are_discovered(self):
+        assert _CASES, "no provenance-gate fixtures discovered"
+
+    def test_at_least_four_internal_fixtures(self):
+        internal = _INTERNAL_CASES
+        assert len(internal) >= 4, f"expected >=4 internal FP fixtures, got {len(internal)}"
+
+    def test_external_provenance_covers_both_dimensions(self):
+        external = [c for c in _CASES if c.expected["provenance"] == "external"]
+        assert any(c.expected["dimension"] == "reliability" for c in external), "no reliability external control"
+        assert any(c.expected["dimension"] == "security" for c in external), "no security external control"
+
+    def test_an_operator_controlled_fixture_exists(self):
+        operator = [c for c in _CASES if c.expected["provenance"] == "operator"]
+        assert operator, "no operator-controlled fixture: the argv/env tier is unguarded"
+
+    def test_no_operator_controlled_fixture_expects_critical(self):
+        operator = [c for c in _CASES if c.expected["provenance"] == "operator"]
+        assert all(c.expected["expectation"] != "stays_critical" for c in operator), \
+            "an operator-controlled fixture expects critical; that is the bug this tier exists to prevent"
+
+    @pytest.mark.parametrize("case", _CASES, ids=_CASE_IDS)
+    def test_expected_json_has_the_required_keys(self, case):
         for key in ("dimension", "req", "display_file", "target_line", "construct", "provenance", "expectation"):
             assert key in case.expected, f"{case.name}: expected.json missing {key!r}"
+
+    @pytest.mark.parametrize("case", _CASES, ids=_CASE_IDS)
+    def test_source_file_exists(self, case):
         assert case.source_file.is_file(), f"{case.name}: source file missing at {case.source_file}"
 
 
@@ -158,8 +190,7 @@ def test_fixture_construct_anchored_at_target_line(case):
 
 
 @pytest.mark.parametrize(
-    "case", [c for c in _CASES if c.expected["provenance"] == "internal"],
-    ids=[c.name for c in _CASES if c.expected["provenance"] == "internal"],
+    "case", _INTERNAL_CASES, ids=[c.name for c in _INTERNAL_CASES],
 )
 def test_internal_fixture_prompt_has_no_role_label(case):
     """The assembled production prompt for an internal fixture must not tone down.
@@ -169,11 +200,8 @@ def test_internal_fixture_prompt_has_no_role_label(case):
     `(role:` label that would instruct the model to discount the finding.
     """
     prompt = assemble_api_prompt(
-        source_files=[case.source_file],
-        standards_text="",
-        dimension=case.expected["dimension"],
-        repo_name="provenance-gate-fixture",
-        repo_root=case.repo_dir,
+        source_files=[case.source_file], standards_text="", dimension=case.expected["dimension"],
+        project=ProjectBrief(name="provenance-gate-fixture", root=case.repo_dir),
     )
     assert "(role:" not in prompt
     assert "test_fixture" not in prompt

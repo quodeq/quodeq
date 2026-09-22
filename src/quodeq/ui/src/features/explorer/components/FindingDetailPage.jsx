@@ -9,9 +9,12 @@
  * summary. If the user wants the principle's full list, there's already the
  * PrincipleDetailPage route.
  */
-import { TermHeader, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
+import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
 import { EvalViolationCard } from './EvalCards.jsx';
 import { t } from '../../../strings/index.js';
+
+// Short severity code shown in the header ("CRIT", "MAJO", "MINO").
+const SEVERITY_ABBREV_LENGTH = 4;
 
 export default function FindingDetailPage({ finding, principle, dimension, onDismiss }) {
   if (!finding) {
@@ -23,7 +26,7 @@ export default function FindingDetailPage({ finding, principle, dimension, onDis
   }
 
   const severity = (finding.severity || 'minor').toLowerCase();
-  const shortSev = severity.toUpperCase().slice(0, 4);
+  const shortSev = severity.toUpperCase().slice(0, SEVERITY_ABBREV_LENGTH);
 
   return (
     <section className="finding-detail-page">

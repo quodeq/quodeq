@@ -52,4 +52,18 @@ describe('EmptyStateWithTour', () => {
     fireEvent.click(screen.getByRole('button', { name: /browse remote repositories/i }));
     expect(onBrowseRemote).toHaveBeenCalled();
   });
+
+  it('add-project button does not call onAdd while an evaluation is running', () => {
+    const onAdd = vi.fn();
+    render(<EmptyStateWithTour onAdd={onAdd} onTour={() => {}} isEvaluating />);
+    fireEvent.click(screen.getByRole('button', { name: /add a project/i }));
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('take-tour button does not call onTour while an evaluation is running', () => {
+    const onTour = vi.fn();
+    render(<EmptyStateWithTour onAdd={() => {}} onTour={onTour} isEvaluating />);
+    fireEvent.click(screen.getByRole('button', { name: /take the tour/i }));
+    expect(onTour).not.toHaveBeenCalled();
+  });
 });

@@ -11,16 +11,18 @@ export default function FileCopyBtn({ display, copyText }) {
     // that toggles open/closed on click. Stop the event so copying the
     // path doesn't also expand/collapse the row.
     e.stopPropagation();
+    // Show the outcome, then fall back to the file name after the same beat
+    // whether the copy worked or not.
+    const settle = (outcome) => {
+      setStatus(outcome);
+      setTimeout(() => setStatus('idle'), COPY_FEEDBACK_MS);
+    };
     setStatus('copying');
     copyToClipboard(copyText)
-      .then(() => {
-        setStatus('copied');
-        setTimeout(() => setStatus('idle'), COPY_FEEDBACK_MS);
-      })
-      .then(undefined, (err) => {
+      .then(() => settle('copied'))
+      .catch((err) => {
         console.warn('Clipboard copy failed:', err?.message || err);
-        setStatus('failed');
-        setTimeout(() => setStatus('idle'), COPY_FEEDBACK_MS);
+        settle('failed');
       });
   }, [copyText]);
 

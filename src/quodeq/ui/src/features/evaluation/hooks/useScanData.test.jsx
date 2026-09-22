@@ -11,7 +11,7 @@ import { useScanData } from './useScanData.js';
 
 describe('useScanData', () => {
   beforeEach(() => {
-    globalThis.fetch = vi.fn();
+    vi.stubGlobal('fetch', vi.fn());
     scanPath.mockReset();
   });
   afterEach(() => {

@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAssistantStream } from './useAssistantStream.js';
 
 class MockES {
   static instances = [];
+  static CLOSED = 2;
   constructor(url) { this.url = url; this._h = {}; this.readyState = 0; MockES.instances.push(this); }
   addEventListener(n, f) { (this._h[n] = this._h[n] || []).push(f); }
   set onmessage(f) { this._m = f; } get onmessage() { return this._m; }
@@ -13,7 +14,7 @@ class MockES {
   close() { this.readyState = 2; this.closed = true; }
 }
 
-beforeEach(() => { vi.useFakeTimers(); MockES.instances = []; globalThis.EventSource = MockES; });
+beforeEach(() => { vi.useFakeTimers(); MockES.instances = []; vi.stubGlobal('EventSource', MockES); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 function flush() { act(() => { vi.advanceTimersByTime(200); }); }

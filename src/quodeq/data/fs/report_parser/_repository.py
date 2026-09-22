@@ -17,7 +17,7 @@ def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | 
         build_repository_info("https://github.com/org/repo.git", "python")
     """
     if is_repo_url(repo):
-        name = repo.split("/")[-1].replace(_GIT_SUFFIX, "")
+        name = repo.rstrip("/").split("/")[-1].replace(_GIT_SUFFIX, "")
         return {
             "name": name,
             "discipline": discipline,

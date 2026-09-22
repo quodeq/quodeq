@@ -19,7 +19,6 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from quodeq.config._discipline_detection import (
     _SUBPROJECT_SKIP_DIRS,

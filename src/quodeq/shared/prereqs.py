@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from typing import NamedTuple
 
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
 
@@ -15,14 +16,16 @@ _INSTALL_HINT_NODE = (
 )
 
 _VERSION_CMD_TIMEOUT_S = 30
+_MIN_NODE_MAJOR = 20
+_MIN_NPM_MAJOR = 10
 
 # Provider/command tokens are restricted to a charset with no shell
 # metacharacters, so even on the Windows shell=True path (needed for npm
 # .cmd shim resolution) a value like "x & calc.exe" can never reach cmd.exe.
-_SAFE_CMD_TOKEN_RE = re.compile(r"[A-Za-z0-9._-]+")
+SAFE_CMD_TOKEN_RE = re.compile(r"[A-Za-z0-9._-]+")
 
 
-def _run_version_cmd(cmd: list[str]) -> str:
+def run_version_cmd(cmd: list[str]) -> str:
     """Run a version command and return its stdout, or raise.
 
     On Windows ``shell=True`` is required so npm-installed ``.cmd`` shims
@@ -36,7 +39,7 @@ def _run_version_cmd(cmd: list[str]) -> str:
     if not isinstance(cmd, list):
         raise TypeError("cmd must be a list of strings, not a raw string")
     for token in cmd:
-        if not isinstance(token, str) or not _SAFE_CMD_TOKEN_RE.fullmatch(token):
+        if not isinstance(token, str) or not SAFE_CMD_TOKEN_RE.fullmatch(token):
             raise ValueError(f"unsafe command token: {token!r}")
     result = subprocess.run(
         cmd, capture_output=True, text=True, encoding="utf-8", check=True, shell=_IS_WIN32,
@@ -51,31 +54,53 @@ def _parse_major(version_str: str) -> int:
     return int(cleaned.split(".")[0])
 
 
-def _check_tool_version(cmd: list[str], tool_name: str, min_major: int, install_hint: str) -> None:
-    """Raise RuntimeError if *tool_name* is missing or below *min_major*."""
+class _VersionCheck(NamedTuple):
+    """Classified outcome of one tool's ``--version`` probe."""
+
+    status: str  # "ok", "missing" or "outdated"
+    version: str  # the reported version string, "" when the probe failed
+    error: Exception | None  # the probe failure, kept for exception chaining
+
+
+def _probe_tool_version(cmd: list[str], min_major: int) -> _VersionCheck:
+    """Run *cmd* and classify the version it reports against *min_major*.
+
+    A version string that cannot be parsed counts as ``"ok"``: the tool is
+    installed and there is nothing actionable to report about it.
+    """
     try:
-        version_str = _run_version_cmd(cmd)
+        version_str = run_version_cmd(cmd)
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
-        raise RuntimeError(
-            f"{tool_name} {min_major}+ is required but not found.\n{install_hint}"
-        ) from exc
+        return _VersionCheck("missing", "", exc)
     try:
         major = _parse_major(version_str)
     except (ValueError, IndexError):
-        return
+        return _VersionCheck("ok", version_str, None)
     if major < min_major:
+        return _VersionCheck("outdated", version_str, None)
+    return _VersionCheck("ok", version_str, None)
+
+
+def _check_tool_version(cmd: list[str], tool_name: str, min_major: int, install_hint: str) -> None:
+    """Raise RuntimeError if *tool_name* is missing or below *min_major*."""
+    check = _probe_tool_version(cmd, min_major)
+    if check.status == "missing":
         raise RuntimeError(
-            f"{tool_name} {version_str} is below the minimum required version {min_major}.x.\n"
+            f"{tool_name} {min_major}+ is required but not found.\n{install_hint}"
+        ) from check.error
+    if check.status == "outdated":
+        raise RuntimeError(
+            f"{tool_name} {check.version} is below the minimum required version {min_major}.x.\n"
             f"{install_hint}"
         )
 
 
-def check_node(min_major: int = 20) -> None:
+def check_node(min_major: int = _MIN_NODE_MAJOR) -> None:
     """Raise RuntimeError if Node.js is missing or below minimum version."""
     _check_tool_version(["node", "--version"], "Node.js", min_major, _INSTALL_HINT_NODE)
 
 
-def check_npm(min_major: int = 10) -> None:
+def check_npm(min_major: int = _MIN_NPM_MAJOR) -> None:
     """Raise RuntimeError if npm is missing or below minimum version."""
     _check_tool_version(["npm", "--version"], "npm", min_major, _INSTALL_HINT_NODE)
 
@@ -86,16 +111,11 @@ def _collect_tool_issue(cmd: list[str], tool_name: str, min_major: int) -> str |
     Used by aggregators that want to report every missing/outdated tool in
     a single error instead of failing fast on the first one.
     """
-    try:
-        version_str = _run_version_cmd(cmd)
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    check = _probe_tool_version(cmd, min_major)
+    if check.status == "missing":
         return f"{tool_name} {min_major}+ not found on PATH"
-    try:
-        major = _parse_major(version_str)
-    except (ValueError, IndexError):
-        return None
-    if major < min_major:
-        return f"{tool_name} {version_str} is below the minimum required version {min_major}.x"
+    if check.status == "outdated":
+        return f"{tool_name} {check.version} is below the minimum required version {min_major}.x"
     return None
 
 
@@ -113,10 +133,10 @@ def check_dashboard_dev_prereqs() -> None:
     packages) gets the full story in one message with one install command.
     """
     issues: list[str] = []
-    node_issue = _collect_tool_issue(["node", "--version"], "Node.js", 20)
+    node_issue = _collect_tool_issue(["node", "--version"], "Node.js", _MIN_NODE_MAJOR)
     if node_issue is not None:
         issues.append(node_issue)
-    npm_issue = _collect_tool_issue(["npm", "--version"], "npm", 10)
+    npm_issue = _collect_tool_issue(["npm", "--version"], "npm", _MIN_NPM_MAJOR)
     if npm_issue is not None:
         issues.append(npm_issue)
     if not issues:

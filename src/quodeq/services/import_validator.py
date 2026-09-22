@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
+
+from quodeq.shared.errors import ClientMessageError
 
 _ALLOWED_TOP = {"id", "name", "description", "weight", "source", "principles"}
 _ALLOWED_PRINCIPLE = {"name", "description", "requirements"}
@@ -25,8 +28,30 @@ _INJECTION_PATTERNS = [
 ]
 
 
+class StandardImportValidationError(ClientMessageError, ValueError):
+    """Raised when an imported payload fails :func:`validate_import`.
+
+    Carries the validator's own field-level reasons so a caller can report
+    them without re-running validation: ``errors`` is that list and
+    ``public_message`` (from ClientMessageError) the joined text an API route
+    may return to the client verbatim, never ``str(exc)`` -- see
+    tests/api/test_no_exception_echo.py. Stays a ``ValueError`` so callers
+    that only distinguish "invalid payload" keep working.
+    """
+
+    def __init__(self, errors: list[str]) -> None:
+        super().__init__("; ".join(errors))
+        self.errors = list(errors)
+
+
 def _truncate(value: str, limit: int) -> str:
     return value[:limit] if len(value) > limit else value
+
+
+def _truncate_field(cleaned: dict, key: str, limit: int) -> None:
+    """Truncate ``cleaned[key]`` in place to *limit* chars, when it is a present string."""
+    if key in cleaned and isinstance(cleaned[key], str):
+        cleaned[key] = _truncate(cleaned[key], limit)
 
 
 def _whitelist_ref(ref: dict) -> dict:
@@ -35,10 +60,8 @@ def _whitelist_ref(ref: dict) -> dict:
 
 def _whitelist_requirement(req: dict) -> dict:
     cleaned = {k: req[k] for k in _ALLOWED_REQUIREMENT if k in req}
-    if "text" in cleaned and isinstance(cleaned["text"], str):
-        cleaned["text"] = _truncate(cleaned["text"], _MAX_REQ_TEXT)
-    if "description" in cleaned and isinstance(cleaned["description"], str):
-        cleaned["description"] = _truncate(cleaned["description"], _MAX_DESCRIPTION)
+    _truncate_field(cleaned, "text", _MAX_REQ_TEXT)
+    _truncate_field(cleaned, "description", _MAX_DESCRIPTION)
     if "refs" in cleaned and isinstance(cleaned["refs"], list):
         cleaned["refs"] = [_whitelist_ref(r) for r in cleaned["refs"] if isinstance(r, dict)]
     return cleaned
@@ -46,13 +69,67 @@ def _whitelist_requirement(req: dict) -> dict:
 
 def _whitelist_principle(principle: dict) -> dict:
     cleaned = {k: principle[k] for k in _ALLOWED_PRINCIPLE if k in principle}
-    if "name" in cleaned and isinstance(cleaned["name"], str):
-        cleaned["name"] = _truncate(cleaned["name"], _MAX_NAME)
-    if "description" in cleaned and isinstance(cleaned["description"], str):
-        cleaned["description"] = _truncate(cleaned["description"], _MAX_DESCRIPTION)
+    _truncate_field(cleaned, "name", _MAX_NAME)
+    _truncate_field(cleaned, "description", _MAX_DESCRIPTION)
     if "requirements" in cleaned and isinstance(cleaned["requirements"], list):
         cleaned["requirements"] = [
             _whitelist_requirement(r) for r in cleaned["requirements"] if isinstance(r, dict)
+        ]
+    return cleaned
+
+
+def _identity_errors(data: dict) -> list[str]:
+    """Complaints about the evaluator's own id and name.
+
+    The id becomes a path segment, so it may not carry separators or
+    parent-traversal.
+    """
+    errors: list[str] = []
+    if not isinstance(data.get("id"), str) or not data["id"]:
+        errors.append("Missing required field: id")
+    else:
+        sid = data["id"]
+        if "/" in sid or "\\" in sid or ".." in sid:
+            errors.append(f"Invalid id: {sid!r} (must not contain /, \\, or ..)")
+    if not isinstance(data.get("name"), str) or not data["name"]:
+        errors.append("Missing required field: name")
+    return errors
+
+
+def _one_principle_errors(index: int, principle: object) -> list[str]:
+    """Complaints about the principle at *index*, named by position for the user."""
+    if not isinstance(principle, dict):
+        return [f"Principle {index} must be an object"]
+    errors: list[str] = []
+    if not isinstance(principle.get("name"), str) or not principle["name"]:
+        errors.append(f"Principle {index} missing required field: name")
+    if "requirements" not in principle:
+        errors.append(f"Principle {index} missing required field: requirements")
+    elif not isinstance(principle["requirements"], list):
+        errors.append(f"Principle {index} field 'requirements' must be a list")
+    return errors
+
+
+def _principle_errors(data: dict) -> list[str]:
+    """Complaints about the principles list and each principle in it."""
+    if "principles" not in data:
+        return ["Missing required field: principles"]
+    if not isinstance(data["principles"], list):
+        return ["Field 'principles' must be a list"]
+    errors: list[str] = []
+    for i, p in enumerate(data["principles"]):
+        errors.extend(_one_principle_errors(i, p))
+    return errors
+
+
+def _sanitized(data: dict) -> dict:
+    """*data* reduced to the allowed keys, with every text field truncated."""
+    cleaned = {k: data[k] for k in _ALLOWED_TOP if k in data}
+    _truncate_field(cleaned, "name", _MAX_NAME)
+    _truncate_field(cleaned, "description", _MAX_DESCRIPTION)
+    if isinstance(cleaned.get("principles"), list):
+        cleaned["principles"] = [
+            _whitelist_principle(p) for p in cleaned["principles"] if isinstance(p, dict)
         ]
     return cleaned
 
@@ -64,57 +141,23 @@ def validate_import(data: dict) -> dict:
     on success, or ``{"valid": False, "errors": [...], "data": None}``
     on failure.
     """
-    errors: list[str] = []
-
-    if not isinstance(data.get("id"), str) or not data["id"]:
-        errors.append("Missing required field: id")
-    else:
-        sid = data["id"]
-        if "/" in sid or "\\" in sid or ".." in sid:
-            errors.append(f"Invalid id: {sid!r} (must not contain /, \\, or ..)")
-
-    if not isinstance(data.get("name"), str) or not data["name"]:
-        errors.append("Missing required field: name")
-
-    if "principles" not in data:
-        errors.append("Missing required field: principles")
-    elif not isinstance(data["principles"], list):
-        errors.append("Field 'principles' must be a list")
-    else:
-        for i, p in enumerate(data["principles"]):
-            if not isinstance(p, dict):
-                errors.append(f"Principle {i} must be an object")
-                continue
-            if not isinstance(p.get("name"), str) or not p["name"]:
-                errors.append(f"Principle {i} missing required field: name")
-            if "requirements" not in p:
-                errors.append(f"Principle {i} missing required field: requirements")
-            elif not isinstance(p["requirements"], list):
-                errors.append(f"Principle {i} field 'requirements' must be a list")
-
+    errors = _identity_errors(data) + _principle_errors(data)
     if errors:
         return {"valid": False, "errors": errors, "data": None}
+    return {"valid": True, "errors": [], "data": _sanitized(data)}
 
-    cleaned = {k: data[k] for k in _ALLOWED_TOP if k in data}
-    if "name" in cleaned and isinstance(cleaned["name"], str):
-        cleaned["name"] = _truncate(cleaned["name"], _MAX_NAME)
-    if "description" in cleaned and isinstance(cleaned["description"], str):
-        cleaned["description"] = _truncate(cleaned["description"], _MAX_DESCRIPTION)
-    if isinstance(cleaned.get("principles"), list):
-        cleaned["principles"] = [
-            _whitelist_principle(p) for p in cleaned["principles"] if isinstance(p, dict)
-        ]
 
-    return {"valid": True, "errors": [], "data": cleaned}
+def _match_patterns(text: str, patterns: Sequence[re.Pattern]) -> list[re.Match]:
+    """Every pattern in *patterns* that hits *text*, in pattern order."""
+    return [m for m in (p.search(text) for p in patterns) if m is not None]
 
 
 def scan_text(text: str) -> list[str]:
     """Return injection warnings for arbitrary untrusted text (empty == clean)."""
-    findings = []
-    for pattern in _INJECTION_PATTERNS:
-        if pattern.search(text):
-            findings.append(f"suspicious content matches {pattern.pattern!r}")
-    return findings
+    return [
+        f"suspicious content matches {m.re.pattern!r}"
+        for m in _match_patterns(text, _INJECTION_PATTERNS)
+    ]
 
 
 def scan_injection(data: dict) -> list[str]:
@@ -125,12 +168,8 @@ def scan_injection(data: dict) -> list[str]:
     warnings: list[str] = []
 
     def _check(text: str, location: str) -> None:
-        if not scan_text(text):
-            return
-        for pattern in _INJECTION_PATTERNS:
-            m = pattern.search(text)
-            if m:
-                warnings.append(f"Suspicious text in {location}: contains '{m.group()}'")
+        for m in _match_patterns(text, _INJECTION_PATTERNS):
+            warnings.append(f"Suspicious text in {location}: contains '{m.group()}'")
 
     for field in ("name", "description", "source"):
         if isinstance(data.get(field), str):

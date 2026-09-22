@@ -6,6 +6,10 @@ import { t } from '../../../strings/index.js';
 
 // Help content is per-locale markdown. Swapping languages later means adding
 // content/<locale>/ and picking the directory here; nothing else moves.
+// Eager on purpose: HelpPage is itself a lazy route chunk (routes/renderers),
+// so these ~48 KB of markdown load only when Help opens. Splitting them into
+// per-section imports would trade that for a fetch and a loading flash on
+// every section click.
 const SECTION_SOURCES = import.meta.glob('../content/en/*.md', {
   query: '?raw', import: 'default', eager: true,
 });

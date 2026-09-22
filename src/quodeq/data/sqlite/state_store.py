@@ -1,43 +1,65 @@
+"""SQLite state store: the findings and grade tables the projection writes."""
 from __future__ import annotations
 
 import logging
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Optional
+from typing import TYPE_CHECKING, Iterator
 
 if TYPE_CHECKING:
     from quodeq.core.scoring.params import ScoringParams
 
 from quodeq.core.events.models import Judgment
+from quodeq.core.dismissals import DismissedKeys
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
-from quodeq.data.sqlite._row_mappers import judgment_to_row
+from quodeq.data.sqlite.row_mappers import judgment_to_row
+from quodeq.data.sqlite._state_store_meta import _StateStoreMetaMixin
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class PrincipleGradeRow:
+    """One ``principle_grades`` row: a principle's score, grade and finding counts."""
+
+    dimension: str
+    principle_id: str
+    score: float | None
+    grade: str | None
+    finding_count: int
+    dismissed_count: int
+
+
 _CHECKPOINT_KEY = "projection_checkpoint"
 _PROJECTED_SIZE_KEY = "projection_event_log_size"
 _ACTIONS_SIZE_KEY = "actions_log_projected_size"
-_GRADES_ALGO_KEY = "grades_algo_version"
 
 _INSERT_FINDING = """
 INSERT OR IGNORE INTO findings (
     schema_version, practice_id, dimension, requirement, verdict, severity,
-    file, line, end_line, title, reason, snippet, violation_type, context,
+    file, line, end_line, title, reason, snippet, violation_type, violation_type_raw, context,
     scope, req_refs_json, dedup_key, confidence, provenance_downgrade,
     scope_downgrade_json
 ) VALUES (
     :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
-    :file, :line, :end_line, :title, :reason, :snippet, :violation_type, :context,
+    :file, :line, :end_line, :title, :reason, :snippet, :violation_type, :violation_type_raw, :context,
     :scope, :req_refs_json, :dedup_key, :confidence, :provenance_downgrade,
     :scope_downgrade_json
 )
 """
 
+# Compliance rows are never dismissed, so they are not read back.
+_SELECT_VERDICT_ROWS = (
+    "SELECT id, requirement, practice_id, file, line, snippet, verdict "
+    "FROM findings WHERE verdict != 'compliance'"
+)
 
-class SQLiteStateStore:
+
+class SQLiteStateStore(_StateStoreMetaMixin):
     """Writes projected event state into evaluation.db."""
 
     def __init__(self, run_dir: Path) -> None:
@@ -48,9 +70,10 @@ class SQLiteStateStore:
     def connection(self) -> Iterator[sqlite3.Connection]:
         """Hold ONE connection for a batch of store operations.
 
-        The projection replay calls update_verdict once per event; without
-        this, every call opens/configures/closes its own connection
-        (measured: ~21s of pure connection churn for a 100-run project).
+        The projection applies the dismissed state and then saves the
+        projected size; without this, every call opens/configures/closes its
+        own connection (measured: ~21s of pure connection churn for a 100-run
+        project back when the replay ran one UPDATE per event).
         """
         with open_evaluation_db(self._run_dir) as conn:
             self._held = conn
@@ -68,12 +91,22 @@ class SQLiteStateStore:
                 yield conn
 
     def record_finding(self, payload: Judgment) -> None:
+        """Insert one judgment into ``findings``.
+
+        INSERT OR IGNORE on the dedup key, so replaying an already-projected
+        event is a no-op rather than a duplicate row.
+        """
         row = judgment_to_row(payload)
         with self._db() as conn:
             conn.execute(_INSERT_FINDING, row)
             conn.commit()
 
     def clear_all(self) -> None:
+        """Reset everything the projection owns for this run.
+
+        Clears ``findings`` and ``dimension_scores`` and drops the checkpoint
+        keys, so the next pass replays from event zero.
+        """
         with self._db() as conn:
             conn.execute("DELETE FROM findings")
             conn.execute("DELETE FROM dimension_scores")
@@ -83,48 +116,40 @@ class SQLiteStateStore:
             )
             conn.commit()
 
-    def get_checkpoint(self) -> Optional[datetime]:
-        with self._db() as conn:
-            row = conn.execute(
-                "SELECT value FROM run_meta WHERE key = ?", (_CHECKPOINT_KEY,)
-            ).fetchone()
-        if row is None:
-            return None
-        return datetime.fromisoformat(row[0])
+    def apply_dismissed_state(self, dismissed: DismissedKeys) -> int:
+        """Set every finding's verdict from the project's net dismissed state.
 
-    def save_checkpoint(self, ts: datetime) -> None:
+        Rows are matched with :meth:`DismissedKeys.matches`, the predicate the
+        services read side uses, so SQL and in-memory reads can never
+        disagree on which findings are hidden. A row with no requirement id
+        matches on its practice id, mirroring the ``req || principle`` key
+        the UI records. Compliance rows are never touched. Only rows whose
+        verdict actually changes are written; returns that count.
+        """
         with self._db() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
-                (_CHECKPOINT_KEY, ts.isoformat()),
-            )
+            rows = conn.execute(_SELECT_VERDICT_ROWS).fetchall()
+            changes: list[tuple[str, int]] = []
+            for fid, req, practice_id, file, line, snippet, verdict in rows:
+                hidden = dismissed.matches(
+                    req=req, principle=practice_id, file=file, line=line, snippet=snippet)
+                wanted = "dismissed" if hidden else "violation"
+                if wanted != verdict:
+                    changes.append((wanted, fid))
+            if changes:
+                conn.executemany("UPDATE findings SET verdict = ? WHERE id = ?", changes)
             conn.commit()
-
-    def get_projected_size(self) -> int | None:
-        with self._db() as conn:
-            row = conn.execute(
-                "SELECT value FROM run_meta WHERE key = ?", (_PROJECTED_SIZE_KEY,)
-            ).fetchone()
-        if row is None:
-            return None
-        return int(row[0])
-
-    def save_projected_size(self, size: int) -> None:
-        with self._db() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
-                (_PROJECTED_SIZE_KEY, str(size)),
-            )
-            conn.commit()
+        return len(changes)
 
     def update_verdict(self, *, req: str, file: str, line: int, verdict: str) -> int:
-        """Update a finding's verdict by (requirement, file, line). Returns row count.
+        """Update one finding's verdict by (requirement, file, line). Returns row count.
 
-        A finding with no requirement id is stored with ``requirement`` NULL, but
-        the dismiss/restore event carries an empty string. ``requirement = ''``
-        never matches NULL in SQL, so an empty ``req`` is matched on (file, line)
-        against rows whose requirement is NULL or empty, scoped so it cannot
-        sweep a different, req-bearing finding at the same location.
+        Direct per-row write for tools and tests; the projection itself goes
+        through :meth:`apply_dismissed_state`. A finding with no requirement
+        id is stored with ``requirement`` NULL, but callers key it as an empty
+        string. ``requirement = ''`` never matches NULL in SQL, so an empty
+        ``req`` is matched on (file, line) against rows whose requirement is
+        NULL or empty, scoped so it cannot sweep a different, req-bearing
+        finding at the same location.
         """
         with self._db() as conn:
             if req:
@@ -143,53 +168,12 @@ class SQLiteStateStore:
             conn.commit()
             return cur.rowcount
 
-    def get_actions_projected_size(self) -> int | None:
-        with self._db() as conn:
-            row = conn.execute(
-                "SELECT value FROM run_meta WHERE key = ?", (_ACTIONS_SIZE_KEY,)
-            ).fetchone()
-        if row is None:
-            return None
-        return int(row[0])
-
-    def save_actions_projected_size(self, size: int) -> None:
-        with self._db() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
-                (_ACTIONS_SIZE_KEY, str(size)),
-            )
-            conn.commit()
-
-    def get_grades_algo_version(self) -> int | None:
-        """Version of the grade math the stored grade tables were computed with.
-
-        None means the tables predate the stamp (or were never computed);
-        callers treat that as stale so pre-stamp DBs heal on first contact.
-        """
-        with self._db() as conn:
-            row = conn.execute(
-                "SELECT value FROM run_meta WHERE key = ?", (_GRADES_ALGO_KEY,)
-            ).fetchone()
-        if row is None:
-            return None
-        try:
-            return int(row[0])
-        except (TypeError, ValueError):
-            return None
-
-    def save_grades_algo_version(self, version: int) -> None:
-        with self._db() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO run_meta (key, value) VALUES (?, ?)",
-                (_GRADES_ALGO_KEY, str(version)),
-            )
-            conn.commit()
-
     # --- grade tables -----------------------------------------------------
 
     def record_dimension_score(
         self, *, dimension: str, score: float | None, grade: str | None,
     ) -> None:
+        """Upsert one ``dimension_scores`` row and stamp ``completed_at``."""
         with self._db() as conn:
             conn.execute(
                 "INSERT INTO dimension_scores (dimension, score, grade, completed_at) "
@@ -200,15 +184,8 @@ class SQLiteStateStore:
             )
             conn.commit()
 
-    def record_principle_grade(
-        self, *,
-        dimension: str,
-        principle_id: str,
-        score: float | None,
-        grade: str | None,
-        finding_count: int,
-        dismissed_count: int,
-    ) -> None:
+    def record_principle_grade(self, row: PrincipleGradeRow) -> None:
+        """Upsert one ``principle_grades`` row, keyed on (dimension, principle_id)."""
         with self._db() as conn:
             conn.execute(
                 "INSERT INTO principle_grades "
@@ -218,10 +195,15 @@ class SQLiteStateStore:
                 "score=excluded.score, grade=excluded.grade, "
                 "finding_count=excluded.finding_count, dismissed_count=excluded.dismissed_count, "
                 "completed_at=excluded.completed_at",
-                (dimension, principle_id, score, grade, finding_count, dismissed_count),
+                (row.dimension, row.principle_id, row.score, row.grade,
+                 row.finding_count, row.dismissed_count),
             )
             conn.commit()
 
+    # The grade writers below persist the neutral domain result dicts from
+    # core/scoring/projector_scoring.py 1:1 (today's columns happen to match
+    # the contract keys). If a column is renamed, added, or dropped, the
+    # dict->column mapping changes HERE — the domain contract does not move.
     def batch_rewrite_grades(
         self,
         principle_rows: "list[tuple[str, dict]]",
@@ -242,37 +224,38 @@ class SQLiteStateStore:
         with self._db() as conn:
             conn.execute("DELETE FROM dimension_scores")
             conn.execute("DELETE FROM principle_grades")
-            for dim, p_grade in principle_rows:
-                conn.execute(
-                    "INSERT INTO principle_grades "
-                    "(dimension, principle_id, score, grade, finding_count, dismissed_count, completed_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
-                    (
-                        dim,
-                        p_grade["principle_id"],
-                        p_grade["score"],
-                        p_grade["grade"],
-                        p_grade["finding_count"],
-                        p_grade["dismissed_count"],
-                    ),
-                )
-            for d_score in dimension_rows:
-                conn.execute(
-                    "INSERT INTO dimension_scores "
-                    "(dimension, score, grade, exit_reason, completed_at) "
-                    "VALUES (?, ?, ?, ?, datetime('now'))",
-                    (d_score["dimension"], d_score["score"], d_score["grade"],
-                     d_score.get("exit_reason")),
-                )
+            # One prepared statement per table instead of one Python/SQLite
+            # round-trip per row; rows land in the order given.
+            conn.executemany(
+                "INSERT INTO principle_grades "
+                "(dimension, principle_id, score, grade, finding_count, dismissed_count, completed_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+                [
+                    (dim, p["principle_id"], p["score"], p["grade"],
+                     p["finding_count"], p["dismissed_count"])
+                    for dim, p in principle_rows
+                ],
+            )
+            conn.executemany(
+                "INSERT INTO dimension_scores "
+                "(dimension, score, grade, exit_reason, completed_at) "
+                "VALUES (?, ?, ?, ?, datetime('now'))",
+                [
+                    (d["dimension"], d["score"], d["grade"], d.get("exit_reason"))
+                    for d in dimension_rows
+                ],
+            )
             conn.commit()
 
     def clear_grades(self) -> None:
+        """Empty both grade tables. Findings are left alone."""
         with self._db() as conn:
             conn.execute("DELETE FROM dimension_scores")
             conn.execute("DELETE FROM principle_grades")
             conn.commit()
 
     def read_dimension_scores(self) -> list[dict]:
+        """Return every ``dimension_scores`` row as a dict, ordered by dimension."""
         with self._db() as conn:
             rows = conn.execute(
                 "SELECT dimension, score, grade, exit_reason "
@@ -284,6 +267,7 @@ class SQLiteStateStore:
         ]
 
     def read_principle_grades(self) -> list[dict]:
+        """Return the ``principle_grades`` rows as dicts, ordered by dimension then id."""
         with self._db() as conn:
             rows = conn.execute(
                 "SELECT dimension, principle_id, score, grade, finding_count, dismissed_count "

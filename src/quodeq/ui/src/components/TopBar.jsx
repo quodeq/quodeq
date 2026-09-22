@@ -19,6 +19,8 @@ import { FileTextIcon, SparkleIcon } from './CopyButton.jsx';
 import ServerStatusDot from './ServerStatusDot.jsx';
 import { AssistantLauncherButton } from './AssistantLauncherButton.jsx';
 import { TerminalLauncherButton } from './TerminalLauncherButton.jsx';
+import { TopBarProviderPill } from './TopBarProviderPill.jsx';
+import { TopBarRunChip, TopBarProgressHairline } from './TopBarRunChip.jsx';
 import { t } from '../strings/index.js';
 
 function SidePaneSpecButton({ type, label, icon, modifier }) {
@@ -88,18 +90,134 @@ function SunIcon() {
   );
 }
 
+function MobileTitleRow({ projectName, onSelectProject, mobileTitle }) {
+  return (
+    <div className="topbar-mobile-title" aria-hidden={!mobileTitle && !projectName}>
+      {projectName && onSelectProject && (
+        <button
+          type="button"
+          className="topbar-mobile-project"
+          onClick={onSelectProject}
+          title={t('common.openProjects')}
+        >
+          {projectName}
+        </button>
+      )}
+      {projectName && onSelectProject && mobileTitle && (
+        <span className="topbar-mobile-sep" aria-hidden="true">/</span>
+      )}
+      {mobileTitle && <span className="topbar-mobile-page">{mobileTitle}</span>}
+    </div>
+  );
+}
+
+function ThemeToggleButton({ onToggleTheme, effectiveDark }) {
+  if (!onToggleTheme) return null;
+  return (
+    <button
+      type="button"
+      className="topbar-btn topbar-btn--icon topbar-btn--theme"
+      onClick={onToggleTheme}
+      aria-label={effectiveDark ? t('common.switchToLight') : t('common.switchToDark')}
+      title={effectiveDark ? t('common.switchToLight') : t('common.switchToDark')}
+    >
+      {effectiveDark ? <SunIcon /> : <MoonIcon />}
+      <span className="topbar-btn__label">{effectiveDark ? 'light' : 'dark'}</span>
+    </button>
+  );
+}
+
+function EvaluateButton({ onEvaluate, evaluating }) {
+  if (!onEvaluate) return null;
+  return (
+    <button
+      type="button"
+      className={`topbar-btn topbar-btn--evaluate${evaluating ? ' topbar-btn--evaluate--running' : ''}`}
+      onClick={evaluating ? undefined : onEvaluate}
+      aria-disabled={evaluating || undefined}
+      title={evaluating ? t('evaluate.alreadyRunningShort') : undefined}
+      aria-live="polite"
+    >
+      <span className="topbar-btn__play" aria-hidden="true">▸</span>
+      <span>{t('common.evaluate')}</span>
+    </button>
+  );
+}
+
+function TopBarActions({
+  serverConnected, serverUrl, onToggleTheme, effectiveDark, provider, model, onProviderClick,
+  onEvaluate, evaluating, runProgress, onMenuToggle,
+}) {
+  return (
+    <div className="topbar-actions">
+      <ServerStatusDot connected={serverConnected} url={serverUrl} />
+      <span className="topbar-divider" aria-hidden="true" />
+
+      <FixPlanToolbarButton />
+      <ReportToolbarButton />
+      <span className="topbar-divider" aria-hidden="true" />
+
+      <ThemeToggleButton onToggleTheme={onToggleTheme} effectiveDark={effectiveDark} />
+
+      <AssistantLauncherButton />
+      <TerminalLauncherButton />
+      <span className="topbar-divider" aria-hidden="true" />
+
+      <TopBarProviderPill provider={provider} model={model} onProviderClick={onProviderClick} />
+
+      <TopBarRunChip onEvaluate={onEvaluate} evaluating={evaluating} runProgress={runProgress} />
+      <EvaluateButton onEvaluate={onEvaluate} evaluating={evaluating} />
+
+      {/* Burger is mobile-only and lives on the right. Desktop hides it. */}
+      {onMenuToggle && (
+        <button
+          type="button"
+          className="topbar-menu-btn"
+          onClick={onMenuToggle}
+          aria-label={t('common.openMenu')}
+        >
+          <BurgerIcon />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Compact-mode back button. Hidden entirely at the root of the nav stack —
+// showing a disabled arrow adds visual noise without giving the user
+// anything to click.
+function CompactBackButton({ canGoBack, onBack }) {
+  if (!canGoBack) return null;
+  return (
+    <button
+      type="button"
+      className="topbar-back-btn"
+      onClick={onBack}
+      aria-label={t('common.goBack')}
+    >
+      <BackIcon />
+    </button>
+  );
+}
+
+/**
+ * @param {object} props
+ * @param {{dimension: string, percent: number}} [props.runProgress] - While a
+ *   run is live, feeds the run chip and the progress hairline along the bar's
+ *   bottom edge. Either field may be null before the first progress poll lands.
+ * @param {boolean} [props.effectiveDark] - Theme toggle — parent owns the
+ *   cycle (light <-> dark within the current family). Reflects what's
+ *   actually showing (so "system" on a light OS still renders the moon icon
+ *   since the next click will flip to dark).
+ */
 export default function TopBar({
   projectName,
-  activeTab,
   serverConnected,
   serverUrl,
   provider,
   model,
   onEvaluate,
   evaluating = false,
-  /* {dimension, percent} while a run is live — feeds the run chip and the
-     progress hairline along the bar's bottom edge. Either field may be null
-     before the first progress poll lands. */
   runProgress = null,
   onProviderClick,
   onMenuToggle,
@@ -108,169 +226,34 @@ export default function TopBar({
   mobileTitle = '',
   canGoBack = false,
   onBack,
-  /* Theme toggle — parent owns the cycle (light ↔ dark within the
-     current family). `effectiveDark` reflects what's actually showing
-     (so "system" on a light OS still renders the moon icon since the
-     next click will flip to dark). */
   effectiveDark = false,
   onToggleTheme,
-  /* 'local' | 'shared' — shared projects get read-only assistant sessions
-     server-side, so this no longer gates the assistant launcher; it still
-     gates the Evaluate button (see App.jsx's shouldShowEvaluateButton). */
-  selectedSource = 'local',
 }) {
   return (
     <header className="topbar pywebview-drag-region">
-      {/* Compact-mode back button. Hidden entirely at the root of the
-          nav stack — showing a disabled arrow adds visual noise without
-          giving the user anything to click. */}
-      {canGoBack && (
-        <button
-          type="button"
-          className="topbar-back-btn"
-          onClick={onBack}
-          aria-label={t('common.goBack')}
-        >
-          <BackIcon />
-        </button>
-      )}
+      <CompactBackButton canGoBack={canGoBack} onBack={onBack} />
 
-      {/* Desktop: full breadcrumb chain. Mobile: tappable project + current
-          page title. The breadcrumb slot is display:none on mobile and this
-          row is display:none on desktop, so only one project control is ever
-          live per viewport. */}
+      {/* Desktop breadcrumb vs. mobile title row — only one is ever live. */}
       {breadcrumb && <div className="topbar-breadcrumb-slot">{breadcrumb}</div>}
-      <div className="topbar-mobile-title" aria-hidden={!mobileTitle && !projectName}>
-        {projectName && onSelectProject && (
-          <button
-            type="button"
-            className="topbar-mobile-project"
-            onClick={onSelectProject}
-            title={t('common.openProjects')}
-          >
-            {projectName}
-          </button>
-        )}
-        {projectName && onSelectProject && mobileTitle && (
-          <span className="topbar-mobile-sep" aria-hidden="true">/</span>
-        )}
-        {mobileTitle && <span className="topbar-mobile-page">{mobileTitle}</span>}
-      </div>
+      <MobileTitleRow projectName={projectName} onSelectProject={onSelectProject} mobileTitle={mobileTitle} />
 
       <div className="topbar-spacer" />
 
-      <div className="topbar-actions">
-        <ServerStatusDot connected={serverConnected} url={serverUrl} />
-        <span className="topbar-divider" aria-hidden="true" />
+      <TopBarActions
+        serverConnected={serverConnected}
+        serverUrl={serverUrl}
+        onToggleTheme={onToggleTheme}
+        effectiveDark={effectiveDark}
+        provider={provider}
+        model={model}
+        onProviderClick={onProviderClick}
+        onEvaluate={onEvaluate}
+        evaluating={evaluating}
+        runProgress={runProgress}
+        onMenuToggle={onMenuToggle}
+      />
 
-        <FixPlanToolbarButton />
-        <ReportToolbarButton />
-        <span className="topbar-divider" aria-hidden="true" />
-
-        {onToggleTheme && (
-          <button
-            type="button"
-            className="topbar-btn topbar-btn--icon topbar-btn--theme"
-            onClick={onToggleTheme}
-            aria-label={effectiveDark ? t('common.switchToLight') : t('common.switchToDark')}
-            title={effectiveDark ? t('common.switchToLight') : t('common.switchToDark')}
-          >
-            {effectiveDark ? <SunIcon /> : <MoonIcon />}
-            <span className="topbar-btn__label">{effectiveDark ? 'light' : 'dark'}</span>
-          </button>
-        )}
-
-        <AssistantLauncherButton />
-        <TerminalLauncherButton />
-        <span className="topbar-divider" aria-hidden="true" />
-
-        {(provider || model) && (
-          onProviderClick ? (
-            <button
-              type="button"
-              className="topbar-pill topbar-pill--button"
-              onClick={onProviderClick}
-              title={t('common.openSettingsForModel')}
-            >
-              {provider && model
-                ? (
-                  <>
-                    {/* Model at rest; the provider prefix pays for its label
-                        only under the cursor (5a — icon at rest, label on
-                        hover, expanding leftward so the primary never moves) */}
-                    <span className="topbar-btn__label topbar-btn__label--lead">{provider} ·</span>
-                    <span className="topbar-pill-muted">{model}</span>
-                  </>
-                )
-                : (
-                  <>
-                    {provider && <span>{provider}</span>}
-                    {model && <span className="topbar-pill-muted">{model}</span>}
-                  </>
-                )}
-            </button>
-          ) : (
-            <span className="topbar-pill">
-              {provider && <span>{provider}</span>}
-              {provider && model && <span className="topbar-pill-sep">·</span>}
-              {model && <span className="topbar-pill-muted">{model}</span>}
-            </span>
-          )
-        )}
-
-        {onEvaluate && evaluating && (
-          <button
-            type="button"
-            className="topbar-run-chip"
-            onClick={onEvaluate}
-            title={t('common.viewRunningEvaluation')}
-          >
-            <span className="topbar-run-chip__dot" aria-hidden="true" />
-            <span className="topbar-run-chip__dim">{runProgress?.dimension || 'evaluating…'}</span>
-            {runProgress?.percent != null && (
-              <>
-                <span className="topbar-run-chip__bar" aria-hidden="true">
-                  <span style={{ width: `${runProgress.percent}%` }} />
-                </span>
-                <span className="topbar-run-chip__pct">{runProgress.percent}%</span>
-              </>
-            )}
-          </button>
-        )}
-        {onEvaluate && (
-          <button
-            type="button"
-            className={`topbar-btn topbar-btn--evaluate${evaluating ? ' topbar-btn--evaluate--running' : ''}`}
-            onClick={evaluating ? undefined : onEvaluate}
-            aria-disabled={evaluating || undefined}
-            title={evaluating ? t('evaluate.alreadyRunningShort') : undefined}
-            aria-live="polite"
-          >
-            <span className="topbar-btn__play" aria-hidden="true">▸</span>
-            <span>{t('common.evaluate')}</span>
-          </button>
-        )}
-
-        {/* Burger is mobile-only and lives on the right. Desktop hides it. */}
-        {onMenuToggle && (
-          <button
-            type="button"
-            className="topbar-menu-btn"
-            onClick={onMenuToggle}
-            aria-label={t('common.openMenu')}
-          >
-            <BurgerIcon />
-          </button>
-        )}
-      </div>
-
-      {/* Run-aware chrome: a 2px hairline along the bar's bottom edge carries
-          overall progress, so a long run stays visible from any page. */}
-      {evaluating && runProgress?.percent != null && (
-        <span className="topbar-progress" aria-hidden="true">
-          <span style={{ width: `${runProgress.percent}%` }} />
-        </span>
-      )}
+      <TopBarProgressHairline evaluating={evaluating} runProgress={runProgress} />
     </header>
   );
 }

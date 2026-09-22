@@ -13,6 +13,21 @@ _logger = logging.getLogger(__name__)
 _NO_STANDARDS_FOR_DIM = "_No compiled standards for this dimension._"
 
 
+def _require_field(entry: dict, field: str, kind: str) -> object:
+    """``entry[field]``, or a ValueError naming the malformed *kind* of entry.
+
+    Compiled standards are the contract the prompt is built from: a
+    principle with no name, a requirement with no id or a dimension with no
+    id cannot be rendered, and failing here names the offending entry.
+    """
+    value = entry.get(field)
+    if value is None:
+        raise ValueError(
+            f"Malformed standards file: a {kind} is missing required {field!r}: {entry!r}"
+        )
+    return value
+
+
 def _load_dimension_data(
     compiled_dir: Path,
     dimension: str,
@@ -54,12 +69,14 @@ def render_compiled_standards(
         reqs = principle.get("requirements", [])
         if not reqs:
             continue
-        lines.append(f"### {principle['name']}")
+        name = _require_field(principle, "name", "principle")
+        lines.append(f"### {name}")
         if principle.get("description"):
             lines.append(principle["description"])
         for req in reqs:
-            text = resolve_requirement_text(req, (overrides or {}).get(req["id"]))
-            req_line = f"- **{req['id']}**: {text}"
+            req_id = _require_field(req, "id", "requirement")
+            text = resolve_requirement_text(req, (overrides or {}).get(req_id))
+            req_line = f"- **{req_id}**: {text}"
             if req.get("description"):
                 req_line += f" — {req['description']}"
             lines.append(req_line)
@@ -86,12 +103,16 @@ def render_compact_standards(
         reqs = principle.get("requirements", [])
         if not reqs:
             continue
+        requirements = []
+        for r in reqs:
+            req_id = _require_field(r, "id", "requirement")
+            requirements.append({
+                "id": req_id,
+                "rule": resolve_requirement_text(r, (overrides or {}).get(req_id)),
+            })
         checklist.append({
             "principle": principle.get("name", "Unknown"),
-            "requirements": [
-                {"id": r["id"], "rule": resolve_requirement_text(r, (overrides or {}).get(r["id"]))}
-                for r in reqs
-            ],
+            "requirements": requirements,
         })
     return json.dumps(checklist, separators=(",", ":"))
 
@@ -99,7 +120,12 @@ def render_compact_standards(
 def render_dimensions(dimensions_data: dict, dimension: str) -> str:
     """Format dimension info for prompt inclusion."""
     applies = dimensions_data.get("applies", [])
-    dim_entry = next((d for d in applies if d["id"] == dimension), None)
+    dim_entry = None
+    for d in applies:
+        d_id = _require_field(d, "id", "dimension")
+        if d_id == dimension:
+            dim_entry = d
+            break
 
     if not dim_entry:
         return f"_Dimension '{dimension}' not configured._"

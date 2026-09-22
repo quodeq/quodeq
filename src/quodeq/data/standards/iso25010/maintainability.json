@@ -16,7 +16,7 @@
             1121
           ],
           "params": {"max_complexity": {"label": "Max cyclomatic complexity", "type": "int",
-                                        "default": 10, "min": 1, "max": 100}}
+                                        "default": 15, "min": 1, "max": 100}}
         },
         {
           "id": "M-MOD-2",
@@ -39,7 +39,7 @@
             1064
           ],
           "params": {"max_params": {"label": "Max function parameters", "type": "int",
-                                    "default": 5, "min": 1, "max": 30}}
+                                    "default": 6, "min": 1, "max": 30}}
         },
         {
           "id": "M-MOD-6",
@@ -202,7 +202,7 @@
             1080
           ],
           "params": {"max_lines": {"label": "Max function lines", "type": "int",
-                                   "default": 50, "min": 10, "max": 500}}
+                                   "default": 60, "min": 10, "max": 500}}
         },
         {
           "id": "M-ANA-3",

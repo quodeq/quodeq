@@ -1,11 +1,33 @@
-"""Data models for the source manifest."""
+"""Data models for the source manifest.
+
+Prompt-text rendering lives in ``manifest_render`` (``describe_target``,
+``render_target_prompt_context``, ``render_manifest_prompt_context``); the
+entities here carry only data.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
-from quodeq.analysis.manifest_render import render_target_prompt_context
 
-_MAX_EXTENSION_DISPLAY = 8
+@dataclass(frozen=True)
+class ManifestWalkSpec:
+    """The per-run inputs shared by every filesystem walk that builds a
+    SourceManifest (single-scope or multi-scope).
+
+    Mostly detection.json, plus the two things resolved per run:
+    ``ignore_patterns`` from ``.quodeqignore`` and ``tracked_files`` from git.
+
+    ``tracked_files`` is the run's git-tracked file set as absolute paths, or
+    None when git could not answer (no repository, no git binary, a failure).
+    None means "scan everything", which is the pre-git behaviour.
+    """
+
+    ext_map: dict[str, str]
+    skip_dirs: set[str]
+    skip_patterns: list[str]
+    ignore_patterns: list[str] | None = None
+    tracked_files: set[Path] | None = None
 
 
 @dataclass
@@ -33,55 +55,28 @@ class AnalysisTarget:
         if not self.language:
             raise ValueError("AnalysisTarget requires a language")
 
-    @property
-    def project_description(self) -> str:
-        """E.g. 'Kotlin mobile using Flutter'."""
-        parts = [self.language.title()]
-        if self.category:
-            parts = [f"{self.language.title()} {self.category}"]
-        if self.frameworks:
-            parts.append(f"using {', '.join(self.frameworks)}")
-        return " ".join(parts)
-
-    def to_prompt_context(self, repo_total_files: int = 0, other_targets: list[AnalysisTarget] | None = None) -> str:
-        """Render target as context for inclusion in analysis prompts.
-
-        Delegates to :func:`render_target_prompt_context`.
-        """
-        return render_target_prompt_context(self, repo_total_files, other_targets)
-
-    def to_dict(self) -> dict:
-        """Serialize for JSON debugging output."""
-        return {
-            "name": self.name,
-            "language": self.language,
-            "category": self.category,
-            "frameworks": self.frameworks,
-            "project_description": self.project_description,
-            "total_files": self.total_files,
-            "source_files_count": len(self.source_files),
-            "language_stats": self.language_stats,
-            "scope_path": self.scope_path,
-        }
-
 
 @dataclass
 class SourceManifest:
-    """Rich description of a repository's source structure."""
+    """Rich description of a repository's source structure.
+
+    ``skipped_untracked`` is how many otherwise-eligible source files the
+    walk dropped because git does not track them. It is a run signal, not
+    just a log line: a score the reader cannot reconcile with the files they
+    can see is worse than a lower one, so the count travels with the manifest.
+    Zero means nothing was dropped, including when there is no git repository
+    to ask.
+    """
 
     targets: list[AnalysisTarget] = field(default_factory=list)
     total_files: int = 0
     language_stats: dict[str, int] = field(default_factory=dict)
-
-    def add_target(self, target: AnalysisTarget) -> None:
-        """Add an analysis target to this manifest."""
-        self.targets.append(target)
-        self.total_files = sum(t.total_files for t in self.targets)
+    skipped_untracked: int = 0
 
     # --- backward-compat properties (delegate to primary target) ---
 
     @property
-    def _primary(self) -> AnalysisTarget | None:
+    def primary(self) -> AnalysisTarget | None:
         """Primary target = largest by file count."""
         if not self.targets:
             return None
@@ -89,17 +84,20 @@ class SourceManifest:
 
     @property
     def language(self) -> str:
-        p = self._primary
+        """Language of the primary target, "unknown" for an empty manifest."""
+        p = self.primary
         return p.language if p else "unknown"
 
     @property
     def category(self) -> str | None:
-        p = self._primary
+        """Category of the primary target, None for an empty manifest."""
+        p = self.primary
         return p.category if p else None
 
     @property
     def frameworks(self) -> list[str]:
-        p = self._primary
+        """Frameworks of the primary target, empty for an empty manifest."""
+        p = self.primary
         return p.frameworks if p else []
 
     @property
@@ -114,54 +112,3 @@ class SourceManifest:
             merged.extend(t.source_files)
         merged.sort()
         return merged
-
-    @property
-    def project_description(self) -> str:
-        p = self._primary
-        return p.project_description if p else "Unknown"
-
-    def to_prompt_context(self) -> str:
-        """Render manifest as context for inclusion in analysis prompts."""
-        if not self.targets:
-            lines = [
-                "**Project type:** Unknown",
-                f"**Source files:** {self.total_files}",
-            ]
-            if self.language_stats:
-                breakdown = ", ".join(
-                    f"{ext}: {count}" for ext, count in
-                    sorted(self.language_stats.items(), key=lambda x: -x[1])[:_MAX_EXTENSION_DISPLAY]
-                )
-                lines.append(f"**Extension breakdown:** {breakdown}")
-            return "\n".join(lines)
-
-        if len(self.targets) == 1:
-            return self.targets[0].to_prompt_context(repo_total_files=self.total_files)
-
-        # Multi-language: describe all detected modules
-        lines = [f"**Source files:** {self.total_files}"]
-        lines.append("**Detected modules:**")
-        for t in self.targets:
-            lines.append(f"- {t.project_description} ({t.total_files} files)")
-        lines.append("")
-        lines.append("Analyze each file according to its language and project type.")
-        if self.language_stats:
-            breakdown = ", ".join(
-                f"{ext}: {count}" for ext, count in
-                sorted(self.language_stats.items(), key=lambda x: -x[1])[:_MAX_EXTENSION_DISPLAY]
-            )
-            lines.append(f"**Extension breakdown:** {breakdown}")
-        return "\n".join(lines)
-
-    def to_dict(self) -> dict:
-        """Serialize for JSON debugging output."""
-        return {
-            "language": self.language,
-            "category": self.category,
-            "frameworks": self.frameworks,
-            "project_description": self.project_description,
-            "total_files": self.total_files,
-            "source_files_count": len(self.source_files),
-            "language_stats": self.language_stats,
-            "targets": [t.to_dict() for t in self.targets],
-        }

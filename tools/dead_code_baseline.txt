@@ -1,0 +1,27 @@
+# Grandfathered dead code (vulture reports over src/quodeq at
+# --min-confidence 60). Do NOT add entries without justification --
+# the goal is to burn this list to zero, not grow it.
+# The fix is to delete the definition, once a grep over src, tests,
+# tools, CI and docs shows nothing references it (a name a test
+# patches by string is NOT dead). A name reached dynamically is a
+# false positive and belongs in tools/vulture_whitelist.py with a
+# reason, not here.
+# Regenerate intentionally: python tools/check_dead_code.py --update-baseline
+# Entries are line-keyed (relpath:lineno:name), so an unrelated
+# line-count change above a grandfathered report shifts its entry.
+# Prefer hand-editing the baseline over blind regeneration, which can
+# silently absorb genuinely new dead code added in the same change.
+src/quodeq/core/events/models.py:113:is_compliance
+src/quodeq/core/events/models.py:117:has_valid_verdict
+src/quodeq/core/types/dashboard.py:41:previous_numeric_average
+src/quodeq/core/types/dashboard.py:44:dimension_count
+src/quodeq/core/types/dashboard.py:45:severity_critical
+src/quodeq/core/types/dashboard.py:46:severity_major
+src/quodeq/core/types/dashboard.py:47:severity_minor
+src/quodeq/core/types/project.py:40:scan_date
+src/quodeq/services/scoring_view/_models.py:102:dim_count
+src/quodeq/services/scoring_view/_models.py:80:bucket_label
+src/quodeq/services/scoring_view/_models.py:83:bucket_iso
+src/quodeq/services/scoring_view/_models.py:89:representative_run_id
+src/quodeq/services/scoring_view/_models.py:94:representative_run_date_iso
+src/quodeq/update/selfupdate.py:53:set_shutdown_callback

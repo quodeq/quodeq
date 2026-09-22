@@ -1,0 +1,97 @@
+"""Cluster 34: shared/ best-effort handlers log at debug instead of swallowing."""
+from __future__ import annotations
+
+import os
+import signal
+import subprocess
+import sys
+from unittest.mock import patch
+
+import pytest
+
+from quodeq.shared import text_io, process_kill, frozen, ssrf
+
+# The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
+# restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
+pytestmark = pytest.mark.usefixtures("restore_environ")
+
+
+def test_configure_stdio_utf8_logs_each_unreconfigurable_stream(monkeypatch) -> None:
+    class _Stream:
+        def reconfigure(self, **_kwargs):
+            raise ValueError("not reconfigurable")
+
+    monkeypatch.setattr(text_io.sys, "stdout", _Stream())
+    monkeypatch.setattr(text_io.sys, "stderr", _Stream())
+    with patch.object(text_io._logger, "debug") as debug:
+        text_io.configure_stdio_utf8()
+    assert debug.call_count == 2
+    assert "reconfigured to UTF-8" in debug.call_args.args[0]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX only")
+def test_kill_tree_logs_when_process_is_already_gone(monkeypatch) -> None:
+    def _gone(*_args):
+        raise ProcessLookupError(3, "No such process")
+
+    monkeypatch.setattr(process_kill.os, "getpgid", _gone)
+    monkeypatch.setattr(process_kill.os, "kill", _gone)
+    with patch.object(process_kill._logger, "debug") as debug:
+        process_kill.kill_tree(999999, signal.SIGTERM)
+    assert debug.called
+    assert "already gone" in debug.call_args.args[0]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX only")
+def test_kill_proc_tree_logs_killpg_failure_then_proc_kill_failure(monkeypatch) -> None:
+    class _Proc:
+        pid = 999999
+
+        def kill(self):
+            raise ProcessLookupError(3, "No such process")
+
+    def _denied(*_args):
+        raise PermissionError(1, "Operation not permitted")
+
+    monkeypatch.setattr(process_kill.os, "getpgid", lambda pid: pid)
+    monkeypatch.setattr(process_kill.os, "killpg", _denied)
+    with patch.object(process_kill._logger, "debug") as debug:
+        process_kill.kill_proc_tree(_Proc())
+    messages = [c.args[0] for c in debug.call_args_list]
+    assert any("killpg failed" in m for m in messages)
+    assert any("already gone" in m for m in messages)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="source_user_path is a no-op on Windows by design")
+def test_source_user_path_logs_timeout_and_falls_back(monkeypatch) -> None:
+    def _slow(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd="zsh", timeout=1)
+
+    # source_user_path() early-returns when not is_frozen() (line 66); force
+    # the frozen-bundle path so the shell probe below actually runs.
+    monkeypatch.setattr(frozen, "is_frozen", lambda: True)
+    monkeypatch.setattr(frozen.subprocess, "run", _slow)
+    monkeypatch.setenv("PATH", "/usr/bin")
+    with patch.object(frozen._logger, "debug") as debug:
+        frozen.source_user_path()
+    assert debug.called
+    assert "PATH discovery failed" in debug.call_args.args[0]
+    assert os.environ["PATH"].startswith("/usr/bin")
+    assert ".local/bin" in os.environ["PATH"]
+
+
+def test_is_private_address_logs_non_literal_before_dns(monkeypatch) -> None:
+    monkeypatch.setattr(
+        ssrf.socket, "getaddrinfo",
+        lambda *_a, **_k: [(None, None, None, None, ("10.0.0.1", 0))],
+    )
+    with patch.object(ssrf._logger, "debug") as debug:
+        assert ssrf.is_private_address("intranet.example") is True
+    # The ValueError sibling at ssrf.py:23 logs once ("Cannot parse ... as IP
+    # literal"), and the OSError site at ssrf.py:32 under test must log a
+    # second time ("... is not an IPv4 literal ..."). Asserting call_count
+    # plus the site-specific substring (rather than the shared "falling
+    # through to DNS" suffix both messages end with) is what makes this test
+    # actually discriminate the :32 site instead of passing regardless of it.
+    assert debug.call_count == 2
+    assert any("not an IPv4 literal" in c.args[0] for c in debug.call_args_list)

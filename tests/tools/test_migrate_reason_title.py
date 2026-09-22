@@ -46,3 +46,33 @@ class TestMigrateFileNonDict:
         p.write_text(json.dumps({"violations": [{"reason": "Modularity -- x"}], "compliance": []}))
         v, c = migrate_file(p, apply=False)
         assert (v, c) == (1, 0)
+
+
+class TestMigrateFileWriteFailure:
+    def test_write_failure_returns_error_sentinel(self, tmp_path, monkeypatch) -> None:
+        import json
+        from migrate_reason_title import migrate_file
+        p = tmp_path / "eval.json"
+        p.write_text(json.dumps({"violations": [{"reason": "Modularity -- x", "principle": "Modularity"}]}))
+
+        def _boom(*a, **kw):
+            raise OSError("disk full")
+        monkeypatch.setattr("pathlib.Path.write_text", _boom)
+
+        assert migrate_file(p, apply=True) == (-1, -1)
+
+
+class TestMainExitCode:
+    def test_main_exits_nonzero_when_a_file_write_fails(self, tmp_path, monkeypatch, capsys) -> None:
+        import json, sys
+        eval_dir = tmp_path / "proj" / "evaluation"
+        eval_dir.mkdir(parents=True)
+        (eval_dir / "security.json").write_text(
+            json.dumps({"violations": [{"reason": "Modularity -- x", "principle": "Modularity"}]})
+        )
+        monkeypatch.setattr("pathlib.Path.write_text", lambda *a, **kw: (_ for _ in ()).throw(OSError("disk full")))
+        monkeypatch.setattr(sys, "argv", ["migrate_reason_title.py", "--dir", str(tmp_path), "--apply"])
+        import migrate_reason_title
+        with pytest.raises(SystemExit) as exc_info:
+            migrate_reason_title.main()
+        assert exc_info.value.code == 1

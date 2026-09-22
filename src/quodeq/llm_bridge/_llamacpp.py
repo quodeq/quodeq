@@ -19,20 +19,32 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import urllib.request
-import urllib.error
+from collections.abc import Mapping
 
 from quodeq.llm_bridge._ollama import (
+    DEFAULT_MEMORY_FRACTION,
     _detect_memory,
     estimate_max_agents,
 )
+from quodeq.config.llm_bridge_env import llamacpp_base_url
 
 _log = logging.getLogger(__name__)
 
-# llama-server defaults to port 8080. Users can override via env.
-_LLAMACPP_BASE = os.environ.get("LLAMACPP_BASE_URL", "http://localhost:8080")
 _TIMEOUT_S = 3
+#: Everything a probe against a llama-server may raise: the socket/HTTP
+#: layer (OSError, which urllib's URLError and ConnectionRefusedError both
+#: subclass) and a body that is not the JSON we expect (ValueError, which
+#: json.JSONDecodeError subclasses).
+_TRANSPORT_ERRORS = (OSError, ValueError)
+
+
+def _default_base_url(env: Mapping[str, str] | None = None) -> str:
+    """llama-server base URL: ``LLAMACPP_BASE_URL`` or the default port 8080.
+
+    Resolved by the config layer, so nothing here reads os.environ.
+    """
+    return llamacpp_base_url(env)
 
 
 def _normalize_base(base_url: str) -> str:
@@ -48,9 +60,9 @@ def _normalize_base(base_url: str) -> str:
     return stripped
 
 
-def get_llamacpp_status(base_url: str = _LLAMACPP_BASE) -> dict:
+def get_llamacpp_status(base_url: str | None = None) -> dict:
     """Check if a llama-server process is running and reachable."""
-    root = _normalize_base(base_url)
+    root = _normalize_base(base_url or _default_base_url())
     try:
         req = urllib.request.Request(f"{root}/health")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
@@ -60,19 +72,19 @@ def get_llamacpp_status(base_url: str = _LLAMACPP_BASE) -> dict:
                 "status": data.get("status", "ok"),
                 "address": root.replace("http://", ""),
             }
-    except (urllib.error.URLError, ConnectionRefusedError, OSError, ValueError) as exc:
+    except _TRANSPORT_ERRORS as exc:
         _log.warning("llama.cpp status check failed: %s", exc)
         return {"running": False, "error": "Connection failed"}
 
 
-def list_llamacpp_models(base_url: str = _LLAMACPP_BASE) -> list[dict]:
+def list_llamacpp_models(base_url: str | None = None) -> list[dict]:
     """List the model loaded by llama-server.
 
     Always returns 0 or 1 entries: llama-server is one-model-per-process.
     The model name is whatever llama-server reports for the GGUF passed
     via ``-m``, which is typically the file basename.
     """
-    root = _normalize_base(base_url)
+    root = _normalize_base(base_url or _default_base_url())
     try:
         req = urllib.request.Request(f"{root}/v1/models")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
@@ -88,14 +100,14 @@ def list_llamacpp_models(base_url: str = _LLAMACPP_BASE) -> list[dict]:
                 for m in entries
                 if m.get("id")
             ]
-    except (urllib.error.URLError, ConnectionRefusedError, OSError, ValueError) as exc:
+    except _TRANSPORT_ERRORS as exc:
         _log.warning("Could not list llama.cpp models: %s", exc)
         return []
 
 
 def run_concurrency_test(
-    model: str,
-    base_url: str = _LLAMACPP_BASE,
+    _model: str,
+    base_url: str | None = None,
 ) -> dict:
     """Estimate max parallel agents for the loaded llama.cpp model.
 
@@ -116,7 +128,7 @@ def run_concurrency_test(
     # No size data from /v1/models, so use a fraction of host memory as a
     # rough per-context budget. This mirrors Ollama's behavior when VRAM
     # info is missing: we still return at least 1.
-    vram_per_context = models[0].get("size", 0) or max(int(gpu_memory * 0.5), 1)
+    vram_per_context = models[0].get("size", 0) or max(int(gpu_memory * DEFAULT_MEMORY_FRACTION), 1)
 
     if gpu_memory <= 0:
         return {

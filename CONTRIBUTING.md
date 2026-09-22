@@ -48,8 +48,21 @@ Keep pull requests focused on a single change. If you are fixing a bug and also 
 ### Code Style
 
 - Follow the existing patterns in the codebase
+- Lint with ruff before pushing. The rule set lives in `pyproject.toml` and the test suite fails on any finding:
+
+      uv run ruff check src/quodeq tests tools
+      uv run ruff check --fix src/quodeq tests tools   # autofix the safe ones
 - No need to add docstrings or type annotations to code you did not change
 - Tests go in `tests/` mirroring the `src/` structure
+- Constants: a literal with meaning gets a name where it is used, with a one-line comment saying why it has that value.
+  - Python: module-level `_UPPER_SNAKE = value  # reason`. Shared inside a package: that package's `_constants.py`. Shared across packages: `quodeq/shared/constants.py` (`core` may not import `shared`, so anything `core` needs lives under `core/`). HTTP statuses use `http.HTTPStatus`. Ruff `PLR2004` fails the build on a bare number in a comparison; a `len(x) == N` check before an unpack is not a constant, unpack instead or `# noqa: PLR2004  # reason`.
+  - UI: module-level `const UPPER_SNAKE = value; // reason`. Shared inside a feature: that feature's constants module. App-wide storage keys, event names, DOM attributes, media queries and breakpoints: `src/constants.js`; unit conversions: `src/utils/time.js`. `npm run lint:magic` ratchets bare numbers per file (`tools/magic_baseline.json` may only shrink).
+  - Tests keep asserting the literal value: the literal is the contract, the constant is the implementation.
+- Accessibility: interactive elements are real buttons, or carry `role`, `tabIndex` and `activateOnKey` (`src/utils/a11y.js`); names go through `t()`. `npm run lint:a11y` ratchets jsx-a11y violations per file (`tools/a11y_baseline.json` may only shrink).
+
+#### API error responses
+
+Every error response from `src/quodeq/api` carries a machine-readable `code`: build it with `error_response(message, status, code)` from `quodeq.api.helpers`, not a bare `jsonify({"error": ...})`. `code` is an UPPER_SNAKE literal; reuse an existing spelling for the same condition (grep `src/quodeq/api` first) rather than inventing a new one. Route modules do not call `abort()`. Raise a small exception and handle it with `@app.errorhandler`, or return `error_response(...)` directly, so the body keeps the `{"error", "code"}` shape instead of Flask's default error page. `tools/check_error_codes.py` enforces this with a zero-tolerance gate: under `src/quodeq/api`, a `jsonify({"error": ...})` or a `return {"error": ...}, <400+>` without a `"code"` key, or an `abort(400+)`, fails the build. A dict literal whose `"error"` value is `None` is exempt: that is a reserved slot in a success payload, not an error response.
 
 ## Branch Model
 

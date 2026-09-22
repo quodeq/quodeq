@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import React from 'react';
 import LoadingScreen, { FadingLoadingScreen } from './LoadingScreen.jsx';
 
 describe('LoadingScreen tips', () => {
@@ -62,28 +61,11 @@ describe('LoadingScreen tips', () => {
     }
   });
 
-  it('renders the warm-up notice when a snapshot is active', () => {
-    const { container } = render(
-      <LoadingScreen warmup={{ active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' }} />,
-    );
-    expect(container.querySelector('.warmup-notice')).toBeTruthy();
-  });
-
-  it('keeps the tip right under the logo and the warm-up notice in the last (bottom) slot', async () => {
-    vi.useFakeTimers();
-    try {
-      const { container } = render(
-        <LoadingScreen tips warmup={{ active: true, projectsDone: 0, projectsTotal: 2, currentProjectName: 'x' }} />,
-      );
-      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
-      const children = Array.from(container.querySelector('.loading-screen').children);
-      const tipIdx = children.findIndex((el) => el.classList.contains('loading-tip'));
-      const noticeIdx = children.findIndex((el) => el.classList.contains('warmup-notice'));
-      expect(tipIdx).toBeGreaterThan(-1);
-      expect(noticeIdx).toBeGreaterThan(tipIdx);
-    } finally {
-      vi.useRealTimers();
-    }
+  it('marks the boot variant so it covers the shell body and swallows clicks', () => {
+    const { container } = render(<LoadingScreen variant="shell" />);
+    const el = container.querySelector('.loading-screen');
+    expect(el.classList.contains('loading-screen--shell')).toBe(true);
+    expect(el.classList.contains('loading-screen--inline')).toBe(false);
   });
 });
 

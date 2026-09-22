@@ -63,7 +63,8 @@ def test_detection_used_when_no_profile(tmp_path):
     assert resolved.network_exposure == "public"
 
 
-def test_desktop_detection_alone_never_relaxes_remote(tmp_path):
+@pytest.fixture()
+def _desktop_detected_trust_model(tmp_path):
     # C1: detection may fill multi_tenant but must NEVER fill
     # network_exposure -- only a human declaration in
     # .quodeq/project-profile.json may waive a remote-reachability finding.
@@ -72,14 +73,41 @@ def test_desktop_detection_alone_never_relaxes_remote(tmp_path):
     # desktop/cli today; none of them may get S-AUT-3 waived on that basis
     # alone.
     _desktop_manifest(tmp_path)
-    resolved = resolve_trust_model(tmp_path)
+    return resolve_trust_model(tmp_path)
+
+
+def test_desktop_detection_alone_never_relaxes_remote(_desktop_detected_trust_model):
+    resolved = _desktop_detected_trust_model
     assert resolved.network_exposure == "public"
     assert resolved.relaxes_remote() is False
 
+
+def test_desktop_detection_alone_does_not_waive_the_scope_gate(_desktop_detected_trust_model):
+    resolved = _desktop_detected_trust_model
     finding = {
         "t": "violation", "req": "S-AUT-3", "severity": "major",
         "w": "Path traversal via job_id",
         "reason": "The job_id is used to construct a file path without validation.",
+    }
+    assert apply_scope_gate(finding, resolved) is False
+    assert finding["severity"] == "major"
+
+
+def test_desktop_detection_alone_never_relaxes_topology(tmp_path):
+    # The topology twin of the test above. detect_shape confidently says
+    # "desktop", which is the shape most likely to be a single host, and it
+    # still must not fill the axis: a hosted service that merely LOOKS like
+    # a desktop app on disk would otherwise get F-SCL-1/2/4 capped without
+    # anyone declaring anything.
+    _desktop_manifest(tmp_path)
+    resolved = resolve_trust_model(tmp_path)
+    assert resolved.deployment_topology == "distributed"
+    assert resolved.is_single_host() is False
+
+    finding = {
+        "t": "violation", "req": "F-SCL-1", "severity": "major",
+        "w": "Session state is held in a process-local dict",
+        "reason": "State must be externalised to survive a second replica.",
     }
     assert apply_scope_gate(finding, resolved) is False
     assert finding["severity"] == "major"
@@ -145,7 +173,8 @@ def test_lan_behaves_as_public_for_relaxation(tmp_path):
 
 
 def test_loopback_relaxes():
-    assert TrustModel(multi_tenant=False, network_exposure="loopback").relaxes_remote() is True
+    assert TrustModel(multi_tenant=False, network_exposure="loopback",
+                      deployment_topology="distributed").relaxes_remote() is True
 
 
 @pytest.mark.skipif(
@@ -197,8 +226,8 @@ def test_deeply_nested_package_json_degrades(tmp_path):
     # Same RecursionError overflow as the declared-side fix, but reached
     # through detection: detect_shape parses package.json via _read_json,
     # whose except json.JSONDecodeError does not catch RecursionError (a
-    # RuntimeError subclass). _detected_fields must degrade this too, not
-    # just the declared-profile path.
+    # RuntimeError subclass). _detected_multi_tenant must degrade this too,
+    # not just the declared-profile path.
     (tmp_path / "package.json").write_text(
         "[" * 80000 + "]" * 80000, encoding="utf-8")
     assert resolve_trust_model(tmp_path) == CONSERVATIVE
@@ -209,3 +238,29 @@ def test_deeply_nested_pyproject_toml_degrades(tmp_path):
     (tmp_path / "pyproject.toml").write_text(
         "a = " + "[" * 5000 + "]" * 5000, encoding="utf-8")
     assert resolve_trust_model(tmp_path) == CONSERVATIVE
+
+
+def test_declared_topology_wins(tmp_path):
+    _write_profile(tmp_path, {"version": 1, "deploymentTopology": "single-host"})
+    resolved = resolve_trust_model(tmp_path)
+    assert resolved.deployment_topology == "single-host"
+    assert resolved.is_single_host() is True
+
+
+def test_undeclared_topology_is_conservative(tmp_path):
+    # Topology is never detected, so an undeclared project stays distributed.
+    _write_profile(tmp_path, {"version": 1, "multiTenant": False})
+    assert resolve_trust_model(tmp_path).deployment_topology == "distributed"
+
+
+def test_unknown_topology_value_is_ignored(tmp_path):
+    _write_profile(tmp_path, {"version": 1, "deploymentTopology": "kubernetes"})
+    assert resolve_trust_model(tmp_path).deployment_topology == "distributed"
+
+
+def test_bad_topology_does_not_discard_other_axes(tmp_path):
+    _write_profile(tmp_path, {
+        "version": 1, "networkExposure": "loopback", "deploymentTopology": 7})
+    resolved = resolve_trust_model(tmp_path)
+    assert resolved.network_exposure == "loopback"
+    assert resolved.deployment_topology == "distributed"

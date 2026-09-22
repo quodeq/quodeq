@@ -19,9 +19,17 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis._report_assembly import build_dashboard_report
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.evidence.parser import (
+    EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 
 _DIMENSION = "demo"
+
+
+def _options(compiled_dir: Path) -> EvidenceParseOptions:
+    return EvidenceParseOptions(
+        compiled_dir=compiled_dir, req_map_reader=read_req_to_principle_map,
+    )
 
 
 @pytest.fixture
@@ -59,14 +67,14 @@ def _context() -> EvidenceContext:
 
 
 def test_evidence_carries_the_quarantined_count(evidence_file, compiled_dir):
-    evidence = parse_jsonl_to_evidence(evidence_file, _context(), compiled_dir=compiled_dir)
+    evidence = parse_jsonl_to_evidence(evidence_file, _context(), _options(compiled_dir))
     assert evidence.quarantined_count == 1
     # Still excluded from scoring: no phantom principle was created.
     assert set(evidence.principles) == {"Analyzability"}
 
 
 def test_report_json_records_the_quarantined_count(evidence_file, compiled_dir):
-    evidence = parse_jsonl_to_evidence(evidence_file, _context(), compiled_dir=compiled_dir)
+    evidence = parse_jsonl_to_evidence(evidence_file, _context(), _options(compiled_dir))
     report = build_dashboard_report(evidence, {})
     assert report["quarantinedCount"] == 1
     # The quarantined finding is metadata only -- it never joins the findings list.
@@ -80,7 +88,7 @@ def test_clean_run_records_zero(tmp_path, compiled_dir):
         "p": "Analyzability", "t": "violation", "d": _DIMENSION,
         "file": "a.py", "line": 1,
     }) + "\n", encoding="utf-8")
-    evidence = parse_jsonl_to_evidence(p, _context(), compiled_dir=compiled_dir)
+    evidence = parse_jsonl_to_evidence(p, _context(), _options(compiled_dir))
     assert build_dashboard_report(evidence, {})["quarantinedCount"] == 0
 
 
@@ -111,7 +119,7 @@ def test_count_survives_the_run_read_into_the_dashboard_payload(tmp_path):
     vanishes before the UI ever sees it and the feature is inert. Pin the whole
     path: report JSON -> DimensionResult -> camelCase payload.
     """
-    from quodeq.core.types import to_camel_dict
+    from quodeq.shared.serialization import to_camel_dict
     from quodeq.data.fs.report_parser.runs import read_run_data
 
     _write_report(tmp_path / "proj" / "run1", "demo", {"quarantinedCount": 3})

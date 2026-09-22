@@ -8,7 +8,7 @@ Implementation modules:
 from __future__ import annotations
 
 from quodeq.analysis._dimensions import load_universal_dimensions as load_universal_dimensions
-from quodeq.analysis._types import (
+from quodeq.analysis.run_types import (
     AnalysisOptions as AnalysisOptions,
     RunConfig as RunConfig,
 )

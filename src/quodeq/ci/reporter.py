@@ -10,18 +10,29 @@ from urllib.request import Request, urlopen
 
 from quodeq.ci._suppressions import filter_suppressed_violations
 from quodeq.ci.review_builder import (
+    ReviewOptions,
     build_review_summary,
     classify_violations,
     determine_verdict,
     violation_to_comment,
 )
+from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
-_GITHUB_API = "https://api.github.com"
+_DEFAULT_GITHUB_API = "https://api.github.com"
 _FILES_PAGE_SIZE = 100
 _HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 _REQUEST_TIMEOUT_SECONDS = 30.0
+
+
+def _github_api_base(env: dict[str, str] | None = None) -> str:
+    """GitHub API base URL, overridable for GitHub Enterprise Server.
+
+    Defaults to github.com's API. Set QUODEQ_GITHUB_API_BASE (e.g.
+    ``https://github.example.com/api/v3``) to point at a GHES instance.
+    """
+    return resolve_env(env).get("QUODEQ_GITHUB_API_BASE") or _DEFAULT_GITHUB_API
 
 
 def _parse_hunks(patch: str | None) -> set[int]:
@@ -61,14 +72,35 @@ def _parse_hunks(patch: str | None) -> set[int]:
     return lines
 
 
+def _github_call(req: Request) -> list | dict:
+    """Perform *req* against the GitHub API, returning parsed JSON.
+
+    Shared by ``_github_get`` (read) and ``_github_request`` (write) so both
+    fail the same way: a non-2xx response or a connection-level failure
+    becomes a ``RuntimeError`` carrying the response/reason, instead of a
+    raw ``urllib.error`` leaking to callers.
+    """
+    try:
+        with urlopen(req, timeout=_REQUEST_TIMEOUT_SECONDS) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        _logger.error("GitHub API request failed: HTTP %s %s – %s", exc.code, exc.reason, body)
+        raise RuntimeError(
+            f"GitHub API returned HTTP {exc.code} ({exc.reason}): {body}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        _logger.error("GitHub API request failed: %s", exc.reason)
+        raise RuntimeError(f"GitHub API request failed: {exc.reason}") from exc
+
+
 def _github_get(url: str, token: str) -> list | dict:
     """Authenticated GET to the GitHub API. Returns parsed JSON."""
     req = Request(url, method="GET")
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("Accept", "application/vnd.github+json")
     req.add_header("X-GitHub-Api-Version", "2022-11-28")
-    with urlopen(req, timeout=_REQUEST_TIMEOUT_SECONDS) as resp:
-        return json.loads(resp.read())
+    return _github_call(req)
 
 
 def fetch_pr_changed_lines(
@@ -84,7 +116,7 @@ def fetch_pr_changed_lines(
     page = 1
     while True:
         url = (
-            f"{_GITHUB_API}/repos/{owner}/{repo}/pulls/{pr_number}/files"
+            f"{_github_api_base()}/repos/{owner}/{repo}/pulls/{pr_number}/files"
             f"?per_page={_FILES_PAGE_SIZE}&page={page}"
         )
         data = _github_get(url, token)
@@ -160,12 +192,36 @@ def load_evaluation_reports(evaluation_dir: Path) -> list[dict]:
     return reports
 
 
+def _build_comments_and_outside_diff(
+    new_violations: list[dict],
+    existing_violations: list[dict],
+    changed_lines: dict[str, set[int]] | None,
+) -> tuple[list[dict], list[dict]]:
+    """Build review comments, filtered to the PR diff when *changed_lines* is given.
+
+    Returns ``(comments, outside_diff_new)``. When *changed_lines* is
+    provided, out-of-diff comments can't be posted inline (GitHub 422) and
+    are dropped from ``comments``; the NEW violations among them are
+    returned as ``outside_diff_new`` so the caller can surface them in the
+    summary body instead of silently losing them.
+    """
+    all_comments = [violation_to_comment(v, status="new") for v in new_violations]
+    all_comments += [violation_to_comment(v, status="existing") for v in existing_violations]
+
+    if changed_lines is None:
+        return all_comments, []
+
+    comments, _ = filter_comments_to_diff(all_comments, changed_lines)
+    outside_diff_new = [
+        v for v in new_violations if not _violation_anchorable(v, changed_lines)
+    ]
+    return comments, outside_diff_new
+
+
 def build_review_payload(
     reports: list[dict],
     baseline_violations: list[dict] | None = None,
-    duration_seconds: int | None = None,
-    baseline_available: bool = True,
-    artifact_url: str | None = None,
+    options: ReviewOptions | None = None,
     changed_lines: dict[str, set[int]] | None = None,
 ) -> dict:
     """Build the full GitHub PR review API payload from evaluation reports.
@@ -173,15 +229,15 @@ def build_review_payload(
     baseline_violations: violations from the last nightly evaluation on the base
     branch. When provided, current violations are classified as NEW or EXISTING.
     When omitted, all violations are treated as NEW.
-    baseline_available: when False, a note is added to the summary explaining
-    that no baseline comparison was made (first-run scenario).
-    artifact_url: when provided, a download link is appended to the summary.
+    options: run-level summary details (:class:`ReviewOptions`):
+    ``baseline_available`` False adds a note that no baseline comparison was
+    made (first-run scenario); ``artifact_url`` appends a download link;
+    ``duration_seconds`` adds the completion-time footer.
     changed_lines: when provided, review comments are filtered to only those
-    whose path+line fall within the PR's changed hunks. GitHub rejects
-    comments outside the diff with HTTP 422, so the CLI must fetch the PR's
-    files and pass this mapping. NEW violations that fall outside the changed
-    lines can't be inline-anchored, so they're surfaced in the summary body
-    (file:line + description) instead of silently dropped.
+    whose path+line fall within the PR's changed hunks (GitHub rejects
+    comments outside the diff with HTTP 422) -- see
+    :func:`_build_comments_and_outside_diff` for how out-of-diff NEW
+    violations get surfaced in the summary body instead of silently dropped.
     """
     all_violations: list[dict] = []
     for report in reports:
@@ -191,29 +247,15 @@ def build_review_payload(
         all_violations, baseline_violations or []
     )
 
-    all_comments = [violation_to_comment(v, status="new") for v in new_violations]
-    all_comments += [violation_to_comment(v, status="existing") for v in existing_violations]
-
-    if changed_lines is None:
-        comments = all_comments
-        outside_diff_new: list[dict] = []
-    else:
-        # Out-of-diff comments can't be posted inline (GitHub 422), so they're
-        # dropped from `comments`. But rather than silently lose them, the NEW
-        # violations among them are surfaced in the summary body with file:line
-        # so the headline count and the visible findings agree.
-        comments, _ = filter_comments_to_diff(all_comments, changed_lines)
-        outside_diff_new = [
-            v for v in new_violations if not _violation_anchorable(v, changed_lines)
-        ]
+    comments, outside_diff_new = _build_comments_and_outside_diff(
+        new_violations, existing_violations, changed_lines,
+    )
 
     summary = build_review_summary(
         reports,
         new_violations,
         existing_violations,
-        duration_seconds=duration_seconds,
-        baseline_available=baseline_available,
-        artifact_url=artifact_url,
+        options=options,
         outside_diff_violations=outside_diff_new,
     )
     verdict = determine_verdict(new_violations)
@@ -233,7 +275,7 @@ def post_review(
     token: str,
 ) -> dict:
     """Post a pull request review to GitHub."""
-    url = f"{_GITHUB_API}/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
+    url = f"{_github_api_base()}/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
     return _github_request(url, payload, token)
 
 
@@ -245,13 +287,4 @@ def _github_request(url: str, payload: dict, token: str) -> dict:
     req.add_header("Accept", "application/vnd.github+json")
     req.add_header("Content-Type", "application/json")
     req.add_header("X-GitHub-Api-Version", "2022-11-28")
-
-    try:
-        with urlopen(req, timeout=_REQUEST_TIMEOUT_SECONDS) as resp:
-            return json.loads(resp.read())
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode(errors="replace")
-        _logger.error("GitHub API request failed: HTTP %s %s – %s", exc.code, exc.reason, body)
-        raise RuntimeError(
-            f"GitHub API returned HTTP {exc.code} ({exc.reason}): {body}"
-        ) from exc
+    return _github_call(req)

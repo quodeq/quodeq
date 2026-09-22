@@ -93,7 +93,7 @@ evidence -> tally violation types -> tally compliance types
          -> raw = base + (10 - base) * lift
          -> violation_ceiling(vt_counts)            [stage 3]
          -> severity_grade_floor(vt_counts)         [stage 4]
-         -> final = max(floor, min(ceiling, raw))
+         -> final = clamp_principle_score(raw, vt_counts) = min(ceiling, max(floor, raw))
          -> grade = score_to_grade_label(final)
 ```
 
@@ -112,7 +112,7 @@ If more than 50% of principles are Insufficient, the overall score is flagged wi
 ## Tunable parameters
 
 All Q² constants are wrapped by `ScoringParams` (`core/scoring/params.py`).
-`DEFAULT_PARAMS` mirrors the constants in `_constants.py`; user overrides
+`DEFAULT_PARAMS` mirrors the constants in `constants.py`; user overrides
 persist at `~/.quodeq/grade_formula.json` (see `services/grade_formula.py`)
 and are editable from Settings > Grade formula. Every scoring function takes
 an explicit `params` argument; there is no global mutable configuration.

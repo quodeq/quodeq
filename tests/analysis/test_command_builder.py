@@ -1,10 +1,8 @@
 """Tests for provider-aware AI CLI command builder."""
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from quodeq.analysis._command import _build_ai_cmd
 from quodeq.analysis._config import AnalysisConfig
@@ -69,6 +67,27 @@ _GEMINI_CFG = {
 
 def _patch_providers(cfg: dict):
     return patch("quodeq.analysis._command._get_provider_configs", return_value=cfg)
+
+
+class TestCmdBinaryOverride:
+    """AI_CMD_PATH redirects argv[0] while the provider id keeps keying config."""
+
+    def test_ai_cmd_path_replaces_argv0(self, monkeypatch):
+        monkeypatch.setenv("AI_CMD_PATH", "/opt/bin/claude-api")
+        config = AnalysisConfig(ai_cmd="claude", ai_model="sonnet-4")
+        with _patch_providers(_CLAUDE_CFG):
+            args, _ = _build_ai_cmd("Analyze", config)
+        assert args[0] == "/opt/bin/claude-api"
+        # Provider behavior still resolves from the "claude" registry entry.
+        assert "--print" in args
+        assert "--tools" in args
+
+    def test_without_override_argv0_is_provider_id(self, monkeypatch):
+        monkeypatch.delenv("AI_CMD_PATH", raising=False)
+        config = AnalysisConfig(ai_cmd="claude", ai_model="sonnet-4")
+        with _patch_providers(_CLAUDE_CFG):
+            args, _ = _build_ai_cmd("Analyze", config)
+        assert args[0] == "claude"
 
 
 class TestBuildAiCmdClaude:

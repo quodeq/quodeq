@@ -1,5 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { saveDraft, loadDraft, clearDraft, DRAFT_KEY } from './useWizardDraft.js';
+import {
+  saveDraft, loadDraft, clearDraft, DRAFT_KEY,
+  markWelcomeSkipped, wasWelcomeSkipped, SKIPPED_KEY,
+} from './useWizardDraft.js';
+
+// Same fakeStorage shape as visibleStandards.test.jsx: a plain in-memory
+// object standing in for localStorage, so a test can assert against an
+// injected backend instead of the jsdom global.
+function fakeStorage(initial = {}) {
+  const map = { ...initial };
+  return {
+    getItem: (k) => (k in map ? map[k] : null),
+    setItem: (k, v) => { map[k] = v; },
+    removeItem: (k) => { delete map[k]; },
+    _map: map,
+  };
+}
 
 describe('useWizardDraft', () => {
   beforeEach(() => {
@@ -45,5 +61,27 @@ describe('useWizardDraft', () => {
     } finally {
       Storage.prototype.setItem = originalSetItem;
     }
+  });
+
+  it('markWelcomeSkipped writes the literal "true" under SKIPPED_KEY', () => {
+    markWelcomeSkipped();
+    expect(localStorage.getItem(SKIPPED_KEY)).toBe('true');
+    expect(SKIPPED_KEY).toBe('quodeq_onboarding_skipped');
+  });
+
+  it('wasWelcomeSkipped reflects the stored flag', () => {
+    expect(wasWelcomeSkipped()).toBe(false);
+    markWelcomeSkipped();
+    expect(wasWelcomeSkipped()).toBe(true);
+  });
+
+  it('saveDraft/loadDraft/clearDraft thread an injected storage backend, leaving localStorage untouched', () => {
+    const storage = fakeStorage();
+    saveDraft({ step: 'provider' }, storage);
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull(); // real localStorage untouched
+    expect(loadDraft(storage).step).toBe('provider');
+    clearDraft(storage);
+    expect(loadDraft(storage)).toBeNull();
+    expect(storage.getItem(DRAFT_KEY)).toBeNull();
   });
 });

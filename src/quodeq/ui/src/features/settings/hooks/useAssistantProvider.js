@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT } from '../../../constants.js';
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
@@ -40,16 +40,8 @@ function loadState(storage) {
   return { enabled, mode, activeProvider, model, followsAnalysis: false };
 }
 
-export function useAssistantProvider({ storage = localStorage } = {}) {
-  const [state, setState] = useState(() => loadState(storage));
-
-  const broadcast = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event(CHANGE_EVENT));
-    }
-  }, []);
-
-  const setEnabled = useCallback((value) => {
+function makeSetEnabled(storage, setState, broadcast) {
+  return (value) => {
     try {
       storage.setItem(ASSISTANT_ENABLED_KEY, value ? 'true' : 'false');
     } catch (err) {
@@ -57,9 +49,11 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
     }
     setState(loadState(storage));
     broadcast();
-  }, [storage, broadcast]);
+  };
+}
 
-  const setMode = useCallback((mode) => {
+function makeSetMode(storage, setState, broadcast) {
+  return (mode) => {
     try {
       storage.setItem(ASSISTANT_MODE_KEY, mode === 'custom' ? 'custom' : 'default');
     } catch (err) {
@@ -67,9 +61,11 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
     }
     setState(loadState(storage));
     broadcast();
-  }, [storage, broadcast]);
+  };
+}
 
-  const setActiveProvider = useCallback((id) => {
+function makeSetActiveProvider(storage, setState, broadcast) {
+  return (id) => {
     try {
       storage.setItem(ASSISTANT_ACTIVE_PROVIDER_KEY, id);
     } catch (err) {
@@ -77,9 +73,11 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
     }
     setState(loadState(storage));
     broadcast();
-  }, [storage, broadcast]);
+  };
+}
 
-  const setModel = useCallback((value) => {
+function makeSetModel(storage, setState, broadcast) {
+  return (value) => {
     const { activeProvider } = loadState(storage);
     try {
       storage.setItem(providerKey(activeProvider, 'model-assistant'), value);
@@ -88,14 +86,16 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
     }
     setState(loadState(storage));
     broadcast();
-  }, [storage, broadcast]);
+  };
+}
 
+// Analysis-gate changes (provider/model) fire PROVIDER_SETTINGS_CHANGED_EVENT
+// so Default mode, which mirrors the analysis selection, updates its display live.
+function useProviderChangeSync(storage, setState) {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const handleChange = () => setState(loadState(storage));
     window.addEventListener(CHANGE_EVENT, handleChange);
-    // Analysis-gate changes (provider/model) fire this shared event so Default
-    // mode, which mirrors the analysis selection, updates its display live.
     window.addEventListener(PROVIDER_SETTINGS_CHANGED_EVENT, handleChange);
     window.addEventListener('storage', handleChange);
     return () => {
@@ -104,7 +104,9 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
       window.removeEventListener('storage', handleChange);
     };
   }, [storage]);
+}
 
+function buildAssistantProviderResult(state, setEnabled, setMode, setActiveProvider, setModel) {
   return {
     enabled: state.enabled,
     setEnabled,
@@ -116,6 +118,37 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
     setModel,
     followsAnalysis: state.followsAnalysis,
   };
+}
+
+/**
+ * The assistant's provider selection: whether it is enabled, the mode, the
+ * active provider and its model.
+ *
+ * Every setter persists and broadcasts, so a change made on the Settings
+ * screen reaches the drawer in the same window (a `storage` event only fires
+ * cross-tab). In follow-analysis mode the selection tracks the analysis
+ * provider instead of being set directly. `storage` is injectable for tests.
+ */
+export function useAssistantProvider({ storage = localStorage } = {}) {
+  const [state, setState] = useState(() => loadState(storage));
+
+  const broadcast = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(CHANGE_EVENT));
+    }
+  }, []);
+
+  // useMemo, not useCallback: the factories must run only when their inputs
+  // change, where useCallback(factory(...), deps) rebuilds the closure every
+  // render and then throws it away.
+  const setEnabled = useMemo(() => makeSetEnabled(storage, setState, broadcast), [storage, broadcast]);
+  const setMode = useMemo(() => makeSetMode(storage, setState, broadcast), [storage, broadcast]);
+  const setActiveProvider = useMemo(() => makeSetActiveProvider(storage, setState, broadcast), [storage, broadcast]);
+  const setModel = useMemo(() => makeSetModel(storage, setState, broadcast), [storage, broadcast]);
+
+  useProviderChangeSync(storage, setState);
+
+  return buildAssistantProviderResult(state, setEnabled, setMode, setActiveProvider, setModel);
 }
 
 export default useAssistantProvider;

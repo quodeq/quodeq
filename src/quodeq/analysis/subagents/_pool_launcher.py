@@ -1,18 +1,18 @@
 """Pool creation, launching, and stream-level evidence collection."""
 from __future__ import annotations
 
-import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._runner_markers import emit_marker
-from quodeq.analysis._types import AnalysisOptions, RunConfig
+from quodeq.analysis.runner_markers import emit_marker
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
-from quodeq.shared.constants import DEFAULT_TIME_LIMIT
+from quodeq.config.analysis_env import non_scout_providers, subagent_model_override
+from quodeq.shared.constants import CC_PHASE_DEADLINE_EXTENDED, DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd
 
@@ -34,9 +34,7 @@ _UNLIMITED_BUDGET = 0
 
 def _non_scout_providers(env: dict[str, str] | None = None) -> tuple[str, ...]:
     """Providers that skip scout mode (no per-token billing), read per call."""
-    raw = (env if env is not None else os.environ).get(
-        "QUODEQ_NON_SCOUT_PROVIDERS", "codex,gemini")
-    return tuple(p.strip() for p in raw.split(",") if p.strip())
+    return non_scout_providers(env)
 
 
 def _resolve_time_limit(user_budget: int | None, queue_size: int) -> int:
@@ -80,7 +78,7 @@ def _extend_run_deadline(options: AnalysisOptions, time_limit: int) -> None:
     new_iso = (
         datetime.now(timezone.utc) + timedelta(seconds=time_limit)
     ).isoformat()
-    emit_marker("deadline_extended", deadline_at=new_iso, budget_s=time_limit)
+    emit_marker(CC_PHASE_DEADLINE_EXTENDED, deadline_at=new_iso, budget_s=time_limit)
     if options.on_deadline_extended is not None:
         try:
             options.on_deadline_extended(new_iso)
@@ -97,10 +95,10 @@ def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override, or None to use the client's default.
 
     Checks SUBAGENT_MODEL first (set by dashboard/service layer),
-    then QUODEQ_SUBAGENT_MODEL (direct env var override).
+    then QUODEQ_SUBAGENT_MODEL (direct env var override). Both are
+    resolved by the config layer.
     """
-    _env = env or os.environ
-    return _env.get("SUBAGENT_MODEL") or _env.get("QUODEQ_SUBAGENT_MODEL") or None
+    return subagent_model_override(env)
 
 
 @dataclass
@@ -113,12 +111,19 @@ class LaunchPoolParams:
     all_files: list[str] | None = None
 
 
-def _launch_pool(
+def _resolve_pool_budget(
     config: RunConfig, dim_id: str, params: LaunchPoolParams,
-) -> tuple[Any, list[Any]]:
-    """Create and run a SubagentPool, returning its results."""
-    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = config.options.subagent_model or _default_subagent_model() or config.options.ai_model
+) -> int:
+    """Resolve this pool's effective time limit and ratchet the run deadline.
+
+    Must run BEFORE `_build_pool_config`: the pool snapshots deadline_at,
+    and every deadline consumer (watchdog, drain checks, dashboard
+    countdown) must agree on the granted budget, not the pre-scale one.
+    Only the AUTO-SCALED budget may ratchet the deadline. An explicit
+    time_limit is a run-wide HARD CAP: extending it here handed every
+    dim's pool a fresh full budget, so a 1h run kept running for
+    "1h after the LAST dim launch" (observed: run 838d807e).
+    """
     queue_size = len(params.all_files) if params.all_files is not None else 0
     time_limit = _resolve_time_limit(config.options.time_limit, queue_size)
     base_user_budget = config.options.time_limit if config.options.time_limit is not None else DEFAULT_TIME_LIMIT
@@ -127,16 +132,19 @@ def _launch_pool(
             f"  [{dim_id}] Time limit auto-scaled: {base_user_budget}s → {time_limit}s"
             f" for {queue_size} files"
         )
-    # Must happen BEFORE base_ac is built: the pool snapshots deadline_at,
-    # and every deadline consumer (watchdog, drain checks, dashboard
-    # countdown) must agree on the granted budget, not the pre-scale one.
-    # Only the AUTO-SCALED budget may ratchet the deadline. An explicit
-    # time_limit is a run-wide HARD CAP: extending it here handed every
-    # dim's pool a fresh full budget, so a 1h run kept running for
-    # "1h after the LAST dim launch" (observed: run 838d807e).
     if config.options.time_limit is None:
         _extend_run_deadline(config.options, time_limit)
-    base_ac = AnalysisConfig(
+    return time_limit
+
+
+def _build_pool_config(
+    config: RunConfig, dim_id: str, params: LaunchPoolParams,
+    time_limit: int, env: dict[str, str] | None,
+) -> AnalysisConfig:
+    """Build the per-launch AnalysisConfig for this pool."""
+    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+    subagent_model = config.options.subagent_model or _default_subagent_model(env) or config.options.ai_model
+    return AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
         max_turns=config.options.max_turns,
@@ -150,21 +158,35 @@ def _launch_pool(
         run_config=config,
         dimension=dim_id,
     )
-    n_agents = config.options.max_subagents
 
-    # Skip scout mode for providers without per-token billing (e.g. Codex with
-    # ChatGPT subscription).  Launch all agents immediately for faster results.
-    ai_cmd = get_ai_cmd()
-    use_scout = ai_cmd not in _non_scout_providers()
 
+def _use_scout_mode(env: dict[str, str] | None) -> bool:
+    """Skip scout mode for providers without per-token billing (e.g. Codex
+    with ChatGPT subscription): launch all agents immediately for faster results."""
+    return get_ai_cmd(env) not in _non_scout_providers(env)
+
+
+def _pool_paths(config: RunConfig, params: LaunchPoolParams) -> PoolPaths:
+    return PoolPaths(
+        work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path,
+        src=config.src, all_files=params.all_files, standards_dir=config.standards_dir,
+    )
+
+
+def _launch_pool(
+    config: RunConfig, dim_id: str, params: LaunchPoolParams,
+    *, env: dict[str, str] | None = None,
+) -> tuple[Any, list[Any]]:
+    """Create and run a SubagentPool, returning its results."""
+    time_limit = _resolve_pool_budget(config, dim_id, params)
+    base_ac = _build_pool_config(config, dim_id, params, time_limit, env)
     pool = SubagentPool(
-        paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path,
-                        src=config.src, all_files=params.all_files, standards_dir=config.standards_dir),
+        paths=_pool_paths(config, params),
         options=PoolOptions(
-            n_agents=n_agents,
+            n_agents=config.options.max_subagents,
             prompt=params.prompt,
             dimension=dim_id,
-            scout_first=use_scout,
+            scout_first=_use_scout_mode(env),
         ),
         config=base_ac,
     )

@@ -17,6 +17,10 @@ function normalizeSeverity(value) {
   return KNOWN_SEVERITIES.includes(normalized) ? normalized : 'unknown';
 }
 
+/**
+ * Whether an entry survives the principle and file-substring filters. An
+ * empty filter matches everything.
+ */
 export function matchesEntryFilters(entry, { selectedPrinciples = [], fileFilter = '' } = {}) {
   if (selectedPrinciples.length > 0 && !selectedPrinciples.includes(entry.principle || '')) {
     return false;
@@ -33,6 +37,10 @@ export function matchesEntryFilters(entry, { selectedPrinciples = [], fileFilter
   return true;
 }
 
+/**
+ * matchesEntryFilters plus the severity filter, for violations rather than
+ * compliance entries.
+ */
 export function matchesViolationFilters(
   entry,
   { selectedSeverities = [], selectedPrinciples = [], fileFilter = '' } = {}
@@ -92,6 +100,12 @@ function aggregateViolationEntry(bucket, dimension, entry) {
 
 const DEFAULT_TOP_FILES_LIMIT = 500;
 
+/**
+ * Rolls the filtered violations across every dimension up per file, ordered
+ * worst first and capped at `limit` rows.
+ *
+ * This is the model behind the "top offending files" tables.
+ */
 export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = DEFAULT_TOP_FILES_LIMIT) {
   const bucket = new Map();
 
@@ -125,6 +139,29 @@ export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = DE
     .slice(0, limit);
 }
 
+/** Folds one dimension's violations into the project-root accumulators. */
+function collectRootViolations(dim, acc) {
+  const dimName = dim.dimension || '';
+  for (const v of dim.violations || []) {
+    const sev = normalizeSeverity(v.severity);
+    const enriched = { ...v, dimension: v.dimension || dimName };
+    (acc.violationsBySeverity[sev] || acc.violationsBySeverity.unknown).push(enriched);
+    acc.total += 1;
+    if (enriched.dimension) acc.dims.add(enriched.dimension);
+    if (enriched.principle) acc.principles.add(enriched.principle);
+  }
+}
+
+/** Folds one dimension's compliance entries into the same accumulators. */
+function collectRootCompliance(dim, acc) {
+  const dimName = dim.dimension || '';
+  for (const c of dim.compliance || []) {
+    acc.compliance.push({ ...c, dimension: c.dimension || dimName });
+    if (dimName) acc.dims.add(dimName);
+    if (c.principle) acc.principles.add(c.principle);
+  }
+}
+
 /**
  * Build a synthetic "project root" file object from the same dimensions
  * structure that powers buildTopOffendingFiles. The result has the same
@@ -132,32 +169,23 @@ export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = DE
  * so the project itself can be navigated to as if it were a file.
  */
 export function buildProjectRootFile(dimensions = [], projectName = 'project') {
-  const violationsBySeverity = { critical: [], major: [], minor: [], unknown: [] };
-  const compliance = [];
-  const dims = new Set();
-  const principles = new Set();
-  let total = 0;
+  const acc = {
+    violationsBySeverity: { critical: [], major: [], minor: [], unknown: [] },
+    compliance: [],
+    dims: new Set(),
+    principles: new Set(),
+    total: 0,
+  };
 
   for (const dim of dimensions) {
-    const dimName = dim.dimension || '';
-    for (const v of dim.violations || []) {
-      const sev = normalizeSeverity(v.severity);
-      const enriched = { ...v, dimension: v.dimension || dimName };
-      (violationsBySeverity[sev] || violationsBySeverity.unknown).push(enriched);
-      total += 1;
-      if (enriched.dimension) dims.add(enriched.dimension);
-      if (enriched.principle) principles.add(enriched.principle);
-    }
-    for (const c of dim.compliance || []) {
-      compliance.push({ ...c, dimension: c.dimension || dimName });
-      if (dimName) dims.add(dimName);
-      if (c.principle) principles.add(c.principle);
-    }
+    collectRootViolations(dim, acc);
+    collectRootCompliance(dim, acc);
   }
 
+  const { violationsBySeverity, compliance, dims, principles } = acc;
   return {
     file: projectName || 'project',
-    total,
+    total: acc.total,
     critical: violationsBySeverity.critical.length,
     major: violationsBySeverity.major.length,
     minor: violationsBySeverity.minor.length,
@@ -170,6 +198,11 @@ export function buildProjectRootFile(dimensions = [], projectName = 'project') {
   };
 }
 
+/**
+ * Keeps the current selection when it still exists, otherwise falls back to
+ * the first project (or an empty string when there are none), so a deleted or
+ * renamed project can never leave the UI pointing at nothing.
+ */
 export function pickValidProject(projects = [], selectedProject = '') {
   if (!Array.isArray(projects) || projects.length === 0) {
     return '';

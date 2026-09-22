@@ -46,6 +46,11 @@ def _get_library_client(app: Flask):
 
 
 def register_standards_routes(app: Flask) -> None:
+    """Bind every /api/standards/* route: reads, imports, CRUD, overrides, visibility.
+
+    The service and library client are passed as factories so each request
+    resolves them against the current app config rather than import-time state.
+    """
     register_read_routes(app, _get_service, _get_library_client)
     register_import_routes(app, _get_service, _get_library_client)
     register_crud_routes(app, _get_service)

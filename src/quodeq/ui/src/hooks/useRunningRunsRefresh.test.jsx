@@ -241,7 +241,7 @@ describe('useRunningRunsRefresh', () => {
     expect(refreshCount(invalidateSpy)).toBe(2);
   });
 
-  // Task 17: source-aware cache keys. selectedSource must be folded into
+  // Source-aware cache keys. selectedSource must be folded into
   // every key this hook invalidates, so a refresh scoped to one source never
   // marks the other source's cache stale.
   describe('source-aware cache keys', () => {

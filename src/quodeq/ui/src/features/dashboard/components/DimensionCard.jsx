@@ -14,16 +14,10 @@ import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { splitScore, gradeColorClass, gradeLetter } from '../../../utils/formatters.js';
 import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
+import { fallbackDelta } from '../../../utils/dimensionUtils.js';
+import { SEVERITY_OPTIONS, toggleInList, computePrincipleOptions, filterViolations, formatPer100Files } from './dimensionCardModel.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
-
-const SEVERITY_OPTIONS = ['critical', 'major', 'minor', 'unknown'];
-
-function toggleInList(list, value) {
-  return list.includes(value)
-    ? list.filter((item) => item !== value)
-    : [...list, value];
-}
 
 function PrincipleFilter({ principles }) {
   const { options: principleOptions, selected: selectedPrinciples, setSelected: setSelectedPrinciples } = principles;
@@ -132,25 +126,6 @@ function DimViolationsList({ filteredViolations, activeFilterCount, totalCount, 
   );
 }
 
-function computePrincipleOptions(dimension) {
-  if (!dimension) return [];
-  const names = new Set();
-  (dimension.principles || []).forEach((p) => names.add(p.name));
-  (dimension.violations || []).forEach((v) => { if (v.principle) names.add(v.principle); });
-  return Array.from(names).filter(Boolean).sort((a, b) => a.localeCompare(b));
-}
-
-function filterViolations(dimension, selectedSeverities, selectedPrinciples, fileFilter) {
-  if (!dimension) return [];
-  return (dimension.violations || []).filter((v) => {
-    if (selectedSeverities.length > 0 && !selectedSeverities.includes(v.severity || 'unknown')) return false;
-    if (selectedPrinciples.length > 0 && !selectedPrinciples.includes(v.principle || '')) return false;
-    const normalizedFilter = fileFilter.trim().toLowerCase();
-    if (normalizedFilter && !String(v.file || '').toLowerCase().includes(normalizedFilter)) return false;
-    return true;
-  });
-}
-
 function DimCardHeader({ title, dimension, delta }) {
   const { value: scoreValue, denom: scoreDenom } = splitScore(dimension.overallScore);
   return (
@@ -182,6 +157,7 @@ function DimKpiGrid({ dimension }) {
       <div className="mini-kpi"><p>{t('dimension.kpiTotalCompliance')}</p><strong>{dimension.totals?.complianceCount ?? 0}</strong></div>
       <div className="mini-kpi"><p>{t('dimension.kpiCritical')}</p><strong>{dimension.totals?.severity?.critical ?? 0}</strong></div>
       <div className="mini-kpi"><p>{t('dimension.kpiMajor')}</p><strong>{dimension.totals?.severity?.major ?? 0}</strong></div>
+      <div className="mini-kpi"><p>{t('dimension.kpiPer100Files')}</p><strong>{formatPer100Files(dimension.totals?.violationsPer100Files)}</strong></div>
     </div>
   );
 }
@@ -217,9 +193,7 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
     return <section className="panel dim-card"><h3>{title}</h3><p className="dimension-meta">{t('dimension.selectDimension')}</p></section>;
   }
 
-  const currScore = parseFloat(dimension.overallScore);
-  const prevScore = parseFloat(dimension.previousScore);
-  const delta = !isNaN(currScore) && !isNaN(prevScore) ? (currScore - prevScore) : null;
+  const delta = fallbackDelta(dimension);
 
   return (
     <section className={`panel dim-card ${isSingleFocus ? 'full-width' : ''}`}>

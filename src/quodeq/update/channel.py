@@ -7,25 +7,34 @@ generic pip command rather than guess wrong (telling a pipx user to run
 
 from __future__ import annotations
 
-import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
+
+from quodeq.shared.env_resolve import resolve_env
 
 _PACKAGE = "quodeq"
 _FALLBACK = f"pip install -U {_PACKAGE}"
 
 
 def detect_channel() -> str:
+    """Return "frozen" for the bundled app, "wheel" for a pip-style install."""
     return "frozen" if getattr(sys, "frozen", False) else "wheel"
 
 
 def upgrade_command(
-    env: dict[str, str] | None = None,
+    env: Mapping[str, str] | None = None,
     package_file: str | None = None,
 ) -> str:
+    """Return the shell command that upgrades this install, "" when frozen.
+
+    Decided by where the package file sits: a pipx, uv-tool, or Homebrew root
+    in the path picks that tool's command. Anything unrecognised falls back to
+    ``pip install -U``. *env* and *package_file* exist for tests.
+    """
     if detect_channel() == "frozen":
         return ""
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     try:
         path = str(Path(package_file or __file__).resolve()).replace("\\", "/")
     except OSError:

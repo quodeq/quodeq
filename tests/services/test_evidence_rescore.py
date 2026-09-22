@@ -4,10 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.core.evidence.parser import (
+    EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
+from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import DEFAULT_PARAMS
-from quodeq.services.evidence_rescore import score_dimension_from_evidence
+from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
 
 DIM = "maintainability"
 
@@ -50,8 +52,10 @@ def test_zero_exclusions_matches_scan_time_scoring(run_dir):
         mode="numerical", params=DEFAULT_PARAMS,
     )
     rescored = score_dimension_from_evidence(
-        run_dir, DIM, dismissed=set(), deleted=set(),
-        source_file_count=1000, files_read=50, params=DEFAULT_PARAMS,
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=1000, files_read=50, params=DEFAULT_PARAMS,
+        ),
     )
     assert rescored is not None
     assert rescored.overall.weighted_score == scan.overall.weighted_score
@@ -67,11 +71,13 @@ def test_dismissed_key_removes_only_that_judgment(run_dir):
     # are unconditionally zeroed, which would make this assertion pass
     # vacuously regardless of whether dismissal actually filtered anything.
     base = score_dimension_from_evidence(
-        run_dir, DIM, dismissed=set(), deleted=set(),
-        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
     out = score_dimension_from_evidence(
-        run_dir, DIM, dismissed={("R-2", "a.kt", 20)}, deleted=set(),
-        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed={("R-2", "a.kt", 20)}, deleted=set(),
+            source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
     # The critical violation is gone from Modularity's tallies.
     assert out.principles["Modularity"].deductions.critical_type_count \
         == base.principles["Modularity"].deductions.critical_type_count - 1
@@ -82,12 +88,14 @@ def test_deleted_key_removes_principle_file_matches(run_dir):
     # Reusability's 2 instances out of the "low confidence -> zeroed
     # deductions" bucket so the before/after comparison is meaningful.
     base = score_dimension_from_evidence(
-        run_dir, DIM, dismissed=set(), deleted=set(),
-        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
     out = score_dimension_from_evidence(
-        run_dir, DIM, dismissed=set(),
-        deleted={(DIM, "Reusability", "c.kt")},
-        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=set(),
+            deleted={(DIM, "Reusability", "c.kt")},
+            source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
     # R-4 (violation, Reusability, c.kt) is present before deletion...
     assert base.principles["Reusability"].deductions.major_type_count == 1
     # ...and gone after; compliance C-2 stays, leaving no violation types.
@@ -115,16 +123,21 @@ def test_quarantined_findings_stay_excluded_from_rescore(tmp_path, monkeypatch):
             tmp_path / "evidence" / f"{DIM}_evidence.jsonl",
             EvidenceContext(language="", repository="", date_str="",
                             source_file_count=10, files_read=5),
-            compiled_dir=default_paths().standards_dir / "compiled",
-            evaluators_dir=default_paths().evaluators_dir,
+            EvidenceParseOptions(
+                compiled_dir=default_paths().standards_dir / "compiled",
+                evaluators_dir=default_paths().evaluators_dir,
+                req_map_reader=read_req_to_principle_map,
+            ),
         ),
         mode="numerical", params=DEFAULT_PARAMS,
     )
     assert "NotInStandard" not in scan.principles  # fixture sanity
 
     rescored = score_dimension_from_evidence(
-        tmp_path, DIM, dismissed=set(), deleted=set(),
-        source_file_count=10, files_read=5, params=DEFAULT_PARAMS,
+        tmp_path, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=10, files_read=5, params=DEFAULT_PARAMS,
+        ),
     )
     assert rescored is not None
     assert "NotInStandard" not in rescored.principles
@@ -137,19 +150,22 @@ def test_traversal_dim_id_rejected_before_filesystem_access(tmp_path, bad):
     # rather than reaching Path.is_file()/stat() (py/path-injection guard).
     with pytest.raises(ValueError):
         score_dimension_from_evidence(
-            tmp_path, bad, dismissed=set(), deleted=set(),
-            source_file_count=0, files_read=0, params=DEFAULT_PARAMS)
+            tmp_path, bad, EvidenceScoreRequest(
+                dismissed=set(), deleted=set(),
+                source_file_count=0, files_read=0, params=DEFAULT_PARAMS))
 
 
 def test_missing_or_empty_evidence_returns_none(tmp_path):
     assert score_dimension_from_evidence(
-        tmp_path, DIM, dismissed=set(), deleted=set(),
-        source_file_count=0, files_read=0, params=DEFAULT_PARAMS) is None
+        tmp_path, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=0, files_read=0, params=DEFAULT_PARAMS)) is None
     (tmp_path / "evidence").mkdir()
     (tmp_path / "evidence" / f"{DIM}_evidence.jsonl").write_text("")
     assert score_dimension_from_evidence(
-        tmp_path, DIM, dismissed=set(), deleted=set(),
-        source_file_count=0, files_read=0, params=DEFAULT_PARAMS) is None
+        tmp_path, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=0, files_read=0, params=DEFAULT_PARAMS)) is None
 
 
 def test_traversal_dim_id_does_not_read_evidence_planted_outside_run_dir(tmp_path):
@@ -177,8 +193,10 @@ def test_traversal_dim_id_does_not_read_evidence_planted_outside_run_dir(tmp_pat
     # The guard raises before the join, so the planted secret is never read.
     with pytest.raises(ValueError):
         score_dimension_from_evidence(
-            run_dir, traversal_dim_id, dismissed=set(), deleted=set(),
-            source_file_count=1000, files_read=50, params=DEFAULT_PARAMS,
+            run_dir, traversal_dim_id, EvidenceScoreRequest(
+                dismissed=set(), deleted=set(),
+                source_file_count=1000, files_read=50, params=DEFAULT_PARAMS,
+            ),
         )
 
 
@@ -191,9 +209,34 @@ def test_scoring_engine_exception_returns_none_for_fallback(run_dir, monkeypatch
         raise RuntimeError("scoring engine exploded")
     monkeypatch.setattr("quodeq.services.evidence_rescore.score_evidence", _boom)
     out = score_dimension_from_evidence(
-        run_dir, DIM, dismissed=set(), deleted=set(),
-        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
     assert out is None
+
+
+def test_injected_standard_dirs_fn_replaces_global_resolution(run_dir, monkeypatch):
+    """standard_dirs_fn is an injected dependency: when a caller supplies one,
+    the module-level standard_dirs() (global default_paths resolution) must
+    not run at all."""
+    calls = []
+
+    def fake_dirs():
+        calls.append(True)
+        return (None, None)
+
+    def global_must_not_run():
+        raise AssertionError("global standard_dirs() used despite injection")
+
+    monkeypatch.setattr(
+        "quodeq.services.evidence_rescore.standard_dirs", global_must_not_run)
+    out = score_dimension_from_evidence(
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=10, files_read=5, params=DEFAULT_PARAMS,
+            standard_dirs_fn=fake_dirs))
+    assert out is not None
+    assert calls == [True]
 
 
 def test_dismiss_by_principle_key_matches_no_req_finding(run_dir):
@@ -209,10 +252,12 @@ def test_dismiss_by_principle_key_matches_no_req_finding(run_dir):
     ]
     _write_evidence(run_dir, lines)
     base = score_dimension_from_evidence(
-        run_dir, DIM, dismissed=set(), deleted=set(),
-        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=set(), deleted=set(),
+            source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
     out = score_dimension_from_evidence(
-        run_dir, DIM, dismissed={("Modularity", "b.kt", 7)}, deleted=set(),
-        source_file_count=10, files_read=5, params=DEFAULT_PARAMS)
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed={("Modularity", "b.kt", 7)}, deleted=set(),
+            source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
     assert out.principles["Modularity"].deductions.critical_type_count \
         == base.principles["Modularity"].deductions.critical_type_count - 1

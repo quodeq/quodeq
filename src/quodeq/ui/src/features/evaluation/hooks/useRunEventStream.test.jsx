@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRunEventStream } from "./useRunEventStream";
 import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 import { MockEventSource } from "../../../test-utils/MockEventSource.js";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 function renderStreamWithSpy(jobId) {
   const client = new QueryClient({
@@ -36,7 +35,7 @@ function renderStreamAndQuery(jobId, key) {
 
 describe("useRunEventStream (cache-writer)", () => {
   beforeEach(() => {
-    global.EventSource = MockEventSource;
+    vi.stubGlobal('EventSource', MockEventSource);
     MockEventSource.last = null;
   });
 
@@ -64,12 +63,35 @@ describe("useRunEventStream (cache-writer)", () => {
       MockEventSource.last.emit("finding", { id: 1, practice_id: "P1" });
       MockEventSource.last.emit("finding", { id: 2, practice_id: "P2" });
     });
-    await waitFor(() => {
-      expect(result.current.data).toEqual([
-        { id: 1, practice_id: "P1" },
-        { id: 2, practice_id: "P2" },
-      ]);
+    await waitFor(() => expect(result.current.data).toHaveLength(2));
+    // Frames land in order and keep every wire field. They are no longer
+    // written verbatim: see the normalisation test below.
+    expect(result.current.data.map((f) => f.id)).toEqual([1, 2]);
+    expect(result.current.data.map((f) => f.practice_id)).toEqual(["P1", "P2"]);
+  });
+
+  it("normalises a finding frame so components can read `principle`", async () => {
+    // The frame is serialised straight off the payload, so it says
+    // practice_id where every component reads principle. Writing it verbatim
+    // left the live feed's rule column blank for the whole run.
+    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
+    const { result } = renderStreamAndQuery("job-1", evaluationKeys.findings("job-1"));
+    act(() => {
+      MockEventSource.last.emit("finding", {
+        id: 7, practice_id: "Authenticity", severity: "major",
+        file: "a.py", line: 3, end_line: 5, carried_forward: true,
+        confidence: 25, verdict: "fail",
+      });
     });
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+    const finding = result.current.data[0];
+    expect(finding.principle).toBe("Authenticity");
+    expect(finding.endLine).toBe(5);
+    expect(finding.carriedForward).toBe(true);
+    // Wire-only fields the model does not carry must survive the merge.
+    expect(finding.id).toBe(7);
+    expect(finding.confidence).toBe(25);
+    expect(finding.verdict).toBe("fail");
   });
 
   it("writes dimension-completed events as a map keyed by dimension", async () => {
@@ -108,29 +130,16 @@ describe("useRunEventStream (cache-writer)", () => {
     expect(MockEventSource.last).toBeNull();
   });
 
-  it("invalidates project trend on terminal status (done)", () => {
+  // Every terminal state invalidates the same way; a new one is a row here.
+  it.each([
+    ["done", "job-term-1"],
+    ["failed", "job-term-2"],
+    ["cancelled", "job-term-3"],
+  ])("invalidates project trend on terminal status (%s)", (state, jobId) => {
     vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
-    const { invalidateSpy } = renderStreamWithSpy("job-term-1");
+    const { invalidateSpy } = renderStreamWithSpy(jobId);
     act(() => {
-      MockEventSource.last.emit("status", { state: "done" });
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
-  });
-
-  it("invalidates project trend on terminal status (failed)", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
-    const { invalidateSpy } = renderStreamWithSpy("job-term-2");
-    act(() => {
-      MockEventSource.last.emit("status", { state: "failed" });
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
-  });
-
-  it("invalidates project trend on terminal status (cancelled)", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
-    const { invalidateSpy } = renderStreamWithSpy("job-term-3");
-    act(() => {
-      MockEventSource.last.emit("status", { state: "cancelled" });
+      MockEventSource.last.emit("status", { state });
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
   });

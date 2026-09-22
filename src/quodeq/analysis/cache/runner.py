@@ -67,7 +67,12 @@ class DispatchResult:
 class Dispatcher(Protocol):
     """Plugs the existing analysis machinery into the cache runner."""
 
-    def __call__(self, unit: WorkUnit) -> DispatchResult: ...
+    def __call__(self, unit: WorkUnit) -> DispatchResult:
+        """Analyse *unit* and return its findings. Raise to signal failure.
+
+        Raising leaves no cache entry behind, so the next run re-dispatches.
+        """
+        ...
 
 
 @dataclass(frozen=True)
@@ -87,7 +92,6 @@ def _key_for(unit: WorkUnit, schema_version: int) -> str:
         file_content_hash=unit.file_content_hash,
         file_path=unit.file_path,
         dimension=unit.dimension,
-        language=unit.language,
         params_hash=unit.params_hash,
     ))
 
@@ -123,6 +127,7 @@ def analyze_unit(
         model_id=unit.model_id,
         file_content_hash=unit.file_content_hash,
         language=unit.language,
+        params_hash=unit.params_hash,
         provenance=build_provenance(
             model_id=unit.model_id, prompts_hash=unit.prompts_hash,
             standards_hash=unit.standards_hash,

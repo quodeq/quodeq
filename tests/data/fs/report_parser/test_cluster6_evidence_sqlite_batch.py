@@ -7,9 +7,8 @@ dimension in Python.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.data.fs.report_parser._evidence_sqlite import load_evidence_map_from_db
@@ -79,7 +78,7 @@ def test_load_evidence_map_uses_list_all_not_loop(tmp_path: Path):
         patch.object(SqliteFindingsRepository, "list_all", _spy_list_all),
         patch.object(SqliteFindingsRepository, "list_by_dimension", _spy_list_by_dim),
     ):
-        result = load_evidence_map_from_db(tmp_path)
+        load_evidence_map_from_db(tmp_path)
 
     assert len(list_all_calls) == 1, (
         "Expected exactly one list_all() call — the N+1 loop should be gone."

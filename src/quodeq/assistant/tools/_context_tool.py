@@ -1,8 +1,10 @@
 """Session-scope discovery tool for assistant agents."""
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._registry import ToolRegistry, ToolSpec
+from quodeq.assistant.tools.registry import ToolRegistry, ToolSpec
 
 
 def _run_id(ctx: ToolContext) -> str | None:
@@ -11,10 +13,22 @@ def _run_id(ctx: ToolContext) -> str | None:
     return ctx.run_dir.name
 
 
-def _guidance(ctx: ToolContext) -> str:
-    run_attached = ctx.run_dir is not None and ctx.run_dir.exists()
-    repo_attached = ctx.repo_root is not None and ctx.repo_root.exists()
-    overview_available = ctx.project_id is not None and ctx.reports_dir is not None
+class _AttachmentState(NamedTuple):
+    run_attached: bool
+    repo_attached: bool
+    overview_available: bool
+
+
+def _attachment_state(ctx: ToolContext) -> _AttachmentState:
+    return _AttachmentState(
+        run_attached=ctx.run_dir is not None and ctx.run_dir.exists(),
+        repo_attached=ctx.repo_root is not None and ctx.repo_root.exists(),
+        overview_available=ctx.project_id is not None and ctx.reports_dir is not None,
+    )
+
+
+def _guidance(state: _AttachmentState) -> str:
+    run_attached, repo_attached, overview_available = state
     if run_attached and repo_attached:
         return "Use get_scores/get_violations for the selected run and read_repo_file for source context."
     if run_attached:
@@ -29,17 +43,15 @@ def _guidance(ctx: ToolContext) -> str:
 
 
 def _get_context(ctx: ToolContext) -> dict:
-    run_attached = ctx.run_dir is not None and ctx.run_dir.exists()
-    repo_attached = ctx.repo_root is not None and ctx.repo_root.exists()
-    overview_available = ctx.project_id is not None and ctx.reports_dir is not None
+    state = _attachment_state(ctx)
     return {
         "projectId": ctx.project_id,
         "runId": _run_id(ctx),
         "runSelected": ctx.run_dir is not None,
-        "runDirAttached": run_attached,
-        "repoAttached": repo_attached,
-        "overviewAvailable": overview_available,
-        "guidance": _guidance(ctx),
+        "runDirAttached": state.run_attached,
+        "repoAttached": state.repo_attached,
+        "overviewAvailable": state.overview_available,
+        "guidance": _guidance(state),
     }
 
 
@@ -50,5 +62,5 @@ def register_context_tool(registry: ToolRegistry, ctx: ToolContext) -> None:
         "repository attachment, overview availability, and which tools to use next. "
         "Call this first when the session scope is unclear.",
         {"type": "object", "properties": {}},
-        lambda **kw: _get_context(ctx),
+        lambda **_kw: _get_context(ctx),
     ))

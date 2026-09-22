@@ -1,23 +1,25 @@
 """`_print_scores` prints suppression-adjusted scores after a scan.
 
-Covers the target behaviour: with no active dismissals/deletions, output is
-byte-identical to the historical `  {dim}: {score}` line; when a dismissal
-matches a just-scanned run's evidence, the evidence-based rescore is printed
-instead with a `(N dismissed findings excluded)` suffix; a dimension whose
-evidence is missing from the run falls back to the original line.
+Covers the target behaviour: every line carries the report's violation
+count, major count and density (violations per 100 files read) when the
+report exists; when a dismissal matches a just-scanned run's evidence, the
+evidence-based rescore replaces the grade and a `(N dismissed findings
+excluded)` suffix is appended; a dimension without a report prints the
+plain `  {dim}: {score}` line.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from quodeq._cli_evaluation import _print_scores
+from quodeq.cli_evaluation import _print_scores
+from quodeq._cli_scoring import _format_score_line
 from quodeq.analysis._report_io import write_dimension_report
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.engine import score_evidence
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.services.dismissed import dismiss_finding, dismissed_keys
-from quodeq.services.evidence_rescore import score_dimension_from_evidence
+from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
 
 DIM = "maintainability"
 # Small source_file_count/files_read (matching tests/services/test_evidence_rescore.py
@@ -73,8 +75,10 @@ def test_dismissal_prints_adjusted_score_with_suffix(tmp_path, capsys):
     assert dismissed, "dismiss did not register"
 
     expected = score_dimension_from_evidence(
-        run_dir, DIM, dismissed=dismissed, deleted=set(),
-        source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS,
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed=dismissed, deleted=set(),
+            source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS,
+        ),
     )
     assert expected is not None and expected.overall.weighted_score is not None
     # Sanity: the dismiss must actually move the score, or this test would
@@ -84,10 +88,13 @@ def test_dismissal_prints_adjusted_score_with_suffix(tmp_path, capsys):
     _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
-    assert out == f"  {DIM}: {expected.overall.weighted_score}/10 (1 dismissed findings excluded)\n"
+    assert out == (
+        f"  {DIM}: {expected.overall.weighted_score}/10"
+        "  (3 violations, 2 major, 60.0 per 100 files) (1 dismissed findings excluded)\n"
+    )
 
 
-def test_no_suppressions_prints_byte_identical_line(tmp_path, capsys):
+def test_no_suppressions_prints_score_with_volume(tmp_path, capsys):
     project_dir = tmp_path / "proj"
     run_dir = project_dir / "run1"
     lines = [
@@ -99,7 +106,7 @@ def test_no_suppressions_prints_byte_identical_line(tmp_path, capsys):
     _print_scores({DIM: score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
-    assert out == f"  {DIM}: {score}\n"
+    assert out == f"  {DIM}: {score}  (1 violation, 1 major, 20.0 per 100 files)\n"
 
 
 def test_dimension_without_evidence_falls_back_to_original_line(tmp_path, capsys):
@@ -145,12 +152,12 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
     def _boom(*args, **kwargs):
         raise RuntimeError("scoring engine exploded")
 
-    monkeypatch.setattr("quodeq._cli_evaluation.score_dimension_from_evidence", _boom)
+    monkeypatch.setattr("quodeq.cli_evaluation.rescore_dimension_from_evidence", _boom)
 
     _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
-    assert out == f"  {DIM}: {original_score}\n"
+    assert out == f"  {DIM}: {original_score}  (2 violations, 1 major, 40.0 per 100 files)\n"
 
 
 def test_excluded_count_ignores_quarantined_findings(tmp_path, monkeypatch):
@@ -159,7 +166,7 @@ def test_excluded_count_ignores_quarantined_findings(tmp_path, monkeypatch):
     an exclusion: the printed suffix would otherwise promise a score change
     the rescore does not deliver.
     """
-    from quodeq._cli_evaluation import _count_excluded_findings
+    from quodeq.services.evidence_rescore import rescore_dimension_from_evidence
 
     monkeypatch.setenv("QUODEQ_EVALUATORS_DIR", str(tmp_path / "no-evals"))
     run_dir = tmp_path / "run"
@@ -172,6 +179,29 @@ def test_excluded_count_ignores_quarantined_findings(tmp_path, monkeypatch):
     (ev_dir / f"{DIM}_evidence.jsonl").write_text(
         "\n".join(json.dumps(l) for l in lines) + "\n", encoding="utf-8")
 
-    count = _count_excluded_findings(
-        run_dir, DIM, dismissed={("X-1", "z.kt", 3)}, deleted=set())
-    assert count == 0
+    rescored = rescore_dimension_from_evidence(
+        run_dir, DIM, EvidenceScoreRequest(
+            dismissed={("X-1", "z.kt", 3)}, deleted=set(),
+            source_file_count=SFC, files_read=FILES_READ, params=DEFAULT_PARAMS))
+    assert rescored.excluded == 0
+
+
+def test_format_score_line_without_totals_is_plain():
+    assert _format_score_line("security", "8.0/10", {}) == "  security: 8.0/10"
+
+
+def test_format_score_line_omits_density_when_none():
+    totals = {"violationCount": 2, "severity": {"major": 1}, "violationsPer100Files": None}
+    assert _format_score_line("security", "8.0/10", totals) == "  security: 8.0/10  (2 violations, 1 major)"
+
+
+def test_format_score_line_appends_suffix():
+    totals = {"violationCount": 1, "severity": {}}
+    line = _format_score_line("security", "7.9/10", totals, suffix=" (1 dismissed findings excluded)")
+    assert line == "  security: 7.9/10  (1 violation, 0 major) (1 dismissed findings excluded)"
+
+
+def test_format_score_line_tolerates_corrupt_counts():
+    totals = {"violationCount": "many", "severity": {"major": None}}
+    line = _format_score_line("security", "8.0/10", totals)
+    assert line == "  security: 8.0/10  (0 violations, 0 major)"

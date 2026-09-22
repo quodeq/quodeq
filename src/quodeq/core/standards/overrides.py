@@ -10,8 +10,11 @@ Invalid entries are skipped with a warning; a bad file never fails analysis.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 _logger = logging.getLogger(__name__)
@@ -54,6 +57,20 @@ def resolve_requirement_text(req: dict, req_overrides: dict | None = None) -> st
         text)
 
 
+def _param_requirements(dimension_data: dict) -> Iterator[tuple[str, dict, dict]]:
+    """Yield ``(req_id, req, params)`` for each requirement of *dimension_data* declaring params.
+
+    Requirements with no id or no params block are skipped.
+    """
+    for principle in dimension_data.get("principles", []):
+        for req in principle.get("requirements", []):
+            req_id = req.get("id")
+            params = req.get("params")
+            if not req_id or not params:
+                continue
+            yield req_id, req, params
+
+
 def dimension_params(
     dimension_data: dict, overrides: dict[str, dict],
 ) -> tuple[dict[str, dict[str, int]], dict[str, dict[str, int]]]:
@@ -67,21 +84,57 @@ def dimension_params(
     """
     effective: dict[str, dict[str, int]] = {}
     non_default: dict[str, dict[str, int]] = {}
-    for principle in dimension_data.get("principles", []):
-        for req in principle.get("requirements", []):
-            req_id = req.get("id")
-            params = req.get("params")
-            if not req_id or not params:
-                continue
-            values = effective_params(req, overrides.get(req_id))
-            effective[req_id] = values
-            diff = {
-                name: value for name, value in values.items()
-                if value != (params.get(name) or {}).get("default")
-            }
-            if diff:
-                non_default[req_id] = diff
+    for req_id, req, params in _param_requirements(dimension_data):
+        values = effective_params(req, overrides.get(req_id))
+        effective[req_id] = values
+        diff = {
+            name: value for name, value in values.items()
+            if value != (params.get(name) or {}).get("default")
+        }
+        if diff:
+            non_default[req_id] = diff
     return effective, non_default
+
+
+def hash_non_default_params(non_default: dict[str, dict[str, int]]) -> str:
+    """The cache ``params_hash`` for a non-default params subset.
+
+    "" when nothing differs from the declared defaults, else the SHA-256 of
+    the canonical JSON. This is the ONE formula shared by the cache writer
+    (``analysis.fingerprint``) and the cache schema migration
+    (``data.cache_store.migrate``); a drift between the two would silently
+    orphan every entry written under overrides.
+    """
+    if not non_default:
+        return ""
+    canonical = json.dumps(non_default, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def non_default_from_effective(
+    dimension_data: dict, effective: dict[str, dict[str, int]],
+) -> dict[str, dict[str, int]]:
+    """Recover the non-default subset from a stored *effective* params map.
+
+    Inverse of what ``dimension_params`` computes on the way in: a cache
+    entry stores the full effective map in its provenance, and the migration
+    needs the non-default subset to rebuild the entry's ``params_hash``. A
+    requirement or param the compiled standards no longer declare counts as
+    non-default (its default is unknown), which yields a stale hash and one
+    re-evaluation for that project rather than a wrong reuse.
+    """
+    defaults: dict[str, dict[str, object]] = {}
+    for req_id, _req, params in _param_requirements(dimension_data):
+        defaults[req_id] = {
+            name: (spec or {}).get("default") for name, spec in params.items()
+        }
+    non_default: dict[str, dict[str, int]] = {}
+    for req_id, values in (effective or {}).items():
+        declared = defaults.get(req_id, {})
+        diff = {name: v for name, v in values.items() if v != declared.get(name)}
+        if diff:
+            non_default[req_id] = diff
+    return non_default
 
 
 def validate_overrides(raw: object, declared: dict[str, dict]) -> tuple[dict, list[str]]:

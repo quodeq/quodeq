@@ -2,7 +2,6 @@
  * Finding #500: downloadStandard rejection must be handled -- no unhandled rejection,
  * error surfaced to user.
  */
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -14,6 +13,8 @@ vi.mock('../../../api/index.js', () => ({
 
 import { exportStandard } from '../../../api/index.js';
 import StandardsTable from './StandardsTable.jsx';
+import { UNKNOWN_STANDARD_TYPE } from '../hooks/useStandards.js';
+import { t } from '../../../strings/index.js';
 
 const STANDARD = {
   id: 'my-std',
@@ -36,6 +37,32 @@ describe('StandardsTable customized badge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     exportStandard.mockResolvedValue({ data: {}, fileName: 'test.json' });
+  });
+
+  it('still renders a standard filed under the unknown-type fallback bucket instead of dropping it', () => {
+    const mystery = { id: 'mystery', name: 'Mystery Standard', type: 'mystery-type', description: '', principleCount: 0, requirementCount: 0 };
+    render(
+      <StandardsTable
+        grouped={{ [UNKNOWN_STANDARD_TYPE]: [mystery] }}
+        actions={actions}
+        customizedCounts={{}}
+      />,
+    );
+    expect(screen.getByText('Mystery Standard')).toBeInTheDocument();
+  });
+
+  it('shows a translated "unknown" pill (not an empty label / "--undefined" class) when a standard has no type at all', () => {
+    const noType = { id: 'no-type', name: 'No Type Standard', type: undefined, description: '', principleCount: 0, requirementCount: 0 };
+    const { container } = render(
+      <StandardsTable
+        grouped={{ [UNKNOWN_STANDARD_TYPE]: [noType] }}
+        actions={actions}
+        customizedCounts={{}}
+      />,
+    );
+    expect(screen.getByText(t('standards.baseUnknown'))).toBeInTheDocument();
+    expect(container.querySelector('.standards-base-pill--undefined')).toBeNull();
+    expect(container.querySelector('.standards-base-pill--unknown')).toBeInTheDocument();
   });
 
   it('shows the customized badge when customizedCounts has a nonzero entry for the standard', () => {
@@ -88,20 +115,21 @@ describe('StandardsTable download error handling (#500)', () => {
       event.preventDefault();
     };
     window.addEventListener('unhandledrejection', handler);
+    try {
+      exportStandard.mockRejectedValue(new Error('network error'));
 
-    exportStandard.mockRejectedValue(new Error('network error'));
+      render(<StandardsTable grouped={{ custom: [STANDARD] }} actions={actions} />);
 
-    render(<StandardsTable grouped={{ custom: [STANDARD] }} actions={actions} />);
+      const downloadBtn = screen.getByRole('button', { name: /download my standard/i });
+      fireEvent.click(downloadBtn);
 
-    const downloadBtn = screen.getByRole('button', { name: /download my standard/i });
-    fireEvent.click(downloadBtn);
+      // Give the promise rejection a chance to propagate.
+      await new Promise((r) => setTimeout(r, 50));
 
-    // Give the promise rejection a chance to propagate.
-    await new Promise((r) => setTimeout(r, 50));
-
-    window.removeEventListener('unhandledrejection', handler);
-
-    expect(unhandledErrors).toHaveLength(0);
+      expect(unhandledErrors).toHaveLength(0);
+    } finally {
+      window.removeEventListener('unhandledrejection', handler);
+    }
   });
 
   it('surfaces the download error to the user when download fails', async () => {

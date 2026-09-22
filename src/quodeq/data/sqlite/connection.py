@@ -25,13 +25,41 @@ def _configure(conn: sqlite3.Connection) -> None:
 
 @contextmanager
 def open_evaluation_db(run_dir: Path) -> Iterator[sqlite3.Connection]:
+    """Open (creating if needed) the run's evaluation.db with the schema applied.
+
+    Creates *run_dir* and closes the connection on the way out. Connect and IO
+    failures surface as ``RuntimeError`` naming the path; schema-version
+    mismatches and corruption stay ``sqlite3.DatabaseError`` so readers can
+    fall back to the filesystem.
+    """
     run_dir.mkdir(parents=True, exist_ok=True)
     path = run_dir / EVALUATION_DB_FILENAME
-    conn = sqlite3.connect(path)
+    conn: sqlite3.Connection | None = None
     try:
-        _configure(conn)
-        apply_evaluation_schema(conn)
-        conn.commit()
+        try:
+            conn = sqlite3.connect(path)
+            _configure(conn)
+            apply_evaluation_schema(conn)
+            conn.commit()
+        except sqlite3.OperationalError as exc:
+            # Connect/IO-level failures (locked or missing file, disk I/O error):
+            # give callers a clear, run-scoped message instead of a bare sqlite3
+            # error with no path context.
+            raise RuntimeError(f"Could not open evaluation database at {path}: {exc}") from exc
+        except sqlite3.DatabaseError:
+            # Schema-version mismatches (SchemaVersionError) and generic
+            # corruption ("file is not a database") deliberately stay
+            # sqlite3.DatabaseError subclasses/instances -- existing readers
+            # (dashboard/scores/findings queries) catch that type to degrade
+            # gracefully to filesystem-based data. Wrapping these in RuntimeError
+            # would break that fallback, so let them propagate unchanged.
+            raise
+        except sqlite3.Error as exc:
+            raise RuntimeError(f"Could not open evaluation database at {path}: {exc}") from exc
         yield conn
     finally:
-        conn.close()
+        # Guards both setup failures (conn may or may not have been created)
+        # and the normal yield path -- conn is only ever left open here if
+        # sqlite3.connect() itself never returned one.
+        if conn is not None:
+            conn.close()

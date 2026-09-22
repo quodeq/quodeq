@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { resolveDataTheme } from '../utils/themeResolver.js';
 import { readString, removeKey, writeString } from '../adapters/storage.js';
+import { DATA_THEME_ATTR, PREFERS_DARK_QUERY } from '../constants.js';
 
 const MODE_KEY = 'cc-theme-mode';
 const FAMILY_KEY = 'cc-theme-family';
@@ -46,12 +47,23 @@ export { resolveDataTheme };
 
 function applyDataTheme(value) {
   if (value === null) {
-    document.documentElement.removeAttribute('data-theme');
+    document.documentElement.removeAttribute(DATA_THEME_ATTR);
   } else {
-    document.documentElement.setAttribute('data-theme', value);
+    document.documentElement.setAttribute(DATA_THEME_ATTR, value);
   }
 }
 
+/**
+ * Owns the theme: the mode (system/light/dark) and the palette family, each
+ * persisted and reflected onto <html> through DATA_THEME_ATTR — the single
+ * attribute every other consumer reads (see useThemeIsDark).
+ *
+ * Migrates the pre-split `cc-theme` key on first use and follows the OS
+ * preference while the mode is 'system'. Invalid values are ignored rather
+ * than applied.
+ *
+ * @returns {{themeMode: string, applyMode: Function, themeFamily: string, applyFamily: Function}}
+ */
 export function useAppSettings() {
   function safeGet(key, fallback = '') {
     return readString(key) || fallback;
@@ -65,7 +77,7 @@ export function useAppSettings() {
 
   // Listen for OS color scheme changes when in system mode
   useEffect(() => {
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const mql = window.matchMedia(PREFERS_DARK_QUERY);
     const handler = (e) => {
       if (themeMode === 'system') {
         applyDataTheme(resolveDataTheme('system', themeFamily, e.matches));
@@ -75,19 +87,19 @@ export function useAppSettings() {
     return () => mql.removeEventListener('change', handler);
   }, [themeMode, themeFamily]);
 
-  function applyMode(value, storage = localStorage) {
+  function applyMode(value, storage) {
     if (!VALID_MODES.includes(value)) return;
     setThemeMode(value);
-    storage.setItem(MODE_KEY, value);
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    writeString(MODE_KEY, value, storage);
+    const prefersDark = window.matchMedia(PREFERS_DARK_QUERY).matches;
     applyDataTheme(resolveDataTheme(value, themeFamily, prefersDark));
   }
 
-  function applyFamily(value, storage = localStorage) {
+  function applyFamily(value, storage) {
     if (!VALID_FAMILIES.includes(value)) return;
     setThemeFamily(value);
-    storage.setItem(FAMILY_KEY, value);
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    writeString(FAMILY_KEY, value, storage);
+    const prefersDark = window.matchMedia(PREFERS_DARK_QUERY).matches;
     applyDataTheme(resolveDataTheme(themeMode, value, prefersDark));
   }
 

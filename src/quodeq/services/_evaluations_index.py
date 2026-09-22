@@ -2,39 +2,36 @@
 
 Owns the read-side query path for evaluations: ``list``, ``get_status``,
 ``delete``, ``is_complete``, ``get_log_run_dir``, plus the
-``promote_stale_to_cancelled`` fallback used by ``cancel_evaluation``.
-
-The ``ActionProvider`` methods on ``FilesystemActionProvider`` are 1-line
+``promote_stale_to_cancelled`` fallback used by ``cancel_evaluation``. The
+``ActionProvider`` methods on ``FilesystemActionProvider`` are 1-line
 delegates to an instance of this class.
+
+Split: status.json readers, the terminal-state check,
+and ``RunRow`` -> ``JobSnapshot`` assembly live in ``_run_status_readers.py``
+(re-exported — tests import readers directly); directory-removal,
+filesystem-fallback-scan, and external-job liveness (none patched by any
+test) live in ``_run_index_fs.py`` as plain free functions.
 """
 from __future__ import annotations
 
-import json
 import logging
-import shutil
 from pathlib import Path
 
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
-from quodeq.services._external_jobs import is_safe_run_segment
+from quodeq.services._external_jobs import _sync_external_run
 from quodeq.services.jobs import JobManager
+from quodeq.services._run_index_fs import (
+    _external_job_is_complete, _merge_internal_jobs, _remove_run_directory,
+    _scan_reports_root_for_run,
+)
+from quodeq.services._run_status_readers import build_job_snapshot
+from quodeq.services._run_status_readers import (  # noqa: F401 — re-export
+    _read_deadline_from_status, _read_dimensions_from_status, _read_provider_model_from_status,
+    _read_time_limit_from_status, _status_json_terminal, _tail_run_log,
+)
 
 _logger = logging.getLogger(__name__)
-
-_TERMINAL_STATUS_STATES = {"complete", "completed", "done", "cancelled", "failed", "lost"}
-
-
-def _status_json_terminal(run_dir: Path) -> bool:
-    """Return True when the run's status.json says it ended."""
-    status_path = run_dir / "status.json"
-    if not status_path.exists():
-        return False
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False
-    state = data.get("state")
-    return isinstance(state, str) and state in _TERMINAL_STATUS_STATES
 
 
 class EvaluationsIndex:
@@ -62,51 +59,50 @@ class EvaluationsIndex:
         reports_dir: Path | None = None,
         states: set[str] | None = None,
     ) -> list[JobSnapshot]:
-        """Return runs from the SQLite index merged with in-memory jobs."""
+        """Return runs from the SQLite index merged with in-memory jobs.
+
+        *limit* is a cap on returned entries, never a cap on how far back the
+        search reaches: with *states* set, up to *limit* matching runs are
+        returned however deep in the index they sit.
+        """
         reports_dir = self._coerce_reports_dir(reports_dir)
+        internal_jobs = self._internal_jobs()
+        # limit>0: over-fetch by len(internal_jobs) so that even if every
+        # in-memory job dedupes against (and removes) a fetched DB row, the
+        # fetch still leaves >= limit usable DB rows to fill the merge.
+        # limit<=0 means "fetch all".
+        # A *states* filter is pushed straight into the SQL query
+        # (JobSnapshot.status is exactly RunRow.state for indexed rows), so
+        # it narrows the same bounded fetch instead of requiring a fetch-all
+        # that gets filtered in Python afterwards. It is re-applied in
+        # Python only to drop in-memory jobs that have no row and therefore
+        # can't be filtered in SQL.
+        db_limit = limit + len(internal_jobs) if limit and limit > 0 else None
+        snapshots = self._indexed_snapshots(reports_dir, db_limit, states)
+        merged = _merge_internal_jobs(snapshots, internal_jobs)
+        if states:
+            merged = [s for s in merged if s.status in states]  # keep: in-memory jobs have no row
+        merged.sort(key=lambda s: s.started_at or "", reverse=True)
+        return merged[:limit] if limit and limit > 0 else merged
+
+    def _internal_jobs(self) -> list[JobSnapshot]:
+        """In-memory jobs from the ``JobManager``; empty when it cannot list them."""
+        try:
+            return self._jobs.list_jobs(reports_root=None)
+        except (AttributeError, TypeError):
+            return []
+
+    def _indexed_snapshots(
+        self, reports_dir: Path, db_limit: int | None, states: set[str] | None,
+    ) -> list[JobSnapshot]:
+        """Sync the index against *reports_dir*, then read up to *db_limit* rows (None: all) in *states*."""
         db = self._open_index()
         try:
             _run_index.sync_index(db, reports_dir)
-            rows = _run_index.list_runs(db, limit=0)  # fetch all, merge, then limit
+            rows = _run_index.list_runs(db, limit=db_limit, states=states or None)
         finally:
             db.close()
-        snapshots = [self._run_row_to_snapshot(r) for r in rows]
-        # Internal dashboard-spawned jobs always take priority over index rows
-        # that project the same on-disk run. The dedup key is (project, run_id)
-        # rather than job_id because internal jobs carry bare UUIDs while
-        # indexed rows carry "ext-<run_id>" — keying on job_id never matches
-        # the two views of the same run and both end up in the merged list.
-        try:
-            internal_jobs = self._jobs.list_jobs(reports_root=None)
-        except (AttributeError, TypeError):
-            internal_jobs = []
-        # 'lost' internal jobs are restart placeholders whose subprocess may
-        # still be alive: they must not shadow the truthful ext- row derived
-        # from the run's own status.json, and when such a row exists the
-        # placeholder itself is dropped in its favor.
-        covered = {
-            (j.output_project, j.output_run_id) for j in internal_jobs
-            if j.output_project and j.output_run_id and j.status != "lost"
-        }
-        row_keys = {
-            (s.output_project, s.output_run_id) for s in snapshots
-            if s.output_project and s.output_run_id
-        }
-        visible_internal = [
-            j for j in internal_jobs
-            if not (
-                j.status == "lost"
-                and (j.output_project, j.output_run_id) in row_keys
-            )
-        ]
-        merged = [
-            s for s in snapshots
-            if (s.output_project, s.output_run_id) not in covered
-        ] + visible_internal
-        if states:
-            merged = [s for s in merged if s.status in states]
-        merged.sort(key=lambda s: s.started_at or "", reverse=True)
-        return merged[:limit] if limit and limit > 0 else merged
+        return [self._run_row_to_snapshot(r) for r in rows]
 
     def delete(self, job_id: str, reports_dir: Path | None = None) -> bool:
         """Delete a run's on-disk dir and index row. Refuses running jobs."""
@@ -122,23 +118,9 @@ class EvaluationsIndex:
         run_uuid = job_id[len("ext-"):] if job_id.startswith("ext-") else job_id
         if snapshot.output_run_id:
             run_uuid = snapshot.output_run_id
-        removed_dir = False
-        if snapshot.output_project and reports_dir.is_dir():
-            candidate = reports_dir / snapshot.output_project / run_uuid
-            if candidate.is_dir():
-                shutil.rmtree(candidate, ignore_errors=True)
-                removed_dir = not candidate.exists()
-                if not removed_dir:
-                    _logger.warning("Could not remove run directory %s", candidate)
-        if not removed_dir and reports_dir.is_dir():
-            for project_dir in reports_dir.iterdir():
-                candidate = project_dir / run_uuid
-                if candidate.is_dir():
-                    shutil.rmtree(candidate, ignore_errors=True)
-                    removed_dir = not candidate.exists()
-                    if not removed_dir:
-                        _logger.warning("Could not remove run directory %s", candidate)
-                    break
+        removed_dir = _remove_run_directory(
+            reports_dir, snapshot.output_project, run_uuid, log=_logger,
+        )
         # Remove from index regardless so stale rows get cleaned up. The same
         # on-disk run can be indexed under "ext-<run_uuid>" even when the
         # caller holds the internal job id, so clear both key forms.
@@ -153,8 +135,8 @@ class EvaluationsIndex:
         try:
             if hasattr(self._jobs, "delete"):
                 self._jobs.delete(job_id)
-        except (KeyError, AttributeError):
-            pass
+        except (KeyError, AttributeError) as exc:
+            _logger.debug("in-memory job entry already gone on delete: %s", exc)
         return removed_dir
 
     def get_status(self, job_id: str, reports_dir: Path | None = None) -> JobSnapshot | None:
@@ -164,28 +146,18 @@ class EvaluationsIndex:
         ``ext-`` ids resolve from the SQLite index after a scoped sync so
         stale runs get promoted to cancelled on this request.
         """
-        if not job_id.startswith("ext-"):
-            try:
-                internal = self._jobs.get_job(job_id, reports_root=None) if hasattr(self._jobs, "get_job") else None
-            except TypeError:
-                internal = None
+        is_external = job_id.startswith("ext-")
+        if not is_external:
+            internal = self._in_memory_job(job_id)
             if internal is not None:
                 return internal
 
         reports_dir = self._coerce_reports_dir(reports_dir)
         db = self._open_index()
         try:
-            if job_id.startswith("ext-"):
-                run_id = job_id[len("ext-"):]
-                if not is_safe_run_segment(run_id):
+            if is_external:
+                if not _sync_external_run(db, job_id, reports_dir):
                     return None
-                for project_dir in (reports_dir.iterdir() if reports_dir.is_dir() else []):
-                    candidate = project_dir / run_id
-                    if candidate.is_dir():
-                        _run_index.sync_index_for_run(db, candidate)
-                        break
-                else:
-                    _run_index.sync_index(db, reports_dir)
             else:
                 _run_index.sync_index(db, reports_dir)
             row = _run_index.get_run(db, job_id)
@@ -194,6 +166,13 @@ class EvaluationsIndex:
         if row is None:
             return None
         return self._run_row_to_snapshot(row)
+
+    def _in_memory_job(self, job_id: str) -> JobSnapshot | None:
+        """The live JobManager entry for *job_id*, if this store keeps one."""
+        try:
+            return self._jobs.get_job(job_id) if hasattr(self._jobs, "get_job") else None
+        except TypeError:
+            return None
 
     def promote_stale_to_cancelled(
         self, job_id: str, reports_dir: str | None = None,
@@ -211,7 +190,7 @@ class EvaluationsIndex:
         if snapshot.status != "running":
             return False
 
-        from quodeq.data.sqlite._index_sync import force_promote_to_cancelled_stale
+        from quodeq.data.sqlite.index_sync import force_promote_to_cancelled_stale
 
         run_dir: Path | None = None
         if snapshot.output_project and snapshot.output_run_id and reports_dir:
@@ -252,22 +231,7 @@ class EvaluationsIndex:
                         return candidate
 
         # Filesystem fallback: scan reports_root for <project>/<run_id>/.
-        reports_root = self._resolve_reports_root()
-        if reports_root is None or not reports_root.is_dir():
-            return None
-        resolved_root = reports_root.resolve()
-        for project_dir in reports_root.iterdir():
-            if not project_dir.is_dir():
-                continue
-            candidate = project_dir / run_id
-            try:
-                if not candidate.resolve().is_relative_to(resolved_root):
-                    continue
-            except (OSError, ValueError):
-                continue
-            if candidate.is_dir():
-                return candidate
-        return None
+        return _scan_reports_root_for_run(self._resolve_reports_root(), run_id)
 
     def rebuild(self, reports_root: Path | None = None) -> tuple[int, int]:
         """Rebuild the index from scratch by walking *reports_root*.
@@ -275,18 +239,16 @@ class EvaluationsIndex:
         Returns ``(rows_written, elapsed_ms)``. Used by the
         ``/api/index/rebuild`` admin endpoint.
         """
-        if reports_root is None:
-            from quodeq.shared._env import get_evaluations_dir
-            reports_root = Path(get_evaluations_dir())
+        root = reports_root if reports_root is not None else self._reports_root
         db = self._open_index()
         try:
-            return _run_index.rebuild_index(db, reports_root)
+            return _run_index.rebuild_index(db, root)
         finally:
             db.close()
 
     @property
     def index_db_path(self) -> Path | None:
-        """The resolved path to the index DB (lazily set on first ``_open_index``)."""
+        """The path to the index DB, injected at construction."""
         return self._index_db_path
 
     def is_complete(self, job_id: str) -> bool:
@@ -295,17 +257,7 @@ class EvaluationsIndex:
             run_dir = self.get_log_run_dir(job_id)
             if run_dir is None:
                 return False
-            if (run_dir / "scan.json").exists():
-                return True
-            if _status_json_terminal(run_dir):
-                return True
-            from quodeq.services._external_jobs import resolve_external_pid
-            pid_file = run_dir / ".pid"
-            if not pid_file.exists():
-                return True  # no PID file -> stale/crashed -> complete
-            # run_dir is already resolved; pass its parent straight through
-            # instead of splitting it into names and rejoining them.
-            return resolve_external_pid(run_dir.parent, run_dir.name) is None
+            return _external_job_is_complete(run_dir)
         snapshot = self._jobs.get_job(job_id)
         if snapshot is not None and snapshot.status in {"done", "failed", "cancelled"}:
             return True
@@ -323,178 +275,20 @@ class EvaluationsIndex:
     # -- internals ------------------------------------------------------
 
     def _resolve_reports_root(self) -> Path | None:
-        """Return the active reports directory, falling back to env."""
-        if self._reports_root is not None:
-            return Path(self._reports_root)
-        try:
-            from quodeq.shared.utils import get_evaluations_dir
-            return Path(get_evaluations_dir())
-        except Exception:
-            return None
+        """Return the active reports directory (injected at construction)."""
+        return Path(self._reports_root) if self._reports_root is not None else None
 
     def _coerce_reports_dir(self, reports_dir: Path | None) -> Path:
-        """Resolve *reports_dir* to a Path, falling back to the env var."""
+        """Resolve *reports_dir* to a Path, falling back to the injected reports_root."""
         if reports_dir is not None:
             return Path(reports_dir)
-        from quodeq.shared._env import get_evaluations_dir
-        return Path(get_evaluations_dir())
+        return Path(self._reports_root)
 
     def _open_index(self):
-        """Open (lazily) the index DB. Resolved from init kwarg or env."""
+        """Open the index DB at the injected path."""
         if self._index_db_path is None:
-            from quodeq.shared._env import get_index_db_path
-            self._index_db_path = Path(get_index_db_path())
+            raise ValueError("EvaluationsIndex requires index_db_path to be set")
         return _run_index.open_index(self._index_db_path)
 
     def _run_row_to_snapshot(self, row: "_run_index.RunRow") -> JobSnapshot:
-        logs: list[str] = []
-        dimensions: list[str] | None = None
-        deadline_at: str | None = None
-        ai_provider: str | None = None
-        ai_model: str | None = None
-        time_limit_s: int | None = None
-        if row.run_dir:
-            run_dir_path = Path(row.run_dir)
-            try:
-                logs = _tail_run_log(run_dir_path)
-            except (OSError, ValueError):
-                logs = []
-            try:
-                dimensions = _read_dimensions_from_status(run_dir_path)
-            except (OSError, ValueError):
-                dimensions = None
-            try:
-                deadline_at = _read_deadline_from_status(run_dir_path)
-            except (OSError, ValueError):
-                deadline_at = None
-            try:
-                ai_provider, ai_model = _read_provider_model_from_status(run_dir_path)
-            except (OSError, ValueError):
-                ai_provider, ai_model = None, None
-            try:
-                time_limit_s = _read_time_limit_from_status(run_dir_path)
-            except (OSError, ValueError):
-                time_limit_s = None
-        return JobSnapshot(
-            job_id=row.job_id,
-            status=row.state,
-            command="",
-            started_at=row.started_at,
-            ended_at=row.finalized_at,
-            exit_code=None,
-            logs=logs,
-            output_project=row.project_uuid,
-            output_run_id=row.run_id,
-            phase=row.phase,
-            deadline_at=deadline_at,
-            current_dimension=row.current_dimension,
-            dimensions=dimensions,
-            error=row.exit_reason,
-            source="external" if row.job_id.startswith("ext-") else "internal",
-            exit_reason=row.exit_reason,
-            ai_provider=ai_provider,
-            ai_model=ai_model,
-            time_limit_s=time_limit_s,
-        )
-
-
-def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
-    """Return the last *max_lines* lines from run.log."""
-    log_path = run_dir / "run.log"
-    if not log_path.is_file():
-        return []
-    try:
-        with log_path.open("r", encoding="utf-8", errors="replace") as fp:
-            lines = fp.readlines()
-    except OSError:
-        return []
-    tail = lines[-max_lines:] if len(lines) > max_lines else lines
-    return [line.rstrip("\n") for line in tail]
-
-
-def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
-    """Read the `dimensions` list from status.json, or None if unavailable.
-
-    "All dimensions" runs record an empty list (the raw, unresolved CLI
-    filter is None). The UI fetches per-dim evals from this list, so an
-    empty one blanks the live findings feed for every full scan served via
-    the index. Recover the resolved list from the per-dim sidecars, the
-    same fallback scan_progress uses.
-    """
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return None
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    dims = data.get("dimensions")
-    if not isinstance(dims, list):
-        return None
-    if dims:
-        return dims
-    from quodeq.shared.dim_estimates_io import read_dim_estimates
-    from quodeq.data.fs.dimensions_state_store import read_dimensions
-    recovered: dict[str, None] = {}
-    dim_records = read_dimensions(run_dir).get("dimensions")
-    record_keys = dim_records.keys() if isinstance(dim_records, dict) else ()
-    for key in (*record_keys, *read_dim_estimates(run_dir).keys()):
-        recovered.setdefault(key, None)
-    return list(recovered) if recovered else dims
-
-
-def _read_time_limit_from_status(run_dir: Path) -> int | None:
-    """Read the run budget (`time_limit_s`) from status.json, or None."""
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return None
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    raw = data.get("time_limit_s")
-    return raw if isinstance(raw, int) else None
-
-
-def _read_deadline_from_status(run_dir: Path) -> str | None:
-    """Read the `deadline_at` ISO string from status.json, or None.
-
-    External (CLI) runs are not tracked by JobManager so they don't go
-    through the marker-parsing path that sets ``Job.deadline_at``. Reading
-    directly from status.json keeps the dashboard's countdown ticking.
-    """
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return None
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    val = data.get("deadline_at")
-    return val if isinstance(val, str) else None
-
-
-def _read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | None]:
-    """Read (ai_provider, ai_model) from status.json, or (None, None).
-
-    External (CLI) runs aren't tracked by JobManager, so they don't carry
-    provider/model on an in-memory Job. Reading directly from status.json
-    keeps the dashboard's in-progress card self-describing for ext- runs.
-    """
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return (None, None)
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return (None, None)
-    if not isinstance(data, dict):
-        return (None, None)
-    provider = data.get("ai_provider")
-    model = data.get("ai_model")
-    return (
-        provider if isinstance(provider, str) else None,
-        model if isinstance(model, str) else None,
-    )
+        return build_job_snapshot(row)

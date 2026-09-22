@@ -10,6 +10,7 @@ def _rescored(rid):
 def test_miss_computes_and_caches_then_hit_skips_base(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     calls = []
+
     def base(rid):
         calls.append(rid)
         return _rescored(rid)
@@ -31,6 +32,7 @@ def test_version_change_is_a_miss(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     make_cache_backed_fetcher("proj", lambda _rid: "v1", _rescored)("r1")  # cache under v1
     calls = []
+
     def base(rid):
         calls.append(rid)
         return _rescored(rid)
@@ -62,6 +64,7 @@ def test_in_progress_run_is_not_persisted(tmp_path, monkeypatch):
 
     # Build 1: run "r1" is in progress -- only "security" has scored so far.
     partial_calls = []
+
     def base_partial(rid):
         partial_calls.append(rid)
         return _dims("security")
@@ -74,6 +77,7 @@ def test_in_progress_run_is_not_persisted(tmp_path, monkeypatch):
     # Build 2 (fresh bulk-load): the run has since completed all 6 dims. Because
     # the partial set was never persisted, this is a MISS and re-fetches fresh.
     full_calls = []
+
     def base_full(rid):
         full_calls.append(rid)
         return _dims("security", "reliability", "maintainability",

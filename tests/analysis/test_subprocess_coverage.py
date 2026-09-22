@@ -1,8 +1,6 @@
-"""Tests for subprocess.py — provider dispatch, env building, source gathering, standards loading."""
+"""Tests for subprocess.py: provider dispatch, CLI analysis and credential resolution."""
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,10 +8,7 @@ import pytest
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.subprocess import (
     _get_provider_type,
-    _load_standards_text,
-    _render_standards_grouped,
     _resolve_provider_config,
-    _run_api_analysis_bridge,
     _run_cli_analysis,
     count_files_from_stream,
     run_analysis,
@@ -54,170 +49,6 @@ class TestCountFilesFromStream:
         stream = tmp_path / "stream.json"
         with patch("quodeq.analysis.subprocess.count_files_in_stream", return_value={"a.py", "b.py"}):
             assert count_files_from_stream(stream) == 2
-
-
-# ---------------------------------------------------------------------------
-# _render_standards_grouped
-# ---------------------------------------------------------------------------
-
-class TestRenderStandardsGrouped:
-    def test_returns_empty_for_no_principles(self):
-        assert _render_standards_grouped({}) == ""
-        assert _render_standards_grouped({"principles": []}) == ""
-
-    def test_renders_json_array(self):
-        data = {
-            "principles": [
-                {
-                    "name": "Input Validation",
-                    "requirements": [
-                        {"id": "S-INP-1", "text": "Validate all inputs"},
-                        {"id": "S-INP-2", "text": "Sanitize SQL"},
-                    ],
-                }
-            ]
-        }
-        result = _render_standards_grouped(data)
-        parsed = json.loads(result)
-        assert len(parsed) == 1
-        assert parsed[0]["principle"] == "Input Validation"
-        assert len(parsed[0]["requirements"]) == 2
-        assert parsed[0]["requirements"][0]["id"] == "S-INP-1"
-
-    def test_handles_missing_name(self):
-        data = {"principles": [{"requirements": [{"id": "X-1", "text": "rule"}]}]}
-        result = _render_standards_grouped(data)
-        parsed = json.loads(result)
-        assert parsed[0]["principle"] == "Unknown"
-
-    def test_resolves_default_params_when_no_overrides(self):
-        """With no override file, placeholders must be replaced by defaults — no raw templates in output."""
-        data = {
-            "principles": [{
-                "name": "Analyzability",
-                "requirements": [{
-                    "id": "M-ANA-2",
-                    "text": "Functions MUST NOT exceed {max_lines} lines",
-                    "params": {"max_lines": {"label": "Max function lines", "type": "int",
-                                            "default": 50, "min": 10, "max": 500}},
-                }],
-            }],
-        }
-        result = _render_standards_grouped(data, overrides=None)
-        parsed = json.loads(result)
-        rule = parsed[0]["requirements"][0]["rule"]
-        assert "{max_lines}" not in rule, f"raw placeholder still present: {rule!r}"
-        assert "50" in rule
-
-    def test_resolves_overridden_value(self):
-        """With an override, the tuned value appears in the emitted text."""
-        data = {
-            "principles": [{
-                "name": "Analyzability",
-                "requirements": [{
-                    "id": "M-ANA-2",
-                    "text": "Functions MUST NOT exceed {max_lines} lines",
-                    "params": {"max_lines": {"label": "Max function lines", "type": "int",
-                                            "default": 50, "min": 10, "max": 500}},
-                }],
-            }],
-        }
-        result = _render_standards_grouped(data, overrides={"M-ANA-2": {"max_lines": 80}})
-        parsed = json.loads(result)
-        rule = parsed[0]["requirements"][0]["rule"]
-        assert "80" in rule
-        assert "{max_lines}" not in rule
-
-
-# ---------------------------------------------------------------------------
-# _load_standards_text (override threading)
-# ---------------------------------------------------------------------------
-
-class TestLoadStandardsTextOverrides:
-    _DIM = {
-        "principles": [{
-            "name": "Analyzability",
-            "requirements": [{
-                "id": "M-ANA-2",
-                "text": "Functions MUST NOT exceed {max_lines} lines",
-                "params": {"max_lines": {"label": "Max function lines", "type": "int",
-                                         "default": 50, "min": 10, "max": 500}},
-            }],
-        }],
-    }
-
-    def test_no_override_file_uses_default(self, tmp_path):
-        """No placeholder braces in output when analyzed repo has no override file."""
-        (tmp_path / "compiled").mkdir()
-        (tmp_path / "compiled" / "maintainability.json").write_text(json.dumps(self._DIM))
-        result = _load_standards_text(tmp_path / "compiled", "maintainability", overrides=None)
-        assert "{max_lines}" not in result
-        assert "50" in result
-
-    def test_override_value_appears_in_text(self, tmp_path):
-        """When an override is supplied, the overridden value appears in the emitted text."""
-        (tmp_path / "compiled").mkdir()
-        (tmp_path / "compiled" / "maintainability.json").write_text(json.dumps(self._DIM))
-        result = _load_standards_text(
-            tmp_path / "compiled", "maintainability",
-            overrides={"M-ANA-2": {"max_lines": 75}},
-        )
-        assert "75" in result
-        assert "{max_lines}" not in result
-
-
-# ---------------------------------------------------------------------------
-# _load_standards_text
-# ---------------------------------------------------------------------------
-
-class TestLoadStandardsText:
-    def test_returns_empty_when_no_dir(self):
-        assert _load_standards_text(None, "security") == ""
-
-    def test_returns_empty_when_no_dimension(self, tmp_path):
-        assert _load_standards_text(tmp_path, None) == ""
-
-    def test_loads_from_json(self, tmp_path):
-        data = {
-            "principles": [
-                {"name": "Auth", "requirements": [{"id": "A-1", "text": "Use tokens"}]}
-            ]
-        }
-        (tmp_path / "security.json").write_text(json.dumps(data))
-        result = _load_standards_text(tmp_path, "security")
-        assert "Auth" in result
-        assert "A-1" in result
-
-    def test_falls_back_to_md(self, tmp_path):
-        md_content = "# Security Standards\n- Validate inputs"
-        (tmp_path / "security.md").write_text(md_content)
-        result = _load_standards_text(tmp_path, "security")
-        assert "Security Standards" in result
-
-    def test_truncates_long_json_standards(self, tmp_path):
-        data = {
-            "principles": [
-                {"name": f"Principle{i}", "requirements": [{"id": f"P-{i}", "text": "x" * 5000}]}
-                for i in range(20)
-            ]
-        }
-        (tmp_path / "security.json").write_text(json.dumps(data))
-        result = _load_standards_text(tmp_path, "security")
-        assert "[... standards truncated for context limits ...]" in result
-
-    def test_truncates_long_md_standards(self, tmp_path):
-        (tmp_path / "security.md").write_text("x" * 60_000)
-        result = _load_standards_text(tmp_path, "security")
-        assert "[... standards truncated for context limits ...]" in result
-
-    def test_returns_empty_on_invalid_json(self, tmp_path):
-        (tmp_path / "security.json").write_text("not valid json{{{")
-        result = _load_standards_text(tmp_path, "security")
-        # Falls back to md, which doesn't exist
-        assert result == ""
-
-    def test_returns_empty_when_files_missing(self, tmp_path):
-        assert _load_standards_text(tmp_path, "nonexistent") == ""
 
 
 # ---------------------------------------------------------------------------
@@ -289,193 +120,44 @@ class TestRunCliAnalysis:
 
 
 # ---------------------------------------------------------------------------
-# _run_api_analysis_bridge
-# ---------------------------------------------------------------------------
-
-@pytest.mark.skipif(
-    not __import__("importlib").util.find_spec("openai"),
-    reason="requires the openai SDK",
-)
-class TestRunApiAnalysisBridge:
-    def test_raises_when_no_model(self, tmp_path):
-        stream = tmp_path / "stream.json"
-        cfg = AnalysisConfig(ai_cmd="ollama")
-        provider = {"ollama": {"type": "api", "api_base": "http://localhost:11434/v1"}}
-
-        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             pytest.raises(Exception, match="No model configured"):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
-
-    def test_raises_when_no_api_base(self, tmp_path):
-        stream = tmp_path / "stream.json"
-        cfg = AnalysisConfig(ai_cmd="ollama", ai_model="llama3.1")
-        provider = {"ollama": {"type": "api", "model": "llama3.1"}}
-
-        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             pytest.raises(Exception, match="No API base URL configured"):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
-
-    def test_empty_queue_writes_complete_marker_and_preserves_shared_jsonl(self, tmp_path):
-        """Empty queue: write the per-agent stream 'complete' marker, but
-        leave the SHARED `{dim}_evidence.jsonl` alone — other pool agents
-        append findings to it via MCP and would lose them otherwise.
-        """
-        stream = tmp_path / "stream.json"
-        jsonl = tmp_path / "evidence.jsonl"
-        # Pre-populate the shared JSONL with findings from other agents
-        jsonl.write_text('{"t":"violation","p":"X","file":"a.py","line":1}\n')
-        queue_path = tmp_path / "queue.json"
-        queue_path.write_text(json.dumps({"version": 1, "pending": [], "taken": [], "max_files_per_agent": 10}))
-
-        cfg = AnalysisConfig(
-            ai_cmd="ollama", ai_model="llama3.1",
-            jsonl_file=jsonl, queue_path=queue_path,
-        )
-        provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
-
-        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
-
-        assert "complete" in stream.read_text()
-        assert jsonl.read_text() == '{"t":"violation","p":"X","file":"a.py","line":1}\n'
-
-    def test_calls_run_api_analysis(self, tmp_path):
-        stream = tmp_path / "stream.json"
-        jsonl = tmp_path / "evidence.jsonl"
-        (tmp_path / "main.py").write_text("x = 1")
-
-        cfg = AnalysisConfig(ai_cmd="ollama", ai_model="llama3.1", jsonl_file=jsonl)
-        provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
-
-        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
-             patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
-            mock_api.assert_called_once()
-            assert stream.read_text().strip() != ""
-
-    def test_passes_subagent_count_from_run_config(self, tmp_path):
-        """The pool's RunConfig carrier feeds max_subagents into the API
-        runner config so the read timeout can scale with queue depth."""
-        from types import SimpleNamespace
-
-        stream = tmp_path / "stream.json"
-        jsonl = tmp_path / "evidence.jsonl"
-        (tmp_path / "main.py").write_text("x = 1")
-
-        run_config = SimpleNamespace(options=SimpleNamespace(max_subagents=3))
-        cfg = AnalysisConfig(
-            ai_cmd="ollama", ai_model="llama3.1",
-            jsonl_file=jsonl, run_config=run_config,
-        )
-        provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
-
-        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
-             patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
-
-        assert mock_api.call_args.kwargs["config"].n_subagents == 3
-
-    def test_defaults_subagent_count_without_run_config(self, tmp_path):
-        """Legacy callers pass no RunConfig carrier: timeout stays unscaled."""
-        stream = tmp_path / "stream.json"
-        jsonl = tmp_path / "evidence.jsonl"
-        (tmp_path / "main.py").write_text("x = 1")
-
-        cfg = AnalysisConfig(ai_cmd="ollama", ai_model="llama3.1", jsonl_file=jsonl)
-        provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
-
-        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             patch("quodeq.analysis.api_prompt_assembly.assemble_api_prompt", return_value="prompt"), \
-             patch("quodeq.analysis._api_runner.run_api_analysis") as mock_api:
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
-
-        assert mock_api.call_args.kwargs["config"].n_subagents == 1
-
-    def test_trust_model_reaches_assemble_api_prompt(self, tmp_path):
-        """C2: subprocess.py:435 (``trust_model=trust_model``, fed from
-        subprocess.py:421's ``trust_model = resolve_trust_model(work_dir)``)
-        is one of three live wiring points for the declared trust model.
-        Nothing failed when a reviewer set all three to None at once and the
-        full suite stayed green -- this closes that gap by asserting the
-        resolved model, from a real declared profile, actually reaches
-        assemble_api_prompt's kwargs.
-
-        Patched at ``quodeq.analysis.subprocess.assemble_api_prompt``
-        (the name subprocess.py imported into its OWN namespace via
-        ``from ... import assemble_api_prompt``), not at
-        ``quodeq.analysis.api_prompt_assembly.assemble_api_prompt`` -- the
-        latter only rebinds the origin module's attribute and would silently
-        fail to intercept the call subprocess.py already bound at import
-        time.
-        """
-        stream = tmp_path / "stream.json"
-        jsonl = tmp_path / "evidence.jsonl"
-        (tmp_path / "main.py").write_text("x = 1")
-        profile_dir = tmp_path / ".quodeq"
-        profile_dir.mkdir()
-        (profile_dir / "project-profile.json").write_text(json.dumps({
-            "version": 1, "multiTenant": False, "networkExposure": "loopback",
-        }))
-
-        cfg = AnalysisConfig(ai_cmd="ollama", ai_model="llama3.1", jsonl_file=jsonl)
-        provider = {"ollama": {"type": "api", "model": "llama3.1", "api_base": "http://localhost:11434/v1"}}
-
-        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             patch("quodeq.analysis.subprocess.assemble_api_prompt", return_value="prompt") as mock_assemble, \
-             patch("quodeq.analysis._api_runner.run_api_analysis"):
-            _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
-
-        mock_assemble.assert_called_once()
-        trust_model = mock_assemble.call_args.kwargs["trust_model"]
-        assert trust_model is not None
-        assert trust_model.multi_tenant is False
-        assert trust_model.network_exposure == "loopback"
-
-
-# ---------------------------------------------------------------------------
-# run_analysis dispatch
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 # _resolve_provider_config
 # ---------------------------------------------------------------------------
 
 class TestResolveProviderConfig:
-    def test_reads_api_key_from_env(self, monkeypatch):
+    def test_reads_api_key_from_injected_env(self, monkeypatch):
         provider = {"myprovider": {"type": "api", "model": "m", "api_base": "http://x", "api_key_env": "MY_KEY"}}
-        monkeypatch.setenv("MY_KEY", "secret")
+        # The injected mapping is the only credential source: a conflicting
+        # process env var must be ignored.
+        monkeypatch.setenv("MY_KEY", "process-env-value")
         cfg = AnalysisConfig(ai_cmd="myprovider", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
-            _, _, key = _resolve_provider_config(cfg)
+            _, _, key = _resolve_provider_config(cfg, {"MY_KEY": "secret"})
         assert key == "secret"
 
-    def test_required_api_key_missing_raises(self, monkeypatch):
+    def test_required_api_key_missing_raises(self):
         provider = {"openrouter": {
             "type": "api", "model": "m", "api_base": "https://openrouter.ai/api/v1",
             "api_key_env": "OPENROUTER_API_KEY", "api_key_required": True,
         }}
-        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         cfg = AnalysisConfig(ai_cmd="openrouter", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
             with pytest.raises(Exception, match="OPENROUTER_API_KEY"):
-                _resolve_provider_config(cfg)
+                _resolve_provider_config(cfg, {})
 
     def test_omlx_falls_back_to_read_omlx_api_key(self):
         provider = {"omlx": {"type": "api", "model": "m", "api_base": "http://localhost:8000/v1"}}
         cfg = AnalysisConfig(ai_cmd="omlx", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             patch("quodeq.llm_bridge._omlx._read_omlx_api_key", return_value="omlx-key"):
-            _, _, key = _resolve_provider_config(cfg)
+             patch("quodeq.llm_bridge.omlx.read_omlx_api_key", return_value="omlx-key"):
+            _, _, key = _resolve_provider_config(cfg, {})
         assert key == "omlx-key"
 
     def test_omlx_empty_key_when_not_configured(self):
         provider = {"omlx": {"type": "api", "model": "m", "api_base": "http://localhost:8000/v1"}}
         cfg = AnalysisConfig(ai_cmd="omlx", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             patch("quodeq.llm_bridge._omlx._read_omlx_api_key", return_value=""):
-            _, _, key = _resolve_provider_config(cfg)
+             patch("quodeq.llm_bridge.omlx.read_omlx_api_key", return_value=""):
+            _, _, key = _resolve_provider_config(cfg, {})
         assert key == ""
 
     def test_credential_registry_dispatches_registered_provider(self, monkeypatch):
@@ -483,12 +165,12 @@ class TestResolveProviderConfig:
         dispatched through the registry rather than via a hard-coded branch."""
         from quodeq.analysis.subprocess import _CREDENTIAL_LOADERS
         # Patch a fake provider into the registry for the duration of the test.
-        _CREDENTIAL_LOADERS["testprovider"] = lambda: "registry-key"
+        _CREDENTIAL_LOADERS["testprovider"] = lambda _env: "registry-key"
         try:
             provider = {"testprovider": {"type": "api", "model": "m", "api_base": "http://tp/v1"}}
             cfg = AnalysisConfig(ai_cmd="testprovider", ai_model="m")
             with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
-                _, _, key = _resolve_provider_config(cfg)
+                _, _, key = _resolve_provider_config(cfg, {})
             assert key == "registry-key"
         finally:
             _CREDENTIAL_LOADERS.pop("testprovider", None)
@@ -499,7 +181,7 @@ class TestResolveProviderConfig:
         provider = {"newprovider": {"type": "api", "model": "m", "api_base": "http://np/v1"}}
         cfg = AnalysisConfig(ai_cmd="newprovider", ai_model="m")
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider):
-            _, _, key = _resolve_provider_config(cfg)
+            _, _, key = _resolve_provider_config(cfg, {})
         assert key == ""
 
 
@@ -517,5 +199,3 @@ class TestRunAnalysisDispatch:
             # config arg should be an AnalysisConfig
             _, _, _, passed_cfg = mock_cli.call_args.args
             assert isinstance(passed_cfg, AnalysisConfig)
-
-

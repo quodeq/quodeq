@@ -1,14 +1,16 @@
 """Defensive env parsing: malformed values fall back instead of raising.
 
 Covers the P2 fix round's env sites: QUODEQ_JOB_TIMEOUT_S,
-QUODEQ_CANCEL_GRACE_S, QUODEQ_GIT_CLONE_TIMEOUT_S (services._fs_clone and
-_cli_resolution), and QUODEQ_MAX_HISTORY_RUNS. Import-time constants are
-exercised via importlib.reload with the env var set, then restored.
+QUODEQ_CANCEL_GRACE_S, QUODEQ_GIT_CLONE_TIMEOUT_S (config.clone_env, read
+lazily per call by services._fs_clone and by the _cli_resolution import-time
+constant), and QUODEQ_MAX_HISTORY_RUNS. Import-time constants are exercised
+via importlib.reload with the env var set, then restored.
 """
 from __future__ import annotations
 
 import importlib
 
+from quodeq.config.clone_env import git_clone_timeout_s
 from quodeq.services.jobs import JobManager
 from quodeq.services.scoring import _max_history_runs
 
@@ -62,11 +64,8 @@ class TestImportTimeConstants:
         assert value == 30.0
 
     def test_clone_timeout_invalid_falls_back(self, monkeypatch):
-        value = _reload_attr(
-            monkeypatch, "quodeq.services._fs_clone",
-            "QUODEQ_GIT_CLONE_TIMEOUT_S", "fast", "_GIT_CLONE_TIMEOUT_S",
-        )
-        assert value == 300
+        monkeypatch.setenv("QUODEQ_GIT_CLONE_TIMEOUT_S", "fast")
+        assert git_clone_timeout_s() == 300
 
     def test_fetch_timeout_invalid_falls_back(self, monkeypatch):
         value = _reload_attr(

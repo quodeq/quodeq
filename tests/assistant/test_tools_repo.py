@@ -55,7 +55,7 @@ def test_git_dir_blocked_case_insensitive(ctx):
     # macOS APFS is case-insensitive by default -- ".GIT/config" resolves to
     # the same file as ".git/config" on disk, so the jail must compare
     # lowercased names or a differently-cased path bypasses it.
-    from quodeq.assistant.tools._registry import ToolError
+    from quodeq.assistant.tools.registry import ToolError
     from quodeq.assistant.tools._repo_tools import _jail
 
     with pytest.raises(ToolError, match="inside the .git directory"):

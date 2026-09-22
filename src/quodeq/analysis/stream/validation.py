@@ -4,59 +4,92 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-# NOTE: logging in inner layer — tracked for middleware extraction
-from quodeq.shared.logging import log_debug
+from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.stream.events import copilot_error, copilot_event_data
 from quodeq.shared.utils import open_text
 
 _MCP_SERVER_NAME = "findings"
 
 
-def get_mcp_status(stream_file: Path) -> str | None:
-    """Return MCP server status from the stream init event, or None if unavailable."""
-    if not stream_file.exists() or stream_file.stat().st_size == 0:
-        return None
-    try:
-        with open_text(stream_file) as f:
-            first = f.readline().strip()
-            if not first:
-                return None
-            d = json.loads(first)
-            if not isinstance(d, dict):
-                return None
-            for srv in d.get("mcp_servers", []):
-                if not isinstance(srv, dict):
-                    continue  # skip a non-dict element, keep scanning the rest
-                if srv.get("name") == _MCP_SERVER_NAME:
-                    return srv.get("status")
-    except (json.JSONDecodeError, OSError) as exc:
-        log_debug(f"Failed to read MCP status from {stream_file}: {exc}")
+def _has_content(stream_file: Path) -> bool:
+    """True when *stream_file* exists and holds at least one byte.
+
+    One stat, shared by every reader here: an absent or empty stream carries
+    neither an MCP status nor an error event.
+    """
+    return stream_file.exists() and stream_file.stat().st_size > 0
+
+
+def _event_servers(event: dict) -> list | None:
+    """The MCP server list an init event advertises, in either provider dialect."""
+    if event.get("type") == "session.mcp_servers_loaded":
+        return copilot_event_data(event).get("servers", [])
+    return event.get("mcp_servers", [])
+
+
+def _findings_server_status(servers: list, stream_file: Path, log: LogSink) -> str | None:
+    """The status string the findings server reports, or None if it is absent.
+
+    A findings entry whose status is not a string is logged and skipped, so a
+    later, well-formed entry can still answer.
+    """
+    for srv in servers:
+        if not (isinstance(srv, dict) and srv.get("name") == _MCP_SERVER_NAME):
+            continue
+        status = srv.get("status")
+        if isinstance(status, str):
+            return status
+        log.debug(f"Invalid MCP server status in {stream_file}")
     return None
 
 
-def _is_error_event(line: str, stream_file: Path) -> bool | None:
+def get_mcp_status(stream_file: Path, *, log: LogSink = NULL_LOG) -> str | None:
+    """Return MCP server status from the stream init event, or None if unavailable."""
+    if not _has_content(stream_file):
+        return None
+    try:
+        with open_text(stream_file) as f:
+            for line in f:
+                d = json.loads(line)
+                servers = _event_servers(d) if isinstance(d, dict) else None
+                if not isinstance(servers, list):
+                    if isinstance(d, dict):
+                        log.debug(f"Invalid MCP server list in {stream_file}")
+                    continue
+                status = _findings_server_status(servers, stream_file, log)
+                if status is not None:
+                    return status
+    except (json.JSONDecodeError, OSError) as exc:
+        log.debug(f"Failed to read MCP status from {stream_file}: {exc}")
+    return None
+
+
+def _is_error_event(
+    line: str, stream_file: Path, *, log: LogSink = NULL_LOG,
+) -> bool | None:
     """Check if a stream line is an error event. Returns True/False or None to skip."""
     try:
         d = json.loads(line.strip())
     except json.JSONDecodeError as exc:
-        log_debug(f"Skipping malformed stream line in {stream_file}: {exc}")
+        log.debug(f"Skipping malformed stream line in {stream_file}: {exc}")
         return None
     if not isinstance(d, dict):
         return False  # a valid-JSON non-object line is not an error event
     if d.get("type") == "result" and d.get("is_error"):
         return True
-    return False
+    return copilot_error(d) is not None
 
 
-def is_stream_valid(stream_file: Path) -> bool:
+def is_stream_valid(stream_file: Path, *, log: LogSink = NULL_LOG) -> bool:
     """Return True if stream exists, is non-empty, and has no error events."""
-    if not stream_file.exists() or stream_file.stat().st_size == 0:
+    if not _has_content(stream_file):
         return False
     try:
         with open_text(stream_file) as f:
             for line in f:
-                if _is_error_event(line, stream_file) is True:
+                if _is_error_event(line, stream_file, log=log) is True:
                     return False
     except OSError as exc:
-        log_debug(f"Cannot read stream file {stream_file}: {exc}")
+        log.debug(f"Cannot read stream file {stream_file}: {exc}")
         return False
     return True

@@ -9,6 +9,8 @@ import threading
 from pathlib import Path
 from typing import Callable
 
+from quodeq.shared.env_paths import get_run_dir
+
 _logger = logging.getLogger(__name__)
 _SOCK_TIMEOUT = 0.5
 _RELOAD_PREFIX = "reload:"
@@ -26,15 +28,11 @@ _WIN_PORT_FILE = "dashboard.port"
 
 
 def _default_sock_path() -> Path:
-    run_dir = Path(os.environ.get("QUODEQ_RUN_DIR", Path.home() / ".quodeq" / "run"))
-    run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir / "dashboard.sock"
+    return get_run_dir() / "dashboard.sock"
 
 
 def _default_port_file() -> Path:
-    run_dir = Path(os.environ.get("QUODEQ_RUN_DIR", Path.home() / ".quodeq" / "run"))
-    run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir / _WIN_PORT_FILE
+    return get_run_dir() / _WIN_PORT_FILE
 
 
 class InstanceController:
@@ -239,8 +237,8 @@ class InstanceController:
         if self._server_sock:
             try:
                 self._server_sock.close()
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("instance shutdown cleanup failed: %s", exc)
         if self._listen_thread:
             self._listen_thread.join(timeout=0.5)
         if not owns_socket:

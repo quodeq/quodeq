@@ -13,25 +13,29 @@ analyzed repository at ``<project root>/.quodeq/project-profile.json``,
 alongside ``standards-visibility.json`` and ``standards-overrides.json`` so the
 whole team shares it:
 
-    {"version": 1, "multiTenant": false, "networkExposure": "loopback"}
+    {"version": 1, "multiTenant": false, "networkExposure": "loopback",
+     "deploymentTopology": "single-host"}
 
 Resolution is PER FIELD: a declared value wins, ``detect_shape`` fills what is
 undeclared, and anything still unknown falls back to :data:`CONSERVATIVE`. That
 last step is the no-regression guarantee -- a project that declares nothing and
 detects as nothing is scored exactly as it was before this module existed.
 
-That per-field fallback is deliberately ASYMMETRIC between the two axes.
+That per-field fallback is deliberately ASYMMETRIC between the axes.
 ``multi_tenant`` is a property a manifest can genuinely evidence -- a CLI's
 own entry point is real proof it has one caller. Network exposure is not: a
 loopback Flask app and a hosted one are byte-identical on disk, the same
-point made two paragraphs up. So ``_detected_fields`` may fill
-``multi_tenant``, but its exposure slot is always ``None`` -- detection is
-never allowed to waive a remote-reachability finding by itself. A Rust
+point made two paragraphs up. So ``_detected_multi_tenant`` is the only
+detection step, and it fills ``multi_tenant`` alone -- detection is never
+allowed to waive a remote-reachability finding by itself. A Rust
 ``axum`` service with only a ``main.rs``, a Django app that merely lists
 ``pyinstaller`` in a dev extra, or an Express service with ``electron`` in
 ``devDependencies`` all detect as desktop/CLI today; none of them may get
 ``S-AUT-3``/``S-AUT-10`` waived on that basis alone. Only a human's
 declaration in ``project-profile.json`` may relax that axis.
+``deployment_topology`` is declaration-only for exactly the same reason: a
+single-host deployment and a horizontally scaled one are byte-identical on
+disk, so detection never fills it either.
 
 Nothing here may fail a scan. Every malformed-input branch warns and degrades.
 """
@@ -56,22 +60,33 @@ SUPPORTED_VERSION = 1
 # not a trust boundary this code can reason about.
 NETWORK_EXPOSURES: frozenset[str] = frozenset({"loopback", "lan", "public"})
 
+#: Topology is never detected, for the same reason exposure is not: a
+#: single-host deployment and a horizontally scaled one are byte-identical on
+#: disk. Only a human declaration may relax F-SCL-1/2/4.
+DEPLOYMENT_TOPOLOGIES: frozenset[str] = frozenset({"single-host", "distributed"})
+
 
 @dataclass(frozen=True)
 class TrustModel:
-    """The two axes a finding's severity can legitimately turn on."""
+    """The axes a finding's severity can legitimately turn on."""
 
     multi_tenant: bool
     network_exposure: str
+    deployment_topology: str
 
     def relaxes_remote(self) -> bool:
         """True when no untrusted party can open a socket to this process."""
         return self.network_exposure == "loopback"
 
+    def is_single_host(self) -> bool:
+        """True when the team declared this runs as one process on one host."""
+        return self.deployment_topology == "single-host"
+
 
 #: What an undeclared, undetectable project gets. Deliberately the most
 #: pessimistic model, so absence of information never relaxes a finding.
-CONSERVATIVE = TrustModel(multi_tenant=True, network_exposure="public")
+CONSERVATIVE = TrustModel(
+    multi_tenant=True, network_exposure="public", deployment_topology="distributed")
 
 
 def _read_profile(project_root: Path) -> dict:
@@ -109,8 +124,25 @@ def _read_profile(project_root: Path) -> dict:
     return data
 
 
-def _declared_fields(data: dict) -> tuple[bool | None, str | None]:
-    """Extract the two axes from a parsed profile, per field.
+def _enum_field(data: dict, key: str, allowed: frozenset[str] | set[str]) -> str | None:
+    """The declared *key*, normalised, when it names one of *allowed*.
+
+    None for an absent field and for a bad one, which is warned about: the
+    file is a declaration, not a transaction, so one bad axis never discards
+    the others.
+    """
+    raw = data.get(key)
+    if isinstance(raw, str) and raw.strip().lower() in allowed:
+        return raw.strip().lower()
+    if raw is not None:
+        _logger.warning(
+            "project profile: %s must be one of %s, got %r", key, sorted(allowed), raw,
+        )
+    return None
+
+
+def _declared_fields(data: dict) -> tuple[bool | None, str | None, str | None]:
+    """Extract the three axes from a parsed profile, per field.
 
     A bad value for one axis never discards the other: the file is a
     declaration, not a transaction.
@@ -122,39 +154,21 @@ def _declared_fields(data: dict) -> tuple[bool | None, str | None]:
     elif raw_tenant is not None:
         _logger.warning("project profile: multiTenant must be a boolean, got %r", raw_tenant)
 
-    exposure: str | None = None
-    raw_exposure = data.get("networkExposure")
-    if isinstance(raw_exposure, str) and raw_exposure.strip().lower() in NETWORK_EXPOSURES:
-        exposure = raw_exposure.strip().lower()
-    elif raw_exposure is not None:
-        _logger.warning(
-            "project profile: networkExposure must be one of %s, got %r",
-            sorted(NETWORK_EXPOSURES), raw_exposure,
-        )
-    return multi_tenant, exposure
+    exposure = _enum_field(data, "networkExposure", NETWORK_EXPOSURES)
+    topology = _enum_field(data, "deploymentTopology", DEPLOYMENT_TOPOLOGIES)
+    return multi_tenant, exposure, topology
 
 
-def _detected_fields(project_root: Path) -> tuple[bool | None, str | None]:
-    """Derive ``multi_tenant`` from manifest detection. Exposure is NEVER
-    detected -- the second element of the returned tuple is always ``None``.
+def _detected_multi_tenant(project_root: Path) -> bool | None:
+    """Derive ``multi_tenant`` from manifest detection; None when unknown.
 
-    Whether an untrusted party can open a socket to this process is a
-    deployment fact no manifest can prove: a loopback Flask app and a hosted
-    one are byte-identical on disk (see this module's own docstring). Filling
-    ``network_exposure`` from detection would let any project that merely
-    RESEMBLES a desktop app or single-user CLI on disk get its security
-    findings waived without a human declaring anything -- see the module
-    docstring for the four real hosted services (axum, chi, Django+pyinstaller,
-    Express+electron) that detect as desktop/CLI today. Only
-    ``.quodeq/project-profile.json``, via :func:`resolve_trust_model`, may set
-    that axis.
-
-    ``multi_tenant`` alone is safe to infer: a CLI's own entry point is real
-    evidence of a single caller. ``LIBRARY`` still maps to unknown on
-    purpose -- ``_shape_irrelevant_to_hosted_service`` treats libraries as
-    non-hosted, which is sound for concurrency findings and wrong here: a
-    library's paths may be fed from an HTTP request in the consuming
-    application, and the author cannot know.
+    This is the only trust axis detection may fill -- see the module
+    docstring for why exposure and topology are declaration-only. A CLI's
+    own entry point is real evidence of a single caller. ``LIBRARY`` still
+    maps to unknown on purpose: ``_shape_irrelevant_to_hosted_service``
+    treats libraries as non-hosted, which is sound for concurrency findings
+    and wrong here, because a library's paths may be fed from an HTTP
+    request in the consuming application and the author cannot know.
     """
     try:
         shape = detect_shape(project_root)
@@ -170,14 +184,14 @@ def _detected_fields(project_root: Path) -> tuple[bool | None, str | None]:
         # scan. project_shape.py itself is out of scope for this fix; this
         # catch is deliberately wide as the boundary that must not leak.
         _logger.warning("Project shape detection failed for %s: %s", project_root, exc)
-        return None, None
+        return None
     if shape.deployment is Deployment.WEB_SERVICE:
-        return True, None
+        return True
     if shape.deployment is Deployment.DESKTOP:
-        return False, None
+        return False
     if shape.deployment is Deployment.CLI and shape.is_single_user:
-        return False, None
-    return None, None
+        return False
+    return None
 
 
 def resolve_trust_model(project_root: Path | str | None) -> TrustModel:
@@ -188,14 +202,17 @@ def resolve_trust_model(project_root: Path | str | None) -> TrustModel:
     if not project_root:
         return CONSERVATIVE
     root = Path(project_root)
-    declared_tenant, declared_exposure = _declared_fields(_read_profile(root))
-    detected_tenant, detected_exposure = _detected_fields(root)
-
+    declared_tenant, declared_exposure, declared_topology = _declared_fields(_read_profile(root))
     multi_tenant = declared_tenant
     if multi_tenant is None:
-        multi_tenant = detected_tenant
+        multi_tenant = _detected_multi_tenant(root)
     if multi_tenant is None:
         multi_tenant = CONSERVATIVE.multi_tenant
 
-    exposure = declared_exposure or detected_exposure or CONSERVATIVE.network_exposure
-    return TrustModel(multi_tenant=multi_tenant, network_exposure=exposure)
+    exposure = declared_exposure or CONSERVATIVE.network_exposure
+    topology = declared_topology or CONSERVATIVE.deployment_topology
+    return TrustModel(
+        multi_tenant=multi_tenant,
+        network_exposure=exposure,
+        deployment_topology=topology,
+    )

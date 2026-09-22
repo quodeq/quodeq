@@ -2,33 +2,51 @@
 from __future__ import annotations
 import hashlib
 import json
-import logging
 import ssl
 import urllib.request
 from pathlib import Path
 from typing import Any, Protocol
 
-from quodeq.data.fs.standards_store import (
+from quodeq.services.wiring import (
     read_standard_payload, resolve_jailed_standard_path, write_standard_payload,
 )
-
-# NOTE: logging in inner layer — tracked for middleware extraction
-logger = logging.getLogger(__name__)
 
 _HTTP_TIMEOUT_S = 30
 _HASH_PREFIX_LEN = 16
 
+
+class StandardImportConflictError(ValueError):
+    """Raised when a standard with the same ID already exists locally from
+    a different origin. The only genuine business-logic conflict raised by
+    ``import_standard`` -- every other ``ValueError`` it raises (invalid
+    library file path, invalid/missing standard ID, malformed remote JSON)
+    is a transport/parse failure, not a conflict, and stays a plain
+    ``ValueError`` so callers can tell the two apart by type."""
+
+
 class HttpClient(Protocol):
-    def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any: ...
+    """Transport seam for the library client, so tests can answer without a network."""
+    def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any:
+        """Fetch *url* and return the decoded JSON body."""
+        ...
+
 
 class UrllibJsonClient:
+    """``HttpClient`` over ``urllib`` with a default-verified TLS context."""
     def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any:
+        """Fetch *url* with a 30s timeout. Transport and decode errors propagate."""
         req = urllib.request.Request(url, headers=headers or {})
         ctx = ssl.create_default_context()
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S, context=ctx) as resp:
             return json.loads(resp.read())
 
+
 class StandardsLibraryClient:
+    """Read side of a remote standards library: index, fetch, and import-to-disk.
+
+    Construction rejects any base URL that is not ``https://``, so the bearer
+    token can never ride on a plaintext request.
+    """
     def __init__(self, base_url: str, http_client: HttpClient, token: str | None = None) -> None:
         if not base_url.startswith("https://"):
             raise ValueError(f"Only https:// base URLs are allowed, got: {base_url!r}")
@@ -45,6 +63,8 @@ class StandardsLibraryClient:
     def fetch_index(self) -> list[dict]:
         """Retrieve the remote standards library index."""
         data = self._http.get_json(f"{self._base_url}/index.json", headers=self._headers())
+        if not isinstance(data, dict):
+            raise ValueError(f"Library index is not a JSON object: {type(data).__name__}")
         return data.get("standards", [])
 
     def fetch_standard(self, file_path: str) -> dict:
@@ -61,6 +81,8 @@ class StandardsLibraryClient:
         if ".." in file_path:
             raise ValueError(f"Invalid library file path: {file_path}")
         data = self.fetch_standard(file_path)
+        if not isinstance(data, dict):
+            raise ValueError(f"Library standard is not a JSON object: {file_path}")
         self._validate_id(data.get("id", ""))
         content_hash = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:_HASH_PREFIX_LEN]
         try:
@@ -74,7 +96,7 @@ class StandardsLibraryClient:
                 # Same origin — update in place
                 pass
             else:
-                raise ValueError(
+                raise StandardImportConflictError(
                     f"A standard with ID '{data['id']}' already exists "
                     f"from a different source. Duplicate to customize it first, "
                     f"or delete the existing one."

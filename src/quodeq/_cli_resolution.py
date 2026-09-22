@@ -1,38 +1,52 @@
 """Evaluation input resolution — repo, language, manifest, and scope helpers.
 
-Split from ``_cli_evaluation.py`` to keep each module under 300 lines.
+Split from ``cli_evaluation.py`` to keep each module under 300 lines.
+Worktree management lives in ``_cli_worktree.py``; re-exported here (and, in
+turn, from ``cli_evaluation.py``) so ``quodeq._cli_resolution._create_worktree``
+and ``quodeq.cli_evaluation._cleanup_worktree`` stay valid patch targets.
+``import subprocess`` stays in this module even though the worktree
+functions moved out — ``_resolve_repo`` below still needs the exception
+types, and tests patch ``quodeq._cli_resolution.subprocess.run``, which
+requires this module to expose a ``subprocess`` attribute. ``_FETCH_TIMEOUT_S``
+also stays here (rather than moving with ``_fetch_branch``) because a test
+reloads this module with ``QUODEQ_GIT_CLONE_TIMEOUT_S`` set and reads the
+import-time constant back off it; ``_cli_worktree._fetch_branch`` reads it
+via a deferred facade lookup.
 """
 
 from __future__ import annotations
 
 import argparse
-import os
-import shutil
 import subprocess
 import sys
-import tempfile as _tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
+from quodeq.config.clone_env import git_clone_timeout_s
 from quodeq.config.paths import default_paths
-from quodeq.shared._env import env_int
-from quodeq.shared.utils import is_repo_url, project_name_from_repo, read_json
+from quodeq.shared.utils import is_repo_url, read_json
 from quodeq.shared.validation import validate_path_segment
 from quodeq.analysis.manifest import SourceManifest, build_manifest, detect_language
-from quodeq.analysis.manifest_models import AnalysisTarget
 # Re-exported: moved to the analysis layer (pure manifest logic); CLI modules
 # keep their historical `from quodeq._cli_resolution import ...` path.
-from quodeq.analysis.manifest_scope import _filter_manifest_by_scope  # noqa: F401
+from quodeq.analysis.manifest_scope import filter_manifest_by_scope
 from quodeq.analysis.runner import load_universal_dimensions
+from quodeq.shared.log_sink import SHARED_LOG
+# Re-exported: moved to _cli_worktree.py to keep this module under 300 lines.
+# _cleanup_worktree is unused directly in this module but must stay imported
+# — it is a patch target (quodeq._cli_resolution._cleanup_worktree) and the
+# public re-export chain through quodeq.cli_evaluation depends on it.
+from quodeq._cli_worktree import _cleanup_worktree, _create_worktree
+# Re-exported: moved to _cli_scope.py to keep this module under 300 lines.
+from quodeq._cli_scope import (
+    _override_manifest_single_file, _resolve_scope, _resolve_single_file,
+)
 
-import logging
-
-_logger = logging.getLogger(__name__)
-
-_WORKTREE_TIMEOUT_S = 30
-# Branch fetches go over the network; give them the clone budget, not the
-# local worktree one.
-_FETCH_TIMEOUT_S = env_int("QUODEQ_GIT_CLONE_TIMEOUT_S", 300, minimum=1)
+# Branch fetches (_cli_worktree._fetch_branch) go over the network; give them
+# the clone budget, not the local worktree one. Stays an import-time constant
+# here — see the module docstring for why.
+_FETCH_TIMEOUT_S = git_clone_timeout_s()
 
 
 # ---------------------------------------------------------------------------
@@ -46,79 +60,23 @@ class ResolvedInputs:
     language: str
     manifest: object  # SourceManifest | None
     dims_data: dict
-
-
-# ---------------------------------------------------------------------------
-# Worktree management
-# ---------------------------------------------------------------------------
-
-def _fetch_branch(repo_dir: Path, branch: str) -> bool:
-    """Fetch *branch* from origin into a local branch of the same name.
-
-    Single-branch clones (online repos registered via run_git_clone) have no
-    refspec for other branches, so a plain ``fetch origin <branch>`` would
-    only update FETCH_HEAD; the explicit ``<branch>:<branch>`` refspec makes
-    it usable by ``worktree add``. Returns True when the fetch succeeded.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "fetch", "origin", f"{branch}:{branch}"],
-            capture_output=True, text=True, encoding="utf-8", timeout=_FETCH_TIMEOUT_S,
-        )
-        return result.returncode == 0
-    except (subprocess.SubprocessError, OSError):
-        return False
-
-
-def _create_worktree(repo_dir: Path, branch: str) -> Path | None:
-    """Create a temporary git worktree for the given branch.
-
-    Returns the worktree path, or None on failure. When the first attempt
-    fails, the branch is fetched from origin and the attempt repeated once:
-    single-branch clones (online repos) don't have other branches locally
-    until someone asks for them.
-    """
-    worktree_dir = Path(_tempfile.mkdtemp(prefix=f"quodeq-wt-{branch.replace('/', '-')}-"))
-    for retried in (False, True):
-        try:
-            subprocess.run(
-                ["git", "-C", str(repo_dir), "worktree", "add", str(worktree_dir), branch],
-                capture_output=True, text=True, encoding="utf-8", check=True, timeout=_WORKTREE_TIMEOUT_S,
-            )
-            return worktree_dir
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
-            if not retried and _fetch_branch(repo_dir, branch):
-                continue
-            print(f"Failed to create worktree for branch '{branch}': {exc}", file=sys.stderr)
-            _cleanup_worktree(repo_dir, worktree_dir)
-            shutil.rmtree(worktree_dir, ignore_errors=True)
-            return None
-    return None
-
-
-def _cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
-    """Remove a temporary git worktree."""
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_dir), "worktree", "remove", str(worktree_dir), "--force"],
-            capture_output=True, text=True, encoding="utf-8", timeout=_WORKTREE_TIMEOUT_S,
-        )
-        if result.returncode != 0:
-            _logger.warning(
-                "git worktree remove %s exited %d: %s",
-                worktree_dir, result.returncode, (result.stderr or "").strip(),
-            )
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
-        _logger.debug("Failed to clean up worktree %s: %s", worktree_dir, exc)
+    worktree_origin: Path | None = None
+    worktree_dir: Path | None = None
+    single_file: bool = False
 
 
 # ---------------------------------------------------------------------------
 # Repo / language / manifest resolution
 # ---------------------------------------------------------------------------
 
-def _resolve_repo(args: argparse.Namespace) -> Path | None:
-    """Resolve the repo argument to a local path (cloning if needed)."""
-    from quodeq.data.fs.repo_handler import cleanup_cloned_repo, prepare_repository
+def _resolve_repo(args: argparse.Namespace) -> tuple[Path, Path | None, Path | None] | None:
+    """Resolve the repo argument to a local path (cloning if needed).
+
+    Returns ``(src, worktree_origin, worktree_dir)`` where the worktree
+    fields are non-None only when a temporary branch worktree was created,
+    or ``None`` (with error printed to stderr) on failure.
+    """
+    from quodeq.data.fs.repo_handler import prepare_repository
 
     repo_path = args.repo
     try:
@@ -142,11 +100,9 @@ def _resolve_repo(args: argparse.Namespace) -> Path | None:
         worktree = _create_worktree(src, branch)
         if worktree is None:
             return None
-        args._worktree_origin = src
-        args._worktree_dir = worktree
-        src = worktree
+        return worktree, src, worktree
 
-    return src
+    return src, None, None
 
 
 def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
@@ -185,65 +141,85 @@ def _build_manifest(
         )
         print(f"Detected: {langs}", file=sys.stderr)
     print(f"Source files: {manifest.total_files}", file=sys.stderr)
+    skipped = manifest.skipped_untracked
+    if skipped:
+        print(
+            f"Skipped {skipped} untracked file{'' if skipped == 1 else 's'} "
+            "(only what git tracks is scored)",
+            file=sys.stderr,
+        )
     return manifest
 
 
-# ---------------------------------------------------------------------------
-# Scope and single-file resolution
-# ---------------------------------------------------------------------------
-
-def _resolve_scope(src: Path, args: argparse.Namespace) -> tuple[str | None, bool]:
-    """Resolve --scope flag against the source directory.
-
-    Returns ``(scope_path, ok)`` where *ok* is False when validation fails
-    (error already printed to stderr).
-    """
-    scope = getattr(args, "scope", None)
-    if not scope or not src.is_dir():
-        return None, True
-    scoped = (src / scope).resolve()
-    if not scoped.exists():
-        print(f"Scope path does not exist: {scoped}", file=sys.stderr)
-        return None, False
-    if not scoped.is_relative_to(src):
-        print(f"Scope must be within the repository: {scope}", file=sys.stderr)
-        return None, False
-    kind = "file" if scoped.is_file() else "folder"
-    print(f"Scoped evaluation: {scope} ({kind}, repo root: {src})", file=sys.stderr)
-    return scope, True
-
-
-def _resolve_single_file(src: Path) -> tuple[Path, str | None]:
-    """Detect single-file mode and return (project_root, relative_path | None)."""
-    if not src.is_file():
-        return src, None
-    file_path = src
-    project_root = file_path.parent
-    candidate = file_path.parent
-    while candidate != candidate.parent:
-        if (candidate / ".git").exists():
-            project_root = candidate
-            break
-        candidate = candidate.parent
-    single_file = str(file_path.relative_to(project_root))
-    print(f"Single-file evaluation: {single_file} (project root: {project_root})", file=sys.stderr)
-    return project_root, single_file
-
-
-
-
-def _override_manifest_single_file(
-    language: str, single_file: str, args: argparse.Namespace,
-) -> SourceManifest:
-    """Create a single-file manifest and flag args for single-file mode."""
-    ext = os.path.splitext(single_file)[1]
-    target = AnalysisTarget(
-        name=single_file, language=language,
-        source_files=[single_file], total_files=1,
-        language_stats={ext: 1} if ext else {},
+def _require_standards_config(paths) -> bool:
+    """Return True if detection.json/dimensions.json exist; else print and return False."""
+    if paths.detection_file.exists() and paths.dimensions_file.exists():
+        return True
+    print(
+        "Configuration not found: detection.json and dimensions.json are required. "
+        "These files are created automatically when you install Quodeq standards. "
+        f"Expected location: {paths.detection_file.parent}",
+        file=sys.stderr,
     )
-    args._single_file = True
-    return SourceManifest(targets=[target], total_files=1, language_stats={ext: 1} if ext else {})
+    return False
+
+
+class _SourceScope(NamedTuple):
+    """Where the evaluation reads from, once repo, --scope and single-file are settled."""
+    src: Path
+    worktree_origin: Path | None
+    worktree_dir: Path | None
+    scope_path: str | None
+    single_file: str | None
+
+
+def _resolve_source_scope(args: argparse.Namespace) -> _SourceScope | None:
+    """Resolve the repo, the --scope subtree and single-file mode into one record.
+
+    Returns ``None`` (with error printed to stderr) if any step fails.
+    """
+    resolved = _resolve_repo(args)
+    if resolved is None:
+        return None
+    src, worktree_origin, worktree_dir = resolved
+
+    scope_path, ok = _resolve_scope(src, args)
+    if not ok:
+        return None
+
+    src, single_file = _resolve_single_file(src)
+    return _SourceScope(src, worktree_origin, worktree_dir, scope_path, single_file)
+
+
+def _load_dimensions(paths) -> dict | None:
+    """Load the universal dimensions config; None (with error printed) if invalid."""
+    try:
+        return load_universal_dimensions(paths.dimensions_file)
+    except ValueError as exc:
+        print(f"Invalid dimensions config: {exc}", file=sys.stderr)
+        return None
+
+
+def _resolve_manifest(
+    args: argparse.Namespace, paths, scope: _SourceScope, language: str,
+) -> "SourceManifest | None | object":
+    """Build the manifest, narrow it to --scope, or replace it with the single file.
+
+    Returns ``_SCOPE_EMPTY`` when --scope matched no file, which is a failure
+    rather than the "no prescan" None that ``_build_manifest`` can return.
+    """
+    manifest = _build_manifest(args, scope.src, paths, scope_path=scope.scope_path)
+    if scope.scope_path and manifest:
+        manifest = filter_manifest_by_scope(manifest, scope.scope_path, log=SHARED_LOG)
+        if manifest is None:
+            return _SCOPE_EMPTY
+    if scope.single_file:
+        return _override_manifest_single_file(language, scope.single_file)
+    return manifest
+
+
+_SCOPE_EMPTY = object()
+"""Marker: --scope excluded every file, so the run has nothing to evaluate."""
 
 
 def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | None:
@@ -251,44 +227,58 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
 
     Returns ``None`` (with error printed to stderr) if any step fails.
     """
-    src = _resolve_repo(args)
-    if src is None:
+    scope = _resolve_source_scope(args)
+    if scope is None:
         return None
-
-    scope_path, ok = _resolve_scope(src, args)
-    if not ok:
-        return None
-
-    src, single_file = _resolve_single_file(src)
 
     paths = default_paths()
-    if not paths.detection_file.exists() or not paths.dimensions_file.exists():
-        print(
-            "Configuration not found: detection.json and dimensions.json are required. "
-            "These files are created automatically when you install Quodeq standards. "
-            f"Expected location: {paths.detection_file.parent}",
-            file=sys.stderr,
-        )
+    if not _require_standards_config(paths):
         return None
 
-    language = _resolve_language(args, src, paths)
+    language = _resolve_language(args, scope.src, paths)
     if language is None:
         return None
 
-    try:
-        dims_data = load_universal_dimensions(paths.dimensions_file)
-    except ValueError as exc:
-        print(f"Invalid dimensions config: {exc}", file=sys.stderr)
+    dims_data = _load_dimensions(paths)
+    if dims_data is None:
         return None
 
-    manifest = _build_manifest(args, src, paths, scope_path=scope_path)
+    manifest = _resolve_manifest(args, paths, scope, language)
+    if manifest is _SCOPE_EMPTY:
+        return None
 
-    if scope_path and manifest:
-        manifest = _filter_manifest_by_scope(manifest, scope_path)
-        if manifest is None:
-            return None
+    return ResolvedInputs(
+        src=scope.src, language=language, manifest=manifest, dims_data=dims_data,
+        worktree_origin=scope.worktree_origin, worktree_dir=scope.worktree_dir,
+        single_file=bool(scope.single_file),
+    )
 
-    if single_file:
-        manifest = _override_manifest_single_file(language, single_file, args)
 
-    return ResolvedInputs(src=src, language=language, manifest=manifest, dims_data=dims_data)
+__all__ = [
+    # Defined here.
+    "ResolvedInputs", "filter_manifest_by_scope",
+    "_build_manifest", "_require_standards_config", "_resolve_evaluation_inputs",
+    "_resolve_language", "_resolve_repo",
+    # Re-exported from _cli_scope / _cli_worktree so the historical
+    # ``quodeq._cli_resolution.<name>`` import and patch paths keep working.
+    "_cleanup_worktree", "_create_worktree",
+    "_override_manifest_single_file", "_resolve_scope", "_resolve_single_file",
+    # Public spellings, assigned below.
+    "build_cli_manifest", "cleanup_worktree", "create_worktree",
+    "override_manifest_single_file", "resolve_evaluation_inputs",
+    "resolve_language", "resolve_repo", "resolve_scope", "resolve_single_file",
+]
+
+# Public spellings of the names ``quodeq.cli`` re-exports. The underscore
+# originals stay importable from here for in-package callers.
+# ``_build_manifest`` is spelled ``build_cli_manifest``: this module already
+# binds ``build_manifest`` to the analysis-layer builder it calls.
+build_cli_manifest = _build_manifest
+cleanup_worktree = _cleanup_worktree
+create_worktree = _create_worktree
+override_manifest_single_file = _override_manifest_single_file
+resolve_evaluation_inputs = _resolve_evaluation_inputs
+resolve_language = _resolve_language
+resolve_repo = _resolve_repo
+resolve_scope = _resolve_scope
+resolve_single_file = _resolve_single_file

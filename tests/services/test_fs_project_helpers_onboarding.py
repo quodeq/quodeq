@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.services._fs_project_helpers import _build_project_entry
+from quodeq.services.fs_project_helpers import _ListingOptions, _build_project_entry
 from quodeq.data.fs.report_parser.runs import RunInfo
 
 
@@ -89,7 +89,7 @@ def test_entry_backfill_false_never_writes(tmp_path):
     entry = _build_project_entry(
         tmp_path, "proj-1",
         [_run("2025-12-02_00-00-00", "2025-12-02T00:00:00")],
-        backfill=False,
+        _ListingOptions(backfill=False),
     )
 
     assert entry.onboarding_completed_at is None

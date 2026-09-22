@@ -1,13 +1,14 @@
 """Hardened subprocess spawn for assistant CLI turns (read-only, scrubbed, scratch cwd)."""
 from __future__ import annotations
 
-import os
 import platform
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Callable
+from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.copilot import build_copilot_env
 
 # The spawned agent CLI is network-capable and tool-executing; it must NOT
 # inherit arbitrary secrets from the server process (JIRA_API_TOKEN, GH_TOKEN,
@@ -19,13 +20,6 @@ from typing import Callable
 _ALLOWED_ENV_KEYS = frozenset({
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "TMPDIR", "TZ",
 })
-# Kept for readability/back-compat with anything still referencing the concept
-# of "sensitive keys" conceptually; the allowlist above is what's enforced.
-SENSITIVE_ENV_KEYS = frozenset({
-    "QUODEQ_API_KEY", "DATABASE_URL", "SECRET_KEY",
-    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY",
-})
-
 _DANGEROUS_VALUES = ("bypassPermissions",)
 # Permission-skip flags that are NEVER acceptable in an assistant spawn.
 _DANGEROUS_FLAGS = (
@@ -54,10 +48,11 @@ def _externally_sandboxed(argv: list[str]) -> bool:
     return bool(argv) and Path(argv[0]).name in _EXTERNAL_SANDBOX_LAUNCHERS
 
 
-def build_chat_env(env: dict | None = None) -> dict:
-    source = env if env is not None else os.environ
-    result = {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}
-    return result
+def build_chat_env(env: dict | None = None, *, provider: str | None = None) -> dict:
+    source = resolve_env(env)
+    if provider == "copilot":
+        return build_copilot_env(source)
+    return {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}
 
 
 def scratch_cwd(base: Path) -> Path:
@@ -98,11 +93,20 @@ def _seatbelt_profile(*, writable_dirs: list[str], writable_files: list[str]) ->
     return "\n".join(lines) + "\n"
 
 
+def _writable_paths(writable_dirs: list[str], writable_files: list[str]) -> list[str]:
+    """Every path the sandbox must allow writes under.
+
+    The writable dirs themselves, plus the parent of each writable file -- a
+    sandbox grants a directory, not a single file.
+    """
+    return [*writable_dirs, *(str(Path(f).parent) for f in writable_files)]
+
+
 def _bwrap_prefix(writable_dirs: list[str], writable_files: list[str]) -> list[str]:
     argv = ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
             "--tmpfs", "/tmp", "--share-net", "--die-with-parent", "--unshare-pid"]
     seen: set[str] = set()
-    for d in [*writable_dirs, *(str(Path(f).parent) for f in writable_files)]:
+    for d in _writable_paths(writable_dirs, writable_files):
         if d and d not in seen:
             seen.add(d)
             argv += ["--bind", d, d]
@@ -133,7 +137,7 @@ def external_sandbox_prefix(*, writable_dirs: list[str],
         if shutil.which("firejail"):
             # firejail read-only whole fs, then allow-list the writable dirs
             argv = ["firejail", "--quiet", "--read-only=/"]
-            for d in [*writable_dirs, *(str(Path(f).parent) for f in writable_files)]:
+            for d in _writable_paths(writable_dirs, writable_files):
                 argv.append(f"--read-write={d}")
             return argv, lambda: None
         raise RuntimeError(

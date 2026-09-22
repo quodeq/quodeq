@@ -1,30 +1,11 @@
-"""Injectable dependency bundle for the scoring reader (see ScoringDeps)."""
+"""Re-export shim: the leaf now lives at ``quodeq.services.scoring_deps``.
+
+Moved out of the ``scoring`` package so modules outside it (``_dashboard_history.py``,
+``trend_fetcher.py``) can import ``ScoringDeps`` without triggering
+``scoring/__init__.py`` (which imports ``services/dashboard.py``, which
+imports back into ``_dashboard_history.py`` — a same-layer cycle). Kept here
+as a thin re-export so the in-package importers keep resolving unchanged.
+"""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable
-
-
-@dataclass(frozen=True)
-class ScoringDeps:
-    """Injectable dependency bundle for the scoring reader.
-
-    A ``None`` field resolves to the production callable at call time, so
-    the seam is purely additive: existing callers pass nothing and see no
-    change. Tests construct a ``ScoringDeps`` with fakes instead of
-    patching this module's attributes — the namespace-patch coupling is
-    what made the previous decomposition attempt revert.
-    """
-
-    read_run_data: Callable | None = None
-    read_run_scalars: Callable | None = None
-    dismissed_keys: Callable | None = None
-    deleted_keys: Callable | None = None
-    cached_accumulated: Callable | None = None
-    rescore_dimension: Callable | None = None
-    rescore_runs_by_dimension: Callable | None = None
-    recompute_summary: Callable | None = None
-
-
-_NO_DEPS = ScoringDeps()
-
+from quodeq.services.scoring_deps import ScoringDeps, NO_DEPS  # noqa: F401

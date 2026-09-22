@@ -1,7 +1,6 @@
 """Tests for shared SSRF protection utility."""
 from unittest.mock import patch
 
-import pytest
 
 from quodeq.shared.ssrf import is_private_address
 

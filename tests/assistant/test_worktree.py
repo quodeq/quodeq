@@ -2,6 +2,10 @@ import pytest
 
 from quodeq.assistant.worktree import (
     WorktreeError, WorktreeManager, _run, diff_stats, diff_text)
+from quodeq.assistant.worktree import ensure_session_worktree, gc_stale_worktrees
+from quodeq.data.ports.assistant import SessionScope
+from quodeq.data.sqlite.assistant_repository import AssistantRepository
+import shutil as _shutil
 
 
 @pytest.fixture()
@@ -89,7 +93,6 @@ def test_for_session_sanitizes_project_segment(repo, tmp_path):
 
 
 def test_remove_fallback_when_dir_deleted_out_of_band(manager, repo):
-    import shutil as _shutil
     _shutil.rmtree(manager.path)
     manager.remove()  # must not raise; prunes and deletes the branch
     out = _run(["git", "-C", str(repo), "branch", "--list", manager.branch])
@@ -185,13 +188,10 @@ def test_commit_all_returns_committed(manager):
     assert manager.commit_all("m") is True
 
 
-from quodeq.assistant.worktree import ensure_session_worktree, gc_stale_worktrees
-from quodeq.data.sqlite.assistant_repository import AssistantRepository
-
-
 def _store(tmp_path):
     store = AssistantRepository(tmp_path / "assistant.db")
-    store.create_session(session_id="s1", provider="ollama", project_id="proj")
+    store.create_session(session_id="s1", provider="ollama",
+                         scope=SessionScope(project_id="proj"))
     return store
 
 

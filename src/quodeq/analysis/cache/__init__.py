@@ -1,10 +1,10 @@
 """Content-addressed cache for analysis results.
 
 A successful (file, dimension) analysis is keyed by the SHA-256 of its real
-per-unit inputs (file content, path, dimension, language) and stored as one
-atomic, self-describing JSON entry. The next run computes the same key and
-either serves the recorded result or dispatches the work and writes the new
-entry.
+per-unit inputs (file content, path, dimension, non-default params) and
+stored as one atomic, self-describing JSON entry. The next run computes the
+same key and either serves the recorded result or dispatches the work and
+writes the new entry.
 
 The key is permissive (cost-first): volatile inputs (model, prompts,
 standards, sampling) are NOT keyed — switching them reuses prior work. Each
@@ -12,11 +12,18 @@ entry records those in its ``provenance`` block, so reuse across a model /
 prompts / standards boundary is surfaced, not silent; the user refreshes on
 demand with ``--clean-scan``.
 
+Since schema 4 the project ``language`` is provenance too, so a
+language-detection flip reuses prior work. A file moved inside the repo with
+unchanged content is recovered by adoption (``_adoption.py``) through the
+content index kept beside the entries (``data/cache_store/index.py``); the
+cache log line reports the count as ``adopted``.
+
 This is the canonical incremental layer. Half-computed work never gets a
 key, so there is no partial state to recover from.
 """
 from __future__ import annotations
 
+from quodeq.analysis.cache._persist_watcher import CachePersistProvenance, CachePersistTarget
 from quodeq.analysis.cache.backend import CacheBackend, CacheStats
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
@@ -28,6 +35,7 @@ from quodeq.analysis.cache.dimension_helpers import (
 from quodeq.analysis.cache.entry import CacheEntry
 from quodeq.analysis.cache.gc import (
     collect_legacy_entries,
+    ensure_cache_ready,
     maybe_collect_legacy_entries,
 )
 from quodeq.analysis.cache.key import CacheKey, compute_key
@@ -45,6 +53,8 @@ __all__ = [
     "CacheBackend",
     "CacheEntry",
     "CacheKey",
+    "CachePersistProvenance",
+    "CachePersistTarget",
     "CacheStats",
     "ClassifyResult",
     "DispatchResult",
@@ -59,6 +69,7 @@ __all__ = [
     "collect_legacy_entries",
     "compute_key",
     "default_cache_root",
+    "ensure_cache_ready",
     "format_provenance_drift",
     "maybe_collect_legacy_entries",
     "persist_dispatch_results",

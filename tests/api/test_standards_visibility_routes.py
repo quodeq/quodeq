@@ -41,9 +41,9 @@ def client(repo_root: Path, project_id: str, monkeypatch: pytest.MonkeyPatch):
     """
     app = create_app(test_config={"TESTING": True})
 
-    import quodeq.api.standards_visibility_routes as _mod
+    import quodeq.api.standards_project as _guard
     monkeypatch.setattr(
-        _mod, "resolve_repo_root",
+        _guard, "resolve_repo_root",
         lambda pid: str(repo_root) if pid == project_id else None,
     )
 
@@ -56,6 +56,14 @@ def test_get_returns_defaults_when_no_file(client, project_id):
     assert resp.status_code == 200
     assert resp.get_json()["visibleStandardIds"] == list(DEFAULT_VISIBLE_STANDARDS)
     assert resp.get_json()["isDefault"] is True
+
+
+def test_get_reports_default_standard_ids(client, project_id):
+    """Additive `defaultStandardIds` lets the UI reconcile its boot-time
+    fallback against the server's own default set instead of duplicating
+    it as a second source of truth."""
+    body = client.get(f"/api/projects/{project_id}/standards-visibility").get_json()
+    assert body["defaultStandardIds"] == list(DEFAULT_VISIBLE_STANDARDS)
 
 
 def test_get_reports_known_standard_ids(client, project_id):
@@ -100,6 +108,24 @@ def test_put_accepts_empty_selection(client, project_id, repo_root):
     assert resp.status_code == 200
     assert resp.get_json()["visibleStandardIds"] == []
     assert (repo_root / VISIBILITY_RELPATH).is_file()
+
+
+def test_put_computes_known_ids_once(client, project_id, monkeypatch):
+    import quodeq.api.standards_visibility_routes as _mod
+    real_known_ids = _mod._known_ids
+    calls = {"n": 0}
+
+    def counting(app):
+        calls["n"] += 1
+        return real_known_ids(app)
+
+    monkeypatch.setattr(_mod, "_known_ids", counting)
+
+    resp = client.put(f"/api/projects/{project_id}/standards-visibility",
+                       json={"visibleStandardIds": ["security"]},
+                       headers=_LOCALHOST)
+    assert resp.status_code == 200
+    assert calls["n"] == 1, "the PUT must list all standards only once"
 
 
 def test_routes_404_when_project_has_no_local_repo(client, detached_project_id):

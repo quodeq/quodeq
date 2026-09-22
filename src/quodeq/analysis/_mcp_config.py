@@ -8,20 +8,40 @@ import tempfile
 from pathlib import Path
 
 from quodeq.analysis._config import _AgentParams
-from quodeq.shared._mcp import codex_mcp_override
+from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
+from quodeq.shared.mcp import codex_mcp_override
 
 _SERVER_NAME = "findings"
 _SERVER_MODULE = ["-m", "quodeq.analysis.mcp.findings_server"]
 
 
-def _default_cache_root():
-    """Return the result cache root, honouring QUODEQ_CACHE_ROOT.
-
-    Deferred import breaks the circular dependency:
-    _mcp_config -> cache/__init__ -> dimension_helpers -> _types -> subprocess -> _command -> _mcp_config.
-    """
-    from quodeq.analysis.cache.local import default_cache_root  # noqa: PLC0415
-    return default_cache_root()
+def _findings_server_args(
+    compiled_dir: Path | None, dimension: str | None, ap: _AgentParams,
+) -> list[str]:
+    """Build the findings-server flags shared by the config file and the
+    Codex ``-c`` override, so the two spawn paths never drift."""
+    args: list[str] = []
+    if compiled_dir and dimension:
+        args.extend(["--compiled-dir", str(compiled_dir.resolve()), "--dimension", dimension])
+    if ap.standards_dir:
+        args.extend(["--standards-dir", str(ap.standards_dir.resolve())])
+    if ap.queue_path:
+        args.extend(["--queue", str(ap.queue_path.resolve())])
+    if ap.agent_id:
+        args.extend(["--agent-id", ap.agent_id])
+    if ap.work_dir:
+        args.extend(["--work-dir", str(ap.work_dir.resolve())])
+    # Cache fingerprint inputs (cache_root + model_id +
+    # language) MUST be emitted on every spawn so the subprocess writes cache
+    # entries with the same keys as classify_files_via_cache. Defaults match
+    # cache.dimension_helpers._model_id_from ('unknown') and the
+    # language-unset contract ('').
+    args.extend([
+        "--cache-root", str(_default_cache_root()),
+        "--model-id", ap.model_id or "unknown",
+        "--language", ap.language or "",
+    ])
+    return args
 
 
 def _create_mcp_config(
@@ -29,39 +49,26 @@ def _create_mcp_config(
     compiled_dir: Path | None = None,
     dimension: str | None = None,
     agent_params: _AgentParams | None = None,
+    *,
+    tools: list[str] | None = None,
 ) -> Path:
     """Create a temporary MCP config file pointing to the findings server."""
     ap = agent_params or _AgentParams()
     mcp_script = str(Path(__file__).resolve().parent / "mcp" / "findings_server.py")
-    mcp_args = [mcp_script, str(jsonl_file.resolve())]
-    if compiled_dir and dimension:
-        mcp_args.extend(["--compiled-dir", str(compiled_dir.resolve()), "--dimension", dimension])
-    if ap.standards_dir:
-        mcp_args.extend(["--standards-dir", str(ap.standards_dir.resolve())])
-    if ap.queue_path:
-        mcp_args.extend(["--queue", str(ap.queue_path.resolve())])
-    if ap.agent_id:
-        mcp_args.extend(["--agent-id", ap.agent_id])
-    if ap.work_dir:
-        mcp_args.extend(["--work-dir", str(ap.work_dir.resolve())])
-    # Phase 1.5 (Task 3.5): cache fingerprint inputs (cache_root + model_id +
-    # language) MUST be emitted on every spawn so the subprocess writes cache
-    # entries with the same keys as classify_files_via_cache. Defaults match
-    # cache.dimension_helpers._model_id_from ('unknown') and Task 5's
-    # language-unset contract ('').
-    mcp_args.extend([
-        "--cache-root", str(_default_cache_root()),
-        "--model-id", ap.model_id or "unknown",
-        "--language", ap.language or "",
-    ])
+    mcp_args = [
+        mcp_script, str(jsonl_file.resolve()),
+        *_findings_server_args(compiled_dir, dimension, ap),
+    ]
     config = {
         "mcpServers": {
-            "findings": {
+            _SERVER_NAME: {
                 "command": sys.executable,
                 "args": mcp_args,
             }
         }
     }
+    if tools is not None:
+        config["mcpServers"][_SERVER_NAME]["tools"] = tools
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", prefix="mcp_findings_", delete=False,
     )
@@ -81,20 +88,8 @@ def _codex_mcp_config_arg(
 ) -> str:
     """Return a Codex ``-c`` TOML override for the findings MCP server."""
     ap = agent_params or _AgentParams()
-    args = [*_SERVER_MODULE, str(jsonl_file.resolve())]
-    if compiled_dir and dimension:
-        args.extend(["--compiled-dir", str(compiled_dir.resolve()), "--dimension", dimension])
-    if ap.standards_dir:
-        args.extend(["--standards-dir", str(ap.standards_dir.resolve())])
-    if ap.queue_path:
-        args.extend(["--queue", str(ap.queue_path.resolve())])
-    if ap.agent_id:
-        args.extend(["--agent-id", ap.agent_id])
-    if ap.work_dir:
-        args.extend(["--work-dir", str(ap.work_dir.resolve())])
-    args.extend([
-        "--cache-root", str(_default_cache_root()),
-        "--model-id", ap.model_id or "unknown",
-        "--language", ap.language or "",
-    ])
+    args = [
+        *_SERVER_MODULE, str(jsonl_file.resolve()),
+        *_findings_server_args(compiled_dir, dimension, ap),
+    ]
     return codex_mcp_override(_SERVER_NAME, args)

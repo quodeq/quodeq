@@ -10,7 +10,7 @@ from quodeq.analysis.subagents._pool_models import (
     _AGENT_ID_PREFIX,
     _DEFAULT_MAX_DURATION_S,
 )
-from quodeq.analysis.errors import FatalProviderError
+from quodeq.analysis.errors import REASON_PROVIDER_FATAL, FatalProviderError
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.shared import cancellation
 from quodeq.shared.logging import log_warning
@@ -31,7 +31,18 @@ def build_agent_config(
     base_config: AnalysisConfig,
     wctx: WorkerContext,
 ) -> tuple[AnalysisConfig, Path, Path]:
-    """Build per-agent AnalysisConfig, JSONL path, and stream path."""
+    """Derive agent *idx*'s config from the pool's *base_config* and *wctx*.
+
+    Args:
+        idx: The agent's position in the pool; it names the agent and its
+            stream file, so two live agents never write the same one.
+        base_config: The dimension-wide config every agent starts from.
+        wctx: The dimension and the directories this pool writes into.
+
+    Returns:
+        The agent's AnalysisConfig, the shared per-dimension evidence JSONL
+        every agent in the pool appends to, and this agent's own stream file.
+    """
     agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
     jsonl_file = wctx.evidence_dir / f"{wctx.dimension_key}_evidence.jsonl"
     stream_file = wctx.evidence_dir / f"{wctx.dimension_key}_{agent_id}.stream"
@@ -44,8 +55,8 @@ def build_agent_config(
         remaining = max(1, int(bc.deadline_at - time.monotonic()))
         agent_dur = min(agent_dur, remaining)
     elif bc.time_limit and bc.time_limit > 0:
-        # Legacy clamp: kept for runs without a deadline. A later task will
-        # retire this branch entirely.
+        # Legacy clamp, kept for runs that carry a time limit but no
+        # deadline (the API entry points and older callers).
         agent_dur = min(agent_dur, bc.time_limit)
     ac = AnalysisConfig(
         jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
@@ -56,7 +67,7 @@ def build_agent_config(
         queue_path=wctx.queue_path, agent_id=agent_id,
         max_files_per_agent=bc.max_files_per_agent,
         # Propagate the RunConfig carrier so the API runner can wire a
-        # synchronous cache writer into FindingsRouter (Task 3.5).
+        # synchronous cache writer into FindingsRouter.
         run_config=bc.run_config,
     )
     return ac, jsonl_file, stream_file
@@ -91,7 +102,7 @@ def run_single_agent(
             f"Subagent {agent_id} hit a fatal provider error ({exc.reason}): {exc} "
             f"-- cancelling run, no further agents will be spawned"
         )
-        cancellation.request_cancel(reason=f"provider_fatal:{exc.reason}: {exc}")
+        cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:{exc.reason}: {exc}")
         return SubagentResult(
             agent_id=agent_id, jsonl_file=jsonl_file,
             stream_file=stream_file, success=False, error=str(exc),

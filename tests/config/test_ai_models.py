@@ -1,7 +1,6 @@
 """Tests for model tier resolution."""
 from __future__ import annotations
 
-import pytest
 
 from quodeq.config.ai_models import get_model_for_tier, ModelTier
 

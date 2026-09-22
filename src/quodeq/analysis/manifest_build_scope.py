@@ -1,0 +1,175 @@
+"""Multi-scope manifest building — partition a repo walk across subprojects.
+
+Split out of ``manifest_build.py``: this module owns the deepest-scope
+lookup and the single filesystem walk that buckets files by their owning
+subproject, plus the manifest assembly that turns those buckets into one
+target group per scope. The single-scope path (root-only or a pinned
+``--scope``) stays in ``manifest_build.py``.
+"""
+from __future__ import annotations
+
+from collections import Counter
+from collections.abc import Callable
+from pathlib import Path
+
+from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
+from quodeq.analysis.manifest_targets import (
+    _MIN_FILES_PER_TARGET,
+    WalkCounts,
+    _build_targets_from_matches,
+    _iter_source_files,
+    target_name,
+)
+from quodeq.config.discipline_registry import DisciplineRegistry
+
+
+def _scope_resolver(scope_paths: list[str]) -> Callable[[str], str | None]:
+    """Build the "deepest owning scope" lookup for one walk over *scope_paths*.
+
+    The walk resolves every file, so a per-file scan over all scopes made it
+    O(files * scopes). Instead, each lookup climbs the file's ancestors from
+    the deepest up and stops at the first that is a scope: O(path depth) set
+    probes, independent of how many scopes there are. The deepest ancestor is
+    the unique max-depth match, so the result equals the old linear scan.
+    ``"."`` is the depth-0 fallback for files no other scope covers.
+    """
+    scopes = frozenset(s for s in scope_paths if s != ".")
+    fallback = "." if "." in scope_paths else None
+
+    def resolve(rel_path: str) -> str | None:
+        path = rel_path
+        while True:
+            if path in scopes:
+                return path
+            cut = path.rfind("/")
+            if cut < 0:
+                return fallback
+            path = path[:cut]
+
+    return resolve
+
+
+def _deepest_scope(rel_path: str, scope_paths: list[str]) -> str | None:
+    """Return the most-specific scope (by path depth) that contains *rel_path*.
+
+    Used when partitioning files across subprojects in a monorepo. ``"."`` matches
+    any file as a fallback. Returns ``None`` only when *scope_paths* is empty or
+    contains no scope that covers the file (i.e. no ``"."`` and no ancestor scope).
+    One-off form of :func:`_scope_resolver`; the walk builds the resolver once.
+    """
+    return _scope_resolver(scope_paths)(rel_path)
+
+
+def _walk_and_partition_by_scope(
+    src: Path, walk: ManifestWalkSpec, scope_paths: list[str],
+) -> tuple[
+    dict[str, dict[str, list[str]]],
+    Counter[str],
+    dict[str, dict[str, Counter]],
+    int,
+]:
+    """Walk *src* once, bucketing files by their owning subproject scope.
+
+    Each file is assigned to the deepest scope path that contains it. Files outside
+    every scope are dropped — they don't belong to any classified subproject and
+    shouldn't appear in any target. Callers that must not lose unclassified source
+    pass ``"."`` among *scope_paths* as a catch-all (see _build_multi_scope_manifest).
+
+    The fourth element is how many files the git-tracked filter skipped: the
+    filter lives in the shared walk, so a monorepo run gets it too.
+    """
+    files_by_scope_lang: dict[str, dict[str, list[str]]] = {s: {} for s in scope_paths}
+    ext_counts_overall: Counter[str] = Counter()
+    ext_counts_by_scope_lang: dict[str, dict[str, Counter]] = {s: {} for s in scope_paths}
+    resolve_scope = _scope_resolver(scope_paths)
+    counts = WalkCounts()
+    # Paths are POSIX-style like the scope_paths from detect_matches_recursive,
+    # so prefix matching works on Windows.
+    for rel, suffix, lang in _iter_source_files(src, src, walk, counts):
+        owner = resolve_scope(rel)
+        if owner is None:
+            continue
+        files_by_scope_lang[owner].setdefault(lang, []).append(rel)
+        ext_counts_overall[suffix] += 1
+        ext_counts_by_scope_lang[owner].setdefault(lang, Counter())[suffix] += 1
+    return (
+        files_by_scope_lang, ext_counts_overall, ext_counts_by_scope_lang,
+        counts.skipped_untracked,
+    )
+
+
+def _resolve_scope_paths(
+    sub_results: list[tuple[str, list[str]]],
+) -> tuple[list[str], dict[str, list]]:
+    """Resolve scope_paths + matches_by_scope, ensuring a catch-all root scope.
+
+    No rule classified the repo root, but source can still live outside every
+    detected subproject — e.g. a Kotlin Multiplatform repo where only
+    ``iosApp/`` matches (via *.xcodeproj) while the Gradle/Kotlin root does
+    not. Without a catch-all root scope those files are dropped and the
+    manifest comes back with no targets, which downstream reads as "no
+    source files". "." is depth 0 in _deepest_scope, so it only claims files
+    no more specific scope owns, and _MIN_FILES_PER_TARGET still keeps a
+    handful of stray root files from becoming a target.
+    """
+    scope_paths = [rel for rel, _ in sub_results]
+    matches_by_scope = {rel: matches for rel, matches in sub_results}
+    if "." not in matches_by_scope:
+        scope_paths.append(".")
+        matches_by_scope["."] = []
+    return scope_paths, matches_by_scope
+
+
+def _build_scope_targets(
+    scope_paths: list[str],
+    matches_by_scope: dict[str, list],
+    files_by_scope: dict[str, dict[str, list[str]]],
+    ext_counts_by_scope_lang: dict[str, dict[str, Counter]],
+    registry: DisciplineRegistry,
+) -> list[AnalysisTarget]:
+    """Build one AnalysisTarget group per scope from the partitioned files."""
+    targets: list[AnalysisTarget] = []
+    for scope in scope_paths:
+        lang_files = files_by_scope[scope]
+        ext_counts_by_lang = ext_counts_by_scope_lang[scope]
+        framework_targets = _build_targets_from_matches(
+            registry, matches_by_scope[scope], lang_files, ext_counts_by_lang,
+            scope_path=scope,
+        )
+        targets.extend(framework_targets)
+        for lang, files in lang_files.items():
+            if len(files) < _MIN_FILES_PER_TARGET:
+                continue
+            targets.append(AnalysisTarget(
+                name=target_name(lang, None),
+                language=lang,
+                source_files=sorted(files),
+                total_files=len(files),
+                language_stats=dict(ext_counts_by_lang.get(lang, Counter())),
+                scope_path=scope,
+            ))
+    return targets
+
+
+def _build_multi_scope_manifest(
+    src: Path,
+    walk: ManifestWalkSpec,
+    registry: DisciplineRegistry,
+    sub_results: list[tuple[str, list[str]]],
+) -> SourceManifest:
+    """Produce a manifest with one target group per detected subproject scope."""
+    scope_paths, matches_by_scope = _resolve_scope_paths(sub_results)
+    (
+        files_by_scope, ext_counts_overall, ext_counts_by_scope_lang, skipped,
+    ) = _walk_and_partition_by_scope(src, walk, scope_paths)
+
+    targets = _build_scope_targets(
+        scope_paths, matches_by_scope, files_by_scope, ext_counts_by_scope_lang, registry,
+    )
+
+    targets.sort(key=lambda t: t.total_files, reverse=True)
+    total = sum(t.total_files for t in targets)
+    return SourceManifest(
+        targets=targets, total_files=total, language_stats=dict(ext_counts_overall),
+        skipped_untracked=skipped,
+    )

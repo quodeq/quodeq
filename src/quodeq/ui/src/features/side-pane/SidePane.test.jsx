@@ -1,5 +1,4 @@
-import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidePane } from './SidePane.jsx';
@@ -8,6 +7,10 @@ import { useSidePane } from './SidePaneContext.jsx';
 
 beforeEach(() => {
   Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+});
+
+afterEach(() => {
+  delete navigator.clipboard;
 });
 
 function spec(id, title = id) {

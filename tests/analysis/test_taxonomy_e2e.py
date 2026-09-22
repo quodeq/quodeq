@@ -95,7 +95,7 @@ def test_taxonomy_from_api_producer_to_score(tmp_path):
     reason grouping.
     """
     pytest.importorskip("openai", reason="requires the openai SDK")
-    from quodeq.analysis._api_runner import _parse_findings
+    from quodeq.analysis._api_schema import _parse_findings
     from quodeq.analysis.mcp.router import FindingsRouter
 
     raw = json.dumps({"findings": [

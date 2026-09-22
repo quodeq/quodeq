@@ -1,6 +1,6 @@
 import json
 from quodeq.core.events.models import Judgment
-from quodeq.data.sqlite._row_mappers import (
+from quodeq.data.sqlite.row_mappers import (
     finding_dict_to_row,
     judgment_to_row,
     row_to_finding,
@@ -48,7 +48,7 @@ def test_finding_dict_to_row_handles_missing_optionals():
 
 def test_finding_dict_to_row_reads_violation_type_from_short_vt_key():
     """Regression: the JSONL wire format carries the taxonomy as 'vt'
-    (see core/evidence/_jsonl.py); the row mapper must accept both keys."""
+    (see core/evidence/jsonl.py); the row mapper must accept both keys."""
     finding = {"p": "P1", "t": "violation", "severity": "medium",
                "vt": "missed_deadline"}
     row = finding_dict_to_row(finding)

@@ -1,6 +1,9 @@
 """Tests for source file gathering — _gather_source_files and skip dirs from subprocess.py."""
 from __future__ import annotations
 
+import os
+
+from quodeq.analysis import _api_standards_text, dispatch_policy
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subprocess import (
@@ -22,6 +25,28 @@ class TestGatherSourceFiles:
         names = {f.name for f in result}
         assert "main.py" in names
         assert "app.js" in names
+
+    def test_reads_env_caps_once_per_call(self, tmp_path, monkeypatch):
+        # Both caps come from the environment and are constant for one call;
+        # re-reading them per candidate file was pure overhead.
+        for i in range(6):
+            (tmp_path / f"m{i}.py").write_text("x = 1\n")
+        calls = {"cap": 0, "budget": 0}
+        real_cap = dispatch_policy.api_file_size_cap
+        real_budget = _api_standards_text._api_prompt_char_budget
+
+        def counting_cap(env=None):
+            calls["cap"] += 1
+            return real_cap(env)
+
+        def counting_budget(env=None):
+            calls["budget"] += 1
+            return real_budget(env)
+
+        monkeypatch.setattr(dispatch_policy, "api_file_size_cap", counting_cap)
+        monkeypatch.setattr(_api_standards_text, "_api_prompt_char_budget", counting_budget)
+        assert len(_gather_source_files(tmp_path)) == 6
+        assert calls == {"cap": 1, "budget": 1}
 
     def test_skips_dotdirs(self, tmp_path):
         hidden = tmp_path / ".hidden"
@@ -65,7 +90,6 @@ class TestGatherSourceFiles:
             (tmp_path / f"mod{i}.py").write_text("x" * 10_000)
         (tmp_path / "style.css").write_text("b" * 10_000)
         result = _gather_source_files(tmp_path)
-        names = {f.name for f in result}
         # Code files should be prioritized over markup
         code_count = sum(1 for f in result if f.suffix == ".py")
         markup_count = sum(1 for f in result if f.suffix == ".css")
@@ -86,6 +110,24 @@ class TestGatherSourceFiles:
         names = {f.name for f in result}
         assert "page.html" in names
         assert "style.css" in names
+
+    def test_does_not_descend_into_skipped_dirs(self, tmp_path, monkeypatch):
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "a.py").write_text("x")
+        nm = tmp_path / "node_modules" / "pkg"
+        nm.mkdir(parents=True)
+        (nm / "b.js").write_text("y")
+        visited = []
+        real_scandir = os.scandir
+
+        def spy(path=".", *a, **k):
+            visited.append(str(path))
+            return real_scandir(path, *a, **k)
+
+        monkeypatch.setattr(os, "scandir", spy)
+        files = _gather_source_files(tmp_path)
+        assert [f.name for f in files] == ["a.py"]
+        assert not any("node_modules" in v for v in visited)
 
 
 # ---------------------------------------------------------------------------

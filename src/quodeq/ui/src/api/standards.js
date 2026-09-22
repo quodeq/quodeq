@@ -3,6 +3,12 @@
  */
 
 import { request, BASE } from './request.js';
+import { HTTP_STATUS } from '../constants.js';
+
+// Matches request.js's default request timeout; importStandard uses a raw
+// fetch (not the request() wrapper) so a stream-driven import failure can be
+// distinguished from a network abort.
+const IMPORT_TIMEOUT_MS = 30000;
 
 /** @returns {Promise<Object[]>} */
 export async function listStandards() {
@@ -76,7 +82,7 @@ export async function importFromLibrary(file) {
  */
 export async function importStandard(data, force = false) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), IMPORT_TIMEOUT_MS);
   let res;
   try {
     res = await fetch(`${BASE}/standards/import`, {
@@ -89,7 +95,7 @@ export async function importStandard(data, force = false) {
     clearTimeout(timeoutId);
   }
   const body = await res.json().catch(() => ({}));
-  if (res.status === 409) return { ...body, _conflict: true };
+  if (res.status === HTTP_STATUS.CONFLICT) return { ...body, _conflict: true };
   if (!res.ok) {
     const err = new Error(body.error || `Import failed: ${res.status}`);
     err.status = res.status;
@@ -137,7 +143,7 @@ export async function putStandardsOverrides(projectId, overrides, { dryRun = fal
 /**
  * Fetch the project's visible-standards selection.
  * @param {string} projectId
- * @returns {Promise<{ visibleStandardIds: string[], isDefault: boolean, knownStandardIds: string[] }>}
+ * @returns {Promise<{ visibleStandardIds: string[], isDefault: boolean, knownStandardIds: string[], defaultStandardIds: string[] }>}
  */
 export async function getStandardsVisibility(projectId) {
   return request(`/projects/${encodeURIComponent(projectId)}/standards-visibility`);
@@ -147,7 +153,7 @@ export async function getStandardsVisibility(projectId) {
  * Persist the project's visible-standards selection.
  * @param {string} projectId
  * @param {string[]} visibleStandardIds
- * @returns {Promise<{ visibleStandardIds: string[], isDefault: boolean, knownStandardIds: string[] }>}
+ * @returns {Promise<{ visibleStandardIds: string[], isDefault: boolean, knownStandardIds: string[], defaultStandardIds: string[] }>}
  */
 export async function putStandardsVisibility(projectId, visibleStandardIds) {
   return request(`/projects/${encodeURIComponent(projectId)}/standards-visibility`, {

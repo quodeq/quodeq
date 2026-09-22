@@ -3,7 +3,7 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../../evaluation/components/ConsoleLogViewer.jsx';
 import { LlamaCppLogContext } from './LlamaCppLogContext.js';
 import { useLlamaCppLogStream } from './useLlamaCppLogStream.js';
-import { request } from '../../../api/request.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
 
 const WINDOW_ID = 'llamacpp-log';
@@ -24,18 +24,13 @@ function buildSpec(logs, status) {
   };
 }
 
-export function LlamaCppLogProvider({ children }) {
-  const [open, setOpen] = useState(false);
-  const [available, setAvailable] = useState(false);
-  const { logs, status } = useLlamaCppLogStream(open);
-  const { addWindow, removeWindow, replaceWindow, hasWindow } = useSidePane();
-
-  // The console toggle is hidden unless the server reports a configured
-  // LLAMACPP_LOG_FILE. Probe once on mount; the result is stable for the
-  // session since the env var is set at server-launch time.
+// The console toggle is hidden unless the server reports a configured
+// LLAMACPP_LOG_FILE. Probe once on mount; the result is stable for the
+// session since the env var is set at server-launch time.
+function useLlamaCppAvailabilityProbe(getLlamacppLogAvailable, setAvailable) {
   useEffect(() => {
     let cancelled = false;
-    request('/llamacpp/logs/available')
+    getLlamacppLogAvailable()
       .then((data) => {
         if (!cancelled) setAvailable(Boolean(data?.available));
       })
@@ -43,7 +38,17 @@ export function LlamaCppLogProvider({ children }) {
         if (!cancelled) setAvailable(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [getLlamacppLogAvailable]);
+}
+
+export function LlamaCppLogProvider({ children }) {
+  const { getLlamacppLogAvailable } = useApi();
+  const [open, setOpen] = useState(false);
+  const [available, setAvailable] = useState(false);
+  const { logs, status } = useLlamaCppLogStream(open);
+  const { addWindow, removeWindow, replaceWindow, hasWindow } = useSidePane();
+
+  useLlamaCppAvailabilityProbe(getLlamacppLogAvailable, setAvailable);
 
   const spec = useMemo(() => (open ? buildSpec(logs, status) : null), [open, logs, status]);
 

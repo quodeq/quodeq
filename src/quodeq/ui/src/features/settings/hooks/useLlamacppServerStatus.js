@@ -10,6 +10,11 @@ import { systemKeys } from '../../../api/queryKeys.js';
 
 const POLL_MS = 5000;
 
+/**
+ * The llama-server status, or null before the first poll resolves.
+ *
+ * @returns {{status: 'online'|'offline', address: string|null}|null}
+ */
 export function useLlamacppServerStatus() {
   const { getLlamacppStatus } = useApi();
 
@@ -22,7 +27,8 @@ export function useLlamacppServerStatus() {
           return { status: 'online', address: result.address ?? null };
         }
         return { status: 'offline', address: null };
-      } catch {
+      } catch (err) {
+        console.warn('[useLlamacppServerStatus] status poll failed:', err);
         return { status: 'offline', address: null };
       }
     },

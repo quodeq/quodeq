@@ -1,10 +1,9 @@
 """Networking helpers — host resolution, port scanning, and plaintext-HTTP guard."""
 from __future__ import annotations
 
-import logging
-import os
 import socket
 
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 
 _DEFAULT_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
@@ -17,7 +16,7 @@ def _local_hosts(
     env: dict[str, str] | None = None,
     defaults: frozenset[str] | None = None,
 ) -> frozenset[str]:
-    extra = (env if env is not None else os.environ).get("QUODEQ_LOCAL_HOSTS", "")
+    extra = resolve_env(env).get("QUODEQ_LOCAL_HOSTS", "")
     base = set(defaults or _DEFAULT_LOCAL_HOSTS)
     if extra:
         base.update(h.strip() for h in extra.split(",") if h.strip())
@@ -45,7 +44,11 @@ def _choose_ui_port(start: int, host: str | None = None) -> int:
 def _allow_plaintext_http(
     override: bool | None = None, env: dict[str, str] | None = None,
 ) -> bool:
-    """Return True if plaintext HTTP to non-localhost is allowed."""
+    """Return True if plaintext HTTP to non-localhost is allowed.
+
+    *env* defaults to ``os.environ``; an injected ``{}`` means the opt-in
+    variable is unset, so the guard stays closed.
+    """
     if override is not None:
         return override
-    return (env or os.environ).get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"
+    return resolve_env(env).get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"

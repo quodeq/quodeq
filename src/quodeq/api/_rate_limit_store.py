@@ -12,6 +12,7 @@ from quodeq.api._rate_limit_config import (
     _rate_limit_window,
 )
 
+
 @runtime_checkable
 class RateLimitStore(Protocol):
     """Abstraction for rate-limit state storage.
@@ -27,6 +28,11 @@ class RateLimitStore(Protocol):
 
     def check(self, ip: str, now: float) -> bool:
         """Return True if *ip* has exceeded the rate limit at time *now*."""
+        ...
+
+    def check_and_record(self, ip: str, now: float) -> bool:
+        """Check + record in one call. Return True if *ip* is already rate-limited
+        (request is NOT recorded); otherwise record this request and return False."""
         ...
 
 
@@ -54,17 +60,25 @@ class InMemoryRateLimitStore:
         self._max_ips = max_ips
         self._last_cleanup: float = 0.0
 
+    def _is_stale(self, timestamps: list[float], now: float) -> bool:
+        """True when every timestamp recorded for an IP has aged out of the window."""
+        return all(now - t >= self._window for t in timestamps)
+
+    def _drop(self, keys: list[str]) -> None:
+        """Remove *keys* from the store."""
+        for k in keys:
+            del self._store[k]
+
     def _evict_stale(self, now: float) -> None:
         if len(self._store) <= self._max_ips:
             return
         stale = []
         for k, v in self._store.items():
-            if all(now - t >= self._window for t in v):
+            if self._is_stale(v, now):
                 stale.append(k)
             else:
                 break  # LRU order: first non-stale entry means the rest are newer
-        for k in stale:
-            del self._store[k]
+        self._drop(stale)
         if len(self._store) > self._max_ips:
             self._store.clear()
 
@@ -73,9 +87,7 @@ class InMemoryRateLimitStore:
         if now - self._last_cleanup < self._CLEANUP_INTERVAL:
             return
         self._last_cleanup = now
-        stale = [k for k, v in self._store.items() if all(now - t >= self._window for t in v)]
-        for k in stale:
-            del self._store[k]
+        self._drop([k for k, v in self._store.items() if self._is_stale(v, now)])
 
     def record(self, ip: str, now: float) -> None:
         """Record a state-changing request from *ip* at time *now*."""
@@ -106,3 +118,13 @@ class InMemoryRateLimitStore:
             self._store[ip] = timestamps
             self._store.move_to_end(ip)
         return len(timestamps) >= self._max_requests
+
+    def check_and_record(self, ip: str, now: float) -> bool:
+        """Same contract as check()+record(), but one lock acquisition."""
+        if not ip:
+            return False
+        with self._lock:
+            if self._check_unlocked(ip, now):
+                return True
+            self._record_unlocked(ip, now)
+            return False

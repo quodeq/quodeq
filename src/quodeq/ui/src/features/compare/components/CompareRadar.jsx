@@ -4,21 +4,39 @@
  * Purely presentational; colours come from CSS classes so theming stays in
  * compare.css.
  */
+import { t } from '../../../strings/index.js';
+
 const W = 440;
 const H = 320;
 const CX = W / 2;
 const CY = 156;
 const R = 112;
-const RINGS = [0.25, 0.5, 0.75, 1];
+const RING_QUARTER = 0.25;
+const RING_HALF = 0.5;
+const RING_THREE_QUARTERS = 0.75;
+const RINGS = [RING_QUARTER, RING_HALF, RING_THREE_QUARTERS, 1];
+
+// Angle math: start at 12 o'clock and sweep a full turn across the axes,
+// converting degrees to radians (Math.PI / DEG_TO_RAD_DIVISOR).
+const START_ANGLE_DEG = -90;
+const FULL_CIRCLE_DEG = 360;
+const DEG_TO_RAD_DIVISOR = 180;
+// A zero-score axis still plots a small distance from center instead of
+// collapsing the polygon to a point.
+const MIN_POINT_FRACTION = 0.06;
+// Fewer than 3 axes cannot form a polygon.
+const MIN_RADAR_AXES = 3;
+// Labels sit further out than the polygon points themselves.
+const LABEL_RADIUS_MULTIPLIER = 1.3;
 
 function point(index, count, frac) {
-  const angle = ((-90 + (index * 360) / count) * Math.PI) / 180;
+  const angle = ((START_ANGLE_DEG + (index * FULL_CIRCLE_DEG) / count) * Math.PI) / DEG_TO_RAD_DIVISOR;
   return [CX + Math.cos(angle) * R * frac, CY + Math.sin(angle) * R * frac];
 }
 
 function polygonPoints(values, count) {
   return values
-    .map((v, i) => point(i, count, Math.max(0.06, (v ?? 0) / 10)).map((n) => n.toFixed(1)).join(','))
+    .map((v, i) => point(i, count, Math.max(MIN_POINT_FRACTION, (v ?? 0) / 10)).map((n) => n.toFixed(1)).join(','))
     .join(' ');
 }
 
@@ -31,10 +49,15 @@ function polygonPoints(values, count) {
  */
 export default function CompareRadar({ axes, series }) {
   const n = axes.length;
-  if (n < 3) return null;
+  if (n < MIN_RADAR_AXES) return null;
   return (
     <div className="compare-radar">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" className="compare-radar__svg">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label={t('compare.radarChartAria')}
+        className="compare-radar__svg"
+      >
         {RINGS.map((f) => (
           <polygon
             key={f}
@@ -54,9 +77,12 @@ export default function CompareRadar({ axes, series }) {
           />
         ))}
       </svg>
-      <div className="compare-radar__labels" aria-hidden="true">
+      {/* Not aria-hidden: these overlays carry the only text form of the
+          chart's data, and the svg above is a role="img" whose contents are
+          pruned, so hiding them left the scores unreachable (U-ACC-2). */}
+      <div className="compare-radar__labels">
         {axes.map((axis, i) => {
-          const [x, y] = point(i, n, 1.3);
+          const [x, y] = point(i, n, LABEL_RADIUS_MULTIPLIER);
           return (
             <div
               key={axis.label}

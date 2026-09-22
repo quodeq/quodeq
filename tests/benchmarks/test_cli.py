@@ -2,6 +2,11 @@ import json
 from pathlib import Path
 
 from quodeq_bench.cli import main
+import pytest
+
+# The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
+# restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
+pytestmark = pytest.mark.usefixtures("restore_environ")
 
 _EVIDENCE_LINE = {
     "t": "violation", "d": "security", "w": "hardcoded secret",

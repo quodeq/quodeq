@@ -10,6 +10,10 @@ vi.mock('../../api/assistant.js', () => ({
     sessionId: 's1', repoAttached: true, repoReason: 'ok', writeAvailable: true,
   }),
   postAssistantMessage: vi.fn().mockResolvedValue({ accepted: true }),
+  stopAssistantTurn: vi.fn().mockResolvedValue({ stopping: true }),
+  applyAssistantAction: vi.fn().mockResolvedValue({ applied: true }),
+  rejectAssistantAction: vi.fn().mockResolvedValue({ rejected: true }),
+  assistantEventsUrl: (id, a) => `/api/assistant/sessions/${id}/events?after=${a}`,
   fetchAssistantCatalog: vi.fn().mockResolvedValue({ commands: [], skills: [], actions: [] }),
   fetchAssistantWorkspace: vi.fn().mockResolvedValue({ worktree: null, pending: [] }),
 }));

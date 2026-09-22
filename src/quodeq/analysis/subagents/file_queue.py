@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from quodeq.analysis.subagents._queue_state import (
-    FileQueueError,  # noqa: F401 — re-export
+    FileQueueError,  # re-export
     _QUEUE_VERSION,
     cleanup_stale_lock,
     locked,
@@ -85,7 +85,9 @@ class FileQueue:
             batch = pending[:count]
             if not batch:
                 return []
-            state["pending"] = pending[count:]
+            # Trim in place: rebinding to pending[count:] re-copied the whole
+            # remainder on every take, O(n^2 / batch) over a queue drain.
+            del pending[:count]
             state["taken"].append({
                 _KEY_FILES: batch, _KEY_AGENT: agent_id, _KEY_TS: time.time(),
             })

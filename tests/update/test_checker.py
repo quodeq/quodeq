@@ -1,5 +1,3 @@
-import threading
-import time
 from datetime import datetime, timezone
 from unittest.mock import patch
 
@@ -57,6 +55,18 @@ def test_get_status_update_available(tmp_path) -> None:
     assert status["current"] == "1.4.0"
     assert status["latest"] == "9.9.9"
     assert status["update_available"] is True
+
+
+def test_get_status_includes_self_update(tmp_path) -> None:
+    env = _env(tmp_path)
+    write_state(UpdateState(latest_version="9.9.9", download_url="d"), env)
+    with patch(
+        "quodeq.update.selfupdate.describe",
+        return_value={"supported": False, "reason": "not_frozen", "phase": "idle"},
+    ) as describe:
+        status = checker.get_status(env)
+    describe.assert_called_once_with("d")
+    assert status["self_update"]["reason"] == "not_frozen"
 
 
 def test_get_status_suppresses_dismissed(tmp_path) -> None:
@@ -128,6 +138,56 @@ def test_run_check_handles_none_from_fetch(tmp_path) -> None:
     with patch("quodeq.update.checker.fetch_latest", return_value=None):
         checker.run_check(env, force=True)
     assert read_state(env).last_check_ts is not None
+
+
+def test_begin_self_update_no_update_available(tmp_path) -> None:
+    """begin_self_update rejects when no update is available."""
+    env = _env(tmp_path)
+    result = checker.begin_self_update(env)
+    assert result == {"ok": False, "code": "NO_UPDATE", "error": "no update available"}
+
+
+def test_begin_self_update_unsupported(tmp_path) -> None:
+    """begin_self_update rejects with the self_update.describe() reason when unsupported."""
+    env = _env(tmp_path)
+    write_state(UpdateState(latest_version="9.9.9", download_url="d"), env)
+    with patch("quodeq.update.checker.__version__", "1.4.0"), patch(
+        "quodeq.update.selfupdate.describe",
+        return_value={"supported": False, "reason": "not_frozen", "phase": "idle"},
+    ):
+        result = checker.begin_self_update(env)
+    assert result == {
+        "ok": False,
+        "code": "UNSUPPORTED",
+        "error": "self-update is not supported here",
+        "reason": "not_frozen",
+    }
+
+
+def test_begin_self_update_busy(tmp_path) -> None:
+    """begin_self_update rejects when selfupdate.start() reports one is already running."""
+    env = _env(tmp_path)
+    write_state(UpdateState(latest_version="9.9.9", download_url="d"), env)
+    with patch("quodeq.update.checker.__version__", "1.4.0"), patch(
+        "quodeq.update.selfupdate.describe",
+        return_value={"supported": True, "reason": None, "phase": "idle"},
+    ), patch("quodeq.update.checker._selfupdate.start", return_value=False):
+        result = checker.begin_self_update(env)
+    assert result == {"ok": False, "code": "BUSY", "error": "self-update already running"}
+
+
+def test_begin_self_update_starts(tmp_path) -> None:
+    """begin_self_update kicks off the update and returns fresh status on success."""
+    env = _env(tmp_path)
+    write_state(UpdateState(latest_version="9.9.9", download_url="d"), env)
+    with patch("quodeq.update.checker.__version__", "1.4.0"), patch(
+        "quodeq.update.selfupdate.describe",
+        return_value={"supported": True, "reason": None, "phase": "idle"},
+    ), patch("quodeq.update.checker._selfupdate.start", return_value=True) as start:
+        result = checker.begin_self_update(env)
+    start.assert_called_once_with("d", "9.9.9")
+    assert result["ok"] is True
+    assert result["status"]["latest"] == "9.9.9"
 
 
 def test_check_async_invokes_run_check(tmp_path) -> None:

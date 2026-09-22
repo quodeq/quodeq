@@ -9,14 +9,16 @@ from quodeq.analysis.subagents.priority_config import _LANG_ALIASES, load_priori
 
 def compute_fan_in(
     files: list[str], src: Path, language: str,
-    read_file=None,
+    read_file=None, config: dict | None = None,
 ) -> dict[str, int]:
     """Layer 3: count how many files import each file.
 
     *read_file* is an injectable ``(Path) -> str | None`` reader; defaults
-    to reading from the filesystem.
+    to reading from the filesystem. *config* is the already-loaded priority
+    config (see ``priority_scoring.compute_base_score``); defaults to a
+    fresh load.
     """
-    config = load_priority_config()
+    config = config or load_priority_config()
     lang_key = _LANG_ALIASES.get(language.lower(), language.lower())
     patterns = config.get("import_patterns", {}).get(lang_key)
     if not patterns:

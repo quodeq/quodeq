@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
+from quodeq.data.ports.assistant import SessionScope
+from quodeq.shared.constants import SESSION_SOURCE_LOCAL
 from quodeq.data.sqlite._assistant_schema import (
     ASSISTANT_DDL,
     ASSISTANT_MIGRATIONS,
@@ -21,64 +24,103 @@ def _dict_row(cursor: sqlite3.Cursor, row: tuple) -> dict:
 
 
 class AssistantRepository:
+    """``AssistantStore`` backed by one WAL SQLite file (``assistant.db``).
+
+    Holds a single pooled connection guarded by a lock, so request threads
+    share it instead of reconnecting. Every public method runs inside that
+    lock and commits on exit, rolling back if the body raises. Schema is
+    created or migrated on first use; a file written by a newer schema
+    raises ``sqlite3.DatabaseError`` instead of being downgraded.
+    """
+
     def __init__(self, db_path: Path) -> None:
         self._db_path = Path(db_path)
+        self._conn: sqlite3.Connection | None = None
+        self._conn_lock = threading.Lock()
 
     @property
     def db_path(self) -> Path:
+        """The SQLite file. Its parent is only created when the DB first opens."""
         return self._db_path
+
+    def _open_connection(self) -> sqlite3.Connection:
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        conn.execute("PRAGMA journal_mode = WAL")
+        # NORMAL is durable against app crashes under WAL and skips the
+        # per-commit fsync. CLI streaming writes one event row per text
+        # delta, so a FULL fsync per commit would pace the reader thread.
+        conn.execute("PRAGMA synchronous = NORMAL")
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        if version == 0:
+            conn.executescript(ASSISTANT_DDL)
+        elif version > ASSISTANT_SCHEMA_VERSION:
+            raise sqlite3.DatabaseError(
+                f"assistant.db schema v{version} is newer than supported "
+                f"v{ASSISTANT_SCHEMA_VERSION}"
+            )
+        elif version < ASSISTANT_SCHEMA_VERSION:
+            for target, sql in ASSISTANT_MIGRATIONS:
+                if version < target:
+                    conn.executescript(sql)
+        conn.row_factory = _dict_row
+        return conn
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self._db_path)
-        try:
-            conn.execute("PRAGMA journal_mode = WAL")
-            # NORMAL is durable against app crashes under WAL and skips the
-            # per-commit fsync. CLI streaming writes one event row per text
-            # delta, so a FULL fsync per commit would pace the reader thread.
-            conn.execute("PRAGMA synchronous = NORMAL")
-            conn.execute("PRAGMA foreign_keys = ON")
-            conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
-            version = conn.execute("PRAGMA user_version").fetchone()[0]
-            if version == 0:
-                conn.executescript(ASSISTANT_DDL)
-            elif version > ASSISTANT_SCHEMA_VERSION:
-                raise sqlite3.DatabaseError(
-                    f"assistant.db schema v{version} is newer than supported "
-                    f"v{ASSISTANT_SCHEMA_VERSION}"
-                )
-            elif version < ASSISTANT_SCHEMA_VERSION:
-                for target, sql in ASSISTANT_MIGRATIONS:
-                    if version < target:
-                        conn.executescript(sql)
-            conn.row_factory = _dict_row
-            yield conn
-            conn.commit()
-        finally:
-            conn.close()
+        """Yield the pooled connection, opening + migrating it on first use.
+
+        ``check_same_thread=False`` plus this lock let the connection be
+        reused safely across the request threads that share one
+        AssistantRepository instance, instead of paying connect+PRAGMA+
+        migration-check overhead on every single call.
+        """
+        with self._conn_lock:
+            if self._conn is None:
+                self._conn = self._open_connection()
+            conn = self._conn
+            try:
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+    def close(self) -> None:
+        """Close the pooled connection, if open. Safe to call multiple times."""
+        with self._conn_lock:
+            if self._conn is not None:
+                self._conn.close()
+                self._conn = None
 
     def create_session(self, *, session_id: str, provider: str,
-                       model: str | None = None, project_uuid: str | None = None,
-                       run_id: str | None = None,
-                       project_id: str | None = None,
-                       source: str = "local") -> dict:
+                       model: str | None = None, source: str = SESSION_SOURCE_LOCAL,
+                       scope: SessionScope | None = None) -> dict:
+        """INSERT into ``sessions``, then read the row back for its defaults.
+
+        A duplicate *session_id* raises ``sqlite3.IntegrityError``.
+        """
+        scope = scope or SessionScope()
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO sessions (id, provider, model, project_uuid, run_id,"
                 " project_id, source) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (session_id, provider, model, project_uuid, run_id, project_id,
-                 source),
+                (session_id, provider, model, scope.project_uuid, scope.run_id,
+                 scope.project_id, source),
             )
         return self.get_session(session_id)  # type: ignore[return-value]
 
     def get_session(self, session_id: str) -> dict | None:
+        """Primary-key lookup in ``sessions``, returned as a column dict."""
         with self._connect() as conn:
             return conn.execute(
                 "SELECT * FROM sessions WHERE id = ?", (session_id,)
             ).fetchone()
 
     def set_cli_session_id(self, session_id: str, cli_session_id: str) -> None:
+        """UPDATE the resume handle on ``sessions``. An unknown id updates nothing."""
         with self._connect() as conn:
             conn.execute(
                 "UPDATE sessions SET cli_session_id = ? WHERE id = ?",
@@ -86,6 +128,10 @@ class AssistantRepository:
             )
 
     def add_message(self, session_id: str, role: str, content: str) -> int:
+        """INSERT into ``messages`` and return the autoincrement row id.
+
+        The FK on ``session_id`` rejects a message for an unknown session.
+        """
         with self._connect() as conn:
             cur = conn.execute(
                 "INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)",
@@ -94,6 +140,7 @@ class AssistantRepository:
             return int(cur.lastrowid)
 
     def list_messages(self, session_id: str) -> list[dict]:
+        """Read the whole transcript as (role, content) pairs, ordered by row id."""
         with self._connect() as conn:
             return conn.execute(
                 "SELECT role, content FROM messages WHERE session_id = ? ORDER BY id",
@@ -102,6 +149,10 @@ class AssistantRepository:
 
     def create_action(self, *, action_id: str, session_id: str, action_type: str,
                       payload: dict, content_hash: str) -> dict:
+        """INSERT into ``actions`` with *payload* serialised to JSON.
+
+        Returns the row read back, with ``payload`` decoded again.
+        """
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO actions (id, session_id, action_type, payload_json,"
@@ -112,6 +163,9 @@ class AssistantRepository:
         return self.get_action(action_id)  # type: ignore[return-value]
 
     def get_action(self, action_id: str) -> dict | None:
+        """Primary-key lookup in ``actions``, with ``payload_json`` decoded into
+        ``payload``. Raises ``json.JSONDecodeError`` on a corrupted payload.
+        """
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT * FROM actions WHERE id = ?", (action_id,)
@@ -146,6 +200,11 @@ class AssistantRepository:
             return cur.rowcount == 1
 
     def append_event(self, session_id: str, frame: dict[str, Any]) -> int:
+        """INSERT one JSON frame into ``events`` and return its ``seq``.
+
+        On the hot streaming path: one row and one commit per text delta,
+        which is why the connection runs at ``synchronous = NORMAL``.
+        """
         with self._connect() as conn:
             cur = conn.execute(
                 "INSERT INTO events (session_id, frame_json) VALUES (?, ?)",
@@ -155,6 +214,11 @@ class AssistantRepository:
 
     def events_after(self, session_id: str, after_seq: int,
                      limit: int = 500) -> list[tuple[int, dict]]:
+        """Read up to *limit* frames with ``seq > after_seq``, in sequence order.
+
+        The poller resumes from the last seq it saw; a caller behind by more
+        than *limit* frames catches up over several calls.
+        """
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT seq, frame_json FROM events WHERE session_id = ? AND seq > ?"
@@ -165,6 +229,11 @@ class AssistantRepository:
 
     def upsert_worktree(self, *, session_id: str, project_id: str | None,
                         repo_root: str, path: str, branch: str) -> dict:
+        """Upsert the session's ``worktrees`` row (one per session) and return it.
+
+        A conflict on ``session_id`` overwrites every field, resets the status
+        to active and re-stamps ``created_at``.
+        """
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO worktrees (session_id, project_id, repo_root, path,"
@@ -178,12 +247,14 @@ class AssistantRepository:
         return self.get_worktree(session_id)  # type: ignore[return-value]
 
     def get_worktree(self, session_id: str) -> dict | None:
+        """Look the session's worktree row up by its unique ``session_id``."""
         with self._connect() as conn:
             return conn.execute(
                 "SELECT * FROM worktrees WHERE session_id = ?", (session_id,)
             ).fetchone()
 
     def set_worktree_status(self, session_id: str, status: str) -> None:
+        """UPDATE the worktree's status. Silent when the session has no row."""
         with self._connect() as conn:
             conn.execute(
                 "UPDATE worktrees SET status = ? WHERE session_id = ?",
@@ -191,6 +262,7 @@ class AssistantRepository:
             )
 
     def list_worktrees(self, status: str, project_id: str | None = None) -> list[dict]:
+        """Scan ``worktrees`` for *status*, narrowed to *project_id* when given."""
         with self._connect() as conn:
             if project_id is None:
                 return conn.execute(

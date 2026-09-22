@@ -46,12 +46,6 @@ def test_empty_findings_round_trip():
     assert CacheEntry.from_json(entry.to_json()).findings == []
 
 
-def test_format_version_bumped_to_2():
-    # The new self-describing entry (file_content_hash + provenance) is
-    # format 2; the bump marks the shape change for any future migration.
-    assert ENTRY_FORMAT_VERSION == 2
-
-
 def test_file_content_hash_defaults_empty():
     # Self-describing: an entry records the content hash it was keyed under,
     # but the field is defaulted so legacy/partial construction still works.
@@ -158,7 +152,20 @@ def test_consolidated_false_survives_the_json_round_trip():
     assert CacheEntry.from_json(entry.to_json()).consolidated is False
 
 
-def test_entry_format_version_is_unchanged_by_the_consolidated_field():
-    """from_json tolerates missing and unknown keys in both directions, so
-    adding a field needs no format bump and no migration."""
-    assert ENTRY_FORMAT_VERSION == 2
+def test_entry_format_version_is_3():
+    """Format 3 stores ``params_hash`` explicitly. from_json tolerates missing
+    and unknown keys in both directions, so the bump needs no read-side
+    migration; the schema-3 -> 4 key migration fills the field for old entries."""
+    assert ENTRY_FORMAT_VERSION == 3
+
+
+def test_params_hash_round_trips_and_defaults_blank():
+    entry = _make(
+        schema_version=4, file_content_hash="aa" * 32, params_hash="pp" * 32,
+    )
+    restored = CacheEntry.from_json(entry.to_json())
+    assert restored.params_hash == "pp" * 32
+    assert restored.cache_format_version == 3
+    legacy = json.loads(entry.to_json())
+    del legacy["params_hash"]
+    assert CacheEntry.from_json(json.dumps(legacy)).params_hash == ""

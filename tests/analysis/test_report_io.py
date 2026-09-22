@@ -11,13 +11,13 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.analysis._report_io import _persist_json
+from quodeq.analysis._report_io import persist_json
 
 
 class TestPersistJsonAtomicity:
     def test_writes_valid_json(self, tmp_path):
         target = tmp_path / "security.json"
-        _persist_json({"dimension": "security", "totals": {"violationCount": 3}}, target)
+        persist_json({"dimension": "security", "totals": {"violationCount": 3}}, target)
         assert json.loads(target.read_text(encoding="utf-8"))["dimension"] == "security"
 
     def test_failed_publish_preserves_previous_report(self, tmp_path):
@@ -26,11 +26,11 @@ class TestPersistJsonAtomicity:
         # With a plain write_text the destination is truncated first and a
         # concurrent reader sees a missing/partial dimension.
         target = tmp_path / "security.json"
-        _persist_json({"version": 1}, target)
+        persist_json({"version": 1}, target)
 
         with patch("quodeq.analysis._report_io.os.replace", side_effect=OSError("disk full")):
             with pytest.raises(OSError):
-                _persist_json({"version": 2}, target)
+                persist_json({"version": 2}, target)
 
         assert json.loads(target.read_text(encoding="utf-8")) == {"version": 1}
         leftovers = [p for p in tmp_path.iterdir() if p.name != "security.json"]

@@ -3,60 +3,14 @@
  * score, grade word, violation/ratio line and severity pills. Shared by the
  * accumulated and run overviews.
  */
+import { useId } from 'react';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { SevBadge } from '../../../components/terminal/index.js';
 import { splitScore, scoreGradeColorVar, complianceRatio, formatRunId } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
-import { exitReasonLabel, exitReasonHint } from '../../../models/exitReason.js';
 import { t, LOCALE } from '../../../strings/index.js';
-
-/**
- * Build a coverage record for the gauge card's footer line.
- *
- * Every card with a date gets a footer line; `coveragePct` and `isPartial`
- * are derived from the same signals as the old partial badge:
- *   - "partial" when filesRead < sourceFileCount, OR
- *   - "partial" when exitReason is set to anything other than 'done'.
- * Legacy runs with neither signal end up complete-by-default.
- *
- * `coveragePct` is null when there are no file counts (legacy runs);
- * in that case the footer renders the date only.
- */
-function computeCoverageInfo(filesRead, sourceFileCount, exitReason) {
-  const hasCounts =
-    typeof filesRead === 'number' &&
-    typeof sourceFileCount === 'number' &&
-    sourceFileCount > 0;
-  const coveragePct = hasCounts
-    ? Math.round((filesRead / sourceFileCount) * 100)
-    : null;
-  const coverageIncomplete = hasCounts && filesRead < sourceFileCount;
-  const exitIncomplete = typeof exitReason === 'string' && exitReason !== 'done';
-  const isPartial = coverageIncomplete || exitIncomplete;
-  return { filesRead, sourceFileCount, coveragePct, exitReason, isPartial };
-}
-
-function buildPartialTooltip({ filesRead, sourceFileCount, exitReason }) {
-  const hasCounts =
-    typeof filesRead === 'number' &&
-    typeof sourceFileCount === 'number' &&
-    sourceFileCount > 0;
-  const parts = [t('overview.partialRun')];
-  if (hasCounts) {
-    parts.push(t('overview.filesOf', { read: filesRead.toLocaleString(LOCALE), total: sourceFileCount.toLocaleString(LOCALE) }));
-  }
-  if (typeof exitReason === 'string') {
-    parts.push(t('overview.stoppedReason', { reason: exitReasonLabel(exitReason) }));
-    // A failure-streak (circuit-breaker) dimension is salvaged and shown with a
-    // provisional score, but kept out of the overall grade. Say so explicitly.
-    if (exitReason === 'failure_streak') {
-      parts.push(t('overview.excludedFromGrade'));
-    }
-    const hint = exitReasonHint(exitReason);
-    if (hint) parts.push(hint);
-  }
-  return parts.join(' · ');
-}
+import { computeCoverageInfo, buildPartialTooltip } from './dimensionGaugeMath.js';
+import { activateOnKey } from '../../../utils/a11y.js';
 
 /**
  * Findings the scan produced but scoring never saw, because the principle they
@@ -100,12 +54,97 @@ const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRC = 2 * Math.PI * RING_RADIUS;
 const RING_CX = RING_SIZE / 2;
 const RING_CY = RING_SIZE / 2;
+// Text baseline offsets from ring center: score sits just above, grade word
+// just below.
+const SCORE_TEXT_OFFSET_Y = 4;
+const GRADE_TEXT_OFFSET_Y = 16;
 
-function handleKey(e, onActivate) {
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    onActivate();
-  }
+function InsufficientGauge() {
+  return (
+    <>
+      <div className="dim-gauge-card__gauge dim-gauge-card__gauge--insuf" aria-hidden="true">
+        <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+          <circle
+            className="dim-gauge-card__ring-bg"
+            cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
+            strokeWidth={RING_STROKE}
+            strokeDasharray="3 4"
+          />
+          <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - SCORE_TEXT_OFFSET_Y}>—</text>
+          <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + GRADE_TEXT_OFFSET_Y}>{t('overview.insufficientGrade')}</text>
+        </svg>
+      </div>
+      <div className="dim-gauge-card__insuf-line">{t('overview.insufficientEvidence')}</div>
+    </>
+  );
+}
+
+function ScoreGauge({ scoreDisplay, gradeWord, ringColor, dashOffset }) {
+  return (
+    <div className="dim-gauge-card__gauge" aria-hidden="true">
+      <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+        <circle
+          className="dim-gauge-card__ring-bg"
+          cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
+          strokeWidth={RING_STROKE}
+        />
+        <circle
+          className="dim-gauge-card__ring-fill"
+          cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
+          strokeWidth={RING_STROKE}
+          stroke={ringColor}
+          strokeDasharray={RING_CIRC}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${RING_CX} ${RING_CY})`}
+        />
+        <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - SCORE_TEXT_OFFSET_Y}>
+          {scoreDisplay}
+        </text>
+        {gradeWord && (
+          <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + GRADE_TEXT_OFFSET_Y}>
+            {gradeWord}
+          </text>
+        )}
+      </svg>
+    </div>
+  );
+}
+
+function DimensionScoreBody({ scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev, summaryId }) {
+  return (
+    <>
+      <ScoreGauge scoreDisplay={scoreDisplay} gradeWord={gradeWord} ringColor={ringColor} dashOffset={dashOffset} />
+      <span id={summaryId} className="sr-only">{t('overview.gaugeSummaryAria', { score: scoreDisplay, grade: gradeWord })}</span>
+
+      <div className="dim-gauge-card__meta">
+        {t('overview.violAbbrev')} · {violationCount} · {ratio}
+      </div>
+
+      <div className="dim-gauge-card__sev-row">
+        {(sev.critical ?? 0) > 0 && <SevBadge level="critical" count={sev.critical} format="count-abbr" />}
+        {(sev.major ?? 0)    > 0 && <SevBadge level="major"    count={sev.major}    format="count-abbr" />}
+        {(sev.minor ?? 0)    > 0 && <SevBadge level="minor"    count={sev.minor}    format="count-abbr" />}
+      </div>
+    </>
+  );
+}
+
+/**
+ * Ring geometry and colour for one dimension's score. A dimension with no
+ * parsable score draws an empty muted ring and no grade word.
+ */
+function computeGaugeRing(overallScore) {
+  const { value: scoreDisplay } = splitScore(overallScore);
+  const scoreNum = parseFloat(overallScore);
+  const hasScore = !Number.isNaN(scoreNum);
+  const pct = hasScore ? Math.max(0, Math.min(scoreNum / 10, 1)) : 0;
+  const label = hasScore ? scoreToGradeLabel(scoreNum) : null;
+  return {
+    scoreDisplay,
+    gradeWord: label ? label.toUpperCase() : null,
+    ringColor: hasScore ? scoreGradeColorVar(scoreNum) : 'var(--color-text-muted)',
+    dashOffset: RING_CIRC * (1 - pct),
+  };
 }
 
 /**
@@ -117,6 +156,23 @@ function handleKey(e, onActivate) {
  * @param {string}   [props.dateLabel]         - forwarded to children for run overview
  * @param {string}   [props.selectedRunId]     - forwarded to click handler for run overview
  */
+function computeGaugeCardDerived({ item, evaluatedToday, dateLabel, selectedRunId }) {
+  const violationCount = item.totals?.violationCount ?? 0;
+  const complianceCount = item.totals?.complianceCount ?? 0;
+  const coverage = computeCoverageInfo(item.filesRead, item.sourceFileCount, item.exitReason);
+
+  return {
+    ...computeGaugeRing(item.overallScore),
+    violationCount,
+    ratio: complianceRatio(violationCount, complianceCount),
+    sev: item.totals?.severity || {},
+    staleClass: evaluatedToday ? '' : 'dim-gauge-card--stale',
+    dateText: item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId),
+    coverage,
+    partialTooltip: coverage.isPartial ? buildPartialTooltip(coverage) : undefined,
+  };
+}
+
 export default function DimensionGaugeCard({
   item,
   delta = null,
@@ -126,25 +182,17 @@ export default function DimensionGaugeCard({
   selectedRunId,
   isInsufficient = false,
 }) {
-  const { value: scoreDisplay } = splitScore(item.overallScore);
-  const scoreNum = parseFloat(item.overallScore);
-  const hasScore = !Number.isNaN(scoreNum);
-  const pct = hasScore ? Math.max(0, Math.min(scoreNum / 10, 1)) : 0;
-  const label = hasScore ? scoreToGradeLabel(scoreNum) : null;
-  const gradeWord = label ? label.toUpperCase() : null;
-  const ringColor = hasScore ? scoreGradeColorVar(scoreNum) : 'var(--color-text-muted)';
-  const dashOffset = RING_CIRC * (1 - pct);
-
-  const violationCount = item.totals?.violationCount ?? 0;
-  const complianceCount = item.totals?.complianceCount ?? 0;
-  const ratio = complianceRatio(violationCount, complianceCount);
-  const sev = item.totals?.severity || {};
-
+  const {
+    scoreDisplay, gradeWord, ringColor, dashOffset, violationCount, ratio, sev,
+    staleClass, dateText, coverage, partialTooltip,
+  } = computeGaugeCardDerived({ item, evaluatedToday, dateLabel, selectedRunId });
   const activate = () => onDimensionClick?.(item, selectedRunId);
-  const staleClass = evaluatedToday ? '' : 'dim-gauge-card--stale';
-  const dateText = item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId);
-  const coverage = computeCoverageInfo(item.filesRead, item.sourceFileCount, item.exitReason);
-  const partialTooltip = coverage.isPartial ? buildPartialTooltip(coverage) : undefined;
+  // role="button" gives the article children-presentational semantics, and the
+  // explicit aria-label above already skips its content -- so the sr-only score
+  // summary needs its own id wired up via aria-describedby to reach assistive
+  // tech at all (a11y review, fix round 1). No description when insufficient:
+  // InsufficientGauge's own caption isn't aria-hidden, so it's already exposed.
+  const summaryId = useId();
 
   return (
     <article
@@ -152,8 +200,9 @@ export default function DimensionGaugeCard({
       role="button"
       tabIndex={0}
       onClick={activate}
-      onKeyDown={(e) => handleKey(e, activate)}
+      onKeyDown={activateOnKey(activate)}
       aria-label={t('overview.dimensionDetailsAria', { name: item.dimension })}
+      aria-describedby={isInsufficient ? undefined : summaryId}
     >
       <div className="dim-gauge-card__head">
         <span className="dim-gauge-card__name">{item.dimension}</span>
@@ -161,60 +210,13 @@ export default function DimensionGaugeCard({
       </div>
 
       {isInsufficient ? (
-        <>
-          <div className="dim-gauge-card__gauge dim-gauge-card__gauge--insuf" aria-hidden="true">
-            <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
-              <circle
-                className="dim-gauge-card__ring-bg"
-                cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
-                strokeWidth={RING_STROKE}
-                strokeDasharray="3 4"
-              />
-              <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>—</text>
-              <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>{t('overview.insufficientGrade')}</text>
-            </svg>
-          </div>
-          <div className="dim-gauge-card__insuf-line">{t('overview.insufficientEvidence')}</div>
-        </>
+        <InsufficientGauge />
       ) : (
-        <>
-          <div className="dim-gauge-card__gauge" aria-hidden="true">
-            <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
-              <circle
-                className="dim-gauge-card__ring-bg"
-                cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
-                strokeWidth={RING_STROKE}
-              />
-              <circle
-                className="dim-gauge-card__ring-fill"
-                cx={RING_CX} cy={RING_CY} r={RING_RADIUS}
-                strokeWidth={RING_STROKE}
-                stroke={ringColor}
-                strokeDasharray={RING_CIRC}
-                strokeDashoffset={dashOffset}
-                transform={`rotate(-90 ${RING_CX} ${RING_CY})`}
-              />
-              <text className="dim-gauge-card__score" x={RING_CX} y={RING_CY - 4}>
-                {scoreDisplay}
-              </text>
-              {gradeWord && (
-                <text className="dim-gauge-card__grade" x={RING_CX} y={RING_CY + 16}>
-                  {gradeWord}
-                </text>
-              )}
-            </svg>
-          </div>
-
-          <div className="dim-gauge-card__meta">
-            {t('overview.violAbbrev')} · {violationCount} · {ratio}
-          </div>
-
-          <div className="dim-gauge-card__sev-row">
-            {(sev.critical ?? 0) > 0 && <SevBadge level="critical" count={sev.critical} format="count-abbr" />}
-            {(sev.major ?? 0)    > 0 && <SevBadge level="major"    count={sev.major}    format="count-abbr" />}
-            {(sev.minor ?? 0)    > 0 && <SevBadge level="minor"    count={sev.minor}    format="count-abbr" />}
-          </div>
-        </>
+        <DimensionScoreBody
+          scoreDisplay={scoreDisplay} gradeWord={gradeWord} ringColor={ringColor} dashOffset={dashOffset}
+          violationCount={violationCount} ratio={ratio} sev={sev}
+          summaryId={summaryId}
+        />
       )}
 
       <CoverageLine

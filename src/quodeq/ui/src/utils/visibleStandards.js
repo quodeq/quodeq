@@ -1,6 +1,10 @@
-import { VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS } from '../constants.js';
+import {
+  VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS,
+  STANDARDS_CHANGED_REASON, notifyStandardsChanged,
+} from '../constants.js';
 import { getStandardsVisibility, putStandardsVisibility } from '../api/standards.js';
-import { countBySeverity } from './severity.js';
+import { readJSON, writeString } from '../adapters/storage.js';
+import { decideHydration } from './visibleStandardsModel.js';
 
 // Marks that the (per-browser, not per-project) cache has been reconciled
 // with SOME project's own real file -- either because that project already
@@ -13,18 +17,6 @@ import { countBySeverity } from './severity.js';
 // fake storage per test.
 const VISIBLE_STANDARDS_MIGRATED_KEY = 'quodeq-visible-standards-migrated';
 
-function sameIdSet(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b)) return false;
-  if (a.length === 0 && b.length === 0) return true;
-  const setA = new Set(a);
-  const setB = new Set(b);
-  if (setA.size !== setB.size) return false;
-  for (const id of setA) {
-    if (!setB.has(id)) return false;
-  }
-  return true;
-}
-
 /**
  * Read the visible standard IDs from localStorage.
  * Returns the default ISO dimensions if nothing is stored.
@@ -35,7 +27,8 @@ export function readVisibleStandardIds(storage = localStorage) {
     if (!raw) return DEFAULT_VISIBLE_STANDARDS;
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : DEFAULT_VISIBLE_STANDARDS;
-  } catch {
+  } catch (err) {
+    console.warn('[visibleStandards] could not read visible standard ids:', err);
     return DEFAULT_VISIBLE_STANDARDS;
   }
 }
@@ -64,6 +57,9 @@ export function resetWriteGeneration() {
 export function writeVisibleStandardIds(ids, storage = localStorage) {
   storage.setItem(VISIBLE_STANDARDS_STORAGE_KEY, JSON.stringify(ids));
   writeGeneration += 1;
+  // Same-tab consumers (the Evaluate picker) read this cache synchronously
+  // and only on mount; tell them it moved.
+  notifyStandardsChanged(STANDARDS_CHANGED_REASON.VISIBILITY);
 }
 
 /**
@@ -104,35 +100,36 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
   const generationAtStart = writeGeneration;
   const supersededByNewerWrite = () => isStale?.() || writeGeneration !== generationAtStart;
   try {
-    const { visibleStandardIds, isDefault } = await getStandardsVisibility(projectId);
+    const { visibleStandardIds, isDefault, defaultStandardIds } = await getStandardsVisibility(projectId);
     if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
-    if (isDefault && !storage.getItem(VISIBLE_STANDARDS_MIGRATED_KEY)) {
-      const cachedRaw = storage.getItem(VISIBLE_STANDARDS_STORAGE_KEY);
-      const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
-      // Only a cache that actually differs from the ISO defaults carries
-      // real user intent worth migrating -- a cache that already equals the
-      // defaults (the common case: every project opened so far had no file
-      // of its own either) is nothing but the trailing residue of an
-      // earlier hydrate and must not spawn a file with nothing but the
-      // defaults in it.
-      if (Array.isArray(cached) && !sameIdSet(cached, DEFAULT_VISIBLE_STANDARDS)) {
-        const saved = await putStandardsVisibility(projectId, cached);
-        if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
-        const ids = saved?.visibleStandardIds ?? cached;
-        storage.setItem(VISIBLE_STANDARDS_MIGRATED_KEY, '1');
-        writeVisibleStandardIds(ids, storage);
-        return ids;
-      }
+    // Migration/adoption policy lives in decideHydration (visibleStandardsModel.js);
+    // this orchestrator only fetches, guards the two races below, and executes
+    // the storage writes the decision calls for.
+    const decision = decideHydration({
+      serverIds: visibleStandardIds,
+      isDefault,
+      serverDefaults: defaultStandardIds,
+      cachedIds: readJSON(VISIBLE_STANDARDS_STORAGE_KEY, null, storage),
+      alreadyMigrated: !!storage.getItem(VISIBLE_STANDARDS_MIGRATED_KEY),
+      fallbackDefaults: DEFAULT_VISIBLE_STANDARDS,
+    });
+    if (decision.kind === 'migrate') {
+      const saved = await putStandardsVisibility(projectId, decision.ids);
+      if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
+      const ids = saved?.visibleStandardIds ?? decision.ids;
+      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, '1', storage);
+      writeVisibleStandardIds(ids, storage);
+      return ids;
     }
-    if (!isDefault) {
+    if (decision.markMigrated) {
       // This project already has its own real file: the cache is now known
       // to belong to a specific project's synced selection, so it must
       // never again be read as an unclaimed legacy value up for grabs by
       // the next project that happens to have no file yet.
-      storage.setItem(VISIBLE_STANDARDS_MIGRATED_KEY, '1');
+      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, '1', storage);
     }
-    writeVisibleStandardIds(visibleStandardIds, storage);
-    return visibleStandardIds;
+    writeVisibleStandardIds(decision.ids, storage);
+    return decision.ids;
   } catch (err) {
     // Covers both an offline/failed fetch (expected, cache stays put) and a
     // genuine bug such as a response-shape change throwing a TypeError. The
@@ -142,23 +139,4 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
     console.warn('hydrateVisibleStandardIds: falling back to cached value', err);
     return readVisibleStandardIds(storage);
   }
-}
-
-/**
- * Compute summary stats from a filtered dimensions array.
- */
-export function computeSummaryFromDimensions(dimensions) {
-  let totalViolations = 0;
-  let totalCompliance = 0;
-  const severity = { critical: 0, major: 0, minor: 0 };
-  for (const d of dimensions) {
-    const violations = d.violations || [];
-    totalViolations += violations.length;
-    totalCompliance += d.compliance?.length || 0;
-    const counts = countBySeverity(violations);
-    severity.critical += counts.critical;
-    severity.major += counts.major;
-    severity.minor += counts.minor;
-  }
-  return { totalViolations, totalCompliance, severity };
 }

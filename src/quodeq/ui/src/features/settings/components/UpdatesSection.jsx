@@ -1,23 +1,123 @@
 import { useState } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
-import { checkForUpdates, setUpdateAutoCheck } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { useUpdateStatus } from '../../updates/useUpdateStatus.js';
+import { useSelfUpdate } from '../../updates/useSelfUpdate.js';
 import { openExternal } from '../../updates/openExternal.js';
 import { t } from '../../../strings/index.js';
+import { SettingsOnOffPills } from './settingsRowParts.jsx';
+
+// Up to date, an update waiting, or a security update waiting.
+function versionDescription({ available, status, current }) {
+  if (!available) return t('settings.upToDate', { version: current });
+  return status.is_security
+    ? t('settings.updateAvailableSecurity', { current, latest: status.latest })
+    : t('settings.updateAvailable', { current, latest: status.latest });
+}
+
+function VersionRow({ available, status, current, checking, onCheck }) {
+  return (
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <span className="settings-label">{t('settings.versionLabel')}</span>
+        <span className="settings-description">
+          {versionDescription({ available, status, current })}
+        </span>
+      </div>
+      <button type="button" className="settings-pill" onClick={onCheck} disabled={checking}>
+        {checking ? t('settings.checking') : t('settings.checkNow')}
+      </button>
+    </div>
+  );
+}
+
+const PHASE_STRINGS = {
+  downloading: 'updates.downloading',
+  verifying: 'updates.verifying',
+  installing: 'updates.installing',
+  relaunching: 'updates.relaunching',
+};
+
+// An in-flight update reports its phase; a failed one says so; a build that
+// ships an install command shows the command itself. Otherwise it is the
+// plain "download" prompt.
+function updateDescription(status, selfUpdate) {
+  if (selfUpdate.active) return t(PHASE_STRINGS[selfUpdate.phase], { percent: selfUpdate.percent });
+  if (selfUpdate.failed) return t('updates.selfUpdateFailed', { version: status.latest });
+  return status.action_command || t('settings.downloadNewBuild');
+}
+
+function UpdateAvailableRow({ status, selfUpdate }) {
+  const description = updateDescription(status, selfUpdate);
+  return (
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <span className="settings-label">{t('settings.getTheUpdate')}</span>
+        <span className="settings-description">{description}</span>
+      </div>
+      {selfUpdate.supported && !selfUpdate.failed ? (
+        <button
+          type="button"
+          className="settings-pill"
+          disabled={selfUpdate.active || selfUpdate.starting}
+          onClick={selfUpdate.begin}
+        >
+          {t('updates.updateAndRelaunch')}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="settings-pill"
+          onClick={() => openExternal(status.latest_url || status.download_url)}
+        >
+          {status.action_command ? t('settings.whatsNew') : t('settings.download')}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AutoCheckRow({ auto, onToggle }) {
+  return (
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <span className="settings-label">{t('settings.automaticChecks')}</span>
+        <span className="settings-description">{t('settings.automaticChecksDesc')}</span>
+      </div>
+      <SettingsOnOffPills on={auto} onToggle={onToggle} />
+    </div>
+  );
+}
 
 export default function UpdatesSection() {
-  const { status, setStatus } = useUpdateStatus();
+  const { checkForUpdates, setUpdateAutoCheck } = useApi();
+  const { status, adopt, setAutoCheck } = useUpdateStatus();
+  const selfUpdate = useSelfUpdate(status, adopt);
   const [checking, setChecking] = useState(false);
 
+  // Unlike onToggle below, there is no optimistic mutation to undo here:
+  // status is only written on success, so a failed check already leaves it
+  // exactly as it was before the click. Logging (matching the begin()
+  // precedent) is enough; a "revert" would be a no-op.
   const onCheck = async () => {
     setChecking(true);
-    try { setStatus(await checkForUpdates()); } catch { /* fail-silent */ }
+    try {
+      adopt(await checkForUpdates());
+    } catch (e) {
+      console.warn('check for updates failed:', e);
+    }
     setChecking(false);
   };
 
   const onToggle = async (enabled) => {
-    setStatus((s) => ({ ...(s || {}), auto_check_enabled: enabled }));
-    try { await setUpdateAutoCheck(enabled); } catch { /* fail-silent */ }
+    const previous = status?.auto_check_enabled;
+    setAutoCheck(enabled);
+    try {
+      await setUpdateAutoCheck(enabled);
+    } catch (err) {
+      console.warn('[UpdatesSection] auto-check toggle failed:', err);
+      setAutoCheck(previous);
+    }
   };
 
   const current = status?.current ?? '—';
@@ -30,64 +130,11 @@ export default function UpdatesSection() {
         <SectionLabel marker="▶">{t('settings.updatesLabel')}</SectionLabel>
       </div>
 
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">{t('settings.versionLabel')}</span>
-          <span className="settings-description">
-            {available
-              ? (status.is_security
-                  ? t('settings.updateAvailableSecurity', { current, latest: status.latest })
-                  : t('settings.updateAvailable', { current, latest: status.latest }))
-              : t('settings.upToDate', { version: current })}
-          </span>
-        </div>
-        <button type="button" className="settings-pill" onClick={onCheck} disabled={checking}>
-          {checking ? t('settings.checking') : t('settings.checkNow')}
-        </button>
-      </div>
+      <VersionRow available={available} status={status} current={current} checking={checking} onCheck={onCheck} />
 
-      {available && (
-        <div className="settings-row">
-          <div className="settings-row-label">
-            <span className="settings-label">{t('settings.getTheUpdate')}</span>
-            <span className="settings-description">
-              {status.action_command ? status.action_command : t('settings.downloadNewBuild')}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="settings-pill"
-            onClick={() => openExternal(status.latest_url || status.download_url)}
-          >
-            {status.action_command ? t('settings.whatsNew') : t('settings.download')}
-          </button>
-        </div>
-      )}
+      {available && <UpdateAvailableRow status={status} selfUpdate={selfUpdate} />}
 
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">{t('settings.automaticChecks')}</span>
-          <span className="settings-description">{t('settings.automaticChecksDesc')}</span>
-        </div>
-        <div className="settings-pill-group">
-          <button
-            type="button"
-            className={`settings-pill${auto ? ' settings-pill--active' : ''}`}
-            onClick={() => onToggle(true)}
-            aria-pressed={auto}
-          >
-            {t('settings.on')}
-          </button>
-          <button
-            type="button"
-            className={`settings-pill${!auto ? ' settings-pill--active' : ''}`}
-            onClick={() => onToggle(false)}
-            aria-pressed={!auto}
-          >
-            {t('settings.off')}
-          </button>
-        </div>
-      </div>
+      <AutoCheckRow auto={auto} onToggle={onToggle} />
     </section>
   );
 }

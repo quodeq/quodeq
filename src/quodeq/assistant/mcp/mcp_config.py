@@ -1,0 +1,86 @@
+"""Wire the assistant MCP server into a CLI (config-file for claude; register for codex/gemini)."""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import subprocess
+import sys
+import threading
+from pathlib import Path
+
+from quodeq.shared.mcp import codex_mcp_override
+
+_logger = logging.getLogger(__name__)
+
+_SERVER_NAME = "quodeq-assistant"
+_SERVER_MODULE = ["-m", "quodeq.assistant.mcp.server"]
+_REGISTER_TIMEOUT_S = 10
+_lock = threading.Lock()
+
+
+def _server_argv(server_args: list[str]) -> list[str]:
+    """The full argv that launches the assistant MCP server."""
+    return [sys.executable, *_server_module_args(server_args)]
+
+
+def _server_module_args(server_args: list[str]) -> list[str]:
+    """The interpreter arguments that launch the server, without the interpreter."""
+    return [*_SERVER_MODULE, *server_args]
+
+
+def write_mcp_config(server_args: list[str], path: Path, *, tools: tuple[str, ...] | None = None) -> None:
+    """Write an MCP config file declaring the assistant server at ``path``."""
+    payload = {"mcpServers": {_SERVER_NAME: {
+        "command": sys.executable, "args": _server_module_args(server_args)}}}
+    if tools is not None:
+        payload["mcpServers"][_SERVER_NAME]["tools"] = list(tools)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    os.chmod(path, 0o600)
+
+
+def codex_mcp_config_arg(server_args: list[str]) -> str:
+    """A `codex exec -c <value>` override that defines the assistant MCP server
+    inline as TOML, scoping it to this single invocation.
+
+    This replaces `codex mcp add`, which mutates the user's global
+    ~/.codex/config.toml under a name-only key: concurrent assistant sessions
+    would clobber each other's per-session args and a finished turn would remove
+    the server out from under a still-running one.
+    """
+    return codex_mcp_override(_SERVER_NAME, _server_module_args(server_args))
+
+
+def register_cli_mcp(cmd: str, server_args: list[str], *, separator: bool = True) -> None:
+    """Register the assistant MCP server with the CLI ``cmd``.
+
+    Unregisters first so a stale entry from an earlier session cannot shadow
+    this one's *server_args*. *separator* inserts the ``--`` that some CLIs
+    need before the server argv. Raises RuntimeError when the CLI rejects the
+    registration or is missing.
+    """
+    with _lock:
+        _unregister_locked(cmd)
+        register_cmd = [cmd, "mcp", "add", _SERVER_NAME]
+        if separator:
+            register_cmd.append("--")
+        register_cmd.extend(_server_argv(server_args))
+        try:
+            subprocess.run(register_cmd, check=True, capture_output=True, timeout=_REGISTER_TIMEOUT_S)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError(f"Could not register the quodeq assistant MCP server with {cmd}: {exc}") from exc
+
+
+def _unregister_locked(cmd: str) -> None:
+    """Remove the server from a CLI's registry. Caller must hold `_lock`."""
+    try:
+        subprocess.run([cmd, "mcp", "remove", _SERVER_NAME],
+                       check=False, capture_output=True, timeout=_REGISTER_TIMEOUT_S)
+    except (OSError, subprocess.SubprocessError) as exc:
+        _logger.debug("MCP server unregister via %s failed: %s", cmd, exc)
+
+
+def unregister_cli_mcp(cmd: str) -> None:
+    """Remove the assistant MCP server registration from the CLI ``cmd``."""
+    with _lock:
+        _unregister_locked(cmd)

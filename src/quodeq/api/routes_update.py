@@ -4,7 +4,24 @@ from __future__ import annotations
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.update.checker import check_async, dismiss, get_status, run_check, set_settings
+from quodeq.update.checker import (
+    begin_self_update,
+    check_async,
+    dismiss,
+    get_status,
+    run_check,
+    set_settings,
+)
+
+
+def _selfupdate_start_response() -> Response | tuple[Response, int]:
+    result = begin_self_update()
+    if result["ok"]:
+        return jsonify({"ok": True, "status": result["status"]})
+    body = {"error": result["error"], "code": result["code"]}
+    if "reason" in result:
+        body["reason"] = result["reason"]
+    return jsonify(body), 409
 
 
 def register_update_routes(app: Flask) -> None:
@@ -28,6 +45,10 @@ def register_update_routes(app: Flask) -> None:
             return jsonify({"error": "version is required", "code": "MISSING_PARAM"}), 400
         dismiss(version)
         return jsonify({"ok": True, "status": get_status()})
+
+    @app.post("/api/update/selfupdate")
+    def update_selfupdate() -> Response | tuple[Response, int]:
+        return _selfupdate_start_response()
 
     @app.post("/api/update/settings")
     def update_settings() -> Response:

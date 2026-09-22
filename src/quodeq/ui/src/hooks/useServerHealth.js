@@ -13,16 +13,16 @@
 import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getHealth } from '../api/index.js';
-import { SERVER_BASE_URL } from '../config.js';
+import { SERVER_BASE_URL, DASHBOARD_BASE_PORT } from '../config.js';
 import { systemKeys } from '../api/queryKeys.js';
 
 // Where the server can have moved to. The dashboard walks *upward* from its
 // configured base port when one is taken (see dashboard/_networking.py), so a
 // relaunch while the old instance still held 7863 lands on 7864 and the open
-// window must follow it there. The previous list (4180-4183) predates the
-// current port scheme, so it probed ports quodeq never binds and this recovery
-// could not fire at all.
-const DASHBOARD_BASE_PORT = 7863; // shared/defaults.json -> dashboard_port
+// window must follow it there. The API's CSP connect-src allow-lists exactly
+// this range (shared/dashboard_ports.py mirrors DASHBOARD_BASE_PORT and
+// PORT_SCAN_SPAN; tests/api/test_csp_header.py pins both), so a probe outside
+// it would be blocked by the browser before it reached the server.
 const PORT_SCAN_SPAN = 5; // enough for a few stacked relaunches, not all 20 scan tries
 const HEALTH_CHECK_TIMEOUT_MS = 2000;
 const HEALTH_POLL_INTERVAL_MS = 5000;
@@ -33,11 +33,12 @@ async function probeAltPort(port, baseUrl) {
   const tid = setTimeout(() => ac.abort(), HEALTH_CHECK_TIMEOUT_MS);
   try {
     const res = await fetch(`${baseUrl}:${port}${HEALTH_ENDPOINT}`, { signal: ac.signal });
-    clearTimeout(tid);
     return res.ok ? port : null;
-  } catch {
-    clearTimeout(tid);
+  } catch (err) {
+    console.warn('[useServerHealth] alt-port probe failed:', err);
     return null;
+  } finally {
+    clearTimeout(tid);
   }
 }
 
@@ -60,6 +61,16 @@ async function tryFindPort(candidates, baseUrl) {
   return found ? found.value : null;
 }
 
+/**
+ * Polls the backend and reports whether it is reachable.
+ *
+ * When a poll fails it probes the neighbouring ports and, if it finds the
+ * server there, redirects the page — covering the case where the backend
+ * restarted on a different port. The setter lets the reconnect overlay clear
+ * the disconnected state optimistically until the next poll settles it.
+ *
+ * @returns {[boolean, (next: boolean) => void, string|null]} connected, setter, server version
+ */
 export function useServerHealth({ altPorts, baseUrl = SERVER_BASE_URL } = {}) {
   // Local state is the source of truth for callers. The query side-effects
   // it on each poll resolution. setServerConnected(true) lets the reconnect
@@ -75,7 +86,8 @@ export function useServerHealth({ altPorts, baseUrl = SERVER_BASE_URL } = {}) {
         setConnected(true);
         if (data?.version) setVersion(data.version);
         return true;
-      } catch {
+      } catch (err) {
+        console.warn('[useServerHealth] health check failed:', err);
         const currentPort = typeof window !== 'undefined' ? window.location.port : '';
         const candidates = altPorts || altPortCandidates(currentPort);
         const foundPort = await tryFindPort(

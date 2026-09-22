@@ -3,14 +3,18 @@ POSIX-only stdlib imports are safe at module top level."""
 from __future__ import annotations
 
 import fcntl
+import logging
 import os
-import select
+import selectors
 import struct
 import subprocess
 import sys
 import termios
 
-from quodeq.shared._process_kill import kill_proc_tree
+from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.process_kill import kill_proc_tree
+
+_logger = logging.getLogger(__name__)
 
 _ALLOWED_SHELL_BASENAMES = frozenset({"zsh", "bash", "fish", "sh", "dash", "tcsh", "ksh"})
 # $SHELL must live in a system-managed bin directory. Validating the basename
@@ -23,6 +27,8 @@ _TRUSTED_SHELL_DIRS = frozenset({
     "/opt/homebrew/bin", "/opt/homebrew/sbin",
 })
 _READ_TIMEOUT_S = 0.5
+# killpg sends SIGKILL, so the child should be reaped at once; bound it anyway.
+_REAP_TIMEOUT_S = 2
 # May be absent on unusual builds; guarded at the call site.
 _TIOCSCTTY = getattr(termios, "TIOCSCTTY", None)
 
@@ -40,13 +46,16 @@ def _make_controlling_tty() -> None:
     try:
         fcntl.ioctl(0, _TIOCSCTTY, 0)  # fd 0 == the slave in the child
     except OSError:
-        pass
+        # Post-fork preexec hook: no logging or allocation is safe here and
+        # the spawn must proceed. The shell reports the consequence itself
+        # ("can't access tty; job control turned off").
+        return
 
 
 def resolve_shell(env: dict[str, str] | None = None) -> list[str]:
     """Return argv for a login+interactive shell, validating $SHELL against an
     allowlist (a crafted $SHELL is arbitrary-binary execution)."""
-    src = env if env is not None else os.environ
+    src = resolve_env(env)
     shell = src.get("SHELL", "")
     default = "/bin/zsh" if sys.platform == "darwin" else "/bin/bash"
     if (
@@ -65,13 +74,16 @@ class UnixPty:
         self._env = env
         self._proc: subprocess.Popen | None = None
         self._master_fd: int | None = None
+        self._selector: selectors.BaseSelector | None = None
 
     def spawn(self, *, cwd: str, cols: int, rows: int) -> None:
         master, slave = os.openpty()
         self._master_fd = master
+        self._selector = selectors.DefaultSelector()
+        self._watch(master)
         try:
             _set_winsize(master, cols, rows)
-            env = dict(self._env if self._env is not None else os.environ)
+            env = dict(resolve_env(self._env))
             env["TERM"] = "xterm-256color"
             for k in ("QUODEQ_API_KEY", "QUODEQ_ACTION_API_HOST", "QUODEQ_ACTION_API_PORT"):
                 env.pop(k, None)
@@ -82,7 +94,9 @@ class UnixPty:
                 preexec_fn=_make_controlling_tty,
             )
         except BaseException:
-            # Popen failed to fork/exec — don't leak the master with it.
+            # Popen failed to fork/exec — don't leak the selector or the master with it.
+            self._selector.close()
+            self._selector = None
             os.close(master)
             self._master_fd = None
             raise
@@ -91,23 +105,35 @@ class UnixPty:
             # kept its own dup, on failure it's just cleanup.
             os.close(slave)
 
+    def _watch(self, fd: int) -> None:
+        """Point the selector at `fd`, replacing any previous registration.
+        `read()` polls whichever fd `self._master_fd` currently names, and
+        that number can change from what spawn() registered (a caller
+        reassigning it, as a dup2'd fd), so re-register rather than assume
+        the original registration still matches."""
+        for key in list(self._selector.get_map().values()):
+            self._selector.unregister(key.fd)
+        self._selector.register(fd, selectors.EVENT_READ)
+
     def read(self, max_bytes: int = 65536) -> bytes:
-        if self._master_fd is None:
+        if self._master_fd is None or self._selector is None:
             return b""
         try:
-            ready, _, _ = select.select([self._master_fd], [], [], _READ_TIMEOUT_S)
+            if self._master_fd not in self._selector.get_map():
+                self._watch(self._master_fd)
+            ready = self._selector.select(_READ_TIMEOUT_S)
             if not ready:
                 return b""  # no data yet (PTY alive) -> caller loops, can observe stop
             return os.read(self._master_fd, max_bytes)
-        except OSError:
-            return b""  # master closed / child exited
+        except (OSError, ValueError):
+            return b""  # master closed / child exited, or selector closed under us
 
     def write(self, data: bytes) -> None:
         if self._master_fd is not None:
             try:
                 os.write(self._master_fd, data)
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("pty write dropped, master closed: %s", exc)
 
     def resize(self, cols: int, rows: int) -> None:
         if self._master_fd is not None:
@@ -127,14 +153,22 @@ class UnixPty:
             # Reap the killed child so it doesn't linger as a zombie (killpg
             # sends SIGKILL, so this returns promptly; bound it regardless).
             try:
-                self._proc.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                pass
+                self._proc.wait(timeout=_REAP_TIMEOUT_S)
+            except subprocess.TimeoutExpired as exc:
+                _logger.debug(
+                    "pty child did not exit within %ss after kill: %s",
+                    _REAP_TIMEOUT_S, exc)
+        if self._selector is not None:
+            try:
+                self._selector.close()
+            except OSError as exc:
+                _logger.debug("pty selector close failed: %s", exc)
+            self._selector = None
         if self._master_fd is not None:
             try:
                 os.close(self._master_fd)
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("pty master close failed: %s", exc)
             self._master_fd = None
 
 

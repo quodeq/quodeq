@@ -1,4 +1,3 @@
-import React from 'react';
 import { ReportContent } from './reportContent.jsx';
 import { buildSingleViolationPlanText } from '../../utils/planBuilder.js';
 

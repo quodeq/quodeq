@@ -56,7 +56,7 @@ def test_legacy_run_falls_back_to_read_run_data(tmp_path: Path) -> None:
            [(d.dimension, d.overall_score, d.overall_grade) for d in heavy]
 
 
-def test_null_sql_score_falls_back(tmp_path: Path, monkeypatch) -> None:
+def test_null_sql_score_falls_back(tmp_path: Path) -> None:
     reports = tmp_path / "evaluations"
     run_dir = build_projected_run(reports, "proj", "r1", {"security": (8.5, "Good")})
     SQLiteStateStore(run_dir).record_dimension_score(
@@ -67,18 +67,18 @@ def test_null_sql_score_falls_back(tmp_path: Path, monkeypatch) -> None:
         "totals": {"violationCount": 0, "complianceCount": 0, "severity": {}},
     }))
 
-    import quodeq.data.fs.report_parser.runs as runs_mod
     fell_back = []
-    orig = runs_mod.read_run_data
-    monkeypatch.setattr(runs_mod, "read_run_data",
-                        lambda *a, **k: (fell_back.append(True), orig(*a, **k))[1])
 
-    dims = {d.dimension for d in read_run_scalars(reports, "proj", "r1")}
+    def fallback_reader(*a, **k):
+        fell_back.append(True)
+        return read_run_data(*a, **k)
+
+    dims = {d.dimension for d in read_run_scalars(reports, "proj", "r1", fallback_reader=fallback_reader)}
     assert fell_back, "expected fallback to read_run_data on NULL SQL score"
     assert "reliability" in dims
 
 
-def test_partial_projection_falls_back(tmp_path: Path, monkeypatch) -> None:
+def test_partial_projection_falls_back(tmp_path: Path) -> None:
     reports = tmp_path / "evaluations"
     run_dir = build_projected_run(reports, "proj", "r1", {"security": (8.5, "Good")})
     # A second eval JSON with no matching SQL dimension row → count mismatch.
@@ -87,12 +87,13 @@ def test_partial_projection_falls_back(tmp_path: Path, monkeypatch) -> None:
         "principles": [], "violations": [], "compliance": [],
         "totals": {"violationCount": 0, "complianceCount": 0, "severity": {}},
     }))
-    import quodeq.data.fs.report_parser.runs as runs_mod
     fell_back = []
-    orig = runs_mod.read_run_data
-    monkeypatch.setattr(runs_mod, "read_run_data",
-                        lambda *a, **k: (fell_back.append(True), orig(*a, **k))[1])
-    read_run_scalars(reports, "proj", "r1")
+
+    def fallback_reader(*a, **k):
+        fell_back.append(True)
+        return read_run_data(*a, **k)
+
+    read_run_scalars(reports, "proj", "r1", fallback_reader=fallback_reader)
     assert fell_back, "expected fallback when SQL dim count != on-disk JSON count"
 
 
@@ -101,16 +102,16 @@ def test_path_traversal_rejected(tmp_path: Path) -> None:
         read_run_scalars(tmp_path, "proj", "../escape")
 
 
-def test_fast_path_does_not_fall_back(tmp_path: Path, monkeypatch) -> None:
+def test_fast_path_does_not_fall_back(tmp_path: Path) -> None:
     """With non-NULL SQL scores, read_run_scalars must NOT call read_run_data."""
     reports = tmp_path / "evaluations"
     build_projected_run(reports, "proj", "r1", {"security": (8.5, "Good")})
 
-    import quodeq.data.fs.report_parser.runs as runs_mod
-
     def boom(*_a, **_k):
         raise AssertionError("read_run_scalars fell back to read_run_data")
-    monkeypatch.setattr(runs_mod, "read_run_data", boom)
 
-    dims = {d.dimension: d.overall_score for d in read_run_scalars(reports, "proj", "r1")}
+    dims = {
+        d.dimension: d.overall_score
+        for d in read_run_scalars(reports, "proj", "r1", fallback_reader=boom)
+    }
     assert dims == {"security": "8.5/10"}

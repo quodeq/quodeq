@@ -1,3 +1,4 @@
+"""Dashboard read models: per-run summary, accumulated totals, and trend points."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

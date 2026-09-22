@@ -1,4 +1,3 @@
-import React from 'react';
 import { it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -61,8 +60,8 @@ it('click calls unverifyFinding and removes the chip', async () => {
   await waitFor(() => expect(screen.queryByRole('button', { name: /verified/i })).toBeNull());
 });
 
-// Shared projects have no unverify route on the backend (Task 19's
-// verifiedFindingsContext already no-ops unverify for `source="shared"`).
+// Shared projects have no unverify route on the backend
+// (verifiedFindingsContext already no-ops unverify for `source="shared"`).
 // The chip must still surface the badge (read-only), but as a
 // non-interactive element so there's no dead-end click affordance.
 it('renders a non-interactive chip (no button role, no click) when source is shared', async () => {
@@ -90,7 +89,8 @@ it('renders a clickable button chip when source is local', async () => {
   expect(btn.tagName).toBe('BUTTON');
 });
 
-it('a rejected unverifyFinding does not throw (chip stays, no unhandled rejection)', async () => {
+it('a rejected unverifyFinding warns instead of failing silently (chip stays, no unhandled rejection)', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   unverifyFinding.mockRejectedValueOnce(new Error('network error'));
   render(
     <VerifiedFindingsProvider project="proj">
@@ -101,8 +101,8 @@ it('a rejected unverifyFinding does not throw (chip stays, no unhandled rejectio
   // Should not throw
   fireEvent.click(btn);
   await waitFor(() => expect(unverifyFinding).toHaveBeenCalled());
+  await waitFor(() => expect(warn).toHaveBeenCalledWith('unverify failed:', expect.any(Error)));
   // chip stays because unverify failed; context unverify will have rejected but catch absorbed it
-  // Wait a tick to let any async error surface
-  await new Promise((r) => setTimeout(r, 20));
-  // If we get here without an unhandled rejection, the test passes
+  expect(screen.getByRole('button', { name: /verified/i })).toBeInTheDocument();
+  warn.mockRestore();
 });

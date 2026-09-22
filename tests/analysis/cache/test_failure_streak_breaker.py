@@ -4,26 +4,18 @@ import json
 import time
 from pathlib import Path
 
-import pytest
-
 from quodeq.shared import cancellation
-from quodeq.analysis.cache._failure_streak import (
+from quodeq.analysis.cache.failure_streak import (
     FailureStreakWatcher,
     TripEvent,
     CircuitBreakerError,
 )
+from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 
 
 def _append(jsonl: Path, line: dict) -> None:
     with jsonl.open("a") as f:
         f.write(json.dumps(line) + "\n")
-
-
-@pytest.fixture(autouse=True)
-def _reset_cancel():
-    cancellation.reset()
-    yield
-    cancellation.reset()
 
 
 class TestFailureStreakBreaker:
@@ -141,10 +133,10 @@ class TestFailureStreakBreaker:
 
 class TestCircuitBreakerError:
     def test_error_has_reason(self):
-        exc = CircuitBreakerError("circuit_breaker")
-        assert str(exc) == "circuit_breaker"
-        assert exc.reason == "circuit_breaker"
+        exc = CircuitBreakerError(REASON_CIRCUIT_BREAKER)
+        assert str(exc) == REASON_CIRCUIT_BREAKER
+        assert exc.reason == REASON_CIRCUIT_BREAKER
 
     def test_default_reason(self):
         exc = CircuitBreakerError()
-        assert exc.reason == "circuit_breaker"
+        assert exc.reason == REASON_CIRCUIT_BREAKER

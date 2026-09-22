@@ -1,7 +1,6 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useStandardDetail } from '../hooks/useStandardDetail.js';
-import { useStandardsOverrides } from '../hooks/useStandardsOverrides.js';
-import { useAppState } from '../../../hooks/useAppState.js';
+import { useStandardEditorOverrides } from '../hooks/useStandardEditorOverrides.js';
 import StandardTree from './StandardTree.jsx';
 import StandardDetail from './StandardDetail.jsx';
 import ThresholdImpactDialog from './ThresholdImpactDialog.jsx';
@@ -15,6 +14,17 @@ const MIN_TREE_WIDTH = 180;
 const MAX_TREE_WIDTH = 600;
 const INLINE_ERROR_MARGIN = '8px 16px';
 const DEFAULT_TREE_WIDTH = 280;
+const RESIZE_STEP_PX = 16; // one keyboard step
+
+/** ArrowLeft/ArrowRight resize the tree panel by one RESIZE_STEP_PX, clamped. */
+function makeDividerKeyDown(setWidth) {
+  return (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const delta = e.key === 'ArrowRight' ? RESIZE_STEP_PX : -RESIZE_STEP_PX;
+    setWidth((w) => Math.min(MAX_TREE_WIDTH, Math.max(MIN_TREE_WIDTH, w + delta)));
+  };
+}
 
 function useResizable(defaultWidth) {
   const [width, setWidth] = useState(defaultWidth);
@@ -55,7 +65,7 @@ function useResizable(defaultWidth) {
     };
   }, []);
 
-  return { width, onMouseDown };
+  return { width, onMouseDown, setWidth };
 }
 
 function buildSubLine({ standard, dirty }) {
@@ -95,7 +105,7 @@ function EditorToolbar({ meta, dirty, editable, overridesDirty, customizedCount,
   );
 }
 
-function EditorBody({ treeProps, detailProps, treeWidth, onDividerMouseDown }) {
+function EditorBody({ treeProps, detailProps, treeWidth, onDividerMouseDown, onDividerKeyDown }) {
   const { standard, selectedNode, actions, editable, overrides } = treeProps;
   const { updateField, isNew, onChangeParam } = detailProps;
   return (
@@ -103,7 +113,18 @@ function EditorBody({ treeProps, detailProps, treeWidth, onDividerMouseDown }) {
       <div className="standard-editor-tree-panel" style={{ width: treeWidth, minWidth: MIN_TREE_WIDTH, maxWidth: MAX_TREE_WIDTH }}>
         <StandardTree standard={standard} selectedNode={selectedNode} actions={actions} overrides={overrides} />
       </div>
-      <div className="standard-editor-divider" role="separator" tabIndex={0} onMouseDown={onDividerMouseDown} onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault(); }} />
+      <div
+        className="standard-editor-divider"
+        role="separator"
+        tabIndex={0}
+        onMouseDown={onDividerMouseDown}
+        onKeyDown={onDividerKeyDown}
+        aria-orientation="vertical"
+        aria-label={t('standards.treeDividerAria')}
+        aria-valuenow={treeWidth}
+        aria-valuemin={MIN_TREE_WIDTH}
+        aria-valuemax={MAX_TREE_WIDTH}
+      />
       <div className="standard-editor-detail-panel">
         <StandardDetail standard={standard} selectedNode={selectedNode} onUpdateField={updateField} editable={editable} isNew={isNew} overrides={overrides} onChangeParam={onChangeParam} />
       </div>
@@ -128,79 +149,30 @@ function buildTreeActions({ addPrinciple, removePrinciple, addRequirement, remov
   return { onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement, onSelectNode: setSelectedNode, editable };
 }
 
+// The editor's state: the standard itself, the threshold overrides and their
+// save flow, the resizable tree pane, and the tree's action callbacks.
+function useStandardEditorState({ standardId, isNew, onSaved, onRescan }) {
+  const detail = useStandardDetail(standardId, isNew);
+  const { standard, editable, save, setSelectedNode, addPrinciple, removePrinciple, addRequirement, removeRequirement } = detail;
+  const overrides = useStandardEditorOverrides({ standard, editable, save, onSaved, onRescan });
+  const { width: treeWidth, onMouseDown: onDividerMouseDown, setWidth: setTreeWidth } = useResizable(DEFAULT_TREE_WIDTH);
+  const onDividerKeyDown = makeDividerKeyDown(setTreeWidth);
+  const treeActions = buildTreeActions({ addPrinciple, removePrinciple, addRequirement, removeRequirement, setSelectedNode, editable });
+  return { detail, overrides, treeWidth, onDividerMouseDown, onDividerKeyDown, treeActions };
+}
+
 export default function StandardEditor({ standardId, isNew, onBack, onSaved, onRescan }) {
+  const { detail, overrides: overridesState, treeWidth, onDividerMouseDown, onDividerKeyDown, treeActions } =
+    useStandardEditorState({ standardId, isNew, onSaved, onRescan });
+  const { standard, loading, error, dirty, editable, selectedNode, updateField } = detail;
   const {
-    standard, loading, error, dirty, editable,
-    selectedNode, setSelectedNode,
-    updateField, addPrinciple, removePrinciple, addRequirement, removeRequirement,
-    save,
-  } = useStandardDetail(standardId, isNew);
-
-  const { selectedProject } = useAppState();
-  const { overrides: savedOverrides, save: saveOverrides, preview: previewOverrides } = useStandardsOverrides(selectedProject);
-  const [draftOverrides, setDraftOverrides] = useState(null);
-  const [overridesSaveError, setOverridesSaveError] = useState(null);
-  const [pendingImpact, setPendingImpact] = useState(null); // string[] of changed dimensions while the dialog is open
-  const overrides = draftOverrides ?? savedOverrides;
-  const overridesDirty = draftOverrides !== null;
-
-  const savedOverridesRef = useRef(savedOverrides);
-  useEffect(() => { savedOverridesRef.current = savedOverrides; }, [savedOverrides]);
-
-  const handleChangeParam = useCallback((reqId, paramName, value) => {
-    setDraftOverrides((prev) => {
-      const base = structuredClone(prev ?? savedOverridesRef.current);
-      const reqOverrides = { ...(base[reqId] || {}) };
-      if (value === null) delete reqOverrides[paramName];
-      else reqOverrides[paramName] = value;
-      if (Object.keys(reqOverrides).length === 0) delete base[reqId];
-      else base[reqId] = reqOverrides;
-      return base;
-    });
-  }, []);
-
-  const customizedCount = useMemo(() => {
-    const reqIds = new Set(
-      (standard?.principles || []).flatMap((p) => (p.requirements || []).map((r) => r.id)));
-    return Object.keys(overrides).filter((id) => reqIds.has(id)).length;
-  }, [standard, overrides]);
-
-  const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
-
-  const commitSave = async (rescanDims = null) => {
-    setPendingImpact(null);
-    setOverridesSaveError(null);
-    try {
-      if (editable) await save();
-      if (overridesDirty) {
-        await saveOverrides(overrides);
-        setDraftOverrides(null);
-      }
-      if (rescanDims?.length && onRescan) onRescan(rescanDims);
-      if (onSaved) onSaved(standard?.id);
-    } catch (err) {
-      // Keep the draft so the user can retry; surface the error inline.
-      setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));
-    }
-  };
-
-  const handleSave = async () => {
-    setOverridesSaveError(null);
-    if (!overridesDirty) { await commitSave(); return; }
-    try {
-      const impact = await previewOverrides(overrides);
-      const changed = impact?.changedDimensions || [];
-      if (changed.length === 0) { await commitSave(); return; }
-      setPendingImpact(changed);
-    } catch (err) {
-      setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));
-    }
-  };
+    selectedProject, overrides, overridesDirty, overridesSaveError, pendingImpact, setPendingImpact,
+    customizedCount, handleChangeParam, commitSave, handleSave,
+  } = overridesState;
 
   const earlyReturn = EditorLoadingOrError({ loading, error, standard, onBack });
   if (earlyReturn) return earlyReturn;
 
-  const treeActions = buildTreeActions({ addPrinciple, removePrinciple, addRequirement, removeRequirement, setSelectedNode, editable });
   const onChangeParam = selectedProject ? handleChangeParam : undefined;
 
   return (
@@ -218,6 +190,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved, onR
         detailProps={{ updateField, isNew, onChangeParam }}
         treeWidth={treeWidth}
         onDividerMouseDown={onDividerMouseDown}
+        onDividerKeyDown={onDividerKeyDown}
       />
       {pendingImpact && (
         <ThresholdImpactDialog

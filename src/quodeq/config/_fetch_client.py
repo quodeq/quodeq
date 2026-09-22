@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import threading
 
-from quodeq.config._fetch_client_class import FetchClient  # noqa: F401
+from quodeq.config._fetch_client_class import FetchClient
 
 
 # Module-level singleton with thread-safe lazy initialization.

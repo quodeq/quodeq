@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -61,7 +60,7 @@ class TestApiIntegration:
         jsonl_file = tmp_path / "evidence.jsonl"
 
         with patch("quodeq.analysis.subprocess.get_provider_configs") as mock_cfg, \
-             patch("quodeq.analysis._api_runner.openai.OpenAI", _mock_openai_returning(_FINDINGS_JSON)):
+             patch("openai.OpenAI", _mock_openai_returning(_FINDINGS_JSON)):
 
             mock_cfg.return_value = {
                 "ollama": {
@@ -94,7 +93,7 @@ class TestApiIntegration:
         jsonl_file = tmp_path / "evidence.jsonl"
 
         with patch("quodeq.analysis.subprocess.get_provider_configs") as mock_cfg, \
-             patch("quodeq.analysis._api_runner.openai.OpenAI", _mock_openai_returning(_FINDINGS_JSON)):
+             patch("openai.OpenAI", _mock_openai_returning(_FINDINGS_JSON)):
 
             mock_cfg.return_value = {
                 "openrouter": {

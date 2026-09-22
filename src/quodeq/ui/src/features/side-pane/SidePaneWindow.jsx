@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../../strings/index.js';
+import { copyToClipboard } from '../../utils/clipboard.js';
+import { COPY_FEEDBACK_MS } from '../../components/CopyButton.jsx';
 
-const COPY_FEEDBACK_MS = 1500;
 // Defer mounting the body until the slide-in animation finishes (~220ms).
 // Otherwise the heavy markdown render happens mid-animation and stutters.
 const SLIDE_MS = 220;
+// How many characters of the body feed the auto-generated download filename.
+const SLUG_SOURCE_LENGTH = 32;
 
 function slugify(s) {
   return (s || 'window').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'window';
@@ -16,7 +19,7 @@ function todayISO() {
 }
 
 function triggerDownload({ filename, body }) {
-  const safeName = filename || `${slugify(body?.slice(0, 32))}-${todayISO()}.md`;
+  const safeName = filename || `${slugify(body?.slice(0, SLUG_SOURCE_LENGTH))}-${todayISO()}.md`;
   const pyApi = typeof window !== 'undefined' && window.pywebview && window.pywebview.api;
   if (pyApi && typeof pyApi.save_file === 'function') {
     pyApi.save_file(body, safeName);
@@ -48,35 +51,92 @@ class RenderBoundary extends React.Component {
   }
 }
 
-export function SidePaneWindow({ spec, onClose }) {
-  const bodyRef = useRef(null);
-  const [justCopied, setJustCopied] = useState(false);
-  const [bodyReady, setBodyReady] = useState(false);
-
+// Groups this window's per-spec-identity effects (scroll reset, copy-feedback
+// reset, deferred body mount, copy-feedback auto-clear) so the outer
+// component's body stays under the function-length cap; still called
+// unconditionally, so hook-order is unaffected.
+function useSidePaneWindowEffects({ specId, bodyRef, justCopied, setJustCopied, setBodyReady }) {
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
-  }, [spec.id]);
+  }, [specId]);
 
-  useEffect(() => { setJustCopied(false); }, [spec.id]);
+  useEffect(() => { setJustCopied(false); }, [specId]);
 
   // Defer the body mount on each fresh window; the skeleton holds the slot
   // while the parent's slide-in finishes.
   useEffect(() => {
     setBodyReady(false);
-    const t = setTimeout(() => setBodyReady(true), SLIDE_MS);
-    return () => clearTimeout(t);
-  }, [spec.id]);
+    const timer = setTimeout(() => setBodyReady(true), SLIDE_MS);
+    return () => clearTimeout(timer);
+  }, [specId]);
 
   useEffect(() => {
     if (!justCopied) return undefined;
-    const t = setTimeout(() => setJustCopied(false), COPY_FEEDBACK_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setJustCopied(false), COPY_FEEDBACK_MS);
+    return () => clearTimeout(timer);
   }, [justCopied]);
+}
+
+function WindowHeaderActions({ spec, justCopied, onCopy, onDownload, onClickClose }) {
+  return (
+    <div className="side-pane-window__actions">
+      {spec.copy && (
+        <button
+          type="button"
+          className={`side-pane-window__icon-btn${justCopied ? ' side-pane-window__icon-btn--ok' : ''}`}
+          onClick={onCopy}
+          aria-label={justCopied ? t('sidePane.copied') : t('sidePane.copy')}
+          title={justCopied ? t('sidePane.copied') : t('sidePane.copy')}
+        >{justCopied ? '✓' : '⧉'}</button>
+      )}
+      {spec.download && (
+        <button
+          type="button"
+          className="side-pane-window__icon-btn"
+          onClick={onDownload}
+          aria-label={t('sidePane.download')}
+          title={t('sidePane.download')}
+        >↓</button>
+      )}
+      <button
+        type="button"
+        className="side-pane-window__icon-btn"
+        onClick={onClickClose}
+        aria-label={t('common.closeWindow')}
+        title={t('common.closeWindow')}
+      >✕</button>
+    </div>
+  );
+}
+
+function WindowBody({ bodyReady, spec, body }) {
+  if (!bodyReady) {
+    return (
+      <div className="side-pane-window__body-skeleton" aria-hidden="true">
+        <span /><span /><span />
+      </div>
+    );
+  }
+  return <RenderBoundary contentKey={spec.id}>{body}</RenderBoundary>;
+}
+
+export function SidePaneWindow({ spec, onClose }) {
+  const bodyRef = useRef(null);
+  const [justCopied, setJustCopied] = useState(false);
+  const [bodyReady, setBodyReady] = useState(false);
+
+  useSidePaneWindowEffects({ specId: spec.id, bodyRef, justCopied, setJustCopied, setBodyReady });
 
   const onCopy = useCallback(() => {
     if (!spec.copy) return;
-    navigator.clipboard?.writeText(spec.copy());
-    setJustCopied(true);
+    // Only flip the "Copied" indicator once the write actually succeeded —
+    // copyToClipboard resolves `false` (never rejects) on failure.
+    copyToClipboard(spec.copy()).then((ok) => {
+      if (ok) setJustCopied(true);
+    }).catch((err) => {
+      // copyToClipboard never rejects; defense in depth in case that changes.
+      console.warn('[SidePaneWindow] unexpected clipboard error:', err);
+    });
   }, [spec]);
 
   const onDownload = useCallback(() => {
@@ -96,42 +156,10 @@ export function SidePaneWindow({ spec, onClose }) {
     <section className="side-pane-window" aria-label={spec.title}>
       <header className="side-pane-window__header">
         <h2 className="side-pane-window__title" title={spec.title}>{spec.title}</h2>
-        <div className="side-pane-window__actions">
-          {spec.copy && (
-            <button
-              type="button"
-              className={`side-pane-window__icon-btn${justCopied ? ' side-pane-window__icon-btn--ok' : ''}`}
-              onClick={onCopy}
-              aria-label={justCopied ? 'Copied' : 'Copy'}
-              title={justCopied ? 'Copied' : 'Copy'}
-            >{justCopied ? '✓' : '⧉'}</button>
-          )}
-          {spec.download && (
-            <button
-              type="button"
-              className="side-pane-window__icon-btn"
-              onClick={onDownload}
-              aria-label={t('sidePane.download')}
-              title={t('sidePane.download')}
-            >↓</button>
-          )}
-          <button
-            type="button"
-            className="side-pane-window__icon-btn"
-            onClick={onClickClose}
-            aria-label={t('common.closeWindow')}
-            title={t('common.closeWindow')}
-          >✕</button>
-        </div>
+        <WindowHeaderActions spec={spec} justCopied={justCopied} onCopy={onCopy} onDownload={onDownload} onClickClose={onClickClose} />
       </header>
       <div className="side-pane-window__body" ref={bodyRef}>
-        {bodyReady ? (
-          <RenderBoundary contentKey={spec.id}>{body}</RenderBoundary>
-        ) : (
-          <div className="side-pane-window__body-skeleton" aria-hidden="true">
-            <span /><span /><span />
-          </div>
-        )}
+        <WindowBody bodyReady={bodyReady} spec={spec} body={body} />
       </div>
     </section>
   );

@@ -6,21 +6,27 @@ const ANGLE_SOFT_UP_MAX = 88;
 const ANGLE_SOFT_DOWN_MIN = 92;
 const ANGLE_DOWN_MIN = 110;
 
+// Colour follows the rendered angle, not the raw delta, so a trend word with
+// no delta gets the same colour as the delta that would point the same way.
+function trendClassForAngle(angle) {
+  if (angle <= ANGLE_UP_MAX) return 'trend-up';
+  if (angle <= ANGLE_SOFT_UP_MAX) return 'trend-soft-up';
+  if (angle >= ANGLE_DOWN_MIN) return 'trend-down';
+  if (angle >= ANGLE_SOFT_DOWN_MIN) return 'trend-soft-down';
+  return 'trend-same';
+}
+
 export default function TrendArrow({ trend, delta }) {
   const d = delta !== undefined && delta !== null ? parseFloat(delta) : null;
 
-  const angle = (d !== null && !isNaN(d))
-    ? angleFromDelta(d)
-    : (TREND_ANGLES[trend] ?? 90);
+  // A defined-but-invalid delta (e.g. a non-numeric string) parses to NaN.
+  // Angle and title both fall back to the neutral trend copy rather than
+  // showing "NaN", so the two must agree on what counts as a usable delta.
+  const hasDelta = d !== null && !isNaN(d);
 
-  const colorClass =
-    angle <= ANGLE_UP_MAX      ? 'trend-up'
-    : angle <= ANGLE_SOFT_UP_MAX ? 'trend-soft-up'
-    : angle >= ANGLE_DOWN_MIN    ? 'trend-down'
-    : angle >= ANGLE_SOFT_DOWN_MIN ? 'trend-soft-down'
-    : 'trend-same';
-
-  const title = d !== null ? `${d > 0 ? '+' : ''}${d.toFixed(2)}` : (trend ?? '');
+  const angle = hasDelta ? angleFromDelta(d) : (TREND_ANGLES[trend] ?? TREND_ANGLES.stable);
+  const colorClass = trendClassForAngle(angle);
+  const title = hasDelta ? `${d > 0 ? '+' : ''}${d.toFixed(2)}` : (trend ?? '');
 
   return (
     <span

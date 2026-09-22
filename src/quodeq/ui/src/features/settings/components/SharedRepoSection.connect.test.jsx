@@ -1,0 +1,134 @@
+import { describe, it, expect, vi } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { makeFakeApi, renderWithApi } from './_sharedRepoSection.fixtures.jsx';
+
+/**
+ * Split from SharedRepoSection.test.jsx: status display and connect/save.
+ */
+
+describe('SharedRepoSection', () => {
+  it('renders with not configured when status returns configured: false', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+    });
+
+    renderWithApi(fakeApi);
+
+    await waitFor(() => {
+      expect(screen.getByText(/not configured/i)).toBeTruthy();
+    });
+  });
+
+  it('logs the real error and still falls back to not-configured when the status fetch fails', async () => {
+    // Regression: a server 500 and "genuinely not configured" used to
+    // collapse into the identical {configured: false, url: null} result
+    // with zero trace, making a backend outage indistinguishable from a
+    // legitimate empty state.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const err = new Error('shared status 500');
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => { throw err; }),
+    });
+
+    renderWithApi(fakeApi);
+
+    await waitFor(() => {
+      expect(screen.getByText(/not configured/i)).toBeTruthy();
+    });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringMatching(/shared repo status/i), err);
+    errorSpy.mockRestore();
+  });
+
+  it('renders with current URL when status returns configured: true', async () => {
+    const testUrl = 'https://github.com/team/results.git';
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: true, url: testUrl })),
+    });
+
+    renderWithApi(fakeApi);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(testUrl)).toBeTruthy();
+    });
+  });
+
+  it('calls connectShared with the typed URL on save', async () => {
+    const newUrl = 'https://github.com/team/results.git';
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+      connectShared: vi.fn(async (url) => ({ configured: true, url })),
+    });
+
+    const user = userEvent.setup();
+    renderWithApi(fakeApi);
+
+    // Wait for component to load
+    await waitFor(() => {
+      expect(screen.getByText(/repository url/i)).toBeTruthy();
+    });
+
+    const input = screen.getByRole('textbox', { name: /repository url/i });
+    await user.clear(input);
+    await user.type(input, newUrl);
+
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    await waitFor(() => {
+      expect(fakeApi.connectShared).toHaveBeenCalledWith(newUrl);
+    });
+  });
+
+  it('updates the displayed URL after successful save', async () => {
+    const newUrl = 'https://github.com/team/results.git';
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+      connectShared: vi.fn(async (url) => ({ configured: true, url })),
+    });
+
+    const user = userEvent.setup();
+    renderWithApi(fakeApi);
+
+    await waitFor(() => {
+      expect(screen.getByText(/repository url/i)).toBeTruthy();
+    });
+
+    const input = screen.getByRole('textbox', { name: /repository url/i });
+    await user.clear(input);
+    await user.type(input, newUrl);
+
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(newUrl)).toBeTruthy();
+    });
+  });
+
+  it('displays error message on failed save', async () => {
+    const errorMsg = 'not a valid git repository';
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
+      connectShared: vi.fn(async () => { throw new Error(errorMsg); }),
+    });
+
+    const user = userEvent.setup();
+    renderWithApi(fakeApi);
+
+    await waitFor(() => {
+      expect(screen.getByText(/repository url/i)).toBeTruthy();
+    });
+
+    const input = screen.getByRole('textbox', { name: /repository url/i });
+    await user.clear(input);
+    await user.type(input, 'https://example.com/invalid.git');
+
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(new RegExp(errorMsg, 'i'))).toBeTruthy();
+    });
+  });
+});

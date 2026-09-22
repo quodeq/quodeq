@@ -1,17 +1,13 @@
-"""Tests for clickable-terminal-link resolution and editor launching.
+"""Tests for the pure clickable-terminal-link helpers in quodeq.terminal.links.
 
-Covers the pure helpers in quodeq.terminal.links (no real filesystem, PATH, or
-subprocess) and the /api/terminal/resolve + /open routes.
+No real filesystem, PATH, or subprocess; the /api/terminal/resolve + /open
+routes live in test_terminal_links_routes.py.
 """
 from __future__ import annotations
 
-import pytest
-from flask import Flask
-
-from quodeq.api.terminal_routes import register_terminal_routes
-from quodeq.terminal.sessions import TerminalSessionRegistry
 from quodeq.terminal.links import (
     Editor,
+    PathOps,
     build_open_argv,
     child_cwd,
     detect_editor,
@@ -43,20 +39,20 @@ def _pcommonpath(paths):
 
 # --- resolve_path -----------------------------------------------------------
 
+def _posix_ops(isfile) -> PathOps:
+    return PathOps(isabs=_pisabs, isfile=isfile, join=_pjoin, normpath=_ident, expanduser=_ident)
+
+
 def test_resolve_absolute_existing():
     abs_path, exists = resolve_path(
-        "/proj/a.py", ["/base"], isfile=lambda p: p == "/proj/a.py",
-        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
+        "/proj/a.py", ["/base"], ops=_posix_ops(lambda p: p == "/proj/a.py"),
     )
     assert abs_path == "/proj/a.py"
     assert exists is True
 
 
 def test_resolve_absolute_missing():
-    abs_path, exists = resolve_path(
-        "/nope.py", ["/base"], isfile=lambda p: False,
-        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
-    )
+    abs_path, exists = resolve_path("/nope.py", ["/base"], ops=_posix_ops(lambda p: False))
     assert abs_path == "/nope.py"
     assert exists is False
 
@@ -65,8 +61,7 @@ def test_resolve_relative_picks_first_existing_base():
     # Exists only under the second base.
     real = "/second/rel.py"
     abs_path, exists = resolve_path(
-        "rel.py", ["/first", "/second"], isfile=lambda p: p == real,
-        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
+        "rel.py", ["/first", "/second"], ops=_posix_ops(lambda p: p == real),
     )
     assert abs_path == real
     assert exists is True
@@ -74,8 +69,7 @@ def test_resolve_relative_picks_first_existing_base():
 
 def test_resolve_relative_none_exist_falls_back_to_first_base():
     abs_path, exists = resolve_path(
-        "rel.py", ["/first", "/second"], isfile=lambda p: False,
-        isabs=_pisabs, join=_pjoin, normpath=_ident, expanduser=_ident,
+        "rel.py", ["/first", "/second"], ops=_posix_ops(lambda p: False),
     )
     assert abs_path == "/first/rel.py"
     assert exists is False
@@ -209,153 +203,3 @@ def test_child_cwd_swallows_errors():
         raise OSError("nope")
 
     assert child_cwd(123, platform="linux", readlink=_boom) is None
-
-
-# --- routes -----------------------------------------------------------------
-
-class _FakeManager:
-    def __init__(self, pid=4321):
-        self.pid = pid
-        self._alive = False
-
-    def ensure_session(self, *, cwd, cols, rows):
-        self._alive = True
-
-    def scrollback(self):
-        return ""
-
-    def read(self, max_bytes=65536):
-        return ""
-
-    def write(self, data):
-        pass
-
-    def resize(self, cols, rows):
-        pass
-
-    def kill(self):
-        self._alive = False
-
-    @property
-    def alive(self):
-        return self._alive
-
-
-@pytest.fixture()
-def app():
-    app = Flask(__name__)
-    app.config["QUODEQ_API_KEY"] = None
-    app.config["QUODEQ_BIND_HOST"] = "127.0.0.1"
-    registry = TerminalSessionRegistry(manager_factory=_FakeManager)
-    # /resolve and /open with no explicit session fall back to the first LIVE
-    # session's pid — mirror the old always-present manager.
-    registry.create().manager._alive = True
-    register_terminal_routes(app, registry=registry)
-    return app
-
-
-_H = {"Origin": "http://localhost"}
-
-
-def test_resolve_route_reports_existence(app, monkeypatch):
-    monkeypatch.setattr("quodeq.api.terminal_routes.resolve_bases", lambda pid: ["/base"])
-    monkeypatch.setattr(
-        "quodeq.api.terminal_routes.resolve_path",
-        lambda token, bases: (f"/base/{token}", token == "real.py"),
-    )
-    c = app.test_client()
-    r = c.post("/api/terminal/resolve", json={"paths": ["real.py", "ghost.py"]},
-               headers=_H, base_url="http://localhost")
-    assert r.status_code == 200
-    resolved = r.get_json()["resolved"]
-    assert resolved == [
-        {"input": "real.py", "abs": "/base/real.py", "exists": True},
-        {"input": "ghost.py", "abs": "/base/ghost.py", "exists": False},
-    ]
-
-
-def test_resolve_route_rejects_non_list(app):
-    c = app.test_client()
-    r = c.post("/api/terminal/resolve", json={"paths": "x"}, headers=_H, base_url="http://localhost")
-    assert r.status_code == 400
-
-
-def test_resolve_route_gated(app):
-    app.config["QUODEQ_BIND_HOST"] = "0.0.0.0"  # forces gate refusal
-    c = app.test_client()
-    r = c.post("/api/terminal/resolve", json={"paths": []}, headers=_H, base_url="http://localhost")
-    assert r.status_code == 403
-
-
-def test_open_route_launches_editor(app, monkeypatch):
-    calls = {}
-    # Bypass containment/realpath so the test is deterministic; safe path == input.
-    monkeypatch.setattr("quodeq.api.terminal_routes.resolve_bases", lambda pid: ["/base"])
-    monkeypatch.setattr("quodeq.api.terminal_routes.safe_editor_path", lambda p, bases: p)
-    monkeypatch.setattr("quodeq.api.terminal_routes.os.path.isfile", lambda p: True)
-    monkeypatch.setattr("quodeq.api.terminal_routes.detect_editor",
-                        lambda: Editor("code", "/usr/bin/code", True))
-
-    def _popen(argv, **kw):
-        calls["argv"] = argv
-        calls["kw"] = kw
-        return object()
-
-    monkeypatch.setattr("quodeq.api.terminal_routes.subprocess.Popen", _popen)
-    c = app.test_client()
-    r = c.post("/api/terminal/open", json={"path": "/proj/a.py", "line": 9, "col": 2},
-               headers=_H, base_url="http://localhost")
-    assert r.status_code == 200
-    body = r.get_json()
-    assert body == {"opened": True, "editor": "code"}
-    assert calls["argv"] == ["/usr/bin/code", "-g", "/proj/a.py:9:2"]
-    assert calls["kw"].get("start_new_session") is True
-
-
-def test_open_route_rejects_path_outside_bases(app, monkeypatch):
-    # safe_editor_path returns None for anything outside the terminal's dirs.
-    monkeypatch.setattr("quodeq.api.terminal_routes.resolve_bases", lambda pid: ["/base"])
-    monkeypatch.setattr("quodeq.api.terminal_routes.safe_editor_path", lambda p, bases: None)
-    launched = []
-    monkeypatch.setattr("quodeq.api.terminal_routes.subprocess.Popen",
-                        lambda *a, **k: launched.append(a))
-    c = app.test_client()
-    r = c.post("/api/terminal/open", json={"path": "/etc/passwd"}, headers=_H, base_url="http://localhost")
-    assert r.get_json() == {"opened": False, "editor": None}
-    assert launched == []
-
-
-def test_open_route_missing_file_not_opened(app, monkeypatch):
-    monkeypatch.setattr("quodeq.api.terminal_routes.resolve_bases", lambda pid: ["/base"])
-    monkeypatch.setattr("quodeq.api.terminal_routes.safe_editor_path", lambda p, bases: p)
-    monkeypatch.setattr("quodeq.api.terminal_routes.os.path.isfile", lambda p: False)
-    launched = []
-    monkeypatch.setattr("quodeq.api.terminal_routes.subprocess.Popen",
-                        lambda *a, **k: launched.append(a))
-    c = app.test_client()
-    r = c.post("/api/terminal/open", json={"path": "/gone.py"}, headers=_H, base_url="http://localhost")
-    assert r.get_json() == {"opened": False, "editor": None}
-    assert launched == []
-
-
-def test_open_route_fail_soft_on_launch_error(app, monkeypatch):
-    monkeypatch.setattr("quodeq.api.terminal_routes.resolve_bases", lambda pid: ["/base"])
-    monkeypatch.setattr("quodeq.api.terminal_routes.safe_editor_path", lambda p, bases: p)
-    monkeypatch.setattr("quodeq.api.terminal_routes.os.path.isfile", lambda p: True)
-    monkeypatch.setattr("quodeq.api.terminal_routes.detect_editor",
-                        lambda: Editor("code", "/usr/bin/code", True))
-
-    def _boom(*a, **k):
-        raise OSError("no exec")
-
-    monkeypatch.setattr("quodeq.api.terminal_routes.subprocess.Popen", _boom)
-    c = app.test_client()
-    r = c.post("/api/terminal/open", json={"path": "/proj/a.py"}, headers=_H, base_url="http://localhost")
-    assert r.status_code == 200
-    assert r.get_json() == {"opened": False, "editor": "code"}
-
-
-def test_open_route_requires_path(app):
-    c = app.test_client()
-    r = c.post("/api/terminal/open", json={}, headers=_H, base_url="http://localhost")
-    assert r.status_code == 400

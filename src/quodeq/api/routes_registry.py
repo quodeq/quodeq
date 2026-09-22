@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from flask import Flask
 
 from quodeq.api._log_buffer import LogBuffer
@@ -27,11 +29,13 @@ from quodeq.api.routes_findings import register_findings_routes
 from quodeq.api.llm_bridge_routes import register_llm_bridge_routes
 from quodeq.api.routes_rescore import register_rescore_routes
 from quodeq.api.routes_update import register_update_routes
+from quodeq.api.routes_menubar import register_menubar_routes
 from quodeq.api._scores_routes import register_scores_routes
 from quodeq.api.routes_compare import register_compare_routes
 from quodeq.api.routes_runs import register_runs_routes
 from quodeq.api.routes_shared import register_shared_routes
 from quodeq.api._grade_formula_routes import register_grade_formula_routes
+from quodeq.services.warmup import engine as warmup_engine
 from quodeq.services.base import ActionProvider
 
 
@@ -39,6 +43,7 @@ def register_all_routes(
     app: Flask, provider: ActionProvider,
     eval_store: RateLimitStore, static_dist: str | None,
     log_buffer: LogBuffer | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> None:
     """Register all API route groups on the app.
 
@@ -47,15 +52,18 @@ def register_all_routes(
         provider: Action provider for evaluation and project operations.
         eval_store: Rate-limit store for evaluation requests.
         static_dist: Optional path to the static assets directory.
+        log_buffer: Optional buffer the log routes stream from.
+        env: Environment mapping handed to the route groups that read one,
+            captured here at app-creation time. None means ``os.environ``.
     """
-    register_project_list_routes(app, provider)
+    register_project_list_routes(app, provider, warmup_engine)
     register_project_data_routes(app, provider)
     register_evaluation_list_routes(app, provider, eval_store)
     register_evaluation_item_routes(app, provider)
     register_log_stream_routes(app)
     register_run_events_routes(app)
-    register_ollama_log_routes(app)
-    register_llamacpp_log_routes(app)
+    register_ollama_log_routes(app, env)
+    register_llamacpp_log_routes(app, env)
     register_discovery_routes(app, provider)
     register_standards_routes(app)
     register_assistant_routes(app)
@@ -71,5 +79,6 @@ def register_all_routes(
     if log_buffer:
         register_log_routes(app, log_buffer)
     register_update_routes(app)
+    register_menubar_routes(app)
     register_index_routes(app)
     register_static_routes(app, static_dist)

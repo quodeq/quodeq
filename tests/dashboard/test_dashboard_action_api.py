@@ -3,8 +3,14 @@ from pathlib import Path
 from quodeq.dashboard import _api_spawn, runner
 from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._api_spawn import spawn_action_api
+from quodeq.dashboard._probes import DashboardHooks
 
 from tests.conftest import DummyProcess
+import pytest
+
+# The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
+# restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
+pytestmark = pytest.mark.usefixtures("restore_environ")
 
 _TEST_PORT = 7863
 _TEST_HOST = "127.0.0.1"
@@ -50,15 +56,17 @@ def test_force_action_api_host_port(monkeypatch):
         def terminate(self):
             pass
 
-    def fake_ensure(host, port, static_dist=None, evaluations_dir=None):
+    def fake_ensure(host, port, static_dist=None, evaluations_dir=None, **_kwargs):
         captured["host"] = host
         captured["port"] = port
         return f"http://{host}:{port}", FakeProcess()
 
     monkeypatch.setattr(runner, "_ensure_action_api_forced", fake_ensure)
-    monkeypatch.setattr(runner, "maybe_build_ui", lambda *_args, **_kwargs: Path("ui/web/dist"))
-    monkeypatch.setattr(runner, "check_dashboard_dev_prereqs", lambda: None)
     monkeypatch.setattr(runner, "validate_paths", lambda *_args, **_kwargs: None)
+    hooks = DashboardHooks(
+        build_ui=lambda *_args, **_kwargs: Path("ui/web/dist"),
+        check_prereqs=lambda: None,
+    )
 
     config = runner.DashboardConfig(
         server=runner.ServerConfig(
@@ -78,5 +86,5 @@ def test_force_action_api_host_port(monkeypatch):
         reports_defaulted=True,
     )
 
-    runner.run_dashboard(config)
+    runner.run_dashboard(config, hooks=hooks)
     assert captured == {"host": "0.0.0.0", "port": 9000}

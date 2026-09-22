@@ -53,8 +53,13 @@ export function detectedLanguages(languages, limit = 4) {
     .slice(0, limit);
 }
 
+const BUDGET_5_MIN_S = 300;
+const BUDGET_10_MIN_S = 600;
+const BUDGET_20_MIN_S = 1200;
+const BUDGET_30_MIN_S = 1800;
+
 /** Preset total run time budgets, in seconds. 0 = no limit. */
-export const BUDGET_CHOICES_S = [300, 600, 1200, 1800, 0];
+export const BUDGET_CHOICES_S = [BUDGET_5_MIN_S, BUDGET_10_MIN_S, BUDGET_20_MIN_S, BUDGET_30_MIN_S, 0];
 
 /** "10:00" for seconds, "no limit" for 0/negative. */
 export function formatBudgetLabel(seconds) {

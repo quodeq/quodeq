@@ -31,9 +31,9 @@ def test_dismiss_activates_heavy_path(tmp_path):
     """Sanity check: _dismiss makes dismissed_keys non-empty."""
     project_dir = tmp_path / "proj"
     project_dir.mkdir()
-    assert dismissed_keys(project_dir) == set()
+    assert not dismissed_keys(project_dir)
     _dismiss(project_dir, "R1", "a.py", 1)
-    assert dismissed_keys(project_dir) == {("R1", "a.py", 1)}
+    assert dismissed_keys(project_dir).line_keys() == {("R1", "a.py", 1)}
 
 
 def test_trend_identical_cached_vs_direct(tmp_path, monkeypatch):

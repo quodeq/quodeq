@@ -1,20 +1,22 @@
 """Run discovery, date parsing, and report aggregation for filesystem reports.
 
-The module-level functions (``read_run_data``, ``list_runs``) provide the
-default filesystem implementation.  The ``RunStorage`` protocol is defined
-in ``quodeq.data.fs.report_parser.runs`` — alternative backends should
-implement that protocol and be injected at the call site.
+The module-level functions (``read_run_data``, ``list_runs``, etc.) are the
+filesystem implementation — there is no ``RunStorage`` protocol here. A
+caller that needs a substitute injects a reader callable instead: see
+``ScoringDeps.read_run_data`` (``services/scoring_deps.py``) and
+``trend_fetcher._default_read_run_scalars``.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.core.types import DimensionResult
-from quodeq.core.types.mappers import parse_dimension_result
+from quodeq.data.mappers import parse_dimension_result
 from quodeq.data.fs.report_parser._evaluations import load_evaluations
-from quodeq.data.fs.report_parser._external_pid import resolve_external_pid
+from quodeq.data.fs.report_parser.external_pid import resolve_external_pid
 from quodeq.data.fs.report_parser._evidence import load_evidence_map
 from quodeq.data.fs.report_parser._repository import (
     build_repository_info as build_repository_info,
@@ -25,11 +27,6 @@ from quodeq.data.fs.report_parser._run_info import (
     safe_read_dir as safe_read_dir,
 )
 from quodeq.data.fs.report_parser.run_dates import project_run_dates
-from quodeq.data.fs.report_parser._run_lookup import (
-    RunLookupCache as RunLookupCache,
-    _get_previous_run_for_dimension as _get_previous_run_for_dimension,
-    _make_caching_fetcher as _make_caching_fetcher,
-)
 from quodeq.shared.validation import validate_path_segment
 
 _DEFAULT_RUN_LIMIT = 100
@@ -78,35 +75,38 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[Dimensi
     return overlay_sql_grades(run_dir, dimensions)
 
 
-def read_run_scalars(reports_root: Path, project: str, run_id: str) -> list[DimensionResult]:
-    """Load a run's per-dimension SCALARS (score/grade/principles) only.
-
-    Fast path for the dashboard trend and accumulated carry-forward, which need
-    only ``overall_score`` / ``overall_grade`` per dimension — not the full
-    findings.  Reads the authoritative SQL grade tables directly instead of
-    parsing the evaluation JSON, then falls back to :func:`read_run_data`
-    whenever the SQL tables can't faithfully reproduce the overlaid result:
-    legacy run (no ``events.jsonl``) or no ``evaluation.db``; SQLite disabled or
-    db unreadable; empty grade tables; a NULL SQL score (overlay would keep the
-    eval-time score); or the SQL dim count != the on-disk ``evaluation/*.json``
-    count (partial projection).  Returned dimensions carry empty findings.
+def _default_fallback_reader(reports_root: Path, project: str, run_id: str) -> list[DimensionResult]:
+    """Default ``read_run_scalars`` fallback: a thin wrapper around
+    ``read_run_data``, resolved by name at call time (not captured directly
+    as the default value) so a caller two layers up that still patches this
+    module's ``read_run_data`` attribute (rather than injecting
+    ``fallback_reader``) keeps intercepting the fallback path.
     """
-    validate_path_segment(project, run_id)
-    run_dir = reports_root / project / run_id
+    return read_run_data(reports_root, project, run_id)
 
+
+def _read_run_scalars_from_sql(run_dir: Path) -> "tuple[list[dict], list[dict]] | None":
+    """Read dimension/principle grade rows straight from evaluation.db.
+
+    Returns None whenever the SQL tables can't faithfully reproduce the
+    overlaid result: legacy run (no ``events.jsonl``) or no
+    ``evaluation.db``; SQLite disabled or db unreadable; empty grade
+    tables; a NULL SQL score (overlay would keep the eval-time score); or
+    the SQL dim count != the on-disk ``evaluation/*.json`` count (partial
+    projection). None signals the caller to use its fallback reader.
+    """
     from quodeq.data.fs.report_parser._evidence_sqlite import has_evaluation_db  # noqa: PLC0415
-    from quodeq.shared._env import sqlite_disabled  # noqa: PLC0415
+    from quodeq.shared.env import sqlite_disabled  # noqa: PLC0415
 
     if (
         sqlite_disabled()
         or not has_evaluation_db(run_dir)
         or not (run_dir / "events.jsonl").is_file()
     ):
-        return read_run_data(reports_root, project, run_id)
+        return None
 
     import sqlite3  # noqa: PLC0415
 
-    from quodeq.core.types.report import PrincipleGrade  # noqa: PLC0415
     from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
     from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
 
@@ -116,13 +116,13 @@ def read_run_scalars(reports_root: Path, project: str, run_id: str) -> list[Dime
         dim_rows = store.read_dimension_scores()
         principle_rows = store.read_principle_grades()
     except sqlite3.DatabaseError:
-        return read_run_data(reports_root, project, run_id)
+        return None
 
     if not dim_rows:
-        return read_run_data(reports_root, project, run_id)
+        return None
 
     if any(r.get("score") is None for r in dim_rows):
-        return read_run_data(reports_root, project, run_id)
+        return None
 
     eval_dir = run_dir / "evaluation"
     on_disk = (
@@ -130,12 +130,23 @@ def read_run_scalars(reports_root: Path, project: str, run_id: str) -> list[Dime
         if eval_dir.is_dir() else 0
     )
     if on_disk and len(dim_rows) != on_disk:
-        return read_run_data(reports_root, project, run_id)
+        return None
 
-    # No eval-time grade fallback here (unlike overlay_sql_grades): the fast
-    # path doesn't read the JSON, and a projected dim past the NULL-score
-    # guard always carries a real grade label ("Insufficient" or better),
-    # never "".
+    return dim_rows, principle_rows
+
+
+def _scalars_to_dimension_results(
+    dim_rows: list[dict], principle_rows: list[dict],
+) -> list[DimensionResult]:
+    """Build sorted DimensionResults from validated SQL grade rows.
+
+    No eval-time grade fallback here (unlike overlay_sql_grades): the fast
+    path doesn't read the JSON, and a projected dim past the NULL-score
+    guard always carries a real grade label ("Insufficient" or better),
+    never "".
+    """
+    from quodeq.core.types.report import PrincipleGrade  # noqa: PLC0415
+
     principles_by_dim: dict[str, list[PrincipleGrade]] = {}
     for r in principle_rows:
         principles_by_dim.setdefault(r["dimension"], []).append(PrincipleGrade(
@@ -155,6 +166,33 @@ def read_run_scalars(reports_root: Path, project: str, run_id: str) -> list[Dime
     ]
     dimensions.sort(key=lambda d: d.dimension)
     return dimensions
+
+
+def read_run_scalars(
+    reports_root: Path,
+    project: str,
+    run_id: str,
+    *,
+    fallback_reader: Callable[[Path, str, str], list[DimensionResult]] = _default_fallback_reader,
+) -> list[DimensionResult]:
+    """Load a run's per-dimension SCALARS (score/grade/principles) only.
+
+    Fast path for the dashboard trend and accumulated carry-forward, which need
+    only ``overall_score`` / ``overall_grade`` per dimension — not the full
+    findings.  Reads the authoritative SQL grade tables directly instead of
+    parsing the evaluation JSON, then falls back to *fallback_reader*
+    (defaults to :func:`read_run_data`) whenever the SQL tables can't
+    faithfully reproduce the overlaid result -- see
+    :func:`_read_run_scalars_from_sql` for the full list of guards.
+    """
+    validate_path_segment(project, run_id)
+    run_dir = reports_root / project / run_id
+
+    sql_result = _read_run_scalars_from_sql(run_dir)
+    if sql_result is None:
+        return fallback_reader(reports_root, project, run_id)
+    dim_rows, principle_rows = sql_result
+    return _scalars_to_dimension_results(dim_rows, principle_rows)
 
 
 def _read_run_status(run_dir: Path) -> str | None:
@@ -184,6 +222,23 @@ _TERMINAL_STATE_TO_STATUS = {
     "failed": "failed",
     "cancelled": "cancelled",
 }
+
+
+def _run_status_for_entry(project_dir: Path, run_dir: Path, entry_name: str) -> str:
+    """Status precedence for one run dir entry:
+
+    1. status.json state is terminal (done/failed/cancelled) → honor it,
+       even over a still-live PID (a cancelled run keeps draining after
+       its state flips; it must not resurface as "running").
+    2. Live process holding the PID → "in_progress" (dimmed "Running…" in UI)
+    3. Otherwise → "complete" (historical, crashed, pre-.pid-era runs)
+    """
+    raw_state = _read_run_status(run_dir)
+    terminal_status = _TERMINAL_STATE_TO_STATUS.get(raw_state or "")
+    if terminal_status is not None:
+        return terminal_status
+    pid = resolve_external_pid(project_dir, entry_name)
+    return "in_progress" if pid is not None else "complete"
 
 
 def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIMIT) -> list[RunInfo]:
@@ -217,19 +272,7 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
             or (run_dir / "status.json").is_file()
         if not is_run:
             continue
-        # Status precedence:
-        #   1. status.json state is terminal (done/failed/cancelled) → honor it,
-        #      even over a still-live PID (a cancelled run keeps draining after
-        #      its state flips; it must not resurface as "running").
-        #   2. Live process holding the PID → "in_progress" (dimmed "Running…" in UI)
-        #   3. Otherwise → "complete" (historical, crashed, pre-.pid-era runs)
-        raw_state = _read_run_status(run_dir)
-        terminal_status = _TERMINAL_STATE_TO_STATUS.get(raw_state or "")
-        if terminal_status is not None:
-            status = terminal_status
-        else:
-            pid = resolve_external_pid(project_dir, entry.name)
-            status = "in_progress" if pid is not None else "complete"
+        status = _run_status_for_entry(project_dir, run_dir, entry.name)
         cached = index_dates.get(entry.name)
         if cached is not None:
             date_iso, date_label = cached

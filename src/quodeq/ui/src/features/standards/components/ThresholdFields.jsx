@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import { effectiveParamValue } from '../resolveRequirementText.js';
 import { t } from '../../../strings/index.js';
 
-function ThresholdFieldRow({ name, spec, effectiveValue, overridden, onChangeParam, inputId }) {
+// Was duplicated (inline) in handleChange and handleBlur before this
+// extraction -- same bounds check, same semantics.
+function isInRange(num, spec) {
+  return (spec.min == null || num >= spec.min) && (spec.max == null || num <= spec.max);
+}
+
+function useThresholdDraft({ name, spec, effectiveValue, onChangeParam }) {
   const [draft, setDraft] = useState(String(effectiveValue));
   const [dirty, setDirty] = useState(false);
 
@@ -19,29 +25,27 @@ function ThresholdFieldRow({ name, spec, effectiveValue, overridden, onChangePar
     setDirty(true);
 
     const num = Number(raw);
-    if (raw !== '' && Number.isInteger(num)) {
-      const inRange =
-        (spec.min == null || num >= spec.min) &&
-        (spec.max == null || num <= spec.max);
-      if (inRange) {
-        onChangeParam(name, num);
-      }
+    if (raw !== '' && Number.isInteger(num) && isInRange(num, spec)) {
+      onChangeParam(name, num);
       // out-of-range: do not fire; blur will restore effective value
     }
   }
 
   function handleBlur() {
     const num = Number(draft);
-    const inRange =
-      Number.isInteger(num) &&
-      (spec.min == null || num >= spec.min) &&
-      (spec.max == null || num <= spec.max);
+    const inRange = Number.isInteger(num) && isInRange(num, spec);
     if (draft === '' || !inRange) {
       // Invalid or out-of-range draft — snap back to effective value
       setDraft(String(effectiveValue));
     }
     setDirty(false);
   }
+
+  return { draft, handleChange, handleBlur };
+}
+
+function ThresholdFieldRow({ name, spec, effectiveValue, overridden, onChangeParam, inputId }) {
+  const { draft, handleChange, handleBlur } = useThresholdDraft({ name, spec, effectiveValue, onChangeParam });
 
   return (
     <div className="threshold-field-row">

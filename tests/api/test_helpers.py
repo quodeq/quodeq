@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 from http import HTTPStatus
-from pathlib import Path
 
-import pytest
 from flask import Flask
 
 from quodeq.api.helpers import (

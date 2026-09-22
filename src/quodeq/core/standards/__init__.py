@@ -7,17 +7,11 @@ core layer holds only the parsing/extraction logic.
 from quodeq.core.standards.refs import (
     extract_refs,
     extract_requirements,
-    is_known_dimension,
-    known_dimension_ids,
-    load_compiled_refs,
     ref_label,
 )
 
 __all__ = [
     "extract_refs",
     "extract_requirements",
-    "is_known_dimension",
-    "known_dimension_ids",
-    "load_compiled_refs",
     "ref_label",
 ]

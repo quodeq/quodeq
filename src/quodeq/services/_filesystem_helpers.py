@@ -3,13 +3,10 @@ from __future__ import annotations
 
 import functools
 import json
-import logging
 from pathlib import Path
 
-# NOTE: logging in inner layer — tracked for middleware extraction
-_logger = logging.getLogger(__name__)
-
 from quodeq.config.paths import default_paths
+from quodeq.core.observability import NULL_LOG, LogSink
 
 
 @functools.lru_cache(maxsize=4)
@@ -49,7 +46,9 @@ def reset_dimensions_cache() -> None:
     _dimensions_cache.reset()
 
 
-def _list_available_dimensions_for_discipline(paths: object | None = None) -> tuple[str, ...]:
+def _list_available_dimensions_for_discipline(
+    paths: object | None = None, *, log: LogSink = NULL_LOG,
+) -> tuple[str, ...]:
     """Resolve available dimensions from universal dimensions.json (cached after first read).
 
     Pass *paths* to override the default path resolution (useful for testing).
@@ -61,7 +60,7 @@ def _list_available_dimensions_for_discipline(paths: object | None = None) -> tu
         resolved = paths or default_paths()
         result = _read_dimensions_from_file(str(resolved.dimensions_file))
     except (OSError, TypeError) as exc:
-        _logger.warning("Failed to load dimensions config: %s", exc)
+        log.warning(f"Failed to load dimensions config: {exc}")
         return ()
     if paths is None:
         _dimensions_cache.value = result

@@ -1,14 +1,14 @@
 // src/quodeq/ui/src/api/assistant.test.jsx
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as assistant from './assistant.js';
 
 let calls;
 beforeEach(() => {
   calls = [];
-  globalThis.fetch = vi.fn(async (url, opts) => {
+  vi.stubGlobal('fetch', vi.fn(async (url, opts) => {
     calls.push({ url, opts });
     return { ok: true, json: async () => ({ sessionId: 's1', accepted: true, status: 'rejected' }) };
-  });
+  }));
 });
 afterEach(() => { vi.restoreAllMocks(); });
 

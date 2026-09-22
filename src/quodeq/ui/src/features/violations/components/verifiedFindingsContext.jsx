@@ -1,6 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { listVerifiedFindings, unverifyFinding } from '../../../api/findings.js';
 import { sharedListVerifiedFindings } from '../../../api/shared.js';
+import { ASSISTANT_ACTION_APPLIED_EVENT, PROJECT_SOURCE } from '../../../constants.js';
 
 /**
  * Project-level verified-badge state. Findings are keyed by
@@ -26,14 +27,17 @@ const keyOf = (v) => `${v.req || ''}|${v.file || ''}|${v.line || 0}`;
  * defense-in-depth no-op — it never calls the local unverify endpoint, even
  * if a click handler somehow slips through.
  */
-export function VerifiedFindingsProvider({ project, source = 'local', children }) {
+export function VerifiedFindingsProvider({ project, source = PROJECT_SOURCE.LOCAL, children }) {
   const [entries, setEntries] = useState([]);
-  const isShared = source === 'shared';
+  const isShared = source === PROJECT_SOURCE.SHARED;
 
   const refresh = useCallback(() => {
     if (!project) { setEntries([]); return; }
     const fetchVerified = isShared ? sharedListVerifiedFindings : listVerifiedFindings;
-    fetchVerified(project).then(setEntries).catch(() => setEntries([]));
+    fetchVerified(project).then(setEntries).catch((err) => {
+      console.warn('[verifiedFindingsContext] refresh failed:', err);
+      setEntries([]);
+    });
   }, [project, isShared]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -42,8 +46,8 @@ export function VerifiedFindingsProvider({ project, source = 'local', children }
     const handler = (event) => {
       if (event.detail?.actionType === 'verify_finding') refresh();
     };
-    window.addEventListener('quodeq:assistant-action-applied', handler);
-    return () => window.removeEventListener('quodeq:assistant-action-applied', handler);
+    window.addEventListener(ASSISTANT_ACTION_APPLIED_EVENT, handler);
+    return () => window.removeEventListener(ASSISTANT_ACTION_APPLIED_EVENT, handler);
   }, [refresh]);
 
   const value = useMemo(() => {
@@ -55,6 +59,10 @@ export function VerifiedFindingsProvider({ project, source = 'local', children }
       // for shared projects — there is no mutation route to click into, so
       // rendering a button would be a dead end.
       readOnly: isShared,
+      // Deliberately left to reject on failure (not caught here): the one
+      // caller, VerifiedChip.jsx, already catches and logs it (with the
+      // documented rationale that a stronger revert-on-failure UX is out of
+      // scope), and swallowing it here too would just duplicate that.
       unverify: async (v) => {
         if (isShared) return;
         await unverifyFinding(project, { req: v.req, file: v.file, line: v.line });

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -14,7 +13,7 @@ from quodeq.services.dashboard import (
     _enrich_dimensions_with_trend,
     build_dashboard,
 )
-from quodeq.services._dashboard_trend import build_accumulated_trend as _build_accumulated_trend
+from quodeq.services.dashboard_trend import build_accumulated_trend as _build_accumulated_trend
 from quodeq.data.fs.report_parser.runs import RunInfo
 
 

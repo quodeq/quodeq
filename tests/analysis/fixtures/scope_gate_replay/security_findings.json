@@ -1,0 +1,74 @@
+{
+  "violations": [
+    {
+      "severity": "major",
+      "req": "S-ACC-6",
+      "title": "Rate-limit updates are not synchronized across worker processes",
+      "reason": "`self._lock = threading.Lock()` serializes only threads in one process while `record` performs a file read-modify-write. Concurrent requests routed to separate worker processes overwrite each other's counts, letting a burst exceed the configured authentication or API rate limit.",
+      "file": "src/quodeq/api/_rate_limit_file_store.py"
+    },
+    {
+      "severity": "major",
+      "req": "S-CON-7",
+      "title": "Fallback AI-provider config defaults to sandbox/approval bypass",
+      "reason": "When ai_providers.json cannot be loaded, get_provider_configs silently falls back to base_args \"--dangerously-bypass-approvals-and-sandbox\" for codex and mcp_permission_args [\"--permission-mode\", \"bypassPermissions\"] for claude, so a missing or corrupt config file makes every subagent invocation run the AI CLI with approvals and sandboxing disabled instead of failing closed or falling back to a restrictive default.",
+      "file": "src/quodeq/analysis/_provider_cache.py"
+    },
+    {
+      "severity": "major",
+      "req": "S-CON-9",
+      "title": "normalize_remote_url does not strip embedded userinfo credentials before the value is persisted/published",
+      "reason": "For a URL like `https://user:TOKEN@github.com/owner/repo.git`, after the `https://` prefix is stripped this branch splits on the first `:` (`head=\"user\"`, `tail=\"TOKEN@github.com/owner/repo.git\"`) and rebuilds `url = f\"{head}/{tail}\"`, producing `\"user/TOKEN@github.com/owner/repo\"` \u2014 the credential substring survives intact. `git_remote_url` (data/git_cli.py) feeds this straight from `git config --get remote.origin.url` into `_create_project`, which writes it verbatim to `repository_info.json` (`info[\"remote_url\"] = identity.remote_url`), and `shared_publish.stage_project` copies that file into the shared team results repo. A locally-configured credential-bearing remote therefore ends up committed in cleartext to a less-trusted, multi-user shared repository. Contrast with `_sanitize_url` in api/_evaluation_helpers.py, which does strip userinfo before a URL is logged/surfaced.",
+      "file": "src/quodeq/shared/_repo.py"
+    },
+    {
+      "severity": "major",
+      "req": "S-CON-3",
+      "title": "API key persisted to localStorage instead of secure storage",
+      "reason": "saveProviderSetting writes the 'api-key' setting (see SETTINGS list line 4) to localStorage via storage.setItem with no encryption; any script running on the page (e.g. via an XSS elsewhere in the SPA) can read window.localStorage and exfiltrate the provider API key. No Keychain/Vault or equivalent secure storage is used.",
+      "file": "src/quodeq/ui/src/features/settings/hooks/useProviderSettings.js"
+    },
+    {
+      "severity": "major",
+      "req": "S-CON-16",
+      "title": "API key read back in cleartext from localStorage",
+      "reason": "loadProviderState retrieves the 'api-key' value straight from localStorage with storage.getItem and holds it in component state as a plain string, meaning the credential sits in cleartext in both persistent browser storage and page memory.",
+      "file": "src/quodeq/ui/src/features/settings/hooks/useProviderSettings.js"
+    },
+    {
+      "severity": "major",
+      "req": "S-CON-16",
+      "title": "OMLX API key is read from a cleartext settings file",
+      "reason": "`cfg = json.loads((Path.home() / \".omlx\" / \"settings.json\").read_text(encoding=\"utf-8\"))` loads the configuration containing the API key from a regular cleartext file instead of platform secure storage.",
+      "file": "src/quodeq/llm_bridge/_omlx.py"
+    },
+    {
+      "severity": "major",
+      "req": "S-CON-3",
+      "title": "API key written to a plain config file instead of platform secure storage",
+      "reason": "`lines.append(f\"export {api_key_var}={api_key_value}\")` persists the user's API key as a cleartext line in .quodeq.env rather than macOS Keychain/GNOME Keyring/Windows Credential Manager or a secrets manager; the surrounding chmod 0600 limits but does not eliminate on-disk exposure (e.g. root, backup tools, disk images can still read it).",
+      "file": "src/quodeq/config/ai_provider.py"
+    },
+    {
+      "severity": "major",
+      "req": "S-CON-16",
+      "title": "Cloud API keys read from localStorage in cleartext",
+      "reason": "`localStorage.getItem(\\`cc-${providerId}-api-key\\`)` confirms OpenAI/Anthropic API keys are persisted in browser localStorage, which is unencrypted, accessible to any script in the page context, and not cleared on logout, making it a soft target for XSS-based exfiltration.",
+      "file": "src/quodeq/ui/src/features/onboarding/hooks/providerProbes.js"
+    },
+    {
+      "severity": "major",
+      "req": "S-CON-2",
+      "title": "Logs dashboard stderr: `\"Dashboard crashed (exit code %s): %s\", self._process.returncode, sanitized`",
+      "reason": "The code writes captured dashboard stderr to the application log after only truncating and replacing newlines. Dashboard stderr containing an access token or other credential is retained in logs accessible to local operators.",
+      "file": "packaging/macos/menubar.py"
+    },
+    {
+      "severity": "major",
+      "req": "S-INT-19",
+      "title": "Startup sweep deletes every clone dir when reports_root is unreadable, instead of failing safe",
+      "reason": "When `reports_root.is_dir()` is False, `registered` becomes an empty set with no exception raised, so the loop below treats every directory under `clones_root` as orphaned and calls `remove_clone_dir` on all of them. This runs unconditionally at every app startup (see app.py's `sweep_orphaned_clones(get_clones_dir(), Path(get_evaluations_dir()))`), so a transiently unreadable/unmounted reports_root wipes every clone directory, including ones backing in-progress or otherwise legitimate projects, rather than skipping the sweep when it cannot reliably distinguish orphaned from live clones.",
+      "file": "src/quodeq/services/_ephemeral_cleanup.py"
+    }
+  ]
+}

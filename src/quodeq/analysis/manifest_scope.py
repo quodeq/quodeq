@@ -8,17 +8,17 @@ layer violation.
 from __future__ import annotations
 
 import os
-import sys
 
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
+from quodeq.core.observability import NULL_LOG, LogSink
 
 
-def _filter_manifest_by_scope(
-    manifest: SourceManifest | None, scope_path: str,
+def filter_manifest_by_scope(
+    manifest: SourceManifest | None, scope_path: str, *, log: LogSink = NULL_LOG,
 ) -> SourceManifest | None:
     """Narrow a manifest to only files under *scope_path*.
 
-    Returns None (with error printed) when no files match.
+    Returns None (logging a warning) when no files match.
     """
     if not manifest or not manifest.targets:
         return manifest
@@ -47,9 +47,16 @@ def _filter_manifest_by_scope(
             all_stats[k] = all_stats.get(k, 0) + v
 
     if scoped_targets:
-        print(f"Scope filter: {total} files under '{scope_path}'", file=sys.stderr)
-        return SourceManifest(targets=scoped_targets, total_files=total, language_stats=all_stats)
+        log.info(f"Scope filter: {total} files under '{scope_path}'")
+        # skipped_untracked travels with the manifest by contract, so carry it
+        # across the rebuild rather than resetting it to zero here.
+        return SourceManifest(
+            targets=scoped_targets, total_files=total, language_stats=all_stats,
+            skipped_untracked=manifest.skipped_untracked,
+        )
 
-    print(f"No source files found under scope '{scope_path}'", file=sys.stderr)
-    print("The scoped folder contains no recognized source code files.", file=sys.stderr)
+    log.warning(
+        f"No source files found under scope '{scope_path}'. "
+        "The scoped folder contains no recognized source code files."
+    )
     return None

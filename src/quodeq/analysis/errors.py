@@ -3,21 +3,22 @@ from __future__ import annotations
 
 import re
 
+from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
+
+# Cancel-cause / interruption-reason codes shared by the pool workers and
+# scalers that raise them, the dim-runner circuit breaker, and the loop
+# guards / CLI lifecycle that read them back via cancellation.cancel_reason()
+# or _interruption_reason(). Every consumer imports these rather than
+# retyping the string, so a rename here can't silently desync a comparison.
+REASON_PROVIDER_FATAL = "provider_fatal"
+REASON_AGENT_FAILURE_STREAK = "agent_failure_streak"
+REASON_CIRCUIT_BREAKER = "circuit_breaker"
+REASON_CANCELLED_SIGNAL = "cancelled_signal"
+REASON_FAILED_EXCEPTION = "failed_exception"
+
 
 class EvaluationError(RuntimeError):
     """Base error for evaluation pipeline failures."""
-
-
-class RepoNotFoundError(EvaluationError):
-    """Repository path does not exist or is not accessible."""
-
-
-class RepoCloneError(EvaluationError):
-    """Failed to clone a remote repository."""
-
-
-class NoSourceFilesError(EvaluationError):
-    """No recognized source files found in the repository or scope."""
 
 
 class ProviderError(EvaluationError):
@@ -29,16 +30,20 @@ class FatalProviderError(ProviderError):
 
     Raised so the run aborts once with a clear cause instead of respawning
     agents against a provider that will keep rejecting every call.
-    ``reason`` is a short machine-readable code: "quota", "auth", "payment".
+    ``reason`` is a machine-readable code such as "quota", "auth",
+    "payment", "policy", or "copilot_mcp_policy".
     """
 
-    def __init__(self, message: str, *, reason: str = "provider_fatal") -> None:
+    def __init__(self, message: str, *, reason: str = REASON_PROVIDER_FATAL) -> None:
         super().__init__(message)
         self.reason = reason
 
 
-class BudgetExceededError(EvaluationError):
-    """Evaluation exceeded the configured time or cost budget."""
+def provider_exit_reason(reason: str | None) -> str:
+    """Map a provider reason or cancellation cause to its persistent exit code."""
+    if reason and reason.startswith(f"{REASON_PROVIDER_FATAL}:"):
+        reason = reason.split(":", 2)[1]
+    return COPILOT_MCP_POLICY_REASON if reason == COPILOT_MCP_POLICY_REASON else REASON_PROVIDER_FATAL
 
 
 # Fatal-message classification shared by the CLI path (stderr of the claude/

@@ -1,19 +1,41 @@
+"""Records written to the event log: judgments, user actions, and their envelopes.
+
+Every event is frozen and carries its own id and UTC timestamp, so the log
+is append-only and replayable in order. ``EVENT_MODEL_MAP`` and
+``PAYLOAD_MODEL_MAP`` at the bottom are what the decoder in
+``data.events.codec`` uses to rebuild the right pair of classes per line.
+"""
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
+from typing import Dict, Generic, List, Optional, TypeVar
 from uuid import uuid4, UUID
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
-
+from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.types.req_ref import ReqRef
 
 
 T = TypeVar("T")
 
+# Judgment.verdict vocabulary. "dismissed" is NOT a valid Judgment verdict --
+# that's a derived view-only state on Finding (see Judgment's docstring).
+VERDICT_VIOLATION = "violation"
+VERDICT_COMPLIANCE = "compliance"
+VALID_VERDICTS = frozenset({VERDICT_VIOLATION, VERDICT_COMPLIANCE})
+
+# Judgment.severity's default when the model doesn't set one explicitly.
+DEFAULT_SEVERITY = "medium"
+
 
 class EventType(str, Enum):
+    """Discriminator stored on every event line; the decoder keys both maps off it.
+
+    String-valued so an unknown member read back from an old log surfaces as
+    a plain value error rather than a silent mismatch.
+    """
+
     RUN_STARTED = "RUN_STARTED"
     RUN_COMPLETED = "RUN_COMPLETED"
     RUN_ABORTED = "RUN_ABORTED"
@@ -26,24 +48,24 @@ class EventType(str, Enum):
     FINDING_UNVERIFIED = "FINDING_UNVERIFIED"
 
 
-class BaseEvent(BaseModel, Generic[T]):
+@dataclass(frozen=True, kw_only=True)
+class BaseEvent(Generic[T]):
     """Base class for all events in the quodeq event log."""
-    model_config = ConfigDict(frozen=True)
 
-    event_id: UUID = Field(default_factory=uuid4)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    event_id: UUID = field(default_factory=uuid4)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     event_type: EventType
     payload: T
 
 
-class Judgment(BaseModel):
+@dataclass(frozen=True, kw_only=True)
+class Judgment:
     """What the LLM produced about a single piece of code.
 
     Immutable. The canonical type for findings in the Event Log. Verdict is
     "violation" or "compliance" -- "dismissed" is NOT a valid Judgment verdict;
     that's a derived view-only state on Finding.
     """
-    model_config = ConfigDict(frozen=True)
 
     # Required
     practice_id: str
@@ -56,14 +78,17 @@ class Judgment(BaseModel):
     # Optional
     end_line: Optional[int] = None
     snippet: Optional[str] = None
-    severity: str = "medium"
+    severity: str = DEFAULT_SEVERITY
     violation_type: Optional[str] = None
+    # The model's tag exactly as emitted, before any taxonomy mapping. Feeds
+    # the per-run unmapped-types report; never a scoring input.
+    violation_type_raw: Optional[str] = None
     title: Optional[str] = None
     context: Optional[str] = None
     scope: Optional[str] = None
-    confidence: int = 100
+    confidence: int = FULL_CONFIDENCE
     req: Optional[str] = None
-    req_refs: List[ReqRef] = Field(default_factory=list)
+    req_refs: List[ReqRef] = field(default_factory=list)
     cwe: Optional[str] = None
     # True when the deterministic provenance gate (#639) de-escalated this
     # finding from critical to major. UI/DB-visible audit marker (#656); the
@@ -81,78 +106,82 @@ class Judgment(BaseModel):
     # app still shows every finding in the run).
     carried_forward: bool = False
 
-    @field_validator("req_refs", mode="before")
-    @classmethod
-    def _coerce_legacy_req_refs(cls, value: Any) -> Any:
-        """Accept the legacy bare-string format for ``req_refs``.
-
-        Historical events.jsonl files stored req_refs as a list of bare
-        strings (e.g. ``["CWE-89", "CISQ"]``) before the ReqRef struct was
-        introduced. Strict validation rejected the whole event, which made
-        EventLogReader silently skip it — producing empty grade tables and
-        nonsensical scores for any pre-refactor run.
-
-        Coerce strings to ``ReqRef(label=<string>, url="")`` so legacy events
-        round-trip cleanly. The empty url means the UI's filterValidRefs()
-        drops them from links (it requires http(s)://), which is the right
-        behaviour: there is no URL to recover.
-        """
-        if not isinstance(value, list):
-            return value
-        coerced = []
-        for item in value:
-            if isinstance(item, str):
-                coerced.append(ReqRef(label=item, url=""))
-            else:
-                coerced.append(item)
-        return coerced
-
     def is_violation(self) -> bool:
-        return self.verdict == "violation"
+        """True when this judgment counts against the score."""
+        return self.verdict == VERDICT_VIOLATION
 
     def is_compliance(self) -> bool:
-        return self.verdict == "compliance"
+        """True when this judgment is evidence the practice was followed."""
+        return self.verdict == VERDICT_COMPLIANCE
+
+    def has_valid_verdict(self) -> bool:
+        """True when verdict is one of the known values.
+
+        Deliberately non-raising: ``wire_dict_to_judgment``
+        (``finding_mappings.py``) has a documented never-raises contract
+        (an empty/garbage verdict is normal for a malformed wire dict), and
+        a raising validator here would make historical ``events.jsonl``
+        entries with an unexpected verdict permanently unreplayable.
+        """
+        return self.verdict in VALID_VERDICTS
 
 
 # Deprecation alias -- remove in a follow-up PR once all callers migrate.
 JudgmentPayload = Judgment
 
 
+@dataclass(frozen=True, kw_only=True)
 class JudgmentCreatedEvent(BaseEvent[Judgment]):
     """Event emitted whenever a new judgment is found and recorded."""
+
     event_type: EventType = EventType.JUDGMENT_CREATED
 
 
-class FindingDismissed(BaseModel):
-    """User dismissed a finding identified by (req, file, line)."""
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, kw_only=True)
+class FindingDismissed:
+    """User dismissed a finding.
+
+    Identity is ``(req, file, fingerprint)`` when the finding has a snippet
+    (``fingerprint`` = ``core.finding_identity.snippet_fingerprint``), else
+    ``(req, file, line)``. ``line`` is always recorded: it is the display
+    hint and the identity of snippet-less findings. Entries written before
+    fingerprints existed carry None and are upgraded by the one-shot backfill.
+    """
 
     req: str
     file: str
     line: int
     reason: Optional[str] = None
+    fingerprint: Optional[str] = None
 
 
-class FindingUndismissed(BaseModel):
-    """User restored a previously dismissed finding."""
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True, kw_only=True)
+class FindingUndismissed:
+    """User restored a previously dismissed finding (same identity rules)."""
 
     req: str
     file: str
     line: int
+    fingerprint: Optional[str] = None
 
 
+@dataclass(frozen=True, kw_only=True)
 class FindingDismissedEvent(BaseEvent[FindingDismissed]):
+    """Event emitted when a user hides a finding from the read surfaces."""
+
     event_type: EventType = EventType.FINDING_DISMISSED
 
 
+@dataclass(frozen=True, kw_only=True)
 class FindingUndismissedEvent(BaseEvent[FindingUndismissed]):
+    """Event emitted when a user brings a dismissed finding back into view."""
+
     event_type: EventType = EventType.FINDING_UNDISMISSED
 
 
-class FindingVerified(BaseModel):
+@dataclass(frozen=True, kw_only=True)
+class FindingVerified:
     """User confirmed a finding is a real defect, identified by (req, file, line)."""
-    model_config = ConfigDict(frozen=True)
 
     req: str
     file: str
@@ -160,20 +189,26 @@ class FindingVerified(BaseModel):
     note: Optional[str] = None
 
 
-class FindingUnverified(BaseModel):
+@dataclass(frozen=True, kw_only=True)
+class FindingUnverified:
     """User cleared a previously verified badge."""
-    model_config = ConfigDict(frozen=True)
 
     req: str
     file: str
     line: int
 
 
+@dataclass(frozen=True, kw_only=True)
 class FindingVerifiedEvent(BaseEvent[FindingVerified]):
+    """Event emitted when a user confirms a finding is a real defect."""
+
     event_type: EventType = EventType.FINDING_VERIFIED
 
 
+@dataclass(frozen=True, kw_only=True)
 class FindingUnverifiedEvent(BaseEvent[FindingUnverified]):
+    """Event emitted when a user clears a finding's verified badge."""
+
     event_type: EventType = EventType.FINDING_UNVERIFIED
 
 
@@ -185,4 +220,14 @@ EVENT_MODEL_MAP: Dict[EventType, type[BaseEvent]] = {
     EventType.FINDING_UNDISMISSED: FindingUndismissedEvent,
     EventType.FINDING_VERIFIED: FindingVerifiedEvent,
     EventType.FINDING_UNVERIFIED: FindingUnverifiedEvent,
+}
+
+# Payload class per event type. The decoder (data.events.codec) uses it to
+# construct the nested payload dataclass for each event model.
+PAYLOAD_MODEL_MAP: Dict[EventType, type] = {
+    EventType.JUDGMENT_CREATED: Judgment,
+    EventType.FINDING_DISMISSED: FindingDismissed,
+    EventType.FINDING_UNDISMISSED: FindingUndismissed,
+    EventType.FINDING_VERIFIED: FindingVerified,
+    EventType.FINDING_UNVERIFIED: FindingUnverified,
 }

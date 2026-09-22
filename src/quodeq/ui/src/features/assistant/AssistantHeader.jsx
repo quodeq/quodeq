@@ -1,19 +1,102 @@
-import React from 'react';
 import { useAssistantDrawer } from './AssistantDrawerProvider.jsx';
 import { useSidePane, workspaceDiffSpec } from '../side-pane/index.js';
 import PanelSwitcher from '../drawer/PanelSwitcher.jsx';
 import Badge from '../../components/Badge.jsx';
-import {
-  ChevronDownIcon, GlobeIcon, MaximizeIcon, MinimizeIcon, PencilIcon, RotateCcwIcon,
-} from '../../components/CopyButton.jsx';
+import { GlobeIcon, PencilIcon, RotateCcwIcon } from '../../components/CopyButton.jsx';
+import { DrawerWindowControls } from '../../components/DrawerWindowControls.jsx';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
+import { providerSupportsWebTools } from '../../models/provider.js';
 import { t } from '../../strings/index.js';
 
-// Providers where the web toggle does something: claude flips its native
-// WebSearch/WebFetch; local providers get in-process search_web/fetch_url.
-// Mirrors the backend gate (LOCAL_PROVIDERS in llm_bridge/_providers.py plus
-// the claude argv path in adapters/_cli_command.py) — keep the two in sync.
-const WEB_PROVIDERS = new Set(['claude', 'ollama', 'omlx', 'llamacpp']);
+// Session-state chips: read-only, no-repo-access, and pending-changes.
+function StatusBadges({ readOnly, repoInfo, workspace, sessionId, refreshWorkspace, addWindow }) {
+  return (
+    <>
+      {readOnly && (
+        <Badge variant="tag" tone="info" title={t('assistant.readOnlyTitle')}>
+          {t('assistant.readOnly')}
+        </Badge>
+      )}
+      {/* Repo attachment is the NORMAL case — only the exception is worth a
+          chip. When the session has no repo the assistant's code-reading
+          tools are dead, so surface that as a warning with the server's
+          reason; stay silent when everything is fine. */}
+      {repoInfo && !repoInfo.attached && (
+        <Badge variant="tag" tone="warning"
+          title={t('assistant.repoNotAttached', { reason: repoInfo.reason || t('assistant.unknownReason') })}>
+          {t('assistant.noRepoAccess')}
+        </Badge>
+      )}
+      {workspace?.filesChanged > 0 && (
+        <button type="button" className="badge badge--tag badge--danger drawer-changes-chip"
+          onClick={() => addWindow(workspaceDiffSpec({ sessionId, key: workspace.createdAt, onChanged: refreshWorkspace }))}
+          title={t('assistant.reviewPendingChanges')}>
+          {workspace.filesChanged === 1
+            ? t('assistant.filesChangedOne', { count: workspace.filesChanged })
+            : t('assistant.filesChangedMany', { count: workspace.filesChanged })}
+        </button>
+      )}
+    </>
+  );
+}
+
+// Model chip leads the right-side cluster, aligned with the action buttons;
+// status badges stay on the left with the identity.
+function ModelChipButton({ modelLabel, onOpenSettings, closeActiveTab }) {
+  if (!modelLabel) return null;
+  return (
+    <button type="button" className="assistant-model-chip"
+      title={t('assistant.modelChangeHint', { model: modelLabel })}
+      onClick={() => {
+        // Jump to Settings AND tuck the panel away: the drawer would
+        // otherwise cover the provider section the user is heading to.
+        onOpenSettings?.();
+        closeActiveTab();
+      }}>
+      <span className="assistant-model-dot" aria-hidden="true" />
+      <span className="assistant-model-name">{modelLabel}</span>
+    </button>
+  );
+}
+
+function DrawerControls({ session, toggles, actions }) {
+  const { modelLabel, provider, streaming, sessionReady, repoInfo } = session;
+  const { writeEnabled, toggleWriteEnabled, webEnabled, toggleWebEnabled, maximized, toggleMaximized } = toggles;
+  const { onOpenSettings, closeActiveTab, resetConversation } = actions;
+  return (
+    <div className="assistant-drawer-controls">
+      <ModelChipButton modelLabel={modelLabel} onOpenSettings={onOpenSettings} closeActiveTab={closeActiveTab} />
+      <button type="button" className="assistant-drawer-btn"
+        onClick={resetConversation}
+        aria-label={t('assistant.newConversation')}
+        title={t('assistant.newConversationHint')}
+        disabled={streaming || !sessionReady}>
+        <RotateCcwIcon />
+      </button>
+      {repoInfo?.writeAvailable && (
+        <button type="button" className="assistant-drawer-btn assistant-drawer-write"
+          onClick={toggleWriteEnabled}
+          aria-pressed={writeEnabled}
+          aria-label={t('assistant.allowRepoEdits')}
+          title={t('assistant.allowRepoEditsHint')}
+          disabled={streaming}>
+          <PencilIcon />
+        </button>
+      )}
+      {providerSupportsWebTools(provider) && (
+        <button type="button" className="assistant-drawer-btn assistant-drawer-web"
+          onClick={toggleWebEnabled}
+          aria-pressed={webEnabled}
+          aria-label={t('assistant.allowWebAccess')}
+          title={t('assistant.allowWebAccess')}
+          disabled={streaming}>
+          <GlobeIcon />
+        </button>
+      )}
+      <DrawerWindowControls maximized={maximized} onToggleMaximized={toggleMaximized} onHide={closeActiveTab} />
+    </div>
+  );
+}
 
 /**
  * The assistant panel's own header: panel switcher, animated compass
@@ -45,93 +128,24 @@ export default function AssistantHeader({ selectedProject, onOpenSettings }) {
           <QMarkIcon className={`assistant-compass${streaming ? ' assistant-compass--think' : ''}`} />
         </span>
       )}
+      {/* Always mounted, text toggled: a live region inserted with its text
+          already in it is not reliably announced. */}
+      <span className="sr-only" role="status">{streaming ? t('assistant.responding') : ''}</span>
       <div className="assistant-panel-identity">
         <div className="assistant-panel-title">{t('assistant.assistantLabel')}</div>
         <div className="assistant-panel-subtitle">
           {selectedProject ? t('assistant.projectSub', { name: selectedProject }) : t('assistant.noProjectSelected')}
         </div>
       </div>
-      {readOnly && (
-        <Badge variant="tag" tone="info" title={t('assistant.readOnlyTitle')}>
-          {t('assistant.readOnly')}
-        </Badge>
-      )}
-      {/* Repo attachment is the NORMAL case — only the exception is worth a
-          chip. When the session has no repo the assistant's code-reading
-          tools are dead, so surface that as a warning with the server's
-          reason; stay silent when everything is fine. */}
-      {repoInfo && !repoInfo.attached && (
-        <Badge variant="tag" tone="warning"
-          title={t('assistant.repoNotAttached', { reason: repoInfo.reason || t('assistant.unknownReason') })}>
-          {t('assistant.noRepoAccess')}
-        </Badge>
-      )}
-      {workspace?.filesChanged > 0 && (
-        <button type="button" className="badge badge--tag badge--danger drawer-changes-chip"
-          onClick={() => addWindow(workspaceDiffSpec({ sessionId, key: workspace.createdAt, onChanged: refreshWorkspace }))}
-          title={t('assistant.reviewPendingChanges')}>
-          {workspace.filesChanged === 1
-            ? t('assistant.filesChangedOne', { count: workspace.filesChanged })
-            : t('assistant.filesChangedMany', { count: workspace.filesChanged })}
-        </button>
-      )}
-      <div className="assistant-drawer-controls">
-        {/* Model chip leads the right-side cluster, aligned with the action
-            buttons; status badges stay on the left with the identity. */}
-        {modelLabel && (
-          <button type="button" className="assistant-model-chip"
-            title={t('assistant.modelChangeHint', { model: modelLabel })}
-            onClick={() => {
-              // Jump to Settings AND tuck the panel away: the drawer would
-              // otherwise cover the provider section the user is heading to.
-              onOpenSettings?.();
-              closeActiveTab();
-            }}>
-            <span className="assistant-model-dot" aria-hidden="true" />
-            <span className="assistant-model-name">{modelLabel}</span>
-          </button>
-        )}
-        <button type="button" className="assistant-drawer-btn"
-          onClick={resetConversation}
-          aria-label={t('assistant.newConversation')}
-          title={t('assistant.newConversationHint')}
-          disabled={streaming || !sessionReady}>
-          <RotateCcwIcon />
-        </button>
-        {repoInfo?.writeAvailable && (
-          <button type="button" className="assistant-drawer-btn assistant-drawer-write"
-            onClick={toggleWriteEnabled}
-            aria-pressed={writeEnabled}
-            aria-label={t('assistant.allowRepoEdits')}
-            title={t('assistant.allowRepoEditsHint')}
-            disabled={streaming}>
-            <PencilIcon />
-          </button>
-        )}
-        {WEB_PROVIDERS.has(provider) && (
-          <button type="button" className="assistant-drawer-btn assistant-drawer-web"
-            onClick={toggleWebEnabled}
-            aria-pressed={webEnabled}
-            aria-label={t('assistant.allowWebAccess')}
-            title={t('assistant.allowWebAccess')}
-            disabled={streaming}>
-            <GlobeIcon />
-          </button>
-        )}
-        <button type="button" className="assistant-drawer-btn" onClick={toggleMaximized}
-          aria-label={maximized ? t('common.restoreDrawer') : t('common.maximizeDrawer')}
-          aria-pressed={maximized}
-          title={maximized ? 'Restore' : 'Maximize'}>
-          {maximized ? <MinimizeIcon /> : <MaximizeIcon />}
-        </button>
-        {/* Chevron-down, NOT an ×: neither panel is killed by this. An
-            in-flight assistant turn keeps running server-side; reopening the
-            tab reattaches to it. */}
-        <button type="button" className="assistant-drawer-btn" onClick={closeActiveTab}
-          aria-label={t('common.hideTab')} title={t('common.hideKeepsRunning')}>
-          <ChevronDownIcon />
-        </button>
-      </div>
+      <StatusBadges
+        readOnly={readOnly} repoInfo={repoInfo} workspace={workspace}
+        sessionId={sessionId} refreshWorkspace={refreshWorkspace} addWindow={addWindow}
+      />
+      <DrawerControls
+        session={{ modelLabel, provider, streaming, sessionReady, repoInfo }}
+        toggles={{ writeEnabled, toggleWriteEnabled, webEnabled, toggleWebEnabled, maximized, toggleMaximized }}
+        actions={{ onOpenSettings, closeActiveTab, resetConversation }}
+      />
     </header>
   );
 }

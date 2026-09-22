@@ -1,3 +1,4 @@
+"""Per-dimension evaluation results and the cross-dimension roll-up."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

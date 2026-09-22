@@ -3,14 +3,21 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import Mock
 
-from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+import pytest
+
+from quodeq.core.events.models import (
+    JudgmentCreatedEvent,
+    JudgmentPayload,
+)
 from quodeq.data.events.writer import EventLogWriter
 from quodeq.data.projection.projector import Projector
 from quodeq.services.dismissed import (
     dismiss_finding,
     dismissed_keys,
     restore_finding,
+    restore_all_findings,
 )
 
 
@@ -43,7 +50,7 @@ def test_dismissed_keys_folds_legacy_dismissed_json(tmp_path: Path) -> None:
         {"req": "R2", "file": "b.py", "line": 20},
     ])
 
-    assert dismissed_keys(project_dir) == {("R1", "a.py", 10), ("R2", "b.py", 20)}
+    assert dismissed_keys(project_dir).line_keys() == {("R1", "a.py", 10), ("R2", "b.py", 20)}
 
 
 def test_dismiss_after_upgrade_preserves_legacy_dismissals(tmp_path: Path) -> None:
@@ -55,7 +62,7 @@ def test_dismiss_after_upgrade_preserves_legacy_dismissals(tmp_path: Path) -> No
 
     dismiss_finding(project_dir, {"req": "R2", "file": "b.py", "line": 20})
 
-    assert dismissed_keys(project_dir) == {("R1", "a.py", 10), ("R2", "b.py", 20)}
+    assert dismissed_keys(project_dir).line_keys() == {("R1", "a.py", 10), ("R2", "b.py", 20)}
 
 
 def test_restore_after_upgrade_nets_to_undismissed(tmp_path: Path) -> None:
@@ -70,7 +77,7 @@ def test_restore_after_upgrade_nets_to_undismissed(tmp_path: Path) -> None:
 
     restore_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
 
-    assert dismissed_keys(project_dir) == {("R2", "b.py", 20)}
+    assert dismissed_keys(project_dir).line_keys() == {("R2", "b.py", 20)}
 
 
 def test_dismiss_finding_appends_to_actions_log(tmp_path: Path) -> None:
@@ -110,10 +117,74 @@ def test_dismissed_keys_aggregates_across_runs(tmp_path: Path) -> None:
 
     keys = dismissed_keys(project_dir)
 
-    assert keys == {("R1", "a.py", 10), ("R2", "b.py", 20)}
+    assert keys.line_keys() == {("R1", "a.py", 10), ("R2", "b.py", 20)}
 
 
 def test_dismissed_keys_empty_when_no_runs(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    assert dismissed_keys(project_dir) == set()
+    assert not dismissed_keys(project_dir)
+
+
+def test_dismiss_finding_raises_clear_error_for_non_numeric_line(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="line must be an integer"):
+        dismiss_finding(tmp_path, {"req": "X", "file": "f.py", "line": "not-a-number"})
+
+
+def test_restore_finding_raises_clear_error_for_non_numeric_line(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="line must be an integer"):
+        restore_finding(tmp_path, {"req": "X", "file": "f.py", "line": "not-a-number"})
+
+
+def test_dismiss_finding_uses_injected_writer(tmp_path: Path) -> None:
+    """Verify that dismiss_finding uses the injected writer instead of creating its own."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    mock_writer = Mock()
+    finding = {"req": "R1", "file": "a.py", "line": 10}
+    dismiss_finding(project_dir, finding, writer=mock_writer)
+
+    # Verify the mock writer's emit method was called
+    assert mock_writer.emit.called
+    assert mock_writer.emit.call_count == 1
+    # Verify the event was called with the right type
+    event = mock_writer.emit.call_args[0][0]
+    assert "FindingDismissedEvent" in str(type(event))
+
+
+def test_restore_finding_uses_injected_writer(tmp_path: Path) -> None:
+    """Verify that restore_finding uses the injected writer instead of creating its own."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    mock_writer = Mock()
+    finding = {"req": "R1", "file": "a.py", "line": 10}
+    restore_finding(project_dir, finding, writer=mock_writer)
+
+    # The undismiss events for the finding go to the writer as one batch.
+    mock_writer.emit_many.assert_called_once()
+    (events,) = mock_writer.emit_many.call_args[0]
+    (event,) = list(events)
+    assert "FindingUndismissedEvent" in str(type(event))
+
+
+def test_restore_all_findings_uses_injected_writer(tmp_path: Path) -> None:
+    """Verify that restore_all_findings uses the injected writer instead of creating its own."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    # First, create some dismissed findings using the default writer
+    dismiss_finding(project_dir, {"req": "R1", "file": "a.py", "line": 10})
+    dismiss_finding(project_dir, {"req": "R2", "file": "b.py", "line": 20})
+
+    mock_writer = Mock()
+    count = restore_all_findings(project_dir, writer=mock_writer)
+
+    # One batch carries every undismiss; nothing goes through the default writer.
+    assert count == 2
+    mock_writer.emit_many.assert_called_once()
+    (events,) = mock_writer.emit_many.call_args[0]
+    assert len(list(events)) == 2
+    for event in events:
+        assert "FindingUndismissedEvent" in str(type(event))

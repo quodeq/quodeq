@@ -1,7 +1,11 @@
-import React from 'react';
 import { TerminalIcon } from '../../components/CopyButton.jsx';
 import { QMarkIcon } from '../../components/QMarkIcon.jsx';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
+import { t } from '../../strings/index.js';
+
+// The switcher sits inside a panel header, so its glyph is smaller than the
+// topbar launcher's default.
+const SWITCH_ICON_PX = 11;
 
 /**
  * Compact icon toggle between the drawer's open panels, rendered inside each
@@ -17,20 +21,23 @@ export default function PanelSwitcher() {
   const meta = {
     // The assistant's Q mark wobbles while a turn streams, so activity shows
     // even when the terminal panel is frontmost.
-    assistant: { label: 'Assistant', icon: <QMarkIcon size={11} className={streaming ? 'assistant-q--think' : undefined} /> },
-    terminal: { label: 'Terminal', icon: <TerminalIcon /> },
+    assistant: {
+      label: t('drawer.panelAssistant'),
+      icon: <QMarkIcon size={SWITCH_ICON_PX} className={streaming ? 'assistant-q--think' : undefined} />,
+    },
+    terminal: { label: t('drawer.panelTerminal'), icon: <TerminalIcon /> },
   };
   return (
     <div className="drawer-switch" role="tablist">
-      {openPanels.map((t) => {
-        const m = meta[t];
-        if (!m) return null;
+      {openPanels.map((panelId) => {
+        const panelMeta = meta[panelId];
+        if (!panelMeta) return null;
         return (
-          <button key={t} type="button" role="tab" aria-selected={t === active}
-            aria-label={m.label} title={m.label}
-            className={`drawer-switch-btn${t === active ? ' drawer-switch-btn--active' : ''}`}
-            onClick={() => selectTab(t)}>
-            {m.icon}
+          <button key={panelId} type="button" role="tab" aria-selected={panelId === active}
+            aria-label={panelMeta.label} title={panelMeta.label}
+            className={`drawer-switch-btn${panelId === active ? ' drawer-switch-btn--active' : ''}`}
+            onClick={() => selectTab(panelId)}>
+            {panelMeta.icon}
           </button>
         );
       })}

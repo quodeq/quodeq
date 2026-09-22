@@ -1,10 +1,25 @@
-import React, { useCallback, useEffect, useRef, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
 import AssistantHeader from '../assistant/AssistantHeader.jsx';
 import { t } from '../../strings/index.js';
 
 const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
+
+// One keyboard step for the resize handle, matching the mouse-drag path's
+// granularity closely enough to feel like the same control.
+const RESIZE_STEP_PX = 16;
+// Arrow keys that resize the handle, and which way each one moves the top edge.
+const RESIZE_KEY_DIRECTION = { ArrowUp: 1, ArrowDown: -1 };
+
+// Where a manual resize starts from. A maximized drawer ignores the stored
+// height, so mutating it would move the drawer to a size nobody can see:
+// give way to the manual size and measure what is actually rendered.
+function resizeStartHeight(handleEl, { height, maximized, setMaximized }) {
+  if (!maximized) return height;
+  setMaximized(false);
+  return handleEl.parentElement?.getBoundingClientRect().height ?? height;
+}
 
 /**
  * Shared bottom drawer host: a resizable full-width shell that hosts the
@@ -14,9 +29,7 @@ const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
  * unmounted) so the terminal's xterm buffers and PTY-attached sockets
  * survive a tab switch.
  */
-export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
-  const { isOpen, height, setHeight, openPanels, activeTab,
-          maximized, setMaximized } = useAssistantDrawer();
+function useDrawerDrag({ height, setHeight, maximized, setMaximized }) {
   const dragRef = useRef(null);
 
   const handleDragMove = useCallback((event) => {
@@ -29,24 +42,35 @@ export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
     window.removeEventListener('pointerup', handleDragEnd);
   }, [handleDragMove]);
   const handleDragStart = useCallback((event) => {
-    // Manual resize takes over from "maximized" — capture the real rendered
-    // height so the drag starts from where the maximized drawer actually is.
-    if (maximized) {
-      setMaximized(false);
-      const h = event.currentTarget.parentElement?.getBoundingClientRect().height ?? height;
-      dragRef.current = { startY: event.clientY, startHeight: h };
-    } else {
-      dragRef.current = { startY: event.clientY, startHeight: height };
-    }
+    const startHeight = resizeStartHeight(event.currentTarget, { height, maximized, setMaximized });
+    dragRef.current = { startY: event.clientY, startHeight };
     window.addEventListener('pointermove', handleDragMove);
     window.addEventListener('pointerup', handleDragEnd);
   }, [height, maximized, setMaximized, handleDragMove, handleDragEnd]);
+  // The keyboard path is the same resize, one step at a time.
+  const handleResizeKey = useCallback((event) => {
+    // hasOwn, not a bare lookup: 'constructor' and friends would otherwise
+    // resolve through Object.prototype and resize the drawer to NaN.
+    if (!Object.hasOwn(RESIZE_KEY_DIRECTION, event.key)) return;
+    const direction = RESIZE_KEY_DIRECTION[event.key];
+    event.preventDefault();
+    const from = resizeStartHeight(event.currentTarget, { height, maximized, setMaximized });
+    setHeight(from + direction * RESIZE_STEP_PX);
+  }, [height, maximized, setMaximized, setHeight]);
   // Unmounting mid-drag would leave the window listeners registered and the
   // stale handlers calling setHeight until the next pointerup; drop them.
   useEffect(() => () => {
     window.removeEventListener('pointermove', handleDragMove);
     window.removeEventListener('pointerup', handleDragEnd);
   }, [handleDragMove, handleDragEnd]);
+
+  return { handleDragStart, handleResizeKey };
+}
+
+export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
+  const { isOpen, height, setHeight, openPanels, activeTab,
+          maximized, setMaximized } = useAssistantDrawer();
+  const { handleDragStart, handleResizeKey } = useDrawerDrag({ height, setHeight, maximized, setMaximized });
 
   if (!isOpen) return null;
   // Guard against a transient render where activeTab isn't (yet) an open panel.
@@ -56,7 +80,9 @@ export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
     <aside className={`bottom-drawer assistant-drawer${maximized ? ' bottom-drawer--maximized' : ''}`}
       style={maximized ? undefined : { height }}>
       <div className="assistant-drawer-drag" onPointerDown={handleDragStart}
-        role="separator" aria-orientation="horizontal" aria-label={t('common.resizeDrawer')} />
+        role="separator" tabIndex={0} aria-orientation="horizontal"
+        aria-label={t('common.resizeDrawer')} aria-valuenow={height}
+        onKeyDown={handleResizeKey} />
       {openPanels.includes('assistant') && (
         <div className="drawer-panel" style={{ display: active === 'assistant' ? 'flex' : 'none' }}>
           <AssistantHeader selectedProject={projectName ?? uiState?.selectedProject} onOpenSettings={onOpenSettings} />

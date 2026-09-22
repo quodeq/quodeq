@@ -8,9 +8,17 @@ import sys
 from pathlib import Path
 
 import pytest
+from unittest.mock import patch
 
 from quodeq.api._rate_limit_file_store import FileRateLimitStore
+from quodeq.api._rate_limit_store import InMemoryRateLimitStore
 from quodeq.api._rate_limit_factory import _validated_rate_limit_path, _DEFAULT_RATE_LIMIT_FILE
+from quodeq.api._rate_limit_config import (
+    _DEFAULT_RATE_LIMIT_MAX,
+    _DEFAULT_RATE_LIMIT_WINDOW,
+    _rate_limit_max,
+    _rate_limit_window,
+)
 
 _skip_no_symlink = pytest.mark.skipif(
     sys.platform == "win32", reason="symlink/POSIX-mode semantics differ on Windows"
@@ -76,13 +84,6 @@ def test_validated_path_rejects_dotdot_in_raw_path(tmp_path: Path):
 # (window <= 0) or blocking every client (max <= 0).
 # ---------------------------------------------------------------------------
 
-from quodeq.api._rate_limit_config import (
-    _DEFAULT_RATE_LIMIT_MAX,
-    _DEFAULT_RATE_LIMIT_WINDOW,
-    _rate_limit_max,
-    _rate_limit_window,
-)
-
 
 @pytest.mark.parametrize("raw", ["0", "-5", "abc", ""])
 def test_rate_limit_window_falls_back_on_invalid_env(raw):
@@ -121,3 +122,102 @@ def test_load_treats_scalar_json_as_empty(tmp_path: Path):
     target.write_text('"corrupt"', encoding="utf-8")
     store = FileRateLimitStore(path=target)
     assert store.check("1.2.3.4", 1000.0) is False
+
+
+def test_file_store_check_and_record_does_one_load_one_save(tmp_path: Path):
+
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=5)
+
+    with patch.object(store, "_load", wraps=store._load) as load_spy, \
+         patch.object(store, "_save", wraps=store._save) as save_spy:
+        limited = store.check_and_record("1.2.3.4", 1000.0)
+
+    assert limited is False
+    assert load_spy.call_count == 1
+    assert save_spy.call_count == 1
+
+
+def test_file_store_check_and_record_does_not_record_when_limited(tmp_path: Path):
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=1)
+    assert store.check_and_record("1.2.3.4", 1000.0) is False  # 1st request: allowed
+    assert store.check_and_record("1.2.3.4", 1001.0) is True   # 2nd: limited, not recorded
+    assert store.check_and_record("1.2.3.4", 1002.0) is True   # still limited (2nd wasn't recorded twice)
+
+
+def test_record_and_check_cache_within_ttl_window(tmp_path: Path):
+    """record()/check() are not on the enforcement path and keep the old
+    TTL-cached behavior; check_and_record() no longer does (see the test
+    below) since it must reload fresh from disk under the OS lock."""
+
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=100)
+
+    with patch.object(store, "_load", wraps=store._load) as load_spy, \
+         patch.object(store, "_save", wraps=store._save) as save_spy:
+        for i in range(5):
+            store.record("1.2.3.4", 1000.0 + i * 0.1)  # all within 0.4s
+        assert store.check("1.2.3.4", 1000.4) is False
+
+    assert load_spy.call_count == 1, f"expected 1 load for 5 calls inside the TTL window, got {load_spy.call_count}"
+    assert save_spy.call_count == 1, f"expected 1 save for 5 calls inside the TTL window, got {save_spy.call_count}"
+
+
+def test_check_and_record_bypasses_cache_and_reloads_every_call(tmp_path: Path):
+    """check_and_record() is the enforcement path: it must reload fresh from
+    disk every call rather than trust the TTL cache, even inside one TTL
+    window, since two processes could otherwise each act on their own stale
+    in-memory snapshot within the same lock-free window."""
+
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=100)
+
+    with patch.object(store, "_load", wraps=store._load) as load_spy:
+        for i in range(5):
+            limited = store.check_and_record("1.2.3.4", 1000.0 + i * 0.1)  # all within 0.4s
+            assert limited is False
+
+    assert load_spy.call_count == 5
+
+
+def test_file_store_still_enforces_limit_within_a_single_ttl_window(tmp_path: Path):
+    """Cache must not let a burst inside one TTL window slip past the limit --
+    correctness is enforced from the in-memory write, not just the flush."""
+    store = FileRateLimitStore(path=tmp_path / "rl.json", window=60.0, max_requests=2)
+    assert store.check_and_record("1.2.3.4", 1000.0) is False   # 1st: allowed
+    assert store.check_and_record("1.2.3.4", 1000.1) is False   # 2nd: allowed
+    assert store.check_and_record("1.2.3.4", 1000.2) is True    # 3rd, same TTL window: limited
+
+
+def test_file_store_flushes_immediately_once_limited(tmp_path: Path):
+    """Once a client is actually rate-limited, that state must be durable right
+    away -- only the "still allowed" path is allowed to batch writes."""
+
+    path = tmp_path / "rl.json"
+    store_a = FileRateLimitStore(path=path, window=60.0, max_requests=1)
+    assert store_a.check_and_record("1.2.3.4", 1000.0) is False  # 1st: allowed, recorded
+
+    # A second, independent store instance (simulating another worker process)
+    # must see the durable state immediately after the limiting request, not
+    # after waiting out the cache TTL.
+    store_b = FileRateLimitStore(path=path, window=60.0, max_requests=1)
+    assert store_b.check("1.2.3.4", 1000.05) is True
+
+
+# ---------------------------------------------------------------------------
+# InMemoryRateLimitStore.check_and_record() regression tests
+# ---------------------------------------------------------------------------
+
+def test_in_memory_store_check_and_record_empty_ip_guard():
+    """Empty IP must not be recorded in the store."""
+    store = InMemoryRateLimitStore(window=60.0, max_requests=5)
+    # check_and_record with empty IP should return False but not record
+    result = store.check_and_record("", 1000.0)
+    assert result is False
+    # Store should remain empty; no entry for empty string should exist
+    assert "" not in store._store
+    assert len(store._store) == 0
+
+
+def test_in_memory_store_check_and_record_does_not_record_when_limited():
+    store = InMemoryRateLimitStore(window=60.0, max_requests=1)
+    assert store.check_and_record("1.2.3.4", 1000.0) is False  # 1st request: allowed
+    assert store.check_and_record("1.2.3.4", 1001.0) is True   # 2nd: limited, not recorded
+    assert store.check_and_record("1.2.3.4", 1002.0) is True   # still limited (2nd wasn't recorded twice)

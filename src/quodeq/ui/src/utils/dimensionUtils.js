@@ -23,24 +23,27 @@ export function fallbackDelta(dim) {
   return !Number.isNaN(curr) && !Number.isNaN(prev) ? curr - prev : null;
 }
 
+function severityCounts(violations) {
+  const counts = { critical: 0, major: 0, minor: 0 };
+  (violations || []).forEach((v) => {
+    const s = (v.severity || 'minor').toLowerCase();
+    if (counts[s] !== undefined) counts[s]++;
+  });
+  return counts;
+}
+
 /**
  * Sort dimensions by violation severity (critical > major > minor),
  * keeping only dimensions that have at least one violation.
  */
 export function sortDimensionsByViolationSeverity(dimensions) {
-  return [...dimensions]
+  return dimensions
     .filter((d) => (d.violations || []).length > 0)
-    .map((d) => {
-      const counts = { critical: 0, major: 0, minor: 0 };
-      (d.violations || []).forEach((v) => {
-        const s = (v.severity || 'minor').toLowerCase();
-        if (counts[s] !== undefined) counts[s]++;
-      });
-      return { ...d, _c: counts };
-    })
+    .map((dim) => ({ dim, counts: severityCounts(dim.violations) }))
     .sort((a, b) => {
-      if (b._c.critical !== a._c.critical) return b._c.critical - a._c.critical;
-      if (b._c.major !== a._c.major) return b._c.major - a._c.major;
-      return b._c.minor - a._c.minor;
-    });
+      if (b.counts.critical !== a.counts.critical) return b.counts.critical - a.counts.critical;
+      if (b.counts.major !== a.counts.major) return b.counts.major - a.counts.major;
+      return b.counts.minor - a.counts.minor;
+    })
+    .map(({ dim }) => ({ ...dim }));
 }

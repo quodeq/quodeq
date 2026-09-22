@@ -34,6 +34,50 @@ class TestReadRepositoryInfo:
         assert read_repository_info(tmp_path) == {"path": "/x"}
 
 
+class TestRepositoryInfoExists:
+    def test_absent_returns_false(self, tmp_path):
+        from quodeq.data.fs.project_files import repository_info_exists
+
+        assert repository_info_exists(tmp_path) is False
+
+    def test_present_even_corrupt_returns_true(self, tmp_path):
+        from quodeq.data.fs.project_files import repository_info_exists
+
+        (tmp_path / "repository_info.json").write_text("{nope")
+        assert repository_info_exists(tmp_path) is True
+
+
+class TestReadScanTotalFiles:
+    def test_reads_total_files(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_total_files
+
+        (tmp_path / "scan.json").write_text(json.dumps({"total_files": 1855}))
+        assert read_scan_total_files(tmp_path) == 1855
+
+    def test_zero_when_missing(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_total_files
+
+        assert read_scan_total_files(tmp_path) == 0
+
+    def test_zero_when_corrupt(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_total_files
+
+        (tmp_path / "scan.json").write_text("{nope")
+        assert read_scan_total_files(tmp_path) == 0
+
+    def test_zero_when_not_int(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_total_files
+
+        (tmp_path / "scan.json").write_text(json.dumps({"total_files": "many"}))
+        assert read_scan_total_files(tmp_path) == 0
+
+    def test_zero_when_non_dict_json(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_total_files
+
+        (tmp_path / "scan.json").write_text("[1, 2]")
+        assert read_scan_total_files(tmp_path) == 0
+
+
 class TestWriteRepositoryInfo:
     def test_round_trip(self, tmp_path):
         from quodeq.data.fs.project_files import (
@@ -65,6 +109,49 @@ class TestWriteScanJson:
         assert data["file_tree"] == ["a.py"]
 
 
+class TestReadScanJson:
+    def test_missing_returns_none(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_json
+
+        assert read_scan_json(tmp_path) is None
+
+    def test_corrupt_returns_none(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_json
+
+        (tmp_path / "scan.json").write_text("{nope")
+        assert read_scan_json(tmp_path) is None
+
+    def test_non_dict_json_returns_none(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_json
+
+        (tmp_path / "scan.json").write_text("[1, 2]")
+        assert read_scan_json(tmp_path) is None
+
+    def test_valid_returns_dict(self, tmp_path):
+        from quodeq.data.fs.project_files import read_scan_json
+
+        (tmp_path / "scan.json").write_text(json.dumps({"total_files": 3, "scanned_at": "x"}))
+        assert read_scan_json(tmp_path) == {"total_files": 3, "scanned_at": "x"}
+
+
+class TestRemoveProjectDir:
+    def test_removes_directory_tree(self, tmp_path):
+        from quodeq.data.fs.project_files import remove_project_dir
+
+        project = tmp_path / "proj"
+        (project / "sub").mkdir(parents=True)
+        (project / "sub" / "f.txt").write_text("x")
+
+        assert remove_project_dir(project) is True
+        assert not project.exists()
+
+    def test_oserror_returns_false(self, tmp_path):
+        from quodeq.data.fs.project_files import remove_project_dir
+
+        with patch("shutil.rmtree", side_effect=OSError("boom")):
+            assert remove_project_dir(tmp_path / "missing") is False
+
+
 class TestServiceDelegation:
     def test_mark_onboarding_complete_writes_through_adapter(self, tmp_path):
         from quodeq.services.project_registration import mark_onboarding_complete
@@ -80,11 +167,11 @@ class TestServiceDelegation:
         assert spy.call_args.args[1].get("onboardingCompletedAt")
 
     def test_backfill_heal_writes_through_adapter(self, tmp_path):
-        from quodeq.services._fs_project_helpers import _backfill_onboarding_field
+        from quodeq.services.fs_project_helpers import _backfill_onboarding_field
 
         (tmp_path / "repository_info.json").write_text('{"createdAt": "2026-01-01"}')
         with patch(
-            "quodeq.services._fs_project_helpers.write_repository_info",
+            "quodeq.services.fs_project_helpers.write_repository_info",
             return_value=True,
         ) as spy:
             data = _backfill_onboarding_field(tmp_path)
@@ -93,10 +180,10 @@ class TestServiceDelegation:
         assert data["onboardingCompletedAt"] == "2026-01-01"
 
     def test_scan_write_delegates_to_adapter(self, tmp_path):
-        from quodeq.services import _fs_scan
+        from quodeq.services import fs_scan
 
         scan = ScanData(scanned_at="2026-08-01T00:00:00Z")
-        with patch("quodeq.services._fs_scan.write_scan_json") as spy:
-            _fs_scan._write_scan_json(scan, tmp_path)
+        with patch("quodeq.services.fs_scan.write_scan_json") as spy:
+            fs_scan._write_scan_json(scan, tmp_path)
 
         spy.assert_called_once_with(scan, tmp_path)

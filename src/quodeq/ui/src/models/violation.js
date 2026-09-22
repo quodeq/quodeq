@@ -31,37 +31,46 @@
  * @property {boolean}       carriedForward  true when replayed from the incremental cache rather than produced by the running scan
  */
 
+import { fromFieldSpec } from './fieldSpec.js';
+
+/**
+ * Field table for {@link createViolation}: output key -> [raw spelling(s), default].
+ *
+ * Several fields arrive under two spellings. REST responses go through
+ * `to_camel_dict`; raw JSON files and the SSE serializer emit the payload's
+ * own snake_case, so both are tried. `practice_id` is the SSE spelling of
+ * `principle`: missing it left every streamed finding with no principle.
+ */
+const VIOLATION_FIELDS = {
+  file:                ['file', null],
+  line:                ['line', null],
+  endLine:             [['endLine', 'end_line'], null],
+  severity:            ['severity', 'minor'],
+  principle:           [['practiceId', 'practice_id', 'principle'], null],
+  title:               ['title', null],
+  reason:              [['reason', 'findings'], null],
+  snippet:             [['snippet', 'code'], null],
+  context:             ['context', null],
+  scope:               ['scope', null],
+  cwe:                 ['cwe', null],
+  req:                 ['req', null],
+  reqRefs:             [['reqRefs', 'req_refs'], () => []],
+  dimension:           ['dimension', null],
+  violationType:       [['violationType', 'violation_type'], null],
+  provenanceDowngrade: [['provenanceDowngrade', 'provenance_downgrade'], false],
+  scopeDowngrade:      [['scopeDowngrade', 'scope_downgrade'], null],
+  carriedForward:      [['carriedForward', 'carried_forward'], false],
+};
+
 /**
  * Create a canonical Violation from a raw API object.
- *
- * Handles both camelCase (from to_camel_dict) and snake_case (from raw
- * JSON files) field names.
  *
  * @param {Object} raw
  * @returns {Violation}
  */
 export function createViolation(raw) {
   if (!raw || typeof raw !== 'object') return raw;
-  return {
-    file:          raw.file ?? null,
-    line:          raw.line ?? null,
-    endLine:       raw.endLine ?? raw.end_line ?? null,
-    severity:      raw.severity ?? 'minor',
-    principle:     raw.practiceId ?? raw.principle ?? null,
-    title:         raw.title ?? null,
-    reason:        raw.reason ?? raw.findings ?? null,
-    snippet:       raw.snippet ?? raw.code ?? null,
-    context:       raw.context ?? null,
-    scope:         raw.scope ?? null,
-    cwe:           raw.cwe ?? null,
-    req:           raw.req ?? null,
-    reqRefs:       raw.reqRefs ?? raw.req_refs ?? [],
-    dimension:     raw.dimension ?? null,
-    violationType: raw.violationType ?? raw.violation_type ?? null,
-    provenanceDowngrade: raw.provenanceDowngrade ?? raw.provenance_downgrade ?? false,
-    scopeDowngrade: raw.scopeDowngrade ?? raw.scope_downgrade ?? null,
-    carriedForward: raw.carriedForward ?? raw.carried_forward ?? false,
-  };
+  return fromFieldSpec(raw, VIOLATION_FIELDS);
 }
 
 /**

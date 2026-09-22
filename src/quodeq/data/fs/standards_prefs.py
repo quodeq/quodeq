@@ -52,6 +52,20 @@ def load_visible_standard_ids(project_root: str | Path | None) -> tuple[str, ...
     return normalize_ids(ids)
 
 
+def visibility_is_default(project_root: str | Path | None) -> bool:
+    """True when *project_root* has no saved visibility selection on disk.
+
+    A live ``is_file()`` stat, never cached -- callers (the standards-
+    visibility PUT route) need this to reflect a save that just happened in
+    the same request. No project root at all is trivially "default" (there
+    is nowhere a selection file could live), mirroring
+    ``load_visible_standard_ids``'s None handling.
+    """
+    if not project_root:
+        return True
+    return not (Path(project_root) / VISIBILITY_RELPATH).is_file()
+
+
 def save_visible_standard_ids(project_root: str | Path, ids: list[str]) -> None:
     """Write the selection, creating ``.quodeq/`` when needed."""
     path = Path(project_root) / VISIBILITY_RELPATH

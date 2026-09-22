@@ -12,25 +12,31 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from dataclasses import replace
+
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
-from quodeq.services.dashboard import _make_run_dimension_fetcher
+from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.wiring import load_suppression_rules
 from quodeq.services.rescore import rescore_dimensions
-from quodeq.services.scoring._deps import ScoringDeps, _NO_DEPS
+from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.scoring._summary import recompute_summary
+from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
-from quodeq.data.fs.suppression_rules import load_suppression_rules
 
 _logger = logging.getLogger(__name__)
 
 
 def _rescore_runs_by_dimension(
     dims: list[dict], reports_root: Path, project: str,
-    dismissed: set[tuple], deleted: set[tuple] | None = None,
-    params: ScoringParams = DEFAULT_PARAMS,
+    keys: SuppressionKeys, params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, dict]:
-    """Rescore each unique run and return a map of dim_key -> rescored dict."""
+    """Rescore each unique run and return a map of dim_key -> rescored dict.
+
+    *keys* carries the project's dismissals and deletions; the pattern rules
+    are read from the project here, once per run.
+    """
     validate_path_segment(project)
     dim_to_run: dict[str, str] = {}
     for d in dims:
@@ -39,7 +45,7 @@ def _rescore_runs_by_dimension(
         if key and rid:
             dim_to_run[key] = rid
 
-    fetcher = _make_run_dimension_fetcher(reports_root, project)
+    fetcher = make_run_dimension_fetcher(reports_root, project)
     rescored_by_dim: dict[str, dict] = {}
     seen_runs: dict[str, dict[str, dict]] = {}
     for dim_key, run_id in dim_to_run.items():
@@ -49,9 +55,9 @@ def _rescore_runs_by_dimension(
             # Grouped per run, so this run's own directory is the evidence
             # basis for every dimension sourced from it.
             result = rescore_dimensions(
-                run_dims, dismissed, deleted, params=params,
-                run_dir=reports_root / project / run_id,
-                rules=load_suppression_rules(reports_root / project))
+                run_dims,
+                replace(keys, rules=load_suppression_rules(reports_root / project)),
+                params=params, run_dir=reports_root / project / run_id)
             seen_runs[run_id] = {
                 (rd.get("dimension") or "").lower(): rd
                 for rd in result.get("dimensions", [])
@@ -110,7 +116,7 @@ def _rescore_accumulated_with_coverage(
     keep their raw baked scores and the payload MUST NOT be persisted: its
     version hash cannot tell it apart from a fully rescored one.
     """
-    d = deps or _NO_DEPS
+    d = deps or NO_DEPS
     project_dir = reports_root / project
     dismissed = (d.dismissed_keys or dismissed_keys)(project_dir)
     deleted = (d.deleted_keys or deleted_keys)(project_dir)
@@ -122,7 +128,7 @@ def _rescore_accumulated_with_coverage(
         return accumulated, True
 
     rescored_by_dim = (d.rescore_runs_by_dimension or _rescore_runs_by_dimension)(
-        dims, reports_root, project, dismissed, deleted, params=params,
+        dims, reports_root, project, SuppressionKeys(dismissed, deleted), params=params,
     )
     missing = _dims_expecting_rescore(dims) - set(rescored_by_dim)
     if missing:

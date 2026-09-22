@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -12,25 +11,9 @@ import {
 } from 'recharts';
 import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/formatters.js';
 import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
+import { cssVar } from '../../../components/scoreChartHelpers.js';
+import { fallbackDelta } from '../../../utils/dimensionUtils.js';
 import { t } from '../../../strings/index.js';
-
-// Module-level CSS variable cache. Use clearCssVarCache() for test resets.
-const _cssVarCache = new Map();
-const cssVar = (name, fallback) => {
-  if (_cssVarCache.has(name)) return _cssVarCache.get(name) || fallback;
-  if (typeof document === 'undefined') return fallback;
-  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  _cssVarCache.set(name, val);
-  return val || fallback;
-};
-if (typeof document !== 'undefined') {
-  new MutationObserver(() => _cssVarCache.clear()).observe(
-    document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] },
-  );
-}
-
-/** Clear the CSS variable cache; exported for test resets. */
-export function clearCssVarCache() { _cssVarCache.clear(); }
 
 // Domain constants that match backend scoring tiers (see grading.py).
 const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
@@ -38,12 +21,21 @@ const CHART_LEFT_MARGIN = -16;
 const CHART_HEIGHT = 160;
 const CHART_MAX_BAR_SIZE = 40;
 const CHART_CELL_OPACITY = 0.85;
-const CHART_Y_TICKS = [0, 2.5, 5, 7.5, 10];
-const CHART_BAR_RADIUS = [3, 3, 0, 0];
+const CHART_Y_TICK_QUARTER = 2.5;
+const CHART_Y_TICK_HALF = 5;
+const CHART_Y_TICK_THREE_QUARTER = 7.5;
+const CHART_Y_TICKS = [0, CHART_Y_TICK_QUARTER, CHART_Y_TICK_HALF, CHART_Y_TICK_THREE_QUARTER, 10];
+const CHART_BAR_CORNER_RADIUS = 3;
+const CHART_BAR_RADIUS = [CHART_BAR_CORNER_RADIUS, CHART_BAR_CORNER_RADIUS, 0, 0];
 const TREND_UP_ANGLE = 70;
 const TREND_SOFT_UP = 88;
 const TREND_DOWN = 110;
 const TREND_SOFT_DOWN = 92;
+// Fallback shortcode length for a dimension name not in DIM_CODE.
+const FALLBACK_DIM_CODE_LENGTH = 4;
+// Trend label placement: the delta text sits above the arrow glyph.
+const DELTA_LABEL_Y_OFFSET = 25;
+const ARROW_LABEL_Y_OFFSET = 14;
 
 function scoreBarColor(score) {
   const n = parseFloat(score);
@@ -86,7 +78,7 @@ const DIM_CODE = {
 
 function dimCode(name) {
   if (!name) return '';
-  return (DIM_CODE[name.toLowerCase()] ?? name.slice(0, 4)).toUpperCase();
+  return (DIM_CODE[name.toLowerCase()] ?? name.slice(0, FALLBACK_DIM_CODE_LENGTH)).toUpperCase();
 }
 
 function trendColorVar(colorClass) {
@@ -118,8 +110,7 @@ function prepareDimensionData(dimensions) {
     .sort((a, b) => a.dimension.localeCompare(b.dimension))
     .map((d) => {
       const curr = parseFloat(d.overallScore);
-      const prev = parseFloat(d.previousScore);
-      const delta = !isNaN(curr) && !isNaN(prev) ? curr - prev : null;
+      const delta = fallbackDelta(d);
       return { ...d, numericScore: isNaN(curr) ? 0 : curr, delta };
     });
 }
@@ -134,13 +125,13 @@ function renderTrendLabel(data, { x, y, width, index }) {
   const deltaStr = entry.delta > 0 ? `+${entry.delta.toFixed(1)}` : entry.delta.toFixed(1);
   return (
     <g>
-      <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={fill}>
+      <text x={cx} y={y - DELTA_LABEL_Y_OFFSET} textAnchor="middle" fontSize={9} fill={fill}>
         {deltaStr}
       </text>
       <text
-        x={cx} y={y - 14}
+        x={cx} y={y - ARROW_LABEL_Y_OFFSET}
         textAnchor="middle" fontSize={11} fill={fill}
-        transform={`rotate(${Math.round(angle)}, ${cx}, ${y - 14})`}
+        transform={`rotate(${Math.round(angle)}, ${cx}, ${y - ARROW_LABEL_Y_OFFSET})`}
       >
         ↑
       </text>

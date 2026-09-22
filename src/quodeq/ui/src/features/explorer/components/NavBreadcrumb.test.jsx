@@ -26,6 +26,13 @@ describe('labelFor — map drill-down entries', () => {
   });
 });
 
+describe('labelFor — prototype-named pages', () => {
+  it('falls back to the entry label instead of an Object.prototype member', () => {
+    expect(labelFor({ page: 'constructor' })).toBe('constructor');
+    expect(labelFor({ page: 'toString', label: 'a crumb' })).toBe('a crumb');
+  });
+});
+
 describe('NavBreadcrumb project crumb', () => {
   const stack = [{ page: 'violations' }];
 

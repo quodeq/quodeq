@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from quodeq.core.scoring._constants import _SEVERITY_WEIGHT
+from quodeq.core.scoring.constants import _SEVERITY_WEIGHT
 
 
 def evidence_has_taxonomy(violations: list[dict]) -> bool:

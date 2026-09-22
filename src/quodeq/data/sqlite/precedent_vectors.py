@@ -148,6 +148,10 @@ def _unpack(blob: bytes) -> list[float]:
 
 
 def stored_fingerprints(conn: sqlite3.Connection) -> set[str]:
+    """Return the fingerprints already embedded, so callers skip re-embedding them.
+
+    One full scan of ``vectors``, fingerprints only — the blobs stay on disk.
+    """
     return {row[0] for row in conn.execute("SELECT fingerprint FROM vectors")}
 
 
@@ -178,8 +182,8 @@ def insert_vectors(
         _logger.warning("Precedent vector insert failed: %s", exc)
         try:
             conn.rollback()
-        except sqlite3.DatabaseError:
-            pass
+        except sqlite3.DatabaseError as inner_exc:
+            _logger.debug("rollback after a failed precedent vector insert also failed: %s", inner_exc)
         return False
 
 
@@ -218,8 +222,13 @@ def try_claim_backfill(conn: sqlite3.Connection) -> bool:
 
 
 def release_backfill_claim(conn: sqlite3.Connection) -> None:
+    """Drop the backfill claim so the next process can take it.
+
+    Swallows database errors: a claim left behind is stolen once it goes
+    stale, so failing to release is never fatal.
+    """
     try:
         conn.execute("DELETE FROM meta WHERE key = 'backfill_claim'")
         conn.commit()
-    except sqlite3.DatabaseError:
-        pass
+    except sqlite3.DatabaseError as exc:
+        _logger.debug("backfill claim release failed: %s", exc)

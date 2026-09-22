@@ -75,7 +75,7 @@ class TestProvenanceDowngradeRoundTrip:
 
     def test_judgment_to_dict_emits_marker_only_when_true(self):
         from quodeq.core.events.models import Judgment
-        from quodeq.core.evidence._jsonl import judgment_to_dict
+        from quodeq.core.evidence.jsonl import judgment_to_dict
 
         downgraded = Judgment(
             practice_id="R-FT-2", verdict="violation", dimension="security",
@@ -140,7 +140,7 @@ class TestScopeDowngradeRoundTrip:
 
     def test_judgment_to_dict_emits_marker_only_when_set(self):
         from quodeq.core.events.models import Judgment
-        from quodeq.core.evidence._jsonl import judgment_to_dict
+        from quodeq.core.evidence.jsonl import judgment_to_dict
 
         downgraded = Judgment(
             practice_id="S-AUT-3", verdict="violation", dimension="security",

@@ -24,16 +24,46 @@ _logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
 
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def read_dimensions(run_dir: Path) -> dict[str, Any]:
+    """Read a run's dimensions.json.
+
+    A missing or unparseable file reads as an empty set of dimensions at the
+    current schema, so callers never have to tell "not started yet" apart
+    from "corrupt".
+    """
     path = run_dir / FILENAME
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, FileNotFoundError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return {"schema_version": SCHEMA_VERSION, "dimensions": {}}
+
+
+def _apply_state_transition(
+    entry: dict[str, Any], state: DimState,
+    *, reason: str | None = None, exit_reason: str | None = None,
+) -> dict[str, Any]:
+    """Return *entry* updated for the RUNNING/DONE/INCOMPLETE transition.
+
+    Mutates and returns *entry* in place. See write_dim_state for why each
+    transition merges into the existing record instead of replacing it.
+    """
+    entry["state"] = state.value
+    if state == DimState.RUNNING:
+        entry["started_at"] = _now_iso()
+    elif state == DimState.DONE:
+        entry["completed_at"] = _now_iso()
+        if exit_reason is not None:
+            entry["exit_reason"] = exit_reason
+    elif state == DimState.INCOMPLETE:
+        entry["interrupted_at"] = _now_iso()
+        if reason:
+            entry["reason"] = reason
+    return entry
 
 
 def write_dim_state(
@@ -70,18 +100,9 @@ def write_dim_state(
                 prev = DimState.PENDING
             validate_dim_transition(dimension, prev, state)
         entry: dict[str, Any] = dict(existing) if isinstance(existing, dict) else {}
-        entry["state"] = state.value
-        if state == DimState.RUNNING:
-            entry["started_at"] = _now_iso()
-        elif state == DimState.DONE:
-            entry["completed_at"] = _now_iso()
-            if exit_reason is not None:
-                entry["exit_reason"] = exit_reason
-        elif state == DimState.INCOMPLETE:
-            entry["interrupted_at"] = _now_iso()
-            if reason:
-                entry["reason"] = reason
-        data["dimensions"][dimension] = entry
+        data["dimensions"][dimension] = _apply_state_transition(
+            entry, state, reason=reason, exit_reason=exit_reason,
+        )
         data["schema_version"] = SCHEMA_VERSION
 
         run_dir.mkdir(parents=True, exist_ok=True)

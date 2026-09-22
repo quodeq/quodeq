@@ -6,27 +6,30 @@ The index is **derived state** — rebuildable at any time from the filesystem
 ``~/.quodeq/index.db`` at any time; the next ``open_index`` creates an empty
 database and the next ``sync_index`` call repopulates.
 
-Public API is the only stable surface — internals live in ``_index_sync``.
+Public API is the only stable surface — internals live in ``index_sync``.
 """
 from __future__ import annotations
 
 import logging
 import sqlite3
 import time as _time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.data.sqlite._index_sync import (
+from quodeq.data.sqlite.index_sync import (
     _check_stale_and_promote,
     _delete_orphan_non_terminal_rows,
+    _status_mtime_ns,
     _sync_legacy_run,
     _upsert_from_status,
-    _status_mtime_ns,
+)
+from quodeq.data.sqlite._run_index_schema import (
+    SCHEMA_VERSION,  # noqa: F401 — re-export
+    open_index,  # noqa: F401 — re-export
 )
 
 _logger = logging.getLogger(__name__)
-
-SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -49,107 +52,6 @@ class RunRow:
     status_mtime: int
 
 
-_SCHEMA_V1 = """
-CREATE TABLE IF NOT EXISTS runs (
-    job_id            TEXT PRIMARY KEY,
-    project_uuid      TEXT NOT NULL,
-    run_id            TEXT NOT NULL,
-    run_dir           TEXT NOT NULL,
-    state             TEXT NOT NULL,
-    phase             TEXT,
-    current_dimension TEXT,
-    started_at        TEXT NOT NULL,
-    updated_at        TEXT NOT NULL,
-    finalized_at      TEXT,
-    heartbeat_at      TEXT,
-    pid               INTEGER,
-    exit_reason       TEXT,
-    status_mtime      INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_runs_state      ON runs(state);
-CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs(started_at DESC);
-CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
-"""
-
-
-def _apply_schema_v1(db: sqlite3.Connection) -> None:
-    with db:
-        db.executescript(_SCHEMA_V1)
-        have_version = db.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0]
-        if have_version == 0:
-            db.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
-
-
-def _read_schema_version(db: sqlite3.Connection) -> int | None:
-    try:
-        row = db.execute("SELECT version FROM schema_version").fetchone()
-    except sqlite3.DatabaseError:
-        return None
-    if row is None:
-        return None
-    return int(row[0])
-
-
-def open_index(db_path: Path) -> sqlite3.Connection:
-    """Open (or create) the index DB at *db_path*, migrate to current schema.
-
-    The index is derived state — rebuildable from the run files on disk — so a
-    DB this binary can't use is discarded and recreated rather than fatal:
-
-    * a corrupt/unreadable file, or
-    * a downgraded index whose ``schema_version`` is newer than we support
-      (the user ran a newer quodeq, then installed an older one).
-
-    Either way the next ``sync_index`` repopulates it from disk.
-    """
-    db_path = Path(db_path)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    db: sqlite3.Connection | None = None
-    try:
-        db = sqlite3.connect(str(db_path))
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("PRAGMA busy_timeout=3000")
-    except sqlite3.DatabaseError as exc:
-        _logger.warning("index DB at %s is corrupt (%s) — recreating", db_path, exc)
-        # Windows holds a file handle while the connection is open, so the
-        # subsequent unlink would raise PermissionError. Close first.
-        if db is not None:
-            try:
-                db.close()
-            except sqlite3.Error:
-                pass
-        db_path.unlink(missing_ok=True)
-        db = sqlite3.connect(str(db_path))
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("PRAGMA busy_timeout=3000")
-
-    version = _read_schema_version(db)
-    if version is None:
-        _apply_schema_v1(db)
-        return db
-    if version > SCHEMA_VERSION:
-        # Downgrade: a newer quodeq migrated the index forward. It's a derived
-        # projection, so discard and rebuild rather than crash — mirrors the
-        # corrupt-file recovery above. The next sync_index repopulates it.
-        _logger.warning(
-            "index DB at %s has schema_version=%s newer than supported (%s) — "
-            "rebuilding from run files", db_path, version, SCHEMA_VERSION,
-        )
-        # Close before unlink — Windows holds the file handle open otherwise.
-        try:
-            db.close()
-        except sqlite3.Error:
-            pass
-        db_path.unlink(missing_ok=True)
-        db = sqlite3.connect(str(db_path))
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("PRAGMA busy_timeout=3000")
-        _apply_schema_v1(db)
-        return db
-    return db
-
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -167,27 +69,43 @@ def _walk_run_dirs(evaluations_root: Path):
             yield project_dir.name, run_dir.name, run_dir
 
 
+def _sync_status_backed_run(
+    db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
+    cached_mtimes: dict[str, int | None] | None = None,
+) -> None:
+    """Sync a run that has a ``status.json`` (the common, non-legacy case)."""
+    disk_mtime = _status_mtime_ns(run_dir)
+    job_id = f"ext-{run_id}"
+    if cached_mtimes is not None:
+        cached_value = cached_mtimes.get(job_id)
+    else:
+        row = db.execute(
+            "SELECT status_mtime FROM runs WHERE job_id = ?", (job_id,),
+        ).fetchone()
+        cached_value = row[0] if row is not None else None
+    if cached_value is None or cached_value != disk_mtime:
+        try:
+            _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+        except Exception as exc:  # noqa: BLE001 - one malformed status.json must not stop syncing the rest
+            _logger.warning("skipping run %s: %s", run_dir, exc, exc_info=True)
+            return
+    # Always check staleness, even on mtime-unchanged runs.
+    try:
+        _check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+    except Exception as exc:
+        _logger.warning("stale-check failed for %s: %s", run_dir, exc, exc_info=True)
+
+
 def _sync_one_run(
     db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
+    cached_mtimes: dict[str, int | None] | None = None,
 ) -> None:
     status_path = run_dir / "status.json"
     if status_path.exists():
-        disk_mtime = _status_mtime_ns(run_dir)
-        job_id = f"ext-{run_id}"
-        cached = db.execute(
-            "SELECT status_mtime FROM runs WHERE job_id = ?", (job_id,),
-        ).fetchone()
-        if cached is None or cached[0] != disk_mtime:
-            try:
-                _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
-            except Exception as exc:
-                _logger.warning("skipping run %s: %s", run_dir, exc, exc_info=True)
-                return
-        # Always check staleness, even on mtime-unchanged runs.
-        try:
-            _check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
-        except Exception as exc:
-            _logger.warning("stale-check failed for %s: %s", run_dir, exc, exc_info=True)
+        _sync_status_backed_run(
+            db, run_dir, project_uuid=project_uuid, run_id=run_id,
+            cached_mtimes=cached_mtimes,
+        )
     else:
         try:
             _sync_legacy_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
@@ -206,8 +124,15 @@ def sync_index(db: sqlite3.Connection, evaluations_root: Path) -> None:
     gone — those can't be rescued by the heartbeat-based stale check.
     """
     with db:
+        cached_mtimes = {
+            job_id: status_mtime
+            for job_id, status_mtime in db.execute("SELECT job_id, status_mtime FROM runs")
+        }
         for project_uuid, run_id, run_dir in _walk_run_dirs(evaluations_root):
-            _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+            _sync_one_run(
+                db, run_dir, project_uuid=project_uuid, run_id=run_id,
+                cached_mtimes=cached_mtimes,
+            )
         _delete_orphan_non_terminal_rows(db)
 
 
@@ -227,27 +152,32 @@ def sync_project_dates(db: sqlite3.Connection, project_dir: Path, project_uuid: 
     Lighter than :func:`sync_index` / ``_sync_one_run``: refreshes only rows whose
     ``status.json`` mtime changed, and skips stale-promotion (the run date needs
     only the immutable ``started_at``). Runs without ``status.json`` are left to
-    the caller's ``parse_run_date`` fallback. The mtime cache is keyed by
-    ``(project_uuid, run_id)`` so it matches the row regardless of ``job_id``.
+    the caller's ``parse_run_date`` fallback. The mtime cache is prefetched for
+    the whole project in one query (mirrors :func:`sync_index`'s ``cached_mtimes``
+    at module scope), keyed by ``run_id`` since ``project_uuid`` is fixed here.
     """
     if not project_dir.is_dir():
         return
     with db:
+        cached_mtimes = {
+            run_id: status_mtime
+            for run_id, status_mtime in db.execute(
+                "SELECT run_id, status_mtime FROM runs WHERE project_uuid=?",
+                (project_uuid,),
+            )
+        }
         for run_dir in project_dir.iterdir():
             if not run_dir.is_dir() or run_dir.name.startswith("."):
                 continue
             if not (run_dir / "status.json").exists():
                 continue
             disk_mtime = _status_mtime_ns(run_dir)
-            cached = db.execute(
-                "SELECT status_mtime FROM runs WHERE project_uuid=? AND run_id=?",
-                (project_uuid, run_dir.name),
-            ).fetchone()
-            if cached is None or cached[0] != disk_mtime:
+            cached = cached_mtimes.get(run_dir.name)
+            if cached is None or cached != disk_mtime:
                 try:
                     _upsert_from_status(
                         db, run_dir, project_uuid=project_uuid, run_id=run_dir.name)
-                except Exception:
+                except Exception:  # noqa: BLE001 - one run's date-sync failure must not stop syncing the rest
                     _logger.warning("date-sync upsert failed for %s", run_dir, exc_info=True)
 
 
@@ -265,31 +195,54 @@ def _row_to_runrow(row: tuple) -> RunRow:
     return RunRow(*row)
 
 
-def list_runs(db: sqlite3.Connection, *, limit: int = 0) -> list[RunRow]:
-    """Return runs ordered by started_at DESC. limit=0 means no limit."""
-    sql = f"SELECT {_LIST_COLS} FROM runs ORDER BY started_at DESC"
-    if limit > 0:
-        sql += f" LIMIT {int(limit)}"
-    return [_row_to_runrow(r) for r in db.execute(sql).fetchall()]
+def _limit_clause(limit: int | None) -> str:
+    """``LIMIT n`` for a positive *limit*, nothing for None; anything else is a caller bug."""
+    if limit is None:
+        return ""
+    if limit <= 0:
+        raise ValueError(f"limit must be positive or None, got {limit!r}")
+    return f" LIMIT {int(limit)}"
+
+
+def list_runs(
+    db: sqlite3.Connection, *, limit: int | None, states: Iterable[str] | None = None,
+) -> list[RunRow]:
+    """Return runs ordered by started_at DESC.
+
+    *limit* None returns every row; an int must be positive. *states*, when
+    given, narrows the query in SQL instead of fetching every row to filter
+    in Python.
+    """
+    where, params = "", ()
+    if states:
+        wanted = tuple(states)
+        where = " WHERE state IN (" + ",".join("?" * len(wanted)) + ")"
+        params = wanted
+    sql = f"SELECT {_LIST_COLS} FROM runs{where} ORDER BY started_at DESC{_limit_clause(limit)}"
+    return [_row_to_runrow(r) for r in db.execute(sql, params).fetchall()]
 
 
 def list_runs_for_project(
-    db: sqlite3.Connection, project_uuid: str, *, limit: int = 0,
+    db: sqlite3.Connection, project_uuid: str, *, limit: int | None,
 ) -> list[RunRow]:
-    """Return one project's runs ordered by started_at DESC. limit=0 = no limit.
+    """Return one project's runs ordered by started_at DESC.
 
-    Native indexed query — the replacement for walking the project's run dirs.
+    *limit* None returns every row; an int must be positive. Native indexed
+    query — the replacement for walking the project's run dirs.
     """
     sql = (
         f"SELECT {_LIST_COLS} FROM runs WHERE project_uuid = ? "
-        "ORDER BY started_at DESC"
+        f"ORDER BY started_at DESC{_limit_clause(limit)}"
     )
-    if limit > 0:
-        sql += f" LIMIT {int(limit)}"
     return [_row_to_runrow(r) for r in db.execute(sql, (project_uuid,)).fetchall()]
 
 
 def get_run(db: sqlite3.Connection, job_id: str) -> RunRow | None:
+    """Return the indexed row for *job_id*, or None when the index has no such run.
+
+    A miss means the index is stale, not that the run is gone — the caller
+    falls back to the filesystem.
+    """
     row = db.execute(
         f"SELECT {_LIST_COLS} FROM runs WHERE job_id = ?", (job_id,),
     ).fetchone()

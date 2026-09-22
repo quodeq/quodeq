@@ -5,70 +5,73 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error
 from quodeq.api.routes_common import reports_dir
-from quodeq.core.types import to_camel_dict
+from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
 from quodeq.shared.validation import validate_path_segment
+
+
+def _validate_params(**params: str) -> tuple[Response, int] | None:
+    """Validate each named route parameter one at a time, so the first
+    invalid one names itself in the error message instead of a generic
+    "Invalid parameter"."""
+    for name, value in params.items():
+        try:
+            validate_path_segment(value)
+        except ValueError:
+            return json_error(
+                f"{name} must be a plain path segment, got {value!r}",
+                HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            )
+    return None
 
 
 def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
     """Register project dashboard, accumulated, evaluation, and violation routes."""
 
-    def _validate_params(*params: str) -> tuple[Response, int] | None:
-        try:
-            validate_path_segment(*params)
-        except ValueError:
-            body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
-        return None
-
     @app.get("/api/projects/<project>/dashboard")
     def dashboard(project: str) -> Response | tuple[Response, int]:
-        err = _validate_params(project)
+        err = _validate_params(project=project)
         if err:
             return err
         run = request.args.get("run", "latest")
         try:
             payload = provider.get_dashboard(reports_dir(), project, run)
         except FileNotFoundError:
-            body, status = error_response("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(payload)
 
     @app.get("/api/projects/<project>/accumulated")
     def accumulated(project: str) -> Response | tuple[Response, int]:
-        err = _validate_params(project)
+        err = _validate_params(project=project)
         if err:
             return err
         as_of = request.args.get("asOf")
         payload = provider.get_accumulated(reports_dir(), project, as_of)
         if payload is None:
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(payload)
 
     @app.get("/api/projects/<project>/runs/<run_id>/dimensions/<dimension>/eval")
     def dimension_eval(project: str, run_id: str, dimension: str) -> Response | tuple[Response, int]:
-        err = _validate_params(project, run_id, dimension)
+        err = _validate_params(project=project, run_id=run_id, dimension=dimension)
         if err:
             return err
         payload = provider.get_dimension_eval(reports_dir(), project, run_id, dimension)
         if payload is None:
-            body, status = error_response("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         if payload.get("waiting"):
             return jsonify(payload), HTTPStatus.ACCEPTED
         return jsonify(payload)
 
     @app.get("/api/projects/<project>/runs/<run_id>/violations")
     def run_violations(project: str, run_id: str) -> Response | tuple[Response, int]:
-        err = _validate_params(project, run_id)
+        err = _validate_params(project=project, run_id=run_id)
         if err:
             return err
         try:
             payload = provider.get_violations(reports_dir(), project, run_id)
         except FileNotFoundError:
-            body, status = error_response("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
+            return json_error("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(to_camel_dict(payload))

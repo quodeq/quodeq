@@ -20,7 +20,7 @@ from pathlib import Path
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._job_model import Job, InMemoryJobStore
 from quodeq.services.jobs import JobManager, STATUS_RUNNING
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 
 
 def _seed_status(reports_root: Path, project: str, run_id: str) -> None:
@@ -29,12 +29,14 @@ def _seed_status(reports_root: Path, project: str, run_id: str) -> None:
     run_dir.mkdir(parents=True)
     write_status(
         run_dir,
-        state=RunState.RUNNING,
-        job_id=f"ext-{run_id}",
-        started_at="2026-05-22T19:00:00+00:00",
-        dimensions=["security"],
-        phase="analyzing",
-        pid=99999,
+        RunStatus(
+            state=RunState.RUNNING,
+            job_id=f"ext-{run_id}",
+            started_at="2026-05-22T19:00:00+00:00",
+            dimensions=["security"],
+            phase="analyzing",
+            pid=99999,
+        ),
     )
 
 
@@ -91,14 +93,16 @@ def test_external_snapshot_carries_provider_and_model(tmp_path: Path) -> None:
     run_dir.mkdir(parents=True)
     write_status(
         run_dir,
-        state=RunState.RUNNING,
-        job_id=f"ext-{run_id}",
-        started_at="2026-05-22T19:00:00+00:00",
-        dimensions=["security"],
-        phase="analyzing",
-        pid=99999,
-        ai_provider="llamacpp",
-        ai_model="qwen3.6-27b",
+        RunStatus(
+            state=RunState.RUNNING,
+            job_id=f"ext-{run_id}",
+            started_at="2026-05-22T19:00:00+00:00",
+            dimensions=["security"],
+            phase="analyzing",
+            pid=99999,
+            ai_provider="llamacpp",
+            ai_model="qwen3.6-27b",
+        ),
     )
 
     store = InMemoryJobStore()  # no internal job for this run
@@ -203,12 +207,14 @@ def test_lost_internal_job_yields_to_the_live_indexed_row(tmp_path: Path) -> Non
     run_dir.mkdir(parents=True)
     write_status(
         run_dir,
-        state=RunState.RUNNING,
-        job_id=f"ext-{run_id}",
-        started_at="2026-05-22T19:00:00+00:00",
-        dimensions=["security"],
-        phase="analyzing",
-        pid=os.getpid(),
+        RunStatus(
+            state=RunState.RUNNING,
+            job_id=f"ext-{run_id}",
+            started_at="2026-05-22T19:00:00+00:00",
+            dimensions=["security"],
+            phase="analyzing",
+            pid=os.getpid(),
+        ),
     )
 
     store = InMemoryJobStore()

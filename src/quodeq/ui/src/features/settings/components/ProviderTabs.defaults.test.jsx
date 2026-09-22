@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultsForProvider } from './ProviderTabs.jsx';
+import { defaultsForProvider } from './providerUtils.js';
 
 // Truth-in-display: the Settings tab must show the values a run would
 // actually use. Cloud providers without a bespoke entry used to fall back

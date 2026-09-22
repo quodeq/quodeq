@@ -8,6 +8,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './api/queryClient.js';
 import { SidePaneProvider } from './features/side-pane/index.js';
 import { AssistantDrawerProvider } from './features/assistant/AssistantDrawerProvider.jsx';
+import { DATA_THEME_ATTR, PREFERS_DARK_QUERY, PYWEBVIEW_READY_EVENT } from './constants.js';
 
 const LS_THEME = 'cc-theme';
 const LS_THEME_MODE = 'cc-theme-mode';
@@ -35,6 +36,12 @@ const LEGACY_FAMILY_MAP = {
   cyber: THEME_FAMILIES.DECKARD,
 };
 
+function isMacPlatform() {
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  return /Mac|iPhone|iPad|iPod/.test(platform) || /Mac OS X/.test(ua);
+}
+
 function applyInitialTheme(storage = localStorage, mediaQuery = window.matchMedia) {
   const oldTheme = storage.getItem(LS_THEME);
   if (oldTheme !== null) {
@@ -49,10 +56,10 @@ function applyInitialTheme(storage = localStorage, mediaQuery = window.matchMedi
   }
   const mode = storage.getItem(LS_THEME_MODE) || THEME_MODES.SYSTEM;
   const family = storage.getItem(LS_THEME_FAMILY) || THEME_FAMILIES.DARUMA;
-  const prefersDark = mediaQuery('(prefers-color-scheme: dark)').matches;
+  const prefersDark = mediaQuery(PREFERS_DARK_QUERY).matches;
   const dataTheme = resolveDataTheme(mode, family, prefersDark);
   if (dataTheme !== null) {
-    document.documentElement.setAttribute('data-theme', dataTheme);
+    document.documentElement.setAttribute(DATA_THEME_ATTR, dataTheme);
   }
 }
 
@@ -63,30 +70,26 @@ applyInitialTheme();
 // every platform, so nothing in-page reserves space for window controls;
 // these classes remain for platform/shell-conditional styling.
 try {
-  const ua = navigator.userAgent || '';
-  const platform = navigator.platform || '';
-  const isMac = /Mac|iPhone|iPad|iPod/.test(platform) || /Mac OS X/.test(ua);
-  if (isMac) document.documentElement.classList.add('platform-mac');
-} catch {
-  // ignore — platform detection is a progressive enhancement
+  if (isMacPlatform()) document.documentElement.classList.add('platform-mac');
+} catch (err) {
+  console.warn('[main] platform detection failed:', err); // progressive enhancement only
 }
 
-// pywebview injects `window.pywebview` before `pywebviewready` fires.
+// pywebview injects `window.pywebview` before PYWEBVIEW_READY_EVENT fires.
 // Listen for that event AND probe once on load in case the script
 // loaded after the injection.
 function markWebview() {
   if (window.pywebview) document.documentElement.classList.add('in-webview');
 }
 markWebview();
-window.addEventListener('pywebviewready', markWebview);
+window.addEventListener(PYWEBVIEW_READY_EVENT, markWebview);
 
 // The native OS title bar has no in-app back/forward, so keep the
 // Cmd+[ / Cmd+] history shortcuts the old injected chrome provided.
 // Only inside the native shell — in a browser these are already native.
 document.addEventListener('keydown', (e) => {
   if (!window.pywebview) return;
-  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
-  const mod = isMac ? e.metaKey : e.ctrlKey;
+  const mod = isMacPlatform() ? e.metaKey : e.ctrlKey;
   if (mod && e.key === '[') { e.preventDefault(); history.back(); }
   if (mod && e.key === ']') { e.preventDefault(); history.forward(); }
 });

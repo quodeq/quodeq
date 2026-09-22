@@ -59,7 +59,7 @@ class ScriptedClient:
 @pytest.fixture()
 def app(tmp_path, monkeypatch):
     # NOTE: real get_provider_configs() returns dict[str, dict] keyed by
-    # provider id (see src/quodeq/analysis/_provider_cache.py and
+    # provider id (see src/quodeq/analysis/provider_cache.py and
     # src/quodeq/data/config/ai_providers.json), not {"providers": [...]}
     # as an earlier draft of this test assumed. Mirrors the fixture in
     # tests/api/test_assistant_routes.py.
@@ -74,7 +74,7 @@ def app(tmp_path, monkeypatch):
         lambda *a, **k: True,
     )
     monkeypatch.setattr(
-        "quodeq.assistant.adapters._api._default_client",
+        "quodeq.assistant.adapters.api._default_client",
         lambda config: ScriptedClient(),
     )
     app = Flask(__name__)

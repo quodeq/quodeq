@@ -16,7 +16,7 @@ from pathlib import Path
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._job_model import InMemoryJobStore
 from quodeq.services.jobs import JobManager
-from quodeq.data.fs.run_status_store import RunState, write_status
+from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 
 
 def _seed_run(reports_root: Path, project: str, run_id: str) -> None:
@@ -26,10 +26,12 @@ def _seed_run(reports_root: Path, project: str, run_id: str) -> None:
     (run_dir / "evidence" / "manifest.json").write_text("{}")
     write_status(
         run_dir,
-        state=RunState.DONE,
-        job_id=f"ext-{run_id}",
-        started_at="2026-05-22T19:00:00+00:00",
-        dimensions=["security"],
+        RunStatus(
+            state=RunState.DONE,
+            job_id=f"ext-{run_id}",
+            started_at="2026-05-22T19:00:00+00:00",
+            dimensions=["security"],
+        ),
     )
 
 

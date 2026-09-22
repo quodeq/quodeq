@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from quodeq._cli_evaluation import _write_sarif_if_requested
+from quodeq.cli_evaluation import _write_sarif_if_requested
 
 
 def _seed_reports(eval_dir: Path) -> None:

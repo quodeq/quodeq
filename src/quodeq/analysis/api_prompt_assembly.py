@@ -6,10 +6,11 @@ and evaluation rules.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.analysis.prompts._template import load_template
-from quodeq.analysis.prompts.builder import _load_evaluation_rules
+from quodeq.analysis.prompts.template import load_template
+from quodeq.analysis.prompts.builder import load_evaluation_rules
 from quodeq.config.prompt_templates import render_template
 from quodeq.context.path_role import Role, path_role
 from quodeq.context.project_shape import Deployment, ProjectShape, detect_shape
@@ -23,14 +24,13 @@ Each finding must be a JSON object with these fields:
     "req": string - requirement ID (e.g. "M-MOD-1", "S-CON-3")
     "t": string - "violation" or "compliance"
     "file": string - file path relative to repo root
-    "line": integer - line number
-    "severity": string - "critical", "major", or "minor"
+    "line": integer - 1-indexed line number, must be greater than 0
     "w": string - short title of the finding
     "reason": string - 1–3 sentences: what the quoted code does wrong AS WRITTEN, plus the concrete impact
     "snippet": string - offending code copied VERBATIM from the source (one or a few contiguous lines, exact characters)
   Optional:
+    "severity": string - "critical", "major", or "minor". Rates how bad a violation is, so set it only when "t" is "violation". Omit it on compliance findings; never repeat the value of "t" here.
     "end_line": integer - last line if multi-line
-    "scope": string - "file", "class", or "module"
     "vt": string - violation type taxonomy code: a short, stable, kebab-case class of the violation (e.g. "code-injection", "hardcoded-secret", "missing-error-handling"); reuse the exact same code for every finding of the same kind
 """
 
@@ -73,19 +73,10 @@ def _build_files_block(source_files: list[Path], repo_root: Path | None = None) 
     return "\n\n".join(parts)
 
 
-def _format_shape_block(
-    shape: ProjectShape, trust_model: TrustModel | None = None,
-) -> str:
-    """Render a project briefing for the LLM, or empty when nothing is known.
-
-    A declared trust model is briefed even when shape detection returned
-    UNKNOWN: detection is a guess, the declaration is the team telling us the
-    answer, and suppressing it would waste the only reliable signal we have.
-    """
-    relaxing = trust_model is not None and (
-        trust_model.relaxes_remote() or not trust_model.multi_tenant)
-    if shape.deployment is Deployment.UNKNOWN and not relaxing:
-        return ""
+def _build_shape_summary_parts(
+    shape: ProjectShape, trust_model: TrustModel | None,
+) -> list[str]:
+    """Build the `key=value` summary fragments for a project-shape briefing."""
     parts: list[str] = []
     if shape.deployment is not Deployment.UNKNOWN:
         parts.append(f"deployment={shape.deployment.value}")
@@ -93,37 +84,48 @@ def _format_shape_block(
     if trust_model is not None:
         parts.append(f"multi_tenant={'true' if trust_model.multi_tenant else 'false'}")
         parts.append(f"network_exposure={trust_model.network_exposure}")
+        parts.append(f"deployment_topology={trust_model.deployment_topology}")
     if shape.runtime_langs:
         parts.append(f"runtime={'+'.join(shape.runtime_langs)}")
     if shape.web_frameworks:
         parts.append(f"web_frameworks={'+'.join(shape.web_frameworks)}")
     if shape.ui_lang:
         parts.append(f"ui={shape.ui_lang}")
-    summary = ", ".join(parts)
+    return parts
 
-    note = ""
+
+def _deployment_note(shape: ProjectShape) -> str:
+    """Return a deployment-specific caveat for the LLM, or "" when none applies."""
     if shape.deployment is Deployment.DESKTOP and shape.is_single_user:
-        note = (
+        return (
             " This is a single-user desktop tool, not a hosted multi-tenant"
             " service. Treat findings about thread blocking, distributed"
             " state, concurrent callers, and rate limiting with skepticism."
         )
-    elif shape.deployment is Deployment.LIBRARY:
-        note = (
+    if shape.deployment is Deployment.LIBRARY:
+        return (
             " This is a library, not an end-user application. API stability"
             " and backwards compatibility matter more than user-facing UX."
         )
-    elif shape.deployment is Deployment.CLI and shape.is_single_user:
-        note = (
+    if shape.deployment is Deployment.CLI and shape.is_single_user:
+        return (
             " This is a single-user CLI, not a hosted service. Concurrent"
             " caller and multi-tenant findings rarely apply."
         )
-    # Both notes below mirror scope_gate.py's own two rules, deliberately at
-    # the same preconditions, so the prompt never advises something the
-    # deterministic gate would not also do. Neither ever tells the model a
-    # category "does not apply" -- that invites the model to omit the
-    # finding, which is unrecoverable, unlike a severity cap. Always report;
-    # only the severity guidance changes.
+    return ""
+
+
+def _trust_relaxation_notes(trust_model: TrustModel | None) -> str:
+    """Return trust-relaxation caveats for the LLM, or "" when none apply.
+
+    Each note below mirrors one of ``scope_gate_rules``'s own rules,
+    deliberately at the same preconditions, so the prompt never advises
+    something the deterministic gate would not also do. None of them ever
+    tells the model a category "does not apply" -- that invites the model to omit the
+    finding, which is unrecoverable, unlike a severity cap. Always report;
+    only the severity guidance changes.
+    """
+    note = ""
     if trust_model is not None and trust_model.relaxes_remote():
         note += (
             " No untrusted party can open a socket to this process. For a"
@@ -141,7 +143,49 @@ def _format_shape_block(
             " finding whose only issue is reaching another user's data, still"
             " report it, at `minor` instead of `major`. Do not omit it."
         )
+    if trust_model is not None and trust_model.is_single_host():
+        note += (
+            " This product runs as one process on a single host. Do not ask it"
+            " to externalise state to a shared store or to dispatch work"
+            " horizontally. For a scalability finding whose only issue is that,"
+            " still report it, at `minor` instead of `major`. Do not omit it."
+        )
+    return note
+
+
+def _format_shape_block(
+    shape: ProjectShape, trust_model: TrustModel | None = None,
+) -> str:
+    """Render a project briefing for the LLM, or empty when nothing is known.
+
+    A declared trust model is briefed even when shape detection returned
+    UNKNOWN: detection is a guess, the declaration is the team telling us the
+    answer, and suppressing it would waste the only reliable signal we have.
+    """
+    relaxing = trust_model is not None and (
+        trust_model.relaxes_remote() or not trust_model.multi_tenant
+        or trust_model.is_single_host())
+    if shape.deployment is Deployment.UNKNOWN and not relaxing:
+        return ""
+    summary = ", ".join(_build_shape_summary_parts(shape, trust_model))
+    note = _deployment_note(shape) + _trust_relaxation_notes(trust_model)
     return f"## Project Shape\n\n**{summary}**.{note}"
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectBrief:
+    """What the model is told about the project under evaluation.
+
+    ``name`` labels the repo in the prompt; ``root`` anchors the relative
+    file paths and, when ``shape`` is not supplied, drives shape detection;
+    ``trust_model`` is the trust boundary the deterministic scope gate
+    enforces, resolved by the caller and briefed here so both agree.
+    """
+
+    name: str
+    root: Path | None = None
+    shape: ProjectShape | None = None
+    trust_model: TrustModel | None = None
 
 
 def assemble_api_prompt(
@@ -149,32 +193,31 @@ def assemble_api_prompt(
     source_files: list[Path],
     standards_text: str,
     dimension: str,
-    repo_name: str,
-    repo_root: Path | None = None,
-    project_shape: ProjectShape | None = None,
-    trust_model: TrustModel | None = None,
+    project: ProjectBrief,
 ) -> str:
     """Assemble a complete evaluation prompt for the API runner.
 
-    *project_shape* is computed from *repo_root* when not supplied; pass an
-    explicit shape to skip detection (e.g. when a cached shape is being
-    reused across dimensions). *trust_model* is never detected here -- it is
-    resolved by the caller (declared profile, then detection, then the
-    conservative default) and threaded through so the model is briefed on
-    the same trust boundary the deterministic scope gate enforces.
+    ``project.shape`` is computed from ``project.root`` when not supplied;
+    pass an explicit shape to skip detection (e.g. when a cached shape is
+    being reused across dimensions). ``project.trust_model`` is never
+    detected here -- it is resolved by the caller (declared profile, then
+    detection, then the conservative default) and threaded through so the
+    model is briefed on the same trust boundary the deterministic scope
+    gate enforces.
     """
     template = load_template(template_name="api_prompt.md")
-    rules = _load_evaluation_rules()
-    files_block = _build_files_block(source_files, repo_root=repo_root)
-    if project_shape is None and repo_root is not None:
-        project_shape = detect_shape(repo_root)
+    rules = load_evaluation_rules()
+    files_block = _build_files_block(source_files, repo_root=project.root)
+    project_shape = project.shape
+    if project_shape is None and project.root is not None:
+        project_shape = detect_shape(project.root)
     # Fall back to an UNKNOWN shape rather than skipping the block outright:
     # a declared trust model must still be briefed even without a shape
     # verdict. _format_shape_block itself returns "" when nothing is known.
-    shape_block = _format_shape_block(project_shape or ProjectShape(), trust_model)
+    shape_block = _format_shape_block(project_shape or ProjectShape(), project.trust_model)
     return render_template(template, {
         "DIMENSION": dimension,
-        "REPO_NAME": repo_name,
+        "REPO_NAME": project.name,
         "STANDARDS_TEXT": standards_text,
         "PROJECT_SHAPE": shape_block,
         "EVALUATION_RULES": rules,

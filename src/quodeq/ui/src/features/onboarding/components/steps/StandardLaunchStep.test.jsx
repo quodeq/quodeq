@@ -20,36 +20,44 @@ const baseState = (over = {}) => ({
 
 describe('StandardLaunchStep', () => {
   it('renders radio buttons when isFirstProject=true', () => {
-    render(<StandardLaunchStep state={baseState()} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onCancel={noop} onBack={noop} />);
+    render(<StandardLaunchStep state={baseState()} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onBack={noop} />);
     const radios = screen.getAllByRole('radio');
     expect(radios.length).toBe(2);
   });
 
   it('renders checkboxes when isFirstProject=false', () => {
-    render(<StandardLaunchStep state={baseState({ isFirstProject: false })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onCancel={noop} onBack={noop} />);
+    render(<StandardLaunchStep state={baseState({ isFirstProject: false })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onBack={noop} />);
     const boxes = screen.getAllByRole('checkbox');
     expect(boxes.length).toBe(2);
   });
 
   it('Start evaluation is disabled when no standard is selected', () => {
-    render(<StandardLaunchStep state={baseState()} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onCancel={noop} onBack={noop} />);
+    render(<StandardLaunchStep state={baseState()} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onBack={noop} />);
     expect(screen.getByRole('button', { name: /start evaluation/i })).toBeDisabled();
   });
 
   it('Start evaluation enabled when one standard is selected; click calls onLaunch', () => {
     const onLaunch = vi.fn();
-    render(<StandardLaunchStep state={baseState({ standardIds: new Set(['std-a']) })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={onLaunch} onCancel={noop} onBack={noop} />);
+    render(<StandardLaunchStep state={baseState({ standardIds: new Set(['std-a']) })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={onLaunch} onBack={noop} />);
     fireEvent.click(screen.getByRole('button', { name: /start evaluation/i }));
     expect(onLaunch).toHaveBeenCalledWith(['std-a']);
   });
 
-  it('summary strip shows project, provider, model, and selected standards', () => {
-    render(<StandardLaunchStep state={baseState({ standardIds: new Set(['std-a']) })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onCancel={noop} onBack={noop} />);
+  it('summary strip shows the project id', () => {
+    render(<StandardLaunchStep state={baseState({ standardIds: new Set(['std-a']) })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onBack={noop} />);
+    const label = screen.getByText('PROJECT');
+    expect(label.closest('.term-stat').querySelector('.term-stat__value')).toHaveTextContent('uuid-1');
+  });
+
+  it('summary strip shows the provider and model', () => {
+    render(<StandardLaunchStep state={baseState({ standardIds: new Set(['std-a']) })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onBack={noop} />);
     expect(screen.getByText(/codex-cli/i)).toBeInTheDocument();
     expect(screen.getByText(/gpt-5.2-codex/i)).toBeInTheDocument();
-    // "Security 101" appears in both the summary strip and the card list,
-    // so assert at least one match rather than a single one.
-    const matches = screen.getAllByText(/security 101/i);
-    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('summary strip shows the selected standard name', () => {
+    render(<StandardLaunchStep state={baseState({ standardIds: new Set(['std-a']) })} actions={{ toggleStandard: noop }} standards={standards} onLaunch={noop} onBack={noop} />);
+    const label = screen.getByText('STANDARD');
+    expect(label.closest('.term-stat').querySelector('.term-stat__value')).toHaveTextContent('Security 101');
   });
 });

@@ -4,14 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, _AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream, run_analysis
 from quodeq.analysis.stream.parser import extract_evidence_from_stream
 from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid
+from quodeq.analysis.evidence_parser import parse_evidence_file
 from quodeq.core.evidence.model import Evidence
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
-from quodeq.analysis._runner_markers import make_heartbeat
+from quodeq.analysis.prompts.builder import build_analysis_prompt, prompt_context
+from quodeq.analysis.runner_markers import make_heartbeat
 from quodeq.shared.logging import log_warning
 
 
@@ -19,23 +19,7 @@ def _build_dimension_prompt(
     config: RunConfig, dim_id: str, ctx: _AnalysisContext,
 ) -> str:
     """Build the analysis prompt for a single dimension."""
-    return build_analysis_prompt(
-        ctx.template,
-        PromptContext(
-            language=config.language,
-            repo_name=str(config.src),
-            date_str=ctx.date_str,
-            dimension=dim_id,
-            source_file_count=config.source_file_count,
-            dimensions_data=ctx.dimensions_data,
-            standards_dir=config.standards_dir,
-            evaluators_dir=config.evaluators_dir,
-            manifest=config.manifest,
-            target=config.target,
-            work_dir=config.work_dir or config.src,
-            project_root=config.src,
-        ),
-    )
+    return build_analysis_prompt(ctx.template, prompt_context(config, ctx, dim_id))
 
 
 def _run_dimension_analysis(
@@ -61,14 +45,12 @@ def _run_dimension_analysis(
         compiled_dir=compiled_dir,
         dimension=dim_id,
     )
-    if config.options.max_turns is not None:
-        ac_kwargs["max_turns"] = config.options.max_turns
-    if config.options.max_duration is not None:
-        ac_kwargs["max_duration"] = config.options.max_duration
-    if config.options.time_limit is not None:
-        ac_kwargs["time_limit"] = config.options.time_limit
-    if config.options.deadline_at is not None:
-        ac_kwargs["deadline_at"] = config.options.deadline_at
+    # Left out rather than passed as None so AnalysisConfig's own defaults win
+    # for every budget the run did not set.
+    for name in ("max_turns", "max_duration", "time_limit", "deadline_at"):
+        value = getattr(config.options, name)
+        if value is not None:
+            ac_kwargs[name] = value
     run_analysis(
         work_dir=config.src,
         prompt=prompt,
@@ -93,7 +75,7 @@ def _try_parse_stream_evidence(stream_file: Path, jsonl_file: Path) -> int:
 
 
 def _parse_dimension_evidence(
-    config: RunConfig, dim_id: str, stream_file: Path, jsonl_file: Path,
+    config: RunConfig, _dim_id: str, stream_file: Path, jsonl_file: Path,
     ctx: _AnalysisContext,
 ) -> Evidence | None:
     """Extract and parse evidence from stream/JSONL files for a single dimension.
@@ -104,18 +86,4 @@ def _parse_dimension_evidence(
         return None
 
     files_read = _try_parse_stream_evidence(stream_file, jsonl_file)
-
-    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    return parse_jsonl_to_evidence(
-        jsonl_file,
-        EvidenceContext(
-            language=config.language,
-            repository=str(config.src),
-            date_str=ctx.date_str,
-            source_file_count=config.source_file_count,
-            files_read=files_read,
-            module=config.target.name if config.target else "",
-        ),
-        compiled_dir=compiled_dir,
-        evaluators_dir=config.evaluators_dir,
-    )
+    return parse_evidence_file(config, ctx, jsonl_file, files_read)

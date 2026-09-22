@@ -1,0 +1,4 @@
+# Grandfathered parameter-count violations (functions with more than 5
+# parameters, self/cls excluded). Do NOT add entries without
+# justification -- the goal is to burn this list down, not grow it.
+# Regenerate intentionally: python tools/check_params.py --update-baseline

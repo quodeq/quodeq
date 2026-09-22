@@ -2,10 +2,22 @@
  * Encapsulates project-level actions (delete, export, relocate, import) that
  * were previously inlined inside App, keeping the root component focused
  * on composition rather than API plumbing.
+ *
+ * Failure handlers return `{ ok: false, messageKey, vars }` (the raw i18n
+ * key + interpolation vars, not a rendered string) so a caller can inspect
+ * or relocalize the failure; success returns `{ ok: true }`. Separately,
+ * *onError* (optional second-arg option) is invoked with the RENDERED
+ * message (`t(messageKey, vars)`) so a caller that just wants the old
+ * "tell the user" behavior doesn't have to render it itself -- defaults to
+ * a no-op, since failures already surface structurally via the returned
+ * `{ ok: false, messageKey, vars }` and a caller owns how (or whether) to
+ * present them.
  */
 import { useApi } from '../api/ApiContext.jsx';
 import { chooseDialog } from '../utils/chooseDialog.js';
 import { t } from '../strings/index.js';
+import { apiErrorMessage } from '../strings/apiErrors.js';
+import { HTTP_STATUS } from '../constants.js';
 
 // Strip filesystem-unfriendly characters so a project name like
 // "foo/bar" or "..\\evil" can't influence the download path.
@@ -16,20 +28,34 @@ function sanitizeFilename(name) {
     .slice(0, 100) || 'project';
 }
 
-export function useProjectActions({ projects, selectedProject, handleProjectChange, loadProjects }) {
-  const { deleteProject, getProjectExportUrl, relocateProject, importProject } = useApi();
-  async function handleDeleteProject(projectId) {
+function makeFail(onError) {
+  return function fail(messageKey, vars) {
+    onError(messageKey, vars);
+    return { ok: false, messageKey, vars };
+  };
+}
+
+/**
+ * Builds the delete handler. It moves the selection to another project when
+ * the deleted one was selected, then reloads the list.
+ *
+ * @returns {(projectId: string) => Promise<{ok: boolean, messageKey?: string, vars?: object}>}
+ */
+export function makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail }) {
+  return async function handleDeleteProject(projectId) {
     try {
       await deleteProject(projectId);
     } catch (err) {
-      alert(t('projects.deleteProjectFailed', { error: err.message }));
-      return;
+      return fail('projects.deleteProjectFailed', { error: apiErrorMessage(err, 'projects.deleteProjectFailed') });
     }
     if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
     loadProjects();
-  }
+    return { ok: true };
+  };
+}
 
-  function handleExportProject(projectId) {
+function makeHandleExportProject({ projects, getProjectExportUrl }) {
+  return function handleExportProject(projectId) {
     const proj = projects.find((p) => (p.id || p.name) === projectId);
     const filename = `${sanitizeFilename(proj?.name || projectId)}.zip`;
     // PyWebView: native Save dialog, fetches server-side
@@ -45,28 +71,34 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-  }
+  };
+}
 
-  async function handleRelocateProject(projectId, newPath) {
+function makeHandleRelocateProject({ relocateProject, loadProjects, fail }) {
+  return async function handleRelocateProject(projectId, newPath) {
     try {
       await relocateProject(projectId, newPath);
     } catch (err) {
       console.error('Relocate failed:', err);
-      alert(t('projects.relocateFailed', { error: err.message || t('common.unknownError') }));
-      return;
+      return fail('projects.relocateFailed', { error: err.message || t('common.unknownError') });
     }
     loadProjects();
-  }
+    return { ok: true };
+  };
+}
 
-  async function _attemptImport(file, action) {
+function makeAttemptImport(importProject) {
+  return async function _attemptImport(file, action) {
     try {
       return { ok: true, result: await importProject(file, action ? { action } : {}) };
     } catch (err) {
       return { ok: false, err };
     }
-  }
+  };
+}
 
-  async function _resolveImportConflict(file, err) {
+function makeResolveImportConflict(attemptImport) {
+  return async function _resolveImportConflict(file, err) {
     const isSameUuid = err.kind === 'same_uuid';
     // Four whole sentences rather than one with an optional ` "name"` spliced
     // in: the quoting style is locale-dependent (guillemets, low-high quotes)
@@ -91,35 +123,64 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
       actions,
     });
     if (!choice) return null;
-    return _attemptImport(file, choice);
-  }
+    return attemptImport(file, choice);
+  };
+}
 
-  async function handleImportProject() {
-    if (typeof document === 'undefined') return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.zip,application/zip,application/x-zip-compressed';
-    input.style.display = 'none';
-    document.body.appendChild(input);
-    const file = await new Promise((resolve) => {
-      input.addEventListener('change', () => resolve(input.files?.[0] || null), { once: true });
-      input.addEventListener('cancel', () => resolve(null), { once: true });
-      input.click();
-    });
-    document.body.removeChild(input);
-    if (!file) return;
+async function pickImportFile() {
+  if (typeof document === 'undefined') return null;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.zip,application/zip,application/x-zip-compressed';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  const file = await new Promise((resolve) => {
+    input.addEventListener('change', () => resolve(input.files?.[0] || null), { once: true });
+    input.addEventListener('cancel', () => resolve(null), { once: true });
+    input.click();
+  });
+  document.body.removeChild(input);
+  return file;
+}
 
-    let attempt = await _attemptImport(file);
-    if (!attempt.ok && attempt.err.status === 409 && attempt.err.kind) {
-      attempt = await _resolveImportConflict(file, attempt.err);
-      if (attempt === null) return; // user cancelled
+function makeHandleImportProject({ importProject, loadProjects, fail }) {
+  const attemptImport = makeAttemptImport(importProject);
+  const resolveImportConflict = makeResolveImportConflict(attemptImport);
+  return async function handleImportProject() {
+    const file = await pickImportFile();
+    if (!file) return { ok: false, cancelled: true };
+
+    let attempt = await attemptImport(file);
+    if (!attempt.ok && attempt.err.status === HTTP_STATUS.CONFLICT && attempt.err.kind) {
+      attempt = await resolveImportConflict(file, attempt.err);
+      if (attempt === null) return { ok: false, cancelled: true }; // user cancelled
     }
     if (!attempt.ok) {
-      alert(t('projects.importProjectFailed', { error: attempt.err.message || t('common.unknownError') }));
-      return;
+      return fail('projects.importProjectFailed', { error: attempt.err.message || t('common.unknownError') });
     }
     loadProjects();
-  }
+    return { ok: true };
+  };
+}
+
+/**
+ * The project delete/export/relocate/import handlers, wired to the API client
+ * from context.
+ *
+ * Each handler resolves to `{ ok }` rather than throwing, and reports failures
+ * through `onError(messageKey, vars)` so the caller owns how they are shown.
+ */
+export function useProjectActions(
+  { projects, selectedProject, handleProjectChange, loadProjects },
+  { onError = () => {} } = {},
+) {
+  const { deleteProject, getProjectExportUrl, relocateProject, importProject } = useApi();
+  const fail = makeFail(onError);
+
+  const handleDeleteProject = makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail });
+  const handleExportProject = makeHandleExportProject({ projects, getProjectExportUrl });
+  const handleRelocateProject = makeHandleRelocateProject({ relocateProject, loadProjects, fail });
+  const handleImportProject = makeHandleImportProject({ importProject, loadProjects, fail });
 
   return { handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject };
 }

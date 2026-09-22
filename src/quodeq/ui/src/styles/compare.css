@@ -11,6 +11,15 @@
    strip's own bottom margin stacks on top of the gap. */
 .compare-page .term-stat-strip { margin-bottom: 0; }
 
+/* The dimension drill-down's body is one tabpanel region, so its sections
+   are children of that wrapper rather than of .compare-page. It repeats the
+   page's own column rhythm so the spacing is unchanged. */
+.compare-dimension-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--term-space-3);
+}
+
 /* Pre-projectsLoaded fleet-table stand-in (CompareSkeleton.jsx). Same
    idiom as dashboard.css .overview-skeleton: static dimmed blocks. */
 .compare-skeleton {
@@ -1459,7 +1468,8 @@ button.compare-matrix__cell:hover { background: color-mix(in srgb, currentColor 
 /* Rendered through a portal at a FIXED position (the component computes
    top/bottom/left inline from the button's rect): the projects table is an
    overflow container that would clip an in-flow popover for rows near its
-   bottom edge. max-height must stay in sync with DUEL_MENU_MAX_H. */
+   bottom edge. max-height must stay in sync with LAUNCHER_MENU_MAX_H
+   (compareLauncherMenu.js). */
 .compare-dueltrigger__menu {
   position: fixed;
   z-index: 80;

@@ -1,8 +1,7 @@
-import json
 from types import SimpleNamespace
 
-from quodeq.assistant.adapters._api import ApiTurnConfig, run_api_turn
-from quodeq.assistant.tools._registry import ToolRegistry, ToolSpec
+from quodeq.assistant.adapters.api import ApiTurnConfig, ApiTurnSession, run_api_turn
+from quodeq.assistant.tools.registry import ToolRegistry, ToolSpec
 from tests._timeouts import budget
 
 
@@ -45,6 +44,12 @@ def _registry():
     return reg
 
 
+def _session(emit, cancel=None):
+    if cancel is None:
+        return ApiTurnSession(registry=_registry(), emit=emit)
+    return ApiTurnSession(registry=_registry(), emit=emit, cancel=cancel)
+
+
 def _config(native=True):
     return ApiTurnConfig(api_base="http://x/v1", api_key=None,
                          model="m", native_tools=native)
@@ -54,8 +59,8 @@ def test_plain_streamed_answer():
     client = FakeClient([[_delta("Hel"), _delta("lo"), _delta(finish="stop")]])
     frames = []
     text = run_api_turn(messages=[{"role": "user", "content": "hi"}],
-                        config=_config(), registry=_registry(),
-                        emit=frames.append, client_factory=lambda c: client)
+                        config=_config(), session=_session(frames.append),
+                        client_factory=lambda c: client)
     assert text == "Hello"
     assert [f["text"] for f in frames if f["type"] == "token"] == ["Hel", "lo"]
     assert client.calls[0]["stream"] is True
@@ -72,8 +77,8 @@ def test_native_tool_loop_dispatches_and_feeds_result_back():
     client = FakeClient([turn1, turn2])
     frames = []
     text = run_api_turn(messages=[{"role": "user", "content": "score?"}],
-                        config=_config(), registry=_registry(),
-                        emit=frames.append, client_factory=lambda c: client)
+                        config=_config(), session=_session(frames.append),
+                        client_factory=lambda c: client)
     assert text == "Grade is C"
     tool_frames = [f for f in frames if f["type"] == "tool_call"]
     assert tool_frames == [{"type": "tool_call", "name": "get_scores", "ok": True}]
@@ -90,8 +95,8 @@ def test_fallback_mode_uses_prompted_json_and_no_tools_param():
     turn2 = [_delta("C grade"), _delta(finish="stop")]
     client = FakeClient([turn1, turn2])
     text = run_api_turn(messages=[{"role": "user", "content": "score?"}],
-                        config=_config(native=False), registry=_registry(),
-                        emit=lambda f: None, client_factory=lambda c: client)
+                        config=_config(native=False), session=_session(lambda f: None),
+                        client_factory=lambda c: client)
     assert text == "C grade"
     assert "tools" not in client.calls[0]
     system = client.calls[0]["messages"][0]["content"]
@@ -111,8 +116,8 @@ def test_tool_call_frame_carries_args_summary():
     client = FakeClient([turn1, turn2])
     frames = []
     run_api_turn(messages=[{"role": "user", "content": "score?"}],
-                 config=_config(native=False), registry=_registry(),
-                 emit=frames.append, client_factory=lambda c: client)
+                 config=_config(native=False), session=_session(frames.append),
+                 client_factory=lambda c: client)
     tool_frames = [f for f in frames if f["type"] == "tool_call"]
     assert tool_frames and tool_frames[0]["argsSummary"].startswith('{"')
 
@@ -124,8 +129,8 @@ def test_iteration_cap_ends_turn():
     ]
     client = FakeClient([list(looping) for _ in range(10)])
     text = run_api_turn(messages=[{"role": "user", "content": "x"}],
-                        config=_config(), registry=_registry(),
-                        emit=lambda f: None, client_factory=lambda c: client)
+                        config=_config(), session=_session(lambda f: None),
+                        client_factory=lambda c: client)
     assert "tool iteration limit" in text
     assert len(client.calls) == 6  # MAX_TOOL_ITERATIONS
 
@@ -139,13 +144,13 @@ def test_iteration_cap_is_config_driven():
     config = ApiTurnConfig(api_base="http://x", api_key=None, model="m",
                            native_tools=True, max_tool_iterations=2)
     run_api_turn(messages=[{"role": "user", "content": "x"}],
-                 config=config, registry=_registry(),
-                 emit=lambda f: None, client_factory=lambda c: client)
+                 config=config, session=_session(lambda f: None),
+                 client_factory=lambda c: client)
     assert len(client.calls) == 2
 
 
 def test_extra_body_disables_thinking_for_local_and_sets_ctx(monkeypatch):
-    from quodeq.assistant.adapters._api import ApiTurnConfig, _extra_body
+    from quodeq.assistant.adapters.api import ApiTurnConfig, _extra_body
     monkeypatch.setenv("QUODEQ_CONTEXT_SIZE", "32768")
     local = ApiTurnConfig(api_base="http://localhost:11434/v1", api_key=None, model="m", native_tools=True)
     body = _extra_body(local)
@@ -157,7 +162,7 @@ def test_extra_body_disables_thinking_for_local_and_sets_ctx(monkeypatch):
 
 
 def test_extra_body_openai_uses_reasoning_effort(monkeypatch):
-    from quodeq.assistant.adapters._api import ApiTurnConfig, _extra_body
+    from quodeq.assistant.adapters.api import ApiTurnConfig, _extra_body
     monkeypatch.delenv("QUODEQ_CONTEXT_SIZE", raising=False)
     cloud = ApiTurnConfig(api_base="https://api.openai.com/v1", api_key="k", model="gpt", native_tools=True)
     body = _extra_body(cloud)
@@ -190,8 +195,8 @@ def test_cancel_mid_stream_raises_turn_cancelled_with_partial():
 
     with pytest.raises(TurnCancelled) as exc:
         run_api_turn(messages=[{"role": "user", "content": "hi"}],
-                     config=_config(), registry=_registry(),
-                     emit=emit, client_factory=lambda c: client, cancel=token)
+                     config=_config(), session=_session(emit, cancel=token),
+                     client_factory=lambda c: client)
     assert exc.value.partial == "Hel"
     assert [f["text"] for f in frames if f["type"] == "token"] == ["Hel"]
 
@@ -205,8 +210,8 @@ def test_precancelled_closes_client_and_skips_request():
 
     with pytest.raises(TurnCancelled) as exc:
         run_api_turn(messages=[{"role": "user", "content": "hi"}],
-                     config=_config(), registry=_registry(),
-                     emit=lambda f: None, client_factory=lambda c: client, cancel=token)
+                     config=_config(), session=_session(lambda f: None, cancel=token),
+                     client_factory=lambda c: client)
     assert exc.value.partial == ""
     assert client.calls == []      # never asked the model anything
     assert client.closed is True   # kill hook ran immediately
@@ -231,8 +236,8 @@ def test_stream_error_while_cancelled_is_turn_cancelled():
 
     with pytest.raises(TurnCancelled) as exc:
         run_api_turn(messages=[{"role": "user", "content": "hi"}],
-                     config=_config(), registry=_registry(),
-                     emit=emit, client_factory=lambda c: client, cancel=token)
+                     config=_config(), session=_session(emit, cancel=token),
+                     client_factory=lambda c: client)
     assert exc.value.partial == "Hel"
 
 
@@ -246,8 +251,8 @@ def test_stream_error_without_cancel_still_raises():
     client = ClosableFakeClient([dying_stream()])
     with pytest.raises(RuntimeError, match="connection dropped"):
         run_api_turn(messages=[{"role": "user", "content": "hi"}],
-                     config=_config(), registry=_registry(),
-                     emit=lambda f: None, client_factory=lambda c: client)
+                     config=_config(), session=_session(lambda f: None),
+                     client_factory=lambda c: client)
 
 
 def test_cancel_interrupts_a_stalled_stream_read():
@@ -275,9 +280,8 @@ def test_cancel_interrupts_a_stalled_stream_read():
     def _turn():
         try:
             run_api_turn(messages=[{"role": "user", "content": "hi"}],
-                         config=_config(), registry=_registry(),
-                         emit=lambda f: None, client_factory=lambda c: client,
-                         cancel=token)
+                         config=_config(), session=_session(lambda f: None, cancel=token),
+                         client_factory=lambda c: client)
             outcome["result"] = "returned"
         except TurnCancelled as exc:
             outcome["result"] = "cancelled"

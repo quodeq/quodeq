@@ -42,10 +42,10 @@ def _write_overrides(project_root: Path, overrides: dict) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _clear_caches():
-    fingerprint._hash_standards.cache_clear()
-    yield
-    fingerprint._hash_standards.cache_clear()
+def _clear_caches(monkeypatch):
+    # Fresh HashCache per test: isolation via injection (swapping the
+    # module-default instance), not a cache_clear() attribute hook.
+    monkeypatch.setattr(fingerprint, "_hash_cache", fingerprint.HashCache())
 
 
 @pytest.fixture()
@@ -86,7 +86,7 @@ def test_revert_restores_empty_hash(standards_dir, project_root):
     _write_overrides(project_root, {"M-ANA-2": {"max_lines": 60}})
     assert dimension_params_state(standards_dir, DIM, project_root)[0] != ""
     (project_root / OVERRIDES_RELPATH).unlink()
-    dimension_params_state.cache_clear()
+    fingerprint.reset_hash_caches()
     assert dimension_params_state(standards_dir, DIM, project_root)[0] == ""
 
 
@@ -159,3 +159,60 @@ def test_deeply_nested_compiled_file_hashes_empty(standards_dir, project_root, d
         deeply_nested_json, encoding="utf-8")
 
     assert dimension_params_state(standards_dir, DIM, project_root) == ("", {})
+
+
+# ---------------------------------------------------------------------------
+# Shared params-hash formula (writer + schema migration must agree)
+# ---------------------------------------------------------------------------
+
+import hashlib  # noqa: E402
+
+from quodeq.core.standards.overrides import (  # noqa: E402
+    dimension_params,
+    hash_non_default_params,
+    non_default_from_effective,
+)
+
+_PARAMS_DIM = {
+    "principles": [{
+        "requirements": [
+            {"id": "M-1", "params": {"max_lines": {"default": 50, "min": 10, "max": 500}}},
+            {"id": "M-2", "params": {"depth": {"default": 3}}},
+        ],
+    }],
+}
+
+
+def test_hash_non_default_params_empty_is_blank():
+    assert hash_non_default_params({}) == ""
+
+
+def test_hash_non_default_params_matches_canonical_sha256():
+    nd = {"M-1": {"max_lines": 60}}
+    expected = hashlib.sha256(
+        json.dumps(nd, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    assert hash_non_default_params(nd) == expected
+
+
+def test_non_default_from_effective_diffs_against_declared_defaults():
+    effective = {"M-1": {"max_lines": 60}, "M-2": {"depth": 3}}
+    assert non_default_from_effective(_PARAMS_DIM, effective) == {"M-1": {"max_lines": 60}}
+
+
+def test_non_default_from_effective_all_defaults_is_empty():
+    effective, _ = dimension_params(_PARAMS_DIM, {})
+    assert non_default_from_effective(_PARAMS_DIM, effective) == {}
+
+
+def test_non_default_from_effective_agrees_with_dimension_params():
+    overrides = {"M-2": {"depth": 5}}
+    effective, non_default = dimension_params(_PARAMS_DIM, overrides)
+    assert non_default_from_effective(_PARAMS_DIM, effective) == non_default
+
+
+def test_non_default_from_effective_treats_undeclared_requirement_as_non_default():
+    # A requirement the compiled standards no longer declare has no known
+    # default, so its stored values count as non-default (stale hash, one
+    # re-eval) rather than silently matching a default-config key.
+    assert non_default_from_effective(_PARAMS_DIM, {"GONE": {"x": 1}}) == {"GONE": {"x": 1}}

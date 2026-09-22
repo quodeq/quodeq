@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -6,6 +5,10 @@ import { SidePaneWindow } from './SidePaneWindow.jsx';
 
 beforeEach(() => {
   Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+});
+
+afterEach(() => {
+  delete navigator.clipboard;
 });
 
 function makeSpec(overrides = {}) {
@@ -38,6 +41,20 @@ describe('SidePaneWindow', () => {
     render(<SidePaneWindow spec={makeSpec({ copy: () => 'clip!' })} onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /copy/i }));
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('clip!');
+  });
+
+  it('a rejected copy does not flip the button into the "Copied" state', async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(<SidePaneWindow spec={makeSpec({ copy: () => 'clip!' })} onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('clip!'));
+    // Give the rejected copyToClipboard() promise a tick to settle before
+    // asserting the button never flipped to the "Copied" state.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+    warnSpy.mockRestore();
   });
 
   it('omits the Copy button when spec.copy is not provided', () => {

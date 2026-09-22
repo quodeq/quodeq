@@ -1,0 +1,44 @@
+# Grandfathered tests asserting more than 8 things (Python
+# `assert`/`pytest.raises`, JS `expect(` per `it()`). Do NOT add entries
+# without justification -- the goal is to burn this list to zero by
+# splitting tests, one behaviour per test, not to grow it.
+# Regenerate intentionally: python tools/check_test_asserts.py --update-baseline
+# Entries are keyed relpath:test_name (a method keeps its class).
+src/quodeq/ui/src/api/shared.config.test.jsx:sharedListProjects returns envelope with projects, lastSynced, and stale
+src/quodeq/ui/src/features/assistant/useAssistantStream.test.jsx:two turns over ONE stream produce two separate assistant bubbles
+src/quodeq/ui/src/features/dashboard/components/DashboardPage.fadeOnceIdentity.test.jsx:carries dashboard-appear on first content appearance, holds it through unrelated re-renders for the animation window, then releases
+src/quodeq/ui/src/features/dashboard/components/DashboardPage.noRunsTransition.test.jsx:keeps the empty state (dimmed) through the post-eval selectedRun flip, then swaps straight to content
+src/quodeq/ui/src/features/dashboard/hooks/usePublish.doubleClickAndPoll.test.jsx:polls getSharedStatus every 2s while running and stops once done, refetching the shared list
+src/quodeq/ui/src/features/dashboard/hooks/usePublish.reconcileAndLifecycle.test.jsx:reconciles publish state on re-enable after the job completed while disabled
+src/quodeq/ui/src/features/evaluation/components/JobStatStrip.test.jsx:renders 4 stat cells for a running job
+src/quodeq/ui/src/features/map/viz/components/galaxyFolderScene.test.jsx:rootStars carry the expected per-star fields
+src/quodeq/ui/src/features/onboarding/onboarding.integration.test.jsx:walks Welcome → Repo & Scan → Provider → Standard & Launch and emits onLaunch
+src/quodeq/ui/src/features/terminal/useTerminalSessions.test.jsx:a burst of concurrent reconciles shares one fetch/create cycle and one re-render
+tests/analysis/test_command_builder.py:TestBuildAiCmdCodex.test_inlines_codex_mcp_config_arg_with_jsonl
+tests/analysis/test_copilot_provider.py:test_copilot_command_line_flags
+tests/analysis/test_prompt_builder.py:TestBuildAnalysisPrompt.test_substitutes_all_variables
+tests/analysis/test_report_assembly_coverage.py:TestAssembleReportDict.test_basic_assembly
+tests/api/test_assistant_routes_turn_slots.py:test_stop_cancels_running_turn_and_frees_the_token
+tests/api/test_assistant_routes_turn_slots.py:test_turn_state_instances_are_independent
+tests/api/test_routes_findings_bulk.py:TestDeleteEndpoint.test_delete_returns_delta_envelope
+tests/api/test_routes_findings_lists.py:TestListDismissedEndpoint.test_list_enriches_legacy_runs_from_json_eval_files
+tests/api/test_routes_project_list_scan.py:TestProjectEstimates.test_happy_path_with_dimensions_param
+tests/api/test_routes_shared_config_delete.py:test_delete_config_waits_for_clone_lock
+tests/assistant/test_cli_command.py:test_claude_turn1_preassigns_session_id
+tests/assistant/test_cli_config.py:test_codex_chat_config_is_mcp_only_externally_sandboxed
+tests/core/test_finding_builder.py:TestBuildFindingBase.test_full_spec
+tests/core/test_finding_mappings.py:TestFindingToResponseDict.test_shape_matches_legacy_evidence_dict
+tests/core/test_standards.py:test_load_maintainability_dimension
+tests/data/cache_store/test_migrate.py:TestMigrateEntries.test_v3_entry_becomes_reachable_at_v4_key
+tests/data/fs/report_parser/test_cluster6_evidence_sqlite_batch.py:test_load_evidence_map_groups_correctly_across_dimensions
+tests/data/sqlite/test_row_mappers.py:test_judgment_to_row_maps_required_fields
+tests/data/test_shared_repo_lock.py:test_refresh_waits_for_publish
+tests/integration/test_assistant_hidden_standards.py:test_hidden_standard_is_absent_from_every_general_answer
+tests/services/test_dashboard_build_filtering.py:TestHistoryContextSlimming.test_history_keys_drop_finding_bodies_but_keep_scores
+tests/services/test_response_builders_seam.py:test_fake_reader_drives_full_response
+tests/services/test_runs_unit.py:test_ui_status_mapping
+tests/test_cli_coverage.py:TestParserAdditionalFlags.test_defaults
+tests/test_cli_env_injection.py:test_resolve_limits_reads_every_cap_from_the_injected_env
+tests/test_cli_run_config_phases.py:TestBuildAnalysisOptions.test_maps_resolved_locals_and_limits_onto_the_options
+tests/tools/test_compile_standards.py:test_compile_dimension_output_shape
+tests/update/test_selfupdate.py:test_happy_path_swaps_bundle_and_relaunches

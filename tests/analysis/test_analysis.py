@@ -3,9 +3,7 @@ from __future__ import annotations
 
 import json
 from io import StringIO
-from pathlib import Path
 
-import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig, _build_ai_cmd
 from quodeq.analysis.stream.parser import _extract_jsonl_from_text, extract_evidence_from_stream
@@ -160,7 +158,7 @@ class TestExtractEvidenceFromStream:
         stream = tmp_path / "stream.json"
         jsonl = tmp_path / "evidence.jsonl"
         stream.write_text("not json\n" + _assistant_text_event(_evidence_line()) + "\n")
-        files_read = extract_evidence_from_stream(stream, jsonl)
+        extract_evidence_from_stream(stream, jsonl)
         lines = jsonl.read_text().strip().splitlines()
         assert len(lines) == 1
 

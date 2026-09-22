@@ -12,13 +12,18 @@ import os
 import subprocess
 import sys
 
-from quodeq.shared._io import configure_stdio_utf8
+from quodeq.shared.text_io import configure_stdio_utf8
+import pytest
+
+# The code under test sets PYTHONUTF8 / QUODEQ_WEBVIEW_TOKEN for the process;
+# restore os.environ wholesale so the env-leak guard in tests/conftest.py stays green.
+pytestmark = pytest.mark.usefixtures("restore_environ")
 
 
 def test_non_ascii_print_survives_ascii_console(tmp_path) -> None:
     script = tmp_path / "print_unicode.py"
     script.write_text(
-        "from quodeq.shared._io import configure_stdio_utf8\n"
+        "from quodeq.shared.text_io import configure_stdio_utf8\n"
         "configure_stdio_utf8()\n"
         "print('caf\\u00e9 \\u2713 \\U0001f600')\n",
         encoding="utf-8",

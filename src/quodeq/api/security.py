@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import hmac
 import logging
+import re
 import time
+from collections.abc import Mapping
 from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._rate_limit import RateLimitStore
+from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.constants import SECRET_SUFFIX_CHARS
+from quodeq.shared.dashboard_ports import alt_port_origins
 
 _logger = logging.getLogger(__name__)
 
@@ -26,16 +31,107 @@ _RATE_LIMIT_EXEMPT_PATHS = frozenset({
     "/api/findings/delete",
 })
 _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
+_BEARER_PREFIX = "Bearer "
+_MIN_BEARER_HEADER_LEN = len(_BEARER_PREFIX) + SECRET_SUFFIX_CHARS
 
 # Marker substring in the native webview's User-Agent (set by
-# quodeq.dashboard._webview_window). Requests carrying it are the trusted
-# local desktop shell and are served 'unsafe-eval' so pywebview's
-# new Function() JS bridge works; browsers keep the strict script-src.
-# Loopback-only exposure: a local process could spoof this UA, but it
-# would already have local code execution. The literal MUST match
-# _webview_window._WEBVIEW_UA_MARKER (drift-guarded by
+# quodeq.dashboard._webview_window_about). Kept for human-readable UA
+# strings only — it's a fixed, publicly-known string, so it is NOT what
+# grants 'unsafe-eval' (see _is_trusted_webview below). The literal MUST
+# match _webview_window_about._WEBVIEW_UA_MARKER (drift-guarded by
 # tests/dashboard/test_native_chrome.py).
 _WEBVIEW_UA_MARKER = "QuodeqDesktop"
+
+# Env var carrying the per-launch shared secret _server.py generates and
+# hands to the API subprocess (env) and the webview subprocess (argv), which
+# embeds it in its own UA. Requests whose UA carries the matching token are
+# the trusted local desktop shell and are served 'unsafe-eval' so pywebview's
+# new Function() JS bridge works; everyone else keeps the strict script-src.
+# Unset (e.g. the dashboard run standalone via `quodeq api`, not through the
+# desktop launcher) means the relaxation never fires.
+_ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
+
+# UA prefix the webview puts ahead of the token (see
+# _webview_window_about._webview_user_agent). Must match there.
+_WEBVIEW_TOKEN_UA_PREFIX = "QuodeqWebviewToken/"
+
+
+def _webview_token_from_ua(user_agent: str) -> str | None:
+    idx = user_agent.find(_WEBVIEW_TOKEN_UA_PREFIX)
+    if idx == -1:
+        return None
+    rest = user_agent[idx + len(_WEBVIEW_TOKEN_UA_PREFIX):]
+    candidate = rest.split(" ", 1)[0]
+    if not candidate:
+        return None
+    # hmac.compare_digest raises TypeError on a non-ASCII str, and Werkzeug
+    # decodes request headers as latin-1, so any UA byte >= 0x80 inside the
+    # token would otherwise blow up _is_trusted_webview from inside the
+    # after_request hook -- turning every request into a 500 with none of
+    # the security headers set. The real token is secrets.token_urlsafe(),
+    # always ASCII, so a non-ASCII candidate can never be a match anyway:
+    # drop it here and fail closed like any other wrong token.
+    return candidate if candidate.isascii() else None
+
+
+def _is_trusted_webview(user_agent: str, env: Mapping[str, str] | None = None) -> bool:
+    """True only for a request carrying this launch's webview token.
+
+    Reads QUODEQ_WEBVIEW_TOKEN from *env* (os.environ by default) lazily, not
+    at module load, so it reflects whatever _server.py set in this process's
+    environment before spawning the API subprocess, and so standalone
+    (non-desktop) runs that never set it always fail closed here regardless
+    of UA content.
+    """
+    expected = resolve_env(env).get(_ENV_WEBVIEW_TOKEN)
+    # isascii() for the same reason _webview_token_from_ua guards the
+    # candidate: compare_digest raises TypeError if EITHER str is non-ASCII,
+    # and this one comes from the environment, which an operator can set by
+    # hand. _get_webview_token() only ever produces token_urlsafe() output,
+    # so a non-ASCII value here is a misconfiguration, not a match.
+    if not expected or not expected.isascii():
+        return False
+    candidate = _webview_token_from_ua(user_agent)
+    if not candidate:
+        return False
+    return hmac.compare_digest(candidate, expected)
+
+
+# Host header must look like a bare hostname/IPv4 or a bracketed IPv6
+# literal (RFC 3986 host syntax, e.g. "[::1]:7863"), with an optional port,
+# before it's trusted enough to interpolate into the CSP connect-src
+# directive. Rejects quotes, whitespace, and other characters that could
+# inject extra CSP directives or sources via a spoofed Host header.
+# The IPv6 branch matters here: ::1 is a first-class local address elsewhere
+# in this app (_LOCALHOST_ADDRS below, dashboard/_networking.py,
+# dashboard/_webview_window_native_ops.py's reload allowlist), so a client
+# reaching this dashboard over IPv6 loopback is a real access path, not a
+# hypothetical.
+_VALID_HOST_RE = re.compile(r"^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:\d+)?$")
+
+# connect-src alt-port origins probed by useServerHealth.js's
+# altPortCandidates()/PORT_SCAN_SPAN (shared/dashboard_ports.py). CSP has no
+# port wildcard so each origin is enumerated explicitly. Loopback addresses
+# only, so cross-site exfil to external attackers is still blocked. The
+# currentPort..+4 neighbourhood useServerHealth also probes for a non-default
+# QUODEQ_DASHBOARD_PORT stays uncovered here beyond 'self'. Depends on no
+# request data, so it is built once here instead of on every response.
+_ALT_PORT_ORIGINS = alt_port_origins()
+
+# Cooldown between consecutive "CSP same-origin ws computation failed" log
+# lines. This except block sits in after_request, so it runs on every
+# response; if the computation starts failing under some sustained condition
+# we still want the FIRST occurrence surfaced immediately (was previously
+# silent), but must not turn a per-request code path into a per-request log
+# line -- that would make the failure itself a new source of log-volume
+# noise. Module-level, best-effort (no lock): a rare double-log right at the
+# window boundary under concurrent requests is harmless: it's a diagnostic
+# throttle, not a correctness guarantee.
+_CSP_WS_FAILURE_LOG_INTERVAL_S = 60.0
+# None, not 0.0: time.monotonic() is seconds-since-boot, so a 0.0 sentinel
+# would silently drop the first failure on any machine up for less than the
+# interval (a desktop app launched at login).
+_last_csp_ws_failure_log_at: float | None = None
 
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
@@ -51,7 +147,7 @@ def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
         return None
     if api_key:
         auth = request.headers.get("Authorization", "")
-        if not hmac.compare_digest(auth, f"Bearer {api_key}"):
+        if not hmac.compare_digest(auth, f"{_BEARER_PREFIX}{api_key}"):
             return jsonify({"error": "Unauthorized", "code": "UNAUTHORIZED"}), HTTPStatus.UNAUTHORIZED
     else:
         remote = request.remote_addr or ""
@@ -84,23 +180,83 @@ def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] 
         return None
     ip = request.remote_addr or "unknown"
     now = time.monotonic()
-    if store.check(ip, now):
+    if hasattr(store, "check_and_record"):
+        limited = store.check_and_record(ip, now)
+    else:
+        # Back-compat: external RateLimitStore implementers written against
+        # the old check()/record() Protocol don't have check_and_record.
+        limited = store.check(ip, now)
+        if not limited:
+            store.record(ip, now)
+    if limited:
         return jsonify({"error": "Too many requests", "code": "RATE_LIMITED"}), HTTPStatus.TOO_MANY_REQUESTS
-    store.record(ip, now)
     return None
 
 
-def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: str | None) -> None:
-    """Register before/after request hooks for auth, CSRF, rate-limiting, and security headers."""
+def _same_origin_ws_sources(host: str) -> str:
+    """Build the same-origin ``ws:``/``wss:`` connect-src entry for *host*.
 
-    @app.before_request
-    def _audit_log() -> None:
-        actor = ""
-        if api_key:
-            auth = request.headers.get("Authorization", "")
-            if auth.startswith("Bearer ") and len(auth) > 11:
-                actor = f" (actor=key:***{auth[-4:]})"
-        _logger.info("API: %s %s%s", request.method, request.path, actor)
+    *host* is the raw, attacker-controlled Host header (``request.host``).
+    It's only interpolated into the CSP when it matches a bare
+    ``hostname[:port]`` shape; otherwise the same-origin entry is omitted
+    (the alt-port origins already in connect-src still cover local
+    dev/desktop use) rather than reflecting attacker-controlled bytes into
+    a security header.
+    """
+    if not _VALID_HOST_RE.match(host):
+        return ""
+    return f"ws://{host} wss://{host}"
+
+
+def _actor(api_key: str | None) -> str:
+    if api_key:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith(_BEARER_PREFIX) and len(auth) > _MIN_BEARER_HEADER_LEN:
+            return f" (actor=key:***{auth[-SECRET_SUFFIX_CHARS:]})"
+    return ""
+
+
+def _log_csp_ws_failure(exc: Exception) -> None:
+    """Surface a same-origin ws CSP computation failure, rate-limited.
+
+    Runs inside ``after_request`` on every response, so this must never
+    raise and must never become an unbounded log source on its own: only
+    the exception's type name is logged (no header/request content, so
+    nothing attacker-controlled reaches the log line), and repeats within
+    ``_CSP_WS_FAILURE_LOG_INTERVAL_S`` are dropped. A failing handler is the
+    handler's problem (stdlib handleError contract); this module does not
+    control its logger's handlers, and ``_add_security_headers`` already
+    logs unguarded on every request, so a guard here never covered the
+    real risk.
+    """
+    global _last_csp_ws_failure_log_at
+    now = time.monotonic()
+    if (
+        _last_csp_ws_failure_log_at is not None
+        and now - _last_csp_ws_failure_log_at < _CSP_WS_FAILURE_LOG_INTERVAL_S
+    ):
+        return
+    _last_csp_ws_failure_log_at = now
+    _logger.warning(
+        "CSP same-origin ws/wss connect-src computation failed (%s); "
+        "omitting that entry for this response (further repeats "
+        "suppressed for %ss)",
+        type(exc).__name__,
+        _CSP_WS_FAILURE_LOG_INTERVAL_S,
+    )
+
+
+def configure_security(
+    app: Flask,
+    rate_limit_store: RateLimitStore,
+    api_key: str | None,
+    env: Mapping[str, str] | None = None,
+) -> None:
+    """Register before/after request hooks for auth, CSRF, rate-limiting, and security headers.
+
+    *env* is captured once here, at app-creation time, rather than read per
+    request; ``None`` keeps the per-request lookup against ``os.environ``.
+    """
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
@@ -108,30 +264,22 @@ def configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: st
 
     @app.after_request
     def _add_security_headers(response: Response) -> Response:
+        _logger.info(
+            "API: %s %s%s -> %d", request.method, request.path, _actor(api_key), response.status_code
+        )
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        # connect-src: include alt-port origins probed by useServerHealth
-        # (DEFAULT_ALT_PORTS = [4180, 4181, 4182, 4183] in useServerHealth.js).
-        # CSP has no port wildcard so each origin is enumerated explicitly.
-        # These are loopback addresses only — cross-site exfil to external
-        # attackers is still blocked.
-        _alt_port_origins = " ".join(
-            f"http://127.0.0.1:{p} http://localhost:{p} "
-            f"ws://127.0.0.1:{p} ws://localhost:{p}"
-            for p in (4180, 4181, 4182, 4183)
-        )
         # The primary bind port isn't known here; add same-origin ws explicitly.
-        _self_ws = ""
         try:
-            from flask import request as _req
-            _self_ws = f"ws://{_req.host} wss://{_req.host}"
-        except Exception:
-            _self_ws = ""
-        is_webview = _WEBVIEW_UA_MARKER in request.headers.get("User-Agent", "")
+            self_ws = _same_origin_ws_sources(request.host)
+        except Exception as exc:
+            self_ws = ""
+            _log_csp_ws_failure(exc)
+        is_webview = _is_trusted_webview(request.headers.get("User-Agent", ""), env)
         script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            f"connect-src 'self' {_alt_port_origins} {_self_ws}; "
+            f"connect-src 'self' {_ALT_PORT_ORIGINS} {self_ws}; "
             f"{script_src}; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "

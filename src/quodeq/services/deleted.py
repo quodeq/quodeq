@@ -5,51 +5,35 @@ deleted list permanently suppresses any finding whose
 ``(dimension, principle, file)`` matches an entry. Future scans will not
 surface those findings again. Deletion is one-way: there is no restore.
 
-The on-disk file ``deleted.json`` lives next to ``dismissed.json`` and is
-guarded by the same kind of POSIX file lock used by ``dismissed.py``.
+The on-disk file ``deleted.json`` lives next to ``dismissed.json``; its
+format and lock mechanics live in ``quodeq.data.fs.deleted_store`` — this
+module keeps the business rules only (key semantics, deduplication,
+sweeping matching dismissed entries).
 """
 from __future__ import annotations
 
-import json
 import logging
-import os
-from contextlib import contextmanager
-from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
-from quodeq.services.dismissed import load_dismissed
-from quodeq.services.suppression_keys import is_deleted
-from quodeq.core.events.models import (
-    FindingUndismissed,
-    FindingUndismissedEvent,
+from quodeq.core.dismissals import DismissedEntry, DismissedKeys
+from quodeq.core.finding_identity import DismissKey, finding_dismiss_keys, snippet_fingerprint
+from quodeq.data.ports.actions_log import ActionLog
+from quodeq.services.dismissed_listing import load_dismissed
+from quodeq.services._run_recency import run_dirs_newest_first
+from quodeq.services.dismissed import dismissed_keys, filter_dimension_violations, undismiss_event
+from quodeq.services.wiring import (
+    ActionLogWriter,
+    find_dismissed_matching,
+    locked_deleted_store,
+    read_deleted_entries,
+    write_deleted_entries,
 )
+from quodeq.services.suppression_keys import is_deleted
 from quodeq.core.types.finding import Finding
-from quodeq.data._file_lock import lock_file, unlock_file
-from quodeq.data.actions_log import ActionLogWriter
-from quodeq.services.dismissed import recount_totals
 
 
 _logger = logging.getLogger(__name__)
-
-_FILENAME = "deleted.json"
-
-
-def _deleted_path(project_dir: Path) -> Path:
-    return project_dir / _FILENAME
-
-
-@contextmanager
-def _locked(project_dir: Path):
-    lock_path = project_dir / "deleted.json.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
-    try:
-        lock_file(fd)
-        yield
-    finally:
-        unlock_file(fd)
-        os.close(fd)
 
 
 def _key(entry: dict) -> tuple:
@@ -62,16 +46,7 @@ def _key(entry: dict) -> tuple:
 
 def load_deleted(project_dir: Path) -> list[dict]:
     """Load deleted suppressions for a project. Returns empty list if none."""
-    path = _deleted_path(project_dir)
-    if not path.exists():
-        return []
-    try:
-        items = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    if not isinstance(items, list):
-        return []
-    return items
+    return read_deleted_entries(project_dir)
 
 
 def deleted_keys(project_dir: Path) -> set[tuple]:
@@ -88,15 +63,7 @@ def _entry_from_finding(finding: dict) -> dict:
     }
 
 
-def _write_deleted(project_dir: Path, entries: list[dict]) -> None:
-    path = _deleted_path(project_dir)
-    if entries:
-        path.write_text(json.dumps(entries, indent=2), encoding="utf-8")
-    elif path.exists():
-        path.unlink()
-
-
-def delete_finding(project_dir: Path, finding: dict) -> int:
+def delete_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None = None) -> int:
     """Permanently suppress a finding by (dimension, principle, file).
 
     Also undismisses any dismissed findings that share the same suppression
@@ -107,16 +74,45 @@ def delete_finding(project_dir: Path, finding: dict) -> int:
     if not new_key[1] or not new_key[2]:
         return 0
     swept = 0
-    with _locked(project_dir):
+    with locked_deleted_store(project_dir):
         existing = load_deleted(project_dir)
         if new_key not in {_key(e) for e in existing}:
             existing.append(_entry_from_finding(finding))
-            _write_deleted(project_dir, existing)
-        swept = _sweep_dismissed_matching(project_dir, new_key)
+            write_deleted_entries(project_dir, existing)
+        swept = _sweep_dismissed_matching(project_dir, new_key, writer=writer)
     return swept
 
 
-def delete_all_dismissed(project_dir: Path) -> int:
+def _add_deleted_entries(project_dir: Path, findings: list[dict]) -> None:
+    """Append a deleted entry per unique, fully-keyed finding and write the store.
+
+    Caller holds the deleted-store lock.
+    """
+    existing = load_deleted(project_dir)
+    existing_keys = {_key(e) for e in existing}
+    for finding in findings:
+        k = _key(finding)
+        if not k[1] or not k[2] or k in existing_keys:
+            continue
+        existing.append(_entry_from_finding(finding))
+        existing_keys.add(k)
+    write_deleted_entries(project_dir, existing)
+
+
+def _dismissed_row_entry(row: dict) -> DismissedEntry:
+    """The actions-log entry a dismissed row (as listed by ``load_dismissed``) names."""
+    return DismissedEntry(
+        row.get("req", ""), row.get("file", ""), int(row.get("line", 0)),
+        row.get("fingerprint") or None,
+    )
+
+
+def _emit_undismiss(log: ActionLog, entries: list[DismissedEntry]) -> None:
+    """Undismiss *entries* via the action log in one write."""
+    log.emit_many([undismiss_event(entry) for entry in entries])
+
+
+def delete_all_dismissed(project_dir: Path, *, writer: ActionLog | None = None) -> int:
     """Convert every currently-dismissed entry into a permanent suppression.
 
     Reads dismissed findings from each run's evaluation.db, adds a deleted
@@ -124,63 +120,88 @@ def delete_all_dismissed(project_dir: Path) -> int:
     undismisses all of them via the action log.
     Returns the count of dismissed entries removed.
     """
-    with _locked(project_dir):
+    with locked_deleted_store(project_dir):
         dismissed_entries = load_dismissed(project_dir)
         if not dismissed_entries:
             return 0
-        existing = load_deleted(project_dir)
-        existing_keys = {_key(e) for e in existing}
-        for entry in dismissed_entries:
-            k = _key(entry)
-            if not k[1] or not k[2] or k in existing_keys:
-                continue
-            existing.append(_entry_from_finding(entry))
-            existing_keys.add(k)
-        _write_deleted(project_dir, existing)
-        # Undismiss all via the action log.
-        count = len(dismissed_entries)
-        writer = ActionLogWriter(project_dir)
-        for entry in dismissed_entries:
-            payload = FindingUndismissed(
-                req=entry.get("req", ""),
-                file=entry.get("file", ""),
-                line=int(entry.get("line", 0)),
-            )
-            writer.emit(FindingUndismissedEvent(payload=payload))
-        return count
+        _add_deleted_entries(project_dir, dismissed_entries)
+        log = writer or ActionLogWriter(project_dir)
+        _emit_undismiss(log, [_dismissed_row_entry(row) for row in dismissed_entries])
+        return len(dismissed_entries)
 
 
-def _sweep_dismissed_matching(project_dir: Path, key: tuple) -> int:
+def _entries_by_key(state: DismissedKeys) -> dict[DismissKey, list[DismissedEntry]]:
+    """The recorded entries under each identity a dismissed row may carry.
+
+    An entry is reachable by its fingerprint key and by its line key, so a
+    row found under either maps to it without a scan over every entry.
+    """
+    index: dict[DismissKey, list[DismissedEntry]] = {}
+    for entry in state.entries:
+        index.setdefault(entry.key, []).append(entry)
+        if entry.line_key != entry.key:
+            index.setdefault(entry.line_key, []).append(entry)
+    return index
+
+
+def _sweep_dismissed_matching(
+    project_dir: Path, key: tuple, *, writer: ActionLog | None = None,
+) -> int:
     """Undismiss every dismissed finding whose ``(dimension, principle, file)`` matches *key*.
 
-    Reads from each run's evaluation.db (via the data layer's
-    ``find_dismissed_matching``) to find dismissed findings that match the
-    deletion key, then appends FindingUndismissedEvent to actions.jsonl for each.
-    """
-    from quodeq.data.sqlite.findings_queries import find_dismissed_matching  # noqa: PLC0415
+    Reads each run's evaluation.db (via the data layer's
+    ``find_dismissed_matching``), newest run first, and appends one batch of
+    events per run as its matches are found instead of accumulating every
+    run's matches before writing any -- bounds peak memory to one run's
+    matches on projects with a large run history, and opens the log once per
+    run rather than once per row.
 
-    dimension, principle, file = key
+    Each dismissed row is mapped back to the actions-log entries that hide
+    it (any identity form, see ``finding_dismiss_keys``) so the undismiss
+    names the recorded entry -- by fingerprint when it has one -- and the
+    finding is released in every run, not only at the line this run holds.
+    An entry several runs hold is therefore released once. Returns the
+    number of entries released.
+    """
     if not project_dir.is_dir():
         return 0
 
-    matching: list[tuple[str, str, int]] = []
-    for run_dir in project_dir.iterdir():
-        if not run_dir.is_dir():
-            continue
-        matching.extend(
-            find_dismissed_matching(
-                run_dir, dimension=dimension, practice_id=principle, file=file,
-            )
-        )
+    index = _entries_by_key(dismissed_keys(project_dir))
+    log = writer or ActionLogWriter(project_dir)
+    released: set[DismissedEntry] = set()
+    for run_dir in run_dirs_newest_first(project_dir):
+        batch = _collect_run_releases(run_dir, key, index, released)
+        if batch:
+            _emit_undismiss(log, batch)
+    return len(released)
 
-    if not matching:
-        return 0
 
-    writer = ActionLogWriter(project_dir)
-    for req, f, line in matching:
-        payload = FindingUndismissed(req=req, file=f, line=line)
-        writer.emit(FindingUndismissedEvent(payload=payload))
-    return len(matching)
+def _collect_run_releases(
+    run_dir: Path, key: tuple, index: dict[DismissKey, list[DismissedEntry]],
+    released: set[DismissedEntry],
+) -> list[DismissedEntry]:
+    """The entries one run's matching dismissed rows release, skipping any in *released*.
+
+    Every newly released entry is added to *released* so a later run does not
+    name it again.
+    """
+    dimension, principle, file = key
+    batch: list[DismissedEntry] = []
+    for req, f, line, practice_id, snippet in find_dismissed_matching(
+        run_dir, dimension=dimension, practice_id=principle, file=file,
+    ):
+        keys = finding_dismiss_keys(
+            req=req, principle=practice_id, file=f, line=line, snippet=snippet)
+        targets = [entry for k in keys for entry in index.get(k, ())]
+        if not targets:
+            # SQL says dismissed but the log has no entry (stale
+            # projection): release the row by its own identity.
+            targets = [DismissedEntry(req, f, line, snippet_fingerprint(req, snippet))]
+        for entry in targets:
+            if entry not in released:
+                released.add(entry)
+                batch.append(entry)
+    return batch
 
 
 def is_finding_deleted(
@@ -205,23 +226,13 @@ def filter_deleted_from_dimensions(
     keys = deleted_keys(project_dir)
     if not keys:
         return dimensions
-    result = []
-    for dim in dimensions:
-        dim_id = (getattr(dim, "dimension", "") or "")
-        filtered = [
-            v for v in dim.violations
-            if not is_finding_deleted(keys, dimension=dim_id,
-                                      principle=_principle_of(v), file=v.file or "")
-        ]
-        if len(filtered) == len(dim.violations):
-            result.append(dim)
-        else:
-            result.append(replace(
-                dim,
-                violations=filtered,
-                totals=recount_totals(filtered, old_totals=dim.totals),
-            ))
-    return result
+    return filter_dimension_violations(
+        dimensions,
+        lambda dim, v: not is_finding_deleted(
+            keys, dimension=(getattr(dim, "dimension", "") or ""),
+            principle=_principle_of(v), file=v.file or "",
+        ),
+    )
 
 
 def _principle_of(f: Finding) -> str:

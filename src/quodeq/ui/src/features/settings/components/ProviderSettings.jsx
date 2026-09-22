@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { DEFAULT_TIME_LIMIT_S } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { t } from '../../../strings/index.js';
-import { tRich } from '../../../strings/rich.jsx';
 
 const SECONDS_PER_MINUTE = 60;
 const MIN_MINUTES = 1;
@@ -104,9 +103,9 @@ export function AdvancedAnalysisSettings({ state, update }) {
           </span>
           <span className="settings-description">{t('settings.analysisModeDesc')}</span>
         </div>
-        <div className="settings-pill-group">
-          <button type="button" className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'true')}>{t('settings.perDimension')}</button>
-          <button type="button" className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'false')}>{t('settings.grouped')}</button>
+        <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.violationGroupingAria')}>
+          <button type="button" role="radio" aria-checked={perDimension} className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'true')}>{t('settings.perDimension')}</button>
+          <button type="button" role="radio" aria-checked={!perDimension} className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'false')}>{t('settings.grouped')}</button>
         </div>
       </div>
 
@@ -118,16 +117,16 @@ export function AdvancedAnalysisSettings({ state, update }) {
           </span>
           <span className="settings-description">{t('settings.verifyFindingsDesc')}</span>
         </div>
-        <div className="settings-pill-group">
-          <button type="button" className={`settings-pill${verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'true')}>{t('settings.on')}</button>
-          <button type="button" className={`settings-pill${!verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'false')}>{t('settings.off')}</button>
+        <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.verifyFindingsAria')}>
+          <button type="button" role="radio" aria-checked={verify} className={`settings-pill${verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'true')}>{t('settings.on')}</button>
+          <button type="button" role="radio" aria-checked={!verify} className={`settings-pill${!verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'false')}>{t('settings.off')}</button>
         </div>
       </div>
     </>
   );
 }
 
-export default function ProviderSettings({ state, update, providerType }) {
+export default function ProviderSettings({ state, update }) {
   return (
     <>
       <TimeLimitSetting state={state} update={update} />

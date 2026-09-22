@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import threading
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 from flask import Flask

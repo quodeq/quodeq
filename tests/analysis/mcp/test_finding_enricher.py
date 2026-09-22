@@ -1,16 +1,14 @@
-"""Tests for FindingEnricher — pure dict transformation, no file I/O."""
+"""Tests for FindingEnricher (pure dict transformation): standards fill-in and confidence downweights."""
 from __future__ import annotations
 
 from quodeq.analysis.mcp.enricher import (
     CompiledContext,
     FindingEnricher,
 )
-from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.precedent import fingerprint as make_fingerprint
+from quodeq.context.project_shape import Deployment, ProjectShape
 
-
-def _enricher(**ctx_kwargs) -> FindingEnricher:
-    return FindingEnricher(CompiledContext(**ctx_kwargs))
+from ._finding_enricher_helpers import _enricher
 
 
 # ---------------------------------------------------------------------------
@@ -266,72 +264,3 @@ def test_semantic_respects_llm_emitted_confidence() -> None:
     enricher = FindingEnricher(ctx, file_reader=lambda p: "")
     finding = enricher.enrich(_violation_args(confidence=50))
     assert finding["confidence"] == 50
-
-
-# ---------------------------------------------------------------------------
-# dedup_key
-# ---------------------------------------------------------------------------
-
-def test_dedup_key_resolves_principle_from_reqs() -> None:
-    reqs = {"S-CON-1": {"principle": "Confidentiality", "text": "..."}}
-    key = _enricher(compiled_reqs=reqs).dedup_key(
-        {"req": "S-CON-1", "file": "a.py", "line": 1, "t": "violation"}
-    )
-    assert key == ("Confidentiality", "a.py", 1, "violation")
-
-
-def test_dedup_key_uses_explicit_principle() -> None:
-    key = _enricher().dedup_key(
-        {"p": "Custom", "file": "a.py", "line": 1, "t": "violation"}
-    )
-    assert key[0] == "Custom"
-
-
-# ---------------------------------------------------------------------------
-# Dimension/requirement agreement gate (#661)
-# ---------------------------------------------------------------------------
-
-def test_reroutes_finding_to_requirement_dimension() -> None:
-    """The requirement is authoritative: a finding the model declared under
-    one dimension is rerouted to the dimension its requirement belongs to
-    (multi-dimension scans populate req_to_dim across standards)."""
-    req_to_dim = {"S-CON-1": "security"}
-    result = _enricher(req_to_dim=req_to_dim).enrich(
-        {"t": "violation", "req": "S-CON-1", "d": "maintainability",
-         "severity": "critical", "file": "a.py", "line": 1}
-    )
-    assert result["d"] == "security"
-
-
-def test_does_not_reroute_correctly_filed_finding() -> None:
-    req_to_dim = {"M-MOD-1": "maintainability"}
-    result = _enricher(req_to_dim=req_to_dim).enrich(
-        {"t": "violation", "req": "M-MOD-1", "d": "maintainability",
-         "file": "a.py", "line": 1}
-    )
-    assert result["d"] == "maintainability"
-
-
-def test_keeps_declared_dimension_when_requirement_unresolvable() -> None:
-    """Single-dimension scans leave req_to_dim empty; an unresolvable req
-    cannot be rerouted, so the declared dimension is preserved (the unmapped
-    finding is quarantined downstream at principle grouping, not here)."""
-    result = _enricher(dimension="maintainability").enrich(
-        {"t": "violation", "req": "N/A", "d": "maintainability",
-         "severity": "critical", "file": "a.py", "line": 1}
-    )
-    assert result["d"] == "maintainability"
-
-
-def test_reroute_is_logged(caplog) -> None:
-    import logging
-    req_to_dim = {"S-CON-1": "security"}
-    with caplog.at_level(logging.WARNING):
-        _enricher(req_to_dim=req_to_dim).enrich(
-            {"t": "violation", "req": "S-CON-1", "d": "maintainability",
-             "severity": "critical", "file": "a.py", "line": 1}
-        )
-    assert any(
-        "security" in r.getMessage() and "maintainability" in r.getMessage()
-        for r in caplog.records
-    )

@@ -6,34 +6,36 @@ all transformation here and keeps only routing concerns (dedup, I/O, events).
 """
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
+from quodeq.analysis.mcp._enricher_rules import apply_downweight, resolve_principle
 from quodeq.analysis.mcp.enrichment import enrich_code
+from quodeq.analysis.mcp.precedent_downweight import (
+    UNSET_SCORE,
+    MaybeScore,
+    apply_precedent_downweight,
+    precedent_scores as _compute_precedent_scores,
+    notify_precedent_match,
+)
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
+from quodeq.analysis.mcp.schemas import FINDING_TYPE_VIOLATION
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
-from quodeq.context.precedent import (
-    PrecedentCorpus,
-    fingerprint as _precedent_fingerprint,
-    precedent_text as _precedent_text,
-)
+from quodeq.context.precedent import PrecedentCorpus
 from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.trust_model import TrustModel
-
-_logger = logging.getLogger(__name__)
+from quodeq.core.observability import NULL_LOG, LogSink
 
 _FINDING_SCHEMA_VERSION = 1
 # These downweights set `confidence`, a UI/triage signal ONLY: confidence drives
 # the dashboard's "Low confidence" grouping and does NOT affect the grade (it is
-# excluded from the scoring fields -- see _report_constants._VIOLATION_FIELDS and
+# excluded from the scoring fields -- see _report_constants.VIOLATION_FIELDS and
 # #640). Severity, set by the analysis LLM and enforced by the provenance gate
 # (#639), is the lever that moves the score.
 _NON_PROD_DOWNWEIGHT = 50
 _SHAPE_DOWNWEIGHT = 40
-_PRECEDENT_DOWNWEIGHT = 25
 
 _HOSTED_SERVICE_KEYWORDS: tuple[str, ...] = (
     "concurrent caller", "concurrent callers", "concurrent request",
@@ -50,7 +52,9 @@ _HOSTED_SERVICE_KEYWORDS: tuple[str, ...] = (
 @runtime_checkable
 class FileReader(Protocol):
     """Abstraction for reading source file content."""
-    def __call__(self, path: Path) -> str: ...
+    def __call__(self, path: Path) -> str:
+        """Return the text of *path* for snippet extraction."""
+        ...
 
 
 @dataclass
@@ -65,6 +69,10 @@ class CompiledContext:
     trust_model: TrustModel | None = None
     precedent_fingerprints: set[str] = field(default_factory=set)
     precedent_corpus: PrecedentCorpus | None = None
+    # Called with the enriched finding on an EXACT precedent match, so the
+    # composition root can record a dismissal for it (#1208). Never for the
+    # semantic tier. Optional: None keeps precedent a confidence-only signal.
+    on_precedent_match: Callable[[dict], None] | None = None
 
 
 def _apply_path_role_downweight(finding: dict[str, object]) -> None:
@@ -73,14 +81,12 @@ def _apply_path_role_downweight(finding: dict[str, object]) -> None:
     Skipped when the LLM emitted an explicit confidence below 100 and for
     compliance findings (downweighting "code is fine" makes no sense).
     """
-    if finding.get("t") != "violation":
+    if finding.get("t") != FINDING_TYPE_VIOLATION:
         return
     role = path_role(finding.get("file"))
     if role not in NON_PROD_ROLES:
         return
-    existing = finding.get("confidence")
-    if existing is None or existing == 100:
-        finding["confidence"] = _NON_PROD_DOWNWEIGHT
+    apply_downweight(finding, _NON_PROD_DOWNWEIGHT)
 
 
 def _shape_irrelevant_to_hosted_service(shape: ProjectShape | None) -> bool:
@@ -98,7 +104,7 @@ def _apply_shape_downweight(
     finding: dict[str, object], shape: ProjectShape | None,
 ) -> None:
     """Downweight findings that assume a hosted service when the project isn't one."""
-    if finding.get("t") != "violation":
+    if finding.get("t") != FINDING_TYPE_VIOLATION:
         return
     if not _shape_irrelevant_to_hosted_service(shape):
         return
@@ -110,63 +116,7 @@ def _apply_shape_downweight(
     haystack = " ".join(haystack_parts)
     if not any(kw in haystack for kw in _HOSTED_SERVICE_KEYWORDS):
         return
-    existing = finding.get("confidence")
-    if existing is None or existing == 100:
-        finding["confidence"] = _SHAPE_DOWNWEIGHT
-
-
-def _semantic_eligible(finding: dict[str, object]) -> bool:
-    """Scope-level and empty-snippet findings are excluded from the semantic
-    tier: their enriched snippet is the first ~40 lines of the file regardless
-    of the issue (enrichment.py), so any two scope-level findings on the same
-    file embed near-identical texts and would cross-match across requirements.
-    The exact tier still covers them."""
-    line = finding.get("line")
-    if not isinstance(line, int) or line <= 0:
-        return False
-    if finding.get("scope"):
-        return False
-    snippet = finding.get("snippet")
-    return isinstance(snippet, str) and bool(snippet.strip())
-
-
-def _apply_precedent_downweight(
-    finding: dict[str, object],
-    fingerprints: set[str] | None,
-    corpus: PrecedentCorpus | None = None,
-) -> None:
-    """Drop confidence to ~25 when this finding matches a prior dismissal.
-
-    Tier 1: exact fingerprint (unchanged, SARIF-compatible). Tier 2: semantic
-    similarity via the corpus, only on exact miss and only for eligible
-    findings. Same effect, same guard for both tiers.
-    """
-    if finding.get("t") != "violation":
-        return
-    req = finding.get("req")
-    snippet = finding.get("snippet")
-    req_s = req if isinstance(req, str) else None
-    snippet_s = snippet if isinstance(snippet, str) else None
-
-    fp = _precedent_fingerprint(req_s, snippet_s)
-    matched = fp is not None and fingerprints is not None and fp in fingerprints
-
-    if not matched and corpus is not None and _semantic_eligible(finding):
-        text = _precedent_text(req_s, snippet_s)
-        if text is not None:
-            score = corpus.match(text)
-            if score is not None and score >= corpus.threshold:
-                matched = True
-                _logger.debug(
-                    "Semantic precedent match (%.3f) for %s:%s",
-                    score, finding.get("file"), finding.get("line"),
-                )
-
-    if not matched:
-        return
-    existing = finding.get("confidence")
-    if existing is None or existing == 100:
-        finding["confidence"] = _PRECEDENT_DOWNWEIGHT
+    apply_downweight(finding, _SHAPE_DOWNWEIGHT)
 
 
 def _default_read_file(path: Path) -> str:
@@ -185,6 +135,7 @@ class FindingEnricher:
         self,
         context: CompiledContext,
         file_reader: FileReader | None = None,
+        *, log: LogSink = NULL_LOG,
     ) -> None:
         self._refs = context.compiled_refs
         self._reqs = context.compiled_reqs
@@ -195,69 +146,154 @@ class FindingEnricher:
         self._trust_model = context.trust_model
         self._precedent_fingerprints = context.precedent_fingerprints
         self._precedent_corpus = context.precedent_corpus
-        self._read_file: Callable[[Path], str] = file_reader or _default_read_file
+        self._on_precedent_match = context.on_precedent_match
+        self._log = log
+        base_reader: Callable[[Path], str] = file_reader or _default_read_file
+        self._file_cache: dict[Path, str] = {}
+
+        def _cached_read_file(path: Path) -> str:
+            cached = self._file_cache.get(path)
+            if cached is None:
+                cached = base_reader(path)
+                self._file_cache[path] = cached
+            return cached
+
+        self._read_file: Callable[[Path], str] = _cached_read_file
 
     def dedup_key(self, args: dict) -> tuple:
         """Compute the deduplication key for a raw finding args dict."""
-        p = args.get("p")
         req = args.get("req")
-        if not p and req and req in self._reqs:
-            p = self._reqs[req]["principle"]
+        p = resolve_principle(args.get("p"), req, self._reqs)
         return (p, args.get("file"), args.get("line"), args.get("t"))
 
-    def enrich(self, args: dict) -> dict:
-        """Return a fully enriched finding dict built from *args*."""
-        req = args.get("req")
+    def _resolve_finding_dimension(
+        self, finding: dict, args: dict, req: str | None,
+    ) -> None:
+        """Reroute *finding*'s dimension (in place) per its requirement.
 
-        finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
-        finding.update({k: v for k, v in args.items() if v is not None})
-
-        if not args.get("p") and req and req in self._reqs:
-            finding["p"] = self._reqs[req]["principle"]
-
-        # The requirement is authoritative for a finding's dimension. When a
-        # requirement maps to a dimension (multi-dimension scans populate
-        # req_to_dim across standards), use it even if the model declared a
-        # different dimension -- this reroutes a misfiled finding to where it is
-        # actually scored, rather than letting a, say, security issue land under
-        # maintainability. Falls back to the model's value, then the scanned
-        # dimension. (An unresolvable requirement that cannot be rerouted is
-        # quarantined downstream at principle grouping.)
+        The requirement is authoritative for a finding's dimension. When a
+        requirement maps to a dimension (multi-dimension scans populate
+        req_to_dim across standards), use it even if the model declared a
+        different dimension -- this reroutes a misfiled finding to where it is
+        actually scored, rather than letting a, say, security issue land under
+        maintainability. Falls back to the model's value, then the scanned
+        dimension. (An unresolvable requirement that cannot be rerouted is
+        quarantined downstream at principle grouping.)
+        """
         req_dim = self._req_to_dim.get(req) if req else None
         declared = args.get("d")
         if req_dim:
             if declared and declared != req_dim:
-                _logger.warning(
-                    "Rerouting finding from declared dimension %r to %r per "
-                    "requirement %r (severity=%s, file=%s)",
-                    declared, req_dim, req, args.get("severity"), args.get("file"),
+                self._log.warning(
+                    f"Rerouting finding from declared dimension {declared!r} to "
+                    f"{req_dim!r} per requirement {req!r} "
+                    f"(severity={args.get('severity')}, file={args.get('file')})"
                 )
             finding["d"] = req_dim
         elif not declared and self._dimension:
             finding["d"] = self._dimension
 
+    def _from_standards(self, args: dict) -> dict:
+        """The finding dict *args* maps onto, with its standards-derived fields.
+
+        First stage of the pipeline: no source file is read and no downweight
+        is applied yet, so the dict is not usable as a finding on its own.
+        """
+        req = args.get("req")
+
+        finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
+        finding.update({k: v for k, v in args.items() if v is not None})
+
+        # Keep the model's tag exactly as emitted. PR B maps `vt` onto the
+        # taxonomy; `vt_raw` is what the unmapped-types report and alias
+        # curation read. Absent when the model sent no tag.
+        if args.get("vt"):
+            finding["vt_raw"] = str(args["vt"])
+
+        # Same rule as dedup_key's resolve_principle, but the write is the
+        # finding's own: the requirement's principle is written even when it
+        # is None, so "this requirement declares no principle" stays
+        # distinguishable from "no principle field at all" downstream.
+        if not args.get("p") and req and req in self._reqs:
+            finding["p"] = self._reqs[req]["principle"]
+
+        self._resolve_finding_dimension(finding, args, req)
+
         if req and req in self._refs:
             finding["req_refs"] = select_best_refs(
                 self._refs[req], args.get("w", ""), args.get("reason", ""),
             )
+        return finding
 
+    def _before_precedent(self, finding: dict) -> None:
+        """Attach code context and apply the two content-independent downweights.
+
+        Runs before the precedent tier on purpose: ``enrich_code`` replaces the
+        model's quoted snippet with the source-derived window, and that window
+        is what the precedent corpus was built from. Scoring a precedent before
+        this ran embeds a different text than the corpus holds.
+        """
         enrich_code(finding, self._work_dir, self._read_file)
         _apply_path_role_downweight(finding)
         _apply_shape_downweight(finding, self._project_shape)
-        _apply_precedent_downweight(
-            finding, self._precedent_fingerprints, self._precedent_corpus,
-        )
-        # Gates the LIVE path only: this method runs once per freshly-dispatched
-        # finding, before it ever reaches the cache. A cached finding replayed on
-        # a later run does NOT come back through here -- cache replay bypasses
-        # enrich() entirely and writes straight to the per-dim JSONL, and a
-        # deterministic checker never comes through here at all. Those two sinks
-        # (dimension_runner._write_findings, checks.runner) call the same helper
-        # for the same reason. Every call site is required: this one gates what
-        # the model just emitted, the others gate what a warm cache is about to
-        # replay and what a checker just computed, and skipping any one leaves a
-        # class of findings ungated. See severity_gates.py for why the sequence
-        # lives there rather than being repeated here.
-        apply_severity_gates(finding, self._trust_model)
 
+    def _after_precedent(
+        self, finding: dict, precedent_score: MaybeScore = UNSET_SCORE,
+    ) -> None:
+        """Apply the precedent downweight and the severity gates in place.
+
+        Gates the LIVE path only: this runs once per freshly-dispatched
+        finding, before it ever reaches the cache. A cached finding replayed on
+        a later run does NOT come back through here -- cache replay bypasses
+        enrich() entirely and writes straight to the per-dim JSONL, and a
+        deterministic checker never comes through here at all. Those two sinks
+        (dimension_runner._write_findings, checks.runner) call the same helper
+        for the same reason. Every call site is required: this one gates what
+        the model just emitted, the others gate what a warm cache is about to
+        replay and what a checker just computed, and skipping any one leaves a
+        class of findings ungated. See severity_gates.py for why the sequence
+        lives there rather than being repeated here.
+        """
+        tier = apply_precedent_downweight(
+            finding, self._precedent_fingerprints, self._precedent_corpus,
+            score=precedent_score, log=self._log,
+        )
+        apply_severity_gates(finding, self._trust_model)
+        if tier == "exact":
+            notify_precedent_match(self._on_precedent_match, finding, log=self._log)
+
+    def enrich(self, args: dict, *, precedent_score: MaybeScore = UNSET_SCORE) -> dict:
+        """Return a fully enriched finding dict built from *args*.
+
+        *precedent_score* lets a caller that already ran the batch semantic
+        lookup (``precedent_scores``) skip a second ``corpus.match`` call.
+        """
+        finding = self._from_standards(args)
+        self._before_precedent(finding)
+        self._after_precedent(finding, precedent_score)
         return finding
+
+    def enrich_many(self, findings: list[dict]) -> list[dict]:
+        """Enrich a batch with one batched precedent lookup for all of them.
+
+        Same per-finding step order as ``enrich``; only the precedent tier is
+        shared, and it runs on the ENRICHED dicts so the embedded text is the
+        one the corpus was built from.
+        """
+        enriched = [self._from_standards(args) for args in findings]
+        for finding in enriched:
+            self._before_precedent(finding)
+        scores = self.precedent_scores(enriched)
+        for finding, score in zip(enriched, scores):
+            self._after_precedent(finding, score)
+        return enriched
+
+    def precedent_scores(self, findings: list[dict]) -> list[float | None]:
+        """Best-effort semantic precedent score per finding, one embed call.
+
+        None for a finding that skips the lookup and for every finding when
+        no precedent corpus is configured.
+        """
+        return _compute_precedent_scores(
+            self._precedent_corpus, self._precedent_fingerprints, findings,
+        )

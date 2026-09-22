@@ -1,53 +1,20 @@
 """Log-stream routes — SSE live stream + plain JSON fallback for /api/jobs/<id>/logs."""
 from __future__ import annotations
 
-import os
+import functools
 from http import HTTPStatus
-from pathlib import Path
 
 from flask import Flask, Response, current_app, jsonify, request
 
+from quodeq.api._log_tail_helpers import (
+    _is_visible_log_line,
+    _read_tail,
+    _resolve_run_log,
+    _resolve_stream_log_path,
+    _stream_terminal_state,
+)
 from quodeq.api._sse_log_helpers import sse_tail_generator as _sse_tail_generator
 from quodeq.shared.validation import validate_path_segment
-
-# Lines containing this marker are kept in run.log for forensics but suppressed
-# from the dashboard's live console — they're per-minute resource snapshots
-# (rss / fds / threads / ollama RSS) and clutter the operator-facing view.
-_CONSOLE_HIDDEN_MARKERS: tuple[str, ...] = ("[resources]",)
-
-# Per-poll byte cap: a single tail read will not pull more than this many bytes
-# into memory in one shot. The remaining bytes will be served on the next poll.
-# Caps a runaway log file from blowing out RAM on read.
-_DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
-
-
-def _tail_max_bytes() -> int:
-    raw = os.environ.get("QUODEQ_LOG_TAIL_MAX_BYTES")
-    if not raw:
-        return _DEFAULT_TAIL_MAX_BYTES
-    try:
-        value = int(raw)
-    except ValueError:
-        return _DEFAULT_TAIL_MAX_BYTES
-    return value if value > 0 else _DEFAULT_TAIL_MAX_BYTES
-
-
-def _is_visible_log_line(line: str) -> bool:
-    return not any(marker in line for marker in _CONSOLE_HIDDEN_MARKERS)
-
-
-def _resolve_run_log(job_id: str) -> tuple[Path | None, int]:
-    """Return (log_path, status_hint). status_hint is 0 on success, HTTP code on error."""
-    provider = current_app.config.get("_provider")
-    if provider is None or not hasattr(provider, "get_log_run_dir"):
-        return None, HTTPStatus.NOT_FOUND
-    run_dir = provider.get_log_run_dir(job_id)
-    if run_dir is None or not run_dir.is_dir():
-        return None, HTTPStatus.GONE
-    log_path = run_dir / "run.log"
-    if not log_path.exists():
-        return None, HTTPStatus.NOT_FOUND
-    return log_path, 0
 
 
 def _is_preparing_job(provider, job_id: str) -> bool:
@@ -69,12 +36,9 @@ def _is_preparing_job(provider, job_id: str) -> bool:
     # returns None — without this check the route would 404 the moment the
     # frontend opens the stream after Start.
     jobs = getattr(provider, "_jobs", None)
-    store = getattr(jobs, "_store", None) if jobs is not None else None
-    if store is not None:
-        job = store.get(job_id)
-        if job is not None and getattr(job, "status", None) not in {
-            "done", "failed", "cancelled",
-        }:
+    if jobs is not None:
+        job = jobs.get_job(job_id)
+        if job is not None and job.status not in {"done", "failed", "cancelled"}:
             return True
     # External job: the CLI creates the run directory before opening the
     # ``run.log`` writer, so there is a brief window where the directory
@@ -87,24 +51,58 @@ def _is_preparing_job(provider, job_id: str) -> bool:
     return False
 
 
-def _read_tail(log_path: Path, since: int) -> tuple[list[str], int]:
-    """Read lines starting at byte offset *since*. Returns (lines, next_offset).
+def _initial_offset(last_event_id: str) -> int:
+    """Parse the SSE ``Last-Event-ID`` header (a byte offset); 0 when absent or malformed."""
+    try:
+        return int(last_event_id) if last_event_id else 0
+    except ValueError:
+        return 0
 
-    Drops any trailing partial line (without newline); caller polls again.
+
+def _job_done_checker(provider, job_id: str):
+    """Return a zero-arg callable reporting whether *job_id* has completed."""
+    def is_done() -> bool:
+        return bool(
+            provider and getattr(provider, "is_job_complete", lambda _: False)(job_id)
+        )
+    return is_done
+
+
+def _sse_log_response(provider, job_id: str, initial_offset: int) -> Response:
+    """Build the ``text/event-stream`` response tailing *job_id*'s run.log."""
+    resp = Response(
+        _sse_tail_generator(
+            functools.partial(_resolve_stream_log_path, provider, job_id),
+            initial_offset,
+            is_done=_job_done_checker(provider, job_id),
+            line_filter=_is_visible_log_line,
+            terminal_state=functools.partial(_stream_terminal_state, provider, job_id),
+        ),
+        mimetype="text/event-stream",
+    )
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
+
+
+def _invalid_job_id() -> tuple[Response, int]:
+    """The 400 both log routes answer a malformed job id with."""
+    return jsonify({"error": "invalid job id", "code": "INVALID_INPUT"}), HTTPStatus.BAD_REQUEST
+
+
+def _job_log_inputs(job_id: str):
+    """``(provider, log_path, status)`` for *job_id*, or None when the id is malformed.
+
+    *status* is the HTTP status ``_resolve_run_log`` chose for an absent log;
+    what an absent log means is the route's own call.
     """
-    with open(log_path, "rb") as fh:
-        fh.seek(since)
-        raw = fh.read(_tail_max_bytes())
-    text = raw.decode("utf-8", errors="replace")
-    if not text.endswith("\n"):
-        last_nl = text.rfind("\n")
-        if last_nl == -1:
-            return [], since  # no complete line yet
-        text = text[: last_nl + 1]
-    consumed = len(text.encode("utf-8"))
-    lines = [ln for ln in text.splitlines() if _is_visible_log_line(ln)]
-    return lines, since + consumed
-
+    try:
+        validate_path_segment(job_id)
+    except ValueError:
+        return None
+    provider = current_app.config.get("_provider")
+    log_path, err = _resolve_run_log(provider, job_id)
+    return provider, log_path, err
 
 
 def register_log_stream_routes(app: Flask) -> None:
@@ -116,29 +114,23 @@ def register_log_stream_routes(app: Flask) -> None:
 
     @app.get("/api/jobs/<job_id>/logs")
     def plain_logs(job_id: str) -> Response | tuple[Response, int]:
-        try:
-            validate_path_segment(job_id)
-        except ValueError:
-            return jsonify({"error": "invalid job id", "code": "INVALID_INPUT"}), HTTPStatus.BAD_REQUEST
-        log_path, err = _resolve_run_log(job_id)
+        resolved = _job_log_inputs(job_id)
+        if resolved is None:
+            return _invalid_job_id()
+        provider, log_path, err = resolved
         if log_path is None:
             return jsonify({"error": "log unavailable", "code": "NOT_FOUND"}), err
         since = max(0, request.args.get("since", 0, type=int))
         lines, next_offset = _read_tail(log_path, since)
-        provider = current_app.config.get("_provider")
-        done = bool(
-            provider and getattr(provider, "is_job_complete", lambda _: False)(job_id)
-        )
+        done = _job_done_checker(provider, job_id)()
         return jsonify({"lines": lines, "nextOffset": next_offset, "done": done})
 
     @app.get("/api/jobs/<job_id>/logs/stream")
     def stream_logs(job_id: str) -> Response | tuple[Response, int]:
-        try:
-            validate_path_segment(job_id)
-        except ValueError:
-            return jsonify({"error": "invalid job id", "code": "INVALID_INPUT"}), HTTPStatus.BAD_REQUEST
-        provider = current_app.config.get("_provider")
-        log_path, err = _resolve_run_log(job_id)
+        resolved = _job_log_inputs(job_id)
+        if resolved is None:
+            return _invalid_job_id()
+        provider, log_path, err = resolved
         # If run.log isn't on disk yet but the job is still preparing
         # (no report_path marker yet, or the runner just hasn't created
         # the file), keep the SSE response open and let the generator
@@ -147,65 +139,5 @@ def register_log_stream_routes(app: Flask) -> None:
         # "stream disconnected" until the user reopens the console.
         if log_path is None and not _is_preparing_job(provider, job_id):
             return jsonify({"error": "log unavailable", "code": "NOT_FOUND"}), err
-        last_event_id = request.headers.get("Last-Event-ID", "")
-        try:
-            initial_offset = int(last_event_id) if last_event_id else 0
-        except ValueError:
-            initial_offset = 0
-        is_done = (
-            lambda: bool(
-                provider
-                and getattr(provider, "is_job_complete", lambda _: False)(job_id)
-            )
-        )
-
-        def resolve_log_path() -> Path | None:
-            # Re-resolved each tick. A job that started in the
-            # "preparing" state (no output_project yet) eventually emits
-            # the report_path marker; from then on get_log_run_dir
-            # returns the real run dir and run.log appears.
-            if not hasattr(provider, "get_log_run_dir"):
-                return None
-            run_dir = provider.get_log_run_dir(job_id)
-            if run_dir is None or not run_dir.is_dir():
-                return None
-            return run_dir / "run.log"
-
-        def terminal_state() -> str:
-            # In-memory job (internal runs) carries the most up-to-date status
-            # before the runner has flushed status.json — prefer it.
-            if provider is not None and hasattr(provider, "_jobs"):
-                store = getattr(provider._jobs, "_store", None)
-                if store is not None:
-                    job = store.get(job_id)
-                    if job is not None and job.status in {"done", "failed", "cancelled"}:
-                        return job.status
-            # Fall back to the on-disk status.json the runner writes on exit.
-            path = resolve_log_path()
-            if path is None:
-                return "completed"
-            status_path = path.parent / "status.json"
-            if status_path.exists():
-                try:
-                    import json
-                    data = json.loads(status_path.read_text(encoding="utf-8"))
-                    state = data.get("state")
-                    if isinstance(state, str):
-                        return state
-                except (OSError, ValueError):
-                    pass
-            return "completed"
-
-        resp = Response(
-            _sse_tail_generator(
-                resolve_log_path,
-                initial_offset,
-                is_done=is_done,
-                line_filter=_is_visible_log_line,
-                terminal_state=terminal_state,
-            ),
-            mimetype="text/event-stream",
-        )
-        resp.headers["Cache-Control"] = "no-cache"
-        resp.headers["X-Accel-Buffering"] = "no"
-        return resp
+        initial_offset = _initial_offset(request.headers.get("Last-Event-ID", ""))
+        return _sse_log_response(provider, job_id, initial_offset)
