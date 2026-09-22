@@ -2,14 +2,32 @@
 
 ## [Unreleased]
 
-### Features
-- **Cached results follow files that move**: when a file's content is unchanged and only its directory changed (same file name, same test/production role), the previous evaluation is adopted instead of re-run. A repo restructure that moves a top-level folder no longer costs a full re-evaluation. The cache log line and the `cache_stats` event report the count as `adopted`.
-- **Content index beside the cache**: a small sqlite index (`~/.quodeq/cache/results/.index.db`) maps file content to cached results. It is rebuilt automatically if missing or corrupt.
+## [1.11.0] - 2026-09-22
 
-### Changes
-- **A dismissal now reaches the score in every file**: a finding with the same requirement and the same code as one you dismissed is dismissed automatically when the next run finds it in another file, with the reason "Precedent: same requirement and code as a finding you dismissed." It leaves the score the way a manual dismissal does, shows in the Dismissed tab, and can be restored; code you restore is never auto-dismissed again until you dismiss it yourself. Previously such a match only lowered the finding's confidence, which grouped it in the UI and changed nothing in the grade. Semantic (similar, not identical) matches still only lower confidence.
-- **Subagents launch at full width after the scout**: every provider outside `QUODEQ_NON_SCOUT_PROVIDERS` (by default all but Codex and Gemini) still starts one scout agent per dimension to catch entry problems (auth, quota, oversized prompt) before committing to more. Once the scout finishes, or after up to 30 seconds (sooner under a time limit), every free `--n-subagents` slot launches at once, bounded only by the files left in the queue. Previously the number of extra agents was estimated from the file count, so dimensions with 50 or fewer files ran on a single agent and larger ones rarely reached the configured count. Local model servers still serve one request per model unless their parallelism is raised (`OLLAMA_NUM_PARALLEL`), so on those the extra agents queue rather than speed the run up; the existing startup warning covers this.
-- **Cache key schema 4**: the detected project language is no longer part of the evaluation cache key. A language-detection change (for example `build.gradle` replaced by `build.gradle.kts`) reuses all cached results instead of re-evaluating the repo. Existing entries are migrated in place, once, on the first evaluation or dashboard start after upgrading; on very large caches the one-time pass can take a few minutes.
+### Features
+- **GitHub Copilot**: use Copilot for evaluations and assistant chat, with account model discovery, streamed responses, and session resume. Setup reports organization MCP policy blocks clearly instead of continuing an evaluation that cannot run. (#1213, #1228, #1230)
+- **Built-in macOS menu bar**: enable the menu bar icon from Settings without installing a separate app. Launching the dashboard from a DMG offers to move it to Applications. (#1147, #1148)
+- **Cached results follow file moves**: unchanged files moved to another directory can reuse their previous evaluation when the file name and test/production role still match. Changes in detected project language also preserve cached results. Existing caches migrate automatically, with migration and index building running in the background at dashboard startup. (#1155)
+- **Dismissals survive refactors**: moving code to a different line no longer brings a dismissed finding back. An exact match for the same requirement and code in another file is automatically dismissed and removed from the score; it remains visible in the Dismissed tab and can be restored. Restored code stays eligible for findings until you dismiss it again. (#1165, #1226)
+- **Deployment-aware evaluations**: declare single-host or distributed deployment in the project profile to tailor scalability findings. Loopback-only applications also receive fewer inappropriate transport-encryption findings, while outbound connections remain checked. (#1211, #1229)
+- **Provider launch commands**: choose a different executable or wrapper for CLI evaluations in Settings, with inline validation before starting a run. (#1127, #1129)
+- **Provider key storage**: save API keys through the backend using the operating system keyring when available, with a local configuration-file fallback. (#1160)
+
+### Improvements
+- **Faster dashboards and large histories**: project lists, score comparisons, live progress, and bulk dismissal actions do less repeated file and database work. Bounded caches and log views reduce memory growth during long sessions. (#1138, #1144, #1158, #1180, #1192, #1194)
+- **Better use of evaluation time**: after the initial scout checks provider health, all available subagent slots launch. Dimensions with the largest remaining backlog run first, with time reserved for the remaining dimensions. (#1173, #1174, #1182, #1232)
+- **More useful findings**: models get one repair attempt when a finding is missing its source snippet, and grounded findings are retained when only their severity value is malformed. (#1216, #1224)
+- **Clearer score context**: dimension cards and CLI grades include violations per 100 files; CLI output also shows violation and major counts. Reports preserve the model's original violation-type tag. (#1172)
+- **Maintainability defaults**: use a six-parameter threshold, 60-line functions, and complexity 15, while retaining the 300-line file threshold. The changed thresholds trigger a fresh maintainability evaluation on the next run. (#1190)
+- **Keyboard and screen-reader access**: improve dialog focus, keyboard navigation, chart and map descriptions, control names, and announcements. Destructive bulk actions and workspace operations have clearer confirmations. (#1151, #1203)
+- **Clearer failures**: provider setup, evaluation options, standards imports, terminals, and shared-repository operations report more useful errors. Failed setting changes are surfaced instead of appearing saved. (#1151, #1197)
+
+### Fixes
+- **Consistent source scope**: evaluations and the setup wizard count Git-tracked files consistently and explain how many untracked files are excluded. Projects outside Git retain the filesystem-based scan. (#1207, #1225)
+- **Live findings and history**: dismissing a finding no longer breaks the live view; pending reports are distinguished from empty results; progress counts actual findings; completed dimensions can be opened before the whole run finishes. (#1163, #1219, #1220, #1221)
+- **Dashboard controls**: restore the theme toggle, correct score-history colors and chart height, and refresh new or starred standards in the evaluation picker without reloading. (#1134, #1137, #1196, #1204, #1205)
+- **More resilient state handling**: recover more safely from malformed metadata, unavailable browser storage, failed asynchronous requests, and concurrent database access. (#1153, #1169, #1170, #1212, #1215)
+- **Security hardening**: protect desktop launch tokens, redact repository credentials and internal error details, validate download destinations and repository inputs, and escape untrusted text in generated PR comments. (#1152, #1160, #1162, #1166, #1171, #1223)
 
 ## [1.10.1] - 2026-08-28
 

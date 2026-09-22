@@ -129,6 +129,12 @@ def test_create_app_hands_the_injected_env_to_the_log_routes(monkeypatch, tmp_pa
     """The env reaches a route handler without being a request-time lookup."""
     from quodeq.api.app import create_app
 
+    # An unset override still probes real fallback files, including /tmp.
+    # Keep this environment-wiring test independent of installed providers.
+    monkeypatch.setattr(
+        "quodeq.api._llamacpp_log_routes._default_log_paths",
+        lambda env: [tmp_path / "no-default.log"],
+    )
     log_file = tmp_path / "llama.log"
     log_file.write_text("ready\n", encoding="utf-8")
     monkeypatch.setenv("LLAMACPP_LOG_FILE", str(log_file))
