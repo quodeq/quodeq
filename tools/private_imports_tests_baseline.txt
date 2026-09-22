@@ -436,10 +436,10 @@ tests/api/test_env_injection.py:101:private-name:quodeq.api._run_event_stream._t
 tests/api/test_env_injection.py:109:private-name:quodeq.api._run_event_watcher._DEFAULT_FINDINGS_BATCH
 tests/api/test_env_injection.py:109:private-name:quodeq.api._run_event_watcher._findings_batch_size
 tests/api/test_env_injection.py:121:private-name:quodeq.api.app._configure_logging
-tests/api/test_env_injection.py:148:private-module:quodeq.api._ollama_log_routes
-tests/api/test_env_injection.py:197:private-module:quodeq.api._rate_limit_file_store.FileRateLimitStore
-tests/api/test_env_injection.py:198:private-name:quodeq.api.app._build_rate_limit_store
-tests/api/test_env_injection.py:232:private-name:quodeq.api.app._configure_app
+tests/api/test_env_injection.py:154:private-module:quodeq.api._ollama_log_routes
+tests/api/test_env_injection.py:203:private-module:quodeq.api._rate_limit_file_store.FileRateLimitStore
+tests/api/test_env_injection.py:204:private-name:quodeq.api.app._build_rate_limit_store
+tests/api/test_env_injection.py:238:private-name:quodeq.api.app._configure_app
 tests/api/test_env_injection.py:35:private-name:quodeq.api._ollama_log_routes._ollama_log_path
 tests/api/test_env_injection.py:44:private-name:quodeq.api._llamacpp_log_routes._llamacpp_log_path
 tests/api/test_env_injection.py:55:private-module:quodeq.api._llamacpp_log_routes
