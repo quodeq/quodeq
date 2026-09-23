@@ -108,9 +108,8 @@ class TestProductionCallerReachesRealSink:
     """This logging was inert because every
     production caller left ``log`` at its ``NULL_LOG`` default. These drive a
     real caller (``_fs_metadata.py``) with NO ``log=`` override, proving the
-    module-level ``SHARED_LOG`` wiring added in item B actually reaches a
-    caller-supplied sink in production, not just when a test hands one in
-    directly."""
+    module-level ``SHARED_LOG`` wiring actually reaches a caller-supplied
+    sink in production, not just when a test hands one in directly."""
 
     def test_compute_on_miss_summary_logs_through_shared_log(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
@@ -122,7 +121,7 @@ class TestProductionCallerReachesRealSink:
         log = _FakeLog()
         # Patch the name _fs_metadata.py resolves at call time, not the
         # log_sink module's copy -- proves the import-and-thread wiring in
-        # that file, exactly what item B changed.
+        # that file reaches a real sink.
         monkeypatch.setattr(_md, "SHARED_LOG", log)
 
         result = _md._compute_on_miss_summary(
