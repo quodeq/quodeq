@@ -18,7 +18,7 @@ from pathlib import Path
 # this module stays inside the SEP-06 logging boundary that _job_model.py
 # already carries a declared exemption for (see
 # tests/tools/test_logging_boundary.py's DECLARED_LOGGING_SITES).
-from quodeq.core.run.job_status import JobStatus
+from quodeq.core.run.job_status import JobStatus, parse_job_status
 from quodeq.services._job_model import InMemoryJobStore, Job, JobStore, _MAX_LOG_LINES, _logger
 from quodeq.shared.env_resolve import resolve_env
 
@@ -66,12 +66,24 @@ def _job_to_json(job: Job) -> dict:
     }
 
 
+def _status_from_json(raw: str) -> JobStatus | str:
+    """The JobStatus a job file's status means; an unknown spelling stays raw, logged.
+
+    A job file must never become unreadable over its status word.
+    """
+    try:
+        return parse_job_status(raw)
+    except ValueError:
+        _logger.warning("job file with unknown status %r kept as-is", raw)
+        return raw
+
+
 def _job_from_json(data: dict) -> Job:
     """Deserialize a Job from a JSON dict."""
     logs: deque[str] = deque(data.get("logs", []), maxlen=_MAX_LOG_LINES)
     return Job(
         job_id=data["job_id"],
-        status=data["status"],
+        status=_status_from_json(data["status"]),
         command=data.get("command", []),
         started_at=data.get("started_at", ""),
         ended_at=data.get("ended_at"),

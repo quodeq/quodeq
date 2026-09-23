@@ -1,13 +1,15 @@
-"""JobStatus wire values, the terminal set and the external-job-id helpers."""
+"""JobStatus wire values, parsing, the finished set and the external-job-id helpers."""
 import json
+
+import pytest
 
 from quodeq.core.run.job_status import (
     EXTERNAL_JOB_PREFIX,
     JOB_FINISHED,
-    JOB_TERMINAL,
     JobStatus,
     external_job_id,
     is_external_job_id,
+    parse_job_status,
     strip_external_prefix,
 )
 
@@ -17,10 +19,19 @@ def test_values_match_the_persisted_spellings():
     assert json.dumps({"status": JobStatus.DONE}) == '{"status": "done"}'
 
 
-def test_terminal_set():
-    assert JOB_TERMINAL == frozenset(
-        {JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.LOST}
-    )
+@pytest.mark.parametrize("raw", [m.value for m in JobStatus])
+def test_parse_job_status_accepts_every_member_value(raw):
+    assert parse_job_status(raw) is JobStatus(raw)
+
+
+def test_parse_job_status_ignores_case_and_whitespace():
+    assert parse_job_status("  Done ") is JobStatus.DONE
+
+
+@pytest.mark.parametrize("raw", ["completed", "bogus", "", None])
+def test_parse_job_status_rejects_unknown(raw):
+    with pytest.raises(ValueError, match="unknown job status"):
+        parse_job_status(raw)
 
 
 def test_finished_set_excludes_lost():
@@ -30,8 +41,6 @@ def test_finished_set_excludes_lost():
     assert JOB_FINISHED == frozenset(
         {JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED}
     )
-    assert JobStatus.LOST not in JOB_FINISHED
-    assert JobStatus.LOST in JOB_TERMINAL
 
 
 def test_external_prefix_helpers():

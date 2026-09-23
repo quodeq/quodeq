@@ -2,8 +2,8 @@
 
 A job flips to LOST when the server restarts and its tracking thread is
 gone, but the subprocess it was tracking may still be alive and writing.
-JOB_TERMINAL (which includes LOST) is the wrong set for is_complete: using
-it would end an SSE tail on the internal id while the subprocess keeps
+Treating LOST as terminal is wrong for is_complete: doing so
+would end an SSE tail on the internal id while the subprocess keeps
 running. JOB_FINISHED (DONE/FAILED/CANCELLED only) is correct here --
 LOST falls through to the on-disk status.json/scan.json check instead.
 """

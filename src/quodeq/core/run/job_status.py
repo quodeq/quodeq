@@ -21,19 +21,29 @@ class JobStatus(StrEnum):
     LOST = "lost"
 
 
-JOB_TERMINAL: frozenset[JobStatus] = frozenset(
-    {JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.LOST}
-)
-
 # Excludes LOST on purpose: a lost job's subprocess may still be alive and
 # writing (the tracking thread, not the process, is what was lost), so
 # callers that decide "the run actually finished" (SSE done-frame, is_complete
 # disk fallback, preparing-job liveness) must not treat LOST as finished --
-# they fall through to a status.json/disk check instead. Use JOB_TERMINAL
-# only where "no longer tracked, for any reason including lost" is the point.
+# they fall through to a status.json/disk check instead.
 JOB_FINISHED: frozenset[JobStatus] = frozenset(
     {JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED}
 )
+
+_BY_VALUE: dict[str, JobStatus] = {m.value: m for m in JobStatus}
+
+
+def parse_job_status(raw: str | None) -> JobStatus:
+    """The ``JobStatus`` a persisted status string means.
+
+    Accepts every member value, case- and whitespace-insensitive. Raises
+    ``ValueError`` for anything else so the caller decides how to degrade.
+    """
+    status = _BY_VALUE.get((raw or "").strip().lower())
+    if status is None:
+        raise ValueError(f"unknown job status: {raw!r}")
+    return status
+
 
 # Job ids of runs launched outside the dashboard (CLI, CI) carry this prefix
 # so the evaluations index can tell them from dashboard-managed jobs.

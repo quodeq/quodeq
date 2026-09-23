@@ -124,7 +124,7 @@ def test_stream_terminal_state_uses_public_get_job_not_private_store():
 def test_is_preparing_job_treats_lost_as_still_live(tmp_path):
     """A LOST job's tracking thread died, but the subprocess may still be
     running -- _is_preparing_job must not treat it as finished (JOB_FINISHED
-    excludes LOST on purpose; only JOB_TERMINAL includes it)."""
+    excludes LOST on purpose)."""
     from quodeq.api._log_stream_routes import _is_preparing_job
     from quodeq.core.types.job import JobSnapshot
 
@@ -140,7 +140,7 @@ def test_is_preparing_job_treats_lost_as_still_live(tmp_path):
 
 def test_stream_terminal_state_falls_through_to_status_json_for_lost_job(tmp_path):
     """A LOST job must not short-circuit to "lost" -- it falls through to
-    status.json's real state, same as the pre-JOB_TERMINAL behaviour."""
+    status.json's real state, same as before JobStatus existed."""
     from quodeq.api._log_stream_routes import _stream_terminal_state
     from quodeq.core.types.job import JobSnapshot
     import json
