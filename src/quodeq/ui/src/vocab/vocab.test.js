@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { ACTIVE_RUN_STATES, RUN_STATE, TERMINAL_RUN_STATES } from './runState.js';
-import { JOB_STATUS, JOB_TERMINAL } from './jobStatus.js';
+import { JOB_STATUS, JOB_TERMINAL, JOB_FINISHED } from './jobStatus.js';
 import { EXIT_REASON } from './exitReason.js';
 import { SEVERITY, SEVERITY_ORDER } from './severity.js';
 import { GRADE, GRADE_LADDER } from './grade.js';
@@ -21,6 +21,7 @@ test('vocab modules spell the wire values', () => {
     RUNNING: 'running', DONE: 'done', FAILED: 'failed', CANCELLED: 'cancelled', LOST: 'lost',
   });
   assert.deepEqual([...JOB_TERMINAL], ['done', 'failed', 'cancelled', 'lost']);
+  assert.deepEqual([...JOB_FINISHED], ['done', 'failed', 'cancelled']);
   assert.deepEqual(Object.values(EXIT_REASON), [
     'done', 'time_limit', 'deadline', 'failure_streak', 'cancelled', 'error',
     'stale_detected', 'stale_legacy_pid_dead', 'stale_legacy_no_pid',

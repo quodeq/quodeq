@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { NO_JOB_ID, evaluationKeys } from "../../../api/queryKeys.js";
 import { SSE_ENABLED, findingsRefetchInterval } from "./useEvaluation.helpers.js";
 import { createViolation } from "../../../models/violation.js";
+import { JOB_STATUS } from "../../../vocab/jobStatus.js";
 
 const JOB_POLL_MS = 1500;
 
@@ -102,7 +103,7 @@ export function useEvaluationQueries(api, jobId) {
     refetchInterval: findingsRefetchInterval(job),
   });
 
-  const isJobTerminal = !!job?.status && job.status !== "running";
+  const isJobTerminal = !!job?.status && job.status !== JOB_STATUS.RUNNING;
   useTerminalFindingsRefetch(jobId, isJobTerminal, findingsQuery.refetch);
 
   const liveViolations = groupFindingsByDimension(findingsQuery.data || []);

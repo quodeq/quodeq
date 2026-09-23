@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { projectKeys } from '../api/queryKeys.js';
+import { JOB_STATUS } from '../vocab/jobStatus.js';
 
 /**
  * useEvaluationLifecycle.js's job-completion effect: on-start nav, the
@@ -10,9 +11,9 @@ export function useJobCompletionEffect({ job, navTab, loadProjects, setProjects,
   const prevJobRef = useRef(null);
   const refreshedRunRef = useRef(null);
   useEffect(() => {
-    if (job?.status === 'running' && !prevJobRef.current) navTab('evaluate');
+    if (job?.status === JOB_STATUS.RUNNING && !prevJobRef.current) navTab('evaluate');
     // Auto-refresh dashboard data as soon as the run completes
-    const finished = job && job.status !== 'running' && job.outputProject && job.outputRunId;
+    const finished = job && job.status !== JOB_STATUS.RUNNING && job.outputProject && job.outputRunId;
     if (finished && refreshedRunRef.current !== job.outputRunId) {
       refreshedRunRef.current = job.outputRunId;
       loadProjects()

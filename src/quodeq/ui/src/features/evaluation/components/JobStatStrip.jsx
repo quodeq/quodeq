@@ -8,8 +8,10 @@ import {
 import { recordRateSample, getRateSamples } from './rateSampleStore.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useRunElapsed } from '../hooks/useRunElapsed.js';
+import { JOB_TERMINAL } from '../../../vocab/jobStatus.js';
 
-const TERMINAL_STATES = new Set(['done', 'completed', 'failed', 'cancelled', 'lost']);
+// JOB_TERMINAL: includes 'lost', matching the old literal set. ('completed'
+// dropped -- job.status is never that value, so it was dead in the old set.)
 
 function sumLiveViolations(liveViolations) {
   if (!liveViolations) return 0;
@@ -48,7 +50,7 @@ function computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal,
 
 export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount = 0 }) {
   const jobId = job?.jobId;
-  const isTerminal = TERMINAL_STATES.has(job?.status);
+  const isTerminal = JOB_TERMINAL.has(job?.status);
 
   const { data: progress, dataUpdatedAt } = useEvaluationProgress(jobId, isTerminal);
   // Server-anchored, per-second-ticking elapsed shared with ScanProgress, so

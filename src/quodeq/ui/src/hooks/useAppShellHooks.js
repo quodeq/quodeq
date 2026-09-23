@@ -20,6 +20,8 @@ import {
   useInitialLandingEffect, useProjectScrollResetEffect, useVisibleStandardsHydrationEffect,
 } from './useAppEffects.js';
 import { buildBreadcrumbSiblingsFor } from '../features/side-pane/breadcrumbSiblings.js';
+import { JOB_STATUS } from '../vocab/jobStatus.js';
+import { DIM_STATE } from '../vocab/dimState.js';
 
 // App.jsx's hook groups, extracted verbatim to keep App() itself under the
 // function-length cap without touching hook call order: each group below is
@@ -34,7 +36,7 @@ export function computeIsEvaluating(state) {
   // While an evaluation is running we block any path that would open the
   // onboarding wizard or start a second evaluation — only one job may be in
   // flight at a time.
-  return state.evalLifecycle?.job?.status === 'running';
+  return state.evalLifecycle?.job?.status === JOB_STATUS.RUNNING;
 }
 
 /**
@@ -178,7 +180,7 @@ export function useAppEvalProgress({ state, isEvaluating }) {
   return useMemo(() => {
     if (!isEvaluating) return null;
     const overall = computeOverallProgress(evalProgress);
-    const runningDim = (evalProgress?.dimensions || []).find((d) => d?.state === 'running');
+    const runningDim = (evalProgress?.dimensions || []).find((d) => d?.state === DIM_STATE.RUNNING);
     return {
       dimension: runningDim?.id ? String(runningDim.id).toLowerCase() : null,
       percent: overall.totalFiles > 0 ? overall.overallPct : null,

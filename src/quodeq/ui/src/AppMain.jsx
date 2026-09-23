@@ -16,6 +16,7 @@ import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvi
 import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLogProvider.jsx';
 import { MainContent } from './routes/renderers.jsx';
 import { buildSidebarProps, buildTopBarProps } from './appShellProps.js';
+import { JOB_STATUS } from './vocab/jobStatus.js';
 
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 
@@ -97,7 +98,7 @@ function AppTopBar({ shell }) {
         selectedSource: state.selectedSource,
         projectsCount: state.projects?.length,
         onEvaluateClick: () => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) }),
-        evaluating: state.evalLifecycle?.job?.status === 'running',
+        evaluating: state.evalLifecycle?.job?.status === JOB_STATUS.RUNNING,
         topbarRunProgress,
         navTab,
         setSidebarPinned,

@@ -22,13 +22,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { evaluationKeys, projectKeys } from "../../../api/queryKeys.js";
 import { runEventsUrl } from "../../../api/evaluations.js";
 import { createViolation } from "../../../models/violation.js";
+import { TERMINAL_RUN_STATES } from "../../../vocab/runState.js";
 
 // Cap the per-job findings array so a long-running scan with tens of thousands
 // of findings does not grow the React Query cache without bound. The dashboard
 // renders aggregated counts and the most-recent slice; older entries are still
 // reachable through the scored evaluation/<dim>.json artifacts on disk.
 const MAX_FINDINGS_IN_CACHE = 5000;
-const TERMINAL_STATES = new Set(["done", "failed", "cancelled"]);
+const TERMINAL_STATES = TERMINAL_RUN_STATES;
 
 function isSseEnabled() {
   return import.meta.env?.VITE_USE_SSE_EVENTS === "true";

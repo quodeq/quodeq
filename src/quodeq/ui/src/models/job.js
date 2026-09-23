@@ -3,7 +3,7 @@
  *
  * @typedef {Object} Job
  * @property {string}        jobId
- * @property {'running'|'done'|'failed'|'cancelled'|'lost'} status
+ * @property {string}        status - one of JOB_STATUS's values (see vocab/jobStatus.js)
  * @property {string|null}   phase          - 'setup' | 'analyzing' | 'scoring'
  * @property {string|null}   currentDimension
  * @property {string|null}   outputProject
@@ -23,13 +23,14 @@
  */
 
 import { fromFieldSpec } from './fieldSpec.js';
+import { JOB_STATUS } from '../vocab/jobStatus.js';
 
 /**
  * Field table for {@link createJob}: output key -> [raw spelling(s), default].
  */
 const JOB_FIELDS = {
   jobId:            ['jobId', ''],
-  status:           ['status', 'running'],
+  status:           ['status', JOB_STATUS.RUNNING],
   phase:            ['phase', null],
   currentDimension: ['currentDimension', null],
   outputProject:    ['outputProject', null],
