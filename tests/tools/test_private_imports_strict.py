@@ -66,6 +66,30 @@ def test_rule3_ignores_an_all_without_private_names(tmp_path):
     assert _strict(tmp_path) == []
 
 
+def test_rule3_flags_private_names_in_an_annotated_all(tmp_path):
+    _write(tmp_path, "src/quodeq/services/y.py",
+           '__all__: list[str] = ["_helper", "helper"]\n')
+    assert _strict(tmp_path) == [("private-export", "__all__", "_helper")]
+
+
+def test_rule3_ignores_an_annotated_all_without_private_names(tmp_path):
+    _write(tmp_path, "src/quodeq/services/y.py",
+           '__all__: list[str] = ["helper"]\n')
+    assert _strict(tmp_path) == []
+
+
+def test_rule3_flags_private_names_appended_to_all(tmp_path):
+    _write(tmp_path, "src/quodeq/services/y.py",
+           '__all__ = ["helper"]\n__all__ += ["_helper"]\n')
+    assert _strict(tmp_path) == [("private-export", "__all__", "_helper")]
+
+
+def test_rule3_ignores_public_names_appended_to_all(tmp_path):
+    _write(tmp_path, "src/quodeq/services/y.py",
+           '__all__ = ["helper"]\n__all__ += ["other"]\n')
+    assert _strict(tmp_path) == []
+
+
 def test_rule4_flags_private_attribute_through_a_module_alias(tmp_path):
     _pkg(tmp_path)
     _write(tmp_path, "src/quodeq/services/z.py",
@@ -83,6 +107,20 @@ def test_rule4_ignores_instance_attributes_and_public_attributes(tmp_path):
     _write(tmp_path, "src/quodeq/services/z.py",
            "from quodeq.services import y\n\n\nclass C:\n"
            "    def m(self, provider):\n        return self._x, provider._jobs, y.helper()\n")
+    assert _strict(tmp_path) == []
+
+
+def test_rule4_flags_dotted_chain_after_a_plain_import(tmp_path):
+    _pkg(tmp_path)
+    _write(tmp_path, "src/quodeq/services/z.py",
+           "import quodeq.services.y\n\na = quodeq.services.y._helper()\n")
+    assert _strict(tmp_path) == [("private-attr", "quodeq.services.y", "_helper")]
+
+
+def test_rule4_ignores_a_public_dotted_chain_after_a_plain_import(tmp_path):
+    _pkg(tmp_path)
+    _write(tmp_path, "src/quodeq/services/z.py",
+           "import quodeq.services.y\n\na = quodeq.services.y.helper()\n")
     assert _strict(tmp_path) == []
 
 

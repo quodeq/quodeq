@@ -8,14 +8,18 @@ same-directory absolute case and every relative one.
 Rule 3: a `_name` listed in a module's `__all__` is a violation.
 
 Rule 4: `mod._x` read through a module alias (`import quodeq.a.b as mod`,
-`from quodeq.a import b`, `from . import b`) is a violation. Instance
-attribute reads (`self._x`, `provider._x`) are not checked: too many of
-them are a class reading its own state.
+`from quodeq.a import b`, `from . import b`) is a violation. So is a dotted
+chain rooted at `quodeq` after a plain `import quodeq.a.b` (`quodeq.a.b._x`).
+Instance attribute reads (`self._x`, `provider._x`) are not checked: too
+many of them are a class reading its own state.
 
 A private module (`_mod.py`) imported from inside its package stays legal
 (rule 1, unchanged, enforced by rule B).
 
 Applied to src/quodeq only; tests keep rules A/B and their ratchet.
+
+Not checked: dynamic lookups (`getattr(mod, "_x")`) and `importlib`-based
+access. Both read a name the AST never spells out.
 """
 from __future__ import annotations
 
@@ -75,14 +79,31 @@ def _private_name_hits(node: ast.ImportFrom, ctx: FileCtx, src_root: Path) -> It
             yield make_hit(ctx, node.lineno, "private-name", module, alias.name)
 
 
+def _all_value_elts(node: ast.stmt) -> list[ast.expr] | None:
+    """The list/tuple elements of an `__all__` statement (`=`, annotated
+    `=`, or `+=`), or None if `node` is not one."""
+    if isinstance(node, ast.Assign):
+        targets, value = node.targets, node.value
+    elif isinstance(node, ast.AnnAssign):
+        targets, value = ([node.target] if node.target is not None else []), node.value
+    elif isinstance(node, ast.AugAssign):
+        targets, value = [node.target], node.value
+    else:
+        return None
+    if value is None or not isinstance(value, (ast.List, ast.Tuple)):
+        return None
+    if not any(isinstance(t, ast.Name) and t.id == "__all__" for t in targets):
+        return None
+    return list(value.elts)
+
+
 def _export_hits(tree: ast.Module, ctx: FileCtx) -> Iterator[Hit]:
-    """Rule 3: private names listed in `__all__`."""
+    """Rule 3: private names listed in `__all__` (`=`, annotated `=`, or `+=`)."""
     for node in tree.body:
-        if not isinstance(node, ast.Assign) or not isinstance(node.value, (ast.List, ast.Tuple)):
+        elts = _all_value_elts(node)
+        if elts is None:
             continue
-        if not any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets):
-            continue
-        for elt in node.value.elts:
+        for elt in elts:
             if isinstance(elt, ast.Constant) and isinstance(elt.value, str) and is_private(elt.value):
                 yield make_hit(ctx, elt.lineno, "private-export", "__all__", elt.value)
 
@@ -116,6 +137,41 @@ def _attr_hits(tree: ast.Module, ctx: FileCtx, src_root: Path) -> Iterator[Hit]:
             yield make_hit(ctx, node.lineno, "private-attr", aliases[node.value.id], node.attr)
 
 
+def _has_plain_quodeq_import(tree: ast.Module) -> bool:
+    """True if the file has an `import quodeq[.a.b]` with no `as` alias."""
+    return any(
+        isinstance(node, ast.Import)
+        and any(alias.asname is None and quodeq_segments(alias.name) is not None for alias in node.names)
+        for node in ast.walk(tree)
+    )
+
+
+def _flatten_attr_chain(node: ast.expr) -> list[str] | None:
+    """`[quodeq, a, b, _x]` for `quodeq.a.b._x`, or None off a non-name root."""
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if not isinstance(node, ast.Name):
+        return None
+    parts.append(node.id)
+    parts.reverse()
+    return parts
+
+
+def _chain_hits(tree: ast.Module, ctx: FileCtx) -> Iterator[Hit]:
+    """Rule 4 (dotted form): `quodeq.a.b._x` after a plain `import quodeq.a.b`."""
+    if not _has_plain_quodeq_import(tree):
+        return
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Attribute) and is_private(node.attr)):
+            continue
+        chain = _flatten_attr_chain(node)
+        if chain is None or len(chain) < 3 or chain[0] != "quodeq":
+            continue
+        yield make_hit(ctx, node.lineno, "private-attr", ".".join(chain[:-1]), chain[-1])
+
+
 def strict_hits(tree: ast.Module, ctx: FileCtx, src_root: Path) -> Iterator[Hit]:
     """Every rule 2-4 violation in one parsed src file."""
     for node in ast.walk(tree):
@@ -123,3 +179,4 @@ def strict_hits(tree: ast.Module, ctx: FileCtx, src_root: Path) -> Iterator[Hit]
             yield from _private_name_hits(node, ctx, src_root)
     yield from _export_hits(tree, ctx)
     yield from _attr_hits(tree, ctx, src_root)
+    yield from _chain_hits(tree, ctx)
