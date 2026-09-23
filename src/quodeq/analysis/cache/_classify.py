@@ -135,7 +135,7 @@ def classify_files_via_cache(
     after dispatch — clean-scan refreshes the cache rather than ignoring it.
 
     The pipeline classifies twice per dim (estimates + dim runner). When
-    ``config._classify_cache`` is set to a dict, this function stashes
+    ``config.classify_stash`` is set to a dict, this function stashes
     its result there on the first call for a given ``(dimension, files)``
     pair and short-circuits the second call. The stash MUST NOT short-
     circuit when ``bypass_reads`` is True — clean-scan deletes entries
@@ -143,7 +143,7 @@ def classify_files_via_cache(
     stale by the time the dim runner asks again.
     """
     files_tuple = tuple(files)
-    run_cache = config._classify_cache
+    run_cache = config.classify_stash
     if not bypass_reads and run_cache is not None:
         stashed = run_cache.get(dimension)
         if stashed is not None and stashed.files == files_tuple:

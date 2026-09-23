@@ -160,6 +160,15 @@ class FsEvaluationMixin:
             return fn(job_id, reports_dir=reports_dir)
         return self._jobs.get_job(job_id)
 
+    def in_memory_job(self, job_id: str) -> JobSnapshot | None:
+        """The in-memory JobManager view of *job_id*, or None.
+
+        Unlike ``get_evaluation_status`` this never consults the run index,
+        so an ``ext-`` id or an unknown id returns None. The log-stream routes
+        use it for the freshest status of an internal run.
+        """
+        return self._jobs.get_job(job_id)
+
     def cancel_evaluation(
         self, job_id: str, reports_dir: str | None = None,
         *, discard_partial: bool = False,

@@ -101,7 +101,7 @@ class RunConfig:
     # when the file list still matches. ``None`` means "stashing disabled" —
     # tests and one-shot callers that construct a fresh RunConfig get the
     # original behaviour without any wiring.
-    _classify_cache: "dict[str, ClassifyStash] | None" = None
+    classify_stash: "dict[str, ClassifyStash] | None" = None
     # Explicit DispatchPolicy for this run. ``None`` means "resolve a fresh
     # live snapshot on demand" via :meth:`_policy` — see there for why that
     # resolution is deliberately NOT cached onto this field.
@@ -109,9 +109,9 @@ class RunConfig:
 
     def classify_cache(self, dim_id: str) -> "ClassifyStash | None":
         """This run's stashed classify result for *dim_id*, or None."""
-        if self._classify_cache is None:
+        if self.classify_stash is None:
             return None
-        return self._classify_cache.get(dim_id)
+        return self.classify_stash.get(dim_id)
 
     def _policy(self) -> DispatchPolicy:
         """The DispatchPolicy for this run: the explicit override, or a

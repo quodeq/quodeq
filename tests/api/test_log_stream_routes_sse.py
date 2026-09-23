@@ -84,7 +84,7 @@ def test_sse_waits_for_preparing_internal_job(tmp_path, app) -> None:
 
     job = FakeJob("running")
     provider = app.config["_provider"]
-    provider._jobs = JobsHolder(job)
+    provider.in_memory_job = JobsHolder(job).get_job
 
     # Flip the job to "done" on the second is_job_complete call so the
     # generator first sees an active preparing job (path None, not done)
@@ -127,7 +127,7 @@ def test_sse_streams_log_after_it_appears(tmp_path, app) -> None:
             return FakeJob()
 
     provider = app.config["_provider"]
-    provider._jobs = JobsHolder()
+    provider.in_memory_job = JobsHolder().get_job
 
     # First call (from the route's _resolve_run_log) returns None, so
     # the route falls through to _is_preparing_job and opens the SSE

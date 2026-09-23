@@ -148,8 +148,8 @@ def _prepare_run_context(
     cache-is-None dimension call.
     """
     dimensions, ctx = load_analysis_context(config)
-    if config._classify_cache is None:
-        config._classify_cache = {}
+    if config.classify_stash is None:
+        config.classify_stash = {}
     estimates = _persist_dim_estimates(config, dimensions)
     dimensions, dim_counts = order_by_backlog(dimensions, estimates, log=SHARED_LOG)
 

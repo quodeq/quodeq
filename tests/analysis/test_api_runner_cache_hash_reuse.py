@@ -20,7 +20,7 @@ def _run_config(src_root, *, classify_cache=None):
     return RunConfig(
         src=src_root, language="kotlin", work_dir=src_root,
         options=AnalysisOptions(subagent_model="sonnet"),
-        _classify_cache=classify_cache,
+        classify_stash=classify_cache,
     )
 
 

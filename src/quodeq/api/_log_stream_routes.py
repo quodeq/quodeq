@@ -36,9 +36,9 @@ def _is_preparing_job(provider, job_id: str) -> bool:
     # status. Pre-marker, ``output_project`` is None so ``get_log_run_dir``
     # returns None — without this check the route would 404 the moment the
     # frontend opens the stream after Start.
-    jobs = getattr(provider, "_jobs", None)
-    if jobs is not None:
-        job = jobs.get_job(job_id)
+    lookup = getattr(provider, "in_memory_job", None)
+    if lookup is not None:
+        job = lookup(job_id)
         if job is not None and job.status not in JOB_FINISHED:
             return True
     # External job: the CLI creates the run directory before opening the
