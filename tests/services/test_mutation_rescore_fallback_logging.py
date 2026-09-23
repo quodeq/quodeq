@@ -17,13 +17,13 @@ occur outside ``_bg_project``'s own try/except, e.g. ``lock.acquire()``
 itself), but is NOT what makes this failure observable in production.
 
 The actual production-visible fix is that ``_bg_project`` now catches a
-failure escaping ``_project_all_runs`` itself and logs it via
+failure escaping ``project_all_runs`` itself and logs it via
 ``_logger.warning(...)`` -- WARNING is above the default INFO threshold, so
 this reaches stderr/the log buffer without any operator opt-in. This matches
-the level ``_project_all_runs`` itself already uses for per-run projection
+the level ``project_all_runs`` itself already uses for per-run projection
 failures (``services/_mutation_projection.py:108``).
 
-These tests exercise the real fallback path (run_id=None -> _rescore_run
+These tests exercise the real fallback path (run_id=None -> rescore_run
 short-circuits -> the background projection sweep, via the REAL, un-injected
 ``ThreadBackgroundRunner``) and assert the failure is observable WITHOUT
 lowering the logger below its production default level.
@@ -70,10 +70,10 @@ def test_rescore_with_fallback_wires_module_logger_into_background_runner(monkey
     sink = captured["log"]
     assert sink is mutation_rescore._log_sink
     assert callable(getattr(sink, "success"))  # the LogSink surface a Logger lacks
-    with caplog.at_level(logging.DEBUG, logger=mutation_rescore._logger.name):
+    with caplog.at_level(logging.DEBUG, logger=mutation_rescore.logger.name):
         sink.debug("wiring probe")
     assert any(
-        r.name == mutation_rescore._logger.name and r.getMessage() == "wiring probe"
+        r.name == mutation_rescore.logger.name and r.getMessage() == "wiring probe"
         for r in caplog.records
     ), [r.getMessage() for r in caplog.records]
 
@@ -99,10 +99,10 @@ def test_rescore_with_fallback_logs_background_projection_failure_at_warning(
         finally:
             ran.set()
 
-    monkeypatch.setattr(mutation_rescore, "_project_all_runs", _boom)
-    monkeypatch.setattr(mutation_rescore, "_resolve_project_dir", lambda *_a, **_k: tmp_path)
+    monkeypatch.setattr(mutation_rescore, "project_all_runs", _boom)
+    monkeypatch.setattr(mutation_rescore, "resolve_project_dir", lambda *_a, **_k: tmp_path)
 
-    # run_id=None -> _rescore_run short-circuits to None -> fallback path,
+    # run_id=None -> rescore_run short-circuits to None -> fallback path,
     # using the REAL (un-injected) ThreadBackgroundRunner default.
     result = mutation_rescore.rescore_with_fallback(
         str(tmp_path), "cluster17-fallback-proj", None,

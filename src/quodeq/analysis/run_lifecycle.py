@@ -1,8 +1,8 @@
 """RunLifecycleContext — the run's lifecycle context manager.
 
 Composed from collaborators that each own one concern: ``_StatusWriter``
-(every status.json write), ``_SignalGuard`` (install/restore of the run's
-signal handlers), ``_AtexitGuard`` (the process-exit fallback hook), plus the
+(every status.json write), ``SignalGuard`` (install/restore of the run's
+signal handlers), ``AtexitGuard`` (the process-exit fallback hook), plus the
 shared heartbeat/resource samplers. The context wires them together and keeps
 the exception→state mapping in ``__exit__`` — deciding which terminal state
 an exit maps to is the context manager's own job.
@@ -36,14 +36,14 @@ from quodeq.core.run.exit_reason import ExitReason
 from quodeq.shared.resource_sampler import ResourceSampler
 from quodeq.shared.run_heartbeat import HeartbeatThread
 from quodeq.analysis._run_lifecycle_support import (
-    _AtexitGuard,
-    _SignalGuard,
-    _finalize_run_on_atexit,
-    _is_circuit_breaker_error,
-    _is_named_error,
-    _mark_unfinished_dims_incomplete,
-    _run_signal_shutdown,
-    _seed_dimension_states,
+    AtexitGuard,
+    SignalGuard,
+    finalize_run_on_atexit,
+    is_circuit_breaker_error,
+    is_named_error,
+    mark_unfinished_dims_incomplete,
+    run_signal_shutdown,
+    seed_dimension_states,
 )
 from quodeq.data.fs.run_status_store import (
     RunState,
@@ -132,8 +132,8 @@ class RunLifecycleContext:
         )
         self._heartbeat = HeartbeatThread(run_dir)
         self._resources = ResourceSampler()
-        self._signals = _SignalGuard(self._handle_signal, log=_logger)
-        self._atexit = _AtexitGuard(self._finalize_on_atexit)
+        self._signals = SignalGuard(self._handle_signal, log=_logger)
+        self._atexit = AtexitGuard(self._finalize_on_atexit)
         self._pending_exit_reason: str | None = None
 
     # ---- Context protocol --------------------------------------------------
@@ -148,7 +148,7 @@ class RunLifecycleContext:
         self._signals.install()
         self._atexit.register()
         self._write(RunState.PENDING)
-        _seed_dimension_states(self._run_dir, self._dimensions, log=_logger)
+        seed_dimension_states(self._run_dir, self._dimensions, log=_logger)
         self._transition(RunState.RUNNING)
         self._heartbeat.start()
         self._resources.start()
@@ -167,7 +167,7 @@ class RunLifecycleContext:
         # a done/None status that reads exactly like a full run — the
         # skipped dims are dropped from the run average, and they tend to
         # be the ones late in the order, not a random sample.
-        skipped = _mark_unfinished_dims_incomplete(self._run_dir, "not_reached", log=_logger)
+        skipped = mark_unfinished_dims_incomplete(self._run_dir, "not_reached", log=_logger)
         self._transition(
             RunState.DONE,
             exit_reason=self._pending_exit_reason
@@ -224,9 +224,9 @@ class RunLifecycleContext:
             self._exit_system_exit()
         elif issubclass(exc_type, BrokenPipeError):
             self._exit_broken_pipe()
-        elif _is_circuit_breaker_error(exc_type):
+        elif is_circuit_breaker_error(exc_type):
             self._exit_circuit_breaker()
-        elif _is_named_error(exc_type, "FatalProviderError"):
+        elif is_named_error(exc_type, "FatalProviderError"):
             self._exit_fatal_provider(exc_value)
         else:
             self._exit_other_exception(exc_type)
@@ -281,18 +281,11 @@ class RunLifecycleContext:
     def _write(self, state: RunState, *, exit_reason: str | None = None) -> None:
         self._status.write(state, exit_reason=exit_reason)
 
-    @staticmethod
-    def _is_named_error(exc_type: type[BaseException] | None, name: str) -> bool:
-        """Delegates to ``_run_lifecycle_support._is_named_error``; kept as a
-        staticmethod because a test calls ``RunLifecycleContext._is_named_error``.
-        """
-        return _is_named_error(exc_type, name)
-
     def _handle_signal(self, signum: int, _frame: Any) -> None:
         """Write CANCELLED status, close out unfinished dims, then re-raise as SystemExit."""
-        _run_signal_shutdown(self._heartbeat, self._resources, self._status, signum, log=_logger)
+        run_signal_shutdown(self._heartbeat, self._resources, self._status, signum, log=_logger)
         self._current_state = RunState.CANCELLED
         raise SystemExit(128 + signum)
 
     def _finalize_on_atexit(self) -> None:
-        _finalize_run_on_atexit(self._run_dir, self._heartbeat, self._resources, self._status)
+        finalize_run_on_atexit(self._run_dir, self._heartbeat, self._resources, self._status)

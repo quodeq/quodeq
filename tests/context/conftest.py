@@ -21,7 +21,7 @@ def seed_dismissed(
 
     *scope* lets a test seed a scope-level finding (excluded from the
     semantic-precedent tier -- see ``_semantic_eligible`` /
-    ``_collect_dismissed_texts``); defaults to None for a normal,
+    ``collect_dismissed_texts``); defaults to None for a normal,
     line-level finding.
     """
     run_dir = project_dir / run_id

@@ -2,12 +2,12 @@
 
 Split out so a paginated request can slice the
 project set *before* the expensive per-project hydration
-(``_build_project_entry``) runs, instead of after.
+(``build_project_entry``) runs, instead of after.
 
 ``build_project_index`` is a cheap whole-set pass -- id/path/location/parent
 only, read from each candidate's ``repository_info.json`` -- no run-dir
 scan, no summary/language-stat reads, no backfill write. It is what
-parent/child auto-detection (``_auto_detect_parents``, which only needs
+parent/child auto-detection (``auto_detect_parents``, which only needs
 ``.path``/``.location``/``.id``/``.parent``) and pagination windowing run
 against.
 
@@ -28,31 +28,31 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.core.types import ProjectEntry
-from quodeq.services._fs_metadata import _extract_project_metadata
+from quodeq.services._fs_metadata import extract_project_metadata
 from quodeq.services.fs_project_helpers import (
-    _KnownProjectIds,
-    _ListingOptions,
-    _auto_detect_parents,
-    _backfill_onboarding_field,
-    _max_projects_listed,
-    _project_entry_identity,
+    KnownProjectIds,
+    ListingOptions,
+    auto_detect_parents,
+    backfill_onboarding_field,
+    max_projects_listed,
+    project_entry_identity,
 )
 from quodeq.services.fs_projects import (
-    _build_parent_child_sets,
-    _build_project_entries_threaded,
-    _collect_candidate_dirs,
+    build_parent_child_sets,
+    build_project_entries_threaded,
+    collect_candidate_dirs,
 )
 from quodeq.services.wiring import repository_info_exists
 
 
 def _build_lightweight_entry(entry_name: str, info: dict) -> ProjectEntry:
     """A sparse ``ProjectEntry`` carrying only what parent-detection needs."""
-    meta = _extract_project_metadata(info, entry_name)
-    return ProjectEntry(**_project_entry_identity(entry_name, meta))
+    meta = extract_project_metadata(info, entry_name)
+    return ProjectEntry(**project_entry_identity(entry_name, meta))
 
 
 def _collect_lightweight_entries(reports_root: Path, dir_names: list[str]) -> list[ProjectEntry]:
-    parent_ids, subproject_ids, info_by_name = _build_parent_child_sets(reports_root, dir_names)
+    parent_ids, subproject_ids, info_by_name = build_parent_child_sets(reports_root, dir_names)
     # info_by_name already holds every parseable record, so only the dirs it
     # lacks need the presence probe: a corrupt repository_info.json still
     # marks a registered project (see repository_info_exists) and is listed
@@ -71,10 +71,10 @@ def build_project_index(reports_root: Path) -> list[ProjectEntry]:
     ``build_project_entries`` does the expensive hydration afterwards, only
     for the ids a caller actually needs.
     """
-    dir_names = _collect_candidate_dirs(reports_root, _max_projects_listed())
+    dir_names = collect_candidate_dirs(reports_root, max_projects_listed())
     entries = _collect_lightweight_entries(reports_root, dir_names)
     entries.sort(key=lambda p: p.name)
-    return _auto_detect_parents(entries)
+    return auto_detect_parents(entries)
 
 
 def build_project_entries(
@@ -84,13 +84,13 @@ def build_project_entries(
 
     *ids* must already be vetted by ``build_project_index`` (registered, a
     parent, or a subproject) -- every id here is therefore known-included,
-    so the zero-run stray-dir filter in ``_build_project_entries_threaded``
+    so the zero-run stray-dir filter in ``build_project_entries_threaded``
     is bypassed by treating the whole window as pre-registered.
     """
     if backfill:
         for name in ids:
-            _backfill_onboarding_field(reports_root / name)
-    return _build_project_entries_threaded(
-        reports_root, ids, _KnownProjectIds(registered=set(ids)),
-        _ListingOptions(backfill=backfill, inline_summaries=inline_summaries),
+            backfill_onboarding_field(reports_root / name)
+    return build_project_entries_threaded(
+        reports_root, ids, KnownProjectIds(registered=set(ids)),
+        ListingOptions(backfill=backfill, inline_summaries=inline_summaries),
     )

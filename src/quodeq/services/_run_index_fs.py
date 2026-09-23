@@ -5,7 +5,7 @@ these directly (verified: no test reaches ``EvaluationsIndex`` internals by
 name) so they move as plain free functions — no re-export required, callers
 are ``EvaluationsIndex`` methods only. ``_evaluations_index.py`` is a
 DECLARED_LOGGING_SITES entry; this sibling does not add a new logging
-import, so ``_remove_run_directory`` takes an injected ``LogSink`` (the
+import, so ``remove_run_directory`` takes an injected ``LogSink`` (the
 caller already holds the facade's own declared logger and threads it
 through).
 """
@@ -18,11 +18,11 @@ from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
-from quodeq.services._run_status_readers import _status_json_terminal
+from quodeq.services._run_status_readers import status_json_terminal
 from quodeq.core.utils.io import is_within
 
 
-def _merge_internal_jobs(
+def merge_internal_jobs(
     snapshots: list[JobSnapshot], internal_jobs: list[JobSnapshot],
 ) -> list[JobSnapshot]:
     """Merge SQLite-index snapshots with in-memory internal jobs.
@@ -59,7 +59,7 @@ def _merge_internal_jobs(
     ] + visible_internal
 
 
-def _remove_run_directory(
+def remove_run_directory(
     reports_dir: Path, output_project: str | None, run_uuid: str,
     *, log: LogSink = NULL_LOG,
 ) -> bool:
@@ -93,7 +93,7 @@ def _remove_run_directory(
     return removed_dir
 
 
-def _scan_reports_root_for_run(reports_root: Path | None, run_id: str) -> Path | None:
+def scan_reports_root_for_run(reports_root: Path | None, run_id: str) -> Path | None:
     """Scan *reports_root* for ``<project>/<run_id>/``, jailed to *reports_root*."""
     if reports_root is None or not reports_root.is_dir():
         return None
@@ -108,7 +108,7 @@ def _scan_reports_root_for_run(reports_root: Path | None, run_id: str) -> Path |
     return None
 
 
-def _sync_external_run_by_scan(db, reports_dir: Path, run_id: str) -> None:
+def sync_external_run_by_scan(db, reports_dir: Path, run_id: str) -> None:
     """Fallback for an "ext-" id the index has no usable run_dir for yet.
 
     Scans every project dir under *reports_dir* for ``<project>/<run_id>``
@@ -117,18 +117,18 @@ def _sync_external_run_by_scan(db, reports_dir: Path, run_id: str) -> None:
     been indexed once, ``get_status`` resolves it straight from its stored
     ``run_dir`` instead of reaching this scan again.
     """
-    candidate = _scan_reports_root_for_run(reports_dir, run_id)
+    candidate = scan_reports_root_for_run(reports_dir, run_id)
     if candidate is not None:
         _run_index.sync_index_for_run(db, candidate)
         return
     _run_index.sync_index(db, reports_dir)
 
 
-def _external_job_is_complete(run_dir: Path) -> bool:
+def external_job_is_complete(run_dir: Path) -> bool:
     """True when an external (``ext-``) job's *run_dir* shows it has ended."""
     if (run_dir / "scan.json").exists():
         return True
-    if _status_json_terminal(run_dir):
+    if status_json_terminal(run_dir):
         return True
     from quodeq.services._external_jobs import resolve_external_pid  # noqa: PLC0415
     pid_file = run_dir / ".pid"

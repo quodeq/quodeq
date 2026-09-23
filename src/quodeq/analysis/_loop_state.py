@@ -30,7 +30,7 @@ class DimTransition:
     exit_reason: str | None = None
 
 
-def _safe_write_dim_state(
+def safe_write_dim_state(
     run_dir: Path | None, dim: str, transition: DimTransition, *, log: LogSink = NULL_LOG,
 ) -> None:
     """Best-effort dim-state write. Never raises into the loop.
@@ -58,7 +58,7 @@ def _safe_write_dim_state(
         log.warning(f"[loop] dim-state write failed for {dim}: {exc}")
 
 
-def _run_dir_for(config: RunConfig) -> Path | None:
+def run_dir_for(config: RunConfig) -> Path | None:
     """Resolve the run directory for ``dimensions.json`` writes.
 
     Returns ``config.run_dir`` when set -- the canonical anchor populated by
@@ -85,7 +85,7 @@ def _run_dir_for(config: RunConfig) -> Path | None:
     return None
 
 
-def _interruption_reason(exc: BaseException | None = None) -> str:
+def interruption_reason(exc: BaseException | None = None) -> str:
     """Map a process state and optional exception to a dim-state reason.
 
     - Fatal provider error (quota/auth/billing): 'provider_fatal'.
@@ -110,7 +110,7 @@ def _interruption_reason(exc: BaseException | None = None) -> str:
     return REASON_FAILED_EXCEPTION
 
 
-def _silence_broken_stdout() -> None:
+def silence_broken_stdout() -> None:
     """Redirect stdout/stderr to /dev/null after a BrokenPipeError.
 
     Once the parent has closed its end of the pipe every subsequent write to

@@ -1,7 +1,7 @@
 """Parity between the live scan counter and the persisted run report.
 
 The live counter (``tally_unique_findings``, read by the heartbeat and by
-``services.scan_progress``) and the report path (``_group_judgments``, which
+``services.scan_progress``) and the report path (``group_judgments``, which
 builds the per-dimension evaluation JSON) read the same evidence JSONL. Only
 the report path used to apply the standard-membership predicate, so a finding
 whose principle is not in the dimension's standard was counted live but
@@ -24,7 +24,7 @@ import pytest
 
 from quodeq.analysis.subagents.jsonl_utils import tally_unique_findings
 from quodeq.core.evidence.jsonl import parse_jsonl_line
-from quodeq.core.evidence.req_mapping import _group_judgments, build_principle_resolver
+from quodeq.core.evidence.req_mapping import group_judgments, build_principle_resolver
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 
 _DIMENSION = "demo"
@@ -79,7 +79,7 @@ def _report_violation_count(evidence_path: Path, compiled: Path) -> int:
         parsed = parse_jsonl_line(line)
         if parsed is not None:
             judgments.append(parsed[0])
-    grouped = _group_judgments(judgments, dimension=_DIMENSION, compiled_dir=compiled,
+    grouped = group_judgments(judgments, dimension=_DIMENSION, compiled_dir=compiled,
                                req_map_reader=read_req_to_principle_map)
     return sum(len(v) for v in grouped.violations.values())
 

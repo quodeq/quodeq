@@ -127,7 +127,7 @@ def estimate_max_agents(
     }
 
 
-def _detect_memory() -> float:
+def detect_memory() -> float:
     """Detect total GPU/unified memory in bytes via platform dispatch.
 
     Currently supports:
@@ -160,7 +160,7 @@ def _detect_memory() -> float:
 
 
 # Keep backward-compatible alias
-_get_gpu_memory = _detect_memory
+_get_gpu_memory = detect_memory
 
 
 def run_concurrency_test(

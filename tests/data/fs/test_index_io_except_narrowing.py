@@ -1,7 +1,7 @@
-"""_save_index's except narrowing (R-FT-7).
+"""save_index's except narrowing (R-FT-7).
 
-``_save_index``'s atomic write previously caught bare ``Exception``. Narrowed
-to ``OSError`` to match ``_load_index``'s already-narrowed read path
+``save_index``'s atomic write previously caught bare ``Exception``. Narrowed
+to ``OSError`` to match ``load_index``'s already-narrowed read path
 (``(OSError, json.JSONDecodeError)``) a few lines above it in the same file.
 """
 from __future__ import annotations
@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.data.fs._index_cache import IndexCache
-from quodeq.data.fs._index_io import _save_index
+from quodeq.data.fs._index_io import save_index
 
 
 def test_save_index_oserror_is_caught_and_logged(tmp_path: Path, caplog):
@@ -25,7 +25,7 @@ def test_save_index_oserror_is_caught_and_logged(tmp_path: Path, caplog):
     quodeq_logger.addHandler(caplog.handler)
     try:
         with caplog.at_level(logging.WARNING):
-            _save_index(missing_dir, {"a.py": "hash1"}, cache=cache)
+            save_index(missing_dir, {"a.py": "hash1"}, cache=cache)
     finally:
         quodeq_logger.removeHandler(caplog.handler)
 
@@ -42,4 +42,4 @@ def test_save_index_type_error_propagates(tmp_path: Path):
     bad_index = {"a.py": {"not", "a", "string"}}
 
     with pytest.raises(TypeError):
-        _save_index(tmp_path, bad_index, cache=cache)  # type: ignore[arg-type]
+        save_index(tmp_path, bad_index, cache=cache)  # type: ignore[arg-type]

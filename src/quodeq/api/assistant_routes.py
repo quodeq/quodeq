@@ -26,14 +26,14 @@ from quodeq.api.assistant_session_routes import SessionGates, register_assistant
 from quodeq.api.assistant_turn_routes import TurnGates, register_assistant_turn_routes
 from quodeq.api.assistant_turn_state import (  # noqa: F401 — re-export/patch target
     AssistantTurnState,
-    _release_turn,
-    _try_claim_turn,
-    _turn_state,
+    release_app_turn,
+    claim_app_turn,
+    turn_state,
 )
-from quodeq.api._assistant_helpers import _LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS
 from quodeq.api._assistant_helpers import build_tool_context
 from quodeq.api.assistant_workspace_routes import register_assistant_workspace_routes
 from quodeq.api.helpers import error_response
+from quodeq.assistant import LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant.orchestrator import TurnRequest, run_turn
 from quodeq.assistant.tools import ToolContext
@@ -109,7 +109,7 @@ def _build_tool_context(app: Flask, session: dict) -> ToolContext:
 
 def register_assistant_routes(app: Flask) -> None:
     """Bind every assistant route: workspace, sessions, turns, actions."""
-    _turn_state(app)  # ensure the registry exists even on bare test apps
+    turn_state(app)  # ensure the registry exists even on bare test apps
     register_assistant_workspace_routes(app)
     register_assistant_session_routes(
         app, SessionGates(known_provider=_known_provider, shared_source_error=_shared_source_error),

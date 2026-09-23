@@ -12,10 +12,10 @@ from quodeq.analysis._api_call import _classify_fatal_api_error
 from quodeq.analysis._api_runner import (
     ApiAnalysisRequest,
     ApiRunnerConfig,
-    _call_api,
+    call_api,
     run_api_analysis,
 )
-from quodeq.analysis._process import AnalysisError, _check_process_result
+from quodeq.analysis._process import AnalysisError, check_process_result
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 
 
@@ -98,7 +98,7 @@ class TestCallApiFatal:
         with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
             with pytest.raises(FatalProviderError) as exc_info:
-                _call_api("prompt", self._config())
+                call_api("prompt", self._config())
         assert exc_info.value.reason == "auth"
 
     def test_call_api_stays_lossy_on_transient_429(self):
@@ -108,7 +108,7 @@ class TestCallApiFatal:
         )
         with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
-            findings, was_lossy = _call_api("prompt", self._config())
+            findings, was_lossy = call_api("prompt", self._config())
         assert findings == []
         assert was_lossy is True
 
@@ -143,22 +143,22 @@ class TestCheckProcessResult:
         err = tmp_path / "agent.err"
         err.write_text("Credit balance is too low", encoding="utf-8")
         with pytest.raises(FatalProviderError) as exc_info:
-            _check_process_result(self._process(1), err)
+            check_process_result(self._process(1), err)
         assert exc_info.value.reason == "payment"
 
     def test_usage_limit_stderr_raises_fatal(self, tmp_path):
         err = tmp_path / "agent.err"
         err.write_text("5-hour usage limit reached", encoding="utf-8")
         with pytest.raises(FatalProviderError) as exc_info:
-            _check_process_result(self._process(1), err)
+            check_process_result(self._process(1), err)
         assert exc_info.value.reason == "quota"
 
     def test_generic_stderr_raises_analysis_error(self, tmp_path):
         err = tmp_path / "agent.err"
         err.write_text("segfault or whatever", encoding="utf-8")
         with pytest.raises(AnalysisError) as exc_info:
-            _check_process_result(self._process(1), err)
+            check_process_result(self._process(1), err)
         assert not isinstance(exc_info.value, FatalProviderError)
 
     def test_zero_exit_does_not_raise(self, tmp_path):
-        _check_process_result(self._process(0), tmp_path / "missing.err")
+        check_process_result(self._process(0), tmp_path / "missing.err")

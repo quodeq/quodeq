@@ -24,7 +24,7 @@ from quodeq.api._assistant_helpers import (
     local_provider_busy,
 )
 from quodeq.api._sse_log_helpers import sse_line
-from quodeq.api.assistant_turn_state import AssistantTurnState, _turn_state
+from quodeq.api.assistant_turn_state import AssistantTurnState, turn_state
 from quodeq.api.helpers import json_error
 from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.orchestrator import TurnRequest
@@ -85,7 +85,7 @@ def _sse_release_guard(state: AssistantTurnState):
     return _release
 
 
-_HEARTBEAT_IDLE_TICKS = 20  # ~5s at _POLL_SECONDS; throttles the heartbeat DATA frame
+_HEARTBEAT_IDLE_TICKS = 20  # ~5s at POLL_SECONDS; throttles the heartbeat DATA frame
 
 
 def _sse_event_generator(repo, sid: str, after: int):
@@ -94,7 +94,7 @@ def _sse_event_generator(repo, sid: str, after: int):
     # timer. So on sustained idle (e.g. a slow local model still
     # cold-loading) we must periodically emit a real heartbeat DATA
     # frame, not just comments. Throttled to ~every _HEARTBEAT_IDLE_TICKS-th
-    # idle tick (_HEARTBEAT_IDLE_TICKS * _POLL_SECONDS == ~5s) so we don't
+    # idle tick (_HEARTBEAT_IDLE_TICKS * POLL_SECONDS == ~5s) so we don't
     # spam a data frame every 0.25s; cheap ":keepalive" comments fill the
     # gaps in between.
     yield ":keepalive\n\n"
@@ -143,7 +143,7 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
         shared_error = gates.shared_source_error()
         if shared_error is not None:
             return shared_error
-    state = _turn_state(app)
+    state = turn_state(app)
     cancel = state.claim_turn(sid)
     if cancel is None:
         return json_error("a turn is already running", 409, "TURN_IN_PROGRESS")
@@ -171,7 +171,7 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
 def _stop_assistant_turn(app: Flask, sid: str):
     if get_repository(app).get_session(sid) is None:
         return json_error("unknown session", 404, "UNKNOWN_SESSION")
-    token = _turn_state(app).cancel_token(sid)
+    token = turn_state(app).cancel_token(sid)
     if token is None:
         return json_error("no turn running", 409, "NO_TURN_RUNNING")
     # Fire outside the lock: cancel() runs kill hooks (proc-tree kill /
@@ -192,7 +192,7 @@ def _assistant_events(app: Flask, sid: str):
     except ValueError:
         after = 0
 
-    state = _turn_state(app)
+    state = turn_state(app)
     if not state.try_open_sse_stream():
         return json_error("too many open event streams", 429, "TOO_MANY_STREAMS")
 

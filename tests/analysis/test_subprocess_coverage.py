@@ -7,7 +7,7 @@ import pytest
 
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.subprocess import (
-    _get_provider_type,
+    get_provider_type,
     _resolve_provider_config,
     _run_cli_analysis,
     count_files_from_stream,
@@ -16,28 +16,28 @@ from quodeq.analysis.subprocess import (
 
 
 # ---------------------------------------------------------------------------
-# _get_provider_type
+# get_provider_type
 # ---------------------------------------------------------------------------
 
 class TestGetProviderType:
     def test_returns_cli_for_unknown_provider(self):
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value={}):
-            assert _get_provider_type("unknown") == "cli"
+            assert get_provider_type("unknown") == "cli"
 
     def test_returns_api_when_configured(self):
         cfg = {"ollama": {"type": "api", "model": "llama3.1"}}
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=cfg):
-            assert _get_provider_type("ollama") == "api"
+            assert get_provider_type("ollama") == "api"
 
     def test_returns_cli_when_configured(self):
         cfg = {"claude": {"type": "cli"}}
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=cfg):
-            assert _get_provider_type("claude") == "cli"
+            assert get_provider_type("claude") == "cli"
 
     def test_defaults_to_cli_when_type_missing(self):
         cfg = {"some-tool": {"model": "x"}}
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=cfg):
-            assert _get_provider_type("some-tool") == "cli"
+            assert get_provider_type("some-tool") == "cli"
 
 
 # ---------------------------------------------------------------------------
@@ -63,10 +63,10 @@ class TestRunCliAnalysis:
         mock_process.returncode = 0
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value={"claude": {"type": "cli"}}), \
-             patch("quodeq.analysis.subprocess._build_ai_cmd", return_value=(["claude", "-p", "test"], None)), \
-             patch("quodeq.analysis.subprocess._build_analysis_env", return_value={}), \
-             patch("quodeq.analysis.subprocess._spawn_and_monitor", return_value=(mock_process, False)) as mock_spawn, \
-             patch("quodeq.analysis.subprocess._check_process_result"):
+             patch("quodeq.analysis.subprocess.build_ai_cmd", return_value=(["claude", "-p", "test"], None)), \
+             patch("quodeq.analysis.subprocess.build_analysis_env", return_value={}), \
+             patch("quodeq.analysis.subprocess.spawn_and_monitor", return_value=(mock_process, False)) as mock_spawn, \
+             patch("quodeq.analysis.subprocess.check_process_result"):
             _run_cli_analysis(tmp_path, "test prompt", stream, cfg)
             mock_spawn.assert_called_once()
 
@@ -81,10 +81,10 @@ class TestRunCliAnalysis:
         mock_process.returncode = 0
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value={"claude": {"type": "cli"}}), \
-             patch("quodeq.analysis.subprocess._build_ai_cmd", return_value=(["claude", "-p", "test"], mcp_path)), \
-             patch("quodeq.analysis.subprocess._build_analysis_env", return_value={}), \
-             patch("quodeq.analysis.subprocess._spawn_and_monitor", return_value=(mock_process, False)), \
-             patch("quodeq.analysis.subprocess._check_process_result"):
+             patch("quodeq.analysis.subprocess.build_ai_cmd", return_value=(["claude", "-p", "test"], mcp_path)), \
+             patch("quodeq.analysis.subprocess.build_analysis_env", return_value={}), \
+             patch("quodeq.analysis.subprocess.spawn_and_monitor", return_value=(mock_process, False)), \
+             patch("quodeq.analysis.subprocess.check_process_result"):
             _run_cli_analysis(tmp_path, "test", stream, cfg)
         assert not mcp_path.exists()
 
@@ -94,10 +94,10 @@ class TestRunCliAnalysis:
         mock_process = MagicMock()
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value={}), \
-             patch("quodeq.analysis.subprocess._build_ai_cmd", return_value=(["claude", "-p", "test"], None)), \
-             patch("quodeq.analysis.subprocess._build_analysis_env", return_value={}), \
-             patch("quodeq.analysis.subprocess._spawn_and_monitor", return_value=(mock_process, True)), \
-             patch("quodeq.analysis.subprocess._check_process_result") as mock_check:
+             patch("quodeq.analysis.subprocess.build_ai_cmd", return_value=(["claude", "-p", "test"], None)), \
+             patch("quodeq.analysis.subprocess.build_analysis_env", return_value={}), \
+             patch("quodeq.analysis.subprocess.spawn_and_monitor", return_value=(mock_process, True)), \
+             patch("quodeq.analysis.subprocess.check_process_result") as mock_check:
             _run_cli_analysis(tmp_path, "test", stream, cfg)
             mock_check.assert_not_called()
 
@@ -110,11 +110,11 @@ class TestRunCliAnalysis:
 
         provider_cfg = {"codex": {"type": "cli", "mcp_style": "cli-register"}}
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider_cfg), \
-             patch("quodeq.analysis.subprocess._register_cli_mcp", return_value="quodeq-findings") as mock_reg, \
-             patch("quodeq.analysis.subprocess._build_ai_cmd", return_value=(["codex", "exec", "test"], None)), \
-             patch("quodeq.analysis.subprocess._build_analysis_env", return_value={}), \
-             patch("quodeq.analysis.subprocess._spawn_and_monitor", return_value=(mock_process, False)), \
-             patch("quodeq.analysis.subprocess._check_process_result"):
+             patch("quodeq.analysis.subprocess.register_cli_mcp", return_value="quodeq-findings") as mock_reg, \
+             patch("quodeq.analysis.subprocess.build_ai_cmd", return_value=(["codex", "exec", "test"], None)), \
+             patch("quodeq.analysis.subprocess.build_analysis_env", return_value={}), \
+             patch("quodeq.analysis.subprocess.spawn_and_monitor", return_value=(mock_process, False)), \
+             patch("quodeq.analysis.subprocess.check_process_result"):
             _run_cli_analysis(tmp_path, "test", stream, cfg)
             mock_reg.assert_called_once()
 
@@ -161,11 +161,11 @@ class TestResolveProviderConfig:
         assert key == ""
 
     def test_credential_registry_dispatches_registered_provider(self, monkeypatch):
-        """Fix C (#2291): a provider registered in _CREDENTIAL_LOADERS is
+        """Fix C (#2291): a provider registered in CREDENTIAL_LOADERS is
         dispatched through the registry rather than via a hard-coded branch."""
-        from quodeq.analysis.subprocess import _CREDENTIAL_LOADERS
+        from quodeq.analysis.subprocess import CREDENTIAL_LOADERS
         # Patch a fake provider into the registry for the duration of the test.
-        _CREDENTIAL_LOADERS["testprovider"] = lambda _env: "registry-key"
+        CREDENTIAL_LOADERS["testprovider"] = lambda _env: "registry-key"
         try:
             provider = {"testprovider": {"type": "api", "model": "m", "api_base": "http://tp/v1"}}
             cfg = AnalysisConfig(ai_cmd="testprovider", ai_model="m")
@@ -173,10 +173,10 @@ class TestResolveProviderConfig:
                 _, _, key = _resolve_provider_config(cfg, {})
             assert key == "registry-key"
         finally:
-            _CREDENTIAL_LOADERS.pop("testprovider", None)
+            CREDENTIAL_LOADERS.pop("testprovider", None)
 
     def test_unknown_provider_not_in_registry_returns_empty_key(self):
-        """Fix C: an unknown provider not in _CREDENTIAL_LOADERS falls through
+        """Fix C: an unknown provider not in CREDENTIAL_LOADERS falls through
         to an empty key (existing behavior preserved)."""
         provider = {"newprovider": {"type": "api", "model": "m", "api_base": "http://np/v1"}}
         cfg = AnalysisConfig(ai_cmd="newprovider", ai_model="m")
@@ -192,7 +192,7 @@ class TestResolveProviderConfig:
 class TestRunAnalysisDispatch:
     def test_defaults_to_empty_config(self, tmp_path):
         stream = tmp_path / "stream.json"
-        with patch("quodeq.analysis.subprocess._get_provider_type", return_value="cli"), \
+        with patch("quodeq.analysis.subprocess.get_provider_type", return_value="cli"), \
              patch("quodeq.analysis.subprocess._run_cli_analysis") as mock_cli:
             run_analysis(tmp_path, "test", stream)
             mock_cli.assert_called_once()

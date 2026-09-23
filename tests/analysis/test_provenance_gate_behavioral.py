@@ -23,7 +23,7 @@ What this tier pins (and what it does NOT):
     explicitly permits "major OR drop" for an internal value.
 
 Faithfulness: this drives the exact local-provider path
-(``assemble_api_prompt`` -> ``_call_api``) that ``subprocess.py`` uses. Downstream
+(``assemble_api_prompt`` -> ``call_api``) that ``subprocess.py`` uses. Downstream
 enrichment only downweights confidence and never escalates severity, so the
 emitted severity is a faithful, slightly conservative proxy for the full pipeline.
 
@@ -47,9 +47,9 @@ import pytest
 pytest.importorskip("openai", reason="requires the openai SDK")
 
 import quodeq
-from quodeq.analysis._api_runner import ApiRunnerConfig, _call_api
+from quodeq.analysis._api_runner import ApiRunnerConfig, call_api
 from quodeq.analysis.api_prompt_assembly import ProjectBrief, assemble_api_prompt
-from quodeq.analysis.subprocess import _load_standards_text
+from quodeq.analysis.subprocess import load_standards_text
 from quodeq.llm_bridge._ollama import get_ollama_status, list_ollama_models
 from tests.analysis._provenance_gate_support import discover_cases, target_severity
 
@@ -59,7 +59,7 @@ from tests.analysis._provenance_gate_support import discover_cases, target_sever
 _GATE_MODEL = os.environ.get("AI_MODEL") or "gemma4:26b"
 # Resolve the runner base from OLLAMA_BASE_URL so it targets the SAME server the
 # readiness probe (_ollama.py, which also honours OLLAMA_BASE_URL) checks. When
-# unset this is the standard local base, on which _call_api skips validate_url_safe.
+# unset this is the standard local base, on which call_api skips validate_url_safe.
 _OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 _API_BASE = f"{_OLLAMA_BASE}/v1"
 
@@ -90,7 +90,7 @@ _RUNNABLE, _SKIP_REASON = _gate_runnable()
 pytestmark = [
     pytest.mark.integration,
     # Overrides the 60s global. A test makes _RUNS_* calls, each read-bounded at
-    # _LOCAL_TIMEOUT (500s) in _call_api; 3000s covers the pathological all-slow
+    # _LOCAL_TIMEOUT (500s) in call_api; 3000s covers the pathological all-slow
     # case without the marker killing a working run early.
     pytest.mark.timeout(3000),
     pytest.mark.skipif(not _RUNNABLE, reason=f"provenance-gate live test skipped: {_SKIP_REASON}"),
@@ -108,7 +108,7 @@ _OPERATOR = [c for c in _CASES if c.expected["provenance"] == "operator"]
 def _run(case):
     """One production-path model call. Returns (target_severity|None, was_lossy)."""
     dimension = case.expected["dimension"]
-    standards = _load_standards_text(_COMPILED_DIR, dimension)
+    standards = load_standards_text(_COMPILED_DIR, dimension)
     prompt = assemble_api_prompt(
         source_files=[case.source_file], standards_text=standards, dimension=dimension,
         project=ProjectBrief(name="provenance-gate-fixture", root=case.repo_dir),
@@ -117,7 +117,7 @@ def _run(case):
     # fixture as PROD code (no "tone down" label), else a de-escalation could come
     # from the role label rather than the gate.
     assert "(role:" not in prompt, f"{case.name}: fixture rendered with a role label (wrong repo_root)"
-    findings, lossy = _call_api(prompt, ApiRunnerConfig(model=_GATE_MODEL, api_base=_API_BASE, temperature=0.1))
+    findings, lossy = call_api(prompt, ApiRunnerConfig(model=_GATE_MODEL, api_base=_API_BASE, temperature=0.1))
     # Loose req-only matching is for the single-issue external fixtures; internal
     # fixtures hold other same-req sites, so they match on construct/line only.
     allow_req_only = case.expected["provenance"] in ("external", "operator")

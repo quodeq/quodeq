@@ -5,7 +5,7 @@ import pytest
 
 from quodeq.core.types import DimensionResult
 from quodeq.services.trend_fetcher import make_rescoring_fetcher, make_trend_fetcher
-from quodeq.services.scoring import ScoringDeps, _make_trend_fetcher
+from quodeq.services.scoring import ScoringDeps, make_scoring_trend_fetcher
 
 
 def _make_project(tmp_path: Path) -> tuple[Path, str]:
@@ -24,7 +24,7 @@ def test_no_dismissals_uses_scalar_reader(tmp_path: Path) -> None:
         return [DimensionResult(dimension="security", overall_score="8.0/10", overall_grade="Good")]
 
     deps = ScoringDeps(read_run_scalars=fake_scalar)
-    fetcher = _make_trend_fetcher(reports, project, deps=deps)
+    fetcher = make_scoring_trend_fetcher(reports, project, deps=deps)
     result = fetcher("r1")
 
     assert [d.overall_score for d in result] == ["8.0/10"]
@@ -45,7 +45,7 @@ def test_active_dismissal_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
         return fetch
 
     # The heavy-path rescoring fetcher is built by the shared trend_fetcher
-    # factory (scoring._make_trend_fetcher delegates to it).
+    # factory (scoring.make_scoring_trend_fetcher delegates to it).
     monkeypatch.setattr("quodeq.services.trend_fetcher.make_rescoring_fetcher", fake_rescoring_fetcher)
 
     def boom(*_a):
@@ -57,7 +57,7 @@ def test_active_dismissal_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
         dismissed_keys=lambda _pd: {("R1", "a.py", 1)},
         deleted_keys=lambda _pd: set(),
     )
-    fetcher = _make_trend_fetcher(reports, project, deps=deps)
+    fetcher = make_scoring_trend_fetcher(reports, project, deps=deps)
 
     # Heavy path: the cache-wrapper is returned (not the raw rescoring fetcher).
     # Calling it must invoke the rescoring fetcher (not the scalar reader).
@@ -88,7 +88,7 @@ def test_active_deletion_uses_heavy_path(tmp_path: Path, monkeypatch) -> None:
         dismissed_keys=lambda _pd: set(),
         deleted_keys=lambda _pd: {("sec", "prin", "a.py")},
     )
-    fetcher = _make_trend_fetcher(reports, project, deps=deps)
+    fetcher = make_scoring_trend_fetcher(reports, project, deps=deps)
 
     # Heavy path: rescoring fetcher is wrapped in the cache; scalar reader must NOT be called.
     result = fetcher("r2")

@@ -10,17 +10,17 @@ from typing import Any, Callable
 
 from quodeq.core.types import ProjectEntry
 from quodeq.core.utils.io import is_within
-from quodeq.services._filesystem_helpers import _list_available_dimensions_for_discipline
+from quodeq.services._filesystem_helpers import list_available_dimensions_for_discipline
 from quodeq.shared.log_sink import SHARED_LOG
-from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
-from quodeq.services._fs_working_copy import _annotate_working_copy, _online_path_missing
+from quodeq.services._fs_metadata import project_has_fingerprints, infer_discipline
+from quodeq.services._fs_working_copy import annotate_working_copy, online_path_missing
 from quodeq.services.fs_project_helpers import (
-    _KnownProjectIds,
-    _ListingOptions,
-    _auto_detect_parents,
-    _backfill_onboarding_field,
-    _build_project_entry,
-    _max_projects_listed,
+    KnownProjectIds,
+    ListingOptions,
+    auto_detect_parents,
+    backfill_onboarding_field,
+    build_project_entry,
+    max_projects_listed,
 )
 from quodeq.services._repo_index import RepoIdentity, rekey_repo_index_entry, remove_repo_index_entries
 from quodeq.services.wiring import (
@@ -40,7 +40,7 @@ _logger = logging.getLogger(__name__)
 _MAX_PROJECT_BUILD_WORKERS = 8
 
 
-def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[set[str], set[str], dict[str, dict]]:
+def build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[set[str], set[str], dict[str, dict]]:
     """Single pass: return (parent_ids, subproject_ids, info_by_name) from repo info files."""
     parent_ids: set[str] = set()
     subproject_ids: set[str] = set()
@@ -57,7 +57,7 @@ def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[
     return parent_ids, subproject_ids, info_by_name
 
 
-def _collect_candidate_dirs(reports_root: Path, max_listed: int) -> list[str]:
+def collect_candidate_dirs(reports_root: Path, max_listed: int) -> list[str]:
     """Return up to *max_listed* non-hidden directory names under reports_root."""
     dir_names: list[str] = []
     for entry in safe_read_dir(reports_root):
@@ -69,9 +69,9 @@ def _collect_candidate_dirs(reports_root: Path, max_listed: int) -> list[str]:
     return dir_names
 
 
-def _build_project_entries_threaded(
-    reports_root: Path, dir_names: list[str], known: _KnownProjectIds,
-    options: _ListingOptions, info_by_name: dict[str, dict] | None = None,
+def build_project_entries_threaded(
+    reports_root: Path, dir_names: list[str], known: KnownProjectIds,
+    options: ListingOptions, info_by_name: dict[str, dict] | None = None,
 ) -> list[ProjectEntry]:
     """Build a ProjectEntry per candidate dir in parallel, dropping stray dirs.
 
@@ -88,7 +88,7 @@ def _build_project_entries_threaded(
             runs = list_runs(reports_root, name)
             if not runs and name not in known.registered and name not in known.parents and name not in known.subprojects:
                 return None
-            return _build_project_entry(
+            return build_project_entry(
                 reports_root, name, runs, options, pre_read_info=info_by_name.get(name),
             )
         except (OSError, ValueError, KeyError) as exc:  # JSONDecodeError is a ValueError
@@ -96,7 +96,7 @@ def _build_project_entries_threaded(
 
     # contextvars do NOT propagate into ThreadPoolExecutor worker threads --
     # each worker runs with its own default Context, so a caller-side
-    # score_cache_path_override (e.g. from _with_shared_root) would be
+    # score_cache_path_override (e.g. from with_shared_root) would be
     # invisible inside _build_one and per-project summaries would read/write
     # the LOCAL score cache DB instead of the scoped one. Copy the calling
     # context once per task -- a single Context object cannot be entered by
@@ -114,21 +114,21 @@ def _build_project_entries_threaded(
 
 def _classify_known_ids(
     reports_root: Path, dir_names: list[str], *, backfill: bool,
-) -> tuple[_KnownProjectIds, dict[str, dict]]:
+) -> tuple[KnownProjectIds, dict[str, dict]]:
     """Read every candidate's repo record once: known-id sets plus the records by name.
 
     With *backfill* the lazy ``onboardingCompletedAt`` backfill runs on each
     record before the registered set is taken.
     """
-    parent_ids, subproject_ids, info_by_name = _build_parent_child_sets(reports_root, dir_names)
+    parent_ids, subproject_ids, info_by_name = build_parent_child_sets(reports_root, dir_names)
     if backfill:
         for name in dir_names:
-            _backfill_onboarding_field(reports_root / name, pre_read_data=info_by_name.get(name))
+            backfill_onboarding_field(reports_root / name, pre_read_data=info_by_name.get(name))
     registered_ids = {
         name for name in dir_names
         if repository_info_exists(reports_root / name)
     }
-    return _KnownProjectIds(registered_ids, parent_ids, subproject_ids), info_by_name
+    return KnownProjectIds(registered_ids, parent_ids, subproject_ids), info_by_name
 
 
 def build_project_list(
@@ -137,25 +137,25 @@ def build_project_list(
     """Collect eligible project dirs and build entries in parallel.
 
     *backfill* controls the lazy ``onboardingCompletedAt`` backfill below (and
-    the equivalent one inside ``_build_project_entry``): when False, records
+    the equivalent one inside ``build_project_entry``): when False, records
     are read as-is and never rewritten. Local callers keep the default
     (True); the shared-repo route passes False so listing a clone's projects
     never dirties its git worktree (see routes_shared.py shared_projects).
 
-    *inline_summaries* is forwarded to ``_build_project_entry`` (as
+    *inline_summaries* is forwarded to ``build_project_entry`` (as
     ``compute_on_miss``): the shared-repo route has no warm-up engine to fill
     a missing project-card summary, so it passes True to keep computing one
     inline on a miss. Local callers keep the default (False) -- a miss is
     reported pending and left for the warm-up engine.
     """
-    dir_names = _collect_candidate_dirs(reports_root, _max_projects_listed())
+    dir_names = collect_candidate_dirs(reports_root, max_projects_listed())
     known, info_by_name = _classify_known_ids(reports_root, dir_names, backfill=backfill)
-    projects = _build_project_entries_threaded(
+    projects = build_project_entries_threaded(
         reports_root, dir_names, known,
-        _ListingOptions(backfill=backfill, inline_summaries=inline_summaries), info_by_name,
+        ListingOptions(backfill=backfill, inline_summaries=inline_summaries), info_by_name,
     )
     projects.sort(key=lambda p: p.name)
-    return _auto_detect_parents(projects)
+    return auto_detect_parents(projects)
 
 
 def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
@@ -249,14 +249,14 @@ def delete_project(reports_dir: str, project: str) -> bool:
 def get_project_info(
     reports_dir: str, project: str,
     *,
-    list_dimensions: Callable[..., tuple[str, ...]] = _list_available_dimensions_for_discipline,
-    has_fingerprints: Callable[[Path, str], bool] = _has_fingerprints,
+    list_dimensions: Callable[..., tuple[str, ...]] = list_available_dimensions_for_discipline,
+    has_fingerprints: Callable[[Path, str], bool] = project_has_fingerprints,
 ) -> dict[str, Any] | None:
     """Return project metadata including discipline and available dimensions.
 
     *list_dimensions* and *has_fingerprints* are injection seams for tests,
     defaulting to the production collaborators of the same name
-    (``_list_available_dimensions_for_discipline``, ``_has_fingerprints``).
+    (``list_available_dimensions_for_discipline``, ``project_has_fingerprints``).
     """
     project_dir = (Path(reports_dir) / project).resolve()
     if not is_within(project_dir, reports_dir):
@@ -264,13 +264,13 @@ def get_project_info(
     info = read_repository_info(project_dir)
     if info is None:
         return None
-    discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
+    discipline = info.get("discipline") or infer_discipline(Path(reports_dir), project)
     available_dimensions = (
         list_dimensions(log=SHARED_LOG) if discipline else []
     )
     fingerprints_found = has_fingerprints(Path(reports_dir), project)
-    path_missing = _online_path_missing(info)
-    _annotate_working_copy(info)
+    path_missing = online_path_missing(info)
+    annotate_working_copy(info)
     return {
         **info,
         "discipline": discipline,

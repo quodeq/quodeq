@@ -2,9 +2,9 @@
 
 ``subprocess.py``'s ``_run_api_analysis_bridge`` is the caller: it resolves
 provider credentials, then hands off here to build the batch context
-(``_build_api_batch_context``), the shared runner config
-(``_build_batch_api_config``) and to dispatch the size-budgeted sub-batches
-(``_dispatch_api_batches``, one model call per batch via
+(``build_api_batch_context``), the shared runner config
+(``build_batch_api_config``) and to dispatch the size-budgeted sub-batches
+(``dispatch_api_batches``, one model call per batch via
 ``_dispatch_one_batch``).
 
 This module is a leaf of ``subprocess.py``: it must never import back from
@@ -21,13 +21,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from quodeq.analysis._api_source_gathering import (
-    _batch_files_by_size,
-    _gather_api_source_files,
+    batch_files_by_size,
+    gather_api_source_files,
 )
 from quodeq.analysis._api_standards_text import (
-    _api_prompt_char_budget,
-    _load_standards_text,
-    _max_standards_chars,
+    api_prompt_char_budget,
+    load_standards_text,
+    standards_char_budget,
 )
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.api_prompt_assembly import ProjectBrief, assemble_api_prompt
@@ -43,7 +43,7 @@ _log = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class _BatchContext:
     """Per-dimension inputs shared by every batch, built once by
-    ``_build_api_batch_context`` and reused by ``_dispatch_one_batch``.
+    ``build_api_batch_context`` and reused by ``_dispatch_one_batch``.
     """
 
     work_dir: Path
@@ -63,23 +63,23 @@ def _resolve_standards_text(
     overrides = load_project_overrides(work_dir)
     # env is the resolved process environment (run_analysis defaults it to
     # os.environ), passed explicitly so these lookups skip os.environ itself.
-    return _load_standards_text(
+    return load_standards_text(
         cfg.compiled_dir, cfg.dimension, overrides=overrides,
-        max_chars=_max_standards_chars(env),
+        max_chars=standards_char_budget(env),
     )
 
 
-def _build_api_batch_context(
+def build_api_batch_context(
     work_dir: Path, cfg: AnalysisConfig, env: Mapping[str, str], stream_file: Path,
 ) -> _BatchContext | None:
     """Resolve the per-dimension batch inputs, or None when the queue is
-    exhausted (``_gather_api_source_files`` has already written the stream's
+    exhausted (``gather_api_source_files`` has already written the stream's
     complete marker in that case)."""
     jsonl_file = cfg.jsonl_file
     if jsonl_file is None:
         jsonl_file = Path(str(stream_file).replace(".stream", "_evidence.jsonl"))
 
-    source_files = _gather_api_source_files(work_dir, cfg, jsonl_file, stream_file)
+    source_files = gather_api_source_files(work_dir, cfg, jsonl_file, stream_file)
     if source_files is None:
         return None
 
@@ -95,7 +95,7 @@ def _dispatch_one_batch(
 ) -> None:
     """Assemble the API prompt for one size-budgeted batch and dispatch it.
 
-    Split out of _dispatch_api_batches so that loop itself stays a thin
+    Split out of dispatch_api_batches so that loop itself stays a thin
     cancellation/orchestration step.
     """
     from quodeq.analysis import _api_runner
@@ -128,7 +128,7 @@ def _dispatch_one_batch(
     )
 
 
-def _build_batch_api_config(
+def build_batch_api_config(
     cfg: AnalysisConfig, model: str, api_base: str, api_key: str,
 ) -> ApiRunnerConfig:
     """Build the one ApiRunnerConfig shared by every batch in a dimension."""
@@ -141,13 +141,13 @@ def _build_batch_api_config(
     )
 
 
-def _dispatch_api_batches(
+def dispatch_api_batches(
     ctx: _BatchContext, cfg: AnalysisConfig, api_config: ApiRunnerConfig,
     env: Mapping[str, str],
 ) -> None:
     """Dispatch the dimension's files as size-budgeted sub-batches, one model
     call each, stopping as soon as the run is cancelled."""
-    for batch in _batch_files_by_size(ctx.source_files, _api_prompt_char_budget(env)):
+    for batch in batch_files_by_size(ctx.source_files, api_prompt_char_budget(env)):
         # A cancelled run (signal, breaker, fatal provider error) must not
         # keep burning model calls on the remaining batches.
         if cancellation.is_cancelled():

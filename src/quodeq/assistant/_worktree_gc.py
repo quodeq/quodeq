@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.assistant._worktree_manager import WorktreeManager
-from quodeq.assistant.worktree import WorktreeError, _worktree_ttl_hours
+from quodeq.assistant.worktree import WorktreeError, worktree_ttl_hours
 
 _logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ def gc_worktrees(repository, ttl_hours: int | None = None) -> None:
     a young active worktree is otherwise left untouched so an in-use session
     is never yanked mid-edit.
     """
-    ttl = _worktree_ttl_hours() if ttl_hours is None else ttl_hours
+    ttl = worktree_ttl_hours() if ttl_hours is None else ttl_hours
     now = datetime.now(timezone.utc)
     try:
         rows = repository.list_all_worktrees()

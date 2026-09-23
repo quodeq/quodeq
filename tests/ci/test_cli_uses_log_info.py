@@ -7,7 +7,7 @@ from pathlib import Path
 def test_no_direct_stderr_prints_in_pipeline() -> None:
     """The CLI pipeline must route progress messages through log_info, not print(..., file=sys.stderr).
 
-    Allowed exceptions: dimension score lines in _execute_pipeline's success branch
+    Allowed exceptions: dimension score lines in execute_pipeline's success branch
     (line 133: `print(f"  {dim}: {score}")`) because those print to stdout for
     shell piping.
     """

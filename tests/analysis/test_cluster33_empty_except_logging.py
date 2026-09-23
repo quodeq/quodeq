@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.analysis import _api_standards_text, _loop_state
-from quodeq.analysis._run_lifecycle_support import _SIGNALS_TO_HANDLE, _SignalGuard
+from quodeq.analysis._run_lifecycle_support import _SIGNALS_TO_HANDLE, SignalGuard
 from quodeq.analysis.subagents import _queue_state
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
 from quodeq.config import ai_provider
@@ -21,13 +21,13 @@ from quodeq.config.paths import ConfigPaths
 def test_silence_broken_stdout_survives_unopenable_devnull(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(_loop_state.os, "devnull", str(tmp_path / "missing" / "null"))
     out, err = sys.stdout, sys.stderr
-    _loop_state._silence_broken_stdout()  # must not raise
+    _loop_state.silence_broken_stdout()  # must not raise
     assert sys.stdout is out
     assert sys.stderr is err
 
 
 def test_signal_guard_logs_install_failure_off_main_thread(recording_log) -> None:
-    guard = _SignalGuard(lambda *_: None, log=recording_log)
+    guard = SignalGuard(lambda *_: None, log=recording_log)
     worker = threading.Thread(target=guard.install)
     worker.start()
     worker.join()
@@ -38,7 +38,7 @@ def test_signal_guard_logs_install_failure_off_main_thread(recording_log) -> Non
 
 def test_signal_guard_logs_restore_failure_off_main_thread(recording_log) -> None:
     originals = {sig: signal.getsignal(sig) for sig in _SIGNALS_TO_HANDLE}
-    guard = _SignalGuard(lambda *_: None, log=recording_log)
+    guard = SignalGuard(lambda *_: None, log=recording_log)
     try:
         guard.install()  # main thread: succeeds
         worker = threading.Thread(target=guard.restore)
@@ -105,7 +105,7 @@ def test_load_standards_text_logs_corrupt_json_and_falls_back(tmp_path) -> None:
     success case."""
     (tmp_path / "security.json").write_text("{not json")
     with patch.object(_api_standards_text._log, "debug") as debug:
-        result = _api_standards_text._load_standards_text(tmp_path, "security")
+        result = _api_standards_text.load_standards_text(tmp_path, "security")
     assert debug.called
     assert "compiled standards file skipped" in debug.call_args.args[0]
     assert result == ""
@@ -128,12 +128,12 @@ def test_gather_source_files_logs_unreadable_file(tmp_path, monkeypatch) -> None
 
     monkeypatch.setattr(Path, "stat", _flaky_stat)
     # On Python 3.13, Path.is_file() itself calls stat(); force it to True so the
-    # only stat() call exercised is the one inside _gather_source_files' try block.
+    # only stat() call exercised is the one inside gather_source_files' try block.
     monkeypatch.setattr(Path, "is_file", lambda self, *a, **k: True)
     messages: list[tuple] = []
     monkeypatch.setattr(_api_standards_text._log, "debug", lambda *a: messages.append(a))
 
-    result = _api_standards_text._gather_source_files(tmp_path)
+    result = _api_standards_text.gather_source_files(tmp_path)
 
     assert good in result
     assert flaky not in result

@@ -9,8 +9,8 @@ import pytest
 
 pytest.importorskip("openai", reason="requires the openai SDK")
 
-from quodeq.analysis._api_runner import ApiRunnerConfig, _call_api
-from quodeq.analysis._api_schema import _Finding, _parse_findings
+from quodeq.analysis._api_runner import ApiRunnerConfig, call_api
+from quodeq.analysis._api_schema import _Finding, parse_findings
 
 from ._api_runner_helpers import _mock_raw_client
 
@@ -26,7 +26,7 @@ class TestParserDropAccounting:
             {"t": "violation", "file": "a.py", "line": 5, "w": "x",
              "snippet": "code", "reason": "bad"},  # no req
         ]})
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
         assert findings == []
         assert dropped == 1
 
@@ -36,7 +36,7 @@ class TestParserDropAccounting:
         valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
                  "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
         raw = '{"note": "analysis complete"}' + json.dumps({"findings": [valid]})
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
         assert len(findings) == 1
         assert dropped == 0
 
@@ -47,7 +47,7 @@ class TestParserDropAccounting:
         valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
                  "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
         raw = json.dumps({"severity": "major", "reason": "run summary", "items": [valid]})
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
         assert len(findings) == 1
         assert findings[0]["req"] == "R1"
         assert dropped == 0
@@ -74,7 +74,7 @@ class TestFindingVtTaxonomy:
 
 
 class TestDropStatsRecording:
-    """_call_api feeds the per-run drop-ratio accumulator (issue #606).
+    """call_api feeds the per-run drop-ratio accumulator (issue #606).
 
     The per-call WARNING already counts dropped findings; recording the same
     (dropped, kept) pair into ``_drop_stats`` lets the run loop surface ONE
@@ -83,7 +83,7 @@ class TestDropStatsRecording:
 
     @pytest.fixture(autouse=True)
     def _isolated_counter(self, monkeypatch):
-        # _call_api records through the module-default counter; swap in a
+        # call_api records through the module-default counter; swap in a
         # fresh instance so nothing leaks in from (or out to) other tests.
         from quodeq.analysis import _drop_stats
         monkeypatch.setattr(
@@ -99,7 +99,7 @@ class TestDropStatsRecording:
         client = _mock_raw_client(content)
         with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
-            _call_api("prompt", api_config)
+            call_api("prompt", api_config)
         stats = _drop_stats.consume()
         assert stats.dropped == 1
         assert stats.kept == 1
@@ -110,7 +110,7 @@ class TestDropStatsRecording:
         client.chat.completions.create.side_effect = httpx.ReadTimeout("timeout")
         with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
-            _call_api("prompt", api_config)
+            call_api("prompt", api_config)
         assert _drop_stats.consume().parsed == 0
 
 

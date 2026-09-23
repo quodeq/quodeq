@@ -3,7 +3,7 @@
 Split from ``cli_evaluation.py`` to keep each module under 300 lines.
 Both names are re-exported from ``cli_evaluation`` because
 ``_lifecycle_hooks`` reads them off that module at call time, so
-``quodeq.cli_evaluation._execute_pipeline`` and ``._save_manifest`` stay
+``quodeq.cli_evaluation.execute_pipeline`` and ``.save_manifest`` stay
 valid patch targets. The collaborators they call (``run``, ``run_full``,
 ``write_text``, ``manifest_to_dict``) are looked up here, so patch them at
 ``quodeq._cli_pipeline_exec.<name>``.
@@ -22,12 +22,12 @@ from quodeq.analysis.scoring_pipeline import run_full
 from quodeq.services.grade_formula import load_params
 from quodeq.shared.logging import log_error, log_info
 from quodeq.shared.utils import write_text
-from quodeq._cli_scoring import _print_scores
+from quodeq._cli_scoring import print_scores
 
 _logger = logging.getLogger(__name__)
 
 
-def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
+def execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
     """Execute the evidence/scoring pipeline and print results.
 
     Three modes: scoring (default, run_full → scored evaluation/<dim>.json
@@ -36,7 +36,7 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
     merged json, no scoring).
 
     Domain errors (AnalysisError, EvaluationError) are intentionally *not*
-    caught here — they propagate to _run_pipeline_with_cleanup so that
+    caught here — they propagate to run_pipeline_with_cleanup so that
     RunLifecycleContext.__exit__ can write state=failed before the error is
     mapped to exit code 1.
     """
@@ -65,11 +65,11 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
     log_info(f"Reports written to {evaluation_dir}/")
     run_dir = evaluation_dir.parent
     project_dir = run_dir.parent
-    _print_scores(scores, run_dir, project_dir, load_params())
+    print_scores(scores, run_dir, project_dir, load_params())
     return 0
 
 
-def _save_manifest(manifest, evidence_dir: Path) -> None:
+def save_manifest(manifest, evidence_dir: Path) -> None:
     """Save manifest for debugging (best-effort)."""
     if manifest and evidence_dir:
         try:

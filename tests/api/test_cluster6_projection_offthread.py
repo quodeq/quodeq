@@ -1,4 +1,4 @@
-"""#1389 - _project_all_runs must run off the request thread with dedup lock.
+"""#1389 - project_all_runs must run off the request thread with dedup lock.
 
 Two concurrent POST /api/findings/dismiss calls for the same project (without
 a usable run_id) must NOT run two concurrent projections. The per-project
@@ -14,7 +14,7 @@ import pytest
 from flask import Flask
 
 from quodeq.api.routes_findings import register_findings_routes
-from quodeq.services.mutation_rescore import _DEFAULT_PROJECT_LOCKS
+from quodeq.services.mutation_rescore import DEFAULT_PROJECT_LOCKS
 from tests._timeouts import budget
 
 
@@ -33,7 +33,7 @@ def client(app):
 
 
 def test_dismiss_returns_without_waiting_for_projection(client, tmp_path):
-    """POST /dismiss returns 200 without blocking on _project_all_runs."""
+    """POST /dismiss returns 200 without blocking on project_all_runs."""
     (tmp_path / "my-project").mkdir()
 
     projection_started = threading.Event()
@@ -44,7 +44,7 @@ def test_dismiss_returns_without_waiting_for_projection(client, tmp_path):
         projection_may_finish.wait(timeout=budget(5))
 
     with patch(
-        "quodeq.services.mutation_rescore._project_all_runs",
+        "quodeq.services.mutation_rescore.project_all_runs",
         side_effect=_slow_project,
     ):
         resp = client.post("/api/findings/dismiss", json={
@@ -75,7 +75,7 @@ def test_concurrent_dismisses_same_project_call_project_all_runs_once(
     skip projection when the first is still running.
     """
     # Clear any leftover lock state from previous tests.
-    _DEFAULT_PROJECT_LOCKS.clear()
+    DEFAULT_PROJECT_LOCKS.clear()
 
     (tmp_path / "proj").mkdir()
 
@@ -97,7 +97,7 @@ def test_concurrent_dismisses_same_project_call_project_all_runs_once(
         projection_first_may_finish.wait(timeout=budget(5))
 
     with patch(
-        "quodeq.services.mutation_rescore._project_all_runs",
+        "quodeq.services.mutation_rescore.project_all_runs",
         side_effect=_blocking_project,
     ):
         # Fire first request and wait until projection has started (lock held).

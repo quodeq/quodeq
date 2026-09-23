@@ -31,7 +31,7 @@ if hasattr(signal, "SIGHUP"):
     _SIGNALS_TO_HANDLE = _SIGNALS_TO_HANDLE + (signal.SIGHUP,)
 
 
-class _SignalGuard:
+class SignalGuard:
     """Install *handler* on the run's signals; restore the originals after."""
 
     def __init__(self, handler: Any, *, log: LogSink = NULL_LOG) -> None:
@@ -57,7 +57,7 @@ class _SignalGuard:
         self._previous.clear()
 
 
-class _AtexitGuard:
+class AtexitGuard:
     """Register *callback* with atexit once, and deregister it once."""
 
     def __init__(self, callback: Any) -> None:
@@ -90,7 +90,7 @@ def _deadline_has_passed(deadline_at: str | None) -> bool:
     return datetime.now(timezone.utc) >= deadline
 
 
-def _mark_unfinished_dims_incomplete(
+def mark_unfinished_dims_incomplete(
     run_dir: Path, reason: str, *, log: LogSink,
 ) -> int:
     """Flip non-terminal dims to INCOMPLETE and return how many were flipped.
@@ -122,7 +122,7 @@ def _mark_unfinished_dims_incomplete(
     return flipped
 
 
-def _is_named_error(exc_type: type[BaseException] | None, name: str) -> bool:
+def is_named_error(exc_type: type[BaseException] | None, name: str) -> bool:
     """Detect an analysis-layer error class without a hard import dependency.
 
     Lifecycle is a shared/low-level module; importing from analysis would
@@ -134,11 +134,11 @@ def _is_named_error(exc_type: type[BaseException] | None, name: str) -> bool:
     return any(cls.__name__ == name for cls in exc_type.__mro__)
 
 
-def _is_circuit_breaker_error(exc_type: type[BaseException] | None) -> bool:
-    return _is_named_error(exc_type, "CircuitBreakerError")
+def is_circuit_breaker_error(exc_type: type[BaseException] | None) -> bool:
+    return is_named_error(exc_type, "CircuitBreakerError")
 
 
-def _seed_dimension_states(
+def seed_dimension_states(
     run_dir: Path, dimensions: list[str], *, log: LogSink,
 ) -> None:
     """Initialise dimensions.json with one PENDING entry per dim."""
@@ -150,7 +150,7 @@ def _seed_dimension_states(
             log.warning(f"failed to seed dim state for {dim}: {exc}")
 
 
-def _run_signal_shutdown(
+def run_signal_shutdown(
     heartbeat: Any, resources: Any, status: Any, signum: int, *, log: LogSink,
 ) -> None:
     """Write CANCELLED status and close out unfinished dims for a caught signal.
@@ -187,11 +187,11 @@ def _run_signal_shutdown(
     heartbeat.stop()
     resources.stop()
     status.write(RunState.CANCELLED, exit_reason=exit_reason)
-    _mark_unfinished_dims_incomplete(
+    mark_unfinished_dims_incomplete(
         status.run_dir, "time_limit" if deadline_enforced else "cancelled", log=log)
 
 
-def _finalize_run_on_atexit(
+def finalize_run_on_atexit(
     run_dir: Path, heartbeat: Any, resources: Any, status: Any,
 ) -> None:
     """Write CANCELLED status if the process is exiting without a terminal state."""

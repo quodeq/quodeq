@@ -1,6 +1,6 @@
 """Unit tests for the run-config phase helpers in quodeq._cli_run_config.
 
-``_resolve_limits`` owns the flag/env-derived caps; ``_build_analysis_options``
+``resolve_limits`` owns the flag/env-derived caps; ``build_analysis_options``
 maps them plus the resolved per-run locals onto an ``AnalysisOptions``.
 """
 
@@ -12,7 +12,7 @@ import pytest
 
 
 class TestResolveLimits:
-    """_resolve_limits owns every env/flag-derived cap _build_run_config needs."""
+    """resolve_limits owns every env/flag-derived cap build_run_config needs."""
 
     def _args(self, **over):
         base = dict(
@@ -24,9 +24,9 @@ class TestResolveLimits:
 
     @pytest.fixture()
     def _cli_over_env_limits(self):
-        from quodeq._cli_run_config import _resolve_limits
+        from quodeq._cli_run_config import resolve_limits
 
-        return _resolve_limits(
+        return resolve_limits(
             self._args(max_turns=10, max_duration=300, pool_budget=120, n_subagents=3),
             env={"QUODEQ_MAX_TURNS": "99", "QUODEQ_MAX_DURATION": "99"},
         )
@@ -51,9 +51,9 @@ class TestResolveLimits:
         assert limits.dispatch_policy.ai_cmd == get_ai_cmd({})
 
     def test_env_fills_in_unset_caps(self):
-        from quodeq._cli_run_config import _resolve_limits
+        from quodeq._cli_run_config import resolve_limits
 
-        limits = _resolve_limits(
+        limits = resolve_limits(
             self._args(), env={"QUODEQ_MAX_TURNS": "7", "QUODEQ_NO_VERIFY": "1"},
         )
 
@@ -61,26 +61,26 @@ class TestResolveLimits:
         assert limits.verify_findings is False
 
     def test_clean_scan_and_diff_from_disable_incremental(self):
-        from quodeq._cli_run_config import _resolve_limits
+        from quodeq._cli_run_config import resolve_limits
 
-        assert _resolve_limits(self._args(), env={}).incremental is True
-        assert _resolve_limits(self._args(clean_scan=True), env={}).incremental is False
-        assert _resolve_limits(self._args(diff_from="HEAD~1"), env={}).incremental is False
+        assert resolve_limits(self._args(), env={}).incremental is True
+        assert resolve_limits(self._args(clean_scan=True), env={}).incremental is False
+        assert resolve_limits(self._args(diff_from="HEAD~1"), env={}).incremental is False
 
 
 class TestBuildAnalysisOptions:
     def test_maps_resolved_locals_and_limits_onto_the_options(self):
-        from quodeq.cli_evaluation import _RunConfigLocals
-        from quodeq._cli_run_config import _build_analysis_options, _resolve_limits
+        from quodeq.cli_evaluation import RunConfigLocals
+        from quodeq._cli_run_config import build_analysis_options, resolve_limits
 
-        limits = _resolve_limits(
+        limits = resolve_limits(
             argparse.Namespace(
                 no_verify=True, max_turns=4, max_duration=8, n_subagents=2,
                 pool_budget=None, clean_scan=True, diff_from=None, dry_run=True,
             ),
             env={},
         )
-        resolved = _RunConfigLocals(
+        resolved = RunConfigLocals(
             consolidated=False,
             effective_ai_model="claude-3",
             subagent_model="ollama/llama3",
@@ -89,7 +89,7 @@ class TestBuildAnalysisOptions:
             skip_scoring=True,
         )
 
-        options = _build_analysis_options(["security"], resolved, limits)
+        options = build_analysis_options(["security"], resolved, limits)
 
         assert options.ai_model == "claude-3"
         assert options.dimensions == ["security"]

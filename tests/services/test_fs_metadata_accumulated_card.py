@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.core.run.state import RunState
-from quodeq.services._fs_metadata import _read_accumulated_summary
+from quodeq.services._fs_metadata import read_accumulated_summary
 
 
 class TestCardUsesDefaultViewRuns:
@@ -41,7 +41,7 @@ class TestCardUsesDefaultViewRuns:
             RunInfo(run_id="run-failed", date_iso="2026-01-02", date_label="Jan 02", status=RunState.FAILED),
             RunInfo(run_id="run-complete", date_iso="2026-01-01", date_label="Jan 01", status=RunState.DONE),
         ]
-        grade, score, files, _pending = _read_accumulated_summary(
+        grade, score, files, _pending = read_accumulated_summary(
             Path("/r"), "proj-card-eligibility", runs,
         )
         read_run_ids = {call.args[2] for call in mock_read.call_args_list}
@@ -71,7 +71,7 @@ class TestCardUsesDefaultViewRuns:
             RunInfo(run_id="run-cancelled", date_iso="2026-01-02", date_label="Jan 02", status=RunState.CANCELLED),
             RunInfo(run_id="run-failed", date_iso="2026-01-01", date_label="Jan 01", status=RunState.FAILED),
         ]
-        grade, score, files, _pending = _read_accumulated_summary(
+        grade, score, files, _pending = read_accumulated_summary(
             Path("/r"), "proj-card-fallback", runs,
         )
         read_run_ids = {call.args[2] for call in mock_read.call_args_list}
@@ -104,7 +104,7 @@ class TestCardUsesDefaultViewRuns:
             RunInfo(run_id="run-stub", date_iso="2026-01-02", date_label="Jan 02", status=RunState.CANCELLED),
             RunInfo(run_id="run-real", date_iso="2026-01-01", date_label="Jan 01", status=RunState.CANCELLED),
         ]
-        grade, score, files, _pending = _read_accumulated_summary(
+        grade, score, files, _pending = read_accumulated_summary(
             Path("/r"), "proj-card-stub", runs,
         )
         # The card score must be the real run's 6.0, not the stub's 9.9.

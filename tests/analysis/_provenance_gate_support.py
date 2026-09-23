@@ -71,7 +71,7 @@ def discover_cases() -> list[GateCase]:
 def severity_str(finding: dict) -> str | None:
     """Normalise a finding's severity to a plain string ('critical'/'major'/'minor').
 
-    ``_call_api`` returns ``_Finding.model_dump()`` dicts whose ``severity`` is a
+    ``call_api`` returns ``_Finding.model_dump()`` dicts whose ``severity`` is a
     ``(str, Enum)`` member; ``.value`` yields the bare string. Falls back to the
     value as-is if it is already a string.
     """

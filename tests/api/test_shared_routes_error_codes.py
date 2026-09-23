@@ -20,7 +20,7 @@ from tests.api._routes_shared_fixtures import (  # noqa: F401 -- client/_clean_p
     client,
 )
 
-# --- _with_shared_root (routes_shared_common.py) -----------------------------
+# --- with_shared_root (routes_shared_common.py) -----------------------------
 
 
 def test_shared_root_unconfigured_has_no_shared_repo_code(client, monkeypatch, tmp_path):

@@ -4,7 +4,7 @@ Split from ``routes_project_list.py`` to keep that file under the size
 ratchet's 300-line cap. ``reports_dir`` is looked up dynamically through the
 routes_project_list facade (rather than imported directly) so that
 ``patch("quodeq.api.routes_project_list.reports_dir", ...)`` in existing
-tests still takes effect, since ``_create_project`` is invoked from a
+tests still takes effect, since ``handle_create_project`` is invoked from a
 closure registered by ``register_project_list_routes``.
 """
 from __future__ import annotations
@@ -187,7 +187,7 @@ def _resolve_create_project_source(parsed):
     return (parsed.clone_dest, None) if local_err is None else (None, local_err)
 
 
-def _create_project(provider: ActionProvider) -> Response | tuple[Response, int]:
+def handle_create_project(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Register a new project (clone + scan) without starting an evaluation.
 
     Body: ``{ repo, cloneDest?, ephemeral?, branch?, scopePath?, discipline? }``

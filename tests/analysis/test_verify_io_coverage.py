@@ -37,12 +37,12 @@ class TestParseFindingLine:
 
 class TestLoadPreviousFindings:
     def test_file_not_exists(self, tmp_path):
-        from quodeq.analysis.subagents._verify_io import _load_previous_findings
-        result = _load_previous_findings(tmp_path / "missing.jsonl")
+        from quodeq.analysis.subagents._verify_io import load_previous_findings
+        result = load_previous_findings(tmp_path / "missing.jsonl")
         assert result == []
 
     def test_valid_jsonl(self, tmp_path):
-        from quodeq.analysis.subagents._verify_io import _load_previous_findings
+        from quodeq.analysis.subagents._verify_io import load_previous_findings
         p = tmp_path / "findings.jsonl"
         p.write_text(
             json.dumps({"p": "P1", "t": "violation"}) + "\n"
@@ -50,17 +50,17 @@ class TestLoadPreviousFindings:
             + "bad json\n"
             + "\n"
         )
-        result = _load_previous_findings(p)
+        result = load_previous_findings(p)
         assert len(result) == 2
 
     def test_os_error(self, tmp_path):
-        from quodeq.analysis.subagents._verify_io import _load_previous_findings
+        from quodeq.analysis.subagents._verify_io import load_previous_findings
         p = tmp_path / "findings.jsonl"
         p.write_text("data")
 
         def _raise(path):
             raise OSError("read error")
-        result = _load_previous_findings(p, open_fn=_raise)
+        result = load_previous_findings(p, open_fn=_raise)
         assert result == []
 
 
@@ -122,18 +122,18 @@ class TestFindPreviousEvidence:
 
 class TestResolvePreviousEvidence:
     def test_no_evidence_paths(self, tmp_path):
-        from quodeq.analysis.subagents._verify_io import _resolve_previous_evidence
+        from quodeq.analysis.subagents._verify_io import resolve_previous_evidence
         cache = {}
-        path, cached = _resolve_previous_evidence(tmp_path, "dim", cache, ("key", "val"))
+        path, cached = resolve_previous_evidence(tmp_path, "dim", cache, ("key", "val"))
         assert path is None
         assert ("key", "val") in cache
 
     def test_no_previous_evidence(self, tmp_path):
-        from quodeq.analysis.subagents._verify_io import _resolve_previous_evidence
+        from quodeq.analysis.subagents._verify_io import resolve_previous_evidence
         evidence_dir = tmp_path / "proj" / "run" / "evidence"
         evidence_dir.mkdir(parents=True)
         cache = {}
         with patch("quodeq.analysis.subagents._verify_io._find_previous_evidence", return_value=None):
-            path, cached = _resolve_previous_evidence(evidence_dir, "dim", cache, ("k", "v"))
+            path, cached = resolve_previous_evidence(evidence_dir, "dim", cache, ("k", "v"))
             assert path is None
             assert ("k", "v") in cache

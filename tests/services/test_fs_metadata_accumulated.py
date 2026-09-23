@@ -1,4 +1,4 @@
-"""Tests for _fs_metadata.py — _read_accumulated_summary core behavior.
+"""Tests for _fs_metadata.py — read_accumulated_summary core behavior.
 
 Split from test_fs_metadata.py: grade/score computation, empty/error
 cases. Visibility-selection behavior, the default-view-runs card
@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.services._fs_metadata import _read_accumulated_summary
+from quodeq.services._fs_metadata import read_accumulated_summary
 
 
 class TestReadAccumulatedSummary:
@@ -30,7 +30,7 @@ class TestReadAccumulatedSummary:
         mock_summarize.return_value = mock_summary
 
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
-        grade, score, files, _pending = _read_accumulated_summary(
+        grade, score, files, _pending = read_accumulated_summary(
             Path("/r"), "proj", runs, compute_on_miss=True)
         assert grade == "A"
         assert score == 8.5
@@ -40,13 +40,13 @@ class TestReadAccumulatedSummary:
     def test_no_dimensions(self, mock_read):
         from quodeq.data.fs.report_parser.runs import RunInfo
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
-        grade, score, files, _pending = _read_accumulated_summary(
+        grade, score, files, _pending = read_accumulated_summary(
             Path("/r"), "proj", runs, compute_on_miss=True)
         assert grade is None
         assert score is None
 
     def test_empty_runs(self):
-        grade, score, files, pending = _read_accumulated_summary(Path("/r"), "proj", [])
+        grade, score, files, pending = read_accumulated_summary(Path("/r"), "proj", [])
         assert grade is None
         assert score is None
         assert files is None
@@ -56,7 +56,7 @@ class TestReadAccumulatedSummary:
     def test_error_returns_none_tuple(self, mock_read):
         from quodeq.data.fs.report_parser.runs import RunInfo
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
-        grade, score, files, _pending = _read_accumulated_summary(
+        grade, score, files, _pending = read_accumulated_summary(
             Path("/r"), "proj", runs, compute_on_miss=True)
         assert grade is None
         assert score is None
@@ -67,7 +67,7 @@ class TestReadAccumulatedSummary:
         """A malformed run file (adapter KeyError) keeps the 'no data' card."""
         from quodeq.data.fs.report_parser.runs import RunInfo
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
-        grade, score, files, _pending = _read_accumulated_summary(
+        grade, score, files, _pending = read_accumulated_summary(
             Path("/r"), "proj", runs, compute_on_miss=True)
         assert grade is None
         assert score is None

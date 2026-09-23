@@ -39,7 +39,7 @@ def test_run_dashboard_spawns_action_api_with_static_dist(tmp_path: Path, monkey
         captured["static_dist"] = api_config.static_dist if api_config else None
         return f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()
 
-    monkeypatch.setattr(runner, "_ensure_action_api", fake_ensure)
+    monkeypatch.setattr(runner, "ensure_action_api", fake_ensure)
     hooks = DashboardHooks(
         kill_stale=lambda *_a, **_k: None,
         build_ui=lambda *a, **k: static_dist,
@@ -64,8 +64,8 @@ def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
 
 
 def test_choose_ui_port_skips_taken(monkeypatch):
-    monkeypatch.setattr(_networking, "_is_port_open", lambda host, port: port == _TEST_PORT)
-    port = runner._choose_ui_port(_TEST_PORT)
+    monkeypatch.setattr(_networking, "port_is_open", lambda host, port: port == _TEST_PORT)
+    port = runner.choose_ui_port(_TEST_PORT)
     assert port == _TEST_PORT + 1
 
 
@@ -75,7 +75,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
     static_dist.mkdir(parents=True)
     (static_dist / "index.html").write_text("ok")
 
-    monkeypatch.setattr(_networking, "_is_port_open", lambda host, port: port == _TEST_PORT)
+    monkeypatch.setattr(_networking, "port_is_open", lambda host, port: port == _TEST_PORT)
     hooks = DashboardHooks(
         kill_stale=lambda *_a, **_k: None,
         build_ui=lambda *a, **k: static_dist,
@@ -86,7 +86,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
 
     captured = []
     monkeypatch.setattr(
-        runner, "_ensure_action_api",
+        runner, "ensure_action_api",
         lambda *args, **kwargs: (captured.append(args) or (f"http://127.0.0.1:{_TEST_PORT + 1}", DummyProcess())),
     )
 
@@ -185,7 +185,7 @@ class TestHandoffToRunningInstance:
     """A relaunch must reach the open window without disturbing its backend.
 
     The launch used to spawn a second action API, notice the running instance,
-    and terminate that API on the way out — after _kill_stale_action_api had
+    and terminate that API on the way out — after kill_stale_action_api had
     already killed the *running* instance's one. The open window was left with a
     dead server and an unresolvable loading screen.
     """
@@ -219,7 +219,7 @@ class TestHandoffToRunningInstance:
             calls["spawned"] = True
             return f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()
 
-        monkeypatch.setattr(runner, "_ensure_action_api", fake_ensure)
+        monkeypatch.setattr(runner, "ensure_action_api", fake_ensure)
         monkeypatch.setattr(runner._server_mod, "serve_and_wait", lambda *a, **k: None)
         monkeypatch.setattr(
             "quodeq.dashboard._instance.InstanceController", lambda *a, **k: instance,

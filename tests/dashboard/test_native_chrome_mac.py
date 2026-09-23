@@ -15,7 +15,7 @@ class TestMacTrafficLights:
         window.native = nswindow
         with patch.object(ww.sys, "platform", "darwin"), \
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
-            ww._show_macos_traffic_lights(window)
+            ww.show_macos_traffic_lights(window)
         # one standardWindowButton_ lookup per traffic light (0,1,2), each un-hidden
         assert nswindow.standardWindowButton_.call_count == 3
         setter = nswindow.standardWindowButton_.return_value.setHidden_
@@ -28,7 +28,7 @@ class TestMacTrafficLights:
         window.native = None
         with patch.object(ww.sys, "platform", "darwin"), \
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()) as ca:
-            ww._show_macos_traffic_lights(window)
+            ww.show_macos_traffic_lights(window)
         ca.assert_not_called()
 
 
@@ -38,8 +38,8 @@ class TestMacAppIdentityIdempotent:
         # aborted _on_loaded before the traffic lights were shown. The
         # one-time install guard must make repeat calls safe. (No-op off
         # macOS, where AppKit isn't importable.)
-        ww._set_macos_app_identity()
-        ww._set_macos_app_identity()  # must not raise
+        ww.set_macos_app_identity()
+        ww.set_macos_app_identity()  # must not raise
 
 
 class _SyncThread:
@@ -56,7 +56,7 @@ class TestMacFullscreenClass:
     def test_toggle_true_adds_class(self):
         window = MagicMock()
         with patch("threading.Thread", _SyncThread):
-            ww._set_macos_fullscreen_class(window, True)
+            ww.set_macos_fullscreen_class(window, True)
         window.evaluate_js.assert_called_once()
         js = window.evaluate_js.call_args.args[0]
         assert "macos-fullscreen" in js
@@ -65,7 +65,7 @@ class TestMacFullscreenClass:
     def test_toggle_false_removes_class(self):
         window = MagicMock()
         with patch("threading.Thread", _SyncThread):
-            ww._set_macos_fullscreen_class(window, False)
+            ww.set_macos_fullscreen_class(window, False)
         js = window.evaluate_js.call_args.args[0]
         assert js.endswith("false)")
 
@@ -74,7 +74,7 @@ class TestMacFullscreenClass:
         # always be dispatched to a worker thread.
         window = MagicMock()
         with patch("threading.Thread") as thread_cls:
-            ww._set_macos_fullscreen_class(window, True)
+            ww.set_macos_fullscreen_class(window, True)
         thread_cls.assert_called_once()
         thread_cls.return_value.start.assert_called_once()
         window.evaluate_js.assert_not_called()  # only the worker calls it
@@ -87,8 +87,8 @@ class TestMacFullscreenChrome:
         window = MagicMock()
         nswindow = window.native
         with patch("threading.Thread", _SyncThread), \
-             patch.object(chrome, "_apply_unified_toolbar") as restore:
-            ww._apply_macos_fullscreen_chrome(window, True)
+             patch.object(chrome, "apply_unified_toolbar") as restore:
+            ww.apply_macos_fullscreen_chrome(window, True)
         nswindow.setToolbar_.assert_called_once_with(None)
         restore.assert_not_called()
         assert window.evaluate_js.call_args.args[0].endswith("true)")
@@ -97,8 +97,8 @@ class TestMacFullscreenChrome:
         window = MagicMock()
         nswindow = window.native
         with patch("threading.Thread", _SyncThread), \
-             patch.object(chrome, "_apply_unified_toolbar") as restore:
-            ww._apply_macos_fullscreen_chrome(window, False)
+             patch.object(chrome, "apply_unified_toolbar") as restore:
+            ww.apply_macos_fullscreen_chrome(window, False)
         restore.assert_called_once_with(nswindow)
         nswindow.setToolbar_.assert_not_called()
         assert window.evaluate_js.call_args.args[0].endswith("false)")
@@ -109,8 +109,8 @@ class TestMacFullscreenChrome:
         window = MagicMock()
         nswindow = window.native
         with patch("threading.Thread", _SyncThread), \
-             patch.object(chrome, "_apply_unified_toolbar") as restore:
-            ww._apply_macos_fullscreen_chrome(window, False, restore_toolbar=False)
+             patch.object(chrome, "apply_unified_toolbar") as restore:
+            ww.apply_macos_fullscreen_chrome(window, False, restore_toolbar=False)
         restore.assert_not_called()
         nswindow.setToolbar_.assert_not_called()
         assert window.evaluate_js.call_args.args[0].endswith("false)")
@@ -124,7 +124,7 @@ class TestMacFullscreenObserver:
         window.native = MagicMock()
         with patch.object(ww.sys, "platform", "win32"), \
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()) as ca:
-            ww._install_macos_fullscreen_observer(window)
+            ww.install_macos_fullscreen_observer(window)
         ca.assert_not_called()
 
     def test_noop_without_native_handle(self):
@@ -133,7 +133,7 @@ class TestMacFullscreenObserver:
         window.native = None
         with patch.object(ww.sys, "platform", "darwin"), \
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()) as ca:
-            ww._install_macos_fullscreen_observer(window)
+            ww.install_macos_fullscreen_observer(window)
         ca.assert_not_called()
 
     def test_install_twice_does_not_raise(self):
@@ -145,8 +145,8 @@ class TestMacFullscreenObserver:
         window.native = MagicMock()
         with patch.object(ww.sys, "platform", "darwin"), \
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
-            ww._install_macos_fullscreen_observer(window)
-            ww._install_macos_fullscreen_observer(window)  # must not raise
+            ww.install_macos_fullscreen_observer(window)
+            ww.install_macos_fullscreen_observer(window)  # must not raise
 
 
 @_MACOS_ONLY
@@ -164,7 +164,7 @@ class TestNativeChromeLogging:
         with patch.object(chrome.sys, "platform", "darwin"), \
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
             with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
-                chrome._show_macos_traffic_lights(window)
+                chrome.show_macos_traffic_lights(window)
         assert "traffic light visibility toggle failed" in caplog.text
 
     def test_unified_toolbar_logs_on_exception(self, caplog):
@@ -174,12 +174,12 @@ class TestNativeChromeLogging:
         window = MagicMock()
         window.native = MagicMock()
 
-        # Make _apply_unified_toolbar raise
+        # Make apply_unified_toolbar raise
         with patch.object(chrome.sys, "platform", "darwin"), \
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()), \
-             patch.object(chrome, "_apply_unified_toolbar", side_effect=TypeError("toolbar error")):
+             patch.object(chrome, "apply_unified_toolbar", side_effect=TypeError("toolbar error")):
             with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
-                chrome._set_macos_unified_toolbar(window)
+                chrome.set_macos_unified_toolbar(window)
         assert "unified toolbar installation failed" in caplog.text
 
     def test_titlebar_appearance_logs_on_exception(self, caplog):
@@ -194,7 +194,7 @@ class TestNativeChromeLogging:
         with patch.object(chrome.sys, "platform", "darwin"), \
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()):
             with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
-                chrome._set_macos_titlebar_appearance(window, dark=True)
+                chrome.set_macos_titlebar_appearance(window, dark=True)
         assert "titlebar appearance toggle failed" in caplog.text
 
     def test_windows_titlebar_logs_on_exception(self, caplog):
@@ -204,5 +204,5 @@ class TestNativeChromeLogging:
         # which lands in the except (AttributeError, OSError) clause
         with patch.object(chrome.sys, "platform", "win32"):
             with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
-                chrome._set_windows_titlebar(dark=True)
+                chrome.set_windows_titlebar(dark=True)
         assert "Windows titlebar DWM configuration failed" in caplog.text

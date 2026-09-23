@@ -15,7 +15,7 @@ import threading
 from flask import Flask, jsonify, request
 from flask_sock import Sock
 
-from quodeq.api._terminal_gate import _env_reason, _forbidden, _gate_reason
+from quodeq.api._terminal_gate import env_reason, forbidden, gate_reason
 from quodeq.api._terminal_ws_helpers import (
     pump_terminal_out,
     resolve_ws_session,
@@ -80,7 +80,7 @@ def _session_bases(registry: TerminalSessionRegistry, body: dict) -> list:
 
 
 def _terminal_status(registry: TerminalSessionRegistry):
-    reason = _env_reason()
+    reason = env_reason()
     return jsonify({
         "enabled": reason is None,
         "running": registry.any_alive,
@@ -90,16 +90,16 @@ def _terminal_status(registry: TerminalSessionRegistry):
 
 
 def _terminal_sessions(registry: TerminalSessionRegistry):
-    # _env_reason, not the full gate: same-origin GETs carry no Origin
+    # env_reason, not the full gate: same-origin GETs carry no Origin
     # header (same reasoning as /status).
-    if _env_reason() is not None:
-        return _forbidden()
+    if env_reason() is not None:
+        return forbidden()
     return jsonify({"sessions": registry.list(), "max": registry.MAX_SESSIONS})
 
 
 def _terminal_session_create(registry: TerminalSessionRegistry):
-    if _gate_reason() is not None:
-        return _forbidden()
+    if gate_reason() is not None:
+        return forbidden()
     session = registry.create()
     if session is None:
         return json_error("session limit reached", 409, "SESSION_LIMIT")
@@ -107,8 +107,8 @@ def _terminal_session_create(registry: TerminalSessionRegistry):
 
 
 def _terminal_session_kill(registry: TerminalSessionRegistry, sid):
-    if _gate_reason() is not None:
-        return _forbidden()
+    if gate_reason() is not None:
+        return forbidden()
     if not registry.kill(sid):
         return json_error("unknown session", 404, "UNKNOWN_SESSION")
     return jsonify({"ok": True})
@@ -117,8 +117,8 @@ def _terminal_session_kill(registry: TerminalSessionRegistry, sid):
 def _terminal_kill(registry: TerminalSessionRegistry):
     # Kills EVERY session — this backs Settings' "Restart terminal", which
     # is a full reset; the client reconciles its tabs via /sessions after.
-    if _gate_reason() is not None:
-        return _forbidden()
+    if gate_reason() is not None:
+        return forbidden()
     registry.kill_all()
     return jsonify({"ok": True})
 
@@ -129,8 +129,8 @@ def _terminal_resolve(registry: TerminalSessionRegistry):
     existing ones clickable, so path-shaped text never becomes a dead link.
     Gated exactly like the other terminal routes (same threat model: a
     single-user localhost app whose terminal already grants a full shell)."""
-    if _gate_reason() is not None:
-        return _forbidden()
+    if gate_reason() is not None:
+        return forbidden()
     body = request.get_json(silent=True) or {}
     paths = body.get("paths")
     if not isinstance(paths, list):
@@ -166,8 +166,8 @@ def _terminal_open(registry: TerminalSessionRegistry):
     """Open an already-resolved absolute path in the user's editor at an
     optional line/col. Fail-soft: any error returns opened=false rather than
     raising, so a missing editor never surfaces as a 500."""
-    if _gate_reason() is not None:
-        return _forbidden()
+    if gate_reason() is not None:
+        return forbidden()
     body = request.get_json(silent=True) or {}
     path = body.get("path")
     if not isinstance(path, str) or not path:
@@ -189,7 +189,7 @@ def _terminal_open(registry: TerminalSessionRegistry):
 
 
 def _terminal_ws(registry: TerminalSessionRegistry, ws):
-    if _gate_reason() is not None:
+    if gate_reason() is not None:
         ws.close(_WS_CLOSE_REFUSED)
         return
     session, close_code = resolve_ws_session(registry, request.args.get("session"))

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from quodeq.api.helpers import register_static_routes
-from quodeq.api.routes_common import reports_dir as _reports_dir  # used by routes_evaluation
 from quodeq.api.routes_project_list import register_project_list_routes
 from quodeq.api.routes_project_data import register_project_data_routes
 from quodeq.api.routes_discovery import register_discovery_routes
@@ -20,5 +19,4 @@ __all__ = [
     "register_discovery_routes",
     "register_evaluation_list_routes",
     "register_evaluation_item_routes",
-    "_reports_dir",
 ]

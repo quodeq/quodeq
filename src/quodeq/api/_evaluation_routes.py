@@ -10,11 +10,11 @@ from __future__ import annotations
 from quodeq.services.score_run import score_completed_evidence  # noqa: F401 — re-export/patch target
 
 from quodeq.api._scored_jobs_registry import (  # noqa: F401
-    _scored_jobs,
-    _scored_jobs_lock,
-    _SCORED_JOBS_MAX,
-    _claim_scoring,
-    _release_scoring,
+    scored_jobs,
+    scored_jobs_lock,
+    SCORED_JOBS_MAX,
+    claim_scoring,
+    release_scoring,
     reset_scored_jobs,
 )
 from quodeq.api.routes_evaluations_list import register_evaluation_list_routes  # noqa: F401

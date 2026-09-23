@@ -59,7 +59,7 @@ def test_get_scores_raw_reads_from_sql_after_projection(tmp_path: Path) -> None:
 def test_get_scores_raw_surfaces_provenance_downgrade(tmp_path: Path) -> None:
     """Issue #656: a finding the provenance gate downgraded must keep its
     provenance_downgrade flag through the SQL-backed scores read path
-    (_build_response_from_grade_tables / _SELECT_ACTIVE), so the dashboard
+    (build_response_from_grade_tables / _SELECT_ACTIVE), so the dashboard
     badge can render. A dropped column here silently regresses it to False."""
     violations = _scorable_violations()  # 5 distinct Security violations
     violations[0] = {
@@ -81,7 +81,7 @@ def test_get_scores_raw_surfaces_provenance_downgrade(tmp_path: Path) -> None:
 def test_get_scores_raw_surfaces_scope_downgrade(tmp_path: Path) -> None:
     """A finding the scope gate capped from major to minor must keep its
     scope_downgrade marker -- including WHICH rule fired -- through the
-    SQL-backed scores read path (_build_response_from_grade_tables /
+    SQL-backed scores read path (build_response_from_grade_tables /
     _SELECT_ACTIVE), so the dashboard can show what was waived and why.
     A dropped column here silently makes a waived finding indistinguishable
     from an ordinary minor."""

@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 from flask import Flask
 
-from quodeq.api._evaluation_helpers import _validate_ai_cmd_path, ai_cmd_path_error
+from quodeq.api._evaluation_helpers import validate_ai_cmd_path, ai_cmd_path_error
 
 
 @pytest.fixture
@@ -43,40 +43,40 @@ def _make_executable(directory, name: str) -> str:
 
 class TestValidateAiCmdPath:
     def test_absent_override_is_valid(self, app_ctx):
-        assert _validate_ai_cmd_path("claude", None) is None
-        assert _validate_ai_cmd_path("claude", "") is None
+        assert validate_ai_cmd_path("claude", None) is None
+        assert validate_ai_cmd_path("claude", "") is None
 
     def test_accepts_absolute_path_on_path_dir(self, app_ctx, bin_dir):
         binary = _make_executable(bin_dir, "claude-api")
-        assert _validate_ai_cmd_path("claude", binary) is None
+        assert validate_ai_cmd_path("claude", binary) is None
 
     def test_accepts_bare_name_on_path(self, app_ctx, bin_dir):
         _make_executable(bin_dir, "claude-api")
-        assert _validate_ai_cmd_path("claude", "claude-api") is None
+        assert validate_ai_cmd_path("claude", "claude-api") is None
 
     def test_rejects_shell_metacharacters(self, app_ctx):
-        resp, status = _validate_ai_cmd_path("claude", "claude;rm -rf /")
+        resp, status = validate_ai_cmd_path("claude", "claude;rm -rf /")
         assert status == HTTPStatus.BAD_REQUEST
 
     def test_rejects_dotdot_segments(self, app_ctx, bin_dir):
         binary = _make_executable(bin_dir, "claude-api")
         traversal = os.path.join(os.path.dirname(binary), "..", "bin", "claude-api")
-        resp, status = _validate_ai_cmd_path("claude", traversal)
+        resp, status = validate_ai_cmd_path("claude", traversal)
         assert status == HTTPStatus.BAD_REQUEST
 
     def test_rejects_relative_path_with_separator(self, app_ctx, bin_dir):
         _make_executable(bin_dir, "claude-api")
-        resp, status = _validate_ai_cmd_path("claude", "bin/claude-api")
+        resp, status = validate_ai_cmd_path("claude", "bin/claude-api")
         assert status == HTTPStatus.BAD_REQUEST
 
     def test_rejects_basename_without_provider_prefix(self, app_ctx, bin_dir):
         binary = _make_executable(bin_dir, "notclaude")
-        resp, status = _validate_ai_cmd_path("claude", binary)
+        resp, status = validate_ai_cmd_path("claude", binary)
         assert status == HTTPStatus.BAD_REQUEST
 
     def test_rejects_arbitrary_system_binary(self, app_ctx):
         # The allow-list posture: /api must not be able to spawn any program.
-        resp, status = _validate_ai_cmd_path("claude", "/bin/sh")
+        resp, status = validate_ai_cmd_path("claude", "/bin/sh")
         assert status == HTTPStatus.BAD_REQUEST
 
     def test_rejects_executable_outside_path_dirs(self, app_ctx, bin_dir, tmp_path):
@@ -85,12 +85,12 @@ class TestValidateAiCmdPath:
         outside = tmp_path / "elsewhere"
         outside.mkdir()
         binary = _make_executable(outside, "claude-api")
-        resp, status = _validate_ai_cmd_path("claude", binary)
+        resp, status = validate_ai_cmd_path("claude", binary)
         assert status == HTTPStatus.BAD_REQUEST
 
     def test_rejects_missing_binary(self, app_ctx, bin_dir):
         missing = str(bin_dir / "claude-nowhere")
-        resp, status = _validate_ai_cmd_path("claude", missing)
+        resp, status = validate_ai_cmd_path("claude", missing)
         assert status == HTTPStatus.BAD_REQUEST
 
     def test_rejects_non_executable_file(self, app_ctx, bin_dir):
@@ -98,13 +98,13 @@ class TestValidateAiCmdPath:
         path.write_text("not executable")
         if os.name != "posix":
             pytest.skip("executable-bit check is POSIX-only")
-        resp, status = _validate_ai_cmd_path("claude", str(path))
+        resp, status = validate_ai_cmd_path("claude", str(path))
         assert status == HTTPStatus.BAD_REQUEST
 
     @patch("quodeq.api._evaluation_helpers._get_ai_cmd", return_value="claude")
     def test_provider_falls_back_to_configured_cmd(self, _mock, app_ctx, bin_dir):
         binary = _make_executable(bin_dir, "claude-api")
-        assert _validate_ai_cmd_path(None, binary) is None
+        assert validate_ai_cmd_path(None, binary) is None
 
 
 class TestAiCmdPathErrorEnvInjection:

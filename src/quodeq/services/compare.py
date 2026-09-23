@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quodeq.services._fs_metadata import _local_repo_root
+from quodeq.services._fs_metadata import local_repo_root
 from quodeq.services.wiring import count_commits_since
 from quodeq.services.scoring import get_project_scores
 
@@ -80,6 +80,6 @@ def build_compare_summary(reports_root: Path, project: str) -> dict[str, Any] | 
         "trend": trend,
         "runsCount": len(runs),
         "lastRun": runs[0] if runs else None,
-        "commitsSinceLastRun": _commits_since(_local_repo_root(reports_root, project), since_iso),
+        "commitsSinceLastRun": _commits_since(local_repo_root(reports_root, project), since_iso),
         "scoring": scores.get("scoring") or {},
     }

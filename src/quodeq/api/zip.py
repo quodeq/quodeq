@@ -19,16 +19,16 @@ from quodeq.shared.env import env_int
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_ZIP_SIZE_MB = 500
-_MANIFEST_FILENAME = "manifest.json"
-_MANIFEST_KIND = "quodeq-project-export"
-_MANIFEST_SCHEMA = 1
+MANIFEST_FILENAME = "manifest.json"
+MANIFEST_KIND = "quodeq-project-export"
+MANIFEST_SCHEMA = 1
 # Import allows the extracted (uncompressed) archive to reach the MB cap times
 # this multiple (evaluation data is text that deflates ~5x). Export applies the
 # same bound so it never produces an archive that would fail re-import.
-_EXTRACT_HEADROOM = 10
+EXTRACT_HEADROOM = 10
 
 
-def _max_zip_size_bytes(max_mb: int | None = None, env: dict[str, str] | None = None) -> int:
+def max_zip_size_bytes(max_mb: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the max zip export size in bytes.
 
     *max_mb* overrides the env var for testing. An unparseable
@@ -53,8 +53,8 @@ def _build_manifest(project_path: Path) -> dict[str, object]:
         except (OSError, json.JSONDecodeError):
             info = {}
     return {
-        "schema": _MANIFEST_SCHEMA,
-        "kind": _MANIFEST_KIND,
+        "schema": MANIFEST_SCHEMA,
+        "kind": MANIFEST_KIND,
         "source_uuid": info.get("uuid") or project_path.name,
         "project_name": info.get("name"),
         "scope_path": info.get("scopePath"),
@@ -115,7 +115,7 @@ def _iter_export_files(project_path: Path):
     for file_entry in project_path.rglob("*"):
         if file_entry.is_symlink() or not file_entry.is_file():
             continue
-        if file_entry == project_path / _MANIFEST_FILENAME:
+        if file_entry == project_path / MANIFEST_FILENAME:
             continue
         yield file_entry
 
@@ -123,7 +123,7 @@ def _iter_export_files(project_path: Path):
 def _write_manifest_entry(zf: zipfile.ZipFile, project_path: Path) -> int:
     """Write the export manifest into *zf*; returns its uncompressed byte size."""
     manifest_json = json.dumps(_build_manifest(project_path), indent=2)
-    zf.writestr(f"{project_path.name}/{_MANIFEST_FILENAME}", manifest_json)
+    zf.writestr(f"{project_path.name}/{MANIFEST_FILENAME}", manifest_json)
     return len(manifest_json.encode("utf-8"))
 
 
@@ -149,17 +149,17 @@ def _write_project_zip_entries(
         raise limits.uncompressed_error
 
 
-def _build_project_zip(project_path: Path) -> Path:
+def build_project_zip(project_path: Path) -> Path:
     """Create a temporary zip archive of a project directory and return its path.
 
     Two caps mirror the import side so a successful export always re-imports:
     the compressed archive against the MB limit, and the total uncompressed size
-    against that limit times ``_EXTRACT_HEADROOM``.
+    against that limit times ``EXTRACT_HEADROOM``.
     """
     fd, tmp_path = tempfile.mkstemp(suffix=".zip", prefix="quodeq_export_")
     os.close(fd)
-    size_limit = _max_zip_size_bytes()
-    uncompressed_limit = size_limit * _EXTRACT_HEADROOM
+    size_limit = max_zip_size_bytes()
+    uncompressed_limit = size_limit * EXTRACT_HEADROOM
     limits = _ZipLimits.build(size_limit, uncompressed_limit)
     try:
         with open(tmp_path, "wb") as fh:
@@ -204,7 +204,7 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
     if err is not None:
         return err
     try:
-        tmp_path = _build_project_zip(project_path)
+        tmp_path = build_project_zip(project_path)
     except _ZipSizeLimitError as exc:
         return json_error(exc.public_message, HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
     except (OSError, zipfile.BadZipFile, ValueError) as exc:

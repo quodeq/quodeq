@@ -39,7 +39,7 @@ def _as_int(value: object) -> int:
         return 0
 
 
-def _dim_evidence_counts(evaluation_dir: Path, dim_id: str) -> tuple[int, int]:
+def dim_evidence_counts(evaluation_dir: Path, dim_id: str) -> tuple[int, int]:
     """Read (sourceFileCount, filesRead) from a dimension's just-written report JSON.
 
     Falls back to (0, 0) when the report is missing or unparseable.
@@ -82,7 +82,7 @@ def _format_score_line(dim: str, score: str, totals: dict, suffix: str = "") -> 
     return f"  {dim}: {score}  ({', '.join(parts)}){suffix}"
 
 
-def _format_adjusted_score(original: str, result: ScoringResult) -> str | None:
+def format_adjusted_score(original: str, result: ScoringResult) -> str | None:
     """Format *result*'s overall value to match *original*'s numeric-vs-grade shape.
 
     Returns None when no adjusted value is available, so the caller falls
@@ -112,7 +112,7 @@ def _adjusted_score(
     from quodeq import cli_evaluation as _facade
 
     dismissed, deleted = suppressions
-    source_file_count, files_read = _dim_evidence_counts(run_dir / "evaluation", dim)
+    source_file_count, files_read = dim_evidence_counts(run_dir / "evaluation", dim)
     try:
         rescored = _facade.rescore_dimension_from_evidence(
             run_dir, dim, EvidenceScoreRequest(
@@ -126,15 +126,15 @@ def _adjusted_score(
         )
     except Exception as exc:  # noqa: BLE001 — console embellishment on top of
         # reports already on disk; nothing upstream catches a generic exception
-        # (see _run_pipeline_with_cleanup), so fall back instead of crashing.
+        # (see run_pipeline_with_cleanup), so fall back instead of crashing.
         _logger.debug("Suppression-aware rescore failed for dim %s: %s", dim, exc)
         return None, 0
     if rescored.excluded == 0 or rescored.result is None:
         return None, rescored.excluded
-    return _format_adjusted_score(score, rescored.result), rescored.excluded
+    return format_adjusted_score(score, rescored.result), rescored.excluded
 
 
-def _print_scores(
+def print_scores(
     scores: dict[str, str], run_dir: Path, project_dir: Path, params: ScoringParams,
 ) -> None:
     """Print each dimension's score with its volume, noting excluded findings.

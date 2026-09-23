@@ -5,11 +5,11 @@ Re-exported by ``_cli_resolution.py`` (which is in turn re-exported by
 ``cli_evaluation.py``), so existing ``quodeq._cli_resolution.<name>`` and
 ``quodeq.cli_evaluation.<name>`` patch targets keep working unchanged.
 
-``_create_worktree``'s failure path calls ``_cleanup_worktree`` through a
+``create_worktree``'s failure path calls ``cleanup_worktree`` through a
 deferred lookup on ``quodeq._cli_resolution`` (rather than a bare name)
-because tests patch ``quodeq._cli_resolution._cleanup_worktree`` directly —
+because tests patch ``quodeq._cli_resolution.cleanup_worktree`` directly —
 see ``tests/test_cli_worktree_cleanup.py``. ``_fetch_branch`` looks up its
-timeout the same way: ``_FETCH_TIMEOUT_S`` stays defined in
+timeout the same way: ``FETCH_TIMEOUT_S`` stays defined in
 ``_cli_resolution.py`` because a test reloads that module
 (``importlib.reload``) with ``QUODEQ_GIT_CLONE_TIMEOUT_S`` set and reads the
 import-time constant back off it — see
@@ -42,14 +42,14 @@ def _fetch_branch(repo_dir: Path, branch: str) -> bool:
     try:
         result = subprocess.run(
             ["git", "-C", str(repo_dir), "fetch", "origin", f"{branch}:{branch}"],
-            capture_output=True, text=True, encoding="utf-8", timeout=_facade._FETCH_TIMEOUT_S,
+            capture_output=True, text=True, encoding="utf-8", timeout=_facade.FETCH_TIMEOUT_S,
         )
         return result.returncode == 0
     except (subprocess.SubprocessError, OSError):
         return False
 
 
-def _create_worktree(repo_dir: Path, branch: str) -> Path | None:
+def create_worktree(repo_dir: Path, branch: str) -> Path | None:
     """Create a temporary git worktree for the given branch.
 
     Returns the worktree path, or None on failure. When the first attempt
@@ -70,13 +70,13 @@ def _create_worktree(repo_dir: Path, branch: str) -> Path | None:
             if not retried and _fetch_branch(repo_dir, branch):
                 continue
             print(f"Failed to create worktree for branch '{branch}': {exc}", file=sys.stderr)
-            _facade._cleanup_worktree(repo_dir, worktree_dir)
+            _facade.cleanup_worktree(repo_dir, worktree_dir)
             shutil.rmtree(worktree_dir, ignore_errors=True)
             return None
     return None
 
 
-def _cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
+def cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
     """Remove a temporary git worktree."""
     try:
         result = subprocess.run(

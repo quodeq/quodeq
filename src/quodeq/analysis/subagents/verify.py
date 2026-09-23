@@ -16,12 +16,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis.subagents._verify_filter import _pre_filter_gone
+from quodeq.analysis.subagents._verify_filter import pre_filter_gone
 from quodeq.analysis.subagents._verify_io import (  # noqa: F401 — re-exports
-    _resolve_previous_evidence,
+    resolve_previous_evidence,
     resolve_evidence_paths,
 )
-from quodeq.analysis.subagents._verify_io import _load_previous_findings
+from quodeq.analysis.subagents._verify_io import load_previous_findings
 from quodeq.shared.logging import log_info
 
 
@@ -53,19 +53,19 @@ def load_previous_findings_for_dimension(
                 log_info(f"  [{dim_id}] {total} previous findings: {gone} files gone, {len(surviving)} surviving")
             return surviving
 
-    prev_jsonl, _ = _resolve_previous_evidence(evidence_dir, dim_id, cache, cache_key)
+    prev_jsonl, _ = resolve_previous_evidence(evidence_dir, dim_id, cache, cache_key)
     if prev_jsonl is None:
         if not quiet:
             log_info(f"  [{dim_id}] No previous evaluation — skipping verification")
         return []
 
-    prev_findings = _load_previous_findings(prev_jsonl)
+    prev_findings = load_previous_findings(prev_jsonl)
     if not prev_findings:
         if cache is not None:
             cache[cache_key] = ([], 0, 0)
         return []
 
-    surviving, gone = _pre_filter_gone(prev_findings, config.src)
+    surviving, gone = pre_filter_gone(prev_findings, config.src)
     if not quiet:
         log_info(f"  [{dim_id}] {len(prev_findings)} previous findings: {gone} files gone, {len(surviving)} surviving")
     if cache is not None:

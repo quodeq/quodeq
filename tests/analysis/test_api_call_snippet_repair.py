@@ -19,15 +19,15 @@ import pytest
 pytest.importorskip("openai", reason="requires the openai SDK")
 
 from quodeq.analysis import _drop_stats
-from quodeq.analysis._api_call import ApiRunnerConfig, _call_api
+from quodeq.analysis._api_call import ApiRunnerConfig, call_api
 from quodeq.analysis._api_response import (
     _MAX_REPAIR_FINDINGS,
     _REPAIR_PROMPT,
-    _finish_call,
+    finish_call,
     _merge_repaired,
     _snippetless,
 )
-from quodeq.analysis._api_schema import _parse_findings
+from quodeq.analysis._api_schema import parse_findings
 from quodeq.config.analysis_env import finding_repair_disabled
 
 _GOOD = {
@@ -59,7 +59,7 @@ def _config() -> ApiRunnerConfig:
 
 @pytest.fixture(autouse=True)
 def _isolated_drop_stats():
-    """_finish_call records on the run-wide counter; keep tests independent."""
+    """finish_call records on the run-wide counter; keep tests independent."""
     _drop_stats.consume()
     yield
     _drop_stats.consume()
@@ -68,7 +68,7 @@ def _isolated_drop_stats():
 class TestDroppedSink:
     def test_sink_receives_the_rejected_dicts(self):
         sink: list[dict] = []
-        findings, dropped = _parse_findings(
+        findings, dropped = parse_findings(
             _payload(_GOOD, _SNIPPETLESS), dropped_sink=sink,
         )
         assert len(findings) == 1
@@ -76,7 +76,7 @@ class TestDroppedSink:
         assert sink == [_SNIPPETLESS]
 
     def test_no_sink_still_counts(self):
-        findings, dropped = _parse_findings(_payload(_GOOD, _SNIPPETLESS))
+        findings, dropped = parse_findings(_payload(_GOOD, _SNIPPETLESS))
         assert (len(findings), dropped) == (1, 1)
 
 
@@ -119,7 +119,7 @@ class TestMergeRepaired:
 class TestFinishCallRepair:
     def test_recovered_findings_rejoin_the_kept_list(self):
         reask = MagicMock(return_value=[dict(_REPAIRED)])
-        findings, lossy = _finish_call(
+        findings, lossy = finish_call(
             "test-model", "stop", _payload(_GOOD, _SNIPPETLESS), 0.0, reask=reask,
         )
         assert lossy is False
@@ -129,7 +129,7 @@ class TestFinishCallRepair:
 
     def test_drop_stats_describe_the_final_outcome(self):
         reask = MagicMock(return_value=[dict(_REPAIRED)])
-        _finish_call(
+        finish_call(
             "test-model", "stop", _payload(_GOOD, _SNIPPETLESS), 0.0, reask=reask,
         )
         stats = _drop_stats.consume()
@@ -139,7 +139,7 @@ class TestFinishCallRepair:
 
     def test_failed_repair_keeps_first_pass_findings_and_counts(self):
         reask = MagicMock(return_value=[])
-        findings, _ = _finish_call(
+        findings, _ = finish_call(
             "test-model", "stop", _payload(_GOOD, _SNIPPETLESS), 0.0, reask=reask,
         )
         assert [f["req"] for f in findings] == ["A-1"]
@@ -149,20 +149,20 @@ class TestFinishCallRepair:
 
     def test_no_drops_means_no_reask(self):
         reask = MagicMock()
-        _finish_call("test-model", "stop", _payload(_GOOD), 0.0, reask=reask)
+        finish_call("test-model", "stop", _payload(_GOOD), 0.0, reask=reask)
         reask.assert_not_called()
 
     def test_unrepairable_drops_do_not_reask(self):
         # Dropped WITH a snippet present: the failure is elsewhere, and a
         # repair call would burn a model round-trip for nothing.
         reask = MagicMock()
-        _finish_call("test-model", "stop", _payload(_GOOD, _SNIPPET_PRESENT), 0.0, reask=reask)
+        finish_call("test-model", "stop", _payload(_GOOD, _SNIPPET_PRESENT), 0.0, reask=reask)
         reask.assert_not_called()
 
     def test_kill_switch_disables_the_reask(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_DISABLE_FINDING_REPAIR", "1")
         reask = MagicMock()
-        findings, _ = _finish_call(
+        findings, _ = finish_call(
             "test-model", "stop", _payload(_GOOD, _SNIPPETLESS), 0.0, reask=reask,
         )
         reask.assert_not_called()
@@ -185,7 +185,7 @@ class TestCallApiRepairRoundTrip:
         with patch("openai.OpenAI") as mock_oa:
             client = self._client(responses)
             mock_oa.return_value.__enter__.return_value = client
-            findings, lossy = _call_api("the source", _config())
+            findings, lossy = call_api("the source", _config())
         return findings, lossy, client
 
     def test_second_call_replays_findings_and_source(self):

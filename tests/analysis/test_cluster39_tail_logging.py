@@ -11,7 +11,7 @@ from quodeq.analysis.cache.dimension_helpers import CacheEntryTarget
 
 
 def test_build_cache_entry_logs_when_content_hash_is_unavailable(monkeypatch, tmp_path) -> None:
-    # Both write paths hash through _key_provenance._content_hash_for.
+    # Both write paths hash through _key_provenance.content_hash_for.
     monkeypatch.setattr(_key_provenance, "hash_file", lambda path: None)
     # _build_cache_entry_for_file reads only config.src and config.language.
     config = SimpleNamespace(src=tmp_path, language="python")

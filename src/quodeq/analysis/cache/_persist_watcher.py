@@ -7,11 +7,11 @@ in ``dimension_runner.py`` -- ``mock.patch("...dimension_runner.threading")``
 resolves where ``threading.Thread``/``threading.Event()`` are called, not
 where this module happens to live.
 
-``_periodic_persist`` takes a ``log_warning`` callable rather than owning
+``periodic_persist`` takes a ``log_warning`` callable rather than owning
 its own logger, so this module has no logging import of its own -- the
 caller threads its module logger's ``.warning`` method through.
 
-``_make_persist_fn`` builds the callable the thread runs. It binds the
+``make_persist_fn`` builds the callable the thread runs. It binds the
 dispatch-constant provenance hashes and one ``DispatchJsonlState``. Ticks
 read the JSONL incrementally through that state; the final persist (once
 ``stop_event`` is set) resets it first and re-reads the whole file.
@@ -24,9 +24,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis.run_types import AnalysisOptions, RunConfig
-from quodeq.analysis.cache._dimension_context import _CacheContext
+from quodeq.analysis.cache._dimension_context import CacheContext
 from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
-from quodeq.analysis.cache._key_provenance import _hash_prompts_combined
+from quodeq.analysis.cache._key_provenance import hash_prompts_combined
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_helpers import persist_dispatch_results
 from quodeq.analysis.fingerprint import hash_standards, dimension_params_state
@@ -35,7 +35,7 @@ from quodeq.analysis.fingerprint import hash_standards, dimension_params_state
 # dispatch. Smaller = less work lost on cancel; larger = less I/O during
 # normal runs. 30s is a pragmatic default -- at typical model dispatch
 # speeds (~10-30s per file), each tick covers a handful of completed files.
-_PERSIST_INTERVAL_S = 30.0
+PERSIST_INTERVAL_S = 30.0
 
 
 @dataclass(frozen=True)
@@ -85,12 +85,12 @@ def _compute_persist_hash_inputs(config: RunConfig, dimension: str) -> CachePers
     return CachePersistProvenance(
         standards_hash=standards_hash, params_hash=params_hash,
         effective_params=effective_params,
-        prompts_hash=_hash_prompts_combined(config.prompts_dir),
+        prompts_hash=hash_prompts_combined(config.prompts_dir),
     )
 
 
-def _make_persist_fn(
-    config: RunConfig, dim_id: str, cctx: _CacheContext, stop_event: threading.Event,
+def make_persist_fn(
+    config: RunConfig, dim_id: str, cctx: CacheContext, stop_event: threading.Event,
 ) -> Callable[[], None]:
     """Build the watcher's persist callable for one dispatch.
 
@@ -123,7 +123,7 @@ def _make_persist_fn(
     return _persist_now
 
 
-def _resolve_failure_streak_threshold(
+def resolve_failure_streak_threshold(
     opts: AnalysisOptions, *, override: int | None = None,
 ) -> int:
     """Return the effective breaker threshold.
@@ -136,7 +136,7 @@ def _resolve_failure_streak_threshold(
     return max(0, opts.failure_streak_threshold)
 
 
-def _periodic_persist(
+def periodic_persist(
     stop_event: threading.Event, persist_fn: Callable[[], None],
     interval: float, log_warning: Callable[..., None],
 ) -> None:

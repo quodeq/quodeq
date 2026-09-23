@@ -7,11 +7,11 @@ from collections.abc import Mapping
 
 from quodeq.shared.env_resolve import resolve_env
 
-_LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
-logging.addLevelName(_LOG_SUCCESS, "SUCCESS")
+LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
+logging.addLevelName(LOG_SUCCESS, "SUCCESS")
 
 
-def _should_use_color(env: Mapping[str, str] | None = None) -> bool:
+def should_use_color(env: Mapping[str, str] | None = None) -> bool:
     """Determine whether ANSI color codes should be emitted.
 
     *env* overrides ``os.environ`` when provided, making the check
@@ -21,17 +21,17 @@ def _should_use_color(env: Mapping[str, str] | None = None) -> bool:
     return not environ.get("NO_COLOR") and environ.get("TERM") != "dumb"
 
 
-_USE_COLOR: bool = _should_use_color()
+USE_COLOR: bool = should_use_color()
 
 
-def _use_color() -> bool:
+def use_color() -> bool:
     """Return whether color output is enabled (cached at import time)."""
-    return _USE_COLOR
+    return USE_COLOR
 
 
-def _color(code: str) -> str:
+def color(code: str) -> str:
     """Return the ANSI *code* if color is enabled, else empty string."""
-    return code if _USE_COLOR else ""
+    return code if USE_COLOR else ""
 
 
 _ANSI_GREY = "\033[0;90m"
@@ -44,7 +44,7 @@ _NC = "\033[0m"
 _STYLES: dict[int, tuple[str, str]] = {
     logging.DEBUG: (_ANSI_GREY, "[DEBUG]"),
     logging.INFO: (_ANSI_BLUE, "[INFO]"),
-    _LOG_SUCCESS: (_ANSI_GREEN, "[SUCCESS]"),
+    LOG_SUCCESS: (_ANSI_GREEN, "[SUCCESS]"),
     logging.WARNING: (_ANSI_YELLOW, "[WARNING]"),
     logging.ERROR: (_ANSI_RED, "[ERROR]"),
 }
@@ -55,7 +55,7 @@ class ColorFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         raw_color, prefix = _STYLES.get(record.levelno, ("", f"[{record.levelname}]"))
-        if _use_color():
+        if use_color():
             return f"{raw_color}{prefix}{_NC} {record.getMessage()}"
         return f"{prefix} {record.getMessage()}"
 

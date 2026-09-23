@@ -20,7 +20,7 @@ import pytest
 from quodeq.shared import frozen
 from quodeq.shared._config import _ConfigHolder, defaults_path
 from quodeq.shared.text_io import configure_stdio_utf8
-from quodeq.shared._log_format import _should_use_color
+from quodeq.shared._log_format import should_use_color
 from quodeq.shared.logging import _apply_env_log_level, _logger
 from quodeq.shared.provider_env import providers_path
 
@@ -83,11 +83,11 @@ class TestProvidersPath:
 class TestShouldUseColor:
     def test_uses_the_injected_value(self, monkeypatch):
         monkeypatch.delenv("NO_COLOR", raising=False)
-        assert _should_use_color({"NO_COLOR": "1"}) is False
+        assert should_use_color({"NO_COLOR": "1"}) is False
 
     def test_empty_injected_env_ignores_the_process(self, monkeypatch):
         monkeypatch.setenv("NO_COLOR", "1")
-        assert _should_use_color({}) is True
+        assert should_use_color({}) is True
 
 
 class TestApplyEnvLogLevel:

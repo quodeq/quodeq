@@ -11,7 +11,7 @@ import pytest
 pytest.importorskip("openai", reason="requires the openai SDK")
 
 from quodeq.analysis._api_call import _LOCAL_TIMEOUT
-from quodeq.analysis._api_runner import ApiAnalysisRequest, _call_api, run_api_analysis
+from quodeq.analysis._api_runner import ApiAnalysisRequest, call_api, run_api_analysis
 
 from ._api_runner_helpers import (
     _make_findings_json,
@@ -108,7 +108,7 @@ class TestRunApiAnalysis:
                 choices=[MagicMock(message=MagicMock(content='{"findings":[]}'))]
             )
             mock_oa.return_value.__enter__.return_value = client
-            _call_api("prompt", api_config)
+            call_api("prompt", api_config)
         assert mock_oa.call_args.kwargs["max_retries"] == 0
 
 

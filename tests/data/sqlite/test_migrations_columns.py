@@ -242,8 +242,8 @@ def test_additive_upgrades_skip_a_db_without_findings():
 
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE runs (id INTEGER PRIMARY KEY)")
-    for upgrade in (additive._upgrade_v5_to_v6, additive._upgrade_v6_to_v7,
-                    additive._upgrade_v7_to_v8, additive._upgrade_v8_to_v9):
+    for upgrade in (additive.upgrade_v5_to_v6, additive.upgrade_v6_to_v7,
+                    additive.upgrade_v7_to_v8, additive.upgrade_v8_to_v9):
         upgrade(conn)  # must not raise
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert tables == {"runs"}

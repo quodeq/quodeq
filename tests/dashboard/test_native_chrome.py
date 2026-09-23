@@ -59,27 +59,27 @@ class TestWindowCreation:
 class TestUaMarkerNoDrift:
     def test_marker_matches_security_module(self):
         from quodeq.api import security
-        assert ww._WEBVIEW_UA_MARKER == security._WEBVIEW_UA_MARKER
+        assert ww.WEBVIEW_UA_MARKER == security._WEBVIEW_UA_MARKER
 
     def test_user_agent_carries_marker(self):
-        assert ww._WEBVIEW_UA_MARKER in ww._webview_user_agent()
+        assert ww.WEBVIEW_UA_MARKER in ww.webview_user_agent()
 
     def test_token_prefix_matches_security_module(self):
         from quodeq.api import security
         from quodeq.dashboard import _webview_window_about
-        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX == security._WEBVIEW_TOKEN_UA_PREFIX
+        assert _webview_window_about.WEBVIEW_TOKEN_UA_PREFIX == security._WEBVIEW_TOKEN_UA_PREFIX
 
     def test_user_agent_without_token_has_no_token_prefix(self):
         """The marker alone is not the security check — no token, no token prefix."""
         from quodeq.dashboard import _webview_window_about
-        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ww._webview_user_agent()
-        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ww._webview_user_agent(None)
+        assert _webview_window_about.WEBVIEW_TOKEN_UA_PREFIX not in ww.webview_user_agent()
+        assert _webview_window_about.WEBVIEW_TOKEN_UA_PREFIX not in ww.webview_user_agent(None)
 
     def test_user_agent_with_token_carries_it(self):
         from quodeq.dashboard import _webview_window_about
-        ua = ww._webview_user_agent("shared-secret-123")
-        assert f"{_webview_window_about._WEBVIEW_TOKEN_UA_PREFIX}shared-secret-123" in ua
-        assert ww._WEBVIEW_UA_MARKER in ua  # human-readable marker kept alongside the token
+        ua = ww.webview_user_agent("shared-secret-123")
+        assert f"{_webview_window_about.WEBVIEW_TOKEN_UA_PREFIX}shared-secret-123" in ua
+        assert ww.WEBVIEW_UA_MARKER in ua  # human-readable marker kept alongside the token
 
 
 class TestMainThreadsWebviewToken:
@@ -99,14 +99,14 @@ class TestMainThreadsWebviewToken:
         monkeypatch.setattr(ww.sys, "stdin", io.StringIO(stdin_text))
         mock_instance = MagicMock()
         mock_instance.try_acquire.return_value = False
-        with patch.object(ww, "_set_app_icon"), \
+        with patch.object(ww, "set_app_icon"), \
              patch.object(ww, "InstanceController", return_value=mock_instance), \
              patch.object(ww, "_create_window", return_value=MagicMock()), \
-             patch.object(ww, "_make_on_reload", return_value=MagicMock()), \
-             patch.object(ww, "_make_on_loaded", return_value=MagicMock()), \
-             patch.object(ww, "_make_on_closing", return_value=MagicMock()), \
-             patch.object(ww, "_non_macos_menu", return_value=None), \
-             patch.object(ww, "_quodeq_dir", return_value=tmp_path), \
+             patch.object(ww, "make_on_reload", return_value=MagicMock()), \
+             patch.object(ww, "make_on_loaded", return_value=MagicMock()), \
+             patch.object(ww, "make_on_closing", return_value=MagicMock()), \
+             patch.object(ww, "non_macos_menu", return_value=None), \
+             patch.object(ww, "quodeq_dir", return_value=tmp_path), \
              patch.object(ww, "webview") as mock_webview:
             ww.main()
         return mock_webview.start.call_args.kwargs["user_agent"]
@@ -114,7 +114,7 @@ class TestMainThreadsWebviewToken:
     def test_token_from_stdin_reaches_user_agent(self, monkeypatch, tmp_path):
         from quodeq.dashboard import _webview_window_about
         ua = self._run_main(monkeypatch, tmp_path, "shared-secret-123\n")
-        assert f"{_webview_window_about._WEBVIEW_TOKEN_UA_PREFIX}shared-secret-123" in ua
+        assert f"{_webview_window_about.WEBVIEW_TOKEN_UA_PREFIX}shared-secret-123" in ua
 
     def test_empty_stdin_is_backward_compatible(self, monkeypatch, tmp_path):
         """A launcher that sends nothing (or a parent that died before the
@@ -122,7 +122,7 @@ class TestMainThreadsWebviewToken:
         API serves the strict CSP -- fail closed, not fail open."""
         from quodeq.dashboard import _webview_window_about
         ua = self._run_main(monkeypatch, tmp_path, "")
-        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ua
+        assert _webview_window_about.WEBVIEW_TOKEN_UA_PREFIX not in ua
 
     def test_a_token_left_in_argv_is_ignored(self, monkeypatch, tmp_path):
         """Regression guard for the fix itself.
@@ -136,47 +136,47 @@ class TestMainThreadsWebviewToken:
             monkeypatch, tmp_path, "", argv_tail=("", "token-from-argv"),
         )
         assert "token-from-argv" not in ua
-        assert _webview_window_about._WEBVIEW_TOKEN_UA_PREFIX not in ua
+        assert _webview_window_about.WEBVIEW_TOKEN_UA_PREFIX not in ua
 
     def test_stdin_wins_over_a_stale_argv_token(self, monkeypatch, tmp_path):
         from quodeq.dashboard import _webview_window_about
         ua = self._run_main(
             monkeypatch, tmp_path, "real-token\n", argv_tail=("", "token-from-argv"),
         )
-        assert f"{_webview_window_about._WEBVIEW_TOKEN_UA_PREFIX}real-token" in ua
+        assert f"{_webview_window_about.WEBVIEW_TOKEN_UA_PREFIX}real-token" in ua
         assert "token-from-argv" not in ua
 
 
 class TestSetTitlebarTheme:
     def _api(self):
-        api = ww._WindowApi()
+        api = ww.WindowApi()
         api._window = MagicMock()
         return api
 
     def test_dark_dispatches_macos(self):
         api = self._api()
         with patch.object(ww.sys, "platform", "darwin"), \
-             patch.object(chrome, "_set_macos_titlebar_appearance") as mac:
+             patch.object(chrome, "set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("dark")
         mac.assert_called_once_with(api._window, True)
 
     def test_light_dispatches_macos(self):
         api = self._api()
         with patch.object(ww.sys, "platform", "darwin"), \
-             patch.object(chrome, "_set_macos_titlebar_appearance") as mac:
+             patch.object(chrome, "set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("light")
         mac.assert_called_once_with(api._window, False)
 
     def test_dark_dispatches_windows(self):
         api = self._api()
         with patch.object(ww.sys, "platform", "win32"), \
-             patch.object(chrome, "_set_windows_titlebar") as win:
+             patch.object(chrome, "set_windows_titlebar") as win:
             api.set_titlebar_theme("dark")
         win.assert_called_once_with(True)
 
     def test_unknown_mode_is_noop(self):
         api = self._api()
         with patch.object(ww.sys, "platform", "darwin"), \
-             patch.object(chrome, "_set_macos_titlebar_appearance") as mac:
+             patch.object(chrome, "set_macos_titlebar_appearance") as mac:
             api.set_titlebar_theme("purple")
         mac.assert_not_called()

@@ -17,7 +17,7 @@ from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.row_mappers import judgment_to_row
-from quodeq.data.sqlite._state_store_meta import _StateStoreMetaMixin
+from quodeq.data.sqlite._state_store_meta import StateStoreMetaMixin
 
 _logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ _SELECT_VERDICT_ROWS = (
 )
 
 
-class SQLiteStateStore(_StateStoreMetaMixin):
+class SQLiteStateStore(StateStoreMetaMixin):
     """Writes projected event state into evaluation.db."""
 
     def __init__(self, run_dir: Path) -> None:

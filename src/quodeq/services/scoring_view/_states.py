@@ -27,7 +27,7 @@ def select_default_view_runs(run_infos: Sequence) -> list:
 
     Used by:
       - ``accumulated._compute_result`` — the Overview cards/headline.
-      - ``_fs_metadata._read_accumulated_summary`` — the repositories
+      - ``_fs_metadata.read_accumulated_summary`` — the repositories
         screen's project-card grade.
 
     Both consult this single function so the card a user sees on the
@@ -57,7 +57,7 @@ def select_trend_runs(run_infos: Iterable) -> list:
     wait-until-terminal rule.
 
     Used by:
-      - ``_dashboard_history._compute_dashboard_payload`` — history window.
+      - ``_dashboard_history.compute_dashboard_payload`` — history window.
       - ``scoring.get_project_scores`` — the /scores trend.
 
     Args/returns are ``RunInfo``-shaped objects; order is preserved.

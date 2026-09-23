@@ -1,6 +1,6 @@
 """Live-progress polling reuses one IncrementalTally per evidence file.
 
-`_dim_evidence_tally` and `_consolidated_dim_progress`
+`_dim_evidence_tally` and `consolidated_dim_progress`
 called `tally_unique_findings` from byte 0 on every poll, so a growing
 evidence.jsonl got fully re-parsed on every ~2s tick while a pool ran.
 `live_tally` memoizes an `IncrementalTally` per (file, suppression state) so
@@ -25,18 +25,18 @@ from quodeq.services._scan_progress_dims import (
     forget_live_tallies,
     live_tally,
 )
-from quodeq.services._scan_progress_types import _ProgressContext
+from quodeq.services._scan_progress_types import ProgressContext
 from quodeq.services.scan_progress import build_scan_progress
 
 
-def _ctx(run_dir: Path, evaluators_dir=None, compiled_dir=None) -> _ProgressContext:
+def _ctx(run_dir: Path, evaluators_dir=None, compiled_dir=None) -> ProgressContext:
     """The run-level context `_dim_evidence_tally` reads.
 
     It only touches `run_dir`, `evaluators_dir` and `compiled_dir`; the rest
     are filled with inert values. These used to be separate positional args
-    and were bundled into `_ProgressContext` by the parameter-count ratchet.
+    and were bundled into `ProgressContext` by the parameter-count ratchet.
     """
-    return _ProgressContext(
+    return ProgressContext(
         run_dir=run_dir, status={}, state="running", is_terminal=False,
         total_elapsed_s=None, run_budget_s=None, project_files=0,
         dim_estimates={}, dim_records={}, dim_ids=[],

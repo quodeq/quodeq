@@ -89,13 +89,13 @@ def test_taxonomy_from_api_producer_to_score(tmp_path):
     taxonomy_used=True.
 
     Drives the actual producer seam the writer-side tests above cannot reach:
-    raw model output -> _parse_findings (_Finding validation) -> FindingsRouter
+    raw model output -> parse_findings (_Finding validation) -> FindingsRouter
     -> JSONL -> parse -> score. Before _Finding carried 'vt', validation
     silently stripped the taxonomy and every fresh run fell back to free-text
     reason grouping.
     """
     pytest.importorskip("openai", reason="requires the openai SDK")
-    from quodeq.analysis._api_schema import _parse_findings
+    from quodeq.analysis._api_schema import parse_findings
     from quodeq.analysis.mcp.router import FindingsRouter
 
     raw = json.dumps({"findings": [
@@ -108,7 +108,7 @@ def test_taxonomy_from_api_producer_to_score(tmp_path):
             ("c", "Unsanitised input reaches eval."),
         ], start=1)
     ]})
-    findings, dropped = _parse_findings(raw)
+    findings, dropped = parse_findings(raw)
     assert dropped == 0
     assert len(findings) == 3
 

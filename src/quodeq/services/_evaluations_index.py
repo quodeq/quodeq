@@ -20,16 +20,16 @@ from pathlib import Path
 from quodeq.core.run.job_status import JOB_FINISHED, JobStatus, external_job_id, is_external_job_id, strip_external_prefix
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
-from quodeq.services._external_jobs import _sync_external_run
+from quodeq.services._external_jobs import sync_external_run
 from quodeq.services.jobs import JobManager
 from quodeq.services._run_index_fs import (
-    _external_job_is_complete, _merge_internal_jobs, _remove_run_directory,
-    _scan_reports_root_for_run,
+    external_job_is_complete, merge_internal_jobs, remove_run_directory,
+    scan_reports_root_for_run,
 )
 from quodeq.services._run_status_readers import build_job_snapshot
 from quodeq.services._run_status_readers import (  # noqa: F401 — re-export
-    _read_deadline_from_status, _read_dimensions_from_status, _read_provider_model_from_status,
-    _read_time_limit_from_status, _status_json_terminal, _tail_run_log,
+    read_deadline_from_status, read_dimensions_from_status, read_provider_model_from_status,
+    read_time_limit_from_status, status_json_terminal, tail_run_log,
 )
 
 _logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ class EvaluationsIndex:
         # can't be filtered in SQL.
         db_limit = limit + len(internal_jobs) if limit and limit > 0 else None
         snapshots = self._indexed_snapshots(reports_dir, db_limit, states)
-        merged = _merge_internal_jobs(snapshots, internal_jobs)
+        merged = merge_internal_jobs(snapshots, internal_jobs)
         if states:
             merged = [s for s in merged if s.status in states]  # keep: in-memory jobs have no row
         merged.sort(key=lambda s: s.started_at or "", reverse=True)
@@ -119,7 +119,7 @@ class EvaluationsIndex:
         run_uuid = strip_external_prefix(job_id)
         if snapshot.output_run_id:
             run_uuid = snapshot.output_run_id
-        removed_dir = _remove_run_directory(
+        removed_dir = remove_run_directory(
             reports_dir, snapshot.output_project, run_uuid, log=_logger,
         )
         # Remove from index regardless so stale rows get cleaned up. The same
@@ -157,7 +157,7 @@ class EvaluationsIndex:
         db = self._open_index()
         try:
             if is_external:
-                if not _sync_external_run(db, job_id, reports_dir):
+                if not sync_external_run(db, job_id, reports_dir):
                     return None
             else:
                 _run_index.sync_index(db, reports_dir)
@@ -232,7 +232,7 @@ class EvaluationsIndex:
                         return candidate
 
         # Filesystem fallback: scan reports_root for <project>/<run_id>/.
-        return _scan_reports_root_for_run(self._resolve_reports_root(), run_id)
+        return scan_reports_root_for_run(self._resolve_reports_root(), run_id)
 
     def rebuild(self, reports_root: Path | None = None) -> tuple[int, int]:
         """Rebuild the index from scratch by walking *reports_root*.
@@ -258,7 +258,7 @@ class EvaluationsIndex:
             run_dir = self.get_log_run_dir(job_id)
             if run_dir is None:
                 return False
-            return _external_job_is_complete(run_dir)
+            return external_job_is_complete(run_dir)
         snapshot = self._jobs.get_job(job_id)
         if snapshot is not None and snapshot.status in JOB_FINISHED:
             return True
@@ -271,7 +271,7 @@ class EvaluationsIndex:
             return False
         if (run_dir / "scan.json").exists():
             return True
-        return _status_json_terminal(run_dir)
+        return status_json_terminal(run_dir)
 
     # -- internals ------------------------------------------------------
 

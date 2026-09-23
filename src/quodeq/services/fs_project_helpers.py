@@ -19,26 +19,26 @@ from quodeq.services.wiring import (
     write_repository_info,
 )
 from quodeq.services._fs_metadata import (
-    _check_path_exists,
-    _extract_project_metadata,
-    _read_accumulated_summary,
-    _read_language_stats,
-    _read_repo_info,
+    check_path_exists,
+    extract_project_metadata,
+    read_accumulated_summary,
+    read_language_stats,
+    read_repo_info,
 )
 from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
-    _auto_detect_parents,
-    _find_best_parent,
-    _max_projects_listed,
+    auto_detect_parents,
+    find_best_parent,
+    max_projects_listed,
 )
 from quodeq.data.fs.report_parser.runs import RunInfo
-from quodeq.services._registration_url import _strip_credentials
-from quodeq.services._repo_index import _load_repo_index, _repo_index_key, _save_repo_index
+from quodeq.services._registration_url import strip_credentials
+from quodeq.services._repo_index import load_repo_index, repo_index_key, save_repo_index
 
 _logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
-class _ListingOptions:
+class ListingOptions:
     """How a project listing treats each record it hydrates.
 
     ``backfill`` allows the lazy ``onboardingCompletedAt`` rewrite (False for
@@ -50,11 +50,11 @@ class _ListingOptions:
     inline_summaries: bool = False
 
 
-_DEFAULT_LISTING = _ListingOptions()
+_DEFAULT_LISTING = ListingOptions()
 
 
 @dataclass(frozen=True, slots=True)
-class _KnownProjectIds:
+class KnownProjectIds:
     """Directory names a listing keeps even when they have no runs.
 
     ``registered`` have a project record, ``parents`` are named as a parent by
@@ -65,7 +65,7 @@ class _KnownProjectIds:
     subprojects: set[str] = field(default_factory=set)
 
 
-def _backfill_onboarding_field(
+def backfill_onboarding_field(
     project_dir: Path, *, pre_read_data: dict | None = None, heal_completed_at: str | None = None,
 ) -> dict | None:
     """Normalize ``onboardingCompletedAt`` in ``repository_info.json``.
@@ -107,7 +107,7 @@ def _derive_latest_done_run_id(runs: list[RunInfo]) -> str | None:
     return next((run.run_id for run in runs if run.status is RunState.DONE), None)
 
 
-def _project_entry_identity(entry_name: str, meta: dict) -> dict[str, object]:
+def project_entry_identity(entry_name: str, meta: dict) -> dict[str, object]:
     """The identity half of a ``ProjectEntry``'s kwargs, read off a metadata dict.
 
     Everything a sparse entry carries: id, name, parent, display name,
@@ -146,24 +146,24 @@ def _backfill_and_read_meta(
     """
     project_dir = reports_root / entry_name
     heal_at = (runs[-1].date_iso or datetime.now(timezone.utc).isoformat()) if runs else None
-    backfilled = _backfill_onboarding_field(
+    backfilled = backfill_onboarding_field(
         project_dir, pre_read_data=pre_read_info, heal_completed_at=heal_at,
     ) if backfill else None
     info = backfilled if backfilled is not None else (
-        pre_read_info if pre_read_info is not None else _read_repo_info(reports_root, entry_name)
+        pre_read_info if pre_read_info is not None else read_repo_info(reports_root, entry_name)
     )
-    return info, _extract_project_metadata(info, entry_name)
+    return info, extract_project_metadata(info, entry_name)
 
 
-def _build_project_entry(
+def build_project_entry(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
-    options: _ListingOptions = _DEFAULT_LISTING, *,
+    options: ListingOptions = _DEFAULT_LISTING, *,
     pre_read_info: dict | None = None,
 ) -> ProjectEntry:
     """Build a frozen ProjectEntry from its directory and run list.
 
     ``options.inline_summaries`` mirrors ``build_project_list``'s parameter of
-    the same name, forwarded to ``_read_accumulated_summary`` as
+    the same name, forwarded to ``read_accumulated_summary`` as
     ``compute_on_miss``: the shared-repo route has no warm-up engine, so it
     keeps computing a missing summary inline instead of reporting it pending.
     See ``_backfill_and_read_meta`` for the ``options.backfill`` rationale.
@@ -172,21 +172,21 @@ def _build_project_entry(
     info, meta = _backfill_and_read_meta(
         reports_root, entry_name, runs, backfill=options.backfill, pre_read_info=pre_read_info,
     )
-    latest_grade, latest_score, files_count, summary_pending = _read_accumulated_summary(
+    latest_grade, latest_score, files_count, summary_pending = read_accumulated_summary(
         reports_root, entry_name, runs, compute_on_miss=options.inline_summaries,
     )
     latest_done_run_id = _derive_latest_done_run_id(runs)
     return ProjectEntry(
-        **_project_entry_identity(entry_name, meta),
+        **project_entry_identity(entry_name, meta),
         runs_count=len(runs),
         latest_run_id=runs[0].run_id if runs else None,
         latest_done_run_id=latest_done_run_id,
         latest_date=runs[0].date_iso if runs else None,
-        path_exists=_check_path_exists(meta["path"], meta["location"]),
+        path_exists=check_path_exists(meta["path"], meta["location"]),
         files_count=files_count,
         latest_grade=latest_grade,
         latest_score=latest_score,
-        language_stats=_read_language_stats(reports_root, entry_name, runs),
+        language_stats=read_language_stats(reports_root, entry_name, runs),
         onboarding_completed_at=info.get("onboardingCompletedAt"),
         origin_url=info.get("originUrl"),
         summary_pending=summary_pending,
@@ -243,7 +243,7 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
     try:
         is_url = is_repo_url(repo)
     except ValueError as exc:
-        _logger.warning("Rejecting malformed repo identifier %r in duplicate check: %s", _strip_credentials(repo), exc)
+        _logger.warning("Rejecting malformed repo identifier %r in duplicate check: %s", strip_credentials(repo), exc)
         return None
     repo_resolved = repo if is_url else str(Path(repo).resolve())
     expected_name = project_name_from_repo(repo)
@@ -251,8 +251,8 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
     if not reports_path.is_dir():
         return None
 
-    key = _repo_index_key(expected_name, repo_resolved, scope_path)
-    index = _load_repo_index(reports_path)
+    key = repo_index_key(expected_name, repo_resolved, scope_path)
+    index = load_repo_index(reports_path)
     candidate = index.get(key)
     if candidate is not None:
         if is_url or scope_path or _repo_identity_matches(
@@ -260,7 +260,7 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
         ):
             return candidate
         index.pop(key, None)
-        _save_repo_index(reports_path, index)
+        save_repo_index(reports_path, index)
 
     for child in reports_path.iterdir():
         if not child.is_dir():
@@ -268,7 +268,7 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
         if not _repo_identity_matches(child, expected_name, repo_resolved, scope_path):
             continue
         index[key] = child.name
-        _save_repo_index(reports_path, index)
+        save_repo_index(reports_path, index)
         return child.name
     return None
 

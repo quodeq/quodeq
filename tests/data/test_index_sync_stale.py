@@ -14,8 +14,8 @@ from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 from quodeq.data.sqlite.run_index import open_index
 from quodeq.data.sqlite.index_sync import (
     _is_pid_alive,
-    _upsert_from_status,
-    _check_stale_and_promote,
+    upsert_from_status,
+    check_stale_and_promote,
     force_promote_to_cancelled_stale,
 )
 from tests._timeouts import budget
@@ -28,13 +28,13 @@ def test_stale_promotion_old_heartbeat_dead_pid(tmp_path: Path) -> None:
         run = _make_run_dir(tmp_path, "p", "r7")
         write_status(run, RunStatus(state=RunState.RUNNING, job_id="ext-r7",
                      started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=999999999))
-        _upsert_from_status(db, run, project_uuid="p", run_id="r7")
+        upsert_from_status(db, run, project_uuid="p", run_id="r7")
         heartbeat = run / ".heartbeat"
         heartbeat.touch()
         old = time.time() - 60
         os.utime(heartbeat, (old, old))
 
-        promoted = _check_stale_and_promote(db, run, project_uuid="p", run_id="r7",
+        promoted = check_stale_and_promote(db, run, project_uuid="p", run_id="r7",
                                             stale_seconds=30)
         assert promoted is True
         row = db.execute("SELECT state, exit_reason FROM runs WHERE job_id = ?", ("ext-r7",)).fetchone()
@@ -53,13 +53,13 @@ def test_stale_promotion_live_pid_not_promoted(tmp_path: Path) -> None:
         run = _make_run_dir(tmp_path, "p", "r8")
         write_status(run, RunStatus(state=RunState.RUNNING, job_id="ext-r8",
                      started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=os.getpid()))
-        _upsert_from_status(db, run, project_uuid="p", run_id="r8")
+        upsert_from_status(db, run, project_uuid="p", run_id="r8")
         heartbeat = run / ".heartbeat"
         heartbeat.touch()
         old = time.time() - 60
         os.utime(heartbeat, (old, old))
 
-        promoted = _check_stale_and_promote(db, run, project_uuid="p", run_id="r8",
+        promoted = check_stale_and_promote(db, run, project_uuid="p", run_id="r8",
                                             stale_seconds=30)
         assert promoted is False
         row = db.execute("SELECT state FROM runs WHERE job_id = ?", ("ext-r8",)).fetchone()
@@ -77,7 +77,7 @@ def test_stale_promotion_after_sigkill_real_subprocess(tmp_path: Path) -> None:
 
     Spawns a real subprocess so we get a PID that is genuinely alive, records
     it in status.json, then `kill -9`s the process without any cleanup hook
-    running. After the heartbeat ages out, `_check_stale_and_promote` must
+    running. After the heartbeat ages out, `check_stale_and_promote` must
     mark the run CANCELLED with exit_reason="stale_detected".
     """
     db = open_index(tmp_path / "idx.db")
@@ -98,7 +98,7 @@ def test_stale_promotion_after_sigkill_real_subprocess(tmp_path: Path) -> None:
                 pid=proc.pid,
             ),
         )
-        _upsert_from_status(db, run, project_uuid="p", run_id="r10")
+        upsert_from_status(db, run, project_uuid="p", run_id="r10")
         heartbeat = run / ".heartbeat"
         heartbeat.touch()
 
@@ -112,7 +112,7 @@ def test_stale_promotion_after_sigkill_real_subprocess(tmp_path: Path) -> None:
         old = time.time() - 120
         os.utime(heartbeat, (old, old))
 
-        promoted = _check_stale_and_promote(
+        promoted = check_stale_and_promote(
             db, run, project_uuid="p", run_id="r10", stale_seconds=30,
         )
         assert promoted is True
@@ -134,8 +134,8 @@ def test_stale_promotion_terminal_state_untouched(tmp_path: Path) -> None:
         run = _make_run_dir(tmp_path, "p", "r9")
         write_status(run, RunStatus(state=RunState.DONE, job_id="ext-r9",
                      started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
-        _upsert_from_status(db, run, project_uuid="p", run_id="r9")
-        promoted = _check_stale_and_promote(db, run, project_uuid="p", run_id="r9",
+        upsert_from_status(db, run, project_uuid="p", run_id="r9")
+        promoted = check_stale_and_promote(db, run, project_uuid="p", run_id="r9",
                                             stale_seconds=30)
         assert promoted is False
         row = db.execute("SELECT state FROM runs WHERE job_id = ?", ("ext-r9",)).fetchone()
@@ -146,7 +146,7 @@ def test_stale_promotion_terminal_state_untouched(tmp_path: Path) -> None:
 
 def test_force_promote_preserves_provider_model_deadline(tmp_path: Path) -> None:
     """force_promote_to_cancelled_stale must carry ai_provider/ai_model/deadline_at
-    into the rewritten status.json, consistent with _check_stale_and_promote."""
+    into the rewritten status.json, consistent with check_stale_and_promote."""
     db = open_index(tmp_path / "idx.db")
     try:
         run = _make_run_dir(tmp_path, "p", "r11")
@@ -163,7 +163,7 @@ def test_force_promote_preserves_provider_model_deadline(tmp_path: Path) -> None
                 deadline_at="2026-01-01T00:00:00+00:00",
             ),
         )
-        _upsert_from_status(db, run, project_uuid="p", run_id="r11")
+        upsert_from_status(db, run, project_uuid="p", run_id="r11")
 
         promoted = force_promote_to_cancelled_stale(db, "ext-r11", run_dir=run)
         assert promoted is True

@@ -71,8 +71,8 @@ signal of clean inspection — still an open question).
 
 Both consult a single function so two call sites can never drift apart
 (a class of bug hit repeatedly before centralisation): `accumulated._compute_result`
-and `_fs_metadata._read_accumulated_summary` both call
-`select_default_view_runs`; `_dashboard_history._compute_dashboard_payload`
+and `_fs_metadata.read_accumulated_summary` both call
+`select_default_view_runs`; `_dashboard_history.compute_dashboard_payload`
 and `scoring.get_project_scores` both call `select_trend_runs`.
 
 ---

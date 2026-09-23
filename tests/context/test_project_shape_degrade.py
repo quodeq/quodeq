@@ -22,7 +22,7 @@ class TestPathologicalManifestsDegrade:
     """
 
     def test_deeply_nested_package_json(self, tmp_path: Path, deeply_nested_json: str) -> None:
-        # _read_json caught only json.JSONDecodeError. Nesting deep enough to
+        # read_json caught only json.JSONDecodeError. Nesting deep enough to
         # exhaust the C decoder's call stack raises RecursionError instead --
         # a RuntimeError subclass, so it escaped.
         _write(tmp_path / "package.json", deeply_nested_json)
@@ -31,12 +31,12 @@ class TestPathologicalManifestsDegrade:
     def test_deeply_nested_pyproject_toml(self, tmp_path: Path) -> None:
         # Same class through tomllib, which is a pure-Python recursive-descent
         # parser and so overflows at a much shallower depth than the C JSON
-        # decoder. _read_toml caught only OSError/TOMLDecodeError.
+        # decoder. read_toml caught only OSError/TOMLDecodeError.
         _write(tmp_path / "pyproject.toml", "a = " + "[" * 5000 + "]" * 5000)
         assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
 
     def test_deeply_nested_cargo_toml(self, tmp_path: Path) -> None:
-        # _rust_signals shares _read_toml, so Cargo.toml is the same hole.
+        # rust_signals shares read_toml, so Cargo.toml is the same hole.
         _write(tmp_path / "Cargo.toml", "a = " + "[" * 5000 + "]" * 5000)
         assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
 
@@ -44,7 +44,7 @@ class TestPathologicalManifestsDegrade:
         """Not a RecursionError, and not fixed by widening the readers.
 
         ``dependencies = 5`` parses as perfectly valid TOML, so every reader
-        succeeds; _python_signals then did ``list(deps_list)`` on an int and
+        succeeds; python_signals then did ``list(deps_list)`` on an int and
         raised TypeError. Guarding only the readers would leave this escape
         open, which is the whole point of fixing detect_shape at the source
         rather than wrapping each caller.

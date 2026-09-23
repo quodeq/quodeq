@@ -9,7 +9,7 @@ that produces a finding. Enforcing that by convention has failed twice:
   ``apply_scope_gate`` for the same reason, and needed the same fix again.
 
 Both were one shape: a code path nobody enumerated. Three sinks exist today --
-``FindingEnricher.enrich`` (live), ``_write_findings`` (cache replay) and
+``FindingEnricher.enrich`` (live), ``write_findings`` (cache replay) and
 ``checks.runner`` (deterministic checkers) -- and the only thing that stopped
 the third from being a third instance of that bug was that no shipped standard
 declares a ``check`` on a gated requirement yet.

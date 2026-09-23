@@ -7,7 +7,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_FORBIDDEN, ERROR_CODE_NOT_FOUND
-from quodeq.api.helpers import _json_object_or_error, error_response
+from quodeq.api.helpers import json_object_or_error, error_response
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def _handle_create(get_service, app: Flask) -> tuple[Response, int]:
     """Handle POST /api/standards -- create a new standard."""
     svc = get_service(app)
-    payload = _json_object_or_error()
+    payload = json_object_or_error()
     if not isinstance(payload, dict):
         return payload
     standard_id = payload.get("id")

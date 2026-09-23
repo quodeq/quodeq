@@ -10,11 +10,11 @@ from quodeq.core.types import Finding, ViolationResponse
 from quodeq.core.stream.events import TEXT_EXTRACTORS, extract_files_from_event
 from quodeq.services.violation_context import ViolationContext
 from quodeq.services._violations_shared import (
-    _build_finding_entry,
-    _build_violation_response,
-    _ResponseOptions,
-    _FINDING_TYPES,
-    _TYPE_VIOLATION,
+    build_finding_entry,
+    build_violation_response,
+    ResponseOptions,
+    FINDING_TYPES,
+    TYPE_VIOLATION,
 )
 from quodeq.shared.utils import open_text
 
@@ -31,13 +31,13 @@ def _try_parse_text_line(
         obj = json.loads(stripped_line)
     except json.JSONDecodeError:
         return None
-    if not obj.get("p") or obj.get("t") not in _FINDING_TYPES:
+    if not obj.get("p") or obj.get("t") not in FINDING_TYPES:
         return None
     key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}:{obj['t']}"
     if key in seen:
         return None
     seen.add(key)
-    entry = _build_finding_entry(obj, dimension)
+    entry = build_finding_entry(obj, dimension)
     if entry.snippet:
         entry = replace(entry, snippet=str(entry.snippet).strip())
     return obj["t"], entry
@@ -55,7 +55,7 @@ def _parse_entries_from_texts(
             if result is None:
                 continue
             finding_type, entry = result
-            if finding_type == _TYPE_VIOLATION:
+            if finding_type == TYPE_VIOLATION:
                 violations.append(entry)
             else:
                 compliance.append(entry)
@@ -99,9 +99,9 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> Vi
         _logger.warning("Failed to read stream file: %s", exc)
         return None
 
-    return _build_violation_response(
+    return build_violation_response(
         ctx, acc.violations, acc.compliance,
-        _ResponseOptions(
+        ResponseOptions(
             partial=True,
             progress={"filesRead": len(acc.files_read), "violations": len(acc.violations), "compliance": len(acc.compliance)},
         ),

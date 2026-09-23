@@ -1,5 +1,5 @@
 """Operational helpers extracted from the facade purely to fit the file-size
-cap: _WindowApi's HTTP/native-dialog bodies, the reload-socket handler, and
+cap: WindowApi's HTTP/native-dialog bodies, the reload-socket handler, and
 process teardown. None of this is patch-tested by name — tests patch
 urllib.request.urlopen directly (a global module attribute, patching the
 real shared module rather than a name in some namespace) and the underlying
@@ -30,7 +30,7 @@ _CANCEL_TIMEOUT_S = 5.0
 _DOWNLOAD_TIMEOUT_S = 120
 
 
-def _fetch_running_evaluation(base_url: str) -> dict | None:
+def fetch_running_evaluation(base_url: str) -> dict | None:
     """Return the first non-stale running evaluation job, or None.
 
     The staleness rule (a "running" record whose project no longer exists is
@@ -49,7 +49,7 @@ def _fetch_running_evaluation(base_url: str) -> dict | None:
     return job if isinstance(job, dict) else None
 
 
-def _send_cancel_evaluation(base_url: str, job_id: str | None) -> None:
+def send_cancel_evaluation(base_url: str, job_id: str | None) -> None:
     """Issue DELETE /api/evaluations/<job_id> to stop a running scan.
 
     The API enforces an Origin header to reject cross-site requests, so set
@@ -91,7 +91,7 @@ def _ask_save_path(window: object, filename: str) -> str | None:
     return path or None
 
 
-def _save_via_dialog(window: object, content: str, filename: str) -> bool:
+def save_via_dialog(window: object, content: str, filename: str) -> bool:
     """Open a native Save dialog and write content to the chosen path."""
     if not window:
         return False
@@ -105,7 +105,7 @@ def _save_via_dialog(window: object, content: str, filename: str) -> bool:
         return False
 
 
-def _download_via_dialog(window: object, base_url: str, path: str, filename: str) -> bool:
+def download_via_dialog(window: object, base_url: str, path: str, filename: str) -> bool:
     """Fetch a URL from the API and save it via native Save dialog."""
     if not window or not base_url:
         return False
@@ -114,7 +114,7 @@ def _download_via_dialog(window: object, base_url: str, path: str, filename: str
         return False
     try:
         url = urllib.parse.urljoin(base_url, path)
-        if not _is_safe_reload_url(url):
+        if not is_safe_reload_url(url):
             return False
         with urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT_S) as resp:
             Path(save_path).write_bytes(resp.read())
@@ -128,7 +128,7 @@ def _download_via_dialog(window: object, base_url: str, path: str, filename: str
         return False
 
 
-def _kill_api(pid: int) -> None:
+def kill_api(pid: int) -> None:
     """Terminate the Flask API process."""
     try:
         sig = signal.SIGTERM if sys.platform != "win32" else signal.CTRL_BREAK_EVENT
@@ -137,7 +137,7 @@ def _kill_api(pid: int) -> None:
         _logger.debug("action API process already gone or not killable: %s", exc)
 
 
-def _is_safe_reload_url(url: str) -> bool:
+def is_safe_reload_url(url: str) -> bool:
     """Return True only when *url* points to the local dashboard origin.
 
     Rejects anything that is not http/https on 127.0.0.1, localhost, or ::1
@@ -166,10 +166,10 @@ def _current_url(window: object) -> str | None:
     except Exception:  # noqa: BLE001 — backend-specific; the window may be mid-teardown
         _logger.debug("get_current_url failed; focusing without reload", exc_info=True)
         return None
-    return url if isinstance(url, str) and _is_safe_reload_url(url) else None
+    return url if isinstance(url, str) and is_safe_reload_url(url) else None
 
 
-def _make_on_reload(window: object) -> "Callable[[str], None]":
+def make_on_reload(window: object) -> "Callable[[str], None]":
     """Return the ``_on_reload`` handler bound to *window*.
 
     Extracted from ``main()`` so the test suite can import and exercise the
@@ -181,7 +181,7 @@ def _make_on_reload(window: object) -> "Callable[[str], None]":
     raise the window either way.
     """
     def _on_reload(new_url: str) -> None:
-        if new_url and not _is_safe_reload_url(new_url):
+        if new_url and not is_safe_reload_url(new_url):
             _logger.warning("Ignoring unsafe reload URL: %s", new_url)
             return
         target = new_url or _current_url(window)

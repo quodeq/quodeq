@@ -1,4 +1,4 @@
-"""Tests for source file gathering — _gather_source_files and skip dirs from subprocess.py."""
+"""Tests for source file gathering — gather_source_files and skip dirs from subprocess.py."""
 from __future__ import annotations
 
 import os
@@ -7,21 +7,21 @@ from quodeq.analysis import _api_standards_text, dispatch_policy
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subprocess import (
-    _gather_api_source_files,
-    _gather_source_files,
-    _SKIP_DIRS,
+    gather_api_source_files,
+    gather_source_files,
+    SKIP_DIRS,
 )
 
 
 # ---------------------------------------------------------------------------
-# _gather_source_files
+# gather_source_files
 # ---------------------------------------------------------------------------
 
 class TestGatherSourceFiles:
     def test_collects_code_files(self, tmp_path):
         (tmp_path / "main.py").write_text("x = 1")
         (tmp_path / "app.js").write_text("const x = 1;")
-        result = _gather_source_files(tmp_path)
+        result = gather_source_files(tmp_path)
         names = {f.name for f in result}
         assert "main.py" in names
         assert "app.js" in names
@@ -33,7 +33,7 @@ class TestGatherSourceFiles:
             (tmp_path / f"m{i}.py").write_text("x = 1\n")
         calls = {"cap": 0, "budget": 0}
         real_cap = dispatch_policy.api_file_size_cap
-        real_budget = _api_standards_text._api_prompt_char_budget
+        real_budget = _api_standards_text.api_prompt_char_budget
 
         def counting_cap(env=None):
             calls["cap"] += 1
@@ -44,8 +44,8 @@ class TestGatherSourceFiles:
             return real_budget(env)
 
         monkeypatch.setattr(dispatch_policy, "api_file_size_cap", counting_cap)
-        monkeypatch.setattr(_api_standards_text, "_api_prompt_char_budget", counting_budget)
-        assert len(_gather_source_files(tmp_path)) == 6
+        monkeypatch.setattr(_api_standards_text, "api_prompt_char_budget", counting_budget)
+        assert len(gather_source_files(tmp_path)) == 6
         assert calls == {"cap": 1, "budget": 1}
 
     def test_skips_dotdirs(self, tmp_path):
@@ -53,7 +53,7 @@ class TestGatherSourceFiles:
         hidden.mkdir()
         (hidden / "secret.py").write_text("x = 1")
         (tmp_path / "visible.py").write_text("y = 2")
-        result = _gather_source_files(tmp_path)
+        result = gather_source_files(tmp_path)
         names = {f.name for f in result}
         assert "secret.py" not in names
         assert "visible.py" in names
@@ -63,7 +63,7 @@ class TestGatherSourceFiles:
         nm.mkdir(parents=True)
         (nm / "index.js").write_text("module.exports = {};")
         (tmp_path / "app.js").write_text("const x = 1;")
-        result = _gather_source_files(tmp_path)
+        result = gather_source_files(tmp_path)
         names = {f.name for f in result}
         assert "index.js" not in names
         assert "app.js" in names
@@ -71,7 +71,7 @@ class TestGatherSourceFiles:
     def test_skips_empty_files(self, tmp_path):
         (tmp_path / "empty.py").write_text("")
         (tmp_path / "real.py").write_text("x = 1")
-        result = _gather_source_files(tmp_path)
+        result = gather_source_files(tmp_path)
         names = {f.name for f in result}
         assert "empty.py" not in names
         assert "real.py" in names
@@ -79,7 +79,7 @@ class TestGatherSourceFiles:
     def test_skips_oversized_files(self, tmp_path):
         (tmp_path / "big.py").write_text("x" * 20_000)
         (tmp_path / "small.py").write_text("y = 1")
-        result = _gather_source_files(tmp_path)
+        result = gather_source_files(tmp_path)
         names = {f.name for f in result}
         assert "big.py" not in names
         assert "small.py" in names
@@ -89,7 +89,7 @@ class TestGatherSourceFiles:
         for i in range(4):
             (tmp_path / f"mod{i}.py").write_text("x" * 10_000)
         (tmp_path / "style.css").write_text("b" * 10_000)
-        result = _gather_source_files(tmp_path)
+        result = gather_source_files(tmp_path)
         # Code files should be prioritized over markup
         code_count = sum(1 for f in result if f.suffix == ".py")
         markup_count = sum(1 for f in result if f.suffix == ".css")
@@ -99,14 +99,14 @@ class TestGatherSourceFiles:
         # Create many files that exceed budget
         for i in range(50):
             (tmp_path / f"mod{i}.py").write_text("x" * 1000)
-        result = _gather_source_files(tmp_path)
+        result = gather_source_files(tmp_path)
         total = sum(f.stat().st_size for f in result)
         assert total <= 30_000
 
     def test_includes_markup_files(self, tmp_path):
         (tmp_path / "page.html").write_text("<html></html>")
         (tmp_path / "style.css").write_text("body{}")
-        result = _gather_source_files(tmp_path)
+        result = gather_source_files(tmp_path)
         names = {f.name for f in result}
         assert "page.html" in names
         assert "style.css" in names
@@ -125,13 +125,13 @@ class TestGatherSourceFiles:
             return real_scandir(path, *a, **k)
 
         monkeypatch.setattr(os, "scandir", spy)
-        files = _gather_source_files(tmp_path)
+        files = gather_source_files(tmp_path)
         assert [f.name for f in files] == ["a.py"]
         assert not any("node_modules" in v for v in visited)
 
 
 # ---------------------------------------------------------------------------
-# _SKIP_DIRS
+# SKIP_DIRS
 # ---------------------------------------------------------------------------
 
 class TestGatherApiSourceFiles:
@@ -156,7 +156,7 @@ class TestGatherApiSourceFiles:
         stream_file = evidence_dir / "agent.stream"
         cfg = AnalysisConfig(queue_path=queue_path, agent_id="agent-1")
 
-        result = _gather_api_source_files(tmp_path, cfg, jsonl_file, stream_file)
+        result = gather_api_source_files(tmp_path, cfg, jsonl_file, stream_file)
 
         assert result is None
         content = jsonl_file.read_text()
@@ -171,6 +171,6 @@ class TestGatherApiSourceFiles:
 
 class TestLoadSkipDirs:
     def test_returns_frozenset(self):
-        assert isinstance(_SKIP_DIRS, frozenset)
+        assert isinstance(SKIP_DIRS, frozenset)
         # Should at minimum contain common dirs
-        assert "node_modules" in _SKIP_DIRS or len(_SKIP_DIRS) > 0
+        assert "node_modules" in SKIP_DIRS or len(SKIP_DIRS) > 0

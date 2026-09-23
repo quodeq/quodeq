@@ -1,4 +1,4 @@
-"""Extended tests for _api_runner.py: _call_api parsing, lossy flags and response_format."""
+"""Extended tests for _api_runner.py: call_api parsing, lossy flags and response_format."""
 from __future__ import annotations
 
 import logging
@@ -10,11 +10,11 @@ pytest.importorskip("openai", reason="requires the openai SDK")
 
 import httpx
 
-from quodeq.analysis._api_runner import ApiRunnerConfig, _call_api
+from quodeq.analysis._api_runner import ApiRunnerConfig, call_api
 
 
 # ---------------------------------------------------------------------------
-# _call_api
+# call_api
 # ---------------------------------------------------------------------------
 
 def _mock_response(content: str) -> MagicMock:
@@ -54,7 +54,7 @@ class TestCallApi:
             else:
                 client.chat.completions.create.return_value = _mock_response(content)
             mock_oa.return_value.__enter__.return_value = client
-            findings, lossy = _call_api("prompt", config or _local_config())
+            findings, lossy = call_api("prompt", config or _local_config())
             return findings, lossy, mock_oa, client
 
     def test_clean_wrapped_array(self):

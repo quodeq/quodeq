@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from quodeq.api._run_event_stream import (
     WatcherState,
-    _payload_as_sse_finding,
+    payload_as_sse_finding,
     serialize_status_event,
     serialize_dimension_event,
     serialize_finding_event,
@@ -74,7 +74,7 @@ def test_payload_as_sse_finding_includes_provenance_downgrade():
         file="f.py", line=1, reason="r", severity="major",
         provenance_downgrade=True,
     )
-    payload = _payload_as_sse_finding(j, finding_id=1)
+    payload = payload_as_sse_finding(j, finding_id=1)
     assert payload["provenance_downgrade"] is True
 
 
@@ -87,7 +87,7 @@ def test_payload_as_sse_finding_includes_carried_forward():
         file="f.py", line=1, reason="r", severity="major",
         carried_forward=True,
     )
-    payload = _payload_as_sse_finding(j, finding_id=1)
+    payload = payload_as_sse_finding(j, finding_id=1)
     assert payload["carried_forward"] is True
 
 
@@ -97,7 +97,7 @@ def test_payload_as_sse_finding_defaults_carried_forward_false():
         practice_id="R-FT-2", verdict="violation", dimension="security",
         file="f.py", line=1, reason="r", severity="major",
     )
-    payload = _payload_as_sse_finding(j, finding_id=1)
+    payload = payload_as_sse_finding(j, finding_id=1)
     assert payload["carried_forward"] is False
 
 
@@ -111,7 +111,7 @@ def test_payload_as_sse_finding_includes_scope_downgrade():
         file="f.py", line=1, reason="r", severity="minor",
         scope_downgrade={"rule": "sourceless_path", "from": "major", "to": "minor"},
     )
-    payload = _payload_as_sse_finding(j, finding_id=1)
+    payload = payload_as_sse_finding(j, finding_id=1)
     assert payload["scope_downgrade"] == {
         "rule": "sourceless_path", "from": "major", "to": "minor",
     }
@@ -123,7 +123,7 @@ def test_payload_as_sse_finding_defaults_scope_downgrade_none():
         practice_id="R-FT-2", verdict="violation", dimension="security",
         file="f.py", line=1, reason="r", severity="major",
     )
-    payload = _payload_as_sse_finding(j, finding_id=1)
+    payload = payload_as_sse_finding(j, finding_id=1)
     assert payload["scope_downgrade"] is None
 
 

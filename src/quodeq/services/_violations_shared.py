@@ -14,26 +14,26 @@ from quodeq.core.types import Finding, ProgressInfo, ViolationResponse
 from quodeq.core.evidence.parser import resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base
 
-_TYPE_VIOLATION = "violation"
-_TYPE_COMPLIANCE = "compliance"
-_FINDING_TYPES = frozenset({_TYPE_VIOLATION, _TYPE_COMPLIANCE})
+TYPE_VIOLATION = "violation"
+TYPE_COMPLIANCE = "compliance"
+FINDING_TYPES = frozenset({TYPE_VIOLATION, TYPE_COMPLIANCE})
 
 
 @dataclass(frozen=True)
-class _ResponseOptions:
-    """Keyword-only parameters for _build_violation_response."""
+class ResponseOptions:
+    """Keyword-only parameters for build_violation_response."""
     partial: bool = False
     progress: dict[str, int] | None = None
 
 
-def _build_violation_response(
+def build_violation_response(
     ctx: ViolationContext,
     violations: list[Finding],
     compliance: list[Finding],
-    options: _ResponseOptions | None = None,
+    options: ResponseOptions | None = None,
 ) -> ViolationResponse:
     """Build the common ViolationResponse for violation/compliance parse results."""
-    opts = options or _ResponseOptions()
+    opts = options or ResponseOptions()
     progress: ProgressInfo | None = None
     if opts.progress is not None:
         progress = ProgressInfo(
@@ -52,7 +52,7 @@ def _build_violation_response(
     )
 
 
-def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None) -> Finding:
+def build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None) -> Finding:
     """Build a normalized finding from a raw JSON object."""
     req = obj.get("req")
     # Prefer MCP-enriched req_refs (already filtered to best-match);

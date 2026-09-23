@@ -13,7 +13,7 @@ from typing import Any
 from quodeq.analysis.subagents._git_scoring import compute_git_scores
 from quodeq.analysis.subagents.priority_config import (
     ScoringInputs,
-    _LANG_ALIASES,
+    LANG_ALIASES,
     load_priority_config,
     reset_priority_config_cache,
 )
@@ -27,7 +27,7 @@ from quodeq.core.observability import NULL_LOG, LogSink
 
 # Re-export everything that consumers import from this module
 __all__ = [
-    "_LANG_ALIASES",
+    "LANG_ALIASES",
     "ScoringInputs",
     "compute_base_score",
     "compute_dimension_boost",

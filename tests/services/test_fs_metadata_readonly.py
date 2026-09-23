@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.fs.report_parser._run_info import RunInfo
-from quodeq.services._fs_metadata import _compute_summary, _read_accumulated_summary, warm_project_summary
+from quodeq.services._fs_metadata import _compute_summary, read_accumulated_summary, warm_project_summary
 
 
 def _project(tmp_path: Path, name: str = "proj") -> Path:
@@ -34,7 +34,7 @@ def test_miss_returns_pending_without_computing(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     _project(tmp_path)
     with patch("quodeq.services._fs_metadata._compute_summary") as compute:
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _runs(), DEFAULT_PARAMS)
     compute.assert_not_called()
     assert (grade, score, files, pending) == (None, None, None, True)
@@ -47,7 +47,7 @@ def test_no_complete_runs_is_not_pending(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     _project(tmp_path)
     with patch("quodeq.services._fs_metadata._compute_summary") as compute:
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", [], DEFAULT_PARAMS)
     compute.assert_not_called()
     assert (grade, score, files, pending) == (None, None, None, False)
@@ -62,7 +62,7 @@ def test_cancelled_only_miss_returns_pending_without_computing(tmp_path, monkeyp
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     _project(tmp_path)
     with patch("quodeq.services._fs_metadata._compute_summary") as compute:
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _cancelled_runs(), DEFAULT_PARAMS)
     compute.assert_not_called()
     assert (grade, score, files, pending) == (None, None, None, True)
@@ -83,7 +83,7 @@ def test_warm_cancelled_only_then_read_hits_without_pending(tmp_path, monkeypatc
     ):
         warm_project_summary(tmp_path, "proj")
         assert compute.call_count == 1
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _cancelled_runs(), DEFAULT_PARAMS)
     assert (grade, score, files, pending) == ("D", 4.0, 2, False)
     assert compute.call_count == 1  # the read did not recompute
@@ -100,7 +100,7 @@ def test_warm_then_read_hits_without_pending(tmp_path, monkeypatch):
     ):
         warm_project_summary(tmp_path, "proj")
         assert compute.call_count == 1
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _runs(), DEFAULT_PARAMS)
     assert (grade, score, files, pending) == ("B", 7.5, 10, False)
     assert compute.call_count == 1  # the read did not recompute
@@ -115,7 +115,7 @@ def test_compute_on_miss_keeps_inline_behavior_for_shared_path(tmp_path, monkeyp
         "quodeq.services._fs_metadata._compute_summary",
         return_value={"grade": "C", "score": 5.0, "files": 4},
     ) as compute:
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _runs(), DEFAULT_PARAMS, compute_on_miss=True)
     compute.assert_called_once()
     assert (grade, score, files, pending) == ("C", 5.0, 4, False)
@@ -128,7 +128,7 @@ def test_kill_switch_keeps_inline_compute(tmp_path, monkeypatch):
         "quodeq.services._fs_metadata._compute_summary",
         return_value={"grade": "A", "score": 9.0, "files": 3},
     ):
-        grade, score, files, pending = _read_accumulated_summary(
+        grade, score, files, pending = read_accumulated_summary(
             tmp_path, "proj", _runs(), DEFAULT_PARAMS)
     assert (grade, score, files, pending) == ("A", 9.0, 3, False)
 

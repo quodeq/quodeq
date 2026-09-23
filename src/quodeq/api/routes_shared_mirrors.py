@@ -32,7 +32,7 @@ from quodeq.services.shared_repo import (
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.serialization import to_camel_dict
 
-from .routes_shared_common import _logger, _validate_segment, _with_shared_root
+from .routes_shared_common import logger, validate_segment, with_shared_root
 
 
 def _shared_projects(
@@ -84,18 +84,18 @@ def _load_or_500(
     try:
         return load(), None
     except Exception:
-        _logger.exception(log_msg, project)
+        logger.exception(log_msg, project)
         return None, json_error(error_msg, HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
 
 
-@_with_shared_root
+@with_shared_root
 def shared_project_info(project: str, eval_root: Path, url: str):
     """Return the shared clone's project card, enriched with who published it.
 
     The publishedBy/publishedAt fields have no local counterpart; the UI's
     shared-project hero badge needs them.
     """
-    err = _validate_segment(project)
+    err = validate_segment(project)
     if err:
         return err
     info, err = _load_or_500(
@@ -117,10 +117,10 @@ def shared_project_info(project: str, eval_root: Path, url: str):
     return jsonify(info)
 
 
-@_with_shared_root
+@with_shared_root
 def shared_runs(project: str, eval_root: Path, url: str):
     """Return the shared clone's run history for a project, for the run picker."""
-    err = _validate_segment(project)
+    err = validate_segment(project)
     if err:
         return err
     runs, err = _load_or_500(
@@ -132,10 +132,10 @@ def shared_runs(project: str, eval_root: Path, url: str):
     return jsonify({"runs": runs})
 
 
-@_with_shared_root
+@with_shared_root
 def shared_dashboard(project: str, eval_root: Path):
     """Return one run's dashboard payload from the shared clone. ``?run=`` defaults to latest."""
-    err = _validate_segment(project)
+    err = validate_segment(project)
     if err:
         return err
     run = request.args.get("run", "latest")
@@ -146,10 +146,10 @@ def shared_dashboard(project: str, eval_root: Path):
     return jsonify(payload)
 
 
-@_with_shared_root
+@with_shared_root
 def shared_accumulated(project: str, eval_root: Path):
     """Return the shared clone's accumulated-score history, optionally cut at ``?asOf=``."""
-    err = _validate_segment(project)
+    err = validate_segment(project)
     if err:
         return err
     as_of = request.args.get("asOf")
@@ -159,10 +159,10 @@ def shared_accumulated(project: str, eval_root: Path):
     return jsonify(payload)
 
 
-@_with_shared_root
+@with_shared_root
 def shared_scores(project: str, eval_root: Path):
     """Return the shared clone's per-dimension scores, optionally cut at ``?asOf=``."""
-    err = _validate_segment(project)
+    err = validate_segment(project)
     if err:
         return err
     as_of = request.args.get("asOf")
@@ -177,10 +177,10 @@ def shared_scores(project: str, eval_root: Path):
     return jsonify(result)
 
 
-@_with_shared_root
+@with_shared_root
 def shared_compare_summary(project: str, eval_root: Path):
     """Return the run-over-run comparison for a shared project, for the compare view."""
-    err = _validate_segment(project)
+    err = validate_segment(project)
     if err:
         return err
     result, err = _load_or_500(
@@ -195,10 +195,10 @@ def shared_compare_summary(project: str, eval_root: Path):
     return jsonify(result)
 
 
-@_with_shared_root
+@with_shared_root
 def shared_run_scores(project: str, run_id: str, eval_root: Path):
     """Return one shared run's scores in the slim shape the run picker renders."""
-    err = _validate_segment(project, run_id)
+    err = validate_segment(project, run_id)
     if err:
         return err
     try:
@@ -208,7 +208,7 @@ def shared_run_scores(project: str, run_id: str, eval_root: Path):
     return jsonify(result)
 
 
-@_with_shared_root
+@with_shared_root
 def shared_dimension_eval(project: str, dim: str, eval_root: Path):
     """Return one dimension's evaluation from the shared clone.
 
@@ -216,7 +216,7 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
     UI polls instead of showing an error.
     """
     run_id = request.args.get("run", "latest")
-    err = _validate_segment(project, dim, run_id)
+    err = validate_segment(project, dim, run_id)
     if err:
         return err
     payload = fs_reports.get_dimension_eval(str(eval_root), project, run_id, dim)
@@ -227,11 +227,11 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
     return jsonify(payload)
 
 
-@_with_shared_root
+@with_shared_root
 def shared_violations(project: str, eval_root: Path):
     """Return one shared run's violations, camelCased for the UI."""
     run_id = request.args.get("run", "latest")
-    err = _validate_segment(project, run_id)
+    err = validate_segment(project, run_id)
     if err:
         return err
     try:
@@ -255,7 +255,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
     from quodeq.api import routes_shared as _routes_shared
 
     @app.get("/api/shared/projects")
-    @_with_shared_root
+    @with_shared_root
     def shared_projects(eval_root: Path, url: str):
         return _shared_projects(
             eval_root, url, _routes_shared.refresh_shared_clone, _routes_shared.sync_shared_index,

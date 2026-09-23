@@ -6,7 +6,7 @@ from __future__ import annotations
 from quodeq.services._job_model import (
     Job,
     InMemoryJobStore,
-    _MAX_LOG_LINES,
+    MAX_LOG_LINES,
     REPORT_PATH_RE,
 )
 
@@ -31,12 +31,12 @@ class TestJob:
 
     def test_log_rolling_buffer(self):
         job = self._make_job()
-        for i in range(_MAX_LOG_LINES + 50):
+        for i in range(MAX_LOG_LINES + 50):
             job.logs.append(f"line {i}")
-        assert len(job.logs) == _MAX_LOG_LINES
+        assert len(job.logs) == MAX_LOG_LINES
         # Oldest lines should have been evicted
         assert "line 0" not in job.logs
-        assert f"line {_MAX_LOG_LINES + 49}" in job.logs
+        assert f"line {MAX_LOG_LINES + 49}" in job.logs
 
     def test_to_dict_returns_snapshot(self):
         job = self._make_job(

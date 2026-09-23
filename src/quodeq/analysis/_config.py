@@ -15,9 +15,9 @@ HeartbeatCallback = Callable[[int, dict], None]
 
 _DEFAULT_MAX_FILES_PER_AGENT = 30
 
-_MCP_TOOL_REPORT_FINDING = "mcp__findings__report_finding"
-_MCP_TOOL_GET_NEXT_FILES = "mcp__findings__get_next_files"
-_MCP_TOOL_MARK_FILE_DONE = "mcp__findings__mark_file_done"
+MCP_TOOL_REPORT_FINDING = "mcp__findings__report_finding"
+MCP_TOOL_GET_NEXT_FILES = "mcp__findings__get_next_files"
+MCP_TOOL_MARK_FILE_DONE = "mcp__findings__mark_file_done"
 
 
 @dataclass(frozen=True)
@@ -52,7 +52,7 @@ class AnalysisConfig:
 
 
 @dataclass(frozen=True)
-class _AgentParams:
+class AgentParams:
     """Optional grouping of per-agent MCP config parameters."""
     queue_path: Path | None = None
     agent_id: str = ""
@@ -73,7 +73,7 @@ class _AgentParams:
 
 
 @dataclass(frozen=True)
-class _SpawnPaths:
+class SpawnPaths:
     """Paths for the AI CLI subprocess stdout/stderr capture files."""
     stream_file: Path
     stream_err: Path

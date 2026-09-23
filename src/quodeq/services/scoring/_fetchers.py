@@ -22,12 +22,12 @@ from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.shared.env import env_int
 
 
-def _max_history_runs() -> int:
+def max_history_runs() -> int:
     """Read max history runs from env at call time for lazy configuration."""
     return env_int("QUODEQ_MAX_HISTORY_RUNS", 100, minimum=1)
 
 
-def _make_trend_fetcher(
+def make_scoring_trend_fetcher(
     reports_root: Path, project: str,
     params: ScoringParams = DEFAULT_PARAMS,
     cacheable_run_ids: set[str] | None = None,
@@ -49,6 +49,6 @@ def _make_trend_fetcher(
             read_run_scalars=d.read_run_scalars or read_run_scalars,
             dismissed_keys=d.dismissed_keys or dismissed_keys,
             deleted_keys=d.deleted_keys or deleted_keys,
-            max_history=_max_history_runs(),
+            max_history=max_history_runs(),
         ),
     )

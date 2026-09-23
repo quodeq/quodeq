@@ -1,12 +1,12 @@
 """Request plumbing for assistant routes: repo/context construction, busy check.
 
 Split into three modules plus this thin facade:
-  - _assistant_hygiene.py: ``run_assistant_hygiene``, ``_session_ttl_days``,
+  - _assistant_hygiene.py: ``run_assistant_hygiene``, ``session_ttl_days``,
     ``SharedSourceUnavailable``.
   - _assistant_location.py: ``resolve_run_location``,
     ``resolve_shared_run_location``, ``repo_attach_info``,
     ``resolve_repo_root``.
-  - _assistant_events.py: ``event_frames``, ``_POLL_SECONDS``, ``_IDLE_LIMIT``.
+  - _assistant_events.py: ``event_frames``, ``POLL_SECONDS``, ``IDLE_LIMIT``.
 
 The moved names stay imported here (re-exported) so callers across the
 codebase and tests can keep patching/importing "quodeq.api._assistant_helpers.
@@ -37,7 +37,7 @@ from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
 
 from quodeq.api._assistant_hygiene import (  # noqa: F401 — re-export/patch target
     SharedSourceUnavailable,
-    _session_ttl_days,
+    session_ttl_days,
     run_assistant_hygiene,
 )
 from quodeq.api._assistant_location import (  # noqa: F401 — re-export/patch target
@@ -47,8 +47,8 @@ from quodeq.api._assistant_location import (  # noqa: F401 — re-export/patch t
     resolve_shared_run_location,
 )
 from quodeq.api._assistant_events import (  # noqa: F401 — re-export/patch target
-    _IDLE_LIMIT,
-    _POLL_SECONDS,
+    IDLE_LIMIT,
+    POLL_SECONDS,
     event_frames,
 )
 

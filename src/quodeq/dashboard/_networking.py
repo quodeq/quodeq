@@ -7,12 +7,12 @@ from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 
 _DEFAULT_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
-_MAX_PORT_SCAN_TRIES = 20
+MAX_PORT_SCAN_TRIES = 20
 _PORT_CHECK_TIMEOUT_S = 2
 _MAX_PORT = 65535
 
 
-def _local_hosts(
+def local_host_names(
     env: dict[str, str] | None = None,
     defaults: frozenset[str] | None = None,
 ) -> frozenset[str]:
@@ -23,25 +23,25 @@ def _local_hosts(
     return frozenset(base)
 
 
-def _is_port_open(host: str, port: int) -> bool:
+def port_is_open(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(_PORT_CHECK_TIMEOUT_S)
         return sock.connect_ex((host, port)) == 0
 
 
-def _choose_ui_port(start: int, host: str | None = None) -> int:
+def choose_ui_port(start: int, host: str | None = None) -> int:
     host = host if host is not None else _get_default_host()
     port = start
     tries = 0
-    while _is_port_open(host, port):
+    while port_is_open(host, port):
         port += 1
         tries += 1
-        if tries >= _MAX_PORT_SCAN_TRIES or port > _MAX_PORT:
+        if tries >= MAX_PORT_SCAN_TRIES or port > _MAX_PORT:
             raise RuntimeError("No free port available.")
     return port
 
 
-def _allow_plaintext_http(
+def allow_plaintext_http(
     override: bool | None = None, env: dict[str, str] | None = None,
 ) -> bool:
     """Return True if plaintext HTTP to non-localhost is allowed.

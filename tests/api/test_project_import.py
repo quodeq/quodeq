@@ -8,7 +8,7 @@ import zipfile
 
 import pytest
 
-from quodeq.api.zip import _MANIFEST_FILENAME, _MANIFEST_KIND, _MANIFEST_SCHEMA
+from quodeq.api.zip import MANIFEST_FILENAME, MANIFEST_KIND, MANIFEST_SCHEMA
 from tests.api._project_import_fixtures import (  # noqa: F401 -- app_client is a pytest fixture
     _ORIGIN,
     _make_zip,
@@ -94,9 +94,9 @@ def test_import_rejects_backslashes_in_member_name():
     directory, so a HTTP-level test can't exercise this branch on Windows.
     Test the validator directly instead.
     """
-    from quodeq.api.import_project import _ImportError, _validate_member_name
-    with pytest.raises(_ImportError) as exc:
-        _validate_member_name("uuid\\repository_info.json")
+    from quodeq.api.import_project import ImportValidationError, validate_member_name
+    with pytest.raises(ImportValidationError) as exc:
+        validate_member_name("uuid\\repository_info.json")
     assert "backslash" in str(exc.value).lower()
 
 
@@ -138,9 +138,9 @@ def test_import_rejects_missing_repository_info(app_client):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         manifest = {
-            "schema": _MANIFEST_SCHEMA, "kind": _MANIFEST_KIND, "source_uuid": project_uuid,
+            "schema": MANIFEST_SCHEMA, "kind": MANIFEST_KIND, "source_uuid": project_uuid,
         }
-        zf.writestr(f"{project_uuid}/{_MANIFEST_FILENAME}", json.dumps(manifest))
+        zf.writestr(f"{project_uuid}/{MANIFEST_FILENAME}", json.dumps(manifest))
     with _patch_home(home):
         resp = _post_zip(c, buf.getvalue())
     assert resp.status_code == 400

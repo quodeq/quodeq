@@ -16,7 +16,7 @@ from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
 from quodeq.analysis.prompts.builder import build_consolidated_prompt, prompt_context
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
-from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
+from quodeq.analysis.subagents._pool_launcher import default_subagent_model, compute_files_per_agent
 from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.analysis.runner_markers import cleanup_stream
 from quodeq.core.observability import NULL_LOG, LogSink
@@ -44,7 +44,7 @@ def _build_consolidated_config(
     compiled_dir: "Path | None" = None,
 ) -> AnalysisConfig:
     """Build AnalysisConfig for consolidated mode."""
-    subagent_model = config.options.subagent_model or _default_subagent_model() or config.options.ai_model
+    subagent_model = config.options.subagent_model or default_subagent_model() or config.options.ai_model
     time_limit_val = config.options.time_limit
     return AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
@@ -126,7 +126,7 @@ def process_consolidated_dimensions(
 
     # 2. Build consolidated prompt and create file queue
     prompt = _build_prompt(config, dimensions, ctx)
-    files_per_agent = _compute_files_per_agent(len(files))
+    files_per_agent = compute_files_per_agent(len(files))
     queue_path = evidence_dir / "consolidated_queue.json"
     FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
     log.info(f"Consolidated analysis: {len(files)} files, {len(dimensions)} dimensions, max {config.options.max_subagents} agents")

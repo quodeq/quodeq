@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from quodeq.analysis._command import _build_ai_cmd, _build_analysis_env
+from quodeq.analysis._command import build_ai_cmd, build_analysis_env
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.errors import FatalProviderError
 from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid
@@ -52,7 +52,7 @@ def _built_ai_cmd(tmp_path):
         jsonl_file=tmp_path / "findings.jsonl", queue_path=tmp_path / "queue.json",
         agent_id="agent-2", max_turns=3, analysis_budget=1,
     )
-    args, path = _build_ai_cmd("Inspect sources", config, work_dir=tmp_path)
+    args, path = build_ai_cmd("Inspect sources", config, work_dir=tmp_path)
     yield args, path
     if path:
         path.unlink(missing_ok=True)
@@ -96,7 +96,7 @@ def test_copilot_scoped_mcp_server_args_identify_the_agent_and_paths(_built_ai_c
 
 def test_copilot_analysis_env_uses_dedicated_profile(tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
-    env = _build_analysis_env("copilot", env={
+    env = build_analysis_env("copilot", env={
         "PATH": "/bin", "COPILOT_HOME": "/personal-profile",
         "COPILOT_GITHUB_TOKEN": "not-inherited", "GH_TOKEN": "not-inherited",
         "GITHUB_TOKEN": "not-inherited", "COPILOT_ALLOW_ALL": "true",
@@ -122,7 +122,7 @@ def test_copilot_evaluation_uses_scratch_cwd_and_cleans_mcp(tmp_path, monkeypatc
         paths.stream_file.write_text('{"type":"result","exitCode":0}\n')
         return Mock(returncode=0), False
 
-    monkeypatch.setattr("quodeq.analysis.subprocess._spawn_and_monitor", spawn)
+    monkeypatch.setattr("quodeq.analysis.subprocess.spawn_and_monitor", spawn)
     cfg = AnalysisConfig(ai_cmd="copilot", jsonl_file=tmp_path / "f.jsonl")
     _run_cli_analysis(tmp_path, "Inspect sources", tmp_path / "s.jsonl", cfg)
     from pathlib import Path
@@ -143,7 +143,7 @@ def test_copilot_stdout_auth_error_aborts_evaluation(tmp_path, monkeypatch):
         }) + "\n")
         return Mock(returncode=1), False
 
-    monkeypatch.setattr("quodeq.analysis.subprocess._spawn_and_monitor", spawn)
+    monkeypatch.setattr("quodeq.analysis.subprocess.spawn_and_monitor", spawn)
     with pytest.raises(FatalProviderError, match="Sign in") as exc:
         _run_cli_analysis(tmp_path, "hi", tmp_path / "s.jsonl", AnalysisConfig(ai_cmd="copilot"))
     assert exc.value.reason == "auth"
@@ -251,7 +251,7 @@ def test_copilot_policy_block_in_completed_stream_aborts_evaluation(tmp_path, mo
         paths.stream_file.write_text(json.dumps(POLICY_BLOCK_EVENT) + "\n")
         return Mock(returncode=0), False
 
-    monkeypatch.setattr("quodeq.analysis.subprocess._spawn_and_monitor", spawn)
+    monkeypatch.setattr("quodeq.analysis.subprocess.spawn_and_monitor", spawn)
     with pytest.raises(FatalProviderError, match="administrator") as exc:
         _run_cli_analysis(tmp_path, "hi", tmp_path / "s.jsonl", AnalysisConfig(ai_cmd="copilot"))
     assert exc.value.reason == "copilot_mcp_policy"

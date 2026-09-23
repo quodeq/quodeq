@@ -18,7 +18,7 @@ from quodeq.core.scoring.overall import weighted_overall, MODE_NUMERICAL
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.data.fs.report_parser.grades import summarize_dimensions
 from quodeq.services import grade_formula
-from quodeq.services._rescore_legacy import _group_by_principle, _score_all_principles
+from quodeq.services._rescore_legacy import group_by_principle, score_all_principles
 from quodeq.services.dismissed import recount_totals
 from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
 from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
@@ -83,9 +83,9 @@ def _rescore_legacy_fallback(
     dim: DimensionResult, filtered_violations: list[Finding], params: ScoringParams,
 ) -> DimensionResult:
     """In-place rescore for a run/dimension with no evidence basis."""
-    principles_violations = _group_by_principle(filtered_violations)
-    principles_compliance = _group_by_principle(dim.compliance)
-    principle_scores, principle_grades = _score_all_principles(
+    principles_violations = group_by_principle(filtered_violations)
+    principles_compliance = group_by_principle(dim.compliance)
+    principle_scores, principle_grades = score_all_principles(
         principles_violations, principles_compliance,
         source_file_count=dim.source_file_count or 0,
         params=params,

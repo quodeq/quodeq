@@ -1,6 +1,6 @@
 """Pre-dispatch setup for the V2 cache-aware dimension processor.
 
-``_prepare_cache_context`` resolves everything ``dimension_runner``'s
+``prepare_cache_context`` resolves everything ``dimension_runner``'s
 ``process_dimension_with_cache`` needs before it decides between the
 all-hits short-circuit and a miss dispatch: the cache backend, the trust
 model, the source-file list, the hit/miss classification and the evidence
@@ -21,7 +21,7 @@ from pathlib import Path
 
 from quodeq.analysis.runner_markers import emit_marker
 from quodeq.analysis.run_types import RunConfig
-from quodeq.analysis.cache._replay import _jsonl_path, _write_replayed_keys_sidecar
+from quodeq.analysis.cache._replay import dim_jsonl_path, write_replayed_keys_sidecar
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
@@ -38,7 +38,7 @@ _logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class _CacheContext:
+class CacheContext:
     """Everything resolved once per dimension before dispatch, so the
     orchestrator and its steps pass one object instead of five values.
     """
@@ -100,9 +100,9 @@ def _classify_and_log(
     return classify
 
 
-def _prepare_cache_context(
+def prepare_cache_context(
     config: RunConfig, dim_id: str, cache: CacheBackend | None,
-) -> _CacheContext | None:
+) -> CacheContext | None:
     """Resolve the per-dimension cache inputs, or None when there is no
     source-file list to classify (matches V1's no-files fallback)."""
     if cache is None:
@@ -115,6 +115,6 @@ def _prepare_cache_context(
 
     bypass_reads = _invalidate_for_clean_scan(config, files, dim_id, cache)
     classify = _classify_and_log(config, dim_id, files, cache, bypass_reads)
-    jsonl = _jsonl_path(config, dim_id)
-    _write_replayed_keys_sidecar(config, dim_id, classify.unconsolidated_hit_keys)
-    return _CacheContext(cache, trust_model, files, classify, jsonl)
+    jsonl = dim_jsonl_path(config, dim_id)
+    write_replayed_keys_sidecar(config, dim_id, classify.unconsolidated_hit_keys)
+    return CacheContext(cache, trust_model, files, classify, jsonl)

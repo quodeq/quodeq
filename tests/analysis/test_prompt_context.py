@@ -51,7 +51,7 @@ def test_render_previous_findings_no_file_key():
 def test_build_subagent_prompt_passes_inline_findings():
     from unittest.mock import MagicMock
 
-    from quodeq.analysis.subagents._prompts import _build_subagent_prompt
+    from quodeq.analysis.subagents._prompts import build_subagent_prompt
 
     findings = [{"file": "a.py", "p": "S", "t": "violation", "line": 1, "reason": "test"}]
     ctx = MagicMock()
@@ -69,6 +69,6 @@ def test_build_subagent_prompt_passes_inline_findings():
     config.target = None
     config.work_dir = None
 
-    result = _build_subagent_prompt(config, "security", ctx, inline_findings=findings)
+    result = build_subagent_prompt(config, "security", ctx, inline_findings=findings)
     assert "Previous findings" in result
     assert "a.py" in result

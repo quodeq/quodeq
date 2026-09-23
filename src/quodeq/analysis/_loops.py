@@ -4,30 +4,30 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 
-from quodeq.analysis._dim_order import _apply_dim_deadline
+from quodeq.analysis._dim_order import apply_dim_deadline
 from quodeq.analysis._drop_stats import DropStatsCounter, report_run_drop_stats
-from quodeq.analysis.run_types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import LogSink
 from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.analysis._loop_state import (
     DimTransition,
-    _run_dir_for,
-    _safe_write_dim_state,
-    _interruption_reason,
-    _silence_broken_stdout,
+    run_dir_for,
+    safe_write_dim_state,
+    interruption_reason,
+    silence_broken_stdout,
 )
 from quodeq.analysis._loop_guards import (
-    _raise_on_fatal_cancel,
+    raise_on_fatal_cancel,
     check_zero_findings,
     check_model_reachable,
 )
 from quodeq.analysis._loop_steps import (
     LoopDeps,
-    _LoopRun,
-    _finalize_dim_result,
-    _loop_should_stop,
-    _run_one_incremental_dim,
+    LoopRun,
+    finalize_dim_result,
+    loop_should_stop,
+    run_one_incremental_dim,
 )
 
 
@@ -41,17 +41,17 @@ def _run_post_loop_guards(
     worthless run often co-occur, so the summary must land either way.
     """
     report_run_drop_stats(drop_counter)
-    _raise_on_fatal_cancel(_run_dir_for(config), log=log)
+    raise_on_fatal_cancel(run_dir_for(config), log=log)
     check_zero_findings(
         result, config.source_file_count, skipped_count,
         incremental_filter_active=config.options.incremental_file_filter is not None
             or config.options.skip_scoring,
     )
-    check_model_reachable(_run_dir_for(config), result)
+    check_model_reachable(run_dir_for(config), result)
 
 
 def run_incremental_loop(
-    config: RunConfig, dimensions: list[str], ctx: _AnalysisContext, deps: LoopDeps,
+    config: RunConfig, dimensions: list[str], ctx: AnalysisContext, deps: LoopDeps,
     *, dim_counts: Mapping[str, int] | None = None,
 ) -> dict[str, Evidence]:
     """Run incremental per-dimension analysis.
@@ -72,13 +72,13 @@ def run_incremental_loop(
     log = deps.log
     result: dict[str, Evidence] = {}
     log.info(f"[loop] incremental: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
-    run = _LoopRun(deps=deps, result=result)
+    run = LoopRun(deps=deps, result=result)
     run_deadline = getattr(config.options, "deadline_at", None)
     config.options.run_deadline_at = run_deadline
     try:
         for idx, dimension in enumerate(dimensions, 1):
-            _apply_dim_deadline(config, dimensions[idx - 1:], run_deadline, dim_counts)
-            if _run_one_incremental_dim(config, dimension, idx, ctx, run):
+            apply_dim_deadline(config, dimensions[idx - 1:], run_deadline, dim_counts)
+            if run_one_incremental_dim(config, dimension, idx, ctx, run):
                 break
     # This restore would also discard a ratchet from
     # ``_pool_launcher._extend_run_deadline``, which only fires when
@@ -97,32 +97,32 @@ def run_incremental_loop(
 
 
 def _dispatch_per_dim(
-    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext, deps: LoopDeps,
+    config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
 ) -> Evidence | None:
     """Run one dimension (full scan). Returns the Evidence, or None if skipped.
 
     On any caught exception, or a clean ``None`` return from the runner, this
     writes the dim's ``INCOMPLETE`` state (with the reason keyed off the real
-    exception -- ``_interruption_reason`` special-cases ``FatalProviderError``
+    exception -- ``interruption_reason`` special-cases ``FatalProviderError``
     and ``CircuitBreakerError``, both of which surface here) and logs the
     "completed iteration" line itself, so the exception never needs to leave
     this function.
     """
     log = deps.log
-    run_dir = _run_dir_for(config)
+    run_dir = run_dir_for(config)
 
     def _skip(reason: str, exc: BaseException | None = None) -> None:
         """Mark the dim INCOMPLETE and log the iteration as skipped for *reason*."""
-        _safe_write_dim_state(
+        safe_write_dim_state(
             run_dir, dimension,
-            DimTransition(DimState.INCOMPLETE, reason=_interruption_reason(exc)), log=log,
+            DimTransition(DimState.INCOMPLETE, reason=interruption_reason(exc)), log=log,
         )
         log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: {reason})")
 
     try:
         ev = deps.runner.run(config, dimension, idx, ctx, emit_log=True)
     except BrokenPipeError as exc:
-        _silence_broken_stdout()
+        silence_broken_stdout()
         _skip("broken pipe", exc)
         return None
     except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
@@ -145,24 +145,24 @@ def _dispatch_per_dim(
 
 
 def _run_one_dimension(
-    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext, run: _LoopRun,
+    config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, run: LoopRun,
 ) -> Evidence | None:
     """Take one dimension through RUNNING -> analysis -> finalized.
 
     Returns None when the dimension was skipped; ``_dispatch_per_dim`` has
     already written its INCOMPLETE state and logged the reason.
     """
-    run_dir = _run_dir_for(config)
-    _safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=run.deps.log)
+    run_dir = run_dir_for(config)
+    safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=run.deps.log)
     ev = _dispatch_per_dim(config, dimension, idx, ctx, run.deps)
     if ev is None:
         return None
-    _finalize_dim_result(run_dir, dimension, ev, run)
+    finalize_dim_result(run_dir, dimension, ev, run)
     return ev
 
 
 def run_per_dimension_loop(
-    config: RunConfig, dimensions: list[str], ctx: _AnalysisContext, deps: LoopDeps,
+    config: RunConfig, dimensions: list[str], ctx: AnalysisContext, deps: LoopDeps,
 ) -> dict[str, Evidence]:
     """Per-dimension loop (fallback or single-dimension).
 
@@ -171,12 +171,12 @@ def run_per_dimension_loop(
     """
     log = deps.log
     result: dict[str, Evidence] = {}
-    run = _LoopRun(deps=deps, result=result)
+    run = LoopRun(deps=deps, result=result)
     skipped_count = 0
     log.info(f"[loop] per-dimension: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
     for idx, dimension in enumerate(dimensions, 1):
         log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
-        if _loop_should_stop(config, dimension, log):
+        if loop_should_stop(config, dimension, log):
             break
         if _run_one_dimension(config, dimension, idx, ctx, run) is None:
             skipped_count += 1

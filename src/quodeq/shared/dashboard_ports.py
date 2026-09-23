@@ -13,7 +13,7 @@ port is taken (dashboard/_networking.py).
 useServerHealth.altPortCandidates() also probes the currentPort..+4
 neighbourhood for a non-default QUODEQ_DASHBOARD_PORT; that neighbourhood is
 out of scope here and stays uncovered by connect-src beyond 'self' (not
-widened to dashboard/_networking.py's _MAX_PORT_SCAN_TRIES).
+widened to dashboard/_networking.py's MAX_PORT_SCAN_TRIES).
 """
 from __future__ import annotations
 

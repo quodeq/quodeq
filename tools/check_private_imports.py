@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Private-import ratchet: flag imports that reach into another package's
-private names/modules (rule A/B, see tools/_private_imports_rules.py).
+private names/modules (rule A/B, see tools/_private_imports_rules.py) and,
+for src/quodeq, the stricter rules 2-4 (tools/_private_imports_strict.py):
+no `_name` imported from another file, none listed in `__all__`, and no
+`mod._x` read through a module alias.
 
 Existing violations are grandfathered via two baselines so the gate runs
 green today while preventing NEW ones:
@@ -25,6 +28,7 @@ from pathlib import Path
 
 import _ratchet
 from _private_imports_rules import Hit, scan_tree
+from _private_imports_strict import strict_hits
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = REPO_ROOT / "src" / "quodeq"
@@ -33,9 +37,8 @@ SRC_BASELINE_PATH = Path(__file__).resolve().parent / "private_imports_baseline.
 TESTS_BASELINE_PATH = Path(__file__).resolve().parent / "private_imports_tests_baseline.txt"
 
 _SRC_HEADER = (
-    "# Grandfathered private-import violations in src/quodeq (rule A: a\n"
-    "# private name imported across packages; rule B: a private module\n"
-    "# imported across packages). Do NOT add entries without justification\n"
+    "# Grandfathered private-import violations in src/quodeq (rules A/B and 2-4,\n"
+    "# see tools/check_private_imports.py). Do NOT add entries without justification\n"
     "# -- the goal is to burn this list to ZERO, not grow it.\n"
     "# Regenerate intentionally: python tools/check_private_imports.py --update-baseline\n"
     "# Entries are line-keyed (relpath:lineno:kind:module.name), so an unrelated\n"
@@ -53,8 +56,8 @@ _TESTS_HEADER = (
 
 
 def _scan_src() -> list[Hit]:
-    """Return all current rule A/B violations under src/quodeq."""
-    return scan_tree(SRC_ROOT, SRC_ROOT, REPO_ROOT)
+    """Return all current rule A/B and 2-4 violations under src/quodeq."""
+    return scan_tree(SRC_ROOT, SRC_ROOT, REPO_ROOT, extra=strict_hits)
 
 
 def _scan_tests() -> list[Hit]:

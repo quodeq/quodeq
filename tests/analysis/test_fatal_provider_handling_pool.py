@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.analysis._loops import _interruption_reason, _raise_on_fatal_cancel
+from quodeq.analysis._loops import interruption_reason, raise_on_fatal_cancel
 from quodeq.analysis.cache.failure_streak import CircuitBreakerError
 from quodeq.analysis.errors import (
     REASON_AGENT_FAILURE_STREAK, REASON_CANCELLED_SIGNAL, REASON_PROVIDER_FATAL,
@@ -87,41 +87,41 @@ class TestRunSingleAgentFatal:
 
 
 class TestLoopFatalMapping:
-    """_interruption_reason (consumer, quodeq.analysis._loop_state) must read back
+    """interruption_reason (consumer, quodeq.analysis._loop_state) must read back
     exactly what the producers (_pool_worker, _pool_scaling) write via
     cancellation.request_cancel, both sides keyed off quodeq.analysis.errors.REASON_*."""
 
     def test_interruption_reason_for_fatal_exc(self):
-        assert _interruption_reason(FatalProviderError("x")) == REASON_PROVIDER_FATAL
+        assert interruption_reason(FatalProviderError("x")) == REASON_PROVIDER_FATAL
 
     def test_interruption_reason_from_cancel_reason(self):
         cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:quota: details")
-        assert _interruption_reason() == REASON_PROVIDER_FATAL
+        assert interruption_reason() == REASON_PROVIDER_FATAL
 
     def test_interruption_reason_streak(self):
         cancellation.request_cancel(reason=REASON_AGENT_FAILURE_STREAK)
-        assert _interruption_reason() == REASON_AGENT_FAILURE_STREAK
+        assert interruption_reason() == REASON_AGENT_FAILURE_STREAK
 
     def test_interruption_reason_plain_cancel(self):
         cancellation.request_cancel()
-        assert _interruption_reason() == REASON_CANCELLED_SIGNAL
+        assert interruption_reason() == REASON_CANCELLED_SIGNAL
 
     def test_raise_on_fatal_cancel_raises_fatal(self, tmp_path):
         cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:quota: credits gone")
         with pytest.raises(FatalProviderError, match="credits gone"):
-            _raise_on_fatal_cancel(tmp_path)
+            raise_on_fatal_cancel(tmp_path)
 
     def test_raise_on_fatal_cancel_raises_breaker_for_streak(self, tmp_path):
         cancellation.request_cancel(reason=REASON_AGENT_FAILURE_STREAK)
         with pytest.raises(CircuitBreakerError):
-            _raise_on_fatal_cancel(tmp_path)
+            raise_on_fatal_cancel(tmp_path)
 
     def test_raise_on_fatal_cancel_noop_without_reason(self, tmp_path):
         cancellation.request_cancel()
-        _raise_on_fatal_cancel(tmp_path)
+        raise_on_fatal_cancel(tmp_path)
 
     def test_raise_on_fatal_cancel_noop_when_not_cancelled(self, tmp_path):
-        _raise_on_fatal_cancel(tmp_path)
+        raise_on_fatal_cancel(tmp_path)
 
     @staticmethod
     def _write_markers(run_dir, *statuses):
@@ -139,23 +139,23 @@ class TestLoopFatalMapping:
         """Quota died halfway: files were analysed, run finalizes as done."""
         self._write_markers(tmp_path, "ok", "ok", "error")
         cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:quota: credits gone")
-        _raise_on_fatal_cancel(tmp_path)  # must not raise
+        raise_on_fatal_cancel(tmp_path)  # must not raise
 
     def test_partial_success_keeps_run_alive_for_streak(self, tmp_path):
         self._write_markers(tmp_path, "ok", "error", "error")
         cancellation.request_cancel(reason=REASON_AGENT_FAILURE_STREAK)
-        _raise_on_fatal_cancel(tmp_path)  # must not raise
+        raise_on_fatal_cancel(tmp_path)  # must not raise
 
     def test_error_only_markers_still_fail_the_run(self, tmp_path):
         """Markers exist but nothing succeeded: the run produced no analysis."""
         self._write_markers(tmp_path, "error", "error")
         cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:quota: credits gone")
         with pytest.raises(FatalProviderError):
-            _raise_on_fatal_cancel(tmp_path)
+            raise_on_fatal_cancel(tmp_path)
 
 
 class TestLifecycleMapping:
     def test_fatal_provider_error_recognised_by_name(self):
-        from quodeq.analysis.run_lifecycle import RunLifecycleContext
-        assert RunLifecycleContext._is_named_error(FatalProviderError, "FatalProviderError")
-        assert not RunLifecycleContext._is_named_error(ValueError, "FatalProviderError")
+        from quodeq.analysis.run_lifecycle import is_named_error
+        assert is_named_error(FatalProviderError, "FatalProviderError")
+        assert not is_named_error(ValueError, "FatalProviderError")

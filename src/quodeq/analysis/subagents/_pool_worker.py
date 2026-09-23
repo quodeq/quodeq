@@ -7,8 +7,8 @@ from pathlib import Path
 
 from quodeq.analysis.subagents._pool_models import (
     SubagentResult,
-    _AGENT_ID_PREFIX,
-    _DEFAULT_MAX_DURATION_S,
+    AGENT_ID_PREFIX,
+    DEFAULT_MAX_DURATION_S,
 )
 from quodeq.analysis.errors import REASON_PROVIDER_FATAL, FatalProviderError
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
@@ -43,11 +43,11 @@ def build_agent_config(
         The agent's AnalysisConfig, the shared per-dimension evidence JSONL
         every agent in the pool appends to, and this agent's own stream file.
     """
-    agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
+    agent_id = f"{AGENT_ID_PREFIX}-{idx}"
     jsonl_file = wctx.evidence_dir / f"{wctx.dimension_key}_evidence.jsonl"
     stream_file = wctx.evidence_dir / f"{wctx.dimension_key}_{agent_id}.stream"
     bc = base_config
-    agent_dur = bc.max_duration or _DEFAULT_MAX_DURATION_S
+    agent_dur = bc.max_duration or DEFAULT_MAX_DURATION_S
     # Clamp to remaining budget so the last in-flight agent dies on or
     # before the run-level deadline. Without this, a respawn near the
     # deadline gets a fresh full-length cap and extends the run.
@@ -81,7 +81,7 @@ def run_single_agent(
     wctx: WorkerContext,
 ) -> SubagentResult:
     """Run a single subagent. Returns SubagentResult."""
-    agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
+    agent_id = f"{AGENT_ID_PREFIX}-{idx}"
     ac, jsonl_file, stream_file = build_agent_config(idx, base_config, wctx)
     try:
         run_analysis(

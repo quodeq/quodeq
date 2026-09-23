@@ -9,19 +9,19 @@ from __future__ import annotations
 from quodeq.core.types.finding import Finding, ReqRef, SeverityTally, Totals
 
 from ._mapper_helpers import (
-    _int,
-    _opt_float,
-    _opt_str,
-    _opt_str_or_int,
-    _str,
+    get_int,
+    get_opt_float,
+    get_opt_str,
+    get_opt_str_or_int,
+    get_str,
 )
 
 
 def parse_req_ref(raw: dict[str, object]) -> ReqRef:
     """Parse a raw dict into a ReqRef (requirement reference) instance."""
     return ReqRef(
-        label=_str(raw, "label"),
-        url=_str(raw, "url"),
+        label=get_str(raw, "label"),
+        url=get_str(raw, "url"),
     )
 
 
@@ -33,29 +33,29 @@ def parse_finding(raw: dict[str, object]) -> Finding:
         req_refs = [parse_req_ref(r) for r in req_refs_raw if isinstance(r, dict)]
 
     return Finding(
-        practice_id=_opt_str(raw.get("practiceId") or raw.get("principle")),
-        verdict=_opt_str(raw.get("verdict")),
-        file=_opt_str(raw.get("file")),
-        line=_opt_str_or_int(raw.get("line")),
-        title=_opt_str(raw.get("title")),
-        reason=_opt_str(raw.get("reason")),
-        snippet=_opt_str(raw.get("snippet")),
-        severity=_str(raw, "severity", "minor"),
-        cwe=_opt_str_or_int(raw.get("cwe")),
-        req=_opt_str(raw.get("req")),
+        practice_id=get_opt_str(raw.get("practiceId") or raw.get("principle")),
+        verdict=get_opt_str(raw.get("verdict")),
+        file=get_opt_str(raw.get("file")),
+        line=get_opt_str_or_int(raw.get("line")),
+        title=get_opt_str(raw.get("title")),
+        reason=get_opt_str(raw.get("reason")),
+        snippet=get_opt_str(raw.get("snippet")),
+        severity=get_str(raw, "severity", "minor"),
+        cwe=get_opt_str_or_int(raw.get("cwe")),
+        req=get_opt_str(raw.get("req")),
         req_refs=req_refs,
-        dimension=_opt_str(raw.get("dimension")),
-        violation_type=_opt_str(raw.get("violationType")),
+        dimension=get_opt_str(raw.get("dimension")),
+        violation_type=get_opt_str(raw.get("violationType")),
     )
 
 
 def parse_severity_tally(raw: dict[str, object]) -> SeverityTally:
     """Parse a raw dict into a SeverityTally (critical/major/minor/unknown counts)."""
     return SeverityTally(
-        critical=_int(raw, "critical"),
-        major=_int(raw, "major"),
-        minor=_int(raw, "minor"),
-        unknown=_int(raw, "unknown"),
+        critical=get_int(raw, "critical"),
+        major=get_int(raw, "major"),
+        minor=get_int(raw, "minor"),
+        unknown=get_int(raw, "unknown"),
     )
 
 
@@ -64,14 +64,14 @@ def parse_totals(raw: dict[str, object]) -> Totals:
     sev_raw = raw.get("severity")
     severity = parse_severity_tally(sev_raw) if isinstance(sev_raw, dict) else SeverityTally()
     return Totals(
-        violation_count=_int(raw, "violationCount"),
-        compliance_count=_int(raw, "complianceCount"),
+        violation_count=get_int(raw, "violationCount"),
+        compliance_count=get_int(raw, "complianceCount"),
         severity=severity,
-        violations_per100_files=_opt_float(raw.get("violationsPer100Files")),
+        violations_per100_files=get_opt_float(raw.get("violationsPer100Files")),
     )
 
 
-def _parse_finding_list(raw_list: object) -> list[Finding]:
+def parse_finding_list(raw_list: object) -> list[Finding]:
     """Parse a list of findings, accepting both dicts and Finding instances."""
     if not isinstance(raw_list, list):
         return []

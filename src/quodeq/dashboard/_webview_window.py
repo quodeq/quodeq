@@ -6,8 +6,8 @@ patched name. ``patch.object(ww, "X")`` only rebinds the name ``X`` inside
 *this* module's namespace — so whichever function bare-calls ``X`` must be
 defined here (its ``__globals__`` must be this module's dict), or the mock
 never intercepts the call. The remaining seams of that kind are ``webview``,
-``InstanceController``, the ``_make_on_*`` factories, ``_create_window``,
-``_quodeq_dir``, ``_set_app_icon``, and ``_non_macos_menu`` — all bare-called
+``InstanceController``, the ``make_on_*`` factories, ``_create_window``,
+``quodeq_dir``, ``set_app_icon``, and ``non_macos_menu`` — all bare-called
 from main() (or, for ``webview``, also from _create_window), defined here or
 merely re-exported from a sibling module. ``sys`` and ``webbrowser`` are
 patched as shared module objects instead (e.g.
@@ -23,48 +23,48 @@ from pathlib import Path
 
 import webview
 
-from quodeq.dashboard._build_npm import _quodeq_dir
+from quodeq.dashboard._build_npm import quodeq_dir
 from quodeq.dashboard._instance import InstanceController
 from quodeq.dashboard._webview_token import read_token_from_stdin
 from quodeq.dashboard._webview_window_about import (  # noqa: F401 — re-export
-    _set_app_icon,
-    _set_macos_app_identity,
-    _webview_user_agent,
-    _WEBVIEW_UA_MARKER,
+    set_app_icon,
+    set_macos_app_identity,
+    webview_user_agent,
+    WEBVIEW_UA_MARKER,
 )
 from quodeq.dashboard import _webview_window_chrome as _chrome
 from quodeq.dashboard._webview_window_chrome import (  # noqa: F401 — re-export
-    _apply_unified_toolbar,
-    _set_macos_fullscreen_class,
-    _set_macos_titlebar_appearance,
-    _set_windows_titlebar,
-    _show_macos_traffic_lights,
+    apply_unified_toolbar,
+    set_macos_fullscreen_class,
+    set_macos_titlebar_appearance,
+    set_windows_titlebar,
+    show_macos_traffic_lights,
 )
 from quodeq.dashboard._webview_window_close import (  # noqa: F401 — re-export
-    _alert_return_to_choice,
-    _ask_close_choice,
-    _CLOSE_CONFIRM_BODY,
-    _CLOSE_CONFIRM_TITLE,
-    _macos_confirm_close,
-    _make_on_closing,
-    _prompt_close_choice_and_finish,
+    alert_return_to_choice,
+    ask_close_choice,
+    CLOSE_CONFIRM_BODY,
+    CLOSE_CONFIRM_TITLE,
+    macos_confirm_close,
+    make_on_closing,
+    prompt_close_choice_and_finish,
 )
 from quodeq.dashboard._webview_window_fullscreen import (  # noqa: F401 — re-export
-    _install_macos_fullscreen_observer,
+    install_macos_fullscreen_observer,
 )
 from quodeq.dashboard._webview_window_help_menu import (  # noqa: F401 — re-export
-    _NAVIGATE_HELP_JS,
-    _non_macos_menu,
+    NAVIGATE_HELP_JS,
+    non_macos_menu,
 )
-from quodeq.dashboard._webview_window_lifecycle import _make_on_loaded
+from quodeq.dashboard._webview_window_lifecycle import make_on_loaded
 from quodeq.dashboard._webview_window_native_ops import (  # noqa: F401 — re-export
-    _download_via_dialog,
-    _fetch_running_evaluation,
-    _is_safe_reload_url,
-    _kill_api,
-    _make_on_reload,
-    _save_via_dialog,
-    _send_cancel_evaluation,
+    download_via_dialog,
+    fetch_running_evaluation,
+    is_safe_reload_url,
+    kill_api,
+    make_on_reload,
+    save_via_dialog,
+    send_cancel_evaluation,
 )
 
 _logger = logging.getLogger(__name__)
@@ -75,13 +75,13 @@ _WINDOW_BG_COLOR = '#0d1117'
 _ARGV_API_PID = 3  # optional argv slot: pid of the API process to watch
 
 
-class _WindowApi:
+class WindowApi:
     """Python API exposed to JavaScript for window controls.
 
     HTTP and native-dialog bodies live in _webview_window_native_ops.py
     (none of them are patch-tested by name); set_titlebar_theme dispatches
     through _webview_window_chrome (imported here as _chrome), so a patch on
-    either module's copy of _set_macos_titlebar_appearance / _set_windows_titlebar
+    either module's copy of set_macos_titlebar_appearance / set_windows_titlebar
     is visible to the call.
     """
 
@@ -100,10 +100,10 @@ class _WindowApi:
         self._base_url = base_url.rstrip('/')
 
     def _get_running_evaluation(self) -> dict | None:
-        return _fetch_running_evaluation(self._base_url)
+        return fetch_running_evaluation(self._base_url)
 
     def _cancel_evaluation(self, job_id: str | None) -> None:
-        _send_cancel_evaluation(self._base_url, job_id)
+        send_cancel_evaluation(self._base_url, job_id)
 
     def open_browser(self, path: str = '/') -> None:
         """Open a dashboard path or an absolute web URL in the default browser.
@@ -119,10 +119,10 @@ class _WindowApi:
         webbrowser.open(url)
 
     def download_url(self, path: str, filename: str) -> bool:
-        return _download_via_dialog(self._window, self._base_url, path, filename)
+        return download_via_dialog(self._window, self._base_url, path, filename)
 
     def save_file(self, content: str, filename: str) -> bool:
-        return _save_via_dialog(self._window, content, filename)
+        return save_via_dialog(self._window, content, filename)
 
     def set_titlebar_theme(self, mode: str) -> None:
         """Match the native titlebar to the active quodeq theme.
@@ -136,17 +136,17 @@ class _WindowApi:
             return
         dark = mode == "dark"
         if sys.platform == "darwin":
-            _chrome._set_macos_titlebar_appearance(self._window, dark)
+            _chrome.set_macos_titlebar_appearance(self._window, dark)
         elif sys.platform == "win32":
-            _chrome._set_windows_titlebar(dark)
+            _chrome.set_windows_titlebar(dark)
 
 
-def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
+def _create_window(url: str, api: "WindowApi") -> "webview.Window":
     """Create the dashboard window.
 
     macOS uses a frameless window so NSFullSizeContentView lets the app's
     topbar run under the titlebar; the native traffic lights are re-shown over
-    it (see _show_macos_traffic_lights) for a unified look, and the topbar acts
+    it (see show_macos_traffic_lights) for a unified look, and the topbar acts
     as the drag region via the ``pywebview-drag-region`` class. Windows and
     Linux use native OS chrome.
 
@@ -160,7 +160,7 @@ def _create_window(url: str, api: "_WindowApi") -> "webview.Window":
     )
 
 
-def _apply_macos_fullscreen_chrome(
+def apply_macos_fullscreen_chrome(
     window: object, is_full: bool, *, restore_toolbar: bool = True,
 ) -> None:
     """Reflect fullscreen state in both the native and the web chrome.
@@ -172,11 +172,11 @@ def _apply_macos_fullscreen_chrome(
     the now-pointless traffic-light reservation.
 
     ``restore_toolbar=False`` skips re-adding the toolbar when windowed; the
-    initial install (_set_macos_unified_toolbar) already owns that, so the
+    initial install (set_macos_unified_toolbar) already owns that, so the
     load-time sync must not add a second one.
 
     Calls through _webview_window_chrome (imported here as _chrome) for
-    _apply_unified_toolbar, so a patch on either module's copy is visible.
+    apply_unified_toolbar, so a patch on either module's copy is visible.
     """
     nswindow = getattr(window, "native", None) if window is not None else None
     if nswindow is not None:
@@ -184,10 +184,10 @@ def _apply_macos_fullscreen_chrome(
             if is_full:
                 nswindow.setToolbar_(None)
             elif restore_toolbar:
-                _chrome._apply_unified_toolbar(nswindow)
+                _chrome.apply_unified_toolbar(nswindow)
         except (AttributeError, ValueError, TypeError, ImportError) as exc:
             _logger.debug("macOS fullscreen chrome not applied: %s", exc)
-    _set_macos_fullscreen_class(window, is_full)
+    set_macos_fullscreen_class(window, is_full)
 
 
 def _parse_argv() -> tuple[str, Path, int]:
@@ -202,11 +202,11 @@ def _parse_argv() -> tuple[str, Path, int]:
 def _wire_window(url: str, sock_path: Path, api_pid: int) -> tuple[webview.Window, InstanceController]:
     """Create the window, bind its JS API and hook the lifecycle events."""
     instance = InstanceController(sock_path)
-    api = _WindowApi()
+    api = WindowApi()
     window = _create_window(url, api)
     api.bind(window, api_pid=api_pid, instance=instance, base_url=url)
-    window.events.loaded += _make_on_loaded(window)
-    window.events.closing += _make_on_closing(api, window)
+    window.events.loaded += make_on_loaded(window)
+    window.events.closing += make_on_closing(api, window)
     return window, instance
 
 
@@ -221,25 +221,25 @@ def _own_reload_socket(instance: InstanceController, window: webview.Window) -> 
             instance.sock_path,
         )
     else:
-        instance.start_listening(on_reload=_make_on_reload(window))
+        instance.start_listening(on_reload=make_on_reload(window))
 
 
 def _run_webview(window: webview.Window, webview_token: str, instance: InstanceController,
                  api_pid: int) -> None:
     """Block in the webview loop; release the socket and the API process on exit."""
-    storage_dir = str(_quodeq_dir() / "webview")
+    storage_dir = str(quodeq_dir() / "webview")
     try:
         webview.start(private_mode=False, storage_path=storage_dir,
-                      user_agent=_webview_user_agent(webview_token),
-                      menu=_non_macos_menu(window) or [])
+                      user_agent=webview_user_agent(webview_token),
+                      menu=non_macos_menu(window) or [])
     finally:
         instance.shutdown()
         if api_pid:
-            _kill_api(api_pid)
+            kill_api(api_pid)
 
 
 def main() -> None:
-    _set_app_icon()
+    set_app_icon()
     url, sock_path, api_pid = _parse_argv()
     webview_token = read_token_from_stdin()
     window, instance = _wire_window(url, sock_path, api_pid)

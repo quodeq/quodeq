@@ -6,7 +6,7 @@ siblings below and are re-exported so every existing import path
 (``from quodeq.shared.env import <name>``, including this project-wide
 fan-in's many call sites) keeps working unchanged.
 
-``_sanitized_env_path`` lives in the leaf module ``_env_sanitize.py`` (not
+``sanitized_env_path`` lives in the leaf module ``_env_sanitize.py`` (not
 defined here) so ``env_paths.py``/``_env_db.py`` can import it without a
 cycle back through this module -- see that module's docstring.
 """
@@ -17,8 +17,8 @@ import os
 from collections.abc import Callable
 from typing import TypeVar
 
-from quodeq.shared._config import _get_config
-from quodeq.shared._env_sanitize import _sanitized_env_path  # noqa: F401 — re-export
+from quodeq.shared._config import get_config
+from quodeq.shared._env_sanitize import sanitized_env_path  # noqa: F401 — re-export
 
 
 def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
@@ -91,17 +91,17 @@ def env_float(
 
 def get_action_api_port(env: dict[str, str] | None = None) -> int:
     """Return the action API port from environment or default."""
-    return _env_int("QUODEQ_ACTION_API_PORT", _get_config()["action_api_port"], env=env)
+    return _env_int("QUODEQ_ACTION_API_PORT", get_config()["action_api_port"], env=env)
 
 
 def get_action_api_host(env: dict[str, str] | None = None) -> str:
     """Return the action API host from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_ACTION_API_HOST", _get_config()["default_host"])
+    return (os.environ if env is None else env).get("QUODEQ_ACTION_API_HOST", get_config()["default_host"])
 
 
 def get_dashboard_port(env: dict[str, str] | None = None) -> int:
     """Return the dashboard preview port from environment or default."""
-    return _env_int("QUODEQ_DASHBOARD_PORT", _get_config()["dashboard_port"], env=env)
+    return _env_int("QUODEQ_DASHBOARD_PORT", get_config()["dashboard_port"], env=env)
 
 
 def get_anthropic_api_key(env: dict[str, str] | None = None) -> str | None:
@@ -111,17 +111,17 @@ def get_anthropic_api_key(env: dict[str, str] | None = None) -> str | None:
 
 def get_asvs_url(env: dict[str, str] | None = None) -> str:
     """Return the OWASP ASVS JSON URL from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_ASVS_URL", _get_config()["asvs_url"])
+    return (os.environ if env is None else env).get("QUODEQ_ASVS_URL", get_config()["asvs_url"])
 
 
 def get_github_search_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub repository search URL from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_GITHUB_SEARCH_URL", _get_config()["github_search_url"])
+    return (os.environ if env is None else env).get("QUODEQ_GITHUB_SEARCH_URL", get_config()["github_search_url"])
 
 
 def get_github_raw_base_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub raw content base URL from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_GITHUB_RAW_BASE_URL", _get_config()["github_raw_base_url"])
+    return (os.environ if env is None else env).get("QUODEQ_GITHUB_RAW_BASE_URL", get_config()["github_raw_base_url"])
 
 
 # ---------------------------------------------------------------------------

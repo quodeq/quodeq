@@ -13,42 +13,42 @@ from quodeq.analysis._api_runner import (
     ApiAnalysisRequest,
     ApiRunnerConfig,
     _build_router_context,
-    _resolve_file_paths,
+    resolve_file_paths,
     run_api_analysis,
 )
 
 
 # ---------------------------------------------------------------------------
-# _resolve_file_paths
+# resolve_file_paths
 # ---------------------------------------------------------------------------
 
 class TestResolveFilePaths:
     def test_resolves_short_name_to_full_path(self):
         findings = [{"file": "app.py", "req": "X-1"}]
         source_paths = ["src/myproject/app.py", "src/myproject/utils.py"]
-        result = _resolve_file_paths(findings, source_paths)
+        result = resolve_file_paths(findings, source_paths)
         assert result[0]["file"] == "src/myproject/app.py"
 
     def test_leaves_full_paths_unchanged(self):
         findings = [{"file": "src/myproject/app.py", "req": "X-1"}]
         source_paths = ["src/myproject/app.py"]
-        result = _resolve_file_paths(findings, source_paths)
+        result = resolve_file_paths(findings, source_paths)
         assert result[0]["file"] == "src/myproject/app.py"
 
     def test_leaves_unknown_names_unchanged(self):
         findings = [{"file": "unknown.py", "req": "X-1"}]
         source_paths = ["src/myproject/app.py"]
-        result = _resolve_file_paths(findings, source_paths)
+        result = resolve_file_paths(findings, source_paths)
         assert result[0]["file"] == "unknown.py"
 
     def test_handles_empty_file_field(self):
         findings = [{"file": "", "req": "X-1"}]
-        result = _resolve_file_paths(findings, ["src/app.py"])
+        result = resolve_file_paths(findings, ["src/app.py"])
         assert result[0]["file"] == ""
 
     def test_handles_missing_file_field(self):
         findings = [{"req": "X-1"}]
-        result = _resolve_file_paths(findings, ["src/app.py"])
+        result = resolve_file_paths(findings, ["src/app.py"])
         assert "file" not in result[0] or result[0].get("file", "") == ""
 
 

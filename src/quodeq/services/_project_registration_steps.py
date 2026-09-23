@@ -20,8 +20,8 @@ from pathlib import Path
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services._fs_clone import run_git_clone
 from quodeq.services.fs_scan import scan_project
-from quodeq.services._registration_scan import _scan_parent_project
-from quodeq.services._registration_url import _read_origin_remote, _strip_credentials
+from quodeq.services._registration_scan import scan_parent_project
+from quodeq.services._registration_url import read_origin_remote, strip_credentials
 from quodeq.services.wiring import (
     ProjectIdentity,
     read_repository_info,
@@ -35,7 +35,7 @@ from quodeq.shared.utils import is_repo_url, project_name_from_repo
 _LOCATION_LOCAL = "local"
 
 
-def _resolve_target_path(request: _MaterializeRequest) -> Path:
+def _resolve_target_path(request: MaterializeRequest) -> Path:
     """Resolve/create the on-disk path the project will live at.
 
     For a URL input, clones into an ephemeral cache dir or the caller's
@@ -84,22 +84,22 @@ def _persist_repository_info(
     info["path"] = str(target_path.resolve())
     info["location"] = _LOCATION_LOCAL
     info["ephemeral"] = bool(ephemeral)
-    origin_url = repo if is_url else _read_origin_remote(target_path)
+    origin_url = repo if is_url else read_origin_remote(target_path)
     if origin_url:
-        # Defense in depth: _read_origin_remote already strips credentials
+        # Defense in depth: read_origin_remote already strips credentials
         # from the local-remote branch, but strip again here so the
         # URL-registration branch (raw *repo*) is covered too, and so this
         # call site stays safe even if the helper's behavior changes.
-        info["originUrl"] = _strip_credentials(origin_url)
+        info["originUrl"] = strip_credentials(origin_url)
     write_repository_info(project_dir, info)
 
 
 def _ensure_onboarding_field(project_dir: Path) -> None:
     """Add `onboardingCompletedAt: null` to repository_info.json if absent.
 
-    Called during registration (via `_resolve_project_slot`) so newly-registered
+    Called during registration (via `resolve_project_slot`) so newly-registered
     projects start with the field set to null. Existing projects without the
-    field get a backfill on read (see `_backfill_onboarding_field` in
+    field get a backfill on read (see `backfill_onboarding_field` in
     fs_project_helpers.py).
     """
     data = read_repository_info(project_dir)
@@ -109,7 +109,7 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
     write_repository_info(project_dir, data)
 
 
-def _resolve_project_slot(
+def resolve_project_slot(
     repo: str, discipline: str | None, reports_path: Path, scope_path: str | None,
 ) -> tuple[str, Path, str, str]:
     """Resolve project identity/uuid/dir. Returns
@@ -128,8 +128,8 @@ def _resolve_project_slot(
 
 
 @dataclass(frozen=True)
-class _MaterializeRequest:
-    """Everything ``_materialize_and_scan`` needs, bundled to keep its own
+class MaterializeRequest:
+    """Everything ``materialize_and_scan`` needs, bundled to keep its own
     parameter count down."""
 
     repo: str
@@ -146,7 +146,7 @@ class _MaterializeRequest:
     log: LogSink = NULL_LOG
 
 
-def _materialize_and_scan(request: _MaterializeRequest) -> None:
+def materialize_and_scan(request: MaterializeRequest) -> None:
     """Resolve the on-disk path, persist repository_info.json, and scan."""
     target_path = _resolve_target_path(request)
     _persist_repository_info(
@@ -157,4 +157,4 @@ def _materialize_and_scan(request: _MaterializeRequest) -> None:
     # Scan now that files are guaranteed on disk.
     scan_project(target_path, output_dir=request.project_dir)
     if request.scope_path:
-        _scan_parent_project(request.project_dir, request.reports_path, target_path, log=request.log)
+        scan_parent_project(request.project_dir, request.reports_path, target_path, log=request.log)

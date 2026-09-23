@@ -5,7 +5,7 @@ import json
 from io import StringIO
 
 
-from quodeq.analysis.subprocess import AnalysisConfig, _build_ai_cmd
+from quodeq.analysis.subprocess import AnalysisConfig, build_ai_cmd
 from quodeq.analysis.stream.parser import _extract_jsonl_from_text, extract_evidence_from_stream
 from quodeq.analysis.stream.validation import is_stream_valid
 from tests._evidence_helpers import _evidence_line
@@ -192,7 +192,7 @@ class TestIsStreamValid:
 
 
 # ---------------------------------------------------------------------------
-# _build_ai_cmd — prevent regressions in CLI tool/permission flags
+# build_ai_cmd — prevent regressions in CLI tool/permission flags
 # ---------------------------------------------------------------------------
 
 class TestBuildAiCmd:
@@ -201,14 +201,14 @@ class TestBuildAiCmd:
     def test_bash_not_in_default_tools(self):
         """Bash must NOT be in the default tools — it enables arbitrary command
         execution which could be exploited via prompt injection to exfiltrate data."""
-        args, _ = _build_ai_cmd("test prompt", AnalysisConfig())
+        args, _ = build_ai_cmd("test prompt", AnalysisConfig())
         tools_idx = args.index("--tools")
         tools_value = args[tools_idx + 1]
         assert "Bash" not in tools_value.split(",")
 
     def test_read_glob_grep_in_allowed_tools(self):
         """File exploration tools must be available."""
-        args, _ = _build_ai_cmd("test prompt", AnalysisConfig())
+        args, _ = build_ai_cmd("test prompt", AnalysisConfig())
         tools_idx = args.index("--tools")
         tools_value = args[tools_idx + 1]
         for tool in ("Read", "Glob", "Grep"):
@@ -218,7 +218,7 @@ class TestBuildAiCmd:
         """MCP mode must use bypassPermissions — without it, tools are blocked
         in --print mode and the evaluation silently produces 0 findings."""
         jsonl = tmp_path / "findings.jsonl"
-        args, mcp_path = _build_ai_cmd(
+        args, mcp_path = build_ai_cmd(
             "test prompt", AnalysisConfig(jsonl_file=jsonl),
         )
         assert "--permission-mode" in args, (
@@ -231,7 +231,7 @@ class TestBuildAiCmd:
     def test_mcp_config_created_with_jsonl(self, tmp_path):
         """When jsonl_file is set, MCP config must be generated."""
         jsonl = tmp_path / "findings.jsonl"
-        args, mcp_path = _build_ai_cmd(
+        args, mcp_path = build_ai_cmd(
             "test prompt", AnalysisConfig(jsonl_file=jsonl),
         )
         assert mcp_path is not None
@@ -242,7 +242,7 @@ class TestBuildAiCmd:
 
     def test_print_mode_always_set(self):
         """Analysis must run in --print (non-interactive) mode."""
-        args, _ = _build_ai_cmd("test prompt", AnalysisConfig())
+        args, _ = build_ai_cmd("test prompt", AnalysisConfig())
         assert "--print" in args
         assert "--output-format" in args
         fmt_idx = args.index("--output-format")

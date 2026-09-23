@@ -19,7 +19,7 @@ from quodeq.shared.utils import write_text
 from quodeq.config._asvs_network import (  # noqa: F401
     fetch_with_retry as _fetch_with_retry,
     verify_integrity as _verify_integrity,
-    _DEFAULT_FETCH_TIMEOUT_S,
+    DEFAULT_FETCH_TIMEOUT_S,
 )
 from quodeq.config._asvs_parser import parse_asvs_content as _parse_asvs_content
 

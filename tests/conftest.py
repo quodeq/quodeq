@@ -95,7 +95,7 @@ def _isolate_quodeq_home(tmp_path_factory: pytest.TempPathFactory,
     Set the env vars the production code actually consults:
       * ``QUODEQ_INDEX_DB_PATH``    — ``services/filesystem._open_index``
       * ``QUODEQ_EVALUATIONS_DIR``  — ``services/filesystem.list_evaluations`` etc.
-      * ``QUODEQ_DIR``              — ``dashboard/_build_npm._quodeq_dir``
+      * ``QUODEQ_DIR``              — ``dashboard/_build_npm.quodeq_dir``
       * ``QUODEQ_CACHE_ROOT``       — ``analysis/cache/local.default_cache_root``
         (and the online cache). Without this, the content-addressed result
         cache falls through to the real ``~/.quodeq/cache``; the one-time

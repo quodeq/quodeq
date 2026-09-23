@@ -10,8 +10,8 @@ from typing import Callable
 from quodeq.analysis.subagents._pool_models import (
     ScaleUpState,
     SubagentResult,
-    _FUTURE_POLL_INTERVAL_S,
-    _SCOUT_TIMEOUT_S,
+    FUTURE_POLL_INTERVAL_S,
+    SCOUT_TIMEOUT_S,
 )
 from quodeq.analysis.subagents._pool_scaling import (
     EvidencePaths,
@@ -71,7 +71,7 @@ def scout_loop(ctx: LoopContext) -> None:
     """Scout-then-scale loop: one agent first, then fill the pool when the
     scout finishes or times out. Each later poll respawns for the pending
     files no in-flight agent will take, capped by the slots just vacated."""
-    scout_timeout = _SCOUT_TIMEOUT_S if ctx.max_duration <= 0 else min(_SCOUT_TIMEOUT_S, ctx.max_duration / max(ctx.n_agents, 1) * _SCOUT_BUDGET_FRACTION)
+    scout_timeout = SCOUT_TIMEOUT_S if ctx.max_duration <= 0 else min(SCOUT_TIMEOUT_S, ctx.max_duration / max(ctx.n_agents, 1) * _SCOUT_BUDGET_FRACTION)
     state = ScaleUpState(
         pool_start=ctx.pool_start, max_duration=ctx.max_duration, scout_timeout=scout_timeout,
     )
@@ -92,7 +92,7 @@ def scout_loop(ctx: LoopContext) -> None:
             done, state, ctx.n_agents, scale_ctx, running=len(ctx.futures),
         )
         if not done:
-            time.sleep(_FUTURE_POLL_INTERVAL_S)
+            time.sleep(FUTURE_POLL_INTERVAL_S)
             continue
         if not gate_was_open:
             # The scout finishing is what opened the gate this iteration, and
@@ -118,6 +118,6 @@ def immediate_loop(ctx: LoopContext) -> None:
         if done:
             check_agent_failure_streak(ctx.results)
         if not done:
-            time.sleep(_FUTURE_POLL_INTERVAL_S)
+            time.sleep(FUTURE_POLL_INTERVAL_S)
             continue
         _respawn_for_surplus(ctx, len(done))

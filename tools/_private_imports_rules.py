@@ -13,7 +13,9 @@ directly contains `_mod`. A private package anywhere in the dotted path
 (`quodeq.pkg._sub.mod`) counts the same way for `_sub`.
 
 Relative imports (`from . import x`, `from ._mod import _x`) are same-package
-by construction and are never violations.
+by construction and are never violations under rules A/B. The src scan adds
+rules 2-4 on top through `scan_tree(..., extra=...)`; see
+tools/_private_imports_strict.py.
 
 Distinguishing the two rules for `from quodeq.<pkg...> import _x` (no `.mod`
 in the dotted path) needs a filesystem check: if `_x` is itself an existing
@@ -26,7 +28,7 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Sequence
+from typing import Callable, Iterable, Iterator, Sequence
 
 import _ratchet
 
@@ -53,7 +55,7 @@ class _Classification:
 
 
 @dataclass(frozen=True, slots=True)
-class _FileCtx:
+class FileCtx:
     """The per-file facts every violation in it shares."""
 
     path: Path
@@ -62,12 +64,16 @@ class _FileCtx:
     source_lines: list[str]
 
 
+# A per-file rule set run after rules A/B (see tools/_private_imports_strict.py).
+ExtraRule = Callable[[ast.Module, FileCtx, Path], Iterable[Hit]]
+
+
 def is_private(name: str) -> bool:
     """True for a single-leading-underscore name; dunders are not private."""
     return name.startswith("_") and not name.startswith("__")
 
 
-def _quodeq_segments(dotted: str) -> list[str] | None:
+def quodeq_segments(dotted: str) -> list[str] | None:
     """Dotted path components after `quodeq`, or None if not quodeq-rooted."""
     if dotted == "quodeq":
         return []
@@ -76,29 +82,29 @@ def _quodeq_segments(dotted: str) -> list[str] | None:
     return None
 
 
-def _dir_for_segments(src_root: Path, segments: Sequence[str]) -> Path:
+def dir_for_segments(src_root: Path, segments: Sequence[str]) -> Path:
     """The directory a dotted path's segments would live under, if it were
     a package: `src_root/seg0/seg1/...`."""
     return src_root.joinpath(*segments) if segments else src_root
 
 
-def _resolve_module_dir(src_root: Path, segments: Sequence[str]) -> Path:
+def resolve_module_dir(src_root: Path, segments: Sequence[str]) -> Path:
     """Directory that owns a `from`-imported module's dotted path: its own
     directory when it is a package (`__init__` counts as that directory),
     else the directory holding its leaf module file."""
     if not segments:
         return src_root
-    pkg_dir = _dir_for_segments(src_root, segments)
+    pkg_dir = dir_for_segments(src_root, segments)
     if pkg_dir.is_dir():
         return pkg_dir
-    return _dir_for_segments(src_root, segments[:-1])
+    return dir_for_segments(src_root, segments[:-1])
 
 
-def _submodule_exists(src_root: Path, segments: Sequence[str], name: str) -> bool:
+def submodule_exists(src_root: Path, segments: Sequence[str], name: str) -> bool:
     """True if `name` is an existing submodule/subpackage of the package at
     `segments` (tells `from quodeq.pkg import _mod` apart from a private
     name re-exported by `pkg`'s `__init__`)."""
-    pkg_dir = _dir_for_segments(src_root, segments)
+    pkg_dir = dir_for_segments(src_root, segments)
     if not pkg_dir.is_dir():
         return False
     return (pkg_dir / f"{name}.py").exists() or (pkg_dir / name / "__init__.py").exists()
@@ -118,13 +124,13 @@ def _classify_from_import(
     """Rule A/B outcome for one name imported by a `from` statement, or
     None if neither rule is triggered."""
     if is_private(imported_name):
-        if _submodule_exists(src_root, segments, imported_name):
-            return _Classification("private-module", _dir_for_segments(src_root, segments))
-        return _Classification("private-name", _resolve_module_dir(src_root, segments))
+        if submodule_exists(src_root, segments, imported_name):
+            return _Classification("private-module", dir_for_segments(src_root, segments))
+        return _Classification("private-name", resolve_module_dir(src_root, segments))
     index = _first_private_index(segments)
     if index is None:
         return None
-    return _Classification("private-module", _dir_for_segments(src_root, segments[:index]))
+    return _Classification("private-module", dir_for_segments(src_root, segments[:index]))
 
 
 def _classify_plain_import(src_root: Path, segments: Sequence[str]) -> _Classification | None:
@@ -132,23 +138,24 @@ def _classify_plain_import(src_root: Path, segments: Sequence[str]) -> _Classifi
     index = _first_private_index(segments)
     if index is None:
         return None
-    return _Classification("private-module", _dir_for_segments(src_root, segments[:index]))
+    return _Classification("private-module", dir_for_segments(src_root, segments[:index]))
 
 
-def _source_line(ctx: _FileCtx, lineno: int) -> str:
+def _source_line(ctx: FileCtx, lineno: int) -> str:
     return ctx.source_lines[lineno - 1].strip() if lineno <= len(ctx.source_lines) else ""
 
 
-def _make_hit(ctx: _FileCtx, line: int, cls: _Classification, module: str, name: str) -> Hit:
-    key = f"{ctx.rel}:{line}:{cls.kind}:{module}.{name}"
-    return Hit(path=ctx.path, line=line, kind=cls.kind, module=module, name=name, key=key,
+def make_hit(ctx: FileCtx, line: int, kind: str, module: str, name: str) -> Hit:
+    """A Hit keyed `relpath:line:kind:module.name`, carrying its source line."""
+    key = f"{ctx.rel}:{line}:{kind}:{module}.{name}"
+    return Hit(path=ctx.path, line=line, kind=kind, module=module, name=name, key=key,
                source=_source_line(ctx, line))
 
 
-def _from_import_hits(node: ast.ImportFrom, ctx: _FileCtx, src_root: Path) -> Iterator[Hit]:
+def _from_import_hits(node: ast.ImportFrom, ctx: FileCtx, src_root: Path) -> Iterator[Hit]:
     if node.level or node.module is None:
         return  # relative import: same-package by construction, never a violation
-    segments = _quodeq_segments(node.module)
+    segments = quodeq_segments(node.module)
     if segments is None:
         return
     for alias in node.names:
@@ -157,38 +164,44 @@ def _from_import_hits(node: ast.ImportFrom, ctx: _FileCtx, src_root: Path) -> It
         cls = _classify_from_import(src_root, segments, alias.name)
         if cls is None or ctx.importer_dir == cls.required_dir:
             continue
-        yield _make_hit(ctx, node.lineno, cls, node.module, alias.name)
+        yield make_hit(ctx, node.lineno, cls.kind, node.module, alias.name)
 
 
-def _plain_import_hits(node: ast.Import, ctx: _FileCtx, src_root: Path) -> Iterator[Hit]:
+def _plain_import_hits(node: ast.Import, ctx: FileCtx, src_root: Path) -> Iterator[Hit]:
     for alias in node.names:
-        segments = _quodeq_segments(alias.name)
+        segments = quodeq_segments(alias.name)
         if segments is None:
             continue
         cls = _classify_plain_import(src_root, segments)
         if cls is None or ctx.importer_dir == cls.required_dir:
             continue
         name = alias.asname or segments[-1]
-        yield _make_hit(ctx, node.lineno, cls, alias.name, name)
+        yield make_hit(ctx, node.lineno, cls.kind, alias.name, name)
 
 
-def _file_hits(path: Path, rel: str, src_root: Path, text: str) -> list[Hit]:
+def _file_hits(
+    path: Path, rel: str, src_root: Path, text: str, extra: ExtraRule | None,
+) -> list[Hit]:
     """Return every rule A/B violation in one already-read source file."""
     try:
         tree = ast.parse(text, filename=str(path))
     except SyntaxError:
         return []
-    ctx = _FileCtx(path=path, rel=rel, importer_dir=path.parent, source_lines=text.splitlines())
+    ctx = FileCtx(path=path, rel=rel, importer_dir=path.parent, source_lines=text.splitlines())
     found: list[Hit] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             found.extend(_from_import_hits(node, ctx, src_root))
         elif isinstance(node, ast.Import):
             found.extend(_plain_import_hits(node, ctx, src_root))
+    if extra is not None:
+        found.extend(extra(tree, ctx, src_root))
     return found
 
 
-def scan_tree(root: Path, src_root: Path, repo_root: Path) -> list[Hit]:
+def scan_tree(
+    root: Path, src_root: Path, repo_root: Path, extra: ExtraRule | None = None,
+) -> list[Hit]:
     """Return every rule A/B violation under `root`.
 
     `src_root` is always the `src/quodeq` package tree (the anchor rule A/B
@@ -201,5 +214,5 @@ def scan_tree(root: Path, src_root: Path, repo_root: Path) -> list[Hit]:
         if text is None:
             continue
         rel = py.relative_to(repo_root).as_posix()
-        hits.extend(_file_hits(py, rel, src_root, text))
+        hits.extend(_file_hits(py, rel, src_root, text, extra))
     return sorted(hits, key=lambda h: h.key)

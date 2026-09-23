@@ -9,7 +9,7 @@ _import_validation.py and _import_extract.py for the checks themselves).
 Split into three collaborator modules plus this orchestrator:
   - _import_validation.py: archive/member/manifest/repo-info validation.
   - _import_identity.py: identity-collision detection and index updates.
-  - _import_extract.py: ``_safe_extract``, the hardened extraction step.
+  - _import_extract.py: ``safe_extract``, the hardened extraction step.
 This module re-exports every moved name so existing imports and patches
 (tests/api/test_project_import.py) keep working unchanged.
 """
@@ -29,31 +29,31 @@ from flask import Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.api.zip import (
-    _EXTRACT_HEADROOM,
-    _MANIFEST_FILENAME,
-    _max_zip_size_bytes,
+    EXTRACT_HEADROOM,
+    MANIFEST_FILENAME,
+    max_zip_size_bytes,
 )
 from quodeq.services.project_index import ProjectIdentity
 
-from ._import_extract import _safe_extract  # re-export
+from ._import_extract import safe_extract  # re-export
 from ._import_identity import (
-    _REPO_INFO_FILENAME,
-    _find_identity_collision,
-    _identity_from_info,
-    _rewrite_repository_info,  # re-export
-    _update_index,
+    REPO_INFO_FILENAME,
+    find_identity_collision,
+    identity_from_info,
+    rewrite_repository_info,  # re-export
+    update_index,
 )
 from ._import_validation import (
-    _ImportError,
-    _bad_request,
-    _is_symlink_entry,  # noqa: F401 — re-export
-    _is_uuid,  # noqa: F401 — re-export
-    _logger,
-    _read_member_json,
-    _validate_archive,
-    _validate_manifest,
-    _validate_member_name,  # noqa: F401 — re-export
-    _validate_repository_info,
+    ImportValidationError,
+    bad_request,
+    is_symlink_entry,  # noqa: F401 — re-export
+    is_uuid,  # noqa: F401 — re-export
+    logger,
+    read_member_json,
+    validate_archive,
+    validate_manifest,
+    validate_member_name,  # noqa: F401 — re-export
+    validate_repository_info,
 )
 
 _ACTION_REPLACE = "replace"
@@ -111,7 +111,7 @@ def _resolve_import_conflict(
     """
     same_uuid_path = reports_root / top_dir
     same_uuid_collision = same_uuid_path.is_dir()
-    same_identity_uuid = _find_identity_collision(reports_root, identity, ignore_uuid=top_dir)
+    same_identity_uuid = find_identity_collision(reports_root, identity, ignore_uuid=top_dir)
 
     # Without an explicit action, surface the collision so the client can
     # prompt the user.
@@ -172,21 +172,21 @@ def _stage_and_commit(
     the repository_info.json UUID (if renamed) and the project index."""
     staging = Path(tempfile.mkdtemp(prefix="quodeq_import_", dir=str(target.reports_root)))
     try:
-        _safe_extract(zf, members, staging)
+        safe_extract(zf, members, staging)
         staged_project = staging / target.top_dir
         if not staged_project.is_dir():
-            raise _bad_request("Archive missing top-level project directory.", "BAD_LAYOUT")
+            raise bad_request("Archive missing top-level project directory.", "BAD_LAYOUT")
         final_path = target.reports_root / target.target_uuid
         if final_path.exists():  # extremely narrow race window after the replace check above
-            raise _bad_request("Target project directory already exists.", "RACE")
+            raise bad_request("Target project directory already exists.", "RACE")
         staged_project.rename(final_path)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 
     if target.target_uuid != target.top_dir:
-        _rewrite_repository_info(final_path, target.target_uuid)
+        rewrite_repository_info(final_path, target.target_uuid)
 
-    _update_index(target.reports_root, target.identity, target.target_uuid)
+    update_index(target.reports_root, target.identity, target.target_uuid)
 
 
 def _read_and_validate_member_payloads(
@@ -194,19 +194,19 @@ def _read_and_validate_member_payloads(
 ) -> dict[str, Any]:
     """Read + validate the required repository_info.json and optional
     manifest.json members; return the parsed repository_info dict."""
-    repo_info_arc = f"{top_dir}/{_REPO_INFO_FILENAME}"
+    repo_info_arc = f"{top_dir}/{REPO_INFO_FILENAME}"
     if repo_info_arc not in members:
-        raise _bad_request(
-            f"Archive missing required {_REPO_INFO_FILENAME}.",
+        raise bad_request(
+            f"Archive missing required {REPO_INFO_FILENAME}.",
             "MISSING_REPO_INFO",
         )
-    repo_info = _read_member_json(zf, members[repo_info_arc])
-    _validate_repository_info(repo_info, top_dir)
+    repo_info = read_member_json(zf, members[repo_info_arc])
+    validate_repository_info(repo_info, top_dir)
 
-    manifest_arc = f"{top_dir}/{_MANIFEST_FILENAME}"
+    manifest_arc = f"{top_dir}/{MANIFEST_FILENAME}"
     if manifest_arc in members:
-        manifest = _read_member_json(zf, members[manifest_arc])
-        _validate_manifest(manifest, top_dir)
+        manifest = read_member_json(zf, members[manifest_arc])
+        validate_manifest(manifest, top_dir)
 
     return repo_info
 
@@ -214,7 +214,7 @@ def _read_and_validate_member_payloads(
 def _build_success_outcome(
     target: _ImportTarget, action: str | None, remote_addr: str | None,
 ) -> ImportOutcome:
-    _logger.info(
+    logger.info(
         "import_project: source_uuid=%s target_uuid=%s action=%s remote_addr=%s",
         target.top_dir, target.target_uuid, action, remote_addr,
     )
@@ -242,7 +242,7 @@ def import_zip_stream(
             f"Invalid action; expected one of {sorted(_ALLOWED_ACTIONS)}.",
             HTTPStatus.BAD_REQUEST, "INVALID_ACTION",
         )
-    size_limit = _max_zip_size_bytes()
+    size_limit = max_zip_size_bytes()
     raw = stream.read(size_limit + 1)
     if len(raw) > size_limit:
         return _error_outcome(
@@ -254,15 +254,15 @@ def import_zip_stream(
         return _error_outcome("reports directory does not exist", HTTPStatus.INTERNAL_SERVER_ERROR, "NO_REPORTS_DIR")
     try:
         with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-            top_dir, members = _validate_archive(zf, max_total_bytes=size_limit * _EXTRACT_HEADROOM)
+            top_dir, members = validate_archive(zf, max_total_bytes=size_limit * EXTRACT_HEADROOM)
             repo_info = _read_and_validate_member_payloads(zf, members, top_dir)
-            identity = _identity_from_info(repo_info)
+            identity = identity_from_info(repo_info)
             resolution = _resolve_import_conflict(reports_root, top_dir, action, identity)
             if isinstance(resolution, ImportOutcome):
                 return resolution
             target = _ImportTarget(reports_root, top_dir, resolution, identity)
             _stage_and_commit(zf, members, target)
-    except _ImportError as exc:
+    except ImportValidationError as exc:
         return _error_outcome(exc.public_message, exc.status, exc.code)
     except zipfile.BadZipFile:
         return _error_outcome(
@@ -270,7 +270,7 @@ def import_zip_stream(
             HTTPStatus.BAD_REQUEST, "BAD_ZIP",
         )
     except OSError as exc:
-        _logger.warning("import: filesystem error: %s", exc)
+        logger.warning("import: filesystem error: %s", exc)
         return _error_outcome(
             "Failed to write imported project. Check disk space and permissions.",
             HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR",

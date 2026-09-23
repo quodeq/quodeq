@@ -104,7 +104,7 @@ The architecture stands on six promises. If any of them break, incremental consi
 |---|---|
 | `<run>/evidence/{dim}_evidence.jsonl` as findings storage | Derived from cache + manifest. Cannot drift from cache because it is computed from cache. |
 | `<run>/events.jsonl` as a parallel findings store | Same. SQL projector reads cache + manifest directly. |
-| `FindingsRouter` ↔ `_emit_cached_findings` symmetry burden | One write path: worker → cache. The cache write IS the event. |
+| `FindingsRouter` ↔ `emit_cached_findings` symmetry burden | One write path: worker → cache. The cache write IS the event. |
 | `deduplicate_jsonl` post-pass | Duplicates impossible — cache is keyed by fingerprint. |
 | Three scoring callsites kept in sync manually | All derive Evidence from the same cache. Symmetry by construction. |
 | `_marker: file_done` lines as a side-channel | The cache write IS the marker. No third state. |

@@ -12,7 +12,7 @@ import importlib
 
 from quodeq.config.clone_env import git_clone_timeout_s
 from quodeq.services.jobs import JobManager
-from quodeq.services.scoring import _max_history_runs
+from quodeq.services.scoring import max_history_runs
 
 
 def _reload_attr(monkeypatch, module_name: str, var: str, value: str, attr: str):
@@ -44,15 +44,15 @@ class TestJobTimeoutCap:
 class TestMaxHistoryRuns:
     def test_invalid_value_falls_back(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_MAX_HISTORY_RUNS", "lots")
-        assert _max_history_runs() == 100
+        assert max_history_runs() == 100
 
     def test_zero_falls_back(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_MAX_HISTORY_RUNS", "0")
-        assert _max_history_runs() == 100
+        assert max_history_runs() == 100
 
     def test_valid_value_is_used(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_MAX_HISTORY_RUNS", "7")
-        assert _max_history_runs() == 7
+        assert max_history_runs() == 7
 
 
 class TestImportTimeConstants:
@@ -70,6 +70,6 @@ class TestImportTimeConstants:
     def test_fetch_timeout_invalid_falls_back(self, monkeypatch):
         value = _reload_attr(
             monkeypatch, "quodeq._cli_resolution",
-            "QUODEQ_GIT_CLONE_TIMEOUT_S", "fast", "_FETCH_TIMEOUT_S",
+            "QUODEQ_GIT_CLONE_TIMEOUT_S", "fast", "FETCH_TIMEOUT_S",
         )
         assert value == 300

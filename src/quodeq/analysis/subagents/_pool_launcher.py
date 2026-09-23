@@ -86,12 +86,12 @@ def _extend_run_deadline(options: AnalysisOptions, time_limit: int) -> None:
             log_warning(f"deadline extension notify failed: {exc}")
 
 
-def _compute_files_per_agent(total_files: int) -> int:
+def compute_files_per_agent(total_files: int) -> int:
     """Compute adaptive max files per agent. Capped to avoid turn limits."""
     return min(total_files, _MAX_FILES_PER_AGENT_CAP) if total_files > 0 else 0
 
 
-def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
+def default_subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override, or None to use the client's default.
 
     Checks SUBAGENT_MODEL first (set by dashboard/service layer),
@@ -143,7 +143,7 @@ def _build_pool_config(
 ) -> AnalysisConfig:
     """Build the per-launch AnalysisConfig for this pool."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = config.options.subagent_model or _default_subagent_model(env) or config.options.ai_model
+    subagent_model = config.options.subagent_model or default_subagent_model(env) or config.options.ai_model
     return AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -174,7 +174,7 @@ def _pool_paths(config: RunConfig, params: LaunchPoolParams) -> PoolPaths:
     )
 
 
-def _launch_pool(
+def launch_pool(
     config: RunConfig, dim_id: str, params: LaunchPoolParams,
     *, env: dict[str, str] | None = None,
 ) -> tuple[Any, list[Any]]:
@@ -194,7 +194,7 @@ def _launch_pool(
     return pool, pool.run()
 
 
-def _collect_all_evidence(results: list[Any], cleanup_stream_fn: Any) -> int:
+def collect_all_evidence(results: list[Any], cleanup_stream_fn: Any) -> int:
     """Sum files-read counts across all subagent result stream files, cleaning up each."""
     total = 0
     for r in results:

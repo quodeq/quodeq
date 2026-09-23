@@ -108,17 +108,17 @@ class AssistantTurnState:
             return self._open_sse_streams
 
 
-def _turn_state(app: Flask) -> AssistantTurnState:
+def turn_state(app: Flask) -> AssistantTurnState:
     """The app's turn registry. ``create_app`` instantiates it; setdefault
     keeps bare test apps (register_assistant_routes on a plain Flask) working."""
     return app.extensions.setdefault("assistant_turns", AssistantTurnState())
 
 
-def _try_claim_turn(sid: str) -> bool:
+def claim_app_turn(sid: str) -> bool:
     """Request-context shim for the workspace routes (see AssistantTurnState)."""
-    return _turn_state(current_app).try_claim_turn(sid)
+    return turn_state(current_app).try_claim_turn(sid)
 
 
-def _release_turn(sid: str) -> None:
+def release_app_turn(sid: str) -> None:
     """Request-context shim for the workspace routes (see AssistantTurnState)."""
-    _turn_state(current_app).release_turn(sid)
+    turn_state(current_app).release_turn(sid)

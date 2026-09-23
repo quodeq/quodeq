@@ -27,26 +27,26 @@ from quodeq.services.wiring import (
 )
 
 # Re-export so existing external imports keep working.
-from quodeq.services._accumulated_data import _read_all_run_data
+from quodeq.services._accumulated_data import read_all_run_data
 from quodeq.services._accumulated_data import make_slim_run_fetcher
 
 from quodeq.services._accumulated_cache import (  # noqa: F401 — re-export
     AccumulatedCacheConfig,
-    _WALK_CACHE,
-    _WALK_CACHE_LOCK,
-    _acc_dim_cache_max,
-    _resolve_cache,
-    _walk_cache_max,
+    WALK_CACHE,
+    WALK_CACHE_LOCK,
+    acc_dim_cache_max,
+    resolve_cache,
+    walk_cache_max,
     clear_accumulated_process_cache,
     create_accumulated_cache,
 )
 from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
 from quodeq.services._accumulated_aggregate import (  # noqa: F401 — re-export
-    _AccumulatedResult,
-    _aggregate_severity_counts,
-    _build_accumulated_response,
-    _compute_accumulated_scores,
-    _compute_accumulated_trends,
+    AccumulatedResult,
+    aggregate_severity_counts,
+    build_accumulated_response,
+    compute_accumulated_scores,
+    compute_accumulated_trends,
     numeric_average,
 )
 
@@ -55,7 +55,7 @@ def _compute_result(
     reports_root: Path, project: str, all_run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
     params: ScoringParams = DEFAULT_PARAMS,
-) -> _AccumulatedResult:
+) -> AccumulatedResult:
     """Load run data and compute trends, severity, and scores.
 
     Only ``done`` runs feed the overview by default. ``running``
@@ -85,7 +85,7 @@ def _load_run_dimensions(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
 ) -> tuple[dict[str, DimensionResult], dict[str, DimensionResult], list[DimensionResult]]:
-    _cache, _lock, _max = _resolve_cache(cache_config)
+    _cache, _lock, _max = resolve_cache(cache_config)
     ctx = DimensionCacheContext(cache=_cache, lock=_lock, max_size=_max)
     get_run_data = make_lru_dimension_fetcher(reports_root, project, ctx)
     # A caller-supplied cache_config asks for per-call isolation, so it backs the
@@ -93,11 +93,11 @@ def _load_run_dimensions(
     if cache_config is not None:
         walk_cache, walk_lock, walk_max = _cache, _lock, _max
     else:
-        walk_cache, walk_lock, walk_max = _WALK_CACHE, _WALK_CACHE_LOCK, _walk_cache_max()
+        walk_cache, walk_lock, walk_max = WALK_CACHE, WALK_CACHE_LOCK, walk_cache_max()
     get_run_slim = make_slim_run_fetcher(
         reports_root, project, walk_cache, walk_lock, walk_max,
     )
-    return _read_all_run_data(
+    return read_all_run_data(
         reports_root, project, run_infos, get_run_data, get_run_slim=get_run_slim,
     )
 
@@ -113,16 +113,16 @@ def _build_accumulated_for_runs(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
     params: ScoringParams = DEFAULT_PARAMS,
-) -> _AccumulatedResult:
+) -> AccumulatedResult:
     """Read run data and assemble the accumulated result for *run_infos*."""
     latest_by_dim, prev_occurrence, prev_run_latest = _load_run_dimensions(
         reports_root, project, run_infos, cache_config,
     )
     all_dims = _suppress_run_dimensions(latest_by_dim, reports_root / project)
-    dims_with_trend = _compute_accumulated_trends(all_dims, prev_occurrence)
-    severity = _aggregate_severity_counts(all_dims)
-    avg, prev_avg = _compute_accumulated_scores(all_dims, prev_run_latest, params)
-    return _AccumulatedResult(all_dims, dims_with_trend, severity, avg, prev_avg)
+    dims_with_trend = compute_accumulated_trends(all_dims, prev_occurrence)
+    severity = aggregate_severity_counts(all_dims)
+    avg, prev_avg = compute_accumulated_scores(all_dims, prev_run_latest, params)
+    return AccumulatedResult(all_dims, dims_with_trend, severity, avg, prev_avg)
 
 
 _MAX_CHILD_RUNS_CONSIDERED = 50  # per-child run cap when merging into a parent's accumulated view
@@ -160,10 +160,10 @@ def _compute_parent_accumulated(
         all_dims.extend(result.all_dimensions)
     if not all_dims:
         return None
-    severity = _aggregate_severity_counts(all_dims)
-    avg, _ = _compute_accumulated_scores(all_dims, [], params)
-    merged_result = _AccumulatedResult(all_dims, all_dims, severity, avg, None)
-    response = _build_accumulated_response(scope.parent_id, merged_result, params)
+    severity = aggregate_severity_counts(all_dims)
+    avg, _ = compute_accumulated_scores(all_dims, [], params)
+    merged_result = AccumulatedResult(all_dims, all_dims, severity, avg, None)
+    response = build_accumulated_response(scope.parent_id, merged_result, params)
     # Tag each dimension with its source child project for navigation
     for dim_dict in response.get("dimensions", []):
         dim_name = dim_dict.get("dimension", "")
@@ -209,7 +209,7 @@ def compute_accumulated(
     # Has own runs — check if also has children to merge
     own_result = _compute_result(reports_root, project, all_run_infos, cache_config, params)
     if not children:
-        return _build_accumulated_response(project, own_result, params)
+        return build_accumulated_response(project, own_result, params)
 
     # Has both own runs AND children — merge everything
     return _compute_parent_accumulated(

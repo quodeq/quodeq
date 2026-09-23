@@ -1,7 +1,7 @@
 """Cache replays must be distinguishable from this scan's own findings.
 
 Split from test_dimension_runner_carried_forward.py: the direct unit
-tests for ``_write_findings`` / ``_emit_cached_findings`` (the write
+tests for ``write_findings`` / ``emit_cached_findings`` (the write
 side). The integration tests that drive replay through
 ``process_dimension_with_cache`` live in
 test_dimension_runner_carried_forward_replay.py.
@@ -15,8 +15,8 @@ from pathlib import Path
 
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult
 from quodeq.analysis.cache.dimension_runner import (
-    _emit_cached_findings,
-    _write_findings,
+    emit_cached_findings,
+    write_findings,
 )
 
 
@@ -36,7 +36,7 @@ def _replay(consolidated: list[dict], unconsolidated: list[dict] | None = None) 
 
 def test_write_findings_stamps_carried_forward(tmp_path: Path):
     jsonl = tmp_path / "security_evidence.jsonl"
-    _write_findings(jsonl, _replay([_finding("carry-a")]), append=False, emit_events=False)
+    write_findings(jsonl, _replay([_finding("carry-a")]), append=False, emit_events=False)
     written = [json.loads(ln) for ln in jsonl.read_text().splitlines() if ln.strip()]
     assert written[0]["carried_forward"] is True
 
@@ -61,7 +61,7 @@ def test_emit_cached_findings_uses_injected_writer_factory(tmp_path: Path):
         return writer
 
     events_log = tmp_path / "events.jsonl"
-    _emit_cached_findings(
+    emit_cached_findings(
         events_log, [_finding("carry-a"), _finding("carry-b")],
         writer_factory=factory,
     )
@@ -78,7 +78,7 @@ def test_write_findings_does_not_mutate_the_source_dicts(tmp_path: Path):
     a later fresh scan of the same file look carried."""
     jsonl = tmp_path / "security_evidence.jsonl"
     source = [_finding("carry-a")]
-    _write_findings(jsonl, _replay(source), append=False, emit_events=False)
+    write_findings(jsonl, _replay(source), append=False, emit_events=False)
     assert "carried_forward" not in source[0]
 
 
@@ -86,7 +86,7 @@ def test_write_findings_does_not_stamp_unconsolidated_replays(tmp_path: Path):
     """A finding produced by a run that never completed was never consolidated
     into an Overview. Replaying it must read as this scan's own finding."""
     jsonl = tmp_path / "security_evidence.jsonl"
-    _write_findings(
+    write_findings(
         jsonl, _replay([_finding("carry-a")], [dict(_finding("pending-b"), file="b.py")]),
         append=False, emit_events=False,
     )
@@ -100,7 +100,7 @@ def test_write_findings_orders_consolidated_replays_first(tmp_path: Path):
     """Foundation-then-new ordering in the JSONL, matching the existing
     carried-before-fresh contract."""
     jsonl = tmp_path / "security_evidence.jsonl"
-    _write_findings(
+    write_findings(
         jsonl, _replay([_finding("carry-a")], [dict(_finding("pending-b"), file="b.py")]),
         append=False, emit_events=False,
     )
@@ -111,14 +111,14 @@ def test_write_findings_orders_consolidated_replays_first(tmp_path: Path):
 def test_write_findings_does_not_stamp_the_unconsolidated_source_dicts(tmp_path: Path):
     jsonl = tmp_path / "security_evidence.jsonl"
     source = [dict(_finding("pending-b"), file="b.py")]
-    _write_findings(jsonl, _replay([], source), append=False, emit_events=False)
+    write_findings(jsonl, _replay([], source), append=False, emit_events=False)
     assert "carried_forward" not in source[0]
 
 
 def test_write_findings_accepts_only_unconsolidated(tmp_path: Path):
     """A dimension whose every hit is unconsolidated still writes findings."""
     jsonl = tmp_path / "security_evidence.jsonl"
-    _write_findings(
+    write_findings(
         jsonl, _replay([], [dict(_finding("pending-b"), file="b.py")]),
         append=False, emit_events=False,
     )

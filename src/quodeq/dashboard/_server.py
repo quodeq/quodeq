@@ -14,14 +14,14 @@ from pathlib import Path
 
 from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._config import DashboardConfig
-from quodeq.dashboard._networking import _MAX_PORT_SCAN_TRIES, _allow_plaintext_http
+from quodeq.dashboard._networking import MAX_PORT_SCAN_TRIES, allow_plaintext_http
 from quodeq.dashboard._frozen import subprocess_cmd
 from quodeq.dashboard._probes import ApiProbes, NativeShell
-from quodeq.dashboard._process import _PROCESS_WAIT_TIMEOUT_S, _wait_for_process
+from quodeq.dashboard._process import PROCESS_WAIT_TIMEOUT_S, wait_for_process
 from quodeq.dashboard._webview_token import (
-    _ENV_WEBVIEW_TOKEN,
-    _get_webview_token,
-    _warn_reused_api_token_mismatch,
+    ENV_WEBVIEW_TOKEN,
+    get_webview_token,
+    warn_reused_api_token_mismatch,
     spawn_window_with_token,
 )
 from quodeq.shared.env_resolve import resolve_env_mut
@@ -39,7 +39,7 @@ def _guard_plaintext_http(
     probes = probes or ApiProbes()
     if host in probes.local_hosts():
         return
-    if _allow_plaintext_http(allow_plaintext):
+    if allow_plaintext_http(allow_plaintext):
         logging.getLogger(__name__).warning(
             "API traffic to %s uses plaintext HTTP; use a TLS reverse proxy for remote hosts", host,
         )
@@ -51,10 +51,10 @@ def _guard_plaintext_http(
         )
 
 
-def _ensure_action_api(
+def ensure_action_api(
     host: str,
     start_port: int,
-    max_tries: int = _MAX_PORT_SCAN_TRIES,
+    max_tries: int = MAX_PORT_SCAN_TRIES,
     api_config: ApiConfig | None = None,
     *,
     probes: ApiProbes | None = None,
@@ -73,15 +73,15 @@ def _ensure_action_api(
         base_url = f"{_HTTP_SCHEME}://{host}:{port}"
         if probes.is_port_open(host, port):
             if probes.api_healthy(base_url):
-                _warn_reused_api_token_mismatch(base_url)
+                warn_reused_api_token_mismatch(base_url)
                 return base_url, None
             continue
-        resolve_env_mut(env)[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
+        resolve_env_mut(env)[ENV_WEBVIEW_TOKEN] = get_webview_token()
         return probes.spawn(port, base_url, cfg)
     raise RuntimeError("Unable to find a free port for Action API.")
 
 
-def _ensure_action_api_forced(
+def ensure_action_api_forced(
     host: str,
     port: int,
     static_dist: Path | None = None,
@@ -93,17 +93,17 @@ def _ensure_action_api_forced(
     """Start (or reuse) the action API on exactly *port*.
 
     *env* is where this launch's webview token is published; see
-    :func:`_ensure_action_api`.
+    :func:`ensure_action_api`.
     """
     probes = probes or ApiProbes()
     _guard_plaintext_http(host, probes=probes)
     base_url = f"http://{host}:{port}"
     if probes.is_port_open(host, port):
         if probes.api_healthy(base_url):
-            _warn_reused_api_token_mismatch(base_url)
+            warn_reused_api_token_mismatch(base_url)
             return base_url, None
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
-    resolve_env_mut(env)[_ENV_WEBVIEW_TOKEN] = _get_webview_token()
+    resolve_env_mut(env)[ENV_WEBVIEW_TOKEN] = get_webview_token()
     return probes.spawn(
         port, base_url, ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir),
     )
@@ -113,7 +113,7 @@ def _stop_children_for(action_api_process: subprocess.Popen | None) -> None:
     if action_api_process and action_api_process.poll() is None:
         action_api_process.terminate()
         try:
-            action_api_process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
+            action_api_process.wait(timeout=PROCESS_WAIT_TIMEOUT_S)
         except subprocess.TimeoutExpired:
             action_api_process.kill()
 
@@ -289,7 +289,7 @@ def _serve_blocking(
     """Block until process exits or keyboard interrupt (browser mode)."""
     try:
         if action_api_process:
-            _wait_for_process(action_api_process)
+            wait_for_process(action_api_process)
         elif IS_WIN32:
             threading.Event().wait()
         else:

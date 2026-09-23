@@ -10,7 +10,7 @@ from pathlib import Path
 
 from quodeq.assistant.adapters._cli_spawn import build_chat_env
 from quodeq.assistant.skills import cached_skills, load_skills, skills_directory
-from quodeq.assistant.worktree import _DEFAULT_WORKTREE_TTL_H, _worktree_ttl_hours, worktrees_base
+from quodeq.assistant.worktree import _DEFAULT_WORKTREE_TTL_H, worktree_ttl_hours, worktrees_base
 
 
 class TestSkillsDirectory:
@@ -66,11 +66,11 @@ class TestLoadSkillsTakesEnv:
 class TestWorktreeTtlHours:
     def test_uses_the_injected_value(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_ASSISTANT_WORKTREE_TTL_H", "5")
-        assert _worktree_ttl_hours({"QUODEQ_ASSISTANT_WORKTREE_TTL_H": "11"}) == 11
+        assert worktree_ttl_hours({"QUODEQ_ASSISTANT_WORKTREE_TTL_H": "11"}) == 11
 
     def test_empty_injected_env_ignores_the_process(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_ASSISTANT_WORKTREE_TTL_H", "5")
-        assert _worktree_ttl_hours({}) == _DEFAULT_WORKTREE_TTL_H
+        assert worktree_ttl_hours({}) == _DEFAULT_WORKTREE_TTL_H
 
 
 class TestWorktreesBase:

@@ -12,7 +12,7 @@ _DENY_BASENAMES = (".env", "id_rsa", "id_ed25519", ".netrc", ".npmrc", ".pypirc"
 _DENY_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".keystore")
 
 
-def _jail(ctx: ToolContext, rel_path: str) -> Path:
+def jail(ctx: ToolContext, rel_path: str) -> Path:
     root_path = ctx.worktree_dir or ctx.repo_root
     if root_path is None:
         raise ToolError(
@@ -34,7 +34,7 @@ def _jail(ctx: ToolContext, rel_path: str) -> Path:
 
 
 def _read_repo_file(ctx: ToolContext, path: str) -> dict:
-    target = _jail(ctx, path)
+    target = jail(ctx, path)
     if not target.is_file():
         raise ToolError(f"not a file: {path}")
     with target.open("rb") as fh:
@@ -47,7 +47,7 @@ def _read_repo_file(ctx: ToolContext, path: str) -> dict:
 
 
 def _list_repo_dir(ctx: ToolContext, path: str = ".") -> dict:
-    target = _jail(ctx, path)
+    target = jail(ctx, path)
     if not target.is_dir():
         raise ToolError(f"not a directory: {path}")
     entries = []

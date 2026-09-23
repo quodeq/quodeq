@@ -6,7 +6,7 @@ oversized files cannot be dispatched and are capped by
 files through their own tools and have no such cap.
 
 The queue builder / estimates (``list_source_files``) and the dispatch-time
-worker (``_gather_api_source_files``) MUST share this predicate. When they
+worker (``gather_api_source_files``) MUST share this predicate. When they
 diverged, files entered the queue, were taken, then silently dropped at
 dispatch: no ``file_done`` marker, no cache entry, re-queued as misses on
 every incremental run — and dim coverage never converged to 100%.

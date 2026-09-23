@@ -45,10 +45,6 @@ _memo: PrecedentMemo = LRUDict(_MEMO_MAX_RUNS)
 _memo_lock = threading.Lock()
 
 
-# Kept under the old private name for ``context.precedent``'s re-export.
-_normalize_snippet = normalize_snippet
-
-
 def precedent_text(req: str | None, snippet: str | None) -> str | None:
     """Canonical text embedded for a finding -- used on BOTH store and match
     sides so the comparison is symmetric. None when both parts are blank.

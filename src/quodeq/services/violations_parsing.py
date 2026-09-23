@@ -12,12 +12,12 @@ from pathlib import Path
 from quodeq.core.types import Finding, ViolationResponse
 from quodeq.services._violations_jsonl import parse_violations_from_jsonl
 from quodeq.services._violations_shared import (  # noqa: F401 — re-exported patch targets
-    _FINDING_TYPES,
-    _TYPE_COMPLIANCE,
-    _TYPE_VIOLATION,
-    _ResponseOptions,
-    _build_finding_entry,
-    _build_violation_response,
+    FINDING_TYPES,
+    TYPE_COMPLIANCE,
+    TYPE_VIOLATION,
+    ResponseOptions,
+    build_finding_entry,
+    build_violation_response,
 )
 from quodeq.services._violations_stream import parse_violations_from_stream
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
@@ -56,7 +56,7 @@ def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -
         # read_json wraps JSONDecodeError and non-object payloads in ValueError.
         return None
     violations = _extract_violations_from_principles(data.get("principles") or {})
-    return _build_violation_response(ctx, violations, [], _ResponseOptions(partial=True))
+    return build_violation_response(ctx, violations, [], ResponseOptions(partial=True))
 
 
 __all__ = [

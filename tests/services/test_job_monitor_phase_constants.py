@@ -1,7 +1,7 @@
 """The CC_MARKER_KEY phase vocabulary (setup/analyzing/scoring/analyzing_start/
 deadline_extended/report_path) is written by analysis/runner_markers.emit_marker
 (and its callers across analysis/) and read back by
-services/_job_monitor_mixin._JobMonitorMixin._apply_marker. Both sides import
+services/_job_monitor_mixin.JobMonitorMixin._apply_marker. Both sides import
 the same constants from shared.constants -- services may not import analysis
 -- so this test drives _apply_marker with the producer's own constants,
 never retyped strings, and checks core.stream.events.COPILOT_MCP_POLICY_REASON

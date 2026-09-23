@@ -13,8 +13,8 @@ from http import HTTPStatus
 import httpx
 import openai
 
-from quodeq.analysis._api_response import _finish_call, _repair_snippetless
-from quodeq.analysis._api_schema import _SYSTEM_PROMPT
+from quodeq.analysis._api_response import finish_call, repair_snippetless
+from quodeq.analysis._api_schema import SYSTEM_PROMPT
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 from quodeq.config.analysis_env import (
     api_read_timeout_override, context_size_override, max_output_tokens_override,
@@ -160,7 +160,7 @@ def _build_create_kwargs(prompt: str, config: ApiRunnerConfig) -> tuple[dict, bo
     create_kwargs: dict = dict(
         model=config.model,
         messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
         temperature=config.temperature,
@@ -210,7 +210,7 @@ def _handle_call_exception(exc: Exception, config: ApiRunnerConfig, start: float
         )
 
 
-def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
+def call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     """Call the LLM raw, validate each finding independently, return ``(findings, was_lossy)``.
 
     ``was_lossy`` is True when we failed to REACH the model (network/timeout)
@@ -219,7 +219,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     some findings were malformed returns ``(good_findings, False)`` -- the
     call succeeded end-to-end. Dropped malformed findings are logged (count)
     but do not set ``was_lossy``. Findings dropped only for a missing
-    ``snippet`` get one repair re-ask (see ``_repair_snippetless``) before
+    ``snippet`` get one repair re-ask (see ``repair_snippetless``) before
     they count as dropped; QUODEQ_DISABLE_FINDING_REPAIR turns that off.
     See ``run_api_analysis`` for the marker contract.
 
@@ -252,6 +252,6 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
         finish_reason = getattr(choice, "finish_reason", None)
         text = (choice.message.content or "") if choice else ""
         # Finishing inside the with block keeps the client open for the
-        # snippet repair re-ask _finish_call may make through this partial.
-        reask = functools.partial(_repair_snippetless, client, create_kwargs, config.model)
-        return _finish_call(config.model, finish_reason, text, start, reask=reask)
+        # snippet repair re-ask finish_call may make through this partial.
+        reask = functools.partial(repair_snippetless, client, create_kwargs, config.model)
+        return finish_call(config.model, finish_reason, text, start, reask=reask)

@@ -12,11 +12,11 @@ from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared._log_format import (  # noqa: F401
     ColorFormatter as _ColorFormatter,
     StderrHandler as _StderrHandler,
-    _LOG_SUCCESS,
-    _color,
-    _should_use_color,
-    _use_color,
-    _USE_COLOR,
+    LOG_SUCCESS,
+    color,
+    should_use_color,
+    use_color,
+    USE_COLOR,
 )
 
 # Module-level logger configuration is intentional -- standard Python convention.
@@ -46,7 +46,7 @@ def log_info(message: str, *, logger: logging.Logger | None = None) -> None:
 
 def log_success(message: str, *, logger: logging.Logger | None = None) -> None:
     """Log a success message."""
-    (logger or _logger).log(_LOG_SUCCESS, message)
+    (logger or _logger).log(LOG_SUCCESS, message)
 
 
 def log_warning(message: str, *, logger: logging.Logger | None = None) -> None:

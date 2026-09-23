@@ -24,7 +24,7 @@ from collections.abc import Mapping
 
 from quodeq.llm_bridge._ollama import (
     DEFAULT_MEMORY_FRACTION,
-    _detect_memory,
+    detect_memory,
     estimate_max_agents,
 )
 from quodeq.config.llm_bridge_env import llamacpp_base_url
@@ -117,7 +117,7 @@ def run_concurrency_test(
     and assume the loaded model occupies it. The estimate is conservative,
     capped by ``estimate_max_agents``.
     """
-    gpu_memory = _detect_memory()
+    gpu_memory = detect_memory()
     models = list_llamacpp_models(base_url)
     if not models:
         return {

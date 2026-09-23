@@ -8,7 +8,7 @@ from __future__ import annotations
 
 # Rebuild of the `findings` table used by `_upgrade_v3_to_v4` to widen the
 # severity CHECK constraint (SQLite cannot ALTER a CHECK in place).
-_V4_REBUILD_DDL = """
+V4_REBUILD_DDL = """
     -- Drop triggers and FTS index that reference the old table by name.
     DROP TRIGGER IF EXISTS findings_ai;
     DROP TRIGGER IF EXISTS findings_ad;

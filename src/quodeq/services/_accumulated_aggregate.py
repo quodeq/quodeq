@@ -1,6 +1,6 @@
 """Trend, severity, and score aggregation for the accumulated (cross-run) view.
 
-Split out of ``accumulated.py``. ``_build_accumulated_response`` is
+Split out of ``accumulated.py``. ``build_accumulated_response`` is
 the module's ``to_camel_dict`` wire-serialization call site — moving it here
 requires (and got) an update to ``DECLARED_WIRE_BOUNDARIES`` in
 ``tests/tools/test_serialization_boundary.py``.
@@ -30,7 +30,7 @@ def numeric_average(
     return dimension_weighted_average(pairs, params)
 
 
-def _compute_accumulated_trends(
+def compute_accumulated_trends(
     all_dimensions: list[DimensionResult],
     prev_occurrence: dict[str, DimensionResult],
 ) -> list[DimensionResult]:
@@ -51,7 +51,7 @@ def _compute_accumulated_trends(
     return result
 
 
-def _aggregate_severity_counts(all_dimensions: list[DimensionResult]) -> dict[str, int]:
+def aggregate_severity_counts(all_dimensions: list[DimensionResult]) -> dict[str, int]:
     """Sum violation/compliance counts and severity buckets across dimensions."""
     total_violations = total_compliance = critical = major = minor = 0
     for dim in all_dimensions:
@@ -68,7 +68,7 @@ def _aggregate_severity_counts(all_dimensions: list[DimensionResult]) -> dict[st
     }
 
 
-def _compute_accumulated_scores(
+def compute_accumulated_scores(
     all_dimensions: list[DimensionResult], prev_run_latest: list[DimensionResult],
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> tuple[float | None, float | None]:
@@ -79,7 +79,7 @@ def _compute_accumulated_scores(
 
 
 @dataclass(frozen=True)
-class _AccumulatedResult:
+class AccumulatedResult:
     all_dimensions: list[DimensionResult]
     dimensions_with_trend: list[DimensionResult]
     severity: dict[str, int]
@@ -87,8 +87,8 @@ class _AccumulatedResult:
     prev_avg_score: float | None
 
 
-def _build_accumulated_response(
-    project: str, result: _AccumulatedResult,
+def build_accumulated_response(
+    project: str, result: AccumulatedResult,
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, Any]:
     return {

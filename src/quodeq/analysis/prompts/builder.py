@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from quodeq.analysis.prompts import _context as ctx
 from quodeq.data.fs.standards_prefs import load_project_overrides
 from quodeq.analysis.prompts._renderers import (
-    _load_dimension_data,
+    load_dimension_data,
     render_compiled_standards,
     render_compact_standards,
     render_dimensions,
@@ -93,7 +93,7 @@ __all__ = [
     "render_compiled_standards",
     "render_dimensions",
     "render_previous_findings_section",
-    "_load_dimension_data",
+    "load_dimension_data",
 ]
 
 

@@ -18,24 +18,24 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.api.import_project import import_zip_stream
-from quodeq.api.zip import _build_project_zip
+from quodeq.api.zip import build_project_zip
 
 from .routes_common import reports_dir
-from .routes_shared_common import _logger, _shared_project_dir, _validate_segment, _with_shared_root
+from .routes_shared_common import logger, shared_project_dir, validate_segment, with_shared_root
 
 
 def _build_pull_zip(project: str, project_path: Path) -> tuple[Path, None] | tuple[None, tuple[Response, int]]:
     """Build the in-memory-to-disk zip of the shared project. Returns
     (zip_path, None) on success, (None, error) on failure."""
     try:
-        return _build_project_zip(project_path), None
+        return build_project_zip(project_path), None
     except ValueError:
         body, status = error_response(
             "Project too large to pull", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE",
         )
         return None, (jsonify(body), status)
     except (OSError, zipfile.BadZipFile):
-        _logger.exception("Failed to build zip for shared pull of %s", project)
+        logger.exception("Failed to build zip for shared pull of %s", project)
         body, status = error_response(
             "Failed to build project archive from the shared repository",
             HTTPStatus.INTERNAL_SERVER_ERROR, "EXPORT_ERROR",
@@ -51,7 +51,7 @@ def _import_pulled_zip(project: str, zip_path: Path, action: str | None) -> tupl
             )
         return jsonify(outcome.body), outcome.status
     except OSError:
-        _logger.exception("Failed to read zip for shared pull of %s", project)
+        logger.exception("Failed to read zip for shared pull of %s", project)
         body, status = error_response(
             "Failed to read project archive from the shared repository",
             HTTPStatus.INTERNAL_SERVER_ERROR, "EXPORT_ERROR",
@@ -61,10 +61,10 @@ def _import_pulled_zip(project: str, zip_path: Path, action: str | None) -> tupl
         try:
             zip_path.unlink()
         except OSError as exc:
-            _logger.warning("Failed to remove temp zip %s: %s", zip_path, exc)
+            logger.warning("Failed to remove temp zip %s: %s", zip_path, exc)
 
 
-@_with_shared_root
+@with_shared_root
 def shared_pull(project: str, eval_root: Path) -> Response | tuple[Response, int]:
     """Materialize a shared project as a local copy.
 
@@ -73,10 +73,10 @@ def shared_pull(project: str, eval_root: Path) -> Response | tuple[Response, int
     manual ``POST /api/projects/import`` route, since both funnel through
     ``import_zip_stream``.
     """
-    err = _validate_segment(project)
+    err = validate_segment(project)
     if err:
         return err
-    project_path = _shared_project_dir(eval_root, project)
+    project_path = shared_project_dir(eval_root, project)
     if project_path is None:
         body, status = error_response(
             "Project not found in the shared repository", HTTPStatus.NOT_FOUND, "NOT_FOUND",

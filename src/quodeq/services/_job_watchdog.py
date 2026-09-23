@@ -5,9 +5,9 @@ Split out of jobs.py as free functions. ``JobManager``'s own
 delegates that call these, passing in the collaborators (store,
 reports_root, cap) the instance already owns.
 
-``watchdog_should_kill`` looks up ``_WATCHDOG_DEADLINE_GRACE_S`` on the
+``watchdog_should_kill`` looks up ``WATCHDOG_DEADLINE_GRACE_S`` on the
 ``jobs`` module at call time (deferred, in-function) rather than importing
-it directly: tests monkeypatch ``quodeq.services.jobs._WATCHDOG_DEADLINE_GRACE_S``
+it directly: tests monkeypatch ``quodeq.services.jobs.WATCHDOG_DEADLINE_GRACE_S``
 to shrink the grace window, and a top-level import here would bind its own
 copy and silently escape that patch. The same deferred pattern is used for
 ``_publish_git.py``'s lookups of ``shared_publish.run_git``.
@@ -39,7 +39,7 @@ def watchdog_should_kill(job_id: str, started_at: float, *, store: "JobStore", j
         deadline = datetime.fromisoformat(deadline_at).timestamp()
     except (TypeError, ValueError):
         return False
-    return now > deadline + _jobs._WATCHDOG_DEADLINE_GRACE_S
+    return now > deadline + _jobs.WATCHDOG_DEADLINE_GRACE_S
 
 
 def run_status_exit_reason(job: "Job | None", reports_root: Path | None) -> str | None:
@@ -47,7 +47,7 @@ def run_status_exit_reason(job: "Job | None", reports_root: Path | None) -> str 
 
     The analysis loops break out at the deadline without raising, and the
     lifecycle records ``exit_reason="deadline"`` (see
-    ``cli_evaluation._record_deadline_if_hit``). When the process then
+    ``cli_evaluation.record_deadline_if_hit``). When the process then
     exits nonzero without the job watchdog ever firing, this is the only
     signal that the exit was a time-limit truncation, not a failure.
     """

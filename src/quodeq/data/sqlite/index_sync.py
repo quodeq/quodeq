@@ -30,7 +30,7 @@ from quodeq.data.sqlite._index_sync_promote import (
     force_promote_to_cancelled_stale,  # noqa: F401 — re-export
 )
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 _KNOWN_STATE_VALUES = {s.value for s in RunState}
 
@@ -71,21 +71,22 @@ def _heartbeat_iso(run_dir: Path) -> str | None:
     return datetime.fromtimestamp(m, tz=timezone.utc).isoformat(timespec="seconds")
 
 
-def _status_mtime_ns(run_dir: Path) -> int:
+def status_mtime_ns(run_dir: Path) -> int:
+    """The run's status.json mtime in nanoseconds, or 0 when it is missing."""
     try:
         return (run_dir / STATUS_FILENAME).stat().st_mtime_ns
     except OSError:
         return 0
 
 
-def _upsert_from_status(
+def upsert_from_status(
     db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
 ) -> None:
     """Read status.json + heartbeat, upsert the row."""
     try:
         status = read_status(run_dir)
     except UnsupportedSchemaError:
-        _logger.warning("skipping run %s: status schema newer than supported", run_dir)
+        logger.warning("skipping run %s: status schema newer than supported", run_dir)
         return
     if status is None:
         return
@@ -106,12 +107,12 @@ def _upsert_from_status(
             _heartbeat_iso(run_dir),
             status.get("pid"),
             status.get("exit_reason"),
-            _status_mtime_ns(run_dir),
+            status_mtime_ns(run_dir),
         ),
     )
 
 
-def _sync_legacy_run(
+def sync_legacy_run(
     db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
 ) -> None:
     """Synthesize a row from filesystem signals for a run with no status.json."""
@@ -158,12 +159,12 @@ def _sync_legacy_run(
     )
 
 
-def _delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
+def delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
     """Remove non-terminal rows whose ``run_dir`` no longer exists on disk.
 
     Without this sweep, an orphan row (e.g. left by a crashed test, a manually
     deleted run dir, or a partial cleanup) stays as ``running`` forever:
-    ``_check_stale_and_promote`` reads ``.heartbeat`` from ``run_dir``, and an
+    ``check_stale_and_promote`` reads ``.heartbeat`` from ``run_dir``, and an
     unreadable heartbeat (no dir) provides no liveness signal, so the row is
     never promoted. Terminal rows are left alone — users may prune old dirs
     to save disk and the index is their only record.
@@ -180,7 +181,7 @@ def _delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
     return len(orphan_ids)
 
 
-def _check_stale_and_promote(
+def check_stale_and_promote(
     db: sqlite3.Connection, run_dir: Path, *,
     project_uuid: str, run_id: str, stale_seconds: int = 30,
 ) -> bool:
@@ -226,7 +227,7 @@ def _check_stale_and_promote(
         )
         write_status(run_dir, new_status)
         with db:
-            _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+            upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
         return True
 
     return False

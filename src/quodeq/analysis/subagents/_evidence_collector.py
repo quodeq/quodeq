@@ -17,13 +17,13 @@ from quodeq.core.evidence.parser import (
     EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.analysis.subagents.pool import SubagentPool
-from quodeq.analysis.subagents._pool_launcher import _collect_all_evidence
+from quodeq.analysis.subagents._pool_launcher import collect_all_evidence
 from quodeq.analysis.runner_markers import cleanup_stream
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 
 
 @dataclass
-class _CollectionContext:
+class CollectionContext:
     """Grouped parameters for collecting evidence after a subagent pool run."""
     results: list[Any]
     ctx: AnalysisContext
@@ -31,15 +31,15 @@ class _CollectionContext:
     exit_reason: str | None = None
 
 
-def _collect_evidence(
+def collect_evidence(
     config: RunConfig, dim_id: str, evidence_dir: Path,
-    collection: _CollectionContext,
+    collection: CollectionContext,
 ) -> Evidence:
     """Deduplicate JSONL, count files read, and parse into Evidence."""
     merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)
 
-    total_files_read = _collect_all_evidence(collection.results, cleanup_stream)
+    total_files_read = collect_all_evidence(collection.results, cleanup_stream)
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     ev = parse_jsonl_to_evidence(

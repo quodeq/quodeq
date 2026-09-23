@@ -9,7 +9,7 @@ from pathlib import Path
 from quodeq.shared.utils import get_evaluations_dir, get_static_dist
 from quodeq.shared.env import get_dashboard_port
 from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
-from ._build import _static_dir
+from ._build import default_static_dir
 
 
 def _default_static_dist() -> str:
@@ -17,7 +17,7 @@ def _default_static_dist() -> str:
     bundled = get_static_dist()
     if bundled:
         return bundled
-    return str(_static_dir())
+    return str(default_static_dir())
 
 
 def _help_default(value: object) -> str:

@@ -7,12 +7,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from unittest.mock import MagicMock
 
-from quodeq.analysis.run_types import _AnalysisContext
+from quodeq.analysis.run_types import AnalysisContext
 
 
-def _ctx(total: int) -> _AnalysisContext:
-    """Minimal _AnalysisContext — only `total` is read by the loops."""
-    return _AnalysisContext(
+def _ctx(total: int) -> AnalysisContext:
+    """Minimal AnalysisContext — only `total` is read by the loops."""
+    return AnalysisContext(
         dimensions_data=None,
         date_str="",
         template="",

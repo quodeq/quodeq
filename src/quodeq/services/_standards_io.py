@@ -8,7 +8,7 @@ from pathlib import Path
 from quodeq.core.types.standard import StandardDetail, StandardMeta
 logger = logging.getLogger(__name__)
 
-_TYPE_CUSTOM = "custom"
+TYPE_CUSTOM = "custom"
 _TYPE_BUILTIN = "builtin"
 
 
@@ -93,7 +93,7 @@ def _builtin_fields(
     }
 
 
-def build_detail(data: dict, *, type_default: str = _TYPE_CUSTOM) -> StandardDetail:
+def build_detail(data: dict, *, type_default: str = TYPE_CUSTOM) -> StandardDetail:
     """Construct a StandardDetail from a raw JSON dict."""
     sid = _require_id(data, "standard")
     return StandardDetail(
@@ -118,7 +118,7 @@ def build_custom_meta(data: dict, p_count: int, r_count: int) -> StandardMeta:
     """Build a StandardMeta for a user-created custom standard."""
     sid = _require_id(data, "custom standard")
     return StandardMeta(
-        **_custom_fields(data, sid, _TYPE_CUSTOM),
+        **_custom_fields(data, sid, TYPE_CUSTOM),
         principle_count=p_count, requirement_count=r_count,
     )
 

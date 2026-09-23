@@ -12,8 +12,8 @@ from quodeq.analysis.subagents._pool_models import (
     PoolOptions,
     PoolPaths,
     SubagentResult,
-    _AGENT_ID_PREFIX,
-    _HEARTBEAT_JOIN_TIMEOUT_S,
+    AGENT_ID_PREFIX,
+    HEARTBEAT_JOIN_TIMEOUT_S,
 )
 from quodeq.analysis.subagents._pool_worker import WorkerContext, build_agent_config, run_single_agent
 from quodeq.analysis.subagents.file_queue import WorkQueue
@@ -76,7 +76,7 @@ class SubagentPool:
         )
 
     def _submit_agent(self, executor: ThreadPoolExecutor) -> None:
-        self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+        self._finished[f"{AGENT_ID_PREFIX}-{self._next_idx}"] = False
         self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
         self._next_idx += 1
 
@@ -166,7 +166,7 @@ class SubagentPool:
             raise
         finally:
             stop.set()
-            hb.join(timeout=_HEARTBEAT_JOIN_TIMEOUT_S)
+            hb.join(timeout=HEARTBEAT_JOIN_TIMEOUT_S)
 
     def _record_exit_reason(self, max_dur: int, pool_start: float) -> None:
         """Without an exception, decide between "done" and "time_limit"."""

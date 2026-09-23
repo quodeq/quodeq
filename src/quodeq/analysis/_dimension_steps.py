@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis.run_types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream, run_analysis
 from quodeq.analysis.stream.parser import extract_evidence_from_stream
 from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid
@@ -15,16 +15,16 @@ from quodeq.analysis.runner_markers import make_heartbeat
 from quodeq.shared.logging import log_warning
 
 
-def _build_dimension_prompt(
-    config: RunConfig, dim_id: str, ctx: _AnalysisContext,
+def build_dimension_prompt(
+    config: RunConfig, dim_id: str, ctx: AnalysisContext,
 ) -> str:
     """Build the analysis prompt for a single dimension."""
     return build_analysis_prompt(ctx.template, prompt_context(config, ctx, dim_id))
 
 
-def _run_dimension_analysis(
+def run_dimension_analysis(
     config: RunConfig, dim_id: str, prompt: str,
-    idx: int, ctx: _AnalysisContext,
+    idx: int, ctx: AnalysisContext,
 ) -> tuple[Path, Path]:
     """Run the AI analysis subprocess for a single dimension.
 
@@ -74,9 +74,9 @@ def _try_parse_stream_evidence(stream_file: Path, jsonl_file: Path) -> int:
     return extract_evidence_from_stream(stream_file, jsonl_file)
 
 
-def _parse_dimension_evidence(
+def parse_dimension_evidence(
     config: RunConfig, _dim_id: str, stream_file: Path, jsonl_file: Path,
-    ctx: _AnalysisContext,
+    ctx: AnalysisContext,
 ) -> Evidence | None:
     """Extract and parse evidence from stream/JSONL files for a single dimension.
 

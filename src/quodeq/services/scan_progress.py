@@ -12,7 +12,7 @@ Sources:
 - ``<dim>_evidence.jsonl``        — unique violation / compliance / duplicate counts (in-memory dedup)
 - ``<dim>_agent-*.stream`` mtime  — per-dim active-agents heuristic
 
-Data shapes (``_DimProgress``/``_ScanProgress``) live in
+Data shapes (``DimProgress``/``ScanProgress``) live in
 ``_scan_progress_types.py``; per-dim elapsed-time math lives in
 ``_scan_progress_elapsed.py``; per-dim progress-row construction lives in
 ``_scan_progress_dims.py`` -- all split out to keep this module under the
@@ -26,15 +26,15 @@ from pathlib import Path
 from quodeq.config.paths import default_paths
 from quodeq.core.run.state import TERMINAL_STATES, RunState
 from quodeq.services._scan_progress_dims import (
-    _build_dim_progress,
-    _consolidated_dim_progress,
+    build_dim_progress,
+    consolidated_dim_progress,
     forget_live_tallies,
 )
-from quodeq.services._scan_progress_elapsed import _parse_started_at
-from quodeq.services._scan_progress_types import (  # noqa: F401 - _DimProgress/_ScanProgress re-export
-    _DimProgress,
-    _ProgressContext,
-    _ScanProgress,
+from quodeq.services._scan_progress_elapsed import parse_started_at
+from quodeq.services._scan_progress_types import (  # noqa: F401 - DimProgress/ScanProgress re-export
+    DimProgress,
+    ProgressContext,
+    ScanProgress,
 )
 from quodeq.services.wiring import read_run_status_json, read_scan_total_files
 from quodeq.services.suppression import project_suppressions
@@ -80,14 +80,14 @@ def _recover_dim_ids(status: dict, dim_records: dict, dim_estimates: dict) -> li
 
 
 def _scan_progress(
-    job_id: str, ctx: _ProgressContext, dimensions: list[_DimProgress],
-) -> _ScanProgress:
+    job_id: str, ctx: ProgressContext, dimensions: list[DimProgress],
+) -> ScanProgress:
     """A progress snapshot: the run-level header from *ctx*, plus *dimensions*.
 
     Both the consolidated-live and per-dim paths report the same header, so
     the field list is written once here.
     """
-    return _ScanProgress(
+    return ScanProgress(
         job_id=job_id,
         state=ctx.state,
         phase=ctx.status.get("phase"),
@@ -100,7 +100,7 @@ def _scan_progress(
     )
 
 
-def _maybe_consolidated_live_progress(job_id: str, ctx: _ProgressContext) -> _ScanProgress | None:
+def _maybe_consolidated_live_progress(job_id: str, ctx: ProgressContext) -> ScanProgress | None:
     """Consolidated (grouped) runs dispatch every dimension in one pass and
     write consolidated_* files — there are no per-dim queues, so the per-dim
     reader would report 0% / "estimating…" for the whole run. While such a
@@ -116,17 +116,17 @@ def _maybe_consolidated_live_progress(job_id: str, ctx: _ProgressContext) -> _Sc
         or any((evidence_dir / f"{d}_queue.json").is_file() for d in ctx.dim_ids)
     ):
         return None
-    return _scan_progress(job_id, ctx, [_consolidated_dim_progress(ctx.run_dir)])
+    return _scan_progress(job_id, ctx, [consolidated_dim_progress(ctx.run_dir)])
 
 
 def _gather_progress_context(
     status: dict, run_dir: Path, time_limit_s: int | None, compiled_dir: Path | None,
-) -> _ProgressContext:
+) -> ProgressContext:
     """Resolve the run-level scalars build_scan_progress needs before
     dispatching to the consolidated-live check or the per-dim loop."""
     state = status.get("state") or "unknown"
     dim_estimates, dim_records, dim_ids = _read_dimension_inputs(status, run_dir)
-    return _ProgressContext(
+    return ProgressContext(
         run_dir=run_dir,
         status=status,
         state=state,
@@ -145,7 +145,7 @@ def _gather_progress_context(
 
 def _total_elapsed_s(status: dict, state: str) -> float | None:
     """Seconds the run has been going (live) or took (finalized); None when unknown."""
-    return _compute_total_elapsed(status, state, _parse_started_at(status))
+    return _compute_total_elapsed(status, state, parse_started_at(status))
 
 
 def _read_dimension_inputs(status: dict, run_dir: Path) -> tuple[dict, dict, list[str]]:
@@ -155,7 +155,7 @@ def _read_dimension_inputs(status: dict, run_dir: Path) -> tuple[dict, dict, lis
     return dim_estimates, dim_records, _recover_dim_ids(status, dim_records, dim_estimates)
 
 
-def _build_per_dim_progress(job_id: str, ctx: _ProgressContext) -> _ScanProgress:
+def _build_per_dim_progress(job_id: str, ctx: ProgressContext) -> ScanProgress:
     # The scanner re-finds everything the user has dismissed or deleted, so a
     # raw evidence tally can run several times the number the finished report
     # shows. Read the suppression stores once per tick and net them out here,
@@ -163,7 +163,7 @@ def _build_per_dim_progress(job_id: str, ctx: _ProgressContext) -> _ScanProgress
     dismissed, deleted = project_suppressions(ctx.run_dir.parent)
 
     dim_results = [
-        _build_dim_progress(dim_id, ctx, dismissed, deleted)
+        build_dim_progress(dim_id, ctx, dismissed, deleted)
         for dim_id in ctx.dim_ids
     ]
     if ctx.is_terminal:
@@ -181,7 +181,7 @@ def build_scan_progress(
     *,
     time_limit_s: int | None = None,
     compiled_dir: Path | None = None,
-) -> _ScanProgress | None:
+) -> ScanProgress | None:
     """Compute progress for a run.
 
     Reads only on-disk state — works for internal and external runs uniformly.

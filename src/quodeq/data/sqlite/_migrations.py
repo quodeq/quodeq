@@ -4,12 +4,12 @@ from __future__ import annotations
 import sqlite3
 
 from quodeq.data.sqlite._migrations_additive import (
-    _upgrade_v5_to_v6,
-    _upgrade_v6_to_v7,
-    _upgrade_v7_to_v8,
-    _upgrade_v8_to_v9,
+    upgrade_v5_to_v6,
+    upgrade_v6_to_v7,
+    upgrade_v7_to_v8,
+    upgrade_v8_to_v9,
 )
-from quodeq.data.sqlite._migrations_ddl import _V4_REBUILD_DDL
+from quodeq.data.sqlite._migrations_ddl import V4_REBUILD_DDL
 from quodeq.data.sqlite._schema import EVALUATION_DDL, SCHEMA_VERSION
 
 
@@ -147,7 +147,7 @@ def _upgrade_v3_to_v4(conn: sqlite3.Connection) -> None:
     this function returns.
     """
     _recover_v4_rebuild_state(conn)
-    conn.executescript(_V4_REBUILD_DDL)
+    conn.executescript(V4_REBUILD_DDL)
     _invalidate_projection_checkpoint(conn)
 
 
@@ -183,10 +183,10 @@ _UPGRADES = {
     2: _upgrade_v2_to_v3,
     3: _upgrade_v3_to_v4,
     4: _upgrade_v4_to_v5,
-    5: _upgrade_v5_to_v6,
-    6: _upgrade_v6_to_v7,
-    7: _upgrade_v7_to_v8,
-    8: _upgrade_v8_to_v9,
+    5: upgrade_v5_to_v6,
+    6: upgrade_v6_to_v7,
+    7: upgrade_v7_to_v8,
+    8: upgrade_v8_to_v9,
 }
 
 

@@ -11,7 +11,7 @@ from quodeq.core.run.job_status import JobStatus
 from quodeq.services._job_model import InMemoryJobStore, Job
 from quodeq.services.jobs import (
     JobManager,
-    _EXIT_CODE_TIMEOUT,
+    EXIT_CODE_TIMEOUT,
 )
 
 
@@ -94,9 +94,11 @@ class TestMonitorProcess:
         """
         from quodeq.services import jobs as jobs_mod
         monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(
+            "quodeq.services._job_monitor_mixin.WATCHDOG_POLL_INTERVAL_S", 0.01,
+        )
         # Group-wide terminate would signal a real pid; stub it to the fake's kill.
-        monkeypatch.setattr(jobs_mod, "_terminate_process", lambda p: p.kill())
+        monkeypatch.setattr(jobs_mod, "terminate_process", lambda p: p.kill())
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -108,7 +110,7 @@ class TestMonitorProcess:
         mgr._monitor_process("j1", proc)
 
         assert proc.killed is True
-        assert job.exit_code == _EXIT_CODE_TIMEOUT
+        assert job.exit_code == EXIT_CODE_TIMEOUT
         # Watchdog kills are time-budget exits, not failures: the header
         # renders them as "time limit reached" via the exit_reason.
         assert job.status == JobStatus.CANCELLED
@@ -118,9 +120,10 @@ class TestMonitorProcess:
         """With no QUODEQ_JOB_TIMEOUT_S and no deadline_at, the watchdog must
         never preemptively kill — the user did not opt into a time cap.
         """
-        from quodeq.services import jobs as jobs_mod
         monkeypatch.delenv("QUODEQ_JOB_TIMEOUT_S", raising=False)
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(
+            "quodeq.services._job_monitor_mixin.WATCHDOG_POLL_INTERVAL_S", 0.01,
+        )
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -139,8 +142,9 @@ class TestMonitorProcess:
     def test_deadline_in_future_does_not_kill(self, monkeypatch):
         """Job with deadline_at in the future is not killed by the watchdog."""
         from datetime import datetime, timedelta, timezone
-        from quodeq.services import jobs as jobs_mod
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(
+            "quodeq.services._job_monitor_mixin.WATCHDOG_POLL_INTERVAL_S", 0.01,
+        )
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -159,11 +163,13 @@ class TestMonitorProcess:
         """Job whose deadline_at has passed (plus the grace window) is killed."""
         from datetime import datetime, timedelta, timezone
         from quodeq.services import jobs as jobs_mod
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_DEADLINE_GRACE_S", 0.02)
+        monkeypatch.setattr(
+            "quodeq.services._job_monitor_mixin.WATCHDOG_POLL_INTERVAL_S", 0.01,
+        )
+        monkeypatch.setattr(jobs_mod, "WATCHDOG_DEADLINE_GRACE_S", 0.02)
         # The watchdog must terminate the whole process tree, not just the
         # parent PID; patch it to the stub's own kill so the loop can break.
-        monkeypatch.setattr(jobs_mod, "_terminate_process", lambda p: p.kill())
+        monkeypatch.setattr(jobs_mod, "terminate_process", lambda p: p.kill())
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -176,7 +182,7 @@ class TestMonitorProcess:
         mgr._monitor_process("j1", proc)
 
         assert proc.killed is True
-        assert job.exit_code == _EXIT_CODE_TIMEOUT
+        assert job.exit_code == EXIT_CODE_TIMEOUT
         # Deadline kill = the user's own time budget doing its job.
         assert job.status == JobStatus.CANCELLED
         assert job.exit_reason == "deadline"
@@ -188,19 +194,21 @@ class TestMonitorProcess:
         process.kill() SIGKILLs only the parent — the subagent pool + AI-CLI
         children are orphaned (token/CPU leak) and can keep writing into the
         abandoned run dir. Every other kill path goes through
-        _terminate_process (group-wide, TERM->grace->KILL); the watchdog
+        terminate_process (group-wide, TERM->grace->KILL); the watchdog
         must too.
         """
         from quodeq.services import jobs as jobs_mod
         monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(
+            "quodeq.services._job_monitor_mixin.WATCHDOG_POLL_INTERVAL_S", 0.01,
+        )
         calls = []
 
         def fake_terminate(p):
             calls.append(p)
             p.kill()  # let the stub's wait() start returning so the loop ends
 
-        monkeypatch.setattr(jobs_mod, "_terminate_process", fake_terminate)
+        monkeypatch.setattr(jobs_mod, "terminate_process", fake_terminate)
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -210,8 +218,8 @@ class TestMonitorProcess:
         mgr._processes["j1"] = proc
         mgr._monitor_process("j1", proc)
 
-        assert calls == [proc], "watchdog kill must go through _terminate_process"
-        assert job.exit_code == _EXIT_CODE_TIMEOUT
+        assert calls == [proc], "watchdog kill must go through terminate_process"
+        assert job.exit_code == EXIT_CODE_TIMEOUT
         assert job.status == JobStatus.CANCELLED
 
 

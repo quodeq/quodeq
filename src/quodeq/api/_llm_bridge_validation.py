@@ -10,10 +10,10 @@ from flask import Response, jsonify, request
 
 from quodeq.shared.url_validation import url_safety_error
 
-_BODY_NOT_OBJECT = {"error": "request body must be a JSON object", "code": "INVALID_PARAM"}
+BODY_NOT_OBJECT = {"error": "request body must be a JSON object", "code": "INVALID_PARAM"}
 
 
-def _json_body() -> dict | None:
+def json_body() -> dict | None:
     """Return the request's JSON body when it is an object, else None.
 
     A body like ``[1]`` or ``"x"`` parses as valid JSON but crashes the
@@ -24,7 +24,7 @@ def _json_body() -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def _invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:
+def invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:
     """Return a 400 response when *base_url* fails SSRF validation, else None.
 
     Same policy as /api/provider/test: http(s) scheme only, private/LAN
@@ -48,7 +48,7 @@ def _invalid_model_name(model: str) -> tuple[Response, int] | None:
     return None
 
 
-def _require_model_name(
+def require_model_name(
     data: dict, *, require_nonempty: bool,
 ) -> tuple[str | None, tuple[Response, int] | None]:
     """Validate the ``model`` field shared by the concurrency-test routes.

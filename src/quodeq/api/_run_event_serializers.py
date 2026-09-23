@@ -34,7 +34,7 @@ def serialize_finding_event(judgment_dict: dict[str, Any]) -> str:
     return json.dumps(judgment_dict, separators=(",", ":"))
 
 
-def _payload_as_sse_finding(payload: Any, finding_id: int) -> dict[str, Any]:
+def payload_as_sse_finding(payload: Any, finding_id: int) -> dict[str, Any]:
     """Project a Judgment into the finding dict the SSE client expects."""
     return {
         "id": finding_id,

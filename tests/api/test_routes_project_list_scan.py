@@ -128,7 +128,7 @@ class TestProjectEstimates:
         """Create a registered project pointing at a tiny local repo.
 
         Three files minimum: the manifest builder drops languages with
-        fewer than _MIN_FILES_PER_TARGET (3) files.
+        fewer than MIN_FILES_PER_TARGET (3) files.
         """
         repo = tmp_path / "repo"
         repo.mkdir(exist_ok=True)

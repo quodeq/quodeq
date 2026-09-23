@@ -35,8 +35,8 @@ class TestDiscardSkipsScoring:
             output_project="proj", output_run_id="run1",
         )
         with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
-             patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard, \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
+             patch("quodeq.services.evaluation_mixin.discard_run_state") as mock_discard, \
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status"):
             result = m.cancel_evaluation(
                 "j1", reports_dir="/reports", discard_partial=True,
             )
@@ -54,7 +54,7 @@ class TestDiscardSkipsScoring:
             output_project="proj", output_run_id="run1",
         )
         with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status"):
             result = m.cancel_evaluation("j1", reports_dir="/reports")
         assert result is True
         mock_score.assert_called_once()
@@ -86,13 +86,13 @@ class TestRouteDiscardBlocksScoringResurrection:
 
     @pytest.fixture(autouse=True)
     def _reset_claim_registry(self, monkeypatch):
-        from quodeq.api._evaluation_routes import _scored_jobs, _scored_jobs_lock
+        from quodeq.api._evaluation_routes import scored_jobs, scored_jobs_lock
         monkeypatch.delenv("QUODEQ_API_KEY", raising=False)
-        with _scored_jobs_lock:
-            _scored_jobs.clear()
+        with scored_jobs_lock:
+            scored_jobs.clear()
         yield
-        with _scored_jobs_lock:
-            _scored_jobs.clear()
+        with scored_jobs_lock:
+            scored_jobs.clear()
 
     def test_get_after_discard_cancel_does_not_score(self, tmp_path, monkeypatch):
         monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path))

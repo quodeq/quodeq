@@ -20,23 +20,23 @@ from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
 from quodeq.shared.constants import CC_MARKER_KEY
 
-_REPORT_PATH_MARKER = "Report path:"
-_EXIT_CODE_TIMEOUT = -9
+REPORT_PATH_MARKER = "Report path:"
+EXIT_CODE_TIMEOUT = -9
 
 # Watchdog polls process state every N seconds and re-checks deadline_at,
 # which only lands in job state after the analyzing_start marker -- so a
 # blocking wait(timeout=full_budget) at spawn time can't see it.
-_WATCHDOG_POLL_INTERVAL_S = 1.0
+WATCHDOG_POLL_INTERVAL_S = 1.0
 
 if TYPE_CHECKING:
     import subprocess
 
     from quodeq.services._external_jobs import ProcessControl
 
-_MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
-_MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
-_CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
+MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
+MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
+CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
 
 
@@ -105,7 +105,7 @@ class Job:
     started_at: str
     ended_at: str | None
     exit_code: int | None
-    logs: deque[str] = field(default_factory=lambda: deque(maxlen=_MAX_LOG_LINES))
+    logs: deque[str] = field(default_factory=lambda: deque(maxlen=MAX_LOG_LINES))
     output_project: str | None = None
     output_run_id: str | None = None
     phase: str | None = None
@@ -206,4 +206,4 @@ class InMemoryJobStore:
             self._jobs.pop(job_id, None)
 
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)

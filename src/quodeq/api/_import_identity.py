@@ -16,12 +16,12 @@ from quodeq.services.project_index import (
     save_index,
 )
 
-from ._import_validation import _logger
+from ._import_validation import logger
 
-_REPO_INFO_FILENAME = "repository_info.json"
+REPO_INFO_FILENAME = "repository_info.json"
 
 
-def _identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
+def identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
     return ProjectIdentity(
         project_name=str(info.get("name") or ""),
         repo_path=str(info.get("path") or ""),
@@ -33,7 +33,7 @@ def _identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
 
 
 def _index_collision(reports_root: Path, identity: ProjectIdentity, ignore_uuid: str) -> str | None:
-    """O(1) index lookup for a colliding project (mirrors ``_update_index``'s
+    """O(1) index lookup for a colliding project (mirrors ``update_index``'s
     use of the same index)."""
     index = load_index(reports_root)
     candidate = index.get(index_key(identity))
@@ -60,7 +60,7 @@ def _heal_index(reports_root: Path, identity: ProjectIdentity, uuid: str) -> Non
         index[index_key(identity)] = uuid
         save_index(reports_root, index)
     except OSError as exc:
-        _logger.warning("import: could not update project_index.json: %s", exc)
+        logger.warning("import: could not update project_index.json: %s", exc)
 
 
 def _walk_for_collision(reports_root: Path, identity: ProjectIdentity, ignore_uuid: str) -> str | None:
@@ -71,7 +71,7 @@ def _walk_for_collision(reports_root: Path, identity: ProjectIdentity, ignore_uu
     for child in reports_root.iterdir():
         if not child.is_dir() or child.name == ignore_uuid:
             continue
-        info_file = child / _REPO_INFO_FILENAME
+        info_file = child / REPO_INFO_FILENAME
         if not info_file.exists():
             continue
         try:
@@ -85,7 +85,7 @@ def _walk_for_collision(reports_root: Path, identity: ProjectIdentity, ignore_uu
     return None
 
 
-def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, ignore_uuid: str) -> str | None:
+def find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, ignore_uuid: str) -> str | None:
     """Return the UUID of any other project matching this identity.
 
     Fast path: O(1) index lookup instead of a directory walk + repository_info.json
@@ -104,9 +104,9 @@ def _find_identity_collision(reports_root: Path, identity: ProjectIdentity, *, i
     return _walk_for_collision(reports_root, identity, ignore_uuid)
 
 
-def _rewrite_repository_info(project_dir: Path, new_uuid: str) -> None:
+def rewrite_repository_info(project_dir: Path, new_uuid: str) -> None:
     """Update the imported project's repository_info.json with its new UUID."""
-    info_path = project_dir / _REPO_INFO_FILENAME
+    info_path = project_dir / REPO_INFO_FILENAME
     try:
         data = json.loads(info_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -115,10 +115,10 @@ def _rewrite_repository_info(project_dir: Path, new_uuid: str) -> None:
     try:
         info_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     except OSError as exc:
-        _logger.warning("import: could not rewrite repository_info.json: %s", exc)
+        logger.warning("import: could not rewrite repository_info.json: %s", exc)
 
 
-def _update_index(
+def update_index(
     reports_root: Path,
     identity: ProjectIdentity,
     project_uuid: str,
@@ -137,4 +137,4 @@ def _update_index(
         index[index_key(identity)] = project_uuid
         save_fn(reports_root, index)
     except OSError as exc:
-        _logger.warning("import: could not update project_index.json: %s", exc)
+        logger.warning("import: could not update project_index.json: %s", exc)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.api._import_identity import _find_identity_collision
+from quodeq.api._import_identity import find_identity_collision
 from quodeq.services.project_index import ProjectIdentity, index_key, load_index, save_index
 
 
@@ -23,20 +23,20 @@ def test_finds_collision_via_index_without_reading_repository_info(tmp_path: Pat
     # would find nothing; the index lookup must still find the collision.
     (tmp_path / "existing-uuid").mkdir()
 
-    result = _find_identity_collision(tmp_path, identity, ignore_uuid="new-uuid")
+    result = find_identity_collision(tmp_path, identity, ignore_uuid="new-uuid")
     assert result == "existing-uuid"
 
 
 def test_no_collision_when_index_has_no_matching_key(tmp_path: Path):
     save_index(tmp_path, {})
-    result = _find_identity_collision(tmp_path, _identity(), ignore_uuid="new-uuid")
+    result = find_identity_collision(tmp_path, _identity(), ignore_uuid="new-uuid")
     assert result is None
 
 
 def test_ignores_the_candidate_uuid_itself(tmp_path: Path):
     identity = _identity()
     save_index(tmp_path, {index_key(identity): "self-uuid"})
-    result = _find_identity_collision(tmp_path, identity, ignore_uuid="self-uuid")
+    result = find_identity_collision(tmp_path, identity, ignore_uuid="self-uuid")
     assert result is None
 
 
@@ -58,7 +58,7 @@ def test_self_match_in_index_still_falls_through_to_directory_walk(tmp_path: Pat
         "location": identity.location,
     }))
 
-    result = _find_identity_collision(tmp_path, identity, ignore_uuid="new-uuid")
+    result = find_identity_collision(tmp_path, identity, ignore_uuid="new-uuid")
     assert result == "legacy-uuid"
 
 
@@ -81,7 +81,7 @@ def test_falls_back_to_directory_walk_when_index_misses_and_self_heals(tmp_path:
     # write that never happened.
     assert load_index(tmp_path) == {}
 
-    result = _find_identity_collision(tmp_path, identity, ignore_uuid="new-uuid")
+    result = find_identity_collision(tmp_path, identity, ignore_uuid="new-uuid")
     assert result == "existing-uuid"
 
     # Self-heal: the fallback hit must have been written back into the index.
@@ -91,5 +91,5 @@ def test_falls_back_to_directory_walk_when_index_misses_and_self_heals(tmp_path:
     # A second lookup now hits the fast path even if repository_info.json
     # disappears (proving it no longer needs the directory walk).
     (existing / "repository_info.json").unlink()
-    result_again = _find_identity_collision(tmp_path, identity, ignore_uuid="new-uuid")
+    result_again = find_identity_collision(tmp_path, identity, ignore_uuid="new-uuid")
     assert result_again == "existing-uuid"

@@ -28,7 +28,7 @@ from quodeq.data.fs.report_parser.external_pid import (  # noqa: F401 — re-exp
     resolve_external_pid,
 )
 from quodeq.services._run_index_fs import (
-    _scan_reports_root_for_run, _sync_external_run_by_scan,
+    scan_reports_root_for_run, sync_external_run_by_scan,
 )
 from quodeq.shared.env import env_float
 from quodeq.shared.process import is_pid_alive
@@ -80,12 +80,12 @@ def resolve_external_run_project(
     output_project/output_run_id skips scanning every project dir under
     *reports_root*.
 
-    Without a hint this goes through ``_scan_reports_root_for_run``, the one
+    Without a hint this goes through ``scan_reports_root_for_run``, the one
     copy of the scan, so the ``is_within`` jail applies here too.
     """
     if run_dir_hint is not None and run_dir_hint.is_dir():
         return run_dir_hint.parent.name
-    candidate = _scan_reports_root_for_run(reports_root, run_id)
+    candidate = scan_reports_root_for_run(reports_root, run_id)
     return candidate.parent.name if candidate is not None else None
 
 
@@ -127,7 +127,7 @@ def cancel_external_run(
     return not control.pid_alive(pid)
 
 
-def _sync_external_run(db, job_id: str, reports_dir: Path) -> bool:
+def sync_external_run(db, job_id: str, reports_dir: Path) -> bool:
     """Bring the index row for an external run up to date; False if the id is unsafe.
 
     Prefers the run directory the index already knows. A blank run_dir falls
@@ -142,5 +142,5 @@ def _sync_external_run(db, job_id: str, reports_dir: Path) -> bool:
     if run_dir is not None and run_dir.is_dir():
         _run_index.sync_index_for_run(db, run_dir)
     else:
-        _sync_external_run_by_scan(db, reports_dir, run_id)
+        sync_external_run_by_scan(db, reports_dir, run_id)
     return True

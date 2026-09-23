@@ -45,7 +45,7 @@ def _count_ok_files(run_dir: Path | None) -> int:
     return _tally_evidence_dir(run_dir)[0]
 
 
-def _raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> None:
+def raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> None:
     """Fail the run loudly when a dead provider stopped it before ANY analysis.
 
     Two outcomes, keyed on whether this run already analysed files
@@ -56,7 +56,7 @@ def _raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> 
       with silently incomplete dimensions.
     - Partial success (e.g. quota died halfway): the data is worth keeping.
       Return without raising so the run finalizes as done; the CLI hook
-      (``_record_provider_fatal_if_cancelled``) stamps the exit_reason so
+      (``record_provider_fatal_if_cancelled``) stamps the exit_reason so
       the UI says "stopped early, results are partial" rather than showing
       a clean completion.
     """

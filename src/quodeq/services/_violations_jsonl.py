@@ -16,11 +16,11 @@ from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.config.paths import default_paths
 from quodeq.shared.validation import validate_path_segment
 from quodeq.services._violations_shared import (
-    _build_finding_entry,
-    _build_violation_response,
-    _ResponseOptions,
-    _FINDING_TYPES,
-    _TYPE_VIOLATION,
+    build_finding_entry,
+    build_violation_response,
+    ResponseOptions,
+    FINDING_TYPES,
+    TYPE_VIOLATION,
 )
 from quodeq.shared.utils import open_text
 
@@ -39,7 +39,7 @@ def _resolve_and_dedupe(
     already seen.
     """
     principle = obj.get("p") or obj.get("req")
-    if not principle or obj.get("t") not in _FINDING_TYPES:
+    if not principle or obj.get("t") not in FINDING_TYPES:
         return None
     if matcher.is_suppressed(obj):
         return None
@@ -67,7 +67,7 @@ def _parse_jsonl_findings(
     Two exclusions keep this live view from showing more findings than the
     persisted evaluation: rows the dashboard suppresses (the dismissed/deleted
     sets in *keys*), and rows whose principle is not in the dimension's
-    standard, which the report path quarantines in ``_group_judgments``.
+    standard, which the report path quarantines in ``group_judgments``.
     """
     violations: list[Finding] = []
     compliance: list[Finding] = []
@@ -101,8 +101,8 @@ def _parse_jsonl_findings(
         resolved_obj = _resolve_and_dedupe(obj, matcher, resolver, seen)
         if resolved_obj is None:
             continue
-        entry = _build_finding_entry(resolved_obj, dimension, req_refs_lookup)
-        if resolved_obj["t"] == _TYPE_VIOLATION:
+        entry = build_finding_entry(resolved_obj, dimension, req_refs_lookup)
+        if resolved_obj["t"] == TYPE_VIOLATION:
             violations.append(entry)
         else:
             compliance.append(entry)
@@ -148,9 +148,9 @@ def parse_violations_from_jsonl(
         _logger.warning("Failed to read findings file: %s", exc)
         return None
     files_read = len(count_files_in_stream(stream_path)) if stream_path and stream_path.exists() else 0
-    return _build_violation_response(
+    return build_violation_response(
         ctx, violations, compliance,
-        _ResponseOptions(
+        ResponseOptions(
             partial=True,
             progress={"filesRead": files_read, "violations": len(violations), "compliance": len(compliance)},
         ),

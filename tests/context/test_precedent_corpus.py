@@ -25,7 +25,7 @@ def test_backfill_scans_the_corpus_once_not_per_chunk(monkeypatch) -> None:
     """
     from quodeq.context.precedent_store import Embedder, _backfill_missing
 
-    monkeypatch.setattr("quodeq.context.precedent_store._BACKFILL_CHUNK", 1)
+    monkeypatch.setattr("quodeq.context.precedent_store.BACKFILL_CHUNK", 1)
     iterations = [0]
 
     class CountingTexts(dict):

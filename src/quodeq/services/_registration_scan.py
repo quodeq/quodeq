@@ -12,7 +12,7 @@ from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.fs_scan import scan_project
 
 
-def _zero_run_scan_fallback() -> dict:
+def zero_run_scan_fallback() -> dict:
     """Fresh zero-run scan_data for a project whose scan.json is missing/corrupt.
 
     A factory, not a module-level constant: dict(_ZERO_RUN_SCAN_FALLBACK) used
@@ -27,7 +27,7 @@ def _zero_run_scan_fallback() -> dict:
     }
 
 
-def _scan_parent_project(
+def scan_parent_project(
     project_dir: Path, reports_path: Path, repo_path: Path, *, log: LogSink = NULL_LOG,
 ) -> None:
     """Scan the parent project directory if it lacks a scan.json."""

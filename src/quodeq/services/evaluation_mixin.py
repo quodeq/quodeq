@@ -4,8 +4,8 @@ Split to stay under the file-size cap: the dispatch abstraction and CLI
 command building live in ``_evaluation_dispatch.py``, env-var building in
 ``_evaluation_env.py``, and the cancel-wait/discard machinery in
 ``_run_discard.py``. All are re-exported here — tests import
-``SubprocessDispatcher``/``_build_evaluate_cmd`` and patch
-``_wait_for_terminal_status``/``_discard_run_state`` at this module's path.
+``SubprocessDispatcher``/``build_evaluate_cmd`` and patch
+``wait_for_terminal_status``/``discard_run_state`` at this module's path.
 """
 
 from __future__ import annotations
@@ -21,13 +21,13 @@ from quodeq.services.project_registration import mark_onboarding_complete, regis
 from quodeq.services.score_run import score_completed_evidence
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url
 
-from quodeq.services._evaluation_dispatch import EvaluationDispatcher, SubprocessDispatcher, _build_evaluate_cmd  # re-export
+from quodeq.services._evaluation_dispatch import EvaluationDispatcher, SubprocessDispatcher, build_evaluate_cmd  # re-export
 from quodeq.services._evaluation_env import build_eval_env
 from quodeq.services._run_discard import (  # noqa: F401 — re-export
-    _CacheEraser,
-    _discard_run_state,
-    _open_cache,
-    _wait_for_terminal_status,
+    CacheEraser,
+    discard_run_state,
+    open_cache,
+    wait_for_terminal_status,
 )
 
 if TYPE_CHECKING:
@@ -142,7 +142,7 @@ class FsEvaluationMixin:
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
         """Start an asynchronous evaluation subprocess for a repository."""
         resolved = self._resolve_repo_target(repo)
-        cmd = _build_evaluate_cmd(repo, options, reports_dir)
+        cmd = build_evaluate_cmd(repo, options, reports_dir)
         self._register_target_project(repo, reports_dir, options)
         return self._launch_evaluation_job(cmd, reports_dir, options, resolved)
 
@@ -158,6 +158,15 @@ class FsEvaluationMixin:
         fn = getattr(self, "_get_status_fn", None)
         if fn is not None:
             return fn(job_id, reports_dir=reports_dir)
+        return self._jobs.get_job(job_id)
+
+    def in_memory_job(self, job_id: str) -> JobSnapshot | None:
+        """The in-memory JobManager view of *job_id*, or None.
+
+        Unlike ``get_evaluation_status`` this never consults the run index,
+        so an ``ext-`` id or an unknown id returns None. The log-stream routes
+        use it for the freshest status of an internal run.
+        """
         return self._jobs.get_job(job_id)
 
     def cancel_evaluation(
@@ -198,9 +207,9 @@ class FsEvaluationMixin:
             run_dir = Path(reports_dir) / job.output_project / job.output_run_id
         ok = self._jobs.cancel_job(job_id, reports_root=reports_root, run_dir=run_dir)
         if ok and run_dir is not None:
-            _wait_for_terminal_status(run_dir)
+            wait_for_terminal_status(run_dir)
             if discard_partial:
-                _discard_run_state(reports_dir, _run_ref(job))
+                discard_run_state(reports_dir, _run_ref(job))
             else:
                 score_completed_evidence(reports_dir, _run_ref(job))
         return ok

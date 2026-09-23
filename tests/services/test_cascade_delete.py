@@ -7,7 +7,7 @@ from pathlib import Path
 
 import quodeq.services.fs_projects as fs_projects
 from quodeq.services.fs_projects import delete_project
-from quodeq.services._repo_index import RepoIdentity, _load_repo_index, add_repo_index_entry
+from quodeq.services._repo_index import RepoIdentity, load_repo_index, add_repo_index_entry
 
 
 def _make_project(reports_root: Path, name: str, parent: str | None = None) -> Path:
@@ -80,7 +80,7 @@ def test_delete_parent_purges_index_entries_for_parent_and_children(tmp_path: Pa
     result = delete_project(str(tmp_path), parent_id)
 
     assert result is True
-    remaining = _load_repo_index(tmp_path)
+    remaining = load_repo_index(tmp_path)
     assert set(remaining.values()) == {other_id}
 
 
@@ -116,5 +116,5 @@ def test_delete_purges_child_index_entries_even_when_parent_removal_fails(
     assert not (tmp_path / child_id).exists()
     assert (tmp_path / parent_id).exists()
 
-    remaining = _load_repo_index(tmp_path)
+    remaining = load_repo_index(tmp_path)
     assert set(remaining.values()) == {parent_id}

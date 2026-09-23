@@ -103,7 +103,7 @@ export function drawConstellationLines(ctx, activeScene, tc, w2s) {
 
 /**
  * Draw a folder star's nebula, texture blobs, and dashed cluster border.
- * Mutates `s._clusterHitR` (the hit-test radius the click handler reads).
+ * Mutates `s.clusterHitR` (the hit-test radius the click handler reads).
  */
 function drawFolderNebula(ctx, star, view) {
   const { s, i, sc, sr } = star;
@@ -136,7 +136,7 @@ function drawFolderNebula(ctx, star, view) {
   ctx.strokeStyle = `rgba(${cr},${cg},${cb},${FOLDER_NEBULA.borderAlpha * nebulaFade})`;
   ctx.lineWidth = 1;
   ctx.setLineDash(FOLDER_NEBULA_DASH); ctx.stroke(); ctx.setLineDash([]);
-  s._clusterHitR = borderR;
+  s.clusterHitR = borderR;
 
   if (!zoomed) {
     ctx.beginPath(); ctx.arc(sc.x, sc.y, sr * FOLDER_NEBULA.innerRingRadiusRatio, 0, TAU);
@@ -202,7 +202,7 @@ function hitTestStar({ s, i, sc, sr }, params) {
   if (animRef.current || fly || mx < 0) return null;
   const dx = mx - sc.x, dy = my - sc.y;
   const d2 = dx * dx + dy * dy;
-  const clusterR = s.isFolder && s._clusterHitR > 0 ? s._clusterHitR : 0;
+  const clusterR = s.isFolder && s.clusterHitR > 0 ? s.clusterHitR : 0;
   const starHitR = Math.max(sr * 2, FOLDER_STAR.hitRadiusMinPx);
   if (d2 < starHitR * starHitR || (clusterR > 0 && d2 < clusterR * clusterR)) {
     return { type: s.isFolder ? 'folder' : 'file', starIdx: i, data: s };

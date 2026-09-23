@@ -99,7 +99,7 @@ class TestListLlamacppModels:
 class TestConcurrency:
     def test_no_model_loaded(self):
         with patch("quodeq.llm_bridge._llamacpp.list_llamacpp_models", return_value=[]), \
-             patch("quodeq.llm_bridge._llamacpp._detect_memory", return_value=48e9):
+             patch("quodeq.llm_bridge._llamacpp.detect_memory", return_value=48e9):
             result = run_concurrency_test("any")
         assert result["recommended"] == 1
         assert "reason" in result
@@ -108,7 +108,7 @@ class TestConcurrency:
         with patch(
             "quodeq.llm_bridge._llamacpp.list_llamacpp_models",
             return_value=[{"name": "model.gguf", "size": 0}],
-        ), patch("quodeq.llm_bridge._llamacpp._detect_memory", return_value=128e9):
+        ), patch("quodeq.llm_bridge._llamacpp.detect_memory", return_value=128e9):
             result = run_concurrency_test("model.gguf")
         assert result["recommended"] >= 1
         assert result["gpu_memory"] == 128e9
@@ -117,6 +117,6 @@ class TestConcurrency:
         with patch(
             "quodeq.llm_bridge._llamacpp.list_llamacpp_models",
             return_value=[{"name": "model.gguf", "size": 0}],
-        ), patch("quodeq.llm_bridge._llamacpp._detect_memory", return_value=0):
+        ), patch("quodeq.llm_bridge._llamacpp.detect_memory", return_value=0):
             result = run_concurrency_test("model.gguf")
         assert result["recommended"] == 1

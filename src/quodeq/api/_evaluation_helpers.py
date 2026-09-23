@@ -98,7 +98,7 @@ def coerce_int(value: object, default: int, field: str) -> int:
         raise InvalidEvaluationOption(f"{field} must be an integer") from exc
 
 
-def _sanitize_url(url: str) -> str:
+def sanitize_url(url: str) -> str:
     """Remove embedded credentials from a URL for safe logging/error messages.
 
     Userinfo ends at the LAST "@" of the authority (RFC 3986), so the search
@@ -116,7 +116,7 @@ def _sanitize_url(url: str) -> str:
     return f"{scheme}***@{after}"
 
 
-def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tuple[Response, int] | None:
+def validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tuple[Response, int] | None:
     """Return an error response if *ai_cmd* is not in the allow-list, or None if valid."""
     if not ai_cmd:
         return None
@@ -131,7 +131,7 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
     return None
 
 
-def _validate_ai_model(
+def validate_ai_model(
     ai_cmd: str | None, ai_model: str | None, provider_configs: Mapping[str, dict],
 ) -> tuple[Response, int] | None:
     """API-type providers require an explicit model."""
@@ -207,7 +207,7 @@ def ai_cmd_path_error(
     return None
 
 
-def _validate_ai_cmd_path(
+def validate_ai_cmd_path(
     ai_cmd: str | None, ai_cmd_path: str | None,
 ) -> tuple[Response, int] | None:
     """Return a 400 error response if *ai_cmd_path* is not an acceptable
@@ -223,7 +223,7 @@ def _validate_ai_cmd_path(
     )
 
 
-def _check_eval_rate_limit(eval_rate_store: "RateLimitStore | None") -> tuple[Response, int] | None:
+def check_eval_rate_limit(eval_rate_store: "RateLimitStore | None") -> tuple[Response, int] | None:
     """Return an error response if the evaluation rate limit is exceeded, or None."""
     if eval_rate_store is None:
         return None

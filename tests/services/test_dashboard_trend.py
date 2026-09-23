@@ -1,7 +1,7 @@
 """Tests for quodeq.services.dashboard — trend/previous/stale helpers.
 
-Split from test_dashboard.py: _collect_previous_scores,
-_collect_stale_dimensions, _enrich_dimensions_with_trend, and
+Split from test_dashboard.py: collect_previous_scores,
+_collect_stale_dimensions, enrich_dimensions_with_trend, and
 _build_accumulated_trend. Shared builders live in
 tests/services/_dashboard_fixtures.py.
 """
@@ -15,8 +15,8 @@ from quodeq.services.dashboard_trend import (
     build_accumulated_trend as _build_accumulated_trend,
 )
 from quodeq.services.dashboard import (
-    _collect_previous_scores,
-    _enrich_dimensions_with_trend,
+    collect_previous_scores,
+    enrich_dimensions_with_trend,
 )
 from tests.services._dashboard_fixtures import _dim, _make_run
 
@@ -25,20 +25,20 @@ class TestCollectPreviousScores:
     def test_finds_previous_for_matching_dimension(self):
         runs = [_make_run("r1"), _make_run("r2")]
         fetcher = lambda rid: [_dim("security", "A", "9.0")] if rid == "r2" else []
-        result = _collect_previous_scores(runs, 0, {"security"}, fetcher)
+        result = collect_previous_scores(runs, 0, {"security"}, fetcher)
         assert "security" in result
         assert result["security"].overall_grade == "A"
 
     def test_skips_na_grades(self):
         runs = [_make_run("r1"), _make_run("r2")]
         fetcher = lambda rid: [_dim("security", "NA", "0")] if rid == "r2" else []
-        result = _collect_previous_scores(runs, 0, {"security"}, fetcher)
+        result = collect_previous_scores(runs, 0, {"security"}, fetcher)
         assert result == {}
 
     def test_ignores_dimensions_not_in_selected(self):
         runs = [_make_run("r1"), _make_run("r2")]
         fetcher = lambda rid: [_dim("perf")] if rid == "r2" else []
-        result = _collect_previous_scores(runs, 0, {"security"}, fetcher)
+        result = collect_previous_scores(runs, 0, {"security"}, fetcher)
         assert result == {}
 
 
@@ -66,7 +66,7 @@ class TestCollectPreviousScoresEdgeCases:
     def test_single_run_returns_empty(self):
         runs = [_make_run("r1")]
         fetcher = lambda rid: [_dim("security", "A", "9.0")]
-        result = _collect_previous_scores(runs, 0, {"security"}, fetcher)
+        result = collect_previous_scores(runs, 0, {"security"}, fetcher)
         assert result == {}
 
 
@@ -74,7 +74,7 @@ class TestEnrichDimensionsWithTrend:
     def test_adds_trend_fields(self):
         dims = [_dim("security", "B", "7.0")]
         previous = {"security": DimensionResult(dimension="security", overall_score="6.0", run_id="r0")}
-        result = _enrich_dimensions_with_trend(dims, previous)
+        result = enrich_dimensions_with_trend(dims, previous)
         assert len(result) == 1
         assert result[0].trend is not None
         assert result[0].previous_run_id == "r0"
@@ -82,7 +82,7 @@ class TestEnrichDimensionsWithTrend:
 
     def test_no_previous(self):
         dims = [_dim("security")]
-        result = _enrich_dimensions_with_trend(dims, {})
+        result = enrich_dimensions_with_trend(dims, {})
         assert result[0].previous_run_id is None
 
 

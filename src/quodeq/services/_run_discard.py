@@ -2,7 +2,7 @@
 
 Split out of ``evaluation_mixin.py``. Re-exported there for
 backward compatibility — ``FsEvaluationMixin.cancel_evaluation`` calls
-``_wait_for_terminal_status``/``_discard_run_state`` as bare module-global
+``wait_for_terminal_status``/``discard_run_state`` as bare module-global
 names so ``unittest.mock.patch("quodeq.services.evaluation_mixin.<name>")``
 keeps working after the move (tests patch both).
 """
@@ -21,7 +21,7 @@ _CANCEL_WAIT_TIMEOUT_S = 2.0
 _CANCEL_WAIT_POLL_S = 0.05
 # The replayed_unconsolidated_keys pattern names keys belonging to EARLIER
 # runs. It is cleaned up as scratch but deliberately never fed to
-# _discard_run_state's cache-deletion loop, which only deletes this run's
+# discard_run_state's cache-deletion loop, which only deletes this run's
 # own dispatched cache keys.
 _SCRATCH_PATTERNS = (
     "*_queue.json", "*_fingerprint.json",
@@ -30,7 +30,7 @@ _SCRATCH_PATTERNS = (
 )
 
 
-def _wait_for_terminal_status(
+def wait_for_terminal_status(
     run_dir: Path,
     *,
     timeout_s: float = _CANCEL_WAIT_TIMEOUT_S,
@@ -69,7 +69,7 @@ def _wait_for_terminal_status(
         time.sleep(poll_interval_s)
 
 
-def _open_cache():
+def open_cache():
     """Lazily construct the default cache backend (import kept local).
 
     Deferred rather than routed through ``services.wiring``: ``wiring`` is
@@ -95,8 +95,8 @@ def _is_run_path_valid(reports_path: Path, run_dir: Path) -> bool:
         return False
 
 
-def _discard_run_state(
-    reports_dir: str, job: dict, *, cache: "_CacheEraser | None" = None,
+def discard_run_state(
+    reports_dir: str, job: dict, *, cache: "CacheEraser | None" = None,
     log: LogSink = NULL_LOG,
 ) -> None:
     """Wipe every trace a discarded run left behind.
@@ -131,7 +131,7 @@ def _discard_run_state(
 
     keys = read_dispatched_cache_keys(evidence_dir)
     if keys:
-        cache = cache or _open_cache()
+        cache = cache or open_cache()
         for key in keys:
             try:
                 cache.delete(key)
@@ -141,16 +141,16 @@ def _discard_run_state(
     remove_matching_files(evidence_dir, _SCRATCH_PATTERNS)
 
 
-class _CacheEraser(Protocol):
-    """The one cache-backend method ``_discard_run_state`` needs.
+class CacheEraser(Protocol):
+    """The one cache-backend method ``discard_run_state`` needs.
 
     A local structural type instead of importing
     ``data.cache_store.backend.CacheBackend`` directly: this Protocol is the
-    injection seam ``_discard_run_state`` tests against, independent of
-    which concrete backend ``_open_cache`` returns. ``LocalFileBackend``
-    (returned by ``_open_cache``, and every other real cache backend)
+    injection seam ``discard_run_state`` tests against, independent of
+    which concrete backend ``open_cache`` returns. ``LocalFileBackend``
+    (returned by ``open_cache``, and every other real cache backend)
     satisfies this shape without any inheritance. Defined after
-    ``_discard_run_state`` (referenced there only as a deferred string
+    ``discard_run_state`` (referenced there only as a deferred string
     annotation, per ``from __future__ import annotations``).
     """
 

@@ -14,10 +14,10 @@ from quodeq.api._rate_limit_file_store import FileRateLimitStore
 from quodeq.api._rate_limit_store import InMemoryRateLimitStore
 from quodeq.api._rate_limit_factory import _validated_rate_limit_path, _DEFAULT_RATE_LIMIT_FILE
 from quodeq.api._rate_limit_config import (
-    _DEFAULT_RATE_LIMIT_MAX,
-    _DEFAULT_RATE_LIMIT_WINDOW,
-    _rate_limit_max,
-    _rate_limit_window,
+    DEFAULT_RATE_LIMIT_MAX,
+    DEFAULT_RATE_LIMIT_WINDOW,
+    rate_limit_max,
+    rate_limit_window,
 )
 
 _skip_no_symlink = pytest.mark.skipif(
@@ -87,20 +87,20 @@ def test_validated_path_rejects_dotdot_in_raw_path(tmp_path: Path):
 
 @pytest.mark.parametrize("raw", ["0", "-5", "abc", ""])
 def test_rate_limit_window_falls_back_on_invalid_env(raw):
-    assert _rate_limit_window(env={"QUODEQ_RATE_LIMIT_WINDOW": raw}) == _DEFAULT_RATE_LIMIT_WINDOW
+    assert rate_limit_window(env={"QUODEQ_RATE_LIMIT_WINDOW": raw}) == DEFAULT_RATE_LIMIT_WINDOW
 
 
 def test_rate_limit_window_accepts_valid_env():
-    assert _rate_limit_window(env={"QUODEQ_RATE_LIMIT_WINDOW": "30"}) == 30
+    assert rate_limit_window(env={"QUODEQ_RATE_LIMIT_WINDOW": "30"}) == 30
 
 
 @pytest.mark.parametrize("raw", ["0", "-1", "many", ""])
 def test_rate_limit_max_falls_back_on_invalid_env(raw):
-    assert _rate_limit_max(env={"QUODEQ_RATE_LIMIT_MAX": raw}) == _DEFAULT_RATE_LIMIT_MAX
+    assert rate_limit_max(env={"QUODEQ_RATE_LIMIT_MAX": raw}) == DEFAULT_RATE_LIMIT_MAX
 
 
 def test_rate_limit_max_accepts_valid_env():
-    assert _rate_limit_max(env={"QUODEQ_RATE_LIMIT_MAX": "5"}) == 5
+    assert rate_limit_max(env={"QUODEQ_RATE_LIMIT_MAX": "5"}) == 5
 
 
 # ---------------------------------------------------------------------------

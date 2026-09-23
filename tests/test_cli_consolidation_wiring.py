@@ -51,15 +51,15 @@ def wired(tmp_path: Path, monkeypatch):
     paths = (tmp_path / "reports", evidence_dir, evaluation_dir)
 
     monkeypatch.setattr(
-        cli_evaluation, "_resolve_evaluation_inputs",
+        cli_evaluation, "resolve_evaluation_inputs",
         lambda a: ResolvedInputs(
             src=src, language="python",
             manifest=SourceManifest(), dims_data={"applies": []},
         ),
     )
-    monkeypatch.setattr(cli_evaluation, "_setup_run_dirs", lambda a, s: paths)
+    monkeypatch.setattr(cli_evaluation, "setup_run_dirs", lambda a, s: paths)
     monkeypatch.setattr(
-        cli_evaluation, "_run_pipeline_with_cleanup", lambda a, i, p: 0,
+        cli_evaluation, "run_pipeline_with_cleanup", lambda a, i, p: 0,
     )
 
     calls: list[Path] = []

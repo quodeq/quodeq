@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 
-from quodeq.cli_evaluation import _build_run_config, run_evaluate
+from quodeq.cli_evaluation import build_run_config, run_evaluate
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.analysis.manifest_models import SourceManifest
 
@@ -56,7 +56,7 @@ def _args(repo: Path, **overrides) -> argparse.Namespace:
 
 def _inputs(repo: Path) -> ResolvedInputs:
     # SourceManifest's modern API uses targets; an empty manifest is fine
-    # because _build_run_config only passes it through to RunConfig.
+    # because build_run_config only passes it through to RunConfig.
     manifest = SourceManifest()
     return ResolvedInputs(
         src=repo,
@@ -70,7 +70,7 @@ def test_diff_from_populates_file_filter_and_skip_scoring(tmp_path: Path) -> Non
     repo = _make_repo_with_diff(tmp_path)
     args = _args(repo, diff_from="main")
     args._diff_files = {"changed.py"}  # normally set by run_evaluate
-    config = _build_run_config(args, inputs=_inputs(repo), evidence_dir=repo / "evi")
+    config = build_run_config(args, inputs=_inputs(repo), evidence_dir=repo / "evi")
     assert config.options.diff_from == "main"
     assert config.options.skip_scoring is True
     assert config.options.incremental_file_filter == {"changed.py"}
@@ -79,7 +79,7 @@ def test_diff_from_populates_file_filter_and_skip_scoring(tmp_path: Path) -> Non
 def test_no_diff_from_leaves_file_filter_unset(tmp_path: Path) -> None:
     repo = _make_repo_with_diff(tmp_path)
     args = _args(repo, diff_from=None)
-    config = _build_run_config(args, inputs=_inputs(repo), evidence_dir=repo / "evi")
+    config = build_run_config(args, inputs=_inputs(repo), evidence_dir=repo / "evi")
     assert config.options.diff_from is None
     assert config.options.skip_scoring is False
     assert config.options.incremental_file_filter is None

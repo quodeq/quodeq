@@ -2,7 +2,7 @@ import pytest
 
 from quodeq.assistant.tools import ToolContext, ToolRegistry, build_registry
 from quodeq.assistant.tools.write_tools import register_write_tools
-from quodeq.assistant.worktree import WorktreeManager, _run
+from quodeq.assistant.worktree import WorktreeManager, run_git
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
@@ -10,13 +10,13 @@ from quodeq.data.sqlite.assistant_repository import AssistantRepository
 def wt_ctx(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
-    _run(["git", "-C", str(repo), "init", "-q", "-b", "main"])
-    _run(["git", "-C", str(repo), "config", "core.autocrlf", "false"])
-    _run(["git", "-C", str(repo), "config", "user.name", "T"])
-    _run(["git", "-C", str(repo), "config", "user.email", "t@example.com"])
+    run_git(["git", "-C", str(repo), "init", "-q", "-b", "main"])
+    run_git(["git", "-C", str(repo), "config", "core.autocrlf", "false"])
+    run_git(["git", "-C", str(repo), "config", "user.name", "T"])
+    run_git(["git", "-C", str(repo), "config", "user.email", "t@example.com"])
     (repo / "app.py").write_bytes(b"a = 1\nb = 2\nb = 2\n")
-    _run(["git", "-C", str(repo), "add", "-A"])
-    _run(["git", "-C", str(repo), "commit", "-q", "-m", "init"])
+    run_git(["git", "-C", str(repo), "add", "-A"])
+    run_git(["git", "-C", str(repo), "commit", "-q", "-m", "init"])
     manager = WorktreeManager.for_session(repo, "proj", "abcdef1234567890",
                                           base=tmp_path / "wts")
     manager.create()

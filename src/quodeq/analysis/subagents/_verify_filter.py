@@ -1,6 +1,6 @@
 """Pre-filter for prior findings — drops findings whose files no longer exist.
 
-Only ``_pre_filter_gone`` survives. The fingerprint-
+Only ``pre_filter_gone`` survives. The fingerprint-
 based partition logic (``partition_findings_by_fingerprint``,
 ``_classify_findings``) was specific to the V1 verify-pool, which V2
 replaces with content-addressed cache invalidation.
@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def _pre_filter_gone(findings: list[dict], src: Path) -> tuple[list[dict], int]:
+def pre_filter_gone(findings: list[dict], src: Path) -> tuple[list[dict], int]:
     """Fast pre-filter: drop findings whose files no longer exist.
 
     Returns (surviving_findings, gone_count).

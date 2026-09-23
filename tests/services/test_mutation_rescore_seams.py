@@ -14,7 +14,7 @@ def test_project_lock_registry_shares_per_project_and_clears():
 
 
 def test_project_all_runs_uses_injected_repo_factory(tmp_path):
-    from quodeq.services.mutation_rescore import _project_all_runs
+    from quodeq.services.mutation_rescore import project_all_runs
 
     (tmp_path / "r1").mkdir()
     (tmp_path / "r1" / "events.jsonl").write_text("")
@@ -29,7 +29,7 @@ def test_project_all_runs_uses_injected_repo_factory(tmp_path):
         def ensure_projected(self):
             seen.append(self._run_dir)
 
-    _project_all_runs(tmp_path, repo_factory=_FakeRepo)
+    project_all_runs(tmp_path, repo_factory=_FakeRepo)
 
     assert seen == [tmp_path / "r1"]
     assert not (tmp_path / "r1" / "evaluation.db").exists()

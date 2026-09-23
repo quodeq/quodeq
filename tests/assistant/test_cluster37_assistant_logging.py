@@ -31,12 +31,12 @@ def test_detect_memory_logs_and_returns_zero(monkeypatch) -> None:
     def _missing(*_args, **_kwargs):
         raise FileNotFoundError(2, "No such file", "sysctl")
 
-    # _detect_memory only probes on Darwin/Linux; force Linux so the (mocked)
+    # detect_memory only probes on Darwin/Linux; force Linux so the (mocked)
     # nvidia-smi probe runs on every platform, including Windows CI.
     monkeypatch.setattr(_ollama.platform, "system", lambda: "Linux")
     monkeypatch.setattr(_ollama.subprocess, "check_output", _missing)
     with patch.object(_ollama._log, "debug") as debug:
-        assert _ollama._detect_memory() == 0
+        assert _ollama.detect_memory() == 0
     assert debug.called
     assert "memory detection failed" in debug.call_args.args[0]
 
@@ -61,7 +61,7 @@ def test_worktree_remove_logs_when_branch_delete_fails(monkeypatch, tmp_path) ->
             raise WorktreeError("boom")
         return ""
 
-    monkeypatch.setattr(_worktree_manager, "_run", fake_run)
+    monkeypatch.setattr(_worktree_manager, "run_git", fake_run)
     with patch.object(_worktree_manager._logger, "debug") as debug:
         manager.remove(delete_branch=True)
     assert debug.called
@@ -130,7 +130,7 @@ def test_cleanup_run_artifacts_logs_when_pid_unlink_fails(monkeypatch, tmp_path)
 
 def test_run_pipeline_with_cleanup_logs_when_pid_write_fails(monkeypatch, tmp_path) -> None:
     import quodeq._cli_lifecycle as lifecycle
-    from quodeq.cli_evaluation import _run_pipeline_with_cleanup
+    from quodeq.cli_evaluation import run_pipeline_with_cleanup
     from quodeq.cli import ResolvedInputs
 
     class _Sentinel(Exception):
@@ -149,10 +149,10 @@ def test_run_pipeline_with_cleanup_logs_when_pid_write_fails(monkeypatch, tmp_pa
         raise _Sentinel()
 
     monkeypatch.setattr(Path, "write_text", _raise_write)
-    monkeypatch.setattr("quodeq.cli_evaluation._build_run_config", _raise_sentinel)
+    monkeypatch.setattr("quodeq.cli_evaluation.build_run_config", _raise_sentinel)
 
     with patch.object(lifecycle._logger, "debug") as debug:
         with pytest.raises(_Sentinel):
-            _run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
+            run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
     assert debug.called
     assert "pid file write failed" in debug.call_args.args[0]

@@ -87,9 +87,9 @@ def _configure_upload_limits(app: Flask) -> None:
     limit, plus a small headroom for multipart framing. Flask aborts with
     413 before reading the full body, which keeps large bogus uploads cheap.
     """
-    from quodeq.api.zip import _max_zip_size_bytes
+    from quodeq.api.zip import max_zip_size_bytes
     app.config.setdefault(
-        "MAX_CONTENT_LENGTH", _max_zip_size_bytes() + _MULTIPART_FRAMING_HEADROOM_BYTES,
+        "MAX_CONTENT_LENGTH", max_zip_size_bytes() + _MULTIPART_FRAMING_HEADROOM_BYTES,
     )
 
 
@@ -229,7 +229,7 @@ def _install_shutdown_handlers() -> None:
 
     Evaluation subprocesses are spawned with start_new_session=True so they
     survive the API process dying, and are intentionally NOT killed here --
-    otherwise launching a second dashboard (which calls _kill_stale_action_api
+    otherwise launching a second dashboard (which calls kill_stale_action_api
     on the first) would cascade and kill any scan in flight. Scans have their
     own lifecycle; use the UI cancel button or the DELETE endpoint.
     """

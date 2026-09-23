@@ -1,7 +1,7 @@
 """The API-provider file-size cap must be enforced at enumeration, not
 silently at dispatch (the perpetual-97%-coverage bug).
 
-Bug: ``_gather_api_source_files`` dropped files over ``QUODEQ_MAX_API_FILE_SIZE``
+Bug: ``gather_api_source_files`` dropped files over ``QUODEQ_MAX_API_FILE_SIZE``
 *after* taking them from the queue, without writing any ``file_done`` marker.
 The files never entered the cache, so every incremental run re-counted them as
 misses, re-queued them, and re-skipped them. The same ~3% of files haunted

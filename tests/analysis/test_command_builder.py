@@ -4,7 +4,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 
-from quodeq.analysis._command import _build_ai_cmd
+from quodeq.analysis._command import build_ai_cmd
 from quodeq.analysis._config import AnalysisConfig
 
 
@@ -76,7 +76,7 @@ class TestCmdBinaryOverride:
         monkeypatch.setenv("AI_CMD_PATH", "/opt/bin/claude-api")
         config = AnalysisConfig(ai_cmd="claude", ai_model="sonnet-4")
         with _patch_providers(_CLAUDE_CFG):
-            args, _ = _build_ai_cmd("Analyze", config)
+            args, _ = build_ai_cmd("Analyze", config)
         assert args[0] == "/opt/bin/claude-api"
         # Provider behavior still resolves from the "claude" registry entry.
         assert "--print" in args
@@ -86,7 +86,7 @@ class TestCmdBinaryOverride:
         monkeypatch.delenv("AI_CMD_PATH", raising=False)
         config = AnalysisConfig(ai_cmd="claude", ai_model="sonnet-4")
         with _patch_providers(_CLAUDE_CFG):
-            args, _ = _build_ai_cmd("Analyze", config)
+            args, _ = build_ai_cmd("Analyze", config)
         assert args[0] == "claude"
 
 
@@ -96,7 +96,7 @@ class TestBuildAiCmdClaude:
     def test_uses_print_and_stream_json(self):
         config = AnalysisConfig(ai_cmd="claude", ai_model="sonnet-4")
         with _patch_providers(_CLAUDE_CFG):
-            args, _ = _build_ai_cmd("Analyze this", config)
+            args, _ = build_ai_cmd("Analyze this", config)
         assert "--print" in args
         assert "--output-format" in args
         idx = args.index("--output-format")
@@ -117,7 +117,7 @@ class TestBuildAiCmdClaude:
             jsonl_file=jsonl, compiled_dir=tmp_path, dimension="security",
         )
         with _patch_providers(_CLAUDE_CFG):
-            args, mcp_path = _build_ai_cmd("Analyze", config)
+            args, mcp_path = build_ai_cmd("Analyze", config)
         assert mcp_path is not None
         assert "--mcp-config" in args
         assert "--allowedTools" in args
@@ -134,13 +134,13 @@ class TestBuildAiCmdClaude:
             jsonl_file=jsonl, compiled_dir=tmp_path, dimension="security",
         )
         with _patch_providers(_CLAUDE_CFG):
-            args, _ = _build_ai_cmd("Analyze", config)
+            args, _ = build_ai_cmd("Analyze", config)
         assert "--strict-mcp-config" in args
 
     def test_no_strict_mcp_config_without_jsonl(self):
         config = AnalysisConfig(ai_cmd="claude", ai_model="sonnet-4")
         with _patch_providers(_CLAUDE_CFG):
-            args, _ = _build_ai_cmd("Analyze", config)
+            args, _ = build_ai_cmd("Analyze", config)
         assert "--strict-mcp-config" not in args
 
 
@@ -150,7 +150,7 @@ class TestBuildAiCmdCodex:
     def test_uses_exec_subcommand_and_json(self):
         config = AnalysisConfig(ai_cmd="codex", ai_model="gpt-5.4")
         with _patch_providers(_CODEX_CFG):
-            args, _ = _build_ai_cmd("Analyze this", config)
+            args, _ = build_ai_cmd("Analyze this", config)
         # "exec" must appear right after binary
         assert args[0] == "codex"
         assert args[1] == "exec"
@@ -163,7 +163,7 @@ class TestBuildAiCmdCodex:
     def test_no_print_flag(self):
         config = AnalysisConfig(ai_cmd="codex", ai_model="gpt-5.4")
         with _patch_providers(_CODEX_CFG):
-            args, _ = _build_ai_cmd("Analyze", config)
+            args, _ = build_ai_cmd("Analyze", config)
         assert "--print" not in args
         assert "--output-format" not in args
         assert "-p" not in args
@@ -174,14 +174,14 @@ class TestBuildAiCmdCodex:
             analysis_budget="5.00", max_turns=50,
         )
         with _patch_providers(_CODEX_CFG):
-            args, _ = _build_ai_cmd("Analyze", config)
+            args, _ = build_ai_cmd("Analyze", config)
         assert "--max-budget-usd" not in args
         assert "--max-turns" not in args
 
     def test_includes_model_flag(self):
         config = AnalysisConfig(ai_cmd="codex", ai_model="gpt-5.4")
         with _patch_providers(_CODEX_CFG):
-            args, _ = _build_ai_cmd("Analyze", config)
+            args, _ = build_ai_cmd("Analyze", config)
         assert "--model" in args
         idx = args.index("--model")
         assert args[idx + 1] == "gpt-5.4"
@@ -189,7 +189,7 @@ class TestBuildAiCmdCodex:
     def test_normalizes_numeric_model_shorthand(self):
         config = AnalysisConfig(ai_cmd="codex", ai_model="5.4")
         with _patch_providers(_CODEX_CFG):
-            args, _ = _build_ai_cmd("Analyze", config)
+            args, _ = build_ai_cmd("Analyze", config)
         idx = args.index("--model")
         assert args[idx + 1] == "gpt-5.4"
 
@@ -206,7 +206,7 @@ class TestBuildAiCmdCodex:
             queue_path=queue, agent_id="agent-0",
         )
         with _patch_providers(_CODEX_CFG):
-            args, mcp_path = _build_ai_cmd("Analyze", config)
+            args, mcp_path = build_ai_cmd("Analyze", config)
 
         assert mcp_path is None
         assert "--mcp-config" not in args
@@ -233,7 +233,7 @@ class TestBuildAiCmdGemini:
             jsonl_file=jsonl, compiled_dir=tmp_path, dimension="security",
         )
         with _patch_providers(_GEMINI_CFG):
-            args, mcp_path = _build_ai_cmd("Analyze", config)
+            args, mcp_path = build_ai_cmd("Analyze", config)
         # Server registration happens out-of-band (`gemini mcp add`), so no
         # config file or inline config — but the CLI must still be told the
         # registered server is allowed, or every tool call is blocked.
@@ -246,14 +246,14 @@ class TestBuildAiCmdGemini:
     def test_cli_register_no_mcp_args_without_jsonl(self):
         config = AnalysisConfig(ai_cmd="gemini", ai_model="gemini-2.5-pro")
         with _patch_providers(_GEMINI_CFG):
-            args, mcp_path = _build_ai_cmd("Analyze", config)
+            args, mcp_path = build_ai_cmd("Analyze", config)
         assert mcp_path is None
         assert "--allowed-mcp-server-names" not in args
 
     def test_prompt_via_flag_and_stream_json(self):
         config = AnalysisConfig(ai_cmd="gemini", ai_model="gemini-2.5-pro")
         with _patch_providers(_GEMINI_CFG):
-            args, _ = _build_ai_cmd("Analyze this", config)
+            args, _ = build_ai_cmd("Analyze this", config)
         assert args[0] == "gemini"
         assert "--yolo" in args
         pidx = args.index("-p")
@@ -265,10 +265,10 @@ class TestBuildAnalysisEnv:
         # API providers read their key from the environment at analysis time
         # (see _resolve_provider_config); the sensitive-key filter must never
         # grow to swallow provider api_key_env variables.
-        from quodeq.analysis._command import _build_analysis_env
+        from quodeq.analysis._command import build_analysis_env
 
         env = {"OPENROUTER_API_KEY": "sk-or-x", "QUODEQ_API_KEY": "internal", "PATH": "/usr/bin"}
         with _patch_providers({"openrouter": {"type": "api"}}):
-            out = _build_analysis_env("openrouter", env=env)
+            out = build_analysis_env("openrouter", env=env)
         assert out.get("OPENROUTER_API_KEY") == "sk-or-x"
         assert "QUODEQ_API_KEY" not in out

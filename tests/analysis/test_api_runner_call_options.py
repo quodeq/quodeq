@@ -8,7 +8,7 @@ import pytest
 pytest.importorskip("openai", reason="requires the openai SDK")
 
 from quodeq.analysis._api_call import _LOCAL_TIMEOUT
-from quodeq.analysis._api_runner import ApiRunnerConfig, _call_api
+from quodeq.analysis._api_runner import ApiRunnerConfig, call_api
 
 from ._api_runner_helpers import (
     _make_findings_json,
@@ -73,7 +73,7 @@ class TestResolveTimeout:
         raw_client = _mock_raw_client('{"findings":[]}')
         with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = raw_client
-            _call_api("prompt", cfg)
+            call_api("prompt", cfg)
         timeout = mock_oa.call_args.kwargs["timeout"]
         assert timeout.read == _LOCAL_TIMEOUT.read * 2
 
@@ -82,7 +82,7 @@ def _create_kwargs(cfg):
     raw_client = _mock_raw_client('{"findings":[]}')
     with patch("openai.OpenAI") as mock_oa:
         mock_oa.return_value.__enter__.return_value = raw_client
-        _call_api("prompt", cfg)
+        call_api("prompt", cfg)
     return raw_client.chat.completions.create.call_args.kwargs
 
 
@@ -183,7 +183,7 @@ class TestTruncationDetection:
         client = _mock_raw_client_finish(content, "length")
         with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
-            _findings, was_lossy = _call_api("prompt", api_config)
+            _findings, was_lossy = call_api("prompt", api_config)
         assert was_lossy is True
 
     def test_complete_response_is_not_lossy(self, api_config):
@@ -193,6 +193,6 @@ class TestTruncationDetection:
         client = _mock_raw_client_finish(content, "stop")
         with patch("openai.OpenAI") as mock_oa:
             mock_oa.return_value.__enter__.return_value = client
-            findings, was_lossy = _call_api("prompt", api_config)
+            findings, was_lossy = call_api("prompt", api_config)
         assert was_lossy is False
         assert len(findings) == 1

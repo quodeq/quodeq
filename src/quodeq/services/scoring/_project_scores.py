@@ -4,7 +4,7 @@ Split from ``scoring/__init__.py`` to keep that file under the size
 ratchet's 300-line cap. ``get_project_scores`` stays re-exported from there.
 Fetchers are called through the ``_fetchers`` module attribute (not names
 bound into this module's namespace) so tests can still
-``monkeypatch.setattr(_fetchers, "_make_trend_fetcher", ...)`` and have it
+``monkeypatch.setattr(_fetchers, "make_scoring_trend_fetcher", ...)`` and have it
 take effect here.
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ from quodeq.services.score_cache import (
 from quodeq.services.wiring import find_children, list_runs
 from quodeq.services.scoring import _fetchers
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
-from quodeq.services.scoring._rescoring import _rescore_accumulated_with_coverage
+from quodeq.services.scoring._rescoring import rescore_accumulated_with_coverage
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +48,7 @@ def _compute_accumulated_payload(req: _ScoresRequest, rescore_complete: list[boo
     acc = compute_accumulated(str(req.reports_root), req.project, req.as_of, params=req.params)
     if acc is None:
         acc = {"dimensions": [], "summary": {}}
-    payload, complete = _rescore_accumulated_with_coverage(
+    payload, complete = rescore_accumulated_with_coverage(
         acc, req.reports_root, req.project, params=req.params, deps=req.deps,
     )
     rescore_complete[0] = complete
@@ -88,13 +88,13 @@ def _resolve_trend(
     chart. They remain in availableRuns so the UI can show them when the
     user asks for them explicitly."""
     scoreable_runs = select_trend_runs(all_runs)
-    history_runs = scoreable_runs[:_fetchers._max_history_runs()]
+    history_runs = scoreable_runs[:_fetchers.max_history_runs()]
     # Only completed runs may be persisted to the score cache: an in-progress
     # run's scalar set is still growing, and the cache version can't see that,
     # so caching its partial set would strand a stale row (e.g. 1 of 6 dims)
     # served forever after the run finishes.
     cacheable_run_ids = {r.run_id for r in history_runs if r.status is RunState.DONE}
-    trend_fetcher = _fetchers._make_trend_fetcher(
+    trend_fetcher = _fetchers.make_scoring_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
         deps=deps,
     )

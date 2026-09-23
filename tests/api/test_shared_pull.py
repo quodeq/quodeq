@@ -2,12 +2,12 @@
 
 Pulls a project from the shared clone into the local evaluations directory
 by building an in-memory zip of the clone's project directory
-(``_build_project_zip``) and feeding it to ``import_zip_stream`` -- the same
+(``build_project_zip``) and feeding it to ``import_zip_stream`` -- the same
 hardened validation/collision logic used by the manual
 ``POST /api/projects/import`` route (see tests/api/test_project_import.py).
 
 Note on project naming: real local project directories under reports_dir are
-named by UUID (``import_project.py``'s ``_validate_archive`` requires the
+named by UUID (``import_project.py``'s ``validate_archive`` requires the
 zip's single top-level directory to be a valid UUID), and ``publish_project``
 mirrors the source directory name as-is into the shared repo -- so a
 realistic pull target is UUID-named too. This intentionally differs from
@@ -63,7 +63,7 @@ def uuid_named_shared_clone_fixture(tmp_path, monkeypatch):
     tests/api/conftest.py's canonical ``shared_clone_fixture``, but publishes
     a UUID-named project (see module docstring) with a complete
     repository_info.json so the import-side validation
-    (_validate_repository_info requires 'name' and 'path') succeeds.
+    (validate_repository_info requires 'name' and 'path') succeeds.
 
     Returns (url, project_uuid) -- unlike the conftest fixture, which
     publishes the slug "proj-a" and returns only the url.

@@ -156,7 +156,7 @@ def test_summary_pending_serializes_camelcase():
 def test_paginated_hydration_gets_the_index_auto_detected_parent():
     """Critical #1 regression (code review): _hydrate() must not silently
     return the raw, unenriched .parent that build_project_entries()/
-    _build_project_entry() read straight off repository_info.json -- it
+    build_project_entry() read straight off repository_info.json -- it
     must use the value build_project_index() already auto-detected.
     """
     index = [ProjectEntry(id="child", name="child", parent="parent")]

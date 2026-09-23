@@ -39,11 +39,11 @@ def _tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
     return value if value > 0 else _DEFAULT_TAIL_MAX_BYTES
 
 
-def _is_visible_log_line(line: str) -> bool:
+def is_visible_log_line(line: str) -> bool:
     return not any(marker in line for marker in _CONSOLE_HIDDEN_MARKERS)
 
 
-def _resolve_run_log(provider, job_id: str) -> tuple[Path | None, int]:
+def resolve_run_log(provider, job_id: str) -> tuple[Path | None, int]:
     """Return (log_path, status_hint). status_hint is 0 on success, HTTP code on error."""
     if provider is None or not hasattr(provider, "get_log_run_dir"):
         return None, HTTPStatus.NOT_FOUND
@@ -56,7 +56,7 @@ def _resolve_run_log(provider, job_id: str) -> tuple[Path | None, int]:
     return log_path, 0
 
 
-def _read_tail(
+def read_tail(
     log_path: Path, since: int, env: Mapping[str, str] | None = None,
 ) -> tuple[list[str], int]:
     """Read lines starting at byte offset *since*. Returns (lines, next_offset).
@@ -74,11 +74,11 @@ def _read_tail(
             return [], since  # no complete line yet
         text = text[: last_nl + 1]
     consumed = len(text.encode("utf-8"))
-    lines = [ln for ln in text.splitlines() if _is_visible_log_line(ln)]
+    lines = [ln for ln in text.splitlines() if is_visible_log_line(ln)]
     return lines, since + consumed
 
 
-def _resolve_stream_log_path(provider, job_id: str) -> Path | None:
+def resolve_stream_log_path(provider, job_id: str) -> Path | None:
     """Re-resolved each tick. A job that started in the "preparing" state (no
     output_project yet) eventually emits the report_path marker; from then on
     get_log_run_dir returns the real run dir and run.log appears.
@@ -91,15 +91,15 @@ def _resolve_stream_log_path(provider, job_id: str) -> Path | None:
     return run_dir / "run.log"
 
 
-def _stream_terminal_state(provider, job_id: str) -> str:
+def stream_terminal_state(provider, job_id: str) -> str:
     # In-memory job (internal runs) carries the most up-to-date status
     # before the runner has flushed status.json — prefer it.
-    if provider is not None and hasattr(provider, "_jobs"):
-        job = provider._jobs.get_job(job_id)
+    if provider is not None:
+        job = provider.in_memory_job(job_id)
         if job is not None and job.status in JOB_FINISHED:
             return job.status
     # Fall back to the on-disk status.json the runner writes on exit.
-    path = _resolve_stream_log_path(provider, job_id)
+    path = resolve_stream_log_path(provider, job_id)
     if path is None:
         return JobStatus.DONE
     status_path = path.parent / "status.json"

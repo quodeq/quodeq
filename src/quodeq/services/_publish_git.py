@@ -35,7 +35,7 @@ def _app_version() -> str:
     return __version__ or "0.0.0+dev"
 
 
-def _prepare_clone(url: str, env: dict | None) -> tuple[Path, str]:
+def prepare_clone(url: str, env: dict | None) -> tuple[Path, str]:
     """Ensure the shared clone exists, is refreshed, and is a format we
     understand. Returns (repo, fmt); does not bootstrap or stage."""
     from quodeq.services.shared_publish import PublishError
@@ -58,7 +58,7 @@ def _prepare_clone(url: str, env: dict | None) -> tuple[Path, str]:
     return repo, fmt
 
 
-def _commit_staged_changes(repo: Path, project_id: str, count: int) -> None:
+def commit_staged_changes(repo: Path, project_id: str, count: int) -> None:
     """Commit the staged files, unless the only staged change is a
     republish's fresh published.json (revert that no-op diff first).
 
@@ -135,7 +135,7 @@ def _local_branch_name(repo: Path) -> str:
     return name if ok and name and name != "HEAD" else "main"
 
 
-def _push_with_rebase_fallback(repo: Path) -> None:
+def push_with_rebase_fallback(repo: Path) -> None:
     """Push, retrying once via rebase on a rejected push (a race with
     another publisher), and raise PublishError if both attempts fail."""
     from quodeq.services.shared_publish import GIT_ERROR_SNIPPET_MAX_CHARS, PublishError
