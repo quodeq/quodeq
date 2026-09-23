@@ -18,8 +18,8 @@ from quodeq.data.sqlite import precedent_vectors as _sqlite_vectors
 
 _logger = logging.getLogger(__name__)
 
-_BACKFILL_BUDGET_S = 60.0
-_BACKFILL_CHUNK = 32
+BACKFILL_BUDGET_S = 60.0
+BACKFILL_CHUNK = 32
 
 EmbedFn = Callable[..., list[list[float]]]
 AvailabilityFn = Callable[[str, str], bool]
@@ -40,7 +40,7 @@ class VectorStoreFns:
 
     Mirrors the ``embed_fn``/``availability_fn`` seam: tests inject fakes,
     production resolves the sqlite-backed implementations from
-    ``data/sqlite/precedent_vectors.py`` via :func:`_resolve_vector_store`.
+    ``data/sqlite/precedent_vectors.py`` via :func:`resolve_vector_store`.
     The connection handle is opaque to this layer -- it is only ever passed
     back into the other five callables.
     """
@@ -53,7 +53,7 @@ class VectorStoreFns:
     release_backfill_claim: Callable[[object], None]
 
 
-def _resolve_vector_store() -> VectorStoreFns:
+def resolve_vector_store() -> VectorStoreFns:
     """Build the production vector-store callables from ``data.sqlite``."""
     return VectorStoreFns(
         open_vector_store=_sqlite_vectors.open_vector_store,
@@ -80,10 +80,10 @@ def _backfill_missing(
     the corpus size. Returns how many were newly embedded.
     """
     embedded_new = 0
-    deadline = time.monotonic() + _BACKFILL_BUDGET_S
+    deadline = time.monotonic() + BACKFILL_BUDGET_S
     stored = store.stored_fingerprints(conn)
     missing = [fp for fp in texts if fp not in stored]
-    chunk_size = _BACKFILL_CHUNK
+    chunk_size = BACKFILL_CHUNK
     for start in range(0, len(missing), chunk_size):
         if time.monotonic() >= deadline:
             break
@@ -99,7 +99,7 @@ def _backfill_missing(
     return embedded_new
 
 
-def _load_or_backfill_vectors(
+def load_or_backfill_vectors(
     store: VectorStoreFns,
     project_dir: Path,
     texts: dict[str, str],

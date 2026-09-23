@@ -1,4 +1,4 @@
-"""`_print_scores` prints suppression-adjusted scores after a scan.
+"""`print_scores` prints suppression-adjusted scores after a scan.
 
 Covers the target behaviour: every line carries the report's violation
 count, major count and density (violations per 100 files read) when the
@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.cli_evaluation import _print_scores
+from quodeq.cli_evaluation import print_scores
 from quodeq._cli_scoring import _format_score_line
 from quodeq.analysis._report_io import write_dimension_report
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
@@ -85,7 +85,7 @@ def test_dismissal_prints_adjusted_score_with_suffix(tmp_path, capsys):
     # pass vacuously even if suppression exclusion were broken.
     assert f"{expected.overall.weighted_score}/10" != original_score
 
-    _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
+    print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
     assert out == (
@@ -103,7 +103,7 @@ def test_no_suppressions_prints_score_with_volume(tmp_path, capsys):
     ]
     score = _build_run(run_dir, DIM, lines)
 
-    _print_scores({DIM: score}, run_dir, project_dir, DEFAULT_PARAMS)
+    print_scores({DIM: score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
     assert out == f"  {DIM}: {score}  (1 violation, 1 major, 20.0 per 100 files)\n"
@@ -121,7 +121,7 @@ def test_dimension_without_evidence_falls_back_to_original_line(tmp_path, capsys
     dismiss_finding(project_dir, {"req": "R-9", "file": "z.kt", "line": 1})
     assert dismissed_keys(project_dir), "dismiss did not register"
 
-    _print_scores({"security": "8.0/10"}, run_dir, project_dir, DEFAULT_PARAMS)
+    print_scores({"security": "8.0/10"}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
     assert out == "  security: 8.0/10\n"
@@ -144,7 +144,7 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
     ]
     original_score = _build_run(run_dir, DIM, lines)
 
-    # A dismissal that matches this run's evidence, so `_print_scores` takes
+    # A dismissal that matches this run's evidence, so `print_scores` takes
     # the rescore branch (not the "no suppressions" or "no match" fallback).
     dismiss_finding(project_dir, {"req": "R-2", "file": "a.kt", "line": 20})
     assert dismissed_keys(project_dir), "dismiss did not register"
@@ -154,7 +154,7 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
 
     monkeypatch.setattr("quodeq.cli_evaluation.rescore_dimension_from_evidence", _boom)
 
-    _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
+    print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
     assert out == f"  {DIM}: {original_score}  (2 violations, 1 major, 40.0 per 100 files)\n"

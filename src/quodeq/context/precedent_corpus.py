@@ -21,17 +21,18 @@ from quodeq.context.precedent_store import (
     EmbedFn,
     Embedder,
     VectorStoreFns,
-    _load_or_backfill_vectors,
-    _resolve_vector_store,
+    load_or_backfill_vectors,
+    resolve_vector_store,
 )
 
 _logger = logging.getLogger(__name__)
 
 MARKER_NAME = ".semantic_precedents_off"
-_EMBED_BUDGET_S = 20.0
+EMBED_BUDGET_S = 20.0
 
 
-def _unit(vec: list[float]) -> list[float] | None:
+def unit(vec: list[float]) -> list[float] | None:
+    """*vec* scaled to length 1, or None for the zero vector."""
     norm = math.sqrt(math.sumprod(vec, vec))
     if norm == 0.0:
         return None
@@ -55,7 +56,7 @@ class PrecedentCorpus:
         threshold: float,
         marker_path: Path,
     ) -> None:
-        self._vectors = [u for v in vectors if (u := _unit(v)) is not None]
+        self._vectors = [u for v in vectors if (u := unit(v)) is not None]
         self._embed = embed
         self.threshold = threshold
         self._marker_path = marker_path
@@ -83,9 +84,9 @@ class PrecedentCorpus:
             self._elapsed += time.monotonic() - start
             scores: list[float | None] = []
             for query in queries:
-                q = _unit(query)
+                q = unit(query)
                 scores.append(None if q is None else max(math.sumprod(q, v) for v in self._vectors))
-            if self._elapsed > _EMBED_BUDGET_S:
+            if self._elapsed > EMBED_BUDGET_S:
                 self._trip("cumulative embedding time budget exceeded")
             return scores
         except Exception as exc:  # noqa: BLE001 -- contractually total
@@ -97,7 +98,7 @@ class PrecedentCorpus:
         return self.match_many([text])[0]
 
 
-def _collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
+def collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
     """Map fingerprint -> canonical text for every dismissed finding.
 
     Mirrors ``_semantic_eligible`` in ``analysis/mcp/precedent_downweight.py``
@@ -125,7 +126,7 @@ def _collect_dismissed_texts(project_dir: Path) -> dict[str, str]:
     return out
 
 
-def _resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, AvailabilityFn, object]:
+def resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, AvailabilityFn, object]:
     """Build the production embed/availability callables from llm_bridge.
 
     Split out from load_precedent_corpus because assigning a nested
@@ -149,7 +150,7 @@ def _resolve_embedding(model: str, base_url: str) -> tuple[EmbedFn, Availability
     return _embed, embedding_model_available, BATCH_TIMEOUT
 
 
-def _resolve_embed_and_availability(
+def resolve_embed_and_availability(
     embed_fn: EmbedFn | None,
     availability_fn: AvailabilityFn | None,
     model: str,
@@ -163,7 +164,7 @@ def _resolve_embed_and_availability(
     """
     batch_timeout: object = None
     if embed_fn is None or availability_fn is None:
-        prod_embed_fn, prod_availability_fn, prod_batch_timeout = _resolve_embedding(
+        prod_embed_fn, prod_availability_fn, prod_batch_timeout = resolve_embedding(
             model, base_url
         )
         if embed_fn is None:
@@ -180,7 +181,7 @@ def _resolve_available_embedder(
 ) -> Embedder | None:
     """Resolve model/embed_fn/batch_timeout, or None when unavailable.
 
-    Wraps :func:`_resolve_embed_and_availability` with the model/base_url
+    Wraps :func:`resolve_embed_and_availability` with the model/base_url
     lookup and the availability check + degrade-log, so
     ``load_precedent_corpus`` only has to handle a single
     None-or-proceed branch.
@@ -189,7 +190,7 @@ def _resolve_available_embedder(
 
     model = get_embedding_model()
     base_url = get_embedding_base_url()
-    embed_fn, availability_fn, batch_timeout = _resolve_embed_and_availability(
+    embed_fn, availability_fn, batch_timeout = resolve_embed_and_availability(
         embed_fn, availability_fn, model, base_url,
     )
     if not availability_fn(model, base_url):
@@ -203,7 +204,7 @@ def _resolve_available_embedder(
 
 def _resolve_store() -> VectorStoreFns:
     """Production store resolver; tests patch ``precedent_corpus._resolve_vector_store``."""
-    return _resolve_vector_store()
+    return resolve_vector_store()
 
 
 @dataclass(frozen=True)
@@ -223,7 +224,7 @@ def _embed_and_build_corpus(
 ) -> "PrecedentCorpus | None":
     """Backfill/load vectors and assemble the corpus, or None if nothing embedded."""
     start = time.monotonic()
-    result = _load_or_backfill_vectors(store, project_dir, texts, embedder)
+    result = load_or_backfill_vectors(store, project_dir, texts, embedder)
     if result is None:
         return None
     pairs, embedded_new = result
@@ -282,7 +283,7 @@ def load_precedent_corpus(
         if embedder is None:
             return None
 
-        texts = _collect_dismissed_texts(project_dir)
+        texts = collect_dismissed_texts(project_dir)
         if not texts:
             _logger.debug("Semantic precedents: no dismissed findings")
             return None

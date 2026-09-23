@@ -41,8 +41,8 @@ def test_pipeline_installs_and_removes_run_log_handler(tmp_path: Path, monkeypat
     initial_handlers = set(id(h) for h in logger.handlers)
 
     # Stub _execute_pipeline so we exercise only the wrapper's install/remove logic.
-    with patch.object(cli, "_execute_pipeline", return_value=0), \
-         patch.object(cli, "_save_manifest"), \
+    with patch.object(cli, "execute_pipeline", return_value=0), \
+         patch.object(cli, "save_manifest"), \
          patch.object(cli, "_build_run_config"), \
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):
@@ -60,7 +60,7 @@ def test_pipeline_installs_and_removes_run_log_handler(tmp_path: Path, monkeypat
         def _spy(*a, **k):
             attached.append(any(isinstance(h, RunLogHandler) for h in logger.handlers))
             return 0
-        with patch.object(cli, "_execute_pipeline", side_effect=_spy):
+        with patch.object(cli, "execute_pipeline", side_effect=_spy):
             cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     assert attached == [True]

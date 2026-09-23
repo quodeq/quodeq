@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Iterable
 
-from quodeq.config._discipline_rule import _DEFAULT_DETECT_PRIORITY, _strip_quotes
+from quodeq.config._discipline_rule import DEFAULT_DETECT_PRIORITY, strip_quotes
 
 # Conf keys that map to indexed positions in detect_files / detect_contains
 _FILE_KEYS = {"detect_file": 0, "detect_file_alt": 1, "detect_file_alt2": 2}
@@ -42,7 +42,7 @@ def _parse_priority(value: str) -> int:
     try:
         return int(value)
     except ValueError:
-        return _DEFAULT_DETECT_PRIORITY
+        return DEFAULT_DETECT_PRIORITY
 
 
 def _dispatch_field(
@@ -60,7 +60,7 @@ def _dispatch_field(
         _set_indexed(files, _FILE_KEYS[key], value)
         return
     if key in _CONTAINS_KEYS:
-        _set_indexed(contains, _CONTAINS_KEYS[key], _strip_quotes(value))
+        _set_indexed(contains, _CONTAINS_KEYS[key], strip_quotes(value))
         return
     if key in _CSV_FIELDS:
         kwargs[key] = _parse_csv(value)

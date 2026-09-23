@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from quodeq._cli_lifecycle import _record_provider_fatal_if_cancelled
+from quodeq._cli_lifecycle import record_provider_fatal_if_cancelled
 from quodeq.analysis._loop_guards import raise_on_fatal_cancel
 from quodeq.analysis._loop_state import interruption_reason
 from quodeq.analysis.errors import REASON_PROVIDER_FATAL, FatalProviderError
@@ -55,7 +55,7 @@ def test_policy_failure_preserves_completed_files_with_specific_warning(tmp_path
         error = _policy_error()
         cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:{error.reason}: {error}")
         raise_on_fatal_cancel(tmp_path)
-        _record_provider_fatal_if_cancelled(lifecycle)
+        record_provider_fatal_if_cancelled(lifecycle)
     status = read_status(tmp_path)
     assert status["state"] == "done"
     assert status["exit_reason"] == "copilot_mcp_policy"

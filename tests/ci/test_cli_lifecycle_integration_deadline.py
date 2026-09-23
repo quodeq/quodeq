@@ -29,7 +29,7 @@ def test_record_deadline_if_hit_tags_lifecycle_when_deadline_past(tmp_path: Path
         config = SimpleNamespace(
             options=SimpleNamespace(deadline_at=time.monotonic() - 1.0),
         )
-        cli._record_deadline_if_hit(lifecycle, config)
+        cli.record_deadline_if_hit(lifecycle, config)
         lifecycle.transition_to_finalizing()
 
     status = read_status(run_dir)
@@ -48,7 +48,7 @@ def test_record_deadline_if_hit_noop_when_no_deadline(tmp_path: Path) -> None:
     run_dir.mkdir()
     with RunLifecycleContext(run_dir, job_id="ext-test", dimensions=["flex"]) as lifecycle:
         config = SimpleNamespace(options=SimpleNamespace(deadline_at=None))
-        cli._record_deadline_if_hit(lifecycle, config)
+        cli.record_deadline_if_hit(lifecycle, config)
         # Finish the declared dimension: a run that ends without scoring one
         # now reports incomplete_dimensions, which would mask what this asserts.
         write_dim_state(run_dir, "flex", DimState.RUNNING)
@@ -73,7 +73,7 @@ def test_record_deadline_if_hit_noop_when_deadline_not_yet_reached(tmp_path: Pat
         config = SimpleNamespace(
             options=SimpleNamespace(deadline_at=time.monotonic() + 3600.0),
         )
-        cli._record_deadline_if_hit(lifecycle, config)
+        cli.record_deadline_if_hit(lifecycle, config)
         # Finish the declared dimension: a run that ends without scoring one
         # now reports incomplete_dimensions, which would mask what this asserts.
         write_dim_state(run_dir, "flex", DimState.RUNNING)
@@ -103,8 +103,8 @@ def test_pipeline_records_deadline_exit_reason_when_budget_expired(tmp_path: Pat
     fake_config.options.deadline_at = time.monotonic() - 1.0
     fake_config.options.dimensions = ["flex"]
 
-    with patch.object(cli, "_execute_pipeline", return_value=0), \
-         patch.object(cli, "_save_manifest"), \
+    with patch.object(cli, "execute_pipeline", return_value=0), \
+         patch.object(cli, "save_manifest"), \
          patch.object(cli, "_build_run_config", return_value=fake_config), \
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):
@@ -163,7 +163,7 @@ def test_c88be50e_partial_state_invariants_agree(tmp_path: Path) -> None:
         config = SimpleNamespace(
             options=SimpleNamespace(deadline_at=time.monotonic() - 1.0),
         )
-        cli._record_deadline_if_hit(lifecycle, config)
+        cli.record_deadline_if_hit(lifecycle, config)
         lifecycle.transition_to_finalizing()
 
     # --- Half (b): files_read reflects analyzed count, not input total ------

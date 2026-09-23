@@ -16,7 +16,7 @@ from quodeq.analysis.manifest import SourceManifest
 from quodeq.analysis.manifest_models import AnalysisTarget
 
 
-def _resolve_scope(src: Path, args: argparse.Namespace) -> tuple[str | None, bool]:
+def resolve_scope(src: Path, args: argparse.Namespace) -> tuple[str | None, bool]:
     """Resolve --scope flag against the source directory.
 
     Returns ``(scope_path, ok)`` where *ok* is False when validation fails
@@ -37,7 +37,7 @@ def _resolve_scope(src: Path, args: argparse.Namespace) -> tuple[str | None, boo
     return scope, True
 
 
-def _resolve_single_file(src: Path) -> tuple[Path, str | None]:
+def resolve_single_file(src: Path) -> tuple[Path, str | None]:
     """Detect single-file mode and return (project_root, relative_path | None)."""
     if not src.is_file():
         return src, None
@@ -54,7 +54,7 @@ def _resolve_single_file(src: Path) -> tuple[Path, str | None]:
     return project_root, single_file
 
 
-def _override_manifest_single_file(language: str, single_file: str) -> SourceManifest:
+def override_manifest_single_file(language: str, single_file: str) -> SourceManifest:
     """Create a manifest covering exactly one source file."""
     ext = os.path.splitext(single_file)[1]
     language_stats = {ext: 1} if ext else {}

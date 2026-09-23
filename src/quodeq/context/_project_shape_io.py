@@ -49,7 +49,7 @@ def _manifest_missing(path: Path) -> bool:
     return True
 
 
-def _read_text(path: Path) -> str | None:
+def read_text(path: Path) -> str | None:
     if _manifest_missing(path):
         return None
     try:
@@ -62,7 +62,7 @@ def _read_text(path: Path) -> str | None:
         return None
 
 
-def _read_toml(path: Path) -> dict[str, object] | None:
+def read_toml(path: Path) -> dict[str, object] | None:
     if _manifest_missing(path):
         return None
     try:
@@ -80,10 +80,10 @@ def _read_toml(path: Path) -> dict[str, object] | None:
         return None
 
 
-def _read_json(path: Path) -> dict[str, object] | None:
-    # Absence is already handled quietly by _read_text, so reaching the handler
+def read_json(path: Path) -> dict[str, object] | None:
+    # Absence is already handled quietly by read_text, so reaching the handler
     # below means the file exists and its contents are unusable.
-    text = _read_text(path)
+    text = read_text(path)
     if text is None:
         return None
     try:
@@ -96,7 +96,7 @@ def _read_json(path: Path) -> dict[str, object] | None:
     return data if isinstance(data, dict) else None
 
 
-def _flat_dep_names(*sources: object) -> list[str]:
+def flat_dep_names(*sources: object) -> list[str]:
     out: list[str] = []
     for src in sources:
         if not isinstance(src, dict):
@@ -106,7 +106,7 @@ def _flat_dep_names(*sources: object) -> list[str]:
     return out
 
 
-def _matches_any(haystack: list[str], needles: tuple[str, ...]) -> list[str]:
+def matches_any(haystack: list[str], needles: tuple[str, ...]) -> list[str]:
     needle_set = {n.lower() for n in needles}
     return [n for n in haystack if n in needle_set]
 
@@ -114,7 +114,7 @@ def _matches_any(haystack: list[str], needles: tuple[str, ...]) -> list[str]:
 _DEP_SPEC_RE = re.compile(r"^([A-Za-z0-9_.\-]+)")
 
 
-def _strip_dep_spec(spec: str) -> str:
+def strip_dep_spec(spec: str) -> str:
     """Reduce a PEP 508 spec like ``flask>=3.0`` to its bare name."""
     m = _DEP_SPEC_RE.match(spec.strip())
     return m.group(1) if m else spec.strip()

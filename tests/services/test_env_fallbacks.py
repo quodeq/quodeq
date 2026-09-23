@@ -70,6 +70,6 @@ class TestImportTimeConstants:
     def test_fetch_timeout_invalid_falls_back(self, monkeypatch):
         value = _reload_attr(
             monkeypatch, "quodeq._cli_resolution",
-            "QUODEQ_GIT_CLONE_TIMEOUT_S", "fast", "_FETCH_TIMEOUT_S",
+            "QUODEQ_GIT_CLONE_TIMEOUT_S", "fast", "FETCH_TIMEOUT_S",
         )
         assert value == 300

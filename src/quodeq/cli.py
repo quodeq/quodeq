@@ -23,7 +23,6 @@ from quodeq._cli_env import (  # noqa: F401 — public re-exports
     ENV_MAX_DURATION,
     ENV_MAX_TURNS,
     ENV_POOL_BUDGET,
-    _environ,
     cli_env_int,
     cli_environ,
     no_verify,
@@ -67,7 +66,7 @@ def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> Non
     NEXT invocation has fresh data.
     """
     out = stream if stream is not None else sys.stdout
-    environ = _environ(env)
+    environ = cli_environ(env)
     try:
         if not getattr(out, "isatty", lambda: False)():
             return

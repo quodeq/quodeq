@@ -1,4 +1,4 @@
-"""`_print_scores` parses a dimension's evidence jsonl exactly once.
+"""`print_scores` parses a dimension's evidence jsonl exactly once.
 
 Sibling to test_cli_evaluation_print.py (already at the 240-line cap) rather
 than an addition to it. A dismissal that matches the run's evidence used to
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 
-from quodeq.cli_evaluation import _print_scores
+from quodeq.cli_evaluation import print_scores
 from quodeq.analysis._report_io import write_dimension_report
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.core.scoring.engine import score_evidence
@@ -76,7 +76,7 @@ def test_print_scores_parses_evidence_once_per_dimension(tmp_path, monkeypatch):
     monkeypatch.setattr(_scoring_mod, "parse_jsonl_to_evidence", counting_parse,
                         raising=False)
 
-    _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
+    print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     assert calls["n"] == 1, "evidence must be parsed exactly once per dimension"
 
@@ -115,7 +115,7 @@ def test_print_scores_does_not_score_when_nothing_was_excluded(tmp_path, monkeyp
     project_dir, run_dir, original_score = _run_with_unmatched_dismissal(tmp_path)
     calls = _counting_score_evidence(monkeypatch)
 
-    _print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
+    print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     assert calls["n"] == 0, "the CLI scored a dimension with nothing excluded"
 

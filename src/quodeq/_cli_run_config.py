@@ -6,8 +6,8 @@ owns the dimension filter, the flag/env-derived caps (``_RunLimits``) and the
 ``cli_evaluation`` because tests patch ``default_paths`` at that module's path.
 
 Patch target note: the names below are looked up in THIS module's globals, so
-tests patch ``quodeq._cli_run_config.<name>`` — ``_env_int``, ``_no_verify``,
-``_resolve_time_limit``, ``default_dispatch_policy``,
+tests patch ``quodeq._cli_run_config.<name>`` — ``cli_env_int``, ``no_verify``,
+``resolve_time_limit``, ``default_dispatch_policy``,
 ``expand_dimension_aliases`` and ``AnalysisOptions``. ``cli_evaluation``
 re-exports some of the same names for ``quodeq.cli``, but patching them there
 does not reach this module.
@@ -25,18 +25,18 @@ from quodeq.analysis.runner import AnalysisOptions
 from quodeq.shared.logging import log_info
 
 from quodeq._cli_env import (
-    _ENV_MAX_DURATION,
-    _ENV_MAX_TURNS,
-    _env_int,
-    _environ,
-    _no_verify,
-    _resolve_time_limit,
+    ENV_MAX_DURATION,
+    ENV_MAX_TURNS,
+    cli_env_int,
+    cli_environ,
+    no_verify,
+    resolve_time_limit,
 )
 
 if TYPE_CHECKING:
     # Annotation only — a runtime import would close the cycle, since
     # cli_evaluation imports this module.
-    from quodeq.cli_evaluation import _RunConfigLocals
+    from quodeq.cli_evaluation import RunConfigLocals
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,22 +52,22 @@ class _RunLimits:
     dispatch_policy: DispatchPolicy
 
 
-def _resolve_limits(args: argparse.Namespace, env: dict[str, str] | None = None) -> _RunLimits:
+def resolve_limits(args: argparse.Namespace, env: dict[str, str] | None = None) -> _RunLimits:
     return _RunLimits(
-        max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None, env=env),
-        max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None, env=env),
+        max_turns=args.max_turns if args.max_turns is not None else cli_env_int(ENV_MAX_TURNS, None, env=env),
+        max_duration=args.max_duration if args.max_duration is not None else cli_env_int(ENV_MAX_DURATION, None, env=env),
         max_subagents=args.n_subagents,
-        verify_findings=not _no_verify(args, env=env),
-        time_limit=_resolve_time_limit(args, env=env),
+        verify_findings=not no_verify(args, env=env),
+        time_limit=resolve_time_limit(args, env=env),
         incremental=not (getattr(args, "clean_scan", False) or bool(getattr(args, "diff_from", None))),
         dry_run=getattr(args, "dry_run", False),
-        dispatch_policy=default_dispatch_policy(env=_environ(env)),
+        dispatch_policy=default_dispatch_policy(env=cli_environ(env)),
     )
 
 
-def _build_analysis_options(
+def build_analysis_options(
     dimensions_filter: list[str] | None,
-    resolved: _RunConfigLocals,
+    resolved: RunConfigLocals,
     limits: _RunLimits,
 ) -> AnalysisOptions:
     return AnalysisOptions(
@@ -88,7 +88,7 @@ def _build_analysis_options(
     )
 
 
-def _dimensions_filter(args: argparse.Namespace) -> list[str] | None:
+def dimensions_filter_for(args: argparse.Namespace) -> list[str] | None:
     expanded_dimensions = expand_dimension_aliases(args.dimensions)
     dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
     log_info(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")

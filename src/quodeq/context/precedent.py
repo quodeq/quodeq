@@ -9,15 +9,14 @@ This module is the stable import path every caller (and every patch target)
 uses; the implementation is split across three siblings:
 
 - ``precedent_fingerprint.py`` -- exact-match fingerprinting
-  (``fingerprint``, ``_normalize_snippet``, ``precedent_text``,
-  ``load_precedent_fingerprints``).
+  (``fingerprint``, ``precedent_text``, ``load_precedent_fingerprints``).
 - ``precedent_store.py`` -- the sqlite-backed vector-store seam and its
-  backfill loop (``VectorStoreFns``, ``_resolve_vector_store``,
-  ``_load_or_backfill_vectors``).
+  backfill loop (``VectorStoreFns``, ``resolve_vector_store``,
+  ``load_or_backfill_vectors``).
 - ``precedent_corpus.py`` -- the semantic matcher and its loader
   (``PrecedentCorpus``, ``load_precedent_corpus``, and their helpers).
 
-Patch ``_resolve_vector_store`` on ``precedent_corpus`` and ``_BACKFILL_CHUNK``
+Patch ``resolve_vector_store`` on ``precedent_corpus`` and ``BACKFILL_CHUNK``
 on ``precedent_store``: the siblings read their own module globals, and this
 facade never gets imported back by them.
 """
@@ -27,7 +26,6 @@ from __future__ import annotations
 # Re-exports -- exact-match fingerprinting
 # ---------------------------------------------------------------------------
 from quodeq.context.precedent_fingerprint import (  # noqa: F401 — re-export
-    _normalize_snippet,
     fingerprint,
     load_precedent_fingerprints,
     precedent_text,
@@ -40,10 +38,10 @@ from quodeq.context.precedent_store import (  # noqa: F401 — re-export
     AvailabilityFn,
     EmbedFn,
     VectorStoreFns,
-    _BACKFILL_BUDGET_S,
-    _BACKFILL_CHUNK,
-    _load_or_backfill_vectors,
-    _resolve_vector_store,
+    BACKFILL_BUDGET_S,
+    BACKFILL_CHUNK,
+    load_or_backfill_vectors,
+    resolve_vector_store,
 )
 
 # ---------------------------------------------------------------------------
@@ -52,10 +50,10 @@ from quodeq.context.precedent_store import (  # noqa: F401 — re-export
 from quodeq.context.precedent_corpus import (  # noqa: F401 — re-export
     MARKER_NAME,
     PrecedentCorpus,
-    _EMBED_BUDGET_S,
-    _collect_dismissed_texts,
-    _resolve_embed_and_availability,
-    _resolve_embedding,
-    _unit,
+    EMBED_BUDGET_S,
+    collect_dismissed_texts,
+    resolve_embed_and_availability,
+    resolve_embedding,
+    unit,
     load_precedent_corpus,
 )

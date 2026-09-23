@@ -185,14 +185,14 @@ def test_nothing_logged_when_nothing_skipped(
 
 
 def _cli_prescan_stderr(tmp_path: Path, repo: Path, detection: dict, capsys) -> str:
-    from quodeq._cli_resolution import _build_manifest
+    from quodeq._cli_resolution import build_cli_manifest
 
     detection_file = tmp_path / "detection.json"
     detection_file.write_text(json.dumps(detection), encoding="utf-8")
     paths = SimpleNamespace(
         detection_file=detection_file, disciplines_conf=tmp_path / "absent.conf",
     )
-    _build_manifest(SimpleNamespace(no_prescan=False), repo, paths)
+    build_cli_manifest(SimpleNamespace(no_prescan=False), repo, paths)
     return capsys.readouterr().err
 
 

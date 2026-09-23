@@ -23,8 +23,8 @@ def test_pipeline_writes_running_then_done(tmp_path: Path) -> None:
     evidence_dir.mkdir(parents=True)
     evaluation_dir.mkdir(parents=True)
 
-    with patch.object(cli, "_execute_pipeline", return_value=0), \
-         patch.object(cli, "_save_manifest"), \
+    with patch.object(cli, "execute_pipeline", return_value=0), \
+         patch.object(cli, "save_manifest"), \
          patch.object(cli, "_build_run_config"), \
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):
@@ -51,8 +51,8 @@ def test_pipeline_writes_failed_on_exception(tmp_path: Path) -> None:
     def _boom(*a, **k):
         raise RuntimeError("pipeline failed")
 
-    with patch.object(cli, "_execute_pipeline", side_effect=_boom), \
-         patch.object(cli, "_save_manifest"), \
+    with patch.object(cli, "execute_pipeline", side_effect=_boom), \
+         patch.object(cli, "save_manifest"), \
          patch.object(cli, "_build_run_config"), \
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):
@@ -81,8 +81,8 @@ def test_pipeline_writes_failed_on_domain_error(tmp_path: Path) -> None:
     # Key difference vs existing tests: we patch the INNER pipeline function
     # (run_full / run) that raises EvaluationError, and let the production
     # _execute_pipeline / _run_pipeline_with_cleanup handle the propagation.
-    with patch.object(cli, "_execute_pipeline", side_effect=EvaluationError("domain explosion")), \
-         patch.object(cli, "_save_manifest"), \
+    with patch.object(cli, "execute_pipeline", side_effect=EvaluationError("domain explosion")), \
+         patch.object(cli, "save_manifest"), \
          patch.object(cli, "_build_run_config"), \
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):

@@ -34,7 +34,7 @@ from pathlib import Path
 
 from quodeq.context._project_shape_types import Deployment, ProjectShape  # re-export
 from quodeq.context._project_shape_signals import (
-    _detect_runtime_langs, _go_signals, _node_signals, _python_signals, _rust_signals,
+    detect_runtime_langs, go_signals, node_signals, python_signals, rust_signals,
 )
 
 _logger = logging.getLogger(__name__)
@@ -52,10 +52,10 @@ def detect_shape(repo_path: Path) -> ProjectShape:
         return ProjectShape()
 
     try:
-        py_dep, py_web, _ = _python_signals(repo)
-        js_dep, js_web, _, ui_lang = _node_signals(repo)
-        rust_dep = _rust_signals(repo)
-        go_dep = _go_signals(repo)
+        py_dep, py_web, _ = python_signals(repo)
+        js_dep, js_web, _, ui_lang = node_signals(repo)
+        rust_dep = rust_signals(repo)
+        go_dep = go_signals(repo)
     except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
         _logger.warning(
             "Manifest signal detection failed for %s, degrading to UNKNOWN: %s", repo, exc,
@@ -83,7 +83,7 @@ def detect_shape(repo_path: Path) -> ProjectShape:
                 deployment = candidate
 
     web_frameworks = sorted({*py_web, *js_web})
-    runtime_langs = _detect_runtime_langs(repo)
+    runtime_langs = detect_runtime_langs(repo)
     is_single_user = deployment is not Deployment.WEB_SERVICE
 
     return ProjectShape(

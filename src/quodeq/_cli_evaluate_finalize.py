@@ -1,7 +1,7 @@
 """run_evaluate's diff-from resolution and post-run finalization (SARIF export).
 
 Split out of ``cli_evaluation.py`` to keep that file under the size
-ratchet's 300-line cap. ``_apply_diff_from`` and ``_finalize_run_evaluate``
+ratchet's 300-line cap. ``apply_diff_from`` and ``finalize_run_evaluate``
 are called only from ``cli_evaluation.run_evaluate``.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ from quodeq.analysis.diff_resolver import DiffResolveError
 from quodeq.shared.logging import log_error, log_info, log_warning
 
 
-def _apply_diff_from(
+def apply_diff_from(
     args: argparse.Namespace, inputs: ResolvedInputs, resolve_diff_files: Callable[[Path, str], Iterable[str]],
 ) -> int | None:
     """Resolve --diff-from into args._diff_files. Returns an exit code on
@@ -41,7 +41,7 @@ def _apply_diff_from(
     return None
 
 
-def _write_sarif_if_requested(args: argparse.Namespace, evaluation_dir: Path) -> None:
+def write_sarif_if_requested(args: argparse.Namespace, evaluation_dir: Path) -> None:
     """Write a SARIF file if --sarif was passed. Fail-soft: never raises.
 
     Called from run_evaluate AFTER the run lifecycle has fully closed, so a
@@ -72,7 +72,7 @@ def _write_sarif_if_requested(args: argparse.Namespace, evaluation_dir: Path) ->
         log_warning(f"SARIF export failed (evaluation results are safe): {exc}")
 
 
-def _finalize_run_evaluate(args: argparse.Namespace, evaluation_dir: Path, result: int) -> int:
+def finalize_run_evaluate(args: argparse.Namespace, evaluation_dir: Path, result: int) -> int:
     """Fail-soft consolidation + SARIF export, run OUTSIDE the run lifecycle
     (already closed) so a failure here can never flip the run state."""
     # --diff-from / --evidence-only produce no scored reports: nothing to export.
@@ -88,5 +88,5 @@ def _finalize_run_evaluate(args: argparse.Namespace, evaluation_dir: Path, resul
         mark_run_consolidated(evaluation_dir.parent)
     # Only export SARIF on success and only when scored reports exist.
     if result == 0 and getattr(args, "sarif", None) and not no_scored_reports:
-        _write_sarif_if_requested(args, evaluation_dir)
+        write_sarif_if_requested(args, evaluation_dir)
     return result

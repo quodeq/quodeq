@@ -57,7 +57,7 @@ class TestCliWiring:
 
         with patch("quodeq.cli_evaluation.default_paths") as mock_paths, \
              patch("quodeq.cli_evaluation.get_ai_model", return_value=None), \
-             patch("quodeq.cli_evaluation._subagent_model", return_value=None):
+             patch("quodeq.cli_evaluation.subagent_model", return_value=None):
             mock_paths.return_value.standards_dir = tmp_path / "standards"
             mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
             config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
@@ -90,7 +90,7 @@ class TestCliWiring:
 
         with patch("quodeq.cli_evaluation.default_paths") as mock_paths, \
              patch("quodeq.cli_evaluation.get_ai_model", return_value=None), \
-             patch("quodeq.cli_evaluation._subagent_model", return_value=None):
+             patch("quodeq.cli_evaluation.subagent_model", return_value=None):
             mock_paths.return_value.standards_dir = tmp_path / "standards"
             mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
             config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
@@ -124,7 +124,7 @@ class TestCliWiring:
 
         with patch("quodeq.cli_evaluation.default_paths") as mock_paths, \
              patch("quodeq.cli_evaluation.get_ai_model", return_value=None), \
-             patch("quodeq.cli_evaluation._subagent_model", return_value=None):
+             patch("quodeq.cli_evaluation.subagent_model", return_value=None):
             mock_paths.return_value.standards_dir = tmp_path / "standards"
             mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
             config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")

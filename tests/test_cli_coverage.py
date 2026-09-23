@@ -120,7 +120,7 @@ class TestResolveRepo:
         worktree_dir.mkdir()
         args = argparse.Namespace(repo=str(repo_dir), branch="feature/x")
         with patch("quodeq._cli_resolution.is_repo_url", return_value=False), \
-             patch("quodeq._cli_resolution._create_worktree", return_value=worktree_dir) as mock_wt:
+             patch("quodeq._cli_resolution.create_worktree", return_value=worktree_dir) as mock_wt:
             result = resolve_repo(args)
             assert result == (worktree_dir, repo_dir.resolve(), worktree_dir)
             mock_wt.assert_called_once()
@@ -130,7 +130,7 @@ class TestResolveRepo:
         repo_dir.mkdir()
         args = argparse.Namespace(repo=str(repo_dir), branch="bad-branch")
         with patch("quodeq._cli_resolution.is_repo_url", return_value=False), \
-             patch("quodeq._cli_resolution._create_worktree", return_value=None):
+             patch("quodeq._cli_resolution.create_worktree", return_value=None):
             result = resolve_repo(args)
             assert result is None
 

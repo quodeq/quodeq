@@ -34,7 +34,7 @@ from quodeq.analysis.errors import (
 from quodeq.analysis.runner import EvaluationError, RunConfig
 from quodeq.analysis.subprocess import AnalysisError
 from quodeq.core.run.job_status import external_job_id
-from quodeq._cli_env import _resolve_time_limit
+from quodeq._cli_env import resolve_time_limit
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.data.fs.project_resolver import ProjectIdentity
 from quodeq.shared.constants import CC_PHASE_REPORT_PATH
@@ -64,7 +64,7 @@ class LifecycleHooks:
 # Run directory setup
 # ---------------------------------------------------------------------------
 
-def _setup_run_dirs(args: argparse.Namespace, src: Path, hooks: LifecycleHooks) -> tuple[Path, Path, Path]:
+def setup_run_dirs(args: argparse.Namespace, src: Path, hooks: LifecycleHooks) -> tuple[Path, Path, Path]:
     """Resolve project UUID and create evidence/evaluation directories."""
     reports_root = Path(args.output)
     reports_root.mkdir(parents=True, exist_ok=True)
@@ -97,7 +97,7 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path, hooks: LifecycleHooks) 
 # Deadline / provider-fatal exit_reason tagging
 # ---------------------------------------------------------------------------
 
-def _record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig") -> None:
+def record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig") -> None:
     """Tag the lifecycle with exit_reason='deadline' if the run's
     --max-duration was reached before natural completion.
 
@@ -115,7 +115,7 @@ def _record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig
         lifecycle.set_exit_reason("deadline")
 
 
-def _record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> None:
+def record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> None:
     """Tag a completed run that a dead provider cut short.
 
     ``_raise_on_fatal_cancel`` lets the pipeline finish when files were
@@ -182,7 +182,7 @@ def _apply_time_budget(args: argparse.Namespace, lifecycle: "RunLifecycleContext
     via env, not the CLI flag. Wires the pool auto-scale extension callback so
     a deadline widened mid-run lands in status.json too.
     """
-    budget_s = _resolve_time_limit(args)
+    budget_s = resolve_time_limit(args)
     if budget_s is not None:
         lifecycle.set_time_limit(budget_s)
     if budget_s is not None and budget_s > 0:
@@ -224,8 +224,8 @@ def _run_lifecycle_body(
                 lifecycle.set_phase("analyzing")
                 _apply_time_budget(args, lifecycle, config)
                 result = hooks.execute_pipeline(args, config, paths.evidence_dir, paths.evaluation_dir)
-                _record_deadline_if_hit(lifecycle, config)
-                _record_provider_fatal_if_cancelled(lifecycle)
+                record_deadline_if_hit(lifecycle, config)
+                record_provider_fatal_if_cancelled(lifecycle)
                 # run_full writes per-dimension reports as it goes, so scoring
                 # is already done by the time it returns.
                 lifecycle.set_phase("scoring")
@@ -266,7 +266,7 @@ def _write_pid_file(run_dir: Path) -> Path:
     return pid_file
 
 
-def _run_pipeline_with_cleanup(
+def run_pipeline_with_cleanup(
     args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path], hooks: LifecycleHooks,
 ) -> int:
     """Set up directories, build config, run the pipeline, and clean up cloned repos."""

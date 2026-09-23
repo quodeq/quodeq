@@ -221,6 +221,6 @@ def test_signal_detector_exception_degrades_to_unknown(
     def _boom(repo: Path) -> None:
         raise RuntimeError("unexpected failure in signal detection")
 
-    monkeypatch.setattr("quodeq.context.project_shape._python_signals", _boom)
+    monkeypatch.setattr("quodeq.context.project_shape.python_signals", _boom)
     shape = detect_shape(tmp_path)
     assert shape == ProjectShape()

@@ -65,14 +65,14 @@ src/quodeq/assistant/tools/_read_tools_scope.py:129:broad-except
 src/quodeq/assistant/tools/_read_tools_scope.py:88:broad-except
 src/quodeq/assistant/tools/registry.py:66:broad-except
 src/quodeq/ci/cli.py:101:broad-except
-src/quodeq/cli.py:94:broad-except
+src/quodeq/cli.py:93:broad-except
 src/quodeq/config/ai_provider.py:246:broad-except
 src/quodeq/config/ai_provider.py:281:broad-except
 src/quodeq/context/_project_shape_io.py:60:broad-except
 src/quodeq/context/_project_shape_io.py:74:broad-except
 src/quodeq/context/_project_shape_io.py:91:broad-except
-src/quodeq/context/precedent_corpus.py:294:broad-except
-src/quodeq/context/precedent_corpus.py:91:broad-except
+src/quodeq/context/precedent_corpus.py:295:broad-except
+src/quodeq/context/precedent_corpus.py:92:broad-except
 src/quodeq/context/precedent_store.py:93:broad-except
 src/quodeq/context/project_shape.py:59:broad-except
 src/quodeq/context/trust_model.py:108:broad-except

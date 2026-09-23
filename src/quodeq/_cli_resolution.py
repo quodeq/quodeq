@@ -2,12 +2,12 @@
 
 Split from ``cli_evaluation.py`` to keep each module under 300 lines.
 Worktree management lives in ``_cli_worktree.py``; re-exported here (and, in
-turn, from ``cli_evaluation.py``) so ``quodeq._cli_resolution._create_worktree``
-and ``quodeq.cli_evaluation._cleanup_worktree`` stay valid patch targets.
+turn, from ``cli_evaluation.py``) so ``quodeq._cli_resolution.create_worktree``
+and ``quodeq.cli_evaluation.cleanup_worktree`` stay valid patch targets.
 ``import subprocess`` stays in this module even though the worktree
-functions moved out — ``_resolve_repo`` below still needs the exception
+functions moved out — ``resolve_repo`` below still needs the exception
 types, and tests patch ``quodeq._cli_resolution.subprocess.run``, which
-requires this module to expose a ``subprocess`` attribute. ``_FETCH_TIMEOUT_S``
+requires this module to expose a ``subprocess`` attribute. ``FETCH_TIMEOUT_S``
 also stays here (rather than moving with ``_fetch_branch``) because a test
 reloads this module with ``QUODEQ_GIT_CLONE_TIMEOUT_S`` set and reads the
 import-time constant back off it; ``_cli_worktree._fetch_branch`` reads it
@@ -34,19 +34,19 @@ from quodeq.analysis.manifest_scope import filter_manifest_by_scope
 from quodeq.analysis.runner import load_universal_dimensions
 from quodeq.shared.log_sink import SHARED_LOG
 # Re-exported: moved to _cli_worktree.py to keep this module under 300 lines.
-# _cleanup_worktree is unused directly in this module but must stay imported
+# cleanup_worktree is unused directly in this module but must stay imported
 # — it is a patch target (quodeq._cli_resolution._cleanup_worktree) and the
 # public re-export chain through quodeq.cli_evaluation depends on it.
-from quodeq._cli_worktree import _cleanup_worktree, _create_worktree
+from quodeq._cli_worktree import cleanup_worktree, create_worktree
 # Re-exported: moved to _cli_scope.py to keep this module under 300 lines.
 from quodeq._cli_scope import (
-    _override_manifest_single_file, _resolve_scope, _resolve_single_file,
+    override_manifest_single_file, resolve_scope, resolve_single_file,
 )
 
 # Branch fetches (_cli_worktree._fetch_branch) go over the network; give them
 # the clone budget, not the local worktree one. Stays an import-time constant
 # here — see the module docstring for why.
-_FETCH_TIMEOUT_S = git_clone_timeout_s()
+FETCH_TIMEOUT_S = git_clone_timeout_s()
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ class ResolvedInputs:
 # Repo / language / manifest resolution
 # ---------------------------------------------------------------------------
 
-def _resolve_repo(args: argparse.Namespace) -> tuple[Path, Path | None, Path | None] | None:
+def resolve_repo(args: argparse.Namespace) -> tuple[Path, Path | None, Path | None] | None:
     """Resolve the repo argument to a local path (cloning if needed).
 
     Returns ``(src, worktree_origin, worktree_dir)`` where the worktree
@@ -97,7 +97,7 @@ def _resolve_repo(args: argparse.Namespace) -> tuple[Path, Path | None, Path | N
 
     branch = getattr(args, "branch", None)
     if branch and not is_remote and src.is_dir():
-        worktree = _create_worktree(src, branch)
+        worktree = create_worktree(src, branch)
         if worktree is None:
             return None
         return worktree, src, worktree
@@ -105,7 +105,7 @@ def _resolve_repo(args: argparse.Namespace) -> tuple[Path, Path | None, Path | N
     return src, None, None
 
 
-def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
+def resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
     """Detect or validate the language for a repo using universal detection."""
     if args.language:
         validate_path_segment(args.language)
@@ -119,7 +119,7 @@ def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
         return None
 
 
-def _build_manifest(
+def build_cli_manifest(
     args: argparse.Namespace, src: Path, paths,
     scope_path: str | None = None,
 ) -> "SourceManifest | None":
@@ -151,7 +151,7 @@ def _build_manifest(
     return manifest
 
 
-def _require_standards_config(paths) -> bool:
+def require_standards_config(paths) -> bool:
     """Return True if detection.json/dimensions.json exist; else print and return False."""
     if paths.detection_file.exists() and paths.dimensions_file.exists():
         return True
@@ -178,16 +178,16 @@ def _resolve_source_scope(args: argparse.Namespace) -> _SourceScope | None:
 
     Returns ``None`` (with error printed to stderr) if any step fails.
     """
-    resolved = _resolve_repo(args)
+    resolved = resolve_repo(args)
     if resolved is None:
         return None
     src, worktree_origin, worktree_dir = resolved
 
-    scope_path, ok = _resolve_scope(src, args)
+    scope_path, ok = resolve_scope(src, args)
     if not ok:
         return None
 
-    src, single_file = _resolve_single_file(src)
+    src, single_file = resolve_single_file(src)
     return _SourceScope(src, worktree_origin, worktree_dir, scope_path, single_file)
 
 
@@ -206,15 +206,15 @@ def _resolve_manifest(
     """Build the manifest, narrow it to --scope, or replace it with the single file.
 
     Returns ``_SCOPE_EMPTY`` when --scope matched no file, which is a failure
-    rather than the "no prescan" None that ``_build_manifest`` can return.
+    rather than the "no prescan" None that ``build_cli_manifest`` can return.
     """
-    manifest = _build_manifest(args, scope.src, paths, scope_path=scope.scope_path)
+    manifest = build_cli_manifest(args, scope.src, paths, scope_path=scope.scope_path)
     if scope.scope_path and manifest:
         manifest = filter_manifest_by_scope(manifest, scope.scope_path, log=SHARED_LOG)
         if manifest is None:
             return _SCOPE_EMPTY
     if scope.single_file:
-        return _override_manifest_single_file(language, scope.single_file)
+        return override_manifest_single_file(language, scope.single_file)
     return manifest
 
 
@@ -222,7 +222,7 @@ _SCOPE_EMPTY = object()
 """Marker: --scope excluded every file, so the run has nothing to evaluate."""
 
 
-def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | None:
+def resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | None:
     """Resolve src, language, manifest, and dims_data from CLI args.
 
     Returns ``None`` (with error printed to stderr) if any step fails.
@@ -232,10 +232,10 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
         return None
 
     paths = default_paths()
-    if not _require_standards_config(paths):
+    if not require_standards_config(paths):
         return None
 
-    language = _resolve_language(args, scope.src, paths)
+    language = resolve_language(args, scope.src, paths)
     if language is None:
         return None
 
@@ -257,28 +257,10 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
 __all__ = [
     # Defined here.
     "ResolvedInputs", "filter_manifest_by_scope",
-    "_build_manifest", "_require_standards_config", "_resolve_evaluation_inputs",
-    "_resolve_language", "_resolve_repo",
+    "build_cli_manifest", "require_standards_config", "resolve_evaluation_inputs",
+    "resolve_language", "resolve_repo",
     # Re-exported from _cli_scope / _cli_worktree so the historical
     # ``quodeq._cli_resolution.<name>`` import and patch paths keep working.
-    "_cleanup_worktree", "_create_worktree",
-    "_override_manifest_single_file", "_resolve_scope", "_resolve_single_file",
-    # Public spellings, assigned below.
-    "build_cli_manifest", "cleanup_worktree", "create_worktree",
-    "override_manifest_single_file", "resolve_evaluation_inputs",
-    "resolve_language", "resolve_repo", "resolve_scope", "resolve_single_file",
+    "cleanup_worktree", "create_worktree",
+    "override_manifest_single_file", "resolve_scope", "resolve_single_file",
 ]
-
-# Public spellings of the names ``quodeq.cli`` re-exports. The underscore
-# originals stay importable from here for in-package callers.
-# ``_build_manifest`` is spelled ``build_cli_manifest``: this module already
-# binds ``build_manifest`` to the analysis-layer builder it calls.
-build_cli_manifest = _build_manifest
-cleanup_worktree = _cleanup_worktree
-create_worktree = _create_worktree
-override_manifest_single_file = _override_manifest_single_file
-resolve_evaluation_inputs = _resolve_evaluation_inputs
-resolve_language = _resolve_language
-resolve_repo = _resolve_repo
-resolve_scope = _resolve_scope
-resolve_single_file = _resolve_single_file

@@ -16,13 +16,13 @@ _logger = logging.getLogger(__name__)
 
 _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
 
-_DEFAULT_FETCH_TIMEOUT_S = 30
+DEFAULT_FETCH_TIMEOUT_S = 30
 _RETRY_BASE_DELAY_S = 0.5
 _RETRY_JITTER_S = 0.3
 _MAX_FETCH_BYTES = 50 * 1024 * 1024  # ASVS standard docs are well under this; guards against a compromised/misconfigured allowlisted host
 
 
-def fetch_with_retry(url: str, timeout: int = _DEFAULT_FETCH_TIMEOUT_S, max_retries: int = 3) -> bytes:
+def fetch_with_retry(url: str, timeout: int = DEFAULT_FETCH_TIMEOUT_S, max_retries: int = 3) -> bytes:
     """Fetch URL content with exponential-backoff retries.
 
     Retries on network errors up to *max_retries* times, raising

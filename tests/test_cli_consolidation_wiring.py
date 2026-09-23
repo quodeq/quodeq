@@ -51,7 +51,7 @@ def wired(tmp_path: Path, monkeypatch):
     paths = (tmp_path / "reports", evidence_dir, evaluation_dir)
 
     monkeypatch.setattr(
-        cli_evaluation, "_resolve_evaluation_inputs",
+        cli_evaluation, "resolve_evaluation_inputs",
         lambda a: ResolvedInputs(
             src=src, language="python",
             manifest=SourceManifest(), dims_data={"applies": []},
