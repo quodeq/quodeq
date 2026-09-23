@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from pathlib import Path
 
 from tests.api._project_import_fixtures import (  # noqa: F401 -- app_client is a pytest fixture
     _make_zip,
@@ -131,3 +132,68 @@ def test_import_same_identity_replace_is_refused(app_client):
         resp = _post_zip(c, data, action="replace")
     assert resp.status_code == 409
     assert resp.get_json()["code"] == "AMBIGUOUS_REPLACE"
+
+
+def _existing_project(eval_dir, project_uuid):
+    existing = eval_dir / project_uuid
+    existing.mkdir()
+    (existing / "repository_info.json").write_text(json.dumps({
+        "uuid": project_uuid, "name": "old-name", "location": "local", "path": "/tmp/old",
+    }))
+    (existing / "old-marker.txt").write_text("old content")
+    return existing
+
+
+def test_replace_keeps_old_project_when_extract_fails(app_client, monkeypatch):
+    c, home, eval_dir = app_client
+    project_uuid = str(uuid.uuid4())
+    existing = _existing_project(eval_dir, project_uuid)
+
+    def _fail_extract(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("quodeq.api.import_project.safe_extract", _fail_extract)
+    with _patch_home(home):
+        resp = _post_zip(c, _make_zip(project_uuid=project_uuid), action="replace")
+    assert resp.status_code == 500
+    assert resp.get_json()["code"] == "IO_ERROR"
+    assert (existing / "old-marker.txt").read_text() == "old content"
+
+
+def test_replace_restores_old_project_when_final_rename_fails(app_client, monkeypatch):
+    c, home, eval_dir = app_client
+    project_uuid = str(uuid.uuid4())
+    existing = _existing_project(eval_dir, project_uuid)
+    real_rename = Path.rename
+
+    def _flaky_rename(self, target):
+        # Fail only the staged project -> final path move; let the backup
+        # moves (old project aside, and back) through.
+        if Path(target).resolve() == existing.resolve() and self.name == project_uuid:
+            raise OSError("rename failed")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", _flaky_rename)
+    with _patch_home(home):
+        resp = _post_zip(c, _make_zip(project_uuid=project_uuid), action="replace")
+    assert resp.status_code == 500
+    assert resp.get_json()["code"] == "IO_ERROR"
+    assert (existing / "old-marker.txt").read_text() == "old content"
+
+
+def test_replace_leaves_old_project_when_it_cannot_be_moved_aside(app_client, monkeypatch):
+    c, home, eval_dir = app_client
+    project_uuid = str(uuid.uuid4())
+    existing = _existing_project(eval_dir, project_uuid)
+    real_rename = Path.rename
+
+    def _locked_rename(self, target):
+        if self.resolve() == existing.resolve():
+            raise PermissionError("locked")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", _locked_rename)
+    with _patch_home(home):
+        resp = _post_zip(c, _make_zip(project_uuid=project_uuid), action="replace")
+    assert resp.status_code == 500
+    assert (existing / "old-marker.txt").read_text() == "old content"
