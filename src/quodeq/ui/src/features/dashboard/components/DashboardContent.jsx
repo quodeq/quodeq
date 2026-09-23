@@ -3,9 +3,10 @@ import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { t } from '../../../strings/index.js';
+import { RUN_STATE } from '../../../vocab/runState.js';
 
 function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }) {
-  const hasRunning = availableRuns.some((r) => r?.status === 'in_progress');
+  const hasRunning = availableRuns.some((r) => r?.status === RUN_STATE.RUNNING);
   if (hasRunning) {
     // First-ever evaluation is still running. There's no prior data to
     // show, but we still avoid claiming the project has "no" evaluations

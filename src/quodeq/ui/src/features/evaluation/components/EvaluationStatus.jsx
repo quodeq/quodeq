@@ -12,49 +12,42 @@ import useLiveFeedSettings from '../../settings/hooks/useLiveFeedSettings.js';
 import { exitReasonLabel, isTimeLimitExit } from '../../../models/exitReason.js';
 import { t } from '../../../strings/index.js';
 import { jobStatusLabel } from '../../../strings/labels.js';
-
-const STATUS = {
-  RUNNING: 'running', DONE: 'done', COMPLETED: 'completed',
-  FAILED: 'failed', CANCELLED: 'cancelled', LOST: 'lost',
-};
-const TERMINAL_STATES = new Set([
-  STATUS.DONE, STATUS.COMPLETED, STATUS.FAILED, STATUS.CANCELLED, STATUS.LOST,
-]);
+import { JOB_STATUS, JOB_TERMINAL } from '../../../vocab/jobStatus.js';
 
 // A cancelled/failed job whose run hit its time budget is not an error:
 // the header must agree with the coverage banner below it, which already
 // says "time limit reached" from the run's status.json. Done runs keep
 // their "complete" header; the banner tells the truncation story there.
 function isTimeLimitEnd(status, exitReason) {
-  return (status === STATUS.CANCELLED || status === STATUS.FAILED) && isTimeLimitExit(exitReason);
+  return (status === JOB_STATUS.CANCELLED || status === JOB_STATUS.FAILED) && isTimeLimitExit(exitReason);
 }
 
 function termNameForStatus(status, exitReason) {
-  if (status === STATUS.RUNNING) return t('evaluate.termInProgress');
+  if (status === JOB_STATUS.RUNNING) return t('evaluate.termInProgress');
   if (isTimeLimitEnd(status, exitReason)) return t('evaluate.termTimeLimit');
-  if (status === STATUS.DONE)    return t('evaluate.termComplete');
-  if (status === STATUS.FAILED)  return t('evaluate.termFailed');
-  if (status === STATUS.LOST)    return t('evaluate.termLost');
+  if (status === JOB_STATUS.DONE)    return t('evaluate.termComplete');
+  if (status === JOB_STATUS.FAILED)  return t('evaluate.termFailed');
+  if (status === JOB_STATUS.LOST)    return t('evaluate.termLost');
   return t('evaluate.termCancelled');
 }
 
 function RunPill({ status, exitReason }) {
   const timeLimit = isTimeLimitEnd(status, exitReason);
-  const mod = status === STATUS.RUNNING ? 'running'
-    : status === STATUS.DONE ? 'done'
-    : !timeLimit && (status === STATUS.FAILED || status === STATUS.LOST) ? 'failed'
+  const mod = status === JOB_STATUS.RUNNING ? 'running'
+    : status === JOB_STATUS.DONE ? 'done'
+    : !timeLimit && (status === JOB_STATUS.FAILED || status === JOB_STATUS.LOST) ? 'failed'
     : 'neutral';
   return (
     <span className={`eval-run-pill eval-run-pill--${mod}`}>
-      {status === STATUS.RUNNING && <span className="eval-run-pill__dot" aria-hidden="true" />}
+      {status === JOB_STATUS.RUNNING && <span className="eval-run-pill__dot" aria-hidden="true" />}
       {timeLimit ? exitReasonLabel(exitReason) : jobStatusLabel(status)}
     </span>
   );
 }
 
 function JobHeader({ job, onDismiss, onCancel }) {
-  const isRunning = job.status === STATUS.RUNNING;
-  const isDone = job.status === STATUS.DONE;
+  const isRunning = job.status === JOB_STATUS.RUNNING;
+  const isDone = job.status === JOB_STATUS.DONE;
   return (
     <div className="evaluate-panel__top evaluate-panel__top--row">
       <TermHeader
@@ -79,7 +72,7 @@ function JobHeader({ job, onDismiss, onCancel }) {
 }
 
 function JobIdentityStrip({ job, projectLabel }) {
-  const isTerminal = TERMINAL_STATES.has(job.status);
+  const isTerminal = JOB_TERMINAL.has(job.status);
   // Shares the strip/progress query cache entry — no extra polling.
   const { data: progress } = useEvaluationProgress(job.jobId, isTerminal);
   const mode = deriveScanMode(progress);

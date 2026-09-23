@@ -13,6 +13,7 @@ import urllib.request
 
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.config.analysis_env import provider_explicitly_configured
+from quodeq.config.provider import Provider
 from quodeq.config.llm_bridge_env import api_key, llamacpp_base_url, ollama_base_url
 from quodeq.shared.prereqs import SAFE_CMD_TOKEN_RE, run_version_cmd
 from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path
@@ -129,7 +130,7 @@ def _probe_local_server(url: str, message: str) -> None:
 def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> None:
     """Check that an API provider has basic connectivity (Ollama: server running)
     and that cloud providers have their required API key set."""
-    if provider == "ollama":
+    if provider == Provider.OLLAMA:
         _probe_local_server(
             f"{ollama_base_url(env)}/api/tags",
             "Ollama is configured as your AI provider but the server is not running.\n\n"
@@ -137,7 +138,7 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
             "  ollama serve\n\n"
             "Or install Ollama from https://ollama.com/download",
         )
-    elif provider == "llamacpp":
+    elif provider == Provider.LLAMACPP:
         _probe_local_server(
             f"{llamacpp_base_url(env)}/health",
             "llama.cpp is configured as your AI provider but llama-server is not running.\n\n"

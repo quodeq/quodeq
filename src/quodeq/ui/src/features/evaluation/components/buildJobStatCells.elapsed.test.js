@@ -149,7 +149,6 @@ test('buildJobStatCells: builds done-state cells with SCANNED + VIOLATIONS + DUR
 
 test('buildJobStatCells: uses correct tone for STATUS by status', () => {
   assert.equal(buildJobStatCells('done',      baseInputs)[0].tone, 'success');
-  assert.equal(buildJobStatCells('completed', baseInputs)[0].tone, 'success');
   assert.equal(buildJobStatCells('failed',    baseInputs)[0].tone, 'critical');
   assert.equal(buildJobStatCells('lost',      baseInputs)[0].tone, 'critical');
   assert.equal(buildJobStatCells('cancelled', baseInputs)[0].tone, 'default');

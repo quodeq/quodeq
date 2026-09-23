@@ -5,6 +5,7 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
 import { safeGetItem, readAnalysisPower, writeAnalysisPower, resolveSubagentModel } from './evaluationLifecycleHelpers.js';
 import { useJobCompletionEffect } from './useJobCompletionEffect.js';
 import { t } from '../strings/index.js';
+import { JOB_STATUS } from '../vocab/jobStatus.js';
 
 /**
  * Manages the full evaluation lifecycle: start, poll, dismiss, cancel.
@@ -24,7 +25,7 @@ function makeStartEvaluationHandler({ job, setBlockedStartError, storage, analys
     // otherwise overwrite the live job state and confuse the lifecycle.
     // Returns false so callers can keep one-shot UI state (the clean-scan
     // "once" toggle) instead of consuming it for a start that never ran.
-    if (job && job.status === 'running') {
+    if (job && job.status === JOB_STATUS.RUNNING) {
       setBlockedStartError(
         t('evaluate.alreadyRunning'),
       );

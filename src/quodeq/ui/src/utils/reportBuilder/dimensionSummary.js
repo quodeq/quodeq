@@ -1,6 +1,7 @@
 // src/quodeq/ui/src/utils/reportBuilder/dimensionSummary.js
 import { formatViolationEntry } from './shared.js';
 import { complianceRatio } from '../textFormatting.js';
+import { SEVERITY } from '../../vocab/severity.js';
 
 const MAX_TOP_FILES = 15;
 
@@ -47,7 +48,7 @@ export function buildTopOffendingFiles(accumulatedDimensions) {
       const f = v.file.split(':')[0];
       if (!fileMap[f]) fileMap[f] = { count: 0, critical: 0, major: 0, minor: 0 };
       fileMap[f].count++;
-      const s = (v.severity || 'minor').toLowerCase();
+      const s = (v.severity || SEVERITY.MINOR).toLowerCase();
       if (fileMap[f][s] !== undefined) fileMap[f][s]++;
     }
   }
@@ -76,7 +77,7 @@ export function buildCritMajorSection(accumulatedDimensions) {
   const lines = [];
   const critMajor = [];
   for (const dim of accumulatedDimensions) {
-    const vs = (dim.violations || []).filter((v) => v.severity === 'critical' || v.severity === 'major');
+    const vs = (dim.violations || []).filter((v) => v.severity === SEVERITY.CRITICAL || v.severity === SEVERITY.MAJOR);
     if (vs.length > 0) critMajor.push({ dimension: dim.dimension, violations: vs });
   }
   if (critMajor.length > 0) {

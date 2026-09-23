@@ -12,6 +12,7 @@ import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
 import DeferredMount from './DeferredMount.jsx';
 import CardListSkeleton from './CardListSkeleton.jsx';
 import { t } from '../../../strings/index.js';
+import { GRADE } from '../../../vocab/grade.js';
 
 // Rows are virtualized (same VirtualList as FileDetailPage): a principle can
 // carry hundreds of findings, and each card runs pretext measurement layout
@@ -83,7 +84,7 @@ function PrincipleHeader({ data }) {
     ? `1:${Math.round(compliance.length / violations.length)}`
     : '—';
 
-  const scoreHint = grade === 'Insufficient'
+  const scoreHint = grade === GRADE.INSUFFICIENT
     ? t('explorer.notEnoughEvidence')
     : grade ? t('overview.gradeHint', { letter: gradeLetter(grade) }) : null;
 

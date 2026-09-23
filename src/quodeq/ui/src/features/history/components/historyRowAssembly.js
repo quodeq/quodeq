@@ -6,20 +6,22 @@
 // HistoryPage.jsx (which would create a circular import, since HistoryPage
 // imports HistoryContent).
 
+import { RUN_STATE } from '../../../vocab/runState.js';
+
 // Only outright failures are hidden. Cancelled runs may still have written
 // per-dim evaluation files (the dashboard's overview reads them and shows
 // scores), so hiding them here would create a confusing mismatch where the
 // overview shows scores from a run that history claims doesn't exist.
-export const HIDDEN_STATUSES = new Set(['failed']);
-export const PARTIAL_STATUSES = new Set(['cancelled']);
+export const HIDDEN_STATUSES = new Set([RUN_STATE.FAILED]);
+export const PARTIAL_STATUSES = new Set([RUN_STATE.CANCELLED]);
 
 function buildInProgressStubs(availableRuns, trendIds) {
   return (availableRuns || [])
-    .filter((r) => r.status === 'in_progress' && !trendIds.has(r.runId))
+    .filter((r) => r.status === RUN_STATE.RUNNING && !trendIds.has(r.runId))
     // hasScoredDims=false: this run is running but no dimension has finished
     // scoring yet. Clicking would land on an empty dashboard, so the row is
     // rendered as not-yet-ready.
-    .map((r) => ({ runId: r.runId, dateLabel: r.dateLabel, dateISO: null, status: 'in_progress', hasScoredDims: false }));
+    .map((r) => ({ runId: r.runId, dateLabel: r.dateLabel, dateISO: null, status: RUN_STATE.RUNNING, hasScoredDims: false }));
 }
 
 function buildCancelledStubs(availableRuns, trendIds) {
@@ -28,10 +30,10 @@ function buildCancelledStubs(availableRuns, trendIds) {
   // complete run exists. Surface them as partial, dated rows so History and
   // the Overview agree instead of showing scores over an empty table.
   return (availableRuns || [])
-    .filter((r) => r.status === 'cancelled' && !trendIds.has(r.runId))
+    .filter((r) => r.status === RUN_STATE.CANCELLED && !trendIds.has(r.runId))
     .map((r) => ({
       runId: r.runId, dateLabel: r.dateLabel, dateISO: r.dateISO ?? null,
-      status: 'cancelled', hasScoredDims: true,
+      status: RUN_STATE.CANCELLED, hasScoredDims: true,
     }));
 }
 

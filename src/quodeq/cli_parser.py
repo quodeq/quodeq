@@ -3,7 +3,11 @@ from __future__ import annotations
 
 import argparse
 
+from quodeq.core.types.severity import SEVERITY_ORDER
 from quodeq.shared.utils import get_evaluations_dir
+
+# argparse compares the raw argv string, so the choices are the plain values.
+_SEVERITY_CHOICES = [s.value for s in SEVERITY_ORDER]
 
 _DEFAULT_N_SUBAGENTS = 5
 _MODE_NUMERICAL = "numerical"
@@ -124,7 +128,7 @@ def _add_evaluate_sarif_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--min-severity",
         default=None,
-        choices=["critical", "major", "minor"],
+        choices=_SEVERITY_CHOICES,
         help="When writing SARIF, drop findings below this severity.",
     )
     parser.add_argument(
@@ -194,7 +198,7 @@ def _add_export_subcommand(subparsers) -> None:
     sarif_parser.add_argument("--evaluation-dir", required=True, help="Directory containing evaluation/<dim>.json reports")
     sarif_parser.add_argument("-o", "--output", required=True, help="Path to write the .sarif file")
     sarif_parser.add_argument(
-        "--min-severity", default=None, choices=["critical", "major", "minor"],
+        "--min-severity", default=None, choices=_SEVERITY_CHOICES,
         help="Drop findings below this severity.",
     )
     sarif_parser.add_argument(

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.shared_repo import (
+    REPO_FORMAT_OK,
     check_repo_format,
     ensure_shared_clone,
     read_state,
@@ -67,4 +68,4 @@ def connect_shared_repo(url: str, *, log: LogSink = NULL_LOG) -> ConnectOutcome:
     if fmt == "unsupported_version":
         return ConnectOutcome(status="unsupported_version", url=url)
     write_settings(SharedSettings(url=url), log=log)
-    return ConnectOutcome(status="ok", url=url)
+    return ConnectOutcome(status=REPO_FORMAT_OK, url=url)

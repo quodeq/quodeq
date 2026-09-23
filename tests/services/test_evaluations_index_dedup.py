@@ -17,9 +17,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._job_model import Job, InMemoryJobStore
-from quodeq.services.jobs import JobManager, STATUS_RUNNING
+from quodeq.services.jobs import JobManager
 from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 
 
@@ -56,7 +57,7 @@ def test_list_returns_one_entry_for_dashboard_spawned_run(tmp_path: Path) -> Non
     store.put(
         Job(
             job_id="internal-uuid-1",
-            status=STATUS_RUNNING,
+            status=JobStatus.RUNNING,
             command=["python", "-m", "quodeq.cli", "evaluate"],
             started_at="2026-05-22T19:00:00+00:00",
             ended_at=None,
@@ -160,7 +161,7 @@ def test_list_prefers_internal_over_indexed_external(tmp_path: Path) -> None:
     store.put(
         Job(
             job_id="internal-uuid-2",
-            status=STATUS_RUNNING,
+            status=JobStatus.RUNNING,
             command=["python", "-m", "quodeq.cli", "evaluate"],
             started_at="2026-05-22T19:00:00+00:00",
             ended_at=None,

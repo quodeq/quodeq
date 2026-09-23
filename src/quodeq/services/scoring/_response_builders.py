@@ -14,6 +14,7 @@ from pathlib import Path
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.core.evidence.model import violations_per_100_files
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
+from quodeq.core.types.severity import Severity
 from quodeq.core.scoring.dimension_summary import build_dimension_summary
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
@@ -35,7 +36,11 @@ from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
 
 
-def _severity_bucket(severity: str) -> str:
+_UNKNOWN_BUCKET = "unknown"
+_BUCKET_BY_SEVERITY: dict[str, Severity] = {s.value: s for s in Severity}
+
+
+def _severity_bucket(severity: str) -> Severity | str:
     """Map DB severity strings to the legacy tally buckets.
 
     The DB stores ``critical``, ``high``, ``medium``, ``low``, ``minor``. Only
@@ -45,13 +50,7 @@ def _severity_bucket(severity: str) -> str:
     a pre-existing bucketing semantics worth a follow-up but out of PR 2 scope.
     """
     s = (severity or "").lower()
-    if s == "critical":
-        return "critical"
-    if s == "major":
-        return "major"
-    if s == "minor":
-        return "minor"
-    return "unknown"
+    return _BUCKET_BY_SEVERITY.get(s, _UNKNOWN_BUCKET)
 
 
 def _build_totals_from_findings(
@@ -61,11 +60,11 @@ def _build_totals_from_findings(
     critical = major = minor = unknown = 0
     for v in violations:
         bucket = _severity_bucket(v.severity or "")
-        if bucket == "critical":
+        if bucket == Severity.CRITICAL:
             critical += 1
-        elif bucket == "major":
+        elif bucket == Severity.MAJOR:
             major += 1
-        elif bucket == "minor":
+        elif bucket == Severity.MINOR:
             minor += 1
         else:
             unknown += 1

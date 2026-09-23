@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from quodeq.analysis.provider_cache import get_provider_configs as _get_cached_configs
 from quodeq.config.llm_bridge_env import api_key as _api_key, local_api_markers
+from quodeq.config.provider import Provider
 
 
 def get_provider_configs() -> dict[str, dict]:
@@ -19,7 +20,8 @@ def get_provider_type(provider_id: str) -> str:
 # Fixed-endpoint local model servers. The assistant's in-process web tools
 # (search_web/fetch_url) are only ever registered for these providers; cloud
 # API providers (openrouter/custom) are excluded by design.
-LOCAL_PROVIDERS = frozenset({"ollama", "llamacpp", "omlx"})
+# omlx is a provider-config id with no Provider member.
+LOCAL_PROVIDERS = frozenset({Provider.OLLAMA, Provider.LLAMACPP, "omlx"})
 
 
 def _local_api_markers(env: dict[str, str] | None = None) -> frozenset[str]:

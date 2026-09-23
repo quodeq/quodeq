@@ -4,11 +4,12 @@ import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 import CloneTargetStep from './CloneTargetStep.jsx';
 import { RepoScanSummary } from './RepoScanSummary.jsx';
 import { useRepoScanStep } from '../../hooks/useRepoScanStep.js';
+import { SCAN_SUB_STATE } from '../../hooks/useWizardState.js';
 import { t } from '../../../../strings/index.js';
 
 function RepoScanInputRow({ sub, state, actions, handleSubmit, setFolderBrowserOpen }) {
   return (
-    <div className={sub === 'idle' ? 'onboarding-repo-row' : 'onboarding-repo-row onboarding-form-locked'}>
+    <div className={sub === SCAN_SUB_STATE.IDLE ? 'onboarding-repo-row' : 'onboarding-repo-row onboarding-form-locked'}>
       <TermInput
         prompt="$"
         command="repo"
@@ -22,7 +23,7 @@ function RepoScanInputRow({ sub, state, actions, handleSubmit, setFolderBrowserO
         type="button"
         className="term-btn--secondary onboarding-repo-row__browse"
         onClick={() => setFolderBrowserOpen(true)}
-        disabled={sub !== 'idle'}
+        disabled={sub !== SCAN_SUB_STATE.IDLE}
       >
         {t('onboarding.local')}
       </button>
@@ -33,18 +34,18 @@ function RepoScanInputRow({ sub, state, actions, handleSubmit, setFolderBrowserO
 function RepoScanStatusSection({ sub, state, actions, handleSubmit }) {
   return (
     <>
-      {sub === 'scanned' && (
+      {sub === SCAN_SUB_STATE.SCANNED && (
         <button type="button" className="onboarding-edit-link" onClick={actions.resetScan}>{t('onboarding.editRepository')}</button>
       )}
 
-      {sub === 'scanning' && (
+      {sub === SCAN_SUB_STATE.SCANNING && (
         <div className="onboarding-scan-progress">
           <ScanProgress />
           <p className="onboarding-scan-progress__hint">{t('onboarding.scanning')}</p>
         </div>
       )}
 
-      {sub === 'error' && (
+      {sub === SCAN_SUB_STATE.ERROR && (
         <div className="onboarding-scan-error" role="alert">
           <p>{state.scanError?.message || t('onboarding.scanFailed')}</p>
           <div className="onboarding-step__actions">
@@ -54,7 +55,7 @@ function RepoScanStatusSection({ sub, state, actions, handleSubmit }) {
         </div>
       )}
 
-      {sub === 'scanned' && <RepoScanSummary scan={state.scan} />}
+      {sub === SCAN_SUB_STATE.SCANNED && <RepoScanSummary scan={state.scan} />}
     </>
   );
 }
@@ -63,10 +64,10 @@ function RepoScanFooterActions({ sub, state, handleSubmit, onContinue, folderBro
   return (
     <>
       <div className="onboarding-step__actions">
-        {sub === 'idle' && (
+        {sub === SCAN_SUB_STATE.IDLE && (
           <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={handleSubmit} disabled={!state.repo.value}>{t('onboarding.scanRepository')}</button>
         )}
-        {sub === 'scanned' && (
+        {sub === SCAN_SUB_STATE.SCANNED && (
           <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onContinue}>{t('common.continue')}</button>
         )}
       </div>

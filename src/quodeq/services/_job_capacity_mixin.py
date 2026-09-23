@@ -10,8 +10,9 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timezone
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
-from quodeq.services._job_model import STATUS_FAILED, Job
+from quodeq.services._job_model import Job
 from quodeq.shared.env import env_int
 
 _DEFAULT_MAX_CONCURRENT_JOBS = 8
@@ -51,7 +52,7 @@ class _JobCapacityMixin:
             "finish or raise QUODEQ_MAX_CONCURRENT_JOBS."
         )
         self._log.error(message)
-        job.status = STATUS_FAILED
+        job.status = JobStatus.FAILED
         job.ended_at = datetime.now(timezone.utc).isoformat()
         job.exit_code = _EXIT_CODE_TOO_MANY_JOBS
         job.logs.append(message)

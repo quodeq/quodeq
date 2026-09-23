@@ -1,3 +1,4 @@
+import { SEVERITY } from '../vocab/severity.js';
 /**
  * Shared helpers for dimension data used by dashboard overview panels.
  */
@@ -26,7 +27,7 @@ export function fallbackDelta(dim) {
 function severityCounts(violations) {
   const counts = { critical: 0, major: 0, minor: 0 };
   (violations || []).forEach((v) => {
-    const s = (v.severity || 'minor').toLowerCase();
+    const s = (v.severity || SEVERITY.MINOR).toLowerCase();
     if (counts[s] !== undefined) counts[s]++;
   });
   return counts;

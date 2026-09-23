@@ -58,17 +58,17 @@ def _compute_result(
 ) -> _AccumulatedResult:
     """Load run data and compute trends, severity, and scores.
 
-    Only ``complete`` runs feed the overview by default. ``in_progress``
+    Only ``done`` runs feed the overview by default. ``running``
     runs are excluded so partial mid-flight dims don't leak into the
     cards: during a running evaluation the overview shows the previous
-    complete run's data unchanged, and when the run terminates with
-    status ``complete`` its dims become the new latest pick. ``failed``
+    done run's data unchanged, and when the run terminates with
+    status ``done`` its dims become the new latest pick. ``failed``
     runs are excluded outright (no trustworthy data).
 
-    If no complete run exists but cancelled runs do (fresh project where
+    If no done run exists but cancelled runs do (fresh project where
     every attempt was stopped early), fall back to those — better to
     show what real data we have than to render a blank dashboard. The
-    fallback excludes ``in_progress`` (a brand-new project whose first
+    fallback excludes ``running`` (a brand-new project whose first
     run is still alive starts blank) and ``failed`` (the run errored;
     its partial scoring must not masquerade as the project grade).
 

@@ -1,7 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApi } from '../../api/ApiContext.jsx';
 
-const ACTIVE_PHASES = new Set(['downloading', 'verifying', 'installing', 'relaunching']);
+// The self-update flow's own phase vocabulary, not the run/job/dim
+// vocabulary -- kept local rather than forced into vocab/*.js.
+const SELF_UPDATE_PHASE = Object.freeze({
+  IDLE: 'idle', DOWNLOADING: 'downloading', VERIFYING: 'verifying',
+  INSTALLING: 'installing', RELAUNCHING: 'relaunching', ERROR: 'error',
+});
+const ACTIVE_PHASES = new Set([
+  SELF_UPDATE_PHASE.DOWNLOADING, SELF_UPDATE_PHASE.VERIFYING,
+  SELF_UPDATE_PHASE.INSTALLING, SELF_UPDATE_PHASE.RELAUNCHING,
+]);
 // Fast enough that the phase/percent banner reads as live progress.
 const STATUS_POLL_MS = 1000;
 
@@ -14,7 +23,7 @@ export function useSelfUpdate(status, adoptStatus) {
   const { getUpdateStatus, startSelfUpdate } = useApi();
   const [starting, setStarting] = useState(false);
   const selfUpdate = status?.self_update || null;
-  const phase = selfUpdate?.phase || 'idle';
+  const phase = selfUpdate?.phase || SELF_UPDATE_PHASE.IDLE;
   const active = ACTIVE_PHASES.has(phase);
 
   useEffect(() => {
@@ -37,7 +46,7 @@ export function useSelfUpdate(status, adoptStatus) {
     supported: Boolean(selfUpdate?.supported),
     phase,
     active,
-    failed: phase === 'error',
+    failed: phase === SELF_UPDATE_PHASE.ERROR,
     percent: selfUpdate?.percent ?? 0,
     starting,
     begin,

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from quodeq.core.run.exit_reason import ExitReason
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.data.fs.report_parser.grades import most_frequent_grade, parse_numeric_score
@@ -27,7 +28,7 @@ def _accumulate_dimension_totals(
 
     for d in dimensions:
         score_str = d.get("overallScore")
-        if score_str and d.get("exitReason") != "failure_streak":
+        if score_str and d.get("exitReason") != ExitReason.FAILURE_STREAK:
             val = parse_numeric_score(score_str)
             if val is not None:
                 score_pairs.append((d.get("dimension"), val))

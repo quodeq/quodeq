@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import json
 from quodeq.core.stream.events import (
-    EVENT_TYPE_ASSISTANT, EVENT_TYPE_ASSISTANT_MESSAGE, EVENT_TYPE_ITEM_COMPLETED,
-    EVENT_TYPE_RESULT, EVENT_TYPE_TOOL_EXECUTION_START,
+    EVENT_TYPE_ASSISTANT, EVENT_TYPE_ASSISTANT_MESSAGE, EVENT_TYPE_ERROR, EVENT_TYPE_ITEM_COMPLETED,
+    EVENT_TYPE_RESULT, EVENT_TYPE_TOOL_EXECUTION_START, EVENT_TYPE_TURN_FAILED,
     copilot_error, copilot_event_data, texts_from_copilot,
 )
 
@@ -177,9 +177,9 @@ def error_message(event: dict) -> str | None:
     error = copilot_error(event)
     if error:
         return error[0]
-    if event.get("type") == "error":
+    if event.get("type") == EVENT_TYPE_ERROR:
         return _nested_error_message(event.get("message")) or _nested_error_message(event)
-    if event.get("type") == "turn.failed":
+    if event.get("type") == EVENT_TYPE_TURN_FAILED:
         return _nested_error_message(event.get("error")) or _nested_error_message(event)
     return None
 

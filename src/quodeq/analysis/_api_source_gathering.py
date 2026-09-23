@@ -9,6 +9,7 @@ is re-exported there; nothing here is itself patched by name.
 """
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -19,6 +20,12 @@ from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 
 _log = logging.getLogger(__name__)
+
+# The API runner's stream-done marker: a distinct artifact from the run-list/
+# RunState vocabulary (it is never written to status.json), so it gets its
+# own name rather than borrowing a RunState-shaped string. Shared by
+# subprocess.py's clean-finish write and this module's queue-exhausted write.
+API_RUNNER_STREAM_DONE = "complete"
 
 
 def _read_omlx_key(env: Mapping[str, str] | None = None) -> str | None:
@@ -65,7 +72,7 @@ def _gather_api_source_files(
             # Don't touch jsonl_file — it's the SHARED `{dim}_evidence.jsonl`
             # that every agent in the pool appends to via MCP. Truncating it
             # here wipes findings from every other agent in the pool.
-            stream_file.write_text('{"type":"api_runner","status":"complete"}\n', encoding="utf-8")
+            write_stream_done_marker(stream_file)
             return None
         return source_files
     return _gather_source_files(work_dir)
@@ -95,3 +102,8 @@ def _batch_files_by_size(files: list[Path], budget: int) -> list[list[Path]]:
     if current:
         batches.append(current)
     return batches
+
+
+def write_stream_done_marker(stream_file: Path) -> None:
+    """Overwrite *stream_file* with the API runner's one-line done marker."""
+    stream_file.write_text(json.dumps({"type": "api_runner", "status": API_RUNNER_STREAM_DONE}) + "\n", encoding="utf-8")

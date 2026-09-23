@@ -26,7 +26,7 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
     loading: false,
     isFetching: false,
     error: null,
-    availableRuns: [{ runId: 'r1', status: 'complete' }],
+    availableRuns: [{ runId: 'r1', status: 'done' }],
   };
 
   it('keeps the same .dashboard-page DOM node across a transition from an early-return branch to the main content branch', () => {

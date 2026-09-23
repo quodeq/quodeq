@@ -32,6 +32,7 @@ from typing import Any
 
 from quodeq.shared import cancellation
 from quodeq.analysis.errors import provider_exit_reason
+from quodeq.core.run.exit_reason import ExitReason
 from quodeq.shared.resource_sampler import ResourceSampler
 from quodeq.shared.run_heartbeat import HeartbeatThread
 from quodeq.analysis._run_lifecycle_support import (
@@ -193,7 +194,7 @@ class RunLifecycleContext:
         exit_reason makes the History entry distinguishable from regular failures.
         """
         if self._current_state not in TERMINAL_STATES:
-            self._transition(RunState.FAILED, exit_reason="failure_streak")
+            self._transition(RunState.FAILED, exit_reason=ExitReason.FAILURE_STREAK)
 
     def _exit_fatal_provider(self, exc: BaseException | None) -> None:
         """Provider reported an unrecoverable condition (quota, auth, credits).

@@ -45,7 +45,7 @@ _SCORES_PAYLOAD = {
             "runId": "run-1",
             "dateISO": "2026-08-01T10:00:00",
             "dateLabel": "01 Aug",
-            "status": "complete",
+            "status": "done",
             "numericAverage": 7.0,
             "overallGrade": "Good",
             "runNumericAverage": 7.0,
@@ -55,7 +55,7 @@ _SCORES_PAYLOAD = {
         },
     ],
     "availableRuns": [
-        {"runId": "run-1", "dateLabel": "01 Aug", "status": "complete"},
+        {"runId": "run-1", "dateLabel": "01 Aug", "status": "done"},
     ],
     "scoring": {"customFormula": False},
 }

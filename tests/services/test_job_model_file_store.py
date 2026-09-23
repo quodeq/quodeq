@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.services._job_model import Job
 from quodeq.services._job_file_store import FileJobStore, _default_persist_dir
 
@@ -30,6 +31,21 @@ class TestFileJobStore:
         assert (tmp_path / "j1.json").exists()
         data = json.loads((tmp_path / "j1.json").read_text())
         assert data["job_id"] == "j1"
+
+    def test_status_round_trips_through_disk_as_done(self, tmp_path: Path):
+        """A job whose status is JobStatus.DONE serializes to the plain
+        string "done" on disk (StrEnum, not the repr) and reads back equal
+        to JobStatus.DONE (not merely the string "done")."""
+        store = FileJobStore(persist_dir=tmp_path)
+        job = Job("j1", JobStatus.DONE, ["echo"], "now", "later", 0)
+        store.put(job)
+        data = json.loads((tmp_path / "j1.json").read_text())
+        assert data["status"] == "done"
+
+        reloaded_store = FileJobStore(persist_dir=tmp_path)
+        reloaded = reloaded_store.get("j1")
+        assert reloaded is not None
+        assert reloaded.status == JobStatus.DONE
 
     def test_loads_on_init(self, tmp_path: Path):
         # Write a job file manually
@@ -71,6 +87,13 @@ class TestFileJobStore:
         (tmp_path / "bad.json").write_text("not json{{{")
         store = FileJobStore(persist_dir=tmp_path)
         assert store.list() == []
+
+    def test_non_string_status_does_not_abort_the_load(self, tmp_path: Path):
+        (tmp_path / "bad.json").write_text(json.dumps({"job_id": "bad", "status": 5}))
+        (tmp_path / "ok.json").write_text(json.dumps({"job_id": "ok", "status": "done"}))
+        store = FileJobStore(persist_dir=tmp_path)
+        assert store.get("bad").status == 5
+        assert store.get("ok").status is JobStatus.DONE
 
     def test_delete_removes_file(self, tmp_path: Path):
         store = FileJobStore(persist_dir=tmp_path)

@@ -17,6 +17,7 @@ import logging
 from pathlib import Path
 
 from quodeq.analysis.cache.backend import CacheBackend
+from quodeq.core.run.state import RunState
 
 _logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def _run_reached_done(run_dir: Path) -> bool:
         data = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
-    return isinstance(data, dict) and data.get("state") == "done"
+    return isinstance(data, dict) and data.get("state") == RunState.DONE
 
 
 def _collect_keys(evidence_dir: Path) -> set[str]:

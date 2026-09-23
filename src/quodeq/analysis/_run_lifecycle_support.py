@@ -113,7 +113,7 @@ def _mark_unfinished_dims_incomplete(
         return 0
     flipped = 0
     for dim, entry in entries.items():
-        if isinstance(entry, dict) and entry.get("state") in {"running", "pending"}:
+        if isinstance(entry, dict) and entry.get("state") in {DimState.RUNNING, DimState.PENDING}:
             try:
                 write_dim_state(run_dir, dim, DimState.INCOMPLETE, reason=reason)
                 flipped += 1
@@ -199,7 +199,7 @@ def _finalize_run_on_atexit(
     if current is None:
         return
     state_str = current.get("state")
-    if state_str in {s.value for s in TERMINAL_STATES}:
+    if state_str in TERMINAL_STATES:
         return
     heartbeat.stop()
     resources.stop()

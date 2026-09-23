@@ -33,6 +33,7 @@ from dataclasses import dataclass, replace
 from quodeq.analysis.evidence_parser import parse_evidence_from_jsonl
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
+from quodeq.core.run.exit_reason import ExitReason
 from quodeq.analysis.cache._dimension_context import (
     _CacheContext,
     _prepare_cache_context,
@@ -167,7 +168,7 @@ def _handle_breaker_trip(
             files_read=_compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
         )
         if salvaged is not None and salvaged.principles:
-            salvaged.exit_reason = "failure_streak"
+            salvaged.exit_reason = ExitReason.FAILURE_STREAK
             return salvaged
     raise CircuitBreakerError(REASON_CIRCUIT_BREAKER)
 

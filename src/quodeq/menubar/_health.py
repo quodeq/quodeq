@@ -19,6 +19,10 @@ _API_HEALTH_PATH = "/api/health"
 _API_EVALUATIONS_PATH = "/api/evaluations"
 _LOCAL_BASE_URL = "http://127.0.0.1"
 _DEFAULT_COMMANDS = ("python3", "node", "claude")
+# JobStatus.RUNNING's value: menubar/ may import only update/ plus the
+# cross-cutting shared/config (tools/check_imports.py); JobStatus lives in
+# core/, so this compares against the value directly instead.
+_JOB_STATUS_RUNNING = "running"
 
 
 def _icons_dir() -> Path:
@@ -89,6 +93,6 @@ def is_evaluating(port: int) -> bool:
     try:
         url = f"{_LOCAL_BASE_URL}:{port}{_API_EVALUATIONS_PATH}?limit=1&status=running"
         with urllib.request.urlopen(url, timeout=_HEALTH_TIMEOUT) as r:
-            return any(j.get("status") == "running" for j in json.loads(r.read()))
+            return any(j.get("status") == _JOB_STATUS_RUNNING for j in json.loads(r.read()))
     except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):
         return False

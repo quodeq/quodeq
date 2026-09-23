@@ -16,6 +16,7 @@
  * `filesProjectTotal` per dim) when every dim carries it; otherwise the
  * coverage fields are null and the UI falls back to the run-only display.
  */
+import { DIM_STATE } from '../../../vocab/dimState.js';
 
 export function pct(taken, total) {
   if (!total || total <= 0) return 0;
@@ -30,7 +31,7 @@ export function pct(taken, total) {
 export function dimFileEstimate(progress) {
   const dims = progress?.dimensions || [];
   const observed = dims
-    .filter((d) => d?.state !== 'pending')
+    .filter((d) => d?.state !== DIM_STATE.PENDING)
     .map((d) => d?.files?.total ?? 0)
     .filter((n) => n > 0);
   if (observed.length > 0) return Math.max(...observed);
@@ -45,7 +46,7 @@ const NO_EXCLUDED = { excludedFiles: null };
 // total, we show what we know rather than contradicting an obviously-running
 // run with a "preparing" label.
 function hasKnownProgress(dims) {
-  const anyDimStarted = dims.some((d) => d?.state === 'running' || d?.state === 'done');
+  const anyDimStarted = dims.some((d) => d?.state === DIM_STATE.RUNNING || d?.state === DIM_STATE.DONE);
   const anyTotalKnown = dims.some((d) => (d?.files?.total ?? 0) > 0);
   return anyDimStarted || anyTotalKnown;
 }

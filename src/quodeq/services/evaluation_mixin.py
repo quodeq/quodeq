@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
 from quodeq.services._job_model import JobLaunchOptions
 from quodeq.services.base import EvaluationOptions, NewProjectSpec
@@ -207,7 +208,7 @@ class FsEvaluationMixin:
     def score_failed_evaluation(self, job_id: str, reports_dir: str) -> bool:
         """Score any completed dimensions from a failed evaluation."""
         job = self._jobs.get_job(job_id)
-        if not job or job.status not in ("failed", "cancelled"):
+        if not job or job.status not in (JobStatus.FAILED, JobStatus.CANCELLED):
             return False
         if job.output_project and job.output_run_id:
             score_completed_evidence(reports_dir, _run_ref(job))

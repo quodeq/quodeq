@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import ActionProvider
 
@@ -57,7 +58,7 @@ def find_active_evaluation(
     items = provider.list_evaluations(reports_dir=reports_dir)
     running = [
         j for j in (items if isinstance(items, list) else [])
-        if _job_status(j) == "running"
+        if _job_status(j) == JobStatus.RUNNING
     ]
     if not running:
         return None

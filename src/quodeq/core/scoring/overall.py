@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from quodeq.core.types import OverallScore, PrincipleScore
+from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.internals import (
     GRADE_LADDER,
@@ -26,12 +27,12 @@ def accumulate_weights(
     """
     total_count = len(principles_scores)
     insufficient_count = sum(
-        1 for p in principles_scores.values() if p.grade == "Insufficient"
+        1 for p in principles_scores.values() if p.grade == Grade.INSUFFICIENT
     )
     total_weight = 0
     total_value = 0.0
     for pdata in principles_scores.values():
-        if pdata.grade == "Insufficient":
+        if pdata.grade == Grade.INSUFFICIENT:
             continue
         multiplier = weight_as_multiplier(pdata.weight)
         total_weight += multiplier
@@ -68,8 +69,8 @@ def weighted_overall(
 
     if tw == 0:
         if mode == MODE_NUMERICAL:
-            return OverallScore(weighted_score=0.0, grade="Insufficient")
-        return OverallScore(weighted_grade="Insufficient")
+            return OverallScore(weighted_score=0.0, grade=Grade.INSUFFICIENT)
+        return OverallScore(weighted_grade=Grade.INSUFFICIENT)
 
     result = build_overall_result(mode, tw, tv, params)
 

@@ -138,7 +138,7 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
       sharedGetDashboard: vi.fn(),
       getProjectScores: vi.fn(async () => (
         backend.newRun
-          ? { accumulated: { score: 95 }, trend: [], availableRuns: [{ runId: backend.newRun, dateLabel: '2026-07-01', status: 'complete' }] }
+          ? { accumulated: { score: 95 }, trend: [], availableRuns: [{ runId: backend.newRun, dateLabel: '2026-07-01', status: 'done' }] }
           : { accumulated: { score: 70 }, trend: [], availableRuns: [] }
       )),
       sharedGetProjectScores: vi.fn(),

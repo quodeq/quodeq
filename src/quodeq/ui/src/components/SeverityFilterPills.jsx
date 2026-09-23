@@ -1,6 +1,5 @@
 import FlagPill from './terminal/FlagPill.jsx';
-
-const SEVERITY_LEVELS = ['critical', 'major', 'minor'];
+import { SEVERITY_ORDER } from '../vocab/severity.js';
 
 /**
  * Reusable severity filter pill group rendered in the terminal `--flag` style.
@@ -21,7 +20,7 @@ export default function SeverityFilterPills({ counts, complianceCount = 0, activ
   return (
     <div className="term-flag-row">
       <FlagPill flag="all" active={isAllActive} onClick={() => onFilterChange(null)} />
-      {SEVERITY_LEVELS.map((sev) =>
+      {SEVERITY_ORDER.map((sev) =>
         counts[sev] > 0 ? (
           <FlagPill
             key={sev}

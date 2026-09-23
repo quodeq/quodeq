@@ -51,10 +51,10 @@ def _select_accumulated_dims(
 ) -> tuple[dict[str, object], dict[str, Path], int | None]:
     """Pick each dimension's latest valid result across the default view runs.
 
-    Same run-set selection as the accumulated Overview (complete-only,
-    cancelled fallback, never failed or in_progress). Iterating ALL runs
+    Same run-set selection as the accumulated Overview (done-only,
+    cancelled fallback, never failed or running). Iterating ALL runs
     newest-first gave the card a different grade than the Overview whenever
-    the newest run was cancelled/failed/in_progress.
+    the newest run was cancelled/failed/running.
 
     Each dimension may come from a DIFFERENT run (last valid run per
     dimension), so ``run_dir_by_dim`` remembers the source run's directory
@@ -213,8 +213,8 @@ def _read_settled_or_pending_summary(
     Only a project with NO runs at all will never be picked up by the
     warm-up engine (``warm_project_summary`` has the same empty-runs gate),
     so a cache miss here would report pending forever -- report it settled
-    instead. A project whose runs are all cancelled/in-progress (no
-    "complete" run) is NOT special-cased here: ``warm_project_summary``
+    instead. A project whose runs are all cancelled/running (no
+    "done" run) is NOT special-cased here: ``warm_project_summary``
     computes a fallback grade for it too (cancelled fallback via
     ``select_default_view_runs``), so its cache must still be consulted
     below rather than assumed empty forever.
@@ -266,8 +266,8 @@ def _read_accumulated_summary(
 def warm_project_summary(reports_root: Path, entry_name: str) -> None:
     """Compute-and-cache one project's card summary (warm-up engine entry).
 
-    Computes whenever the project has ANY run, not just a "complete" one --
-    a cancelled-only or in-progress-only project still gets a fallback grade
+    Computes whenever the project has ANY run, not just a "done" one --
+    a cancelled-only or running-only project still gets a fallback grade
     via ``_compute_summary``'s ``select_default_view_runs`` cancelled
     fallback, so it must not be left permanently ungraded. Versions are
     status-stamped (``_summary_version`` -> ``per_run_versions``), so an

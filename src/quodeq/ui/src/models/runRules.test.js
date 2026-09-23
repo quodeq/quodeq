@@ -10,17 +10,17 @@ import {
 } from './runRules.js';
 
 test('isFrozenRun: a completed historical run is frozen', () => {
-  const runs = [{ runId: 'r1', status: 'complete' }];
+  const runs = [{ runId: 'r1', status: 'done' }];
   assert.equal(isFrozenRun('r1', runs), true);
 });
 
 test('isFrozenRun: an in-progress run is never frozen', () => {
-  const runs = [{ runId: 'r1', status: 'in_progress' }];
+  const runs = [{ runId: 'r1', status: 'running' }];
   assert.equal(isFrozenRun('r1', runs), false);
 });
 
 test('isFrozenRun: "latest" is never frozen — it tracks a moving target', () => {
-  assert.equal(isFrozenRun('latest', [{ runId: 'latest', status: 'complete' }]), false);
+  assert.equal(isFrozenRun('latest', [{ runId: 'latest', status: 'done' }]), false);
 });
 
 test('isFrozenRun: no selection is not frozen', () => {
@@ -31,7 +31,7 @@ test('isFrozenRun: no selection is not frozen', () => {
 test('isFrozenRun: an unknown run counts as frozen', () => {
   // By the time a run detail opens, the runs list is cached; treating the
   // brief unknown window as frozen avoids a spurious mount refetch.
-  assert.equal(isFrozenRun('r-missing', [{ runId: 'r1', status: 'complete' }]), true);
+  assert.equal(isFrozenRun('r-missing', [{ runId: 'r1', status: 'done' }]), true);
   assert.equal(isFrozenRun('r1', null), true);
 });
 

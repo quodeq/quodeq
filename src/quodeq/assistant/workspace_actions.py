@@ -28,6 +28,12 @@ _logger = logging.getLogger(__name__)
 ClaimTurn = Callable[[str], bool]
 ReleaseTurn = Callable[[str], None]
 
+# Outcome.kind's "failed" spelling -- a local closed vocabulary (see the
+# Literal on each Outcome dataclass below), distinct from RunState/JobStatus
+# even though it spells the same word; named so the ratchet in
+# tools/check_vocab_literals.py doesn't mistake this for that vocabulary.
+OUTCOME_FAILED = "failed"
+
 
 def _manager(row: dict) -> WorktreeManager:
     return WorktreeManager(repo_root=Path(row["repo_root"]),
@@ -63,7 +69,7 @@ def apply_workspace(
         try:
             stats = manager.apply_to_repo()
         except WorktreeError as exc:
-            return ApplyOutcome("failed", detail=str(exc))
+            return ApplyOutcome(OUTCOME_FAILED, detail=str(exc))
         repo.set_worktree_status(sid, "applied")
         try:
             manager.remove()
@@ -114,7 +120,7 @@ def create_workspace_pr(
         try:
             result = manager.create_pr(draft.title, draft.body)
         except WorktreeError as exc:
-            return PrOutcome("failed", detail=str(exc))
+            return PrOutcome(OUTCOME_FAILED, detail=str(exc))
         if result.get("prUrl"):
             repo.set_worktree_status(sid, "pr_created")
             try:
@@ -157,7 +163,7 @@ def discard_workspace(
         try:
             _manager(row).remove()
         except WorktreeError as exc:
-            return DiscardOutcome("failed", detail=str(exc))
+            return DiscardOutcome(OUTCOME_FAILED, detail=str(exc))
         repo.set_worktree_status(sid, "discarded")
         return DiscardOutcome("discarded")
     finally:

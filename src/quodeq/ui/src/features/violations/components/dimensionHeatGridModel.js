@@ -3,16 +3,17 @@
  * here touches i18n or the DOM (COLUMNS calls t() at module scope, so it —
  * and PRINCIPLE_INDENT_PX — stay in DimensionHeatGridView.jsx).
  */
+import { SEVERITY } from '../../../vocab/severity.js';
 
-export const DEFAULT_SEVERITY = 'minor';
+export const DEFAULT_SEVERITY = SEVERITY.MINOR;
 const UNKNOWN_PRINCIPLE = '(unknown)'; // findings that name no principle share one synthetic row
 
 export function getSortValue(row, col) {
   switch (col) {
     case 'name': return row.name || '';
-    case 'critical': return row.severity.critical;
-    case 'major': return row.severity.major;
-    case 'minor': return row.severity.minor;
+    case SEVERITY.CRITICAL: return row.severity.critical;
+    case SEVERITY.MAJOR: return row.severity.major;
+    case SEVERITY.MINOR: return row.severity.minor;
     case 'violations': return row.violations;
     case 'health': return row.complianceRate;
     default: return 0;

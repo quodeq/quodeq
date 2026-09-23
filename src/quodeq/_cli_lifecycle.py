@@ -33,6 +33,7 @@ from quodeq.analysis.errors import (
 )
 from quodeq.analysis.runner import EvaluationError, RunConfig
 from quodeq.analysis.subprocess import AnalysisError
+from quodeq.core.run.job_status import external_job_id
 from quodeq._cli_env import _resolve_time_limit
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.data.fs.project_resolver import ProjectIdentity
@@ -213,7 +214,7 @@ def _run_lifecycle_body(
         ai_model = hooks.get_ai_model()
         with RunLifecycleContext(
             run_dir=paths.run_dir,
-            job_id=f"ext-{paths.run_id}",
+            job_id=external_job_id(paths.run_id),
             dimensions=dimensions_list,
             ai_provider=ai_provider,
             ai_model=ai_model,

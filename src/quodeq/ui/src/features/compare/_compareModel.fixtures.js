@@ -20,7 +20,7 @@ export function makeSummary({ score = 7, dims = [], trend = [], lastRunDaysAgo =
     dimensions: dims,
     trend,
     runsCount: trend.length || 1,
-    lastRun: { runId: 'r1', dateISO: iso(lastRunDaysAgo), status: 'complete' },
+    lastRun: { runId: 'r1', dateISO: iso(lastRunDaysAgo), status: 'done' },
   };
 }
 

@@ -15,10 +15,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quodeq.core.run.job_status import is_external_job_id
+from quodeq.core.run.state import TERMINAL_STATES, parse_run_state
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
-
-_TERMINAL_STATUS_STATES = {"complete", "completed", "done", "cancelled", "failed", "lost"}
 
 
 def _status_json_terminal(run_dir: Path) -> bool:
@@ -31,7 +31,12 @@ def _status_json_terminal(run_dir: Path) -> bool:
     except (OSError, ValueError):
         return False
     state = data.get("state")
-    return isinstance(state, str) and state in _TERMINAL_STATUS_STATES
+    if not isinstance(state, str):
+        return False
+    try:
+        return parse_run_state(state) in TERMINAL_STATES
+    except ValueError:
+        return False
 
 
 def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
@@ -220,7 +225,7 @@ def build_job_snapshot(row: "_run_index.RunRow") -> JobSnapshot:
         current_dimension=row.current_dimension,
         dimensions=dimensions,
         error=row.exit_reason,
-        source="external" if row.job_id.startswith("ext-") else "internal",
+        source="external" if is_external_job_id(row.job_id) else "internal",
         exit_reason=row.exit_reason,
         ai_provider=ai_provider,
         ai_model=ai_model,

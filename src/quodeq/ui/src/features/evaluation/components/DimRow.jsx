@@ -2,6 +2,8 @@ import { pct } from './scanProgressTotals.js';
 import { formatDuration } from '../../../utils/formatters.js';
 import { exitReasonHint, exitReasonLabel } from '../../../models/exitReason.js';
 import { t } from '../../../strings/index.js';
+import { EXIT_REASON } from '../../../vocab/exitReason.js';
+import { DIM_STATE } from '../../../vocab/dimState.js';
 
 // Reasons surfaced as a badge so an unusually large estimate isn't a mystery.
 export const ESTIMATE_REASON_LABEL = {
@@ -34,7 +36,7 @@ function DimMetaDone({ dim, taken, total }) {
   // zero total is preserved — it's load-bearing (chip renders only when
   // !== null).
   const coveragePct = total > 0 ? pct(taken, total) : null;
-  const isPartial = typeof dim.exitReason === 'string' && dim.exitReason !== 'done';
+  const isPartial = typeof dim.exitReason === 'string' && dim.exitReason !== EXIT_REASON.DONE;
   const hint = exitReasonHint(dim.exitReason);
   const partialTooltip = isPartial
     ? `${t('overview.stoppedReason', { reason: exitReasonLabel(dim.exitReason) })} · ${t('overview.filesOf', { read: taken, total })}${hint ? ` · ${hint}` : ''}`
@@ -75,7 +77,7 @@ function DimMetaRunning({ dim, reasonBadge }) {
 
 export default function DimRow({ dim }) {
   const taken = dim.files?.taken ?? 0;
-  const isPending = dim.state === 'pending';
+  const isPending = dim.state === DIM_STATE.PENDING;
   const total = dim.files?.total ?? 0;
   const reasonLabel = ESTIMATE_REASON_LABEL[dim.estimateReason];
   const reasonBadge = reasonLabel
@@ -85,8 +87,8 @@ export default function DimRow({ dim }) {
   // `files.taken < files.total` (incremental skips, dismissed files, etc.).
   // Backend `done` is the source of truth — count drift shouldn't make a
   // green dimension look red.
-  const isDone = dim.state === 'done';
-  const isRunning = dim.state === 'running';
+  const isDone = dim.state === DIM_STATE.DONE;
+  const isRunning = dim.state === DIM_STATE.RUNNING;
   const p = isDone ? 100 : pct(taken, total);
   const dotClass = isDone ? ' scan-progress__dim-dot--done' : isRunning ? ' scan-progress__dim-dot--running' : '';
   const fillClass = isDone ? 'scan-progress__bar-fill--done' : '';

@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from quodeq.core.run.job_status import JOB_FINISHED, JobStatus, external_job_id, is_external_job_id, strip_external_prefix
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
 from quodeq.services._external_jobs import _sync_external_run
@@ -109,13 +110,13 @@ class EvaluationsIndex:
         snapshot = self.get_status(job_id, reports_dir=reports_dir)
         if snapshot is None:
             return False
-        if snapshot.status == "running":
+        if snapshot.status == JobStatus.RUNNING:
             return False
         reports_dir = self._coerce_reports_dir(reports_dir)
         # External job IDs are "ext-<run_uuid>" where run_uuid is also the
         # run directory name. Internal job IDs are unrelated to the directory
         # name, so prefer the snapshot's own run coordinates when present.
-        run_uuid = job_id[len("ext-"):] if job_id.startswith("ext-") else job_id
+        run_uuid = strip_external_prefix(job_id)
         if snapshot.output_run_id:
             run_uuid = snapshot.output_run_id
         removed_dir = _remove_run_directory(
@@ -128,7 +129,7 @@ class EvaluationsIndex:
         try:
             _run_index.delete_run(db, job_id)
             if run_uuid != job_id:
-                _run_index.delete_run(db, f"ext-{run_uuid}")
+                _run_index.delete_run(db, external_job_id(run_uuid))
         finally:
             db.close()
         # Also drop any in-memory JobManager entry.
@@ -146,7 +147,7 @@ class EvaluationsIndex:
         ``ext-`` ids resolve from the SQLite index after a scoped sync so
         stale runs get promoted to cancelled on this request.
         """
-        is_external = job_id.startswith("ext-")
+        is_external = is_external_job_id(job_id)
         if not is_external:
             internal = self._in_memory_job(job_id)
             if internal is not None:
@@ -187,7 +188,7 @@ class EvaluationsIndex:
         if snapshot is None:
             # Nothing to cancel — the user's intent is satisfied.
             return True
-        if snapshot.status != "running":
+        if snapshot.status != JobStatus.RUNNING:
             return False
 
         from quodeq.data.sqlite.index_sync import force_promote_to_cancelled_stale
@@ -214,10 +215,10 @@ class EvaluationsIndex:
         back to a filesystem scan so the SSE endpoint keeps working for any
         run that exists on disk.
         """
-        run_id = job_id[len("ext-"):] if job_id.startswith("ext-") else job_id
+        run_id = strip_external_prefix(job_id)
 
         # Active-job fast path: trust the jobs index when present.
-        if not job_id.startswith("ext-"):
+        if not is_external_job_id(job_id):
             snapshot = self._jobs.get_job(job_id)
             if (
                 snapshot is not None
@@ -253,13 +254,13 @@ class EvaluationsIndex:
 
     def is_complete(self, job_id: str) -> bool:
         """Return True if *job_id* has reached a terminal state."""
-        if job_id.startswith("ext-"):
+        if is_external_job_id(job_id):
             run_dir = self.get_log_run_dir(job_id)
             if run_dir is None:
                 return False
             return _external_job_is_complete(run_dir)
         snapshot = self._jobs.get_job(job_id)
-        if snapshot is not None and snapshot.status in {"done", "failed", "cancelled"}:
+        if snapshot is not None and snapshot.status in JOB_FINISHED:
             return True
         # Fall back to disk: scan.json or terminal status.json mean the run
         # is over. Covers eviction from the in-memory store and the gap

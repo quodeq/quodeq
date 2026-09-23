@@ -20,6 +20,7 @@ from quodeq.core.dismissals import (
     DismissedKeys,
     fold_dismissals,
 )
+from quodeq.core.types.severity import Severity
 from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services._dismiss_fingerprints import backfill_if_needed, resolve_fingerprint
 from quodeq.services.wiring import (
@@ -190,11 +191,11 @@ def recount_totals(
     critical = major = minor = unknown = 0
     for v in violations:
         sev = (v.severity or "").lower()
-        if sev == "critical":
+        if sev == Severity.CRITICAL:
             critical += 1
-        elif sev == "major":
+        elif sev == Severity.MAJOR:
             major += 1
-        elif sev == "minor":
+        elif sev == Severity.MINOR:
             minor += 1
         else:
             unknown += 1

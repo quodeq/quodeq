@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
+from quodeq.analysis.mcp.schemas import FileDoneStatus
 from quodeq.shared import cancellation
 
 _logger = logging.getLogger(__name__)
@@ -156,10 +157,10 @@ class FailureStreakWatcher:
             if entry.get("_marker") != "file_done":
                 continue
             status = entry.get("status")
-            if status == "ok":
+            if status == FileDoneStatus.OK:
                 streak = 0
                 recent = []
-            elif status == "error":
+            elif status == FileDoneStatus.ERROR:
                 streak += 1
                 recent.append(FileError(
                     file=str(entry.get("file", "?")),

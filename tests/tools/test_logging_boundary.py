@@ -117,6 +117,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'services/grade_formula.py': _out_of_scope('User-tuned grade formula: apply/preview orchestration'),
     'services/mutation_rescore.py': _out_of_scope('Rescore-after-mutation helpers, shared by API routes and assistant actions'),
     'services/plugin_discovery.py': _out_of_scope('Discover available languages and return plugin metadata'),
+    'services/runs_unit.py': 'Builder for the `runs` UI data unit - the 2026-09-22 run-list-vocabulary-into-RunState migration added a warning log for a previously-silent unknown-index-state fallback in _row_status; out of scope for the SEP-06 sweep (not a flagged per-site conversion)',
     'services/score_run.py': 'Use case: score completed evidence after cancellation - imports the raw stdlib logger (out of scope for this sweep) and quodeq.shared.log_sink for quarantine-sink logging (log_malformed_jsonl_line/log_quarantined_findings) - plan-sanctioned composition wiring',
     'services/scoring/_rescoring.py': _out_of_scope('Accumulated-rescore machinery for the scoring reader'),
     'services/scoring/_scores_raw.py': _out_of_scope('Single-run scores: SQL-backed with a JSON-eval-file fallback - own logger (quodeq.services.scoring._scores_raw), no longer threaded from the package facade (M-MOD-3 import-cycle fix)'),

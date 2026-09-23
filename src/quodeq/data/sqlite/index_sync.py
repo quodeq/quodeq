@@ -13,6 +13,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.core.run.exit_reason import ExitReason
+from quodeq.core.run.job_status import external_job_id
 from quodeq.shared.process import is_pid_alive as _is_pid_alive
 from quodeq.shared.run_heartbeat import HEARTBEAT_FILENAME
 from quodeq.data.fs.run_status_store import (
@@ -30,7 +32,6 @@ from quodeq.data.sqlite._index_sync_promote import (
 
 _logger = logging.getLogger(__name__)
 
-_TERMINAL_STATE_VALUES = {s.value for s in TERMINAL_STATES}
 _KNOWN_STATE_VALUES = {s.value for s in RunState}
 
 _UPSERT_SQL = """
@@ -88,7 +89,7 @@ def _upsert_from_status(
         return
     if status is None:
         return
-    job_id = status.get("job_id") or f"ext-{run_id}"
+    job_id = status.get("job_id") or external_job_id(run_id)
     db.execute(
         _UPSERT_SQL,
         (
@@ -96,7 +97,7 @@ def _upsert_from_status(
             project_uuid,
             run_id,
             str(run_dir),
-            status.get("state", "running"),
+            status.get("state", RunState.RUNNING),
             status.get("phase"),
             status.get("current_dimension"),
             status.get("started_at", ""),
@@ -124,7 +125,7 @@ def _sync_legacy_run(
     exit_reason: str | None
 
     if scan_path.exists():
-        state, exit_reason = "done", None
+        state, exit_reason = RunState.DONE, None
     elif pid_path.exists():
         try:
             pid = int(pid_path.read_text(encoding="utf-8").strip())
@@ -132,13 +133,13 @@ def _sync_legacy_run(
         except (OSError, ValueError):
             alive = False
         if alive:
-            state, exit_reason = "running", None
+            state, exit_reason = RunState.RUNNING, None
         else:
-            state, exit_reason = "cancelled", "stale_legacy_pid_dead"
+            state, exit_reason = RunState.CANCELLED, ExitReason.STALE_LEGACY_PID_DEAD
     else:
-        state, exit_reason = "cancelled", "stale_legacy_no_pid"
+        state, exit_reason = RunState.CANCELLED, ExitReason.STALE_LEGACY_NO_PID
 
-    job_id = f"ext-{run_id}"
+    job_id = external_job_id(run_id)
     try:
         started_ts = manifest_path.stat().st_mtime
     except OSError:
@@ -150,7 +151,7 @@ def _sync_legacy_run(
         (
             job_id, project_uuid, run_id, str(run_dir),
             state, None, None,
-            started_iso, started_iso, started_iso if state in _TERMINAL_STATE_VALUES else None,
+            started_iso, started_iso, started_iso if state in TERMINAL_STATES else None,
             None, None, exit_reason,
             0,
         ),
@@ -167,10 +168,10 @@ def _delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
     never promoted. Terminal rows are left alone — users may prune old dirs
     to save disk and the index is their only record.
     """
-    placeholders = ", ".join("?" for _ in _TERMINAL_STATE_VALUES)
+    placeholders = ", ".join("?" for _ in TERMINAL_STATES)
     rows = db.execute(
         f"SELECT job_id, run_dir FROM runs WHERE state NOT IN ({placeholders})",
-        tuple(_TERMINAL_STATE_VALUES),
+        tuple(TERMINAL_STATES),
     ).fetchall()
     orphan_ids = [job_id for job_id, run_dir in rows if not Path(run_dir).is_dir()]
     if not orphan_ids:
@@ -196,7 +197,7 @@ def _check_stale_and_promote(
     if status is None:
         return False
     state = status.get("state")
-    if state in _TERMINAL_STATE_VALUES:
+    if state in TERMINAL_STATES:
         return False
 
     heartbeat_mtime = _heartbeat_mtime(run_dir)
@@ -217,9 +218,9 @@ def _check_stale_and_promote(
         new_status = dataclasses.replace(
             base,
             state=RunState.CANCELLED,
-            job_id=status.get("job_id", f"ext-{run_id}"),
+            job_id=status.get("job_id", external_job_id(run_id)),
             pid=pid if isinstance(pid, int) else None,
-            exit_reason="stale_detected",
+            exit_reason=ExitReason.STALE_DETECTED,
             finalized_at=None,
             time_limit_s=None,
         )

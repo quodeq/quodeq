@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER } from '../../../utils/formatters.js';
 import { usePrincipleData } from './explorerDataHooks.js';
+import { SEVERITY } from '../../../vocab/severity.js';
 
 /** Split an evalPrincipal's violations into per-severity buckets and totals. */
 export function computeEvalPrincipleData(evalPrincipal) {
@@ -11,7 +12,7 @@ export function computeEvalPrincipleData(evalPrincipal) {
   const sevCounts = { critical: 0, major: 0, minor: 0 };
   for (const sev of EVAL_SEVERITY_ORDER) violationsBySeverity[sev] = [];
   for (const v of violations) {
-    const sev = (v.severity || 'minor').toLowerCase();
+    const sev = (v.severity || SEVERITY.MINOR).toLowerCase();
     if (violationsBySeverity[sev]) violationsBySeverity[sev].push(v);
     if (sevCounts[sev] !== undefined) sevCounts[sev]++;
   }
@@ -52,7 +53,7 @@ export function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) 
     }
     const allFiltered = Object.values(bySev).flat();
     const counts = { critical: 0, major: 0, minor: 0 };
-    allFiltered.forEach((v) => { const s = (v.severity || 'minor').toLowerCase(); if (counts[s] !== undefined) counts[s]++; });
+    allFiltered.forEach((v) => { const s = (v.severity || SEVERITY.MINOR).toLowerCase(); if (counts[s] !== undefined) counts[s]++; });
     return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: counts };
   }, [violationsBySeverity, dismissedSet]);
 

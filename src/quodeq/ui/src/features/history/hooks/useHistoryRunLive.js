@@ -28,6 +28,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRunEventStream } from '../../evaluation/hooks/useRunEventStream.js';
 import { getEvaluationProgress } from '../../../api/index.js';
 import { NO_JOB_ID, evaluationKeys } from '../../../api/queryKeys.js';
+import { DIM_STATE } from '../../../vocab/dimState.js';
 
 const PROGRESS_POLL_MS = 3000;
 
@@ -81,7 +82,7 @@ export function useHistoryRunLive(runId) {
     : [];
 
   const hasScoredDimension = Array.isArray(progress?.dimensions)
-    && progress.dimensions.some((d) => d?.state === 'done');
+    && progress.dimensions.some((d) => d?.state === DIM_STATE.DONE);
 
   return { liveDims, plannedDimensions, hasScoredDimension };
 }

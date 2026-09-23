@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from quodeq.core.run.state import RunState
 from quodeq.core.types import DimensionSummary
 from quodeq.data.fs.report_parser import RunInfo
 from quodeq.services.dashboard import build_dashboard
@@ -28,8 +29,8 @@ class TestInProgressFreshnessThroughDashboard:
         # test can't mask a regression here.
         monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "score_cache.db"))
 
-        selected = RunInfo(run_id="r-sel", date_iso="2024-02-01", date_label="2024-02-01", status="complete")
-        running = RunInfo(run_id="r-run", date_iso="2024-01-01", date_label="2024-01-01", status="in_progress")
+        selected = RunInfo(run_id="r-sel", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.DONE)
+        running = RunInfo(run_id="r-run", date_iso="2024-01-01", date_label="2024-01-01", status=RunState.RUNNING)
         runs = [selected, running]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
 

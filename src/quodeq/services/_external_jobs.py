@@ -22,6 +22,7 @@ from typing import Callable
 
 from quodeq.shared.process_kill import kill_tree as _kill_tree
 from quodeq.core.utils.io import resolve_child_dir
+from quodeq.core.run.job_status import strip_external_prefix
 from quodeq.data.fs.report_parser.external_pid import (  # noqa: F401 — re-exported API
     is_safe_run_segment,
     resolve_external_pid,
@@ -133,7 +134,7 @@ def _sync_external_run(db, job_id: str, reports_dir: Path) -> bool:
     through to the scan: ``Path("")`` is ``Path(".")``, whose ``is_dir()`` is
     True, so it would sync the process cwd as if it were the run.
     """
-    run_id = job_id[len("ext-"):]
+    run_id = strip_external_prefix(job_id)
     if not is_safe_run_segment(run_id):
         return False
     known = _run_index.get_run(db, job_id)

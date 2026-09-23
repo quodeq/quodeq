@@ -11,6 +11,8 @@ import json
 import logging
 from pathlib import Path
 
+from quodeq.core.types.severity import Severity
+
 _logger = logging.getLogger(__name__)
 
 
@@ -26,7 +28,7 @@ def _judgment_to_violation(obj: dict) -> dict | None:
         return None
     out: dict = {
         "file": file,
-        "severity": obj.get("severity", "minor"),
+        "severity": obj.get("severity", Severity.MINOR),
         "title": obj.get("w", ""),
         "reason": obj.get("reason", ""),
         "snippet": obj.get("snippet", ""),

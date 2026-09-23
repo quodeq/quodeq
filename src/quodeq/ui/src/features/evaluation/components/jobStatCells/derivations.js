@@ -7,6 +7,8 @@ import { computeOverallProgress } from '../scanProgressTotals.js';
 import { t } from '../../../../strings/index.js';
 import { SCAN_MODE } from '../scanModes.js';
 import { SECONDS_PER_HOUR } from '../../../../utils/time.js';
+import { DIM_STATE } from '../../../../vocab/dimState.js';
+import { SEVERITY_ORDER } from '../../../../vocab/severity.js';
 
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
@@ -148,12 +150,12 @@ export function deriveRunElapsedS({ running, serverElapsedS, serverUpdatedAtMs, 
 export function buildDimensionCycle(progress) {
   const dims = progress?.dimensions || [];
   if (dims.length === 0) return null;
-  let runningIdx = dims.findIndex((d) => d?.state === 'running');
+  let runningIdx = dims.findIndex((d) => d?.state === DIM_STATE.RUNNING);
   if (runningIdx === -1) {
-    const doneCount = dims.filter((d) => d?.state === 'done').length;
+    const doneCount = dims.filter((d) => d?.state === DIM_STATE.DONE).length;
     runningIdx = Math.min(doneCount, dims.length - 1);
   }
-  const next = dims.slice(runningIdx + 1).find((d) => d?.state === 'pending')?.id ?? null;
+  const next = dims.slice(runningIdx + 1).find((d) => d?.state === DIM_STATE.PENDING)?.id ?? null;
   return {
     current: progress?.currentDimension ?? dims[runningIdx]?.id ?? null,
     index: runningIdx + 1,
@@ -176,7 +178,7 @@ export function sumSeverities(liveViolations) {
 
 /** "1 critical · 4 major" — zero buckets omitted; "none yet" when all zero. */
 export function formatSevHint(counts) {
-  const parts = ['critical', 'major', 'minor']
+  const parts = SEVERITY_ORDER
     .filter((k) => counts?.[k] > 0)
     .map((k) => `${counts[k]} ${k}`);
   return parts.length > 0 ? parts.join(' · ') : 'none yet';

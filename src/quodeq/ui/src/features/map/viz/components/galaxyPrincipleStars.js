@@ -9,6 +9,7 @@ import {
   TAU, scoreRGB, seedHash, seededRng, gradeToScore, mkParticles,
   NEUTRAL_SCORE, RNG_MIDPOINT,
 } from '../core/galaxyCore.js';
+import { SEVERITY } from '../../../../vocab/severity.js';
 
 // Principle-level geometry, in world units. Radii and orbit distances grow
 // with the square root of a principle's finding count, so one huge principle
@@ -53,8 +54,8 @@ export function buildGradeLookup(dim) {
 export function countSeverities(violations) {
   let critical = 0, major = 0, minor = 0;
   for (const v of violations) {
-    if (v.severity === 'critical') critical++;
-    else if (v.severity === 'major') major++;
+    if (v.severity === SEVERITY.CRITICAL) critical++;
+    else if (v.severity === SEVERITY.MAJOR) major++;
     else minor++;
   }
   return { critical, major, minor };

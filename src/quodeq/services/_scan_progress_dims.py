@@ -14,10 +14,11 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.evidence.req_mapping import build_principle_resolver
+from quodeq.core.run.dimensions import DimState
 from quodeq.data.fs.evidence_tally import FindingTally, IncrementalTally
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services._scan_progress_elapsed import _dim_elapsed_s
-from quodeq.services._scan_progress_types import DimProgressState, _DimProgress, _ProgressContext
+from quodeq.services._scan_progress_types import _DimProgress, _ProgressContext
 from quodeq.services.wiring import (
     count_active_agent_streams,
     dimension_evidence_file,
@@ -145,7 +146,7 @@ def _dim_state(
     *,
     has_queue: bool,
     has_evaluation: bool,
-) -> DimProgressState:
+) -> DimState:
     """Classify a dimension as done | running | pending.
 
     Order of checks:
@@ -157,18 +158,18 @@ def _dim_state(
     5. Otherwise → pending
     """
     if has_evaluation:
-        return "done"
+        return DimState.DONE
     if terminal:
         # If the run terminated and this dim has a queue but no eval, the
         # dimension is *partially done* — surfaces visually via the
         # taken < total signal in the UI. Dims with no queue at all never
         # ran; keep them as pending so they don't claim completion.
-        return "done" if has_queue else "pending"
+        return DimState.DONE if has_queue else DimState.PENDING
     if has_queue:
-        return "running"
+        return DimState.RUNNING
     if status.get("current_dimension") == dim_id:
-        return "running"
-    return "pending"
+        return DimState.RUNNING
+    return DimState.PENDING
 
 
 def _queue_file_counts(queue: dict) -> dict[str, int]:
@@ -202,20 +203,20 @@ def _consolidated_dim_progress(run_dir: Path) -> _DimProgress:
                        suppressed=None, resolver=None, memo_key=("consolidated",))
     return _DimProgress(
         id="consolidated",
-        state="running",
+        state=DimState.RUNNING,
         files=_queue_file_counts(queue),
         violations=tally.violations,
         compliance=tally.compliance,
         duplicates=tally.duplicates,
-        elapsed_s=_dim_elapsed_s("consolidated", run_dir, "running"),
+        elapsed_s=_dim_elapsed_s("consolidated", run_dir, DimState.RUNNING),
         active_agents=_active_agents(evidence_dir, "consolidated"),
     )
 
 
-def _dim_files_summary(queue: dict | None, d_state: DimProgressState, dim_estimates: dict, dim_id: str) -> dict:
+def _dim_files_summary(queue: dict | None, d_state: DimState, dim_estimates: dict, dim_id: str) -> dict:
     if queue is not None:
         return _queue_file_counts(queue)
-    if d_state == "pending":
+    if d_state == DimState.PENDING:
         # Pending dims report 0 until the precomputed estimate lands.
         # The UI uses "any pending dim with total=0" as the signal to
         # keep the header in "preparing…" — better to show nothing
@@ -252,7 +253,7 @@ def _dim_evidence_tally(dim_id: str, ctx: _ProgressContext, dismissed, deleted):
 
 
 def _dim_measurements(
-    dim_id: str, ctx: _ProgressContext, d_state: DimProgressState, record: dict | None,
+    dim_id: str, ctx: _ProgressContext, d_state: DimState, record: dict | None,
 ) -> dict[str, Any]:
     """Elapsed time, live agents and estimate counts for one dim, as ``_DimProgress`` kwargs.
 
@@ -262,7 +263,7 @@ def _dim_measurements(
     meta = ctx.dim_estimates.get(dim_id)
     return {
         "elapsed_s": _dim_elapsed_s(dim_id, ctx.run_dir, d_state, record),
-        "active_agents": _active_agents(ctx.evidence_dir, dim_id) if d_state == "running" else 0,
+        "active_agents": _active_agents(ctx.evidence_dir, dim_id) if d_state == DimState.RUNNING else 0,
         "estimate_reason": meta["reason"] if meta else None,
         "files_cached": meta["cached"] if meta else None,
         "files_project_total": meta["total"] if meta else None,

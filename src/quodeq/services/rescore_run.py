@@ -21,6 +21,7 @@ from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import resolve_child_dir, validate_path_segment
 
 RescoreStatus = Literal["ok", "invalid_param", "project_not_found", "run_not_found"]
+RESCORE_OK = "ok"
 
 
 @dataclass(frozen=True)

@@ -10,6 +10,7 @@ from typing import Any
 from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown
 from quodeq.data.fs.standards_loader import is_known_dimension
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
+from quodeq.core.types.severity import Severity
 from quodeq.shared.utils import env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # re-export
 from quodeq.services._violation_filters import (  # noqa: F401 — re-exported for tests
@@ -223,8 +224,8 @@ def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:
                 file_path, {"path": file_path, "count": 0, "critical": 0, "major": 0, "minor": 0}
             )
             entry["count"] += 1
-            sev = violation.get("severity") or "minor"
-            entry[sev if sev in ("critical", "major") else "minor"] += 1
+            sev = violation.get("severity") or Severity.MINOR
+            entry[sev if sev in (Severity.CRITICAL, Severity.MAJOR) else Severity.MINOR] += 1
     # _max_violation_files() reads from env at call time; the env injection
     # parameter exists for unit-testing _max_violation_files directly.
     top_files = sorted(

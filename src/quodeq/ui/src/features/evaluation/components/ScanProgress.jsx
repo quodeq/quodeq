@@ -3,8 +3,12 @@ import { useEvalLog } from '../eval-log/EvalLogContext.js';
 import { ScanProgressBody } from './ScanProgressParts.jsx';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useRunElapsed } from '../hooks/useRunElapsed.js';
+import { JOB_STATUS, JOB_FINISHED } from '../../../vocab/jobStatus.js';
 
-const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled']);
+// JOB_FINISHED, not JOB_TERMINAL: this set lacked 'lost' before the vocab
+// sweep (a lost job's subprocess may still be running, so progress polling
+// must keep going for it) -- see vocab/jobStatus.js's JOB_FINISHED doc.
+const TERMINAL_STATES = JOB_FINISHED;
 
 function useSyncEvalLogStatus(evalLog, jobId, status) {
   useEffect(() => {
@@ -27,9 +31,9 @@ function makeToggleConsole({ consoleOpen, evalLog, jobId, status, progress }) {
 export default function ScanProgress({ job }) {
   const jobId = job?.jobId;
   const status = job?.status;
-  const isRunning = status === 'running';
-  const isFailed = status === 'failed';
-  const isLost = status === 'lost';
+  const isRunning = status === JOB_STATUS.RUNNING;
+  const isFailed = status === JOB_STATUS.FAILED;
+  const isLost = status === JOB_STATUS.LOST;
 
   const [detailOpen, setDetailOpen] = useState(false);
   const evalLog = useEvalLog();

@@ -8,6 +8,7 @@ from quodeq.api import _llamacpp_log_routes as llama_routes
 from quodeq.api import _log_tail_helpers as log_tail_helpers
 from quodeq.api import _rate_limit_file_store as store_mod
 from quodeq.api import routes_project_scan
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types.scan import ScanData
 from tests.api._routes_project_list_fixtures import (  # noqa: F401 -- app/client/provider are pytest fixtures
     app,
@@ -79,6 +80,6 @@ def test_stream_terminal_state_logs_debug_on_corrupt_status_json(tmp_path) -> No
     provider = _ProviderStub(run_dir)
     with patch.object(log_tail_helpers._logger, "debug") as debug:
         state = log_tail_helpers._stream_terminal_state(provider, "job-123")
-    assert state == "completed"
+    assert state == JobStatus.DONE
     assert debug.called
     assert debug.call_args.args[1] == "job-123"

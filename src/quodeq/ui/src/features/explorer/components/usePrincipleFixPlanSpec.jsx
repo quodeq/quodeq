@@ -3,6 +3,7 @@ import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER } from '../../../utils/formatters.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { filterTitleSuffix } from './usePrincipleReportSpec.jsx';
+import { SEVERITY } from '../../../vocab/severity.js';
 
 /** Registers the principle's fix-plan side-pane window spec, kept in sync
  * with the active severity filter. */
@@ -14,7 +15,7 @@ export function usePrincipleFixPlanSpec({
     const buildBySeverity = () => {
       const bucket = {};
       for (const sev of EVAL_SEVERITY_ORDER) {
-        bucket[sev] = filteredViolations.filter((v) => (v.severity || 'minor').toLowerCase() === sev);
+        bucket[sev] = filteredViolations.filter((v) => (v.severity || SEVERITY.MINOR).toLowerCase() === sev);
       }
       return bucket;
     };

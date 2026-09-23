@@ -14,6 +14,7 @@ from pathlib import Path
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.parser import (
     EvidenceContext, EvidenceParseOptions, parse_jsonl_to_evidence)
+from quodeq.core.run.dimensions import DimState
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
@@ -112,7 +113,7 @@ def _should_score_dimension(
 ) -> bool:
     if dimension_report_exists(evaluation_dir, dim_id):
         return False  # already scored
-    if dim_states.get(dim_id, {}).get("state") == "incomplete":
+    if dim_states.get(dim_id, {}).get("state") == DimState.INCOMPLETE:
         _logger.info("Skipping scoring for incomplete dim %s", dim_id)
         return False
     if evidence_size == 0:

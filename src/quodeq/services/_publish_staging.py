@@ -19,6 +19,7 @@ import json
 import time
 from pathlib import Path
 
+from quodeq.core.run.state import RunState
 from quodeq.services.wiring import (
     ACTIONS_LOG_FILENAME,
     DIMENSIONS_FILENAME,
@@ -49,7 +50,7 @@ def list_completed_runs(project_dir: Path) -> list[Path]:
         except UnsupportedSchemaError:
             # Skip runs with unsupported schema versions
             continue
-        if status and status.get("state") == "done":
+        if status and status.get("state") == RunState.DONE:
             runs.append(entry)
     return runs
 

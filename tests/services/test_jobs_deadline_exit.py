@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.services._job_model import (
     InMemoryJobStore,
     Job,
@@ -28,10 +29,6 @@ from quodeq.services._job_file_store import (
 )
 from quodeq.services.jobs import (
     JobManager,
-    STATUS_CANCELLED,
-    STATUS_DONE,
-    STATUS_FAILED,
-    STATUS_RUNNING,
     _EXIT_CODE_TIMEOUT,
 )
 
@@ -70,7 +67,7 @@ class _ExitsWith:
 def _running_job(**kwargs) -> Job:
     return Job(
         job_id="j1",
-        status=STATUS_RUNNING,
+        status=JobStatus.RUNNING,
         command=["quodeq"],
         started_at=datetime.now(timezone.utc).isoformat(),
         ended_at=None,
@@ -108,7 +105,7 @@ class TestWatchdogDeadlineKill:
         mgr._monitor_process("j1", proc)
 
         assert proc.killed is True
-        assert job.status == STATUS_CANCELLED
+        assert job.status == JobStatus.CANCELLED
         assert job.exit_reason == "deadline"
         assert job.exit_code == _EXIT_CODE_TIMEOUT
 
@@ -138,7 +135,7 @@ class TestRunStatusDeadlineFallback:
 
         mgr._monitor_process("j1", proc)
 
-        assert job.status == STATUS_CANCELLED
+        assert job.status == JobStatus.CANCELLED
         assert job.exit_reason == "deadline"
         assert job.exit_code == 1
 
@@ -150,7 +147,7 @@ class TestRunStatusDeadlineFallback:
 
         mgr._monitor_process("j1", proc)
 
-        assert job.status == STATUS_CANCELLED
+        assert job.status == JobStatus.CANCELLED
         assert job.exit_reason == "time_limit"
 
     def test_other_exit_reason_stays_failed(self, tmp_path):
@@ -163,7 +160,7 @@ class TestRunStatusDeadlineFallback:
 
         mgr._monitor_process("j1", proc)
 
-        assert job.status == STATUS_FAILED
+        assert job.status == JobStatus.FAILED
         assert job.exit_reason is None
 
     def _monitored_copilot_policy_job(self, tmp_path, exit_code, status):
@@ -180,13 +177,13 @@ class TestRunStatusDeadlineFallback:
         mgr._monitor_process("j1", proc)
         return job
 
-    @pytest.mark.parametrize("exit_code,status", [(1, STATUS_FAILED), (0, STATUS_DONE)])
+    @pytest.mark.parametrize("exit_code,status", [(1, JobStatus.FAILED), (0, JobStatus.DONE)])
     def test_copilot_policy_reason_survives_monitor_classification(self, tmp_path, exit_code, status):
         job = self._monitored_copilot_policy_job(tmp_path, exit_code, status)
         assert job.status == status
         assert job.exit_reason == "copilot_mcp_policy"
 
-    @pytest.mark.parametrize("exit_code,status", [(1, STATUS_FAILED), (0, STATUS_DONE)])
+    @pytest.mark.parametrize("exit_code,status", [(1, JobStatus.FAILED), (0, JobStatus.DONE)])
     def test_copilot_policy_reason_survives_json_round_trip(self, tmp_path, exit_code, status):
         job = self._monitored_copilot_policy_job(tmp_path, exit_code, status)
         restored = _job_from_json(_job_to_json(job))
@@ -200,7 +197,7 @@ class TestRunStatusDeadlineFallback:
 
         mgr._monitor_process("j1", proc)
 
-        assert job.status == STATUS_FAILED
+        assert job.status == JobStatus.FAILED
         assert job.exit_reason is None
 
     def test_corrupt_status_json_stays_failed(self, tmp_path):
@@ -213,7 +210,7 @@ class TestRunStatusDeadlineFallback:
 
         mgr._monitor_process("j1", proc)
 
-        assert job.status == STATUS_FAILED
+        assert job.status == JobStatus.FAILED
         assert job.exit_reason is None
 
     def test_clean_exit_stays_done_even_with_deadline_reason(self, tmp_path):
@@ -226,7 +223,7 @@ class TestRunStatusDeadlineFallback:
 
         mgr._monitor_process("j1", proc)
 
-        assert job.status == STATUS_DONE
+        assert job.status == JobStatus.DONE
         assert job.exit_reason is None
 
 

@@ -12,7 +12,7 @@ vi.mock('../hooks/useHistoryRunLive.js', () => ({
   useHistoryRunLive: vi.fn(() => ({ liveDims: {}, plannedDimensions: [], hasScoredDimension: false })),
 }));
 
-const inProgressEntry = { runId: 'run-1', status: 'in_progress', hasScoredDims: false };
+const inProgressEntry = { runId: 'run-1', status: 'running', hasScoredDims: false };
 
 function renderTable(props = {}) {
   return render(

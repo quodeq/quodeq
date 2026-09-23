@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
+from quodeq.core.run.state import TERMINAL_STATES, RunState
 from quodeq.services._scan_progress_dims import (
     _build_dim_progress,
     _consolidated_dim_progress,
@@ -47,7 +48,7 @@ def _project_total_files(run_dir: Path) -> int:
 
 
 def _compute_total_elapsed(status: dict, state: str, started_at: datetime | None) -> float | None:
-    if state == "running" and started_at:
+    if state == RunState.RUNNING and started_at:
         return max(0.0, (datetime.now(timezone.utc) - started_at).total_seconds())
     if started_at and status.get("finalized_at"):
         try:
@@ -129,7 +130,7 @@ def _gather_progress_context(
         run_dir=run_dir,
         status=status,
         state=state,
-        is_terminal=state in {"done", "failed", "cancelled"},
+        is_terminal=state in TERMINAL_STATES,
         total_elapsed_s=_total_elapsed_s(status, state),
         run_budget_s=time_limit_s if (time_limit_s and time_limit_s > 0) else None,
         project_files=_project_total_files(run_dir),

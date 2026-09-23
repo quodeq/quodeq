@@ -7,6 +7,7 @@
 import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_CONFIGURED_MARKER } from "../../../constants.js";
 import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
 import { t } from "../../../strings/index.js";
+import { JOB_STATUS } from "../../../vocab/jobStatus.js";
 
 export const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
 const DIM_POLL_MS = 2000;
@@ -20,7 +21,7 @@ const DIM_POLL_MS = 2000;
  */
 export function findingsRefetchInterval(job, sseEnabled = SSE_ENABLED) {
   if (sseEnabled) return false;
-  if (job?.status && job.status !== "running") return false;
+  if (job?.status && job.status !== JOB_STATUS.RUNNING) return false;
   return DIM_POLL_MS;
 }
 

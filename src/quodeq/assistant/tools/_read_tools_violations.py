@@ -17,6 +17,7 @@ from quodeq.core.standards.visibility import (
     partition_entries_visible,
     partition_visible,
 )
+from quodeq.core.types.severity import Severity
 
 # Trimmed violation shape shared by get_report and get_violations. We keep only
 # the fields that let the model locate and explain an issue and DROP the large
@@ -27,9 +28,11 @@ VIOLATION_FIELDS = ("principle", "file", "line", "severity", "title", "reason")
 _VIOLATIONS_DEFAULT_LIMIT = 40
 _VIOLATIONS_MAX_LIMIT = 100
 # Severity ordering (critical/major first). Unknown severities sort last.
+# The Severity members are the canonical keys; the rest are synonyms models
+# and older reports use for the same rungs.
 _SEVERITY_RANK = {
-    "critical": 0, "blocker": 0, "high": 1, "major": 1,
-    "moderate": 2, "medium": 2, "minor": 3, "low": 3, "info": 4, "trivial": 4,
+    Severity.CRITICAL: 0, "blocker": 0, "high": 1, Severity.MAJOR: 1,
+    "moderate": 2, "medium": 2, Severity.MINOR: 3, "low": 3, "info": 4, "trivial": 4,
 }
 
 

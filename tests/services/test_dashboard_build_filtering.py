@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from quodeq.core.run.state import RunState
 from quodeq.core.types import DimensionResult, DimensionSummary
 from quodeq.data.fs.report_parser import RunInfo
 from quodeq.services.dashboard import build_dashboard
@@ -143,8 +144,8 @@ class TestHistoryContextSlimming:
     def test_history_keys_drop_finding_bodies_but_keep_scores(self, tmp_path):
         from quodeq.core.types.finding import Totals
         runs = [
-            RunInfo(run_id="r-new", date_iso="2024-02-01", date_label="2024-02-01", status="complete"),
-            RunInfo(run_id="r-old", date_iso="2024-01-01", date_label="2024-01-01", status="complete"),
+            RunInfo(run_id="r-new", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.DONE),
+            RunInfo(run_id="r-old", date_iso="2024-01-01", date_label="2024-01-01", status=RunState.DONE),
         ]
         selected_dims = [DimensionResult(
             dimension="security", overall_grade="B", overall_score="7.0/10",

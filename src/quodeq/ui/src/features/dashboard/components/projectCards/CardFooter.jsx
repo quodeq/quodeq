@@ -1,5 +1,6 @@
 import { DownloadGlyph, TrashGlyph } from '../../../../components/glyphs.jsx';
 import { t } from '../../../../strings/index.js';
+import { PUBLISH_STATE } from '../../hooks/usePublish.js';
 
 const ACTION_ICON_SIZE = 13;
 
@@ -38,16 +39,16 @@ export function CardFooter({ name, confirming, setConfirming, onDelete, onExport
     return <DeleteConfirmRow name={name} onDelete={onDelete} setConfirming={setConfirming} />;
   }
   const {
-    publishState = 'idle',
+    publishState = PUBLISH_STATE.IDLE,
     publishingProject = null,
     publishError = null,
     publishErrorProject = null,
     onPublish,
   } = publishActions || {};
-  const isThisPublishing = publishState === 'running' && publishingProject === name;
+  const isThisPublishing = publishState === PUBLISH_STATE.RUNNING && publishingProject === name;
   // Single global publish job: while ANY project is publishing, every
   // publish button is disabled, not just the one that was clicked.
-  const publishDisabled = publishState === 'running';
+  const publishDisabled = publishState === PUBLISH_STATE.RUNNING;
   const showError = !!publishError && publishErrorProject === name;
   return (
     <>

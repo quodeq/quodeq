@@ -4,9 +4,10 @@
  *
  * Split out of LiveViolationsFeed.jsx verbatim.
  */
+import { SEVERITY } from '../../../vocab/severity.js';
 
 function severityOrder(s) {
-  return s === 'critical' ? 0 : s === 'major' ? 1 : 2;
+  return s === SEVERITY.CRITICAL ? 0 : s === SEVERITY.MAJOR ? 1 : 2;
 }
 
 export function orderDimensions(liveViolations, lastActivity) {

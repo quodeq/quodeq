@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../../../strings/index.js';
+import { JOB_STATUS } from '../../../vocab/jobStatus.js';
+
+// This hook's own SSE-connection lifecycle, distinct from the job/run status
+// vocabulary: 'done' here means "the stream closed", not JOB_STATUS.DONE
+// (though the two do coincide on a clean finish). Kept local rather than
+// forced into vocab/jobStatus.js.
+export const LOG_STREAM_STATUS = Object.freeze({
+  IDLE: 'idle', STREAMING: 'streaming', DONE: 'done', ERROR: 'error',
+});
 
 const MAX_LINES = 5000;
 const INACTIVITY_MS = 60000;
@@ -57,7 +66,7 @@ function makeResetInactivity({ inactivityRef, es, setStatus }) {
     }
     inactivityRef.current = setTimeout(() => {
       es.close();
-      setStatus('error');
+      setStatus(LOG_STREAM_STATUS.ERROR);
     }, INACTIVITY_MS);
   };
 }
@@ -77,15 +86,15 @@ function wireEventSource({ es, append, resetInactivity, inactivityRef, setTermin
     // The rendered terminal line is EvalLogProvider's job now (it reads
     // terminalState + logPresentation.terminalLine); this hook only
     // records which state was reached.
-    setTerminalState(state || 'done');
-    setStatus('done');
+    setTerminalState(state || JOB_STATUS.DONE);
+    setStatus(LOG_STREAM_STATUS.DONE);
     es.close();
   });
   es.onerror = () => {
     if (finishedBox.current) return;
     if (es.readyState === EventSource.CLOSED) {
       append(t('evaluate.logDisconnected'));
-      setStatus('error');
+      setStatus(LOG_STREAM_STATUS.ERROR);
     }
   };
 }
@@ -101,7 +110,7 @@ function teardownStream({ es, finishedBox, inactivityRef, rafRef, timerRef, pend
 
 export function useJobLogStream(jobId) {
   const [logs, setLogs] = useState([]);
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState(LOG_STREAM_STATUS.IDLE);
   const [terminalState, setTerminalState] = useState(null);
   const pendingRef = useRef([]);
   const rafRef = useRef(null);
@@ -116,10 +125,10 @@ export function useJobLogStream(jobId) {
     clearRef(timerRef, clearTimeout);
     clearRef(inactivityRef, clearTimeout);
     if (!jobId) {
-      setStatus('idle');
+      setStatus(LOG_STREAM_STATUS.IDLE);
       return undefined;
     }
-    setStatus('streaming');
+    setStatus(LOG_STREAM_STATUS.STREAMING);
     const url = `/api/jobs/${encodeURIComponent(jobId)}/logs/stream`;
     const es = new EventSource(url);
 

@@ -12,6 +12,8 @@ from typing import Any, Callable
 import subprocess
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.run.exit_reason import DEADLINE_EXIT_REASONS
+from quodeq.core.run.job_status import JobStatus, is_external_job_id, strip_external_prefix
 from quodeq.core.types import JobSnapshot
 
 from quodeq.shared.process_kill import kill_tree as _kill_tree, terminate_process as _terminate_process
@@ -23,12 +25,6 @@ from quodeq.services._job_model import (
     JobStore,
     InMemoryJobStore,
     REPORT_PATH_RE,
-    # Status strings live with the Job in _job_model; re-exported below.
-    STATUS_CANCELLED,
-    STATUS_DONE,
-    STATUS_FAILED,
-    STATUS_RUNNING,
-    _DEADLINE_EXIT_REASONS,
     _EXIT_CODE_TIMEOUT,
     _MAX_COMPLETED_JOBS,
     _WATCHDOG_POLL_INTERVAL_S,
@@ -45,11 +41,11 @@ from quodeq.services._job_capacity_mixin import _JobCapacityMixin
 # Re-export public names so existing imports from this module keep working.
 __all__ = [
     "Job", "JobLaunchOptions", "JobProcessSeams", "JobStore", "InMemoryJobStore",
-    "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager",
-    "STATUS_RUNNING", "STATUS_CANCELLED", "STATUS_DONE", "STATUS_FAILED",
+    "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager", "JobStatus",
+    "DEADLINE_EXIT_REASONS",
     # Owned by _job_model (which _job_monitor_mixin also reads them from) and
     # re-exported here: tests import and patch them at this module's path.
-    "_DEADLINE_EXIT_REASONS", "_EXIT_CODE_TIMEOUT", "_MAX_COMPLETED_JOBS",
+    "_EXIT_CODE_TIMEOUT", "_MAX_COMPLETED_JOBS",
     "_WATCHDOG_POLL_INTERVAL_S",
 ]
 
@@ -122,7 +118,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
     def start_job(self, cmd: list[str], launch: JobLaunchOptions | None = None) -> JobSnapshot:
         """Spawn a subprocess and return its initial job state."""
         launch = launch if launch is not None else JobLaunchOptions()
-        job = new_job(str(uuid.uuid4()), cmd, launch, status=STATUS_RUNNING)
+        job = new_job(str(uuid.uuid4()), cmd, launch, status=JobStatus.RUNNING)
         refusal = self._reserve_slot_or_refuse(job)
         if refusal is not None:
             return refusal
@@ -153,7 +149,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         """Persist *job* as failed to start and return the snapshot the caller reports."""
         self._log.error(f"Failed to start job subprocess: {exc}")
         self._release_slot(job.job_id)
-        mark_spawn_failed(job, exc, status=STATUS_FAILED, exit_code=_EXIT_CODE_SPAWN_FAILURE)
+        mark_spawn_failed(job, exc, status=JobStatus.FAILED, exit_code=_EXIT_CODE_SPAWN_FAILURE)
         with self._lock:
             self._store.put(job)
         result = job.to_dict()
@@ -171,7 +167,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         owns the run. For internal jobs, kills the tracked subprocess. *run_dir*
         lets ``_cancel_external`` skip its project-directory scan.
         """
-        if job_id.startswith("ext-") and reports_root is not None:
+        if is_external_job_id(job_id) and reports_root is not None:
             return self._cancel_external(job_id, reports_root, run_dir=run_dir)
         return self._cancel_internal(job_id)
 
@@ -188,9 +184,9 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         with self._lock:
             job = self._store.get(job_id)
             process = self._processes.get(job_id)
-            if not job or job.status != STATUS_RUNNING:
+            if not job or job.status != JobStatus.RUNNING:
                 return False
-            job.status = STATUS_CANCELLED
+            job.status = JobStatus.CANCELLED
             job.ended_at = datetime.now(timezone.utc).isoformat()
             self._store.put(job)
         if process:
@@ -200,7 +196,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
     def _cancel_external(self, job_id: str, reports_root: Path, run_dir: Path | None = None) -> bool:
         """Send SIGTERM to an external run's process; *run_dir* skips the scan when valid."""
         from quodeq.services._external_jobs import cancel_external_run, is_safe_run_segment, resolve_external_run_project
-        run_id = job_id[len("ext-"):]
+        run_id = strip_external_prefix(job_id)
         if not is_safe_run_segment(run_id):
             return False
         project_uuid = resolve_external_run_project(reports_root, run_id, run_dir_hint=run_dir)
@@ -226,7 +222,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         SQLite index. Callers that encounter an ``ext-`` id here should route
         through the provider instead.
         """
-        if job_id.startswith("ext-"):
+        if is_external_job_id(job_id):
             return None
         with self._lock:
             job = self._store.get(job_id)
@@ -243,7 +239,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         """
         with self._lock:
             job = self._store.get(job_id)
-            if not job or job.status == STATUS_RUNNING:
+            if not job or job.status == JobStatus.RUNNING:
                 return False
             self._store.delete(job_id)
             return True

@@ -95,6 +95,7 @@ _.terminal_resolve  # api/terminal_routes.py: Flask view function; the route dec
 _.terminal_session_create  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
 _.terminal_session_kill  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
 _.terminal_sessions  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
+_.terminal_status  # api/terminal_routes.py: Flask view function; the route decorator is its only caller. Was masked by an unrelated same-named local var in data/fs/report_parser/runs.py._run_status_for_entry, removed by the 2026-09-22 run-list-vocabulary-into-RunState migration.
 _.terminal_ws  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
 _.unverify  # api/routes_findings.py: Flask view function; the route decorator is its only caller.
 _.update_check  # api/routes_update.py: Flask view function; the route decorator is its only caller.
@@ -155,8 +156,6 @@ _.requirement_count  # core/types/standard.py: StandardMeta field; read by name 
 _.runId  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (704 refs).
 _.runNumericAverage  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (9 refs).
 _.runOverallGrade  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (7 refs).
-_.run_date_iso  # services/scoring_view/_models.py: DimResolution field; read by name through serialization or a dict key (1 refs).
-_.run_state  # services/scoring_view/_models.py: DimResolution field; read by name through serialization or a dict key (4 refs).
 _.runs_count  # core/types/project.py: ProjectEntry field; read by name through serialization or a dict key (10 refs).
 _.sample  # core/finding_markers.py: FindingMarker field; read by name through serialization or a dict key (35 refs).
 _.severity_drops  # core/types/scoring.py: PrincipleScore field; read by name through serialization or a dict key (5 refs).
@@ -173,7 +172,6 @@ _._build_agent_config  # analysis/subagents/pool.py: Referenced only from tests/
 _._make_rescoring_fetcher  # services/scoring/__init__.py: Referenced only from tests/, which this scan does not cover (1 refs).
 _._make_status_aware_fetcher  # services/dashboard.py: Referenced only from tests/, which this scan does not cover (9 refs).
 _._reset_for_tests  # update/selfupdate.py: Referenced only from tests/, which this scan does not cover (2 refs).
-_.add_log  # services/_job_model.py: Referenced only from tests/, which this scan does not cover (5 refs).
 _.check_node  # shared/prereqs.py: Referenced only from tests/, which this scan does not cover (4 refs).
 _.check_npm  # shared/prereqs.py: Referenced only from tests/, which this scan does not cover (4 refs).
 _.choose_highest_priority  # config/_discipline_detection.py: Referenced only from tests/, which this scan does not cover (1 refs).

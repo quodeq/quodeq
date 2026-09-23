@@ -17,11 +17,13 @@ from quodeq.core.scoring.constants import (
     _LIFT_COMPRESS,
     _SEVERITY_GRADE_FLOOR,
     _SEVERITY_WEIGHT,
+    Grade,
     MAX_SCORE,
 )
+from quodeq.core.types.severity import SEVERITY_ORDER
 
 # Canonical grade labels: positions are fixed, only the numeric boundaries move.
-GRADE_LABELS: tuple[str, ...] = ("Exemplary", "Good", "Adequate", "Poor")
+GRADE_LABELS: tuple[str, ...] = (Grade.EXEMPLARY, Grade.GOOD, Grade.ADEQUATE, Grade.POOR)
 
 # Mirrors data/config/dimensions.json (pinned by a sync test). Defaults are
 # equal (1.0) so the overall score is a plain mean; users can retune per
@@ -151,7 +153,7 @@ def validate_params(params: ScoringParams) -> list[str]:
             errors.append(f"{name} must be between {lo} and {hi}, got {value}")
     if params.floor_minor < params.floor_major:
         errors.append("floor_minor must be >= floor_major")
-    for sev in ("critical", "major", "minor"):
+    for sev in SEVERITY_ORDER:
         w = params.severity_weight.get(sev)
         if w is None or not (_SEVERITY_WEIGHT_RANGE[0] <= w <= _SEVERITY_WEIGHT_RANGE[1]):
             errors.append(

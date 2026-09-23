@@ -49,7 +49,7 @@ export function summary(score, dimScore) {
       { runId: 'r2', dateISO: iso(1), numericAverage: score, dimensionDetails: [{ dimension: 'Security', score: dimScore }] },
     ],
     runsCount: 2,
-    lastRun: { runId: 'r2', dateISO: iso(1), status: 'complete' },
+    lastRun: { runId: 'r2', dateISO: iso(1), status: 'done' },
   };
 }
 

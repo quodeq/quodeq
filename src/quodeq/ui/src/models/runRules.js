@@ -8,6 +8,7 @@
  * untestable without React. Same shape as `exitReason.js`: pure functions,
  * no framework imports.
  */
+import { RUN_STATE } from '../vocab/runState.js';
 
 /**
  * Confidence below which a finding is grouped away as low-signal.
@@ -32,7 +33,7 @@ export const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
 export function isFrozenRun(selectedRun, availableRuns) {
   if (!selectedRun || selectedRun === 'latest') return false;
   const status = (availableRuns || []).find((r) => r.runId === selectedRun)?.status;
-  return status !== 'in_progress';
+  return status !== RUN_STATE.RUNNING;
 }
 
 /** True when a finding's confidence is below the low-signal threshold. */

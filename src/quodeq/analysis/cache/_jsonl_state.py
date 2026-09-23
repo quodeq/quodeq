@@ -28,6 +28,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import BinaryIO
 
+from quodeq.analysis.mcp.schemas import FileDoneStatus
+
 # Trailing bytes of the consumed prefix kept for the rewrite guard. Longer
 # than any realistic run of repeated bytes in a findings JSONL, so a shifted
 # rewrite cannot line up with it by accident.
@@ -51,7 +53,7 @@ class DispatchJsonlState:
 
     def ok_files(self) -> set[str]:
         """Files whose most recent file_done marker has status='ok'."""
-        return {f for f, s in self.last_status.items() if s == "ok"}
+        return {f for f, s in self.last_status.items() if s == FileDoneStatus.OK}
 
     def reset(self) -> None:
         self.offset = 0
@@ -106,7 +108,7 @@ class DispatchJsonlState:
         if not isinstance(f, str):
             return
         if entry.get("_marker") == "file_done":
-            if entry.get("status") in ("ok", "error"):
+            if entry.get("status") in (FileDoneStatus.OK, FileDoneStatus.ERROR):
                 self.last_status[f] = entry["status"]
                 self.dirty.add(f)
         elif f:

@@ -20,6 +20,7 @@ from quodeq.analysis.subagents.file_queue import WorkQueue
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.core.evidence.req_mapping import build_principle_resolver
+from quodeq.core.run.exit_reason import ExitReason
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
@@ -60,7 +61,7 @@ class SubagentPool:
         self._futures: dict[Future[SubagentResult], int] = {}
         self._finished: dict[str, bool] = {}
         self._next_idx = 0
-        self.exit_reason: str = "done"
+        self.exit_reason: str = ExitReason.DONE
 
     def _shared_jsonl_path(self) -> Path:
         return self._evidence_dir / f"{self._dimension_key}_evidence.jsonl"
@@ -160,7 +161,7 @@ class SubagentPool:
         try:
             self._run_loops(results, max_dur, pool_start)
         except BaseException:
-            self.exit_reason = "error"
+            self.exit_reason = ExitReason.ERROR
             raise
         finally:
             stop.set()
@@ -170,11 +171,11 @@ class SubagentPool:
         """Without an exception, decide between "done" and "time_limit"."""
         elapsed = time.monotonic() - pool_start
         if max_dur > 0 and elapsed >= max_dur:
-            self.exit_reason = "time_limit"
+            self.exit_reason = ExitReason.TIME_LIMIT
 
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, returning a SubagentResult per agent."""
-        self.exit_reason = "done"
+        self.exit_reason = ExitReason.DONE
         max_dur = self._base_config.time_limit if self._base_config.time_limit is not None else DEFAULT_TIME_LIMIT
         pool_start = time.monotonic()
         self._log_launch()

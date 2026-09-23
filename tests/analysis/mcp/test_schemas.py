@@ -7,10 +7,8 @@ from quodeq.analysis.mcp.schemas import (
     MARK_FILE_DONE_DESC,
     MARK_FILE_DONE_SCHEMA,
     REPORT_FINDING_SCHEMA,
-    SEVERITY_CRITICAL,
-    SEVERITY_MAJOR,
-    SEVERITY_MINOR,
 )
+from quodeq.core.types.severity import Severity
 
 
 class TestReportFindingSchema:
@@ -30,29 +28,27 @@ class TestReportFindingSchema:
 
     def test_severity_enum_matches_the_severity_constants(self):
         assert REPORT_FINDING_SCHEMA["properties"]["severity"]["enum"] == [
-            SEVERITY_CRITICAL, SEVERITY_MAJOR, SEVERITY_MINOR,
+            s.value for s in Severity
         ]
 
 
 class TestFindingTypeAndSeverityConstantsSharedAcrossGates:
     """scope_gate.py, provenance_gate.py, precedent_downweight.py and
     enricher.py all read/write the same report_finding dict this schema
-    defines; each imports these constants from here rather than retyping
-    "violation"/"major"/"minor"/"critical"."""
+    defines; each imports FINDING_TYPE_VIOLATION from here (rather than
+    retyping "violation") and Severity straight from core.types.severity."""
 
     def test_scope_gate_imports_the_shared_constants(self):
         from quodeq.analysis.mcp import scope_gate
 
         assert scope_gate.FINDING_TYPE_VIOLATION is FINDING_TYPE_VIOLATION
-        assert scope_gate.SEVERITY_MAJOR is SEVERITY_MAJOR
-        assert scope_gate.SEVERITY_MINOR is SEVERITY_MINOR
+        assert scope_gate.Severity is Severity
 
     def test_provenance_gate_imports_the_shared_constants(self):
         from quodeq.analysis.mcp import provenance_gate
 
         assert provenance_gate.FINDING_TYPE_VIOLATION is FINDING_TYPE_VIOLATION
-        assert provenance_gate.SEVERITY_CRITICAL is SEVERITY_CRITICAL
-        assert provenance_gate.SEVERITY_MAJOR is SEVERITY_MAJOR
+        assert provenance_gate.Severity is Severity
 
     def test_precedent_downweight_imports_the_shared_constant(self):
         from quodeq.analysis.mcp import precedent_downweight

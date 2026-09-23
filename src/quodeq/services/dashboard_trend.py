@@ -91,10 +91,11 @@ def _build_trend_entry(
         "runId": item.run_id,
         "dateISO": item.date_iso,
         "dateLabel": item.date_label,
-        # Surface the run's lifecycle state so the History row can
-        # render "running" instead of a misleading completion time
-        # while the evaluation is still in progress (some dims have
-        # scored, others haven't).
+        # Surface the run's RunState so the History row can render
+        # "running" instead of a misleading completion time while the
+        # evaluation is still RunState.RUNNING (some dims have scored,
+        # others haven't). Serializes as its wire value (e.g. "running"),
+        # see quodeq.core.run.state.RunState.
         "status": item.status,
         "dimensionsCount": len(run_dim_names),
         "dimensions": run_dim_names,

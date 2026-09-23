@@ -13,6 +13,7 @@
  * while keeping background load near-zero (4 requests/min while a
  * run is alive, none otherwise).
  */
+import { RUN_STATE } from '../vocab/runState.js';
 export const IN_PROGRESS_POLL_MS = 15000;
 
 /**
@@ -24,6 +25,6 @@ export const IN_PROGRESS_POLL_MS = 15000;
  */
 export function pollIntervalForRuns(availableRuns) {
   if (!availableRuns || availableRuns.length === 0) return false;
-  const anyRunning = availableRuns.some((r) => r && r.status === 'in_progress');
+  const anyRunning = availableRuns.some((r) => r && r.status === RUN_STATE.RUNNING);
   return anyRunning ? IN_PROGRESS_POLL_MS : false;
 }

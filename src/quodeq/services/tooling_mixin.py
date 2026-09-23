@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.analysis.provider_cache import get_provider_configs
+from quodeq.config.provider import Provider
 from quodeq.services._browse_mixin import FsBrowseMixin
 from quodeq.services.wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
 from quodeq.shared.env_resolve import resolve_env
@@ -50,7 +51,7 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
     )
 
 
-_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "gemini", "copilot"})
+_DEFAULT_CLIENT_IDS = frozenset({Provider.CLAUDE, Provider.CODEX, Provider.GEMINI, Provider.COPILOT})
 
 
 def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
@@ -154,7 +155,7 @@ class FsToolingMixin(FsBrowseMixin):
             return {"models": []}
         if not client_id.isalnum():
             return {"models": []}
-        if client_id == "copilot":
+        if client_id == Provider.COPILOT:
             return fetch_copilot_models(env=env)
         output = run_cli_models_command(client_id, timeout_s=_CLI_MODEL_TIMEOUT_S)
         models = []

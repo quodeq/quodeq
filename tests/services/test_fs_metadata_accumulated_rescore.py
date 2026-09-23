@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
+from quodeq.core.run.state import RunState
 from quodeq.services._fs_metadata import _read_accumulated_summary
 
 
@@ -165,8 +166,8 @@ class TestPerDimensionRunDirRescore:
 
         # Runs passed newest-first, exactly like the real list_runs() order.
         runs = [
-            RunInfo(run_id=_RUN_NEW_ID, date_iso="2026-01-02", date_label="Jan 02", status="complete"),
-            RunInfo(run_id=_RUN_OLD_ID, date_iso="2026-01-01", date_label="Jan 01", status="complete"),
+            RunInfo(run_id=_RUN_NEW_ID, date_iso="2026-01-02", date_label="Jan 02", status=RunState.DONE),
+            RunInfo(run_id=_RUN_OLD_ID, date_iso="2026-01-01", date_label="Jan 01", status=RunState.DONE),
         ]
         _read_accumulated_summary(reports_root, project, runs, DEFAULT_PARAMS)
 

@@ -1,5 +1,6 @@
 // src/quodeq/ui/src/utils/reportBuilder/shared.js
 import { SEVERITY_ORDER } from '../formatters.js';
+import { SEVERITY } from '../../vocab/severity.js';
 
 const SNIPPET_MAX_LINES = 5;
 // Short run-id shown in report headers ("**Run:** 3f9c1a2b").
@@ -55,7 +56,7 @@ export function formatViolationEntry(v) {
     const fileRef = v.line != null ? `${v.file}:${v.line}` : v.file;
     lines.push(`- **File:** \`${fileRef}\``);
   }
-  lines.push(`- **Severity:** ${v.severity || 'minor'}`);
+  lines.push(`- **Severity:** ${v.severity || SEVERITY.MINOR}`);
   if (v.reason && v.reason !== title) lines.push(`- **Why:** ${v.reason}`);
   const refs = (v.reqRefs || []).filter((r) => r.url);
   if (refs.length > 0) {
@@ -96,7 +97,7 @@ export function groupBySeverity(violations) {
   const groups = {};
   for (const sev of SEVERITY_ORDER) groups[sev] = [];
   for (const v of violations) {
-    const s = (v.severity || 'minor').toLowerCase();
+    const s = (v.severity || SEVERITY.MINOR).toLowerCase();
     (groups[s] || (groups[s] = [])).push(v);
   }
   return groups;

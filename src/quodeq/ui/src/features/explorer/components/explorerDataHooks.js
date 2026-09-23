@@ -5,6 +5,7 @@ import { useExplorerQueries } from './useExplorerQueries.js';
 import { computeComplianceByPrinciple, buildEvalPrincipalFn } from '../../../utils/evalPrincipal.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { violationKey } from '../../../utils/violationKey.js';
+import { SEVERITY } from '../../../vocab/severity.js';
 
 export { computeComplianceByPrinciple, buildEvalPrincipalFn };
 
@@ -16,7 +17,7 @@ export function computeAllViolations(evalData) {
       principle: p.name,
       file: v.file ? v.file.split(':')[0] : null,
       line: v.line || null,
-      severity: v.severity || 'minor',
+      severity: v.severity || SEVERITY.MINOR,
       reason: v.reason || v.code || '',
     }))
   );

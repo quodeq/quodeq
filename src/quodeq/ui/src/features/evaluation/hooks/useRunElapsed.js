@@ -1,5 +1,6 @@
 import { useEffect, useReducer } from 'react';
 import { deriveRunElapsedS, msUntilNextSecond } from '../components/buildJobStatCells.js';
+import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 
 /**
  * The evaluate screen's elapsed clock, in seconds. Server-anchored (see
@@ -18,7 +19,7 @@ import { deriveRunElapsedS, msUntilNextSecond } from '../components/buildJobStat
  * @returns {number|null} elapsed seconds, null while unknowable
  */
 export function useRunElapsed(job, progress, dataUpdatedAt) {
-  const running = job?.status === 'running';
+  const running = job?.status === JOB_STATUS.RUNNING;
   const [, bump] = useReducer((t) => t + 1, 0);
 
   const elapsedS = deriveRunElapsedS({

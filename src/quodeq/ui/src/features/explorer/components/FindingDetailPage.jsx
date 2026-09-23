@@ -12,6 +12,7 @@
 import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
 import { EvalViolationCard } from './EvalCards.jsx';
 import { t } from '../../../strings/index.js';
+import { SEVERITY } from '../../../vocab/severity.js';
 
 // Short severity code shown in the header ("CRIT", "MAJO", "MINO").
 const SEVERITY_ABBREV_LENGTH = 4;
@@ -25,7 +26,7 @@ export default function FindingDetailPage({ finding, principle, dimension, onDis
     );
   }
 
-  const severity = (finding.severity || 'minor').toLowerCase();
+  const severity = (finding.severity || SEVERITY.MINOR).toLowerCase();
   const shortSev = severity.toUpperCase().slice(0, SEVERITY_ABBREV_LENGTH);
 
   return (

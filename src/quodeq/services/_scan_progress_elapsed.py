@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from quodeq.services._scan_progress_types import DimProgressState
+from quodeq.core.run.dimensions import DimState
 from quodeq.services.wiring import file_mtime, latest_dim_activity_mtime, read_queue_state
 
 
@@ -42,7 +42,7 @@ def _queue_take_timestamps(qstate: dict) -> list[float]:
     ]
 
 
-def _stamped_elapsed_s(record: dict | None, state: DimProgressState) -> float | None:
+def _stamped_elapsed_s(record: dict | None, state: DimState) -> float | None:
     """Per-dim elapsed from the transition timestamps in dimensions.json.
 
     write_dim_state stamps ``started_at`` when the dimension starts and
@@ -56,7 +56,7 @@ def _stamped_elapsed_s(record: dict | None, state: DimProgressState) -> float | 
     start = _parse_iso_utc(record.get("started_at"))
     if start is None:
         return None
-    if state == "running":
+    if state == DimState.RUNNING:
         return max(0.0, (datetime.now(timezone.utc) - start).total_seconds())
     end = _parse_iso_utc(record.get("completed_at")) or _parse_iso_utc(record.get("interrupted_at"))
     if end is None:
@@ -64,7 +64,7 @@ def _stamped_elapsed_s(record: dict | None, state: DimProgressState) -> float | 
     return max(0.0, (end - start).total_seconds())
 
 
-def _dim_elapsed_s(dim_id: str, run_dir: Path, state: DimProgressState, record: dict | None = None) -> float | None:
+def _dim_elapsed_s(dim_id: str, run_dir: Path, state: DimState, record: dict | None = None) -> float | None:
     """Per-dim elapsed time.
 
     Prefers the transition timestamps stamped in dimensions.json (see
@@ -84,7 +84,7 @@ def _dim_elapsed_s(dim_id: str, run_dir: Path, state: DimProgressState, record: 
     surviving agent streams (streams are deleted at dim completion, so they
     rarely survive).
     """
-    if state == "pending":
+    if state == DimState.PENDING:
         return None
     stamped = _stamped_elapsed_s(record, state)
     if stamped is not None:
@@ -103,7 +103,7 @@ def _dim_elapsed_s(dim_id: str, run_dir: Path, state: DimProgressState, record: 
             if mtime is None:
                 return None
             start = mtime
-    if state == "running":
+    if state == DimState.RUNNING:
         return max(0.0, time.time() - start)
     # done: latest activity signal still on disk
     end = start

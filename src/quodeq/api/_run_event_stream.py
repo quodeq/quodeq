@@ -40,6 +40,7 @@ from quodeq.api._run_event_watcher import (  # noqa: F401 — re-export
     compute_tick,
 )
 from quodeq.api._sse_log_helpers import sse_line
+from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.shared.env import env_float
 from quodeq.shared.env_resolve import resolve_env
 
@@ -47,8 +48,6 @@ from quodeq.shared.env_resolve import resolve_env
 # module import (it logs and falls back to 15s). minimum=0.1 keeps a bogus
 # tiny/negative value from turning every tick into a keepalive frame.
 _HEARTBEAT_S = env_float("QUODEQ_SSE_HEARTBEAT_S", 15.0, minimum=0.1)
-
-_TERMINAL_STATES = frozenset({"done", "failed", "cancelled"})
 
 
 def _tick_ms(env: Mapping[str, str] | None = None) -> int:
@@ -68,7 +67,7 @@ def _is_terminal(status_payload: str) -> tuple[bool, str]:
     except ValueError:
         return False, ""
     state = data.get("state") if isinstance(data, dict) else None
-    if isinstance(state, str) and state in _TERMINAL_STATES:
+    if isinstance(state, str) and state in TERMINAL_STATES:
         return True, state
     return False, ""
 

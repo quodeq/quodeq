@@ -3,9 +3,7 @@ import { complianceRatio } from '../../../utils/formatters.js';
 import StatGrid2x2 from './StatGrid2x2.jsx';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
 import { t } from '../../../strings/index.js';
-
-// The three buckets the violations stat summarises, most severe first.
-const SUMMARY_SEVERITIES = ['critical', 'major', 'minor'];
+import { SEVERITY_ORDER } from '../../../vocab/severity.js';
 
 /** The score/violations/compliance/ratio stat grid + the run-history bar
  * chart — the left column of the dimension page's top grid. */
@@ -24,9 +22,9 @@ export default function ExplorerStatsPanel({
         <Stat
           label={t('overview.statViolations')}
           value={allViolations.length}
-          hint={SUMMARY_SEVERITIES.some((level) => sev[level]) ? (
+          hint={SEVERITY_ORDER.some((level) => sev[level]) ? (
             <span className="principle-detail-sev-row">
-              {SUMMARY_SEVERITIES.map((level) => sev[level] > 0 && (
+              {SEVERITY_ORDER.map((level) => sev[level] > 0 && (
                 <SevBadge
                   key={level}
                   level={level}

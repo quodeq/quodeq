@@ -8,14 +8,14 @@ import { isTimeLimitExit } from '../../../../models/exitReason.js';
 import { t } from '../../../../strings/index.js';
 import { suppressedSuffix, carriedSuffix, formatSevHint } from './derivations.js';
 import { SCAN_MODE } from '../scanModes.js';
+import { JOB_STATUS } from '../../../../vocab/jobStatus.js';
 
 const STATUS_TONE = {
-  running: 'warning',
-  done: 'success',
-  completed: 'success',
-  failed: 'critical',
-  lost: 'critical',
-  cancelled: 'default',
+  [JOB_STATUS.RUNNING]: 'warning',
+  [JOB_STATUS.DONE]: 'success',
+  [JOB_STATUS.FAILED]: 'critical',
+  [JOB_STATUS.LOST]: 'critical',
+  [JOB_STATUS.CANCELLED]: 'default',
 };
 
 function statusTone(s) { return STATUS_TONE[s] || 'default'; }
@@ -49,11 +49,11 @@ function foundCell(liveCount, label = 'FOUND', hint = t('evaluate.liveViolations
 }
 
 function statusHint(s) {
-  if (s === 'running') return t('evaluate.scanInProgress');
-  if (s === 'done' || s === 'completed') return null;
-  if (s === 'failed') return 'see logs';
-  if (s === 'lost')   return t('evaluate.trackingLost');
-  if (s === 'cancelled') return t('evaluate.userCancelled');
+  if (s === JOB_STATUS.RUNNING) return t('evaluate.scanInProgress');
+  if (s === JOB_STATUS.DONE) return null;
+  if (s === JOB_STATUS.FAILED) return 'see logs';
+  if (s === JOB_STATUS.LOST)   return t('evaluate.trackingLost');
+  if (s === JOB_STATUS.CANCELLED) return t('evaluate.userCancelled');
   return null;
 }
 
@@ -104,7 +104,7 @@ function buildRunningCells(inputs) {
 }
 
 /**
- * @param {string} status — job.status: running | done | completed | failed | lost | cancelled
+ * @param {string} status — job.status, one of JOB_STATUS's values (vocab/jobStatus.js)
  * @param {object} inputs
  * @param {number} inputs.overallPct
  * @param {number} inputs.takenFiles
@@ -132,11 +132,11 @@ export function buildJobStatCells(status, inputs) {
     hint: timeLimit ? t('evaluate.timeLimitReached') : statusHint(status),
   };
 
-  if (status === 'done' || status === 'completed') {
+  if (status === JOB_STATUS.DONE) {
     return buildDoneCells(statusCell, inputs);
   }
 
-  if (status === 'running') {
+  if (status === JOB_STATUS.RUNNING) {
     return buildRunningCells(inputs);
   }
 

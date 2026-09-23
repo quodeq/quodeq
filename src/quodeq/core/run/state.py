@@ -14,11 +14,14 @@ SCHEMA_VERSION = 2
 STATUS_FILENAME = "status.json"
 
 
-class RunState(str, enum.Enum):
+class RunState(enum.StrEnum):
     """The states a run passes through, as persisted in ``status.json``.
 
     String-valued because the value is the on-disk representation; renaming a
-    member breaks every status file already written.
+    member breaks every status file already written. StrEnum (not a bare
+    ``(str, enum.Enum)`` mixin) so ``str()``/f-strings/``%s`` render the
+    plain value ("done") instead of "RunState.DONE" -- equality, hashing and
+    json.dumps were already value-based either way.
     """
 
     PENDING = "pending"
@@ -74,6 +77,35 @@ class RunStatus:
 
 
 TERMINAL_STATES: frozenset[RunState] = frozenset({RunState.DONE, RunState.FAILED, RunState.CANCELLED})
+
+ACTIVE_STATES: frozenset[RunState] = frozenset({RunState.PENDING, RunState.RUNNING, RunState.FINALIZING})
+
+# Spellings older builds wrote to status.json / index rows, or that the
+# derived run-list vocabulary used before it was folded into RunState
+# (2026-09-22). Reading is the only place they are allowed to appear.
+_LEGACY_SPELLINGS: dict[str, RunState] = {
+    "complete": RunState.DONE, "completed": RunState.DONE, "finished": RunState.DONE,
+    "in_progress": RunState.RUNNING,
+    "canceled": RunState.CANCELLED,
+    "error": RunState.FAILED, "lost": RunState.FAILED,
+}
+
+
+_BY_SPELLING: dict[str, RunState] = {m.value: m for m in RunState} | _LEGACY_SPELLINGS
+
+
+def parse_run_state(raw: str | None) -> RunState:
+    """The ``RunState`` a stored or transmitted state string means.
+
+    Accepts every member value plus the legacy spellings above, case- and
+    whitespace-insensitive. Raises ``ValueError`` for anything else so a
+    corrupt status file is reported, not silently mapped.
+    """
+    state = _BY_SPELLING.get((raw or "").strip().lower())
+    if state is None:
+        raise ValueError(f"unknown run state: {raw!r}")
+    return state
+
 
 # Allowed transitions (src -> set of dst). All other transitions raise.
 _ALLOWED_TRANSITIONS: dict[RunState, frozenset[RunState]] = {

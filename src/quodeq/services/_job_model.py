@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Callable, Protocol, runtime_checkable
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
 from quodeq.shared.constants import CC_MARKER_KEY
 
@@ -27,26 +28,10 @@ _EXIT_CODE_TIMEOUT = -9
 # blocking wait(timeout=full_budget) at spawn time can't see it.
 _WATCHDOG_POLL_INTERVAL_S = 1.0
 
-# status.json exit reasons that mean "the run hit its time budget" -- the
-# user's own setting doing its job, not an error. Jobs ending this way are
-# marked cancelled (already in the salvage-scoring trigger list in
-# api/_evaluation_routes.py) with exit_reason set, so the evaluate header
-# renders "time limit reached" instead of FAILED.
-_DEADLINE_EXIT_REASONS = ("deadline", "time_limit")
-_EXIT_REASON_DEADLINE = "deadline"
-
 if TYPE_CHECKING:
     import subprocess
 
     from quodeq.services._external_jobs import ProcessControl
-
-# Canonical job status strings. They live here, with the Job they describe,
-# so both jobs.py (which re-exports them for its importers) and the mixins
-# it composes can import them without reaching back into jobs.py.
-STATUS_RUNNING = "running"
-STATUS_CANCELLED = "cancelled"
-STATUS_DONE = "done"
-STATUS_FAILED = "failed"
 
 _MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
@@ -70,7 +55,7 @@ class JobLaunchOptions:
     time_limit_s: int | None = None
 
 
-def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: str) -> "Job":
+def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: JobStatus) -> "Job":
     """A fresh job record for *cmd*, started now, carrying *launch*'s run metadata."""
     from datetime import datetime, timezone  # noqa: PLC0415
 
@@ -87,7 +72,7 @@ def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: st
     )
 
 
-def mark_spawn_failed(job: "Job", exc: BaseException, *, status: str, exit_code: int) -> None:
+def mark_spawn_failed(job: "Job", exc: BaseException, *, status: JobStatus, exit_code: int) -> None:
     """Close *job* as failed-to-start: terminal status, end time, exit code and a log line."""
     from datetime import datetime, timezone  # noqa: PLC0415
 
@@ -115,7 +100,7 @@ class Job:
     """State of a single evaluation subprocess."""
 
     job_id: str
-    status: str
+    status: JobStatus
     command: list[str]
     started_at: str
     ended_at: str | None
@@ -134,29 +119,6 @@ class Job:
     # completions and plain failures. Lets the UI tell a time-budget kill
     # apart from a real failure.
     exit_reason: str | None = None
-
-    def complete(self, exit_code: int, ended_at: str) -> None:
-        """Transition job to a terminal state based on exit code."""
-        self.exit_code = exit_code
-        self.ended_at = ended_at
-        self.status = "completed" if exit_code == 0 else "failed"
-
-    def cancel(self, ended_at: str) -> None:
-        """Mark job as cancelled."""
-        if self.status in ("completed", "failed"):
-            return
-        self.status = "cancelled"
-        self.ended_at = ended_at
-
-    def add_log(self, line: str) -> None:
-        """Append a log line to the rolling buffer."""
-        self.logs.append(line)
-
-    def set_phase(self, phase: str, dimension: str | None = None) -> None:
-        """Update the current analysis phase."""
-        self.phase = phase
-        if dimension is not None:
-            self.current_dimension = dimension
 
     def to_dict(self) -> JobSnapshot:
         """Return a frozen snapshot of the current job state."""

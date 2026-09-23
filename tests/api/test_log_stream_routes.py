@@ -119,3 +119,44 @@ def test_stream_terminal_state_uses_public_get_job_not_private_store():
             return None
 
     assert _stream_terminal_state(FakeProvider(), "job-1") == "done"
+
+
+def test_is_preparing_job_treats_lost_as_still_live(tmp_path):
+    """A LOST job's tracking thread died, but the subprocess may still be
+    running -- _is_preparing_job must not treat it as finished (JOB_FINISHED
+    excludes LOST on purpose)."""
+    from quodeq.api._log_stream_routes import _is_preparing_job
+    from quodeq.core.types.job import JobSnapshot
+
+    class FakeJobs:
+        def get_job(self, job_id):
+            return JobSnapshot(job_id=job_id, status="lost", output_project=None)
+
+    class FakeProvider:
+        _jobs = FakeJobs()
+
+    assert _is_preparing_job(FakeProvider(), "job-1") is True
+
+
+def test_stream_terminal_state_falls_through_to_status_json_for_lost_job(tmp_path):
+    """A LOST job must not short-circuit to "lost" -- it falls through to
+    status.json's real state, same as before JobStatus existed."""
+    from quodeq.api._log_stream_routes import _stream_terminal_state
+    from quodeq.core.types.job import JobSnapshot
+    import json
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "status.json").write_text(json.dumps({"state": "running"}), encoding="utf-8")
+
+    class FakeJobs:
+        def get_job(self, job_id):
+            return JobSnapshot(job_id=job_id, status="lost", output_project=None)
+
+    class FakeProvider:
+        _jobs = FakeJobs()
+
+        def get_log_run_dir(self, job_id):
+            return run_dir
+
+    assert _stream_terminal_state(FakeProvider(), "job-1") == "running"

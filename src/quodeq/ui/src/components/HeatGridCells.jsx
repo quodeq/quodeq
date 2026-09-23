@@ -1,8 +1,7 @@
 import { severityCellStyle, complianceRateCellStyle, severityColor, complianceRateColor } from '../features/map/viz/core/mapColors.js';
 import { t } from '../strings/index.js';
 import { activateOnKey } from '../utils/a11y.js';
-
-const SEVERITY_LEVELS = ['critical', 'major', 'minor'];
+import { SEVERITY_ORDER } from '../vocab/severity.js';
 
 // The catalog has no pluralisation, so a count of one takes its own key. An
 // unnamed row gets its fallback from the catalog too, not a bare literal.
@@ -92,7 +91,7 @@ export default function HeatGridCells({ row, onCellClick, variant = 'heat' }) {
 
   return (
     <>
-      {SEVERITY_LEVELS.map((sev) => (
+      {SEVERITY_ORDER.map((sev) => (
         <SeverityCell key={sev} row={row} sev={sev} flat={flat} onCellClick={onCellClick} />
       ))}
       <ViolationsCell row={row} onCellClick={onCellClick} />

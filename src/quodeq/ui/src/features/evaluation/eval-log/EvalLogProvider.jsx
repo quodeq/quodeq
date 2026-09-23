@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../components/ConsoleLogViewer.jsx';
 import { EvalLogContext, EvalLogLogsContext, useEvalLogLogs } from './EvalLogContext.js';
-import { useJobLogStream } from './useJobLogStream.js';
+import { useJobLogStream, LOG_STREAM_STATUS } from './useJobLogStream.js';
 import { JOB_STATUS_WORD, terminalLine } from './logPresentation.js';
+import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { t } from '../../../strings/index.js';
 
 // Read logs from the dedicated logs context so the side-pane's spec stays
@@ -18,10 +19,10 @@ function EvalLogPaneBody({ terminalState }) {
 }
 
 const STREAM_STATUS_WORD = {
-  idle: '',
-  streaming: 'running',
-  done: 'completed',
-  error: 'error',
+  [LOG_STREAM_STATUS.IDLE]: '',
+  [LOG_STREAM_STATUS.STREAMING]: 'running',
+  [LOG_STREAM_STATUS.DONE]: 'completed',
+  [LOG_STREAM_STATUS.ERROR]: 'error',
 };
 
 function statusWord(jobStatus, streamStatus, terminalState) {
@@ -31,14 +32,14 @@ function statusWord(jobStatus, streamStatus, terminalState) {
   // ScanProgress isn't mounted to push the lifecycle reason.
   if (terminalState && JOB_STATUS_WORD[terminalState]) return JOB_STATUS_WORD[terminalState];
   // Specific terminal job states win over a generic stream "done".
-  if (jobStatus === 'failed' || jobStatus === 'cancelled' || jobStatus === 'lost') {
+  if (jobStatus === JOB_STATUS.FAILED || jobStatus === JOB_STATUS.CANCELLED || jobStatus === JOB_STATUS.LOST) {
     return JOB_STATUS_WORD[jobStatus];
   }
   // Otherwise the stream's terminal states override a stale "running"
   // jobStatus (e.g. progress poll hasn't caught up, or ScanProgress
   // unmounted before flipping status).
-  if (streamStatus === 'done') return 'completed';
-  if (streamStatus === 'error') return 'error';
+  if (streamStatus === LOG_STREAM_STATUS.DONE) return 'completed';
+  if (streamStatus === LOG_STREAM_STATUS.ERROR) return 'error';
   if (jobStatus && JOB_STATUS_WORD[jobStatus]) return JOB_STATUS_WORD[jobStatus];
   return STREAM_STATUS_WORD[streamStatus] || '';
 }

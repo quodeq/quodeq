@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from quodeq.core.finding_builder import format_file_line
+from quodeq.core.types.severity import Severity
 
-_DEFAULT_SEVERITY = "minor"
 _FINDING_TYPE_VIOLATIONS = "violations"
 _FINDING_TYPE_COMPLIANCE = "compliance"
 
@@ -56,7 +56,7 @@ def _collect_findings(
             "reason": item.get("reason", ""),
         }
         if finding_type == _FINDING_TYPE_VIOLATIONS:
-            entry["severity"] = item.get("severity", _DEFAULT_SEVERITY)
+            entry["severity"] = item.get("severity", Severity.MINOR)
         if item.get("cwe"):
             entry["cwe"] = item["cwe"]
         if item.get("req"):

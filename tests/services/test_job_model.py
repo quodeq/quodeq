@@ -29,61 +29,14 @@ class TestJob:
         defaults.update(overrides)
         return Job(**defaults)
 
-    def test_complete_success(self):
-        job = self._make_job()
-        job.complete(0, "2026-01-01T01:00:00+00:00")
-        assert job.status == "completed"
-        assert job.exit_code == 0
-        assert job.ended_at == "2026-01-01T01:00:00+00:00"
-
-    def test_complete_failure(self):
-        job = self._make_job()
-        job.complete(1, "2026-01-01T01:00:00+00:00")
-        assert job.status == "failed"
-        assert job.exit_code == 1
-
-    def test_cancel_running(self):
-        job = self._make_job()
-        job.cancel("2026-01-01T01:00:00+00:00")
-        assert job.status == "cancelled"
-        assert job.ended_at is not None
-
-    def test_cancel_already_completed_noop(self):
-        job = self._make_job(status="completed")
-        job.cancel("2026-01-01T02:00:00+00:00")
-        assert job.status == "completed"
-
-    def test_cancel_already_failed_noop(self):
-        job = self._make_job(status="failed")
-        job.cancel("2026-01-01T02:00:00+00:00")
-        assert job.status == "failed"
-
-    def test_add_log(self):
-        job = self._make_job()
-        job.add_log("line 1")
-        job.add_log("line 2")
-        assert list(job.logs) == ["line 1", "line 2"]
-
     def test_log_rolling_buffer(self):
         job = self._make_job()
         for i in range(_MAX_LOG_LINES + 50):
-            job.add_log(f"line {i}")
+            job.logs.append(f"line {i}")
         assert len(job.logs) == _MAX_LOG_LINES
         # Oldest lines should have been evicted
         assert "line 0" not in job.logs
         assert f"line {_MAX_LOG_LINES + 49}" in job.logs
-
-    def test_set_phase_with_dimension(self):
-        job = self._make_job()
-        job.set_phase("analyzing", dimension="security")
-        assert job.phase == "analyzing"
-        assert job.current_dimension == "security"
-
-    def test_set_phase_without_dimension(self):
-        job = self._make_job()
-        job.set_phase("setup")
-        assert job.phase == "setup"
-        assert job.current_dimension is None
 
     def test_to_dict_returns_snapshot(self):
         job = self._make_job(
@@ -93,7 +46,7 @@ class TestJob:
             current_dimension="perf",
             dimensions=["security", "perf"],
         )
-        job.add_log("hello")
+        job.logs.append("hello")
         snap = job.to_dict()
         assert snap.job_id == "j1"
         assert snap.status == "running"

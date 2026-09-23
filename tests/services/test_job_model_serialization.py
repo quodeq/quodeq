@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from quodeq.services._job_model import Job
 from quodeq.services._job_file_store import _job_to_json, _job_from_json
+from quodeq.core.run.job_status import JobStatus
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ class TestSerialization:
             current_dimension="security",
             dimensions=["security", "performance"],
         )
-        original.add_log("log line 1")
+        original.logs.append("log line 1")
         data = _job_to_json(original)
         restored = _job_from_json(data)
         assert restored.job_id == original.job_id
@@ -101,3 +102,22 @@ class TestSerialization:
         snap = job.to_dict()
         assert snap.ai_provider == "ollama"
         assert snap.ai_model == "gemma4:26b-mlx"
+
+
+class TestStatusParsing:
+    def test_known_status_is_parsed_to_the_member(self):
+        job = _job_from_json({"job_id": "j1", "status": "done"})
+        assert job.status is JobStatus.DONE
+
+    def test_unknown_status_is_kept_raw_with_a_warning(self, caplog):
+        with caplog.at_level("WARNING"):
+            job = _job_from_json({"job_id": "j1", "status": "completed"})
+        assert job.status == "completed"
+        assert not isinstance(job.status, JobStatus)
+        assert "completed" in caplog.text
+
+    def test_non_string_status_is_kept_raw_with_a_warning(self, caplog):
+        with caplog.at_level("WARNING"):
+            job = _job_from_json({"job_id": "j1", "status": 5})
+        assert job.status == 5
+        assert "non-string status" in caplog.text

@@ -3,10 +3,14 @@ import { STEP_WELCOME } from '../wizardSteps.js';
 
 const DEFAULT_TIME_LIMIT_S = 600; // 10 minutes
 
+/** The wizard's repo-scan sub-step states (`repoScanSubState`). Its own
+ *  vocabulary, not the run/job/dim one in src/vocab. */
+export const SCAN_SUB_STATE = Object.freeze({ IDLE: 'idle', SCANNING: 'scanning', SCANNED: 'scanned', ERROR: 'error' });
+
 function initialState(initial = {}) {
   return {
     step: initial.step || STEP_WELCOME,
-    repoScanSubState: 'idle',
+    repoScanSubState: SCAN_SUB_STATE.IDLE,
     repo: { source: 'url', value: '', branch: null, scopePath: null },
     projectId: null,
     scan: null,
@@ -39,15 +43,15 @@ function toggleStandard(state, id) {
 const HANDLERS = {
   GO_TO_STEP: (state, action) => ({ ...state, step: action.step }),
   SET_REPO: (state, action) => ({ ...state, repo: { ...state.repo, ...action.repo } }),
-  SCAN_START: (state) => ({ ...state, repoScanSubState: 'scanning', scan: null, projectId: null }),
+  SCAN_START: (state) => ({ ...state, repoScanSubState: SCAN_SUB_STATE.SCANNING, scan: null, projectId: null }),
   SCAN_SUCCESS: (state, action) => ({
     ...state,
-    repoScanSubState: 'scanned',
+    repoScanSubState: SCAN_SUB_STATE.SCANNED,
     scan: action.scan,
     projectId: action.projectId,
   }),
-  SCAN_ERROR: (state, action) => ({ ...state, repoScanSubState: 'error', scanError: action.error }),
-  SCAN_RESET: (state) => ({ ...state, repoScanSubState: 'idle', scan: null, projectId: null, scanError: null }),
+  SCAN_ERROR: (state, action) => ({ ...state, repoScanSubState: SCAN_SUB_STATE.ERROR, scanError: action.error }),
+  SCAN_RESET: (state) => ({ ...state, repoScanSubState: SCAN_SUB_STATE.IDLE, scan: null, projectId: null, scanError: null }),
   SET_PROVIDER: (state, action) => ({ ...state, provider: { ...state.provider, ...action.provider } }),
   SET_PROVIDER_VIEW: (state, action) => ({ ...state, providerView: action.view }),
   SET_TIME_LIMIT: (state, action) => ({ ...state, totalTimeLimitS: action.seconds }),

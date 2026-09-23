@@ -14,9 +14,9 @@ from pathlib import Path
 from typing import Protocol
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.services.wiring import read_dispatched_cache_keys, remove_matching_files
 
-_TERMINAL_RUN_STATES = frozenset({"done", "failed", "cancelled"})
 _CANCEL_WAIT_TIMEOUT_S = 2.0
 _CANCEL_WAIT_POLL_S = 0.05
 # The replayed_unconsolidated_keys pattern names keys belonging to EARLIER
@@ -58,7 +58,7 @@ def _wait_for_terminal_status(
     while True:
         try:
             data = json.loads(status_path.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and data.get("state") in _TERMINAL_RUN_STATES:
+            if isinstance(data, dict) and data.get("state") in TERMINAL_STATES:
                 return True
         except (OSError, ValueError) as exc:
             if not logged:

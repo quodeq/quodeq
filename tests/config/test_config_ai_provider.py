@@ -58,9 +58,7 @@ class TestExpandedProviders:
         assert "custom" in PROVIDERS
 
     def test_ollama_no_api_key_required(self):
-        api_key_var, cmd = PROVIDERS["ollama"]
-        assert api_key_var == ""
+        assert PROVIDERS["ollama"] == ""
 
     def test_openrouter_api_key_env(self):
-        api_key_var, cmd = PROVIDERS["openrouter"]
-        assert api_key_var == "OPENROUTER_API_KEY"
+        assert PROVIDERS["openrouter"] == "OPENROUTER_API_KEY"

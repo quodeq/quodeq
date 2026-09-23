@@ -1,0 +1,65 @@
+"""Job status vocabulary (pure; persistence in services/_job_file_store).
+
+A job is the process wrapper around a run. Its status spells the same words
+as ``RunState`` where the meanings coincide, plus ``lost`` for a job whose
+process disappeared with the server (``_job_file_store`` flips a persisted
+``running`` job to ``lost`` on startup). Jobs never persist ``pending`` or
+``finalizing``.
+"""
+from __future__ import annotations
+
+from enum import StrEnum
+
+
+class JobStatus(StrEnum):
+    """The statuses a job passes through, as persisted in the job file."""
+
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    LOST = "lost"
+
+
+# Excludes LOST on purpose: a lost job's subprocess may still be alive and
+# writing (the tracking thread, not the process, is what was lost), so
+# callers that decide "the run actually finished" (SSE done-frame, is_complete
+# disk fallback, preparing-job liveness) must not treat LOST as finished --
+# they fall through to a status.json/disk check instead.
+JOB_FINISHED: frozenset[JobStatus] = frozenset(
+    {JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED}
+)
+
+_BY_VALUE: dict[str, JobStatus] = {m.value: m for m in JobStatus}
+
+
+def parse_job_status(raw: str | None) -> JobStatus:
+    """The ``JobStatus`` a persisted status string means.
+
+    Accepts every member value, case- and whitespace-insensitive. Raises
+    ``ValueError`` for anything else so the caller decides how to degrade.
+    """
+    status = _BY_VALUE.get((raw or "").strip().lower())
+    if status is None:
+        raise ValueError(f"unknown job status: {raw!r}")
+    return status
+
+
+# Job ids of runs launched outside the dashboard (CLI, CI) carry this prefix
+# so the evaluations index can tell them from dashboard-managed jobs.
+EXTERNAL_JOB_PREFIX = "ext-"
+
+
+def is_external_job_id(job_id: str) -> bool:
+    """True for a job id minted by an external launcher."""
+    return job_id.startswith(EXTERNAL_JOB_PREFIX)
+
+
+def strip_external_prefix(job_id: str) -> str:
+    """The run id behind an external job id; other ids are returned as-is."""
+    return job_id[len(EXTERNAL_JOB_PREFIX):] if is_external_job_id(job_id) else job_id
+
+
+def external_job_id(run_id: str) -> str:
+    """The external job id for *run_id* (the inverse of strip_external_prefix)."""
+    return f"{EXTERNAL_JOB_PREFIX}{run_id}"

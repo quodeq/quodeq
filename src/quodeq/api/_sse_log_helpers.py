@@ -29,6 +29,15 @@ _KEEPALIVE_MS = 2000
 _DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
 _ENV_TAIL_MAX_BYTES = "QUODEQ_LOG_TAIL_MAX_BYTES"
 
+# _wait_for_log_file/_tail_new_lines tick statuses -- a local closed
+# vocabulary distinct from RunState/JobStatus/FileDoneStatus even though two
+# of its members spell the same words; named so the vocab-literal ratchet
+# doesn't mistake this generator plumbing for one of those.
+_TICK_CONTINUE = "continue"
+_TICK_TIMEOUT = "timeout"
+_TICK_DONE = "done"
+_TICK_ERROR = "error"
+
 
 def _tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
     raw = resolve_env(env).get(_ENV_TAIL_MAX_BYTES)
@@ -61,7 +70,7 @@ def _emit_done_frame(terminal_state, offset: int) -> str:
     """Build the ``event: done`` frame that ends a tail stream.
 
     terminal_state: optional callable returning a string describing why the
-             run ended (e.g. ``"cancelled"``, ``"failed"``, ``"completed"``).
+             run ended (e.g. ``"cancelled"``, ``"failed"``, ``"done"``).
              If provided and non-empty, that value rides in the done frame
              as ``data:`` so the client can show the right title without
              relying on a separate dashboard poll.
@@ -97,17 +106,17 @@ def _wait_for_log_file(is_done, waited_ms: int, keepalive_ms: int):
     if is_done is None:
         if waited_ms >= _max_wait_s() * 1000:
             yield sse_line("log file unavailable", event="error")
-            return waited_ms, keepalive_ms, "timeout"
+            return waited_ms, keepalive_ms, _TICK_TIMEOUT
         waited_ms += poll_ms
     else:
         if is_done():
-            return waited_ms, keepalive_ms, "done"
+            return waited_ms, keepalive_ms, _TICK_DONE
         keepalive_ms += poll_ms
         if keepalive_ms >= _KEEPALIVE_MS:
             yield ":keepalive\n\n"
             keepalive_ms = 0
     time.sleep(poll_ms / 1000)
-    return waited_ms, keepalive_ms, "continue"
+    return waited_ms, keepalive_ms, _TICK_CONTINUE
 
 
 def _tail_new_lines(path: Path, offset: int, line_filter):
@@ -125,7 +134,7 @@ def _tail_new_lines(path: Path, offset: int, line_filter):
             raw = fh.read(_tail_max_bytes())
     except OSError:  # includes FileNotFoundError
         yield sse_line("log file unavailable", event="error")
-        return offset, "error"
+        return offset, _TICK_ERROR
     text = raw.decode("utf-8", errors="replace")
     if text:
         complete = text if text.endswith("\n") else text[: text.rfind("\n") + 1]
@@ -134,7 +143,7 @@ def _tail_new_lines(path: Path, offset: int, line_filter):
                 offset += len(line.encode("utf-8")) + 1  # +1 for '\n'
                 if line_filter is None or line_filter(line):
                     yield sse_line(line, event_id=offset)
-    return offset, "continue"
+    return offset, _TICK_CONTINUE
 
 
 def sse_tail_generator(
@@ -174,14 +183,14 @@ def sse_tail_generator(
             waited_ms, keepalive_ms, status = yield from _wait_for_log_file(
                 is_done, waited_ms, keepalive_ms,
             )
-            if status == "timeout":
+            if status == _TICK_TIMEOUT:
                 return
-            if status == "done":
+            if status == _TICK_DONE:
                 yield _emit_done_frame(terminal_state, offset)
                 return
             continue
         offset, tail_status = yield from _tail_new_lines(path, offset, line_filter)
-        if tail_status == "error":
+        if tail_status == _TICK_ERROR:
             return
         if is_done is not None and is_done():
             yield _emit_done_frame(terminal_state, offset)

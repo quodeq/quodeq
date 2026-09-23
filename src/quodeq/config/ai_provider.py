@@ -10,6 +10,7 @@ from pathlib import Path
 import keyring
 
 from quodeq.config.paths import ConfigPaths, default_paths
+from quodeq.config.provider import PROVIDERS
 from quodeq.shared.constants import SECRET_SUFFIX_CHARS
 from quodeq.shared.logging import log_debug, log_error, log_info, log_success, log_warning
 from quodeq.shared import get_ai_provider
@@ -30,17 +31,6 @@ _API_KEY_FORBIDDEN_CHARS = ("\n", "\r", "\0")
 # trailing newline, so `match()` accepts "gemini\n", which is the exact
 # character this pattern exists to reject.
 _VALID_PROVIDER_RE = re.compile(r"[A-Za-z0-9_-]+")
-
-PROVIDERS = {
-    "claude": ("ANTHROPIC_API_KEY", "claude"),
-    "codex": ("CODEX_API_KEY", "codex"),
-    "gemini": ("GEMINI_API_KEY", "gemini"),
-    "copilot": ("", "copilot"),
-    "ollama": ("", "ollama"),
-    "llamacpp": ("", "llamacpp"),
-    "openrouter": ("OPENROUTER_API_KEY", "openrouter"),
-    "custom": ("AI_API_KEY", "custom"),
-}
 
 
 def _read_export_value(env_file: Path, prefix: str) -> str | None:
@@ -226,7 +216,7 @@ def configure_provider_noninteractive(provider: str, paths: ConfigPaths) -> int:
         valid = ", ".join(sorted(PROVIDERS.keys()))
         log_error(f"Invalid provider: {provider}. Expected one of: {valid}")
         return 1
-    api_key_var, _ = PROVIDERS[provider]
+    api_key_var = PROVIDERS[provider]
     api_key_value = ""
     _write_env(paths, provider, api_key_var, api_key_value)
     _ensure_gitignore(paths)
@@ -236,7 +226,7 @@ def configure_provider_noninteractive(provider: str, paths: ConfigPaths) -> int:
 
 def _api_key_var_for(provider: str) -> str:
     """Return the env var name used to persist *provider*'s key in cleartext."""
-    api_key_var, _ = PROVIDERS.get(provider, (f"{provider.upper()}_API_KEY", provider))
+    api_key_var = PROVIDERS.get(provider, f"{provider.upper()}_API_KEY")
     return api_key_var
 
 
