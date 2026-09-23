@@ -81,6 +81,9 @@ export default function LoadingScreen({ message, variant = 'fullscreen', tips = 
   const classes = ['loading-screen'];
   if (variant === 'inline') classes.push('loading-screen--inline');
   if (variant === 'shell') classes.push('loading-screen--shell');
+  // Known at mount, so the logo is lifted from the first frame and never
+  // jumps when the first tip arrives.
+  if (tips) classes.push('loading-screen--tips');
   if (leaving) classes.push('loading-screen--leaving');
   return (
     <div className={classes.join(' ')} role="status" aria-live="polite">

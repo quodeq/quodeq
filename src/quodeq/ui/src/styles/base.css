@@ -1970,7 +1970,7 @@ textarea:focus {
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  max-width: 30rem;
+  max-width: 34rem;
   padding: 0 var(--space-4);
   margin-top: var(--space-5);
   text-align: center;
@@ -2000,11 +2000,22 @@ textarea:focus {
   text-wrap: balance;
 }
 
-/* The tip floats below the centered logo instead of joining the flex column,
-   so the logo never shifts when a tip appears or wraps to a second line. */
+/* With tips on, the logo sits above center so logo and tip read as one group
+   centered on screen, instead of the tip hanging below a centered logo. The
+   margin (not a transform) keeps loading-pulse's scale free. */
+.loading-screen--tips {
+  --loading-tip-lift: 48px;
+}
+
+.loading-screen--tips .loading-logo {
+  margin-bottom: calc(var(--loading-tip-lift) * 2);
+}
+
+/* The tip floats below the logo instead of joining the flex column, so the
+   logo never shifts when a tip appears or wraps to a second line. */
 .loading-screen:not(.loading-screen--inline) .loading-tip {
   position: absolute;
-  top: calc(50% + 76px);
+  top: calc(50% + 76px - var(--loading-tip-lift, 0px));
   left: 0;
   right: 0;
   margin: 0 auto;
