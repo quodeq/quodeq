@@ -51,6 +51,7 @@ from quodeq.services.wiring import (  # noqa: F401 — facade re-export
     write_cached_project_summary,
     write_cached_rows,
 )
+from quodeq.services._score_cache_stale import clear_stale_payloads  # noqa: F401 — facade re-export
 from quodeq.services._score_cache_fetch import (  # noqa: F401 — facade re-export
     cached_accumulated,
     cached_project_summary,
@@ -165,6 +166,27 @@ def accumulated_cache_version(
         "as_of": as_of or "",
         **({} if visible_dims is None else {"visible": sorted(visible_dims)}),
     }, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+_IN_FLIGHT = frozenset({RunState.PENDING, RunState.RUNNING, RunState.FINALIZING})
+
+
+def accumulated_stale_scope(
+    params: ScoringParams, run_versions: list[tuple], as_of: str | None, suppression_fp: str,
+) -> str:
+    """Scope inside which a stale accumulated payload may be served while it refreshes.
+
+    The accumulated version with in-flight runs' scoped versions blanked (their
+    keys grow with every finding an eval writes), plus *suppression_fp*
+    (:func:`suppression_state_fingerprint`), since a blanked run's version was
+    the only place a dismiss touching just that run showed up. A run
+    appearing, finishing or vanishing, or any dismiss/delete, changes it.
+    """
+    masked = [(rid, status, "" if status in _IN_FLIGHT else version)
+              for rid, status, version in run_versions]
+    payload = json.dumps({"acc": accumulated_cache_version(params, masked, as_of),
+                          "suppression": suppression_fp}, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
