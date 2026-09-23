@@ -1,18 +1,42 @@
 import { useEffect, useState } from 'react';
 import { QMarkIcon } from './QMarkIcon.jsx';
 import { t } from '../strings/index.js';
+import { renderRich } from '../strings/rich.jsx';
 
-// One short sentence each — the 5s rotation only leaves reading time for
-// about a dozen words, so anything longer gets split into two tips.
+// One plain sentence each. The 8s rotation leaves reading time for about
+// fifteen words; anything longer gets split into two tips. Each tip bolds the
+// one thing worth catching at a glance (**...**) and marks file names and
+// commands as `code`, so a skim still lands the point. A tip that opens with
+// a question gets it on its own line: the reader decides from the question
+// alone whether the rest applies to them.
 const TIP_KEYS = [
-  'loading.tips.warmup', 'loading.tips.incremental', 'loading.tips.carryforward',
-  'loading.tips.dimensions', 'loading.tips.dismiss', 'loading.tips.fixplans',
-  'loading.tips.standards', 'loading.tips.ignore', 'loading.tips.history',
-  'loading.tips.compliance', 'loading.tips.shared', 'loading.tips.matrix',
-  'loading.tips.duel', 'loading.tips.standardsToggle',
+  'loading.tips.warmup', 'loading.tips.incremental', 'loading.tips.cleanScan',
+  'loading.tips.fixplans', 'loading.tips.dismiss', 'loading.tips.ignore',
+  'loading.tips.assistant', 'loading.tips.riskMatrix', 'loading.tips.architecture',
+  'loading.tips.compliance', 'loading.tips.stale', 'loading.tips.matrix',
+  'loading.tips.duel', 'loading.tips.standards', 'loading.tips.customStandard',
+  'loading.tips.prReview', 'loading.tips.ollama', 'loading.tips.monorepo',
+  'loading.tips.shared',
 ];
+const LEADING_QUESTION = /^([^?]+\?)\s+(.+)$/s;
+
+function TipText({ text }) {
+  const m = LEADING_QUESTION.exec(text);
+  if (!m) return <p className="loading-tip__text">{renderRich(text)}</p>;
+  return (
+    <p className="loading-tip__text">
+      <span className="loading-tip__question">{renderRich(m[1])}</span>
+      {' '}
+      {renderRich(m[2])}
+    </p>
+  );
+}
+
 const TIPS_DELAY_MS = 300;
-const TIPS_ROTATE_MS = 5000;
+const TIPS_ROTATE_MS = 8000;
+// Each swap fades the old tip out, changes the text, then fades the new one in.
+// Keep in step with the .loading-tip transition in base.css.
+const TIP_FADE_MS = 700;
 const LEAVE_MS = 400;
 
 // Fisher-Yates copy shuffle: each launch walks the tips in a fresh order,
@@ -29,6 +53,7 @@ function shuffled(keys) {
 function useRotatingTip(enabled) {
   const [order] = useState(() => shuffled(TIP_KEYS));
   const [idx, setIdx] = useState(-1);
+  const [fading, setFading] = useState(false);
   useEffect(() => {
     if (!enabled) return undefined;
     const start = setTimeout(() => setIdx(0), TIPS_DELAY_MS);
@@ -37,10 +62,17 @@ function useRotatingTip(enabled) {
   const started = idx >= 0;
   useEffect(() => {
     if (!started) return undefined;
-    const id = setInterval(() => setIdx((i) => (i + 1) % order.length), TIPS_ROTATE_MS);
-    return () => clearInterval(id);
+    let swap;
+    const id = setInterval(() => {
+      setFading(true);
+      swap = setTimeout(() => {
+        setIdx((i) => (i + 1) % order.length);
+        setFading(false);
+      }, TIP_FADE_MS);
+    }, TIPS_ROTATE_MS);
+    return () => { clearInterval(id); clearTimeout(swap); };
   }, [started, order.length]);
-  return started ? order[idx] : null;
+  return { tipKey: started ? order[idx] : null, fading };
 }
 
 /**
@@ -64,16 +96,24 @@ function useRotatingTip(enabled) {
  * seconds.
  */
 export default function LoadingScreen({ message, variant = 'fullscreen', tips = false, leaving = false }) {
-  const tipKey = useRotatingTip(tips);
+  const { tipKey, fading } = useRotatingTip(tips);
   const classes = ['loading-screen'];
   if (variant === 'inline') classes.push('loading-screen--inline');
   if (variant === 'shell') classes.push('loading-screen--shell');
+  // Known at mount, so the logo is lifted from the first frame and never
+  // jumps when the first tip arrives.
+  if (tips) classes.push('loading-screen--tips');
   if (leaving) classes.push('loading-screen--leaving');
   return (
     <div className={classes.join(' ')} role="status" aria-live="polite">
       <QMarkIcon className="loading-logo" />
       {message && <p className="loading-message">{message}</p>}
-      {tipKey && <p className="loading-tip">{t(tipKey)}</p>}
+      {tipKey && (
+        <div className={fading ? 'loading-tip loading-tip--fading' : 'loading-tip'}>
+          <span className="loading-tip__label">{t('loading.tipLabel')}</span>
+          <TipText text={t(tipKey)} />
+        </div>
+      )}
     </div>
   );
 }

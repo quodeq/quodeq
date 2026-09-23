@@ -6,7 +6,7 @@ import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
 import { isFrozenRun } from '../../../models/runRules.js';
 import { t } from '../../../strings/index.js';
 import { useDashboardInvalidation } from './useDashboardInvalidation.js';
-import { STALE_TIME_MS } from '../../../hooks/queryDefaults.js';
+import { STALE_TIME_MS, refetchWhileError } from '../../../hooks/queryDefaults.js';
 
 const EMPTY_TREND = [];
 
@@ -62,6 +62,9 @@ function buildDashboardQueryConfig({ projectKey, selectedRun, selectedSource, fe
     queryFn: () => fetchDashboard(selectedProject, selectedRun),
     enabled: !!selectedProject,
     staleTime: frozenRun ? Infinity : STALE_TIME_MS,
+    // The webview has no focus/reconnect events, so an errored query must
+    // poll its own way back to health (see refetchWhileError).
+    refetchInterval: refetchWhileError,
     // Keep showing the previous run's data while a new run loads — instant
     // perceived navigation. isFetching toggles true during the background
     // fetch, which the page reads to show a subtle indicator.

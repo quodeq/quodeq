@@ -1966,22 +1966,88 @@ textarea:focus {
 }
 
 .loading-tip {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  text-align: center;
-  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 34rem;
+  padding: 0 var(--space-4);
   margin-top: var(--space-5);
-  animation: loading-fadein 500ms ease;
+  text-align: center;
+  animation: loading-fadein 700ms ease;
+  /* Duration mirrors TIP_FADE_MS in LoadingScreen.jsx. */
+  transition: opacity 700ms ease, transform 700ms ease;
 }
 
-/* The tip floats below the centered logo instead of joining the flex column,
-   so the logo never shifts when a tip appears or wraps to a second line. */
+.loading-tip--fading {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.loading-tip__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+.loading-tip__text {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--color-text-muted);
+  text-wrap: balance;
+}
+
+/* The question is a block so the answer starts on the next line; the space
+   between them in the markup keeps textContent readable for screen readers. */
+.loading-tip__question {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/* Medium, not bold: the highlight should guide a skim, not shout. */
+.loading-tip__text strong {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.loading-tip__text code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 1px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+/* With tips on, the logo sits above center so logo and tip read as one group
+   centered on screen, instead of the tip hanging below a centered logo. The
+   margin (not a transform) keeps loading-pulse's scale free. */
+.loading-screen--tips {
+  --loading-tip-lift: 48px;
+}
+
+.loading-screen--tips .loading-logo {
+  margin-bottom: calc(var(--loading-tip-lift) * 2);
+}
+
+/* The tip floats below the logo instead of joining the flex column, so the
+   logo never shifts when a tip appears or wraps to a second line. */
 .loading-screen:not(.loading-screen--inline) .loading-tip {
   position: absolute;
-  top: calc(50% + 64px);
+  top: calc(50% + 76px - var(--loading-tip-lift, 0px));
   left: 0;
   right: 0;
   margin: 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-tip--fading { transform: none; }
 }
 
 .loading-screen--leaving {
