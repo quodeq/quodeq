@@ -107,6 +107,7 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'services/_post_run_hook.py': _out_of_scope('Post-run hook: runs after a JobManager job reaches a terminal state'),
     'services/_standards_io.py': _out_of_scope('I/O helpers and data-conversion utilities for the standards service'),
     'services/_standards_queries.py': _out_of_scope('Query operations for listing and retrieving standards'),
+    'services/scoring/_project_scores.py': 'Full dashboard scores payload - imports quodeq.shared.log_sink only for SHARED_LOG, threaded into cached_accumulated(log=...) so a failed score-cache write or background accumulated refresh is not silently invisible - same composition wiring as services/_fs_metadata.py and services/trend_fetcher.py',
     'services/trend_fetcher.py': 'Shared cache-backed, dismiss-adjusted SCALAR trend fetcher - out of scope for this sweep (not a flagged per-site conversion); final-review fix wave (fault-tolerance cycle 1, item B) additionally imports quodeq.shared.log_sink for SHARED_LOG, threaded into make_cache_backed_fetcher(log=...) so a best-effort score-cache write failure is no longer silently invisible - plan-sanctioned composition wiring, not a logging-boundary violation',
     'services/_violations_jsonl.py': _out_of_scope('JSONL-specific parsing for extracting violations from MCP findings files'),
     'services/_violations_stream.py': _out_of_scope('Stream-specific parsing for extracting violations from live event log files'),
