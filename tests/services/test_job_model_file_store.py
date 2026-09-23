@@ -88,6 +88,13 @@ class TestFileJobStore:
         store = FileJobStore(persist_dir=tmp_path)
         assert store.list() == []
 
+    def test_non_string_status_does_not_abort_the_load(self, tmp_path: Path):
+        (tmp_path / "bad.json").write_text(json.dumps({"job_id": "bad", "status": 5}))
+        (tmp_path / "ok.json").write_text(json.dumps({"job_id": "ok", "status": "done"}))
+        store = FileJobStore(persist_dir=tmp_path)
+        assert store.get("bad").status == 5
+        assert store.get("ok").status is JobStatus.DONE
+
     def test_delete_removes_file(self, tmp_path: Path):
         store = FileJobStore(persist_dir=tmp_path)
         job = Job("j1", "done", ["echo"], "now", "later", 0)

@@ -115,3 +115,9 @@ class TestStatusParsing:
         assert job.status == "completed"
         assert not isinstance(job.status, JobStatus)
         assert "completed" in caplog.text
+
+    def test_non_string_status_is_kept_raw_with_a_warning(self, caplog):
+        with caplog.at_level("WARNING"):
+            job = _job_from_json({"job_id": "j1", "status": 5})
+        assert job.status == 5
+        assert "non-string status" in caplog.text

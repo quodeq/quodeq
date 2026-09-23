@@ -66,11 +66,14 @@ def _job_to_json(job: Job) -> dict:
     }
 
 
-def _status_from_json(raw: str) -> JobStatus | str:
-    """The JobStatus a job file's status means; an unknown spelling stays raw, logged.
+def _status_from_json(raw: object) -> JobStatus | object:
+    """The JobStatus a job file's status means; an unknown or non-string value stays raw, logged.
 
     A job file must never become unreadable over its status word.
     """
+    if not isinstance(raw, str):
+        _logger.warning("job file with non-string status %r kept as-is", raw)
+        return raw
     try:
         return parse_job_status(raw)
     except ValueError:
