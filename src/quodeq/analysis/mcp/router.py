@@ -186,7 +186,7 @@ class FindingsRouter:
         """
         allowed = (FileDoneStatus.OK, FileDoneStatus.ERROR, FileDoneStatus.SKIPPED)
         if status not in allowed:
-            names = ", ".join(repr(s) for s in allowed)
+            names = ", ".join(repr(s.value) for s in allowed)
             raise ValueError(
                 f"mark_file_done: status must be one of {names}, got {status!r}"
             )

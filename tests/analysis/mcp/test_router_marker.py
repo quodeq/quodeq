@@ -53,6 +53,14 @@ class TestMarkFileDone:
         with pytest.raises(ValueError):
             router.mark_file_done(file="src/foo.py", status="bogus")
 
+    def test_invalid_status_message_names_the_plain_values(self):
+        router = _make_router(io.StringIO())
+        with pytest.raises(ValueError) as exc:
+            router.mark_file_done(file="src/foo.py", status="bogus")
+        assert str(exc.value) == (
+            "mark_file_done: status must be one of 'ok', 'error', 'skipped', got 'bogus'"
+        )
+
 
 def test_router_accumulates_findings_per_file_then_drains_on_ok():
     """Receive 3 findings for Foo.kt and 2 for Bar.kt. Call mark_file_done(Foo.kt, ok).
