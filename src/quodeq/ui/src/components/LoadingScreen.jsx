@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { QMarkIcon } from './QMarkIcon.jsx';
 import { t } from '../strings/index.js';
+import { tRich } from '../strings/rich.jsx';
 
 // One plain sentence each. The 8s rotation leaves reading time for about
-// fifteen words; anything longer gets split into two tips.
+// fifteen words; anything longer gets split into two tips. Each tip bolds the
+// one thing worth catching at a glance (**...**) and marks file names and
+// commands as `code`, so a skim still lands the point.
 const TIP_KEYS = [
   'loading.tips.warmup', 'loading.tips.incremental', 'loading.tips.cleanScan',
   'loading.tips.fixplans', 'loading.tips.dismiss', 'loading.tips.ignore',
@@ -92,7 +95,7 @@ export default function LoadingScreen({ message, variant = 'fullscreen', tips = 
       {tipKey && (
         <div className={fading ? 'loading-tip loading-tip--fading' : 'loading-tip'}>
           <span className="loading-tip__label">{t('loading.tipLabel')}</span>
-          <p className="loading-tip__text">{t(tipKey)}</p>
+          <p className="loading-tip__text">{tRich(tipKey)}</p>
         </div>
       )}
     </div>

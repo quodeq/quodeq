@@ -1,6 +1,7 @@
 // Catalog strings that need inline <code> spans carry them as `backticks`,
-// the same convention translators already know from markdown. tRich() renders
-// one such string into React nodes.
+// and emphasis as **double asterisks**, the same conventions translators
+// already know from markdown. tRich() renders one such string into React
+// nodes.
 //
 // Why not HTML in the catalog: t() returns a plain string and React escapes
 // it, so "<code>x</code>" would render as literal angle brackets. Splitting a
@@ -10,17 +11,21 @@
 // whole and the markup out of the translator's way.
 import { t } from './index.js';
 
-const CODE_SPAN = /`([^`]+)`/g;
+// Bold is tried first at each position, so a backtick inside **...** stays
+// literal (e.g. **Ctrl+`**).
+const RICH_SPAN = /\*\*([^*]+)\*\*|`([^`]+)`/g;
 
 export function tRich(key, vars) {
   const text = t(key, vars);
   const nodes = [];
   let last = 0;
   let match;
-  CODE_SPAN.lastIndex = 0;
-  while ((match = CODE_SPAN.exec(text)) !== null) {
+  RICH_SPAN.lastIndex = 0;
+  while ((match = RICH_SPAN.exec(text)) !== null) {
     if (match.index > last) nodes.push(text.slice(last, match.index));
-    nodes.push(<code key={match.index}>{match[1]}</code>);
+    nodes.push(match[1] !== undefined
+      ? <strong key={match.index}>{match[1]}</strong>
+      : <code key={match.index}>{match[2]}</code>);
     last = match.index + match[0].length;
   }
   if (last < text.length) nodes.push(text.slice(last));
