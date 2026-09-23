@@ -7,15 +7,14 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-# report_finding's "t" and "severity" enums -- the gates in this package
-# (scope_gate.py, provenance_gate.py, precedent_downweight.py, enricher.py)
-# read and write the same finding dict, so they import these rather than
-# retyping the values the schema declares valid.
+from quodeq.core.types.severity import Severity
+
+# report_finding's "t" enum -- the gates in this package (scope_gate.py,
+# provenance_gate.py, precedent_downweight.py, enricher.py) read and write
+# the same finding dict, so they import this rather than retyping the
+# values the schema declares valid. "severity" uses Severity directly.
 FINDING_TYPE_VIOLATION = "violation"
 FINDING_TYPE_COMPLIANCE = "compliance"
-SEVERITY_CRITICAL = "critical"
-SEVERITY_MAJOR = "major"
-SEVERITY_MINOR = "minor"
 
 
 class FileDoneStatus(StrEnum):
@@ -54,7 +53,7 @@ REPORT_FINDING_SCHEMA = {
         "line": {"type": "integer", "description": "Line number"},
         "end_line": {"type": "integer", "description": "Last line of the violation pattern (omit if single line)"},
         "scope": {"type": "string", "enum": ["file", "class", "module"], "description": "Set when the finding affects an entire file/class/module rather than specific lines"},
-        "severity": {"type": "string", "enum": [SEVERITY_CRITICAL, SEVERITY_MAJOR, SEVERITY_MINOR], "description": "Severity level"},
+        "severity": {"type": "string", "enum": [s.value for s in Severity], "description": "Severity level"},
         "vt": {"type": "string", "description": "Violation type taxonomy code: a short, stable, kebab-case class of the violation (e.g. 'code-injection', 'hardcoded-secret', 'missing-error-handling'). Reuse the exact same code for every finding of the same kind."},
         "w": {"type": "string", "description": "Short description of the finding"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},

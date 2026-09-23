@@ -9,8 +9,9 @@ from __future__ import annotations
 from quodeq.core.checks.model import SourceLocation
 from quodeq.core.events.models import Judgment, VERDICT_COMPLIANCE, VERDICT_VIOLATION
 from quodeq.core.constants import FULL_CONFIDENCE
+from quodeq.core.types.severity import Severity
 
-SEVERITY = "major"
+SEVERITY = Severity.MAJOR
 
 
 def violation(*, req: str, dimension: str, at: SourceLocation,

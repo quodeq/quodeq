@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.types.req_ref import ReqRef as ReqRef
+from quodeq.core.types.severity import Severity
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,7 +51,7 @@ class Finding:
     title: str | None = None
     reason: str | None = None
     snippet: str | None = None
-    severity: str = "minor"
+    severity: str = Severity.MINOR
     cwe: int | str | None = None
     req: str | None = None
     req_refs: list[ReqRef] = field(default_factory=list)

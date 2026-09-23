@@ -16,6 +16,8 @@ from enum import Enum as _Enum
 
 from pydantic import BaseModel, Field, field_validator
 
+from quodeq.core.types.severity import Severity
+
 _SYSTEM_PROMPT = (
     "You are a code quality evaluator. Quote the offending code into "
     "`snippet` VERBATIM from the source, one or a few contiguous lines, "
@@ -31,18 +33,9 @@ class _FindingType(str, _Enum):
     compliance = "compliance"
 
 
-class _Severity(str, _Enum):
-    critical = "critical"
-    major = "major"
-    minor = "minor"
-
-
-_SEVERITY_VALUES = frozenset(s.value for s in _Severity)
-
-
 def _is_known_severity(value: object) -> bool:
-    """True when *value* names a `_Severity` member (case- and space-insensitive)."""
-    return isinstance(value, str) and value.strip().lower() in _SEVERITY_VALUES
+    """True when *value* names a `Severity` member (case- and space-insensitive)."""
+    return isinstance(value, str) and value.strip().lower() in set(Severity)
 
 
 class _Finding(BaseModel):
@@ -62,7 +55,7 @@ class _Finding(BaseModel):
             "makes the highlight readable."
         ),
     )
-    severity: _Severity = Field(default=_Severity.minor)
+    severity: Severity = Field(default=Severity.MINOR)
     vt: str | None = Field(
         default=None,
         description=(
@@ -113,11 +106,11 @@ class _Finding(BaseModel):
         ``"Major"`` lands as ``major`` rather than silently degrading to the
         default.
         """
-        if isinstance(value, _Severity):
+        if isinstance(value, Severity):
             return value
         if _is_known_severity(value):
             return value.strip().lower()  # type: ignore[union-attr]
-        return _Severity.minor
+        return Severity.MINOR
 
 
 # A dict that fails `_Finding` validation but carries the required, domain-specific
