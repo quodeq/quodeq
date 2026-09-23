@@ -6,6 +6,7 @@ from quodeq.core.run.job_status import (
     JOB_FINISHED,
     JOB_TERMINAL,
     JobStatus,
+    external_job_id,
     is_external_job_id,
     strip_external_prefix,
 )
@@ -39,3 +40,9 @@ def test_external_prefix_helpers():
     assert not is_external_job_id("abc")
     assert strip_external_prefix("ext-abc") == "abc"
     assert strip_external_prefix("abc") == "abc"
+
+
+def test_external_job_id_is_the_inverse_of_strip_external_prefix():
+    assert external_job_id("abc") == "ext-abc"
+    assert strip_external_prefix(external_job_id("abc")) == "abc"
+    assert is_external_job_id(external_job_id("abc"))

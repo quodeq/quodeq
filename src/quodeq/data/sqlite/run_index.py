@@ -17,6 +17,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.core.run.job_status import external_job_id
 from quodeq.data.sqlite.index_sync import (
     _check_stale_and_promote,
     _delete_orphan_non_terminal_rows,
@@ -75,7 +76,7 @@ def _sync_status_backed_run(
 ) -> None:
     """Sync a run that has a ``status.json`` (the common, non-legacy case)."""
     disk_mtime = _status_mtime_ns(run_dir)
-    job_id = f"ext-{run_id}"
+    job_id = external_job_id(run_id)
     if cached_mtimes is not None:
         cached_value = cached_mtimes.get(job_id)
     else:

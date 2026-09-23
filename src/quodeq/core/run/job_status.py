@@ -48,3 +48,8 @@ def is_external_job_id(job_id: str) -> bool:
 def strip_external_prefix(job_id: str) -> str:
     """The run id behind an external job id; other ids are returned as-is."""
     return job_id[len(EXTERNAL_JOB_PREFIX):] if is_external_job_id(job_id) else job_id
+
+
+def external_job_id(run_id: str) -> str:
+    """The external job id for *run_id* (the inverse of strip_external_prefix)."""
+    return f"{EXTERNAL_JOB_PREFIX}{run_id}"

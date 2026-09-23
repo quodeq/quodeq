@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.run.exit_reason import ExitReason
+from quodeq.core.run.job_status import external_job_id
 from quodeq.shared.process import is_pid_alive as _is_pid_alive
 from quodeq.shared.run_heartbeat import HEARTBEAT_FILENAME
 from quodeq.data.fs.run_status_store import (
@@ -89,7 +90,7 @@ def _upsert_from_status(
         return
     if status is None:
         return
-    job_id = status.get("job_id") or f"ext-{run_id}"
+    job_id = status.get("job_id") or external_job_id(run_id)
     db.execute(
         _UPSERT_SQL,
         (
@@ -139,7 +140,7 @@ def _sync_legacy_run(
     else:
         state, exit_reason = RunState.CANCELLED, ExitReason.STALE_LEGACY_NO_PID
 
-    job_id = f"ext-{run_id}"
+    job_id = external_job_id(run_id)
     try:
         started_ts = manifest_path.stat().st_mtime
     except OSError:
@@ -218,7 +219,7 @@ def _check_stale_and_promote(
         new_status = dataclasses.replace(
             base,
             state=RunState.CANCELLED,
-            job_id=status.get("job_id", f"ext-{run_id}"),
+            job_id=status.get("job_id", external_job_id(run_id)),
             pid=pid if isinstance(pid, int) else None,
             exit_reason=ExitReason.STALE_DETECTED,
             finalized_at=None,

@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from quodeq.core.run.job_status import EXTERNAL_JOB_PREFIX, JOB_FINISHED, JobStatus, is_external_job_id, strip_external_prefix
+from quodeq.core.run.job_status import JOB_FINISHED, JobStatus, external_job_id, is_external_job_id, strip_external_prefix
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
 from quodeq.services._external_jobs import _sync_external_run
@@ -129,7 +129,7 @@ class EvaluationsIndex:
         try:
             _run_index.delete_run(db, job_id)
             if run_uuid != job_id:
-                _run_index.delete_run(db, f"{EXTERNAL_JOB_PREFIX}{run_uuid}")
+                _run_index.delete_run(db, external_job_id(run_uuid))
         finally:
             db.close()
         # Also drop any in-memory JobManager entry.
