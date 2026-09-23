@@ -32,9 +32,9 @@
  * @property {string|null}   fromDateISO
  * @property {number|null}   [filesRead]         - files analyzed in this dim (Phase 1+)
  * @property {number|null}   [sourceFileCount]   - total project source-file count (Phase 1+)
- * @property {string|null}   [exitReason]        - per-dim or run-level exit signal.
- *   Values: "done" (success), "time_limit", "failure_streak", "cancelled",
- *   "error", or null/missing (legacy, treated as "done" by the UI).
+ * @property {string|null}   [exitReason]        - per-dim or run-level exit signal,
+ *   one of EXIT_REASON's values (see vocab/exitReason.js), or null/missing
+ *   (legacy, treated as EXIT_REASON.DONE by the UI).
  * @property {number}        [dismissedCount]    - re-found violations hidden by the
  *   project-level dismissed filter (dashboard run view). Missing when zero.
  *

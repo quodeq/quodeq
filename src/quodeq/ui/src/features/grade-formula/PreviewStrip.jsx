@@ -1,4 +1,5 @@
 import { scoreColorClass } from '../../utils/formatters.js';
+import { GRADE } from '../../vocab/grade.js';
 
 /**
  * One before -> after gauge. The label grade comes from the server's preview
@@ -14,7 +15,7 @@ import { scoreColorClass } from '../../utils/formatters.js';
  */
 function Gauge({ name, before, after, grade }) {
   const changed = before !== after && before != null && after != null;
-  const insufficient = after == null || grade === 'Insufficient';
+  const insufficient = after == null || grade === GRADE.INSUFFICIENT;
   return (
     <div className="gf-gauge">
       {changed ? <span className="gf-gauge-was">{before}</span> : null}

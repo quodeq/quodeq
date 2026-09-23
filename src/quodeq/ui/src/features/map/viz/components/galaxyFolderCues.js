@@ -14,6 +14,7 @@
  * instead of picking one width for a whole severity.
  */
 import { TAU, rgba } from '../core/galaxyCore.js';
+import { SEVERITY } from '../../../../vocab/severity.js';
 
 const CUE_RING_RADIUS_RATIO = 2.2; // ring sits outside the particle's own dot
 const CUE_RING2_RADIUS_RATIO = 3.4; // critical's second, outer ring
@@ -33,8 +34,8 @@ const ARC_STRIDE = 3; // x, y, r per queued arc
  */
 export function starShapeFor(severity) {
   switch (severity) {
-    case 'critical': return 'double-ring';
-    case 'major': return 'ring';
+    case SEVERITY.CRITICAL: return 'double-ring';
+    case SEVERITY.MAJOR: return 'ring';
     default: return 'dot';
   }
 }

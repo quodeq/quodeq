@@ -2,6 +2,7 @@ import { rgb } from '../core/galaxyCore.js';
 import { pushSeverityRows, showTooltip } from './galaxyTooltipDom.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { t } from '../../../../strings/index.js';
+import { SEVERITY } from '../../../../vocab/severity.js';
 
 const CLUSTER_HIT_PADDING = 40; // world units of fat-finger slack around a constellation's spread
 
@@ -33,9 +34,9 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
     if (sc == null && d._raw?.violations) {
       sc = sm = sn = 0;
       (d._raw.violations || []).forEach(v => {
-        const s = v.severity || 'minor';
-        if (s === 'critical') sc++;
-        else if (s === 'major') sm++;
+        const s = v.severity || SEVERITY.MINOR;
+        if (s === SEVERITY.CRITICAL) sc++;
+        else if (s === SEVERITY.MAJOR) sm++;
         else sn++;
       });
     }

@@ -3,6 +3,7 @@ import {
   seedHash, seededRng, mkBackgroundStars,
   RNG_MIDPOINT, MIN_SEPARATION_PX, REPULSION_PASSES_LARGE,
 } from '../core/galaxyCore.js';
+import { SEVERITY } from '../../../../vocab/severity.js';
 
 /* ── Position consistency engine ── */
 
@@ -105,7 +106,7 @@ function _buildFolderParticles(c, radius, sev) {
         or: radius * FOLDER_ALERT.orbitRadiusRatio + fRng() * radius * FOLDER_ALERT.orbitJitterRatio,
         os: (FOLDER_ALERT.speedMin + fRng() * FOLDER_ALERT.speedRange) * (fRng() > RNG_MIDPOINT ? 1 : -1),
         op: fRng() * TAU,
-        sz: sevName === 'critical' ? FOLDER_ALERT.sizeCritical + fRng() * FOLDER_ALERT.sizeCriticalRange : sevName === 'major' ? FOLDER_ALERT.sizeMajor + fRng() * FOLDER_ALERT.sizeMajorRange : FOLDER_ALERT.sizeMinor + fRng() * FOLDER_ALERT.sizeMinorRange,
+        sz: sevName === SEVERITY.CRITICAL ? FOLDER_ALERT.sizeCritical + fRng() * FOLDER_ALERT.sizeCriticalRange : sevName === SEVERITY.MAJOR ? FOLDER_ALERT.sizeMajor + fRng() * FOLDER_ALERT.sizeMajorRange : FOLDER_ALERT.sizeMinor + fRng() * FOLDER_ALERT.sizeMinorRange,
         ec: FOLDER_ALERT.eccentricityBase + fRng() * FOLDER_ALERT.eccentricityRange,
         tp: fRng() * TAU,
       });
@@ -131,7 +132,7 @@ function _buildFileParticles(c, radius) {
         or: radius * FILE_PARTICLE.orbitRadiusRatio + rng2() * radius * FILE_PARTICLE.orbitJitterRatio,
         os: (FILE_PARTICLE.speedMin + rng2() * FILE_PARTICLE.speedRange) * (rng2() > RNG_MIDPOINT ? 1 : -1),
         op: rng2() * TAU,
-        sz: sevName === 'critical' ? FILE_PARTICLE.sizeCritical + rng2() * FILE_PARTICLE.sizeCriticalRange : sevName === 'major' ? FILE_PARTICLE.sizeMajor + rng2() * FILE_PARTICLE.sizeMajorRange : FILE_PARTICLE.sizeMinor + rng2() * FILE_PARTICLE.sizeMinorRange,
+        sz: sevName === SEVERITY.CRITICAL ? FILE_PARTICLE.sizeCritical + rng2() * FILE_PARTICLE.sizeCriticalRange : sevName === SEVERITY.MAJOR ? FILE_PARTICLE.sizeMajor + rng2() * FILE_PARTICLE.sizeMajorRange : FILE_PARTICLE.sizeMinor + rng2() * FILE_PARTICLE.sizeMinorRange,
         ec: FILE_PARTICLE.eccentricityBase + rng2() * FILE_PARTICLE.eccentricityRange,
         tp: rng2() * TAU,
       });

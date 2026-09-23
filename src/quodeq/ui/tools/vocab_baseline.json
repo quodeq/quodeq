@@ -1,26 +1,10 @@
 {
   "src/components/FileCopyBtn.jsx": 1,
   "src/features/assistant/useAssistantStream.js": 2,
-  "src/features/dashboard/components/dimensionGaugeMath.js": 2,
   "src/features/dashboard/components/projectCards/CardFooter.jsx": 2,
   "src/features/dashboard/hooks/usePublish.js": 2,
   "src/features/dashboard/hooks/usePublishPolling.js": 2,
   "src/features/dashboard/hooks/useSharedProjects.js": 1,
-  "src/features/evaluation/components/DimRow.jsx": 4,
-  "src/features/evaluation/components/LiveViolationsFeed.jsx": 5,
-  "src/features/evaluation/components/jobStatCells/derivations.js": 3,
-  "src/features/evaluation/components/liveViolationsOrdering.js": 2,
-  "src/features/evaluation/components/scanProgressTotals.js": 3,
-  "src/features/explorer/components/PrincipleDetailPage.jsx": 1,
-  "src/features/grade-formula/PreviewStrip.jsx": 1,
-  "src/features/history/hooks/useHistoryRunLive.js": 1,
-  "src/features/map/viz/components/galaxyFolderCues.js": 2,
-  "src/features/map/viz/components/galaxyFolderScene.js": 4,
-  "src/features/map/viz/components/galaxyPrincipleStars.js": 2,
-  "src/features/map/viz/components/galaxyViewEvents.js": 2,
-  "src/features/map/viz/core/galaxyCore.js": 2,
   "src/features/onboarding/components/steps/RepoScanStep.jsx": 1,
-  "src/features/updates/useSelfUpdate.js": 1,
-  "src/features/violations/components/dimensionHeatGridModel.js": 3,
-  "src/utils/reportBuilder/dimensionSummary.js": 2
+  "src/features/updates/useSelfUpdate.js": 1
 }

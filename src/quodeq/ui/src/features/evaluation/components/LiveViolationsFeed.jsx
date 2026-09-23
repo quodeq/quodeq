@@ -9,10 +9,13 @@ import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
 import { orderDimensions } from './liveViolationsOrdering.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
+import { JOB_STATUS } from '../../../vocab/jobStatus.js';
+import { DIM_STATE } from '../../../vocab/dimState.js';
+import { SEVERITY_ORDER } from '../../../vocab/severity.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
-const KNOWN_SEVERITIES = new Set(['critical', 'major', 'minor']);
+const KNOWN_SEVERITIES = new Set(SEVERITY_ORDER);
 
 function ViolationLiveRow({ violation, index }) {
   const [open, setOpen] = useState(false);
@@ -152,11 +155,11 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
   // Per-dim activity timestamps power "latest active dimension on top".
   const lastActivity = useDimensionActivity(liveViolations);
 
-  const isRunning = job?.status === 'running';
+  const isRunning = job?.status === JOB_STATUS.RUNNING;
   // Shares the progress query cache entry with the strip/progress — the hook
   // adds no polling of its own. Only used for the streaming footer/header.
   const { data: progress } = useEvaluationProgress(job?.jobId, !isRunning);
-  const runningDim = (progress?.dimensions || []).find((d) => d?.state === 'running');
+  const runningDim = (progress?.dimensions || []).find((d) => d?.state === DIM_STATE.RUNNING);
   const queued = computeQueuedFiles(runningDim);
 
   const orderedDims = useMemo(() => orderDimensions(liveViolations, lastActivity),
