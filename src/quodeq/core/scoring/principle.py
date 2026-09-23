@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from quodeq.core.types import PrincipleScore
 from quodeq.core.evidence.model import DEFAULT_WEIGHT
+from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.overall import MODE_NUMERICAL
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.internals import (
@@ -79,7 +80,7 @@ def _score_numerical(
         return PrincipleScore(
             **kwargs, base_score=0,
             deductions=build_deductions({}, scale_multiplier=ctx.scale_mult),
-            final_score=0.0, grade="Insufficient",
+            final_score=0.0, grade=Grade.INSUFFICIENT,
         )
     base = violation_base(ctx.vt_counts, params=params)
     lift = compliance_lift(ctx.ct_counts, ctx.vt_counts, params=params)
@@ -104,14 +105,14 @@ def _score_graded(
     kwargs = _base_kwargs(ctx)
     if ctx.conf_level == "low":
         return PrincipleScore(
-            **kwargs, base_grade="Insufficient", severity_drops=0,
-            grade="Insufficient",
+            **kwargs, base_grade=Grade.INSUFFICIENT, severity_drops=0,
+            grade=Grade.INSUFFICIENT,
         )
     drops = count_grade_drops(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
     return PrincipleScore(
-        **kwargs, base_grade="Exemplary", severity_drops=drops,
+        **kwargs, base_grade=Grade.EXEMPLARY, severity_drops=drops,
         dampening_multiplier=ctx.dampening,
-        grade=drop_grade("Exemplary", int(drops * ctx.dampening)),
+        grade=drop_grade(Grade.EXEMPLARY, int(drops * ctx.dampening)),
     )
 
 

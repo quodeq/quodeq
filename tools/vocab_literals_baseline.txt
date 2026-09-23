@@ -17,13 +17,6 @@ quodeq/api/_run_event_watcher.py:85:pending
 quodeq/api/_run_event_watcher.py:89:pending
 quodeq/api/_run_event_watcher.py:93:pending
 quodeq/core/evidence/merge.py:39:done
-quodeq/core/scoring/overall.py:29:Insufficient
-quodeq/core/scoring/overall.py:34:Insufficient
-quodeq/core/scoring/overall.py:71:Insufficient
-quodeq/core/scoring/principle.py:108:Insufficient
-quodeq/core/scoring/principle.py:82:Insufficient
-quodeq/core/scoring/projector_scoring.py:140:Insufficient
-quodeq/core/scoring/projector_scoring.py:57:Insufficient
 quodeq/menubar/_health.py:92:running
 quodeq/services/_publish_staging.py:52:done
 quodeq/services/_scan_progress_dims.py:205:running

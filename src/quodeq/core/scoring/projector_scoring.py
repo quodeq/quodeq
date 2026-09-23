@@ -23,6 +23,7 @@ from typing import Any
 
 from quodeq.core.evidence.model import classify_confidence_level
 from quodeq.core.run.exit_reason import ExitReason
+from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.principle import compute_tallies
 from quodeq.core.scoring.internals import (
     finding_to_scoring_dict,
@@ -54,7 +55,7 @@ def _insufficient_grade(principle_id: str, finding_count: int, dismissed_count: 
     return {
         "principle_id": principle_id,
         "score": None,
-        "grade": "Insufficient",
+        "grade": Grade.INSUFFICIENT,
         "finding_count": finding_count,
         "dismissed_count": dismissed_count,
     }
@@ -137,7 +138,7 @@ def compute_dimension_score(
     """
     scored = [p for p in principle_grades if p.get("score") is not None]
     if not scored:
-        return {"dimension": dimension, "score": None, "grade": "Insufficient"}
+        return {"dimension": dimension, "score": None, "grade": Grade.INSUFFICIENT}
     avg = round(sum(p["score"] for p in scored) / len(scored), 1)
     return {"dimension": dimension, "score": avg, "grade": score_to_grade_label(avg, params=params)}
 
