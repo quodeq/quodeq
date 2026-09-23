@@ -25,6 +25,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { projectKeys } from '../api/queryKeys.js';
 import { pollIntervalForRuns } from '../utils/runPolling.js';
+import { RUN_STATE } from '../vocab/runState.js';
 
 const SSE_ENABLED = () => import.meta.env?.VITE_USE_SSE_EVENTS === 'true';
 
@@ -32,7 +33,7 @@ function invalidateHistoryScope(queryClient, selectedProject, availableRuns, sel
   queryClient.invalidateQueries({ queryKey: projectKeys.scores(selectedProject, null, selectedSource) });
   queryClient.invalidateQueries({ queryKey: projectKeys.dashboard(selectedProject, null, selectedSource) });
   for (const r of availableRuns || []) {
-    if (r?.status === 'in_progress' && r.runId) {
+    if (r?.status === RUN_STATE.RUNNING && r.runId) {
       queryClient.invalidateQueries({ queryKey: projectKeys.dashboard(selectedProject, r.runId, selectedSource) });
     }
   }

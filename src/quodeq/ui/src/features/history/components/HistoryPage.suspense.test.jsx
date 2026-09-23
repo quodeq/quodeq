@@ -18,7 +18,7 @@ vi.mock('../../side-pane/SidePaneContext.jsx', () => ({
 const trend = [
   {
     runId: 'r1',
-    status: 'complete',
+    status: 'done',
     dateISO: '2026-07-01T10:00:00Z',
     dateLabel: '1 Jul 2026',
     numericAverage: 8.2,
@@ -27,7 +27,7 @@ const trend = [
   },
 ];
 const availableRuns = [
-  { runId: 'r1', status: 'complete', dateISO: '2026-07-01T10:00:00Z', dateLabel: '1 Jul 2026' },
+  { runId: 'r1', status: 'done', dateISO: '2026-07-01T10:00:00Z', dateLabel: '1 Jul 2026' },
 ];
 
 function makeFakeApi() {

@@ -21,7 +21,7 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
     loading: false,
     isFetching: false,
     error: null,
-    availableRuns: [{ runId: 'r1', status: 'complete' }],
+    availableRuns: [{ runId: 'r1', status: 'done' }],
   };
 
   // Fast path: content lands well before the grace timer would fire (the
@@ -147,7 +147,7 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
       loading: false,
       isFetching: false,
       error: null,
-      availableRuns: [{ runId, status: 'complete' }],
+      availableRuns: [{ runId, status: 'done' }],
     });
 
     vi.useFakeTimers();

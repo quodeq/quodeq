@@ -10,7 +10,7 @@ test('returns false when there are no runs', () => {
 
 test('returns false when every run is terminal', () => {
   const runs = [
-    { runId: 'r1', status: 'complete' },
+    { runId: 'r1', status: 'done' },
     { runId: 'r2', status: 'cancelled' },
     { runId: 'r3', status: 'failed' },
   ];
@@ -19,8 +19,8 @@ test('returns false when every run is terminal', () => {
 
 test('returns the poll interval when at least one run is in_progress', () => {
   const runs = [
-    { runId: 'r1', status: 'in_progress' },
-    { runId: 'r2', status: 'complete' },
+    { runId: 'r1', status: 'running' },
+    { runId: 'r2', status: 'done' },
   ];
   assert.equal(pollIntervalForRuns(runs), IN_PROGRESS_POLL_MS);
 });

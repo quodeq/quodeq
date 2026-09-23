@@ -2,7 +2,6 @@
   "src/AppMain.jsx": 1,
   "src/components/FileCopyBtn.jsx": 1,
   "src/features/assistant/useAssistantStream.js": 2,
-  "src/features/dashboard/components/DashboardContent.jsx": 1,
   "src/features/dashboard/components/dimensionGaugeMath.js": 2,
   "src/features/dashboard/components/projectCards/CardFooter.jsx": 2,
   "src/features/dashboard/hooks/usePublish.js": 2,
@@ -23,8 +22,6 @@
   "src/features/evaluation/hooks/useRunEventStream.js": 3,
   "src/features/explorer/components/PrincipleDetailPage.jsx": 1,
   "src/features/grade-formula/PreviewStrip.jsx": 1,
-  "src/features/history/components/EvaluationsTable.jsx": 1,
-  "src/features/history/components/historyRowAssembly.js": 6,
   "src/features/history/hooks/useHistoryRunLive.js": 1,
   "src/features/map/viz/components/galaxyFolderCues.js": 2,
   "src/features/map/viz/components/galaxyFolderScene.js": 4,
@@ -34,13 +31,8 @@
   "src/features/onboarding/components/steps/RepoScanStep.jsx": 1,
   "src/features/updates/useSelfUpdate.js": 1,
   "src/features/violations/components/dimensionHeatGridModel.js": 3,
-  "src/hooks/projectScoresDerived.js": 2,
   "src/hooks/useAppShellHooks.js": 2,
   "src/hooks/useEvaluationLifecycle.js": 1,
   "src/hooks/useJobCompletionEffect.js": 2,
-  "src/hooks/useRunningRunsRefresh.js": 1,
-  "src/models/runRules.js": 1,
-  "src/utils/dailyGrouping.js": 1,
-  "src/utils/reportBuilder/dimensionSummary.js": 2,
-  "src/utils/runPolling.js": 1
+  "src/utils/reportBuilder/dimensionSummary.js": 2
 }

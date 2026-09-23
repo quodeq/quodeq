@@ -87,7 +87,7 @@ describe("useDashboard frozen historical runs", () => {
       {
         accumulated: { score: 90 },
         trend: [{ runId: "r1", dimensionDetails: [{ dimension: "security", delta: 0.2, score: 7 }] }],
-        availableRuns: [{ runId: "r1", status: "complete" }],
+        availableRuns: [{ runId: "r1", status: "done" }],
       },
       { updatedAt: Date.now() },
     );
@@ -148,7 +148,7 @@ describe("useDashboard frozen historical runs", () => {
       {
         accumulated: { score: 90 },
         trend: sharedTrend,
-        availableRuns: [{ runId: "r1", status: "complete" }],
+        availableRuns: [{ runId: "r1", status: "done" }],
       },
       { updatedAt: Date.now() },
     );

@@ -1,4 +1,5 @@
 import { MS_PER_DAY } from './time.js';
+import { RUN_STATE } from '../vocab/runState.js';
 
 const DAYS_PER_WEEK = 7;
 // ISO weeks are anchored on Thursday: shifting any date in the week to its
@@ -89,7 +90,7 @@ export function bucketKey(dateISO, granularity = 'day') {
  * @returns {boolean}
  */
 export function isBucketEligible(entry) {
-  return (entry?.status || '') !== 'in_progress';
+  return (entry?.status || '') !== RUN_STATE.RUNNING;
 }
 
 /**

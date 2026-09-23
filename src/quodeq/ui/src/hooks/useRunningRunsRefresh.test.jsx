@@ -47,7 +47,7 @@ describe('useRunningRunsRefresh', () => {
       () =>
         useRunningRunsRefresh({
           selectedProject: 'p1',
-          availableRuns: [{ runId: 'r1', status: 'complete' }],
+          availableRuns: [{ runId: 'r1', status: 'done' }],
         }),
       { wrapper: Wrapper },
     );
@@ -71,7 +71,7 @@ describe('useRunningRunsRefresh', () => {
       () =>
         useRunningRunsRefresh({
           selectedProject: 'p1',
-          availableRuns: [{ runId: 'r1', status: 'complete' }],
+          availableRuns: [{ runId: 'r1', status: 'done' }],
         }),
       { wrapper: Wrapper },
     );
@@ -91,8 +91,8 @@ describe('useRunningRunsRefresh', () => {
         useRunningRunsRefresh({
           selectedProject: 'p1',
           availableRuns: [
-            { runId: 'r_live', status: 'in_progress' },
-            { runId: 'r_done', status: 'complete' },
+            { runId: 'r_live', status: 'running' },
+            { runId: 'r_done', status: 'done' },
           ],
         }),
       { wrapper: Wrapper },
@@ -109,8 +109,8 @@ describe('useRunningRunsRefresh', () => {
         useRunningRunsRefresh({
           selectedProject: 'p1',
           availableRuns: [
-            { runId: 'r1', status: 'in_progress' },
-            { runId: 'r0', status: 'complete' },
+            { runId: 'r1', status: 'running' },
+            { runId: 'r0', status: 'done' },
           ],
         }),
       { wrapper: Wrapper },
@@ -133,7 +133,7 @@ describe('useRunningRunsRefresh', () => {
       {
         wrapper: Wrapper,
         initialProps: {
-          runs: [{ runId: 'r1', status: 'in_progress' }],
+          runs: [{ runId: 'r1', status: 'running' }],
         },
       },
     );
@@ -145,7 +145,7 @@ describe('useRunningRunsRefresh', () => {
     invalidateSpy.mockClear();
     // Run terminates. Polling stops; selectedProject didn't change so the
     // mount-effect doesn't re-fire.
-    rerender({ runs: [{ runId: 'r1', status: 'complete' }] });
+    rerender({ runs: [{ runId: 'r1', status: 'done' }] });
     act(() => {
       vi.advanceTimersByTime(IN_PROGRESS_POLL_MS * 5);
     });
@@ -161,7 +161,7 @@ describe('useRunningRunsRefresh', () => {
       ({ project }) =>
         useRunningRunsRefresh({
           selectedProject: project,
-          availableRuns: [{ runId: 'r1', status: 'complete' }],
+          availableRuns: [{ runId: 'r1', status: 'done' }],
         }),
       {
         wrapper: Wrapper,
@@ -181,7 +181,7 @@ describe('useRunningRunsRefresh', () => {
       () =>
         useRunningRunsRefresh({
           selectedProject: '',
-          availableRuns: [{ runId: 'r1', status: 'in_progress' }],
+          availableRuns: [{ runId: 'r1', status: 'running' }],
         }),
       { wrapper: Wrapper },
     );
@@ -198,7 +198,7 @@ describe('useRunningRunsRefresh', () => {
       () =>
         useRunningRunsRefresh({
           selectedProject: 'p1',
-          availableRuns: [{ runId: 'r1', status: 'in_progress' }],
+          availableRuns: [{ runId: 'r1', status: 'running' }],
         }),
       { wrapper: Wrapper },
     );
@@ -212,7 +212,7 @@ describe('useRunningRunsRefresh', () => {
       () =>
         useRunningRunsRefresh({
           selectedProject: 'p1',
-          availableRuns: [{ runId: 'r1', status: 'in_progress' }],
+          availableRuns: [{ runId: 'r1', status: 'running' }],
         }),
       { wrapper: Wrapper },
     );
@@ -230,7 +230,7 @@ describe('useRunningRunsRefresh', () => {
       () =>
         useRunningRunsRefresh({
           selectedProject: 'p1',
-          availableRuns: [{ runId: 'r1', status: 'in_progress' }],
+          availableRuns: [{ runId: 'r1', status: 'running' }],
         }),
       { wrapper: Wrapper },
     );
@@ -251,7 +251,7 @@ describe('useRunningRunsRefresh', () => {
         () =>
           useRunningRunsRefresh({
             selectedProject: 'p1',
-            availableRuns: [{ runId: 'r1', status: 'complete' }],
+            availableRuns: [{ runId: 'r1', status: 'done' }],
           }),
         { wrapper: Wrapper },
       );
@@ -267,7 +267,7 @@ describe('useRunningRunsRefresh', () => {
           useRunningRunsRefresh({
             selectedProject: 'p1',
             selectedSource: 'shared',
-            availableRuns: [{ runId: 'r1', status: 'complete' }],
+            availableRuns: [{ runId: 'r1', status: 'done' }],
           }),
         { wrapper: Wrapper },
       );

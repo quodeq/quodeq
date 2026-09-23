@@ -20,7 +20,7 @@ describe("useProjectScores", () => {
       const api = {
         getProjectScores: vi.fn(async (project) => {
           if (project === "p1") {
-            return { accumulated: { score: 90 }, trend: [], availableRuns: [{ runId: "r9", status: "complete" }] };
+            return { accumulated: { score: 90 }, trend: [], availableRuns: [{ runId: "r9", status: "done" }] };
           }
           return new Promise((resolve) => {
             release = () => resolve({ accumulated: { score: 40 }, trend: [], availableRuns: [] });
@@ -52,8 +52,8 @@ describe("useProjectScores", () => {
               accumulated: { score: 90 },
               trend: [],
               availableRuns: [
-                { runId: "r9", status: "complete" },
-                { runId: "r1", status: "complete" },
+                { runId: "r9", status: "done" },
+                { runId: "r1", status: "done" },
               ],
             };
           }
@@ -122,8 +122,8 @@ describe("useProjectScores", () => {
             accumulated: { score: asOf ? 80 : 90 },
             trend: [],
             availableRuns: [
-              { runId: "r9", status: "complete" },
-              { runId: "r1", status: "complete" },
+              { runId: "r9", status: "done" },
+              { runId: "r1", status: "done" },
             ],
           };
         }),

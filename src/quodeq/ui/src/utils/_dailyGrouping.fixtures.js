@@ -21,9 +21,9 @@ export const AVAILABLE_RUNS = [
 ];
 
 export const TREND_WITH_RUNNING = [
-  { runId: 'live', dateISO: '2026-03-25T16:00:00', status: 'in_progress', numericAverage: 5.1, dimensions: ['security'], dimensionDetails: [{ dimension: 'security', score: 5.1 }] },
-  { runId: 'done2', dateISO: '2026-03-25T10:00:00', status: 'complete', numericAverage: 9.2, dimensions: ['maintainability'], dimensionDetails: [{ dimension: 'maintainability', score: 9.2 }] },
-  { runId: 'done1', dateISO: '2026-03-24T10:00:00', status: 'complete', numericAverage: 8.0, dimensions: ['security'], dimensionDetails: [{ dimension: 'security', score: 8.0 }] },
+  { runId: 'live', dateISO: '2026-03-25T16:00:00', status: 'running', numericAverage: 5.1, dimensions: ['security'], dimensionDetails: [{ dimension: 'security', score: 5.1 }] },
+  { runId: 'done2', dateISO: '2026-03-25T10:00:00', status: 'done', numericAverage: 9.2, dimensions: ['maintainability'], dimensionDetails: [{ dimension: 'maintainability', score: 9.2 }] },
+  { runId: 'done1', dateISO: '2026-03-24T10:00:00', status: 'done', numericAverage: 8.0, dimensions: ['security'], dimensionDetails: [{ dimension: 'security', score: 8.0 }] },
 ];
 
 // Runs spanning 3 days / 3 ISO-weeks / 3 months (newest-first).

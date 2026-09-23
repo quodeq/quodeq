@@ -7,6 +7,7 @@ import { t, LOCALE } from '../../../strings/index.js';
 import { activateOnKey, isActivationKey } from '../../../utils/a11y.js';
 import { PARTIAL_STATUSES } from './historyRowAssembly.js';
 import { deltaDirection } from '../utils/deltaDirection.js';
+import { RUN_STATE } from '../../../vocab/runState.js';
 
 const DELTA_SIGN = { up: '+', down: '-', flat: '' };
 const DELTA_CLASS = {
@@ -242,7 +243,7 @@ function CompletedHistoryRow({ entry, delta, selectedRunId, statusByRunId, onRun
 
 function renderEvaluationRow(entry, i, props) {
   const { selectedRunId, deltas, statusByRunId, onRunClick, onRunHover, onDeleteRun, onNotReadyClick } = props;
-  if (entry.status === 'in_progress') {
+  if (entry.status === RUN_STATE.RUNNING) {
     return (
       <InProgressHistoryRow
         key={entry.runId}

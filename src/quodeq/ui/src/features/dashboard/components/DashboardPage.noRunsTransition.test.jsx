@@ -74,7 +74,7 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
             accumulated: null,
             loading: true,
             isFetching: true,
-            availableRuns: [{ runId: 'r1', status: 'complete' }],
+            availableRuns: [{ runId: 'r1', status: 'done' }],
           }}
           callbacks={{}}
           runMode={false}
@@ -94,7 +94,7 @@ describe('DashboardPage no-runs -> first-run transition (P5-T2)', () => {
             accumulated: { dimensions: dims },
             loading: false,
             isFetching: false,
-            availableRuns: [{ runId: 'r1', status: 'complete' }],
+            availableRuns: [{ runId: 'r1', status: 'done' }],
           }}
           callbacks={{}}
           runMode={false}

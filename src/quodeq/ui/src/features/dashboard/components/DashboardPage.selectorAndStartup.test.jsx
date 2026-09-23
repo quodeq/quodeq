@@ -21,7 +21,7 @@ const overviewLoading = {
   loading: true,
   isFetching: false,
   error: null,
-  availableRuns: [{ runId: 'r1', status: 'complete' }],
+  availableRuns: [{ runId: 'r1', status: 'done' }],
 };
 
 // Finding 5 (final whole-branch review): projectInfo for a shared selection
