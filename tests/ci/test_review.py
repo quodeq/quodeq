@@ -1,12 +1,15 @@
 """Tests for quodeq review (local PR review): gh lookups, run snapshots, CLI parsing."""
 from __future__ import annotations
 
+import ast
 import json
 import subprocess as sp
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+import quodeq.ci.review as review_module
 from quodeq.ci.review import (
     ReviewError,
     detect_pr,
@@ -101,3 +104,26 @@ def test_review_subcommand_defaults():
     assert args.pr is None
     assert args.dimensions is None  # default is all dimensions (no --dimensions flag)
     assert args.dry_run is False
+
+
+@pytest.mark.parametrize("call", [
+    detect_pr,
+    lambda: detect_pr(pr_override=7),
+    get_github_token,
+    get_repo_info,
+])
+def test_every_gh_call_reports_a_missing_gh_the_same_way(call):
+    with patch("quodeq.ci.review.subprocess.run", side_effect=FileNotFoundError):
+        with pytest.raises(ReviewError, match="gh CLI not found"):
+            call()
+
+
+def test_gh_is_spawned_from_one_place():
+    tree = ast.parse(Path(review_module.__file__).read_text(encoding="utf-8"))
+    runs = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "run" and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "subprocess"
+    ]
+    assert len(runs) == 1
