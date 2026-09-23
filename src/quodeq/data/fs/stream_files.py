@@ -69,7 +69,7 @@ def latest_dim_activity_mtime(evidence_dir: Path, dim_id: str) -> float | None:
 
     None when neither exists (or neither is statable). Used as the "done" end-
     of-activity signal when a dimension's transition timestamps are unavailable
-    (see ``services.scan_progress._dim_elapsed_s``): agent streams are deleted
+    (see ``services.scan_progress.dim_elapsed_s``): agent streams are deleted
     at dimension completion, so they rarely survive, but the evidence file's
     own mtime remains as the fallback signal.
     """

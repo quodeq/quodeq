@@ -4,7 +4,7 @@ NEVER registered from build_registry(): the orchestrator registers these for
 API providers only on a write-granted turn, and the MCP server registers them
 only when spawned with --enable-write, which the orchestrator adds only for a
 granted turn. All paths are jailed to the session WORKTREE (never the user's
-working tree) via _repo_tools._jail, which prefers ctx.worktree_dir.
+working tree) via _repo_tools.jail, which prefers ctx.worktree_dir.
 """
 from __future__ import annotations
 

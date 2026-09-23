@@ -31,7 +31,7 @@ def test_detect_memory_logs_and_returns_zero(monkeypatch) -> None:
     def _missing(*_args, **_kwargs):
         raise FileNotFoundError(2, "No such file", "sysctl")
 
-    # _detect_memory only probes on Darwin/Linux; force Linux so the (mocked)
+    # detect_memory only probes on Darwin/Linux; force Linux so the (mocked)
     # nvidia-smi probe runs on every platform, including Windows CI.
     monkeypatch.setattr(_ollama.platform, "system", lambda: "Linux")
     monkeypatch.setattr(_ollama.subprocess, "check_output", _missing)

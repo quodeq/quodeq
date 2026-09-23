@@ -18,7 +18,7 @@ from tests.ci._lifecycle_helpers import _assert_partial_state_invariants
 
 
 def test_record_deadline_if_hit_tags_lifecycle_when_deadline_past(tmp_path: Path) -> None:
-    """_record_deadline_if_hit must call set_exit_reason('deadline') when
+    """record_deadline_if_hit must call set_exit_reason('deadline') when
     config.options.deadline_at is in the past (i.e. loop broke on deadline)."""
     import quodeq.cli_evaluation as cli
     from quodeq.analysis.run_lifecycle import RunLifecycleContext
@@ -87,7 +87,7 @@ def test_record_deadline_if_hit_noop_when_deadline_not_yet_reached(tmp_path: Pat
 
 
 def test_pipeline_records_deadline_exit_reason_when_budget_expired(tmp_path: Path) -> None:
-    """End-to-end: when _execute_pipeline returns cleanly but the deadline
+    """End-to-end: when execute_pipeline returns cleanly but the deadline
     set on config.options has already passed, the pipeline's status.json
     must show state=done AND exit_reason='deadline'."""
     import quodeq.cli_evaluation as cli
@@ -145,7 +145,7 @@ def test_pipeline_records_deadline_exit_reason_when_budget_expired(tmp_path: Pat
 
 def test_c88be50e_partial_state_invariants_agree(tmp_path: Path) -> None:
     """A deadline-truncated run must surface BOTH partial-state signals:
-    status.json has exit_reason='deadline' AND _compute_files_read reports
+    status.json has exit_reason='deadline' AND compute_files_read reports
     files_read < source_file_count for the dimension that broke on deadline.
 
     Scenario mirrors c88be50e in miniature: 5 input files, 1 pre-existing

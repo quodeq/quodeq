@@ -1,7 +1,7 @@
 """save_index's except narrowing (R-FT-7).
 
 ``save_index``'s atomic write previously caught bare ``Exception``. Narrowed
-to ``OSError`` to match ``_load_index``'s already-narrowed read path
+to ``OSError`` to match ``load_index``'s already-narrowed read path
 (``(OSError, json.JSONDecodeError)``) a few lines above it in the same file.
 """
 from __future__ import annotations

@@ -257,7 +257,7 @@ class TestBuildDashboard:
         # Regression: build_dashboard formerly raised IndexError when the
         # selected complete run had cancelled/failed runs above it in the
         # full list, because ctx.index (full-list index) was passed to
-        # collect_stale_dimensions / _collect_previous_scores along with
+        # collect_stale_dimensions / collect_previous_scores along with
         # `history_runs` (filtered list of scoreable runs only). When
         # ctx.index >= len(history_runs), `history_runs[newer_idx]` blew up.
         cancelled_top = [

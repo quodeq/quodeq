@@ -69,7 +69,7 @@ class TestCallbackRetryPersistsSideEffects:
         def fake_runner(_c, dim, _i, _ctx):
             return _FakeEvidence()
 
-        # _log_dimension_result raises BrokenPipeError before
+        # log_dimension_result raises BrokenPipeError before
         # on_dimension_done is reached on the original try; the retry path
         # then invokes on_dimension_done with stdout silenced.
         def log_result(_ev, dim, _i, _t, **_):

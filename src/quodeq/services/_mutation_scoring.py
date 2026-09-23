@@ -60,7 +60,7 @@ def rescore_run(
 
     Returns ``None`` when ``run_id`` is missing or the run directory cannot
     be resolved. When it returns ``None``, the caller also calls
-    ``_project_all_runs`` so the action still lands in SQL — otherwise the
+    ``project_all_runs`` so the action still lands in SQL — otherwise the
     dismissed-tab list (which reads ``WHERE verdict='dismissed'`` from each
     run's evaluation.db) wouldn't see the entry until the user happened to
     trigger projection some other way.

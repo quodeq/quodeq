@@ -40,7 +40,7 @@ def test_pipeline_installs_and_removes_run_log_handler(tmp_path: Path, monkeypat
     logger = logging.getLogger("quodeq")
     initial_handlers = set(id(h) for h in logger.handlers)
 
-    # Stub _execute_pipeline so we exercise only the wrapper's install/remove logic.
+    # Stub execute_pipeline so we exercise only the wrapper's install/remove logic.
     with patch.object(cli, "execute_pipeline", return_value=0), \
          patch.object(cli, "save_manifest"), \
          patch.object(cli, "_build_run_config"), \

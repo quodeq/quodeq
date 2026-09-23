@@ -44,9 +44,9 @@ def build_eval_env(
     base = resolve_env(env)
     built_env = {**base, "PYTHONUNBUFFERED": "1"}
     built_env["AI_CMD"] = ai_cmd
-    # Validated at the API boundary (_validate_ai_cmd_path); the scan
+    # Validated at the API boundary (validate_ai_cmd_path); the scan
     # subprocess spawns it as argv[0] while AI_CMD keeps keying the
-    # provider config (analysis._command._cmd_binary).
+    # provider config (analysis._command.cmd_binary).
     if options.ai_cmd_path:
         built_env["AI_CMD_PATH"] = options.ai_cmd_path
     subagent_model = options.subagent_model or ai_model

@@ -123,7 +123,7 @@ def test_kill_api_logs_when_process_is_already_gone(monkeypatch) -> None:
 
     monkeypatch.setattr(native_ops.os, "kill", _raise)
     with patch.object(native_ops._logger, "debug") as debug:
-        native_ops.kill_api(424242)  # signature: _kill_api(pid: int) -> None
+        native_ops.kill_api(424242)  # signature: kill_api(pid: int) -> None
     assert debug.called
     assert "already gone" in debug.call_args.args[0]
 

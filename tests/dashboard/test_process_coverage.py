@@ -70,7 +70,7 @@ class TestKillStaleActionApi:
     def test_health_is_checked_on_the_recorded_port_not_the_requested_one(self, tmp_path):
         """The two differ in exactly the case that matters.
 
-        _choose_ui_port has already skipped the port the live API holds, so the
+        choose_ui_port has already skipped the port the live API holds, so the
         launch asks for 7864 while the API to protect is on 7863.
         """
         _kill, health, _pid_file = self._run(

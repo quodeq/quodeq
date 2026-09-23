@@ -1,4 +1,4 @@
-"""_WindowApi.open_browser: absolute web URLs must open as-is.
+"""WindowApi.open_browser: absolute web URLs must open as-is.
 
 The update banner's "what's new" button passes the GitHub release URL
 through this API. Prefixing it with the local dashboard base URL sends

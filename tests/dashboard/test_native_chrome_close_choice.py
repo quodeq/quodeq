@@ -7,9 +7,9 @@ from tests.dashboard._native_chrome_helpers import _MACOS_ONLY
 
 
 class TestOnClosingChoice:
-    """The choice seam behind _make_on_closing (see test_native_chrome_close.py)."""
+    """The choice seam behind make_on_closing (see test_native_chrome_close.py)."""
 
-    # --- _ask_close_choice: platform dispatch + 2-button mapping ------------
+    # --- ask_close_choice: platform dispatch + 2-button mapping ------------
 
     def test_ask_close_choice_macos_dispatches_to_native_alert(self):
         window = MagicMock()
@@ -96,7 +96,7 @@ class TestOnClosingChoice:
 
 @_MACOS_ONLY
 class TestMacConfirmClose:
-    """Exercise the real _macos_confirm_close AppKit body with AppHelper.callAfter
+    """Exercise the real macos_confirm_close AppKit body with AppHelper.callAfter
     run inline and NSAlert mocked, so button order, choice mapping, the
     Stay-is-default fix, and semaphore-release-on-error are verified without a
     real modal (mirrors TestMacTrafficLights)."""

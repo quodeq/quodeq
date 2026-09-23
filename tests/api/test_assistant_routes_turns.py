@@ -85,8 +85,8 @@ def test_event_frames_keeps_yielding_past_a_done_frame(app, monkeypatch):
 
 
 def test_events_stream_heartbeats_while_idle(client, monkeypatch):
-    # No message ever posted -> no rows to replay. With small _POLL_SECONDS/
-    # _IDLE_LIMIT the stream must emit repeated ":keepalive" comments (not
+    # No message ever posted -> no rows to replay. With small POLL_SECONDS/
+    # IDLE_LIMIT the stream must emit repeated ":keepalive" comments (not
     # just the one at open) instead of hanging until the idle limit, proving
     # event_frames yields a heartbeat sentinel on each idle tick.
     monkeypatch.setattr("quodeq.api._assistant_helpers.POLL_SECONDS", 0.001)
@@ -103,7 +103,7 @@ def test_events_stream_emits_heartbeat_data_frame_on_sustained_idle(client, monk
     # ":keepalive" SSE comments, so the browser's inactivity timer never
     # resets on comments alone. The generator must also emit a real
     # {"type": "heartbeat"} DATA frame on a throttled cadence (every 20th
-    # idle tick == ~5s at the real _POLL_SECONDS) so the client sees liveness,
+    # idle tick == ~5s at the real POLL_SECONDS) so the client sees liveness,
     # while a final "done" frame still terminates the stream normally.
     monkeypatch.setattr("quodeq.api._assistant_helpers.POLL_SECONDS", 0.001)
     monkeypatch.setattr("quodeq.api._assistant_helpers.IDLE_LIMIT", 100)
@@ -119,7 +119,7 @@ def test_idle_limit_is_a_600s_safety_cap_not_a_60s_timeout():
     # A legitimate turn (cold-loading local 26B model, or a CLI provider near
     # its ~500s read timeout) can run minutes without a done/error frame yet
     # still be alive. run_turn always writes a terminal done/error frame on
-    # completion, so event_frames already exits correctly then; _IDLE_LIMIT
+    # completion, so event_frames already exits correctly then; IDLE_LIMIT
     # only guards against a turn that dies without ever emitting one (e.g. a
     # crashed daemon thread), so it must be generous, not a tight timeout.
     from quodeq.api import _assistant_helpers

@@ -102,7 +102,7 @@ def test_latest_timestamp_missing_file_is_caught(tmp_path: Path):
 def test_latest_timestamp_undecodable_bytes_are_caught(log_path: Path, reader: EventLogReader):
     """A log corrupted with invalid UTF-8 raises UnicodeDecodeError during
     line iteration (not just at open()) -- also part of the realistic
-    surface, per _load_index's precedent of bundling I/O-open failures with
+    surface, per load_index's precedent of bundling I/O-open failures with
     decode failures."""
     with open(log_path, "wb") as f:
         f.write(b'{"event_type": "JUDGMENT_CREATED"}\n')

@@ -229,7 +229,7 @@ def _install_shutdown_handlers() -> None:
 
     Evaluation subprocesses are spawned with start_new_session=True so they
     survive the API process dying, and are intentionally NOT killed here --
-    otherwise launching a second dashboard (which calls _kill_stale_action_api
+    otherwise launching a second dashboard (which calls kill_stale_action_api
     on the first) would cascade and kill any scan in flight. Scans have their
     own lifecycle; use the UI cancel button or the DELETE endpoint.
     """

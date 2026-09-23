@@ -85,7 +85,7 @@ def _sse_release_guard(state: AssistantTurnState):
     return _release
 
 
-_HEARTBEAT_IDLE_TICKS = 20  # ~5s at _POLL_SECONDS; throttles the heartbeat DATA frame
+_HEARTBEAT_IDLE_TICKS = 20  # ~5s at POLL_SECONDS; throttles the heartbeat DATA frame
 
 
 def _sse_event_generator(repo, sid: str, after: int):
@@ -94,7 +94,7 @@ def _sse_event_generator(repo, sid: str, after: int):
     # timer. So on sustained idle (e.g. a slow local model still
     # cold-loading) we must periodically emit a real heartbeat DATA
     # frame, not just comments. Throttled to ~every _HEARTBEAT_IDLE_TICKS-th
-    # idle tick (_HEARTBEAT_IDLE_TICKS * _POLL_SECONDS == ~5s) so we don't
+    # idle tick (_HEARTBEAT_IDLE_TICKS * POLL_SECONDS == ~5s) so we don't
     # spam a data frame every 0.25s; cheap ":keepalive" comments fill the
     # gaps in between.
     yield ":keepalive\n\n"

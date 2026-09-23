@@ -32,7 +32,7 @@ class ToolContext:
     # When set, any code path that DISPATCHES tools must wrap execution in
     # score_cache_path_override(score_cache_path) so rescoring hits the
     # per-clone cache DB, never the local one (the routes_shared
-    # _with_shared_root mechanism). Wrapped in the messages-route worker and
+    # with_shared_root mechanism). Wrapped in the messages-route worker and
     # the MCP server main.
     score_cache_path: Path | None = None
     # Per-project visible-standards selection

@@ -3,7 +3,7 @@
 Read-only invariant: every route under /api/shared/projects/... is a thin GET
 delegation to the same service functions the local /api/projects/... routes
 use, pointed at the shared clone's evaluations root instead of the local
-reports directory. This module covers the ``_with_shared_root`` decorator's
+reports directory. This module covers the ``with_shared_root`` decorator's
 failure branches, the read-only route sweep and GET /api/shared/projects;
 the per-project mirror routes live in the test_routes_shared_read_* siblings,
 all built against a REAL published clone (tests/api/conftest.py).
@@ -28,7 +28,7 @@ from tests.api._routes_shared_read_fixtures import (  # noqa: F401 -- pytest fix
 )
 
 
-# --- _with_shared_root decorator ---------------------------------------------
+# --- with_shared_root decorator ---------------------------------------------
 
 def test_shared_routes_409_when_unconfigured(client, monkeypatch, tmp_path):
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
@@ -237,7 +237,7 @@ def test_shared_projects_score_cache_override_propagates_into_pool(
     """Finding 1 regression: build_project_list runs _build_one (which
     ultimately calls cached_project_summary) inside a ThreadPoolExecutor.
     contextvars do NOT propagate into pool worker threads by default, so the
-    score_cache_path_override set by _with_shared_root would be invisible
+    score_cache_path_override set by with_shared_root would be invisible
     there and per-project summaries would read/write the LOCAL score cache
     DB instead of this clone's own one. Both must hold: the per-clone cache
     gets written, and the local (sandboxed-default) cache never does."""

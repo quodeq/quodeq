@@ -96,7 +96,7 @@ def build_project_entries_threaded(
 
     # contextvars do NOT propagate into ThreadPoolExecutor worker threads --
     # each worker runs with its own default Context, so a caller-side
-    # score_cache_path_override (e.g. from _with_shared_root) would be
+    # score_cache_path_override (e.g. from with_shared_root) would be
     # invisible inside _build_one and per-project summaries would read/write
     # the LOCAL score cache DB instead of the scoped one. Copy the calling
     # context once per task -- a single Context object cannot be entered by

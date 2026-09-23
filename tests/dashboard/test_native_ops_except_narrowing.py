@@ -6,7 +6,7 @@ call sites (R-FT-7):
 * ``download_via_dialog`` (urllib fetch + file write) — the tuple
   ``(OSError, Exception)`` was a no-op (``OSError`` is already an
   ``Exception`` subclass); narrowed to plain ``OSError``, matching
-  ``_save_via_dialog``'s equivalent file-write catch immediately above it.
+  ``save_via_dialog``'s equivalent file-write catch immediately above it.
 """
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ class TestDownloadViaDialogExceptNarrowing:
 
     def test_write_failure_is_caught_and_returns_false(self, tmp_path):
         """A realistic write failure (target directory doesn't exist) is
-        swallowed and reported as False, matching _save_via_dialog."""
+        swallowed and reported as False, matching save_via_dialog."""
         window = self._window(str(tmp_path / "does-not-exist" / "output.txt"))
         mock_response = MagicMock()
         mock_response.read.return_value = b"data"

@@ -67,7 +67,7 @@ def _parse_jsonl_findings(
     Two exclusions keep this live view from showing more findings than the
     persisted evaluation: rows the dashboard suppresses (the dismissed/deleted
     sets in *keys*), and rows whose principle is not in the dimension's
-    standard, which the report path quarantines in ``_group_judgments``.
+    standard, which the report path quarantines in ``group_judgments``.
     """
     violations: list[Finding] = []
     compliance: list[Finding] = []

@@ -1,6 +1,6 @@
 """Rescore coverage: a partial rescore must be flagged so it is never persisted.
 
-Regression: `_rescore_runs_by_dimension` silently treats a dimension missing
+Regression: `rescore_runs_by_dimension` silently treats a dimension missing
 from the run read as "keep the raw score". When the run-dimension fetcher
 served a partial dim list (1 of 6 dims frozen in the process LRU mid-run),
 only that one dimension was rescored, and the half-rescored accumulated

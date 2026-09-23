@@ -105,7 +105,7 @@ def _clear_process_cache():
 def test_neighbouring_as_of_selections_reuse_the_run_walk(tmp_path, counting_reader):
     """The second day selected must not re-read every run's findings again.
 
-    This is the regression under test: ``_resolve_cache(None)`` used to build a
+    This is the regression under test: ``resolve_cache(None)`` used to build a
     fresh empty LRU per call, so each as-of selection re-hydrated the entire
     run history from disk.
     """

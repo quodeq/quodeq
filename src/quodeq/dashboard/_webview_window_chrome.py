@@ -1,7 +1,7 @@
 """Native window chrome: titlebar appearance, traffic lights, unified toolbar.
 
 Leaf helpers for _webview_window.py. Callers in the facade (the
-titlebar-theme dispatch in _WindowApi, the fullscreen-chrome sync) reach
+titlebar-theme dispatch in WindowApi, the fullscreen-chrome sync) reach
 set_macos_titlebar_appearance / set_windows_titlebar / apply_unified_toolbar
 through this module (imported there as ``_chrome``) rather than by bare name,
 so tests/dashboard/test_native_chrome.py patches this module's own namespace

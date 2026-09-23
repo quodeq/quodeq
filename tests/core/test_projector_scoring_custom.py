@@ -78,7 +78,7 @@ def test_summary_builders_agree_under_dimension_weights():
         {"dimension": "security", "overallScore": "8.0/10", "overallGrade": "Good"},
         {"dimension": "performance", "overallScore": "6.0/10", "overallGrade": "Adequate"},
     ]
-    # score_pairs are the raw floats a real caller (_build_response_from_grade_tables)
+    # score_pairs are the raw floats a real caller (build_response_from_grade_tables)
     # builds from the SQL dim_rows -- the same values that were formatted into
     # dim_dicts' "overallScore" display strings above.
     score_pairs = [("security", 8.0), ("performance", 6.0)]

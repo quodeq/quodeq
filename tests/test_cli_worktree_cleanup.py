@@ -2,7 +2,7 @@
 
 The except block in create_worktree previously called worktree_dir.rmdir()
 which only removes an empty dir and leaves a registered/populated worktree
-behind. Fix: call _cleanup_worktree + shutil.rmtree on the failure path.
+behind. Fix: call cleanup_worktree + shutil.rmtree on the failure path.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ class TestCreateWorktreeCleanupOnFailure:
 
     def test_cleanup_worktree_called_on_subprocess_failure(self, tmp_path: Path) -> None:
         """When subprocess.run raises CalledProcessError after the dir is created,
-        _cleanup_worktree must be called (not just rmdir) so the git worktree
+        cleanup_worktree must be called (not just rmdir) so the git worktree
         registration is also removed."""
         from quodeq._cli_resolution import create_worktree
 
@@ -41,7 +41,7 @@ class TestCreateWorktreeCleanupOnFailure:
             result = create_worktree(repo_dir, "some-branch")
 
         assert result is None, "Expected None when subprocess raises"
-        # _cleanup_worktree must have been called once with the correct repo_dir
+        # cleanup_worktree must have been called once with the correct repo_dir
         mock_cleanup.assert_called_once()
         called_repo, called_wt = mock_cleanup.call_args.args
         assert called_repo == repo_dir

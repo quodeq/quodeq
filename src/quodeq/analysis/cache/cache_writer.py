@@ -70,7 +70,7 @@ class CacheWriteTarget:
     content_hashes: Mapping[str, str] = field(default_factory=dict)
     # file_path -> the file's ``stat_key`` when classify hashed it. The
     # hash above is reused only while it still matches; a file missing
-    # here is hashed at write time. See ``_key_provenance._content_hash_for``.
+    # here is hashed at write time. See ``_key_provenance.content_hash_for``.
     content_stamps: Mapping[str, tuple[int, int]] = field(default_factory=dict)
 
 
@@ -124,7 +124,7 @@ def _resolve_writer_provenance(
     """Resolve cache-writer provenance context, computed once per closure.
 
     ``src_root`` doubles as the project root whose threshold overrides fold
-    into the standards hash — must match classify's ``_current_provenance``.
+    into the standards hash — must match classify's ``current_provenance``.
     """
     standards_hash = (
         (hash_standards(standards_dir, dimension, src_root) if standards_dir else "")
@@ -147,7 +147,7 @@ def _entry_content_hash(target: CacheWriteTarget, file_path: str) -> str:
     A path that escapes ``src_root`` is never read: it keeps the empty hash
     it has always had (such an entry is not adoptable, which is the point).
     Everything else goes through the shared
-    ``_key_provenance._content_hash_for``, so this path and the
+    ``_key_provenance.content_hash_for``, so this path and the
     dispatch-persist path key entries on the same rules.
     """
     resolved = target.src_root / file_path
@@ -213,7 +213,7 @@ def build_cache_writer(spec: CacheWriterSpec) -> Callable[[str, list[dict]], Non
     It is intended to be passed to ``FindingsRouter(on_file_done=...)`` so the
     router fires it synchronously when ``mark_file_done(status="ok")`` arrives.
 
-    ``spec.prompts_dir`` MUST match what classify-time ``_current_provenance``
+    ``spec.prompts_dir`` MUST match what classify-time ``current_provenance``
     hashes, or reused entries report phantom prompts drift.
 
     Failures (disk full, permission denied, etc.) propagate as exceptions

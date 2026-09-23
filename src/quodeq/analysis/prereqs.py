@@ -71,7 +71,7 @@ def _check_cli_binary_override(provider: str, override: str) -> None:
 
     This is an availability check, not a security boundary: AI_CMD_PATH
     reaches this process either from the operator's own environment or via
-    the dashboard API, where api._evaluation_helpers._validate_ai_cmd_path
+    the dashboard API, where api._evaluation_helpers.validate_ai_cmd_path
     enforces the spawn restrictions (provider-prefixed name, on-PATH dir).
     """
     if not _SAFE_CMD_PATH_RE.fullmatch(override):

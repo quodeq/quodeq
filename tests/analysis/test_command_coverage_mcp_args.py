@@ -108,7 +108,7 @@ class TestBuildMcpServerArgs:
 
     def test_model_id_falls_back_to_unknown(self, tmp_path):
         """No ai_model and no run_config => model_id is 'unknown' (reference
-        from cache.dimension_helpers._model_id_from).
+        from cache.dimension_helpers.model_id_from).
         """
         jsonl = tmp_path / "findings.jsonl"
         config = AnalysisConfig(jsonl_file=jsonl)

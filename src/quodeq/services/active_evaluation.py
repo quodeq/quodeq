@@ -6,7 +6,7 @@ against /api/projects to decide whether a "running" job is stale. That rule
 now lives here, served by ``GET /api/evaluations/active``, so it cannot
 diverge between presentation layers.
 
-The rule (moved verbatim from ``_WindowApi._get_running_evaluation``):
+The rule (moved verbatim from ``WindowApi._get_running_evaluation``):
 a "running" job whose ``outputProject`` no longer exists in the project
 list (project deleted, or the API restarted mid-scan) is stale and ignored.
 Jobs without an ``outputProject`` are very-early-phase evals that haven't

@@ -1,5 +1,5 @@
 """Operational helpers extracted from the facade purely to fit the file-size
-cap: _WindowApi's HTTP/native-dialog bodies, the reload-socket handler, and
+cap: WindowApi's HTTP/native-dialog bodies, the reload-socket handler, and
 process teardown. None of this is patch-tested by name — tests patch
 urllib.request.urlopen directly (a global module attribute, patching the
 real shared module rather than a name in some namespace) and the underlying

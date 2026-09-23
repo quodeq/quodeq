@@ -1,7 +1,7 @@
 """Unit tests for services.active_evaluation.find_active_evaluation.
 
 The staleness rule moved here verbatim from
-dashboard/_webview_window._WindowApi._get_running_evaluation, so these tests
+dashboard/_webview_window.WindowApi._get_running_evaluation, so these tests
 pin exactly the behavior that function used to implement: a "running" job
 whose outputProject is missing from the project list is stale and skipped,
 jobs without an outputProject stay valid, and a failing project lookup falls

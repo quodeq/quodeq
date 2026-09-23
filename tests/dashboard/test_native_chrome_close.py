@@ -7,7 +7,7 @@ from tests._timeouts import budget
 
 
 class TestOnClosing:
-    """The close handler behaves differently by backend (see _make_on_closing):
+    """The close handler behaves differently by backend (see make_on_closing):
 
     macOS/GTK/Qt marshal the dialog onto the GUI thread and block the caller, so
     it must run OFF the GUI thread (worker + veto + destroy). Windows/winforms

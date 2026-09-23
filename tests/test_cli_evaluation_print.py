@@ -131,7 +131,7 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
     """A scoring-engine exception during the suppression-aware rescore must
     never propagate. The rescore is a console embellishment layered on top
     of reports already written to disk -- nothing upstream of
-    `_execute_pipeline` catches a generic exception (only AnalysisError /
+    `execute_pipeline` catches a generic exception (only AnalysisError /
     EvaluationError), so a bug here would otherwise crash an
     otherwise-successful scan's exit path with a raw traceback.
     """

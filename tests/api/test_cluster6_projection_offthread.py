@@ -1,4 +1,4 @@
-"""#1389 - _project_all_runs must run off the request thread with dedup lock.
+"""#1389 - project_all_runs must run off the request thread with dedup lock.
 
 Two concurrent POST /api/findings/dismiss calls for the same project (without
 a usable run_id) must NOT run two concurrent projections. The per-project
@@ -33,7 +33,7 @@ def client(app):
 
 
 def test_dismiss_returns_without_waiting_for_projection(client, tmp_path):
-    """POST /dismiss returns 200 without blocking on _project_all_runs."""
+    """POST /dismiss returns 200 without blocking on project_all_runs."""
     (tmp_path / "my-project").mkdir()
 
     projection_started = threading.Event()

@@ -224,7 +224,7 @@ def test_boolean_version_is_rejected(tmp_path):
 
 def test_deeply_nested_package_json_degrades(tmp_path):
     # Same RecursionError overflow as the declared-side fix, but reached
-    # through detection: detect_shape parses package.json via _read_json,
+    # through detection: detect_shape parses package.json via read_json,
     # whose except json.JSONDecodeError does not catch RecursionError (a
     # RuntimeError subclass). _detected_multi_tenant must degrade this too,
     # not just the declared-profile path.

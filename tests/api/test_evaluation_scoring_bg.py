@@ -3,7 +3,7 @@ provider returns a job snapshot shape that doesn't guarantee a ``.job_id``
 attribute (e.g. a dict-shaped snapshot) for a failed/cancelled job.
 
 Guards routes_evaluations_item.py's _score_completed_dims_in_bg: it must use
-the route's URL job_id (passed in explicitly) for _claim_scoring and the
+the route's URL job_id (passed in explicitly) for claim_scoring and the
 background task name, never `job.job_id` — a job-snapshot-shaped object is
 not guaranteed to carry that attribute, unlike the production JobSnapshot
 dataclass.

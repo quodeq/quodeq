@@ -99,7 +99,7 @@ def _ensure_onboarding_field(project_dir: Path) -> None:
 
     Called during registration (via `resolve_project_slot`) so newly-registered
     projects start with the field set to null. Existing projects without the
-    field get a backfill on read (see `_backfill_onboarding_field` in
+    field get a backfill on read (see `backfill_onboarding_field` in
     fs_project_helpers.py).
     """
     data = read_repository_info(project_dir)

@@ -53,7 +53,7 @@ class DimensionCache:
     Without a shared cache, every dashboard request used a fresh one (built
     fresh in ``make_run_dimension_fetcher`` below), so re-fetching the same
     project's history (which ``collect_stale_dimensions`` /
-    ``_collect_previous_scores`` / ``build_accumulated_trend`` all walk) cost
+    ``collect_previous_scores`` / ``build_accumulated_trend`` all walk) cost
     ~750ms per request even on warm calls. The shared cache eliminates the
     cross-request I/O without compromising the per-request consistency
     guarantees (the cache is keyed by

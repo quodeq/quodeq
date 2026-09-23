@@ -3,8 +3,8 @@
 Split from test_dimension_runner_carried_forward.py: the integration
 tests that drive replay through ``process_dimension_with_cache`` (cache
 hit vs. dispatch, unconsolidated hits, the sidecar, and the cancelled-run
-user story). The direct unit tests for ``_write_findings`` /
-``_emit_cached_findings`` live in test_dimension_runner_carried_forward_write.py.
+user story). The direct unit tests for ``write_findings`` /
+``emit_cached_findings`` live in test_dimension_runner_carried_forward_write.py.
 """
 import json
 from pathlib import Path

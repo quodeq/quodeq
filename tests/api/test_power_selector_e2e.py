@@ -6,7 +6,7 @@ These tests patch subprocess.Popen (no real AI calls) and assert that
 
     PowerSelector level → subagentModel payload → SUBAGENT_MODEL env /
     AnalysisOptions.subagent_model → AnalysisConfig.ai_model →
-    _build_ai_cmd() → subprocess.Popen args
+    build_ai_cmd() → subprocess.Popen args
 """
 from __future__ import annotations
 
@@ -133,7 +133,7 @@ class TestRunnerModelResolution:
         """Exercise the model-resolution precedence by calling the real
         ``_pool_launcher._build_pool_config`` production function, so a
         regression at its ``config.options.subagent_model or
-        _default_subagent_model(env) or config.options.ai_model`` line fails
+        default_subagent_model(env) or config.options.ai_model`` line fails
         these tests. ``ai_model`` is set to the haiku constant here to stand
         in for whatever default the caller configured, since AnalysisOptions
         itself has no built-in default.

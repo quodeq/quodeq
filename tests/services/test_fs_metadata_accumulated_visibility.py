@@ -173,7 +173,7 @@ class TestReadAccumulatedSummary:
 
         Builds a real event-log run, bakes default grades, applies a custom
         formula, then asserts read_accumulated_summary (which feeds the
-        project card via _build_project_entry) surfaces the CUSTOM grade —
+        project card via build_project_entry) surfaces the CUSTOM grade —
         proving both the read-layer overlay and the loaded-params threading.
         """
         import dataclasses

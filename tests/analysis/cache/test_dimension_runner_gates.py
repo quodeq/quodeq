@@ -26,7 +26,7 @@ class TestCacheReplayAppliesProvenanceGate:
     through the deterministic provenance gate too.
 
     The live finding path gates in ``FindingEnricher.enrich()``, but cache
-    replay (``_write_findings``) writes cached findings straight to the
+    replay (``write_findings``) writes cached findings straight to the
     per-dim JSONL and the event log, bypassing ``enrich()``. A stale,
     un-gated ``critical`` R-FT-2 / S-AUT-3 finding produced by an older
     quodeq version would otherwise replay at ``critical`` and inflate the

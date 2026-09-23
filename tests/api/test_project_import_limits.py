@@ -101,7 +101,7 @@ class TestUpdateIndexDI:
 
     def test_injected_repository_is_used_not_filesystem(self, tmp_path):
         """When a repository is injected, load_index/save_index on it are called
-        instead of the default _load_index/_save_index filesystem helpers."""
+        instead of the default load_index/save_index filesystem helpers."""
         from quodeq.api.import_project import update_index
         from quodeq.data.fs._models import ProjectIdentity
         from quodeq.data.fs._resolution import index_key

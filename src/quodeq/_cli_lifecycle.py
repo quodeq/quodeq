@@ -7,9 +7,9 @@ Re-exported from ``cli_evaluation.py`` so existing
 
 The names tests patch at ``quodeq.cli_evaluation.<name>``
 (``resolve_project_uuid``, ``project_name_from_repo``, ``is_repo_url``,
-``emit_marker``, ``cleanup_cloned_repo``, ``_cleanup_worktree``,
-``get_ai_model``, ``_save_manifest``, ``_build_run_config``,
-``_execute_pipeline``) reach this module as a :class:`LifecycleHooks`
+``emit_marker``, ``cleanup_cloned_repo``, ``cleanup_worktree``,
+``get_ai_model``, ``save_manifest``, ``_build_run_config``,
+``execute_pipeline``) reach this module as a :class:`LifecycleHooks`
 bundle that ``cli_evaluation`` assembles at call time, so this module never
 imports its own importer.
 """
@@ -118,7 +118,7 @@ def record_deadline_if_hit(lifecycle: "RunLifecycleContext", config: "RunConfig"
 def record_provider_fatal_if_cancelled(lifecycle: "RunLifecycleContext") -> None:
     """Tag a completed run that a dead provider cut short.
 
-    ``_raise_on_fatal_cancel`` lets the pipeline finish when files were
+    ``raise_on_fatal_cancel`` lets the pipeline finish when files were
     already analysed before the provider died (partial data is worth
     keeping). Without this hook such a run finalizes with
     ``exit_reason=null``, indistinguishable from a clean completion, and

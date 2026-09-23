@@ -122,7 +122,7 @@ class TestIncrementalLoopTransitions:
         ev = MagicMock()
         ev.exit_reason = None
         # Patch the success-log call so the test doesn't depend on its side
-        # effects (markers, log_success). The loop calls _log_dimension_result
+        # effects (markers, log_success). The loop calls log_dimension_result
         # directly after a successful incremental dim.
         monkeypatch.setattr("quodeq.analysis._loop_steps.log_dimension_result", MagicMock())
 

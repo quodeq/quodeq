@@ -1,7 +1,7 @@
 """Tests for quodeq.dashboard._server's serve modes — browser, blocking, native.
 
 Split out of test_server_coverage.py when that file crossed the 300-line cap;
-that file keeps the API-startup (_ensure_action_api[_forced]) coverage.
+that file keeps the API-startup (ensure_action_api[_forced]) coverage.
 """
 
 from __future__ import annotations

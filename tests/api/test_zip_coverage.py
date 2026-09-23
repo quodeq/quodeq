@@ -132,7 +132,7 @@ class TestBuildProjectZip:
     def test_uncompressed_size_over_headroom_raises(self, tmp_path):
         # Highly compressible data can slip under the compressed cap while its
         # uncompressed size exceeds what import accepts (size_limit *
-        # _EXTRACT_HEADROOM). Export must reject it up front rather than produce
+        # EXTRACT_HEADROOM). Export must reject it up front rather than produce
         # an archive that then fails on re-import. 64 KB cap -> 640 KB
         # uncompressed headroom; 800 KB of "x" deflates to ~1 KB (under the
         # compressed cap) but is over the uncompressed cap.

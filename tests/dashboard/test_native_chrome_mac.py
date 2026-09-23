@@ -174,7 +174,7 @@ class TestNativeChromeLogging:
         window = MagicMock()
         window.native = MagicMock()
 
-        # Make _apply_unified_toolbar raise
+        # Make apply_unified_toolbar raise
         with patch.object(chrome.sys, "platform", "darwin"), \
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()), \
              patch.object(chrome, "apply_unified_toolbar", side_effect=TypeError("toolbar error")):

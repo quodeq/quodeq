@@ -185,7 +185,7 @@ class TestHandoffToRunningInstance:
     """A relaunch must reach the open window without disturbing its backend.
 
     The launch used to spawn a second action API, notice the running instance,
-    and terminate that API on the way out — after _kill_stale_action_api had
+    and terminate that API on the way out — after kill_stale_action_api had
     already killed the *running* instance's one. The open window was left with a
     dead server and an unresolvable loading screen.
     """

@@ -7,7 +7,7 @@ against this module's own namespace (`patch.object(wwc, "ask_close_choice")`
 in tests/dashboard/test_native_chrome.py, where ``wwc`` is this module) and
 prompt_close_choice_and_finish bare-calls it from here, so both need to
 live together. The facade re-exports both names so
-``ww._ask_close_choice(window)`` direct calls keep working, but a patch on
+``ww.ask_close_choice(window)`` direct calls keep working, but a patch on
 the facade's re-export would not intercept the bare call made from this
 module — tests patch this module directly.
 """

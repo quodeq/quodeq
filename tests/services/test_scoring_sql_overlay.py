@@ -122,7 +122,7 @@ def test_get_project_scores_reflects_applied_custom_params_without_dismissals(
 ):
     """No dismissals → accumulated still reflects the APPLIED custom formula.
 
-    This is the seam ``_rescore_accumulated_response`` left open: it
+    This is the seam ``rescore_accumulated_response`` left open: it
     early-returns when there are no dismissals, so the fix must come from
     the read layer overlaying the (re-baked) SQL grades.
     """

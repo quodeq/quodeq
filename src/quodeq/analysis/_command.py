@@ -111,7 +111,7 @@ def _build_mcp_server_args(
     # can write cache entries synchronously on each mark_file_done(ok). These
     # MUST match classify_files_via_cache's inputs so CLI- and API-path keys
     # agree for the same project state. See cache_writer.build_cache_writer
-    # and cache.dimension_helpers._model_id_from for the reference.
+    # and cache.dimension_helpers.model_id_from for the reference.
     mcp_args.extend([
         "--cache-root", str(_default_cache_root()),
         "--model-id", resolve_model_id(config),

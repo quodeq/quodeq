@@ -5,7 +5,7 @@ Split out of jobs.py as free functions. ``JobManager``'s own
 delegates that call these, passing in the collaborators (store,
 reports_root, cap) the instance already owns.
 
-``watchdog_should_kill`` looks up ``_WATCHDOG_DEADLINE_GRACE_S`` on the
+``watchdog_should_kill`` looks up ``WATCHDOG_DEADLINE_GRACE_S`` on the
 ``jobs`` module at call time (deferred, in-function) rather than importing
 it directly: tests monkeypatch ``quodeq.services.jobs.WATCHDOG_DEADLINE_GRACE_S``
 to shrink the grace window, and a top-level import here would bind its own
@@ -47,7 +47,7 @@ def run_status_exit_reason(job: "Job | None", reports_root: Path | None) -> str 
 
     The analysis loops break out at the deadline without raising, and the
     lifecycle records ``exit_reason="deadline"`` (see
-    ``cli_evaluation._record_deadline_if_hit``). When the process then
+    ``cli_evaluation.record_deadline_if_hit``). When the process then
     exits nonzero without the job watchdog ever firing, this is the only
     signal that the exit was a time-limit truncation, not a failure.
     """

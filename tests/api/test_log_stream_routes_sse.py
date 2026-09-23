@@ -129,7 +129,7 @@ def test_sse_streams_log_after_it_appears(tmp_path, app) -> None:
     provider = app.config["_provider"]
     provider.in_memory_job = JobsHolder().get_job
 
-    # First call (from the route's _resolve_run_log) returns None, so
+    # First call (from the route's resolve_run_log) returns None, so
     # the route falls through to _is_preparing_job and opens the SSE
     # response. From the second call onward (generator's lazy resolver)
     # the run dir is "available" and run.log gets seeded — that's the

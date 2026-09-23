@@ -35,7 +35,7 @@ from quodeq.analysis.runner import load_universal_dimensions
 from quodeq.shared.log_sink import SHARED_LOG
 # Re-exported: moved to _cli_worktree.py to keep this module under 300 lines.
 # cleanup_worktree is unused directly in this module but must stay imported
-# — it is a patch target (quodeq._cli_resolution._cleanup_worktree) and the
+# — it is a patch target (quodeq._cli_resolution.cleanup_worktree) and the
 # public re-export chain through quodeq.cli_evaluation depends on it.
 from quodeq._cli_worktree import cleanup_worktree, create_worktree
 # Re-exported: moved to _cli_scope.py to keep this module under 300 lines.

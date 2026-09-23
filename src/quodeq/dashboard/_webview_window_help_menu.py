@@ -125,7 +125,7 @@ def install_macos_help_menu(window: object) -> None:
     ``navTab('help')``.
 
     Installs at most once: the ObjC classes can only be defined once per
-    process (see _install_about_panel_override).
+    process (see install_about_panel_override).
     """
     global _help_target, _help_menu_installed
     if _help_menu_installed:

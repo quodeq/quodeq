@@ -25,7 +25,7 @@ class ProjectLockRegistry:
     Intentionally unbounded: one tiny Lock object per distinct project name
     that has ever triggered a background projection on this host.  In practice
     this mirrors the number of projects on disk, which is small and naturally
-    bounded by real usage.  Contrast with _scored_jobs (bounded LRU) — scored
+    bounded by real usage.  Contrast with scored_jobs (bounded LRU) — scored
     jobs can accumulate many run-ids per project, so a size cap there is
     meaningful; here there is one entry per project, not per run.
 

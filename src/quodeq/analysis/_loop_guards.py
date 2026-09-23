@@ -56,7 +56,7 @@ def raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> N
       with silently incomplete dimensions.
     - Partial success (e.g. quota died halfway): the data is worth keeping.
       Return without raising so the run finalizes as done; the CLI hook
-      (``_record_provider_fatal_if_cancelled``) stamps the exit_reason so
+      (``record_provider_fatal_if_cancelled``) stamps the exit_reason so
       the UI says "stopped early, results are partial" rather than showing
       a clean completion.
     """

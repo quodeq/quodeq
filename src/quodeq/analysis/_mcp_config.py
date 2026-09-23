@@ -34,7 +34,7 @@ def _findings_server_args(
     # Cache fingerprint inputs (cache_root + model_id +
     # language) MUST be emitted on every spawn so the subprocess writes cache
     # entries with the same keys as classify_files_via_cache. Defaults match
-    # cache.dimension_helpers._model_id_from ('unknown') and the
+    # cache.dimension_helpers.model_id_from ('unknown') and the
     # language-unset contract ('').
     args.extend([
         "--cache-root", str(_default_cache_root()),

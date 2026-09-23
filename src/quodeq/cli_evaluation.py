@@ -79,7 +79,7 @@ from quodeq._cli_pipeline_exec import execute_pipeline, save_manifest
 class RunConfigLocals(NamedTuple):
     """The per-run scalars `_build_run_config` resolves before assembling RunConfig.
 
-    Named rather than a bare tuple so `_cli_run_config._build_analysis_options`
+    Named rather than a bare tuple so `_cli_run_config.build_analysis_options`
     reads them by attribute: reordering these fields can no longer silently
     swap, say, `consolidated` and `skip_scoring` at the call site.
     """

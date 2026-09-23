@@ -9,7 +9,7 @@ Re-exported by ``_cli_resolution.py`` (which is in turn re-exported by
 deferred lookup on ``quodeq._cli_resolution`` (rather than a bare name)
 because tests patch ``quodeq._cli_resolution.cleanup_worktree`` directly —
 see ``tests/test_cli_worktree_cleanup.py``. ``_fetch_branch`` looks up its
-timeout the same way: ``_FETCH_TIMEOUT_S`` stays defined in
+timeout the same way: ``FETCH_TIMEOUT_S`` stays defined in
 ``_cli_resolution.py`` because a test reloads that module
 (``importlib.reload``) with ``QUODEQ_GIT_CLONE_TIMEOUT_S`` set and reads the
 import-time constant back off it — see

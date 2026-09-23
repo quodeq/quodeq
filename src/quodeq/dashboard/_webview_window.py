@@ -6,7 +6,7 @@ patched name. ``patch.object(ww, "X")`` only rebinds the name ``X`` inside
 *this* module's namespace — so whichever function bare-calls ``X`` must be
 defined here (its ``__globals__`` must be this module's dict), or the mock
 never intercepts the call. The remaining seams of that kind are ``webview``,
-``InstanceController``, the ``_make_on_*`` factories, ``_create_window``,
+``InstanceController``, the ``make_on_*`` factories, ``_create_window``,
 ``quodeq_dir``, ``set_app_icon``, and ``non_macos_menu`` — all bare-called
 from main() (or, for ``webview``, also from _create_window), defined here or
 merely re-exported from a sibling module. ``sys`` and ``webbrowser`` are
@@ -172,7 +172,7 @@ def apply_macos_fullscreen_chrome(
     the now-pointless traffic-light reservation.
 
     ``restore_toolbar=False`` skips re-adding the toolbar when windowed; the
-    initial install (_set_macos_unified_toolbar) already owns that, so the
+    initial install (set_macos_unified_toolbar) already owns that, so the
     load-time sync must not add a second one.
 
     Calls through _webview_window_chrome (imported here as _chrome) for

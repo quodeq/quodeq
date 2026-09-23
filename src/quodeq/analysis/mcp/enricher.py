@@ -247,7 +247,7 @@ class FindingEnricher:
         a later run does NOT come back through here -- cache replay bypasses
         enrich() entirely and writes straight to the per-dim JSONL, and a
         deterministic checker never comes through here at all. Those two sinks
-        (dimension_runner._write_findings, checks.runner) call the same helper
+        (dimension_runner.write_findings, checks.runner) call the same helper
         for the same reason. Every call site is required: this one gates what
         the model just emitted, the others gate what a warm cache is about to
         replay and what a checker just computed, and skipping any one leaves a

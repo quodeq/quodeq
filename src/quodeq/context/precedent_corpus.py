@@ -203,7 +203,7 @@ def _resolve_available_embedder(
 
 
 def _resolve_store() -> VectorStoreFns:
-    """Production store resolver; tests patch ``precedent_corpus._resolve_vector_store``."""
+    """Production store resolver; tests patch ``precedent_corpus.resolve_vector_store``."""
     return resolve_vector_store()
 
 

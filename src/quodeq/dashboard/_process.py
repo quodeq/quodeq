@@ -74,7 +74,7 @@ def kill_stale_action_api(host: str, port: int) -> None:
     unconditionally, which meant every launch executed the previous launch's
     backend: the running window kept its dead Flask server, could never load
     projects, and sat on the loading screen forever. The recorded endpoint is
-    health-checked rather than the requested one because ``_choose_ui_port``
+    health-checked rather than the requested one because ``choose_ui_port``
     has already skipped the port the live API holds, so the two differ in
     exactly the case that matters.
     """

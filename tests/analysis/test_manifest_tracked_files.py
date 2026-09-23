@@ -146,7 +146,7 @@ def test_tracked_names_with_spaces_and_non_ascii(tmp_path: Path, detection: dict
 
 
 def test_multi_scope_walk_filters_untracked(tmp_path: Path) -> None:
-    """The monorepo walk shares _iter_source_files, so it filters too."""
+    """The monorepo walk shares iter_source_files, so it filters too."""
     from quodeq.analysis.manifest_build_scope import _walk_and_partition_by_scope
     from quodeq.analysis.manifest_models import ManifestWalkSpec
 

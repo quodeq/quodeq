@@ -2,7 +2,7 @@
 
 Split out so a paginated request can slice the
 project set *before* the expensive per-project hydration
-(``_build_project_entry``) runs, instead of after.
+(``build_project_entry``) runs, instead of after.
 
 ``build_project_index`` is a cheap whole-set pass -- id/path/location/parent
 only, read from each candidate's ``repository_info.json`` -- no run-dir

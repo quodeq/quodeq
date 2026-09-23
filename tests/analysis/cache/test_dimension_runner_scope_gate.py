@@ -26,7 +26,7 @@ class TestCacheReplayAppliesScopeGate:
     ``FindingEnricher.enrich()`` calls ``apply_scope_gate`` right after
     ``apply_provenance_gate`` on the live path, but that method only runs
     once per freshly-dispatched finding -- cache replay writes straight to
-    the per-dim JSONL via ``_write_findings`` and never touches ``enrich()``.
+    the per-dim JSONL via ``write_findings`` and never touches ``enrich()``.
     Without re-gating here, a ``major`` finding already sitting in a warm
     cache would never be re-capped after the operator declares a tighter
     trust model in ``.quodeq/project-profile.json``, which on a repo with

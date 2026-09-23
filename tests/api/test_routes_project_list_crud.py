@@ -100,9 +100,9 @@ class TestListProjects:
         ``repository_info.json`` only ever gets an explicit "parent" field
         from the scope_path/subproject creation flow -- two independently
         registered local projects that merely share a path prefix rely
-        entirely on ``_auto_detect_parents`` running at read time. The
+        entirely on ``auto_detect_parents`` running at read time. The
         fixture below uses two *genuinely different* paths (one a real
-        subdirectory of the other) so ``_find_best_parent``'s
+        subdirectory of the other) so ``find_best_parent``'s
         startswith-prefix check actually fires, unlike a fixture where every
         project shares one identical path.
         """

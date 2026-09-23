@@ -25,7 +25,7 @@ def test_trend_identical_between_fast_and_heavy_paths(tmp_path: Path, monkeypatc
     # Fast path (default: no dismissals -> scalar reader).
     fast = get_project_scores(reports, "proj")
 
-    # Force the heavy path for the SAME data by making _make_trend_fetcher
+    # Force the heavy path for the SAME data by making make_scoring_trend_fetcher
     # return the rescoring fetcher regardless of dismissals. _project_scores
     # calls through the _fetchers module attribute (not a name bound into its
     # own namespace at import time), so patching it here actually takes

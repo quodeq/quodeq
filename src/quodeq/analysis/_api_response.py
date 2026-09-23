@@ -189,7 +189,7 @@ def finish_call(
 
     Returns ``(findings, was_lossy)``. ``was_lossy`` is True when the
     response was truncated by the output budget (``finish_reason ==
-    "length"``), so findings past the cut are lost. See ``_call_api`` for
+    "length"``), so findings past the cut are lost. See ``call_api`` for
     the full lossy-vs-dropped contract.
 
     *reask*, when supplied, takes the snippetless dropped nodes and returns

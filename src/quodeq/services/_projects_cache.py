@@ -116,10 +116,10 @@ class ProjectsCache:
             # truncated or empty page with no error signal (a real race under
             # Flask's default threaded=True).
             #
-            # The index already ran _auto_detect_parents over the WHOLE
+            # The index already ran auto_detect_parents over the WHOLE
             # project set (a windowed re-run couldn't see out-of-window
             # sibling candidates for the path-prefix match), so its .parent
-            # is authoritative. _build_project_entry, which built the cached
+            # is authoritative. build_project_entry, which built the cached
             # entry, only ever reads the raw, unenriched "parent" field off
             # repository_info.json -- propagate the index's value onto each
             # hydrated result rather than silently returning that raw one.

@@ -1,7 +1,7 @@
 """Shared setup helpers for tests/dashboard/test_dashboard_runner.py.
 
 Split out of test_dashboard_runner.py to shrink the repeated
-static_dist/hooks/_ensure_action_api boilerplate each test needed.
+static_dist/hooks/ensure_action_api boilerplate each test needed.
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def _setup_dashboard(
     "spawn a fake action API" wiring every vanilla run_dashboard test needs.
 
     Returns ``(config, hooks, static_dist)``. Callers needing a custom
-    ``_ensure_action_api`` or a non-default hook still patch/build those
+    ``ensure_action_api`` or a non-default hook still patch/build those
     themselves; this only covers the common case.
     """
     if reports:

@@ -3,7 +3,7 @@
 Split from ``cli_evaluation.py`` to keep each module under 300 lines.
 Both names are re-exported from ``cli_evaluation`` because
 ``_lifecycle_hooks`` reads them off that module at call time, so
-``quodeq.cli_evaluation.execute_pipeline`` and ``._save_manifest`` stay
+``quodeq.cli_evaluation.execute_pipeline`` and ``.save_manifest`` stay
 valid patch targets. The collaborators they call (``run``, ``run_full``,
 ``write_text``, ``manifest_to_dict``) are looked up here, so patch them at
 ``quodeq._cli_pipeline_exec.<name>``.

@@ -73,7 +73,7 @@ def _sync_fullscreen_observer(window: object, nswindow: object) -> None:
             _macos_fullscreen_observer = observer  # keep it alive
             _macos_fullscreen_observer_installed = True
         is_full = bool(nswindow.styleMask() & AppKit.NSWindowStyleMaskFullScreen)
-        # Don't re-add the toolbar windowed — _set_macos_unified_toolbar
+        # Don't re-add the toolbar windowed — set_macos_unified_toolbar
         # already installed it; a second one would race/flicker.
         apply_macos_fullscreen_chrome(window, is_full, restore_toolbar=False)
     except (AttributeError, ValueError, TypeError) as exc:

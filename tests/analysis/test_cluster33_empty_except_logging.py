@@ -128,7 +128,7 @@ def test_gather_source_files_logs_unreadable_file(tmp_path, monkeypatch) -> None
 
     monkeypatch.setattr(Path, "stat", _flaky_stat)
     # On Python 3.13, Path.is_file() itself calls stat(); force it to True so the
-    # only stat() call exercised is the one inside _gather_source_files' try block.
+    # only stat() call exercised is the one inside gather_source_files' try block.
     monkeypatch.setattr(Path, "is_file", lambda self, *a, **k: True)
     messages: list[tuple] = []
     monkeypatch.setattr(_api_standards_text._log, "debug", lambda *a: messages.append(a))

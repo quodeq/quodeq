@@ -108,7 +108,7 @@ def test_sync_index_deletes_orphan_non_terminal_row(tmp_path: Path) -> None:
     """A non-terminal row whose run_dir is missing on disk must be removed.
 
     Reproduces the production trap where a row gets stuck as `running` because
-    `_check_stale_and_promote` reads `.heartbeat` from a run_dir that no longer
+    `check_stale_and_promote` reads `.heartbeat` from a run_dir that no longer
     exists, so the heartbeat is unreadable and the row is never promoted.
     """
     reports = tmp_path / "reports"

@@ -19,7 +19,7 @@ _webview_token: str | None = None
 def get_webview_token() -> str:
     """Return this process's launch token, generating it on first use.
 
-    Memoized so the API subprocess (started via _ensure_action_api[_forced],
+    Memoized so the API subprocess (started via ensure_action_api[_forced],
     which sets it into this process's environment before spawning) and the
     webview subprocess (started later by _serve_native, which appends it to
     argv) get the same value, however far apart their call sites are.

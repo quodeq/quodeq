@@ -5,7 +5,7 @@ and MCP-config args builders (config-file / config-arg / cli-register
 dispatch), the model/budget/turns/prompt args builder, and the RunConfig
 cache-fingerprint resolvers those builders (and _command.py's own
 ``_build_mcp_server_args``) share. None of these names are mock.patch
-targets -- ``_build_ai_cmd`` (in _command.py) receives ``provider_cfg``
+targets -- ``build_ai_cmd`` (in _command.py) receives ``provider_cfg``
 already resolved and passes it straight through.
 """
 from __future__ import annotations
@@ -44,7 +44,7 @@ def cmd_binary(cmd: str) -> str:
     """Return the binary to spawn for provider *cmd*.
 
     AI_CMD_PATH (validated at the API boundary, see
-    api._evaluation_helpers._validate_ai_cmd_path) redirects the spawn to an
+    api._evaluation_helpers.validate_ai_cmd_path) redirects the spawn to an
     alternate install or wrapper while *cmd* keeps keying the provider config.
     """
     return get_ai_cmd_path() or cmd
@@ -176,7 +176,7 @@ def build_model_budget_prompt_args(
 def resolve_model_id(config: AnalysisConfig) -> str:
     """Pick the most specific model identifier available for cache keys.
 
-    Mirrors ``cache.dimension_helpers._model_id_from`` when a RunConfig is
+    Mirrors ``cache.dimension_helpers.model_id_from`` when a RunConfig is
     carried; otherwise falls back to ``AnalysisConfig.ai_model``; otherwise
     ``"unknown"``.
     """

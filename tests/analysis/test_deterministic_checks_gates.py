@@ -22,7 +22,7 @@ class TestSeverityGates:
     """A checker's findings go through the same severity gates as everyone else.
 
     The checks path is the third finding sink, after ``FindingEnricher.enrich``
-    (live) and ``_write_findings`` (cache replay). It used to write straight to
+    (live) and ``write_findings`` (cache replay). It used to write straight to
     the evidence and the JSONL, so a checker declared on a gated requirement
     would land at whatever severity it assigned -- the same "code path nobody
     enumerated" shape as issue #657.

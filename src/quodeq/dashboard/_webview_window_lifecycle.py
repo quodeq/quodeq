@@ -1,7 +1,7 @@
 """Window lifecycle hooks: what runs once pywebview's ``loaded`` event fires.
 
 Nothing here is patch-tested by name (tests exercise the individual chrome
-setters through _WindowApi.set_titlebar_theme / _ask_close_choice's own call
+setters through WindowApi.set_titlebar_theme / ask_close_choice's own call
 sites in _webview_window_close.py, not through this orchestration layer), so
 it is free to live outside the facade. main() (in _webview_window.py) imports
 make_on_loaded from here.
@@ -52,7 +52,7 @@ def _run_macos_loaded_hooks(window: object) -> None:
 
 
 def make_on_loaded(window: object) -> "Callable[[], None]":
-    """Return the ``loaded`` handler bound to *window* (mirrors _make_on_reload)."""
+    """Return the ``loaded`` handler bound to *window* (mirrors make_on_reload)."""
     def _on_loaded() -> None:
         window.show()
         if sys.platform == "darwin":
