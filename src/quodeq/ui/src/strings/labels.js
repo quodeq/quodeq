@@ -4,15 +4,17 @@
 import { t } from './index.js';
 import { JOB_STATUS } from '../vocab/jobStatus.js';
 import { SCOPE_GATE_RULE } from '../vocab/scopeGateRule.js';
+import { KNOWN_SEVERITIES } from '../utils/constants.js';
+import { GRANULARITY } from '../utils/granularity.js';
 
-const KNOWN_SEVERITIES = new Set(['critical', 'major', 'minor', 'unknown']);
+const KNOWN_SEVERITY_KEYS = new Set(KNOWN_SEVERITIES);
 
 export function severityLabel(severity) {
   const key = severity || 'unknown';
-  return KNOWN_SEVERITIES.has(key) ? t(`severity.${key}`) : key;
+  return KNOWN_SEVERITY_KEYS.has(key) ? t(`severity.${key}`) : key;
 }
 
-const KNOWN_GRANULARITIES = new Set(['day', 'week', 'month']);
+const KNOWN_GRANULARITIES = new Set(Object.values(GRANULARITY));
 
 export function granularityLabel(granularity) {
   return KNOWN_GRANULARITIES.has(granularity) ? t(`granularity.${granularity}`) : granularity;

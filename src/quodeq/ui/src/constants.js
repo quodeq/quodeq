@@ -1,3 +1,5 @@
+import { GRANULARITY } from './utils/granularity.js';
+
 export const ISO_25010_URL = 'https://www.iso.org/';
 
 // Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).
@@ -67,8 +69,7 @@ export const DEFAULT_VISIBLE_STANDARDS = [
 ];
 
 export const SCORE_HISTORY_GRANULARITY_STORAGE_KEY = 'quodeq-score-history-granularity';
-export const SCORE_HISTORY_GRANULARITIES = ['day', 'week', 'month'];
-export const DEFAULT_SCORE_HISTORY_GRANULARITY = 'day';
+export const DEFAULT_SCORE_HISTORY_GRANULARITY = GRANULARITY.DAY;
 
 // Fired (same-tab) by the assistant's ActionPreviewCard after a successful
 // apply, with { actionType, scores, delta } as detail. App-level effects and
