@@ -19,13 +19,13 @@ export function usePrincipleFixPlanSpec({
       }
       return bucket;
     };
-    const buildMarkdown = () => buildPrinciplePlanText(
+    const buildMarkdown = () => buildPrinciplePlanText({
       principle,
-      filteredViolations,
-      buildBySeverity(),
+      violations: filteredViolations,
+      violationsBySeverity: buildBySeverity(),
       principleData,
-      activeSevFilter,
-    );
+      severityFilter: activeSevFilter,
+    });
     const slug = `${(dimension || 'dim')}-${principle}`.replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
     return {
       id: `fixplan:principle:${dimension || 'dim'}:${principle}:${runId || 'current'}`,
