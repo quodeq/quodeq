@@ -174,7 +174,6 @@ _._build_agent_config  # analysis/subagents/pool.py: Referenced only from tests/
 _._make_rescoring_fetcher  # services/scoring/__init__.py: Referenced only from tests/, which this scan does not cover (1 refs).
 _._make_status_aware_fetcher  # services/dashboard.py: Referenced only from tests/, which this scan does not cover (9 refs).
 _._reset_for_tests  # update/selfupdate.py: Referenced only from tests/, which this scan does not cover (2 refs).
-_.add_log  # services/_job_model.py: Referenced only from tests/, which this scan does not cover (5 refs).
 _.check_node  # shared/prereqs.py: Referenced only from tests/, which this scan does not cover (4 refs).
 _.check_npm  # shared/prereqs.py: Referenced only from tests/, which this scan does not cover (4 refs).
 _.choose_highest_priority  # config/_discipline_detection.py: Referenced only from tests/, which this scan does not cover (1 refs).

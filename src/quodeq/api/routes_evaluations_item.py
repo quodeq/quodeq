@@ -9,6 +9,7 @@ from typing import Any
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._scored_jobs_registry import _claim_scoring, _release_scoring, reset_scored_jobs
+from quodeq.core.run.job_status import JobStatus
 from quodeq.api.helpers import error_response
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.routes import _reports_dir
@@ -51,7 +52,7 @@ def _score_completed_dims_in_bg(app: Flask, job_id: str, job: Any) -> None:
     _claim_scoring() is atomic: exactly one concurrent GET wins the claim.
     """
     job_status = getattr(job, "status", None)
-    if job_status not in ("failed", "cancelled"):
+    if job_status not in (JobStatus.FAILED, JobStatus.CANCELLED):
         return
     if not _claim_scoring(job_id):
         return
@@ -82,12 +83,12 @@ def _resolve_cancel_intent(snapshot: Any, intent: str | None) -> tuple[dict, int
     Returns an ``(body, status)`` error pair if the intent conflicts with
     the status, else ``None`` to let the caller proceed.
     """
-    if intent == "cancel" and snapshot.status != "running":
+    if intent == "cancel" and snapshot.status != JobStatus.RUNNING:
         return error_response(
             "Evaluation already finished. Nothing was cancelled.",
             HTTPStatus.CONFLICT, "ALREADY_FINISHED",
         )
-    if intent == "delete" and snapshot.status == "running":
+    if intent == "delete" and snapshot.status == JobStatus.RUNNING:
         return error_response(
             "Evaluation is still running. Cancel it before deleting.",
             HTTPStatus.CONFLICT, "STILL_RUNNING",
@@ -186,7 +187,7 @@ def _cancel_or_delete_evaluation(provider: ActionProvider, job_id: str) -> Respo
     if conflict is not None:
         body, status = conflict
         return jsonify(body), status
-    if snapshot.status == "running":
+    if snapshot.status == JobStatus.RUNNING:
         return _cancel_running(provider, job_id)
     return _delete_finished(provider, job_id)
 

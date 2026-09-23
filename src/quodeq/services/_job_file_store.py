@@ -18,6 +18,7 @@ from pathlib import Path
 # this module stays inside the SEP-06 logging boundary that _job_model.py
 # already carries a declared exemption for (see
 # tests/tools/test_logging_boundary.py's DECLARED_LOGGING_SITES).
+from quodeq.core.run.job_status import JobStatus
 from quodeq.services._job_model import InMemoryJobStore, Job, JobStore, _MAX_LOG_LINES, _logger
 from quodeq.shared.env_resolve import resolve_env
 
@@ -157,8 +158,8 @@ class FileJobStore(InMemoryJobStore):
                 # the job 'lost' (tracking gone), NOT 'failed': the merged
                 # evaluations list then yields to the truthful ext- index
                 # row for the same run, which can still track and cancel it.
-                if job.status == "running":
-                    job.status = "lost"
+                if job.status == JobStatus.RUNNING:
+                    job.status = JobStatus.LOST
                     job.exit_code = None
                     # Stamp an end time or _cleanup_stale (which only prunes
                     # jobs with ended_at) keeps the flipped job forever.
@@ -176,7 +177,7 @@ class FileJobStore(InMemoryJobStore):
         now = time.time()
         stale_ids: list[str] = []
         for job in self._jobs.values():
-            if job.status == "running":
+            if job.status == JobStatus.RUNNING:
                 continue
             if not job.ended_at:
                 continue

@@ -7,13 +7,10 @@ import subprocess
 import threading
 
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.services._job_model import InMemoryJobStore, Job
 from quodeq.services.jobs import (
     JobManager,
-    STATUS_RUNNING,
-    STATUS_CANCELLED,
-    STATUS_DONE,
-    STATUS_FAILED,
     _EXIT_CODE_TIMEOUT,
 )
 
@@ -47,35 +44,35 @@ class TestMonitorProcess:
             done_event.set()
 
         mgr = JobManager(job_store=store, on_job_complete=on_complete)
-        job = Job("j1", STATUS_RUNNING, ["echo"], "now", None, None)
+        job = Job("j1", JobStatus.RUNNING, ["echo"], "now", None, None)
         store.put(job)
         proc = FakeProcess(stdout="", returncode=0)
         mgr._processes["j1"] = proc
         mgr._monitor_process("j1", proc)
-        assert job.status == STATUS_DONE
+        assert job.status == JobStatus.DONE
         assert job.exit_code == 0
         assert done_event.is_set()
 
     def test_failed_completion(self):
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
+        job = Job("j1", JobStatus.RUNNING, ["cmd"], "now", None, None)
         store.put(job)
         proc = FakeProcess(returncode=1)
         mgr._processes["j1"] = proc
         mgr._monitor_process("j1", proc)
-        assert job.status == STATUS_FAILED
+        assert job.status == JobStatus.FAILED
         assert job.exit_code == 1
 
     def test_cancelled_job_not_overwritten(self):
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
-        job = Job("j1", STATUS_CANCELLED, ["cmd"], "now", "later", None)
+        job = Job("j1", JobStatus.CANCELLED, ["cmd"], "now", "later", None)
         store.put(job)
         proc = FakeProcess(returncode=0)
         mgr._processes["j1"] = proc
         mgr._monitor_process("j1", proc)
-        assert job.status == STATUS_CANCELLED  # not overwritten
+        assert job.status == JobStatus.CANCELLED  # not overwritten
 
     def test_callback_error_does_not_crash(self):
         store = InMemoryJobStore()
@@ -84,12 +81,12 @@ class TestMonitorProcess:
             raise RuntimeError("callback boom")
 
         mgr = JobManager(job_store=store, on_job_complete=bad_callback)
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
+        job = Job("j1", JobStatus.RUNNING, ["cmd"], "now", None, None)
         store.put(job)
         proc = FakeProcess(returncode=0)
         mgr._processes["j1"] = proc
         mgr._monitor_process("j1", proc)  # should not raise
-        assert job.status == STATUS_DONE
+        assert job.status == JobStatus.DONE
 
     def test_env_cap_kills_process(self, monkeypatch):
         """When QUODEQ_JOB_TIMEOUT_S is set, the watchdog kills past that cap
@@ -103,7 +100,7 @@ class TestMonitorProcess:
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
+        job = Job("j1", JobStatus.RUNNING, ["cmd"], "now", None, None)
         store.put(job)
 
         proc = _NeverExitsProcess()
@@ -114,7 +111,7 @@ class TestMonitorProcess:
         assert job.exit_code == _EXIT_CODE_TIMEOUT
         # Watchdog kills are time-budget exits, not failures: the header
         # renders them as "time limit reached" via the exit_reason.
-        assert job.status == STATUS_CANCELLED
+        assert job.status == JobStatus.CANCELLED
         assert job.exit_reason == "deadline"
 
     def test_no_cap_no_deadline_does_not_kill(self, monkeypatch):
@@ -127,7 +124,7 @@ class TestMonitorProcess:
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
+        job = Job("j1", JobStatus.RUNNING, ["cmd"], "now", None, None)
         store.put(job)
 
         # Process exits cleanly after a few poll cycles.
@@ -137,7 +134,7 @@ class TestMonitorProcess:
 
         assert proc.killed is False
         assert job.exit_code == 0
-        assert job.status == STATUS_DONE
+        assert job.status == JobStatus.DONE
 
     def test_deadline_in_future_does_not_kill(self, monkeypatch):
         """Job with deadline_at in the future is not killed by the watchdog."""
@@ -148,7 +145,7 @@ class TestMonitorProcess:
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
         future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None, deadline_at=future)
+        job = Job("j1", JobStatus.RUNNING, ["cmd"], "now", None, None, deadline_at=future)
         store.put(job)
 
         proc = _ExitsAfter(returncode=0, exits_after_n_polls=3)
@@ -156,7 +153,7 @@ class TestMonitorProcess:
         mgr._monitor_process("j1", proc)
 
         assert proc.killed is False
-        assert job.status == STATUS_DONE
+        assert job.status == JobStatus.DONE
 
     def test_deadline_past_plus_grace_kills(self, monkeypatch):
         """Job whose deadline_at has passed (plus the grace window) is killed."""
@@ -171,7 +168,7 @@ class TestMonitorProcess:
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
         past = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None, deadline_at=past)
+        job = Job("j1", JobStatus.RUNNING, ["cmd"], "now", None, None, deadline_at=past)
         store.put(job)
 
         proc = _NeverExitsProcess()
@@ -181,7 +178,7 @@ class TestMonitorProcess:
         assert proc.killed is True
         assert job.exit_code == _EXIT_CODE_TIMEOUT
         # Deadline kill = the user's own time budget doing its job.
-        assert job.status == STATUS_CANCELLED
+        assert job.status == JobStatus.CANCELLED
         assert job.exit_reason == "deadline"
 
     def test_watchdog_kill_terminates_the_process_tree(self, monkeypatch):
@@ -207,7 +204,7 @@ class TestMonitorProcess:
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
-        job = Job("j1", STATUS_RUNNING, ["cmd"], "now", None, None)
+        job = Job("j1", JobStatus.RUNNING, ["cmd"], "now", None, None)
         store.put(job)
         proc = _NeverExitsProcess()
         mgr._processes["j1"] = proc
@@ -215,7 +212,7 @@ class TestMonitorProcess:
 
         assert calls == [proc], "watchdog kill must go through _terminate_process"
         assert job.exit_code == _EXIT_CODE_TIMEOUT
-        assert job.status == STATUS_CANCELLED
+        assert job.status == JobStatus.CANCELLED
 
 
 class _NeverExitsProcess:

@@ -13,8 +13,9 @@ from pathlib import Path
 
 import pytest
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.services._job_model import InMemoryJobStore, JobProcessSeams
-from quodeq.services.jobs import JobManager, STATUS_FAILED
+from quodeq.services.jobs import JobManager
 from tests._timeouts import budget
 
 
@@ -64,16 +65,16 @@ class TestConcurrencyCap:
         manager.start_job(["x"])
         third = manager.start_job(["x"])
         assert third.error and "QUODEQ_MAX_CONCURRENT_JOBS" in third.error
-        assert third.status == STATUS_FAILED
+        assert third.status == JobStatus.FAILED
 
     def test_start_job_uses_a_default_cap_of_eight_when_env_unset(self, monkeypatch, fake_spawn):
         monkeypatch.delenv("QUODEQ_MAX_CONCURRENT_JOBS", raising=False)
         manager = JobManager(JobProcessSeams(spawn_impl=fake_spawn), job_store=InMemoryJobStore())
         for _ in range(8):
             snap = manager.start_job(["x"])
-            assert snap.status != STATUS_FAILED
+            assert snap.status != JobStatus.FAILED
         ninth = manager.start_job(["x"])
-        assert ninth.status == STATUS_FAILED
+        assert ninth.status == JobStatus.FAILED
         assert "QUODEQ_MAX_CONCURRENT_JOBS" in ninth.error
 
     def test_two_starts_racing_at_the_cap_produce_exactly_one_refusal(self, monkeypatch):
@@ -112,23 +113,23 @@ class TestConcurrencyCap:
             for proc in created:
                 proc.kill()
 
-        assert second.status == STATUS_FAILED
+        assert second.status == JobStatus.FAILED
         assert second.error and "QUODEQ_MAX_CONCURRENT_JOBS" in second.error
         assert len(created) == 1, "the second start spawned a process past the cap"
-        assert first_result and first_result[0].status != STATUS_FAILED
+        assert first_result and first_result[0].status != JobStatus.FAILED
 
     def test_start_job_allows_a_new_job_once_a_slot_frees_up(self, monkeypatch, fake_spawn):
         monkeypatch.setenv("QUODEQ_MAX_CONCURRENT_JOBS", "1")
         manager = JobManager(JobProcessSeams(spawn_impl=fake_spawn), job_store=InMemoryJobStore())
         first = manager.start_job(["x"])
         refused = manager.start_job(["x"])
-        assert refused.status == STATUS_FAILED
+        assert refused.status == JobStatus.FAILED
 
         with manager._lock:
             manager._processes.pop(first.job_id, None)
 
         allowed = manager.start_job(["x"])
-        assert allowed.status != STATUS_FAILED
+        assert allowed.status != JobStatus.FAILED
 
 
 class TestCancelExternalRunDirHint:

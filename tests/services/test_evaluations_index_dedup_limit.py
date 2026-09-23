@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._job_model import Job, InMemoryJobStore
-from quodeq.services.jobs import JobManager, STATUS_RUNNING
+from quodeq.services.jobs import JobManager
 from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 
 
@@ -59,7 +60,7 @@ def test_list_limit_pushdown_keeps_db_row_that_outranks_a_deduped_job(tmp_path: 
     store.put(
         Job(
             job_id="internal-stale",
-            status=STATUS_RUNNING,
+            status=JobStatus.RUNNING,
             command=["python", "-m", "quodeq.cli", "evaluate"],
             started_at="2026-01-01T00:00:00+00:00",
             ended_at=None,

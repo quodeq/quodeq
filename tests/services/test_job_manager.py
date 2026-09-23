@@ -6,16 +6,13 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
 from quodeq.services._job_model import InMemoryJobStore, Job
 from quodeq.services.jobs import (
     JobLaunchOptions,
     JobManager,
     JobProcessSeams,
-    STATUS_RUNNING,
-    STATUS_CANCELLED,
-    STATUS_DONE,
-    STATUS_FAILED,
     _EXIT_CODE_SPAWN_FAILURE,
 )
 from tests._timeouts import budget
@@ -31,7 +28,7 @@ def _wait_for_job(manager: JobManager, job_id: str, timeout: float = 5.0) -> Job
     deadline = time.monotonic() + budget(timeout)
     while time.monotonic() < deadline:
         snap = manager.get_job(job_id)
-        if snap and snap.status != STATUS_RUNNING:
+        if snap and snap.status != JobStatus.RUNNING:
             return snap
         time.sleep(0.05)
     return manager.get_job(job_id)
@@ -49,7 +46,7 @@ class TestStartJobSpawnFailure:
 
         mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
         snap = mgr.start_job(["nonexistent"])
-        assert snap.status == STATUS_FAILED
+        assert snap.status == JobStatus.FAILED
         assert snap.exit_code == _EXIT_CODE_SPAWN_FAILURE
         assert snap.error is not None
 
@@ -59,7 +56,7 @@ class TestStartJobSpawnFailure:
 
         mgr = JobManager(JobProcessSeams(spawn_impl=bad_spawn), job_store=InMemoryJobStore())
         snap = mgr.start_job(["bad"])
-        assert snap.status == STATUS_FAILED
+        assert snap.status == JobStatus.FAILED
         assert snap.exit_code == _EXIT_CODE_SPAWN_FAILURE
 
     def test_spawn_failure_returns_friendly_error_not_raw_exception(self):
@@ -99,21 +96,21 @@ class TestCancelJob:
 
     def test_cancel_already_done_returns_false(self):
         store = InMemoryJobStore()
-        store.put(Job("j1", STATUS_DONE, [], "now", "later", 0))
+        store.put(Job("j1", JobStatus.DONE, [], "now", "later", 0))
         mgr = JobManager(job_store=store)
         assert mgr.cancel_job("j1") is False
 
     @patch("quodeq.services.jobs._terminate_process")
     def test_cancel_running_job(self, mock_terminate):
         store = InMemoryJobStore()
-        store.put(Job("j1", STATUS_RUNNING, [], "now", None, None))
+        store.put(Job("j1", JobStatus.RUNNING, [], "now", None, None))
         mgr = JobManager(job_store=store)
         # Simulate a tracked process
         fake_proc = MagicMock()
         fake_proc.pid = 999
         mgr._processes["j1"] = fake_proc
         assert mgr.cancel_job("j1") is True
-        assert store.get("j1").status == STATUS_CANCELLED
+        assert store.get("j1").status == JobStatus.CANCELLED
         # Internal cancel must go through _terminate_process (TERM → grace →
         # SIGKILL); bare _kill_tree leaves orphans when the child is blocked
         # in a long socket read.

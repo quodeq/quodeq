@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
 
+from quodeq.core.run.job_status import JOB_TERMINAL, JobStatus
 from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
@@ -95,12 +96,12 @@ def _stream_terminal_state(provider, job_id: str) -> str:
     # before the runner has flushed status.json — prefer it.
     if provider is not None and hasattr(provider, "_jobs"):
         job = provider._jobs.get_job(job_id)
-        if job is not None and job.status in {"done", "failed", "cancelled"}:
+        if job is not None and job.status in JOB_TERMINAL:
             return job.status
     # Fall back to the on-disk status.json the runner writes on exit.
     path = _resolve_stream_log_path(provider, job_id)
     if path is None:
-        return "completed"
+        return JobStatus.DONE
     status_path = path.parent / "status.json"
     if status_path.exists():
         try:
@@ -110,4 +111,4 @@ def _stream_terminal_state(provider, job_id: str) -> str:
                 return state
         except (OSError, ValueError) as exc:
             _logger.debug("status.json unreadable for job %s, reporting completed: %s", job_id, exc)
-    return "completed"
+    return JobStatus.DONE

@@ -27,7 +27,7 @@ class TestSerialization:
             current_dimension="security",
             dimensions=["security", "performance"],
         )
-        original.add_log("log line 1")
+        original.logs.append("log line 1")
         data = _job_to_json(original)
         restored = _job_from_json(data)
         assert restored.job_id == original.job_id

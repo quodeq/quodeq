@@ -15,6 +15,7 @@ import shutil
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
 from quodeq.services._run_status_readers import _status_json_terminal
@@ -39,7 +40,7 @@ def _merge_internal_jobs(
     """
     covered = {
         (j.output_project, j.output_run_id) for j in internal_jobs
-        if j.output_project and j.output_run_id and j.status != "lost"
+        if j.output_project and j.output_run_id and j.status != JobStatus.LOST
     }
     row_keys = {
         (s.output_project, s.output_run_id) for s in snapshots
@@ -48,7 +49,7 @@ def _merge_internal_jobs(
     visible_internal = [
         j for j in internal_jobs
         if not (
-            j.status == "lost"
+            j.status == JobStatus.LOST
             and (j.output_project, j.output_run_id) in row_keys
         )
     ]

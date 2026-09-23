@@ -20,13 +20,14 @@ from typing import Any, Callable, Iterable
 
 from quodeq.services._job_log_tee import TeeContext, consume_stream, drain_pre_marker_buffer, tee_run_log
 from quodeq.services._job_model import (
-    Job, JobStore, REPORT_PATH_RE, STATUS_CANCELLED, STATUS_DONE, STATUS_FAILED, STATUS_RUNNING,
+    Job, JobStore, REPORT_PATH_RE,
     _ANSI_RE, _CC_MARKER_PREFIX, _DEADLINE_EXIT_REASONS, _EXIT_CODE_TIMEOUT,
     _EXIT_REASON_DEADLINE, _MAX_COMPLETED_JOBS, _REPORT_PATH_MARKER,
     _WATCHDOG_POLL_INTERVAL_S,
 )
 from quodeq.services._job_watchdog import run_status_exit_reason, watchdog_should_kill
 from quodeq.core.observability import LogSink
+from quodeq.core.run.job_status import JobStatus
 from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
 from quodeq.shared.env import env_float
 from quodeq.shared.run_log import RunLogWriter
@@ -141,7 +142,7 @@ class _JobMonitorMixin:
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""
         all_jobs = self._store.list()
-        completed = [j for j in all_jobs if j.status != STATUS_RUNNING]
+        completed = [j for j in all_jobs if j.status != JobStatus.RUNNING]
         excess = len(completed) - _MAX_COMPLETED_JOBS
         if excess > 0:
             # Oldest first, or a store wedged with old junk would evict the
@@ -227,17 +228,17 @@ class _JobMonitorMixin:
         with self._lock:
             self._processes.pop(job_id, None)
             job = self._store.get(job_id)
-            if not job or job.status == STATUS_CANCELLED:
+            if not job or job.status == JobStatus.CANCELLED:
                 return
             job.exit_code = exit_code
             job.exit_reason = exit_reason
             job.ended_at = datetime.now(timezone.utc).isoformat()
             if exit_code == 0:
-                job.status = STATUS_DONE
+                job.status = JobStatus.DONE
             elif exit_reason in _DEADLINE_EXIT_REASONS:
-                job.status = STATUS_CANCELLED
+                job.status = JobStatus.CANCELLED
             else:
-                job.status = STATUS_FAILED
+                job.status = JobStatus.FAILED
             self._store.put(job)
             self._evict_completed_jobs()
         if self._on_job_complete is not None:
