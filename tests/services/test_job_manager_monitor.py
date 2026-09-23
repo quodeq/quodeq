@@ -94,7 +94,9 @@ class TestMonitorProcess:
         """
         from quodeq.services import jobs as jobs_mod
         monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
-        monkeypatch.setattr(jobs_mod, "WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(
+            "quodeq.services._job_monitor_mixin.WATCHDOG_POLL_INTERVAL_S", 0.01,
+        )
         # Group-wide terminate would signal a real pid; stub it to the fake's kill.
         monkeypatch.setattr(jobs_mod, "terminate_process", lambda p: p.kill())
 
@@ -118,9 +120,10 @@ class TestMonitorProcess:
         """With no QUODEQ_JOB_TIMEOUT_S and no deadline_at, the watchdog must
         never preemptively kill — the user did not opt into a time cap.
         """
-        from quodeq.services import jobs as jobs_mod
         monkeypatch.delenv("QUODEQ_JOB_TIMEOUT_S", raising=False)
-        monkeypatch.setattr(jobs_mod, "WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(
+            "quodeq.services._job_monitor_mixin.WATCHDOG_POLL_INTERVAL_S", 0.01,
+        )
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -139,8 +142,9 @@ class TestMonitorProcess:
     def test_deadline_in_future_does_not_kill(self, monkeypatch):
         """Job with deadline_at in the future is not killed by the watchdog."""
         from datetime import datetime, timedelta, timezone
-        from quodeq.services import jobs as jobs_mod
-        monkeypatch.setattr(jobs_mod, "WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(
+            "quodeq.services._job_monitor_mixin.WATCHDOG_POLL_INTERVAL_S", 0.01,
+        )
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -159,7 +163,9 @@ class TestMonitorProcess:
         """Job whose deadline_at has passed (plus the grace window) is killed."""
         from datetime import datetime, timedelta, timezone
         from quodeq.services import jobs as jobs_mod
-        monkeypatch.setattr(jobs_mod, "WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(
+            "quodeq.services._job_monitor_mixin.WATCHDOG_POLL_INTERVAL_S", 0.01,
+        )
         monkeypatch.setattr(jobs_mod, "WATCHDOG_DEADLINE_GRACE_S", 0.02)
         # The watchdog must terminate the whole process tree, not just the
         # parent PID; patch it to the stub's own kill so the loop can break.
@@ -193,7 +199,9 @@ class TestMonitorProcess:
         """
         from quodeq.services import jobs as jobs_mod
         monkeypatch.setenv("QUODEQ_JOB_TIMEOUT_S", "0.05")
-        monkeypatch.setattr(jobs_mod, "WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(
+            "quodeq.services._job_monitor_mixin.WATCHDOG_POLL_INTERVAL_S", 0.01,
+        )
         calls = []
 
         def fake_terminate(p):
