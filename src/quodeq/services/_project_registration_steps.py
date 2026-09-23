@@ -29,10 +29,9 @@ from quodeq.services.wiring import (
     validate_remote_url,
     write_repository_info,
 )
+from quodeq.core.types.project_source import ProjectLocation
 from quodeq.shared.env import get_clones_dir
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
-
-_LOCATION_LOCAL = "local"
 
 
 def _resolve_target_path(request: MaterializeRequest) -> Path:
@@ -82,7 +81,7 @@ def _persist_repository_info(
     """
     info = read_repository_info(project_dir) or {}
     info["path"] = str(target_path.resolve())
-    info["location"] = _LOCATION_LOCAL
+    info["location"] = ProjectLocation.LOCAL
     info["ephemeral"] = bool(ephemeral)
     origin_url = repo if is_url else read_origin_remote(target_path)
     if origin_url:
@@ -120,7 +119,7 @@ def resolve_project_slot(
 
     project_uuid = resolve_project_uuid(
         reports_path,
-        ProjectIdentity(project_name, repo_resolved, discipline, _LOCATION_LOCAL, scope_path=scope_path),
+        ProjectIdentity(project_name, repo_resolved, discipline, ProjectLocation.LOCAL, scope_path=scope_path),
     )
     project_dir = reports_path / project_uuid
     _ensure_onboarding_field(project_dir)

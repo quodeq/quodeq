@@ -32,7 +32,7 @@ from quodeq.services.shared_repo import (
 )
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared.env import get_evaluations_dir
-from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
+from quodeq.core.types.project_source import ProjectSource
 
 from quodeq.api._assistant_hygiene import (  # noqa: F401 — re-export/patch target
     SharedSourceUnavailable,
@@ -88,7 +88,7 @@ def _resolve_shared_source(session: dict) -> tuple[Path, Path | None]:
     must stop an already-open session's reads too, same as every
     /api/shared/* route enforces at request time.
     """
-    if (session.get("source") or SESSION_SOURCE_LOCAL) != SESSION_SOURCE_SHARED:
+    if (session.get("source") or ProjectSource.LOCAL) != ProjectSource.SHARED:
         return Path(get_evaluations_dir()), None
     settings = read_settings()
     if not settings.url:
@@ -110,7 +110,7 @@ def build_tool_context(
     revisited with a schema v2 if needed.
     """
     run_dir = session.get("run_id")
-    source = session.get("source") or SESSION_SOURCE_LOCAL
+    source = session.get("source") or ProjectSource.LOCAL
     reports_dir, score_cache_path = _resolve_shared_source(session)
     repo_root = (
         Path(session["project_uuid"]) if session.get("project_uuid") else None)
@@ -123,7 +123,7 @@ def build_tool_context(
     # only when session-creation-time resolution failed, and it recomputes the
     # identical repo_attach_info check rather than a looser one, so it is a
     # self-healing retry rather than a widening of trust.
-    if repo_root is None and source != SESSION_SOURCE_SHARED and session.get("project_id"):
+    if repo_root is None and source != ProjectSource.SHARED and session.get("project_id"):
         resolved = repo_root_resolver(session["project_id"])
         repo_root = Path(resolved) if resolved else None
     return ToolContext(
@@ -136,7 +136,7 @@ def build_tool_context(
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
         project_id=session.get("project_id"),
         reports_dir=reports_dir,
-        read_only=(source == SESSION_SOURCE_SHARED),
+        read_only=(source == ProjectSource.SHARED),
         score_cache_path=score_cache_path,
         visible_standard_ids=load_visible_standard_ids(repo_root),
         findings_repo_factory=default_findings_repo_factory,

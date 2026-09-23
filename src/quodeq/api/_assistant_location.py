@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from quodeq.core.types.project_source import ProjectLocation
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.services.fs_projects import get_project_info
 from quodeq.services.shared_repo import shared_evaluations_root
@@ -84,7 +85,7 @@ def repo_attach_info(project_id: str | None) -> tuple[str | None, str]:
     path = info.get("path")
     if not path or not isinstance(path, str):
         return None, "no_recorded_path"
-    if str(info.get("location", "")).lower() == "online" or "://" in path:
+    if str(info.get("location", "")).lower() == ProjectLocation.ONLINE or "://" in path:
         return None, "online_project"
     if not Path(path).is_dir():
         return None, "path_missing"

@@ -34,6 +34,7 @@ from quodeq.analysis.errors import (
 from quodeq.analysis.runner import EvaluationError, RunConfig
 from quodeq.analysis.subprocess import AnalysisError
 from quodeq.core.run.job_status import external_job_id
+from quodeq.core.types.project_source import ProjectLocation
 from quodeq._cli_env import resolve_time_limit
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.data.fs.project_resolver import ProjectIdentity
@@ -70,13 +71,13 @@ def setup_run_dirs(args: argparse.Namespace, src: Path, hooks: LifecycleHooks) -
     reports_root.mkdir(parents=True, exist_ok=True)
 
     project_name = hooks.project_name_from_repo(args.repo)
-    location = "online" if is_repo_url(args.repo) else "local"
+    location = ProjectLocation.ONLINE if is_repo_url(args.repo) else ProjectLocation.LOCAL
     scope = getattr(args, "scope", None)
 
     # Detect the git 'origin' remote so two clones of the same repo in
     # different local paths share a single project identity.
     remote_url = None
-    if location == "local":
+    if location == ProjectLocation.LOCAL:
         from quodeq.data.git_cli import git_remote_url
         remote_url = git_remote_url(str(src))
 

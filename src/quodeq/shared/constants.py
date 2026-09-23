@@ -21,13 +21,6 @@ CC_PHASE_ANALYZING_START = "analyzing_start"
 CC_PHASE_DEADLINE_EXTENDED = "deadline_extended"
 CC_PHASE_REPORT_PATH = "report_path"
 
-# Assistant-session source: the user's own repo ("local") vs a read-only
-# shared-results mirror ("shared"). Not the project location, which uses
-# "local"/"online" on a different axis.
-SESSION_SOURCE_LOCAL = "local"
-SESSION_SOURCE_SHARED = "shared"
-SESSION_SOURCES = (SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED)
-
 # Ollama's default listening port and the base URL local providers fall back to.
 OLLAMA_DEFAULT_PORT = "11434"
 OLLAMA_DEFAULT_BASE_URL = f"http://localhost:{OLLAMA_DEFAULT_PORT}"

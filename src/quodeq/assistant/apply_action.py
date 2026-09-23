@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from quodeq.assistant.tools.actions import ACTIONS, ActionConflict, ActionContext, ActionSpec
+from quodeq.core.types.project_source import ProjectSource
 from quodeq.data.ports.assistant import AssistantStore
-from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ def _is_read_only_action(repo: AssistantStore, action: Mapping) -> bool:
     id.
     """
     owner = repo.get_session(action["session_id"])
-    return owner is not None and (owner.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED
+    return owner is not None and (owner.get("source") or ProjectSource.LOCAL) == ProjectSource.SHARED
 
 
 def apply_drafted_action(

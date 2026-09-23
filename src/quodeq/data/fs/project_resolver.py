@@ -15,6 +15,7 @@ from quodeq.data.fs._index_io import load_index, save_index
 from quodeq.data.fs._models import ProjectIdentity, ProjectRepository
 from quodeq.data.fs._resolution import create_project, find_existing_project
 from quodeq.data.fs.children import find_children
+from quodeq.core.types.project_source import ProjectLocation
 
 # Re-exports for backward compatibility
 __all__ = [
@@ -93,7 +94,7 @@ def resolve_project_uuid(
     resolved/created first, then a child project scoped to the subfolder
     is resolved/created with a ``parent`` back-link.
     """
-    if identity.location == "online":
+    if identity.location == ProjectLocation.ONLINE:
         resolved_path = identity.repo_path
     else:
         resolved_path = str(Path(identity.repo_path).resolve())
