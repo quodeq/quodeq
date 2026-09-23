@@ -19,7 +19,9 @@ from quodeq.core.run.state import RunState
 from quodeq.core.scoring.constants import Grade
 from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.project_source import ProjectSource
+from quodeq.core.types.provider import Provider
 from quodeq.core.types.severity import Severity
+from quodeq.llm_bridge import LOCAL_PROVIDERS
 from quodeq.services.shared_publish import PublishState
 
 _UI_SRC = Path(__file__).resolve().parents[2] / "src" / "quodeq" / "ui" / "src"
@@ -55,6 +57,36 @@ def test_ui_mirror_matches_python_enum(rel: str, name: str, enum: type[StrEnum])
 
 
 def test_every_vocab_module_is_covered():
-    covered = {rel for rel, _, _ in _MIRRORS if rel.startswith("vocab/")}
+    covered = {rel for rel, _, _ in _MIRRORS if rel.startswith("vocab/")} | _SPECIAL_VOCAB_MODULES
     present = {f"vocab/{p.name}" for p in _VOCAB_DIR.glob("*.js") if not p.name.endswith(".test.js")}
     assert present == covered
+
+
+_PROVIDER_JS = _UI_SRC / "vocab" / "provider.js"
+# vocab/ modules with a mirror shape _MIRRORS cannot express; each has its own test below.
+_SPECIAL_VOCAB_MODULES = {"vocab/provider.js"}
+
+
+def _js_provider_set(name: str, members: dict[str, str], known: dict[str, set[str]]) -> set[str]:
+    """The values of ``export const <name> = new Set([PROVIDER.X, ...OTHER])`` in vocab/provider.js."""
+    text = _PROVIDER_JS.read_text(encoding="utf-8")
+    match = re.search(rf"export const {name}\s*=\s*new Set\(\[(.*?)\]\)", text, re.DOTALL)
+    assert match, f"{name} not found in {_PROVIDER_JS}"
+    out: set[str] = set()
+    for member, spread in re.findall(r"PROVIDER\.(\w+)|\.\.\.(\w+)", match.group(1)):
+        out |= {members[member]} if member else known[spread]
+    return out
+
+
+def test_ui_provider_mirror_is_python_provider_plus_omlx():
+    ui = _js_object(_PROVIDER_JS, "PROVIDER")
+    assert ui.pop("OMLX") == "omlx"
+    assert ui == {m.name: m.value for m in Provider}
+
+
+def test_ui_provider_sets_match_the_backend_gate():
+    members = _js_object(_PROVIDER_JS, "PROVIDER")
+    local = _js_provider_set("LOCAL_API_PROVIDERS", members, {})
+    assert local == set(LOCAL_PROVIDERS)
+    web = _js_provider_set("WEB_TOOL_PROVIDERS", members, {"LOCAL_API_PROVIDERS": local})
+    assert web == set(LOCAL_PROVIDERS) | {Provider.CLAUDE}

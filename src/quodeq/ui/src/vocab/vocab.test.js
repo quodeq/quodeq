@@ -11,6 +11,7 @@ import { GRADE, GRADE_LADDER } from './grade.js';
 import { DIM_STATE } from './dimState.js';
 import { FINDING_TYPE } from './findingType.js';
 import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from './projectSource.js';
+import { PROVIDER, LOCAL_API_PROVIDERS, WEB_TOOL_PROVIDERS } from './provider.js';
 
 test('vocab modules spell the wire values', () => {
   assert.deepEqual(RUN_STATE, {
@@ -51,4 +52,10 @@ test('external job ids carry the ext- prefix', () => {
   assert.equal(EXTERNAL_JOB_PREFIX, 'ext-');
   assert.equal(isExternalJobId('ext-abc'), true);
   assert.equal(isExternalJobId('abc'), false);
+});
+
+test('provider sets derive from PROVIDER', () => {
+  assert.deepEqual([...LOCAL_API_PROVIDERS].sort(), ['llamacpp', 'ollama', 'omlx']);
+  assert.deepEqual([...WEB_TOOL_PROVIDERS].sort(), ['claude', 'llamacpp', 'ollama', 'omlx']);
+  assert.equal(Object.isFrozen(PROVIDER), true);
 });

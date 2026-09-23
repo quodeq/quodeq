@@ -11,7 +11,6 @@ vi.mock('../../../constants.js', () => ({
   ACTIVE_PROVIDER_KEY: 'active-provider',
   DEFAULT_TIME_LIMIT_S: 3600,
   DEFAULT_MAX_SUBAGENTS: 5,
-  LOCAL_API_PROVIDERS: new Set(['ollama', 'llamacpp', 'omlx']),
   providerKey: (p, k) => `${p}-${k}`,
 }));
 

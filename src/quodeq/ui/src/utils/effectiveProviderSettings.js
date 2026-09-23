@@ -12,9 +12,9 @@ import {
   ACTIVE_PROVIDER_KEY,
   DEFAULT_MAX_SUBAGENTS,
   DEFAULT_TIME_LIMIT_S,
-  LOCAL_API_PROVIDERS,
   providerKey,
 } from '../constants.js';
+import { LOCAL_API_PROVIDERS } from '../vocab/provider.js';
 import { readString } from '../adapters/storage.js';
 
 /**
