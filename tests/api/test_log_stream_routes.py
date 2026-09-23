@@ -86,7 +86,7 @@ def test_stream_logs_rejects_traversal_job_id(tmp_path, app) -> None:
     assert resp.get_json()["code"] == "INVALID_INPUT"
 
 
-def test_is_preparing_job_uses_public_get_job_not_private_store():
+def test_is_preparing_job_uses_in_memory_job():
     """_is_preparing_job must work through provider.in_memory_job(), not the provider's private job store."""
     from quodeq.api._log_stream_routes import _is_preparing_job
     from quodeq.core.types.job import JobSnapshot
@@ -102,7 +102,7 @@ def test_is_preparing_job_uses_public_get_job_not_private_store():
     assert _is_preparing_job(FakeProvider(), "job-1") is True
 
 
-def test_stream_terminal_state_uses_public_get_job_not_private_store():
+def test_stream_terminal_state_uses_in_memory_job():
     """stream_terminal_state must work through provider.in_memory_job(), not the provider's private job store."""
     from quodeq.api._log_stream_routes import stream_terminal_state
     from quodeq.core.types.job import JobSnapshot
