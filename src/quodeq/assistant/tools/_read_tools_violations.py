@@ -76,6 +76,7 @@ def _principle_of(v: dict):
 
 
 def trim_violation(v: dict) -> dict:
+    """Reduce a raw violation to VIOLATION_FIELDS plus principle and requirement."""
     out = {k: v.get(k) for k in VIOLATION_FIELDS}
     out["principle"] = _principle_of(v)
     # Expose the requirement id so the model can form a correct dismiss/verify

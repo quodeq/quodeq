@@ -49,7 +49,7 @@ function useCopyApiRegistration(registerApi, sessionId, termRef) {
     };
     registerApi(sessionId, { getCopyText });
     return () => registerApi(sessionId, null);
-  }, [registerApi, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
+  }, [registerApi, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps -- the ref (termRef) is read at run time, not tracked
 }
 
 // Fit xterm to its box and push the resulting size to the PTY. A failing fit
@@ -169,7 +169,7 @@ function useFocusOnActivate(active, live, termRef) {
     } catch (err) {
       console.warn('[TerminalSessionView] focus on activate failed:', err);
     }
-  }, [active, live]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
+  }, [active, live]); // eslint-disable-line react-hooks/exhaustive-deps -- the ref (termRef) is read at run time, not tracked
 }
 
 // While the socket is not open, disable xterm input. send() already no-ops
@@ -182,7 +182,7 @@ function useDisableInputWhenClosed(status, live, termRef) {
     const term = termRef.current;
     if (!term) return;
     term.options.disableStdin = status !== 'open';
-  }, [status, live]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
+  }, [status, live]); // eslint-disable-line react-hooks/exhaustive-deps -- the ref (termRef) is read at run time, not tracked
 }
 
 // A dead socket swallows keystrokes with no visual cue, so any not-connected

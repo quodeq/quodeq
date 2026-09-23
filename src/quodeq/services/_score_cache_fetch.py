@@ -68,7 +68,7 @@ def _single_flight(kind: str, project: str, version: str) -> Iterator[None]:
 
 
 @dataclass(frozen=True)
-class _CacheTable:
+class CacheTable:
     """One read-through score-cache table: how to read and write its rows."""
 
     kind: str
@@ -79,7 +79,7 @@ class _CacheTable:
 
 
 def read_through(
-    table: _CacheTable, project: str, version: str, compute: Callable[[], dict],
+    table: CacheTable, project: str, version: str, compute: Callable[[], dict],
     cacheable: Callable[[dict], bool] | None, log: LogSink,
 ) -> dict:
     """Hit -> the cached payload. Miss -> compute, cache best-effort, return.
@@ -136,7 +136,7 @@ def cached_accumulated(
     a silent no-op (``NULL_LOG``) since no current caller of this entry point
     threads a real sink here -- see ``_log_write_failure``.
     """
-    table = _CacheTable("accumulated", "accumulated", read_cached_accumulated,
+    table = CacheTable("accumulated", "accumulated", read_cached_accumulated,
                         write_cached_accumulated, "write_cached_accumulated")
     return read_through(table, project, version, compute, cacheable, log)
 
@@ -152,7 +152,7 @@ def cached_project_summary(
     ``log=SHARED_LOG`` through both of its production call sites, so a write
     failure reaches a real sink there.
     """
-    table = _CacheTable("summary", "project summary", read_cached_project_summary,
+    table = CacheTable("summary", "project summary", read_cached_project_summary,
                         write_cached_project_summary, "write_cached_project_summary")
     return read_through(table, project, version, compute, None, log)
 

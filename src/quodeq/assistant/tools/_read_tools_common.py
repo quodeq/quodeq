@@ -58,5 +58,10 @@ def requirement_of(v: dict) -> str:
     dismiss/verify and the suppression filter key on. Run-scoped eval JSON
     and the accumulated serialized-Finding payload both key it as "req";
     "requirement" is accepted for any producer that already renamed it.
+
+    ``req`` is optional on a finding -- ``practiceId`` is the guaranteed
+    identity -- so ``""`` is a normal, round-trippable result: the
+    suppression filter keys on ``req or ""``, so a req-less finding is
+    dismissed and later matched with the same empty string.
     """
     return str(v.get("req") or v.get("requirement") or "")

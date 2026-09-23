@@ -93,6 +93,12 @@ def should_respawn(
     "remaining run budget" (1s past the deadline) would die and immediately
     be respawned, producing an infinite stream of 1-second agents that never
     do useful work.
+
+    The "time budget reached" log names the gate "run deadline" rather than
+    "dimension slice" whenever *run_deadline_at* is None (consolidated mode
+    never sets it) or the auto-scale ratchet has moved *deadline_at* to or
+    past it, since only a *deadline_at* strictly earlier than the whole-run
+    deadline is actually a per-dimension slice.
     """
     remaining = get_queue(queue, queue_path).remaining()
     if cancellation.is_cancelled():
