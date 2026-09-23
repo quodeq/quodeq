@@ -1,0 +1,29 @@
+"""JobStatus wire values, the terminal set and the external-job-id helpers."""
+import json
+
+from quodeq.core.run.job_status import (
+    EXTERNAL_JOB_PREFIX,
+    JOB_TERMINAL,
+    JobStatus,
+    is_external_job_id,
+    strip_external_prefix,
+)
+
+
+def test_values_match_the_persisted_spellings():
+    assert [m.value for m in JobStatus] == ["running", "done", "failed", "cancelled", "lost"]
+    assert json.dumps({"status": JobStatus.DONE}) == '{"status": "done"}'
+
+
+def test_terminal_set():
+    assert JOB_TERMINAL == frozenset(
+        {JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.LOST}
+    )
+
+
+def test_external_prefix_helpers():
+    assert EXTERNAL_JOB_PREFIX == "ext-"
+    assert is_external_job_id("ext-abc")
+    assert not is_external_job_id("abc")
+    assert strip_external_prefix("ext-abc") == "abc"
+    assert strip_external_prefix("abc") == "abc"

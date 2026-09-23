@@ -1,6 +1,8 @@
 """Scoring constants, lookup tables, and project-size scaling."""
 from __future__ import annotations
 
+from enum import StrEnum
+
 # ---------------------------------------------------------------------------
 # Violation severity weights (for weighted violation count)
 # ---------------------------------------------------------------------------
@@ -36,19 +38,37 @@ _RATIO_DAMPENING_TABLE: list[tuple[float, float]] = [
     (-1.0, _MAX_PENALTY_MULTIPLIER),
 ]
 
-# Canonical ordering from worst to best
+
+class Grade(StrEnum):
+    """The grade labels the numeric score scale maps onto.
+
+    The member value is the label written to reports, the grade tables and
+    every API response, so renaming one rewrites stored history.
+    """
+
+    EXEMPLARY = "Exemplary"
+    GOOD = "Good"
+    ADEQUATE = "Adequate"
+    POOR = "Poor"
+    INSUFFICIENT = "Insufficient"
+
+
+# Canonical ordering from worst to best for the qualitative ("text") mode,
+# which `drop_grade` and the weighted-grade aggregation index into. Distinct
+# from `Grade`: "Developing" and "Proficient" exist only on this ladder and
+# no code path produces them from a numeric score.
 GRADE_LADDER: list[str] = [
-    "Insufficient",
+    Grade.INSUFFICIENT,
     "Developing",
     "Proficient",
-    "Exemplary",
+    Grade.EXEMPLARY,
 ]
 
-_GRADE_THRESHOLDS: list[tuple[int, str]] = [
-    (9, "Exemplary"),
-    (7, "Good"),
-    (5, "Adequate"),
-    (3, "Poor"),
+_GRADE_THRESHOLDS: list[tuple[int, Grade]] = [
+    (9, Grade.EXEMPLARY),
+    (7, Grade.GOOD),
+    (5, Grade.ADEQUATE),
+    (3, Grade.POOR),
 ]
 
 # ---------------------------------------------------------------------------

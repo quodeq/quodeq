@@ -17,11 +17,12 @@ from quodeq.core.scoring.constants import (
     _LIFT_COMPRESS,
     _SEVERITY_GRADE_FLOOR,
     _SEVERITY_WEIGHT,
+    Grade,
     MAX_SCORE,
 )
 
 # Canonical grade labels: positions are fixed, only the numeric boundaries move.
-GRADE_LABELS: tuple[str, ...] = ("Exemplary", "Good", "Adequate", "Poor")
+GRADE_LABELS: tuple[str, ...] = (Grade.EXEMPLARY, Grade.GOOD, Grade.ADEQUATE, Grade.POOR)
 
 # Mirrors data/config/dimensions.json (pinned by a sync test). Defaults are
 # equal (1.0) so the overall score is a plain mean; users can retune per

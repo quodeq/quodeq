@@ -5,6 +5,8 @@ for ``report_finding``, ``get_next_files``, and ``mark_file_done``.
 """
 from __future__ import annotations
 
+from enum import StrEnum
+
 # report_finding's "t" and "severity" enums -- the gates in this package
 # (scope_gate.py, provenance_gate.py, precedent_downweight.py, enricher.py)
 # read and write the same finding dict, so they import these rather than
@@ -15,15 +17,28 @@ SEVERITY_CRITICAL = "critical"
 SEVERITY_MAJOR = "major"
 SEVERITY_MINOR = "minor"
 
-# mark_file_done's "status" vocabulary. router.py writes these into the JSONL
-# file_done markers; _loop_guards.py reads them back to count analysed vs
-# abandoned files, so both sides import these rather than retyping them.
-FILE_DONE_STATUS_OK = "ok"
-FILE_DONE_STATUS_ERROR = "error"
-# Accepted by the router but deliberately absent from the tool schema's enum
-# below: "skipped" is written by the server for files the worker could never
-# dispatch, not something a worker is told to report.
-FILE_DONE_STATUS_SKIPPED = "skipped"
+
+class FileDoneStatus(StrEnum):
+    """mark_file_done's "status" vocabulary.
+
+    router.py writes these into the JSONL file_done markers; _loop_guards.py
+    reads them back to count analysed vs abandoned files, so both sides
+    import this rather than retyping the values.
+    """
+
+    OK = "ok"
+    ERROR = "error"
+    # Accepted by the router but deliberately absent from the tool schema's
+    # enum: written by the server for files the worker could never dispatch,
+    # not something a worker is told to report.
+    SKIPPED = "skipped"
+
+
+# Aliases for importers still spelling the old constant names; delete each
+# one once its importers read FileDoneStatus directly.
+FILE_DONE_STATUS_OK = FileDoneStatus.OK
+FILE_DONE_STATUS_ERROR = FileDoneStatus.ERROR
+FILE_DONE_STATUS_SKIPPED = FileDoneStatus.SKIPPED
 
 REPORT_FINDING_NAME = "report_finding"
 REPORT_FINDING_DESC = (
@@ -79,7 +94,7 @@ MARK_FILE_DONE_SCHEMA = {
     "type": "object",
     "properties": {
         "file": {"type": "string", "description": "Repo-relative file path that was just analysed"},
-        "status": {"type": "string", "enum": [FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR], "description": "ok if analysis completed, error if abandoned"},
+        "status": {"type": "string", "enum": [FileDoneStatus.OK, FileDoneStatus.ERROR], "description": "ok if analysis completed, error if abandoned"},
         "reason": {"type": "string", "description": "Short stable code when status=error: token_limit | parse_error | retry_exhausted | subprocess_error | timeout"},
     },
     "required": ["file", "status"],

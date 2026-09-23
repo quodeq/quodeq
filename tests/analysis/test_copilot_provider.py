@@ -29,7 +29,7 @@ def test_copilot_is_discoverable_and_keyless(monkeypatch):
     clients = FsToolingMixin().get_ai_clients(env={})["clients"]
     assert {"id": "copilot", "label": "GitHub Copilot", "type": "cli", "installed": True} in clients
     assert "copilot" in get_allowed_client_ids(env={})
-    assert PROVIDERS["copilot"] == ("", "copilot")
+    assert PROVIDERS["copilot"] == ""
 
 
 def test_copilot_model_listing_uses_account_discovery_not_interactive_cli(monkeypatch):
