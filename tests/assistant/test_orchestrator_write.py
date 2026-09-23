@@ -2,7 +2,7 @@ import pytest
 
 from quodeq.assistant.orchestrator import TurnEngines, TurnRequest, run_turn
 from quodeq.assistant.tools import ToolContext
-from quodeq.assistant.worktree import run
+from quodeq.assistant.worktree import run_git
 from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -11,13 +11,13 @@ from quodeq.data.sqlite.assistant_repository import AssistantRepository
 def repo(tmp_path):
     root = tmp_path / "repo"
     root.mkdir()
-    run(["git", "-C", str(root), "init", "-q", "-b", "main"])
-    run(["git", "-C", str(root), "config", "core.autocrlf", "false"])
-    run(["git", "-C", str(root), "config", "user.name", "T"])
-    run(["git", "-C", str(root), "config", "user.email", "t@example.com"])
+    run_git(["git", "-C", str(root), "init", "-q", "-b", "main"])
+    run_git(["git", "-C", str(root), "config", "core.autocrlf", "false"])
+    run_git(["git", "-C", str(root), "config", "user.name", "T"])
+    run_git(["git", "-C", str(root), "config", "user.email", "t@example.com"])
     (root / "app.py").write_bytes(b"x = 1\n")
-    run(["git", "-C", str(root), "add", "-A"])
-    run(["git", "-C", str(root), "commit", "-q", "-m", "init"])
+    run_git(["git", "-C", str(root), "add", "-A"])
+    run_git(["git", "-C", str(root), "commit", "-q", "-m", "init"])
     return root
 
 

@@ -40,7 +40,7 @@ class WorktreeError(Exception):
     """User-facing worktree/git failure."""
 
 
-def run_bytes(argv: list[str], *, cwd: Path | None = None) -> bytes:
+def run_git_bytes(argv: list[str], *, cwd: Path | None = None) -> bytes:
     """Run *argv* and return its stdout bytes, raising WorktreeError on failure."""
     if argv[0] == "git":
         # never let core.autocrlf (Git-for-Windows default: true) rewrite line
@@ -61,9 +61,9 @@ def run_bytes(argv: list[str], *, cwd: Path | None = None) -> bytes:
     return proc.stdout or b""
 
 
-def run(argv: list[str], *, cwd: Path | None = None) -> str:
+def run_git(argv: list[str], *, cwd: Path | None = None) -> str:
     """Run *argv* and return its stdout decoded as UTF-8."""
-    return run_bytes(argv, cwd=cwd).decode("utf-8", errors="replace")
+    return run_git_bytes(argv, cwd=cwd).decode("utf-8", errors="replace")
 
 
 def diff_text(worktree: Path) -> str:
@@ -71,8 +71,8 @@ def diff_text(worktree: Path) -> str:
 
     Diffs against HEAD, not the index: `git add -N .` records a tracked file's
     deletion in the index, so a plain worktree-vs-index diff would hide it."""
-    run(["git", "-C", str(worktree), "add", "-N", "."])
-    return run(["git", "-C", str(worktree), "diff", "HEAD"])
+    run_git(["git", "-C", str(worktree), "add", "-N", "."])
+    return run_git(["git", "-C", str(worktree), "diff", "HEAD"])
 
 
 def diff_stats(worktree: Path) -> list[dict]:
@@ -81,8 +81,8 @@ def diff_stats(worktree: Path) -> list[dict]:
     Binary files report 0/0 (numstat writes "-"). Unparseable lines are
     skipped rather than raising.
     """
-    run(["git", "-C", str(worktree), "add", "-N", "."])
-    out = run(["git", "-C", str(worktree), "diff", "HEAD", "--numstat"])
+    run_git(["git", "-C", str(worktree), "add", "-N", "."])
+    out = run_git(["git", "-C", str(worktree), "diff", "HEAD", "--numstat"])
     stats = []
     for line in out.splitlines():
         try:

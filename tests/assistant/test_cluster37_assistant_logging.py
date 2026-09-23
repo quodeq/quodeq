@@ -61,7 +61,7 @@ def test_worktree_remove_logs_when_branch_delete_fails(monkeypatch, tmp_path) ->
             raise WorktreeError("boom")
         return ""
 
-    monkeypatch.setattr(_worktree_manager, "run", fake_run)
+    monkeypatch.setattr(_worktree_manager, "run_git", fake_run)
     with patch.object(_worktree_manager._logger, "debug") as debug:
         manager.remove(delete_branch=True)
     assert debug.called
