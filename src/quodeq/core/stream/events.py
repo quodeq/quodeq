@@ -23,6 +23,8 @@ EVENT_TYPE_ITEM_COMPLETED = "item.completed"
 EVENT_TYPE_SESSION_WARNING = "session.warning"
 EVENT_TYPE_SESSION_ERROR = "session.error"
 EVENT_TYPE_TOOL_EXECUTION_START = "tool.execution_start"
+EVENT_TYPE_ERROR = "error"
+EVENT_TYPE_TURN_FAILED = "turn.failed"
 # Copilot's tool-name equivalents of Claude's _FILE_READ_TOOLS.
 _COPILOT_FILE_READ_TOOLS = frozenset({"view", "grep"})
 # Non-retryable reason code for a Copilot MCP-policy block. Read back by

@@ -7,7 +7,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import json_error
-from quodeq.services.rescore_run import rescore_project_run
+from quodeq.services.rescore_run import RESCORE_OK, rescore_project_run
 from quodeq.shared.utils import get_evaluations_dir
 
 
@@ -44,7 +44,7 @@ def register_rescore_routes(app: Flask) -> None:
         eval_dir = _eval_dir_from_app(app)
 
         outcome = rescore_project_run(Path(eval_dir), project, run_id)
-        if outcome.status != "ok":
+        if outcome.status != RESCORE_OK:
             message, http_status, code = _OUTCOME_ERRORS[outcome.status]
             return json_error(message, http_status, code)
         return jsonify(outcome.result)

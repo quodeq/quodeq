@@ -28,6 +28,7 @@ from quodeq.analysis._mcp_arg_builders import (
 from quodeq.analysis.provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
 from quodeq.config.process_env import process_environment_copy
+from quodeq.config.provider import Provider
 from quodeq.shared.utils import get_ai_cmd, get_ai_model
 from quodeq.shared.copilot import build_copilot_env
 
@@ -51,7 +52,7 @@ def _build_ai_cmd(
     args = _build_base_args(cmd, provider_cfg)
     mcp_args, mcp_config_path = _build_mcp_args(config, provider_cfg, work_dir)
     args.extend(mcp_args)
-    if cmd == "copilot" and work_dir is not None:
+    if cmd == Provider.COPILOT and work_dir is not None:
         root = str(work_dir.resolve())
         args.extend(["--add-dir", root])
         prompt = (
@@ -196,6 +197,6 @@ def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = 
             env[key] = val
     for key in provider_cfg.get("env_remove", []):
         env.pop(key, None)
-    if ai_cmd == "copilot":
+    if ai_cmd == Provider.COPILOT:
         return build_copilot_env(env)
     return env

@@ -25,6 +25,8 @@ from quodeq.assistant.tools import ActionContext, ToolContext, default_findings_
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services.standards_prefs import load_visible_standard_ids
 from quodeq.services.shared_repo import (
+    REPO_FORMAT_EMPTY,
+    REPO_FORMAT_OK,
     read_state,
     shared_evaluations_root,
     shared_score_cache_path,
@@ -93,7 +95,7 @@ def _resolve_shared_source(session: dict) -> tuple[Path, Path | None]:
     if not settings.url:
         raise SharedSourceUnavailable("shared repository not configured")
     state = read_state(settings.url)
-    if state not in ("ok", "empty"):
+    if state not in (REPO_FORMAT_OK, REPO_FORMAT_EMPTY):
         raise SharedSourceUnavailable(f"shared repository unavailable: {state}")
     return shared_evaluations_root(settings.url), shared_score_cache_path(settings.url)
 

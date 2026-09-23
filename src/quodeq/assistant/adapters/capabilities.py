@@ -6,6 +6,8 @@ from typing import Callable
 
 import httpx
 
+from quodeq.config.provider import Provider
+
 _logger = logging.getLogger(__name__)
 
 _ASSUME_NATIVE = frozenset({"openrouter", "custom"})
@@ -24,7 +26,7 @@ def supports_native_tools(
     """Report whether the provider/model pair accepts native tool calls."""
     if provider_id in _ASSUME_NATIVE:
         return True
-    if provider_id == "ollama":
+    if provider_id == Provider.OLLAMA:
         base = api_base.rstrip("/")
         base = base[: -len("/v1")] if base.endswith("/v1") else base
         try:

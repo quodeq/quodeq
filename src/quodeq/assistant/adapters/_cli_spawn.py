@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Callable
+from quodeq.config.provider import Provider
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.copilot import build_copilot_env
 
@@ -50,7 +51,7 @@ def _externally_sandboxed(argv: list[str]) -> bool:
 
 def build_chat_env(env: dict | None = None, *, provider: str | None = None) -> dict:
     source = resolve_env(env)
-    if provider == "copilot":
+    if provider == Provider.COPILOT:
         return build_copilot_env(source)
     return {k: v for k, v in source.items() if k in _ALLOWED_ENV_KEYS or k.startswith("LC_")}
 

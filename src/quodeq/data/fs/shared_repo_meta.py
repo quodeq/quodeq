@@ -19,6 +19,18 @@ PUBLISHED_META_FILENAME = "published.json"
 
 _GITIGNORE_CONTENT = "**/evaluation.db\n*.log\n"
 
+# Repo-format/clone-state vocabulary. A local closed set distinct from the
+# core run/job/severity/grade vocabularies core.run/core.types/core.scoring
+# own (tools/check_vocab_literals.py only ratchets those); named here so the
+# handful of comparison call sites below and in api/_assistant_helpers.py,
+# api/assistant_routes.py and services/shared_connect.py spell these out
+# once rather than retyping "ok"/"foreign"/... as bare strings.
+REPO_FORMAT_OK = "ok"
+REPO_FORMAT_EMPTY = "empty"
+REPO_FORMAT_FOREIGN = "foreign"
+REPO_FORMAT_UNSUPPORTED_VERSION = "unsupported_version"
+REPO_STATE_MISSING = "missing"
+
 
 def check_repo_format(repo_root: Path) -> str:
     """Classify a clone from its marker file: ok | empty | foreign | unsupported_version.
@@ -33,30 +45,30 @@ def check_repo_format(repo_root: Path) -> str:
         try:
             data = json.loads(marker.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-            return "foreign"
+            return REPO_FORMAT_FOREIGN
 
         # Marker JSON must be a dict; if not, it's foreign.
         if not isinstance(data, dict):
-            return "foreign"
+            return REPO_FORMAT_FOREIGN
 
         if data.get("format") != FORMAT_NAME:
-            return "foreign"
+            return REPO_FORMAT_FOREIGN
 
         # Try to parse version as int; if it fails or is non-numeric, unsupported.
         try:
             version = int(data.get("version", 0))
         except (ValueError, TypeError):
-            return "unsupported_version"
+            return REPO_FORMAT_UNSUPPORTED_VERSION
 
         if version > FORMAT_VERSION:
-            return "unsupported_version"
-        return "ok"
+            return REPO_FORMAT_UNSUPPORTED_VERSION
+        return REPO_FORMAT_OK
 
     try:
         entries = [p for p in repo_root.iterdir() if p.name != ".git"]
     except OSError:
-        return "foreign"
-    return "empty" if not entries else "foreign"
+        return REPO_FORMAT_FOREIGN
+    return REPO_FORMAT_EMPTY if not entries else REPO_FORMAT_FOREIGN
 
 
 def bootstrap_repo_layout(repo_root: Path) -> None:
@@ -105,7 +117,7 @@ def read_state(url: str, env: dict | None = None) -> str:
     is servable -- routes return an empty listing for it."""
     repo = shared_repo_path(url, env)
     if not (repo / ".git").exists():
-        return "missing"
+        return REPO_STATE_MISSING
     return check_repo_format(repo)
 
 
