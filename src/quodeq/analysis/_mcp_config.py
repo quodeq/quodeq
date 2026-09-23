@@ -7,7 +7,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from quodeq.analysis._config import _AgentParams
+from quodeq.analysis._config import AgentParams
 from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
 from quodeq.shared.mcp import codex_mcp_override
 
@@ -16,7 +16,7 @@ _SERVER_MODULE = ["-m", "quodeq.analysis.mcp.findings_server"]
 
 
 def _findings_server_args(
-    compiled_dir: Path | None, dimension: str | None, ap: _AgentParams,
+    compiled_dir: Path | None, dimension: str | None, ap: AgentParams,
 ) -> list[str]:
     """Build the findings-server flags shared by the config file and the
     Codex ``-c`` override, so the two spawn paths never drift."""
@@ -44,16 +44,16 @@ def _findings_server_args(
     return args
 
 
-def _create_mcp_config(
+def create_mcp_config(
     jsonl_file: Path,
     compiled_dir: Path | None = None,
     dimension: str | None = None,
-    agent_params: _AgentParams | None = None,
+    agent_params: AgentParams | None = None,
     *,
     tools: list[str] | None = None,
 ) -> Path:
     """Create a temporary MCP config file pointing to the findings server."""
-    ap = agent_params or _AgentParams()
+    ap = agent_params or AgentParams()
     mcp_script = str(Path(__file__).resolve().parent / "mcp" / "findings_server.py")
     mcp_args = [
         mcp_script, str(jsonl_file.resolve()),
@@ -80,14 +80,14 @@ def _create_mcp_config(
     return Path(tmp.name)
 
 
-def _codex_mcp_config_arg(
+def codex_mcp_config_arg(
     jsonl_file: Path,
     compiled_dir: Path | None = None,
     dimension: str | None = None,
-    agent_params: _AgentParams | None = None,
+    agent_params: AgentParams | None = None,
 ) -> str:
     """Return a Codex ``-c`` TOML override for the findings MCP server."""
-    ap = agent_params or _AgentParams()
+    ap = agent_params or AgentParams()
     args = [
         *_SERVER_MODULE, str(jsonl_file.resolve()),
         *_findings_server_args(compiled_dir, dimension, ap),

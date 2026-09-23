@@ -22,15 +22,15 @@ from quodeq.data.ports.events import EventEmitter
 _logger = logging.getLogger(__name__)
 
 
-def _evidence_dir(config: RunConfig) -> Path:
+def evidence_dir(config: RunConfig) -> Path:
     return config.work_dir or config.src
 
 
-def _jsonl_path(config: RunConfig, dim_id: str) -> Path:
-    return _evidence_dir(config) / f"{dim_id}_evidence.jsonl"
+def dim_jsonl_path(config: RunConfig, dim_id: str) -> Path:
+    return evidence_dir(config) / f"{dim_id}_evidence.jsonl"
 
 
-def _write_replayed_keys_sidecar(
+def write_replayed_keys_sidecar(
     config: RunConfig, dim_id: str, keys: dict[str, str],
 ) -> None:
     """Record which unconsolidated cache entries this dim replayed.
@@ -45,12 +45,12 @@ def _write_replayed_keys_sidecar(
     """
     if not keys:
         return
-    sidecar = _evidence_dir(config) / f"{dim_id}_replayed_unconsolidated_keys.json"
+    sidecar = evidence_dir(config) / f"{dim_id}_replayed_unconsolidated_keys.json"
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(json.dumps(keys, indent=2), encoding="utf-8")
 
 
-def _compute_files_read(
+def compute_files_read(
     classify: ClassifyResult, jsonl_path: Path, all_files: list[str],
 ) -> int:
     """Return the count of source files reproducible from the cache after
@@ -93,7 +93,7 @@ def _events_log_path(jsonl: Path) -> Path:
     return jsonl.parent.parent / "events.jsonl"
 
 
-def _emit_cached_findings(
+def emit_cached_findings(
     events_log: Path, findings: list[dict], *,
     writer_factory: Callable[[Path], EventEmitter] | None = None,
 ) -> None:
@@ -206,7 +206,7 @@ def _stamp_and_write_findings(
     return stamped
 
 
-def _write_findings(
+def write_findings(
     jsonl: Path, classify: ClassifyResult, *, append: bool,
     emit_events: bool = True,
     trust_model: TrustModel | None = None,
@@ -226,11 +226,11 @@ def _write_findings(
 
     Both groups are re-gated and both are mirrored to events.jsonl. Skipping
     the unconsolidated group in the event log would resurrect the UI-vs-CLI
-    score disagreement that _emit_cached_findings exists to prevent.
+    score disagreement that emit_cached_findings exists to prevent.
     """
     findings = classify.cached_findings
     pending = list(classify.unconsolidated_findings)
     _regate_replayed_findings(findings, pending, trust_model)
     stamped = _stamp_and_write_findings(jsonl, findings, pending, append=append)
     if emit_events:
-        _emit_cached_findings(_events_log_path(jsonl), stamped)
+        emit_cached_findings(_events_log_path(jsonl), stamped)

@@ -14,7 +14,7 @@ from collections.abc import Callable
 import httpx
 import openai
 
-from quodeq.analysis._api_schema import _parse_findings
+from quodeq.analysis._api_schema import parse_findings
 from quodeq.analysis._drop_stats import format_reasons as _format_drop_reasons
 from quodeq.analysis._drop_stats import record as _record_drop_stats
 from quodeq.config.analysis_env import finding_repair_disabled
@@ -71,7 +71,7 @@ def _finding_identity(finding: dict) -> tuple:
     )
 
 
-def _repair_snippetless(
+def repair_snippetless(
     client: openai.OpenAI,
     create_kwargs: dict,
     model: str,
@@ -110,7 +110,7 @@ def _repair_snippetless(
         return []
     choice = response.choices[0] if response.choices else None
     text = (choice.message.content or "") if choice else ""
-    findings, _ = _parse_findings(text)
+    findings, _ = parse_findings(text)
     return findings
 
 
@@ -176,7 +176,7 @@ def _apply_repair(
     return max(0, dropped - recovered)
 
 
-def _finish_call(
+def finish_call(
     model: str,
     finish_reason: str | None,
     text: str,
@@ -198,7 +198,7 @@ def _finish_call(
     """
     drop_reasons: dict[str, int] = {}
     dropped_nodes: list[dict] = []
-    findings, dropped = _parse_findings(
+    findings, dropped = parse_findings(
         text, drop_reasons=drop_reasons, dropped_sink=dropped_nodes,
     )
     if dropped and reask is not None and not finding_repair_disabled():

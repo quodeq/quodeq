@@ -2,7 +2,7 @@
 
 Split out of ``dimension_helpers.py``: this module owns the fingerprint ->
 key formula (``build_cache_key_for_file``) and the provenance drift
-comparison (``_current_provenance`` / ``_accumulate_drift`` /
+comparison (``current_provenance`` / ``accumulate_drift`` /
 ``format_provenance_drift``) that lets ``dimension_helpers.classify_files_via_cache``
 report how many reused findings predate the current model / standards /
 prompts.
@@ -18,8 +18,7 @@ from pathlib import Path
 
 from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache.entry import quodeq_version
-from quodeq.analysis.cache.key import SCHEMA_VERSION as _SCHEMA_VERSION
-from quodeq.analysis.cache.key import CacheKey, compute_key
+from quodeq.analysis.cache.key import SCHEMA_VERSION, CacheKey, compute_key
 from quodeq.analysis.fingerprint import (
     hash_file,
     hash_prompts_map,
@@ -29,8 +28,7 @@ from quodeq.analysis.fingerprint import (
 )
 
 # The schema constant and its history live with the key formula in
-# ``data/cache_store/key.py``; ``_SCHEMA_VERSION`` is re-exported here for the
-# call sites and tests that import it from this module.
+# ``data/cache_store/key.py``.
 
 
 # Provenance fields compared at classify time, in display order.
@@ -46,21 +44,21 @@ _PROV_LABELS = {
 }
 
 
-def _current_provenance(config: RunConfig, dimension: str) -> dict:
+def current_provenance(config: RunConfig, dimension: str) -> dict:
     """The provenance the current run would stamp on a fresh entry."""
     standards_hash = (
         hash_standards(config.standards_dir, dimension, config.src)
         if config.standards_dir else ""
     ) or ""
     return {
-        "model_id": _model_id_from(config),
+        "model_id": model_id_from(config),
         "standards_hash": standards_hash,
-        "prompts_hash": _hash_prompts_combined(config.prompts_dir),
+        "prompts_hash": hash_prompts_combined(config.prompts_dir),
         "quodeq_version": quodeq_version(),
     }
 
 
-def _accumulate_drift(drift: dict, entry_provenance: dict, current: dict) -> None:
+def accumulate_drift(drift: dict, entry_provenance: dict, current: dict) -> None:
     """Count, per provenance field, hits whose recorded value differs from the
     current run. Unknown (blank/missing) entry values are skipped — we only
     claim drift we can prove, so legacy/empty-provenance entries are quiet."""
@@ -95,7 +93,7 @@ def format_provenance_drift(drift: dict, *, reused: int) -> str:
     return ", ".join(parts)
 
 
-def _hash_prompts_combined(prompts_dir: Path | None) -> str:
+def hash_prompts_combined(prompts_dir: Path | None) -> str:
     """Hash all rules-bearing prompts into a single SHA-256.
 
     The fingerprint module stores a per-file map for selective
@@ -115,13 +113,13 @@ def _hash_prompts_combined(prompts_dir: Path | None) -> str:
     return h.hexdigest()
 
 
-def _model_id_from(config: RunConfig) -> str:
+def model_id_from(config: RunConfig) -> str:
     """Pick the most specific model identifier available."""
     opts = config.options
     return opts.subagent_model or opts.ai_model or "unknown"
 
 
-def _content_hash_for(
+def content_hash_for(
     resolved: Path, stashed_hash: str | None, stashed_stamp: tuple[int, int] | None,
 ) -> str:
     """The content hash to key one file's cache entry on.
@@ -164,7 +162,7 @@ def build_cache_key_struct(config: RunConfig, file_path: str, dimension: str) ->
     content_hash = hash_file(config.src / file_path) or ""
     params_hash, _ = dimension_params_state(config.standards_dir, dimension, config.src)
     return CacheKey(
-        schema_version=_SCHEMA_VERSION,
+        schema_version=SCHEMA_VERSION,
         file_content_hash=content_hash,
         file_path=file_path,
         dimension=dimension,

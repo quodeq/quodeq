@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import sys
 
-_JSONRPC_VERSION = "2.0"
+JSONRPC_VERSION = "2.0"
 _MAX_LOG_LINE_PREVIEW = 200
 
 
@@ -19,7 +19,7 @@ def send(msg: dict) -> None:
 
 def ok(req_id: object, result: dict) -> dict:
     """Build a successful JSON-RPC response."""
-    return {"jsonrpc": _JSONRPC_VERSION, "id": req_id, "result": result}
+    return {"jsonrpc": JSONRPC_VERSION, "id": req_id, "result": result}
 
 
 def read_message() -> dict | None:

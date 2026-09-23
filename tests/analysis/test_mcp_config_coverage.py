@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis._config import _AgentParams
-from quodeq.analysis._mcp_config import _create_mcp_config
+from quodeq.analysis._config import AgentParams
+from quodeq.analysis._mcp_config import create_mcp_config
 
 
 @pytest.fixture
@@ -24,13 +24,13 @@ def findings_jsonl(tmp_path: Path) -> Path:
 def make_mcp_config(findings_jsonl: Path):
     """Build an MCP config file and delete every file built, pass or fail.
 
-    ``_create_mcp_config`` writes outside tmp_path, so the cleanup has to be
+    ``create_mcp_config`` writes outside tmp_path, so the cleanup has to be
     explicit; a fixture does it once instead of a try/finally per test.
     """
     created: list[Path] = []
 
     def build(jsonl: Path | None = None, **kwargs) -> Path:
-        path = _create_mcp_config(jsonl or findings_jsonl, **kwargs)
+        path = create_mcp_config(jsonl or findings_jsonl, **kwargs)
         created.append(path)
         return path
 
@@ -75,7 +75,7 @@ class TestCreateMcpConfig:
         queue.touch()
         work = tmp_path / "work"
         work.mkdir()
-        params = _AgentParams(queue_path=queue, agent_id="agent-1", work_dir=work)
+        params = AgentParams(queue_path=queue, agent_id="agent-1", work_dir=work)
         config_path = make_mcp_config(agent_params=params)
         data = json.loads(config_path.read_text())
         args = data["mcpServers"]["findings"]["args"]
@@ -108,7 +108,7 @@ class TestCreateMcpConfig:
         --cache-root, --model-id, and --language so the subprocess can build
         a cache writer whose fingerprint matches classify_files_via_cache.
         """
-        params = _AgentParams(model_id="sonnet", language="kotlin")
+        params = AgentParams(model_id="sonnet", language="kotlin")
         config_path = make_mcp_config(agent_params=params)
         data = json.loads(config_path.read_text())
         args = data["mcpServers"]["findings"]["args"]
@@ -138,7 +138,7 @@ class TestCreateMcpConfig:
 
     def test_includes_standards_dir_from_agent_params(self, tmp_path, make_mcp_config):
         """Final-review fix: --standards-dir is emitted from
-        _AgentParams.standards_dir -- the standards ROOT, distinct from
+        AgentParams.standards_dir -- the standards ROOT, distinct from
         --compiled-dir (already .../compiled). Regression coverage for the
         bug where findings_server.py received compiled_dir where it expected
         the root, doubling the "compiled" path segment and silently missing
@@ -146,7 +146,7 @@ class TestCreateMcpConfig:
         """
         standards_dir = tmp_path / "standards"
         standards_dir.mkdir()
-        params = _AgentParams(standards_dir=standards_dir)
+        params = AgentParams(standards_dir=standards_dir)
         config_path = make_mcp_config(agent_params=params)
         data = json.loads(config_path.read_text())
         args = data["mcpServers"]["findings"]["args"]
@@ -154,7 +154,7 @@ class TestCreateMcpConfig:
         assert str(standards_dir.resolve()) in args
 
     def test_standards_dir_omitted_by_default(self, make_mcp_config):
-        """No _AgentParams.standards_dir => --standards-dir is omitted
+        """No AgentParams.standards_dir => --standards-dir is omitted
         entirely (back-compat: cache writer degrades to no params fingerprint,
         not a crash)."""
         config_path = make_mcp_config(agent_params=None)
@@ -163,7 +163,7 @@ class TestCreateMcpConfig:
         assert "--standards-dir" not in args
 
     def test_cache_flag_fallbacks(self, make_mcp_config):
-        """No _AgentParams overrides => model_id='unknown', language=''."""
+        """No AgentParams overrides => model_id='unknown', language=''."""
         config_path = make_mcp_config(agent_params=None)
         data = json.loads(config_path.read_text())
         args = data["mcpServers"]["findings"]["args"]
@@ -175,7 +175,7 @@ class TestCreateMcpConfig:
 
 
 class TestFindingsServerArgsAreShared:
-    """_create_mcp_config and _codex_mcp_config_arg must emit the same flags.
+    """create_mcp_config and codex_mcp_config_arg must emit the same flags.
 
     They used to hold two copies of the same 14-line block; both now go
     through _findings_server_args.
@@ -199,14 +199,14 @@ class TestFindingsServerArgsAreShared:
         queue.touch()
         work = tmp_path / "work"
         work.mkdir()
-        ap = _AgentParams(
+        ap = AgentParams(
             queue_path=queue, agent_id="agent-7", work_dir=work,
             model_id="sonnet", language="python", standards_dir=standards,
         )
         return jsonl, compiled, ap
 
     def test_both_emitters_agree(self, tmp_path, findings_jsonl, make_mcp_config):
-        from quodeq.analysis._mcp_config import _codex_mcp_config_arg
+        from quodeq.analysis._mcp_config import codex_mcp_config_arg
         from quodeq.analysis.cache.local import default_cache_root
 
         jsonl, compiled, ap = self._fixture(tmp_path, findings_jsonl)
@@ -215,7 +215,7 @@ class TestFindingsServerArgsAreShared:
             jsonl, compiled_dir=compiled, dimension="security", agent_params=ap,
         )
         file_args = json.loads(config_path.read_text())["mcpServers"]["findings"]["args"]
-        codex = _codex_mcp_config_arg(
+        codex = codex_mcp_config_arg(
             jsonl, compiled_dir=compiled, dimension="security", agent_params=ap,
         )
 

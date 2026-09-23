@@ -9,7 +9,7 @@ from pathlib import Path
 
 from quodeq.analysis.subagents._queue_state import (
     FileQueueError,  # re-export
-    _QUEUE_VERSION,
+    QUEUE_VERSION,
     cleanup_stale_lock,
     locked,
     read_state,
@@ -39,7 +39,7 @@ class FileQueue:
 
         if files is not None:
             state: dict = {
-                "version": _QUEUE_VERSION,
+                "version": QUEUE_VERSION,
                 "pending": list(files),
                 "taken": [],
                 # Dim-start timestamp for progress reporting. The file's own

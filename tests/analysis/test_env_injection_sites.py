@@ -11,13 +11,13 @@ from pathlib import Path
 import pytest
 
 from quodeq.analysis import dispatch_policy
-from quodeq.analysis._api_standards_text import _api_prompt_char_budget, _max_standards_chars
-from quodeq.analysis._command import _build_analysis_env
-from quodeq.analysis._mcp_arg_builders import _get_ai_tools, _get_base_ai_args
+from quodeq.analysis._api_standards_text import api_prompt_char_budget, standards_char_budget
+from quodeq.analysis._command import build_analysis_env
+from quodeq.analysis._mcp_arg_builders import get_ai_tools, get_base_ai_args
 from quodeq.analysis.mcp.handlers import _max_file_batch_size
 from quodeq.analysis.prereqs import _check_api_provider, _is_provider_explicitly_configured
 from quodeq.analysis.subagents._pool_launcher import (
-    _default_subagent_model,
+    default_subagent_model,
     _non_scout_providers,
 )
 from quodeq.analysis.subagents._pool_scaling import _agent_failure_streak_limit
@@ -32,10 +32,10 @@ def test_api_file_size_cap_honours_injected_env(monkeypatch):
 def test_prompt_and_standards_budgets_honour_injected_env(monkeypatch):
     monkeypatch.setenv("QUODEQ_MAX_API_PROMPT_CHARS", "11")
     monkeypatch.setenv("QUODEQ_MAX_STANDARDS_CHARS", "11")
-    assert _api_prompt_char_budget(env={"QUODEQ_MAX_API_PROMPT_CHARS": "150"}) == 150
-    assert _api_prompt_char_budget(env={}) == 30000
-    assert _max_standards_chars(env={"QUODEQ_MAX_STANDARDS_CHARS": "99"}) == 99
-    assert _max_standards_chars(env={}) == 50000
+    assert api_prompt_char_budget(env={"QUODEQ_MAX_API_PROMPT_CHARS": "150"}) == 150
+    assert api_prompt_char_budget(env={}) == 30000
+    assert standards_char_budget(env={"QUODEQ_MAX_STANDARDS_CHARS": "99"}) == 99
+    assert standards_char_budget(env={}) == 50000
 
 
 def test_mcp_batch_ceiling_honours_injected_env(monkeypatch):
@@ -47,10 +47,10 @@ def test_mcp_batch_ceiling_honours_injected_env(monkeypatch):
 def test_ai_tools_and_base_args_honour_injected_env(monkeypatch):
     monkeypatch.setenv("QUODEQ_AI_TOOLS", "FromProcess")
     monkeypatch.setenv("QUODEQ_AI_BASE_ARGS", "--from-process")
-    assert _get_ai_tools(env={"QUODEQ_AI_TOOLS": "Read"}) == "Read"
-    assert _get_ai_tools(env={}) == "Glob,Grep,Read"
-    assert _get_base_ai_args(env={"QUODEQ_AI_BASE_ARGS": "-a -b"}) == ("-a", "-b")
-    assert _get_base_ai_args(env={}) == (
+    assert get_ai_tools(env={"QUODEQ_AI_TOOLS": "Read"}) == "Read"
+    assert get_ai_tools(env={}) == "Glob,Grep,Read"
+    assert get_base_ai_args(env={"QUODEQ_AI_BASE_ARGS": "-a -b"}) == ("-a", "-b")
+    assert get_base_ai_args(env={}) == (
         "--print", "--output-format", "stream-json", "--verbose")
 
 
@@ -62,8 +62,8 @@ def test_non_scout_providers_honours_injected_env(monkeypatch):
 
 def test_default_subagent_model_honours_injected_env(monkeypatch):
     monkeypatch.setenv("SUBAGENT_MODEL", "from-process")
-    assert _default_subagent_model(env={"QUODEQ_SUBAGENT_MODEL": "m"}) == "m"
-    assert _default_subagent_model(env={}) is None
+    assert default_subagent_model(env={"QUODEQ_SUBAGENT_MODEL": "m"}) == "m"
+    assert default_subagent_model(env={}) is None
 
 
 def test_agent_failure_streak_limit_honours_injected_env(monkeypatch):
@@ -117,15 +117,15 @@ def test_omlx_credential_loader_honours_the_injected_env(monkeypatch, tmp_path: 
 
 def test_build_analysis_env_uses_the_injected_mapping(monkeypatch):
     monkeypatch.setenv("FROM_PROCESS", "1")
-    built = _build_analysis_env(None, {"KEEP": "yes"})
+    built = build_analysis_env(None, {"KEEP": "yes"})
     assert built["KEEP"] == "yes"
     assert "FROM_PROCESS" not in built
-    assert _build_analysis_env(None, {}) == {}
+    assert build_analysis_env(None, {}) == {}
 
 
 def test_build_analysis_env_does_not_mutate_the_injected_mapping():
     injected = {"KEEP": "yes"}
-    _build_analysis_env(None, injected)
+    build_analysis_env(None, injected)
     assert injected == {"KEEP": "yes"}
 
 
@@ -135,7 +135,7 @@ def test_run_analysis_passes_the_injected_env_to_the_api_bridge(
     from quodeq.analysis import subprocess as analysis_subprocess
 
     seen: list[object] = []
-    monkeypatch.setattr(analysis_subprocess, "_get_provider_type", lambda _cmd: "api")
+    monkeypatch.setattr(analysis_subprocess, "get_provider_type", lambda _cmd: "api")
     monkeypatch.setattr(
         analysis_subprocess, "_run_api_analysis_bridge",
         lambda *args: seen.append(args[-1]))

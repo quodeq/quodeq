@@ -41,8 +41,8 @@ def _setup(
 
 def _make_ctx():
     from quodeq.analysis._dimensions import DimensionsConfig
-    from quodeq.analysis.run_types import _AnalysisContext
-    return _AnalysisContext(
+    from quodeq.analysis.run_types import AnalysisContext
+    return AnalysisContext(
         dimensions_data=DimensionsConfig(dimensions={}),
         date_str="2026-01-01", template="", subagent_template="", total=1,
     )
@@ -80,13 +80,13 @@ def _setup_cache_with_hits(
 def _callbacks():
     """The standard DimensionCallbacks wiring used by every dispatch test here."""
     from quodeq.analysis._dimension_steps import (
-        _build_dimension_prompt,
-        _parse_dimension_evidence,
-        _run_dimension_analysis,
+        build_dimension_prompt,
+        parse_dimension_evidence,
+        run_dimension_analysis,
     )
     from quodeq.analysis.subagents.runner import DimensionCallbacks
     return DimensionCallbacks(
-        build_prompt=_build_dimension_prompt,
-        run_analysis=_run_dimension_analysis,
-        parse_evidence=_parse_dimension_evidence,
+        build_prompt=build_dimension_prompt,
+        run_analysis=run_dimension_analysis,
+        parse_evidence=parse_dimension_evidence,
     )

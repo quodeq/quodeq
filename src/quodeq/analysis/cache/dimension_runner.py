@@ -35,24 +35,24 @@ from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 from quodeq.core.run.exit_reason import ExitReason
 from quodeq.analysis.cache._dimension_context import (
-    _CacheContext,
-    _prepare_cache_context,
+    CacheContext,
+    prepare_cache_context,
 )
 from quodeq.analysis.cache.failure_streak import (
     CircuitBreakerError,
     FailureStreakWatcher,
 )
 from quodeq.analysis.cache._persist_watcher import (
-    _PERSIST_INTERVAL_S,
-    _make_persist_fn,
-    _periodic_persist,
-    _resolve_failure_streak_threshold,
+    PERSIST_INTERVAL_S,
+    make_persist_fn,
+    periodic_persist,
+    resolve_failure_streak_threshold,
 )
 from quodeq.analysis.cache._replay import (
-    _compute_files_read,
-    _emit_cached_findings,  # noqa: F401 -- re-export
-    _evidence_dir,
-    _write_findings,
+    compute_files_read,
+    emit_cached_findings,  # noqa: F401 -- re-export
+    evidence_dir,
+    write_findings,
 )
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.subagents.runner import (
@@ -79,7 +79,7 @@ class CacheRunOptions:
     callbacks: DimensionCallbacks
     cache: CacheBackend | None = None
     dispatcher: Callable[..., Evidence | None] = process_dimension_with_subagents
-    persist_interval_s: float = _PERSIST_INTERVAL_S
+    persist_interval_s: float = PERSIST_INTERVAL_S
 
 
 @dataclass(frozen=True)
@@ -96,46 +96,46 @@ class _MissDispatch:
 
 
 def _handle_all_hits(
-    config: RunConfig, ctx: AnalysisContext, cctx: _CacheContext,
+    config: RunConfig, ctx: AnalysisContext, cctx: CacheContext,
 ) -> Evidence | None:
     """All-hits short-circuit: no dispatch needed. Appends (not overwrites)
     since a dim may run multiple times in the same run (e.g. V1's backfill
     phase); dedup after handles overlap from a same-run repeat."""
     from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
-    _write_findings(cctx.jsonl, cctx.classify, append=True, trust_model=cctx.trust_model)
+    write_findings(cctx.jsonl, cctx.classify, append=True, trust_model=cctx.trust_model)
     if cctx.jsonl.exists():
         deduplicate_jsonl(cctx.jsonl)
     return parse_evidence_from_jsonl(
         config, ctx, cctx.jsonl,
-        files_read=_compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
+        files_read=compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
     )
 
 
-def _prepare_miss_dispatch(config: RunConfig, dim_id: str, cctx: _CacheContext) -> RunConfig:
+def _prepare_miss_dispatch(config: RunConfig, dim_id: str, cctx: CacheContext) -> RunConfig:
     """Build the dispatcher's file-filtered config, pre-write any cached
     findings, and persist the miss-key sidecar the discard path needs."""
     classify = cctx.classify
     miss_options = replace(config.options, incremental_file_filter=set(classify.misses))
     miss_config = replace(config, options=miss_options)
     if classify.cached_findings or classify.unconsolidated_findings:
-        _write_findings(cctx.jsonl, classify, append=True, trust_model=cctx.trust_model)
-    sidecar = _evidence_dir(config) / f"{dim_id}_dispatch_keys.json"
+        write_findings(cctx.jsonl, classify, append=True, trust_model=cctx.trust_model)
+    sidecar = evidence_dir(config) / f"{dim_id}_dispatch_keys.json"
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(json.dumps(classify.miss_keys, indent=2), encoding="utf-8")
     return miss_config
 
 
 def _start_watchers(
-    config: RunConfig, dim_id: str, cctx: _CacheContext, persist_interval_s: float,
+    config: RunConfig, dim_id: str, cctx: CacheContext, persist_interval_s: float,
 ) -> tuple[threading.Event, threading.Thread, FailureStreakWatcher]:
     """Start the periodic-persist watcher (safety net only; on_file_done
     already persists synchronously) and the failure-streak breaker.
     Creates the evidence JSONL up front, when absent, so the breaker's
     first poll doesn't warn about a missing file."""
     stop_event = threading.Event()
-    persist_fn = _make_persist_fn(config, dim_id, cctx, stop_event)
+    persist_fn = make_persist_fn(config, dim_id, cctx, stop_event)
     watcher = threading.Thread(
-        target=_periodic_persist,
+        target=periodic_persist,
         args=(stop_event, persist_fn, persist_interval_s, _logger.warning),
         daemon=True,
         name=f"v2-cache-persist-{dim_id}",
@@ -148,7 +148,7 @@ def _start_watchers(
 
     breaker = FailureStreakWatcher(
         cctx.jsonl,
-        threshold=_resolve_failure_streak_threshold(
+        threshold=resolve_failure_streak_threshold(
             config.options, override=failure_streak_override(),
         ),
     )
@@ -157,7 +157,7 @@ def _start_watchers(
 
 
 def _handle_breaker_trip(
-    config: RunConfig, ctx: AnalysisContext, cctx: _CacheContext,
+    config: RunConfig, ctx: AnalysisContext, cctx: CacheContext,
 ) -> Evidence:
     """Salvage the completed-so-far JSONL instead of discarding the whole
     dimension, flagging failure_streak. Raises when there is nothing to
@@ -165,7 +165,7 @@ def _handle_breaker_trip(
     if cctx.jsonl.exists():
         salvaged = parse_evidence_from_jsonl(
             config, ctx, cctx.jsonl,
-            files_read=_compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
+            files_read=compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
         )
         if salvaged is not None and salvaged.principles:
             salvaged.exit_reason = ExitReason.FAILURE_STREAK
@@ -174,7 +174,7 @@ def _handle_breaker_trip(
 
 
 def _handle_dispatch_result(
-    config: RunConfig, ctx: AnalysisContext, cctx: _CacheContext,
+    config: RunConfig, ctx: AnalysisContext, cctx: CacheContext,
     miss_evidence: Evidence | None,
 ) -> Evidence | None:
     """Finalize Evidence after a normal (non-tripped) dispatch return,
@@ -186,19 +186,19 @@ def _handle_dispatch_result(
         if replayed_anything and cctx.jsonl.exists():
             return parse_evidence_from_jsonl(
                 config, ctx, cctx.jsonl,
-                files_read=_compute_files_read(
+                files_read=compute_files_read(
                     cctx.classify, cctx.jsonl, cctx.files,
                 ),
             )
         return None
     return parse_evidence_from_jsonl(
         config, ctx, cctx.jsonl,
-        files_read=_compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
+        files_read=compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
     )
 
 
 def _dispatch_misses_with_watchers(
-    config: RunConfig, dim_id: str, cctx: _CacheContext,
+    config: RunConfig, dim_id: str, cctx: CacheContext,
     dispatch: _MissDispatch, persist_interval_s: float,
 ) -> Evidence | None:
     """Dispatch the misses under the periodic-persist watcher and the
@@ -229,7 +229,7 @@ def process_dimension_with_cache(
     """V2 entry point — content-addressed cache replaces V1 change
     detection. Falls through to ``opts.dispatcher`` when there's no
     source-file list to classify (matches V1's no-files fallback)."""
-    cctx = _prepare_cache_context(config, dim_id, opts.cache)
+    cctx = prepare_cache_context(config, dim_id, opts.cache)
     if cctx is None:
         return opts.dispatcher(config, dim_id, idx, ctx, opts.callbacks)
 

@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.analysis.run_types import AnalysisOptions, RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import AnalysisOptions, RunConfig, AnalysisContext
 from quodeq.analysis.cache import (
     CacheEntry, LocalFileBackend, build_cache_key_for_file,
 )
@@ -39,9 +39,9 @@ def _setup(tmp_path: Path, contents: dict[str, str]) -> RunConfig:
     )
 
 
-def _make_ctx() -> _AnalysisContext:
+def _make_ctx() -> AnalysisContext:
     from quodeq.analysis._dimensions import DimensionsConfig
-    return _AnalysisContext(
+    return AnalysisContext(
         dimensions_data=DimensionsConfig(dimensions={}),
         date_str="2026-01-01", template="", subagent_template="", total=1,
     )
@@ -49,13 +49,13 @@ def _make_ctx() -> _AnalysisContext:
 
 def _make_callbacks():
     from quodeq.analysis._dimension_steps import (
-        _build_dimension_prompt, _parse_dimension_evidence, _run_dimension_analysis,
+        build_dimension_prompt, parse_dimension_evidence, run_dimension_analysis,
     )
     from quodeq.analysis.subagents.runner import DimensionCallbacks
     return DimensionCallbacks(
-        build_prompt=_build_dimension_prompt,
-        run_analysis=_run_dimension_analysis,
-        parse_evidence=_parse_dimension_evidence,
+        build_prompt=build_dimension_prompt,
+        run_analysis=run_dimension_analysis,
+        parse_evidence=parse_dimension_evidence,
     )
 
 

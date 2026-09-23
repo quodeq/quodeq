@@ -12,14 +12,14 @@ from datetime import datetime, timedelta, timezone
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.runner_markers import emit_marker
-from quodeq.analysis.subprocess import _get_provider_type
+from quodeq.analysis.subprocess import get_provider_type
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.constants import CC_PHASE_ANALYZING_START
 
 _LOCAL_API_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 
-def _warn_if_local_api_oversubscribed(
+def warn_if_local_api_oversubscribed(
     config: RunConfig, *, log: LogSink = NULL_LOG,
 ) -> None:
     """Warn when subagents will queue behind one local-API inference slot.
@@ -35,7 +35,7 @@ def _warn_if_local_api_oversubscribed(
     if config.options.max_subagents <= 1:
         return
     ai_cmd = config.ai_cmd
-    if _get_provider_type(ai_cmd) != "api":
+    if get_provider_type(ai_cmd) != "api":
         return
     api_base = get_provider_configs().get(ai_cmd, {}).get("api_base", "")
     if not any(host in api_base for host in _LOCAL_API_HOSTS):
@@ -49,7 +49,7 @@ def _warn_if_local_api_oversubscribed(
     )
 
 
-def _set_run_deadline(config: RunConfig) -> None:
+def set_run_deadline(config: RunConfig) -> None:
     """Set the run-level deadline once, just before the dim loop starts.
 
     Skipped for dry runs (caller returns earlier), unlimited budget, or when

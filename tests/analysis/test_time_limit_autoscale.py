@@ -176,7 +176,7 @@ class TestLaunchPoolExtendsDeadline:
         with patch.object(_pool_launcher, "SubagentPool", side_effect=_fake_pool), \
              patch.object(_pool_launcher, "get_ai_cmd", return_value="ollama"), \
              patch("quodeq.analysis.subagents._pool_launcher.emit_marker"):
-            _pool_launcher._launch_pool(config, "dim-x", params)
+            _pool_launcher.launch_pool(config, "dim-x", params)
 
         assert config.options.deadline_at > original
         assert captured["config"].deadline_at == config.options.deadline_at
@@ -211,7 +211,7 @@ class TestLaunchPoolExtendsDeadline:
         with patch.object(_pool_launcher, "SubagentPool", side_effect=_fake_pool), \
              patch.object(_pool_launcher, "get_ai_cmd", return_value="ollama"), \
              patch("quodeq.analysis.subagents._pool_launcher.emit_marker") as marker:
-            _pool_launcher._launch_pool(config, "dim-x", params)
+            _pool_launcher.launch_pool(config, "dim-x", params)
 
         assert config.options.deadline_at == original
         assert "deadline_extended" not in [c.args[0] for c in marker.call_args_list]

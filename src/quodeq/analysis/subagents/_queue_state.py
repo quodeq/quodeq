@@ -16,7 +16,7 @@ import time as _time
 from quodeq.analysis.subagents._file_lock import lock_file, unlock_file
 
 
-_QUEUE_VERSION = 1
+QUEUE_VERSION = 1
 
 _LOCK_FILE_MODE = 0o600
 _STALE_LOCK_THRESHOLD_SECS = 60
@@ -84,8 +84,8 @@ def read_state(path: Path) -> dict:
     except json.JSONDecodeError as exc:
         raise FileQueueError(f"Queue file is corrupted: {exc}") from exc
     version = state.get("version")
-    if version != _QUEUE_VERSION:
-        raise FileQueueError(f"Unsupported queue version: {version} (expected {_QUEUE_VERSION})")
+    if version != QUEUE_VERSION:
+        raise FileQueueError(f"Unsupported queue version: {version} (expected {QUEUE_VERSION})")
     if not isinstance(state.get("pending"), list):
         raise FileQueueError("Queue file missing 'pending' list")
     if not isinstance(state.get("taken"), list):

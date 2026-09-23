@@ -32,11 +32,11 @@ def _build_spec(cache_root: Path, src_root: Path, *, content_hashes=None, conten
 
 
 def _key_for(hash_: str) -> str:
-    from quodeq.analysis.cache.cache_writer import _SCHEMA_VERSION
+    from quodeq.analysis.cache.key import SCHEMA_VERSION
     from quodeq.analysis.cache.key import CacheKey, compute_key
 
     return compute_key(CacheKey(
-        schema_version=_SCHEMA_VERSION,
+        schema_version=SCHEMA_VERSION,
         file_content_hash=hash_,
         file_path="a.py",
         dimension="flexibility",

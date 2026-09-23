@@ -14,10 +14,10 @@ from pathlib import Path
 
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
 from quodeq.analysis.manifest_targets import (
-    _MIN_FILES_PER_TARGET,
+    MIN_FILES_PER_TARGET,
     WalkCounts,
-    _build_targets_from_matches,
-    _iter_source_files,
+    build_targets_from_matches,
+    iter_source_files,
     target_name,
 )
 from quodeq.config.discipline_registry import DisciplineRegistry
@@ -73,7 +73,7 @@ def _walk_and_partition_by_scope(
     Each file is assigned to the deepest scope path that contains it. Files outside
     every scope are dropped — they don't belong to any classified subproject and
     shouldn't appear in any target. Callers that must not lose unclassified source
-    pass ``"."`` among *scope_paths* as a catch-all (see _build_multi_scope_manifest).
+    pass ``"."`` among *scope_paths* as a catch-all (see build_multi_scope_manifest).
 
     The fourth element is how many files the git-tracked filter skipped: the
     filter lives in the shared walk, so a monorepo run gets it too.
@@ -85,7 +85,7 @@ def _walk_and_partition_by_scope(
     counts = WalkCounts()
     # Paths are POSIX-style like the scope_paths from detect_matches_recursive,
     # so prefix matching works on Windows.
-    for rel, suffix, lang in _iter_source_files(src, src, walk, counts):
+    for rel, suffix, lang in iter_source_files(src, src, walk, counts):
         owner = resolve_scope(rel)
         if owner is None:
             continue
@@ -109,7 +109,7 @@ def _resolve_scope_paths(
     not. Without a catch-all root scope those files are dropped and the
     manifest comes back with no targets, which downstream reads as "no
     source files". "." is depth 0 in _deepest_scope, so it only claims files
-    no more specific scope owns, and _MIN_FILES_PER_TARGET still keeps a
+    no more specific scope owns, and MIN_FILES_PER_TARGET still keeps a
     handful of stray root files from becoming a target.
     """
     scope_paths = [rel for rel, _ in sub_results]
@@ -132,13 +132,13 @@ def _build_scope_targets(
     for scope in scope_paths:
         lang_files = files_by_scope[scope]
         ext_counts_by_lang = ext_counts_by_scope_lang[scope]
-        framework_targets = _build_targets_from_matches(
+        framework_targets = build_targets_from_matches(
             registry, matches_by_scope[scope], lang_files, ext_counts_by_lang,
             scope_path=scope,
         )
         targets.extend(framework_targets)
         for lang, files in lang_files.items():
-            if len(files) < _MIN_FILES_PER_TARGET:
+            if len(files) < MIN_FILES_PER_TARGET:
                 continue
             targets.append(AnalysisTarget(
                 name=target_name(lang, None),
@@ -151,7 +151,7 @@ def _build_scope_targets(
     return targets
 
 
-def _build_multi_scope_manifest(
+def build_multi_scope_manifest(
     src: Path,
     walk: ManifestWalkSpec,
     registry: DisciplineRegistry,

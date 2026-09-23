@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from quodeq.analysis.run_types import ClassifyStash, RunConfig
 from quodeq.analysis.cache._adoption import try_adopt
 from quodeq.analysis.cache._key_provenance import (
-    _accumulate_drift,
-    _current_provenance,
+    accumulate_drift,
+    current_provenance,
     build_cache_key_struct,
 )
 from quodeq.analysis.cache.backend import CacheBackend
@@ -57,7 +57,7 @@ class ClassifyResult:
     adopted: int = 0
 
 
-def _classify_one_file(
+def classify_one_file(
     config: RunConfig, dimension: str, f: str, cache: CacheBackend, *, bypass_reads: bool,
 ) -> tuple[str, str, CacheEntry | None, bool]:
     """Classify one file against the cache. Returns (key, content_hash, hit,
@@ -72,7 +72,7 @@ def _classify_one_file(
     return key, struct.file_content_hash, hit, adopted
 
 
-def _partition_files_by_cache(
+def partition_files_by_cache(
     config: RunConfig, dimension: str, files: list[str], cache: CacheBackend,
     *, bypass_reads: bool,
 ) -> ClassifyResult:
@@ -92,7 +92,7 @@ def _partition_files_by_cache(
         # between the two then carries a stamp older than its hash, and the
         # write path re-hashes rather than trusting a stale hash.
         stamp = stat_key(config.src / f)
-        key, content_hash, hit, was_adopted = _classify_one_file(
+        key, content_hash, hit, was_adopted = classify_one_file(
             config, dimension, f, cache, bypass_reads=bypass_reads,
         )
         if hit is None:
@@ -102,7 +102,7 @@ def _partition_files_by_cache(
                 miss_stamps[f] = stamp
         else:
             if current_prov is None:
-                current_prov = _current_provenance(config, dimension)
+                current_prov = current_provenance(config, dimension)
             adopted += int(was_adopted)
             if hit.consolidated:
                 cached_findings.extend(hit.findings)
@@ -110,7 +110,7 @@ def _partition_files_by_cache(
                 unconsolidated_findings.extend(hit.findings)
                 unconsolidated_hit_keys[f] = key
             assert current_prov is not None  # set on the first hit, above
-            _accumulate_drift(provenance_drift, hit.provenance or {}, current_prov)
+            accumulate_drift(provenance_drift, hit.provenance or {}, current_prov)
     return ClassifyResult(
         cached_findings=cached_findings,
         misses=misses,
@@ -149,7 +149,7 @@ def classify_files_via_cache(
         if stashed is not None and stashed.files == files_tuple:
             return stashed.result
 
-    result = _partition_files_by_cache(config, dimension, files, cache, bypass_reads=bypass_reads)
+    result = partition_files_by_cache(config, dimension, files, cache, bypass_reads=bypass_reads)
     if not bypass_reads and run_cache is not None:
         run_cache[dimension] = ClassifyStash(files_tuple, result)
     return result

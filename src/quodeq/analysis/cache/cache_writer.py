@@ -24,13 +24,10 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from quodeq.analysis.run_types import RunConfig
-from quodeq.analysis.cache._key_provenance import _content_hash_for
-from quodeq.analysis.cache.dimension_helpers import (
-    _SCHEMA_VERSION,
-    _hash_prompts_combined,
-)
+from quodeq.analysis.cache._key_provenance import content_hash_for
+from quodeq.analysis.cache.dimension_helpers import hash_prompts_combined
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
-from quodeq.analysis.cache.key import CacheKey, compute_key
+from quodeq.analysis.cache.key import SCHEMA_VERSION, CacheKey, compute_key
 from quodeq.analysis.cache.local import LocalFileBackend
 from quodeq.analysis.fingerprint import hash_standards, dimension_params_state
 
@@ -133,7 +130,7 @@ def _resolve_writer_provenance(
         (hash_standards(standards_dir, dimension, src_root) if standards_dir else "")
         or ""
     )
-    prompts_hash = _hash_prompts_combined(prompts_dir)
+    prompts_hash = hash_prompts_combined(prompts_dir)
     version = quodeq_version()
     params_hash, effective_params = dimension_params_state(
         standards_dir, dimension, src_root,
@@ -160,7 +157,7 @@ def _entry_content_hash(target: CacheWriteTarget, file_path: str) -> str:
         inside = False
     if not inside:
         return ""
-    return _content_hash_for(
+    return content_hash_for(
         resolved,
         target.content_hashes.get(file_path),
         target.content_stamps.get(file_path),
@@ -179,7 +176,7 @@ def _write_cache_entry(
     """
     content_hash = _entry_content_hash(target, file_path)
     key_struct = CacheKey(
-        schema_version=_SCHEMA_VERSION,
+        schema_version=SCHEMA_VERSION,
         file_content_hash=content_hash,
         file_path=file_path,
         dimension=target.dimension,
@@ -188,7 +185,7 @@ def _write_cache_entry(
     key = compute_key(key_struct)
     entry = CacheEntry(
         key=key,
-        schema_version=_SCHEMA_VERSION,
+        schema_version=SCHEMA_VERSION,
         findings=findings,
         files_read=1,
         file_path=file_path,

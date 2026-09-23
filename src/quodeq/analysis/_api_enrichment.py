@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def _infer_end_line(findings: list[dict]) -> None:
+def infer_end_line(findings: list[dict]) -> None:
     """Derive end_line from snippet line count when the model omits it.
 
     Small local models often skip end_line, which collapses the dashboard
@@ -26,7 +26,7 @@ def _infer_end_line(findings: list[dict]) -> None:
             f["end_line"] = line + n - 1
 
 
-def _resolve_file_paths(findings: list[dict], source_paths: list[str]) -> list[dict]:
+def resolve_file_paths(findings: list[dict], source_paths: list[str]) -> list[dict]:
     """Resolve short filenames to full relative paths."""
     name_to_path: dict[str, str] = {}
     for p in source_paths:
@@ -40,7 +40,7 @@ def _resolve_file_paths(findings: list[dict], source_paths: list[str]) -> list[d
     return findings
 
 
-def _derive_run_paths(jsonl_file: Path) -> tuple[Path | None, Path | None]:
+def derive_run_paths(jsonl_file: Path) -> tuple[Path | None, Path | None]:
     """``(project_dir, run_dir)`` derived from the evidence file location.
 
     *jsonl_file* is ``<project_dir>/<run_id>/evidence/<dim>_evidence.jsonl``,

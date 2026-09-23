@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from quodeq.core.types.severity import Severity, parse_severity
 
-_SYSTEM_PROMPT = (
+SYSTEM_PROMPT = (
     "You are a code quality evaluator. Quote the offending code into "
     "`snippet` VERBATIM from the source, one or a few contiguous lines, "
     "exact characters, no paraphrase. Set `end_line` to match the last "
@@ -202,7 +202,7 @@ def _extract_finding_dicts(
 _JSON_OPENER_RE = re.compile(r"[\[{]")
 
 
-def _parse_findings(
+def parse_findings(
     raw_json: str,
     *,
     drop_reasons: dict[str, int] | None = None,

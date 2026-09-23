@@ -80,7 +80,7 @@ class TestCallbackRetryPersistsSideEffects:
             attempts[dim] = attempts.get(dim, 0) + 1
             written.append(dim)
 
-        with patch("quodeq.analysis._loop_steps._log_dimension_result", side_effect=log_result):
+        with patch("quodeq.analysis._loop_steps.log_dimension_result", side_effect=log_result):
             run_incremental_loop(
                 cfg, ["security", "reliability"], _ctx(2),
                 LoopDeps(runner=_runner_from(fake_runner), on_dimension_done=scoring_callback),
@@ -119,7 +119,7 @@ class TestProductionBugRegression:
                 usability_first_call["done"] = True
                 raise BrokenPipeError("Broken pipe")
 
-        with patch("quodeq.analysis._loop_steps._log_dimension_result"):
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
             result = run_incremental_loop(
                 cfg, ["security", "reliability", "maintainability", "performance", "usability", "flexibility"], _ctx(6),
                 LoopDeps(runner=_runner_from(fake_runner), on_dimension_done=scoring_callback),

@@ -65,12 +65,12 @@ def test_default_run_uses_incremental_loop(patched_pipeline):
 def test_clean_scan_skips_incremental_loop(patched_pipeline):
     """Clean scan (incremental=False) skips run_incremental_loop."""
     with patched_pipeline(*_COMMON_SEAMS, "process_consolidated_dimensions",
-                          "_get_provider_type") as m:
+                          "get_provider_type") as m:
         m.load_analysis_context.return_value = (["security"], MagicMock())
         m.run_incremental_loop.return_value = {}
         m.run_per_dimension_loop.return_value = {}
         m.process_consolidated_dimensions.return_value = {}
-        m._get_provider_type.return_value = "api"
+        m.get_provider_type.return_value = "api"
 
         from quodeq.analysis._pipeline import _run_dimensions
         _run_dimensions(_make_config(incremental=False))

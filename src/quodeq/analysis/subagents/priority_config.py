@@ -11,7 +11,7 @@ from quodeq.core.observability import NULL_LOG, LogSink
 
 _logger = logging.getLogger(__name__)
 
-_LANG_ALIASES = {"typescript": "javascript", "jsx": "javascript", "tsx": "javascript", "kotlin": "java"}
+LANG_ALIASES = {"typescript": "javascript", "jsx": "javascript", "tsx": "javascript", "kotlin": "java"}
 
 
 @dataclass(frozen=True)

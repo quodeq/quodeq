@@ -1,6 +1,6 @@
 """Shared types for the analysis layer — extracted to break circular dependencies.
 
-``RunConfig``, ``AnalysisOptions``, and ``_AnalysisContext`` are defined
+``RunConfig``, ``AnalysisOptions``, and ``AnalysisContext`` are defined
 here so that both ``runner.py`` and its helper modules (``_incremental``,
 ``_loops``, ``_backfill``, ``subagents/``) can import them without creating
 mutual dependencies.
@@ -157,16 +157,10 @@ class RunConfig:
 
 
 @dataclass(frozen=True)
-class _AnalysisContext:
+class AnalysisContext:
     """Pre-loaded data reused across dimensions."""
     dimensions_data: DimensionsConfig
     date_str: str
     template: str
     subagent_template: str
     total: int
-
-
-# Public spelling for cross-package importers (the class itself keeps its
-# underscore name; see the private-import ratchet). The underscore original
-# stays importable for the many in-package callers.
-AnalysisContext = _AnalysisContext

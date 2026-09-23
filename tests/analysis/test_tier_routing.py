@@ -2,10 +2,10 @@
 from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
-from quodeq.analysis.run_types import RunConfig, AnalysisOptions, _AnalysisContext
-from quodeq.analysis._dimension_steps import _run_dimension_analysis
+from quodeq.analysis.run_types import RunConfig, AnalysisOptions, AnalysisContext
+from quodeq.analysis._dimension_steps import run_dimension_analysis
 from quodeq.analysis._config import AnalysisConfig
-from quodeq.analysis.subagents._pool_launcher import _default_subagent_model
+from quodeq.analysis.subagents._pool_launcher import default_subagent_model
 
 
 class TestAnalysisOptionsAiModel:
@@ -69,7 +69,7 @@ class TestBuildRunConfigAiModel:
 
 
 class TestDimensionAnalysisModel:
-    """_run_dimension_analysis should pass ai_model to AnalysisConfig."""
+    """run_dimension_analysis should pass ai_model to AnalysisConfig."""
 
     def test_passes_ai_model_to_analysis_config(self, tmp_path):
         config = RunConfig(
@@ -77,7 +77,7 @@ class TestDimensionAnalysisModel:
             language="python",
             options=AnalysisOptions(ai_model="qwen3.5:9b"),
         )
-        ctx = _AnalysisContext(
+        ctx = AnalysisContext(
             dimensions_data={},
             date_str="2026-04-03",
             template="",
@@ -87,7 +87,7 @@ class TestDimensionAnalysisModel:
 
         with patch("quodeq.analysis._dimension_steps.run_analysis") as mock_run:
             mock_run.return_value = None
-            _run_dimension_analysis(config, "security", "test prompt", 0, ctx)
+            run_dimension_analysis(config, "security", "test prompt", 0, ctx)
 
             # run_analysis is called as: run_analysis(work_dir=..., prompt=..., stream_file=..., config=AnalysisConfig(...))
             call_kwargs = mock_run.call_args
@@ -109,7 +109,7 @@ class TestDimensionAnalysisModel:
             language="python",
             options=AnalysisOptions(),
         )
-        ctx = _AnalysisContext(
+        ctx = AnalysisContext(
             dimensions_data={},
             date_str="2026-04-03",
             template="",
@@ -119,7 +119,7 @@ class TestDimensionAnalysisModel:
 
         with patch("quodeq.analysis._dimension_steps.run_analysis") as mock_run:
             mock_run.return_value = None
-            _run_dimension_analysis(config, "security", "test prompt", 0, ctx)
+            run_dimension_analysis(config, "security", "test prompt", 0, ctx)
 
             call_kwargs = mock_run.call_args
             analysis_config = call_kwargs.kwargs.get("config")
@@ -138,15 +138,15 @@ class TestSubagentModelEnvVar:
 
     def test_pool_launcher_reads_subagent_model(self):
         env = {"SUBAGENT_MODEL": "sonnet"}
-        assert _default_subagent_model(env=env) == "sonnet"
+        assert default_subagent_model(env=env) == "sonnet"
 
     def test_pool_launcher_falls_back_to_quodeq_prefix(self):
         env = {"QUODEQ_SUBAGENT_MODEL": "haiku"}
-        assert _default_subagent_model(env=env) == "haiku"
+        assert default_subagent_model(env=env) == "haiku"
 
     def test_pool_launcher_prefers_subagent_model(self):
         env = {"SUBAGENT_MODEL": "sonnet", "QUODEQ_SUBAGENT_MODEL": "haiku"}
-        assert _default_subagent_model(env=env) == "sonnet"
+        assert default_subagent_model(env=env) == "sonnet"
 
     def test_pool_launcher_returns_none_when_unset(self):
-        assert _default_subagent_model(env={}) is None
+        assert default_subagent_model(env={}) is None

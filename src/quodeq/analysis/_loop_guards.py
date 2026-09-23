@@ -45,7 +45,7 @@ def _count_ok_files(run_dir: Path | None) -> int:
     return _tally_evidence_dir(run_dir)[0]
 
 
-def _raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> None:
+def raise_on_fatal_cancel(run_dir: Path | None, *, log: LogSink = NULL_LOG) -> None:
     """Fail the run loudly when a dead provider stopped it before ANY analysis.
 
     Two outcomes, keyed on whether this run already analysed files

@@ -18,7 +18,7 @@ from quodeq.analysis._ignore import is_ignored
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec
 from quodeq.config.discipline_registry import DisciplineRegistry
 
-_MIN_FILES_PER_TARGET = 3
+MIN_FILES_PER_TARGET = 3
 _UNKNOWN_LANG = "unknown"
 
 
@@ -38,7 +38,7 @@ def target_name(language: str, category: str | None) -> str:
     return language
 
 
-def _build_targets_from_matches(
+def build_targets_from_matches(
     registry: DisciplineRegistry,
     matches: list[str],
     files_by_lang: dict[str, list[str]],
@@ -56,7 +56,7 @@ def _build_targets_from_matches(
         if lang in claimed_languages:
             continue
         lang_files = files_by_lang.get(lang, [])
-        if len(lang_files) < _MIN_FILES_PER_TARGET:
+        if len(lang_files) < MIN_FILES_PER_TARGET:
             continue
         claimed_languages.add(lang)
         topics = list(rule.suggested_topics) if rule.suggested_topics else []
@@ -96,7 +96,7 @@ def _prune_ignored_dirs(
 class WalkCounts:
     """What a walk tallied on the way past, for the caller to read afterwards.
 
-    ``_iter_source_files`` is a generator, so it cannot hand a total back
+    ``iter_source_files`` is a generator, so it cannot hand a total back
     through a return value. The caller owns this object, passes it in and
     reads it once the walk is exhausted.
     """
@@ -104,7 +104,7 @@ class WalkCounts:
     skipped_untracked: int = 0
 
 
-def _iter_source_files(
+def iter_source_files(
     src: Path, walk_root: Path, walk: ManifestWalkSpec, counts: WalkCounts,
 ) -> Iterator[tuple[str, str, str]]:
     """Walk *walk_root* once, yielding ``(rel_path, suffix, language)`` per source file.

@@ -1,6 +1,6 @@
 """The drop count must be able to say WHICH constraint rejected a finding.
 
-Before this, `_parse_findings` reported only how many finding-shaped dicts
+Before this, `parse_findings` reported only how many finding-shaped dicts
 failed validation. A run showing 102 drops gave no way to tell a systemic
 output-shape problem from scattered model slips without replaying prompts
 against the model by hand.
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from quodeq.analysis._api_schema import _parse_findings
+from quodeq.analysis._api_schema import parse_findings
 from quodeq.analysis._drop_stats import format_reasons
 
 _VALID = {
@@ -25,7 +25,7 @@ def _raw(*findings: dict) -> str:
 class TestDropReasons:
     def test_names_the_failing_field_and_error_type(self):
         reasons: dict[str, int] = {}
-        findings, dropped = _parse_findings(
+        findings, dropped = parse_findings(
             _raw({**_VALID, "line": 0}), drop_reasons=reasons,
         )
 
@@ -34,7 +34,7 @@ class TestDropReasons:
 
     def test_tallies_repeats_of_the_same_constraint(self):
         reasons: dict[str, int] = {}
-        _parse_findings(
+        parse_findings(
             _raw({**_VALID, "snippet": ""}, {**_VALID, "snippet": ""}),
             drop_reasons=reasons,
         )
@@ -43,7 +43,7 @@ class TestDropReasons:
 
     def test_distinct_constraints_stay_separate(self):
         reasons: dict[str, int] = {}
-        _parse_findings(
+        parse_findings(
             _raw({**_VALID, "line": 0}, {**_VALID, "reason": ""}),
             drop_reasons=reasons,
         )
@@ -52,7 +52,7 @@ class TestDropReasons:
 
     def test_a_finding_failing_two_constraints_records_both(self):
         reasons: dict[str, int] = {}
-        _parse_findings(
+        parse_findings(
             _raw({**_VALID, "line": 0, "snippet": ""}), drop_reasons=reasons,
         )
 
@@ -60,13 +60,13 @@ class TestDropReasons:
 
     def test_clean_input_records_nothing(self):
         reasons: dict[str, int] = {}
-        _parse_findings(_raw(_VALID), drop_reasons=reasons)
+        parse_findings(_raw(_VALID), drop_reasons=reasons)
 
         assert reasons == {}
 
     def test_collection_is_opt_in(self):
         """Omitting the out-param keeps the original two-value contract."""
-        findings, dropped = _parse_findings(_raw({**_VALID, "line": 0}))
+        findings, dropped = parse_findings(_raw({**_VALID, "line": 0}))
 
         assert (findings, dropped) == ([], 1)
 

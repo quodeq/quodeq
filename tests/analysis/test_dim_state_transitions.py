@@ -124,7 +124,7 @@ class TestIncrementalLoopTransitions:
         # Patch the success-log call so the test doesn't depend on its side
         # effects (markers, log_success). The loop calls _log_dimension_result
         # directly after a successful incremental dim.
-        monkeypatch.setattr("quodeq.analysis._loop_steps._log_dimension_result", MagicMock())
+        monkeypatch.setattr("quodeq.analysis._loop_steps.log_dimension_result", MagicMock())
 
         run_incremental_loop(
             config, ["security"], ctx,
@@ -148,7 +148,7 @@ class TestIncrementalLoopTransitions:
         ctx = MagicMock(total=1)
         ev = MagicMock()
         ev.exit_reason = None
-        monkeypatch.setattr("quodeq.analysis._loop_steps._log_dimension_result", MagicMock())
+        monkeypatch.setattr("quodeq.analysis._loop_steps.log_dimension_result", MagicMock())
         # First call (incremental) fails with RuntimeError → loop triggers
         # the fallback call, which succeeds and returns ev.
         runner = MagicMock()
@@ -163,7 +163,7 @@ class TestIncrementalLoopTransitions:
     ):
         config = _mk_config(tmp_path)
         ctx = MagicMock(total=1)
-        monkeypatch.setattr("quodeq.analysis._loop_steps._log_dimension_result", MagicMock())
+        monkeypatch.setattr("quodeq.analysis._loop_steps.log_dimension_result", MagicMock())
         # Raise something that's NOT in the (OSError, KeyError, ValueError,
         # RuntimeError) tuple, so the bare ``except Exception`` branch runs.
         runner = _runner_raising(TypeError("unexpected"))
@@ -191,7 +191,7 @@ class TestIncrementalLoopTransitions:
 
 class TestRunDirResolution:
     def test_loop_writes_to_run_dir_when_set(self, tmp_path: Path):
-        from quodeq.analysis._loops import _run_dir_for
+        from quodeq.analysis._loops import run_dir_for
 
         run_dir = tmp_path / "run"
         evidence_dir = run_dir / "evidence"
@@ -202,26 +202,26 @@ class TestRunDirResolution:
         config.run_dir = run_dir
         config.work_dir = evidence_dir
         config.src = tmp_path / "src"
-        assert _run_dir_for(config) == run_dir
+        assert run_dir_for(config) == run_dir
 
     def test_falls_back_to_work_dir_when_run_dir_absent(self, tmp_path: Path):
         """Backward-compat for callers that haven't been migrated."""
-        from quodeq.analysis._loops import _run_dir_for
+        from quodeq.analysis._loops import run_dir_for
 
         config = MagicMock()
         config.run_dir = None
         config.work_dir = tmp_path / "work"
         config.src = tmp_path / "src"
-        assert _run_dir_for(config) == tmp_path / "work"
+        assert run_dir_for(config) == tmp_path / "work"
 
     def test_falls_back_to_src_when_neither_set(self, tmp_path: Path):
-        from quodeq.analysis._loops import _run_dir_for
+        from quodeq.analysis._loops import run_dir_for
 
         config = MagicMock()
         config.run_dir = None
         config.work_dir = None
         config.src = tmp_path / "src"
-        assert _run_dir_for(config) == tmp_path / "src"
+        assert run_dir_for(config) == tmp_path / "src"
 
     def test_loop_state_lands_where_lifecycle_seeds(self, tmp_path: Path):
         """End-to-end: lifecycle seeds + loop transitions write to ONE file."""

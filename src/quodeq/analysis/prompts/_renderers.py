@@ -28,7 +28,7 @@ def _require_field(entry: dict, field: str, kind: str) -> object:
     return value
 
 
-def _load_dimension_data(
+def load_dimension_data(
     compiled_dir: Path,
     dimension: str,
     evaluators_dir: Path | None = None,
@@ -61,7 +61,7 @@ def render_compiled_standards(
     overrides: dict[str, dict] | None = None,
 ) -> str:
     """Render compiled standards as a requirements checklist organized by principle."""
-    data = _load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    data = load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if data is None:
         return _NO_STANDARDS_FOR_DIM
     lines = []
@@ -95,7 +95,7 @@ def render_compact_standards(
     Returns a compact JSON array grouped by principle with requirement IDs
     and rules. No pretty-printing — minimizes token usage.
     """
-    data = _load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    data = load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if data is None:
         return _NO_STANDARDS_FOR_DIM
     checklist = []

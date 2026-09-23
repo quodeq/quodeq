@@ -24,9 +24,8 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from quodeq.analysis.cache.backend import CacheBackend
-from quodeq.analysis.cache.dimension_helpers import _SCHEMA_VERSION
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance
-from quodeq.analysis.cache.key import CacheKey, compute_key
+from quodeq.analysis.cache.key import SCHEMA_VERSION, CacheKey, compute_key
 
 
 @dataclass(frozen=True)
@@ -101,7 +100,7 @@ def analyze_unit(
     *,
     cache: CacheBackend,
     dispatcher: Dispatcher,
-    schema_version: int = _SCHEMA_VERSION,
+    schema_version: int = SCHEMA_VERSION,
 ) -> UnitResult:
     """Cache-or-dispatch one work unit.
 

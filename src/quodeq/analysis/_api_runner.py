@@ -22,12 +22,12 @@ from typing import TYPE_CHECKING, Callable
 
 from quodeq.analysis._api_call import (
     ApiRunnerConfig,
-    _call_api,
+    call_api,
 )
 from quodeq.analysis._api_enrichment import (
-    _derive_run_paths,
-    _infer_end_line,
-    _resolve_file_paths,
+    derive_run_paths,
+    infer_end_line,
+    resolve_file_paths,
 )
 from quodeq.analysis.errors import FatalProviderError
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
@@ -240,15 +240,15 @@ def _run_call_and_enrich(
     """
     fatal_exc: FatalProviderError | None = None
     try:
-        findings, was_lossy = _call_api(request.prompt, config)
+        findings, was_lossy = call_api(request.prompt, config)
     except FatalProviderError as exc:
         fatal_exc, findings, was_lossy = exc, [], True
 
     if request.source_file_paths:
-        findings = _resolve_file_paths(findings, request.source_file_paths)
-    _infer_end_line(findings)
+        findings = resolve_file_paths(findings, request.source_file_paths)
+    infer_end_line(findings)
 
-    project_dir, run_dir = _derive_run_paths(request.jsonl_file)
+    project_dir, run_dir = derive_run_paths(request.jsonl_file)
     ctx = _build_router_context(
         request.compiled_dir, request.dimension, request.work_dir, project_dir, run_dir,
     )

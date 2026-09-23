@@ -16,7 +16,7 @@ import json
 
 import pytest
 
-from quodeq.analysis._api_schema import _Finding, _parse_findings
+from quodeq.analysis._api_schema import _Finding, parse_findings
 
 # The exact shape gemma4:26b-mlx emitted, captured from a live run.
 _COMPLIANCE_FINDING = {
@@ -76,7 +76,7 @@ class TestSeverityCoercion:
         violation = {**_COMPLIANCE_FINDING, "t": "violation", "severity": "major"}
         raw = json.dumps({"findings": [violation, _COMPLIANCE_FINDING]})
 
-        findings, dropped = _parse_findings(raw)
+        findings, dropped = parse_findings(raw)
 
         assert dropped == 0
         assert [f["severity"] for f in findings] == ["major", "minor"]

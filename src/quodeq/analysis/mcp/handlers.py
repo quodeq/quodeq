@@ -7,9 +7,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from quodeq import __version__
-from quodeq.analysis.mcp.jsonrpc_io import _JSONRPC_VERSION, send as _send, ok as _ok
+from quodeq.analysis.mcp.jsonrpc_io import JSONRPC_VERSION, send as _send, ok as _ok
 from quodeq.analysis.mcp.schemas import (
-    _DEFAULT_FILE_BATCH_SIZE,
+    DEFAULT_FILE_BATCH_SIZE,
     GET_NEXT_FILES_DESC,
     GET_NEXT_FILES_NAME,
     GET_NEXT_FILES_SCHEMA,
@@ -89,9 +89,9 @@ def _handle_get_next_files(
             "content": [{"type": "text", "text": "No file queue configured. Ensure the evaluation was started with a file manifest and the queue path is set."}],
             "isError": True,
         })
-    count = args.get("count", _DEFAULT_FILE_BATCH_SIZE)
+    count = args.get("count", DEFAULT_FILE_BATCH_SIZE)
     if not isinstance(count, int) or count < 1:
-        count = _DEFAULT_FILE_BATCH_SIZE
+        count = DEFAULT_FILE_BATCH_SIZE
     count = min(count, _max_file_batch_size())
     files = queue.take(count, agent_id=agent_id)
     if not files:
@@ -153,5 +153,5 @@ def handle_tools_call(
 def handle_unknown_method(req_id: object, method: str) -> None:
     """Send a JSON-RPC method-not-found error for unrecognised methods."""
     if req_id is not None:
-        _send({"jsonrpc": _JSONRPC_VERSION, "id": req_id,
+        _send({"jsonrpc": JSONRPC_VERSION, "id": req_id,
                "error": {"code": _JSONRPC_METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 
 from quodeq.analysis._command import (
-    _register_cli_mcp,
+    register_cli_mcp,
     _unregister_cli_mcp,
     _cli_mcp_registered,
 )
@@ -14,7 +14,7 @@ from quodeq.analysis._config import AnalysisConfig
 
 
 # ---------------------------------------------------------------------------
-# _register_cli_mcp / _unregister_cli_mcp
+# register_cli_mcp / _unregister_cli_mcp
 # ---------------------------------------------------------------------------
 
 class TestRegisterCliMcp:
@@ -28,7 +28,7 @@ class TestRegisterCliMcp:
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
              patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.return_value = MagicMock(returncode=0)
-            name = _register_cli_mcp("mycli", config)
+            name = register_cli_mcp("mycli", config)
         assert name == "quodeq-findings"
 
     def test_register_cached_on_second_call(self, tmp_path):
@@ -37,8 +37,8 @@ class TestRegisterCliMcp:
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
              patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.return_value = MagicMock(returncode=0)
-            _register_cli_mcp("mycli", config)
-            _register_cli_mcp("mycli", config)
+            register_cli_mcp("mycli", config)
+            register_cli_mcp("mycli", config)
         # Only called for unregister + register on first call, second call is cached
         # unregister is run(check=False), register is run(check=True)
         assert mock_run.call_count == 2  # 1 unregister + 1 register
@@ -49,7 +49,7 @@ class TestRegisterCliMcp:
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
              patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.side_effect = [MagicMock(), subprocess.CalledProcessError(1, "mycli")]
-            name = _register_cli_mcp("mycli", config)
+            name = register_cli_mcp("mycli", config)
         assert name is None
 
     def test_register_returns_none_on_timeout(self, tmp_path):
@@ -58,7 +58,7 @@ class TestRegisterCliMcp:
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
              patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.side_effect = [MagicMock(), subprocess.TimeoutExpired("mycli", 10)]
-            name = _register_cli_mcp("mycli", config)
+            name = register_cli_mcp("mycli", config)
         assert name is None
 
     def test_register_returns_none_on_file_not_found(self, tmp_path):
@@ -67,7 +67,7 @@ class TestRegisterCliMcp:
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
              patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.side_effect = [MagicMock(), FileNotFoundError("mycli")]
-            name = _register_cli_mcp("mycli", config)
+            name = register_cli_mcp("mycli", config)
         assert name is None
 
     def test_no_separator_when_configured(self, tmp_path):
@@ -77,7 +77,7 @@ class TestRegisterCliMcp:
         with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
              patch("quodeq.analysis._command._get_provider_configs", return_value=provider):
             mock_run.return_value = MagicMock(returncode=0)
-            _register_cli_mcp("gemini", config)
+            register_cli_mcp("gemini", config)
         register_call = mock_run.call_args_list[-1]
         cmd_args = register_call.args[0]
         assert "--" not in cmd_args

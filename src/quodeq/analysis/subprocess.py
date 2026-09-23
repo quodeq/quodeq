@@ -23,29 +23,29 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.analysis._api_batch import (
-    _build_api_batch_context,
-    _build_batch_api_config,
-    _dispatch_api_batches,
+    build_api_batch_context,
+    build_batch_api_config,
+    dispatch_api_batches,
 )
 from quodeq.analysis._api_source_gathering import (
-    _batch_files_by_size,  # noqa: F401 -- re-export
-    _CREDENTIAL_LOADERS,
-    _gather_api_source_files,  # noqa: F401 -- re-export
+    batch_files_by_size,  # noqa: F401 -- re-export
+    CREDENTIAL_LOADERS,
+    gather_api_source_files,  # noqa: F401 -- re-export
     write_stream_done_marker,
 )
 from quodeq.analysis._api_standards_text import (
-    _gather_source_files,  # noqa: F401 -- re-export
-    _load_standards_text,  # noqa: F401 -- re-export
-    _render_standards_grouped,  # noqa: F401 -- re-export
-    _SKIP_DIRS,  # noqa: F401 -- re-export
+    gather_source_files,  # noqa: F401 -- re-export
+    load_standards_text,  # noqa: F401 -- re-export
+    render_standards_grouped,  # noqa: F401 -- re-export
+    SKIP_DIRS,  # noqa: F401 -- re-export
 )
 from quodeq.analysis._command import (
-    _build_ai_cmd,
-    _build_analysis_env,
-    _register_cli_mcp,
+    build_ai_cmd,
+    build_analysis_env,
+    register_cli_mcp,
 )
-from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, _SpawnPaths
-from quodeq.analysis._process import AnalysisError, _check_process_result, _spawn_and_monitor
+from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, SpawnPaths
+from quodeq.analysis._process import AnalysisError, check_process_result, spawn_and_monitor
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
@@ -66,7 +66,7 @@ __all__ = [
     "HeartbeatCallback",
     "count_files_from_stream",
     "run_analysis",
-    "_build_ai_cmd",
+    "build_ai_cmd",
 ]
 
 
@@ -75,7 +75,7 @@ def count_files_from_stream(stream_file: Path) -> int:
     return len(count_files_in_stream(stream_file))
 
 
-def _get_provider_type(ai_cmd: str) -> str:
+def get_provider_type(ai_cmd: str) -> str:
     """Determine the provider type (cli or api) from the provider config."""
     configs = get_provider_configs()
     provider_cfg = configs.get(ai_cmd, {})
@@ -88,7 +88,7 @@ def _run_cli_analysis(
     """Run analysis via CLI subprocess."""
     ai_cmd = cfg.ai_cmd or get_ai_cmd()
     # ai_cmd comes from the AI_CMD/AI_PROVIDER env var and is gated to known
-    # providers in _register_cli_mcp before any subprocess call; it runs via a
+    # providers in register_cli_mcp before any subprocess call; it runs via a
     # subprocess list (no shell injection). Skipping shutil.which for CI/PATH.
     configs = get_provider_configs()
     provider_cfg = configs.get(ai_cmd, {})
@@ -98,30 +98,30 @@ def _run_cli_analysis(
     # Registration is shared across all parallel agents — the first agent registers,
     # and we never unregister during the run (cleanup happens at pool level).
     if mcp_style == MCP_STYLE_CLI_REGISTER and cfg.jsonl_file is not None:
-        _register_cli_mcp(ai_cmd, cfg, work_dir)
+        register_cli_mcp(ai_cmd, cfg, work_dir)
 
-    args, mcp_config_path = _build_ai_cmd(prompt, cfg, work_dir=work_dir)
+    args, mcp_config_path = build_ai_cmd(prompt, cfg, work_dir=work_dir)
     stream_err = Path(str(stream_file) + ".err")
 
     try:
-        env = _build_analysis_env(ai_cmd)
+        env = build_analysis_env(ai_cmd)
         with ExitStack() as stack:
             cwd = work_dir
             if ai_cmd == Provider.COPILOT:
                 cwd = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="quodeq-copilot-")))
-            process, timed_out = _spawn_and_monitor(
-                args, cwd, env, _SpawnPaths(stream_file, stream_err), cfg,
+            process, timed_out = spawn_and_monitor(
+                args, cwd, env, SpawnPaths(stream_file, stream_err), cfg,
             )
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
         # Don't unregister cli MCP here — other parallel agents may still need it.
-        # Cleanup happens via _register_cli_mcp's idempotent remove-then-add on next run.
+        # Cleanup happens via register_cli_mcp's idempotent remove-then-add on next run.
 
     if not timed_out:
         if ai_cmd == Provider.COPILOT:
             _check_copilot_stream(stream_file)
-        _check_process_result(process, stream_err)
+        check_process_result(process, stream_err)
 
 
 def _check_copilot_stream(stream_file: Path) -> None:
@@ -159,7 +159,7 @@ def _resolve_provider_config(
     api_key_env = provider_cfg.get("api_key_env", "")
     api_key = env.get(api_key_env, "") if api_key_env else ""
     if not api_key:
-        loader = _CREDENTIAL_LOADERS.get(ai_cmd)
+        loader = CREDENTIAL_LOADERS.get(ai_cmd)
         if loader is not None:
             api_key = loader(env) or ""
 
@@ -196,12 +196,12 @@ def _run_api_analysis_bridge(
     so a batch of large files cannot overflow the model context.
     """
     model, api_base, api_key = _resolve_provider_config(cfg, env)
-    ctx = _build_api_batch_context(work_dir, cfg, env, stream_file)
+    ctx = build_api_batch_context(work_dir, cfg, env, stream_file)
     if ctx is None:
         return
 
-    api_config = _build_batch_api_config(cfg, model, api_base, api_key)
-    _dispatch_api_batches(ctx, cfg, api_config, env)
+    api_config = build_batch_api_config(cfg, model, api_base, api_key)
+    dispatch_api_batches(ctx, cfg, api_config, env)
 
     write_stream_done_marker(stream_file)
     _log.debug("API analysis complete, evidence written to %s", ctx.jsonl_file)
@@ -219,7 +219,7 @@ def run_analysis(
     """
     cfg = config or AnalysisConfig()
     ai_cmd = cfg.ai_cmd or get_ai_cmd()
-    provider_type = _get_provider_type(ai_cmd)
+    provider_type = get_provider_type(ai_cmd)
 
     if provider_type == "api":
         _run_api_analysis_bridge(work_dir, stream_file, cfg, process_environment(env))

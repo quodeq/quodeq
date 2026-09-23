@@ -39,21 +39,21 @@ from typing import TYPE_CHECKING
 from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache._classify import (
     ClassifyResult,
-    _classify_one_file,  # noqa: F401 -- re-export
-    _partition_files_by_cache,  # noqa: F401 -- re-export
+    classify_one_file,  # noqa: F401 -- re-export
+    partition_files_by_cache,  # noqa: F401 -- re-export
     classify_files_via_cache,  # noqa: F401 -- re-export
 )
 from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
 from quodeq.analysis.cache._key_provenance import (
-    _SCHEMA_VERSION,
-    _content_hash_for,
-    _current_provenance,  # noqa: F401 -- re-export
-    _hash_prompts_combined,  # noqa: F401 -- re-export
-    _model_id_from,
+    content_hash_for,
+    current_provenance,  # noqa: F401 -- re-export
+    hash_prompts_combined,  # noqa: F401 -- re-export
+    model_id_from,
     build_cache_key_for_file,  # noqa: F401 -- re-export
     format_provenance_drift,  # noqa: F401 -- re-export
 )
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
+from quodeq.analysis.cache.key import SCHEMA_VERSION
 
 if TYPE_CHECKING:
     # _persist_watcher imports from this module, so a runtime import here
@@ -115,14 +115,14 @@ def _build_cache_entry_for_file(
     grouped: dict[str, list[dict]], provenance: CachePersistProvenance,
 ) -> CacheEntry:
     """Build the CacheEntry for one dispatched file's persisted result."""
-    content_hash = _content_hash_for(
+    content_hash = content_hash_for(
         config.src / target.file_path, target.content_hash, target.content_stamp,
     )
     if not content_hash:
         _logger.debug("content hash unavailable for %s; cache entry stored without it", target.file_path)
     return CacheEntry(
         key=target.key,
-        schema_version=_SCHEMA_VERSION,
+        schema_version=SCHEMA_VERSION,
         findings=grouped.get(target.file_path, []),
         files_read=1,
         file_path=target.file_path,
@@ -188,7 +188,7 @@ def _persist_ok_files(
     """Store a cache entry for every dirty miss that carries an ok marker."""
     ok_files = state.ok_files()
     stamps = _EntryStamps(
-        model_id=_model_id_from(config), version=quodeq_version(), provenance=provenance,
+        model_id=model_id_from(config), version=quodeq_version(), provenance=provenance,
     )
     for file_path in classify.misses:
         if file_path not in ok_files or file_path not in state.dirty:

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from quodeq.analysis.run_types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.checks.runner import apply_checks_for_run
@@ -24,14 +24,14 @@ from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_SCORING
 
 def _default_callbacks() -> DimensionCallbacks:
     from quodeq.analysis._dimension_steps import (
-        _build_dimension_prompt,
-        _parse_dimension_evidence,
-        _run_dimension_analysis,
+        build_dimension_prompt,
+        parse_dimension_evidence,
+        run_dimension_analysis,
     )
     return DimensionCallbacks(
-        build_prompt=_build_dimension_prompt,
-        run_analysis=_run_dimension_analysis,
-        parse_evidence=_parse_dimension_evidence,
+        build_prompt=build_dimension_prompt,
+        run_analysis=run_dimension_analysis,
+        parse_evidence=parse_dimension_evidence,
     )
 
 
@@ -67,7 +67,7 @@ class DimensionRunner:
         config: RunConfig,
         dim_id: str,
         idx: int,
-        ctx: _AnalysisContext,
+        ctx: AnalysisContext,
         *,
         emit_log: bool = True,
     ) -> Evidence | None:
@@ -95,17 +95,18 @@ class DimensionRunner:
             # line against BrokenPipeError (dashboard pipe can close at any
             # moment) so a logging failure doesn't mask a successful analysis.
             try:
-                _log_dimension_result(ev, dim_id, idx, ctx.total, log=self._log)
+                log_dimension_result(ev, dim_id, idx, ctx.total, log=self._log)
             except BrokenPipeError:
-                from quodeq.analysis._loops import _silence_broken_stdout  # noqa: PLC0415
-                _silence_broken_stdout()
+                from quodeq.analysis._loops import silence_broken_stdout  # noqa: PLC0415
+                silence_broken_stdout()
         return ev
 
 
-def _log_dimension_result(
+def log_dimension_result(
     ev: Evidence, dimension: str, idx: int, total: int, *,
     log: LogSink = NULL_LOG,
 ) -> None:
+    """Emit the scoring marker and log the dimension's file and finding counts."""
     emit_marker(CC_PHASE_SCORING, dimension=dimension)
     violations = sum(len(pe.violations) for pe in ev.principles.values())
     compliances = sum(len(pe.compliance) for pe in ev.principles.values())

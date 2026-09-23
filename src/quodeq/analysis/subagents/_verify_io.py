@@ -44,7 +44,7 @@ def _parse_finding_line(line: str) -> dict | None:
     return None
 
 
-def _load_previous_findings(
+def load_previous_findings(
     jsonl_path: Path,
     open_fn: Callable[[Path], Any] | None = None,
     *,
@@ -84,7 +84,7 @@ def resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
     return run_dir.name, run_dir.parent.name, run_dir.parent.parent
 
 
-def _resolve_previous_evidence(
+def resolve_previous_evidence(
     evidence_dir: Path,
     dim_id: str,
     cache: dict[tuple[str, str], tuple[list[dict], int, int]] | None,

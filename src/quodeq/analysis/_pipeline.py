@@ -7,21 +7,21 @@ from typing import NamedTuple
 from datetime import datetime, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
-from quodeq.analysis._dim_order import DimEstimates, _order_by_backlog
+from quodeq.analysis._dim_order import DimEstimates, order_by_backlog
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
-from quodeq.analysis._loop_state import DimTransition, _run_dir_for, _safe_write_dim_state
+from quodeq.analysis._loop_state import DimTransition, run_dir_for, safe_write_dim_state
 from quodeq.analysis._loop_steps import default_loop_deps
 from quodeq.analysis._pipeline_setup import (
-    _set_run_deadline, _warn_if_local_api_oversubscribed,
+    set_run_deadline, warn_if_local_api_oversubscribed,
 )
 from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
-from quodeq.analysis.run_types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.cache.gc import ensure_cache_ready
 from quodeq.analysis.cache.local import LocalFileBackend
-from quodeq.analysis.dimension_runner import DimensionRunner, _log_dimension_result
+from quodeq.analysis.dimension_runner import DimensionRunner, log_dimension_result
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
-from quodeq.analysis.subprocess import _get_provider_type
+from quodeq.analysis.subprocess import get_provider_type
 from quodeq.core.evidence.model import Evidence
 from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.core.evidence.merge import merge_evidence
@@ -31,7 +31,7 @@ from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG
 
 
-def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContext]:
+def load_analysis_context(config: RunConfig) -> tuple[list[str], AnalysisContext]:
     """Load dimensions data and resolve which dimensions to analyze."""
     return _load_ctx(config)
 
@@ -53,7 +53,7 @@ def _dry_run_dimension(
     flips anything still pending at exit to INCOMPLETE and stamps the run
     exit_reason=incomplete_dimensions.
     """
-    _safe_write_dim_state(
+    safe_write_dim_state(
         scope.run_dir, dimension, DimTransition(DimState.RUNNING), log=SHARED_LOG)
     log_info(f"→ [{idx}/{scope.total}] Dry-run: skipping AI call for {dimension}")
     emit_marker(CC_PHASE_ANALYZING, dimension=dimension)
@@ -72,7 +72,7 @@ def _dry_run_dimension(
     if not jsonl_path.exists():
         jsonl_path.touch()
     emit_marker(CC_PHASE_SCORING, dimension=dimension)
-    _safe_write_dim_state(
+    safe_write_dim_state(
         scope.run_dir, dimension, DimTransition(DimState.DONE), log=SHARED_LOG)
     return ev
 
@@ -85,7 +85,7 @@ def _run_dry_run(
     dimensions, ctx = load_analysis_context(config)
     emit_marker(CC_PHASE_SETUP, dimensions=dimensions)
     scope = _DryRunScope(
-        run_dir=_run_dir_for(config),
+        run_dir=run_dir_for(config),
         evidence_dir=config.work_dir or config.src,
         date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         total=ctx.total,
@@ -120,7 +120,7 @@ def _persist_dim_estimates(config: RunConfig, dimensions: list[str]) -> DimEstim
 
 def _prepare_run_context(
     config: RunConfig,
-) -> tuple[list[str], _AnalysisContext, DimensionRunner, dict[str, int] | None]:
+) -> tuple[list[str], AnalysisContext, DimensionRunner, dict[str, int] | None]:
     """Load dimensions/context, warm the classify cache, and build the runner.
 
     Dimensions come back ordered by pending backlog with their per-dim
@@ -151,7 +151,7 @@ def _prepare_run_context(
     if config._classify_cache is None:
         config._classify_cache = {}
     estimates = _persist_dim_estimates(config, dimensions)
-    dimensions, dim_counts = _order_by_backlog(dimensions, estimates, log=SHARED_LOG)
+    dimensions, dim_counts = order_by_backlog(dimensions, estimates, log=SHARED_LOG)
 
     cache = LocalFileBackend()
     ensure_cache_ready(cache.root)
@@ -170,14 +170,14 @@ def _consolidated_is_available(config: RunConfig, dimensions: list[str]) -> bool
         config.options.consolidated
         and len(dimensions) > 1
         and config.options.max_subagents > 1
-        and _get_provider_type(config.ai_cmd) != "api"
+        and get_provider_type(config.ai_cmd) != "api"
     )
 
 
 def _try_consolidated_mode(
     config: RunConfig,
     dimensions: list[str],
-    ctx: _AnalysisContext,
+    ctx: AnalysisContext,
 ) -> dict[str, Evidence] | None:
     """Attempt consolidated (all-dimensions-in-one-pass) mode; None to fall back.
 
@@ -194,7 +194,7 @@ def _try_consolidated_mode(
             dim_index = {d: i + 1 for i, d in enumerate(dimensions)}
             for dim, ev in result.items():
                 idx = dim_index.get(dim, 0)
-                _log_dimension_result(ev, dim, idx, len(dimensions), log=SHARED_LOG)
+                log_dimension_result(ev, dim, idx, len(dimensions), log=SHARED_LOG)
             return result
         log_warning("Consolidated mode produced no results, falling back to per-dimension")
     except (OSError, KeyError, ValueError, RuntimeError) as exc:
@@ -205,7 +205,7 @@ def _try_consolidated_mode(
 def _dispatch_fixed_mode(
     config: RunConfig,
     dimensions: list[str],
-    ctx: _AnalysisContext,
+    ctx: AnalysisContext,
     runner: DimensionRunner,
     on_dimension_done: "Callable[[str, Evidence], None] | None",
     *,
@@ -240,7 +240,7 @@ def _dispatch_fixed_mode(
 def _run_clean_scan(
     config: RunConfig,
     dimensions: list[str],
-    ctx: _AnalysisContext,
+    ctx: AnalysisContext,
     runner: DimensionRunner,
     on_dimension_done: "Callable[[str, Evidence], None] | None",
 ) -> dict[str, Evidence]:
@@ -267,10 +267,10 @@ def _run_dimensions(
     if config.options.dry_run:
         return _run_dry_run(config, on_dimension_done=on_dimension_done)
 
-    _warn_if_local_api_oversubscribed(config, log=SHARED_LOG)
+    warn_if_local_api_oversubscribed(config, log=SHARED_LOG)
 
     dimensions, ctx, runner, dim_counts = _prepare_run_context(config)
-    _set_run_deadline(config)
+    set_run_deadline(config)
 
     fixed_mode_result = _dispatch_fixed_mode(
         config, dimensions, ctx, runner, on_dimension_done, dim_counts=dim_counts,

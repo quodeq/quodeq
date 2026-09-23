@@ -56,7 +56,7 @@ def test_build_cache_writer_reuses_the_stashed_classify_time_hash(tmp_path, monk
     write("Foo.kt", [])
 
     expected_key = compute_key(CacheKey(
-        schema_version=cache_writer_module._SCHEMA_VERSION,
+        schema_version=cache_writer_module.SCHEMA_VERSION,
         file_content_hash="stashed-hash",
         file_path="Foo.kt",
         dimension="flexibility",
@@ -87,7 +87,7 @@ def test_build_cache_writer_hashes_when_the_stash_has_no_entry(tmp_path, monkeyp
     write("Foo.kt", [])
 
     expected_key = compute_key(CacheKey(
-        schema_version=cache_writer_module._SCHEMA_VERSION,
+        schema_version=cache_writer_module.SCHEMA_VERSION,
         file_content_hash=hash_file(src_root / "Foo.kt") or "",
         file_path="Foo.kt",
         dimension="flexibility",

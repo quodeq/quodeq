@@ -1,7 +1,7 @@
 """AI CLI command-line construction and environment setup.
 
 MCP/tool/model argument construction lives in _mcp_arg_builders.py;
-_build_ai_cmd and the CLI MCP registration block stay here since their
+build_ai_cmd and the CLI MCP registration block stay here since their
 patch targets (_get_provider_configs, get_ai_model, subprocess.run) are
 resolved against this module.
 """
@@ -15,15 +15,15 @@ from pathlib import Path
 
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis._mcp_arg_builders import (
-    _build_base_args,
-    _build_mcp_args,
-    _build_model_budget_prompt_args,
-    _cmd_binary,
-    _get_ai_tools,  # noqa: F401 -- re-export
-    _get_base_ai_args,  # noqa: F401 -- re-export
-    _resolve_language,
-    _resolve_model_id,
-    _resolve_standards_dir,
+    build_base_args,
+    build_mcp_args,
+    build_model_budget_prompt_args,
+    cmd_binary,
+    get_ai_tools,  # noqa: F401 -- re-export
+    get_base_ai_args,  # noqa: F401 -- re-export
+    resolve_language,
+    resolve_model_id,
+    resolve_standards_dir,
 )
 from quodeq.analysis.provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
@@ -40,7 +40,7 @@ _SENSITIVE_ENV_KEYS = frozenset({
 })
 
 
-def _build_ai_cmd(
+def build_ai_cmd(
     prompt: str, config: AnalysisConfig,
     work_dir: Path | None = None,
 ) -> tuple[list[str], Path | None]:
@@ -49,8 +49,8 @@ def _build_ai_cmd(
     model = config.ai_model or get_ai_model()
     provider_cfg = _get_provider_configs().get(cmd, {})
 
-    args = _build_base_args(cmd, provider_cfg)
-    mcp_args, mcp_config_path = _build_mcp_args(config, provider_cfg, work_dir)
+    args = build_base_args(cmd, provider_cfg)
+    mcp_args, mcp_config_path = build_mcp_args(config, provider_cfg, work_dir)
     args.extend(mcp_args)
     if cmd == Provider.COPILOT and work_dir is not None:
         root = str(work_dir.resolve())
@@ -60,7 +60,7 @@ def _build_ai_cmd(
             "Use view, glob and grep where instructions refer to Read, Glob and Grep. "
             "Shell tools are unavailable.\n\n" + prompt
         )
-    args.extend(_build_model_budget_prompt_args(prompt, config, provider_cfg, model))
+    args.extend(build_model_budget_prompt_args(prompt, config, provider_cfg, model))
 
     return args, mcp_config_path
 
@@ -97,7 +97,7 @@ def _build_mcp_server_args(
             "--compiled-dir", str(config.compiled_dir.resolve()),
             "--dimension", config.dimension,
         ])
-    standards_dir = _resolve_standards_dir(config)
+    standards_dir = resolve_standards_dir(config)
     if standards_dir:
         mcp_args.extend(["--standards-dir", str(standards_dir.resolve())])
     if config.queue_path:
@@ -114,8 +114,8 @@ def _build_mcp_server_args(
     # and cache.dimension_helpers._model_id_from for the reference.
     mcp_args.extend([
         "--cache-root", str(_default_cache_root()),
-        "--model-id", _resolve_model_id(config),
-        "--language", _resolve_language(config),
+        "--model-id", resolve_model_id(config),
+        "--language", resolve_language(config),
     ])
     return mcp_args
 
@@ -133,7 +133,7 @@ def _is_known_cli_provider(cmd: str) -> bool:
     return _get_provider_configs().get(cmd, {}).get("type") == "cli"
 
 
-def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = None) -> str | None:
+def register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = None) -> str | None:
     """Register the findings MCP server via `<cmd> mcp add`.
 
     Thread-safe: only the first caller registers; subsequent calls return
@@ -155,7 +155,7 @@ def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = 
         provider_cfg = _get_provider_configs().get(cmd, {})
         # Codex/Copilot use "-- cmd args", Gemini uses "cmd args" (no separator)
         use_separator = provider_cfg.get("mcp_add_separator", True)
-        register_cmd = [_cmd_binary(cmd), "mcp", "add", name]
+        register_cmd = [cmd_binary(cmd), "mcp", "add", name]
         if use_separator:
             register_cmd.append("--")
         register_cmd.extend(mcp_args)
@@ -175,14 +175,14 @@ def _unregister_cli_mcp(cmd: str, name: str) -> None:
         return
     try:
         subprocess.run(
-            [_cmd_binary(cmd), "mcp", "remove", name],
+            [cmd_binary(cmd), "mcp", "remove", name],
             check=False, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
         _log.warning("Failed to unregister MCP server '%s' via '%s mcp remove': %s", name, cmd, exc)
 
 
-def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
+def build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
     """Build the subprocess environment, removing sensitive variables.
 
     The ``None`` default resolves to the process environment in the config

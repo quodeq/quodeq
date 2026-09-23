@@ -2,7 +2,7 @@
 
 ``load_analysis_context`` resolves which dimensions to analyze (from
 the dimensions config, custom evaluators, and the user's
-``--dimensions`` selection) and builds the shared ``_AnalysisContext``
+``--dimensions`` selection) and builds the shared ``AnalysisContext``
 passed to every dimension runner.
 """
 from __future__ import annotations
@@ -12,7 +12,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from quodeq.analysis.run_types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.prompts.builder import load_template
 from quodeq.config.paths import default_paths
 from quodeq.shared.logging import log_warning
@@ -48,7 +48,7 @@ def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[
     return result
 
 
-def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisContext"]:
+def load_analysis_context(config: "RunConfig") -> tuple[list[str], "AnalysisContext"]:
     """Load dimensions data and resolve which dimensions to analyze."""
     dims_data = config.dimensions_data
     if dims_data is None:
@@ -85,7 +85,7 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisCon
     else:
         dimensions = all_dims_raw
 
-    ctx = _AnalysisContext(
+    ctx = AnalysisContext(
         dimensions_data=dims_data,
         date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         template=load_template(config.options.template_path),

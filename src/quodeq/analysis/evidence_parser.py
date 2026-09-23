@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.analysis.run_types import RunConfig, _AnalysisContext
+from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.config.evidence_env import cwe_url_template
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import (
@@ -35,7 +35,7 @@ def evidence_parse_options(config: RunConfig, compiled_dir: Path | None) -> Evid
 
 
 def parse_evidence_file(
-    config: RunConfig, ctx: _AnalysisContext,
+    config: RunConfig, ctx: AnalysisContext,
     jsonl_file: Path, files_read: int,
 ) -> Evidence:
     """Parse *jsonl_file* into Evidence, with no existence guard.
@@ -57,7 +57,7 @@ def parse_evidence_file(
 
 
 def parse_evidence_from_jsonl(
-    config: RunConfig, ctx: _AnalysisContext,
+    config: RunConfig, ctx: AnalysisContext,
     jsonl_file: Path, files_read: int,
 ) -> Evidence | None:
     """Parse a JSONL file into Evidence, or None when the file holds nothing.

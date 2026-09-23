@@ -116,7 +116,7 @@ class TestHashInputsHoistedOncePerDispatch:
                 mock_params_state,
             ),
             patch(
-                "quodeq.analysis.cache._persist_watcher._hash_prompts_combined",
+                "quodeq.analysis.cache._persist_watcher.hash_prompts_combined",
                 mock_hash_prompts,
             ),
         ):

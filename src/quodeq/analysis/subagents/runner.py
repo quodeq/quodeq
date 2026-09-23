@@ -17,17 +17,17 @@ from quodeq.core.observability import NULL_LOG, LogSink
 
 # Re-exports from split modules -- keep the public API stable
 from quodeq.analysis.subagents.source_files import list_source_files
-from quodeq.analysis.subagents._prompts import _build_subagent_prompt
+from quodeq.analysis.subagents._prompts import build_subagent_prompt
 from quodeq.analysis.subagents._pool_launcher import (  # noqa: F401
     LaunchPoolParams,
-    _compute_files_per_agent,
-    _default_subagent_model,
-    _launch_pool,
-    _collect_all_evidence,
+    compute_files_per_agent,
+    default_subagent_model,
+    launch_pool,
+    collect_all_evidence,
 )
 from quodeq.analysis.subagents._evidence_collector import (
-    _CollectionContext,
-    _collect_evidence,
+    CollectionContext,
+    collect_evidence,
 )
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents._consolidated import (
@@ -77,7 +77,7 @@ def _prepare_findings_and_queue(
     """Build the file queue for the pool. No prior-findings logic — V2's
     cache hit/miss already determined which files need dispatch."""
     queue_path = dc.evidence_dir / f"{dc.dim_id}_queue.json"
-    files_per_agent = _compute_files_per_agent(len(dc.files))
+    files_per_agent = compute_files_per_agent(len(dc.files))
     FileQueue(queue_path, dc.files, max_files_per_agent=files_per_agent)
     log.info(
         f"  [{dc.idx}/{dc.ctx.total}] {dc.dim_id} -- {len(dc.files)} files queued",
@@ -91,16 +91,16 @@ def _execute_pool_and_collect(
     config: RunConfig, dc: _DimensionContext, pool_params: _PoolExecutionParams,
 ) -> Evidence | None:
     """Build prompt, launch pool, collect evidence."""
-    prompt = _build_subagent_prompt(config, dc.dim_id, dc.ctx)
+    prompt = build_subagent_prompt(config, dc.dim_id, dc.ctx)
     params = LaunchPoolParams(
         evidence_dir=dc.evidence_dir, queue_path=pool_params.queue_path,
         prompt=prompt, max_files_per_agent=pool_params.files_per_agent,
         all_files=dc.files,
     )
-    pool, results = _launch_pool(config, dc.dim_id, params)
-    return _collect_evidence(
+    pool, results = launch_pool(config, dc.dim_id, params)
+    return collect_evidence(
         config, dc.dim_id, dc.evidence_dir,
-        _CollectionContext(
+        CollectionContext(
             results=results, ctx=dc.ctx, files=dc.files,
             exit_reason=pool.exit_reason,
         ),

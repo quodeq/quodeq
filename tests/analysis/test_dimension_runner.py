@@ -92,10 +92,10 @@ class TestBrokenPipeGuard:
             "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             return_value=ev,
         ), patch(
-            "quodeq.analysis.dimension_runner._log_dimension_result",
+            "quodeq.analysis.dimension_runner.log_dimension_result",
             side_effect=BrokenPipeError("pipe closed"),
         ), patch(
-            "quodeq.analysis._loops._silence_broken_stdout",
+            "quodeq.analysis._loops.silence_broken_stdout",
         ) as mock_silence:
             result = DimensionRunner().run(
                 MagicMock(), "flexibility", 3, _make_ctx(), emit_log=True,
@@ -110,7 +110,7 @@ class TestBrokenPipeGuard:
             "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             return_value=ev,
         ), patch(
-            "quodeq.analysis.dimension_runner._log_dimension_result",
+            "quodeq.analysis.dimension_runner.log_dimension_result",
             side_effect=RuntimeError("real bug"),
         ):
             with pytest.raises(RuntimeError, match="real bug"):
@@ -130,7 +130,7 @@ class TestEmitLog:
             "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             return_value=ev,
         ), patch(
-            "quodeq.analysis.dimension_runner._log_dimension_result",
+            "quodeq.analysis.dimension_runner.log_dimension_result",
         ) as mock_log, patch(
             "quodeq.analysis.dimension_runner.emit_marker",
         ) as mock_marker:
@@ -148,7 +148,7 @@ class TestEmitLog:
             "quodeq.analysis.dimension_runner.process_dimension_with_cache",
             return_value=ev,
         ), patch(
-            "quodeq.analysis.dimension_runner._log_dimension_result",
+            "quodeq.analysis.dimension_runner.log_dimension_result",
         ), patch(
             "quodeq.analysis.dimension_runner.emit_marker",
         ) as mock_marker:

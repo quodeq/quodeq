@@ -57,7 +57,7 @@ REPORT_FINDING_SCHEMA = {
     "required": ["req", "t", "file", "line", "severity", "w", "reason"],
 }
 
-_DEFAULT_FILE_BATCH_SIZE = 5
+DEFAULT_FILE_BATCH_SIZE = 5
 GET_NEXT_FILES_NAME = "get_next_files"
 GET_NEXT_FILES_DESC = (
     "Get your next batch of files to analyse from the queue. "

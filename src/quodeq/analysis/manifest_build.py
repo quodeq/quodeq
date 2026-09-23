@@ -6,13 +6,13 @@ from collections import Counter
 from pathlib import Path
 
 from quodeq.analysis._ignore import load_ignore_patterns
-from quodeq.analysis.manifest_build_scope import _build_multi_scope_manifest
+from quodeq.analysis.manifest_build_scope import build_multi_scope_manifest
 from quodeq.analysis.manifest_models import AnalysisTarget, ManifestWalkSpec, SourceManifest
 from quodeq.analysis.manifest_targets import (
-    _MIN_FILES_PER_TARGET,
+    MIN_FILES_PER_TARGET,
     WalkCounts,
-    _build_targets_from_matches,
-    _iter_source_files,
+    build_targets_from_matches,
+    iter_source_files,
     target_name,
 )
 from quodeq.config.discipline_registry import DisciplineRegistry
@@ -32,7 +32,7 @@ def _build_targets_from_disciplines(
     except (ValueError, OSError) as exc:
         _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
         return []
-    return _build_targets_from_matches(registry, matches, files_by_lang, ext_counts_by_lang)
+    return build_targets_from_matches(registry, matches, files_by_lang, ext_counts_by_lang)
 
 
 def _resolve_walk_root(src: Path, scope_path: str | None) -> Path:
@@ -67,7 +67,7 @@ def _walk_and_group(
     ext_counts_by_lang: dict[str, Counter] = {}
     counts = WalkCounts()
     walk_root = _resolve_walk_root(src, scope_path)
-    for rel, suffix, lang in _iter_source_files(src, walk_root, walk, counts):
+    for rel, suffix, lang in iter_source_files(src, walk_root, walk, counts):
         files_by_lang.setdefault(lang, []).append(rel)
         ext_counts[suffix] += 1
         ext_counts_by_lang.setdefault(lang, Counter())[suffix] += 1
@@ -95,7 +95,7 @@ def _build_single_scope_manifest(
         for t in targets:
             t.scope_path = scope_label
     for lang, lang_files in files_by_lang.items():
-        if len(lang_files) < _MIN_FILES_PER_TARGET:
+        if len(lang_files) < MIN_FILES_PER_TARGET:
             continue
         lang_ext_counts = ext_counts_by_lang.get(lang, Counter())
         targets.append(AnalysisTarget(
@@ -210,6 +210,6 @@ def _dispatch_manifest_build(
     registry, sub_results = _resolve_registry_and_scopes(src, disciplines_conf)
     if sub_results is not None:
         assert registry is not None  # sub_results is only set alongside a loaded registry
-        return _build_multi_scope_manifest(src, walk, registry, sub_results)
+        return build_multi_scope_manifest(src, walk, registry, sub_results)
 
     return _build_single_scope_manifest(src, walk, disciplines_conf, None)

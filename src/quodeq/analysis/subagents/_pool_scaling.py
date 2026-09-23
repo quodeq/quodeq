@@ -11,7 +11,7 @@ from typing import Callable
 from quodeq.analysis.subagents._pool_models import (
     ScaleUpState,
     SubagentResult,
-    _AGENT_ID_PREFIX,
+    AGENT_ID_PREFIX,
 )
 from quodeq.analysis.errors import REASON_AGENT_FAILURE_STREAK
 from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
@@ -184,7 +184,7 @@ def collect_done(
     done_futures = {f for f in futures if f.done()}
     for future in done_futures:
         idx = futures[future]
-        agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
+        agent_id = f"{AGENT_ID_PREFIX}-{idx}"
         try:
             result = future.result()
         except (OSError, RuntimeError, ValueError) as exc:
