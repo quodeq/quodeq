@@ -4,8 +4,8 @@ import '@testing-library/jest-dom/vitest';
 import { useState } from 'react';
 import MapPage from './MapPage.jsx';
 
-// Final whole-branch review: Critical 1 (evaluate CTA gating for shared
-// projects) and Finding 6 (shared read-only chip). MapPage previously never
+// Covers evaluate CTA gating for shared projects and the shared read-only
+// chip. MapPage previously never
 // received selectedSource at all (App.jsx's `map` renderer didn't thread
 // it), so the "Start evaluation" CTA in the no-evaluations-yet empty state
 // always rendered even for a shared project.

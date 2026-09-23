@@ -30,8 +30,8 @@
  * @property {string|null}   fromRunId
  * @property {string|null}   fromDateLabel
  * @property {string|null}   fromDateISO
- * @property {number|null}   [filesRead]         - files analyzed in this dim (Phase 1+)
- * @property {number|null}   [sourceFileCount]   - total project source-file count (Phase 1+)
+ * @property {number|null}   [filesRead]         - files analyzed in this dim (older runs may not have it)
+ * @property {number|null}   [sourceFileCount]   - total project source-file count (older runs may not have it)
  * @property {string|null}   [exitReason]        - per-dim or run-level exit signal,
  *   one of EXIT_REASON's values (see vocab/exitReason.js), or null/missing
  *   (legacy, treated as EXIT_REASON.DONE by the UI).

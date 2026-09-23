@@ -1,7 +1,7 @@
 /**
  * Singleton QueryClient for the dashboard.
  *
- * Defaults match the Plan 3 spec:
+ * Defaults:
  * - staleTime: 30s — most server data is fresh enough on reload.
  * - gcTime: 5min (library default) — kept long enough for screen-back navigation.
  * - retry: 1 — fail fast on real errors.

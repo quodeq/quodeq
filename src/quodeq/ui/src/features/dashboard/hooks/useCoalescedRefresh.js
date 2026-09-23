@@ -18,7 +18,7 @@ import { useCallback, useRef, useState } from 'react';
  * with that same error instead of hanging forever. A queued waiter asked
  * for a refresh; if the refresh failed, "it failed" is the correct answer,
  * not silence. Extracted verbatim from useSharedProjects.js (waiter
- * rejection-on-failure added in cluster 25 -- the original swallowed a
+ * rejection-on-failure added because the original swallowed a
  * leading refreshCore() rejection and left queued waiters unsettled).
  */
 export function useCoalescedRefresh(refreshCore) {

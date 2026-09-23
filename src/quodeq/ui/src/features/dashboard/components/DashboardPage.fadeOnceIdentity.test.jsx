@@ -4,10 +4,10 @@ import DashboardPage from './DashboardPage.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
 
 // Split from DashboardPage.test.jsx: frame-node identity across branch
-// transitions and the dashboard-appear fade-once contract (P3-T2),
+// transitions and the dashboard-appear fade-once contract,
 // part 1 (DOM-node identity + the first-appearance/grace-elapsed fade).
 
-// P3-T2: the page-level frame must survive every branch transition (no
+// The page-level frame must survive every branch transition (no
 // div<->Fragment root-type flip), and `dashboard-fadein` must play once per
 // project/source/run context instead of replaying on every loading<->ready
 // flip or branch swap over unchanged content.
@@ -79,7 +79,7 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
         </SidePaneProvider>,
       );
       let page = container.querySelector('.dashboard-page');
-      // P6: the Overview never dims -- the skeleton is showing here, undimmed --
+      // The Overview never dims -- the skeleton is showing here, undimmed --
       // but it's still "still loading" for the appear latch's purposes.
       expect(page.className).not.toContain('dashboard-loading');
       expect(page.className).toContain('dashboard-ready');
@@ -125,7 +125,7 @@ describe('DashboardPage frame stability and fade-once across branch transitions 
     }
   });
 
-  // P6 fix: the appear latch's read AND write are gated on `!showOverviewSkeleton`
+  // The appear latch's read AND write are gated on `!showOverviewSkeleton`
   // (DashboardPage.jsx, beside `dashboardAppearKey`). Before that gate, the
   // grace-elapsed flip replayed a 400ms fade over the already-visible,
   // unchanged skeleton (a flash) and spent the latch early, so real content

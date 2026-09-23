@@ -130,7 +130,7 @@ describe("handleEvalDismiss('view') cross-project jump", () => {
   });
 });
 
-// Finding 1 (P5 final review): removing useAppState's dashboard-key refetch
+// Removing useAppState's dashboard-key refetch
 // (69b67347) orphaned the scores side. projectKeys.scores(project, null,
 // source) -- the `latest` query behind useProjectScores's `accumulated` and
 // `availableRuns` -- never changes key when selectedRun flips to the new

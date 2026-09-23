@@ -189,7 +189,7 @@ describe('shared repo API client', () => {
       expect(calls[0].url).toBe('/api/shared/projects/proj%2Fwith%2Fslashes/info');
     });
 
-    // Finding 5 (final whole-branch review): createProject() only knows the
+    // createProject() only knows the
     // base Project shape and silently drops publishedBy/publishedAt/source --
     // without passing them through explicitly (same idiom as
     // sharedListProjects above), the Overview's shared-project hero badge has

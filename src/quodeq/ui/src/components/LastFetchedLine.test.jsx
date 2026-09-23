@@ -44,7 +44,7 @@ describe('LastFetchedLine', () => {
   });
 });
 
-// Minor 7 (final whole-branch review): `new Date(null)` coerces to epoch 0
+// `new Date(null)` coerces to epoch 0
 // rather than Invalid Date, so a bare NaN guard let relativeTime(null) render
 // "57 years ago" instead of being treated as absent.
 describe('relativeTime null/undefined guard', () => {

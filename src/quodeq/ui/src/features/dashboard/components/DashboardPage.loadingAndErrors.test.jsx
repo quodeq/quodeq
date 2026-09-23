@@ -33,7 +33,7 @@ const overviewLoading = {
 };
 
 describe('DashboardPage first-load loading gate', () => {
-  // P6: the Overview no longer dims .dashboard-page while isLoading -- the
+  // The Overview no longer dims .dashboard-page while isLoading -- the
   // OverviewSkeleton rendered inside it IS the content (the dim existed to
   // fade *stale* content under the loader overlay, and there is none here).
   it('keeps the Overview showing the skeleton (not real content) until accumulated (scores) is ready, undimmed', () => {
@@ -51,7 +51,7 @@ describe('DashboardPage first-load loading gate', () => {
   // variant) and DashboardContent's own LoadingScreen mounted at once, two
   // overlapping pulsing logos. DashboardContent must not render a loader of
   // its own; readiness is a single decision made by the page.
-  // P6: the Overview's loader ladder is the OverviewSkeleton now, not
+  // The Overview's loader ladder is the OverviewSkeleton now, not
   // LoadingScreen -- still exactly one, never both.
   it('renders exactly one overview skeleton and no LoadingScreen while dashboard is resolved but accumulated is not', () => {
     const { container } = render(<DashboardPage data={overviewLoading} callbacks={{}} runMode={false} />);
@@ -59,7 +59,7 @@ describe('DashboardPage first-load loading gate', () => {
     expect(container.querySelectorAll('.overview-skeleton').length).toBe(1);
   });
 
-  // P2 containment, carried over to the skeleton: it renders inside
+  // Containment, carried over to the skeleton: it renders inside
   // .dashboard-page (never a fixed/fullscreen overlay), so a project switch
   // never covers Sidebar/TopBar. Only the app-level cold-start loader stays
   // fullscreen.
@@ -97,7 +97,7 @@ describe('DashboardPage first-load loading gate', () => {
     }).not.toThrow();
   });
 
-  // P6: the grace fallback no longer hands off from a skeleton to a
+  // The grace fallback no longer hands off from a skeleton to a
   // LoadingScreen -- the same OverviewSkeleton continues across the flip, so
   // there's no loader/skeleton swap for the user to notice.
   it('continues the same overview skeleton across the grace period if scores stays slow (no loader handoff)', () => {
@@ -203,7 +203,7 @@ describe('DashboardPage fetch-failure state', () => {
     expect(getByText('No evaluations yet')).toBeTruthy();
   });
 
-  // P4-T2: clicking Retry sets isFetching while loading stays false and
+  // Clicking Retry sets isFetching while loading stays false and
   // error stays set (react-query's shape for a refetch of a query that's
   // already settled into an error). That state used to render the error
   // branch with no feedback at all -- Retry visibly did nothing.

@@ -53,7 +53,7 @@ function ErrorToast({ message, onDismiss }) {
 
   // role="alert" on the button itself would override its native button role
   // for assistive tech. Keep the button unmodified and announce the same
-  // text through an sr-only alert twin instead (fix round 1, review finding).
+  // text through an sr-only alert twin instead.
   const text = sanitizeErrorMessage(message);
   return (
     <>

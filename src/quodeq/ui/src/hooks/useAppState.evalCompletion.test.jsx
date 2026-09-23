@@ -6,7 +6,7 @@ import { ApiProvider } from '../api/ApiContext.jsx';
 import { SidePaneProvider } from '../features/side-pane/SidePaneProvider.jsx';
 
 // Split from useAppState.test.jsx: useAppState's eval-completion single-
-// refetch path (P5-T1) and the projects-load re-arm-on-reconnect behavior.
+// refetch path and the projects-load re-arm-on-reconnect behavior.
 
 // useAppState composes useEvaluationLifecycle (-> useEvaluation) and
 // useServerHealth. Mocked the same way useEvaluationLifecycle.test.jsx mocks
@@ -29,7 +29,7 @@ vi.mock('./useServerHealth.js', () => ({
   useServerHealth: () => [healthState.connected, vi.fn(), null],
 }));
 
-// P5-T1: single refetch path on run completion. Before this task, useAppState
+// Single refetch path on run completion. Before this task, useAppState
 // ran its OWN eval-completion effect (refreshDashboardActive, keyed off
 // job.outputRunId) in the same effect-flush as useEvaluationLifecycle's
 // selectProjectAndRun. That effect fired before selectedRun's state update
@@ -119,7 +119,7 @@ describe('useAppState eval-completion: single refetch path (P5-T1)', () => {
     await waitFor(() => expect(fakeApi.listProjects.mock.calls.length).toBeGreaterThan(listCallsBefore));
   });
 
-  // Finding 1 (P5 final review): P5-T1 above only proved the DASHBOARD key
+  // The single refetch path above only proved the DASHBOARD key
   // refetches on completion. It missed that the SCORES key -- the `latest`
   // query behind `accumulated`/`availableRuns` -- has no dependency on
   // selectedRun at all, so nothing refetched it once useAppState stopped

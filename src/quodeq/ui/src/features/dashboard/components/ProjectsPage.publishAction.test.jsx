@@ -162,7 +162,7 @@ describe('ProjectsPage — publish action (local cards)', () => {
     }
   });
 
-  // Audit C4 regression lock: the old
+  // Regression lock: the old
   // fix routed post-publish completion through ProjectsPage's own effect
   // calling shared.refresh() -- a full remote git fetch that can take up to
   // 30s -- so the PUBLISHED badge/no-button state lagged behind the

@@ -11,7 +11,7 @@ import { t } from '../../../strings/index.js';
 // returns the Fragment directly, switching between them changes the react
 // element *type* at DashboardPage's own return position (component vs
 // Fragment), which makes React tear down and remount the whole subtree --
-// losing the `.dashboard-page` DOM node identity that P3-T2's frame-
+// losing the `.dashboard-page` DOM node identity that the frame-
 // stability tests assert on. The div's children can freely change type
 // across branches (that's normal reconciliation); only the div+Fragment
 // shell itself must stay put.

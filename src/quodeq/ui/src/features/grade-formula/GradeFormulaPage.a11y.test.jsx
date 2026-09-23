@@ -68,7 +68,7 @@ describe('GradeFormulaPage tab widget a11y', () => {
     expect(screen.getByRole('tabpanel')).toBeInTheDocument();
   });
 
-  // #6033 fix round 1 - complete the tab pattern: each tab points at the
+  // #6033 - complete the tab pattern: each tab points at the
   // panel it controls, and the panel is labelled by whichever tab is active.
   it('wires aria-controls from the active tab to the panel, and aria-labelledby back', () => {
     render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);

@@ -39,8 +39,8 @@ function renderWithApi(ui, fakeApi) {
 // subproject), published-age on originUrl-matched cards, the
 // SyncedIndicator states, and the pending grade chip.
 
-// Review findings 3 & 4 (final whole-branch review): group-aware query
-// filtering for parent/subproject entries, and the empty-CTA filter trap.
+// Group-aware query filtering for parent/subproject entries, and the
+// empty-CTA filter trap.
 describe('ProjectsPage — group-aware filtering and the empty-filter trap', () => {
   const subprojectLocals = [
     { id: 'root-1', name: 'monorepo', latestDate: '2026-07-19T00:00:00Z' },
@@ -117,7 +117,7 @@ describe('ProjectsPage — group-aware filtering and the empty-filter trap', () 
   });
 });
 
-// Review finding 7 (final whole-branch review): the "published <age>"
+// The "published <age>"
 // decoration must also work for shared matches found by originUrl, not just
 // by id (usePublish's own publishedAtByProject is keyed by the SHARED
 // entry's id, which an originUrl match never shares with the local id).
@@ -153,8 +153,7 @@ describe('ProjectsPage — published-age on originUrl-matched cards', () => {
   });
 });
 
-// Review finding 8 (final whole-branch review): SyncedIndicator wording and
-// visibility.
+// SyncedIndicator wording and visibility.
 describe('ProjectsPage — SyncedIndicator: "not synced yet" and unconfigured hiding', () => {
   it('shows "not synced yet" (never "just now") when nothing has synced', async () => {
     const fakeApi = makeFakeApi({
@@ -167,7 +166,7 @@ describe('ProjectsPage — SyncedIndicator: "not synced yet" and unconfigured hi
     expect(screen.queryByText(/just now/)).not.toBeInTheDocument();
   });
 
-  // Audit A2: a list that never loads used to render "not synced yet" with
+  // A list that never loads used to render "not synced yet" with
   // no error and no working recovery control. It now renders a distinct
   // error state, and the same button that used to just say "refresh" is
   // the retry affordance -- clicking it calls the refresh endpoint (which

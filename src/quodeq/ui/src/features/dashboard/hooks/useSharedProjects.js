@@ -115,7 +115,7 @@ function deriveSharedProjectsState({ statusQuery, listQuery, configured, staleOv
   // from before a disconnect (or from a DIFFERENT shared repo before a
   // reconnect) would otherwise keep rendering shared cards -- with live pull
   // buttons -- on a page that has nothing connected (ghost shared cards
-  // after disconnect, final whole-branch review).
+  // after disconnect).
   const projects = configured ? (listQuery.data?.projects || []) : [];
   const lastSynced = listQuery.data?.lastSynced ?? statusQuery.data?.lastSynced ?? null;
   return {
@@ -138,9 +138,8 @@ function useBackgroundRevalidate(listQuerySuccess, refresh) {
       // No .catch needed here or at the toolbar's onRefresh: refreshCore
       // (makeRefreshCore above) catches both of its phases and reports
       // failure through setStaleOverride, so the promise refresh() returns
-      // never rejects. useCoalescedRefresh's waiter rejection (cluster 25)
-      // only surfaces a refreshCore throw, which this core cannot produce.
-      // Audited after the post-PR review (M8).
+      // never rejects. useCoalescedRefresh's waiter rejection only surfaces
+      // a refreshCore throw, which this core cannot produce.
       refresh();
     }
   }, [listQuerySuccess, refresh]);

@@ -24,7 +24,7 @@ const overviewLoading = {
   availableRuns: [{ runId: 'r1', status: 'done' }],
 };
 
-// Finding 5 (final whole-branch review): projectInfo for a shared selection
+// projectInfo for a shared selection
 // must come from the shared-repo fetch (sharedProjectInfo, see useDashboard),
 // never the LOCAL projects list -- a shared selection's id can collide with
 // an unrelated local project (e.g. after a clone-on-add pull), and looking it

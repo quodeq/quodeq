@@ -46,7 +46,7 @@ describe('HelpMarkdown', () => {
     expect(container.querySelector('.sg-figure')).toBeTruthy();
   });
 
-  // #6043 fix round 1 - HelpFigure wraps illustration children in
+  // #6043 - HelpFigure wraps illustration children in
   // aria-hidden="true" by default, which suppressed GradeFormulaCurveFigure's
   // role="img"/aria-label from ever reaching a screen reader on the real Help
   // page. The registry now marks it informative so HelpFigure skips hiding it.

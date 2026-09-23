@@ -30,7 +30,7 @@ const baseActions = {
 describe('EvaluateScreen error toast a11y', () => {
   it('is announced as an alert so a screen reader user is notified without stumbling onto it, while the dismiss control still reads as a button', () => {
     // role="alert" on the dismiss <button> itself would override its button
-    // role for assistive tech (fix round 1, review finding). A sibling
+    // role for assistive tech. A sibling
     // sr-only alert carries the same text so the message is announced on
     // insertion without taking over the control's semantics.
     render(

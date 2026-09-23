@@ -8,7 +8,7 @@ export const META_COMMANDS = [
   { name: 'help', description: t('assistant.cmdHelp') },
   { name: 'skills', description: t('assistant.cmdSkills') },
   // Still answered locally if typed, but hidden from the welcome list,
-  // /help, and autocomplete until the Phase 2 action registry gives it
+  // /help, and autocomplete until the action registry gives it
   // more than one entry. The name stays reserved server-side.
   { name: 'actions', description: t('assistant.cmdActions'), hidden: true },
   { name: 'clear', description: t('assistant.cmdClear') },

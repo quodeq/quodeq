@@ -190,7 +190,7 @@ export default function DimensionGaugeCard({
   // role="button" gives the article children-presentational semantics, and the
   // explicit aria-label above already skips its content -- so the sr-only score
   // summary needs its own id wired up via aria-describedby to reach assistive
-  // tech at all (a11y review, fix round 1). No description when insufficient:
+  // tech at all. No description when insufficient:
   // InsufficientGauge's own caption isn't aria-hidden, so it's already exposed.
   const summaryId = useId();
 
