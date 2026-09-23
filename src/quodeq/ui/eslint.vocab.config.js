@@ -6,9 +6,12 @@
 // Consumed by tools/check_vocab.mjs with inline config disabled: the only
 // way to grandfather a violation is tools/vocab_baseline.json, which may
 // only shrink.
-// One word list per vocabulary (mirrors VOCABULARIES in
-// tools/check_vocab_literals.py, minus Provider, which has no UI module). A
-// word can sit in several; the same-vocabulary array rule matches per list.
+// One word list per vocabulary. Mirrors VOCABULARIES in
+// tools/check_vocab_literals.py minus FileDoneStatus (no UI code reads
+// file-done status) and Provider (the UI spells "custom" for the assistant
+// mode too); tests/tools/test_vocab_gate_word_lists_match.py holds the two
+// lists together. A word can sit in several lists; the same-vocabulary array
+// rule matches per list.
 const VOCABULARIES = {
   runState: [
     'pending', 'running', 'finalizing', 'done', 'failed', 'cancelled',
@@ -21,7 +24,6 @@ const VOCABULARIES = {
   ],
   severity: ['critical', 'major', 'minor'],
   grade: ['Exemplary', 'Good', 'Adequate', 'Poor', 'Insufficient'],
-  fileDone: ['ok', 'error', 'skipped'],
   dimState: ['pending', 'running', 'done', 'incomplete'],
   findingType: ['violation', 'compliance'],
 };

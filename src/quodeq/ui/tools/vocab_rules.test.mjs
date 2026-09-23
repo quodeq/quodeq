@@ -44,3 +44,9 @@ test('finding-type words are gated like the other vocabularies', async () => {
   assert.equal(await count("export const f = (filter) => filter !== 'compliance';"), 1);
   assert.equal(await count("export const f = (bucket) => bucket === 'violations';"), 0);
 });
+
+test('file-done words are not a UI vocabulary', async () => {
+  assert.equal(await count("export const f = (s) => s === 'skipped';"), 0);
+  assert.equal(await count("export const f = (s) => s === 'ok';"), 0);
+  assert.equal(await count("export const f = (s) => s === 'error';"), 1);
+});
