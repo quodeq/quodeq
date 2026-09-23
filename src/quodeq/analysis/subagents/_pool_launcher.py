@@ -153,6 +153,7 @@ def _build_pool_config(
         max_files_per_agent=params.max_files_per_agent,
         time_limit=time_limit,
         deadline_at=config.options.deadline_at,
+        run_deadline_at=config.options.run_deadline_at,
         # Carry the RunConfig + dimension so the API runner can construct a
         # per-file cache writer (synchronous cache.put on file_done='ok').
         run_config=config,

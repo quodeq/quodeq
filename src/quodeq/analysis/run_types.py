@@ -44,6 +44,10 @@ class AnalysisOptions:
     consolidated: bool = True
     time_limit: int | None = None
     deadline_at: float | None = None
+    # The whole-run deadline while ``deadline_at`` holds one dimension's slice
+    # (set by ``_loops.run_incremental_loop``); None when nothing is sliced.
+    # Only read to say which budget stopped a pool.
+    run_deadline_at: float | None = None
     # Invoked with the new ISO deadline whenever the pool auto-scale ratchets
     # ``deadline_at`` forward — wired by the CLI layer to the lifecycle so
     # status.json (dashboard countdown, exit-reason labeling) follows.

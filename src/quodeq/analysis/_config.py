@@ -34,6 +34,8 @@ class AnalysisConfig:
     time_limit: int = DEFAULT_TIME_LIMIT
     deadline_at: float | None = None
     """Absolute monotonic-clock deadline for the whole run. None = unlimited."""
+    run_deadline_at: float | None = None
+    """The whole-run deadline when ``deadline_at`` is a per-dimension slice."""
     compiled_dir: Path | None = None
     dimension: str | None = None
     queue_path: Path | None = None

@@ -16,7 +16,7 @@ src/quodeq/analysis/_loop_steps.py:108:broad-except
 src/quodeq/analysis/_loop_steps.py:139:broad-except
 src/quodeq/analysis/_loop_steps.py:182:broad-except
 src/quodeq/analysis/_loop_steps.py:184:broad-except
-src/quodeq/analysis/_loops.py:130:broad-except
+src/quodeq/analysis/_loops.py:132:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:112:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:120:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:149:broad-except
@@ -93,7 +93,7 @@ src/quodeq/dashboard/_webview_window_lifecycle.py:44:broad-except
 src/quodeq/dashboard/_webview_window_lifecycle.py:50:broad-except
 src/quodeq/dashboard/_webview_window_native_ops.py:166:broad-except
 src/quodeq/dashboard/_webview_window_native_ops.py:72:broad-except
-src/quodeq/dashboard/cli.py:89:broad-except
+src/quodeq/dashboard/cli.py:95:broad-except
 src/quodeq/dashboard/runner.py:161:broad-except
 src/quodeq/dashboard/runner.py:179:broad-except
 src/quodeq/dashboard/runner.py:190:broad-except

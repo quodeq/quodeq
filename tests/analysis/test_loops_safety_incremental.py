@@ -82,3 +82,25 @@ class TestIncrementalLoopSafety:
         assert any("entering iteration 2/2 for flexibility" in m for m in messages)
         assert any("completed iteration 2/2 for flexibility" in m for m in messages)
         assert any("incremental finished: processed 2 of 2 dim(s)" in m for m in messages)
+
+
+def test_incremental_loop_exposes_the_run_deadline_while_slicing(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr("quodeq.analysis._loop_steps.time.monotonic", lambda: clock[0])
+    cfg = _config()
+    cfg.options.deadline_at = 1000.0
+    seen: list[tuple[float, float]] = []
+
+    def fake_runner(config, _dim, _idx, _ctx):
+        seen.append((config.options.deadline_at, config.options.run_deadline_at))
+        clock[0] = config.options.deadline_at
+        return _FakeEvidence()
+
+    with patch("quodeq.analysis._loop_steps._log_dimension_result"):
+        run_incremental_loop(
+            cfg, ["security", "reliability"], _ctx(2), LoopDeps(runner=_runner_from(fake_runner)),
+            dim_counts={"security": 10, "reliability": 10},
+        )
+    assert [run for _slice, run in seen] == [1000.0, 1000.0]
+    assert seen[0][0] < 1000.0
+    assert (cfg.options.deadline_at, cfg.options.run_deadline_at) == (1000.0, None)
