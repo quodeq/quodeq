@@ -16,7 +16,7 @@ from quodeq.core.types import ViolationResponse
 from quodeq.services.suppression_keys import FindingRef, is_dismissed
 
 
-def _violation_location(v: dict, *, log: LogSink = NULL_LOG) -> tuple[str, int]:
+def violation_location(v: dict, *, log: LogSink = NULL_LOG) -> tuple[str, int]:
     """``(file, line)`` of a violation dict.
 
     Handles two formats:
@@ -41,7 +41,7 @@ def _violation_dismissed(
     v: dict, dismissed: "DismissedKeys | set[tuple]", principle: str | None,
 ) -> bool:
     """The shared predicate on a violation dict (snippet-aware, ``req || principle``)."""
-    file, line = _violation_location(v)
+    file, line = violation_location(v)
     return is_dismissed(dismissed, FindingRef(
         req=v.get("req"),
         principle=principle or v.get("practiceId") or v.get("principle"),
@@ -49,7 +49,7 @@ def _violation_dismissed(
     ))
 
 
-def _deleted_key_for_violation(v: dict, dimension: str, principle: str | None = None) -> tuple:
+def deleted_key_for_violation(v: dict, dimension: str, principle: str | None = None) -> tuple:
     """Build a (dimension, principle, file) suppression key from a violation dict.
 
     Parsed eval violations are camelCase (``practiceId``); ``principle`` is
@@ -64,7 +64,7 @@ def _deleted_key_for_violation(v: dict, dimension: str, principle: str | None = 
     return (dimension or "", principle or "", raw_file)
 
 
-def _filter_dismissed_from_result(
+def filter_dismissed_from_result(
     result: "ViolationResponse | dict[str, Any] | None",
     dkeys: "DismissedKeys | set[tuple]",
     delkeys: "set[tuple] | None" = None,
@@ -78,7 +78,7 @@ def _filter_dismissed_from_result(
             result["violations"] = [
                 v for v in result["violations"]
                 if not _violation_dismissed(v, dkeys, None)
-                and (not delkeys or _deleted_key_for_violation(v, dimension) not in delkeys)
+                and (not delkeys or deleted_key_for_violation(v, dimension) not in delkeys)
             ]
         for p in result.get("principles", []):
             if "violations" in p:
@@ -86,6 +86,6 @@ def _filter_dismissed_from_result(
                 p["violations"] = [
                     v for v in p["violations"]
                     if not _violation_dismissed(v, dkeys, group_principle)
-                    and (not delkeys or _deleted_key_for_violation(v, dimension, group_principle) not in delkeys)
+                    and (not delkeys or deleted_key_for_violation(v, dimension, group_principle) not in delkeys)
                 ]
     return result

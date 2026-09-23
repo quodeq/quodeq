@@ -71,13 +71,13 @@ class TestListProjects:
             }))
 
         calls: list[str] = []
-        original = fs_projects._build_project_entry
+        original = fs_projects.build_project_entry
 
         def _counting_build(reports_root, entry_name, runs, options, **kwargs):
             calls.append(entry_name)
             return original(reports_root, entry_name, runs, options, **kwargs)
 
-        monkeypatch.setattr(fs_projects, "_build_project_entry", _counting_build)
+        monkeypatch.setattr(fs_projects, "build_project_entry", _counting_build)
 
         flask_app = Flask(__name__)
         flask_app.config["TESTING"] = True

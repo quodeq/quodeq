@@ -4,9 +4,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from quodeq.shared._env_sanitize import _sanitized_env_path
+from quodeq.shared._env_sanitize import sanitized_env_path
 
-_SQLITE_DISABLE_TRUTHY = {"1", "true", "yes", "on"}
+SQLITE_DISABLE_TRUTHY = {"1", "true", "yes", "on"}
 
 _DEFAULT_INDEX_DB_PATH = Path.home() / ".quodeq" / "index.db"
 
@@ -19,7 +19,7 @@ def get_index_db_path(default: str | None = None, env: dict[str, str] | None = N
     """
     environ = env if env is not None else os.environ
     if "QUODEQ_INDEX_DB_PATH" in environ:
-        return _sanitized_env_path(environ["QUODEQ_INDEX_DB_PATH"])
+        return sanitized_env_path(environ["QUODEQ_INDEX_DB_PATH"])
     return default or str(_DEFAULT_INDEX_DB_PATH)
 
 
@@ -35,7 +35,7 @@ def get_score_cache_path(env: dict[str, str] | None = None) -> str:
     """
     environ = env if env is not None else os.environ
     if "QUODEQ_SCORE_CACHE_PATH" in environ:
-        return _sanitized_env_path(environ["QUODEQ_SCORE_CACHE_PATH"])
+        return sanitized_env_path(environ["QUODEQ_SCORE_CACHE_PATH"])
     index_parent = Path(get_index_db_path(env=environ)).parent
     if str(index_parent) not in ("", "."):
         return str(index_parent / "score_cache.db")
@@ -45,7 +45,7 @@ def get_score_cache_path(env: dict[str, str] | None = None) -> str:
 def score_cache_disabled(env: dict[str, str] | None = None) -> bool:
     """Return True when QUODEQ_DISABLE_SCORE_CACHE is truthy (operator kill switch)."""
     environ = env if env is not None else os.environ
-    return environ.get("QUODEQ_DISABLE_SCORE_CACHE", "").strip().lower() in _SQLITE_DISABLE_TRUTHY
+    return environ.get("QUODEQ_DISABLE_SCORE_CACHE", "").strip().lower() in SQLITE_DISABLE_TRUTHY
 
 
 def sqlite_disabled() -> bool:
@@ -55,4 +55,4 @@ def sqlite_disabled() -> bool:
     analysis pipeline only writes JSONL and read paths only consult JSONL/JSON.
     """
     raw = os.environ.get("QUODEQ_DISABLE_SQLITE", "")
-    return raw.strip().lower() in _SQLITE_DISABLE_TRUTHY
+    return raw.strip().lower() in SQLITE_DISABLE_TRUTHY

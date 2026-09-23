@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import os
 
-from quodeq.shared._config import _get_config
+from quodeq.shared._config import get_config
 
 
 def get_ai_provider(env: dict[str, str] | None = None) -> str:
     """Return the AI provider from environment or default."""
-    return (os.environ if env is None else env).get("AI_PROVIDER", _get_config()["ai_provider_default"])
+    return (os.environ if env is None else env).get("AI_PROVIDER", get_config()["ai_provider_default"])
 
 
 def get_ai_cmd(env: dict[str, str] | None = None) -> str:
@@ -22,7 +22,7 @@ def get_ai_cmd(env: dict[str, str] | None = None) -> str:
         return _env["AI_CMD"]
     if "AI_PROVIDER" in _env:
         return _env["AI_PROVIDER"]
-    return _get_config()["ai_cmd_default"]
+    return get_config()["ai_cmd_default"]
 
 
 def get_ai_model(env: dict[str, str] | None = None) -> str | None:

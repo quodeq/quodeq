@@ -19,7 +19,7 @@ _DEFAULT_MAX_CONCURRENT_JOBS = 8
 _EXIT_CODE_TOO_MANY_JOBS = -2
 
 
-class _JobCapacityMixin:
+class JobCapacityMixin:
     @staticmethod
     def _max_concurrent_jobs() -> int:
         """Return QUODEQ_MAX_CONCURRENT_JOBS, or 8 when unset/invalid."""

@@ -16,7 +16,7 @@ from quodeq.analysis.cache import CacheEntry, LocalFileBackend
 from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state
 from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 from quodeq.services._external_jobs import ProcessControl
-from quodeq.services.evaluation_mixin import _discard_run_state
+from quodeq.services.evaluation_mixin import discard_run_state
 from quodeq.services.filesystem import FilesystemActionProvider
 from quodeq.services.jobs import JobManager, JobProcessSeams
 
@@ -74,7 +74,7 @@ class TestDiscardRunState:
         cache_root = tmp_path / "cache"
         cache = _seed_cache_entries(cache_root, ["kkkkk1", "kkkkk2", "kkkkk3"])
 
-        _discard_run_state(str(reports), {
+        discard_run_state(str(reports), {
             "outputProject": "proj", "outputRunId": "run-1",
         }, cache=cache)
 
@@ -110,7 +110,7 @@ class TestDiscardRunState:
         cache = _seed_cache_entries(cache_root, ["kkkkk9"])
 
         # No dimensions.json at all. Must not crash, must still wipe.
-        _discard_run_state(str(reports), {
+        discard_run_state(str(reports), {
             "outputProject": "proj", "outputRunId": "run-1",
         }, cache=cache)
 
@@ -123,7 +123,7 @@ class TestDiscardRunState:
         reports, run = _seed_run(tmp_path)
         (run / "evidence" / "d_inc_evidence.jsonl").write_text('{"file":"a.py"}\n')
 
-        _discard_run_state(str(reports), {
+        discard_run_state(str(reports), {
             "outputProject": "proj", "outputRunId": "run-1",
         })
 

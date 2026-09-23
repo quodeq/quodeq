@@ -16,7 +16,7 @@ from quodeq.core.run.exit_reason import DEADLINE_EXIT_REASONS
 from quodeq.core.run.job_status import JobStatus, is_external_job_id, strip_external_prefix
 from quodeq.core.types import JobSnapshot
 
-from quodeq.shared.process_kill import kill_tree as _kill_tree, terminate_process as _terminate_process
+from quodeq.shared.process_kill import kill_tree as _kill_tree, terminate_process
 from quodeq.shared.run_log import RunLogWriter
 from quodeq.services._job_model import (
     Job,
@@ -25,18 +25,18 @@ from quodeq.services._job_model import (
     JobStore,
     InMemoryJobStore,
     REPORT_PATH_RE,
-    _EXIT_CODE_TIMEOUT,
-    _MAX_COMPLETED_JOBS,
-    _WATCHDOG_POLL_INTERVAL_S,
+    EXIT_CODE_TIMEOUT,
+    MAX_COMPLETED_JOBS,
+    WATCHDOG_POLL_INTERVAL_S,
     mark_spawn_failed,
     new_job,
 )
-from quodeq.services._job_monitor_mixin import _JobMonitorMixin
+from quodeq.services._job_monitor_mixin import JobMonitorMixin
 from quodeq.services._job_file_store import (
     FileJobStore,
     create_job_store,
 )
-from quodeq.services._job_capacity_mixin import _JobCapacityMixin
+from quodeq.services._job_capacity_mixin import JobCapacityMixin
 
 # Re-export public names so existing imports from this module keep working.
 __all__ = [
@@ -45,8 +45,8 @@ __all__ = [
     "DEADLINE_EXIT_REASONS",
     # Owned by _job_model (which _job_monitor_mixin also reads them from) and
     # re-exported here: tests import and patch them at this module's path.
-    "_EXIT_CODE_TIMEOUT", "_MAX_COMPLETED_JOBS",
-    "_WATCHDOG_POLL_INTERVAL_S",
+    "EXIT_CODE_TIMEOUT", "MAX_COMPLETED_JOBS",
+    "WATCHDOG_POLL_INTERVAL_S",
 ]
 
 _EXIT_CODE_SPAWN_FAILURE = -1
@@ -58,10 +58,10 @@ _DEFAULT_LIST_LIMIT = 100
 # legitimate in-flight call is one scaled local read timeout (500s per
 # subagent, realistically up to 3), so the grace must exceed that or a
 # healthy drain gets SIGTERMed and the batch's work is lost.
-_WATCHDOG_DEADLINE_GRACE_S = 1800
+WATCHDOG_DEADLINE_GRACE_S = 1800
 
 
-class JobManager(_JobMonitorMixin, _JobCapacityMixin):
+class JobManager(JobMonitorMixin, JobCapacityMixin):
     """Thread-safe manager for spawning and tracking evaluation subprocesses.
 
     NOTE: Job state is stored via a ``JobStore`` (defaulting to in-memory).
@@ -73,7 +73,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
     ``_consume_stream``, ``_drain_pre_marker_buffer``, ``_tee_run_log``,
     ``_evict_completed_jobs``, ``_job_timeout_cap_s``,
     ``_watchdog_should_kill``, ``_run_status_exit_reason``,
-    ``_classify_exit``, ``_monitor_process``) live in ``_JobMonitorMixin``
+    ``_classify_exit``, ``_monitor_process``) live in ``JobMonitorMixin``
     (see ``_job_monitor_mixin.py``).
     """
 
@@ -177,7 +177,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
         Bare SIGTERM doesn't reliably interrupt a child blocked in a long
         httpx socket read (e.g. waiting on an Ollama inference that takes
         minutes) -- the signal queues behind the syscall and the process
-        keeps holding the upstream connection. ``_terminate_process`` runs
+        keeps holding the upstream connection. ``terminate_process`` runs
         SIGTERM with a grace window then escalates to SIGKILL, matching the
         external-cancel path in ``_external_jobs.cancel_external_run``.
         """
@@ -190,7 +190,7 @@ class JobManager(_JobMonitorMixin, _JobCapacityMixin):
             job.ended_at = datetime.now(timezone.utc).isoformat()
             self._store.put(job)
         if process:
-            _terminate_process(process)
+            terminate_process(process)
         return True
 
     def _cancel_external(self, job_id: str, reports_root: Path, run_dir: Path | None = None) -> bool:

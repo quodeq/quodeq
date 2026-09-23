@@ -46,7 +46,7 @@ def reset_dimensions_cache() -> None:
     _dimensions_cache.reset()
 
 
-def _list_available_dimensions_for_discipline(
+def list_available_dimensions_for_discipline(
     paths: object | None = None, *, log: LogSink = NULL_LOG,
 ) -> tuple[str, ...]:
     """Resolve available dimensions from universal dimensions.json (cached after first read).

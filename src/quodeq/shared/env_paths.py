@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from quodeq.shared._env_sanitize import _sanitized_env_path
+from quodeq.shared._env_sanitize import sanitized_env_path
 
 
 def get_static_dist(env: dict[str, str] | None = None) -> str | None:
@@ -28,7 +28,7 @@ def get_evaluations_dir(default: str | None = None, env: dict[str, str] | None =
     """
     from_env = (os.environ if env is None else env).get("QUODEQ_EVALUATIONS_DIR")
     if from_env:
-        return _sanitized_env_path(from_env)
+        return sanitized_env_path(from_env)
     if default is not None:
         return default
     return str(Path.home() / ".quodeq" / "evaluations")
@@ -47,7 +47,7 @@ def get_quodeq_dir(env: dict[str, str] | None = None) -> Path:
     """
     from_env = (os.environ if env is None else env).get("QUODEQ_DIR")
     if from_env:
-        return Path(_sanitized_env_path(from_env))
+        return Path(sanitized_env_path(from_env))
     return Path.home() / ".quodeq"
 
 
@@ -60,7 +60,7 @@ def get_clones_dir(env: dict[str, str] | None = None) -> Path:
     """
     from_env = (os.environ if env is None else env).get("QUODEQ_CLONES_DIR")
     if from_env:
-        return Path(_sanitized_env_path(from_env))
+        return Path(sanitized_env_path(from_env))
     return Path.home() / ".quodeq" / "clones"
 
 
@@ -75,7 +75,7 @@ def get_grade_formula_path(env: dict[str, str] | None = None) -> str:
     """
     environ = env if env is not None else os.environ
     if "QUODEQ_GRADE_FORMULA_PATH" in environ:
-        return _sanitized_env_path(environ["QUODEQ_GRADE_FORMULA_PATH"])
+        return sanitized_env_path(environ["QUODEQ_GRADE_FORMULA_PATH"])
     return str(Path.home() / ".quodeq" / "grade_formula.json")
 
 

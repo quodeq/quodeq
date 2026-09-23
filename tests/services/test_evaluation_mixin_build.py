@@ -1,4 +1,4 @@
-"""Tests for evaluation_mixin.py — _build_evaluate_cmd/_build_eval_env/dispatcher.
+"""Tests for evaluation_mixin.py — build_evaluate_cmd/_build_eval_env/dispatcher.
 
 Split from test_evaluation_mixin.py."""
 from __future__ import annotations
@@ -17,14 +17,14 @@ from quodeq.services.base import (
 from quodeq.services.evaluation_mixin import (
     FsEvaluationMixin,
     SubprocessDispatcher,
-    _build_evaluate_cmd,
+    build_evaluate_cmd,
 )
 
 
 class TestBuildEvaluateCmd:
     def test_basic_command(self, tmp_path: Path):
         opts = EvaluationOptions()
-        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path / "reports"))
+        cmd = build_evaluate_cmd(str(tmp_path), opts, str(tmp_path / "reports"))
         assert cmd[0] == sys.executable
         assert "-m" in cmd
         assert "quodeq.cli" in cmd
@@ -34,51 +34,51 @@ class TestBuildEvaluateCmd:
 
     def test_repo_url_passed_as_is(self, tmp_path: Path):
         opts = EvaluationOptions()
-        cmd = _build_evaluate_cmd("https://github.com/org/repo.git", opts, str(tmp_path))
+        cmd = build_evaluate_cmd("https://github.com/org/repo.git", opts, str(tmp_path))
         assert "https://github.com/org/repo.git" in cmd
 
     def test_dimensions_list(self, tmp_path: Path):
         opts = EvaluationOptions(dimensions=["security", "performance"])
-        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
+        cmd = build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
         assert "-d" in cmd
         idx = cmd.index("-d")
         assert cmd[idx + 1] == "security,performance"
 
     def test_dimensions_string(self, tmp_path: Path):
         opts = EvaluationOptions(dimensions="security")
-        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
+        cmd = build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
         assert "-d" in cmd
         idx = cmd.index("-d")
         assert cmd[idx + 1] == "security"
 
     def test_numerical_mode(self, tmp_path: Path):
         opts = EvaluationOptions(numerical=True)
-        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
+        cmd = build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
         assert "-m" in cmd
         assert "numerical" in cmd
 
     def test_custom_subagents(self, tmp_path: Path):
         opts = EvaluationOptions(max_subagents=10)
-        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
+        cmd = build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
         assert "--n-subagents" in cmd
         assert "10" in cmd
 
     def test_default_subagents_not_added(self, tmp_path: Path):
         opts = EvaluationOptions(max_subagents=DEFAULT_MAX_SUBAGENTS)
-        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
+        cmd = build_evaluate_cmd(str(tmp_path), opts, str(tmp_path))
         assert "--n-subagents" not in cmd
 
     def test_subprocess_cmd_emits_clean_scan_flag(self, tmp_path: Path):
         """When clean_scan is True, the spawned CLI gets --clean-scan."""
         opts = EvaluationOptions(clean_scan=True, dimensions="security")
-        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path / "reports"))
+        cmd = build_evaluate_cmd(str(tmp_path), opts, str(tmp_path / "reports"))
         assert "--clean-scan" in cmd
         assert "--incremental" not in cmd
 
     def test_subprocess_cmd_omits_clean_scan_by_default(self, tmp_path: Path):
         """When clean_scan is False (default), --clean-scan is not emitted."""
         opts = EvaluationOptions(dimensions="security")
-        cmd = _build_evaluate_cmd(str(tmp_path), opts, str(tmp_path / "reports"))
+        cmd = build_evaluate_cmd(str(tmp_path), opts, str(tmp_path / "reports"))
         assert "--clean-scan" not in cmd
         assert "--incremental" not in cmd
 

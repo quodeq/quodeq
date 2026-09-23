@@ -2,9 +2,9 @@
 
 Split out of ``mutation_rescore.py``. ``mutation_rescore.py`` is a
 DECLARED_LOGGING_SITES entry (still imports stdlib ``logging``); this sibling
-originally avoided a new logging import, routing ``_rescore_run``'s failure
+originally avoided a new logging import, routing ``rescore_run``'s failure
 log through an injected ``LogSink`` instead. A stdlib ``_logger`` was added
-later for ``_resolve_default_run_id``'s previously-silent
+later for ``resolve_default_run_id``'s previously-silent
 ``list_runs`` failure -- this module is now its own DECLARED_LOGGING_SITES
 entry too (see ``tests/tools/test_logging_boundary.py``).
 """
@@ -21,7 +21,7 @@ from quodeq.shared.validation import validate_path_segment
 _logger = logging.getLogger(__name__)
 
 
-def _slim_scores(scores: dict[str, Any]) -> dict[str, Any]:
+def slim_scores(scores: dict[str, Any]) -> dict[str, Any]:
     """Drop violation/compliance arrays from the rescored payload.
 
     The UI's dismiss handlers (PrincipleDetail, FileDetail, FindingDetail)
@@ -52,7 +52,7 @@ def _slim_scores(scores: dict[str, Any]) -> dict[str, Any]:
     return {"dimensions": slim_dims, "summary": scores.get("summary", {})}
 
 
-def _rescore_run(
+def rescore_run(
     evaluations_dir: str, project: str, run_id: str | None,
     *, log: LogSink = NULL_LOG,
 ) -> dict[str, Any] | None:
@@ -66,7 +66,7 @@ def _rescore_run(
     trigger projection some other way.
 
     The payload omits per-finding arrays since dismiss handlers only need
-    score/grade fields — see ``_slim_scores`` for the rationale. Callers
+    score/grade fields — see ``slim_scores`` for the rationale. Callers
     fold the result into the response body so the UI can apply the new
     scores without a follow-up GET.
     """
@@ -80,7 +80,7 @@ def _rescore_run(
 
     reports_root = Path(evaluations_dir).resolve()
     try:
-        return _slim_scores(get_scores_raw(reports_root, project, run_id))
+        return slim_scores(get_scores_raw(reports_root, project, run_id))
     except FileNotFoundError:
         return None
     except Exception as exc:  # noqa: BLE001
@@ -91,7 +91,7 @@ def _rescore_run(
         return None
 
 
-def _resolve_default_run_id(evaluations_dir: str, project: str) -> str | None:
+def resolve_default_run_id(evaluations_dir: str, project: str) -> str | None:
     """Return the run_id the Overview lands on by default, or None.
 
     Reuses the EXACT "latest completed run" rule the dashboard uses: pick the

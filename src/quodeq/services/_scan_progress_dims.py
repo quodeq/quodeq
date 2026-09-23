@@ -2,8 +2,8 @@
 
 Split from ``scan_progress.py`` to keep that file under the size ratchet's
 300-line cap. Moved verbatim (``_dim_state``, ``_active_agents``,
-``_consolidated_dim_progress``), plus ``_dim_files_summary`` and
-``_build_dim_progress`` extracted from ``build_scan_progress``'s per-dim
+``consolidated_dim_progress``), plus ``_dim_files_summary`` and
+``build_dim_progress`` extracted from ``build_scan_progress``'s per-dim
 loop body (no logic change, same values, same order).
 """
 from __future__ import annotations
@@ -17,8 +17,8 @@ from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.core.run.dimensions import DimState
 from quodeq.data.fs.evidence_tally import FindingTally, IncrementalTally
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
-from quodeq.services._scan_progress_elapsed import _dim_elapsed_s
-from quodeq.services._scan_progress_types import _DimProgress, _ProgressContext
+from quodeq.services._scan_progress_elapsed import dim_elapsed_s
+from quodeq.services._scan_progress_types import DimProgress, ProgressContext
 from quodeq.services.wiring import (
     count_active_agent_streams,
     dimension_evidence_file,
@@ -189,7 +189,7 @@ def _queue_file_counts(queue: dict) -> dict[str, int]:
     return {"taken": taken, "total": taken + pending}
 
 
-def _consolidated_dim_progress(run_dir: Path) -> _DimProgress:
+def consolidated_dim_progress(run_dir: Path) -> DimProgress:
     """Progress row for a live consolidated (grouped) pass.
 
     Evidence counters are the raw cross-dimension tally: suppression
@@ -201,14 +201,14 @@ def _consolidated_dim_progress(run_dir: Path) -> _DimProgress:
     queue = read_queue_state(evidence_dir / "consolidated_queue.json") or {}
     tally = live_tally(evidence_dir / "consolidated_evidence.jsonl",
                        suppressed=None, resolver=None, memo_key=("consolidated",))
-    return _DimProgress(
+    return DimProgress(
         id="consolidated",
         state=DimState.RUNNING,
         files=_queue_file_counts(queue),
         violations=tally.violations,
         compliance=tally.compliance,
         duplicates=tally.duplicates,
-        elapsed_s=_dim_elapsed_s("consolidated", run_dir, DimState.RUNNING),
+        elapsed_s=dim_elapsed_s("consolidated", run_dir, DimState.RUNNING),
         active_agents=_active_agents(evidence_dir, "consolidated"),
     )
 
@@ -236,7 +236,7 @@ def _dim_exit_reason(record: dict | None) -> str | None:
     return None
 
 
-def _dim_evidence_tally(dim_id: str, ctx: _ProgressContext, dismissed, deleted):
+def _dim_evidence_tally(dim_id: str, ctx: ProgressContext, dismissed, deleted):
     matcher = build_matcher(dim_id, dismissed, deleted)
     stamp = _suppression_stamp(dismissed, deleted)
     memo_key = None if stamp is None else (
@@ -253,16 +253,16 @@ def _dim_evidence_tally(dim_id: str, ctx: _ProgressContext, dismissed, deleted):
 
 
 def _dim_measurements(
-    dim_id: str, ctx: _ProgressContext, d_state: DimState, record: dict | None,
+    dim_id: str, ctx: ProgressContext, d_state: DimState, record: dict | None,
 ) -> dict[str, Any]:
-    """Elapsed time, live agents and estimate counts for one dim, as ``_DimProgress`` kwargs.
+    """Elapsed time, live agents and estimate counts for one dim, as ``DimProgress`` kwargs.
 
     Returned as kwargs rather than as a second dataclass so the field names
-    and types are declared once, on ``_DimProgress`` itself.
+    and types are declared once, on ``DimProgress`` itself.
     """
     meta = ctx.dim_estimates.get(dim_id)
     return {
-        "elapsed_s": _dim_elapsed_s(dim_id, ctx.run_dir, d_state, record),
+        "elapsed_s": dim_elapsed_s(dim_id, ctx.run_dir, d_state, record),
         "active_agents": _active_agents(ctx.evidence_dir, dim_id) if d_state == DimState.RUNNING else 0,
         "estimate_reason": meta["reason"] if meta else None,
         "files_cached": meta["cached"] if meta else None,
@@ -271,9 +271,9 @@ def _dim_measurements(
     }
 
 
-def _build_dim_progress(
-    dim_id: str, ctx: _ProgressContext, dismissed, deleted,
-) -> _DimProgress:
+def build_dim_progress(
+    dim_id: str, ctx: ProgressContext, dismissed, deleted,
+) -> DimProgress:
     queue = read_queue_state(dimension_queue_file(ctx.run_dir, dim_id))
     d_state = _dim_state(
         dim_id, ctx.status, terminal=ctx.is_terminal,
@@ -283,7 +283,7 @@ def _build_dim_progress(
     record = ctx.dim_records.get(dim_id) if isinstance(ctx.dim_records, dict) else None
     tally = _dim_evidence_tally(dim_id, ctx, dismissed, deleted)
     measurements = _dim_measurements(dim_id, ctx, d_state, record)
-    return _DimProgress(
+    return DimProgress(
         id=dim_id,
         state=d_state,
         files=_dim_files_summary(queue, d_state, ctx.dim_estimates, dim_id),

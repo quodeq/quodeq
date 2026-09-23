@@ -14,12 +14,12 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 
-# _logger threaded from _job_model.py (not a fresh logging.getLogger here) --
+# logger threaded from _job_model.py (not a fresh logging.getLogger here) --
 # this module stays inside the SEP-06 logging boundary that _job_model.py
 # already carries a declared exemption for (see
 # tests/tools/test_logging_boundary.py's DECLARED_LOGGING_SITES).
 from quodeq.core.run.job_status import JobStatus, parse_job_status
-from quodeq.services._job_model import InMemoryJobStore, Job, JobStore, _MAX_LOG_LINES, _logger
+from quodeq.services._job_model import InMemoryJobStore, Job, JobStore, MAX_LOG_LINES, logger
 from quodeq.shared.env_resolve import resolve_env
 
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
@@ -72,18 +72,18 @@ def _status_from_json(raw: object) -> JobStatus | object:
     A job file must never become unreadable over its status word.
     """
     if not isinstance(raw, str):
-        _logger.warning("job file with non-string status %r kept as-is", raw)
+        logger.warning("job file with non-string status %r kept as-is", raw)
         return raw
     try:
         return parse_job_status(raw)
     except ValueError:
-        _logger.warning("job file with unknown status %r kept as-is", raw)
+        logger.warning("job file with unknown status %r kept as-is", raw)
         return raw
 
 
 def _job_from_json(data: dict) -> Job:
     """Deserialize a Job from a JSON dict."""
-    logs: deque[str] = deque(data.get("logs", []), maxlen=_MAX_LOG_LINES)
+    logs: deque[str] = deque(data.get("logs", []), maxlen=MAX_LOG_LINES)
     return Job(
         job_id=data["job_id"],
         status=_status_from_json(data["status"]),
@@ -157,7 +157,7 @@ class FileJobStore(InMemoryJobStore):
             tmp.replace(path)
             os.chmod(path, 0o600)
         except OSError:
-            _logger.warning("Failed to persist job %s", job_id, exc_info=True)
+            logger.warning("Failed to persist job %s", job_id, exc_info=True)
             tmp.unlink(missing_ok=True)
 
     def _load_all(self) -> None:
@@ -185,7 +185,7 @@ class FileJobStore(InMemoryJobStore):
                 else:
                     self._jobs[job.job_id] = job
             except (json.JSONDecodeError, KeyError, OSError):
-                _logger.warning("Skipping corrupt job file %s", path, exc_info=True)
+                logger.warning("Skipping corrupt job file %s", path, exc_info=True)
 
     def _cleanup_stale(self) -> None:
         """Remove completed/failed/cancelled jobs older than 24 hours."""
@@ -206,7 +206,7 @@ class FileJobStore(InMemoryJobStore):
             except (ValueError, TypeError):
                 continue
         for jid in stale_ids:
-            _logger.info("Cleaning up stale job %s", jid)
+            logger.info("Cleaning up stale job %s", jid)
             self._jobs.pop(jid, None)
             (self._persist_dir / f"{jid}.json").unlink(missing_ok=True)
 

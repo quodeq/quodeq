@@ -9,7 +9,7 @@ from ``services/rescore.py``, which is the in-memory grade recompute engine.
 Split: per-project locks + the project-wide projection sweep moved
 to ``_mutation_projection.py``; the slim rescore payload + default-run
 resolution moved to ``_mutation_scoring.py``. Both are re-exported here —
-``ProjectLockRegistry``/``_DEFAULT_PROJECT_LOCKS`` and ``_project_all_runs``
+``ProjectLockRegistry``/``DEFAULT_PROJECT_LOCKS`` and ``project_all_runs``
 are imported directly by tests, which patch/inspect them at this module's
 path.
 """
@@ -21,21 +21,21 @@ from typing import Any
 from quodeq.services.background import BackgroundRunner, ThreadBackgroundRunner
 from quodeq.services._mutation_projection import (  # noqa: F401 — re-export
     ProjectLockRegistry,
-    _DEFAULT_PROJECT_LOCKS,
-    _get_projection_lock,
-    _project_all_runs,
-    _resolve_project_dir,
+    DEFAULT_PROJECT_LOCKS,
+    get_projection_lock,
+    project_all_runs,
+    resolve_project_dir,
 )
 from quodeq.services._mutation_scoring import (  # noqa: F401 — re-export
-    _rescore_run,
-    _resolve_default_run_id,
-    _slim_scores,
+    rescore_run,
+    resolve_default_run_id,
+    slim_scores,
 )
 from quodeq.shared.log_sink import LoggerSink
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 # What the LogSink-typed callees get. A bare Logger has no ``success``.
-_log_sink = LoggerSink(_logger)
+_log_sink = LoggerSink(logger)
 
 
 def _mutation_envelope(
@@ -44,7 +44,7 @@ def _mutation_envelope(
     """Shared delta scaffold: kind/runId/isLatest.
 
     ``isLatest`` is True when ``run_id`` is the run the Overview lands on by
-    default — the exact ``_resolve_default_run_id`` rule shared with the
+    default — the exact ``resolve_default_run_id`` rule shared with the
     dashboard. Per-kind finding fields (``dismissed`` / ``restored`` /
     ``deleted``) are folded in by the caller — bulk kinds (``restore_all`` /
     ``delete_all``) carry none.
@@ -62,7 +62,7 @@ def _mutation_envelope(
     weighted overall summary is left to a lazy refetch to avoid duplicating the
     grade formula on the client.
     """
-    is_latest = bool(run_id) and run_id == _resolve_default_run_id(evaluations_dir, project)
+    is_latest = bool(run_id) and run_id == resolve_default_run_id(evaluations_dir, project)
     return {
         "kind": kind,
         "runId": run_id,
@@ -154,15 +154,15 @@ def rescore_with_fallback(
     """Rescore the requested run, falling back to a project-wide projection.
 
     Shared by the findings mutation routes and the assistant's
-    dismiss_finding action apply. See _rescore_run for the slim payload.
+    dismiss_finding action apply. See rescore_run for the slim payload.
     *runner* lets callers/tests inject a synchronous or fake BackgroundRunner;
     production defaults to a fresh ThreadBackgroundRunner per call (it holds
     no state, so there is nothing to share between calls).
     """
-    scores = _rescore_run(evaluations_dir, project, run_id, log=_log_sink)
+    scores = rescore_run(evaluations_dir, project, run_id, log=_log_sink)
     if scores is None:
-        proj_dir = _resolve_project_dir(evaluations_dir, project)
-        lock = _get_projection_lock(project)
+        proj_dir = resolve_project_dir(evaluations_dir, project)
+        lock = get_projection_lock(project)
 
         def _bg_project() -> None:
             # Non-blocking acquire on purpose: skip rather than queue.
@@ -170,23 +170,23 @@ def rescore_with_fallback(
             if not lock.acquire(blocking=False):
                 return
             try:
-                # No log= kwarg: tests patch _project_all_runs wholesale with a
+                # No log= kwarg: tests patch project_all_runs wholesale with a
                 # bare (project_dir) side_effect, so the call site must stay
                 # single-positional-arg compatible. NULL_LOG default means an
                 # individual run's own projection failure is already logged
-                # at warning by _project_all_runs itself (it falls back to
-                # this module's _logger when no log is injected).
-                _project_all_runs(proj_dir)
+                # at warning by project_all_runs itself (it falls back to
+                # this module's logger when no log is injected).
+                project_all_runs(proj_dir)
             except Exception as exc:  # noqa: BLE001 -- last-resort fallback: a failure that
-                # escapes _project_all_runs itself (e.g. a directory-listing
+                # escapes project_all_runs itself (e.g. a directory-listing
                 # or repo-factory error, not an individual run's projection,
-                # which _project_all_runs already handles per-run) would
+                # which project_all_runs already handles per-run) would
                 # otherwise only reach ThreadBackgroundRunner.submit's own
                 # debug-level swallow -- invisible at this process's default
                 # INFO level (shared/logging.py). Log at warning here,
-                # matching the level _project_all_runs itself already uses
+                # matching the level project_all_runs itself already uses
                 # for per-run failures, so this stays visible in production.
-                _logger.warning(
+                logger.warning(
                     "Background projection fallback failed for project %r "
                     "(run_id=%r): %s", project, run_id, exc,
                 )

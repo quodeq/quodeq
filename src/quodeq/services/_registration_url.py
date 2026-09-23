@@ -12,7 +12,7 @@ from quodeq.services.wiring import remote_origin_url_raw
 from quodeq.shared.repo import split_userinfo
 
 
-def _strip_credentials(url: str) -> str:
+def strip_credentials(url: str) -> str:
     """Remove embedded userinfo (``user:pass@`` / ``token@``) from *url*.
 
     Only applies to scheme'd URLs (``https://user@host/...``). scp-style
@@ -34,9 +34,9 @@ def _strip_credentials(url: str) -> str:
     return scheme + after
 
 
-def _read_origin_remote(repo_dir: Path) -> str | None:
+def read_origin_remote(repo_dir: Path) -> str | None:
     """Best-effort ``git remote get-url origin`` for a local working copy."""
     origin = remote_origin_url_raw(repo_dir)
     if not origin:
         return None
-    return _strip_credentials(origin)
+    return strip_credentials(origin)

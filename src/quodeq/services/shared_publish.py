@@ -24,9 +24,9 @@ from enum import StrEnum
 from pathlib import Path
 
 from quodeq.services._publish_git import (
-    _commit_staged_changes,
-    _push_with_rebase_fallback,
-    _prepare_clone,
+    commit_staged_changes,
+    push_with_rebase_fallback,
+    prepare_clone,
 )
 from quodeq.services._publish_staging import (
     copy_run,
@@ -81,11 +81,11 @@ def _prepare_workspace(
 
     # Everything from here through the final push/rebase runs under one
     # process-wide clone lock, an RLock so the
-    # ensure_shared_clone/refresh_shared_clone calls inside _prepare_clone
+    # ensure_shared_clone/refresh_shared_clone calls inside prepare_clone
     # (each of which acquires it again internally) reenter on this same
     # thread instead of deadlocking.
     with clone_lock(url, env):
-        repo, fmt = _prepare_clone(url, env)
+        repo, fmt = prepare_clone(url, env)
         if fmt == "empty":
             try:
                 bootstrap_repo_layout(repo)
@@ -102,8 +102,8 @@ def _commit_and_push(repo: Path, project_id: str, count: int) -> None:
     if not ok:
         raise PublishError(f"git add failed, {out.strip()[:GIT_ERROR_SNIPPET_MAX_CHARS]}")
 
-    _commit_staged_changes(repo, project_id, count)
-    _push_with_rebase_fallback(repo)
+    commit_staged_changes(repo, project_id, count)
+    push_with_rebase_fallback(repo)
 
 
 def publish_project(

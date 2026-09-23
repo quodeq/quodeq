@@ -33,7 +33,7 @@ from quodeq.core.observability import NULL_LOG, LogSink
 _INDEX_FILENAME = ".repo_index.json"
 
 
-def _repo_index_key(name: str, path: str, scope_path: str | None) -> str:
+def repo_index_key(name: str, path: str, scope_path: str | None) -> str:
     """Stable string key for a (name, path, scopePath) identity tuple."""
     return f"{name}\x00{path}\x00{scope_path or ''}"
 
@@ -51,11 +51,11 @@ class RepoIdentity:
     scope_path: str | None = None
 
     def key(self) -> str:
-        """The index key for this identity (see ``_repo_index_key``)."""
-        return _repo_index_key(self.name, self.path, self.scope_path)
+        """The index key for this identity (see ``repo_index_key``)."""
+        return repo_index_key(self.name, self.path, self.scope_path)
 
 
-def _load_repo_index(reports_root: Path) -> dict[str, str]:
+def load_repo_index(reports_root: Path) -> dict[str, str]:
     """Load the repo-identity index, returning {} on a missing/corrupt file."""
     try:
         data = json.loads((reports_root / _INDEX_FILENAME).read_text(encoding="utf-8"))
@@ -64,7 +64,7 @@ def _load_repo_index(reports_root: Path) -> dict[str, str]:
     return data if isinstance(data, dict) else {}
 
 
-def _save_repo_index(reports_root: Path, index: dict[str, str], *, log: LogSink = NULL_LOG) -> None:
+def save_repo_index(reports_root: Path, index: dict[str, str], *, log: LogSink = NULL_LOG) -> None:
     """Write the repo-identity index atomically.
 
     Best-effort: a write failure is logged and swallowed, leaving
@@ -91,9 +91,9 @@ def add_repo_index_entry(
     *, log: LogSink = NULL_LOG,
 ) -> None:
     """Register a newly-created project in the repo-identity index (best-effort)."""
-    index = _load_repo_index(reports_root)
+    index = load_repo_index(reports_root)
     index[identity.key()] = project_uuid
-    _save_repo_index(reports_root, index, log=log)
+    save_repo_index(reports_root, index, log=log)
 
 
 def rekey_repo_index_entry(
@@ -113,11 +113,11 @@ def rekey_repo_index_entry(
     that verification (their key and record disagree by construction) and
     trust the index, so for those a failure here can cost a wrong answer.
     """
-    index = _load_repo_index(reports_root)
+    index = load_repo_index(reports_root)
     updated = {key: value for key, value in index.items() if value != project_uuid}
     updated[identity.key()] = project_uuid
     if updated != index:
-        _save_repo_index(reports_root, updated, log=log)
+        save_repo_index(reports_root, updated, log=log)
 
 
 def remove_repo_index_entries(
@@ -126,7 +126,7 @@ def remove_repo_index_entries(
     """Purge any index entries pointing at a deleted project (best-effort)."""
     if not project_uuids:
         return
-    index = _load_repo_index(reports_root)
+    index = load_repo_index(reports_root)
     remaining = {key: value for key, value in index.items() if value not in project_uuids}
     if len(remaining) != len(index):
-        _save_repo_index(reports_root, remaining, log=log)
+        save_repo_index(reports_root, remaining, log=log)

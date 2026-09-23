@@ -35,29 +35,29 @@ from quodeq.shared.validation import validate_path_segment
 
 from quodeq.services._dashboard_cache import (  # noqa: F401
     DashboardCacheConfig,
-    _DEFAULT_RUN_DIM_CACHE_MAX,
+    DEFAULT_RUN_DIM_CACHE_MAX,
     make_run_dimension_fetcher,
-    _run_dim_cache_max,
+    run_dim_cache_max,
     clear_shared_dimension_cache,
     create_dimension_cache,
 )
 from quodeq.services._dashboard_history import (  # noqa: F401
-    _DashboardPayload,
-    _DEFAULT_MAX_HISTORY_RUNS,
-    _SKIP_GRADES,
-    _SelectedRunContext,
-    _collect_previous_scores,
-    _compute_dashboard_payload,
-    _enrich_dimensions_with_trend,
-    _max_history_runs,
-    _read_run_exit_reason,
+    DashboardPayload,
+    DEFAULT_MAX_HISTORY_RUNS,
+    SKIP_GRADES,
+    SelectedRunContext,
+    collect_previous_scores,
+    compute_dashboard_payload,
+    enrich_dimensions_with_trend,
+    max_history_runs,
+    read_run_exit_reason,
 )
 from quodeq.services._dashboard_response import (  # noqa: F401
-    _DimensionAnnotations,
-    _attach_dismissed_count_to_dim,
-    _attach_exit_reason_to_dim,
-    _build_dashboard_result,
-    _slim_history_dim,
+    DimensionAnnotations,
+    attach_dismissed_count_to_dim,
+    attach_exit_reason_to_dim,
+    build_dashboard_result,
+    slim_history_dim,
 )
 
 _LATEST_RUN = "latest"
@@ -221,7 +221,7 @@ def _resolve_params(params: ScoringParams | None) -> ScoringParams:
 
 def _select_run(
     reports_root: Path, project: str, runs: list[RunInfo], run: str, params: ScoringParams,
-) -> tuple[_SelectedRunContext, _DimensionAnnotations]:
+) -> tuple[SelectedRunContext, DimensionAnnotations]:
     """Resolve the requested run and rescore its dimensions.
 
     Returns the selected-run context alongside the per-dimension annotations
@@ -232,15 +232,15 @@ def _select_run(
     selected_dims, dismissed_counts, suppressed_counts = _resolve_selected_dims(
         reports_root, project, reports_root / project, selected_run, params,
     )
-    ctx = _SelectedRunContext(
+    ctx = SelectedRunContext(
         run=selected_run,
         index=selected_index,
         dimensions=selected_dims,
         summary=summarize_dimensions(selected_dims, params),
         runs=runs,
     )
-    annotations = _DimensionAnnotations(
-        exit_reason=_read_run_exit_reason(reports_root, project, selected_run.run_id),
+    annotations = DimensionAnnotations(
+        exit_reason=read_run_exit_reason(reports_root, project, selected_run.run_id),
         dismissed_counts=dismissed_counts,
         suppressed_counts=suppressed_counts,
     )
@@ -277,8 +277,8 @@ def build_dashboard(
         }
 
     ctx, annotations = _select_run(reports_root, project, runs, run, params)
-    payload = _compute_dashboard_payload(reports_root, project, ctx, cc, params)
-    return _build_dashboard_result(project, runs, ctx.run, payload, annotations)
+    payload = compute_dashboard_payload(reports_root, project, ctx, cc, params)
+    return build_dashboard_result(project, runs, ctx.run, payload, annotations)
 
 
 __all__ = [

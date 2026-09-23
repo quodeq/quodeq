@@ -60,7 +60,7 @@ def test_summary_builders_agree_under_dimension_weights():
     """SQL-path and eval-files-path summaries must produce the same weighted average."""
     from quodeq.core.types.dimension import DimensionResult
     from quodeq.data.fs.report_parser._summary import summarize_dimensions
-    from quodeq.services.scoring import _build_summary_from_dim_dicts
+    from quodeq.services.scoring import build_summary_from_dim_dicts
 
     params = dataclasses.replace(
         DEFAULT_PARAMS,
@@ -82,7 +82,7 @@ def test_summary_builders_agree_under_dimension_weights():
     # builds from the SQL dim_rows -- the same values that were formatted into
     # dim_dicts' "overallScore" display strings above.
     score_pairs = [("security", 8.0), ("performance", 6.0)]
-    sql = _build_summary_from_dim_dicts(dim_dicts, params=params, score_pairs=score_pairs)
+    sql = build_summary_from_dim_dicts(dim_dicts, params=params, score_pairs=score_pairs)
 
     # security 1.2, performance 0.8 → (8.0*1.2 + 6.0*0.8) / (1.2 + 0.8) = 7.2 weighted (vs 7.0 plain)
     assert legacy.numeric_average == 7.2
@@ -96,7 +96,7 @@ def test_summary_builder_uses_raw_float_score_pairs_not_display_string():
     a parsed "X/10" string. The exact float the caller holds must reach
     ``dimension_weighted_average`` unchanged (frozen scoring numbers).
     """
-    from quodeq.services.scoring import _build_summary_from_dim_dicts
+    from quodeq.services.scoring import build_summary_from_dim_dicts
 
     # overallScore is deliberately a coarser display string than the raw
     # score; if the summary still parsed it back out, numericAverage would
@@ -105,7 +105,7 @@ def test_summary_builder_uses_raw_float_score_pairs_not_display_string():
     tricky_score = 7.666666666666667
     score_pairs = [("security", tricky_score)]
 
-    result = _build_summary_from_dim_dicts(
+    result = build_summary_from_dim_dicts(
         dim_dicts, params=DEFAULT_PARAMS, score_pairs=score_pairs,
     )
 

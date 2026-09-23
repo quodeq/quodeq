@@ -24,10 +24,10 @@ from quodeq.services.wiring import RunInfo, calculate_trend, read_run_status_jso
 from quodeq.services.scoring_view import select_trend_runs
 from quodeq.shared.env_resolve import resolve_env
 
-_SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
+SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 
 
-def _read_run_exit_reason(reports_root: Path, project: str, run_id: str) -> str | None:
+def read_run_exit_reason(reports_root: Path, project: str, run_id: str) -> str | None:
     """Return the run's ``status.json`` ``exit_reason``, or ``None`` if absent.
 
     Used by the dashboard to surface deadline-truncated runs to the UI:
@@ -43,22 +43,22 @@ def _read_run_exit_reason(reports_root: Path, project: str, run_id: str) -> str 
 # Maximum number of historical runs scanned for trend, previous scores, and
 # stale dimensions. The full run list is still returned in availableRuns (metadata
 # only, no disk reads) so users can navigate to older runs directly.
-_DEFAULT_MAX_HISTORY_RUNS = 100
+DEFAULT_MAX_HISTORY_RUNS = 100
 
 
-def _max_history_runs(env: dict[str, str] | None = None) -> int:
+def max_history_runs(env: dict[str, str] | None = None) -> int:
     """Return the history-scan ceiling, honouring QUODEQ_MAX_HISTORY_RUNS."""
     raw = resolve_env(env).get("QUODEQ_MAX_HISTORY_RUNS")
     if not raw:
-        return _DEFAULT_MAX_HISTORY_RUNS
+        return DEFAULT_MAX_HISTORY_RUNS
     try:
         value = int(raw)
     except ValueError:
-        return _DEFAULT_MAX_HISTORY_RUNS
-    return value if value > 0 else _DEFAULT_MAX_HISTORY_RUNS
+        return DEFAULT_MAX_HISTORY_RUNS
+    return value if value > 0 else DEFAULT_MAX_HISTORY_RUNS
 
 
-def _collect_previous_scores(
+def collect_previous_scores(
     runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
     get_run_dimensions: Callable[[str], list[DimensionResult]],
 ) -> dict[str, DimensionResult]:
@@ -71,14 +71,14 @@ def _collect_previous_scores(
             if not dim_name or dim_name not in selected_dim_names:
                 continue
             grade = dim.overall_grade
-            if not grade or str(grade).upper() in _SKIP_GRADES:
+            if not grade or str(grade).upper() in SKIP_GRADES:
                 continue
             if dim_name not in previous_by_dimension:
                 previous_by_dimension[dim_name] = replace(dim, run_id=runs[older_idx].run_id)
     return previous_by_dimension
 
 
-def _enrich_dimensions_with_trend(
+def enrich_dimensions_with_trend(
     selected_dimensions: list[DimensionResult], previous_by_dimension: dict[str, DimensionResult]
 ) -> list[DimensionResult]:
     """Attach trend and previous-run data to each selected dimension."""
@@ -98,7 +98,7 @@ def _enrich_dimensions_with_trend(
 
 
 @dataclass
-class _DashboardPayload:
+class DashboardPayload:
     """Pre-computed parts for the dashboard response."""
     selected_summary: DimensionSummary
     trend: list[dict[str, Any]]
@@ -109,7 +109,7 @@ class _DashboardPayload:
 
 
 @dataclass(frozen=True)
-class _SelectedRunContext:
+class SelectedRunContext:
     """Pre-resolved data for the selected run in a dashboard request.
 
     ``runs`` is the project's full run list (newest first) that ``run`` was
@@ -148,7 +148,7 @@ def _select_history_window(
     selected run's index in the full unfiltered run list can exceed
     len(history_runs) when cancelled/failed runs sit above the selected
     run. Passing the wrong index to collect_stale_dimensions /
-    _collect_previous_scores caused IndexError on history_runs[newer_idx].
+    collect_previous_scores caused IndexError on history_runs[newer_idx].
     """
     scoreable_runs = select_trend_runs(runs)
     selected_in_scoreable = next(
@@ -170,11 +170,11 @@ def _make_history_fetcher(
 ) -> Callable[[str], list[DimensionResult]]:
     """Build the shared history dimension fetcher: cache-backed,
     dismiss-adjusted, SCALAR-only -- the same fetcher the /scores endpoint
-    uses. The three consumers in ``_compute_dashboard_payload``
-    (_collect_previous_scores, collect_stale_dimensions,
+    uses. The three consumers in ``compute_dashboard_payload``
+    (collect_previous_scores, collect_stale_dimensions,
     build_accumulated_trend) read only per-run scalars (dimension +
     overallScore + overallGrade), not the full violations. Reading +
-    rescoring FULL data for every history run (up to _max_history_runs())
+    rescoring FULL data for every history run (up to max_history_runs())
     was the ~2s cost this replaces.
 
     In-progress freshness is preserved: the fast path re-reads each request
@@ -209,24 +209,24 @@ def _make_history_fetcher(
     )
 
 
-def _compute_dashboard_payload(
-    reports_root: Path, project: str, ctx: _SelectedRunContext,
+def compute_dashboard_payload(
+    reports_root: Path, project: str, ctx: SelectedRunContext,
     cc: DashboardCacheConfig, params: ScoringParams = DEFAULT_PARAMS,
-) -> _DashboardPayload:
+) -> DashboardPayload:
     """Compute history-dependent parts of the dashboard response."""
     selected_dim_names = {d.dimension for d in ctx.dimensions}
-    window = _select_history_window(ctx.runs, ctx.run.run_id, _max_history_runs())
+    window = _select_history_window(ctx.runs, ctx.run.run_id, max_history_runs())
     get_run_dimensions = _make_history_fetcher(reports_root, project, window, params, cc)
-    previous_by_dimension = _collect_previous_scores(
+    previous_by_dimension = collect_previous_scores(
         window.runs, window.index, selected_dim_names, get_run_dimensions,
     )
     stale_dimensions, stale_previous_by_dimension = collect_stale_dimensions(
         window.runs, window.index, selected_dim_names, get_run_dimensions,
     )
-    return _DashboardPayload(
+    return DashboardPayload(
         selected_summary=ctx.summary,
         trend=build_accumulated_trend(window.runs, get_run_dimensions, params=params),
-        dimensions_with_trend=_enrich_dimensions_with_trend(ctx.dimensions, previous_by_dimension),
+        dimensions_with_trend=enrich_dimensions_with_trend(ctx.dimensions, previous_by_dimension),
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,
         stale_dimensions=stale_dimensions,

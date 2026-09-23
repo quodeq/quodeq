@@ -29,7 +29,7 @@ from quodeq.services._job_file_store import (
 )
 from quodeq.services.jobs import (
     JobManager,
-    _EXIT_CODE_TIMEOUT,
+    EXIT_CODE_TIMEOUT,
 )
 
 
@@ -90,9 +90,9 @@ class TestWatchdogDeadlineKill:
         """A watchdog kill is the time budget doing its job, not a failure."""
         from quodeq.services import jobs as jobs_mod
 
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_POLL_INTERVAL_S", 0.01)
-        monkeypatch.setattr(jobs_mod, "_WATCHDOG_DEADLINE_GRACE_S", 0.02)
-        monkeypatch.setattr(jobs_mod, "_terminate_process", lambda p: p.kill())
+        monkeypatch.setattr(jobs_mod, "WATCHDOG_POLL_INTERVAL_S", 0.01)
+        monkeypatch.setattr(jobs_mod, "WATCHDOG_DEADLINE_GRACE_S", 0.02)
+        monkeypatch.setattr(jobs_mod, "terminate_process", lambda p: p.kill())
 
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)
@@ -107,7 +107,7 @@ class TestWatchdogDeadlineKill:
         assert proc.killed is True
         assert job.status == JobStatus.CANCELLED
         assert job.exit_reason == "deadline"
-        assert job.exit_code == _EXIT_CODE_TIMEOUT
+        assert job.exit_code == EXIT_CODE_TIMEOUT
 
 
 class TestRunStatusDeadlineFallback:

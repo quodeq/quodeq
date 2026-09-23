@@ -40,7 +40,7 @@ _UNKNOWN_BUCKET = "unknown"
 _BUCKET_BY_SEVERITY: dict[str, Severity] = {s.value: s for s in Severity}
 
 
-def _severity_bucket(severity: str) -> Severity | str:
+def severity_bucket(severity: str) -> Severity | str:
     """Map DB severity strings to the legacy tally buckets.
 
     The DB stores ``critical``, ``high``, ``medium``, ``low``, ``minor``. Only
@@ -53,13 +53,13 @@ def _severity_bucket(severity: str) -> Severity | str:
     return _BUCKET_BY_SEVERITY.get(s, _UNKNOWN_BUCKET)
 
 
-def _build_totals_from_findings(
+def build_totals_from_findings(
     violations: list[Finding], compliance_count: int, files_read: int | None = None,
 ) -> Totals:
     """Build a Totals dataclass from a list of active (non-dismissed) violations."""
     critical = major = minor = unknown = 0
     for v in violations:
-        bucket = _severity_bucket(v.severity or "")
+        bucket = severity_bucket(v.severity or "")
         if bucket == Severity.CRITICAL:
             critical += 1
         elif bucket == Severity.MAJOR:
@@ -76,7 +76,7 @@ def _build_totals_from_findings(
     )
 
 
-def _build_dimension_dict(
+def build_dimension_dict(
     dim_row: dict,
     p_rows: list[dict],
     violations: list[Finding],
@@ -101,7 +101,7 @@ def _build_dimension_dict(
     ]
 
     files_read = dim_row.get("files_read")
-    totals = _build_totals_from_findings(
+    totals = build_totals_from_findings(
         violations, compliance_count=len(compliance), files_read=files_read,
     )
 
@@ -118,14 +118,14 @@ def _build_dimension_dict(
     return to_camel_dict(dim)
 
 
-def _build_summary_from_dim_dicts(
+def build_summary_from_dim_dicts(
     dim_dicts: list[dict], params: ScoringParams = DEFAULT_PARAMS,
     *, score_pairs: list[tuple[str | None, float]],
 ) -> dict:
     """Build a camelCase summary dict from a list of dimension camelCase dicts.
 
     Same shape as ``summarize_dimensions`` but working directly on the
-    already-serialised dicts produced by ``_build_dimension_dict``. The
+    already-serialised dicts produced by ``build_dimension_dict``. The
     grade fallback is deliberately NOT shared: a tied vote resolves here on
     ``Counter`` insertion order (first grade seen wins) and there on grade
     rank, because only the parser side has the rank table. *score_pairs* are
@@ -161,7 +161,7 @@ def _default_grade_tables_reader(run_dir: Path) -> GradeTablesReader:
     return SQLiteStateStore(run_dir)
 
 
-def _build_response_from_grade_tables(
+def build_response_from_grade_tables(
     run_dir: Path, params: ScoringParams = DEFAULT_PARAMS,
     store_factory: Callable[[Path], GradeTablesReader] | None = None,
 ) -> dict:
@@ -197,7 +197,7 @@ def _build_response_from_grade_tables(
     score_pairs: list[tuple[str | None, float]] = []
     for dim_row in dim_rows:
         dim_name = dim_row["dimension"]
-        dim_dicts.append(_build_dimension_dict(
+        dim_dicts.append(build_dimension_dict(
             dim_row,
             p_rows_by_dim.get(dim_name, []),
             violations_by_dim.get(dim_name, []),
@@ -206,11 +206,11 @@ def _build_response_from_grade_tables(
         if dim_row.get("score") is not None:
             score_pairs.append((dim_row["dimension"], float(dim_row["score"])))
 
-    summary = _build_summary_from_dim_dicts(dim_dicts, params=params, score_pairs=score_pairs)
+    summary = build_summary_from_dim_dicts(dim_dicts, params=params, score_pairs=score_pairs)
     return {"dimensions": dim_dicts, "summary": summary}
 
 
-def _build_response_from_eval_files(
+def build_response_from_eval_files(
     reports_root: Path, project: str, run_id: str,
     params: ScoringParams = DEFAULT_PARAMS,
     deps: ScoringDeps | None = None,

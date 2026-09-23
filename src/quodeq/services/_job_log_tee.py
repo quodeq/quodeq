@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Iterator
 
 from quodeq.core.observability import LogSink
-from quodeq.services._job_model import JobStore, _CC_MARKER_PREFIX
+from quodeq.services._job_model import JobStore, CC_MARKER_PREFIX
 from quodeq.shared.run_log import RunLogWriter
 
 
@@ -104,7 +104,7 @@ def _read_and_tee_loop(
             # markers: they are structured IPC, not user-facing terminal
             # output, and leaking them makes the xterm pane noisy.
             for stripped in lines:
-                if not stripped.startswith(_CC_MARKER_PREFIX):
+                if not stripped.startswith(CC_MARKER_PREFIX):
                     tee_run_log(job_id, stripped, ctx)
     except OSError as exc:  # IOError is OSError; BrokenPipeError is a subclass
         ctx.log.warning(f"Stream read error for job {job_id}: {exc}")

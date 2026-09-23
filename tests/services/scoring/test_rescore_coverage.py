@@ -14,8 +14,8 @@ from pathlib import Path
 
 import quodeq.services.scoring as scoring
 from quodeq.services.scoring import (
-    _dims_expecting_rescore,
-    _rescore_accumulated_with_coverage,
+    dims_expecting_rescore,
+    rescore_accumulated_with_coverage,
 )
 
 
@@ -33,14 +33,14 @@ def test_dims_expecting_rescore_needs_a_source_run():
         {"dimension": "performance"},  # no runId -> nothing to rescore from
         {"dimension": "", "runId": "r1"},
     ]
-    assert _dims_expecting_rescore(dims) == {"security"}
+    assert dims_expecting_rescore(dims) == {"security"}
 
 
 def test_no_suppressions_is_complete():
     deps = scoring.ScoringDeps(
         dismissed_keys=lambda pdir: set(), deleted_keys=lambda pdir: set(),
     )
-    payload, complete = _rescore_accumulated_with_coverage(
+    payload, complete = rescore_accumulated_with_coverage(
         _acc([_dim("security")]), Path("/reports"), "proj", deps=deps,
     )
     assert complete is True
@@ -57,7 +57,7 @@ def test_full_coverage_is_complete():
         },
         recompute_summary=lambda dims, summary, params=None: summary,
     )
-    payload, complete = _rescore_accumulated_with_coverage(
+    payload, complete = rescore_accumulated_with_coverage(
         _acc([_dim("security"), _dim("performance")]), Path("/reports"), "proj", deps=deps,
     )
     assert complete is True
@@ -75,7 +75,7 @@ def test_partial_coverage_is_flagged_incomplete():
         },
         recompute_summary=lambda dims, summary, params=None: summary,
     )
-    payload, complete = _rescore_accumulated_with_coverage(
+    payload, complete = rescore_accumulated_with_coverage(
         _acc([_dim("security"), _dim("performance")]), Path("/reports"), "proj", deps=deps,
     )
     assert complete is False

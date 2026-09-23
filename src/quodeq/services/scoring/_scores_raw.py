@@ -16,8 +16,8 @@ from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.wiring import SQLiteStateStore, SqliteFindingsRepository
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.scoring._response_builders import (
-    _build_response_from_eval_files,
-    _build_response_from_grade_tables,
+    build_response_from_eval_files,
+    build_response_from_grade_tables,
 )
 from quodeq.shared.validation import validate_path_segment
 
@@ -63,7 +63,7 @@ def _scores_from_sql_grade_tables(
         store_factory = deps.grade_tables_factory or SQLiteStateStore
         store = store_factory(run_dir)
         if store.read_dimension_scores():
-            return _build_response_from_grade_tables(
+            return build_response_from_grade_tables(
                 run_dir, params=params, store_factory=store_factory,
             )
     except StoreUnreadableError:
@@ -111,7 +111,7 @@ def get_scores_raw(
         if sql_response is not None:
             return sql_response
 
-    return _build_response_from_eval_files(
+    return build_response_from_eval_files(
         reports_root, project, run_id, params=params, deps=deps,
     )
 

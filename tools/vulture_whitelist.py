@@ -206,22 +206,22 @@ _.wait_for_trip  # analysis/cache/failure_streak.py: Referenced only from tests/
 
 # Names reached through a library, a Protocol annotation or a re-export rather than a direct call.
 _.StandardReference  # core/types/standard.py: Referenced as a name or key elsewhere (4 refs outside the definition).
-_._CacheEraser  # services/_run_discard.py: structural Protocol used as an annotation and as the test injection seam.
+_.CacheEraser  # services/_run_discard.py: structural Protocol used as an annotation and as the test injection seam.
 _._api_pid  # dashboard/_webview_window.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _.build_workdir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._coerce_unknown_severity  # analysis/_api_schema.py: pydantic field_validator; pydantic calls it by registration, not by name.
-_._color  # shared/_log_format.py: Referenced as a name or key elsewhere (1 refs outside the definition).
+_.color  # shared/_log_format.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._count_eval_files  # services/cache.py: Referenced as a name or key elsewhere (8 refs outside the definition).
 _._deepest_scope  # analysis/manifest_build_scope.py: Referenced as a name or key elsewhere (4 refs outside the definition).
 _.dev_build_workdir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._drain_pre_marker_buffer  # services/_job_monitor_mixin.py: Referenced as a name or key elsewhere (5 refs outside the definition).
 _.get_ui_source_dir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._poll  # menubar/app.py: Referenced as a name or key elsewhere (2 refs outside the definition).
-_._read_deadline_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (1 refs outside the definition).
-_._read_dimensions_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (7 refs outside the definition).
-_._read_provider_model_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (1 refs outside the definition).
-_._read_scan_summary  # services/_fs_project_primitives.py: Referenced as a name or key elsewhere (9 refs outside the definition).
-_._read_time_limit_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (7 refs outside the definition).
+_.read_deadline_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (1 refs outside the definition).
+_.read_dimensions_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (7 refs outside the definition).
+_.read_provider_model_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (1 refs outside the definition).
+_.read_scan_summary  # services/_fs_project_primitives.py: Referenced as a name or key elsewhere (9 refs outside the definition).
+_.read_time_limit_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (7 refs outside the definition).
 _._tee_run_log  # services/_job_monitor_mixin.py: Referenced as a name or key elsewhere (5 refs outside the definition).
 _.clear_accumulated_process_cache  # services/_accumulated_cache.py: Referenced as a name or key elsewhere (8 refs outside the definition).
 _.close_all_for_tests  # data/cache_store/index.py: Referenced as a name or key elsewhere (4 refs outside the definition).

@@ -35,8 +35,8 @@ class TestDiscardSkipsScoring:
             output_project="proj", output_run_id="run1",
         )
         with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
-             patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard, \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
+             patch("quodeq.services.evaluation_mixin.discard_run_state") as mock_discard, \
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status"):
             result = m.cancel_evaluation(
                 "j1", reports_dir="/reports", discard_partial=True,
             )
@@ -54,7 +54,7 @@ class TestDiscardSkipsScoring:
             output_project="proj", output_run_id="run1",
         )
         with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status"):
             result = m.cancel_evaluation("j1", reports_dir="/reports")
         assert result is True
         mock_score.assert_called_once()

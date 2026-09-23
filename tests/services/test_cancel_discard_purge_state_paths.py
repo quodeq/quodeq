@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.services.evaluation_mixin import _discard_run_state
+from quodeq.services.evaluation_mixin import discard_run_state
 
 
 def test_discard_removes_the_replayed_keys_sidecar(tmp_path: Path):
@@ -19,7 +19,7 @@ def test_discard_removes_the_replayed_keys_sidecar(tmp_path: Path):
     sidecar = evidence / "security_replayed_unconsolidated_keys.json"
     sidecar.write_text(json.dumps({"a.py": "key-a"}))
 
-    _discard_run_state(str(reports), {"outputProject": "proj", "outputRunId": "run1"})
+    discard_run_state(str(reports), {"outputProject": "proj", "outputRunId": "run1"})
 
     assert not sidecar.exists()
 
@@ -44,7 +44,7 @@ def test_discard_does_not_delete_replayed_cache_entries(tmp_path: Path):
         def delete(self, key: str) -> None:
             deleted.append(key)
 
-    _discard_run_state(
+    discard_run_state(
         str(reports), {"outputProject": "proj", "outputRunId": "run1"}, cache=_FakeCache(),
     )
 
@@ -70,7 +70,7 @@ def test_discard_rejects_path_traversal_in_run_id(tmp_path: Path):
         def delete(self, key: str) -> None:
             deleted.append(key)
 
-    _discard_run_state(
+    discard_run_state(
         str(reports),
         {"outputProject": "proj", "outputRunId": "../../../etc/passwd"},
         cache=_FakeCache(),
@@ -100,7 +100,7 @@ def test_discard_rejects_absolute_path_in_project(tmp_path: Path):
         def delete(self, key: str) -> None:
             deleted.append(key)
 
-    _discard_run_state(
+    discard_run_state(
         str(reports),
         {"outputProject": "/etc", "outputRunId": "run1"},
         cache=_FakeCache(),
@@ -128,7 +128,7 @@ def test_discard_allows_legitimate_paths(tmp_path: Path):
         def delete(self, key: str) -> None:
             deleted.append(key)
 
-    _discard_run_state(
+    discard_run_state(
         str(reports),
         {"outputProject": "myproj", "outputRunId": "run-123"},
         cache=_FakeCache(),

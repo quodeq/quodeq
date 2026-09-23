@@ -33,7 +33,7 @@ def test_trend_identical_between_fast_and_heavy_paths(tmp_path: Path, monkeypatc
     import quodeq.services.scoring as scoring
     from quodeq.services.scoring import _fetchers
     monkeypatch.setattr(
-        _fetchers, "_make_trend_fetcher",
+        _fetchers, "make_scoring_trend_fetcher",
         lambda rr, p, params=scoring.DEFAULT_PARAMS, cacheable_run_ids=None, deps=None: (
             scoring._make_rescoring_fetcher(rr, p, params=params, deps=deps)
         ),

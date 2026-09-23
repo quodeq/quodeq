@@ -5,7 +5,7 @@ are not tracked by JobManager, so their dashboard-facing fields (dimensions,
 deadline, provider/model, time limit) are read straight from disk. All five
 readers, plus ``build_job_snapshot`` which assembles a ``JobSnapshot`` from
 an index ``RunRow`` using them, live here; ``_evaluations_index.py``
-re-exports every name for backward compatibility. ``_status_json_terminal``
+re-exports every name for backward compatibility. ``status_json_terminal``
 (the terminal-state check) also lives here — ``_run_index_fs.py``
 needs it too, and putting it in ``_evaluations_index.py`` would have made
 that a circular import.
@@ -21,7 +21,7 @@ from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
 
 
-def _status_json_terminal(run_dir: Path) -> bool:
+def status_json_terminal(run_dir: Path) -> bool:
     """Return True when the run's status.json says it ended."""
     status_path = run_dir / "status.json"
     if not status_path.exists():
@@ -39,7 +39,7 @@ def _status_json_terminal(run_dir: Path) -> bool:
         return False
 
 
-def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
+def tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
     """Return the last *max_lines* lines from run.log.
 
     Reads backward from the end in growing chunks instead of the whole file,
@@ -138,7 +138,7 @@ def _provider_model_from_data(data: dict | None) -> tuple[str | None, str | None
     )
 
 
-def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
+def read_dimensions_from_status(run_dir: Path) -> list[str] | None:
     """Read the `dimensions` list from status.json, or None if unavailable.
 
     "All dimensions" runs record an empty list (the raw, unresolved CLI
@@ -150,12 +150,12 @@ def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
     return _dimensions_from_data(run_dir, _load_status_json(run_dir))
 
 
-def _read_time_limit_from_status(run_dir: Path) -> int | None:
+def read_time_limit_from_status(run_dir: Path) -> int | None:
     """Read the run budget (`time_limit_s`) from status.json, or None."""
     return _time_limit_from_data(_load_status_json(run_dir))
 
 
-def _read_deadline_from_status(run_dir: Path) -> str | None:
+def read_deadline_from_status(run_dir: Path) -> str | None:
     """Read the `deadline_at` ISO string from status.json, or None.
 
     External (CLI) runs are not tracked by JobManager so they don't go
@@ -165,7 +165,7 @@ def _read_deadline_from_status(run_dir: Path) -> str | None:
     return _deadline_from_data(_load_status_json(run_dir))
 
 
-def _read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | None]:
+def read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | None]:
     """Read (ai_provider, ai_model) from status.json, or (None, None).
 
     External (CLI) runs aren't tracked by JobManager, so they don't carry
@@ -184,7 +184,7 @@ def _read_enriched_status_fields(
     fields from the same dict instead of four independent reads.
     """
     try:
-        logs = _tail_run_log(run_dir)
+        logs = tail_run_log(run_dir)
     except (OSError, ValueError):
         logs = []
     try:

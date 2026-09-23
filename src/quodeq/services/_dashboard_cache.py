@@ -34,17 +34,17 @@ class DashboardCacheConfig:
     version: str = ""
 
 
-_DEFAULT_RUN_DIM_CACHE_MAX = 256
+DEFAULT_RUN_DIM_CACHE_MAX = 256
 
 
-def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
+def run_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the run-dimension cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
     try:
-        return int(resolve_env(env).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+        return int(resolve_env(env).get("QUODEQ_RUN_DIM_CACHE_MAX", str(DEFAULT_RUN_DIM_CACHE_MAX)))
     except (ValueError, TypeError):
-        return _DEFAULT_RUN_DIM_CACHE_MAX
+        return DEFAULT_RUN_DIM_CACHE_MAX
 
 
 class DimensionCache:
@@ -118,7 +118,7 @@ def make_run_dimension_fetcher(
     ctx = DimensionCacheContext(
         cache=cc.cache if cc.cache is not None else _shared_dimension_cache.data,
         lock=cc.lock if cc.lock is not None else _shared_dimension_cache.lock,
-        max_size=cc.max_size if cc.max_size is not None else _run_dim_cache_max(),
+        max_size=cc.max_size if cc.max_size is not None else run_dim_cache_max(),
     )
     return make_lru_dimension_fetcher(reports_root, project, ctx, version=cc.version)
 

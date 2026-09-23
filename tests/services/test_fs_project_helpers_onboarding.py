@@ -1,4 +1,4 @@
-"""Tests for the onboardingCompletedAt heal in _build_project_entry.
+"""Tests for the onboardingCompletedAt heal in build_project_entry.
 
 A wizard-created project gets ``onboardingCompletedAt: null`` at registration
 time. Setup completion is stamped when an evaluation starts (see
@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.services.fs_project_helpers import _ListingOptions, _build_project_entry
+from quodeq.services.fs_project_helpers import ListingOptions, build_project_entry
 from quodeq.data.fs.report_parser.runs import RunInfo
 
 
@@ -44,7 +44,7 @@ def test_entry_heals_null_onboarding_to_first_run_date(tmp_path):
         _run("2025-12-02_00-00-00", "2025-12-02T00:00:00"),
     ]
 
-    entry = _build_project_entry(tmp_path, "proj-1", runs)
+    entry = build_project_entry(tmp_path, "proj-1", runs)
 
     assert entry.onboarding_completed_at == "2025-12-02T00:00:00"
     assert _read_field(project_dir) == "2025-12-02T00:00:00"
@@ -54,7 +54,7 @@ def test_entry_heals_null_onboarding_without_run_date(tmp_path):
     """A run with no parseable date still proves an evaluation happened."""
     project_dir = _make_project(tmp_path, onboarding=None)
 
-    entry = _build_project_entry(tmp_path, "proj-1", [_run("some-run", None)])
+    entry = build_project_entry(tmp_path, "proj-1", [_run("some-run", None)])
 
     assert isinstance(entry.onboarding_completed_at, str) and entry.onboarding_completed_at
     assert _read_field(project_dir) == entry.onboarding_completed_at
@@ -63,7 +63,7 @@ def test_entry_heals_null_onboarding_without_run_date(tmp_path):
 def test_entry_keeps_null_onboarding_without_runs(tmp_path):
     project_dir = _make_project(tmp_path, onboarding=None)
 
-    entry = _build_project_entry(tmp_path, "proj-1", [])
+    entry = build_project_entry(tmp_path, "proj-1", [])
 
     assert entry.onboarding_completed_at is None
     assert _read_field(project_dir) is None
@@ -72,7 +72,7 @@ def test_entry_keeps_null_onboarding_without_runs(tmp_path):
 def test_entry_preserves_existing_onboarding_stamp(tmp_path):
     project_dir = _make_project(tmp_path, onboarding="2025-11-01T00:00:00Z")
 
-    entry = _build_project_entry(
+    entry = build_project_entry(
         tmp_path, "proj-1", [_run("2025-12-02_00-00-00", "2025-12-02T00:00:00")],
     )
 
@@ -86,10 +86,10 @@ def test_entry_backfill_false_never_writes(tmp_path):
     info_path = project_dir / "repository_info.json"
     before = info_path.read_text()
 
-    entry = _build_project_entry(
+    entry = build_project_entry(
         tmp_path, "proj-1",
         [_run("2025-12-02_00-00-00", "2025-12-02T00:00:00")],
-        _ListingOptions(backfill=False),
+        ListingOptions(backfill=False),
     )
 
     assert entry.onboarding_completed_at is None

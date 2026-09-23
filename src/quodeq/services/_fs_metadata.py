@@ -1,15 +1,15 @@
 """Metadata and detection helpers for the filesystem action provider.
 
 Split into two sibling modules plus this orchestrator:
-  - _fs_project_primitives.py: leaf metadata reads (_read_scan_summary,
-    _check_path_exists, _extract_project_metadata, _read_repo_info,
-    _local_repo_root).
+  - _fs_project_primitives.py: leaf metadata reads (read_scan_summary,
+    check_path_exists, extract_project_metadata, read_repo_info,
+    local_repo_root).
   - _fs_discipline.py: language-stat and discipline-inference helpers
-    (_read_language_stats, _read_discipline_from_eval,
-    _find_discipline_in_run, _infer_discipline, _has_fingerprints).
+    (read_language_stats, read_discipline_from_eval,
+    find_discipline_in_run, infer_discipline, project_has_fingerprints).
 
-Both are re-exported here: _local_repo_root is used by compare.py, and
-_has_fingerprints/_infer_discipline are used by fs_projects.py.
+Both are re-exported here: local_repo_root is used by compare.py, and
+project_has_fingerprints/infer_discipline are used by fs_projects.py.
 """
 
 from __future__ import annotations
@@ -21,26 +21,26 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
-from quodeq.services._accumulated_data import _has_valid_score
+from quodeq.services._accumulated_data import has_valid_score
 from quodeq.services.wiring import RunInfo, read_run_data, summarize_dimensions
-from quodeq.services._fs_project_primitives import _local_repo_root
+from quodeq.services._fs_project_primitives import local_repo_root
 from quodeq.services._fs_project_primitives import (  # noqa: F401 — re-export
-    _check_path_exists,
-    _extract_project_metadata,
-    _read_repo_info,
-    _read_scan_summary,
+    check_path_exists,
+    extract_project_metadata,
+    read_repo_info,
+    read_scan_summary,
 )
 from quodeq.services._fs_discipline import (  # noqa: F401 — re-export
-    _find_discipline_in_run,
-    _has_fingerprints,
-    _infer_discipline,
-    _read_discipline_from_eval,
-    _read_language_stats,
+    find_discipline_in_run,
+    project_has_fingerprints,
+    infer_discipline,
+    read_discipline_from_eval,
+    read_language_stats,
 )
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import validate_path_segment
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from quodeq.core.scoring.params import ScoringParams
@@ -83,7 +83,7 @@ def _select_accumulated_dims(
 def _is_first_visible_score(d, visible_set: set, latest_by_dim: dict) -> bool:
     """True when *d* is the newest scorable run of a dimension the user can see.
 
-    Same trust gate as the accumulated Overview (``_has_valid_score``): a
+    Same trust gate as the accumulated Overview (``has_valid_score``): a
     coverage-0 stub is skipped so the card falls through to a real older run
     instead of showing the stub's inflated grade. Hidden standards are
     skipped entirely -- the Overview headline excludes them, and a dimension
@@ -93,7 +93,7 @@ def _is_first_visible_score(d, visible_set: set, latest_by_dim: dict) -> bool:
         d.dimension
         and d.dimension.lower() in visible_set
         and d.dimension not in latest_by_dim
-        and _has_valid_score(d)
+        and has_valid_score(d)
     )
 
 
@@ -141,7 +141,7 @@ def _compute_summary(
     except (OSError, json.JSONDecodeError, KeyError) as exc:
         # Adapter errors only: a run/triage file that is missing, unreadable,
         # or malformed genuinely means "no data for the card".
-        _logger.warning("Unreadable/malformed run metadata for card: %s", exc)
+        logger.warning("Unreadable/malformed run metadata for card: %s", exc)
         return {"grade": None, "score": None, "files": None}
     # From here on it is business math over already-loaded data. It stays
     # OUTSIDE the try: a KeyError raised by a rescoring/summarising bug must
@@ -172,7 +172,7 @@ def _summary_version(
     from quodeq.services.score_cache import accumulated_cache_version, per_run_versions  # noqa: PLC0415
 
     project_dir = reports_root / entry_name
-    visible = load_visible_standard_ids(_local_repo_root(reports_root, entry_name))
+    visible = load_visible_standard_ids(local_repo_root(reports_root, entry_name))
     visible_set = set(visible)
     run_versions = per_run_versions(
         project_dir, entry_name, params, [(r.run_id, r.status) for r in runs])
@@ -185,7 +185,7 @@ def _compute_on_miss_summary(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
     params: "ScoringParams", scope: _SummaryScope,
 ) -> tuple[str | None, float | None, int | None, bool]:
-    """Compute-and-cache branch of ``_read_accumulated_summary``.
+    """Compute-and-cache branch of ``read_accumulated_summary``.
 
     Reached when *compute_on_miss* controls what happens on a cache miss.
     False (the default, used by the local projects-list path) never computes
@@ -208,7 +208,7 @@ def _compute_on_miss_summary(
 def _read_settled_or_pending_summary(
     entry_name: str, runs: list[RunInfo], version: str,
 ) -> tuple[str | None, float | None, int | None, bool]:
-    """Read-only branch of ``_read_accumulated_summary``.
+    """Read-only branch of ``read_accumulated_summary``.
 
     Only a project with NO runs at all will never be picked up by the
     warm-up engine (``warm_project_summary`` has the same empty-runs gate),
@@ -229,7 +229,7 @@ def _read_settled_or_pending_summary(
     return None, None, None, True
 
 
-def _read_accumulated_summary(
+def read_accumulated_summary(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
     params: "ScoringParams | None" = None, *, compute_on_miss: bool = False,
 ) -> tuple[str | None, float | None, int | None, bool]:

@@ -2,7 +2,7 @@
 
 Split from test_fs_metadata.py (further split out of
 test_fs_metadata_accumulated.py to stay under the file-size cap). Pins
-the `run_dir_by_dim` bookkeeping in `_read_accumulated_summary`: on the
+the `run_dir_by_dim` bookkeeping in `read_accumulated_summary`: on the
 accumulated/project-card path, each dimension must be rescored from the
 evidence of the run it was actually SOURCED from -- not unconditionally
 from the newest run.
@@ -13,7 +13,7 @@ import json
 from unittest.mock import patch
 
 from quodeq.core.run.state import RunState
-from quodeq.services._fs_metadata import _read_accumulated_summary
+from quodeq.services._fs_metadata import read_accumulated_summary
 
 
 def _fsm_evidence_line(dim, req, file, line, sev="major", t="violation", p="Confidentiality", vt="VT-COUPLING"):
@@ -117,7 +117,7 @@ def _rescore(run_dir, dismissed):
 
 
 class TestPerDimensionRunDirRescore:
-    """Pins the `run_dir_by_dim` bookkeeping in `_read_accumulated_summary`: on
+    """Pins the `run_dir_by_dim` bookkeeping in `read_accumulated_summary`: on
     the accumulated/project-card path, each dimension must be rescored from
     the evidence of the run it was actually SOURCED from -- not
     unconditionally from the newest run.
@@ -169,7 +169,7 @@ class TestPerDimensionRunDirRescore:
             RunInfo(run_id=_RUN_NEW_ID, date_iso="2026-01-02", date_label="Jan 02", status=RunState.DONE),
             RunInfo(run_id=_RUN_OLD_ID, date_iso="2026-01-01", date_label="Jan 01", status=RunState.DONE),
         ]
-        _read_accumulated_summary(reports_root, project, runs, DEFAULT_PARAMS)
+        read_accumulated_summary(reports_root, project, runs, DEFAULT_PARAMS)
 
         acc_dims = mock_summarize.call_args[0][0]
         dim_a_result = next(d for d in acc_dims if d.dimension == _DIM_A)

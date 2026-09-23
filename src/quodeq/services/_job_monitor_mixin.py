@@ -1,7 +1,7 @@
 """JobManager's log/marker parsing and background process-monitoring behavior.
 
 Split from ``jobs.py`` to keep that file under the size ratchet's 300-line
-cap. ``_JobMonitorMixin`` is mixed into ``JobManager`` there; the state it
+cap. ``JobMonitorMixin`` is mixed into ``JobManager`` there; the state it
 reads is declared on the class below and owned by ``JobManager.__init__``,
 which assigns every one of those attributes. Only the methods moved.
 
@@ -21,9 +21,9 @@ from typing import Any, Callable, Iterable
 from quodeq.services._job_log_tee import TeeContext, consume_stream, drain_pre_marker_buffer, tee_run_log
 from quodeq.services._job_model import (
     Job, JobStore, REPORT_PATH_RE,
-    _ANSI_RE, _CC_MARKER_PREFIX, _EXIT_CODE_TIMEOUT,
-    _MAX_COMPLETED_JOBS, _REPORT_PATH_MARKER,
-    _WATCHDOG_POLL_INTERVAL_S,
+    ANSI_RE, CC_MARKER_PREFIX, EXIT_CODE_TIMEOUT,
+    MAX_COMPLETED_JOBS, REPORT_PATH_MARKER,
+    WATCHDOG_POLL_INTERVAL_S,
 )
 from quodeq.services._job_watchdog import run_status_exit_reason, watchdog_should_kill
 from quodeq.core.observability import LogSink
@@ -38,7 +38,7 @@ from quodeq.shared.constants import (
 )
 
 
-class _JobMonitorMixin:
+class JobMonitorMixin:
     """Log/marker parsing and process monitoring for ``JobManager``.
 
     The attributes below are declared, not assigned: ``JobManager.__init__``
@@ -86,13 +86,13 @@ class _JobMonitorMixin:
     def _append_log(self, job: Job, line: str) -> None:
         if not line:
             return
-        if line.startswith(_CC_MARKER_PREFIX):
+        if line.startswith(CC_MARKER_PREFIX):
             self._apply_marker(job, line)
             return
-        job.logs.append(_ANSI_RE.sub("", line))
+        job.logs.append(ANSI_RE.sub("", line))
         # Fallback: extract report path from log text if the structured
         # marker was not received (backward compat with older pipelines).
-        if not job.output_project and _REPORT_PATH_MARKER in line:
+        if not job.output_project and REPORT_PATH_MARKER in line:
             match = REPORT_PATH_RE.search(line)
             if match:
                 job.output_project = match.group(1)
@@ -141,10 +141,10 @@ class _JobMonitorMixin:
         tee_run_log(job_id, line, self._tee_ctx)
 
     def _evict_completed_jobs(self) -> None:
-        """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""
+        """Remove oldest completed/failed/cancelled jobs beyond MAX_COMPLETED_JOBS."""
         all_jobs = self._store.list()
         completed = [j for j in all_jobs if j.status != JobStatus.RUNNING]
-        excess = len(completed) - _MAX_COMPLETED_JOBS
+        excess = len(completed) - MAX_COMPLETED_JOBS
         if excess > 0:
             # Oldest first, or a store wedged with old junk would evict the
             # user's newest real runs while the junk survived.
@@ -203,7 +203,7 @@ class _JobMonitorMixin:
         watchdog_killed = False
         while True:
             try:
-                exit_code = process.wait(timeout=_WATCHDOG_POLL_INTERVAL_S)
+                exit_code = process.wait(timeout=WATCHDOG_POLL_INTERVAL_S)
                 break
             except subprocess.TimeoutExpired:
                 if self._watchdog_should_kill(job_id, started_at):
@@ -214,15 +214,15 @@ class _JobMonitorMixin:
                     # start_new_session=True, so a bare process.kill() would
                     # orphan the subagent pool + AI-CLI children (leaking tokens
                     # and CPU, and letting them write into the abandoned run
-                    # dir). _terminate_process matches the cancel/shutdown paths
+                    # dir). terminate_process matches the cancel/shutdown paths
                     # and waits internally.
                     # Deferred facade lookup: tests patch
-                    # quodeq.services.jobs._terminate_process, so this must
+                    # quodeq.services.jobs.terminate_process, so this must
                     # resolve dynamically through that module rather than a
                     # module-level import here.
                     from quodeq.services import jobs as _jobs_facade
-                    _jobs_facade._terminate_process(process)
-                    exit_code = _EXIT_CODE_TIMEOUT
+                    _jobs_facade.terminate_process(process)
+                    exit_code = EXIT_CODE_TIMEOUT
                     watchdog_killed = True
                     break
         exit_reason = self._classify_exit(job_id, exit_code, watchdog_killed)

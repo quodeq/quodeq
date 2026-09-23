@@ -4,9 +4,9 @@ from __future__ import annotations
 
 
 from quodeq.services.violations import (
-    _deleted_key_for_violation,
-    _filter_dismissed_from_result,
-    _violation_location,
+    deleted_key_for_violation,
+    filter_dismissed_from_result,
+    violation_location,
     _max_violation_files,
     aggregate_violations,
 )
@@ -15,57 +15,57 @@ from quodeq.services.violations import (
 class TestViolationLocation:
     def test_separated_format(self):
         v = {"req": "REQ-1", "file": "main.py", "line": 42}
-        assert _violation_location(v) == ("main.py", 42)
+        assert violation_location(v) == ("main.py", 42)
 
     def test_combined_format(self):
         v = {"req": "REQ-2", "file": "main.py:10", "line": None}
-        assert _violation_location(v) == ("main.py", 10)
+        assert violation_location(v) == ("main.py", 10)
 
     def test_no_line_no_colon(self):
         v = {"req": "REQ-3", "file": "main.py", "line": None}
-        assert _violation_location(v) == ("main.py", 0)
+        assert violation_location(v) == ("main.py", 0)
 
     def test_combined_format_invalid_line(self):
         v = {"req": "REQ-4", "file": "main.py:abc", "line": None}
-        assert _violation_location(v) == ("main.py:abc", 0)
+        assert violation_location(v) == ("main.py:abc", 0)
 
     def test_empty_dict(self):
         v = {}
-        assert _violation_location(v) == ("", 0)
+        assert violation_location(v) == ("", 0)
 
     def test_line_zero_explicit(self):
         v = {"req": "R", "file": "f.py", "line": 0}
-        assert _violation_location(v) == ("f.py", 0)
+        assert violation_location(v) == ("f.py", 0)
 
 
 class TestDeletedKeyForViolation:
     def test_camel_case_practice_id(self):
         v = {"practiceId": "Modularity", "file": "a.py", "line": 3}
-        assert _deleted_key_for_violation(v, "maintainability") == ("maintainability", "Modularity", "a.py")
+        assert deleted_key_for_violation(v, "maintainability") == ("maintainability", "Modularity", "a.py")
 
     def test_legacy_principle_fallback(self):
         v = {"principle": "Modularity", "file": "a.py", "line": 3}
-        assert _deleted_key_for_violation(v, "maintainability") == ("maintainability", "Modularity", "a.py")
+        assert deleted_key_for_violation(v, "maintainability") == ("maintainability", "Modularity", "a.py")
 
     def test_explicit_principle_override(self):
         v = {"file": "a.py:3"}
-        assert _deleted_key_for_violation(v, "maintainability", "Modularity") == ("maintainability", "Modularity", "a.py")
+        assert deleted_key_for_violation(v, "maintainability", "Modularity") == ("maintainability", "Modularity", "a.py")
 
     def test_combined_file_line_stripped(self):
         v = {"practiceId": "Modularity", "file": "a.py:3"}
-        assert _deleted_key_for_violation(v, "maintainability") == ("maintainability", "Modularity", "a.py")
+        assert deleted_key_for_violation(v, "maintainability") == ("maintainability", "Modularity", "a.py")
 
     def test_empty_dict(self):
-        assert _deleted_key_for_violation({}, "") == ("", "", "")
+        assert deleted_key_for_violation({}, "") == ("", "", "")
 
 
 class TestFilterDismissedFromResult:
     def test_none_result(self):
-        assert _filter_dismissed_from_result(None, set()) is None
+        assert filter_dismissed_from_result(None, set()) is None
 
     def test_empty_dkeys(self):
         result = {"violations": [{"req": "R", "file": "f.py", "line": 1}]}
-        assert _filter_dismissed_from_result(result, set()) is result
+        assert filter_dismissed_from_result(result, set()) is result
 
     def test_filters_violations_dict(self):
         result = {
@@ -75,7 +75,7 @@ class TestFilterDismissedFromResult:
             ]
         }
         dkeys = {("R1", "a.py", 1)}
-        filtered = _filter_dismissed_from_result(result, dkeys)
+        filtered = filter_dismissed_from_result(result, dkeys)
         assert len(filtered["violations"]) == 1
         assert filtered["violations"][0]["req"] == "R2"
 
@@ -92,14 +92,14 @@ class TestFilterDismissedFromResult:
             ]
         }
         dkeys = {("R2", "b.py", 2)}
-        filtered = _filter_dismissed_from_result(result, dkeys)
+        filtered = filter_dismissed_from_result(result, dkeys)
         assert len(filtered["principles"][0]["violations"]) == 1
 
     def test_no_violations_key(self):
         result = {"score": 8.5}
         dkeys = {("R1", "a.py", 1)}
         # Should return result unchanged
-        assert _filter_dismissed_from_result(result, dkeys) is result
+        assert filter_dismissed_from_result(result, dkeys) is result
 
 
 class TestMaxViolationFiles:

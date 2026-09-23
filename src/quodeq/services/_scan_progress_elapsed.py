@@ -27,7 +27,7 @@ def _parse_iso_utc(raw: object) -> datetime | None:
     return parsed
 
 
-def _parse_started_at(status: dict) -> datetime | None:
+def parse_started_at(status: dict) -> datetime | None:
     return _parse_iso_utc(status.get("started_at"))
 
 
@@ -64,7 +64,7 @@ def _stamped_elapsed_s(record: dict | None, state: DimState) -> float | None:
     return max(0.0, (end - start).total_seconds())
 
 
-def _dim_elapsed_s(dim_id: str, run_dir: Path, state: DimState, record: dict | None = None) -> float | None:
+def dim_elapsed_s(dim_id: str, run_dir: Path, state: DimState, record: dict | None = None) -> float | None:
     """Per-dim elapsed time.
 
     Prefers the transition timestamps stamped in dimensions.json (see

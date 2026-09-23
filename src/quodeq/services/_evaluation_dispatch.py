@@ -2,7 +2,7 @@
 
 Split out of ``evaluation_mixin.py``: ``EvaluationDispatcher`` is the
 injection seam for how an evaluation command actually gets run (the default
-``SubprocessDispatcher`` spawns it via ``JobManager``); ``_build_evaluate_cmd``
+``SubprocessDispatcher`` spawns it via ``JobManager``); ``build_evaluate_cmd``
 turns an ``EvaluationOptions`` into the CLI argv. Re-exported by
 ``evaluation_mixin.py`` (tests import both names from there).
 """
@@ -44,7 +44,7 @@ class SubprocessDispatcher:
         return self._jobs.start_job(cmd, launch)
 
 
-def _build_evaluate_cmd(
+def build_evaluate_cmd(
     repo: str, options: EvaluationOptions, reports_dir: str,
 ) -> list[str]:
     """Build the CLI command list for a V2 evaluation subprocess."""

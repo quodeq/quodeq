@@ -28,7 +28,7 @@ from quodeq.shared.validation import validate_path_segment
 _logger = logging.getLogger(__name__)
 
 
-def _rescore_runs_by_dimension(
+def rescore_runs_by_dimension(
     dims: list[dict], reports_root: Path, project: str,
     keys: SuppressionKeys, params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, dict]:
@@ -68,7 +68,7 @@ def _rescore_runs_by_dimension(
     return rescored_by_dim
 
 
-def _dims_expecting_rescore(dims: list[dict]) -> set[str]:
+def dims_expecting_rescore(dims: list[dict]) -> set[str]:
     """Dimension keys that carry a source run and therefore expect a rescore."""
     return {
         (d.get("dimension") or "").lower()
@@ -77,7 +77,7 @@ def _dims_expecting_rescore(dims: list[dict]) -> set[str]:
     }
 
 
-def _merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> list[dict]:
+def merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> list[dict]:
     """Merge rescored data into accumulated dimensions."""
     new_dims = []
     for d in dims:
@@ -98,7 +98,7 @@ def _merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> 
     return new_dims
 
 
-def _rescore_accumulated_with_coverage(
+def rescore_accumulated_with_coverage(
     accumulated: dict[str, Any],
     reports_root: Path,
     project: str,
@@ -127,17 +127,17 @@ def _rescore_accumulated_with_coverage(
     if not dims:
         return accumulated, True
 
-    rescored_by_dim = (d.rescore_runs_by_dimension or _rescore_runs_by_dimension)(
+    rescored_by_dim = (d.rescore_runs_by_dimension or rescore_runs_by_dimension)(
         dims, reports_root, project, SuppressionKeys(dismissed, deleted), params=params,
     )
-    missing = _dims_expecting_rescore(dims) - set(rescored_by_dim)
+    missing = dims_expecting_rescore(dims) - set(rescored_by_dim)
     if missing:
         _logger.warning(
             "accumulated rescore for %s covered %d of %d dimensions (missing: %s); "
             "serving the partial result without caching it",
             project, len(rescored_by_dim), len(dims), sorted(missing),
         )
-    new_dims = _merge_rescored_dims(dims, rescored_by_dim)
+    new_dims = merge_rescored_dims(dims, rescored_by_dim)
 
     new_summary = (d.recompute_summary or recompute_summary)(
         new_dims, accumulated.get("summary", {}), params=params,
@@ -145,15 +145,15 @@ def _rescore_accumulated_with_coverage(
     return {**accumulated, "dimensions": new_dims, "summary": new_summary}, not missing
 
 
-def _rescore_accumulated_response(
+def rescore_accumulated_response(
     accumulated: dict[str, Any],
     reports_root: Path,
     project: str,
     params: ScoringParams = DEFAULT_PARAMS,
     deps: ScoringDeps | None = None,
 ) -> dict[str, Any]:
-    """`_rescore_accumulated_with_coverage` for callers that don't persist."""
-    payload, _complete = _rescore_accumulated_with_coverage(
+    """`rescore_accumulated_with_coverage` for callers that don't persist."""
+    payload, _complete = rescore_accumulated_with_coverage(
         accumulated, reports_root, project, params=params, deps=deps,
     )
     return payload

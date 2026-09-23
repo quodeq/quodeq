@@ -15,7 +15,7 @@ from quodeq.shared.utils import env_int
 _DEFAULT_MAX_PROJECTS_LISTED = 200
 
 
-def _find_best_parent(p_path: str, project_id: str, candidates: list[ProjectEntry]) -> str | None:
+def find_best_parent(p_path: str, project_id: str, candidates: list[ProjectEntry]) -> str | None:
     """Find the candidate whose path is the longest prefix of *p_path*.
 
     Candidates must be pre-sorted by descending path length so the first
@@ -30,14 +30,14 @@ def _find_best_parent(p_path: str, project_id: str, candidates: list[ProjectEntr
     return None
 
 
-def _max_projects_listed(override: int | None = None, env: dict[str, str] | None = None) -> int:
+def max_projects_listed(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the max number of projects to list. *override* bypasses env."""
     if override is not None:
         return override
     return env_int("QUODEQ_MAX_PROJECTS_LISTED", _DEFAULT_MAX_PROJECTS_LISTED, env=env)
 
 
-def _auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:
+def auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:
     """Return projects with parent set for local projects sharing a path prefix."""
     local_with_path = [p for p in projects if p.location == "local" and p.path]
     local_with_path.sort(key=lambda p: len(p.path), reverse=True)
@@ -47,7 +47,7 @@ def _auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:
             continue
         if project.location != "local" or not project.path:
             continue
-        best = _find_best_parent(project.path.rstrip("/"), project.id, local_with_path)
+        best = find_best_parent(project.path.rstrip("/"), project.id, local_with_path)
         if best:
             parent_map[project.id] = best
     if not parent_map:

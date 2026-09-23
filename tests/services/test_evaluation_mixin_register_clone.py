@@ -12,7 +12,7 @@ import pytest
 
 from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import (
-    _zero_run_scan_fallback,
+    zero_run_scan_fallback,
 )
 from quodeq.services.project_registration import (
     register_project as _register_project,
@@ -33,8 +33,8 @@ def test_zero_run_scan_fallback_returns_independent_nested_containers():
     (e.g. a caller appending to "modules") silently corrupted every other
     project's fallback result, past and future.
     """
-    a = _zero_run_scan_fallback()
-    b = _zero_run_scan_fallback()
+    a = zero_run_scan_fallback()
+    b = zero_run_scan_fallback()
     assert a == b
     assert a["languages"] is not b["languages"]
     assert a["branches"] is not b["branches"]

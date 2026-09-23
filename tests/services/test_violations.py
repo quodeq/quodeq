@@ -7,7 +7,7 @@ import pytest
 
 from quodeq.services.violations import (
     ViolationContext,
-    _ResolveOptions,
+    ResolveOptions,
     aggregate_violations,
     resolve_dimension_eval,
 )
@@ -161,7 +161,7 @@ class TestResolveDimensionEvalRejectsTraversal:
         (secret_dir / "leaked.json").write_text(
             json.dumps({"dimension": "leaked", "overallGrade": "A", "principles": {}})
         )
-        options = _ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
+        options = ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
 
         result = resolve_dimension_eval(
             base, "proj", "run-1", "../../secret/leaked", options=options,
@@ -179,7 +179,7 @@ class TestResolveDimensionEvalRejectsTraversal:
         (secret_dir / "leaked_evidence.json").write_text(
             json.dumps({"principles": {"p1": {"violations": [{"file": "x.py", "reason": "leak"}]}}})
         )
-        options = _ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
+        options = ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
 
         result = resolve_dimension_eval(
             base, "proj", "run-1", "../../secret/leaked", options=options,
@@ -194,7 +194,7 @@ class TestResolveDimensionEvalRejectsTraversal:
         (base / "evidence").mkdir()
         secret_eval = tmp_path / "secret_eval.json"
         secret_eval.write_text(json.dumps({"dimension": "secret_eval", "overallGrade": "A", "principles": {}}))
-        options = _ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
+        options = ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
 
         absolute_dimension = str(tmp_path / "secret_eval")  # ".json" appended by the code
         result = resolve_dimension_eval(
@@ -208,7 +208,7 @@ class TestResolveDimensionEvalRejectsTraversal:
         base = tmp_path / "run-1"
         (base / "evaluation").mkdir(parents=True)
         (base / "evidence").mkdir()
-        options = _ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
+        options = ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
 
         result = resolve_dimension_eval(
             base, "proj", "run-1", "security\0../../../etc/passwd", options=options,
@@ -225,7 +225,7 @@ class TestResolveDimensionEvalValidDimensionsStillResolve:
         (eval_dir / "security.json").write_text(
             json.dumps({"dimension": "security", "overallGrade": "B", "principles": {}})
         )
-        options = _ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
+        options = ResolveOptions(compiled_dir=_compiled_dir_with(tmp_path, "security"))
 
         result = resolve_dimension_eval(base, "proj", "run-1", "security", options=options)
 
@@ -241,7 +241,7 @@ class TestResolveDimensionEvalValidDimensionsStillResolve:
         evaluators_dir = tmp_path / "evaluators"
         evaluators_dir.mkdir()
         (evaluators_dir / "my-custom-standard.json").write_text("{}")
-        options = _ResolveOptions(
+        options = ResolveOptions(
             compiled_dir=_compiled_dir_with(tmp_path, "security"),
             evaluators_dir=evaluators_dir,
         )

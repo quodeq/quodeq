@@ -1,4 +1,4 @@
-"""Tests for _fs_metadata.py — _read_accumulated_summary and standards
+"""Tests for _fs_metadata.py — read_accumulated_summary and standards
 visibility selection.
 
 Split from test_fs_metadata.py (further split out of
@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from quodeq.services._fs_metadata import _read_accumulated_summary
+from quodeq.services._fs_metadata import read_accumulated_summary
 
 
 class TestReadAccumulatedSummary:
@@ -52,7 +52,7 @@ class TestReadAccumulatedSummary:
         )()
 
         runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
-        _read_accumulated_summary(reports_root, project, runs)
+        read_accumulated_summary(reports_root, project, runs)
 
         # summarize_dimensions must see ALL (visible) dims, including the one
         # missing from the latest config.
@@ -92,7 +92,7 @@ class TestReadAccumulatedSummary:
         )()
 
         runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
-        _read_accumulated_summary(reports_root, project, runs)
+        read_accumulated_summary(reports_root, project, runs)
 
         # Matching is case-insensitive (the selection stores lowercase ids).
         called_dims = mock_summarize.call_args[0][0]
@@ -122,7 +122,7 @@ class TestReadAccumulatedSummary:
         )()
 
         runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
-        _read_accumulated_summary(reports_root, project, runs)
+        read_accumulated_summary(reports_root, project, runs)
 
         called_dims = mock_summarize.call_args[0][0]
         assert [d.dimension for d in called_dims] == ["security"]
@@ -157,10 +157,10 @@ class TestReadAccumulatedSummary:
         runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
 
         save_visible_standard_ids(repo, ["security", "reliability"])
-        _, score_both, _, _ = _read_accumulated_summary(
+        _, score_both, _, _ = read_accumulated_summary(
             reports_root, project, runs, compute_on_miss=True)
         save_visible_standard_ids(repo, ["security"])
-        _, score_one, _, _ = _read_accumulated_summary(
+        _, score_one, _, _ = read_accumulated_summary(
             reports_root, project, runs, compute_on_miss=True)
 
         assert score_both == 7.0
@@ -172,7 +172,7 @@ class TestReadAccumulatedSummary:
         """The project-card summary must reflect the applied grade formula.
 
         Builds a real event-log run, bakes default grades, applies a custom
-        formula, then asserts _read_accumulated_summary (which feeds the
+        formula, then asserts read_accumulated_summary (which feeds the
         project card via _build_project_entry) surfaces the CUSTOM grade —
         proving both the read-layer overlay and the loaded-params threading.
         """
@@ -232,7 +232,7 @@ class TestReadAccumulatedSummary:
 
         clear_shared_dimension_cache()
         runs = [RunInfo(run_id="run1", date_iso="2026-01-01", date_label="Jan 01")]
-        grade, score, files, _pending = _read_accumulated_summary(
+        grade, score, files, _pending = read_accumulated_summary(
             reports_root, project, runs, compute_on_miss=True)
         clear_shared_dimension_cache()
 

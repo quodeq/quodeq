@@ -14,11 +14,11 @@ from quodeq.core.types import DimensionResult
 from quodeq.shared.serialization import to_camel_dict
 
 from quodeq.data.fs.report_parser.runs import RunInfo
-from quodeq.services._dashboard_history import _DashboardPayload
+from quodeq.services._dashboard_history import DashboardPayload
 
 
 @dataclass(frozen=True, slots=True)
-class _DimensionAnnotations:
+class DimensionAnnotations:
     """Selected-run values stamped onto each serialized dimension.
 
     ``exit_reason`` is the run-level ``status.json`` exit reason (also reported
@@ -31,7 +31,7 @@ class _DimensionAnnotations:
     suppressed_counts: dict[str, int] = field(default_factory=dict)
 
 
-def _attach_exit_reason_to_dim(
+def attach_exit_reason_to_dim(
     dim_dict: dict[str, Any], run_exit_reason: str | None,
 ) -> dict[str, Any]:
     """Add ``exitReason`` to a serialized dimension dict.
@@ -55,7 +55,7 @@ def _attach_exit_reason_to_dim(
     return out
 
 
-def _attach_dismissed_count_to_dim(
+def attach_dismissed_count_to_dim(
     dim_dict: dict[str, Any], dismissed_counts: dict[str, int],
     suppressed_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
@@ -80,7 +80,7 @@ def _attach_dismissed_count_to_dim(
     return out
 
 
-def _slim_history_dim(dim: DimensionResult) -> dict[str, Any]:
+def slim_history_dim(dim: DimensionResult) -> dict[str, Any]:
     """Serialize a history-context dimension without its finding bodies.
 
     The previousByDimension / stalePreviousByDimension / staleDimensions keys
@@ -95,18 +95,18 @@ def _slim_history_dim(dim: DimensionResult) -> dict[str, Any]:
     return to_camel_dict(replace(dim, violations=[], compliance=[]))
 
 
-def _build_dashboard_result(
+def build_dashboard_result(
     project: str,
     runs: list[RunInfo],
     selected_run: RunInfo,
-    payload: _DashboardPayload,
-    annotations: _DimensionAnnotations,
+    payload: DashboardPayload,
+    annotations: DimensionAnnotations,
 ) -> dict[str, Any]:
     """Assemble the final dashboard response dict from pre-computed parts."""
     exit_reason = annotations.exit_reason
     dim_dicts = [
-        _attach_dismissed_count_to_dim(
-            _attach_exit_reason_to_dim(to_camel_dict(d), exit_reason),
+        attach_dismissed_count_to_dim(
+            attach_exit_reason_to_dim(to_camel_dict(d), exit_reason),
             annotations.dismissed_counts,
             annotations.suppressed_counts,
         )
@@ -131,7 +131,7 @@ def _build_dashboard_result(
         },
         "trend": payload.trend,
         "dimensions": dim_dicts,
-        "previousByDimension": {k: _slim_history_dim(v) for k, v in payload.previous_by_dimension.items()},
-        "stalePreviousByDimension": {k: _slim_history_dim(v) for k, v in payload.stale_previous_by_dimension.items()},
-        "staleDimensions": [_slim_history_dim(d) for d in payload.stale_dimensions],
+        "previousByDimension": {k: slim_history_dim(v) for k, v in payload.previous_by_dimension.items()},
+        "stalePreviousByDimension": {k: slim_history_dim(v) for k, v in payload.stale_previous_by_dimension.items()},
+        "staleDimensions": [slim_history_dim(d) for d in payload.stale_dimensions],
     }

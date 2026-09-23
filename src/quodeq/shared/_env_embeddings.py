@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from quodeq.shared._env_db import _SQLITE_DISABLE_TRUTHY
+from quodeq.shared._env_db import SQLITE_DISABLE_TRUTHY
 from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL
 
 _DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
@@ -39,7 +39,7 @@ def semantic_precedents_enabled(env: dict[str, str] | None = None) -> bool:
     """True when QUODEQ_SEMANTIC_PRECEDENTS is truthy. Default OFF in v1."""
     environ = env if env is not None else os.environ
     raw = environ.get("QUODEQ_SEMANTIC_PRECEDENTS", "")
-    return raw.strip().lower() in _SQLITE_DISABLE_TRUTHY
+    return raw.strip().lower() in SQLITE_DISABLE_TRUTHY
 
 
 def get_precedent_similarity_threshold(env: dict[str, str] | None = None) -> float:

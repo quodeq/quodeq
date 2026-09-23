@@ -1,7 +1,7 @@
 """The process-lived walk cache and the per-call accumulated-view LRU cache.
 
 Split out of ``accumulated.py``. The walk-cache globals
-(``_WALK_CACHE``/``_WALK_CACHE_LOCK``) are process-wide shared mutable state:
+(``WALK_CACHE``/``WALK_CACHE_LOCK``) are process-wide shared mutable state:
 ``accumulated.py`` re-exports the OBJECTS themselves (not copies), so tests
 reaching in directly via ``clear_accumulated_process_cache`` see the same
 cache instance the computation path reads and writes.
@@ -25,17 +25,17 @@ _DEFAULT_WALK_CACHE_MAX = 2048
 # Process-lived so consecutive as-of selections on the Overview score-history
 # chart reuse the walk. Their run sets overlap in all but a run or two; a
 # per-call cache made every newly-selected day re-read the whole history.
-_WALK_CACHE: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
-_WALK_CACHE_LOCK = threading.Lock()
+WALK_CACHE: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
+WALK_CACHE_LOCK = threading.Lock()
 
 
 def clear_accumulated_process_cache() -> None:
     """Drop the process-lived walk cache. For tests and cache kill switches."""
-    with _WALK_CACHE_LOCK:
-        _WALK_CACHE.clear()
+    with WALK_CACHE_LOCK:
+        WALK_CACHE.clear()
 
 
-def _walk_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
+def walk_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the walk-cache size limit (entries)."""
     if override is not None:
         return override
@@ -47,7 +47,7 @@ def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]
     return OrderedDict(), threading.Lock()
 
 
-def _acc_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
+def acc_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the accumulated-view cache size limit."""
     if override is not None:
         return override
@@ -62,7 +62,7 @@ class AccumulatedCacheConfig:
     cache_max: int | None = None
 
 
-def _resolve_cache(
+def resolve_cache(
     cache_config: AccumulatedCacheConfig | None,
 ) -> tuple[OrderedDict, threading.Lock, int]:
     """Resolve cache, lock, and max-size from *cache_config* or module defaults."""
@@ -70,7 +70,7 @@ def _resolve_cache(
         return (
             cache_config.cache,
             cache_config.cache_lock,
-            cache_config.cache_max if cache_config.cache_max is not None else _acc_dim_cache_max(),
+            cache_config.cache_max if cache_config.cache_max is not None else acc_dim_cache_max(),
         )
     cache, lock = create_accumulated_cache()
-    return cache, lock, _acc_dim_cache_max()
+    return cache, lock, acc_dim_cache_max()

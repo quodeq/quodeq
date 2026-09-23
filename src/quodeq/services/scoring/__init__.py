@@ -39,21 +39,21 @@ from quodeq.services.scoring._summary import recompute_summary  # noqa: F401 —
 # callers and test patch targets keep working against the package facade.
 # ---------------------------------------------------------------------------
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
-from quodeq.services.scoring._fetchers import _make_trend_fetcher, _max_history_runs  # noqa: F401
+from quodeq.services.scoring._fetchers import make_scoring_trend_fetcher, max_history_runs  # noqa: F401
 from quodeq.services.scoring._response_builders import (  # noqa: F401
-    _build_dimension_dict,
-    _build_response_from_eval_files,
-    _build_response_from_grade_tables,
-    _build_summary_from_dim_dicts,
-    _build_totals_from_findings,
-    _severity_bucket,
+    build_dimension_dict,
+    build_response_from_eval_files,
+    build_response_from_grade_tables,
+    build_summary_from_dim_dicts,
+    build_totals_from_findings,
+    severity_bucket,
 )
 from quodeq.services.scoring._rescoring import (  # noqa: F401
-    _dims_expecting_rescore,
-    _merge_rescored_dims,
-    _rescore_accumulated_response,
-    _rescore_accumulated_with_coverage,
-    _rescore_runs_by_dimension,
+    dims_expecting_rescore,
+    merge_rescored_dims,
+    rescore_accumulated_response,
+    rescore_accumulated_with_coverage,
+    rescore_runs_by_dimension,
 )
 from quodeq.services.scoring._project_scores import get_project_scores
 from quodeq.services.scoring._scores_raw import get_scores_raw, get_scores_slim
@@ -139,7 +139,7 @@ def rescore_accumulated(
         return accumulated
     if params is None:
         params = load_params()
-    return _rescore_accumulated_response(
+    return rescore_accumulated_response(
         accumulated, reports_root, project, params=params, deps=deps,
     )
 

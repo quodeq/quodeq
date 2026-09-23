@@ -12,7 +12,7 @@ from quodeq.core.types import ViolationResponse, ViolationSummary
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import build_dashboard
-from quodeq.services.violations import _ResolveOptions, aggregate_violations, resolve_dimension_eval
+from quodeq.services.violations import ResolveOptions, aggregate_violations, resolve_dimension_eval
 
 _SCAN_FILENAME = "scan.json"
 
@@ -68,7 +68,7 @@ def get_dimension_eval(
     effective_evaluators = default_paths().evaluators_dir
     result = resolve_dimension_eval(
         base, project, run_id, dimension,
-        options=_ResolveOptions(
+        options=ResolveOptions(
             compiled_dir=effective_compiled if effective_compiled.exists() else None,
             evaluators_dir=effective_evaluators if effective_evaluators.exists() else None,
         ),

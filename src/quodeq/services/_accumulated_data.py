@@ -14,13 +14,13 @@ from quodeq.core.types import DimensionResult
 
 @dataclass
 class _DimensionBuckets:
-    """Mutable accumulation buckets used during a single _read_all_run_data pass."""
+    """Mutable accumulation buckets used during a single read_all_run_data pass."""
     latest_by_dimension: dict[str, DimensionResult] = field(default_factory=dict)
     prev_occurrence: dict[str, DimensionResult] = field(default_factory=dict)
     prev_run_latest_map: dict[str, DimensionResult] = field(default_factory=dict)
 
 
-def _has_valid_score(dim: DimensionResult) -> bool:
+def has_valid_score(dim: DimensionResult) -> bool:
     """Return True if the dimension carries a usable, trustworthy score.
 
     Requires a non-empty ``overall_score`` AND that the model actually
@@ -46,7 +46,7 @@ def _classify_dimension(
     if dim_name not in buckets.latest_by_dimension:
         # Only accept as latest if the dimension has a valid score;
         # otherwise keep searching older runs for a scored result.
-        if _has_valid_score(dim):
+        if has_valid_score(dim):
             buckets.latest_by_dimension[dim_name] = replace(
                 dim,
                 from_run_id=run_id,
@@ -145,7 +145,7 @@ def _hydrate_latest_dimensions(
             )
 
 
-def _read_all_run_data(
+def read_all_run_data(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     get_run_data: Callable[[str], list[DimensionResult]] | None = None,
     get_run_slim: Callable[[str], list[DimensionResult]] | None = None,

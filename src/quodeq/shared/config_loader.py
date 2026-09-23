@@ -7,7 +7,7 @@ keeping a second one here.
 """
 from __future__ import annotations
 
-from quodeq.shared._config import _get_config as _canonical_get_config, defaults_path
+from quodeq.shared._config import get_config as _canonical_get_config, defaults_path
 from quodeq.shared._config_class import Config
 
 

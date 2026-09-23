@@ -1,9 +1,9 @@
-"""_remove_run_directory path guards: traversal and absolute run ids never reach rmtree."""
+"""remove_run_directory path guards: traversal and absolute run ids never reach rmtree."""
 from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.services._run_index_fs import _remove_run_directory
+from quodeq.services._run_index_fs import remove_run_directory
 
 
 def test_remove_run_directory_rejects_path_traversal_in_run_uuid(tmp_path: Path):
@@ -22,7 +22,7 @@ def test_remove_run_directory_rejects_path_traversal_in_run_uuid(tmp_path: Path)
     sentinel = outside / "sentinel"
     sentinel.touch()
 
-    result = _remove_run_directory(
+    result = remove_run_directory(
         reports,
         output_project="myproj",
         run_uuid="../../../outside/sentinel",
@@ -46,7 +46,7 @@ def test_remove_run_directory_rejects_absolute_path_in_run_uuid(tmp_path: Path):
     sentinel = tmp_path / "sentinel"
     sentinel.mkdir()
 
-    result = _remove_run_directory(
+    result = remove_run_directory(
         reports,
         output_project="myproj",
         run_uuid=str(sentinel),
@@ -66,7 +66,7 @@ def test_remove_run_directory_allows_legitimate_paths(tmp_path: Path):
     run.mkdir(parents=True)
     (run / "status.json").write_text("{}")
 
-    result = _remove_run_directory(
+    result = remove_run_directory(
         reports,
         output_project="myproj",
         run_uuid="run-123",
@@ -92,7 +92,7 @@ def test_remove_run_directory_scan_fallback_rejects_traversal(tmp_path: Path):
     sentinel = outside / "sentinel"
     sentinel.mkdir()
 
-    result = _remove_run_directory(
+    result = remove_run_directory(
         reports,
         output_project=None,
         run_uuid="../../../outside/sentinel",

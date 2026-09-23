@@ -15,7 +15,7 @@ from quodeq.services.base import (
 )
 from quodeq.services.evaluation_mixin import (
     FsEvaluationMixin,
-    _wait_for_terminal_status,
+    wait_for_terminal_status,
 )
 from tests._timeouts import budget
 
@@ -90,7 +90,7 @@ class TestCancelEvaluation:
             output_project="proj", output_run_id="run1",
         )
         with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status"):
             result = m.cancel_evaluation("j1", reports_dir="/reports")
         assert result is True
         mock_score.assert_called_once()
@@ -114,7 +114,7 @@ class TestCancelEvaluation:
         m._jobs.cancel_job.return_value = True
         m._jobs.get_job.return_value = JobSnapshot(job_id="j1", status="running")
         with patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status") as mock_wait:
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status") as mock_wait:
             result = m.cancel_evaluation("j1", reports_dir="/reports")
         assert result is True
         mock_wait.assert_not_called()
@@ -143,7 +143,7 @@ class TestCancelEvaluation:
         )
         with patch.object(FsEvaluationMixin, "get_evaluation_status", return_value=ext_snapshot), \
              patch("quodeq.services.evaluation_mixin.score_completed_evidence") as mock_score, \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"):
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status"):
             result = m.cancel_evaluation("ext-run-42", reports_dir="/reports")
         assert result is True
         mock_score.assert_called_once()
@@ -160,20 +160,20 @@ class TestWaitForTerminalStatus:
         run_dir = tmp_path / "run1"
         run_dir.mkdir()
         (run_dir / "status.json").write_text(json.dumps({"state": "cancelled"}))
-        assert _wait_for_terminal_status(run_dir, timeout_s=0.2) is True
+        assert wait_for_terminal_status(run_dir, timeout_s=0.2) is True
 
     def test_recognizes_all_three_terminal_states(self, tmp_path: Path):
         for state in ("done", "failed", "cancelled"):
             run_dir = tmp_path / f"run-{state}"
             run_dir.mkdir()
             (run_dir / "status.json").write_text(json.dumps({"state": state}))
-            assert _wait_for_terminal_status(run_dir, timeout_s=0.2) is True
+            assert wait_for_terminal_status(run_dir, timeout_s=0.2) is True
 
     def test_returns_false_on_timeout_when_state_never_terminal(self, tmp_path: Path):
         run_dir = tmp_path / "run1"
         run_dir.mkdir()
         (run_dir / "status.json").write_text(json.dumps({"state": "running"}))
-        assert _wait_for_terminal_status(
+        assert wait_for_terminal_status(
             run_dir, timeout_s=0.1, poll_interval_s=0.02,
         ) is False
 
@@ -182,7 +182,7 @@ class TestWaitForTerminalStatus:
         run_dir.mkdir()
         # No status.json file at all -- expected during the brief window
         # before the lifecycle handler creates it.
-        assert _wait_for_terminal_status(
+        assert wait_for_terminal_status(
             run_dir, timeout_s=0.1, poll_interval_s=0.02,
         ) is False
 
@@ -190,14 +190,14 @@ class TestWaitForTerminalStatus:
         run_dir = tmp_path / "run1"
         run_dir.mkdir()
         (run_dir / "status.json").write_text("not valid json")
-        assert _wait_for_terminal_status(
+        assert wait_for_terminal_status(
             run_dir, timeout_s=0.1, poll_interval_s=0.02,
         ) is False
 
     def test_polls_until_terminal_appears(self, tmp_path: Path):
         # Real-world scenario: status starts running, then the subprocess
         # lifecycle handler flushes terminal a moment later. We expect
-        # _wait_for_terminal_status to bridge that gap.
+        # wait_for_terminal_status to bridge that gap.
         import threading
         import time as _time
 
@@ -211,7 +211,7 @@ class TestWaitForTerminalStatus:
             status_path.write_text(json.dumps({"state": "cancelled"}))
 
         threading.Thread(target=write_terminal, daemon=True).start()
-        assert _wait_for_terminal_status(
+        assert wait_for_terminal_status(
             run_dir, timeout_s=budget(1.0), poll_interval_s=0.02,
         ) is True
 
@@ -228,7 +228,7 @@ class TestCancelEvaluationWaitsForTerminal:
             job_id="j1", status="running",
             output_project="proj", output_run_id="run1",
         )
-        with patch("quodeq.services.evaluation_mixin._wait_for_terminal_status") as mock_wait, \
+        with patch("quodeq.services.evaluation_mixin.wait_for_terminal_status") as mock_wait, \
              patch("quodeq.services.evaluation_mixin.score_completed_evidence"):
             m.cancel_evaluation("j1", reports_dir="/reports")
         mock_wait.assert_called_once()
@@ -243,7 +243,7 @@ class TestCancelEvaluationWaitsForTerminal:
         m._jobs = MagicMock()
         m._jobs.cancel_job.return_value = True
         m._jobs.get_job.return_value = JobSnapshot(job_id="j1", status="running")
-        with patch("quodeq.services.evaluation_mixin._wait_for_terminal_status") as mock_wait:
+        with patch("quodeq.services.evaluation_mixin.wait_for_terminal_status") as mock_wait:
             m.cancel_evaluation("j1")
         mock_wait.assert_not_called()
 
@@ -259,8 +259,8 @@ class TestCancelDiscardPartial:
             output_project="proj", output_run_id="run1",
         )
         with patch("quodeq.services.evaluation_mixin.score_completed_evidence"), \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"), \
-             patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard:
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status"), \
+             patch("quodeq.services.evaluation_mixin.discard_run_state") as mock_discard:
             m.cancel_evaluation("j1", reports_dir="/reports")
         mock_discard.assert_not_called()
 
@@ -273,8 +273,8 @@ class TestCancelDiscardPartial:
             output_project="proj", output_run_id="run1",
         )
         with patch("quodeq.services.evaluation_mixin.score_completed_evidence"), \
-             patch("quodeq.services.evaluation_mixin._wait_for_terminal_status"), \
-             patch("quodeq.services.evaluation_mixin._discard_run_state") as mock_discard:
+             patch("quodeq.services.evaluation_mixin.wait_for_terminal_status"), \
+             patch("quodeq.services.evaluation_mixin.discard_run_state") as mock_discard:
             m.cancel_evaluation("j1", reports_dir="/reports", discard_partial=True)
         mock_discard.assert_called_once()
         args = mock_discard.call_args.args

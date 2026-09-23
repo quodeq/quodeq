@@ -14,9 +14,9 @@ from quodeq.core.types.severity import Severity
 from quodeq.shared.utils import env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # re-export
 from quodeq.services._violation_filters import (  # noqa: F401 — re-exported for tests
-    _deleted_key_for_violation,
-    _filter_dismissed_from_result,
-    _violation_location,
+    deleted_key_for_violation,
+    filter_dismissed_from_result,
+    violation_location,
 )
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.services.deleted import deleted_keys as _deleted_keys
@@ -40,7 +40,7 @@ def _max_violation_files(override: int | None = None, env: dict[str, str] | None
 
 
 @dataclass(frozen=True)
-class _ResolveOptions:
+class ResolveOptions:
     """Injectable options for resolve_dimension_eval: filesystem callbacks and paths."""
     exists_fn: Callable[[Path], bool] = Path.exists
     stat_fn: Callable[[Path], Any] = Path.stat
@@ -49,12 +49,12 @@ class _ResolveOptions:
 
 
 def _try_evidence_formats(
-    base: Path, dimension: str, ctx: ViolationContext, opts: _ResolveOptions, keys: SuppressionKeys,
+    base: Path, dimension: str, ctx: ViolationContext, opts: ResolveOptions, keys: SuppressionKeys,
 ) -> ViolationResponse | dict[str, Any] | None:
     """Try evidence file formats (JSON, JSONL, stream) as fallbacks."""
     evidence_path = base / "evidence" / f"{dimension}_evidence.json"
     if opts.exists_fn(evidence_path):
-        return _filter_dismissed_from_result(
+        return filter_dismissed_from_result(
             parse_violations_from_evidence(evidence_path, ctx), keys.dismissed,
             keys.deleted, dimension,
         )
@@ -133,9 +133,9 @@ def _accept_known_dimension(
 
 
 def _resolve_from_json_eval(
-    eval_path: Path, base: Path, ctx: ViolationContext, opts: _ResolveOptions, keys: SuppressionKeys,
+    eval_path: Path, base: Path, ctx: ViolationContext, opts: ResolveOptions, keys: SuppressionKeys,
 ) -> dict[str, Any] | None:
-    filtered = _filter_dismissed_from_result(
+    filtered = filter_dismissed_from_result(
         parse_eval_from_json(eval_path, ctx.project, ctx.run_id, ctx.dimension, compiled_dir=opts.compiled_dir),
         keys.dismissed, keys.deleted, ctx.dimension,
     )
@@ -149,7 +149,7 @@ def _resolve_from_markdown(
         content = read_text(markdown_path)
     except OSError:
         return None
-    return _filter_dismissed_from_result(
+    return filter_dismissed_from_result(
         parse_eval_markdown(content, ctx.project, ctx.run_id, ctx.dimension),
         keys.dismissed, keys.deleted, ctx.dimension,
     )
@@ -161,7 +161,7 @@ def _suppression_keys(base: Path) -> SuppressionKeys:
 
 
 def _resolve_from_source(
-    base: Path, ctx: ViolationContext, opts: _ResolveOptions, keys: SuppressionKeys,
+    base: Path, ctx: ViolationContext, opts: ResolveOptions, keys: SuppressionKeys,
 ) -> ViolationResponse | dict[str, Any] | None:
     eval_path = base / "evaluation" / f"{ctx.dimension}.json"
     if opts.exists_fn(eval_path):
@@ -176,7 +176,7 @@ def _resolve_from_source(
 
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
-    options: _ResolveOptions | None = None,
+    options: ResolveOptions | None = None,
 ) -> ViolationResponse | dict[str, Any] | None:
     """Try successive file formats to load evaluation data for a dimension.
 
@@ -193,7 +193,7 @@ def resolve_dimension_eval(
     directory is configured (e.g. a caller testing file-resolution logic in
     isolation) the check is skipped, preserving prior behaviour.
     """
-    opts = options or _ResolveOptions()
+    opts = options or ResolveOptions()
     if not _accept_known_dimension(dimension, opts.compiled_dir, opts.evaluators_dir):
         return None
     keys = _suppression_keys(base)

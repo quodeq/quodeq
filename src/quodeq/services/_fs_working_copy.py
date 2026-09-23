@@ -31,7 +31,7 @@ def _is_evaluable(repo_path: str | None) -> bool:
     return Path(repo_path).is_dir()
 
 
-def _annotate_working_copy(info: dict[str, Any]) -> None:
+def annotate_working_copy(info: dict[str, Any]) -> None:
     """Stamp *info* with the working-copy facts derived from its ``path``."""
     repo_path = info.get("path")
     info["lastFetchedAt"] = _derive_last_fetched_at(repo_path)
@@ -39,7 +39,7 @@ def _annotate_working_copy(info: dict[str, Any]) -> None:
     info.setdefault("ephemeral", False)
 
 
-def _online_path_missing(info: dict[str, Any]) -> bool:
+def online_path_missing(info: dict[str, Any]) -> bool:
     """True for an online project whose stored path is not a remote URL."""
     return (
         info.get("location") == "online"

@@ -24,12 +24,12 @@ from quodeq.services.wiring import (
 )
 from quodeq.services._fs_clone import CloneError
 from quodeq.services.fs_project_helpers import find_existing_project
-from quodeq.services._registration_scan import _zero_run_scan_fallback
-from quodeq.services._registration_url import _strip_credentials
+from quodeq.services._registration_scan import zero_run_scan_fallback
+from quodeq.services._registration_url import strip_credentials
 from quodeq.services._project_registration_steps import (
-    _MaterializeRequest,
-    _materialize_and_scan,
-    _resolve_project_slot,
+    MaterializeRequest,
+    materialize_and_scan,
+    resolve_project_slot,
 )
 from quodeq.services._repo_index import RepoIdentity, add_repo_index_entry
 from quodeq.services.base import CreateProjectResult, NewProjectSpec
@@ -82,11 +82,11 @@ def register_project(
     _validate_clone_target(spec.repo, is_url, spec.ephemeral, spec.clone_dest)
     reports_path = Path(reports_dir)
 
-    project_uuid, project_dir, project_name, repo_resolved = _resolve_project_slot(
+    project_uuid, project_dir, project_name, repo_resolved = resolve_project_slot(
         spec.repo, spec.discipline, reports_path, spec.scope_path,
     )
 
-    _materialize_and_scan(_MaterializeRequest(
+    materialize_and_scan(MaterializeRequest(
         repo=spec.repo, repo_resolved=repo_resolved, project_name=project_name,
         project_uuid=project_uuid, project_dir=project_dir, reports_path=reports_path,
         scope_path=spec.scope_path, is_url=is_url, ephemeral=spec.ephemeral,
@@ -170,12 +170,12 @@ def register_project_with_rollback(
         # handler would have logged; record it before converting to a
         # generic, no-detail result (the exception text can carry filesystem
         # paths or backend internals that must not reach the remote caller).
-        log.error(f"Registration failed for repo={_strip_credentials(spec.repo)!r}: {exc}")
+        log.error(f"Registration failed for repo={strip_credentials(spec.repo)!r}: {exc}")
         return _rollback_and_report(rollback, "internal_error")
 
     # scan.json is now always present after register_project succeeds.
     project_dir = reports_root_path / project_uuid
-    scan_data = read_scan_json(project_dir) or _zero_run_scan_fallback()
+    scan_data = read_scan_json(project_dir) or zero_run_scan_fallback()
     return CreateProjectResult(status="created", project_id=project_uuid, scan_data=scan_data)
 
 

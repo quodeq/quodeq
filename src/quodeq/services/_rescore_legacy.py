@@ -48,7 +48,7 @@ def _score_principle(
     return principle_score_and_grade(vt_counts, ct_counts, params=params)
 
 
-def _group_by_principle(
+def group_by_principle(
     findings: list[Finding],
 ) -> dict[str, list[Finding]]:
     """Group a list of findings by their principle name."""
@@ -58,7 +58,7 @@ def _group_by_principle(
     return groups
 
 
-def _score_all_principles(
+def score_all_principles(
     principles_violations: dict[str, list[Finding]],
     principles_compliance: dict[str, list[Finding]],
     *,

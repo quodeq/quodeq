@@ -13,13 +13,13 @@ from pathlib import Path
 from quodeq.core.types.standard import StandardDetail
 from quodeq.services.ports import StandardsStore
 from quodeq.services._standards_io import (
-    _TYPE_CUSTOM, build_custom_meta, build_detail, count_principles_and_requirements,
+    TYPE_CUSTOM, build_custom_meta, build_detail, count_principles_and_requirements,
 )
 from quodeq.services.import_validator import (
     StandardImportValidationError, validate_import, scan_injection,
 )
 
-_CUSTOM_DEFAULTS = {"type": _TYPE_CUSTOM, "managed": False, "origin": None, "origin_hash": None}
+_CUSTOM_DEFAULTS = {"type": TYPE_CUSTOM, "managed": False, "origin": None, "origin_hash": None}
 
 
 def _write_and_load_detail(store: StandardsStore, path: Path, payload: dict) -> StandardDetail:
@@ -61,7 +61,7 @@ def update(standard_id: str, data: dict, evaluators_dir: Path, store: StandardsS
         raise FileNotFoundError(f"Standard not found: {standard_id}")
     if store.read(path).get("managed", False):
         raise PermissionError(f"Cannot edit managed standard '{standard_id}'")
-    payload = {**data, "id": standard_id, "type": _TYPE_CUSTOM, "managed": False}
+    payload = {**data, "id": standard_id, "type": TYPE_CUSTOM, "managed": False}
     store.write(path, payload)
     return build_detail(payload)
 

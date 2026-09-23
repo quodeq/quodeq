@@ -42,7 +42,7 @@ def test_get_dashboard_threads_log_into_enrichment(tmp_path, recording_log, monk
 
 
 def test_wait_for_terminal_status_logs_once_while_status_is_missing(tmp_path, recording_log) -> None:
-    ok = _run_discard._wait_for_terminal_status(
+    ok = _run_discard.wait_for_terminal_status(
         tmp_path, timeout_s=0.05, poll_interval_s=0.01, log=recording_log,
     )
     assert ok is False
@@ -166,7 +166,7 @@ def test_save_repo_index_logs_when_tmp_cleanup_also_fails(tmp_path, recording_lo
     monkeypatch.setattr(_repo_index.os, "replace", _raise_replace)
     monkeypatch.setattr(_repo_index.os, "unlink", _raise_unlink)
 
-    _repo_index._save_repo_index(tmp_path, {"a": "b"}, log=recording_log)
+    _repo_index.save_repo_index(tmp_path, {"a": "b"}, log=recording_log)
 
     assert recording_log.warning_messages  # the pre-existing outer failure log
     assert recording_log.debug_messages  # the new inner cleanup-failure log
@@ -200,7 +200,7 @@ def test_violation_location_logs_unparsable_line() -> None:
         def debug(self, message: str) -> None:
             debug_messages.append(message)
 
-    location = violations._violation_location(
+    location = violations.violation_location(
         {"req": "REQ-1", "file": "main.py:not-a-number"}, log=_Sink())
     assert location == ("main.py:not-a-number", 0)
     (message,) = debug_messages

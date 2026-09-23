@@ -45,6 +45,6 @@ class _ConfigHolder:
 _config_holder = _ConfigHolder()
 
 
-def _get_config() -> Config:
+def get_config() -> Config:
     """Return the lazily-loaded singleton Config instance (thread-safe)."""
     return _config_holder.get()

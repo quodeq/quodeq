@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from quodeq.services._fs_project_index import build_project_index
 from quodeq.services.fs_projects import (
-    _build_parent_child_sets,
+    build_parent_child_sets,
     build_project_list,
 )
 from quodeq.services.wiring import find_children
@@ -58,7 +58,7 @@ class TestFindChildren:
 
 
 # ---------------------------------------------------------------------------
-# _build_parent_child_sets
+# build_parent_child_sets
 # ---------------------------------------------------------------------------
 
 
@@ -72,7 +72,7 @@ class TestBuildParentChildSets:
         (tmp_path / "standalone" / "repository_info.json").write_text(
             json.dumps({"name": "standalone"})
         )
-        parents, subs, info_by_name = _build_parent_child_sets(tmp_path, ["child1", "standalone"])
+        parents, subs, info_by_name = build_parent_child_sets(tmp_path, ["child1", "standalone"])
         assert parents == {"parent-uuid"}
         assert subs == {"child1"}
         assert "child1" in info_by_name
@@ -80,7 +80,7 @@ class TestBuildParentChildSets:
         assert info_by_name["child1"]["parent"] == "parent-uuid"
 
     def test_empty_dirs(self, tmp_path: Path):
-        parents, subs, info_by_name = _build_parent_child_sets(tmp_path, [])
+        parents, subs, info_by_name = build_parent_child_sets(tmp_path, [])
         assert parents == set()
         assert subs == set()
         assert info_by_name == {}
@@ -88,7 +88,7 @@ class TestBuildParentChildSets:
     def test_corrupt_json_skipped(self, tmp_path: Path):
         (tmp_path / "bad").mkdir()
         (tmp_path / "bad" / "repository_info.json").write_text("{{{")
-        parents, subs, info_by_name = _build_parent_child_sets(tmp_path, ["bad"])
+        parents, subs, info_by_name = build_parent_child_sets(tmp_path, ["bad"])
         assert parents == set()
         assert subs == set()
         assert "bad" not in info_by_name
@@ -185,14 +185,14 @@ class TestBuildProjectListFailSoft:
         }))
 
         import quodeq.services.fs_projects as mod
-        real_build = mod._build_project_entry
+        real_build = mod.build_project_entry
 
         def side_effect(reports_root, entry_name, runs, options, **kwargs):
             if entry_name == "bad-uuid":
                 raise OSError("simulated disk error reading bad-uuid")
             return real_build(reports_root, entry_name, runs, options, **kwargs)
 
-        with patch("quodeq.services.fs_projects._build_project_entry", side_effect=side_effect):
+        with patch("quodeq.services.fs_projects.build_project_entry", side_effect=side_effect):
             with caplog.at_level("WARNING", logger="quodeq.services.fs_projects"):
                 entries = build_project_list(tmp_path)
 

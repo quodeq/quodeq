@@ -73,4 +73,4 @@ def test_watchdog_grace_covers_a_full_drain():
     from quodeq.analysis._api_call import _LOCAL_TIMEOUT
     from quodeq.services import jobs as jobs_mod
 
-    assert jobs_mod._WATCHDOG_DEADLINE_GRACE_S >= _LOCAL_TIMEOUT.read * 3
+    assert jobs_mod.WATCHDOG_DEADLINE_GRACE_S >= _LOCAL_TIMEOUT.read * 3
