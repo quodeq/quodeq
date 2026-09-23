@@ -92,56 +92,49 @@ export function countDescendants(node) {
   return n;
 }
 
-/** Folder-nebula alert particles (critical/major/minor blips), seeded by path. */
-function _buildFolderParticles(c, radius, sev) {
+// Severity draw order; changing it re-seeds every particle.
+const ORBIT_SEVERITIES = [SEVERITY.CRITICAL, SEVERITY.MAJOR, SEVERITY.MINOR];
+
+/** Violation particles orbiting a star: up to `cfg.maxPerSeverity` blips per
+ * severity, seeded by *seedKey* so a star keeps its particles across renders.
+ * The rng() call order per particle is part of the output; keep it. */
+function _orbitParticles(seedKey, radius, sev, cfg) {
+  const rng = seededRng(seedHash(seedKey));
+  const sizes = {
+    [SEVERITY.CRITICAL]: [cfg.sizeCritical, cfg.sizeCriticalRange],
+    [SEVERITY.MAJOR]: [cfg.sizeMajor, cfg.sizeMajorRange],
+    [SEVERITY.MINOR]: [cfg.sizeMinor, cfg.sizeMinorRange],
+  };
   const particles = [];
-  if (!(sev.critical > 0 || sev.major > 0 || sev.minor > 0)) return particles;
-  const fRng = seededRng(seedHash((c.path || c.name) + ':fsev'));
-  const addAlert = (count, sevName) => {
-    const sevCol = sevRGB(sevName);
-    const pn = Math.min(count, FOLDER_ALERT.maxPerSeverity);
-    for (let j = 0; j < pn; j++) {
+  for (const sevName of ORBIT_SEVERITIES) {
+    const col = sevRGB(sevName);
+    const [sizeBase, sizeRange] = sizes[sevName];
+    const count = Math.min(sev[sevName] || 0, cfg.maxPerSeverity);
+    for (let j = 0; j < count; j++) {
       particles.push({
-        col: sevCol, sev: sevName,
-        or: radius * FOLDER_ALERT.orbitRadiusRatio + fRng() * radius * FOLDER_ALERT.orbitJitterRatio,
-        os: (FOLDER_ALERT.speedMin + fRng() * FOLDER_ALERT.speedRange) * (fRng() > RNG_MIDPOINT ? 1 : -1),
-        op: fRng() * TAU,
-        sz: sevName === SEVERITY.CRITICAL ? FOLDER_ALERT.sizeCritical + fRng() * FOLDER_ALERT.sizeCriticalRange : sevName === SEVERITY.MAJOR ? FOLDER_ALERT.sizeMajor + fRng() * FOLDER_ALERT.sizeMajorRange : FOLDER_ALERT.sizeMinor + fRng() * FOLDER_ALERT.sizeMinorRange,
-        ec: FOLDER_ALERT.eccentricityBase + fRng() * FOLDER_ALERT.eccentricityRange,
-        tp: fRng() * TAU,
+        col, sev: sevName,
+        or: radius * cfg.orbitRadiusRatio + rng() * radius * cfg.orbitJitterRatio,
+        os: (cfg.speedMin + rng() * cfg.speedRange) * (rng() > RNG_MIDPOINT ? 1 : -1),
+        op: rng() * TAU,
+        sz: sizeBase + rng() * sizeRange,
+        ec: cfg.eccentricityBase + rng() * cfg.eccentricityRange,
+        tp: rng() * TAU,
       });
     }
-  };
-  if (sev.critical > 0) addAlert(sev.critical, 'critical');
-  if (sev.major > 0) addAlert(sev.major, 'major');
-  if (sev.minor > 0) addAlert(sev.minor, 'minor');
+  }
   return particles;
+}
+
+/** Folder-nebula alert particles (critical/major/minor blips), seeded by path. */
+function _buildFolderParticles(c, radius, sev) {
+  if (!(sev.critical > 0 || sev.major > 0 || sev.minor > 0)) return [];
+  return _orbitParticles((c.path || c.name) + ':fsev', radius, sev, FOLDER_ALERT);
 }
 
 /** Per-file violation particles orbiting a flagged file, seeded by path. */
 function _buildFileParticles(c, radius) {
-  const particles = [];
-  if (!(c.violations > 0)) return particles;
-  const sev = c.severity || { critical: 0, major: 0, minor: 0 };
-  const rng2 = seededRng(seedHash((c.path || c.name) + ':fp'));
-  const addP = (count, sevName) => {
-    const pcol = sevRGB(sevName);
-    for (let j = 0; j < Math.min(count, FILE_PARTICLE.maxPerSeverity); j++) {
-      particles.push({
-        col: pcol, sev: sevName,
-        or: radius * FILE_PARTICLE.orbitRadiusRatio + rng2() * radius * FILE_PARTICLE.orbitJitterRatio,
-        os: (FILE_PARTICLE.speedMin + rng2() * FILE_PARTICLE.speedRange) * (rng2() > RNG_MIDPOINT ? 1 : -1),
-        op: rng2() * TAU,
-        sz: sevName === SEVERITY.CRITICAL ? FILE_PARTICLE.sizeCritical + rng2() * FILE_PARTICLE.sizeCriticalRange : sevName === SEVERITY.MAJOR ? FILE_PARTICLE.sizeMajor + rng2() * FILE_PARTICLE.sizeMajorRange : FILE_PARTICLE.sizeMinor + rng2() * FILE_PARTICLE.sizeMinorRange,
-        ec: FILE_PARTICLE.eccentricityBase + rng2() * FILE_PARTICLE.eccentricityRange,
-        tp: rng2() * TAU,
-      });
-    }
-  };
-  addP(sev.critical || 0, 'critical');
-  addP(sev.major || 0, 'major');
-  addP(sev.minor || 0, 'minor');
-  return particles;
+  if (!(c.violations > 0)) return [];
+  return _orbitParticles((c.path || c.name) + ':fp', radius, c.severity || {}, FILE_PARTICLE);
 }
 
 /** Every root star's position/radius/color/particles, before repulsion. Returns `{ rootStars, n }`. */

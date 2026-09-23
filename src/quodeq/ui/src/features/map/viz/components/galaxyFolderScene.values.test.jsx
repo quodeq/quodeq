@@ -132,4 +132,10 @@ describe('galaxyFolderScene value characterization', () => {
     expect(a.rootStars.map((s) => round(s.ox))).toMatchSnapshot('large-scene-ox');
     expect(b.rootStars.map((s) => round(s.ox))).toMatchSnapshot('small-scene-ox');
   });
+
+  it('gives a flagged file with no severity counts no particles', () => {
+    const bare = { ...file('x.js', 2), severity: undefined };
+    const scene = buildFolderScene(folder('r', [bare, file('y.js', 0)]), 800, 600);
+    expect(scene.rootStars.find((s) => s.name === 'x.js').particles).toEqual([]);
+  });
 });
