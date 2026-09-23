@@ -11,7 +11,8 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
 import { t } from '../../../strings/index.js';
-import { DATA_THEME_ATTR, PROJECT_SOURCE } from '../../../constants.js';
+import { DATA_THEME_ATTR } from '../../../constants.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { VIEW_MODES } from '../mapVocab.js';
 
 // data-theme attr for forcing the viz dark while the app is light: keep the

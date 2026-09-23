@@ -76,12 +76,6 @@ export const SCORE_HISTORY_GRANULARITY_STORAGE_KEY = 'quodeq-score-history-granu
 export const SCORE_HISTORY_GRANULARITIES = ['day', 'week', 'month'];
 export const DEFAULT_SCORE_HISTORY_GRANULARITY = 'day';
 
-// Where a selected project's data lives: this machine's evaluations or the
-// shared repository mirror. Wire value and the cache-key segment (queryKeys).
-export const PROJECT_SOURCE = Object.freeze({ LOCAL: 'local', SHARED: 'shared' });
-// What every source-taking factory and hook falls back to when none is passed.
-export const DEFAULT_PROJECT_SOURCE = PROJECT_SOURCE.LOCAL;
-
 // Fired (same-tab) by the assistant's ActionPreviewCard after a successful
 // apply, with { actionType, scores, delta } as detail. App-level effects and
 // the verified-findings context listen so caches converge like a manual dismiss.
