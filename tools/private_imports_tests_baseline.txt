@@ -1189,8 +1189,8 @@ tests/services/test_scan_progress_live_tally.py:20:private-name:quodeq.services.
 tests/services/test_scan_progress_live_tally.py:28:private-name:quodeq.services._scan_progress_types._ProgressContext
 tests/services/test_scoped_accumulated.py:10:private-name:quodeq.services.accumulated._find_children
 tests/services/test_score_cache_in_progress.py:15:private-module:quodeq.services._external_jobs
-tests/services/test_score_cache_write_failure_logging.py:29:private-module:quodeq.services._fs_metadata
-tests/services/test_score_cache_write_failure_logging.py:30:private-module:quodeq.services._score_cache_fetch
+tests/services/test_score_cache_write_failure_logging.py:31:private-module:quodeq.services._fs_metadata
+tests/services/test_score_cache_write_failure_logging.py:32:private-module:quodeq.services._score_cache_fetch
 tests/services/test_scoring_parity.py:124:private-name:quodeq.services._fs_metadata._read_accumulated_summary
 tests/services/test_scoring_parity.py:94:private-name:quodeq.services._fs_metadata._read_accumulated_summary
 tests/services/test_scoring_parity_assistant.py:91:private-module:quodeq.assistant.tools._read_tools.finding_keys_in_scope

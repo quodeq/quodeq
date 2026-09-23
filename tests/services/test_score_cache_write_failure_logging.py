@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import sqlite3
 
+import pytest
+
 from quodeq.core.types import DimensionResult
 from quodeq.services import _fs_metadata as _md
 from quodeq.services import _score_cache_fetch
@@ -135,3 +137,42 @@ class TestProductionCallerReachesRealSink:
         # sink (not a copy/shim) absent any monkeypatching -- the object
         # identity that makes the test above representative of production.
         assert _md.SHARED_LOG is SHARED_LOG
+
+
+@pytest.mark.parametrize("entry, kind", [
+    ("cached_accumulated", "accumulated"),
+    ("cached_project_summary", "summary"),
+])
+def test_both_entry_points_share_one_read_through(monkeypatch, entry, kind):
+    seen: list[tuple[str, str, str]] = []
+
+    def fake_read_through(table, project, version, compute, cacheable, log):
+        seen.append((table.kind, project, version))
+        return {"via": "read_through"}
+
+    monkeypatch.setattr(_score_cache_fetch, "read_through", fake_read_through)
+    assert getattr(_score_cache_fetch, entry)("proj", "v1", dict) == {"via": "read_through"}
+    assert seen == [(kind, "proj", "v1")]
+
+
+@pytest.mark.parametrize("entry", ["cached_accumulated", "cached_project_summary"])
+def test_kill_switch_computes_without_touching_the_cache(monkeypatch, entry):
+    monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+    monkeypatch.setattr(_score_cache_fetch, "open_score_cache", _boom)
+    computed = {"score": 1.0}
+    assert getattr(_score_cache_fetch, entry)("proj", "v1", lambda: computed) is computed
+
+
+@pytest.mark.parametrize("entry, reader", [
+    ("cached_accumulated", "read_cached_accumulated"),
+    ("cached_project_summary", "read_cached_project_summary"),
+])
+def test_first_read_error_computes_and_skips_the_write(monkeypatch, tmp_path, entry, reader):
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    monkeypatch.setattr(_score_cache_fetch, reader, _boom)
+    writes: list[str] = []
+    monkeypatch.setattr(_score_cache_fetch, reader.replace("read_", "write_"),
+                        lambda *a, **k: writes.append("write"))
+    computed = {"score": 2.0}
+    assert getattr(_score_cache_fetch, entry)("proj", "v1", lambda: computed) is computed
+    assert writes == []
