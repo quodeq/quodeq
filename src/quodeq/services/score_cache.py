@@ -134,7 +134,7 @@ def accumulated_cache_version(
 
     Each fingerprint tuple carries the run's *status* alongside its scoped
     version (see :func:`per_run_versions`) so a status transition (e.g.
-    ``in_progress -> complete``, ``complete -> cancelled``) changes the hash and
+    ``running -> done``, ``done -> cancelled``) changes the hash and
     invalidates the cache. The scoped version is status-independent — it hashes
     params + intersecting suppressions — so without status folded in, a run
     completing mid-poll would recompute the same version and serve a stale

@@ -110,5 +110,5 @@ def _stream_terminal_state(provider, job_id: str) -> str:
             if isinstance(state, str):
                 return state
         except (OSError, ValueError) as exc:
-            _logger.debug("status.json unreadable for job %s, reporting completed: %s", job_id, exc)
+            _logger.debug("status.json unreadable for job %s, reporting done: %s", job_id, exc)
     return JobStatus.DONE

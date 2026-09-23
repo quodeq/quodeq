@@ -118,9 +118,9 @@ def _make_status_aware_fetcher(
     return fetch
 
 
-# Fallback order for the "latest" default run when none is complete. Each
+# Fallback order for the "latest" default run when none is done. Each
 # tier is tried newest-first; a failed run is only headlined when nothing
-# else remains (handled after this list). Complete mirrors the Overview's
+# else remains (handled after this list). Done mirrors the Overview's
 # is_eligible_for_default_view; cancelled matches its cancelled fallback.
 _LATEST_FALLBACK_ORDER = (
     is_eligible_for_default_view,               # done
@@ -132,8 +132,8 @@ _LATEST_FALLBACK_ORDER = (
 def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent.
 
-    For ``run == _LATEST_RUN``, prefer the most recent ``complete`` run.
-    in_progress and cancelled runs are skipped: the overview waits for a
+    For ``run == _LATEST_RUN``, prefer the most recent ``done`` run.
+    Running and cancelled runs are skipped: the overview waits for a
     run to terminate cleanly before promoting it to the default
     landing-page view. The eligibility predicate is the shared
     ``scoring_view.is_eligible_for_default_view`` rule, used by both
@@ -142,9 +142,9 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     cards say another" inconsistency users hit when the two filters
     drift.
 
-    If no run is complete (fresh project, only run still in progress,
+    If no run is done (fresh project, only run still running,
     every attempt cancelled), fall back by trust order — cancelled, then
-    in_progress — and only headline a ``failed`` run when there is nothing
+    running — and only headline a ``failed`` run when there is nothing
     else. A failed run must not headline the dashboard while a cancelled
     run with real kept-findings data exists, or the headline would show
     untrustworthy data the Overview cards (which never fall back to

@@ -70,7 +70,7 @@ def _emit_done_frame(terminal_state, offset: int) -> str:
     """Build the ``event: done`` frame that ends a tail stream.
 
     terminal_state: optional callable returning a string describing why the
-             run ended (e.g. ``"cancelled"``, ``"failed"``, ``"completed"``).
+             run ended (e.g. ``"cancelled"``, ``"failed"``, ``"done"``).
              If provided and non-empty, that value rides in the done frame
              as ``data:`` so the client can show the right title without
              relying on a separate dashboard poll.
