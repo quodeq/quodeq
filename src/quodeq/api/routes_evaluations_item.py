@@ -8,11 +8,11 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._scored_jobs_registry import _claim_scoring, _release_scoring, reset_scored_jobs
+from quodeq.api._scored_jobs_registry import claim_scoring, release_scoring, reset_scored_jobs
 from quodeq.core.run.job_status import JobStatus
 from quodeq.api.helpers import error_response
 from quodeq.shared.serialization import to_camel_dict
-from quodeq.api.routes import _reports_dir
+from quodeq.api.routes_common import reports_dir
 from quodeq.services.background import BackgroundRunner, ThreadBackgroundRunner
 from quodeq.services.base import ActionProvider
 from quodeq.services.scan_progress import build_scan_progress
@@ -37,7 +37,7 @@ def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
     run_id = getattr(job, "output_run_id", None)
     if not project or not run_id:
         return {}
-    return read_run_dim_states(_reports_dir(), project, run_id)
+    return read_run_dim_states(reports_dir(), project, run_id)
 
 
 def _score_completed_dims_in_bg(app: Flask, job_id: str, job: Any) -> None:
@@ -49,14 +49,14 @@ def _score_completed_dims_in_bg(app: Flask, job_id: str, job: Any) -> None:
 
     Offloaded to a background thread so the GET returns immediately;
     scoring may involve heavy I/O (reading evidence, writing score files).
-    _claim_scoring() is atomic: exactly one concurrent GET wins the claim.
+    claim_scoring() is atomic: exactly one concurrent GET wins the claim.
     """
     job_status = getattr(job, "status", None)
     if job_status not in (JobStatus.FAILED, JobStatus.CANCELLED):
         return
-    if not _claim_scoring(job_id):
+    if not claim_scoring(job_id):
         return
-    _reports = _reports_dir()
+    _reports = reports_dir()
     _score_args = {
         "outputProject": job.output_project,
         "outputRunId": job.output_run_id,
@@ -107,13 +107,13 @@ def _cancel_running(provider: ActionProvider, job_id: str) -> Response | tuple[R
         # cancelled: otherwise the UI's next status poll sees the
         # cancelled state and spawns _score_completed_evidence,
         # resurrecting a run the user just discarded.
-        _claim_scoring(job_id)
+        claim_scoring(job_id)
     ok = provider.cancel_evaluation(
-        job_id, reports_dir=_reports_dir(), discard_partial=discard,
+        job_id, reports_dir=reports_dir(), discard_partial=discard,
     )
     if not ok:
         if discard:
-            _release_scoring(job_id)
+            release_scoring(job_id)
         body, status = error_response("Could not cancel job", HTTPStatus.CONFLICT, "CONFLICT")
         return jsonify(body), status
     return jsonify({"ok": True, "action": "cancelled", "discarded": discard})
@@ -121,7 +121,7 @@ def _cancel_running(provider: ActionProvider, job_id: str) -> Response | tuple[R
 
 def _delete_finished(provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
     _logger.info("delete_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
-    ok = provider.delete_evaluation(job_id, reports_dir=_reports_dir())
+    ok = provider.delete_evaluation(job_id, reports_dir=reports_dir())
     if not ok:
         body, status = error_response("Job could not be deleted", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(body), status
@@ -129,7 +129,7 @@ def _delete_finished(provider: ActionProvider, job_id: str) -> Response | tuple[
 
 
 def _get_evaluation(app: Flask, provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
-    job = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
+    job = provider.get_evaluation_status(job_id, reports_dir=reports_dir())
     if not job:
         body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(body), status
@@ -149,7 +149,7 @@ def _get_evaluation_progress(app: Flask, provider: ActionProvider, job_id: str) 
     # budget for both internal jobs (JobManager) and index-served runs
     # (read from status.json). 0 = unlimited -> no budget shown.
     time_limit_s: int | None = None
-    snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
+    snapshot = provider.get_evaluation_status(job_id, reports_dir=reports_dir())
     if snapshot is not None:
         raw = getattr(snapshot, "time_limit_s", None)
         if isinstance(raw, int) and raw > 0:
@@ -178,7 +178,7 @@ def _cancel_or_delete_evaluation(provider: ActionProvider, job_id: str) -> Respo
     ``?discard=true`` on a cancel also wipes the run entirely so the
     next run treats the work as never-happened.
     """
-    snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
+    snapshot = provider.get_evaluation_status(job_id, reports_dir=reports_dir())
     if snapshot is None:
         body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(body), status

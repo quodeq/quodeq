@@ -10,14 +10,14 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._evaluation_helpers import (
     InvalidEvaluationOption,
-    _check_eval_rate_limit,
-    _sanitize_url,
-    _validate_ai_cmd,
-    _validate_ai_cmd_path,
-    _validate_ai_model,
+    check_eval_rate_limit,
+    sanitize_url,
+    validate_ai_cmd,
+    validate_ai_cmd_path,
+    validate_ai_model,
     clean_scan_conflict_error,
 )
-from quodeq.api._evaluation_options import _build_evaluation_options
+from quodeq.api._evaluation_options import build_evaluation_options
 from quodeq.api.helpers import json_error, page_params, scan_target_error, validate_evaluation_payload
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.shared.validation import relative_scope_error
@@ -42,13 +42,13 @@ def _validate_start_payload(payload: dict) -> Response | tuple[Response, int] | 
     if validation_error:
         return json_error(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
     ai_cmd = payload.get("aiCmd") or None
-    ai_cmd_error = _validate_ai_cmd(ai_cmd)
+    ai_cmd_error = validate_ai_cmd(ai_cmd)
     if ai_cmd_error is not None:
         return ai_cmd_error
-    ai_cmd_path_error = _validate_ai_cmd_path(ai_cmd, payload.get("aiCmdPath") or None)
+    ai_cmd_path_error = validate_ai_cmd_path(ai_cmd, payload.get("aiCmdPath") or None)
     if ai_cmd_path_error is not None:
         return ai_cmd_path_error
-    model_error = _validate_ai_model(
+    model_error = validate_ai_model(
         ai_cmd, payload.get("aiModel") or None, get_provider_configs(),
     )
     if model_error is not None:
@@ -65,7 +65,7 @@ class _StartRequest:
 
 
 def _pre_build_options_error(payload: dict) -> tuple[Response, int] | None:
-    """Pre-check every ValueError source ``_build_evaluation_options`` can
+    """Pre-check every ValueError source ``build_evaluation_options`` can
     hit today (clean_scan conflict, then scope path -- same order it checks
     them internally), so the caller's try/except is an unreachable safety
     net, never a path that has to echo exception text."""
@@ -86,7 +86,7 @@ def _build_options_or_error(payload: dict) -> tuple[Any, tuple[Response, int] | 
     if pre_error is not None:
         return None, pre_error
     try:
-        return _build_evaluation_options(payload), None
+        return build_evaluation_options(payload), None
     except InvalidEvaluationOption as exc:
         # exc.public_message, not str(exc): the field-naming text an
         # InvalidEvaluationOption carries is written by coerce_int itself,
@@ -134,7 +134,7 @@ def _validated_start_request(
     if error is not None:
         return None, error
     repo = payload.get("repo")
-    _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
+    _logger.info("start_evaluation: repo=%s, remote_addr=%s", sanitize_url(repo), request.remote_addr)
     options, options_error = _build_options_or_error(payload)
     if options_error is not None:
         return None, options_error
@@ -178,7 +178,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
 
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:
-        rate_error = _check_eval_rate_limit(eval_rate_store)
+        rate_error = check_eval_rate_limit(eval_rate_store)
         if rate_error is not None:
             return rate_error
         payload = request.get_json(silent=True) or {}

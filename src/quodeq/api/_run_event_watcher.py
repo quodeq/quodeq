@@ -18,14 +18,14 @@ from quodeq.api._run_event_serializers import (
     serialize_dimension_event,
     serialize_finding_event,
     serialize_status_event,
-    _payload_as_sse_finding,
+    payload_as_sse_finding,
 )
 from quodeq.core.run.state import RunState
 from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
-_DEFAULT_FINDINGS_BATCH = 500
+DEFAULT_FINDINGS_BATCH = 500
 """Per-tick cap on findings pulled from the event log for the SSE stream.
 
 Bounds the initial-snapshot burst so a run with tens of thousands of findings
@@ -33,12 +33,12 @@ cannot OOM the API process. Subsequent ticks resume from the last event
 timestamp via the SSE Last-Event-ID mechanism.
 """
 
-_DIM_FILENAME_SUFFIX = ".json"
+DIM_FILENAME_SUFFIX = ".json"
 
 EventTuple = tuple[str, str, str | None]
 """(event_type, payload, optional_event_id) — event_id is ISO timestamp for findings, None for others."""
 
-_STATUS_MTIME_MISSING: float = 0.0
+STATUS_MTIME_MISSING: float = 0.0
 """Sentinel mtime used when status.json does not exist.
 
 WatcherState initialises last_status_mtime=None ("never checked"), which is
@@ -47,15 +47,15 @@ is always emitted on the very first tick even when there is no status.json.
 """
 
 
-def _findings_batch_size(env: Mapping[str, str] | None = None) -> int:
+def findings_batch_size(env: Mapping[str, str] | None = None) -> int:
     raw = resolve_env(env).get("QUODEQ_SSE_FINDINGS_BATCH")
     if not raw:
-        return _DEFAULT_FINDINGS_BATCH
+        return DEFAULT_FINDINGS_BATCH
     try:
         value = int(raw)
     except ValueError:
-        return _DEFAULT_FINDINGS_BATCH
-    return value if value > 0 else _DEFAULT_FINDINGS_BATCH
+        return DEFAULT_FINDINGS_BATCH
+    return value if value > 0 else DEFAULT_FINDINGS_BATCH
 
 
 @dataclass
@@ -77,13 +77,13 @@ class WatcherState:
     emitted_dimensions: frozenset[str] = field(default_factory=frozenset)
 
 
-def _read_status(run_dir: Path) -> tuple[dict[str, Any], float]:
+def read_status(run_dir: Path) -> tuple[dict[str, Any], float]:
     """Read status.json. Returns ({state: pending}, 0.0) when the file is absent."""
     path = run_dir / "status.json"
     try:
         mtime = path.stat().st_mtime
     except OSError:
-        return {"state": RunState.PENDING}, _STATUS_MTIME_MISSING
+        return {"state": RunState.PENDING}, STATUS_MTIME_MISSING
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
@@ -94,27 +94,27 @@ def _read_status(run_dir: Path) -> tuple[dict[str, Any], float]:
         return {"state": RunState.PENDING}, mtime
 
 
-def _scan_completed_dimensions(run_dir: Path) -> set[str]:
+def scan_completed_dimensions(run_dir: Path) -> set[str]:
     """Return the set of dimension names that have an evaluation/<dim>.json file."""
     eval_dir = run_dir / "evaluation"
     try:
         return {
-            entry.name[: -len(_DIM_FILENAME_SUFFIX)]
+            entry.name[: -len(DIM_FILENAME_SUFFIX)]
             for entry in eval_dir.iterdir()
-            if entry.is_file() and entry.name.endswith(_DIM_FILENAME_SUFFIX)
+            if entry.is_file() and entry.name.endswith(DIM_FILENAME_SUFFIX)
         }
     except OSError:
         return set()
 
 
-def _read_dim_eval(run_dir: Path, dimension: str) -> dict[str, Any] | None:
+def read_dim_eval(run_dir: Path, dimension: str) -> dict[str, Any] | None:
     """Read evaluation/<dim>.json. Returns None on any failure.
 
     The returned dict's ``dimension`` key is the canonical dimension name as
     written by the scoring engine. Callers should treat that value as
     authoritative — it always matches the filename stem for well-formed files.
     """
-    path = run_dir / "evaluation" / f"{dimension}{_DIM_FILENAME_SUFFIX}"
+    path = run_dir / "evaluation" / f"{dimension}{DIM_FILENAME_SUFFIX}"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else None
@@ -123,7 +123,7 @@ def _read_dim_eval(run_dir: Path, dimension: str) -> dict[str, Any] | None:
         return None
 
 
-def _read_new_findings_from_events(
+def read_new_findings_from_events(
     run_dir: Path,
     last_event_ts: datetime | None,
     counter_start: int,
@@ -131,7 +131,7 @@ def _read_new_findings_from_events(
     """Return (event_ts, counter, finding_dict) triples for new JUDGMENT_CREATED events.
 
     Reads from run_dir/events.jsonl via EventLogReader.stream(since_timestamp).
-    Caps at _findings_batch_size() results per call so a large initial snapshot
+    Caps at findings_batch_size() results per call so a large initial snapshot
     cannot OOM the API process. Subsequent ticks resume via last_event_ts.
     """
     events_log = run_dir / "events.jsonl"
@@ -142,12 +142,12 @@ def _read_new_findings_from_events(
         from quodeq.core.events.models import EventType  # noqa: PLC0415
         results: list[tuple[datetime, int, dict[str, Any]]] = []
         counter = counter_start
-        batch_limit = _findings_batch_size()
+        batch_limit = findings_batch_size()
         for event in EventLogReader(events_log).stream(since_timestamp=last_event_ts):
             if event.event_type != EventType.JUDGMENT_CREATED:
                 continue
             counter += 1
-            results.append((event.timestamp, counter, _payload_as_sse_finding(event.payload, counter)))
+            results.append((event.timestamp, counter, payload_as_sse_finding(event.payload, counter)))
             if len(results) >= batch_limit:
                 break
         return results
@@ -167,21 +167,21 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
     events: list[EventTuple] = []
 
     # --- Status ---
-    status, status_mtime = _read_status(run_dir)
+    status, status_mtime = read_status(run_dir)
     if status_mtime != state.last_status_mtime:
         events.append(("status", serialize_status_event(status), None))
 
     # --- Dimensions ---
-    completed = _scan_completed_dimensions(run_dir)
+    completed = scan_completed_dimensions(run_dir)
     new_dims = sorted(completed - state.emitted_dimensions)
     for dim in new_dims:
-        eval_data = _read_dim_eval(run_dir, dim)
+        eval_data = read_dim_eval(run_dir, dim)
         events.append(("dimension-completed", serialize_dimension_event(
             dimension=dim, eval_data=eval_data,
         ), None))
 
     # --- Findings ---
-    new_findings = _read_new_findings_from_events(
+    new_findings = read_new_findings_from_events(
         run_dir, state.last_event_ts, state.last_event_counter,
     )
     new_last_ts = state.last_event_ts

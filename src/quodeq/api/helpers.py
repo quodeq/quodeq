@@ -28,7 +28,7 @@ def json_error(message: str, status: int, code: str) -> tuple[Response, int]:
     return jsonify(body), status_code
 
 
-def _json_object_or_error(
+def json_object_or_error(
     code: str = ERROR_CODE_BAD_REQUEST,
 ) -> dict[str, Any] | tuple[dict[str, Any], int]:
     """Return the request's JSON object body, or a 400 error tuple.
@@ -47,7 +47,7 @@ def _json_object_or_error(
     return payload
 
 
-def _path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
+def path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
     """Return the request body's stripped ``path``, or a 400 error tuple.
 
     Shared by PATCH /api/projects/<project>/path and POST /api/scan so both
@@ -120,7 +120,7 @@ def page_params(
     return limit, offset
 
 
-def _sanitize_for_log(value: str) -> str:
+def sanitize_for_log(value: str) -> str:
     """Remove CR/LF from a value before including it in a log message.
 
     Prevents log forging when client-supplied values contain embedded

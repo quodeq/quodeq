@@ -1,7 +1,7 @@
 import pytest
 
 from quodeq.assistant.worktree import (
-    WorktreeError, WorktreeManager, _run, diff_stats, diff_text)
+    WorktreeError, WorktreeManager, run, diff_stats, diff_text)
 from quodeq.assistant.worktree import ensure_session_worktree, gc_stale_worktrees
 from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
@@ -13,13 +13,13 @@ def repo(tmp_path):
     """A real git repo with one committed file."""
     root = tmp_path / "repo"
     root.mkdir()
-    _run(["git", "-C", str(root), "init", "-q", "-b", "main"])
-    _run(["git", "-C", str(root), "config", "core.autocrlf", "false"])
-    _run(["git", "-C", str(root), "config", "user.name", "T"])
-    _run(["git", "-C", str(root), "config", "user.email", "t@example.com"])
+    run(["git", "-C", str(root), "init", "-q", "-b", "main"])
+    run(["git", "-C", str(root), "config", "core.autocrlf", "false"])
+    run(["git", "-C", str(root), "config", "user.name", "T"])
+    run(["git", "-C", str(root), "config", "user.email", "t@example.com"])
     (root / "app.py").write_bytes(b"print('hi')\n")
-    _run(["git", "-C", str(root), "add", "-A"])
-    _run(["git", "-C", str(root), "commit", "-q", "-m", "init"])
+    run(["git", "-C", str(root), "add", "-A"])
+    run(["git", "-C", str(root), "commit", "-q", "-m", "init"])
     return root
 
 
@@ -67,13 +67,13 @@ def test_remove_deletes_worktree_and_branch(manager, repo):
     branch = manager.branch
     manager.remove()
     assert not manager.path.exists()
-    out = _run(["git", "-C", str(repo), "branch", "--list", branch])
+    out = run(["git", "-C", str(repo), "branch", "--list", branch])
     assert out.strip() == ""
 
 
 def test_run_raises_on_failure(repo):
     with pytest.raises(WorktreeError):
-        _run(["git", "-C", str(repo), "not-a-command"])
+        run(["git", "-C", str(repo), "not-a-command"])
 
 
 def test_create_recovers_from_stale_dir(repo, tmp_path):
@@ -95,7 +95,7 @@ def test_for_session_sanitizes_project_segment(repo, tmp_path):
 def test_remove_fallback_when_dir_deleted_out_of_band(manager, repo):
     _shutil.rmtree(manager.path)
     manager.remove()  # must not raise; prunes and deletes the branch
-    out = _run(["git", "-C", str(repo), "branch", "--list", manager.branch])
+    out = run(["git", "-C", str(repo), "branch", "--list", manager.branch])
     assert out.strip() == ""
 
 
@@ -105,14 +105,14 @@ def test_apply_to_repo_leaves_uncommitted_changes(manager, repo):
     assert (repo / "app.py").read_bytes() == b"print('bye')\n"
     assert stats and stats[0]["file"] == "app.py"
     # uncommitted: repo status is dirty
-    out = _run(["git", "-C", str(repo), "status", "--porcelain"])
+    out = run(["git", "-C", str(repo), "status", "--porcelain"])
     assert "app.py" in out
 
 
 def test_byte_exact_despite_autocrlf(repo, tmp_path):
     # core.autocrlf=true is the Git-for-Windows default; checkout and apply
     # must still preserve repo bytes exactly (LF stays LF)
-    _run(["git", "-C", str(repo), "config", "core.autocrlf", "true"])
+    run(["git", "-C", str(repo), "config", "core.autocrlf", "true"])
     manager = WorktreeManager.for_session(repo, "proj", "feedbeef12345678",
                                           base=tmp_path / "wts")
     manager.create()

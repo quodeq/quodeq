@@ -5,7 +5,7 @@ import pytest
 from flask import Flask
 
 from quodeq.api.assistant_routes import register_assistant_routes
-from quodeq.assistant.worktree import ensure_session_worktree, _run
+from quodeq.assistant.worktree import ensure_session_worktree, run
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
 
@@ -34,13 +34,13 @@ def client(app):
 def repo(tmp_path):
     root = tmp_path / "repo"
     root.mkdir()
-    _run(["git", "-C", str(root), "init", "-q", "-b", "main"])
-    _run(["git", "-C", str(root), "config", "core.autocrlf", "false"])
-    _run(["git", "-C", str(root), "config", "user.name", "T"])
-    _run(["git", "-C", str(root), "config", "user.email", "t@example.com"])
+    run(["git", "-C", str(root), "init", "-q", "-b", "main"])
+    run(["git", "-C", str(root), "config", "core.autocrlf", "false"])
+    run(["git", "-C", str(root), "config", "user.name", "T"])
+    run(["git", "-C", str(root), "config", "user.email", "t@example.com"])
     (root / "app.py").write_bytes(b"x = 1\n")
-    _run(["git", "-C", str(root), "add", "-A"])
-    _run(["git", "-C", str(root), "commit", "-q", "-m", "init"])
+    run(["git", "-C", str(root), "add", "-A"])
+    run(["git", "-C", str(root), "commit", "-q", "-m", "init"])
     return root
 
 

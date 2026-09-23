@@ -1,7 +1,7 @@
 """Shared helpers for the ``/api/shared/*`` route modules.
 
-``_with_shared_root`` and ``_validate_segment`` are used by the config, pull,
-and read-only mirror route registrars alike; ``_shared_project_dir`` by the
+``with_shared_root`` and ``validate_segment`` are used by the config, pull,
+and read-only mirror route registrars alike; ``shared_project_dir`` by the
 pull route and two of the mirrors. Split out of routes_shared.py so
 those registrars can share one implementation instead of three copies.
 """
@@ -25,10 +25,10 @@ from quodeq.services.shared_repo import (
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared.validation import resolve_child_dir, validate_path_segment
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
-def _with_shared_root(fn):
+def with_shared_root(fn):
     """Resolve the configured clone; inject eval_root; scope the score cache.
 
     Every decorated route becomes: 409 when unconfigured, 409 when the
@@ -85,7 +85,7 @@ def _with_shared_root(fn):
     return wrapper
 
 
-def _validate_segment(*segments: str) -> tuple[Response, int] | None:
+def validate_segment(*segments: str) -> tuple[Response, int] | None:
     """Shared-route path-segment guard.
 
     Every shared mirror that takes a project/run/dimension segment validates
@@ -100,13 +100,13 @@ def _validate_segment(*segments: str) -> tuple[Response, int] | None:
     return None
 
 
-def _shared_project_dir(eval_root: Path, project: str) -> Path | None:
+def shared_project_dir(eval_root: Path, project: str) -> Path | None:
     """Resolve *project* under *eval_root* by listing; None if there is no such entry.
 
     *project* is matched against real directory entries rather than joined onto
     *eval_root*, so a hostile value matches nothing instead of needing to be
     contained afterwards. None means absent, not invalid: callers run
-    _validate_segment first, so a bad name is already a 400 by this point.
+    validate_segment first, so a bad name is already a 400 by this point.
     """
     resolved = resolve_child_dir(eval_root, project)
     return Path(resolved) if resolved is not None else None

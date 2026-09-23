@@ -25,7 +25,7 @@ class SharedSourceUnavailable(RuntimeError):
 _DEFAULT_SESSION_TTL_DAYS = 90
 
 
-def _session_ttl_days(env: Mapping[str, str] | None = None) -> int:
+def session_ttl_days(env: Mapping[str, str] | None = None) -> int:
     raw = resolve_env(env).get("QUODEQ_ASSISTANT_SESSION_TTL_DAYS")
     if raw is None:
         return _DEFAULT_SESSION_TTL_DAYS
@@ -54,7 +54,7 @@ def run_assistant_hygiene(app: Flask, *, ttl_days: int | None = None) -> None:
     try:
         gc_worktrees(repo)
         removed = repo.prune_sessions_older_than(
-            ttl_days if ttl_days is not None else _session_ttl_days()
+            ttl_days if ttl_days is not None else session_ttl_days()
         )
         if removed:
             _logger.info("Pruned %d old assistant session(s)", removed)

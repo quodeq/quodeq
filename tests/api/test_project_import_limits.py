@@ -45,7 +45,7 @@ def test_import_uncompressed_over_limit_but_compressed_under_is_accepted(app_cli
     payload = b"".join(os.urandom(64) + b"x" * 192 for _ in range(12288))
     data = _make_zip(extra_files={"evidence.jsonl": payload})
     assert len(data) < 1024 * 1024
-    with patch("quodeq.api.import_project._max_zip_size_bytes", return_value=1024 * 1024), _patch_home(home):
+    with patch("quodeq.api.import_project.max_zip_size_bytes", return_value=1024 * 1024), _patch_home(home):
         resp = _post_zip(c, data)
     assert resp.status_code == 200, resp.get_json()
 
@@ -69,7 +69,7 @@ def test_import_zip_bomb_ratio_rejected(app_client):
 
 def test_import_export_roundtrip(app_client):
     """Export a project, then import the resulting zip — should land identically."""
-    from quodeq.api.zip import _build_project_zip
+    from quodeq.api.zip import build_project_zip
     c, home, eval_dir = app_client
     src_uuid = str(uuid.uuid4())
     src = eval_dir / src_uuid
@@ -78,7 +78,7 @@ def test_import_export_roundtrip(app_client):
         "uuid": src_uuid, "name": "myrepo", "location": "local", "path": "/tmp/myrepo",
     }))
     (src / "scan.json").write_text(json.dumps({"total_files": 7}))
-    zip_path = _build_project_zip(src)
+    zip_path = build_project_zip(src)
     try:
         zip_bytes = zip_path.read_bytes()
     finally:
@@ -93,16 +93,16 @@ def test_import_export_roundtrip(app_client):
 
 
 # ---------------------------------------------------------------------------
-# #2494 — _update_index must use an injected repository when provided
+# #2494 — update_index must use an injected repository when provided
 # ---------------------------------------------------------------------------
 
 class TestUpdateIndexDI:
-    """_update_index must delegate to the injected ProjectRepository when given."""
+    """update_index must delegate to the injected ProjectRepository when given."""
 
     def test_injected_repository_is_used_not_filesystem(self, tmp_path):
         """When a repository is injected, load_index/save_index on it are called
         instead of the default _load_index/_save_index filesystem helpers."""
-        from quodeq.api.import_project import _update_index
+        from quodeq.api.import_project import update_index
         from quodeq.data.fs._models import ProjectIdentity
         from quodeq.data.fs._resolution import _index_key
 
@@ -121,7 +121,7 @@ class TestUpdateIndexDI:
         project_uuid = "aaaabbbb-cccc-dddd-eeee-ffffaaaabbbb"
         spy = SpyRepository()
 
-        _update_index(tmp_path, identity, project_uuid, repository=spy)
+        update_index(tmp_path, identity, project_uuid, repository=spy)
 
         assert len(captured_loads) == 1
         assert captured_loads[0] == tmp_path
@@ -131,16 +131,16 @@ class TestUpdateIndexDI:
         assert saved_index[_index_key(identity)] == project_uuid
 
     def test_no_repository_uses_filesystem(self, tmp_path):
-        """Without a repository, _update_index writes to project_index.json on disk."""
+        """Without a repository, update_index writes to project_index.json on disk."""
         import json
-        from quodeq.api.import_project import _update_index
+        from quodeq.api.import_project import update_index
         from quodeq.data.fs._models import ProjectIdentity
         from quodeq.data.fs._resolution import _index_key
 
         identity = ProjectIdentity(project_name="testrepo", repo_path="/tmp/testrepo")
         project_uuid = "11112222-3333-4444-5555-666677778888"
 
-        _update_index(tmp_path, identity, project_uuid)
+        update_index(tmp_path, identity, project_uuid)
 
         index_file = tmp_path / "project_index.json"
         assert index_file.exists()

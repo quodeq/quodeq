@@ -1,7 +1,7 @@
 """Request payload -> EvaluationOptions.
 
 Split out of ``_evaluation_helpers.py`` (which was at the 300-line cap) when
-``_build_evaluation_options`` was broken into ``_parse_limits`` and
+``build_evaluation_options`` was broken into ``_parse_limits`` and
 ``_parse_flags``. Depends on ``_evaluation_helpers`` for the shared coercion
 primitives, never the other way round.
 """
@@ -74,7 +74,7 @@ def _parse_flags(body: dict) -> _Flags:
     )
 
 
-def _build_evaluation_options(payload: dict) -> EvaluationOptions:
+def build_evaluation_options(payload: dict) -> EvaluationOptions:
     """Construct and validate EvaluationOptions from the request payload."""
     limits = _parse_limits(payload)
     flags = _parse_flags(payload)

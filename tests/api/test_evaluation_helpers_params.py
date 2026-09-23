@@ -14,7 +14,7 @@ import pytest
 
 from quodeq.api._evaluation_helpers import InvalidEvaluationOption, coerce_int
 from quodeq.api._evaluation_options import (
-    _build_evaluation_options,
+    build_evaluation_options,
     _parse_flags,
     _parse_limits,
 )
@@ -54,41 +54,41 @@ class TestBuildEvaluationOptionsIntFields:
         return {"repo": "x", **overrides}
 
     def test_absent_max_subagents_keeps_default(self):
-        options = _build_evaluation_options(self._payload())
+        options = build_evaluation_options(self._payload())
         assert options.max_subagents == DEFAULT_MAX_SUBAGENTS
 
     def test_malformed_max_subagents_raises_400_worthy_error(self):
         with pytest.raises(ValueError, match="maxSubagents"):
-            _build_evaluation_options(self._payload(maxSubagents="abc"))
+            build_evaluation_options(self._payload(maxSubagents="abc"))
 
     def test_absent_time_limit_keeps_default(self):
-        options = _build_evaluation_options(self._payload())
+        options = build_evaluation_options(self._payload())
         assert options.time_limit == DEFAULT_TIME_LIMIT
 
     def test_malformed_time_limit_raises_400_worthy_error(self):
         with pytest.raises(ValueError, match="timeLimit"):
-            _build_evaluation_options(self._payload(timeLimit="abc"))
+            build_evaluation_options(self._payload(timeLimit="abc"))
 
     def test_absent_context_size_keeps_default(self):
-        options = _build_evaluation_options(self._payload())
+        options = build_evaluation_options(self._payload())
         assert options.context_size == 0
 
     def test_malformed_context_size_raises_400_worthy_error(self):
         with pytest.raises(ValueError, match="contextSize"):
-            _build_evaluation_options(self._payload(contextSize="abc"))
+            build_evaluation_options(self._payload(contextSize="abc"))
 
     def test_malformed_legacy_pool_budget_names_pool_budget(self):
         """The label is the key the client actually sent: reporting the
         legacy poolBudget as timeLimit named a field absent from the body."""
         with pytest.raises(ValueError, match="poolBudget"):
-            _build_evaluation_options(self._payload(poolBudget="abc"))
+            build_evaluation_options(self._payload(poolBudget="abc"))
 
     def test_malformed_time_limit_still_names_time_limit_when_both_are_sent(self):
         with pytest.raises(ValueError, match="timeLimit"):
-            _build_evaluation_options(self._payload(timeLimit="abc", poolBudget=600))
+            build_evaluation_options(self._payload(timeLimit="abc", poolBudget=600))
 
     def test_blank_time_limit_keeps_the_default(self):
-        options = _build_evaluation_options(self._payload(timeLimit=""))
+        options = build_evaluation_options(self._payload(timeLimit=""))
         assert options.time_limit == DEFAULT_TIME_LIMIT
 
 

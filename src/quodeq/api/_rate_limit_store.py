@@ -6,10 +6,10 @@ from collections import OrderedDict
 from typing import Protocol, runtime_checkable
 
 from quodeq.api._rate_limit_config import (
-    _PRUNE_THRESHOLD_MULTIPLIER,
-    _RATE_STORE_MAX_IPS,
-    _rate_limit_max,
-    _rate_limit_window,
+    PRUNE_THRESHOLD_MULTIPLIER,
+    RATE_STORE_MAX_IPS,
+    rate_limit_max,
+    rate_limit_window,
 )
 
 
@@ -51,12 +51,12 @@ class InMemoryRateLimitStore:
         self,
         window: float | None = None,
         max_requests: int | None = None,
-        max_ips: int = _RATE_STORE_MAX_IPS,
+        max_ips: int = RATE_STORE_MAX_IPS,
     ) -> None:
         self._store: OrderedDict[str, list[float]] = OrderedDict()
         self._lock = threading.Lock()
-        self._window = window if window is not None else _rate_limit_window()
-        self._max_requests = max_requests if max_requests is not None else _rate_limit_max()
+        self._window = window if window is not None else rate_limit_window()
+        self._max_requests = max_requests if max_requests is not None else rate_limit_max()
         self._max_ips = max_ips
         self._last_cleanup: float = 0.0
 
@@ -100,7 +100,7 @@ class InMemoryRateLimitStore:
         self._periodic_cleanup(now)
         timestamps = self._store.setdefault(ip, [])
         timestamps.append(now)
-        if len(timestamps) > self._max_requests * _PRUNE_THRESHOLD_MULTIPLIER:
+        if len(timestamps) > self._max_requests * PRUNE_THRESHOLD_MULTIPLIER:
             self._store[ip] = [t for t in timestamps if now - t < self._window]
         self._store.move_to_end(ip)
 

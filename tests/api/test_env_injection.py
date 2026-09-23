@@ -77,16 +77,16 @@ def test_log_tail_max_bytes_honours_the_injected_env(monkeypatch):
 
 
 def test_read_tail_honours_the_injected_byte_cap(tmp_path: Path):
-    from quodeq.api._log_tail_helpers import _read_tail
+    from quodeq.api._log_tail_helpers import read_tail
 
     log = tmp_path / "run.log"
     # Bytes, not text: on Windows write_text would emit \r\n and the 6-byte
     # cap would cut the first line in half.
     log.write_bytes(b"alpha\nbeta\n")
-    lines, offset = _read_tail(log, 0, {"QUODEQ_LOG_TAIL_MAX_BYTES": "6"})
+    lines, offset = read_tail(log, 0, {"QUODEQ_LOG_TAIL_MAX_BYTES": "6"})
     assert lines == ["alpha"]
     assert offset == 6
-    assert _read_tail(log, 0, {})[0] == ["alpha", "beta"]
+    assert read_tail(log, 0, {})[0] == ["alpha", "beta"]
 
 
 def test_sse_tail_max_bytes_honours_the_injected_env(monkeypatch):
@@ -106,11 +106,11 @@ def test_tick_ms_honours_the_injected_env(monkeypatch):
 
 
 def test_findings_batch_size_honours_the_injected_env(monkeypatch):
-    from quodeq.api._run_event_watcher import _DEFAULT_FINDINGS_BATCH, _findings_batch_size
+    from quodeq.api._run_event_watcher import DEFAULT_FINDINGS_BATCH, findings_batch_size
 
     monkeypatch.setenv("QUODEQ_SSE_FINDINGS_BATCH", "999")
-    assert _findings_batch_size({"QUODEQ_SSE_FINDINGS_BATCH": "5"}) == 5
-    assert _findings_batch_size({}) == _DEFAULT_FINDINGS_BATCH
+    assert findings_batch_size({"QUODEQ_SSE_FINDINGS_BATCH": "5"}) == 5
+    assert findings_batch_size({}) == DEFAULT_FINDINGS_BATCH
 
 
 # --------------------------------------------------------------------------

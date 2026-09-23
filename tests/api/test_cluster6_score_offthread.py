@@ -14,10 +14,10 @@ import pytest
 
 from quodeq.api.app import create_app
 from quodeq.api._evaluation_routes import (
-    _claim_scoring,
-    _scored_jobs,
-    _scored_jobs_lock,
-    _SCORED_JOBS_MAX,
+    claim_scoring,
+    scored_jobs,
+    scored_jobs_lock,
+    SCORED_JOBS_MAX,
 )
 from quodeq.services.base import ActionProvider
 from quodeq.services._job_model import JobSnapshot
@@ -193,23 +193,23 @@ def test_deadline_cancelled_job_still_triggers_salvage_scoring(reports_root):
 
 
 # ---------------------------------------------------------------------------
-# Unit tests for _claim_scoring (race-closure + bounded-registry guarantees)
+# Unit tests for claim_scoring (race-closure + bounded-registry guarantees)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
 def _reset_claim_registry():
-    """Ensure each test starts with a clean _scored_jobs registry."""
-    with _scored_jobs_lock:
-        _scored_jobs.clear()
+    """Ensure each test starts with a clean scored_jobs registry."""
+    with scored_jobs_lock:
+        scored_jobs.clear()
     yield
-    with _scored_jobs_lock:
-        _scored_jobs.clear()
+    with scored_jobs_lock:
+        scored_jobs.clear()
 
 
 def test_claim_scoring_exactly_once_under_concurrency():
-    """_claim_scoring returns True exactly once when N threads race on the same job_id.
+    """claim_scoring returns True exactly once when N threads race on the same job_id.
 
-    A threading.Barrier lines all N threads up so they enter _claim_scoring as
+    A threading.Barrier lines all N threads up so they enter claim_scoring as
     simultaneously as possible, maximising the chance of exposing a race.
     Only one thread should win the claim; all others must get False.
     """
@@ -221,7 +221,7 @@ def test_claim_scoring_exactly_once_under_concurrency():
 
     def _try_claim():
         barrier.wait()  # synchronize all threads to the same starting line
-        claimed = _claim_scoring(job_id)
+        claimed = claim_scoring(job_id)
         with results_lock:
             results.append(claimed)
 
@@ -240,19 +240,19 @@ def test_claim_scoring_exactly_once_under_concurrency():
 
 
 def test_claim_scoring_registry_bounded():
-    """Registry never exceeds _SCORED_JOBS_MAX entries.
+    """Registry never exceeds SCORED_JOBS_MAX entries.
 
-    Claims more than _SCORED_JOBS_MAX distinct job_ids and verifies that
+    Claims more than SCORED_JOBS_MAX distinct job_ids and verifies that
     the registry size stays at or below the cap (oldest entries are evicted).
     """
-    overflow = _SCORED_JOBS_MAX + 50
+    overflow = SCORED_JOBS_MAX + 50
     for i in range(overflow):
-        _claim_scoring(f"bounded-job-{i}")
+        claim_scoring(f"bounded-job-{i}")
 
-    with _scored_jobs_lock:
-        size = len(_scored_jobs)
+    with scored_jobs_lock:
+        size = len(scored_jobs)
 
-    assert size <= _SCORED_JOBS_MAX, (
-        f"Registry grew to {size}, exceeding the cap of {_SCORED_JOBS_MAX}. "
+    assert size <= SCORED_JOBS_MAX, (
+        f"Registry grew to {size}, exceeding the cap of {SCORED_JOBS_MAX}. "
         "Memory leak is still present."
     )

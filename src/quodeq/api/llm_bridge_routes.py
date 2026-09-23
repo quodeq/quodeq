@@ -23,10 +23,10 @@ from quodeq.llm_bridge import (
 from quodeq.shared.url_validation import url_safety_error
 
 from quodeq.api._llm_bridge_validation import (
-    _BODY_NOT_OBJECT,
-    _invalid_base_url,
-    _json_body,
-    _require_model_name,
+    BODY_NOT_OBJECT,
+    invalid_base_url,
+    json_body,
+    require_model_name,
 )
 
 
@@ -46,10 +46,10 @@ def ollama_test_concurrency() -> Response:
     Runs real inference, so it is slow; the settings UI calls it once when the
     user asks to measure rather than on every render.
     """
-    data = _json_body()
+    data = json_body()
     if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
-    model, err = _require_model_name(data, require_nonempty=True)
+        return jsonify(BODY_NOT_OBJECT), 400
+    model, err = require_model_name(data, require_nonempty=True)
     if err is not None:
         return err
     result = run_concurrency_test(model)
@@ -62,9 +62,9 @@ def ollama_estimate_agents() -> Response:
     The cheap alternative to ``ollama_test_concurrency``: arithmetic only, no
     inference, so the settings UI can suggest a number while the user types.
     """
-    data = _json_body()
+    data = json_body()
     if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
+        return jsonify(BODY_NOT_OBJECT), 400
     model_size = data.get("model_size", 0)
     gpu_memory = data.get("gpu_memory", 0)
     if (isinstance(model_size, bool) or isinstance(gpu_memory, bool)
@@ -90,10 +90,10 @@ def llamacpp_test_concurrency() -> Response:
     Unlike the ollama route, an empty ``model`` is accepted: llama.cpp serves
     whatever it was started with.
     """
-    data = _json_body()
+    data = json_body()
     if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
-    model, err = _require_model_name(data, require_nonempty=False)
+        return jsonify(BODY_NOT_OBJECT), 400
+    model, err = require_model_name(data, require_nonempty=False)
     if err is not None:
         return err
     result = run_llamacpp_concurrency_test(model)
@@ -108,7 +108,7 @@ def omlx_status() -> Response:
     the address into settings when this is called.
     """
     base_url = request.args.get("base_url", "").strip() or None
-    err = _invalid_base_url(base_url)
+    err = invalid_base_url(base_url)
     if err is not None:
         return err
     return jsonify(get_omlx_status(base_url=base_url))
@@ -120,7 +120,7 @@ def omlx_models() -> Response:
     The API key rides in the ``X-Api-Key`` header, never the query string.
     """
     base_url = request.args.get("base_url", "").strip() or None
-    err = _invalid_base_url(base_url)
+    err = invalid_base_url(base_url)
     if err is not None:
         return err
     # The key rides in a header, never the query string: query params leak
@@ -135,10 +135,10 @@ def omlx_test_concurrency() -> Response:
     Takes the server address and key in the body rather than from config, so
     the user can measure a server before saving it.
     """
-    data = _json_body()
+    data = json_body()
     if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
-    model, err = _require_model_name(data, require_nonempty=False)
+        return jsonify(BODY_NOT_OBJECT), 400
+    model, err = require_model_name(data, require_nonempty=False)
     if err is not None:
         return err
     base_url = data.get("base_url") or ""
@@ -147,7 +147,7 @@ def omlx_test_concurrency() -> Response:
         return jsonify({"error": "base_url and api_key must be strings", "code": "INVALID_PARAM"}), 400
     base_url = base_url.strip() or None
     api_key = api_key.strip() or None
-    err = _invalid_base_url(base_url)
+    err = invalid_base_url(base_url)
     if err is not None:
         return err
     result = run_omlx_concurrency_test(model, base_url=base_url, api_key=api_key)
@@ -162,9 +162,9 @@ def provider_test() -> Response:
     carries no key, the provider's env var is resolved by provider id, or by
     api_base match for clients predating the ``provider`` field.
     """
-    data = _json_body()
+    data = json_body()
     if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
+        return jsonify(BODY_NOT_OBJECT), 400
     configs = get_provider_configs()
     provider_id = data.get("provider", "")
     provider_cfg = configs.get(provider_id, {}) if provider_id else {}
@@ -214,9 +214,9 @@ def provider_store_key() -> Response:
     was unavailable and the key fell back to ``.quodeq.env`` on disk, which
     the UI surfaces as a warning.
     """
-    data = _json_body()
+    data = json_body()
     if data is None:
-        return jsonify(_BODY_NOT_OBJECT), 400
+        return jsonify(BODY_NOT_OBJECT), 400
     provider = data.get("provider", "")
     api_key = data.get("apiKey", "")
     if not provider or not isinstance(provider, str):

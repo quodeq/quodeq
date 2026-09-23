@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
-from quodeq.api._rate_limit_config import _rate_limit_max, _rate_limit_window, default_rate_limit_path
+from quodeq.api._rate_limit_config import rate_limit_max, rate_limit_window, default_rate_limit_path
 from quodeq.core.utils.file_lock import lock_file, unlock_file
 
 _logger = logging.getLogger(__name__)
@@ -54,8 +54,8 @@ class FileRateLimitStore:
     ) -> None:
         self._path = Path(path)
         self._lock = threading.Lock()
-        self._window = window if window is not None else _rate_limit_window()
-        self._max_requests = max_requests if max_requests is not None else _rate_limit_max()
+        self._window = window if window is not None else rate_limit_window()
+        self._max_requests = max_requests if max_requests is not None else rate_limit_max()
         self._cache: dict[str, list[float]] | None = None
         self._cache_loaded_at = 0.0
         # None means "never flushed yet" -- distinct from 0.0, which a caller

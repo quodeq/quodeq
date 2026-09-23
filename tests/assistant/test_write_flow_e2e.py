@@ -4,7 +4,7 @@ from pathlib import Path
 
 from quodeq.assistant.orchestrator import TurnEngines, TurnRequest, run_turn
 from quodeq.assistant.tools import ToolContext
-from quodeq.assistant.worktree import WorktreeManager, _run
+from quodeq.assistant.worktree import WorktreeManager, run
 from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -13,13 +13,13 @@ def test_edit_diff_apply_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setenv("QUODEQ_WORKTREES_DIR", str(tmp_path / "wts"))
     repo = tmp_path / "repo"
     repo.mkdir()
-    _run(["git", "-C", str(repo), "init", "-q", "-b", "main"])
-    _run(["git", "-C", str(repo), "config", "core.autocrlf", "false"])
-    _run(["git", "-C", str(repo), "config", "user.name", "T"])
-    _run(["git", "-C", str(repo), "config", "user.email", "t@example.com"])
+    run(["git", "-C", str(repo), "init", "-q", "-b", "main"])
+    run(["git", "-C", str(repo), "config", "core.autocrlf", "false"])
+    run(["git", "-C", str(repo), "config", "user.name", "T"])
+    run(["git", "-C", str(repo), "config", "user.email", "t@example.com"])
     (repo / "app.py").write_bytes(b"x = 1\n")
-    _run(["git", "-C", str(repo), "add", "-A"])
-    _run(["git", "-C", str(repo), "commit", "-q", "-m", "init"])
+    run(["git", "-C", str(repo), "add", "-A"])
+    run(["git", "-C", str(repo), "commit", "-q", "-m", "init"])
 
     store = AssistantRepository(tmp_path / "assistant.db")
     store.create_session(session_id="s1", provider="ollama",

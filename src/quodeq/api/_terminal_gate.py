@@ -12,7 +12,7 @@ from quodeq.api.helpers import json_error
 from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
 
 
-def _env_reason() -> str | None:
+def env_reason() -> str | None:
     # Environment availability only (no Origin) — for /status, a same-origin
     # GET the browser sends WITHOUT an Origin header. Gating it on Origin would
     # wrongly report the terminal disabled ("Missing Origin header").
@@ -23,7 +23,7 @@ def _env_reason() -> str | None:
     )
 
 
-def _gate_reason() -> str | None:
+def gate_reason() -> str | None:
     # Full gate incl. Origin — for the WS handshake (browsers DO send Origin on
     # WS) and the /kill POST (Origin also enforced by the global CSRF hook).
     return terminal_gate_reason(
@@ -34,5 +34,5 @@ def _gate_reason() -> str | None:
     )
 
 
-def _forbidden():
+def forbidden():
     return json_error("forbidden", 403, "FORBIDDEN")  # code + message once, for six routes

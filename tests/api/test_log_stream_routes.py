@@ -103,8 +103,8 @@ def test_is_preparing_job_uses_public_get_job_not_private_store():
 
 
 def test_stream_terminal_state_uses_public_get_job_not_private_store():
-    """_stream_terminal_state must work via JobManager.get_job(), not provider._jobs._store."""
-    from quodeq.api._log_stream_routes import _stream_terminal_state
+    """stream_terminal_state must work via JobManager.get_job(), not provider._jobs._store."""
+    from quodeq.api._log_stream_routes import stream_terminal_state
     from quodeq.core.types.job import JobSnapshot
 
     class FakeJobs:
@@ -118,7 +118,7 @@ def test_stream_terminal_state_uses_public_get_job_not_private_store():
         def get_log_run_dir(self, job_id):
             return None
 
-    assert _stream_terminal_state(FakeProvider(), "job-1") == "done"
+    assert stream_terminal_state(FakeProvider(), "job-1") == "done"
 
 
 def test_is_preparing_job_treats_lost_as_still_live(tmp_path):
@@ -141,7 +141,7 @@ def test_is_preparing_job_treats_lost_as_still_live(tmp_path):
 def test_stream_terminal_state_falls_through_to_status_json_for_lost_job(tmp_path):
     """A LOST job must not short-circuit to "lost" -- it falls through to
     status.json's real state, same as before JobStatus existed."""
-    from quodeq.api._log_stream_routes import _stream_terminal_state
+    from quodeq.api._log_stream_routes import stream_terminal_state
     from quodeq.core.types.job import JobSnapshot
     import json
 
@@ -159,4 +159,4 @@ def test_stream_terminal_state_falls_through_to_status_json_for_lost_job(tmp_pat
         def get_log_run_dir(self, job_id):
             return run_dir
 
-    assert _stream_terminal_state(FakeProvider(), "job-1") == "running"
+    assert stream_terminal_state(FakeProvider(), "job-1") == "running"

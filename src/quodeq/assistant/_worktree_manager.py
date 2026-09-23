@@ -2,8 +2,8 @@
 worktree.
 
 Split from ``worktree.py`` to keep that file under the size ratchet's
-300-line cap. Moved verbatim; the low-level git helpers (``_run``,
-``_run_bytes``, ``WorktreeError``, ``diff_text``, ``diff_stats``,
+300-line cap. Moved verbatim; the low-level git helpers (``run``,
+``run_bytes``, ``WorktreeError``, ``diff_text``, ``diff_stats``,
 ``worktrees_base``) stay imported from ``worktree.py`` rather than
 duplicated.
 """
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.assistant.worktree import (
-    WorktreeError, _run, _run_bytes, diff_stats, diff_text, worktrees_base,
+    WorktreeError, run, run_bytes, diff_stats, diff_text, worktrees_base,
 )
 
 _logger = logging.getLogger(__name__)
@@ -41,11 +41,11 @@ class WorktreeManager:
 
     def _git_repo(self, *args: str) -> str:
         """Run git against the user's repository root and return its stdout."""
-        return _run(["git", "-C", str(self.repo_root), *args])
+        return run(["git", "-C", str(self.repo_root), *args])
 
     def _git_worktree(self, *args: str) -> str:
         """Run git against this session's worktree and return its stdout."""
-        return _run(["git", "-C", str(self.path), *args])
+        return run(["git", "-C", str(self.path), *args])
 
     @classmethod
     def for_session(cls, repo_root: Path, project_id: str, session_id: str,
@@ -103,7 +103,7 @@ class WorktreeManager:
         patch file lives OUTSIDE the worktree so a failed cleanup can never
         leak it into a later diff or apply."""
         self._git_worktree("add", "-N", ".")
-        patch = _run_bytes(["git", "-C", str(self.path), "diff", "HEAD",
+        patch = run_bytes(["git", "-C", str(self.path), "diff", "HEAD",
                             "--binary"])
         if not patch.strip():
             raise WorktreeError("no changes to apply")
@@ -157,7 +157,7 @@ class WorktreeManager:
         # away from a model-driven process, and `gh pr create` here is a
         # human-approved, fixed-argv action.
         try:
-            out = _run(["gh", "pr", "create", "--title", title or self.branch,
+            out = run(["gh", "pr", "create", "--title", title or self.branch,
                         "--body", body or "", "--head", self.branch],
                        cwd=self.path)
         except WorktreeError as exc:
@@ -179,7 +179,7 @@ def ensure_session_worktree(repository, *, repo_root: Path, project_id: str | No
                                           session_id, base=base)
     if manager.path.exists():  # crash leftover or terminal reuse: start clean
         shutil.rmtree(manager.path, ignore_errors=True)
-        _run(["git", "-C", str(repo_root), "worktree", "prune"])
+        run(["git", "-C", str(repo_root), "worktree", "prune"])
     manager.create()
     repository.upsert_worktree(session_id=session_id, project_id=project_id,
                                repo_root=str(repo_root), path=str(manager.path),

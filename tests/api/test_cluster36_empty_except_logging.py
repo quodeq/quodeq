@@ -79,7 +79,7 @@ def test_stream_terminal_state_logs_debug_on_corrupt_status_json(tmp_path) -> No
     (run_dir / "status.json").write_text("[")
     provider = _ProviderStub(run_dir)
     with patch.object(log_tail_helpers._logger, "debug") as debug:
-        state = log_tail_helpers._stream_terminal_state(provider, "job-123")
+        state = log_tail_helpers.stream_terminal_state(provider, "job-123")
     assert state == JobStatus.DONE
     assert debug.called
     assert debug.call_args.args[1] == "job-123"

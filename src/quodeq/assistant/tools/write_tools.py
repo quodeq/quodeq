@@ -12,7 +12,7 @@ from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
-from quodeq.assistant.tools._repo_tools import _jail
+from quodeq.assistant.tools._repo_tools import jail
 from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
 
 _MAX_CONTENT_BYTES = 65_536
@@ -22,7 +22,7 @@ _MAX_DIFF_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON head
 def _jail_write(ctx: ToolContext, rel_path: str) -> Path:
     if ctx.worktree_dir is None:
         raise ToolError("write access is not enabled for this conversation")
-    target = _jail(ctx, rel_path)
+    target = jail(ctx, rel_path)
     rel_parts = target.relative_to(ctx.worktree_dir.resolve()).parts
     if [p.lower() for p in rel_parts[:2]] == [".github", "workflows"]:
         raise ToolError("editing CI workflow files is not allowed")

@@ -9,7 +9,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_FORBIDDEN
-from quodeq.api.helpers import _json_object_or_error, _sanitize_for_log, error_response
+from quodeq.api.helpers import json_object_or_error, sanitize_for_log, error_response
 from quodeq.services.import_validator import StandardImportValidationError
 from quodeq.services.standards_library import StandardImportConflictError
 from quodeq.shared.serialization import to_camel_dict
@@ -21,7 +21,7 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
     library = get_library_client(app)
     if library is None:
         return error_response("Standards library not configured", HTTPStatus.BAD_REQUEST, "library_not_configured")
-    payload = _json_object_or_error()
+    payload = json_object_or_error()
     if not isinstance(payload, dict):
         return payload
     file_path = payload.get("file")
@@ -54,14 +54,14 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
             "Import from library failed. Check that the library server is reachable and the standard file is valid.",
             HTTPStatus.BAD_GATEWAY, "import_error",
         )
-    logger.info("standards.import_from_library file=%s", _sanitize_for_log(file_path))
+    logger.info("standards.import_from_library file=%s", sanitize_for_log(file_path))
     return jsonify({"status": "imported"}), HTTPStatus.CREATED
 
 
 def _validate_import_body(body):
     """Split an import request body into (data, force, error_response).
 
-    *body* is whatever ``_json_object_or_error`` returned, so a non-dict is
+    *body* is whatever ``json_object_or_error`` returned, so a non-dict is
     already that helper's error response and is passed straight back.
     """
     if not isinstance(body, dict):
@@ -77,11 +77,11 @@ def _validate_import_body(body):
 
 def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
     svc = get_service(app)
-    data, force, err = _validate_import_body(_json_object_or_error())
+    data, force, err = _validate_import_body(json_object_or_error())
     if err is not None:
         return err
     imported_id = data.get("id", "<unknown>")
-    logger.info("standards.import id=%s", _sanitize_for_log(str(imported_id)))
+    logger.info("standards.import id=%s", sanitize_for_log(str(imported_id)))
     try:
         result = svc.import_from_file(data, force=force)
     except StandardImportValidationError as exc:

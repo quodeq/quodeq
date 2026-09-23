@@ -7,11 +7,11 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import _path_from_body, error_response, json_error, page_params
+from quodeq.api.helpers import path_from_body, error_response, json_error, page_params
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
-from quodeq.api.routes_project_create import _create_project
+from quodeq.api.routes_project_create import handle_create_project
 from quodeq.api.routes_project_scan import register_project_scan_routes
 from quodeq.api.zip import export_project_zip
 from quodeq.services.warmup import WarmupEngine, engine as warmup_engine
@@ -91,7 +91,7 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     """
     project = request.view_args["project"]
     data = request.get_json(silent=True) or {}
-    raw_path = _path_from_body(data)
+    raw_path = path_from_body(data)
     if isinstance(raw_path, tuple):
         body, status = raw_path
         return jsonify(body), status
@@ -206,4 +206,4 @@ def register_project_list_routes(
     @app.post("/api/projects")
     def create_project() -> Response | tuple[Response, int]:
         """Register a new project (clone + scan) without starting an evaluation."""
-        return _create_project(provider)
+        return handle_create_project(provider)

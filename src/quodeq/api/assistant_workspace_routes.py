@@ -11,7 +11,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 
 from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
-from quodeq.api.assistant_routes import _release_turn, _try_claim_turn
+from quodeq.api.assistant_routes import release_app_turn, claim_app_turn
 from quodeq.api.helpers import json_error
 from quodeq.assistant.workspace_actions import (
     OUTCOME_FAILED, PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
@@ -106,8 +106,8 @@ def _workspace_apply(app: Flask, sid: str):
     repo, _row, err = _workspace_target(app, sid)
     if err:
         return err
-    outcome = apply_workspace(repo, sid, claim_turn=_try_claim_turn,
-                              release_turn=_release_turn)
+    outcome = apply_workspace(repo, sid, claim_turn=claim_app_turn,
+                              release_turn=release_app_turn)
     conflict = _turn_conflict(outcome)
     if conflict is not None:
         return conflict
@@ -124,7 +124,7 @@ def _workspace_pr(app: Flask, sid: str):
     req_body = request.get_json(silent=True) or {}
     draft = PrDraft(title=str(req_body.get("title", "")), body=str(req_body.get("body", "")))
     outcome = create_workspace_pr(
-        repo, sid, draft, claim_turn=_try_claim_turn, release_turn=_release_turn)
+        repo, sid, draft, claim_turn=claim_app_turn, release_turn=release_app_turn)
     conflict = _turn_conflict(outcome)
     if conflict is not None:
         return conflict
@@ -142,8 +142,8 @@ def _workspace_discard(app: Flask, sid: str):
     # in-flight apply (overwriting "applied" with "discarded" while the
     # changes sat in the user's real tree) and pulled the worktree out
     # from under a running write turn.
-    outcome = discard_workspace(repo, sid, claim_turn=_try_claim_turn,
-                                release_turn=_release_turn)
+    outcome = discard_workspace(repo, sid, claim_turn=claim_app_turn,
+                                release_turn=release_app_turn)
     conflict = _turn_conflict(outcome)
     if conflict is not None:
         return conflict

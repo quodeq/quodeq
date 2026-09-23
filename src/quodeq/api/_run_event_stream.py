@@ -24,19 +24,19 @@ from quodeq.api._run_event_serializers import (  # noqa: F401 — re-export
     serialize_dimension_event,
     serialize_finding_event,
     serialize_status_event,
-    _payload_as_sse_finding,
+    payload_as_sse_finding,
 )
 from quodeq.api._run_event_watcher import (  # noqa: F401 — re-export
-    _DEFAULT_FINDINGS_BATCH,
-    _DIM_FILENAME_SUFFIX,
-    _STATUS_MTIME_MISSING,
+    DEFAULT_FINDINGS_BATCH,
+    DIM_FILENAME_SUFFIX,
+    STATUS_MTIME_MISSING,
     EventTuple,
     WatcherState,
-    _findings_batch_size,
-    _read_dim_eval,
-    _read_new_findings_from_events,
-    _read_status,
-    _scan_completed_dimensions,
+    findings_batch_size,
+    read_dim_eval,
+    read_new_findings_from_events,
+    read_status,
+    scan_completed_dimensions,
     compute_tick,
 )
 from quodeq.api._sse_log_helpers import sse_line
