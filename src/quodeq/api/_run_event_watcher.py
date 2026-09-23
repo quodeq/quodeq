@@ -20,6 +20,7 @@ from quodeq.api._run_event_serializers import (
     serialize_status_event,
     _payload_as_sse_finding,
 )
+from quodeq.core.run.state import RunState
 from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
@@ -82,15 +83,15 @@ def _read_status(run_dir: Path) -> tuple[dict[str, Any], float]:
     try:
         mtime = path.stat().st_mtime
     except OSError:
-        return {"state": "pending"}, _STATUS_MTIME_MISSING
+        return {"state": RunState.PENDING}, _STATUS_MTIME_MISSING
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
-            return {"state": "pending"}, mtime
+            return {"state": RunState.PENDING}, mtime
         return data, mtime
     except (OSError, ValueError) as exc:
         _logger.warning("status.json read failed at %s: %s", path, exc)
-        return {"state": "pending"}, mtime
+        return {"state": RunState.PENDING}, mtime
 
 
 def _scan_completed_dimensions(run_dir: Path) -> set[str]:

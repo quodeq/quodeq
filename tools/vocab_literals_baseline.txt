@@ -4,25 +4,16 @@
 # severity=/grade= arguments. The fix is the StrEnum member from the
 # vocabulary's home module. Burn to zero; never add.
 # Regenerate intentionally: python tools/check_vocab_literals.py --update-baseline
-quodeq/analysis/_run_lifecycle_support.py:116:pending
-quodeq/analysis/_run_lifecycle_support.py:116:running
-quodeq/api/_run_event_watcher.py:85:pending
-quodeq/api/_run_event_watcher.py:89:pending
-quodeq/api/_run_event_watcher.py:93:pending
-quodeq/menubar/_health.py:92:running
-quodeq/services/_publish_staging.py:52:done
 quodeq/services/_scan_progress_dims.py:205:running
 quodeq/services/_scan_progress_dims.py:218:pending
 quodeq/services/_scan_progress_dims.py:265:running
 quodeq/services/_scan_progress_elapsed.py:106:running
 quodeq/services/_scan_progress_elapsed.py:59:running
 quodeq/services/_scan_progress_elapsed.py:87:pending
-quodeq/services/active_evaluation.py:60:running
 quodeq/services/scan_progress.py:132:cancelled
 quodeq/services/scan_progress.py:132:done
 quodeq/services/scan_progress.py:132:failed
 quodeq/services/scan_progress.py:50:running
-quodeq/services/score_run.py:115:incomplete
 quodeq/services/shared_publish.py:159:running
 quodeq/services/shared_publish.py:162:running
 quodeq/services/shared_publish.py:181:done
