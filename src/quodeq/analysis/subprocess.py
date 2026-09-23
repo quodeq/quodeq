@@ -16,6 +16,7 @@ This module is the public entry point. Implementation is split across:
 """
 from __future__ import annotations
 
+import json
 import logging
 import tempfile
 from contextlib import ExitStack
@@ -28,6 +29,7 @@ from quodeq.analysis._api_batch import (
     _dispatch_api_batches,
 )
 from quodeq.analysis._api_source_gathering import (
+    API_RUNNER_STREAM_DONE,
     _batch_files_by_size,  # noqa: F401 -- re-export
     _CREDENTIAL_LOADERS,
     _gather_api_source_files,  # noqa: F401 -- re-export
@@ -202,7 +204,10 @@ def _run_api_analysis_bridge(
     api_config = _build_batch_api_config(cfg, model, api_base, api_key)
     _dispatch_api_batches(ctx, cfg, api_config, env)
 
-    stream_file.write_text('{"type":"api_runner","status":"complete"}\n', encoding="utf-8")
+    stream_file.write_text(
+        json.dumps({"type": "api_runner", "status": API_RUNNER_STREAM_DONE}) + "\n",
+        encoding="utf-8",
+    )
     _log.debug("API analysis complete, evidence written to %s", ctx.jsonl_file)
 
 

@@ -20,6 +20,7 @@ import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from enum import StrEnum
 from pathlib import Path
 
 from quodeq.services._publish_git import (
@@ -43,7 +44,7 @@ from quodeq.services.wiring import (
 from quodeq.shared.validation import validate_path_segment
 
 __all__ = [
-    "GIT_ERROR_SNIPPET_MAX_CHARS", "PublishError", "PublishStatus",
+    "GIT_ERROR_SNIPPET_MAX_CHARS", "PublishError", "PublishState", "PublishStatus",
     "get_publish_status", "publish_project", "start_publish",
     # Re-exported so callers and tests keep reaching them at this module's
     # path; ``ensure_shared_clone`` is also a patch target.
@@ -126,6 +127,15 @@ def publish_project(
         return count
 
 
+class PublishState(StrEnum):
+    """The states a background publish job passes through."""
+
+    IDLE = "idle"
+    RUNNING = "running"
+    DONE = "done"
+    ERROR = "error"
+
+
 class PublishStatus:
     """Lock-guarded publish job status (states: idle/running/done/error).
 
@@ -136,7 +146,7 @@ class PublishStatus:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._status: dict = {
-            "state": "idle",
+            "state": PublishState.IDLE,
             "project": None,
             "runs": None,
             "error": None,
@@ -156,10 +166,10 @@ class PublishStatus:
     def claim(self, project_id: str) -> bool:
         """Atomically take the publish slot; False when a publish is running."""
         with self._lock:
-            if self._status["state"] == "running":
+            if self._status["state"] == PublishState.RUNNING:
                 return False
             self._status.update(
-                state="running", project=project_id, runs=None, error=None,
+                state=PublishState.RUNNING, project=project_id, runs=None, error=None,
                 finished_at=None,
             )
             return True
@@ -178,12 +188,12 @@ def _run_publish(
 ) -> None:
     try:
         count = publish_project(project_id, url, evaluations_root=evaluations_root)
-        status.set(state="done", runs=count, error=None, finished_at=time.time())
+        status.set(state=PublishState.DONE, runs=count, error=None, finished_at=time.time())
     except PublishError as exc:
-        status.set(state="error", error=str(exc), finished_at=time.time())
+        status.set(state=PublishState.ERROR, error=str(exc), finished_at=time.time())
     except Exception:  # never leave the job stuck in "running"
         logger.exception("unexpected publish failure")
-        status.set(state="error", error="An unexpected error occurred while publishing.", finished_at=time.time())
+        status.set(state=PublishState.ERROR, error="An unexpected error occurred while publishing.", finished_at=time.time())
 
 
 def start_publish(
@@ -208,7 +218,7 @@ def start_publish(
         )
         thread.start()
     except Exception:
-        status.set(state="error", error="Failed to start publish background job.", finished_at=time.time())
+        status.set(state=PublishState.ERROR, error="Failed to start publish background job.", finished_at=time.time())
         logger.exception("failed to start publish thread")
         return "failed"
     return "started"

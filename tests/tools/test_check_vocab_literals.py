@@ -24,6 +24,11 @@ def test_gate_passes_on_current_tree():
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
+def test_baseline_is_empty():
+    lines = [l for l in (TOOLS / "vocab_literals_baseline.txt").read_text().splitlines() if l.strip() and not l.startswith("#")]
+    assert lines == []
+
+
 def test_flags_comparison_membership_match_and_keyword(tmp_path):
     _write(tmp_path, "src/quodeq/services/x.py", (
         'def f(s, job):\n'
