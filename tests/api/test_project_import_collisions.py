@@ -197,3 +197,25 @@ def test_replace_leaves_old_project_when_it_cannot_be_moved_aside(app_client, mo
         resp = _post_zip(c, _make_zip(project_uuid=project_uuid), action="replace")
     assert resp.status_code == 500
     assert (existing / "old-marker.txt").read_text() == "old content"
+
+
+def test_replace_keeps_the_backup_when_the_restore_also_fails(app_client, monkeypatch):
+    c, home, eval_dir = app_client
+    project_uuid = str(uuid.uuid4())
+    existing = _existing_project(eval_dir, project_uuid)
+    real_rename = Path.rename
+
+    def _stuck_rename(self, target):
+        # Both moves onto the final path fail: the new project in, and the
+        # old one back. Only moving the old project aside succeeds.
+        if Path(target).resolve() == existing.resolve():
+            raise OSError("rename failed")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", _stuck_rename)
+    with _patch_home(home):
+        resp = _post_zip(c, _make_zip(project_uuid=project_uuid), action="replace")
+    assert resp.status_code == 500
+    assert resp.get_json()["code"] == "IO_ERROR"
+    kept = list(eval_dir.glob("quodeq_import_*/.replaced/old-marker.txt"))
+    assert [p.read_text() for p in kept] == ["old content"]

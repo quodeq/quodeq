@@ -35,7 +35,7 @@ from quodeq.api.zip import (
 )
 from quodeq.services.project_index import ProjectIdentity
 
-from ._import_extract import safe_extract, swap_into_place  # safe_extract re-exported
+from ._import_extract import StrandedBackupError, safe_extract, swap_into_place  # safe_extract re-exported
 from ._import_identity import (
     REPO_INFO_FILENAME,
     find_identity_collision,
@@ -173,6 +173,7 @@ def _stage_and_commit(
     """Extract into a staging dir, atomically rename into place, then update
     the repository_info.json UUID (if renamed) and the project index."""
     staging = Path(tempfile.mkdtemp(prefix="quodeq_import_", dir=str(target.reports_root)))
+    keep_staging = False  # set when the staging dir holds the only copy of the old project
     try:
         safe_extract(zf, members, staging)
         staged_project = staging / target.top_dir
@@ -185,8 +186,12 @@ def _stage_and_commit(
             if final_path.exists():  # extremely narrow race window after the collision check
                 raise bad_request("Target project directory already exists.", "RACE")
             staged_project.rename(final_path)
+    except StrandedBackupError:
+        keep_staging = True
+        raise
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        if not keep_staging:
+            shutil.rmtree(staging, ignore_errors=True)
 
     if target.target_uuid != target.top_dir:
         rewrite_repository_info(final_path, target.target_uuid)

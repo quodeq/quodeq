@@ -8,11 +8,14 @@ staged project over an existing one without ever leaving neither on disk.
 """
 from __future__ import annotations
 
+import logging
 import shutil
 import zipfile
 from pathlib import Path
 
 from ._import_validation import bad_request
+
+logger = logging.getLogger(__name__)
 
 
 def safe_extract(zf: zipfile.ZipFile, members: dict[str, zipfile.ZipInfo], dest: Path) -> None:
@@ -30,6 +33,11 @@ def safe_extract(zf: zipfile.ZipFile, members: dict[str, zipfile.ZipInfo], dest:
 _REPLACED_BACKUP = ".replaced"
 
 
+class StrandedBackupError(OSError):
+    """The old project could not be moved back and now lives only in the
+    staging dir's backup, so the caller must not delete that dir."""
+
+
 def swap_into_place(staged: Path, final: Path, staging: Path) -> None:
     """Move *final* aside into *staging*, then *staged* into its place.
 
@@ -41,5 +49,10 @@ def swap_into_place(staged: Path, final: Path, staging: Path) -> None:
     try:
         staged.rename(final)
     except OSError:
-        backup.rename(final)
+        try:
+            backup.rename(final)
+        except OSError as restore_exc:
+            logger.error("import: could not restore %s (%s); the old project is kept at %s",
+                         final, restore_exc, backup)
+            raise StrandedBackupError("old project kept in the staging backup") from restore_exc
         raise
