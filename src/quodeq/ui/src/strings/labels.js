@@ -3,6 +3,7 @@
 // fall back to the raw string rather than a "severity.xyz" key.
 import { t } from './index.js';
 import { JOB_STATUS } from '../vocab/jobStatus.js';
+import { SCOPE_GATE_RULE } from '../vocab/scopeGateRule.js';
 
 const KNOWN_SEVERITIES = new Set(['critical', 'major', 'minor', 'unknown']);
 
@@ -23,13 +24,11 @@ export function jobStatusLabel(status) {
   return KNOWN_JOB_STATUSES.has(status) ? t(`status.${status}`) : status;
 }
 
-// scope_gate.py stamps exactly one of these two rule names into a finding's
-// scopeDowngrade marker (see SCOPE_DOWNGRADE_MARKER in
-// analysis/mcp/scope_gate.py) -- an unrecognized value falls through to the
-// raw string rather than a missing-key placeholder, the same defensive
-// fallback every other label helper here uses for data that did not come
-// from a hardcoded set.
-const KNOWN_SCOPE_GATE_RULES = new Set(['sourceless_path', 'cross_principal']);
+// The scope gate stamps one of these rule names into a finding's
+// scopeDowngrade marker. An unrecognized value falls through to the raw
+// string rather than a missing-key placeholder, the same fallback every other
+// helper here uses for data that did not come from a hardcoded set.
+const KNOWN_SCOPE_GATE_RULES = new Set(Object.values(SCOPE_GATE_RULE));
 
 export function scopeGateRuleLabel(rule) {
   return KNOWN_SCOPE_GATE_RULES.has(rule) ? t(`scopeGateRule.${rule}`) : rule;

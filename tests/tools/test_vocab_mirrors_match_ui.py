@@ -17,6 +17,7 @@ from quodeq.core.run.exit_reason import ExitReason
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.run.state import RunState
 from quodeq.core.scoring.constants import Grade
+from quodeq.analysis.mcp.scope_gate_rules import ScopeGateRule
 from quodeq.assistant.frame_type import FrameType
 from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.project_source import ProjectSource
@@ -39,6 +40,7 @@ _MIRRORS = [
     ("vocab/findingType.js", "FINDING_TYPE", FindingType),
     ("vocab/projectSource.js", "PROJECT_SOURCE", ProjectSource),
     ("vocab/frameType.js", "FRAME_TYPE", FrameType),
+    ("vocab/scopeGateRule.js", "SCOPE_GATE_RULE", ScopeGateRule),
     ("features/dashboard/hooks/usePublishPolling.js", "PUBLISH_STATE", PublishState),
 ]
 

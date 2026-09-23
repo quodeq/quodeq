@@ -1021,6 +1021,8 @@
   "runNav.openRunTitle": "Open this run",
   "runNav.view": "View →",
   "scopeGateRule.cross_principal": "cross-principal",
+  "scopeGateRule.loopback_transport": "loopback-only transport",
+  "scopeGateRule.single_host_topology": "single-host deployment",
   "scopeGateRule.sourceless_path": "no reachable source",
   "settings.aboutLabel": "About",
   "settings.advanced": "Advanced",
