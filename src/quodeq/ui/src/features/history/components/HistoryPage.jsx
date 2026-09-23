@@ -124,7 +124,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   const { onRunClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
   // Background refresh while a run is alive so the running row flips
-  // to "complete" without the user manually reloading. Scoped to this
+  // to "done" without the user manually reloading. Scoped to this
   // page only — other tabs don't poll.
   useRunningRunsRefresh({ selectedProject, selectedSource, availableRuns });
   // Warm the run-detail cache on row hover so clicking through is instant.

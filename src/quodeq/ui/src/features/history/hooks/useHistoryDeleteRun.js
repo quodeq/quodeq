@@ -2,6 +2,7 @@ import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { t } from '../../../strings/index.js';
 import { PROJECT_SOURCE } from '../../../constants.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
+import { EXTERNAL_JOB_PREFIX, isExternalJobId } from '../../../vocab/jobStatus.js';
 
 /**
  * HistoryPage.jsx's run-delete handler, extracted verbatim. A failed delete
@@ -25,7 +26,7 @@ export function useHistoryDeleteRun({ selectedSource, deleteEvaluation, onRunDel
       variant: 'danger',
     });
     if (!ok) return;
-    const jobId = runId.startsWith('ext-') ? runId : `ext-${runId}`;
+    const jobId = isExternalJobId(runId) ? runId : `${EXTERNAL_JOB_PREFIX}${runId}`;
     try {
       await deleteEvaluation(jobId);
     } catch (err) {

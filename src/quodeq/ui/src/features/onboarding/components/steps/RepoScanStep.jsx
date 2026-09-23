@@ -4,11 +4,8 @@ import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 import CloneTargetStep from './CloneTargetStep.jsx';
 import { RepoScanSummary } from './RepoScanSummary.jsx';
 import { useRepoScanStep } from '../../hooks/useRepoScanStep.js';
+import { SCAN_SUB_STATE } from '../../hooks/useWizardState.js';
 import { t } from '../../../../strings/index.js';
-
-// The wizard's own repo-scan sub-step vocabulary (useWizardState.js), not
-// the run/job/dim vocabulary -- kept local rather than forced into vocab/*.js.
-const SCAN_SUB_STATE = Object.freeze({ IDLE: 'idle', SCANNING: 'scanning', SCANNED: 'scanned', ERROR: 'error' });
 
 function RepoScanInputRow({ sub, state, actions, handleSubmit, setFolderBrowserOpen }) {
   return (

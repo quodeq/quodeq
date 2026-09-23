@@ -10,16 +10,9 @@ import { suppressedSuffix, carriedSuffix, formatSevHint } from './derivations.js
 import { SCAN_MODE } from '../scanModes.js';
 import { JOB_STATUS } from '../../../../vocab/jobStatus.js';
 
-// 'completed' is not a JOB_STATUS member -- job.status never carries it in
-// practice -- but this module's own contract has long tolerated it as an
-// alias for done (see buildJobStatCells.elapsed.test.js), so it stays, as a
-// named local rather than a bare literal.
-const LEGACY_DONE_ALIAS = 'completed';
-
 const STATUS_TONE = {
   [JOB_STATUS.RUNNING]: 'warning',
   [JOB_STATUS.DONE]: 'success',
-  [LEGACY_DONE_ALIAS]: 'success',
   [JOB_STATUS.FAILED]: 'critical',
   [JOB_STATUS.LOST]: 'critical',
   [JOB_STATUS.CANCELLED]: 'default',
@@ -57,7 +50,7 @@ function foundCell(liveCount, label = 'FOUND', hint = t('evaluate.liveViolations
 
 function statusHint(s) {
   if (s === JOB_STATUS.RUNNING) return t('evaluate.scanInProgress');
-  if (s === JOB_STATUS.DONE || s === LEGACY_DONE_ALIAS) return null;
+  if (s === JOB_STATUS.DONE) return null;
   if (s === JOB_STATUS.FAILED) return 'see logs';
   if (s === JOB_STATUS.LOST)   return t('evaluate.trackingLost');
   if (s === JOB_STATUS.CANCELLED) return t('evaluate.userCancelled');
@@ -111,8 +104,7 @@ function buildRunningCells(inputs) {
 }
 
 /**
- * @param {string} status — job.status, one of JOB_STATUS's values (vocab/jobStatus.js),
- *   or the legacy 'completed' alias for done
+ * @param {string} status — job.status, one of JOB_STATUS's values (vocab/jobStatus.js)
  * @param {object} inputs
  * @param {number} inputs.overallPct
  * @param {number} inputs.takenFiles
@@ -140,7 +132,7 @@ export function buildJobStatCells(status, inputs) {
     hint: timeLimit ? t('evaluate.timeLimitReached') : statusHint(status),
   };
 
-  if (status === JOB_STATUS.DONE || status === LEGACY_DONE_ALIAS) {
+  if (status === JOB_STATUS.DONE) {
     return buildDoneCells(statusCell, inputs);
   }
 

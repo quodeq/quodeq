@@ -6,13 +6,13 @@
  *      finished while they were on another tab). Without this, the user
  *      stares at a stale snapshot until the next poll tick fires.
  *
- *   2. Background polling — while at least one run is in_progress, refresh
- *      on a cadence so the running row flips to "complete" without a
+ *   2. Background polling — while at least one run is running, refresh
+ *      on a cadence so the running row flips to "done" without a
  *      manual reload. When all runs are terminal, the interval clears.
  *
  * Both refreshes are scoped to what History actually renders: the trend and
  * run list (latest scores payload), the latest dashboard, and the dashboard
- * payloads of runs that are still in progress. Completed historical runs are
+ * payloads of runs that are still running. Done historical runs are
  * immutable and their caches deliberately frozen (see useDashboard) — a
  * subtree-wide invalidation here would mark every cached run detail stale
  * and reintroduce the background-refetch dim on every pass through History.
@@ -44,7 +44,7 @@ function invalidateHistoryScope(queryClient, selectedProject, availableRuns, sel
  *
  * selectedSource (default 'local') is folded into every key this hook
  * invalidates so a refresh scoped to one source never marks the other
- * source's cache stale (only local projects ever have in_progress runs, but
+ * source's cache stale (only local projects ever have running runs, but
  * History can be viewing either source's data when this fires).
  */
 export function useRunningRunsRefresh({ selectedProject, selectedSource = 'local', availableRuns }) {
@@ -61,7 +61,7 @@ export function useRunningRunsRefresh({ selectedProject, selectedSource = 'local
     // navigation (mount) and project switch, not on every runs-list update.
   }, [queryClient, selectedProject, selectedSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // (2) Background polling: only while in_progress runs exist AND SSE is off.
+  // (2) Background polling: only while running runs exist AND SSE is off.
   // With SSE on, terminal-status events drive the running -> terminal flip
   // (see useRunEventStream); polling here would just double the request rate.
   useEffect(() => {

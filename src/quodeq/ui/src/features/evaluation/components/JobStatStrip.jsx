@@ -10,8 +10,7 @@ import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useRunElapsed } from '../hooks/useRunElapsed.js';
 import { JOB_TERMINAL } from '../../../vocab/jobStatus.js';
 
-// JOB_TERMINAL: includes 'lost', matching the old literal set. ('completed'
-// dropped -- job.status is never that value, so it was dead in the old set.)
+// JOB_TERMINAL includes 'lost': a lost job is no longer tracked.
 
 function sumLiveViolations(liveViolations) {
   if (!liveViolations) return 0;

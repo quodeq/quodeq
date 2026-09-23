@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { RUN_STATE, TERMINAL_RUN_STATES } from './runState.js';
-import { JOB_STATUS, JOB_TERMINAL, JOB_FINISHED } from './jobStatus.js';
+import { EXTERNAL_JOB_PREFIX, JOB_STATUS, JOB_TERMINAL, JOB_FINISHED, isExternalJobId } from './jobStatus.js';
 import { EXIT_REASON } from './exitReason.js';
 import { SEVERITY, SEVERITY_ORDER } from './severity.js';
 import { GRADE, GRADE_LADDER } from './grade.js';
@@ -40,4 +40,10 @@ test('vocab modules are frozen', () => {
   for (const obj of [RUN_STATE, JOB_STATUS, EXIT_REASON, SEVERITY, GRADE, DIM_STATE]) {
     assert.equal(Object.isFrozen(obj), true);
   }
+});
+
+test('external job ids carry the ext- prefix', () => {
+  assert.equal(EXTERNAL_JOB_PREFIX, 'ext-');
+  assert.equal(isExternalJobId('ext-abc'), true);
+  assert.equal(isExternalJobId('abc'), false);
 });

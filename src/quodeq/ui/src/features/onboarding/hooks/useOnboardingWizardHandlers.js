@@ -1,5 +1,6 @@
 import { clearDraft, markWelcomeSkipped } from './useWizardDraft.js';
 import { STEP_ORDER, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
+import { SCAN_SUB_STATE } from './useWizardState.js';
 
 /**
  * OnboardingWizard.jsx's exit/launch/navigation handlers, extracted
@@ -18,7 +19,7 @@ export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, provide
   }
 
   function handleClose() {
-    if (wizard.state.repoScanSubState === 'scanned') {
+    if (wizard.state.repoScanSubState === SCAN_SUB_STATE.SCANNED) {
       handleSavedExit();
     } else {
       clearDraft();
