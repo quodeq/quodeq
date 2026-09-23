@@ -75,6 +75,9 @@ GET_NEXT_FILES_SCHEMA = {
 }
 
 MARK_FILE_DONE_NAME = "mark_file_done"
+# The statuses a worker model may send. SKIPPED is server-written only (files
+# the worker cannot dispatch), so the tool schema does not offer it.
+_MODEL_FILE_DONE_STATUSES = (FileDoneStatus.OK, FileDoneStatus.ERROR)
 MARK_FILE_DONE_DESC = (
     "Call this exactly once after you have finished analysing a file, "
     "successfully or not. Pass status='ok' if you analysed the file end-to-end "
@@ -87,7 +90,7 @@ MARK_FILE_DONE_SCHEMA = {
     "type": "object",
     "properties": {
         "file": {"type": "string", "description": "Repo-relative file path that was just analysed"},
-        "status": {"type": "string", "enum": [FileDoneStatus.OK, FileDoneStatus.ERROR], "description": "ok if analysis completed, error if abandoned"},
+        "status": {"type": "string", "enum": [s.value for s in _MODEL_FILE_DONE_STATUSES], "description": "ok if analysis completed, error if abandoned"},
         "reason": {"type": "string", "description": "Short stable code when status=error: token_limit | parse_error | retry_exhausted | subprocess_error | timeout"},
     },
     "required": ["file", "status"],

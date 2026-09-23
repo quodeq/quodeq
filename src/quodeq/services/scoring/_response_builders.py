@@ -36,7 +36,11 @@ from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
 
 
-def _severity_bucket(severity: str) -> str:
+_UNKNOWN_BUCKET = "unknown"
+_BUCKET_BY_SEVERITY: dict[str, Severity] = {s.value: s for s in Severity}
+
+
+def _severity_bucket(severity: str) -> Severity | str:
     """Map DB severity strings to the legacy tally buckets.
 
     The DB stores ``critical``, ``high``, ``medium``, ``low``, ``minor``. Only
@@ -46,13 +50,7 @@ def _severity_bucket(severity: str) -> str:
     a pre-existing bucketing semantics worth a follow-up but out of PR 2 scope.
     """
     s = (severity or "").lower()
-    if s == Severity.CRITICAL:
-        return "critical"
-    if s == Severity.MAJOR:
-        return "major"
-    if s == Severity.MINOR:
-        return "minor"
-    return "unknown"
+    return _BUCKET_BY_SEVERITY.get(s, _UNKNOWN_BUCKET)
 
 
 def _build_totals_from_findings(

@@ -32,7 +32,6 @@ from quodeq.data.sqlite._index_sync_promote import (
 
 _logger = logging.getLogger(__name__)
 
-_TERMINAL_STATE_VALUES = {s.value for s in TERMINAL_STATES}
 _KNOWN_STATE_VALUES = {s.value for s in RunState}
 
 _UPSERT_SQL = """
@@ -152,7 +151,7 @@ def _sync_legacy_run(
         (
             job_id, project_uuid, run_id, str(run_dir),
             state, None, None,
-            started_iso, started_iso, started_iso if state in _TERMINAL_STATE_VALUES else None,
+            started_iso, started_iso, started_iso if state in TERMINAL_STATES else None,
             None, None, exit_reason,
             0,
         ),
@@ -169,10 +168,10 @@ def _delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
     never promoted. Terminal rows are left alone — users may prune old dirs
     to save disk and the index is their only record.
     """
-    placeholders = ", ".join("?" for _ in _TERMINAL_STATE_VALUES)
+    placeholders = ", ".join("?" for _ in TERMINAL_STATES)
     rows = db.execute(
         f"SELECT job_id, run_dir FROM runs WHERE state NOT IN ({placeholders})",
-        tuple(_TERMINAL_STATE_VALUES),
+        tuple(TERMINAL_STATES),
     ).fetchall()
     orphan_ids = [job_id for job_id, run_dir in rows if not Path(run_dir).is_dir()]
     if not orphan_ids:
@@ -198,7 +197,7 @@ def _check_stale_and_promote(
     if status is None:
         return False
     state = status.get("state")
-    if state in _TERMINAL_STATE_VALUES:
+    if state in TERMINAL_STATES:
         return False
 
     heartbeat_mtime = _heartbeat_mtime(run_dir)

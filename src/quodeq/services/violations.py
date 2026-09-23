@@ -224,8 +224,8 @@ def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:
                 file_path, {"path": file_path, "count": 0, "critical": 0, "major": 0, "minor": 0}
             )
             entry["count"] += 1
-            sev = violation.get("severity") or "minor"
-            entry[sev if sev in (Severity.CRITICAL, Severity.MAJOR) else "minor"] += 1
+            sev = violation.get("severity") or Severity.MINOR
+            entry[sev if sev in (Severity.CRITICAL, Severity.MAJOR) else Severity.MINOR] += 1
     # _max_violation_files() reads from env at call time; the env injection
     # parameter exists for unit-testing _max_violation_files directly.
     top_files = sorted(

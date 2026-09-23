@@ -199,7 +199,7 @@ def _finalize_run_on_atexit(
     if current is None:
         return
     state_str = current.get("state")
-    if state_str in {s.value for s in TERMINAL_STATES}:
+    if state_str in TERMINAL_STATES:
         return
     heartbeat.stop()
     resources.stop()
