@@ -24,8 +24,8 @@ class TestRunEvaluate:
         result = run_evaluate(args)
         assert result == 1
 
-    @patch("quodeq.cli_evaluation._run_pipeline_with_cleanup", return_value=0)
-    @patch("quodeq.cli_evaluation._setup_run_dirs")
+    @patch("quodeq.cli_evaluation.run_pipeline_with_cleanup", return_value=0)
+    @patch("quodeq.cli_evaluation.setup_run_dirs")
     @patch("quodeq.cli_evaluation.resolve_evaluation_inputs")
     @patch("quodeq.cli_evaluation.check_evaluate_prereqs")
     def test_successful_evaluate(self, mock_prereqs, mock_resolve, mock_dirs, mock_pipeline):

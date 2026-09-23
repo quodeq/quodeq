@@ -8,7 +8,7 @@ Re-exported from ``cli_evaluation.py`` so existing
 The names tests patch at ``quodeq.cli_evaluation.<name>``
 (``resolve_project_uuid``, ``project_name_from_repo``, ``is_repo_url``,
 ``emit_marker``, ``cleanup_cloned_repo``, ``cleanup_worktree``,
-``get_ai_model``, ``save_manifest``, ``_build_run_config``,
+``get_ai_model``, ``save_manifest``, ``build_run_config``,
 ``execute_pipeline``) reach this module as a :class:`LifecycleHooks`
 bundle that ``cli_evaluation`` assembles at call time, so this module never
 imports its own importer.

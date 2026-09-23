@@ -105,7 +105,7 @@ def test_pipeline_records_deadline_exit_reason_when_budget_expired(tmp_path: Pat
 
     with patch.object(cli, "execute_pipeline", return_value=0), \
          patch.object(cli, "save_manifest"), \
-         patch.object(cli, "_build_run_config", return_value=fake_config), \
+         patch.object(cli, "build_run_config", return_value=fake_config), \
          patch.object(cli, "is_repo_url", return_value=False), \
          patch.object(cli, "emit_marker"):
         import argparse
@@ -113,7 +113,7 @@ def test_pipeline_records_deadline_exit_reason_when_budget_expired(tmp_path: Pat
             repo="local", max_duration=None, pool_budget=None,
         )
         inputs = cli.ResolvedInputs(src=tmp_path, language="python", manifest=None, dims_data=None)
-        cli._run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
+        cli.run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
 
     run_dir = evaluation_dir.parent
     status = read_status(run_dir)

@@ -130,7 +130,7 @@ def test_cleanup_run_artifacts_logs_when_pid_unlink_fails(monkeypatch, tmp_path)
 
 def test_run_pipeline_with_cleanup_logs_when_pid_write_fails(monkeypatch, tmp_path) -> None:
     import quodeq._cli_lifecycle as lifecycle
-    from quodeq.cli_evaluation import _run_pipeline_with_cleanup
+    from quodeq.cli_evaluation import run_pipeline_with_cleanup
     from quodeq.cli import ResolvedInputs
 
     class _Sentinel(Exception):
@@ -149,10 +149,10 @@ def test_run_pipeline_with_cleanup_logs_when_pid_write_fails(monkeypatch, tmp_pa
         raise _Sentinel()
 
     monkeypatch.setattr(Path, "write_text", _raise_write)
-    monkeypatch.setattr("quodeq.cli_evaluation._build_run_config", _raise_sentinel)
+    monkeypatch.setattr("quodeq.cli_evaluation.build_run_config", _raise_sentinel)
 
     with patch.object(lifecycle._logger, "debug") as debug:
         with pytest.raises(_Sentinel):
-            _run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
+            run_pipeline_with_cleanup(args, inputs, (tmp_path, evidence_dir, evaluation_dir))
     assert debug.called
     assert "pid file write failed" in debug.call_args.args[0]

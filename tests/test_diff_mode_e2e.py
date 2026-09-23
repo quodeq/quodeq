@@ -63,7 +63,7 @@ def test_diff_mode_dry_run_produces_evidence_no_evaluation(tmp_path: Path) -> No
     assert jsonl_files, "no evidence JSONL files produced"
 
     # Most importantly: no scored reports. The evaluation/ subdir may exist
-    # (created by _setup_run_dirs) but must contain no <dim>.json reports.
+    # (created by setup_run_dirs) but must contain no <dim>.json reports.
     eval_dir = run_dir / "evaluation"
     if eval_dir.exists():
         eval_jsons = list(eval_dir.glob("*.json"))

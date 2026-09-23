@@ -1,8 +1,8 @@
-"""Run-config assembly phases for ``cli_evaluation._build_run_config``.
+"""Run-config assembly phases for ``cli_evaluation.build_run_config``.
 
 Split out so the orchestrator stays a short list of phase calls: this module
 owns the dimension filter, the flag/env-derived caps (``_RunLimits``) and the
-``AnalysisOptions`` mapping. ``_build_run_config`` itself stays in
+``AnalysisOptions`` mapping. ``build_run_config`` itself stays in
 ``cli_evaluation`` because tests patch ``default_paths`` at that module's path.
 
 Patch target note: the names below are looked up in THIS module's globals, so
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class _RunLimits:
-    """The caps and switches _build_run_config reads off CLI flags and env."""
+    """The caps and switches build_run_config reads off CLI flags and env."""
     max_turns: int | None
     max_duration: int | None
     max_subagents: int | None

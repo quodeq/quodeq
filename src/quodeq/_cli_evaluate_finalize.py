@@ -22,7 +22,7 @@ def apply_diff_from(
     """Resolve --diff-from into args._diff_files. Returns an exit code on
     failure, or None on success (including the no --diff-from case).
 
-    Resolved here (not inside _build_run_config) so a DiffResolveError fails
+    Resolved here (not inside build_run_config) so a DiffResolveError fails
     fast before any run directory is created — once a run dir exists, its
     state is always written by RunLifecycleContext. *resolve_diff_files* is
     passed in by ``run_evaluate`` so the ``quodeq.cli_evaluation`` patch

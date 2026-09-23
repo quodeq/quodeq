@@ -69,7 +69,7 @@ def subagent_model(env: dict[str, str] | None = None) -> str | None:
 def cli_environ(env: Mapping[str, str] | None = None) -> Mapping[str, str]:
     """The CLI boundary's process-environment seam.
 
-    ``_build_run_config`` and the update notice resolve the run's
+    ``build_run_config`` and the update notice resolve the run's
     environment here, once, and pass the mapping on; the modules they call
     never name ``os.environ`` themselves. The readers in this module go
     through it too, so the module names ``os.environ`` exactly once. An

@@ -57,9 +57,9 @@ def wired(tmp_path: Path, monkeypatch):
             manifest=SourceManifest(), dims_data={"applies": []},
         ),
     )
-    monkeypatch.setattr(cli_evaluation, "_setup_run_dirs", lambda a, s: paths)
+    monkeypatch.setattr(cli_evaluation, "setup_run_dirs", lambda a, s: paths)
     monkeypatch.setattr(
-        cli_evaluation, "_run_pipeline_with_cleanup", lambda a, i, p: 0,
+        cli_evaluation, "run_pipeline_with_cleanup", lambda a, i, p: 0,
     )
 
     calls: list[Path] = []

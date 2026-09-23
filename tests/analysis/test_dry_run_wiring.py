@@ -32,7 +32,7 @@ class TestAnalysisOptionsDryRun:
 
 class TestCliWiring:
     def test_dry_run_wired_from_args(self, tmp_path):
-        from quodeq.cli_evaluation import _build_run_config
+        from quodeq.cli_evaluation import build_run_config
         from quodeq._cli_resolution import ResolvedInputs
 
         args = argparse.Namespace(
@@ -60,12 +60,12 @@ class TestCliWiring:
              patch("quodeq.cli_evaluation.subagent_model", return_value=None):
             mock_paths.return_value.standards_dir = tmp_path / "standards"
             mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
-            config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
+            config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
 
         assert config.options.dry_run is True
 
     def test_dry_run_false_by_default(self, tmp_path):
-        from quodeq.cli_evaluation import _build_run_config
+        from quodeq.cli_evaluation import build_run_config
         from quodeq._cli_resolution import ResolvedInputs
 
         args = argparse.Namespace(
@@ -93,13 +93,13 @@ class TestCliWiring:
              patch("quodeq.cli_evaluation.subagent_model", return_value=None):
             mock_paths.return_value.standards_dir = tmp_path / "standards"
             mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
-            config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
+            config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
 
         assert config.options.dry_run is False
 
     def test_missing_dry_run_attr_defaults_false(self, tmp_path):
         """getattr fallback: if args has no dry_run attribute, default to False."""
-        from quodeq.cli_evaluation import _build_run_config
+        from quodeq.cli_evaluation import build_run_config
         from quodeq._cli_resolution import ResolvedInputs
 
         args = argparse.Namespace(
@@ -127,6 +127,6 @@ class TestCliWiring:
              patch("quodeq.cli_evaluation.subagent_model", return_value=None):
             mock_paths.return_value.standards_dir = tmp_path / "standards"
             mock_paths.return_value.evaluators_dir = tmp_path / "evaluators"
-            config = _build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
+            config = build_run_config(args, inputs=inputs, evidence_dir=tmp_path / "evidence")
 
         assert config.options.dry_run is False

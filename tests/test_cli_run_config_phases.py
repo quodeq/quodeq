@@ -12,7 +12,7 @@ import pytest
 
 
 class TestResolveLimits:
-    """resolve_limits owns every env/flag-derived cap _build_run_config needs."""
+    """resolve_limits owns every env/flag-derived cap build_run_config needs."""
 
     def _args(self, **over):
         base = dict(

@@ -36,7 +36,7 @@ def execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: 
     merged json, no scoring).
 
     Domain errors (AnalysisError, EvaluationError) are intentionally *not*
-    caught here — they propagate to _run_pipeline_with_cleanup so that
+    caught here — they propagate to run_pipeline_with_cleanup so that
     RunLifecycleContext.__exit__ can write state=failed before the error is
     mapped to exit code 1.
     """

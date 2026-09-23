@@ -5,7 +5,7 @@ setup, RunLifecycleContext wiring, cleanup) lives in ``_cli_lifecycle.py``;
 env/argv helpers in ``_cli_env.py``; suppression-aware score printing lives
 in ``_cli_scoring.py``; run_evaluate's --diff-from resolution and post-run
 consolidation/SARIF finalization live in ``_cli_evaluate_finalize.py``;
-``_build_run_config``'s phase helpers live in ``_cli_run_config.py``;
+``build_run_config``'s phase helpers live in ``_cli_run_config.py``;
 ``execute_pipeline`` and ``save_manifest`` live in
 ``_cli_pipeline_exec.py``. The lifecycle helpers receive this module's
 patchable names as a ``LifecycleHooks`` bundle built here at call time
@@ -77,7 +77,7 @@ from quodeq._cli_pipeline_exec import execute_pipeline, save_manifest
 
 
 class RunConfigLocals(NamedTuple):
-    """The per-run scalars `_build_run_config` resolves before assembling RunConfig.
+    """The per-run scalars `build_run_config` resolves before assembling RunConfig.
 
     Named rather than a bare tuple so `_cli_run_config.build_analysis_options`
     reads them by attribute: reordering these fields can no longer silently
@@ -94,7 +94,7 @@ class RunConfigLocals(NamedTuple):
 def _resolve_run_config_locals(
     args: argparse.Namespace, inputs: ResolvedInputs, env: dict[str, str] | None,
 ) -> RunConfigLocals:
-    """Resolve the per-run scalars _build_run_config needs before assembling RunConfig."""
+    """Resolve the per-run scalars build_run_config needs before assembling RunConfig."""
     _env = cli_environ(env)
     consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get(ENV_NO_CONSOLIDATE))
     if inputs.single_file:
@@ -118,7 +118,7 @@ def _resolve_run_config_locals(
     )
 
 
-def _build_run_config(
+def build_run_config(
     args: argparse.Namespace, *, inputs: ResolvedInputs, evidence_dir: Path,
     run_dir: Path | None = None, env: dict[str, str] | None = None,
 ) -> RunConfig:
@@ -155,17 +155,17 @@ def _lifecycle_hooks() -> LifecycleHooks:
         cleanup_worktree=cleanup_worktree,
         get_ai_model=get_ai_model,
         save_manifest=save_manifest,
-        build_run_config=_build_run_config,
+        build_run_config=build_run_config,
         execute_pipeline=execute_pipeline,
     )
 
 
-def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Path]:
+def setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Path]:
     """Resolve project UUID and create evidence/evaluation directories."""
     return _cli_lifecycle.setup_run_dirs(args, src, _lifecycle_hooks())
 
 
-def _run_pipeline_with_cleanup(
+def run_pipeline_with_cleanup(
     args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path],
 ) -> int:
     """Set up directories, build config, run the pipeline, and clean up cloned repos."""
@@ -217,13 +217,13 @@ def run_evaluate(args: argparse.Namespace) -> int:
         return diff_from_error
 
     try:
-        paths = _setup_run_dirs(args, inputs.src)
+        paths = setup_run_dirs(args, inputs.src)
     except Exception:
         # Leave no worktree behind: the next run would refuse to re-create it.
         if inputs.worktree_dir and inputs.worktree_origin:
             cleanup_worktree(inputs.worktree_origin, inputs.worktree_dir)
         raise
-    result = _run_pipeline_with_cleanup(args, inputs, paths)
+    result = run_pipeline_with_cleanup(args, inputs, paths)
     _, _evidence_dir, evaluation_dir = paths
     return finalize_run_evaluate(args, evaluation_dir, result)
 
@@ -247,10 +247,3 @@ def run_diff_evaluation(
         argv += ["--dimensions", dimensions]
     from quodeq.cli_parser import build_parser  # noqa: PLC0415
     return run_evaluate(build_parser().parse_args(argv))
-
-
-# Public spellings of the names ``quodeq.cli`` re-exports. The underscore
-# originals stay importable from here for in-package callers.
-build_run_config = _build_run_config
-run_pipeline_with_cleanup = _run_pipeline_with_cleanup
-setup_run_dirs = _setup_run_dirs

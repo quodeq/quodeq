@@ -126,7 +126,7 @@ def _adjusted_score(
         )
     except Exception as exc:  # noqa: BLE001 — console embellishment on top of
         # reports already on disk; nothing upstream catches a generic exception
-        # (see _run_pipeline_with_cleanup), so fall back instead of crashing.
+        # (see run_pipeline_with_cleanup), so fall back instead of crashing.
         _logger.debug("Suppression-aware rescore failed for dim %s: %s", dim, exc)
         return None, 0
     if rescored.excluded == 0 or rescored.result is None:

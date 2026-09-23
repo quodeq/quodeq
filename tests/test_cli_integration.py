@@ -18,7 +18,7 @@ pytestmark = pytest.mark.usefixtures("restore_environ")
 
 class TestRunPipelineWithCleanup:
     @patch("quodeq.cli_evaluation.execute_pipeline", return_value=0)
-    @patch("quodeq.cli_evaluation._build_run_config")
+    @patch("quodeq.cli_evaluation.build_run_config")
     @patch("quodeq.cli_evaluation.save_manifest")
     @patch("quodeq.cli_evaluation.emit_marker")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=False)
@@ -42,7 +42,7 @@ class TestRunPipelineWithCleanup:
         mock_wt_cleanup.assert_not_called()
 
     @patch("quodeq.cli_evaluation.execute_pipeline", return_value=0)
-    @patch("quodeq.cli_evaluation._build_run_config")
+    @patch("quodeq.cli_evaluation.build_run_config")
     @patch("quodeq.cli_evaluation.save_manifest")
     @patch("quodeq.cli_evaluation.emit_marker")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=True)
@@ -59,7 +59,7 @@ class TestRunPipelineWithCleanup:
         mock_cleanup.assert_called_once()
 
     @patch("quodeq.cli_evaluation.execute_pipeline", return_value=0)
-    @patch("quodeq.cli_evaluation._build_run_config")
+    @patch("quodeq.cli_evaluation.build_run_config")
     @patch("quodeq.cli_evaluation.save_manifest")
     @patch("quodeq.cli_evaluation.emit_marker")
     @patch("quodeq._cli_resolution.is_repo_url", return_value=False)
