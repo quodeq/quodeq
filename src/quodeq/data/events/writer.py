@@ -39,14 +39,12 @@ class EventLogWriter:
         """
         try:
             with open(self.log_path, mode="a", encoding="utf-8") as f:
-                # Apply an exclusive lock on the file before writing.
                 self._lock.acquire(f)
                 try:
                     line = event_to_json(event)
                     f.write(line + "\n")
-                    f.flush()  # Ensure it hits the OS buffer
+                    f.flush()
                 finally:
-                    # Release the lock.
                     self._lock.release(f)
         except Exception as e:
             _logger.error(f"Failed to emit event {event.event_id} to {self.log_path}: {e}")

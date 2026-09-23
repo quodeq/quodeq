@@ -116,7 +116,7 @@ export default function CompareFleetView({
         noteText={t('compare.attentionNote')}
         items={buildAttentionItems(attnAll, onOpenProject, openDimension)}
       />
-      {/* v4a: every score at a glance — column headers SORT, a cell opens
+      {/* Every score at a glance — column headers SORT, a cell opens
           that project's own dimension (remote rows open the shared project). */}
       <CompareMatrix
         ariaLabel={t('compare.matrixAria')}

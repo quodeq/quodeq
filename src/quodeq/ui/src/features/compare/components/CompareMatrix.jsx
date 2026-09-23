@@ -1,5 +1,5 @@
 /**
- * CompareMatrix — a numbers-only score grid (the v4a pick): the fleet's
+ * CompareMatrix — a numbers-only score grid: the fleet's
  * SCORE_MATRIX (projects x dimensions) and the dimension screen's
  * PRINCIPLE_MATRIX (projects x principles) share this one table.
  *

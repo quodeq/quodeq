@@ -47,7 +47,7 @@ def _severity_bucket(severity: str) -> Severity | str:
     ``critical``, ``major``, and ``minor`` have dedicated buckets; everything
     else (including ``high``, ``medium``, ``low``) falls into ``unknown``.
     This mirrors the legacy ``recount_totals`` in ``services/dismissed.py`` —
-    a pre-existing bucketing semantics worth a follow-up but out of PR 2 scope.
+    a pre-existing bucketing choice, kept as is.
     """
     s = (severity or "").lower()
     return _BUCKET_BY_SEVERITY.get(s, _UNKNOWN_BUCKET)

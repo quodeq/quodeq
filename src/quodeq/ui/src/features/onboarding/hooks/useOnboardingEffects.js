@@ -50,5 +50,5 @@ export function useOnboardingEffects({ wizard, entry, setStandards }) {
       .catch((err) => {
         console.warn('[useOnboardingEffects] resume-scan fetch failed:', err); // tolerate: onboarding still proceeds without the summary
       });
-  }, [entry.presetProjectId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entry.presetProjectId]); // eslint-disable-line react-hooks/exhaustive-deps -- runs once per preset project; wizard is a new object every render and would refire the fetch
 }

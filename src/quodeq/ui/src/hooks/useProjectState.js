@@ -150,7 +150,7 @@ function useInitialProjectLoad({ loadProjects, ...selection }) {
       // loadProjects already retries and never rejects; defense in depth.
       console.warn('[useProjectState] initial project load failed unexpectedly:', err);
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initial load runs once on mount; later loads go through the retry and warm-up hooks
 }
 
 /**

@@ -49,7 +49,7 @@ function useCopyApiRegistration(registerApi, sessionId, termRef) {
     };
     registerApi(sessionId, { getCopyText });
     return () => registerApi(sessionId, null);
-  }, [registerApi, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [registerApi, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
 }
 
 // Fit xterm to its box and push the resulting size to the PTY. A failing fit
@@ -75,7 +75,7 @@ function useRefitOnOpen({ status, resize, rootRef, fitRef, termRef }) {
     const el = rootRef.current;
     if (status !== 'open' || !fitRef.current || !termRef.current || isHidden(el)) return;
     fitAndResize(fitRef.current, termRef.current, resize, 'refit-on-open');
-  }, [status, resize]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status, resize]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
 }
 
 function makeSessionSetup({ rootRef, termRef, fitRef, sessionId, send, resize, box }) {
@@ -142,7 +142,7 @@ function useSessionMount({ live, sessionId, send, resize, rootRef, termRef, fitR
     // to wait for — build immediately.
     setup();
     return makeSessionTeardown({ termRef, fitRef, box });
-  }, [live, sessionId, send, resize]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [live, sessionId, send, resize]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
 }
 
 // Refit + re-sync the PTY when this session becomes visible again (it was
@@ -153,7 +153,7 @@ function useRefitOnActivate({ active, resize, rootRef, fitRef, termRef }) {
     const el = rootRef.current;
     if (!active || !fitRef.current || !termRef.current || isHidden(el)) return;
     fitAndResize(fitRef.current, termRef.current, resize, 'refit-on-activate');
-  }, [active, resize]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [active, resize]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
 }
 
 // Give xterm keyboard focus when this session becomes the frontmost one so
@@ -169,7 +169,7 @@ function useFocusOnActivate(active, live, termRef) {
     } catch (err) {
       console.warn('[TerminalSessionView] focus on activate failed:', err);
     }
-  }, [active, live]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [active, live]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
 }
 
 // While the socket is not open, disable xterm input. send() already no-ops
@@ -182,7 +182,7 @@ function useDisableInputWhenClosed(status, live, termRef) {
     const term = termRef.current;
     if (!term) return;
     term.options.disableStdin = status !== 'open';
-  }, [status, live]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status, live]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
 }
 
 // A dead socket swallows keystrokes with no visual cue, so any not-connected

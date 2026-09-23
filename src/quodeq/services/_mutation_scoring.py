@@ -3,8 +3,8 @@
 Split out of ``mutation_rescore.py``. ``mutation_rescore.py`` is a
 DECLARED_LOGGING_SITES entry (still imports stdlib ``logging``); this sibling
 originally avoided a new logging import, routing ``_rescore_run``'s failure
-log through an injected ``LogSink`` instead. Task C6 (usability sweep) added
-a stdlib ``_logger`` for ``_resolve_default_run_id``'s previously-silent
+log through an injected ``LogSink`` instead. A stdlib ``_logger`` was added
+later for ``_resolve_default_run_id``'s previously-silent
 ``list_runs`` failure -- this module is now its own DECLARED_LOGGING_SITES
 entry too (see ``tests/tools/test_logging_boundary.py``).
 """
