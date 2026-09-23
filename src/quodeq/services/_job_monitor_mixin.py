@@ -21,12 +21,13 @@ from typing import Any, Callable, Iterable
 from quodeq.services._job_log_tee import TeeContext, consume_stream, drain_pre_marker_buffer, tee_run_log
 from quodeq.services._job_model import (
     Job, JobStore, REPORT_PATH_RE,
-    _ANSI_RE, _CC_MARKER_PREFIX, _DEADLINE_EXIT_REASONS, _EXIT_CODE_TIMEOUT,
-    _EXIT_REASON_DEADLINE, _MAX_COMPLETED_JOBS, _REPORT_PATH_MARKER,
+    _ANSI_RE, _CC_MARKER_PREFIX, _EXIT_CODE_TIMEOUT,
+    _MAX_COMPLETED_JOBS, _REPORT_PATH_MARKER,
     _WATCHDOG_POLL_INTERVAL_S,
 )
 from quodeq.services._job_watchdog import run_status_exit_reason, watchdog_should_kill
 from quodeq.core.observability import LogSink
+from quodeq.core.run.exit_reason import DEADLINE_EXIT_REASONS, ExitReason
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
 from quodeq.shared.env import env_float
@@ -190,9 +191,9 @@ class _JobMonitorMixin:
         I/O must not block API request paths contending on self._lock.
         """
         if watchdog_killed:
-            return _EXIT_REASON_DEADLINE
+            return ExitReason.DEADLINE
         reason = self._run_status_exit_reason(self._store.get(job_id))
-        if reason == COPILOT_MCP_POLICY_REASON or (exit_code != 0 and reason in _DEADLINE_EXIT_REASONS):
+        if reason == COPILOT_MCP_POLICY_REASON or (exit_code != 0 and reason in DEADLINE_EXIT_REASONS):
             return reason
         return None
 
@@ -235,7 +236,7 @@ class _JobMonitorMixin:
             job.ended_at = datetime.now(timezone.utc).isoformat()
             if exit_code == 0:
                 job.status = JobStatus.DONE
-            elif exit_reason in _DEADLINE_EXIT_REASONS:
+            elif exit_reason in DEADLINE_EXIT_REASONS:
                 job.status = JobStatus.CANCELLED
             else:
                 job.status = JobStatus.FAILED

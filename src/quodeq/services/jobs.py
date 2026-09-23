@@ -12,6 +12,7 @@ from typing import Any, Callable
 import subprocess
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.run.exit_reason import DEADLINE_EXIT_REASONS
 from quodeq.core.run.job_status import JobStatus, is_external_job_id, strip_external_prefix
 from quodeq.core.types import JobSnapshot
 
@@ -24,7 +25,6 @@ from quodeq.services._job_model import (
     JobStore,
     InMemoryJobStore,
     REPORT_PATH_RE,
-    _DEADLINE_EXIT_REASONS,
     _EXIT_CODE_TIMEOUT,
     _MAX_COMPLETED_JOBS,
     _WATCHDOG_POLL_INTERVAL_S,
@@ -42,9 +42,10 @@ from quodeq.services._job_capacity_mixin import _JobCapacityMixin
 __all__ = [
     "Job", "JobLaunchOptions", "JobProcessSeams", "JobStore", "InMemoryJobStore",
     "FileJobStore", "create_job_store", "REPORT_PATH_RE", "JobManager", "JobStatus",
+    "DEADLINE_EXIT_REASONS",
     # Owned by _job_model (which _job_monitor_mixin also reads them from) and
     # re-exported here: tests import and patch them at this module's path.
-    "_DEADLINE_EXIT_REASONS", "_EXIT_CODE_TIMEOUT", "_MAX_COMPLETED_JOBS",
+    "_EXIT_CODE_TIMEOUT", "_MAX_COMPLETED_JOBS",
     "_WATCHDOG_POLL_INTERVAL_S",
 ]
 

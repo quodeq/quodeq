@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.core.run.exit_reason import ExitReason
 from quodeq.shared.process import is_pid_alive as _is_pid_alive
 from quodeq.shared.run_heartbeat import HEARTBEAT_FILENAME
 from quodeq.data.fs.run_status_store import (
@@ -124,7 +125,7 @@ def _sync_legacy_run(
     exit_reason: str | None
 
     if scan_path.exists():
-        state, exit_reason = "done", None
+        state, exit_reason = RunState.DONE, None
     elif pid_path.exists():
         try:
             pid = int(pid_path.read_text(encoding="utf-8").strip())
@@ -132,11 +133,11 @@ def _sync_legacy_run(
         except (OSError, ValueError):
             alive = False
         if alive:
-            state, exit_reason = "running", None
+            state, exit_reason = RunState.RUNNING, None
         else:
-            state, exit_reason = "cancelled", "stale_legacy_pid_dead"
+            state, exit_reason = RunState.CANCELLED, ExitReason.STALE_LEGACY_PID_DEAD
     else:
-        state, exit_reason = "cancelled", "stale_legacy_no_pid"
+        state, exit_reason = RunState.CANCELLED, ExitReason.STALE_LEGACY_NO_PID
 
     job_id = f"ext-{run_id}"
     try:
@@ -219,7 +220,7 @@ def _check_stale_and_promote(
             state=RunState.CANCELLED,
             job_id=status.get("job_id", f"ext-{run_id}"),
             pid=pid if isinstance(pid, int) else None,
-            exit_reason="stale_detected",
+            exit_reason=ExitReason.STALE_DETECTED,
             finalized_at=None,
             time_limit_s=None,
         )

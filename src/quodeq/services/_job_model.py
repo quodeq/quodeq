@@ -28,14 +28,6 @@ _EXIT_CODE_TIMEOUT = -9
 # blocking wait(timeout=full_budget) at spawn time can't see it.
 _WATCHDOG_POLL_INTERVAL_S = 1.0
 
-# status.json exit reasons that mean "the run hit its time budget" -- the
-# user's own setting doing its job, not an error. Jobs ending this way are
-# marked cancelled (already in the salvage-scoring trigger list in
-# api/_evaluation_routes.py) with exit_reason set, so the evaluate header
-# renders "time limit reached" instead of FAILED.
-_DEADLINE_EXIT_REASONS = ("deadline", "time_limit")
-_EXIT_REASON_DEADLINE = "deadline"
-
 if TYPE_CHECKING:
     import subprocess
 

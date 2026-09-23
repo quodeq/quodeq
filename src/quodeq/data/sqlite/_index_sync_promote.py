@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import NamedTuple
 
+from quodeq.core.run.exit_reason import ExitReason
 from quodeq.data.fs.run_status_store import (
     RunState,
     RunStatus,
@@ -60,7 +61,7 @@ def _promote_via_status_write(
             phase=row.phase,
             current_dimension=row.current_dimension,
             pid=row.pid if isinstance(row.pid, int) else None,
-            exit_reason="stale_detected",
+            exit_reason=ExitReason.STALE_DETECTED,
             finalized_at=None,
             time_limit_s=None,
         )
@@ -83,7 +84,7 @@ def _promote_index_only(db: sqlite3.Connection, job_id: str) -> None:
     db.execute(
         "UPDATE runs SET state = ?, exit_reason = ?, finalized_at = ?, "
         "updated_at = ? WHERE job_id = ?",
-        ("cancelled", "stale_detected", now_iso, now_iso, job_id),
+        (RunState.CANCELLED, ExitReason.STALE_DETECTED, now_iso, now_iso, job_id),
     )
 
 
