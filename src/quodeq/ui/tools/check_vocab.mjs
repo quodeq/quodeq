@@ -24,6 +24,6 @@ main({
   ceiling: TOTAL_CEILING,
   noun: 'vocabulary literals',
   found: 'bare vocabulary literal(s)',
-  hint: 'Import the constant from src/vocab/<runState|jobStatus|exitReason|severity|grade|dimState>.js. Run `npx eslint --no-inline-config -c eslint.vocab.config.js <file>` for details.',
+  hint: 'Import the constant from src/vocab/<runState|jobStatus|exitReason|severity|grade|dimState|findingType>.js. Run `npx eslint --no-inline-config -c eslint.vocab.config.js <file>` for details.',
   updateCommand: 'npm run lint:vocab:update',
 });

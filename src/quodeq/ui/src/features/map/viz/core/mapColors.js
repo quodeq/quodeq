@@ -1,4 +1,5 @@
 import { t } from '../../../../strings/index.js';
+import { MAP_VIEW_MODE } from '../../mapVocab.js';
 
 const RATE_HIGH = 0.9;
 const RATE_MEDIUM = 0.7;
@@ -78,18 +79,18 @@ function complianceRateBorderColor(rate) {
 
 export function nodeBorderColor(node, viewMode) {
   switch (viewMode) {
-    case 'violations': return severityBorderColor(worstSeverity(node.severity));
-    case 'compliance': return complianceRateBorderColor(node.complianceRate);
-    case 'health': return complianceRateBorderColor(node.complianceRate);
+    case MAP_VIEW_MODE.VIOLATIONS: return severityBorderColor(worstSeverity(node.severity));
+    case MAP_VIEW_MODE.COMPLIANCE: return complianceRateBorderColor(node.complianceRate);
+    case MAP_VIEW_MODE.HEALTH: return complianceRateBorderColor(node.complianceRate);
     default: return severityBorderColor(worstSeverity(node.severity));
   }
 }
 
 export function nodeColor(node, viewMode) {
   switch (viewMode) {
-    case 'violations': return severityColor(worstSeverity(node.severity));
-    case 'compliance': return complianceRateColor(node.complianceRate);
-    case 'health': return healthColor(node.complianceRate);
+    case MAP_VIEW_MODE.VIOLATIONS: return severityColor(worstSeverity(node.severity));
+    case MAP_VIEW_MODE.COMPLIANCE: return complianceRateColor(node.complianceRate);
+    case MAP_VIEW_MODE.HEALTH: return healthColor(node.complianceRate);
     default: return severityColor(worstSeverity(node.severity));
   }
 }
@@ -101,7 +102,7 @@ export function nodeColor(node, viewMode) {
  * sighted user gets, so every focusable node label carries this too.
  */
 export function nodeStateText(node, viewMode) {
-  if (viewMode === 'compliance' || viewMode === 'health') {
+  if (viewMode === MAP_VIEW_MODE.COMPLIANCE || viewMode === MAP_VIEW_MODE.HEALTH) {
     return t('map.stateCompliance', { pct: Math.round((node.complianceRate || 0) * 100) });
   }
   const worst = worstSeverity(node.severity || {});
@@ -110,9 +111,9 @@ export function nodeStateText(node, viewMode) {
 
 export function nodeSize(node, viewMode) {
   switch (viewMode) {
-    case 'violations': return node.violations || 1;
-    case 'compliance': return node.compliance || 1;
-    case 'health': return (node.violations + node.compliance) || 1;
+    case MAP_VIEW_MODE.VIOLATIONS: return node.violations || 1;
+    case MAP_VIEW_MODE.COMPLIANCE: return node.compliance || 1;
+    case MAP_VIEW_MODE.HEALTH: return (node.violations + node.compliance) || 1;
     default: return node.violations || 1;
   }
 }

@@ -23,6 +23,7 @@ const VOCABULARIES = {
   grade: ['Exemplary', 'Good', 'Adequate', 'Poor', 'Insufficient'],
   fileDone: ['ok', 'error', 'skipped'],
   dimState: ['pending', 'running', 'done', 'incomplete'],
+  findingType: ['violation', 'compliance'],
 };
 const WORDS = [...new Set(Object.values(VOCABULARIES).flat())];
 const literal = (words) => `Literal[value=/^(${words.join('|')})$/]`;

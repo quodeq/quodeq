@@ -11,6 +11,7 @@ import DeferredMount from './DeferredMount.jsx';
 import CardListSkeleton from './CardListSkeleton.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
+import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
 function renderFileDetailItem(item, { onDismiss, handleDismiss, setLowConfExpanded }) {
   switch (item.kind) {
@@ -22,10 +23,10 @@ function renderFileDetailItem(item, { onDismiss, handleDismiss, setLowConfExpand
       return <GroupHeader title={t('explorer.complianceHeader')} count={item.count} />;
     case 'low-conf-toggle':
       return <LowConfidenceToggle count={item.count} expanded={item.expanded} onToggle={() => setLowConfExpanded((v) => !v)} />;
-    case 'violation':
+    case FINDING_TYPE.VIOLATION:
     case 'low-conf-row':
       return <ViolationCard v={item.v} onDismiss={onDismiss ? handleDismiss : undefined} />;
-    case 'compliance':
+    case FINDING_TYPE.COMPLIANCE:
       return <ComplianceCard c={item.c} principle={item.c.principle} index={0} />;
     default:
       return null;

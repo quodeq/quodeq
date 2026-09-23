@@ -6,6 +6,7 @@ import { useStandardTypes } from './useStandardTypes.js';
 import { useMapDisplayPrefs } from './useMapDisplayPrefs.js';
 import { useMapDimensionFilter } from './useMapDimensionFilter.js';
 import { useMapTreeState } from './useMapTreeState.js';
+import { MAP_VIEW_MODE } from '../mapVocab.js';
 
 // Re-exported so existing importers of the tree helpers keep one seam; the
 // implementations live in mapTree.js (pure, unit-testable without the hook).
@@ -23,7 +24,7 @@ function useMapNavParams(nav) {
   const {
     path: currentPath = '',
     vizStyle = 'zoompack',
-    viewMode = 'health',
+    viewMode = MAP_VIEW_MODE.HEALTH,
     galaxyMode = 'filesystem',
     onPathChange, onVizStyleChange, onViewModeChange, onGalaxyModeChange,
   } = nav || {};

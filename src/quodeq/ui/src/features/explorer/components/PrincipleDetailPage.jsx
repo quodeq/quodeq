@@ -13,6 +13,7 @@ import DeferredMount from './DeferredMount.jsx';
 import CardListSkeleton from './CardListSkeleton.jsx';
 import { t } from '../../../strings/index.js';
 import { GRADE } from '../../../vocab/grade.js';
+import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
 // Rows are virtualized (same VirtualList as FileDetailPage): a principle can
 // carry hundreds of findings, and each card runs pretext measurement layout
@@ -22,22 +23,22 @@ import { GRADE } from '../../../vocab/grade.js';
 // The compliance section shows unless the user has narrowed to one severity:
 // no filter, the explicit "all", and the compliance-only view all keep it.
 function showsComplianceSection(activeSevFilter) {
-  return !activeSevFilter || activeSevFilter === 'all' || activeSevFilter === 'compliance';
+  return !activeSevFilter || activeSevFilter === 'all' || activeSevFilter === FINDING_TYPE.COMPLIANCE;
 }
 
 function buildListItems({ displayedBySeverity, compliance, activeSevFilter }) {
   const arr = [];
-  if (activeSevFilter !== 'compliance') {
+  if (activeSevFilter !== FINDING_TYPE.COMPLIANCE) {
     for (const sev of EVAL_SEVERITY_ORDER) {
       const vs = displayedBySeverity[sev];
       if (!vs || vs.length === 0) continue;
       arr.push({ kind: 'sev-header', sev, count: vs.length });
-      vs.forEach((v, idx) => arr.push({ kind: 'violation', v, idx }));
+      vs.forEach((v, idx) => arr.push({ kind: FINDING_TYPE.VIOLATION, v, idx }));
     }
   }
   if (showsComplianceSection(activeSevFilter) && compliance.length > 0) {
     arr.push({ kind: 'compliance-header', count: compliance.length });
-    compliance.forEach((c, idx) => arr.push({ kind: 'compliance', c, idx }));
+    compliance.forEach((c, idx) => arr.push({ kind: FINDING_TYPE.COMPLIANCE, c, idx }));
   }
   return arr;
 }
@@ -61,7 +62,7 @@ function itemKey(items) {
     if (!item) return i;
     const header = headerRowKey(item);
     if (header) return header;
-    if (item.kind === 'violation') return `v-${item.v.file || ''}:${item.v.line ?? ''}:${item.idx}`;
+    if (item.kind === FINDING_TYPE.VIOLATION) return `v-${item.v.file || ''}:${item.v.line ?? ''}:${item.idx}`;
     return `c-${item.c.file || ''}:${item.c.line ?? ''}:${item.idx}`;
   };
 }
@@ -126,9 +127,9 @@ function renderPrincipleItem(item, { principle, cardDismiss }) {
       return <SectionLabel>{item.sev.toUpperCase()} · {item.count}</SectionLabel>;
     case 'compliance-header':
       return <SectionLabel>{t('overview.statCompliance')} · {item.count}</SectionLabel>;
-    case 'violation':
+    case FINDING_TYPE.VIOLATION:
       return <EvalViolationCard v={item.v} principle={principle} index={item.idx} onDismiss={cardDismiss} />;
-    case 'compliance':
+    case FINDING_TYPE.COMPLIANCE:
       return <ComplianceCard c={item.c} principle={principle} index={item.idx} />;
     default:
       return null;

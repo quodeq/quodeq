@@ -1,5 +1,6 @@
 import FlagPill from './terminal/FlagPill.jsx';
 import { SEVERITY_ORDER } from '../vocab/severity.js';
+import { FINDING_TYPE } from '../vocab/findingType.js';
 
 /**
  * Reusable severity filter pill group rendered in the terminal `--flag` style.
@@ -36,8 +37,8 @@ export default function SeverityFilterPills({ counts, complianceCount = 0, activ
         <FlagPill
           flag="compliance"
           count={complianceCount}
-          active={activeFilter === 'compliance'}
-          onClick={() => toggle('compliance')}
+          active={activeFilter === FINDING_TYPE.COMPLIANCE}
+          onClick={() => toggle(FINDING_TYPE.COMPLIANCE)}
         />
       )}
     </div>

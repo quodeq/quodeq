@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { SEVERITY_ORDER } from '../../../utils/formatters.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
+import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
 const dismissKey = (v) => `${v.file}:${v.line}`;
 
@@ -32,7 +33,7 @@ function pushSeverityRows(arr, { highConfidenceBySeverity, activeFilter }) {
     if (bucket.length === 0) continue;
     if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) continue;
     arr.push({ kind: 'sev-header', sev, count: bucket.length });
-    for (const v of bucket) arr.push({ kind: 'violation', v });
+    for (const v of bucket) arr.push({ kind: FINDING_TYPE.VIOLATION, v });
   }
 }
 
@@ -61,7 +62,7 @@ function buildFileDetailItems({
   }
   if (showCompliance && totalCompliance > 0) {
     arr.push({ kind: 'compliance-header', count: totalCompliance });
-    for (const c of compliance) arr.push({ kind: 'compliance', c });
+    for (const c of compliance) arr.push({ kind: FINDING_TYPE.COMPLIANCE, c });
   }
   return arr;
 }
@@ -87,8 +88,8 @@ export function useFileDetailFiltering({ file, onDismiss, activeFilter, lowConfE
   const totalCompliance = file.compliance?.length || 0;
   const distinctSeverities = SEVERITY_ORDER.filter((s) => liveSevCounts[s] > 0).length;
   const showFilters = distinctSeverities > 1 || (distinctSeverities >= 1 && totalCompliance > 0);
-  const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === 'compliance';
-  const showViolations = activeFilter !== 'compliance';
+  const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === FINDING_TYPE.COMPLIANCE;
+  const showViolations = activeFilter !== FINDING_TYPE.COMPLIANCE;
 
   const items = useMemo(
     () => buildFileDetailItems({

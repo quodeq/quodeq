@@ -9,6 +9,7 @@ import { EXIT_REASON } from './exitReason.js';
 import { SEVERITY, SEVERITY_ORDER } from './severity.js';
 import { GRADE, GRADE_LADDER } from './grade.js';
 import { DIM_STATE } from './dimState.js';
+import { FINDING_TYPE } from './findingType.js';
 
 test('vocab modules spell the wire values', () => {
   assert.deepEqual(RUN_STATE, {
@@ -34,10 +35,11 @@ test('vocab modules spell the wire values', () => {
   assert.deepEqual(DIM_STATE, {
     PENDING: 'pending', RUNNING: 'running', DONE: 'done', INCOMPLETE: 'incomplete',
   });
+  assert.deepEqual(FINDING_TYPE, { VIOLATION: 'violation', COMPLIANCE: 'compliance' });
 });
 
 test('vocab modules are frozen', () => {
-  for (const obj of [RUN_STATE, JOB_STATUS, EXIT_REASON, SEVERITY, GRADE, DIM_STATE]) {
+  for (const obj of [RUN_STATE, JOB_STATUS, EXIT_REASON, SEVERITY, GRADE, DIM_STATE, FINDING_TYPE]) {
     assert.equal(Object.isFrozen(obj), true);
   }
 });
