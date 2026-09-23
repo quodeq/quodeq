@@ -83,6 +83,29 @@ describe('LoadingScreen tips', () => {
     }
   });
 
+  it('puts a leading question on its own line, above the answer', async () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<LoadingScreen tips />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      // Walk the whole rotation: some tips open with a question, some don't.
+      let questions = 0;
+      for (let i = 0; i < 19; i++) {
+        const text = container.querySelector('.loading-tip__text');
+        const q = text.querySelector('.loading-tip__question');
+        if (q) {
+          questions += 1;
+          expect(q.textContent.endsWith('?')).toBe(true);
+          expect(text.textContent.length).toBeGreaterThan(q.textContent.length + 1);
+        }
+        await act(async () => { await vi.advanceTimersByTimeAsync(8700); });
+      }
+      expect(questions).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('marks the boot variant so it covers the shell body and swallows clicks', () => {
     const { container } = render(<LoadingScreen variant="shell" />);
     const el = container.querySelector('.loading-screen');

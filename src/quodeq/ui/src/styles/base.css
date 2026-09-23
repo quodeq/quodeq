@@ -2000,6 +2000,15 @@ textarea:focus {
   text-wrap: balance;
 }
 
+/* The question is a block so the answer starts on the next line; the space
+   between them in the markup keeps textContent readable for screen readers. */
+.loading-tip__question {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
 .loading-tip__text strong {
   font-weight: 600;
   color: var(--color-text);

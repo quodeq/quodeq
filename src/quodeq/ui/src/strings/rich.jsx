@@ -15,8 +15,8 @@ import { t } from './index.js';
 // literal (e.g. **Ctrl+`**).
 const RICH_SPAN = /\*\*([^*]+)\*\*|`([^`]+)`/g;
 
-export function tRich(key, vars) {
-  const text = t(key, vars);
+/** Render one already-translated string's inline markup into React nodes. */
+export function renderRich(text) {
   const nodes = [];
   let last = 0;
   let match;
@@ -30,4 +30,8 @@ export function tRich(key, vars) {
   }
   if (last < text.length) nodes.push(text.slice(last));
   return nodes.length === 0 ? text : <>{nodes}</>;
+}
+
+export function tRich(key, vars) {
+  return renderRich(t(key, vars));
 }

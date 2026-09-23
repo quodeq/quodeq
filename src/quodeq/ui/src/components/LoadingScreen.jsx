@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { QMarkIcon } from './QMarkIcon.jsx';
 import { t } from '../strings/index.js';
-import { tRich } from '../strings/rich.jsx';
+import { renderRich } from '../strings/rich.jsx';
 
 // One plain sentence each. The 8s rotation leaves reading time for about
 // fifteen words; anything longer gets split into two tips. Each tip bolds the
 // one thing worth catching at a glance (**...**) and marks file names and
-// commands as `code`, so a skim still lands the point.
+// commands as `code`, so a skim still lands the point. A tip that opens with
+// a question gets it on its own line: the reader decides from the question
+// alone whether the rest applies to them.
 const TIP_KEYS = [
   'loading.tips.warmup', 'loading.tips.incremental', 'loading.tips.cleanScan',
   'loading.tips.fixplans', 'loading.tips.dismiss', 'loading.tips.ignore',
@@ -16,6 +18,20 @@ const TIP_KEYS = [
   'loading.tips.prReview', 'loading.tips.ollama', 'loading.tips.monorepo',
   'loading.tips.shared',
 ];
+const LEADING_QUESTION = /^([^?]+\?)\s+(.+)$/s;
+
+function TipText({ text }) {
+  const m = LEADING_QUESTION.exec(text);
+  if (!m) return <p className="loading-tip__text">{renderRich(text)}</p>;
+  return (
+    <p className="loading-tip__text">
+      <span className="loading-tip__question">{renderRich(m[1])}</span>
+      {' '}
+      {renderRich(m[2])}
+    </p>
+  );
+}
+
 const TIPS_DELAY_MS = 300;
 const TIPS_ROTATE_MS = 8000;
 // Each swap fades the old tip out, changes the text, then fades the new one in.
@@ -95,7 +111,7 @@ export default function LoadingScreen({ message, variant = 'fullscreen', tips = 
       {tipKey && (
         <div className={fading ? 'loading-tip loading-tip--fading' : 'loading-tip'}>
           <span className="loading-tip__label">{t('loading.tipLabel')}</span>
-          <p className="loading-tip__text">{tRich(tipKey)}</p>
+          <TipText text={t(tipKey)} />
         </div>
       )}
     </div>
