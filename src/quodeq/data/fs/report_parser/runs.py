@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from quodeq.core.run.state import TERMINAL_STATES, RunState, parse_run_state
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.core.types import DimensionResult
 from quodeq.data.mappers import parse_dimension_result
@@ -212,33 +213,25 @@ def _read_run_status(run_dir: Path) -> str | None:
     return state if isinstance(state, str) else None
 
 
-# Terminal status.json states → History status vocabulary. A terminal state is
-# authoritative even when the run's PID is still alive: the cancel path flips
-# status.json to ``cancelled`` immediately, but the subprocess keeps draining
-# its subagents for a few seconds before it exits. Without this, a cancelled
-# run reappears as "running" in History for the length of that drain.
-_TERMINAL_STATE_TO_STATUS = {
-    "done": "complete",
-    "failed": "failed",
-    "cancelled": "cancelled",
-}
-
-
-def _run_status_for_entry(project_dir: Path, run_dir: Path, entry_name: str) -> str:
+def _run_status_for_entry(project_dir: Path, run_dir: Path, entry_name: str) -> RunState:
     """Status precedence for one run dir entry:
 
-    1. status.json state is terminal (done/failed/cancelled) → honor it,
-       even over a still-live PID (a cancelled run keeps draining after
-       its state flips; it must not resurface as "running").
-    2. Live process holding the PID → "in_progress" (dimmed "Running…" in UI)
-    3. Otherwise → "complete" (historical, crashed, pre-.pid-era runs)
+    1. status.json state is terminal -> honor it, even over a still-live
+       PID (a cancelled run keeps draining after its state flips; it must
+       not resurface as running).
+    2. Live process holding the PID -> RUNNING.
+    3. Otherwise -> DONE (historical, crashed, pre-.pid-era runs).
     """
     raw_state = _read_run_status(run_dir)
-    terminal_status = _TERMINAL_STATE_TO_STATUS.get(raw_state or "")
-    if terminal_status is not None:
-        return terminal_status
+    if raw_state:
+        try:
+            state = parse_run_state(raw_state)
+        except ValueError:
+            state = None
+        if state in TERMINAL_STATES:
+            return state
     pid = resolve_external_pid(project_dir, entry_name)
-    return "in_progress" if pid is not None else "complete"
+    return RunState.RUNNING if pid is not None else RunState.DONE
 
 
 def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIMIT) -> list[RunInfo]:

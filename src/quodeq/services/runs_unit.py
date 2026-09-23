@@ -7,8 +7,10 @@ multi-MB dashboard payload.
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
+from quodeq.core.run.state import TERMINAL_STATES, RunState, parse_run_state
 from quodeq.data.fs.report_parser.grades import most_frequent_grade, parse_numeric_score
 from quodeq.data.fs.report_parser.runs import read_run_scalars
 from quodeq.data.sqlite.run_index import (
@@ -18,33 +20,28 @@ from quodeq.data.sqlite.run_index import (
     sync_index,
 )
 
-_INDEX_STATE_TO_UI_STATUS = {
-    "done": "complete", "complete": "complete", "finished": "complete",
-    "running": "in_progress", "in_progress": "in_progress",
-    "pending": "in_progress", "finalizing": "in_progress",
-    "cancelled": "cancelled", "canceled": "cancelled",
-    "failed": "failed", "error": "failed", "lost": "failed",
-}
+_log = logging.getLogger(__name__)
 
 
-def _ui_status(state: str) -> str:
-    """Map an index `state` to the UI's run status vocabulary."""
-    return _INDEX_STATE_TO_UI_STATUS.get((state or "").lower(), "complete")
+def _row_status(state: str) -> RunState:
+    """The run state an index row means; unknown spellings read as DONE, logged."""
+    try:
+        return parse_run_state(state)
+    except ValueError:
+        _log.warning("index row with unknown state %r read as done", state)
+        return RunState.DONE
 
 
 def _row_to_run_entry(row: RunRow) -> dict:
     """One index row → a runs-unit entry with score placeholders."""
     return {
         "runId": row.run_id,
-        "status": _ui_status(row.state),
+        "status": _row_status(row.state),
         "dateISO": row.started_at,
         "overallScore": None,
         "overallGrade": None,
         "dimensionScores": {},
     }
-
-
-_TERMINAL = {"complete", "cancelled", "failed"}
 
 
 def _fill_scores(entry: dict, reports_root: Path, project: str, run_id: str) -> None:
@@ -55,7 +52,7 @@ def _fill_scores(entry: dict, reports_root: Path, project: str, run_id: str) -> 
     carries overall_score as a string ("7.5/10"); parse_numeric_score turns it
     into a float, matching every production caller (see dashboard_trend.py).
     """
-    if entry["status"] not in _TERMINAL:
+    if entry["status"] not in TERMINAL_STATES:
         return
     try:
         dims = read_run_scalars(reports_root, project, run_id)

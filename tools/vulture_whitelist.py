@@ -95,6 +95,7 @@ _.terminal_resolve  # api/terminal_routes.py: Flask view function; the route dec
 _.terminal_session_create  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
 _.terminal_session_kill  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
 _.terminal_sessions  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
+_.terminal_status  # api/terminal_routes.py: Flask view function; the route decorator is its only caller. Was masked by an unrelated same-named local var in data/fs/report_parser/runs.py._run_status_for_entry, removed by the 2026-09-22 run-list-vocabulary-into-RunState migration.
 _.terminal_ws  # api/terminal_routes.py: Flask view function; the route decorator is its only caller.
 _.unverify  # api/routes_findings.py: Flask view function; the route decorator is its only caller.
 _.update_check  # api/routes_update.py: Flask view function; the route decorator is its only caller.

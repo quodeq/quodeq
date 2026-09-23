@@ -40,7 +40,7 @@ def test_runs_endpoint_returns_unit(tmp_path, monkeypatch):
     assert resp.status_code == 200
     body = json.loads(resp.get_data())
     assert body["runs"][0]["runId"] == "a"
-    assert body["runs"][0]["status"] == "complete"
+    assert body["runs"][0]["status"] == "done"
     assert "ETag" in resp.headers
 
 

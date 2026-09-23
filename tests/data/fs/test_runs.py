@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 
+from quodeq.core.run.state import RunState
+
 
 # ---------------------------------------------------------------------------
 # #144 — _read_run_status must not raise when status.json parses to a non-dict
@@ -21,7 +23,7 @@ class TestReadRunStatusNonDict:
         (run_dir / "status.json").write_text(json.dumps([1, 2, 3]))
         runs = list_runs(tmp_path, "proj")
         assert len(runs) == 1
-        assert runs[0].status == "complete"
+        assert runs[0].status is RunState.DONE
 
     def test_string_payload_returns_complete(self, tmp_path: Path) -> None:
         from quodeq.data.fs.report_parser.runs import list_runs
@@ -29,7 +31,7 @@ class TestReadRunStatusNonDict:
         (run_dir / "status.json").write_text('"cancelled"')
         runs = list_runs(tmp_path, "proj")
         assert len(runs) == 1
-        assert runs[0].status == "complete"
+        assert runs[0].status is RunState.DONE
 
     def test_null_payload_returns_complete(self, tmp_path: Path) -> None:
         from quodeq.data.fs.report_parser.runs import list_runs
@@ -37,7 +39,7 @@ class TestReadRunStatusNonDict:
         (run_dir / "status.json").write_text("null")
         runs = list_runs(tmp_path, "proj")
         assert len(runs) == 1
-        assert runs[0].status == "complete"
+        assert runs[0].status is RunState.DONE
 
 
 def test_list_runs_marks_in_progress_when_pid_is_live(tmp_path: Path) -> None:
@@ -54,7 +56,7 @@ def test_list_runs_marks_in_progress_when_pid_is_live(tmp_path: Path) -> None:
 
     runs = list_runs(tmp_path, project_uuid)
     assert len(runs) == 1
-    assert runs[0].status == "in_progress"
+    assert runs[0].status is RunState.RUNNING
 
 
 def test_list_runs_cancelled_state_overrides_live_pid(tmp_path: Path) -> None:
@@ -78,7 +80,7 @@ def test_list_runs_cancelled_state_overrides_live_pid(tmp_path: Path) -> None:
 
     runs = list_runs(tmp_path, project_uuid)
     assert len(runs) == 1
-    assert runs[0].status == "cancelled"
+    assert runs[0].status is RunState.CANCELLED
 
 
 def test_list_runs_failed_state_overrides_live_pid(tmp_path: Path) -> None:
@@ -94,7 +96,7 @@ def test_list_runs_failed_state_overrides_live_pid(tmp_path: Path) -> None:
 
     runs = list_runs(tmp_path, project_uuid)
     assert len(runs) == 1
-    assert runs[0].status == "failed"
+    assert runs[0].status is RunState.FAILED
 
 
 def test_list_runs_running_state_with_live_pid_stays_in_progress(tmp_path: Path) -> None:
@@ -114,7 +116,7 @@ def test_list_runs_running_state_with_live_pid_stays_in_progress(tmp_path: Path)
 
     runs = list_runs(tmp_path, project_uuid)
     assert len(runs) == 1
-    assert runs[0].status == "in_progress"
+    assert runs[0].status is RunState.RUNNING
 
 
 def test_list_runs_marks_historical_runs_as_complete(tmp_path: Path) -> None:
@@ -136,7 +138,7 @@ def test_list_runs_marks_historical_runs_as_complete(tmp_path: Path) -> None:
 
     runs = list_runs(tmp_path, project_uuid)
     assert len(runs) == 1
-    assert runs[0].status == "complete"
+    assert runs[0].status is RunState.DONE
 
 
 def test_list_runs_dead_pid_is_historical(tmp_path: Path) -> None:
@@ -153,7 +155,7 @@ def test_list_runs_dead_pid_is_historical(tmp_path: Path) -> None:
 
     runs = list_runs(tmp_path, project_uuid)
     assert len(runs) == 1
-    assert runs[0].status == "complete"
+    assert runs[0].status is RunState.DONE
 
 
 def test_list_runs_skips_dirs_without_manifest(tmp_path: Path) -> None:
@@ -195,8 +197,8 @@ def test_list_runs_mixes_historical_and_in_progress(tmp_path: Path) -> None:
     runs = list_runs(tmp_path, project_uuid)
     by_id = {r.run_id: r.status for r in runs}
     assert by_id == {
-        "run-historical": "complete",
-        "run-live": "in_progress",
+        "run-historical": RunState.DONE,
+        "run-live": RunState.RUNNING,
     }
 
 
@@ -223,4 +225,18 @@ def test_list_runs_accepts_status_json_without_manifest(tmp_path: Path) -> None:
 
     runs = list_runs(tmp_path, project_uuid)
     assert [r.run_id for r in runs] == ["run-nomanifest"]
-    assert runs[0].status == "complete"
+    assert runs[0].status is RunState.DONE
+
+
+def test_run_status_is_a_run_state(tmp_path: Path) -> None:
+    """RunInfo.status is a RunState member, not a bare string."""
+    from quodeq.data.fs.report_parser.runs import list_runs
+
+    project_uuid = "proj-typed"
+    run_dir = tmp_path / project_uuid / "run-typed"
+    run_dir.mkdir(parents=True)
+    (run_dir / "status.json").write_text(json.dumps({"state": "done"}))
+
+    info = list_runs(tmp_path, project_uuid)[0]
+    assert isinstance(info.status, RunState)
+    assert info.status is RunState.DONE

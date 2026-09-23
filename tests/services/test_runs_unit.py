@@ -1,5 +1,8 @@
 from __future__ import annotations
-from quodeq.services.runs_unit import _ui_status, _row_to_run_entry
+
+import pytest
+
+from quodeq.services.runs_unit import _row_to_run_entry
 from quodeq.data.sqlite.run_index import RunRow
 from quodeq.services import runs_unit as ru
 from quodeq.data.sqlite.run_index import open_index
@@ -14,23 +17,28 @@ def _row(run_id="r1", state="done", started_at="2026-01-02T03:04:05Z"):
     )
 
 
-def test_ui_status_mapping():
-    assert _ui_status("done") == "complete"
-    assert _ui_status("complete") == "complete"
-    assert _ui_status("running") == "in_progress"
-    assert _ui_status("in_progress") == "in_progress"
-    assert _ui_status("cancelled") == "cancelled"
-    assert _ui_status("failed") == "failed"
-    assert _ui_status("lost") == "failed"
-    assert _ui_status("pending") == "in_progress"
-    assert _ui_status("finalizing") == "in_progress"
-    assert _ui_status("weird-unknown") == "complete"
+@pytest.mark.parametrize("state,expected", [
+    ("done", "done"), ("complete", "done"), ("finished", "done"),
+    ("running", "running"), ("in_progress", "running"), ("pending", "pending"), ("finalizing", "finalizing"),
+    ("cancelled", "cancelled"), ("canceled", "cancelled"),
+    ("failed", "failed"), ("error", "failed"), ("lost", "failed"),
+])
+def test_row_status_is_the_parsed_run_state(state, expected):
+    row = _row(run_id="r", state=state)
+    assert _row_to_run_entry(row)["status"] == expected
+
+
+def test_unknown_index_state_falls_back_to_done_with_a_warning(caplog):
+    row = _row(run_id="r", state="bogus")
+    with caplog.at_level("WARNING"):
+        assert _row_to_run_entry(row)["status"] == "done"
+    assert "bogus" in caplog.text
 
 
 def test_row_to_run_entry_shape_is_camel_and_score_placeholders():
     entry = _row_to_run_entry(_row(run_id="abc", state="done"))
     assert entry["runId"] == "abc"
-    assert entry["status"] == "complete"
+    assert entry["status"] == "done"
     assert entry["dateISO"] == "2026-01-02T03:04:05Z"
     assert entry["overallScore"] is None
     assert entry["overallGrade"] is None
