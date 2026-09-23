@@ -15,7 +15,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+
+from quodeq.core.run.state import RunState
 
 
 # ---------------------------------------------------------------------------
@@ -43,7 +44,7 @@ class DimResolution:
 
     # Run provenance — fields the UI uses to render the "from run X" badge
     run_id: str
-    run_state: Literal["complete", "in_progress", "cancelled"]
+    run_state: RunState
     """The run's status when this snapshot was taken. Used to drive the
     'partial' / 'running' chip on the dim card."""
 
@@ -118,8 +119,8 @@ class RunSummary:
 
     run_id: str
     date_iso: str | None
-    status: str
-    """One of the ``RUN_STATE_*`` constants from ``_states``."""
+    status: RunState
+    """The run's lifecycle state."""
 
     exit_reason: str | None = None
     """Status-tag distinguishing budget-timeout from signal-cancel etc.

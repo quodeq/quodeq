@@ -34,48 +34,21 @@ just the bookkeeping for when those scores were produced.
 
 ### Run lifecycle vocabulary
 
-A run can be in one of these states (sourced from `status.json` and
-the dashboard's external-process detection):
+A run's lifecycle state is `quodeq.core.run.state.RunState` (sourced from
+`status.json` and the dashboard's external-process detection):
 
 | state | meaning |
 |---|---|
-| `complete` | Run reached a natural end — every configured dim scored, lifecycle transitioned to DONE. |
-| `in_progress` | Currently running. Dims that finish scoring mid-run produce trustworthy eval files immediately. |
-| `cancelled` | The run was stopped before natural completion. May be **partial-success** (user-configured time budget honored) or **incomplete** (manual signal, stale-detect, error). The `exit_reason` distinguishes them. |
-| `failed` | System error before or during scoring. Eval files written, if any, are not to be trusted. |
-
-### "Successful run" — the canonical definition
-
-A run is **successful** if the data it produced represents the user's
-intent. That includes both happy paths:
-
-1. **Naturally completed** — `state == complete`, every dim scored.
-2. **Budgeted timeout** — `state == cancelled` AND `exit_reason ∈
-   SUCCESSFUL_CANCEL_REASONS` (see `_states.py`). The user said "stop
-   at 10 minutes", the run honored that, and stopped with valid data.
-   This is *partial-success*: less coverage than complete, but
-   intentional and trustworthy.
-
-NOT successful: manual signal cancel, stale-detect (process death),
-unhandled exception, token-exhausted error. These produced incomplete
-or unreliable data; users shouldn't see them as authoritative scores.
-
-### "Trustable run" — the broader rule, for incremental data salvage
-
-A `cancelled` run that *isn't* a budgeted timeout still has eval files
-on disk for the dims it managed to finish. We don't promote those to
-the cards/headline (the user didn't intend that stop), but the **next
-run's incremental classification** can use them as `analyzed_files`
-input — they represent real work the model already did.
-
-A run is trustable iff `state ∈ {complete, in_progress, cancelled}`.
-`failed` is excluded — its eval files may be partial-coverage stubs
-(`filesRead == 0`) or contain garbage from an interrupted scoring
-phase.
+| `PENDING` | Not yet started. |
+| `RUNNING` | Currently running. Dims that finish scoring mid-run produce trustworthy eval files immediately. |
+| `FINALIZING` | Wrapping up after the last dimension finished. |
+| `DONE` | Run reached a natural end — every configured dim scored, lifecycle transitioned to DONE. |
+| `CANCELLED` | The run was stopped before natural completion. |
+| `FAILED` | System error before or during scoring. Eval files written, if any, are not to be trusted. |
 
 ### Per-file granularity
 
-Even within a trustable run, individual files may have errored —
+Even within a run, individual files may have errored —
 typical case: token exhaustion, agent retried twice, gave up. Those
 files were *dispatched* (in `queue.taken`) but *no findings landed*
 (absent from JSONL). Counting them as analyzed lets the next run
@@ -89,23 +62,18 @@ signal of clean inspection — open question, see `_resolution.py`).
 
 ---
 
-## The four user-facing views, mapped to predicates
+## The two user-facing views this package still drives
 
 | view | rule | implementation |
 |---|---|---|
-| **Overview cards** (default landing) | Latest valid run per dim, resolved as-of the selected day. Default day = today. | `resolve_latest_per_dim(as_of=...)` |
-| **Overview headline** | `mean(card.score for card in cards)` | computed in JS from cards |
-| **Score-history chart bars** | One bar per day (current bucket); each bar's score = the day's latest successful run. | `bucket_runs_by_day(...)` (in `_buckets.py`) |
-| **History table** | Successful runs only. | `is_successful_run(state, exit_reason)` |
-| **Run navigator** | Explicit by run_id; no filter. | callers pass run_id directly |
+| **Overview cards / headline** (default landing) | Only a `DONE` run may be the headline; falls back to `CANCELLED` runs when no `DONE` run exists. | `select_default_view_runs` (`is_eligible_for_default_view`) |
+| **Score-history / trend** | `DONE` and `RUNNING` runs; `CANCELLED` and `FAILED` are dropped — their partial scores are misleading as history points. | `select_trend_runs` (`TREND_STATES`) |
 
-Two invariants the package guarantees:
-
-1. **Cards and headline can never disagree.** They draw from the same
-   `resolve_latest_per_dim` output; the headline is `mean(cards)` so
-   it's mathematically impossible for them to drift.
-2. **History and overview agree on "successful".** Both views use the
-   same `is_successful_run` predicate.
+Both consult a single function so two call sites can never drift apart
+(a class of bug hit repeatedly before centralisation): `accumulated._compute_result`
+and `_fs_metadata._read_accumulated_summary` both call
+`select_default_view_runs`; `_dashboard_history._compute_dashboard_payload`
+and `scoring.get_project_scores` both call `select_trend_runs`.
 
 ---
 
@@ -113,17 +81,14 @@ Two invariants the package guarantees:
 
 See `__init__.py` for the canonical export list. Highlights:
 
-- `is_successful_run(state, exit_reason)` — the success predicate.
-- `is_trustable_run(state)` — for incremental salvage.
-- `is_eligible_for_default_view(state)` — narrowest: cards/headline.
-  Only `complete` qualifies; `in_progress` and `cancelled` are excluded
-  so the overview waits for the umbrella run to terminate cleanly
-  before counting any of its dims.
-- `is_visible_in_history(reports_root, project, run_info)` — for the
-  history table filter.
-- `resolve_latest_per_dim(reports_root, project, *, as_of=None)` —
-  the per-dim resolver, with optional date cutoff.
-- `bucket_runs_by_day(runs)` — for the score-history chart.
+- `is_eligible_for_default_view(status: RunState)` — the strictest rule:
+  only `DONE` qualifies; `RUNNING` and `CANCELLED` are both excluded so
+  the overview waits for the umbrella run to terminate before counting
+  any of its dims.
+- `select_default_view_runs(run_infos)` — `DONE` runs when any exist,
+  else the `CANCELLED` fallback.
+- `select_trend_runs(run_infos)` / `TREND_STATES` — the trend/history-chart
+  run set.
 
 Everything else is private (leading underscore on filenames). Reach
 *through* `__init__.py`, never directly into `_states.py` etc.
@@ -135,3 +100,13 @@ Everything else is private (leading underscore on filenames). Reach
 Done. `services/dim_resolution.py` (the re-export shim from the
 previous iteration) has been deleted; every call site imports from
 this package directly.
+
+2026-09-22 (run-list-vocabulary-into-RunState migration): the
+`RUN_STATE_*` string constants, `SUCCESSFUL_CANCEL_REASONS`,
+`is_successful_run`, `is_trustable_run`, `resolve_latest_per_dim`,
+`is_visible_in_history`, `is_eligible_for_chart_bar`,
+`bucket_runs_by_day` and `pick_representative_run` were removed: a
+`grep -rn <name> src` inventory showed none had a production caller
+(the eval-file-provenance resolver and the score-history bucketing were
+never wired into a live view). `DimResolution` / `BucketView` stay in
+`_models.py` for whichever follow-up PR picks that work back up.
