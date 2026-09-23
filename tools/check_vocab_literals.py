@@ -57,11 +57,8 @@ VOCAB_WORDS = frozenset({
     "ok", "skipped",
     # DimState
     "incomplete",
-    # Provider. "codex" is deliberately absent: its one comparison site
-    # (shared/models.py) lives in a strict layer that may import only core/
-    # (tools/check_imports.py), and Provider lives in config/, so that site
-    # cannot import the enum without a layering violation.
-    "claude", "gemini", "copilot", "ollama", "llamacpp", "openrouter", "custom",
+    # Provider
+    "claude", "codex", "gemini", "copilot", "ollama", "llamacpp", "openrouter", "custom",
 })
 
 VOCAB_KEYWORDS = frozenset({"status", "state", "severity", "grade", "run_state", "exit_reason", "provider"})
