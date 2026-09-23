@@ -14,6 +14,7 @@ from pathlib import Path
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types.finding import Finding
+from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.grade_formula_store import load_params
 from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
@@ -126,7 +127,7 @@ def compute_run_grades(
     compliance_by: dict[tuple[str, str], list[Finding]] = {}
     for f in findings:
         key = (f.dimension or "", f.practice_id or "")
-        bucket = violations_by if f.verdict == "violation" else compliance_by
+        bucket = violations_by if f.verdict == FindingType.VIOLATION else compliance_by
         bucket.setdefault(key, []).append(f)
 
     # Compute per-principle grades, group results by dimension.

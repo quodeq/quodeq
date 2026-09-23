@@ -14,6 +14,7 @@ from pathlib import Path
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.core.evidence.model import violations_per_100_files
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
+from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.severity import Severity
 from quodeq.core.scoring.dimension_summary import build_dimension_summary
 from quodeq.core.scoring.internals import score_to_grade_label
@@ -188,7 +189,7 @@ def build_response_from_grade_tables(
     for row in read_active_findings(run_dir):
         f = row_to_finding(row)
         dim = f.dimension or ""
-        if f.verdict == "violation":
+        if f.verdict == FindingType.VIOLATION:
             violations_by_dim.setdefault(dim, []).append(f)
         else:
             compliance_by_dim.setdefault(dim, []).append(f)

@@ -12,9 +12,6 @@ from pathlib import Path
 from quodeq.core.types import Finding, ViolationResponse
 from quodeq.services._violations_jsonl import parse_violations_from_jsonl
 from quodeq.services._violations_shared import (  # noqa: F401 — re-exported patch targets
-    FINDING_TYPES,
-    TYPE_COMPLIANCE,
-    TYPE_VIOLATION,
     ResponseOptions,
     build_finding_entry,
     build_violation_response,

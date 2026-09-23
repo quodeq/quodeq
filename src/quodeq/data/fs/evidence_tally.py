@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.core.evidence.req_mapping import PrincipleResolver
+from quodeq.core.types.finding_type import FINDING_TYPES, FindingType
 from quodeq.shared.utils import open_text
 
 _logger = logging.getLogger(__name__)
@@ -82,18 +83,18 @@ def _classify_finding_row(
     if key in seen:
         return "duplicate"
     seen.add(key)
-    if t not in ("violation", "compliance"):
+    if t not in FINDING_TYPES:
         # Non-finding rows (e.g. the file_done markers the pool appends)
         # still occupy a dedup key but classify as neither.
         return "skip"
     # Mirror parse_jsonl_line: `p` wins, `req` is the fallback.
     if resolver is not None and resolver.resolve(obj.get("p") or obj.get("req")) is None:
         return "quarantined"
-    if t == "violation":
+    if t == FindingType.VIOLATION:
         if suppressed is not None and suppressed(obj):
             return "suppressed"
-        return "violation"
-    return "compliance"
+        return FindingType.VIOLATION
+    return FindingType.COMPLIANCE
 
 
 def tally_unique_findings(
@@ -133,9 +134,9 @@ def tally_unique_findings(
                     quarantined += 1
                 elif kind == "suppressed":
                     hidden += 1
-                elif kind == "violation":
+                elif kind == FindingType.VIOLATION:
                     violations += 1
-                elif kind == "compliance":
+                elif kind == FindingType.COMPLIANCE:
                     compliance += 1
     except OSError as exc:
         _logger.debug("evidence file unreadable during tally: %s", exc)

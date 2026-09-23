@@ -10,8 +10,9 @@ import json
 import logging
 from typing import Any
 
-from quodeq.core.events.models import DEFAULT_SEVERITY, VERDICT_VIOLATION, Judgment
+from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
 from quodeq.core.finding_coercions import coerce_confidence
+from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.req_ref import ReqRef
 
@@ -39,7 +40,7 @@ def finding_dict_to_row(finding: dict[str, Any]) -> dict[str, Any]:
     practice_id = finding.get("p", "")
     file = finding.get("file", "") or ""
     line = int(finding.get("line", 0) or 0)
-    verdict = finding.get("t", VERDICT_VIOLATION)
+    verdict = finding.get("t", FindingType.VIOLATION)
     refs = finding.get("req_refs")
     return {
         "schema_version": int(finding.get("schema_version", 1)),
@@ -129,7 +130,7 @@ def row_to_finding(row: dict[str, Any]) -> Finding:
 
     return Finding(
         practice_id=row["practice_id"],
-        verdict=row.get("verdict", VERDICT_VIOLATION),
+        verdict=row.get("verdict", FindingType.VIOLATION),
         file=row.get("file", ""),
         line=row.get("line", 0),
         end_line=row.get("end_line", 0),

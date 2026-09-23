@@ -210,6 +210,7 @@ _.CacheEraser  # services/_run_discard.py: structural Protocol used as an annota
 _._api_pid  # dashboard/_webview_window.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _.build_workdir  # dashboard/_build_npm.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._coerce_unknown_severity  # analysis/_api_schema.py: pydantic field_validator; pydantic calls it by registration, not by name.
+_._normalise_finding_type  # analysis/_api_schema.py: pydantic field_validator; pydantic calls it by registration, not by name.
 _.color  # shared/_log_format.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _._count_eval_files  # services/cache.py: Referenced as a name or key elsewhere (8 refs outside the definition).
 _._deepest_scope  # analysis/manifest_build_scope.py: Referenced as a name or key elsewhere (4 refs outside the definition).

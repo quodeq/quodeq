@@ -1,10 +1,12 @@
 """Judgment.severity's default ("medium") is defined once, on core.events.models
-(DEFAULT_SEVERITY, alongside the existing VERDICT_VIOLATION/VERDICT_COMPLIANCE
-pair), and every module that builds or reads a Judgment/Finding with a
-fallback severity imports it rather than retyping "medium"."""
+(DEFAULT_SEVERITY, next to the verdict vocabulary FindingType in
+core.types.finding_type), and every module that builds or reads a
+Judgment/Finding with a fallback severity imports it rather than retyping
+"medium"."""
 from __future__ import annotations
 
-from quodeq.core.events.models import DEFAULT_SEVERITY, VERDICT_VIOLATION
+from quodeq.core.events.models import DEFAULT_SEVERITY
+from quodeq.core.types.finding_type import FindingType
 
 
 def test_default_severity_is_medium():
@@ -39,4 +41,4 @@ def test_sqlite_row_mappers_use_the_shared_default_and_verdict():
     from quodeq.data.sqlite import row_mappers
 
     assert row_mappers.DEFAULT_SEVERITY is DEFAULT_SEVERITY
-    assert row_mappers.VERDICT_VIOLATION is VERDICT_VIOLATION
+    assert row_mappers.FindingType is FindingType

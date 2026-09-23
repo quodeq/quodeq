@@ -9,6 +9,7 @@ from typing import Any
 from quodeq.analysis.subagents.priority_config import load_priority_config
 from quodeq.analysis.subagents.priority_fan_in import compute_fan_in
 from quodeq.analysis.subagents.verify import load_previous_findings_for_dimension
+from quodeq.core.types.finding_type import FindingType
 
 _SIZE_SCORE_CAP = 5
 
@@ -94,7 +95,7 @@ def compute_previous_violations(
         except (OSError, KeyError, ValueError):
             continue
         for finding in findings:
-            if finding.get("t") == "violation" and finding.get("file"):
+            if finding.get("t") == FindingType.VIOLATION and finding.get("file"):
                 f = finding["file"]
                 counts[f] = counts.get(f, 0) + 1
 

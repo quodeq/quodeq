@@ -2,8 +2,9 @@
 """Vocabulary-literal ratchet: flag bare state/severity/grade strings in comparisons.
 
 Closed vocabularies (run state, job status, exit reason, severity, grade,
-file-done status, dimension state, provider) are StrEnums in one home module
-each (HOME_MODULES). Writing one of their values as a bare string where the
+file-done status, dimension state, provider, finding type) are StrEnums in one
+home module each (HOME_MODULES). Writing one of their values as a bare string
+where the
 code branches on it -- `s == "running"`, `s in {"done", "failed"}`,
 `case "cancelled":`, `status="done"`, `{"status": "done"}` -- or writes it
 into a variable or attribute named for the vocabulary -- `self.status =
@@ -45,6 +46,7 @@ HOME_MODULES = frozenset({
     "quodeq/core/scoring/constants.py",
     "quodeq/analysis/mcp/schemas.py",
     "quodeq/config/provider.py",
+    "quodeq/core/types/finding_type.py",
 })
 
 # One word set per vocabulary. A word may belong to several (``done`` is a
@@ -66,11 +68,12 @@ VOCABULARIES: dict[str, frozenset[str]] = {
     "FileDoneStatus": frozenset({"ok", "error", "skipped"}),
     "DimState": frozenset({"pending", "running", "done", "incomplete"}),
     "Provider": frozenset({"claude", "codex", "gemini", "copilot", "ollama", "llamacpp", "openrouter", "custom"}),
+    "FindingType": frozenset({"violation", "compliance"}),
 }
 
 VOCAB_WORDS = frozenset().union(*VOCABULARIES.values())
 
-VOCAB_KEYWORDS = frozenset({"status", "state", "severity", "grade", "run_state", "exit_reason", "provider"})
+VOCAB_KEYWORDS = frozenset({"status", "state", "severity", "grade", "run_state", "exit_reason", "provider", "verdict"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,10 +250,10 @@ def describe(hit: Hit) -> str:
 def write_baseline(path: Path = BASELINE_PATH) -> int:
     header = (
         "# Grandfathered bare vocabulary literals (run state, job status, exit\n"
-        "# reason, severity, grade, file-done status, dimension state, provider)\n"
-        "# in comparisons, membership tests, match cases and status=/state=/\n"
-        "# severity=/grade= arguments. The fix is the StrEnum member from the\n"
-        "# vocabulary's home module. Burn to zero; never add.\n"
+        "# reason, severity, grade, file-done status, dimension state, provider,\n"
+        "# finding type) in comparisons, membership tests, match cases and\n"
+        "# status=/state=/severity=/grade=/verdict= arguments. The fix is the\n"
+        "# StrEnum member from the vocabulary's home module. Burn to zero; never add.\n"
         "# Regenerate intentionally: python tools/check_vocab_literals.py --update-baseline\n"
     )
     return _ratchet.write_baseline(path, header, sorted({violation_key(h) for h in _scan()}))
