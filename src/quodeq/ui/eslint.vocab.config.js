@@ -6,17 +6,29 @@
 // Consumed by tools/check_vocab.mjs with inline config disabled: the only
 // way to grandfather a violation is tools/vocab_baseline.json, which may
 // only shrink.
-const WORDS = [
-  'pending', 'running', 'finalizing', 'done', 'failed', 'cancelled',
-  'complete', 'completed', 'finished', 'in_progress', 'canceled', 'lost',
-  'time_limit', 'deadline', 'failure_streak', 'error',
-  'stale_detected', 'stale_legacy_pid_dead', 'stale_legacy_no_pid',
-  'critical', 'major', 'minor',
-  'Exemplary', 'Good', 'Adequate', 'Poor', 'Insufficient',
-  'ok', 'skipped', 'incomplete',
-];
+// One word list per vocabulary (mirrors VOCABULARIES in
+// tools/check_vocab_literals.py, minus Provider, which has no UI module). A
+// word can sit in several; the same-vocabulary array rule matches per list.
+const VOCABULARIES = {
+  runState: [
+    'pending', 'running', 'finalizing', 'done', 'failed', 'cancelled',
+    'complete', 'completed', 'finished', 'in_progress', 'canceled', 'error', 'lost',
+  ],
+  jobStatus: ['running', 'done', 'failed', 'cancelled', 'lost'],
+  exitReason: [
+    'done', 'time_limit', 'deadline', 'failure_streak', 'cancelled', 'error',
+    'stale_detected', 'stale_legacy_pid_dead', 'stale_legacy_no_pid',
+  ],
+  severity: ['critical', 'major', 'minor'],
+  grade: ['Exemplary', 'Good', 'Adequate', 'Poor', 'Insufficient'],
+  fileDone: ['ok', 'error', 'skipped'],
+  dimState: ['pending', 'running', 'done', 'incomplete'],
+};
+const WORDS = [...new Set(Object.values(VOCABULARIES).flat())];
+const literal = (words) => `Literal[value=/^(${words.join('|')})$/]`;
 const KEYS = ['status', 'state', 'severity', 'grade', 'exitReason', 'runState'];
-const VALUE = `Literal[value=/^(${WORDS.join('|')})$/]`;
+const VALUE = literal(WORDS);
+const KEY_RE = `/^(${KEYS.join('|')})$/`;
 const MESSAGE = 'Bare vocabulary literal; use the constant from src/vocab/*.js.';
 
 export default [
@@ -49,6 +61,18 @@ export default [
         { selector: `AssignmentExpression[left.name=/^(${KEYS.join('|')})$/] > ${VALUE}.right`, message: MESSAGE },
         { selector: `AssignmentExpression[left.property.name=/^(${KEYS.join('|')})$/] > ${VALUE}.right`, message: MESSAGE },
         { selector: `VariableDeclarator[id.name=/^(${KEYS.join('|')})$/] > ${VALUE}.init`, message: MESSAGE },
+        // Fallback of a vocabulary-named read: `row.status ?? 'running'`,
+        // `state || 'done'` (the JS form of Python's `.get("state", "running")`).
+        { selector: `LogicalExpression[operator=/^(\\?\\?|\\|\\|)$/][left.property.name=${KEY_RE}] > ${VALUE}.right`, message: MESSAGE },
+        { selector: `LogicalExpression[operator=/^(\\?\\?|\\|\\|)$/][left.name=${KEY_RE}] > ${VALUE}.right`, message: MESSAGE },
+        // An array holding two or more words of one vocabulary is a hand-copied
+        // subset of it: `['done', 'failed']`. Matches from the second such word on.
+        ...Object.values(VOCABULARIES).map((words) => ({
+          selector: `ArrayExpression > ${literal(words)} ~ ${literal(words)}`,
+          message: MESSAGE,
+        })),
+        // `'error' in payload` is a key test: the `in` operator is not in the
+        // equality selector above, so its left operand is never flagged.
       ],
     },
   },
