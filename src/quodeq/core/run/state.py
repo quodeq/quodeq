@@ -14,11 +14,14 @@ SCHEMA_VERSION = 2
 STATUS_FILENAME = "status.json"
 
 
-class RunState(str, enum.Enum):
+class RunState(enum.StrEnum):
     """The states a run passes through, as persisted in ``status.json``.
 
     String-valued because the value is the on-disk representation; renaming a
-    member breaks every status file already written.
+    member breaks every status file already written. StrEnum (not a bare
+    ``(str, enum.Enum)`` mixin) so ``str()``/f-strings/``%s`` render the
+    plain value ("done") instead of "RunState.DONE" -- equality, hashing and
+    json.dumps were already value-based either way.
     """
 
     PENDING = "pending"

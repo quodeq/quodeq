@@ -11,11 +11,13 @@ SCHEMA_VERSION = 1
 FILENAME = "dimensions.json"
 
 
-class DimState(str, enum.Enum):
+class DimState(enum.StrEnum):
     """The states one dimension passes through inside a run.
 
     ``DONE`` and ``INCOMPLETE`` are terminal: a dimension that finished or
-    gave up is never restarted within the same run.
+    gave up is never restarted within the same run. StrEnum (not a bare
+    ``(str, enum.Enum)`` mixin) so ``str()``/f-strings/``%s`` render the
+    plain value ("done") instead of "DimState.DONE".
     """
 
     PENDING = "pending"

@@ -12,6 +12,13 @@ def test_members_serialize_as_their_string(member):
     assert member == member.value
 
 
+def test_str_and_fstring_render_the_plain_value():
+    """RunState is enum.StrEnum, not a bare (str, enum.Enum) mixin: str()/
+    f-strings must render "done", not "RunState.DONE"."""
+    assert f"{RunState.DONE}" == "done"
+    assert str(RunState.DONE) == "done"
+
+
 @pytest.mark.parametrize("raw,expected", [
     ("done", RunState.DONE), ("complete", RunState.DONE), ("completed", RunState.DONE),
     ("finished", RunState.DONE), ("running", RunState.RUNNING), ("in_progress", RunState.RUNNING),

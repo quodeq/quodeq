@@ -471,6 +471,8 @@ tests/api/test_local_provider_busy.py:7:private-module:quodeq.api._assistant_hel
 tests/api/test_log_buffer.py:5:private-module:quodeq.api._log_buffer.LogBuffer
 tests/api/test_log_routes.py:128:private-name:quodeq.api._log_routes._PAGES_DIR
 tests/api/test_log_stream_routes.py:107:private-name:quodeq.api._log_stream_routes._stream_terminal_state
+tests/api/test_log_stream_routes.py:128:private-name:quodeq.api._log_stream_routes._is_preparing_job
+tests/api/test_log_stream_routes.py:144:private-name:quodeq.api._log_stream_routes._stream_terminal_state
 tests/api/test_log_stream_routes.py:91:private-name:quodeq.api._log_stream_routes._is_preparing_job
 tests/api/test_power_selector_backend.py:190:private-name:quodeq.analysis.subagents.runner._default_subagent_model
 tests/api/test_power_selector_e2e.py:142:private-module:quodeq.analysis.subagents._pool_launcher.LaunchPoolParams
@@ -1052,6 +1054,9 @@ tests/services/test_evaluations_index_dimensions.py:57:private-name:quodeq.servi
 tests/services/test_evaluations_index_dimensions.py:66:private-name:quodeq.services._evaluations_index._read_time_limit_from_status
 tests/services/test_evaluations_index_downgrade.py:16:private-module:quodeq.services._evaluations_index.EvaluationsIndex
 tests/services/test_evaluations_index_downgrade.py:17:private-module:quodeq.services._job_model.InMemoryJobStore
+tests/services/test_evaluations_index_is_complete.py:16:private-module:quodeq.services._evaluations_index.EvaluationsIndex
+tests/services/test_evaluations_index_is_complete.py:17:private-module:quodeq.services._job_model.InMemoryJobStore
+tests/services/test_evaluations_index_is_complete.py:17:private-module:quodeq.services._job_model.Job
 tests/services/test_evaluations_index_safety.py:13:private-module:quodeq.services._evaluations_index.EvaluationsIndex
 tests/services/test_evaluations_index_safety.py:14:private-module:quodeq.services._job_model.InMemoryJobStore
 tests/services/test_external_jobs.py:106:private-module:quodeq.services._external_jobs.cancel_external_run
@@ -1130,9 +1135,9 @@ tests/services/test_job_model.py:6:private-module:quodeq.services._job_model.InM
 tests/services/test_job_model.py:6:private-module:quodeq.services._job_model.Job
 tests/services/test_job_model.py:6:private-module:quodeq.services._job_model.REPORT_PATH_RE
 tests/services/test_job_model.py:6:private-name:quodeq.services._job_model._MAX_LOG_LINES
-tests/services/test_job_model_file_store.py:10:private-module:quodeq.services._job_model.Job
-tests/services/test_job_model_file_store.py:11:private-module:quodeq.services._job_file_store.FileJobStore
-tests/services/test_job_model_file_store.py:11:private-name:quodeq.services._job_file_store._default_persist_dir
+tests/services/test_job_model_file_store.py:11:private-module:quodeq.services._job_model.Job
+tests/services/test_job_model_file_store.py:12:private-module:quodeq.services._job_file_store.FileJobStore
+tests/services/test_job_model_file_store.py:12:private-name:quodeq.services._job_file_store._default_persist_dir
 tests/services/test_job_model_serialization.py:6:private-module:quodeq.services._job_model.Job
 tests/services/test_job_model_serialization.py:7:private-name:quodeq.services._job_file_store._job_from_json
 tests/services/test_job_model_serialization.py:7:private-name:quodeq.services._job_file_store._job_to_json
