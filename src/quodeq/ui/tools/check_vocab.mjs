@@ -14,7 +14,7 @@ import { main } from './ratchet.mjs';
 
 // Revise DOWNWARD as burn-down tasks land; NEVER raise without a
 // justification reviewed in the PR that raises it.
-const TOTAL_CEILING = 102; // the inventory as of this gate's first commit; burned to 0 in the burn-down commits
+const TOTAL_CEILING = 0; // burn-down complete; every file uses the src/vocab/*.js constants
 
 main({
   script: 'check_vocab.mjs',
