@@ -72,10 +72,7 @@ def _gather_api_source_files(
             # Don't touch jsonl_file — it's the SHARED `{dim}_evidence.jsonl`
             # that every agent in the pool appends to via MCP. Truncating it
             # here wipes findings from every other agent in the pool.
-            stream_file.write_text(
-                json.dumps({"type": "api_runner", "status": API_RUNNER_STREAM_DONE}) + "\n",
-                encoding="utf-8",
-            )
+            stream_file.write_text(json.dumps({"type": "api_runner", "status": API_RUNNER_STREAM_DONE}) + "\n", encoding="utf-8")
             return None
         return source_files
     return _gather_source_files(work_dir)

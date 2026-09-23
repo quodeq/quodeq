@@ -204,10 +204,7 @@ def _run_api_analysis_bridge(
     api_config = _build_batch_api_config(cfg, model, api_base, api_key)
     _dispatch_api_batches(ctx, cfg, api_config, env)
 
-    stream_file.write_text(
-        json.dumps({"type": "api_runner", "status": API_RUNNER_STREAM_DONE}) + "\n",
-        encoding="utf-8",
-    )
+    stream_file.write_text(json.dumps({"type": "api_runner", "status": API_RUNNER_STREAM_DONE}) + "\n", encoding="utf-8")
     _log.debug("API analysis complete, evidence written to %s", ctx.jsonl_file)
 
 
