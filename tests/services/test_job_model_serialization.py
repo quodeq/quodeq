@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 
-from quodeq.core.run.job_status import JobStatus
 from quodeq.services._job_model import Job
 from quodeq.services._job_file_store import _job_to_json, _job_from_json
+from quodeq.core.run.job_status import JobStatus
 
 
 # ---------------------------------------------------------------------------

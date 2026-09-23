@@ -51,7 +51,7 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
     )
 
 
-_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "gemini", "copilot"})
+_DEFAULT_CLIENT_IDS = frozenset({Provider.CLAUDE, Provider.CODEX, Provider.GEMINI, Provider.COPILOT})
 
 
 def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:

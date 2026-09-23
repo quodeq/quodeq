@@ -20,6 +20,7 @@ from quodeq.core.scoring.constants import (
     Grade,
     MAX_SCORE,
 )
+from quodeq.core.types.severity import SEVERITY_ORDER
 
 # Canonical grade labels: positions are fixed, only the numeric boundaries move.
 GRADE_LABELS: tuple[str, ...] = (Grade.EXEMPLARY, Grade.GOOD, Grade.ADEQUATE, Grade.POOR)
@@ -152,7 +153,7 @@ def validate_params(params: ScoringParams) -> list[str]:
             errors.append(f"{name} must be between {lo} and {hi}, got {value}")
     if params.floor_minor < params.floor_major:
         errors.append("floor_minor must be >= floor_major")
-    for sev in ("critical", "major", "minor"):
+    for sev in SEVERITY_ORDER:
         w = params.severity_weight.get(sev)
         if w is None or not (_SEVERITY_WEIGHT_RANGE[0] <= w <= _SEVERITY_WEIGHT_RANGE[1]):
             errors.append(

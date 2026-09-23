@@ -22,18 +22,13 @@ _BROWSE_ERROR_MAP = {
 }
 _BROWSE_ERROR_DEFAULT = (HTTPStatus.NOT_FOUND, "INVALID_INPUT", "Path not found or not accessible")
 
-# A provider-response dict's error-flag key -- unrelated to any closed
-# vocabulary the ratchet tracks (ExitReason/FileDoneStatus also spell
-# "error"); named so it reads as what it is.
-_ERROR_KEY = "error"
-
 
 def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle GET /api/browse."""
     path = request.args.get("path")
     include_files = request.args.get("files", "").lower() in ("1", "true")
     payload = provider.browse_repo(path, include_files=include_files)
-    if _ERROR_KEY in payload:
+    if "error" in payload:
         http_status, code, safe_msg = _BROWSE_ERROR_MAP.get(
             payload.get("error_code"), _BROWSE_ERROR_DEFAULT,
         )
@@ -71,12 +66,12 @@ def _handle_browse_mkdir(provider: ActionProvider) -> Response | tuple[Response,
     name = data.get("name")
     name = name.strip() if isinstance(name, str) else ""
     payload = provider.browse_mkdir(parent, name)
-    if _ERROR_KEY in payload:
+    if "error" in payload:
         http_status, code = _MKDIR_ERROR_MAP.get(
             payload.get("error_code"),
             (HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR"),
         )
-        return json_error(payload[_ERROR_KEY], http_status, code)
+        return json_error(payload["error"], http_status, code)
     return jsonify(payload)
 
 
@@ -90,8 +85,8 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/ai-clients/<client_id>/models")
     def client_models(client_id: str) -> Response | tuple[Response, int]:
         payload = provider.get_client_models(client_id)
-        if _ERROR_KEY in payload:
-            return json_error(payload[_ERROR_KEY], HTTPStatus.SERVICE_UNAVAILABLE, payload["error_code"])
+        if "error" in payload:
+            return json_error(payload["error"], HTTPStatus.SERVICE_UNAVAILABLE, payload["error_code"])
         return jsonify(payload)
 
     @app.get("/api/ai-clients/<client_id>/cmd-path-check")

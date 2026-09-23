@@ -6,11 +6,13 @@ import logging
 import re
 from typing import Any
 
+from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.internals import GRADE_LADDER
 
 _logger = logging.getLogger(__name__)
 
-NUMERIC_GRADE_ORDER = ["Critical", "Poor", "Adequate", "Good", "Exemplary"]
+# "Critical" is the lowest label older numeric reports wrote; it has no Grade member.
+NUMERIC_GRADE_ORDER = ["Critical", Grade.POOR, Grade.ADEQUATE, Grade.GOOD, Grade.EXEMPLARY]
 TEXT_GRADE_ORDER = GRADE_LADDER
 
 _SCORE_RE = re.compile(r"(\d+(?:\.\d+)?)")

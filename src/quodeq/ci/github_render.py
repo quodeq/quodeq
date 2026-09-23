@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from quodeq.core.types.severity import Severity
 from quodeq.shared.serialization import coerce_line
 
 
@@ -62,7 +63,7 @@ def violation_to_comment(violation: dict, status: str = "new") -> dict:
 
     status: "new" (introduced by this PR) or "existing" (pre-existing baseline issue).
     """
-    severity = violation.get("severity", "minor")
+    severity = violation.get("severity", Severity.MINOR)
     title = _md_escape(violation.get("title", "Violation"))
     reason = _md_escape(violation.get("reason", ""))
     req = _md_escape(violation.get("req", ""))
@@ -125,7 +126,7 @@ def _violation_breakdown_lines(new_violations: list[dict], existing_violations: 
     if new_count > 0:
         new_severity_counts: dict[str, int] = {}
         for v in new_violations:
-            sev = v.get("severity", "minor")
+            sev = v.get("severity", Severity.MINOR)
             new_severity_counts[sev] = new_severity_counts.get(sev, 0) + 1
         parts = [f"{n} {sev}" for sev, n in new_severity_counts.items() if n > 0]
         if parts:
@@ -151,7 +152,7 @@ def _outside_diff_lines(outside: list[dict]) -> list[str]:
         file = v.get("file", "?")
         line = v.get("line")
         loc = f"{file}:{line}" if line is not None else file
-        severity = str(v.get("severity", "minor")).upper()
+        severity = str(v.get("severity", Severity.MINOR)).upper()
         title = _md_escape(v.get("title") or "Violation")
         lines.append(f"- `{loc}` — **{severity}** {title}")
     lines.append("")
@@ -225,7 +226,7 @@ def determine_verdict(new_violations: list[dict]) -> str:
     if not new_violations:
         return "COMMENT"
 
-    severities = {v.get("severity", "minor") for v in new_violations}
+    severities = {v.get("severity", Severity.MINOR) for v in new_violations}
     if severities & {"critical", "high"}:
         return "REQUEST_CHANGES"
     return "COMMENT"

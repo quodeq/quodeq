@@ -32,6 +32,8 @@ from quodeq.config.llm_bridge_env import llamacpp_base_url
 _log = logging.getLogger(__name__)
 
 _TIMEOUT_S = 3
+# The /health body's own status word; not a quodeq vocabulary.
+_HEALTH_OK = "ok"
 #: Everything a probe against a llama-server may raise: the socket/HTTP
 #: layer (OSError, which urllib's URLError and ConnectionRefusedError both
 #: subclass) and a body that is not the JSON we expect (ValueError, which
@@ -69,7 +71,7 @@ def get_llamacpp_status(base_url: str | None = None) -> dict:
             data = json.loads(resp.read() or b"{}")
             return {
                 "running": True,
-                "status": data.get("status", "ok"),
+                "status": data.get("status", _HEALTH_OK),
                 "address": root.replace("http://", ""),
             }
     except _TRANSPORT_ERRORS as exc:

@@ -1,13 +1,14 @@
 """Findings flattening and principle-row building for reports."""
 from __future__ import annotations
 
+from quodeq.core.scoring.constants import Grade
+from quodeq.core.types.severity import Severity
 from quodeq.data.fs.dimension_report.report_constants import (
     COMPLIANCE_FIELDS,
     FIELD_CONFIDENCE_INTERVAL,
     FIELD_CONFIDENCE_INTERVAL_SNAKE,
     FIELD_FINAL_SCORE,
     FIELD_FINAL_SCORE_SNAKE,
-    GRADE_INSUFFICIENT,
     VIOLATION_FIELDS,
 )
 from quodeq.data.fs.dimension_report.report_scoring import grade_from_score
@@ -31,7 +32,7 @@ def build_principle_row(raw_key: str, pdata: dict, lookup: dict) -> dict:
     raw_final = matched.get(FIELD_FINAL_SCORE)
     if raw_final is None:
         raw_final = matched.get(FIELD_FINAL_SCORE_SNAKE)
-    if grade == GRADE_INSUFFICIENT:
+    if grade == Grade.INSUFFICIENT:
         formatted_score = None
     else:
         formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
@@ -71,7 +72,7 @@ def build_principle_rows(
         viols = flatten_findings(pdata.get("violations", []), label, VIOLATION_FIELDS)
         flat_violations.extend(viols)
         for v in viols:
-            bucket = v.get("severity", "minor")
+            bucket = v.get("severity", Severity.MINOR)
             if bucket in sev_tally:
                 sev_tally[bucket] += 1
 

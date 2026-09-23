@@ -27,10 +27,6 @@ _REQUEST_ID = "quodeq-models"
 _RPC_HEADER_NAME = "Content-Length"
 _RPC_HEADER_PREFIX = f"{_RPC_HEADER_NAME}:".encode()
 _RPC_TERMINATOR = b"\r\n\r\n"
-# JSON-RPC error field: unrelated to any closed vocabulary (ExitReason/
-# FileDoneStatus also spell "error") -- named so the vocab-literal ratchet
-# doesn't mistake this RPC-protocol key for one of those.
-_RPC_ERROR_KEY = "error"
 
 
 class _ModelDiscoveryError(ClientMessageError):
@@ -81,8 +77,8 @@ async def _read_models(stdout: asyncio.StreamReader) -> list[str]:
             raise _ModelDiscoveryError("Copilot returned an invalid RPC response.")
         if response.get("id") != _REQUEST_ID:
             continue
-        if _RPC_ERROR_KEY in response:
-            raise _ModelDiscoveryError(_rpc_error_message(response[_RPC_ERROR_KEY]))
+        if "error" in response:
+            raise _ModelDiscoveryError(_rpc_error_message(response["error"]))
         return _model_ids(response.get("result"))
 
 

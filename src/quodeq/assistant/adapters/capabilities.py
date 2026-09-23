@@ -10,7 +10,7 @@ from quodeq.config.provider import Provider
 
 _logger = logging.getLogger(__name__)
 
-_ASSUME_NATIVE = frozenset({"openrouter", "custom"})
+_ASSUME_NATIVE = frozenset({Provider.OPENROUTER, Provider.CUSTOM})
 
 
 def _default_probe(url: str, json: dict) -> dict:

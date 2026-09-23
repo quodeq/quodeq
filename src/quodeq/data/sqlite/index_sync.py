@@ -98,7 +98,7 @@ def _upsert_from_status(
             project_uuid,
             run_id,
             str(run_dir),
-            status.get("state", "running"),
+            status.get("state", RunState.RUNNING),
             status.get("phase"),
             status.get("current_dimension"),
             status.get("started_at", ""),

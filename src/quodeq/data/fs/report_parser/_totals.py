@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from quodeq.core.types import Finding, SeverityTally, Totals
+from quodeq.core.types.severity import SEVERITY_ORDER
 
-SEVERITIES = {"critical", "major", "minor", "unknown"}
+# The tally buckets: every Severity plus "unknown" for a missing or unreadable one.
+SEVERITIES = {*SEVERITY_ORDER, "unknown"}
 
 
 def build_totals(violations: list[Finding], compliance: list[Finding]) -> Totals:

@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from quodeq.core.scoring.constants import _SEVERITY_WEIGHT
+from quodeq.core.types.severity import Severity
 
 
 def evidence_has_taxonomy(violations: list[dict]) -> bool:
@@ -23,7 +24,7 @@ def _tally_types_fallback(items: list[dict], key_fields: tuple[str, ...]) -> dic
     buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
     for item in items:
         value = next((item[k] for k in key_fields if item.get(k)), "unknown")
-        sev = item.get("severity", "minor")
+        sev = item.get("severity", Severity.MINOR)
         buckets.setdefault(sev, set()).add(value)
     return {sev: len(seen) for sev, seen in buckets.items()}
 

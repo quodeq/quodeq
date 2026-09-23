@@ -323,7 +323,6 @@ tests/analysis/test_report_assembly_density.py:4:private-module:quodeq.analysis.
 tests/analysis/test_report_assembly_density.py:4:private-module:quodeq.analysis._report_assembly.assemble_report_dict
 tests/analysis/test_report_assembly_exit_reason.py:4:private-module:quodeq.analysis._report_assembly.ReportData
 tests/analysis/test_report_assembly_exit_reason.py:4:private-module:quodeq.analysis._report_assembly.assemble_report_dict
-tests/analysis/test_report_findings_coverage.py:10:private-module:quodeq.analysis._report_constants.GRADE_INSUFFICIENT
 tests/analysis/test_report_findings_coverage.py:5:private-module:quodeq.analysis._report_findings.build_principle_row
 tests/analysis/test_report_findings_coverage.py:5:private-module:quodeq.analysis._report_findings.build_principle_rows
 tests/analysis/test_report_findings_coverage.py:5:private-module:quodeq.analysis._report_findings.flatten_findings

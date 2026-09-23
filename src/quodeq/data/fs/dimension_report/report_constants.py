@@ -45,4 +45,3 @@ COMPLIANCE_FIELDS = (
     "file", "line", "end_line", "title", "reason",
     "snippet", "context", "scope", "req", "req_refs",
 )
-GRADE_INSUFFICIENT = "Insufficient"
