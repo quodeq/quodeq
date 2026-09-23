@@ -124,7 +124,7 @@ class TestCancelEvaluation:
         """External (ext-) cancels must still score completed dimensions.
 
         Before this refactor, cancel_evaluation used self._jobs.get_job which
-        returns None for ext- ids after Plan B2, so the scoring block was dead
+        returns None for ext- ids, so the scoring block was dead
         for externals. Now it goes through self.get_evaluation_status, which
         the FilesystemActionProvider overrides to resolve ext- ids via the
         SQLite index. This test mocks that override pattern on the mixin
@@ -133,7 +133,7 @@ class TestCancelEvaluation:
         m = FsEvaluationMixin()
         m._jobs = MagicMock()
         m._jobs.cancel_job.return_value = True
-        # Simulate Plan B2 behavior: JobManager.get_job returns None for ext-.
+        # Simulate JobManager.get_job returning None for ext-.
         m._jobs.get_job.return_value = None
         # Simulate the FilesystemActionProvider override: get_evaluation_status
         # resolves ext- via the index and returns a real snapshot.

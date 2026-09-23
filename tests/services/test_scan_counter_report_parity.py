@@ -7,7 +7,7 @@ the report path used to apply the standard-membership predicate, so a finding
 whose principle is not in the dimension's standard was counted live but
 quarantined out of the report — a visible off-by-N in the UI.
 
-Regression case: run 8fc08558 of project d33f1fd0 had 571 unique maintainability
+Regression case: a run had 571 unique maintainability
 violations in the JSONL and 570 in evaluation/maintainability.json. The extra row
 carried no ``p`` and ``req: "N/A"``, so it resolved to the phantom principle
 "N/A", which the standard does not define.

@@ -1,4 +1,4 @@
-"""Cluster 33: analysis/config best-effort handlers log through the injected sink."""
+"""analysis/config best-effort handlers log through the injected sink."""
 from __future__ import annotations
 
 import os

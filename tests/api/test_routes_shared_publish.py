@@ -33,7 +33,7 @@ def test_refresh_failure_returns_502(client, tmp_path, monkeypatch):
 
 
 def test_refresh_failure_body_carries_error_reason(client, tmp_path, monkeypatch):
-    """Audit B3: the 502 body must carry the failure reason so the UI can
+    """The 502 body must carry the failure reason so the UI can
     distinguish DNS vs auth vs a deleted origin, instead of only ever being
     able to render "Request failed: 502"."""
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))

@@ -1,4 +1,4 @@
-"""Cluster 32: services best-effort handlers log through the injected LogSink."""
+"""services best-effort handlers log through the injected LogSink."""
 from __future__ import annotations
 
 import sqlite3

@@ -1,4 +1,4 @@
-"""Cluster 38: custom logging handlers contain their own failures (stdlib handleError contract)."""
+"""Custom logging handlers contain their own failures (stdlib handleError contract)."""
 from __future__ import annotations
 
 import logging

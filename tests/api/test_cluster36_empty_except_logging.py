@@ -1,4 +1,4 @@
-"""Cluster 36: api best-effort handlers log at debug instead of swallowing."""
+"""api best-effort handlers log at debug instead of swallowing."""
 from __future__ import annotations
 
 import json

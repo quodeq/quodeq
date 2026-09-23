@@ -221,7 +221,7 @@ def test_consume_stream_cleans_up_on_unexpected_exception(tmp_path: Path) -> Non
 
 
 # ---------------------------------------------------------------------------
-# Cluster 10: drain_pre_marker_buffer's writer.write() calls must not raise
+# drain_pre_marker_buffer's writer.write() calls must not raise
 # ---------------------------------------------------------------------------
 
 def test_drain_pre_marker_buffer_survives_broken_pipe(tmp_path: Path) -> None:

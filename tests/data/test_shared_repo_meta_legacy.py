@@ -92,7 +92,7 @@ def test_refresh_shared_clone_unshallows_legacy_cache(tmp_path, monkeypatch):
     (verified live). refresh_shared_clone must detect `.git/shallow` and run
     `git fetch --unshallow origin` first, so a legacy shallow cache
     self-heals on its next refresh instead of keeping the shallow-clone
-    misattribution (audit finding C1) forever.
+    misattribution forever.
     """
     builder_cache = tmp_path / "builder-cache"
     monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(builder_cache))

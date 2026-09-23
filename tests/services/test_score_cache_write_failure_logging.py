@@ -1,4 +1,4 @@
-"""Cluster 16: score-cache write failures must log, not just silently degrade.
+"""score-cache write failures must log, not just silently degrade.
 
 Each of the three write-side except blocks in ``_score_cache_fetch`` (write
 cached_accumulated, write cached_project_summary, write_cached_rows inside
@@ -15,7 +15,7 @@ instead of using caplog.
 The tests above prove the mechanism works when a caller passes ``log=``.
 They do NOT prove any production caller actually does -- final review item B
 (fault-tolerance cycle 1) found that every production caller left ``log`` at
-its silent ``NULL_LOG`` default, so cluster 16's logging never fired outside
+its silent ``NULL_LOG`` default, so this logging never fired outside
 tests. ``TestProductionCallerReachesRealSink`` below drives a real production
 caller (``_fs_metadata.py``, which now threads ``log=SHARED_LOG``) with no
 ``log=`` override at all, to prove the wiring -- not just the mechanism --
@@ -105,7 +105,7 @@ def test_make_cache_backed_fetcher_logs_on_write_failure(monkeypatch, tmp_path):
 
 
 class TestProductionCallerReachesRealSink:
-    """Final review Important 2: cluster 16's logging was inert because every
+    """This logging was inert because every
     production caller left ``log`` at its ``NULL_LOG`` default. These drive a
     real caller (``_fs_metadata.py``) with NO ``log=`` override, proving the
     module-level ``SHARED_LOG`` wiring added in item B actually reaches a

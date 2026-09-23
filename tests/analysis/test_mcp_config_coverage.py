@@ -104,7 +104,7 @@ class TestCreateMcpConfig:
         assert "--work-dir" not in args
 
     def test_includes_cache_root_model_id_language(self, make_mcp_config):
-        """Task 3.5 #6: the JSON config file's args list MUST include
+        """#6: the JSON config file's args list MUST include
         --cache-root, --model-id, and --language so the subprocess can build
         a cache writer whose fingerprint matches classify_files_via_cache.
         """

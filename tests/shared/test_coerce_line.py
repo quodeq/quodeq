@@ -1,4 +1,4 @@
-"""Post-PR review M11: one public ``coerce_line`` instead of three private copies.
+"""One public ``coerce_line`` instead of three private copies.
 
 ``_coerce_line`` lived in ``services/suppression_keys.py`` (re-exported by
 ``services/suppression.py``), was duplicated verbatim in

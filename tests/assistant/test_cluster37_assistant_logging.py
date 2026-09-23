@@ -1,4 +1,4 @@
-"""Cluster 37: assistant, cli, and lifecycle best-effort handlers log at debug."""
+"""assistant, cli, and lifecycle best-effort handlers log at debug."""
 from __future__ import annotations
 
 import argparse

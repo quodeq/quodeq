@@ -1,5 +1,5 @@
 """Retry-after-broken-pipe persistence semantics, and the exact production
-bug shape (run f7768d55).
+bug shape (observed in a real run).
 
 Split from test_loops_safety.py. Shared helpers live in
 tests/analysis/_loops_safety_fixtures.py.
@@ -14,7 +14,7 @@ from tests.analysis._loops_safety_fixtures import _FakeEvidence, _config, _ctx, 
 
 
 class TestCallbackRetryPersistsSideEffects:
-    """Pin down the per-dim run f061b58e bug: security's queue completed,
+    """Pin down the per-dim bug: security's queue completed,
     the scoring callback raised BrokenPipeError mid-run, the loop swallowed
     it with a misleading "result kept" message but evaluation/security.json
     was never written.
@@ -91,7 +91,7 @@ class TestCallbackRetryPersistsSideEffects:
 
 
 class TestProductionBugRegression:
-    """Pins down the run f7768d55 incident: usability's queue completed,
+    """Pins down the production incident: usability's queue completed,
     the scoring callback raised BrokenPipeError, the loop bailed before
     flexibility could iterate, and the lifecycle promoted the half-done
     state to ``done`` — both usability's eval and flexibility entirely

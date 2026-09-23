@@ -1,4 +1,4 @@
-"""Regression tests for finding 5398: classify_files_via_cache exposes the
+"""Regression tests: classify_files_via_cache exposes the
 content hash it already computed for each miss (via build_cache_key_struct),
 so the caller can hand it to the cache writer instead of re-hashing the file.
 

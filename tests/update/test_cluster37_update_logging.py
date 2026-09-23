@@ -1,4 +1,4 @@
-"""Cluster 37: update best-effort handlers log at debug."""
+"""update best-effort handlers log at debug."""
 from __future__ import annotations
 
 from unittest.mock import patch

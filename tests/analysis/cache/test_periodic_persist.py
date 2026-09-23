@@ -1,4 +1,4 @@
-"""Periodic cache persistence during dispatch (B5e): watcher lifecycle.
+"""Periodic cache persistence during dispatch: watcher lifecycle.
 
 When a dimension runs, the dispatch can take minutes. If the user
 cancels mid-dim, the previous design lost cache entries for files that

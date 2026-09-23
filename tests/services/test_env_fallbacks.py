@@ -1,6 +1,6 @@
 """Defensive env parsing: malformed values fall back instead of raising.
 
-Covers the P2 fix round's env sites: QUODEQ_JOB_TIMEOUT_S,
+Covers these env sites: QUODEQ_JOB_TIMEOUT_S,
 QUODEQ_CANCEL_GRACE_S, QUODEQ_GIT_CLONE_TIMEOUT_S (config.clone_env, read
 lazily per call by services._fs_clone and by the _cli_resolution import-time
 constant), and QUODEQ_MAX_HISTORY_RUNS. Import-time constants are exercised

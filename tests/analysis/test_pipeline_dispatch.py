@@ -83,7 +83,7 @@ def test_diff_from_uses_per_dim_loop(patched_pipeline):
 
     Diff mode is evidence-only -- fingerprint reuse doesn't apply, so
     even with incremental=True (default), the diff path takes precedence.
-    Note: the CLI translation layer (Task 3) actually sets incremental=False
+    Note: the CLI translation layer actually sets incremental=False
     when diff_from is given, but this test verifies the pipeline-level
     branch ordering directly.
     """

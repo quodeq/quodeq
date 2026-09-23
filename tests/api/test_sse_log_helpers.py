@@ -1,6 +1,6 @@
 """_tail_new_lines: a TOCTOU race between the caller's path.exists() check and
 open() must end in an SSE error frame, not an uncaught FileNotFoundError
-escaping the streaming generator (cluster 10, fault-tolerance cycle 1).
+escaping the streaming generator.
 
 A persistent open failure (permission denied, run directory removed
 mid-stream) must not turn into an unbounded error-frame flood: the stream

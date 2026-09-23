@@ -20,7 +20,7 @@ from tests.analysis.cache.conftest import (
 
 
 class TestCacheReplayAppliesScopeGate:
-    """Task 4 follow-up: the scope gate must be re-applied on the replay
+    """The scope gate must be re-applied on the replay
     path too, exactly like the provenance gate is for issue #657.
 
     ``FindingEnricher.enrich()`` calls ``apply_scope_gate`` right after

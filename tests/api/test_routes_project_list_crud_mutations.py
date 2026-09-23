@@ -50,7 +50,7 @@ class TestUpdateProjectPath:
         assert resp.status_code == 400
 
     def test_update_success(self, client, provider, tmp_path):
-        # finding 5926: update_project_path now also requires the target to
+        # update_project_path now also requires the target to
         # be an existing directory, so a real one (not the placeholder
         # absolute path) is needed for the success path.
         target = tmp_path / "relocated"

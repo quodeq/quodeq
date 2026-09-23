@@ -1,4 +1,4 @@
-"""ProjectsCache caches entities; the route owns serialization (WS6).
+"""ProjectsCache caches entities; the route owns serialization.
 
 The cache used to store the camelCase wire payload, a declared
 serialization-ratchet entry. It now caches ``ProjectEntry`` objects — the
@@ -94,7 +94,7 @@ def test_concurrent_cold_reads_share_one_build(tmp_path):
 
 
 def test_service_module_does_no_serialization():
-    """The declared WS6 wire-boundary entry is retired: no to_camel_dict here."""
+    """The declared wire-boundary entry is retired: no to_camel_dict here."""
     import quodeq.services._projects_cache as mod
 
     assert "to_camel_dict" not in open(mod.__file__).read()

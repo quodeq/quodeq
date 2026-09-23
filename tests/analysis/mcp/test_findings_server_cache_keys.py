@@ -13,7 +13,7 @@ def test_cli_path_and_api_path_compute_same_cache_key(tmp_path):
 
     Without this, the same file would land in DIFFERENT cache entries depending
     on which path ran first, and incremental runs across mixed paths would
-    re-dispatch unnecessarily. This pins the Task 3.5 cross-path consistency
+    re-dispatch unnecessarily. This pins the cross-path consistency
     guarantee against drift in either build_cache_writer caller.
     """
     from quodeq.analysis.run_types import AnalysisOptions, RunConfig
@@ -201,7 +201,7 @@ def test_cli_path_key_matches_api_path_when_language_missing(tmp_path):
     sa.work_dir = str(src_root)
     sa.cache_root = str(cache_root)
     sa.model_id = "sonnet"
-    # sa.language intentionally left as None -- simulates Task 6 not wired yet
+    # sa.language intentionally left as None -- simulates language support not wired yet
 
     router = _build_router(io.StringIO(), findings_jsonl, CompiledContext(), sa)
     router.receive({

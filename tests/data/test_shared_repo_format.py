@@ -106,7 +106,7 @@ def test_read_state_unsupported_version(tmp_path, monkeypatch):
 
 
 def test_read_state_foreign_with_evaluations_dir_still_foreign(tmp_path, monkeypatch):
-    """Audit A1: read_state must not treat "has an evaluations/ dir" as a
+    """read_state must not treat "has an evaluations/ dir" as a
     proxy for "ok" -- that let a real foreign repo (someone else's git repo
     that happens to contain a directory named evaluations/) serve as if it
     were a quodeq clone. A foreign repo is foreign regardless of its
@@ -123,7 +123,7 @@ def test_read_state_foreign_with_evaluations_dir_still_foreign(tmp_path, monkeyp
 
 
 def test_read_state_distinguishes_empty_and_foreign(tmp_path, monkeypatch):
-    """Audit A1: read_state must surface all four check_repo_format outcomes
+    """read_state must surface all four check_repo_format outcomes
     instead of collapsing "empty" and "foreign" down to "missing" -- real
     clones of real local bare origins, not hand-built directories, so the
     full ensure_shared_clone -> read_state path is exercised end to end."""

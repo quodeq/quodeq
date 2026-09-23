@@ -139,7 +139,7 @@ class TestOmlxBaseUrlValidation:
 
 
 # ---------------------------------------------------------------------------
-# Task 2 — backend secure storage for provider API keys.
+# Backend secure storage for provider API keys.
 # ---------------------------------------------------------------------------
 
 class TestProviderKeyRoutes:

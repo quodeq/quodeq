@@ -1,4 +1,4 @@
-"""Cluster 39: a timed-out in-flight wait falls back to a direct fetch and says so."""
+"""a timed-out in-flight wait falls back to a direct fetch and says so."""
 from __future__ import annotations
 
 import threading

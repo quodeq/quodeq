@@ -71,7 +71,7 @@ class TestExtendRunDeadline:
     The auto-scaled pool budget can exceed the run deadline computed from
     the user's original limit; without ratcheting the deadline forward,
     the job watchdog SIGTERMs a healthy run at original-limit+grace while
-    the pool believes it has hours left (observed: run d8f96511, limit
+    the pool believes it has hours left (observed: limit
     60s auto-scaled to 7200s, killed at start+121s).
     """
 
@@ -185,7 +185,7 @@ class TestLaunchPoolExtendsDeadline:
         """An explicit time_limit is a HARD CAP on the whole run. Each
         dim's pool launch must NOT ratchet the run deadline forward by a
         fresh full budget, or a 1h run becomes '1h after the LAST dim
-        launch' (observed: run 838d807e, 1h budget, deadline pushed 43min
+        launch' (observed: 1h budget, deadline pushed 43min
         past start+1h and still climbing at dim 5/6)."""
         from quodeq.analysis.subagents import _pool_launcher
 

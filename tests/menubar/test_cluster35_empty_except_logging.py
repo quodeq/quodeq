@@ -1,4 +1,4 @@
-"""Cluster 35: menubar best-effort handlers log at debug instead of swallowing."""
+"""menubar best-effort handlers log at debug instead of swallowing."""
 from __future__ import annotations
 
 import subprocess

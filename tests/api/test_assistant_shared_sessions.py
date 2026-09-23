@@ -4,7 +4,7 @@ tool dispatch (get_scores/search_findings), and the read-only registry.
 
 Reuses the fake-clone recipe (bare origin + publish_project +
 sync_shared_index) via ``shared_clone_fixture``, moved to
-tests/api/conftest.py in Task 6 Step 0 so it isn't duplicated here.
+tests/api/conftest.py so it isn't duplicated here.
 """
 from __future__ import annotations
 

@@ -24,7 +24,7 @@ def test_shared_project_info_invalid_segment(client, shared_clone_fixture):
 def test_shared_project_info_returns_sanitized_500_on_unexpected_error(
     client, shared_clone_fixture, monkeypatch,
 ):
-    """Cluster 11: shared_project_info is reached via a publicly shared URL,
+    """shared_project_info is reached via a publicly shared URL,
     unlike most of this app's local-only UI. Before this fix it had no
     try/except at all -- an unexpected exception from get_project_info would
     propagate straight into Flask's raw error handling instead of the
@@ -117,7 +117,7 @@ def test_shared_scores_not_found(client, shared_clone_fixture):
 
 
 def test_shared_scores_uses_isolated_score_cache(client, shared_clone_fixture):
-    """Task 9 integration: the shared clone's own score_cache.db is touched,
+    """The shared clone's own score_cache.db is touched,
     not the local (unconfigured, in this test) default score cache path."""
     from quodeq.data.fs.shared_repo import shared_score_cache_path
 

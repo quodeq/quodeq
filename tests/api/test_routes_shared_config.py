@@ -113,7 +113,7 @@ def _push_seed_file(origin: Path, name: str, content: str) -> None:
 
 
 def test_put_config_rejects_foreign_repo_after_clone(client, monkeypatch, tmp_path):
-    """Audit A1: PUT must validate format AFTER a real clone succeeds --
+    """PUT must validate format AFTER a real clone succeeds --
     a real, clonable git repo that isn't a quodeq results repo (no
     quodeq.json marker) is rejected, and settings are never written for it.
     """
@@ -139,7 +139,7 @@ def test_put_config_rejects_foreign_repo_after_clone(client, monkeypatch, tmp_pa
 
 
 def test_put_config_rejects_unsupported_version_after_clone(client, monkeypatch, tmp_path):
-    """Audit A1: same AFTER-clone validation for a repo whose quodeq.json
+    """Same AFTER-clone validation for a repo whose quodeq.json
     marker declares a format version newer than this build understands."""
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
     monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
@@ -160,7 +160,7 @@ def test_put_config_rejects_unsupported_version_after_clone(client, monkeypatch,
 
 
 def test_put_config_accepts_empty_repo(client, monkeypatch, tmp_path):
-    """Audit A1: a real clone of a bare origin with zero commits ("empty",
+    """A real clone of a bare origin with zero commits ("empty",
     never published into) must be accepted, not rejected as foreign."""
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
     monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
@@ -198,7 +198,7 @@ def test_put_config_happy_path(client, monkeypatch, tmp_path):
 
 
 def test_put_config_reconnect_refreshes_pre_existing_clone(client, monkeypatch, tmp_path):
-    """Audit A4: reconnecting to a URL whose clone already exists in the
+    """Reconnecting to a URL whose clone already exists in the
     cache must fetch fresh content before returning, not silently keep
     serving whatever was last fetched. Regression: a project is published
     directly to origin AFTER the first connect, then the same URL is
