@@ -23,18 +23,9 @@ from quodeq.context.online_cache import (
 )
 from quodeq.data.fs.repo_validation import validate_remote_url as _validate_remote_url
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.config.clone_env import git_clone_timeout_s
 
 _logger = logging.getLogger(__name__)
-
-_DEFAULT_CLONE_TIMEOUT_S = 300
-
-
-def _get_clone_timeout(env: Mapping[str, str] | None = None) -> int:
-    """Return the git clone timeout, reading the env var lazily."""
-    try:
-        return int(resolve_env(env).get("QUODEQ_GIT_CLONE_TIMEOUT", str(_DEFAULT_CLONE_TIMEOUT_S)))
-    except ValueError:
-        return _DEFAULT_CLONE_TIMEOUT_S
 
 
 class GitCloneClient:
@@ -105,8 +96,9 @@ def _legacy_tempdir_clone(repo_input: str, *, client: GitCloneClient | None = No
     tmp_dir = tempfile.mkdtemp()
     dest = Path(tmp_dir) / repo_name
     try:
-        _logger.info("Cloning %s (timeout: %ds)...", repo_input, _get_clone_timeout())
-        client.clone_legacy(repo_input, dest, timeout_s=_get_clone_timeout())
+        timeout_s = git_clone_timeout_s()
+        _logger.info("Cloning %s (timeout: %ds)...", repo_input, timeout_s)
+        client.clone_legacy(repo_input, dest, timeout_s=timeout_s)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
         shutil.rmtree(tmp_dir, ignore_errors=True)
         raise

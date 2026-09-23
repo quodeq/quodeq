@@ -877,8 +877,6 @@ tests/data/test_db_stamp_memo.py:10:private-module:quodeq.data.sqlite._db_stamp_
 tests/data/test_db_stamp_memo.py:10:private-module:quodeq.data.sqlite._db_stamp_memo.memoized_by_db_stamp
 tests/data/test_db_stamp_memo.py:10:private-name:quodeq.data.sqlite._db_stamp_memo._DEFAULT_CACHE
 tests/data/test_db_stamp_memo.py:10:private-name:quodeq.data.sqlite._db_stamp_memo._StampCache
-tests/data/test_env_seams_t5.py:12:private-name:quodeq.data.fs.repo_clone._DEFAULT_CLONE_TIMEOUT_S
-tests/data/test_env_seams_t5.py:12:private-name:quodeq.data.fs.repo_clone._get_clone_timeout
 tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._cache_base
 tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._git_env
 tests/data/test_git_cli.py:215:private-module:quodeq.analysis.subagents._git_scoring.git_scoring

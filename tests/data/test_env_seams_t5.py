@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.data.cache_store.local import LocalFileBackend, default_cache_root
-from quodeq.data.fs.repo_clone import _DEFAULT_CLONE_TIMEOUT_S, GitCloneClient, _get_clone_timeout
+from quodeq.data.fs.repo_clone import GitCloneClient, cleanup_cloned_repo, prepare_repository
 from quodeq.data.fs.shared_repo import _cache_base, _git_env, run_git
 
 
@@ -37,14 +37,34 @@ class TestLocalFileBackendRoot:
         assert backend._root == Path.home() / ".quodeq" / "cache" / "results"
 
 
-class TestCloneTimeout:
-    def test_uses_the_injected_value(self, monkeypatch):
-        monkeypatch.setenv("QUODEQ_GIT_CLONE_TIMEOUT", "11")
-        assert _get_clone_timeout({"QUODEQ_GIT_CLONE_TIMEOUT": "22"}) == 22
+class _RecordingCloneClient:
+    """Stands in for GitCloneClient on the legacy path; records the timeout."""
 
-    def test_empty_injected_env_ignores_the_process(self, monkeypatch):
+    def __init__(self) -> None:
+        self.timeouts: list[int] = []
+
+    def clone_legacy(self, repo_input: str, dest: Path, *, timeout_s: int) -> None:
+        self.timeouts.append(timeout_s)
+
+
+class TestCloneTimeout:
+    """The legacy clone path reads the same variable as every other clone."""
+
+    def _clone(self, monkeypatch) -> list[int]:
+        monkeypatch.setenv("QUODEQ_DISABLE_ONLINE_CACHE", "1")
+        monkeypatch.setattr("quodeq.data.fs.repo_clone._validate_remote_url", lambda url: None)
+        client = _RecordingCloneClient()
+        cleanup_cloned_repo(prepare_repository("https://github.com/octo/demo.git", client=client))
+        return client.timeouts
+
+    def test_reads_quodeq_git_clone_timeout_s(self, monkeypatch):
+        monkeypatch.setenv("QUODEQ_GIT_CLONE_TIMEOUT_S", "42")
+        assert self._clone(monkeypatch) == [42]
+
+    def test_ignores_the_dropped_variable(self, monkeypatch):
+        monkeypatch.delenv("QUODEQ_GIT_CLONE_TIMEOUT_S", raising=False)
         monkeypatch.setenv("QUODEQ_GIT_CLONE_TIMEOUT", "11")
-        assert _get_clone_timeout({}) == _DEFAULT_CLONE_TIMEOUT_S
+        assert self._clone(monkeypatch) == [300]
 
 
 class TestGitCloneClientEnv:
