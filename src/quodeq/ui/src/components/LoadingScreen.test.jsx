@@ -20,8 +20,28 @@ describe('LoadingScreen tips', () => {
       const first = container.querySelector('.loading-tip');
       expect(first).toBeTruthy();
       const firstText = first.textContent;
-      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(8700); });
       expect(container.querySelector('.loading-tip').textContent).not.toBe(firstText);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fades the old tip out before swapping in the next one', async () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<LoadingScreen tips />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      const tip = () => container.querySelector('.loading-tip');
+      const firstText = tip().textContent;
+      expect(tip().classList.contains('loading-tip--fading')).toBe(false);
+      await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
+      // Mid-fade: still the old text, now fading out.
+      expect(tip().classList.contains('loading-tip--fading')).toBe(true);
+      expect(tip().textContent).toBe(firstText);
+      await act(async () => { await vi.advanceTimersByTimeAsync(700); });
+      expect(tip().classList.contains('loading-tip--fading')).toBe(false);
+      expect(tip().textContent).not.toBe(firstText);
     } finally {
       vi.useRealTimers();
     }
@@ -49,11 +69,13 @@ describe('LoadingScreen tips', () => {
     vi.useFakeTimers();
     try {
       const { container } = render(<LoadingScreen tips />);
-      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      // Land mid-cycle so each sample sits between two swaps.
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
       const seen = [];
       for (let i = 0; i < 14; i++) {
         seen.push(container.querySelector('.loading-tip').textContent);
-        await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
       }
       expect(new Set(seen).size).toBe(14);
     } finally {
