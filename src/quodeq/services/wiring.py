@@ -151,6 +151,7 @@ from quodeq.data.fs.children import find_children  # noqa: F401
 from quodeq.data.fs.shared_repo import (  # noqa: F401
     MARKER_FILENAME,
     PUBLISHED_META_FILENAME,
+    RepoFormat,
     bootstrap_repo_layout,
     check_repo_format,
     clone_lock,

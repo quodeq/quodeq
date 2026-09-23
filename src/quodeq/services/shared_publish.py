@@ -36,6 +36,7 @@ from quodeq.services._publish_staging import (
 )
 from quodeq.services.wiring import (
     MARKER_FILENAME,
+    RepoFormat,
     bootstrap_repo_layout,
     clone_lock,
     ensure_shared_clone,
@@ -86,7 +87,7 @@ def _prepare_workspace(
     # thread instead of deadlocking.
     with clone_lock(url, env):
         repo, fmt = prepare_clone(url, env)
-        if fmt == "empty":
+        if fmt == RepoFormat.EMPTY:
             try:
                 bootstrap_repo_layout(repo)
             except (OSError, ValueError) as exc:

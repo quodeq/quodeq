@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.shared_repo import (
-    REPO_FORMAT_OK,
+    RepoFormat,
     check_repo_format,
     ensure_shared_clone,
     read_state,
@@ -50,7 +50,7 @@ def connect_shared_repo(url: str, *, log: LogSink = NULL_LOG) -> ConnectOutcome:
     # check has to happen here, before it. refresh_shared_clone acquires
     # clone_lock itself (RLock, so nesting would be safe too, but there
     # is nothing else in this route that needs the lock held around it).
-    pre_existing = read_state(url) != "missing"
+    pre_existing = read_state(url) != RepoFormat.MISSING
     repo = ensure_shared_clone(url)
     if repo is None:
         return ConnectOutcome(status="clone_failed", url=url)
@@ -63,9 +63,9 @@ def connect_shared_repo(url: str, *, log: LogSink = NULL_LOG) -> ConnectOutcome:
     # on). "empty" (never published into) is a legitimate first-connect
     # state and is accepted here same as "ok".
     fmt = check_repo_format(repo)
-    if fmt == "foreign":
-        return ConnectOutcome(status="foreign", url=url)
-    if fmt == "unsupported_version":
-        return ConnectOutcome(status="unsupported_version", url=url)
+    if fmt == RepoFormat.FOREIGN:
+        return ConnectOutcome(status=RepoFormat.FOREIGN, url=url)
+    if fmt == RepoFormat.UNSUPPORTED_VERSION:
+        return ConnectOutcome(status=RepoFormat.UNSUPPORTED_VERSION, url=url)
     write_settings(SharedSettings(url=url), log=log)
-    return ConnectOutcome(status=REPO_FORMAT_OK, url=url)
+    return ConnectOutcome(status=RepoFormat.OK, url=url)

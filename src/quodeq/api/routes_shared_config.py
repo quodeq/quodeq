@@ -12,7 +12,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.services.shared_connect import connect_shared_repo
 from quodeq.services.shared_publish import get_publish_status
-from quodeq.services.shared_repo import disconnect_shared_repo, last_synced_at, read_state
+from quodeq.services.shared_repo import RepoFormat, disconnect_shared_repo, last_synced_at, read_state
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import path_segment_error
@@ -73,13 +73,13 @@ def shared_config_put() -> Response | tuple[Response, int]:
             502,
             "CLONE_FAILED",
         )
-    if outcome.status == "foreign":
+    if outcome.status == RepoFormat.FOREIGN:
         return json_error(
             "the repository exists but does not look like a quodeq results repository",
             400,
             "FOREIGN_REPO",
         )
-    if outcome.status == "unsupported_version":
+    if outcome.status == RepoFormat.UNSUPPORTED_VERSION:
         return json_error(
             "this shared repository requires a newer version of quodeq",
             400,
