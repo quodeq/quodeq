@@ -15,7 +15,8 @@ the client directly.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -40,6 +41,60 @@ def _manager(row: dict) -> WorktreeManager:
                            path=Path(row["path"]), branch=row["branch"])
 
 
+_ACTIVE_ONLY = ("active",)
+
+
+@dataclass(frozen=True, slots=True)
+class _Claim:
+    """The worktree row re-read under a claimed turn, or why there is none.
+
+    ``refusal`` is "" when ``row`` is usable, else "turn_busy", "gone" or
+    "not_active" (with the row's status in ``detail``).
+    """
+
+    row: dict | None = None
+    refusal: str = ""
+    detail: str = ""
+
+
+@contextmanager
+def _claimed_row(
+    repo: AssistantStore, sid: str, claim_turn: ClaimTurn, release_turn: ReleaseTurn,
+    allowed: tuple[str, ...],
+) -> Iterator[_Claim]:
+    """Claim the turn slot, re-read the row (state may have moved since the
+    route's lookup) and gate it on *allowed*. Releases on every exit path
+    once the claim succeeded."""
+    if not claim_turn(sid):
+        yield _Claim(refusal="turn_busy")
+        return
+    try:
+        row = repo.get_worktree(sid)
+        if row is None:
+            yield _Claim(refusal="gone")
+        elif row["status"] not in allowed:
+            yield _Claim(refusal="not_active", detail=row["status"])
+        else:
+            yield _Claim(row=row)
+    finally:
+        release_turn(sid)
+
+
+def _active_refusal(claim: _Claim) -> tuple[str, str]:
+    """(kind, detail) for apply/pr, which report a missing row as not_active/"gone"."""
+    if claim.refusal == "gone":
+        return "not_active", "gone"
+    return claim.refusal, claim.detail
+
+
+def _remove_quietly(manager: WorktreeManager, sid: str, after: str, **kwargs) -> None:
+    """Best-effort worktree removal once the row already moved on; logs only."""
+    try:
+        manager.remove(**kwargs)
+    except WorktreeError:
+        _logger.warning("worktree remove failed after %s for %s", after, sid)
+
+
 @dataclass(frozen=True)
 class ApplyOutcome:
     """Result of an apply attempt.
@@ -59,25 +114,17 @@ def apply_workspace(
     """Apply the worktree diff onto the user's repo and advance the row to
     "applied". Claims the turn slot first so a concurrent /messages turn (or
     another apply/pr) sees "turn_busy" instead of racing the same worktree."""
-    if not claim_turn(sid):
-        return ApplyOutcome("turn_busy")
-    try:
-        row = repo.get_worktree(sid)  # re-read under the claim
-        if row is None or row["status"] != "active":
-            return ApplyOutcome("not_active", detail=row["status"] if row else "gone")
-        manager = _manager(row)
+    with _claimed_row(repo, sid, claim_turn, release_turn, _ACTIVE_ONLY) as claim:
+        if claim.refusal:
+            return ApplyOutcome(*_active_refusal(claim))
+        manager = _manager(claim.row)
         try:
             stats = manager.apply_to_repo()
         except WorktreeError as exc:
             return ApplyOutcome(OUTCOME_FAILED, detail=str(exc))
         repo.set_worktree_status(sid, "applied")
-        try:
-            manager.remove()
-        except WorktreeError:
-            _logger.warning("worktree remove failed after apply for %s", sid)
+        _remove_quietly(manager, sid, "apply")
         return ApplyOutcome("applied", stats=stats)
-    finally:
-        release_turn(sid)
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,26 +157,18 @@ def create_workspace_pr(
     """Commit, push, and open a PR from the worktree; advance the row to
     "pr_created" only once a PR URL actually comes back (fail-soft cases
     leave the row "active" so the user can retry)."""
-    if not claim_turn(sid):
-        return PrOutcome("turn_busy")
-    try:
-        row = repo.get_worktree(sid)  # re-read under the claim
-        if row is None or row["status"] != "active":
-            return PrOutcome("not_active", detail=row["status"] if row else "gone")
-        manager = _manager(row)
+    with _claimed_row(repo, sid, claim_turn, release_turn, _ACTIVE_ONLY) as claim:
+        if claim.refusal:
+            return PrOutcome(*_active_refusal(claim))
+        manager = _manager(claim.row)
         try:
             result = manager.create_pr(draft.title, draft.body)
         except WorktreeError as exc:
             return PrOutcome(OUTCOME_FAILED, detail=str(exc))
         if result.get("prUrl"):
             repo.set_worktree_status(sid, "pr_created")
-            try:
-                manager.remove(delete_branch=False)  # branch lives on the remote PR
-            except WorktreeError:
-                _logger.warning("worktree remove failed after pr for %s", sid)
+            _remove_quietly(manager, sid, "pr", delete_branch=False)  # branch lives on the remote PR
         return PrOutcome("created", result=result)
-    finally:
-        release_turn(sid)
 
 
 @dataclass(frozen=True)
@@ -152,19 +191,12 @@ def discard_workspace(
     apply (overwriting "applied" with "discarded" while the changes sat in
     the user's real tree) and pulled the worktree out from under a running
     write turn."""
-    if not claim_turn(sid):
-        return DiscardOutcome("turn_busy")
-    try:
-        row = repo.get_worktree(sid)  # re-read under the claim
-        if row is None:
-            return DiscardOutcome("gone")
-        if row["status"] not in ("active", "stale"):
-            return DiscardOutcome("not_active", detail=row["status"])
+    with _claimed_row(repo, sid, claim_turn, release_turn, ("active", "stale")) as claim:
+        if claim.refusal:
+            return DiscardOutcome(claim.refusal, detail=claim.detail)
         try:
-            _manager(row).remove()
+            _manager(claim.row).remove()
         except WorktreeError as exc:
             return DiscardOutcome(OUTCOME_FAILED, detail=str(exc))
         repo.set_worktree_status(sid, "discarded")
         return DiscardOutcome("discarded")
-    finally:
-        release_turn(sid)
