@@ -6,7 +6,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, current_app, jsonify, request
 
-from quodeq.core.run.job_status import JOB_TERMINAL
+from quodeq.core.run.job_status import JOB_FINISHED
 from quodeq.api._log_tail_helpers import (
     _is_visible_log_line,
     _read_tail,
@@ -39,7 +39,7 @@ def _is_preparing_job(provider, job_id: str) -> bool:
     jobs = getattr(provider, "_jobs", None)
     if jobs is not None:
         job = jobs.get_job(job_id)
-        if job is not None and job.status not in JOB_TERMINAL:
+        if job is not None and job.status not in JOB_FINISHED:
             return True
     # External job: the CLI creates the run directory before opening the
     # ``run.log`` writer, so there is a brief window where the directory

@@ -25,6 +25,16 @@ JOB_TERMINAL: frozenset[JobStatus] = frozenset(
     {JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.LOST}
 )
 
+# Excludes LOST on purpose: a lost job's subprocess may still be alive and
+# writing (the tracking thread, not the process, is what was lost), so
+# callers that decide "the run actually finished" (SSE done-frame, is_complete
+# disk fallback, preparing-job liveness) must not treat LOST as finished --
+# they fall through to a status.json/disk check instead. Use JOB_TERMINAL
+# only where "no longer tracked, for any reason including lost" is the point.
+JOB_FINISHED: frozenset[JobStatus] = frozenset(
+    {JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED}
+)
+
 # Job ids of runs launched outside the dashboard (CLI, CI) carry this prefix
 # so the evaluations index can tell them from dashboard-managed jobs.
 EXTERNAL_JOB_PREFIX = "ext-"

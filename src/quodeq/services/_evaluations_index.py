@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from quodeq.core.run.job_status import EXTERNAL_JOB_PREFIX, JOB_TERMINAL, JobStatus, is_external_job_id, strip_external_prefix
+from quodeq.core.run.job_status import EXTERNAL_JOB_PREFIX, JOB_FINISHED, JobStatus, is_external_job_id, strip_external_prefix
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
 from quodeq.services._external_jobs import _sync_external_run
@@ -260,7 +260,7 @@ class EvaluationsIndex:
                 return False
             return _external_job_is_complete(run_dir)
         snapshot = self._jobs.get_job(job_id)
-        if snapshot is not None and snapshot.status in JOB_TERMINAL:
+        if snapshot is not None and snapshot.status in JOB_FINISHED:
             return True
         # Fall back to disk: scan.json or terminal status.json mean the run
         # is over. Covers eviction from the in-memory store and the gap
