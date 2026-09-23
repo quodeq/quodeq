@@ -97,3 +97,51 @@ def test_writes_to_non_vocabulary_targets_are_not_flagged(tmp_path):
         'def f(obj):\n    name = "done"\n    obj.label = "running"\n    return name\n',
     )
     assert check_vocab_literals.scan_tree(tmp_path / "src") == []
+
+
+def test_flags_collections_of_two_or_more_words_from_one_vocabulary(tmp_path):
+    _write(tmp_path, "src/quodeq/services/x.py", (
+        '_TERMINAL = frozenset({"done", "failed"})\n'
+        'CHOICES = ["critical", "major", "minor"]\n'
+        'PAIR = ("openrouter", "custom")\n'
+        'MIXED = {"Poor", "unknown"}\n'
+        'ACROSS = ("critical", "Poor", "claude")\n'
+    ))
+    hits = check_vocab_literals.scan_tree(tmp_path / "src")
+    assert [(h.line, h.literal) for h in hits] == [
+        (1, "done"), (1, "failed"),
+        (2, "critical"), (2, "major"), (2, "minor"),
+        (3, "custom"), (3, "openrouter"),
+    ]
+
+
+def test_a_membership_collection_is_reported_once_per_literal(tmp_path):
+    _write(tmp_path, "src/quodeq/services/x.py", 'def f(s):\n    return s in ("done", "failed")\n')
+    hits = check_vocab_literals.scan_tree(tmp_path / "src")
+    assert [(h.line, h.literal) for h in hits] == [(2, "done"), (2, "failed")]
+
+
+def test_flags_vocabulary_default_of_a_vocabulary_key_get(tmp_path):
+    _write(tmp_path, "src/quodeq/services/x.py", (
+        'def f(d):\n'
+        '    a = d.get("state", "running")\n'
+        '    b = d.get("severity", "minor")\n'
+        '    c = d.get("label", "done")\n'
+        '    e = d.get("status")\n'
+        '    return a, b, c, e\n'
+    ))
+    hits = check_vocab_literals.scan_tree(tmp_path / "src")
+    assert [(h.line, h.literal) for h in hits] == [(2, "running"), (3, "minor")]
+
+
+def test_left_operand_of_membership_is_a_key_test(tmp_path):
+    _write(tmp_path, "src/quodeq/services/x.py", (
+        'def f(payload, s):\n'
+        '    if "error" in payload:\n'
+        '        return payload["error"]\n'
+        '    if "done" not in payload:\n'
+        '        return None\n'
+        '    return s in ("ok",) or "failed" == s\n'
+    ))
+    hits = check_vocab_literals.scan_tree(tmp_path / "src")
+    assert [(h.line, h.literal) for h in hits] == [(6, "failed"), (6, "ok")]

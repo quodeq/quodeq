@@ -7,11 +7,16 @@ each (HOME_MODULES). Writing one of their values as a bare string where the
 code branches on it -- `s == "running"`, `s in {"done", "failed"}`,
 `case "cancelled":`, `status="done"`, `{"status": "done"}` -- or writes it
 into a variable or attribute named for the vocabulary -- `self.status =
-"done"`, `state = "running"` -- is what this gate flags (maintainability
-M-MDF-1, and the typo class nothing else catches).
+"done"`, `state = "running"` -- or reads it as the fallback of a
+vocabulary-named key -- `d.get("state", "running")` -- is what this gate
+flags (maintainability M-MDF-1, and the typo class nothing else catches).
+A set/tuple/list literal holding two or more words of the same vocabulary
+is flagged wherever it sits: `_TERMINAL = frozenset({"done", "failed"})` is
+a hand-copied subset of the enum.
 The fix is the enum member: `s == RunState.RUNNING`.
 
-Not flagged: dict keys, f-strings, docstrings, log/message arguments, and
+Not flagged: dict keys, the left operand of `in`/`not in` (`"error" in
+payload` is a key test), f-strings, docstrings, log/message arguments, and
 any string that is not in VOCAB_WORDS. Home modules are exempt.
 
 Entries are line-keyed (relpath:lineno:literal). Regenerate intentionally:
@@ -42,24 +47,28 @@ HOME_MODULES = frozenset({
     "quodeq/config/provider.py",
 })
 
-VOCAB_WORDS = frozenset({
-    # RunState + legacy spellings
-    "pending", "running", "finalizing", "done", "failed", "cancelled",
-    "complete", "completed", "finished", "in_progress", "canceled", "lost",
-    # ExitReason
-    "time_limit", "deadline", "failure_streak", "error",
-    "stale_detected", "stale_legacy_pid_dead", "stale_legacy_no_pid",
-    # Severity
-    "critical", "major", "minor",
-    # Grade
-    "Exemplary", "Good", "Adequate", "Poor", "Insufficient",
-    # FileDoneStatus
-    "ok", "skipped",
-    # DimState
-    "incomplete",
-    # Provider
-    "claude", "codex", "gemini", "copilot", "ollama", "llamacpp", "openrouter", "custom",
-})
+# One word set per vocabulary. A word may belong to several (``done`` is a
+# run state, a job status, an exit reason and a dimension state); the
+# same-vocabulary collection rule counts per set.
+VOCABULARIES: dict[str, frozenset[str]] = {
+    "RunState": frozenset({
+        "pending", "running", "finalizing", "done", "failed", "cancelled",
+        # legacy spellings parse_run_state still reads
+        "complete", "completed", "finished", "in_progress", "canceled", "error", "lost",
+    }),
+    "JobStatus": frozenset({"running", "done", "failed", "cancelled", "lost"}),
+    "ExitReason": frozenset({
+        "done", "time_limit", "deadline", "failure_streak", "cancelled", "error",
+        "stale_detected", "stale_legacy_pid_dead", "stale_legacy_no_pid",
+    }),
+    "Severity": frozenset({"critical", "major", "minor"}),
+    "Grade": frozenset({"Exemplary", "Good", "Adequate", "Poor", "Insufficient"}),
+    "FileDoneStatus": frozenset({"ok", "error", "skipped"}),
+    "DimState": frozenset({"pending", "running", "done", "incomplete"}),
+    "Provider": frozenset({"claude", "codex", "gemini", "copilot", "ollama", "llamacpp", "openrouter", "custom"}),
+}
+
+VOCAB_WORDS = frozenset().union(*VOCABULARIES.values())
 
 VOCAB_KEYWORDS = frozenset({"status", "state", "severity", "grade", "run_state", "exit_reason", "provider"})
 
@@ -117,6 +126,26 @@ def _assigned_constants(target: ast.AST, value: ast.AST | None) -> list[ast.Cons
     return _vocab_constants(value) if _is_vocab_target(target) else []
 
 
+def _same_vocab_constants(node: ast.Set | ast.Tuple | ast.List) -> list[ast.Constant]:
+    """The elements of a collection literal that share a vocabulary with another element."""
+    consts = [e for e in node.elts if isinstance(e, ast.Constant) and isinstance(e.value, str) and e.value in VOCAB_WORDS]
+    out: list[ast.Constant] = []
+    for words in VOCABULARIES.values():
+        members = [c for c in consts if c.value in words]
+        if len(members) >= 2:  # noqa: PLR2004 -- "two or more" is the rule itself
+            out.extend(members)
+    return out
+
+
+def _is_vocab_get(node: ast.Call) -> bool:
+    """True for ``<x>.get("<vocab key>", <default>)``."""
+    return (
+        isinstance(node.func, ast.Attribute) and node.func.attr == "get"
+        and len(node.args) >= 2  # noqa: PLR2004 -- key and default
+        and isinstance(node.args[0], ast.Constant) and node.args[0].value in VOCAB_KEYWORDS
+    )
+
+
 class _Finder(ast.NodeVisitor):
     """Collects every vocabulary constant sitting in a branching or write position."""
 
@@ -124,8 +153,23 @@ class _Finder(ast.NodeVisitor):
         self.found: list[ast.Constant] = []
 
     def visit_Compare(self, node: ast.Compare) -> None:
-        for operand in [node.left, *node.comparators]:
+        operands = [node.left, *node.comparators]
+        if isinstance(node.ops[0], (ast.In, ast.NotIn)):
+            operands = operands[1:]  # `"error" in payload` tests a key, not a state
+        for operand in operands:
             self.found.extend(_vocab_constants(operand))
+        self.generic_visit(node)
+
+    def visit_Set(self, node: ast.Set) -> None:
+        self.found.extend(_same_vocab_constants(node))
+        self.generic_visit(node)
+
+    def visit_Tuple(self, node: ast.Tuple) -> None:
+        self.found.extend(_same_vocab_constants(node))
+        self.generic_visit(node)
+
+    def visit_List(self, node: ast.List) -> None:
+        self.found.extend(_same_vocab_constants(node))
         self.generic_visit(node)
 
     def visit_match_case(self, node: ast.match_case) -> None:
@@ -136,6 +180,8 @@ class _Finder(ast.NodeVisitor):
         for kw in node.keywords:
             if kw.arg in VOCAB_KEYWORDS:
                 self.found.extend(_vocab_constants(kw.value))
+        if _is_vocab_get(node):
+            self.found.extend(_vocab_constants(node.args[1]))
         self.generic_visit(node)
 
     def visit_Dict(self, node: ast.Dict) -> None:
@@ -176,7 +222,10 @@ def scan_tree(src_root: Path) -> list[Hit]:
         finder = _Finder()
         finder.visit(tree)
         source = text.splitlines()
-        for const in finder.found:
+        # A constant can match twice (a comparator that is also a same-vocab
+        # collection); report it once.
+        unique = {id(c): c for c in finder.found}.values()
+        for const in unique:
             line = const.lineno
             text_at = source[line - 1].strip() if line <= len(source) else ""
             hits.append(Hit(path=py, line=line, literal=const.value, key=f"{rel}:{line}:{const.value}", source=text_at))
