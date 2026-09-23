@@ -15,10 +15,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quodeq.core.run.state import TERMINAL_STATES, parse_run_state
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
-
-_TERMINAL_STATUS_STATES = {"complete", "completed", "done", "cancelled", "failed", "lost"}
 
 
 def _status_json_terminal(run_dir: Path) -> bool:
@@ -31,7 +30,12 @@ def _status_json_terminal(run_dir: Path) -> bool:
     except (OSError, ValueError):
         return False
     state = data.get("state")
-    return isinstance(state, str) and state in _TERMINAL_STATUS_STATES
+    if not isinstance(state, str):
+        return False
+    try:
+        return parse_run_state(state) in TERMINAL_STATES
+    except ValueError:
+        return False
 
 
 def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:

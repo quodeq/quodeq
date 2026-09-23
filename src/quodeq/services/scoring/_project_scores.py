@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from quodeq.core.run.state import RunState
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.services.dashboard_trend import build_accumulated_trend
 from quodeq.services.accumulated import compute_accumulated
@@ -92,7 +93,7 @@ def _resolve_trend(
     # run's scalar set is still growing, and the cache version can't see that,
     # so caching its partial set would strand a stale row (e.g. 1 of 6 dims)
     # served forever after the run finishes.
-    cacheable_run_ids = {r.run_id for r in history_runs if r.status == "complete"}
+    cacheable_run_ids = {r.run_id for r in history_runs if r.status is RunState.DONE}
     trend_fetcher = _fetchers._make_trend_fetcher(
         reports_root, project, params=params, cacheable_run_ids=cacheable_run_ids,
         deps=deps,

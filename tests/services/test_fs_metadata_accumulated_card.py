@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+from quodeq.core.run.state import RunState
 from quodeq.services._fs_metadata import _read_accumulated_summary
 
 
@@ -36,9 +37,9 @@ class TestCardUsesDefaultViewRuns:
             "S", (), {"overall_grade": "B", "numeric_average": 7.0},
         )()
         runs = [
-            RunInfo(run_id="run-cancelled", date_iso="2026-01-03", date_label="Jan 03", status="cancelled"),
-            RunInfo(run_id="run-failed", date_iso="2026-01-02", date_label="Jan 02", status="failed"),
-            RunInfo(run_id="run-complete", date_iso="2026-01-01", date_label="Jan 01", status="complete"),
+            RunInfo(run_id="run-cancelled", date_iso="2026-01-03", date_label="Jan 03", status=RunState.CANCELLED),
+            RunInfo(run_id="run-failed", date_iso="2026-01-02", date_label="Jan 02", status=RunState.FAILED),
+            RunInfo(run_id="run-complete", date_iso="2026-01-01", date_label="Jan 01", status=RunState.DONE),
         ]
         grade, score, files, _pending = _read_accumulated_summary(
             Path("/r"), "proj-card-eligibility", runs,
@@ -67,8 +68,8 @@ class TestCardUsesDefaultViewRuns:
             "S", (), {"overall_grade": "C", "numeric_average": 6.0},
         )()
         runs = [
-            RunInfo(run_id="run-cancelled", date_iso="2026-01-02", date_label="Jan 02", status="cancelled"),
-            RunInfo(run_id="run-failed", date_iso="2026-01-01", date_label="Jan 01", status="failed"),
+            RunInfo(run_id="run-cancelled", date_iso="2026-01-02", date_label="Jan 02", status=RunState.CANCELLED),
+            RunInfo(run_id="run-failed", date_iso="2026-01-01", date_label="Jan 01", status=RunState.FAILED),
         ]
         grade, score, files, _pending = _read_accumulated_summary(
             Path("/r"), "proj-card-fallback", runs,
@@ -100,8 +101,8 @@ class TestCardUsesDefaultViewRuns:
         }
         mock_read.side_effect = lambda root, proj, run_id: per_run[run_id]
         runs = [
-            RunInfo(run_id="run-stub", date_iso="2026-01-02", date_label="Jan 02", status="cancelled"),
-            RunInfo(run_id="run-real", date_iso="2026-01-01", date_label="Jan 01", status="cancelled"),
+            RunInfo(run_id="run-stub", date_iso="2026-01-02", date_label="Jan 02", status=RunState.CANCELLED),
+            RunInfo(run_id="run-real", date_iso="2026-01-01", date_label="Jan 01", status=RunState.CANCELLED),
         ]
         grade, score, files, _pending = _read_accumulated_summary(
             Path("/r"), "proj-card-stub", runs,

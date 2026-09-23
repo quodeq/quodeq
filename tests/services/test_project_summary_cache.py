@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from quodeq.core.run.state import RunState
 from quodeq.core.types import DimensionResult
 from quodeq.services import _fs_metadata as md
 from quodeq.services.score_cache import (
@@ -35,7 +36,7 @@ def test_read_accumulated_summary_is_cached(monkeypatch, tmp_path):
     class _Run:
         def __init__(self, rid):
             self.run_id = rid
-            self.status = "complete"
+            self.status = RunState.DONE
     runs = [_Run("a"), _Run("b")]
 
     # compute_on_miss=True: this test exercises the compute-and-cache path

@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.core.run.state import RunState
 from quodeq.core.types import ProjectEntry
 from quodeq.services.wiring import (
     read_repository_info,
@@ -97,13 +98,13 @@ def _derive_latest_done_run_id(runs: list[RunInfo]) -> str | None:
     """The newest run a republish would actually move forward.
 
     runs is sorted newest-first (list_runs); status is already read there
-    (cancelled/failed/in_progress detection), so no extra per-run read is
-    needed here. "Done" == the "complete" bucket list_runs assigns to
-    anything that isn't a live/cancelled/failed run -- this is what the
+    (cancelled/failed/running detection), so no extra per-run read is
+    needed here. RunState.DONE is the bucket list_runs assigns to anything
+    that isn't a live/cancelled/failed run -- this is what the
     update-vs-in-sync comparison needs, skipping a newer run that failed or
     was cancelled after the last successful one.
     """
-    return next((run.run_id for run in runs if run.status == "complete"), None)
+    return next((run.run_id for run in runs if run.status is RunState.DONE), None)
 
 
 def _project_entry_identity(entry_name: str, meta: dict) -> dict[str, object]:

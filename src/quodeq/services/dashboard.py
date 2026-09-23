@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.core.run.state import RunState
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import DimensionResult
 
@@ -110,7 +111,7 @@ def _make_status_aware_fetcher(
     status_by_id = {r.run_id: r.status for r in runs}
 
     def fetch(run_id: str) -> list[DimensionResult]:
-        if status_by_id.get(run_id) == "in_progress":
+        if status_by_id.get(run_id) is RunState.RUNNING:
             return read_run_data(reports_root, project, run_id)
         return cached(run_id)
 
@@ -122,9 +123,9 @@ def _make_status_aware_fetcher(
 # else remains (handled after this list). Complete mirrors the Overview's
 # is_eligible_for_default_view; cancelled matches its cancelled fallback.
 _LATEST_FALLBACK_ORDER = (
-    is_eligible_for_default_view,               # complete
-    lambda status: status == "cancelled",
-    lambda status: status == "in_progress",
+    is_eligible_for_default_view,               # done
+    lambda status: status is RunState.CANCELLED,
+    lambda status: status is RunState.RUNNING,
 )
 
 

@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
+from quodeq.core.run.state import RunState
 from quodeq.core.types import DimensionSummary
 from quodeq.data.fs.report_parser import RunInfo
 from quodeq.services.dashboard import build_dashboard
@@ -127,8 +128,8 @@ class TestBuildDashboard:
         # ``"latest"`` defaults to the most recent fully-completed run so the
         # per-dim cards reflect a coherent run that agrees with the headline.
         # The cancelled run remains reachable via explicit selection.
-        cancelled = RunInfo(run_id="r-newest", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
-        complete = RunInfo(run_id="r-older", date_iso="2024-02-01", date_label="2024-02-01", status="complete")
+        cancelled = RunInfo(run_id="r-newest", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.CANCELLED)
+        complete = RunInfo(run_id="r-older", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.DONE)
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
@@ -142,8 +143,8 @@ class TestBuildDashboard:
     def test_latest_falls_back_when_all_cancelled(self, tmp_path):
         # If every run is cancelled, fall back to the newest one rather than
         # refusing to render — the dashboard still needs to show something.
-        cancelled1 = RunInfo(run_id="r2", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
-        cancelled2 = RunInfo(run_id="r1", date_iso="2024-02-01", date_label="2024-02-01", status="cancelled")
+        cancelled1 = RunInfo(run_id="r2", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.CANCELLED)
+        cancelled2 = RunInfo(run_id="r1", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.CANCELLED)
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
@@ -158,8 +159,8 @@ class TestBuildDashboard:
         # A failed run must not headline the dashboard while a cancelled run
         # (with real kept-findings data) exists — mirror the Overview's
         # select_default_view_runs rule so the two surfaces agree.
-        failed = RunInfo(run_id="r-failed", date_iso="2024-03-01", date_label="2024-03-01", status="failed")
-        cancelled = RunInfo(run_id="r-cancelled", date_iso="2024-02-01", date_label="2024-02-01", status="cancelled")
+        failed = RunInfo(run_id="r-failed", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.FAILED)
+        cancelled = RunInfo(run_id="r-cancelled", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.CANCELLED)
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
@@ -173,8 +174,8 @@ class TestBuildDashboard:
     def test_latest_all_failed_still_renders_newest(self, tmp_path):
         # If every run failed there's nothing trustworthy, but the dashboard
         # must still render something rather than error — pick the newest.
-        failed1 = RunInfo(run_id="r2", date_iso="2024-03-01", date_label="2024-03-01", status="failed")
-        failed2 = RunInfo(run_id="r1", date_iso="2024-02-01", date_label="2024-02-01", status="failed")
+        failed1 = RunInfo(run_id="r2", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.FAILED)
+        failed2 = RunInfo(run_id="r1", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.FAILED)
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
@@ -188,8 +189,8 @@ class TestBuildDashboard:
     def test_explicit_run_selection_overrides_latest_default(self, tmp_path):
         # Explicit selection by run_id navigates to that run regardless of
         # state — users can still inspect partial runs from the bar chart.
-        cancelled = RunInfo(run_id="r-cancelled", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
-        complete = RunInfo(run_id="r-complete", date_iso="2024-02-01", date_label="2024-02-01", status="complete")
+        cancelled = RunInfo(run_id="r-cancelled", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.CANCELLED)
+        complete = RunInfo(run_id="r-complete", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.DONE)
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
@@ -208,7 +209,7 @@ class TestBuildDashboard:
         # (its findings are always needed) via dashboard.read_run_data.
         monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "score_cache.db"))
         runs = [
-            RunInfo(run_id=f"r{i}", date_iso=f"2024-{i:02d}-01", date_label=f"2024-{i:02d}-01", status="complete")
+            RunInfo(run_id=f"r{i}", date_iso=f"2024-{i:02d}-01", date_label=f"2024-{i:02d}-01", status=RunState.DONE)
             for i in range(1, 6)
         ]
         dims = [_dim("security", "B", "7.0")]
@@ -260,12 +261,12 @@ class TestBuildDashboard:
         # `history_runs` (filtered list of scoreable runs only). When
         # ctx.index >= len(history_runs), `history_runs[newer_idx]` blew up.
         cancelled_top = [
-            RunInfo(run_id=f"c{i}", date_iso="2024-03-01", date_label="2024-03-01", status="cancelled")
+            RunInfo(run_id=f"c{i}", date_iso="2024-03-01", date_label="2024-03-01", status=RunState.CANCELLED)
             for i in range(5)
         ]
-        selected = RunInfo(run_id="r-selected", date_iso="2024-02-15", date_label="2024-02-15", status="complete")
+        selected = RunInfo(run_id="r-selected", date_iso="2024-02-15", date_label="2024-02-15", status=RunState.DONE)
         complete_below = [
-            RunInfo(run_id=f"c-below-{i}", date_iso="2024-02-01", date_label="2024-02-01", status="complete")
+            RunInfo(run_id=f"c-below-{i}", date_iso="2024-02-01", date_label="2024-02-01", status=RunState.DONE)
             for i in range(2)
         ]
         runs = cancelled_top + [selected] + complete_below

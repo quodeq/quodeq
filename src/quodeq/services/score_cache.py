@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from quodeq.core.run.state import RunState
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
@@ -169,10 +170,10 @@ def accumulated_cache_version(
 
 def per_run_versions(
     project_dir: Path, project: str, params: ScoringParams,
-    runs: list[tuple[str, str]],
+    runs: list[tuple[str, RunState]],
     *,
     keys: SuppressionKeys | None = None,
-) -> list[tuple[str, str, str]]:
+) -> list[tuple[str, RunState, str]]:
     """``(run_id, status, scoped_version)`` per run, from persisted/lazy run_keys.
 
     *runs* is a list of ``(run_id, status)`` pairs. The returned ``status`` is
@@ -201,10 +202,10 @@ def per_run_versions(
     if keys is None:
         keys = SuppressionKeys(dismissed_keys(project_dir), deleted_keys(project_dir))
     inputs = VersionInputs.of(params, keys.dismissed, keys.deleted)
-    out: list[tuple[str, str, str]] = []
-    pending: list[tuple[int, str, str]] = []
+    out: list[tuple[str, RunState, str]] = []
+    pending: list[tuple[int, str, RunState]] = []
     for idx, (rid, status) in enumerate(runs):
-        version = memoized_run_version(project_dir, rid, inputs.fingerprint) if status == "complete" else None
+        version = memoized_run_version(project_dir, rid, inputs.fingerprint) if status is RunState.DONE else None
         if version is None:
             pending.append((idx, rid, status))
         out.append((rid, status, version or ""))
@@ -231,7 +232,7 @@ class VersionInputs:
 
 
 def _fill_pending_versions(
-    out: list[tuple[str, str, str]], pending: list[tuple[int, str, str]],
+    out: list[tuple[str, RunState, str]], pending: list[tuple[int, str, RunState]],
     project_dir: Path, project: str, inputs: VersionInputs,
 ) -> None:
     """Compute the versions per_run_versions could not serve from the memo.
@@ -242,10 +243,10 @@ def _fill_pending_versions(
     from quodeq.services.run_keys import read_run_key_sets  # noqa: PLC0415
     cached = (
         load_run_keys_or_empty(project)
-        if any(status == "complete" for _, _, status in pending) else {}
+        if any(status is RunState.DONE for _, _, status in pending) else {}
     )
     for idx, rid, status in pending:
-        terminal = status == "complete"
+        terminal = status is RunState.DONE
         keys = cached.get(rid) if terminal else None
         if keys is None:
             keys = read_run_key_sets(project_dir / rid)

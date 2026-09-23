@@ -7,6 +7,7 @@ versions that had not changed.
 """
 import pytest
 
+from quodeq.core.run.state import RunState
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.services import run_keys as run_keys_mod
@@ -52,7 +53,7 @@ def test_unchanged_state_serves_complete_runs_from_memory(tmp_path, monkeypatch)
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
     _run_with_finding(pd, "r2", file="b.py")
-    runs = [("r1", "complete"), ("r2", "complete")]
+    runs = [("r1", RunState.DONE), ("r2", RunState.DONE)]
     first = per_run_versions(pd, "proj", DEFAULT_PARAMS, runs, keys=_NO_KEYS)
 
     _forbid_key_reads(monkeypatch)
@@ -63,20 +64,20 @@ def test_unchanged_state_serves_complete_runs_from_memory(tmp_path, monkeypatch)
 def test_a_dismissal_touching_the_run_changes_its_version(tmp_path):
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
-    base = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
+    base = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", RunState.DONE)], keys=_NO_KEYS)
     touched = per_run_versions(
-        pd, "proj", DEFAULT_PARAMS, [("r1", "complete")],
+        pd, "proj", DEFAULT_PARAMS, [("r1", RunState.DONE)],
         keys=SuppressionKeys({("R1", "a.py", 1)}, set()))
     assert base[0][2] != touched[0][2]
     # Back to the earlier state: the earlier version, not a third one.
-    back = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "complete")], keys=_NO_KEYS)
+    back = per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", RunState.DONE)], keys=_NO_KEYS)
     assert back == base
 
 
 def test_non_complete_runs_are_still_read_every_call(tmp_path, monkeypatch):
     pd = tmp_path / "proj"
     _run_with_finding(pd, "r1")
-    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "cancelled")], keys=_NO_KEYS)
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", RunState.CANCELLED)], keys=_NO_KEYS)
 
     seen = []
     real = run_keys_mod.read_run_key_sets
@@ -86,7 +87,7 @@ def test_non_complete_runs_are_still_read_every_call(tmp_path, monkeypatch):
         return real(run_dir)
 
     monkeypatch.setattr(run_keys_mod, "read_run_key_sets", counting)
-    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", "cancelled")], keys=_NO_KEYS)
+    per_run_versions(pd, "proj", DEFAULT_PARAMS, [("r1", RunState.CANCELLED)], keys=_NO_KEYS)
     assert seen == [pd / "r1"]
 
 

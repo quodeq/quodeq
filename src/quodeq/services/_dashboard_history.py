@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.core.run.state import RunState
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult, DimensionSummary
 
@@ -194,7 +195,7 @@ def _make_history_fetcher(
     here rather than a per-run scoped one -- per-run scoping only makes sense
     when a single run is in play, which this path is not.
     """
-    cacheable_run_ids = {r.run_id for r in window.runs if r.status == "complete"}
+    cacheable_run_ids = {r.run_id for r in window.runs if r.status is RunState.DONE}
     from quodeq.services.score_cache import score_cache_version  # noqa: PLC0415
     dim_cache_config = replace(cc, version=score_cache_version(reports_root / project, params))
     return make_trend_fetcher(

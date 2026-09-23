@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.data.fs.report_parser.runs import read_run_data
 from quodeq.data.fs.run_files import count_eval_files, read_run_state
 from quodeq.core.types import DimensionResult
@@ -37,11 +38,6 @@ class DimensionCacheContext:
         return self.reader if self.reader is not None else read_run_data
 
 
-# Terminal status.json states, mirroring data/fs/report_parser/runs.py. Any
-# other state means the run's evaluation/ set may still be growing.
-_TERMINAL_RUN_STATES = frozenset({"done", "failed", "cancelled"})
-
-
 def _count_eval_files(reports_root: Path, project: str, run_id: str) -> int:
     """Count ``evaluation/*.json`` files on disk for a run.
 
@@ -63,7 +59,7 @@ def _run_is_in_progress(reports_root: Path, project: str, run_id: str) -> bool:
     the safe direction for a cache guard.
     """
     state = read_run_state(reports_root / project / run_id)
-    return state is not None and state not in _TERMINAL_RUN_STATES
+    return state is not None and state not in TERMINAL_STATES
 
 
 def _cached_entry_is_stale(
