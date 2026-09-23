@@ -68,8 +68,8 @@ class TestStoreApiKeySecure:
         assert result is False
 
     def test_out_of_scope_error_propagates(self, paths, monkeypatch):
-        """Cluster 13 (R-FT-7): the cleartext-fallback except was narrowed
-        from bare `Exception` to `(OSError, ValueError)` — the realistic
+        """The cleartext-fallback except was narrowed
+        from bare `Exception` to `(OSError, ValueError)` (R-FT-7) — the realistic
         surface of `_write_env`/`_ensure_gitignore`'s file I/O plus
         `_validate_env_write`'s ValueError for malformed input (see
         `test_provider_without_an_api_key_var_is_rejected_cleanly` below).

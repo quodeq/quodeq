@@ -1,6 +1,6 @@
 """Full loop for a CLI provider: create session -> message -> SSE frames -> apply.
 
-Mirrors ``test_assistant_end_to_end.py`` (Plan 1, API providers) but drives a
+Mirrors ``test_assistant_end_to_end.py`` (API providers) but drives a
 CLI-provider ("claude") turn instead. No real CLI binary is ever spawned: the
 `spawn_turn` boundary that `run_cli_turn` falls back to
 (`quodeq.assistant.adapters.cli.spawn_turn`) is monkeypatched with a
@@ -23,7 +23,7 @@ Because the fake CLI here never spawns that child process, the fake
 so the test can assert the resulting `action_draft` frame. The genuine CLI
 <-> MCP-server round trip (stdio JSON-RPC, tool discovery, live binary
 quirks) is NOT exercised here -- it is covered only by the manual live smoke
-test (Plan 2 Task 9 Step 5).
+test.
 
 No `@pytest.mark.integration` marker, matching every other file already in
 this directory (see the module docstring of `test_assistant_end_to_end.py`):

@@ -1,4 +1,4 @@
-"""Cluster 37: context best-effort handlers log at debug."""
+"""context best-effort handlers log at debug."""
 from __future__ import annotations
 
 from pathlib import Path

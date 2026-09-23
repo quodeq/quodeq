@@ -1,4 +1,4 @@
-"""Cluster 31: dashboard best-effort handlers log at debug instead of swallowing."""
+"""dashboard best-effort handlers log at debug instead of swallowing."""
 from __future__ import annotations
 
 import ctypes

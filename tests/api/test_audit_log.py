@@ -1,4 +1,4 @@
-"""Audit log records the request outcome, not just that a request was attempted (Task 11)."""
+"""Audit log records the request outcome, not just that a request was attempted."""
 from __future__ import annotations
 
 import logging

@@ -129,7 +129,7 @@ describe('usePublish', () => {
     expect(result.current.publishErrorProject).toBe('p1');
   });
 
-  // Minor 8 (final whole-branch review): CardFooter keys its inline error
+  // CardFooter keys its inline error
   // banner on publishErrorProject alone (see ProjectsPage.jsx's CardFooter),
   // not on publishState. A rejected click on a DIFFERENT project (409, the
   // single-job guard -- see "does not clobber a genuinely running job" above)
@@ -204,7 +204,7 @@ describe('usePublish', () => {
     }
   });
 
-  // Audit C6: useSharedProjects and usePublish used to each fetch status
+  // useSharedProjects and usePublish used to each fetch status
   // and list independently -- two of every request per Projects mount.
   // Both hooks now read `sharedKeys.status()`/`sharedKeys.list()`, so
   // react-query dedupes: mounting them together issues exactly one status

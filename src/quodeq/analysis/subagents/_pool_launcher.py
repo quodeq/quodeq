@@ -122,7 +122,7 @@ def _resolve_pool_budget(
     Only the AUTO-SCALED budget may ratchet the deadline. An explicit
     time_limit is a run-wide HARD CAP: extending it here handed every
     dim's pool a fresh full budget, so a 1h run kept running for
-    "1h after the LAST dim launch" (observed: run 838d807e).
+    "1h after the LAST dim launch" (observed in a real run).
     """
     queue_size = len(params.all_files) if params.all_files is not None else 0
     time_limit = _resolve_time_limit(config.options.time_limit, queue_size)
@@ -153,6 +153,7 @@ def _build_pool_config(
         max_files_per_agent=params.max_files_per_agent,
         time_limit=time_limit,
         deadline_at=config.options.deadline_at,
+        run_deadline_at=config.options.run_deadline_at,
         # Carry the RunConfig + dimension so the API runner can construct a
         # per-file cache writer (synchronous cache.put on file_done='ok').
         run_config=config,

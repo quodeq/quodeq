@@ -46,7 +46,7 @@ function wrap(fakeApi, children) {
 // refresh/pull double-submit and coalescing guards.
 
 describe('useSharedProjects', () => {
-  // Audit A2: a one-shot mount fetch with no retry used to leave
+  // A one-shot mount fetch with no retry used to leave
   // configured=false forever on any transient failure, with the ⟳ control
   // hidden (no error was ever exposed). react-query's own queries expose
   // the failure as `error`; refresh() -- the same function behind the
@@ -75,7 +75,7 @@ describe('useSharedProjects', () => {
     await waitFor(() => expect(result.current.projects).toHaveLength(1));
   });
 
-  // Audit B2: /status carries lastSynced on every response; a list that
+  // /status carries lastSynced on every response; a list that
   // never lands (fails on its very first fetch) must not regress the
   // toolbar to "not synced yet" when the server just reported a real sync
   // time moments ago.
@@ -97,9 +97,9 @@ describe('useSharedProjects', () => {
     expect(result.current.error).toBe('list failed');
   });
 
-  // Ghost shared cards after disconnect (final whole-branch review, Important
-  // finding): the list query is disabled once `configured` flips false, but a
-  // disabled query's cached data is not cleared by invalidation alone -- it
+  // Ghost shared cards after disconnect: the list query is disabled once
+  // `configured` flips false, but a disabled query's cached data is not
+  // cleared by invalidation alone -- it
   // just sits there. Before the fix, `projects` read straight off
   // `listQuery.data` ungated, so a lingering cache entry (left over from
   // before a disconnect, or from a DIFFERENT shared repo before a reconnect)

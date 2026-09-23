@@ -127,7 +127,7 @@ describe('DashboardPage, teammate persona: shared selection + zero local project
   });
 });
 
-// P4: the Overview's frame must stay mounted across every state, including
+// The Overview's frame must stay mounted across every state, including
 // the "no projects"/"no project selected" empty branches -- otherwise the
 // page jumps (no .dashboard-page wrapper, then one appears) the moment real
 // content shows up. The error and no-completed-evaluation branches already

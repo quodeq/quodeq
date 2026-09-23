@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import DashboardPage from './DashboardPage.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
 
-// Split from DashboardPage.test.jsx: dashboard-appear fade-once (P3-T2),
+// Split from DashboardPage.test.jsx: dashboard-appear fade-once,
 // part 2 (no-replay on empty-state handoff, re-arm on project/run switch).
 
 describe('DashboardPage frame stability and fade-once across branch transitions (P3-T2)', () => {

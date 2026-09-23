@@ -1,5 +1,5 @@
 """FindingEnricher.precedent_scores: one PrecedentCorpus.match_many call for
-a batch of findings (finding 5598). Split from test_finding_enricher.py to
+a batch of findings. Split from test_finding_enricher.py to
 stay under the file-size ratchet (that file is already over the 240-line
 sibling-file threshold)."""
 from __future__ import annotations

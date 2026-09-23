@@ -36,7 +36,7 @@ def test_shared_status_configured(client, tmp_path):
 
 
 def test_shared_status_repo_state_reflects_read_state(client, tmp_path):
-    """Audit A1: /status must report the real clone state, not just whether
+    """/status must report the real clone state, not just whether
     a URL is configured -- a configured-but-never-cloned URL is "missing"."""
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
     resp = client.get("/api/shared/status")

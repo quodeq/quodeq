@@ -1,5 +1,5 @@
-"""Cluster 13 (R-FT-7) — except narrowing for two `_webview_window_native_ops`
-call sites:
+"""Except narrowing for two `_webview_window_native_ops`
+call sites (R-FT-7):
 
 * ``_fetch_running_evaluation`` (urllib fetch + ``json.loads``) — narrowed
   from bare ``Exception`` to ``(OSError, ValueError)``.
@@ -106,7 +106,7 @@ class TestDownloadViaDialogExceptNarrowing:
                     window, "http://127.0.0.1:7863", "/api/export", "output.txt",
                 )
 
-    # Post-PR review M9: two realistic transport failures sat outside plain
+    # Two realistic transport failures sat outside plain
     # OSError and escaped into the pywebview js_api bridge as an unhandled
     # error instead of reporting "download failed".
 

@@ -163,7 +163,7 @@ describe('ProjectsPage — shared entries (configured)', () => {
     await waitFor(() => expect(pullSharedProject).toHaveBeenLastCalledWith('shared-1', 'copy'));
   });
 
-  // Important 2 (final whole-branch review): a plain (non-conflicting) pull
+  // A plain (non-conflicting) pull
   // must refresh the LOCAL project list (so it shows up merged) and give the
   // user visible feedback that it landed, not silently succeed with no
   // observable change until some unrelated action reloads the list.

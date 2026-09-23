@@ -1,4 +1,4 @@
-"""Host header validation before CSP interpolation (Task 9).
+"""Host header validation before CSP interpolation.
 
 Split out of test_csp_header.py when that file crossed the 300-line cap.
 """

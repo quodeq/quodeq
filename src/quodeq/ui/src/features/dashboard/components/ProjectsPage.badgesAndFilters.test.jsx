@@ -65,7 +65,7 @@ describe('ProjectsPage', () => {
   });
 });
 
-// P4: ProjectsPage previously had no loading signal at all, so the empty
+// ProjectsPage previously had no loading signal at all, so the empty
 // local-projects array during the initial fetch rendered the "Add your first
 // project" CTA -- a false-empty flash before the real list ever had a chance
 // to arrive. `projectsLoaded` now gates that, mirroring the other pages'

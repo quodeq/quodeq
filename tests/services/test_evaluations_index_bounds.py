@@ -1,8 +1,8 @@
-"""Bounded reads through EvaluationsIndex (findings 5390, 5391).
+"""Bounded reads through EvaluationsIndex.
 
-- 5390: a *states* filter on ``list()`` must narrow the SQL query, not force
+- A *states* filter on ``list()`` must narrow the SQL query, not force
   a fetch-all that gets filtered in Python.
-- 5391: ``get_status`` on an already-indexed "ext-" id must resolve the run
+- ``get_status`` on an already-indexed "ext-" id must resolve the run
   directly from the index instead of scanning every project dir.
 """
 from __future__ import annotations

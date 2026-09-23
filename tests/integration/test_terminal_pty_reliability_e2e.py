@@ -1,7 +1,7 @@
-"""Cluster 12 shared regression test: terminal PTY reliability.
+"""Shared regression test: terminal PTY reliability.
 
 Three findings, one causal chain (see .superpowers/sdd/2026-09-09-fault-tolerance-cycle1/
-findings/consolidated-tasks.md, Cluster 12):
+findings/consolidated-tasks.md):
 
 1. `_pty_windows.py`'s `write()` had no `isalive()` guard (unlike `read()`),
    so a write to a dead process propagated an uncaught exception.

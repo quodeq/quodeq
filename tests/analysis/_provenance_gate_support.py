@@ -8,7 +8,7 @@ model-calling code.
 
 The fixtures under ``fixtures/provenance_gate/`` are a matrix of cases:
 
-  internal_*  — code that run fa56db32 rated `critical` but whose flagged
+  internal_*  — code that a real evaluation run rated `critical` but whose flagged
                 value is provably INTERNAL (a defaulted prop/arg, a content
                 hash). Vendored byte-for-byte from commit a84ab6f8 (before the
                 later code-hardening at c0edcd6f / 521f46c6) so the fixture is

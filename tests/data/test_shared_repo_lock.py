@@ -1,4 +1,4 @@
-"""Tests for clone_lock (audit finding C2): git mutations on one shared
+"""Tests for clone_lock: git mutations on one shared
 clone directory -- refresh vs refresh vs publish -- must be serialized
 behind one process-wide reentrant lock, not left to interleave.
 """

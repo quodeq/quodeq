@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useDismissedFindings } from './useDismissedFindings.js';
 
-// Split out for cluster 25: the mount-time fetchDismissed() was the sole
+// Split out: the mount-time fetchDismissed() was the sole
 // handler in this file skipping the console.error + setRestoreError
 // convention every sibling mutation handler uses -- a failed load silently
 // fell back to an empty list with no user-visible signal.

@@ -1,4 +1,4 @@
-"""Tests for maxSubagents/timeLimit/contextSize validation (finding 5880).
+"""Tests for maxSubagents/timeLimit/contextSize validation.
 
 coerce_int used to swallow any TypeError/ValueError and silently return the
 default, so a client sending e.g. ``maxSubagents: "abc"`` got the default
@@ -94,8 +94,7 @@ class TestBuildEvaluationOptionsIntFields:
 
 class TestPostEvaluationsMalformedOption:
     """End to end: the field-naming message must reach the client instead
-    of the route's generic "Invalid evaluation options" catch-all (review
-    round 1 on finding 5880)."""
+    of the route's generic "Invalid evaluation options" catch-all."""
 
     @pytest.fixture()
     def client(self, monkeypatch):

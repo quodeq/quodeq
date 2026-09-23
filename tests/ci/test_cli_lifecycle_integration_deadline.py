@@ -123,7 +123,7 @@ def test_pipeline_records_deadline_exit_reason_when_budget_expired(tmp_path: Pat
 
 
 # ---------------------------------------------------------------------------
-# c88be50e regression — partial-state invariants agree (Task 8)
+# c88be50e regression — partial-state invariants agree
 # ---------------------------------------------------------------------------
 #
 # Symptom report: a flexibility run with --max-duration truncated at ~850 of
@@ -131,12 +131,12 @@ def test_pipeline_records_deadline_exit_reason_when_budget_expired(tmp_path: Pat
 # re-run, 123 of 280 findings vanished because only ~662 of 790 ok-marked
 # files had a cache entry (the watcher.join timeout dropped ~16% of writes).
 #
-# Phase 1 closes the dashboard half of that gap by ensuring TWO partial-state
+# This closes the dashboard half of that gap by ensuring TWO partial-state
 # signals agree end-to-end:
 #
-#   (a) lifecycle records exit_reason="deadline" (Task 5 + 6)
+#   (a) lifecycle records exit_reason="deadline"
 #   (b) the dimension Evidence reports files_read < source_file_count
-#       (Task 4 — only files with a file_done="ok" marker count)
+#       (only files with a file_done="ok" marker count)
 #
 # Tasks 1–3 close the *finding-loss* half (synchronous cache writes); the
 # regression for that is exercised by the cache test suite. This test pins

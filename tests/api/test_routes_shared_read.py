@@ -66,7 +66,7 @@ def test_shared_routes_409_when_unsupported_version(client):
 
 
 def test_shared_routes_409_when_foreign(client):
-    """Audit A1: a foreign repo (real content, no quodeq.json marker) must
+    """A foreign repo (real content, no quodeq.json marker) must
     be rejected at read time with a distinct 409, not silently 503'd or
     served as if it were a real quodeq clone."""
     url = "file:///dummy/foreign.git"
@@ -86,7 +86,7 @@ def test_shared_routes_409_when_foreign(client):
 
 
 def test_empty_repo_lists_zero_projects_not_503(client, empty_shared_clone_fixture):
-    """Audit A1: first connect to an empty (never-published) repo must be
+    """First connect to an empty (never-published) repo must be
     servable -- an empty projects list, not a false "not cloned yet" 503."""
     resp = client.get("/api/shared/projects")
     assert resp.status_code == 200

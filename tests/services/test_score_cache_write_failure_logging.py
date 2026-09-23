@@ -1,4 +1,4 @@
-"""Cluster 16: score-cache write failures must log, not just silently degrade.
+"""score-cache write failures must log, not just silently degrade.
 
 Each of the three write-side except blocks in ``_score_cache_fetch`` (write
 cached_accumulated, write cached_project_summary, write_cached_rows inside
@@ -13,9 +13,9 @@ tests/tools/test_logging_boundary.py), so these tests pass a fake sink
 instead of using caplog.
 
 The tests above prove the mechanism works when a caller passes ``log=``.
-They do NOT prove any production caller actually does -- final review item B
-(fault-tolerance cycle 1) found that every production caller left ``log`` at
-its silent ``NULL_LOG`` default, so cluster 16's logging never fired outside
+They do NOT prove any production caller actually does -- a review found that
+every production caller left ``log`` at its silent ``NULL_LOG`` default,
+so this logging never fired outside
 tests. ``TestProductionCallerReachesRealSink`` below drives a real production
 caller (``_fs_metadata.py``, which now threads ``log=SHARED_LOG``) with no
 ``log=`` override at all, to prove the wiring -- not just the mechanism --
@@ -24,6 +24,8 @@ reaches a real sink.
 from __future__ import annotations
 
 import sqlite3
+
+import pytest
 
 from quodeq.core.types import DimensionResult
 from quodeq.services import _fs_metadata as _md
@@ -103,12 +105,11 @@ def test_make_cache_backed_fetcher_logs_on_write_failure(monkeypatch, tmp_path):
 
 
 class TestProductionCallerReachesRealSink:
-    """Final review Important 2: cluster 16's logging was inert because every
+    """This logging was inert because every
     production caller left ``log`` at its ``NULL_LOG`` default. These drive a
     real caller (``_fs_metadata.py``) with NO ``log=`` override, proving the
-    module-level ``SHARED_LOG`` wiring added in item B actually reaches a
-    caller-supplied sink in production, not just when a test hands one in
-    directly."""
+    module-level ``SHARED_LOG`` wiring actually reaches a caller-supplied
+    sink in production, not just when a test hands one in directly."""
 
     def test_compute_on_miss_summary_logs_through_shared_log(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
@@ -120,7 +121,7 @@ class TestProductionCallerReachesRealSink:
         log = _FakeLog()
         # Patch the name _fs_metadata.py resolves at call time, not the
         # log_sink module's copy -- proves the import-and-thread wiring in
-        # that file, exactly what item B changed.
+        # that file reaches a real sink.
         monkeypatch.setattr(_md, "SHARED_LOG", log)
 
         result = _md._compute_on_miss_summary(
@@ -135,3 +136,42 @@ class TestProductionCallerReachesRealSink:
         # sink (not a copy/shim) absent any monkeypatching -- the object
         # identity that makes the test above representative of production.
         assert _md.SHARED_LOG is SHARED_LOG
+
+
+@pytest.mark.parametrize("entry, kind", [
+    ("cached_accumulated", "accumulated"),
+    ("cached_project_summary", "summary"),
+])
+def test_both_entry_points_share_one_read_through(monkeypatch, entry, kind):
+    seen: list[tuple[str, str, str]] = []
+
+    def fake_read_through(table, project, version, compute, cacheable, log):
+        seen.append((table.kind, project, version))
+        return {"via": "read_through"}
+
+    monkeypatch.setattr(_score_cache_fetch, "read_through", fake_read_through)
+    assert getattr(_score_cache_fetch, entry)("proj", "v1", dict) == {"via": "read_through"}
+    assert seen == [(kind, "proj", "v1")]
+
+
+@pytest.mark.parametrize("entry", ["cached_accumulated", "cached_project_summary"])
+def test_kill_switch_computes_without_touching_the_cache(monkeypatch, entry):
+    monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+    monkeypatch.setattr(_score_cache_fetch, "open_score_cache", _boom)
+    computed = {"score": 1.0}
+    assert getattr(_score_cache_fetch, entry)("proj", "v1", lambda: computed) is computed
+
+
+@pytest.mark.parametrize("entry, reader", [
+    ("cached_accumulated", "read_cached_accumulated"),
+    ("cached_project_summary", "read_cached_project_summary"),
+])
+def test_first_read_error_computes_and_skips_the_write(monkeypatch, tmp_path, entry, reader):
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    monkeypatch.setattr(_score_cache_fetch, reader, _boom)
+    writes: list[str] = []
+    monkeypatch.setattr(_score_cache_fetch, reader.replace("read_", "write_"),
+                        lambda *a, **k: writes.append("write"))
+    computed = {"score": 2.0}
+    assert getattr(_score_cache_fetch, entry)("proj", "v1", lambda: computed) is computed
+    assert writes == []

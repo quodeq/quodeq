@@ -81,7 +81,7 @@ def test_csp_connect_src_includes_alt_port_origins(csp):
 
 
 def test_csp_connect_src_includes_ws_sources(csp):
-    """connect-src must list ws:// sources for the terminal WebSocket (Task 5).
+    """connect-src must list ws:// sources for the terminal WebSocket.
 
     WebKit/pywebview enforces CSP against the WebSocket handshake's scheme,
     so the terminal's ws:// connection to the alt-port server and to the

@@ -40,7 +40,7 @@ def disconnect_shared_repo(*, log: LogSink = NULL_LOG) -> None:
     test_delete_config_removes_cache_dir and
     test_delete_config_waits_for_clone_lock) and must not be reordered.
 
-    Audit finding A4: disconnecting must not leave the clone's cache dir
+    Disconnecting must not leave the clone's cache dir
     (repo + index.db + score_cache.db, all under shared_cache_dir) behind on
     disk forever. Read the url BEFORE clearing settings (it's gone from
     settings after write_settings), then remove it AFTER -- so a crash

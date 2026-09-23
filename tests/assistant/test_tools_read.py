@@ -159,7 +159,7 @@ def test_get_violations_page_keeps_severity_order_and_stable_ties(ctx, monkeypat
     raw.append({"principle": "P", "file": "src/crit.py", "line": 99, "severity": "critical",
                 "title": "t", "reason": "r"})
     monkeypatch.setattr(rv, "_violations_from_run", lambda c, d: (raw, "security", []))
-    out = rv._get_violations(ctx, "security", limit=5)
+    out = rv.get_violations(ctx, "security", limit=5)
     assert [v["file"] for v in out["violations"]] == [
         "src/crit.py", "src/f0.py", "src/f1.py", "src/f2.py", "src/f3.py"]
     assert out["count"] == 11

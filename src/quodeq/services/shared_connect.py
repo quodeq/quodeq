@@ -43,7 +43,7 @@ def connect_shared_repo(url: str, *, log: LogSink = NULL_LOG) -> ConnectOutcome:
         validate_remote_url(url)
     except ValueError as exc:
         return ConnectOutcome(status="invalid_url", url=url, detail=str(exc))
-    # Audit finding A4: reconnecting to a URL whose cache dir is already
+    # Reconnecting to a URL whose cache dir is already
     # on disk (a prior connect, possibly stale) must not silently keep
     # serving whatever was last fetched -- ensure_shared_clone below
     # early-returns an existing clone without fetching, so the freshness

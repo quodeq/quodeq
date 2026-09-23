@@ -11,12 +11,6 @@ from quodeq.data.fs.run_files import run_fingerprint  # facade re-export
 from quodeq.data.fs.report_parser.runs import RunInfo, read_run_data
 from quodeq.core.types import DimensionResult
 
-# Files whose contents feed read_run_data for a single run. A completed run is
-# not immutable: dismissing a finding or applying a grade formula rewrites the
-# SQL grade tables that overlay_sql_grades reads back, so the fingerprint has
-# to cover the database (and its write-ahead log, which absorbs writes long
-# before a checkpoint touches the main file) alongside the JSON.
-
 
 @dataclass
 class _DimensionBuckets:

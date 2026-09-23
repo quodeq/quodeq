@@ -13,14 +13,11 @@ import time
 from quodeq.assistant import AssistantStore
 
 _POLL_SECONDS = 0.25
-_IDLE_LIMIT = 2400  # 2400 * 0.25s = 600s idle backstop. The stream now stays
-# open across turns (done/error no longer end event_frames), so this bounds a
-# session that sits idle with NO new frames for the whole window — a turn that
-# dies without emitting a terminal frame (e.g. a crashed daemon thread), or a
-# session left open with no further turns. On the backstop the generator
-# closes and the client reconnects on its next turn. Sized generously above
-# the slowest legitimate gap (a cold-loading local model or a CLI provider's
-# ~500s read timeout) so it never truncates a live turn.
+# Idle backstop: 2400 polls x 0.25s = 600s with no new frame closes the
+# stream (the client reconnects on its next turn). It bounds a turn that
+# dies without a terminal frame; sized above the slowest legitimate gap (a
+# cold local model, a CLI provider's ~500s read timeout).
+_IDLE_LIMIT = 2400
 
 
 def event_frames(repository: AssistantStore, session_id: str, after_seq: int):

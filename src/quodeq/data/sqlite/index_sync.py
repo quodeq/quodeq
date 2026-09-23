@@ -114,7 +114,7 @@ def _upsert_from_status(
 def _sync_legacy_run(
     db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
 ) -> None:
-    """Synthesize a row from filesystem signals for pre-Plan-A runs (no status.json)."""
+    """Synthesize a row from filesystem signals for a run with no status.json."""
     scan_path = run_dir / "scan.json"
     pid_path = run_dir / ".pid"
     manifest_path = run_dir / "evidence" / "manifest.json"

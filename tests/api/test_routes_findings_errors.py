@@ -1,4 +1,4 @@
-"""Error-shape tests for the findings routes (usability finding 5950).
+"""Error-shape tests for the findings routes.
 
 Sibling to test_routes_findings.py (611 lines, well past the 240-line
 threshold for adding more) rather than an addition to it; the ``app``/
@@ -10,7 +10,7 @@ from tests.api.test_routes_findings import app, client  # noqa: F401 -- fixtures
 
 
 def test_dismiss_unknown_project_returns_structured_404(client):
-    """Finding 5950: the 404 for an unknown project must carry a machine-
+    """The 404 for an unknown project must carry a machine-
     readable ``code`` like every other error branch in this file, instead
     of Flask's default abort() body.
     """

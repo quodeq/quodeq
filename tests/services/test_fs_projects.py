@@ -163,7 +163,7 @@ class TestBuildProjectList:
 
 
 # ---------------------------------------------------------------------------
-# Cluster 10: _build_one fail-soft (one bad project dir must not fail the
+# _build_one fail-soft (one bad project dir must not fail the
 # whole listing)
 # ---------------------------------------------------------------------------
 
@@ -209,7 +209,7 @@ class TestBuildProjectListFailSoft:
 class TestBuildProjectIndex:
     def test_reads_repository_info_once_per_directory(self, tmp_path: Path, monkeypatch):
         # The parent/child pass already parses every record; the entry pass
-        # must reuse it instead of re-reading the same file (finding 5451).
+        # must reuse it instead of re-reading the same file.
         for name, extra in (("proj1-uuid", {}), ("proj2-uuid", {"parent": "parent-uuid"})):
             proj = tmp_path / name
             proj.mkdir()

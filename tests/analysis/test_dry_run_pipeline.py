@@ -67,10 +67,6 @@ class TestDryRunPipeline:
             assert ev.files_read == 0
             assert ev.coverage_pct == 0.0
 
-    # Removed test_fingerprints_saved_per_dimension: V1's per-dimension
-    # fingerprint write is gone. V2 writes per-file cache entries during
-    # dispatch, and dry-run doesn't dispatch — no cache state to assert.
-
     def test_on_dimension_done_callback_called(self, tmp_path):
         """on_dimension_done callback receives each dimension and its Evidence."""
         config = self._make_config(tmp_path)

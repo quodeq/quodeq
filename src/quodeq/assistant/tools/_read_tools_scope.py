@@ -8,9 +8,8 @@ import json
 import logging
 from pathlib import Path
 
-from quodeq.assistant.tools import _read_tools as _facade
-from quodeq.assistant.tools import _read_tools_violations as _violations_facade
 from quodeq.assistant.tools._context import ToolContext
+from quodeq.assistant.tools._read_tools_common import default_findings_repo_factory, requirement_of
 from quodeq.assistant.tools.registry import ToolError
 from quodeq.data.ports.findings import FindingsRepository
 from quodeq.services import fs_reports
@@ -22,12 +21,14 @@ from quodeq.shared.serialization import coerce_line, to_camel_dict
 _logger = logging.getLogger(__name__)
 
 
-def _findings_repo(ctx: ToolContext, run_dir: Path) -> FindingsRepository:
-    factory = ctx.findings_repo_factory or _facade.default_findings_repo_factory
+def findings_repo(ctx: ToolContext, run_dir: Path) -> FindingsRepository:
+    """The run's findings repository from the context factory, else the SQLite default."""
+    factory = ctx.findings_repo_factory or default_findings_repo_factory
     return factory(run_dir)
 
 
-def _require_run(ctx: ToolContext):
+def require_run(ctx: ToolContext):
+    """The selected run dir, or a ToolError telling the model which tool to use instead."""
     if ctx.run_dir is None or not ctx.run_dir.exists():
         raise ToolError(
             "no run selected for this session. Call get_context to confirm "
@@ -36,12 +37,12 @@ def _require_run(ctx: ToolContext):
     return ctx.run_dir
 
 
-def _has_run(ctx: ToolContext) -> bool:
+def has_run(ctx: ToolContext) -> bool:
     """A specific run was selected (vs. the accumulated overview scope)."""
     return ctx.run_dir is not None and ctx.run_dir.exists()
 
 
-def _accumulated_dims(ctx: ToolContext, *, rescored: bool = True) -> list[dict] | None:
+def accumulated_dims(ctx: ToolContext, *, rescored: bool = True) -> list[dict] | None:
     """Per-dimension-latest composition (the dashboard/overview data).
 
     Each entry is one dimension sourced from ITS OWN latest run — so the set
@@ -67,7 +68,7 @@ def _accumulated_dims(ctx: ToolContext, *, rescored: bool = True) -> list[dict] 
     return payload.get("dimensions", []) or []
 
 
-def _scored_run_dims(ctx: ToolContext) -> list[dict] | None:
+def scored_run_dims(ctx: ToolContext) -> list[dict] | None:
     """The selected run's dimensions with the project-wide dismiss/delete
     rescore applied, as camelCase dicts.
 
@@ -89,7 +90,8 @@ def _scored_run_dims(ctx: ToolContext) -> list[dict] | None:
     return [to_camel_dict(d) for d in dims]
 
 
-def _no_scope_error() -> ToolError:
+def no_scope_error() -> ToolError:
+    """The ToolError for a session with neither a run nor a project scope."""
     return ToolError(
         "no project or run scope for this session. Call get_context to confirm "
         "scope, then ask the user to open a project overview or select a run.")
@@ -121,7 +123,7 @@ def _sql_finding_keys(ctx: ToolContext, keys: set[tuple]) -> None:
     if not (ctx.run_dir / "evaluation.db").is_file():
         return
     try:
-        for f in _findings_repo(ctx, ctx.run_dir).list_all():
+        for f in findings_repo(ctx, ctx.run_dir).list_all():
             keys.add((str(f.req or ""), str(f.file or ""),
                       coerce_line(f.line)))
     except Exception:  # noqa: BLE001 - a corrupt db must not block the read
@@ -135,7 +137,7 @@ def _accumulated_finding_keys(ctx: ToolContext, add) -> None:
         # rescored=False: the identity check must keep seeing every finding
         # a dismiss/verify key could reference, including already-dismissed
         # ones (idempotent re-dismiss / verify must still match).
-        for d in (_accumulated_dims(ctx, rescored=False) or []):
+        for d in (accumulated_dims(ctx, rescored=False) or []):
             for v in (d.get("violations") or []):
                 add(v)
     except (ToolError, OSError, ValueError) as exc:
@@ -163,10 +165,10 @@ def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
     keys: set[tuple] = set()
 
     def _add(v: dict) -> None:
-        keys.add((_violations_facade._requirement_of(v), str(v.get("file") or ""),
+        keys.add((requirement_of(v), str(v.get("file") or ""),
                   coerce_line(v.get("line"))))
 
-    if _has_run(ctx):
+    if has_run(ctx):
         _eval_json_finding_keys(ctx, _add)
         _sql_finding_keys(ctx, keys)
     else:

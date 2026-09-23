@@ -1,4 +1,4 @@
-"""Cluster 13 (R-FT-7) — _save_index's except narrowing.
+"""_save_index's except narrowing (R-FT-7).
 
 ``_save_index``'s atomic write previously caught bare ``Exception``. Narrowed
 to ``OSError`` to match ``_load_index``'s already-narrowed read path

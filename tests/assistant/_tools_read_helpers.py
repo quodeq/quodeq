@@ -97,7 +97,7 @@ def _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=None):
     repo = AssistantRepository(tmp_path / "assistant.db")
     repo.create_session(session_id="s1", provider="ollama")
     monkeypatch.setattr(
-        "quodeq.assistant.tools._read_tools.fs_reports.get_accumulated",
+        "quodeq.services.fs_reports.get_accumulated",
         lambda reports_dir, project, as_of: _ACC)
     return ToolContext(
         repository=repo, session_id="s1", run_dir=None, repo_root=None,

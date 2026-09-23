@@ -149,6 +149,7 @@ class SubagentPool:
                 evidence_dir=self._evidence_dir, dimension_key=self._dimension_key,
                 submit_fn=lambda: self._submit_agent(pool),
                 deadline_at=self._base_config.deadline_at,
+                run_deadline_at=self._base_config.run_deadline_at,
             )
             if self._scout_first:
                 scout_loop(ctx)

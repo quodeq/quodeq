@@ -2,7 +2,7 @@
  * ScanProgress's smaller subcomponents/helpers: the failed/lost banner, the
  * coverage bar + legend, the summary line, and the footer.
  *
- * Split out of ScanProgress.jsx verbatim — moved into named
+ * Presentational parts of ScanProgress.jsx — moved into named
  * functions/components so ScanProgress itself clears the
  * max-lines-per-function gate. Logic is unchanged from the pre-split
  * version.

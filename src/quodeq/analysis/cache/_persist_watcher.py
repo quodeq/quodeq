@@ -1,6 +1,6 @@
 """Background watcher that periodically persists in-flight cache entries.
 
-Split out of ``dimension_runner.py`` (B4/B5e): the watcher thread body and
+Split out of ``dimension_runner.py``: the watcher thread body and
 the failure-streak threshold resolution are self-contained pieces of the
 V2 cache-aware dimension processor. The thread itself is still constructed
 in ``dimension_runner.py`` -- ``mock.patch("...dimension_runner.threading")``

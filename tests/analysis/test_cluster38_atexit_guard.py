@@ -1,4 +1,4 @@
-"""Cluster 38: _AtexitGuard.deregister needs no exception guard."""
+"""_AtexitGuard.deregister needs no exception guard."""
 from __future__ import annotations
 
 from quodeq.analysis._run_lifecycle_support import _AtexitGuard

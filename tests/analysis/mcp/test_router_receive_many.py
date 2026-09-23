@@ -1,5 +1,5 @@
 """FindingsRouter.receive_many: one PrecedentCorpus.match_many call for a
-batch of findings from one file (finding 5598)."""
+batch of findings from one file."""
 from __future__ import annotations
 
 import io

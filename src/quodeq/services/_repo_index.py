@@ -1,8 +1,8 @@
 """On-disk index backing ``find_existing_project``'s duplicate pre-flight check.
 
-Finding (self-eval, Time Behaviour, major): ``find_existing_project`` did a
-linear directory scan with a ``repository_info.json`` read per project
-instead of an indexed lookup.
+Why: ``find_existing_project`` used to scan every project directory and read
+each ``repository_info.json``; this index makes the duplicate check a
+lookup.
 
 Mirrors the import-identity index
 (``api/_import_identity.py`` + ``data/fs/project_index.py``): index-first

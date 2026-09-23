@@ -2,82 +2,37 @@
 from __future__ import annotations
 
 import dataclasses
-import re
-from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
+from quodeq.assistant.tools._read_tools_common import raw_run_dims, validate_dimension
 from quodeq.assistant.tools._read_tools_scope import (
-    _accumulated_dims,
-    _findings_repo,
-    _has_run,
-    _no_scope_error,
-    _require_run,
-    _scored_run_dims,
-    finding_keys_in_scope,  # noqa: F401 - re-export (assistant/tools import, external tests)
+    accumulated_dims,
+    finding_keys_in_scope,  # noqa: F401 - re-export (actions.py, external tests)
+    findings_repo,
+    has_run,
+    no_scope_error,
+    require_run,
+    scored_run_dims,
 )
 from quodeq.assistant.tools._read_tools_violations import (
-    _available_names,
-    _get_violations,
-    _hidden_ids,
-    _trim_violation,
-    _visible_only,
+    available_names,
+    get_violations,
+    hidden_ids,
+    trim_violation,
+    visible_only,
 )
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_visible
-from quodeq.data.fs.report_parser.finding_details import (
-    iter_eval_reports,
-    read_eval_report,
-)
-from quodeq.data.ports.findings import FindingsRepository
-# Imported for its module identity, not called directly here: tests patch
-# `quodeq.assistant.tools._read_tools.fs_reports.get_accumulated`, which
-# mutates the shared `fs_reports` module object that
-# `_read_tools_scope._accumulated_dims` actually calls through.
-from quodeq.services import fs_reports  # noqa: F401 - re-export (patch target)
+from quodeq.data.fs.report_parser.finding_details import read_eval_report
 from quodeq.services.standards import StandardsService
 
-# Dimension ids are simple slugs. The tool-call `dimension` argument is
-# model-controlled text used to build a file path, so anything outside this
-# charset (path separators, dots, absolute paths) is rejected outright.
-_DIMENSION_RE = re.compile(r"[a-z0-9_-]+")
 # Cap violations embedded in a full report so a single get_report stays small.
 _REPORT_VIOLATION_CAP = 40
 
 
-def _validate_dimension(dimension: str) -> str:
-    if not isinstance(dimension, str) or not _DIMENSION_RE.fullmatch(dimension):
-        raise ToolError(f"invalid dimension: {dimension!r}")
-    return dimension
-
-
-def default_findings_repo_factory(run_dir: Path) -> FindingsRepository:
-    """Composition fallback: the concrete SQLite findings repository.
-
-    Real composition roots (``api._assistant_helpers.build_tool_context``,
-    the MCP server) pass ``ToolContext.findings_repo_factory`` explicitly;
-    this lazy default keeps directly-constructed contexts working without
-    coupling the context module — or this module's import time — to SQLite.
-    """
-    from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
-    return SqliteFindingsRepository(run_dir)
-
-
-def _raw_run_dims(eval_dir: Path) -> list[dict]:
-    """A run's evaluation reports as dicts, each guaranteed a ``dimension``.
-
-    Mirrors the pre-filtering fallback ``data.get("dimension", path.stem)``: a
-    report that omits the field is named after its file rather than dropped.
-    """
-    out: list[dict] = []
-    for dimension, data in iter_eval_reports(eval_dir):
-        data.setdefault("dimension", dimension)
-        out.append(data)
-    return out
-
-
 def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
-    run_dir = _require_run(ctx)
-    repo = _findings_repo(ctx, run_dir)
+    run_dir = require_run(ctx)
+    repo = findings_repo(ctx, run_dir)
     # Hidden dims must be known BEFORE the query runs, so the exclusion can be
     # pushed into SQL ahead of LIMIT (see SqliteFindingsRepository.search).
     # Filtering the returned rows afterward is not equivalent: rows are
@@ -87,7 +42,7 @@ def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
     # exist. Sourced from every dimension in the run's DB (not from the
     # query's hits) so a dimension whose rows never come back from SQL is
     # still reported as withheld.
-    hidden = _hidden_ids(ctx, list(repo.count_by_dimension()))
+    hidden = hidden_ids(ctx, list(repo.count_by_dimension()))
     hits = repo.search(query, limit=max(1, min(int(limit), 50)),
                         exclude_dimensions=hidden or None)
     # Model-facing key is "requirement"; the Finding attribute is `req`
@@ -103,24 +58,24 @@ def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
 def _get_scores(ctx: ToolContext) -> dict:
     # A specific run selected → that run's dims. Otherwise the accumulated
     # (per-dimension-latest) scores — the default dashboard/overview view.
-    if _has_run(ctx):
+    if has_run(ctx):
         eval_dir = ctx.run_dir / "evaluation"
         if not eval_dir.is_dir():
             raise ToolError("no evaluation reports in this run")
-        scored = _scored_run_dims(ctx)
+        scored = scored_run_dims(ctx)
         if scored is None:
-            scored = _raw_run_dims(eval_dir)
-        kept, hidden = _visible_only(ctx, scored)
+            scored = raw_run_dims(eval_dir)
+        kept, hidden = visible_only(ctx, scored)
         return {
             "scores": {d["dimension"]: {
                 "score": d.get("overallScore"), "grade": d.get("overallGrade"),
             } for d in kept if d.get("dimension")},
             "hiddenStandardIds": hidden,
         }
-    dims = _accumulated_dims(ctx)
+    dims = accumulated_dims(ctx)
     if dims is None:
-        raise _no_scope_error()
-    kept, hidden = _visible_only(ctx, dims)
+        raise no_scope_error()
+    kept, hidden = visible_only(ctx, dims)
     return {
         "scores": {d.get("dimension"): {
             "score": d.get("overallScore"), "grade": d.get("overallGrade"),
@@ -138,7 +93,7 @@ def _get_report_from_run(ctx: ToolContext, dimension: str) -> dict:
            ("dimension", "overallScore", "overallGrade", "principles",
             "totals", "coveragePct")}
     viols = data.get("violations") or []
-    scored = _scored_run_dims(ctx)
+    scored = scored_run_dims(ctx)
     if scored is not None:
         entry = next((d for d in scored if d.get("dimension") == dimension), None)
         if entry is not None:
@@ -151,17 +106,17 @@ def _get_report_from_run(ctx: ToolContext, dimension: str) -> dict:
                                  for p in (entry.get("principles") or [])]
             out["totals"] = entry.get("totals")
             viols = entry.get("violations") or []
-    out["violations"] = [_trim_violation(v) for v in viols[:_REPORT_VIOLATION_CAP]]
+    out["violations"] = [trim_violation(v) for v in viols[:_REPORT_VIOLATION_CAP]]
     return out
 
 
 def _get_report_from_accumulated(ctx: ToolContext, dimension: str) -> dict:
-    dims = _accumulated_dims(ctx)
+    dims = accumulated_dims(ctx)
     if dims is None:
-        raise _no_scope_error()
+        raise no_scope_error()
     entry = next((d for d in dims if d.get("dimension") == dimension), None)
     if entry is None:
-        avail = _available_names(ctx, dims)
+        avail = available_names(ctx, dims)
         raise ToolError(
             f"no report for dimension: {dimension}. Available: {avail or '(none)'}")
     viols = entry.get("violations") or []
@@ -182,13 +137,13 @@ def _get_report_from_accumulated(ctx: ToolContext, dimension: str) -> dict:
         # The accumulated view picks each dimension's latest run independently;
         # expose which run this dimension's data came from.
         "fromRun": entry.get("fromRunId"),
-        "violations": [_trim_violation(v) for v in viols[:_REPORT_VIOLATION_CAP]],
+        "violations": [trim_violation(v) for v in viols[:_REPORT_VIOLATION_CAP]],
     }
 
 
 def _get_report(ctx: ToolContext, dimension: str) -> dict:
-    _validate_dimension(dimension)
-    if _has_run(ctx):
+    validate_dimension(dimension)
+    if has_run(ctx):
         return _get_report_from_run(ctx, dimension)
     return _get_report_from_accumulated(ctx, dimension)
 
@@ -235,7 +190,7 @@ def _register_findings_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
             "dimension": {"type": "string"},
             "limit": {"type": "integer", "minimum": 1, "maximum": 100},
         }},
-        lambda **kw: _get_violations(ctx, **kw)))
+        lambda **kw: get_violations(ctx, **kw)))
 
 
 def _register_score_tools(registry: ToolRegistry, ctx: ToolContext) -> None:

@@ -1,4 +1,4 @@
-"""Cluster 17 site 1 regression: the projection fallback's failure logging.
+"""The projection fallback's failure logging.
 
 ``rescore_with_fallback`` used to hand the background projection sweep to a
 bare ``ThreadBackgroundRunner()``, which defaults to ``log=NULL_LOG``
@@ -45,7 +45,7 @@ def test_rescore_with_fallback_wires_module_logger_into_background_runner(monkey
     common failure path production-visible; the ``_bg_project`` warning-level
     catch below does that.
 
-    Post-PR review M6: the runner is typed ``log: LogSink`` and a bare
+    The runner is typed ``log: LogSink`` and a bare
     ``logging.Logger`` has no ``success``, so the module hands it a
     ``LoggerSink`` wrapper. What matters is that lines written through that
     sink still land on ``quodeq.services.mutation_rescore``.

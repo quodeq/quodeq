@@ -52,7 +52,7 @@ def test_shared_violations_invalid_run_segment(client, shared_clone_fixture):
 
 
 def test_shared_violations_passes_shared_log_sink(client, shared_clone_fixture, monkeypatch):
-    """shared_violations threads log=SHARED_LOG, matching shared_dashboard (Task 3 follow-up)."""
+    """shared_violations threads log=SHARED_LOG, matching shared_dashboard."""
     calls: list[object] = []
     original = fs_reports.get_violations
 

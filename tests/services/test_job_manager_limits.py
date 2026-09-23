@@ -1,8 +1,8 @@
 """JobManager's start_job concurrency cap and cancel_job's run_dir hint.
 
 Split from test_job_manager.py (672 lines, already at the file-length
-ratchet) rather than growing it further. Covers findings 5400 (cancel_job's
-scan of every project dir) and 5401 (start_job's unbounded thread spawning).
+ratchet) rather than growing it further. Covers cancel_job's scan of every
+project dir and start_job's unbounded thread spawning.
 """
 from __future__ import annotations
 

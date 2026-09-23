@@ -21,8 +21,8 @@ def test_parse_args_accepts_cache_root_and_model_id(tmp_path):
 def test_parse_args_cache_root_and_model_id_default_to_none():
     """When omitted, both fields default to None on ServerArgs.
 
-    The hard-fail check on missing values lives in _build_router (Task 5)
-    and CLI-level enforcement (Task 7), NOT here.
+    The hard-fail check on missing values lives in _build_router
+    and CLI-level enforcement, NOT here.
     """
     args = parse_args(["/tmp/findings.jsonl"])
     assert args.cache_root is None

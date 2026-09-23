@@ -1,7 +1,7 @@
 """Dimension-level cache helpers — bridge between RunConfig + filesystem
 and the cache layer.
 
-These are pure functions used by the V2 dimension processor (Phase B5):
+These are pure functions used by the V2 dimension processor:
 
   - ``build_cache_key_for_file``: derive a deterministic cache key from
     the current ``RunConfig`` and a target file. The key composition

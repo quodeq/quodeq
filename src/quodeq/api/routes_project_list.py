@@ -87,7 +87,7 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     path-traversal attempt, a non-existent target) is validated by
     ``_validated_target_path`` and given its own message/code. Once that
     passes, a False from the provider can only mean the project itself is
-    not registered, so NOT_FOUND is reserved for that case (finding 5926).
+    not registered, so NOT_FOUND is reserved for that case.
     """
     project = request.view_args["project"]
     data = request.get_json(silent=True) or {}

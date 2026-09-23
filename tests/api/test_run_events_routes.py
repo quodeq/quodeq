@@ -43,7 +43,7 @@ def test_route_returns_404_for_unknown_job(app: Flask):
 
 
 def test_unresolvable_job_reports_gone_code_not_not_found(app: Flask):
-    """finding 6509: job_id resolves to no run dir -> 410, and the JSON
+    """job_id resolves to no run dir -> 410, and the JSON
     ``code`` field must say GONE, not the hardcoded NOT_FOUND that used
     to be returned regardless of the actual HTTP status."""
     client = app.test_client()

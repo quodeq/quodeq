@@ -104,7 +104,7 @@ def test_aliased_module_suppress_is_flagged():
     assert _kinds("with cl.suppress(OSError):\n    f()\n") == [(1, "suppress")]
 
 
-# Post-PR review M3: suppress() is flagged wherever it is CALLED, not only as
+# suppress() is flagged wherever it is CALLED, not only as
 # a direct `with` item, so the two evasions the review probed are closed.
 
 def test_suppress_via_exit_stack_is_flagged():
@@ -123,7 +123,7 @@ def test_suppress_is_keyed_once_per_call_site():
     assert _kinds(src) == [(1, "suppress")]
 
 
-# Post-PR review M3: `_reraises` is a reachability-aware scan of the handler's
+# `_reraises` is a reachability-aware scan of the handler's
 # top level, so a `raise` that can never run does not launder a broad catch.
 
 def test_unreachable_raise_after_return_does_not_count_as_reraise():

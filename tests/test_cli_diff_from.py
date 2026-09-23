@@ -36,7 +36,7 @@ def test_clean_scan_and_diff_from_mutually_exclusive(capsys) -> None:
 def test_legacy_incremental_with_diff_from_does_not_error(capsys) -> None:
     """Deprecated --incremental no longer triggers the mutex when paired with --diff-from.
 
-    Regression guard: the mutex was rewritten in Task 3 to check --clean-scan,
+    Regression guard: the mutex was rewritten to check --clean-scan,
     not --incremental. The legacy flag is a no-op alias that emits a warning
     but should not block --diff-from runs.
 

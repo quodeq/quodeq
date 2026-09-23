@@ -5,7 +5,7 @@ similarity is consulted only on an exact-tier miss (see
 ``apply_precedent_downweight``). The batch path -- ``precedent_scores``,
 called from ``FindingEnricher.precedent_scores`` -- computes every eligible
 finding's score with one ``PrecedentCorpus.match_many`` call instead of one
-``match`` call per finding (finding 5598).
+``match`` call per finding.
 """
 from __future__ import annotations
 

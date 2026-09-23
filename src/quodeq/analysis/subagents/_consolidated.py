@@ -85,9 +85,8 @@ def _collect_consolidated_results(
             # file and a malformed "taken" entry.
             log.warning(f"Could not read taken files from consolidated queue {queue_path}: {exc}")
 
-    # V2 cache owns incremental state via per-file entries written
-    # during dispatch; the V1 per-dimension fingerprint write is no
-    # longer needed (B6.2).
+    # Incremental state lives in the per-file cache entries written
+    # during dispatch, so no per-dimension fingerprint is written here.
 
     ev_ctx = EvidenceContext(
         language=config.language,

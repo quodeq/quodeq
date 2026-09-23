@@ -77,7 +77,7 @@ def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
     # project has no active dismissals/deletions).
     payload = rescore_accumulated(payload, ctx.reports_dir, ctx.project_id)
     raw_dims = payload.get("dimensions", []) or []
-    # Shared with _read_tools._visible_only: one implementation of "what
+    # Shared with _read_tools_violations.visible_only: one implementation of "what
     # counts as hidden" for every read surface.
     kept, hidden = partition_entries_visible(raw_dims, ctx.visible_standard_ids)
     dimensions = [

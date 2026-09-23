@@ -24,7 +24,8 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
     (see ``services/run_index.py``'s ``_walk_run_dirs`` and
     ``services/fs_projects.get_project_info``): a run lives at
     ``<evaluations_root>/<project_id>/<run_id>`` where ``project_id`` is the
-    directory name under ``get_evaluations_dir()`` (Plan-1's "project_uuid"),
+    directory name under ``get_evaluations_dir()`` (the session row calls it
+    "project_uuid"),
     and the repo root is ``repository_info.json``'s ``path`` field, read via
     the existing ``get_project_info`` helper. Returns ``(None, None)`` when
     the run directory does not exist on disk.

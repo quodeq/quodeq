@@ -74,6 +74,7 @@ def run_incremental_loop(
     log.info(f"[loop] incremental: {len(dimensions)} dim(s) to process: {', '.join(dimensions)}")
     run = _LoopRun(deps=deps, result=result)
     run_deadline = getattr(config.options, "deadline_at", None)
+    config.options.run_deadline_at = run_deadline
     try:
         for idx, dimension in enumerate(dimensions, 1):
             _apply_dim_deadline(config, dimensions[idx - 1:], run_deadline, dim_counts)
@@ -86,6 +87,7 @@ def run_incremental_loop(
     # ever pre-sets deadline_at together with a time limit.
     finally:
         config.options.deadline_at = run_deadline
+        config.options.run_deadline_at = None
     log.info(
         f"[loop] incremental finished: processed {len(result)} of {len(dimensions)} dim(s) "
         f"({', '.join(result) if result else 'none'})",

@@ -1,9 +1,8 @@
 """Error-code coverage for the shared-repository route modules.
 
-Task 2 of usability cycle 1 (findings 6104, 6105, 6106, 6111, 6001, 6002,
-6003, 6004): every error response under ``routes_shared_common.py`` and
+Every error response under ``routes_shared_common.py`` and
 ``routes_shared_config.py`` now carries a machine-readable ``code``, and the
-FOREIGN_REPO message names the fix (finding 6111). Shared fixtures come from
+FOREIGN_REPO message names the fix. Shared fixtures come from
 ``tests/api/_routes_shared_fixtures.py``; the state-setup helpers mirror
 ``tests/api/test_routes_shared_read.py``/``test_routes_shared_config.py``
 rather than duplicating their fixtures.
@@ -53,7 +52,7 @@ def test_shared_root_missing_has_shared_repo_missing_code(client):
 
 
 def test_shared_root_foreign_message_tells_user_to_reconnect(client):
-    """Finding 6111: the FOREIGN_REPO message must give a next step, mirroring
+    """The FOREIGN_REPO message must give a next step, mirroring
     the "missing" branch's "reconnect it in Settings" wording."""
     url = "file:///dummy/foreign.git"
     repo = shared_repo_path(url)

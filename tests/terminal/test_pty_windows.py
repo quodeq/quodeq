@@ -6,7 +6,7 @@ tests/menubar/test_app.py uses for rumps -- letting these guards be exercised
 on any dev/CI platform. This complements test_pty_windows_smoke.py, which
 exercises the real ConPTY backend but only runs on win32.
 
-Part of Cluster 12 (terminal PTY reliability): see also
+This ties into the terminal PTY reliability fix; see also
 tests/integration/test_terminal_pty_reliability_e2e.py for the shared
 end-to-end regression test that ties this fix together with the
 terminal_read_loop / pump_terminal_out stop-signal fix.

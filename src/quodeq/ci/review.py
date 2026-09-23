@@ -18,32 +18,41 @@ class ReviewError(RuntimeError):
     """Raised when the review command cannot proceed."""
 
 
+_GH_MISSING = "gh CLI not found. Install with 'brew install gh' and run 'gh auth login'."
+
+
+def _run_gh(args: list[str]) -> str:
+    """Run ``gh`` with *args* and return its stdout.
+
+    A missing gh binary becomes the one ReviewError every caller shares; a
+    non-zero exit propagates as ``subprocess.CalledProcessError`` so each
+    caller words its own failure.
+    """
+    try:
+        result = subprocess.run(
+            ["gh", *args], capture_output=True, text=True, encoding="utf-8", check=True,
+        )
+    except FileNotFoundError:
+        raise ReviewError(_GH_MISSING)
+    return result.stdout
+
+
 def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
     """Detect the open PR for the current branch. Returns (pr_number, base_branch).
 
     Raises ReviewError with a clear message if no PR is found or gh is unavailable.
     """
     if pr_override is not None:
-        # Still need baseRefName — query gh for this PR
+        # Still need baseRefName, so ask gh about this PR.
         try:
-            result = subprocess.run(
-                ["gh", "pr", "view", str(pr_override), "--json", "number,baseRefName"],
-                capture_output=True, text=True, encoding="utf-8", check=True,
-            )
-        except FileNotFoundError:
-            raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
+            out = _run_gh(["pr", "view", str(pr_override), "--json", "number,baseRefName"])
         except subprocess.CalledProcessError as exc:
             raise ReviewError(f"Could not find PR #{pr_override}: {exc.stderr.strip()}")
-        data = json.loads(result.stdout)
+        data = json.loads(out)
         return data["number"], data["baseRefName"]
 
     try:
-        result = subprocess.run(
-            ["gh", "pr", "view", "--json", "number,baseRefName"],
-            capture_output=True, text=True, encoding="utf-8", check=True,
-        )
-    except FileNotFoundError:
-        raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
+        out = _run_gh(["pr", "view", "--json", "number,baseRefName"])
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()
         if "no pull requests found" in stderr.lower():
@@ -52,25 +61,16 @@ def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
                 "Open a PR first, or pass --pr <number>."
             )
         raise ReviewError(f"gh pr view failed: {stderr}")
-
-    data = json.loads(result.stdout)
+    data = json.loads(out)
     return data["number"], data["baseRefName"]
 
 
 def get_github_token() -> str:
     """Get a GitHub token via `gh auth token`."""
     try:
-        result = subprocess.run(
-            ["gh", "auth", "token"],
-            capture_output=True, text=True, encoding="utf-8", check=True,
-        )
-    except FileNotFoundError:
-        raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
+        token = _run_gh(["auth", "token"]).strip()
     except subprocess.CalledProcessError:
-        raise ReviewError(
-            "Not authenticated with GitHub. Run 'gh auth login' first."
-        )
-    token = result.stdout.strip()
+        raise ReviewError("Not authenticated with GitHub. Run 'gh auth login' first.")
     if not token:
         raise ReviewError("gh auth token returned empty. Run 'gh auth login'.")
     return token
@@ -79,16 +79,13 @@ def get_github_token() -> str:
 def get_repo_info() -> tuple[str, str]:
     """Get (owner, repo) from the current git repository via gh."""
     try:
-        result = subprocess.run(
-            ["gh", "repo", "view", "--json", "owner,name"],
-            capture_output=True, text=True, encoding="utf-8", check=True,
-        )
-    except (FileNotFoundError, subprocess.CalledProcessError):
+        out = _run_gh(["repo", "view", "--json", "owner,name"])
+    except subprocess.CalledProcessError:
         raise ReviewError(
             "Could not determine GitHub repo. "
             "Run from inside a GitHub-connected git repo, or use 'gh repo set-default'."
         )
-    data = json.loads(result.stdout)
+    data = json.loads(out)
     return data["owner"]["login"], data["name"]
 
 

@@ -49,7 +49,7 @@ def test_cli_run_appears_in_index(tmp_path: Path, monkeypatch) -> None:
 
 @pytest.mark.integration
 def test_legacy_run_appears_as_cancelled(tmp_path: Path, monkeypatch) -> None:
-    """A pre-Plan-A run dir (no status.json, no .pid) shows up as cancelled."""
+    """A legacy run dir (no status.json, no .pid) shows up as cancelled."""
     reports = tmp_path / "reports"
     run = reports / "p" / "legacy-run"
     (run / "evidence").mkdir(parents=True)

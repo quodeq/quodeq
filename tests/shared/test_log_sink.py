@@ -1,4 +1,4 @@
-"""Post-PR review M6: a stdlib Logger is not a LogSink.
+"""A stdlib Logger is not a LogSink.
 
 ``LogSink`` requires ``success`` alongside the four stdlib levels, and
 ``logging.Logger`` has no such method. ``services/mutation_rescore.py`` was

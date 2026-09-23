@@ -1,6 +1,6 @@
 """Post-PR review I2: the consolidated collector logs through the injected sink.
 
-Cluster 9 of fault-tolerance cycle 1 replaced a silent ``except: pass`` around
+A prior fix replaced a silent ``except: pass`` around
 the queue read with a warning, but wired it to a raw stdlib logger in a module
 whose public entry point already carries ``log: LogSink``. ``analysis/`` is one
 of the inner layers ARCHITECTURE.md requires to take an injected sink, and the
@@ -47,7 +47,7 @@ def test_corrupt_queue_warning_reaches_the_injected_sink(tmp_path):
     evidence_dir.mkdir()
     (evidence_dir / "consolidated_evidence.jsonl").write_text("", encoding="utf-8")
     # A queue file that exists but cannot be parsed: the exact failure the
-    # cluster 9 fix made visible.
+    # fix made visible.
     (evidence_dir / "consolidated_queue.json").write_text("{not json", encoding="utf-8")
 
     ctx_obj = MagicMock()

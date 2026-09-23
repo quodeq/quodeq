@@ -21,7 +21,7 @@ class TestBuildDashboardDismissedFiltering:
     """The run-level dashboard payload must not resurface findings the user
     dismissed or deleted at project level.
 
-    Regression for the 2026-07-04 report: run 03c99d26 showed "1 critical"
+    Regression for the 2026-07-04 report: a run showed "1 critical"
     in the history run view for a finding dismissed on 2026-06-20, while the
     dimension detail (which applies the dismissed-keys filter) correctly hid
     it. The run view, the dimension detail, and the accumulated overview must

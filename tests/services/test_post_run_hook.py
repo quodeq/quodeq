@@ -1,6 +1,6 @@
 """PostRunHook.__call__: a cleanup_clone failure must not block project_events.
 
-Cluster 10 (fault-tolerance cycle 1): cleanup_clone's call was previously
+Its call was previously
 unguarded, so a cleanup failure skipped project_events (the State Store
 projection) two lines below entirely. The fix mirrors the existing
 `except Exception: _logger.warning(..., exc_info=True)` guard already in

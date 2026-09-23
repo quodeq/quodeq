@@ -104,9 +104,8 @@ describe('HistoryPage — delete-run source gating', () => {
   });
 });
 
-// Final whole-branch review: Critical 1 (evaluate CTA gating), Finding 3
-// (teammate persona -- shared selection + zero local projects), Finding 6
-// (shared read-only chip).
+// Covers evaluate CTA gating, teammate persona (shared selection + zero
+// local projects), and the shared read-only chip.
 function renderHistoryPageWithData(overrides = {}) {
   const QC = withQueryClient();
   const fakeApi = makeFakeApi();

@@ -1,7 +1,6 @@
-"""More machine-readable error-code coverage for terminal_routes.py
-(usability cycle 1, task 6 sweep): the one bare jsonify() tools/
-check_error_codes.py (the zero-tolerance gate added in task 6) found under
-terminal_routes.py -- POST /api/terminal/open's "path is required" 400.
+"""More machine-readable error-code coverage for terminal_routes.py:
+tools/check_error_codes.py's zero-tolerance gate found one bare jsonify()
+under terminal_routes.py -- POST /api/terminal/open's "path is required" 400.
 
 Sibling of test_terminal_routes_error_codes.py. The ``app``/``_FakeManager``
 fixtures are reused, not copied, from test_terminal_routes.py.

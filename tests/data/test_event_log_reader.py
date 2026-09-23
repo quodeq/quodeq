@@ -89,8 +89,8 @@ def test_latest_timestamp(writer: EventLogWriter, reader: EventLogReader):
 
 
 def test_latest_timestamp_missing_file_is_caught(tmp_path: Path):
-    """Cluster 13 (R-FT-7) — get_latest_timestamp's except was narrowed
-    from bare `Exception` to `(OSError, UnicodeDecodeError)`. A missing log
+    """get_latest_timestamp's except was narrowed
+    from bare `Exception` to `(OSError, UnicodeDecodeError)` (R-FT-7). A missing log
     file (open() raising FileNotFoundError, an OSError subclass) is the
     realistic case this function exists to tolerate: return None, not raise."""
     missing = tmp_path / "does-not-exist.jsonl"

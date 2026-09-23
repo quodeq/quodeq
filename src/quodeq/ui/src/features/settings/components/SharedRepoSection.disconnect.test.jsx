@@ -91,7 +91,7 @@ describe('SharedRepoSection', () => {
     expect(fakeApi.disconnectShared).not.toHaveBeenCalled();
   });
 
-  // Important 4 (final whole-branch review): a currently-'shared' selection
+  // A currently-'shared' selection
   // has nowhere left to resolve once the repo is disconnected. SharedRepoSection
   // doesn't own project-selection state itself -- it calls an onDisconnected
   // callback so App.jsx can reset the selection at the seam that actually
@@ -115,7 +115,7 @@ describe('SharedRepoSection', () => {
     await waitFor(() => expect(onDisconnected).toHaveBeenCalledTimes(1));
   });
 
-  // Audit C6: this section's mutations must reach the SAME cache
+  // This section's mutations must reach the SAME cache
   // ProjectsPage's useSharedProjects/usePublish read, not just this
   // section's own settings-detail status query -- otherwise a connect made
   // here would leave the Projects page showing the stale pre-connect state
@@ -167,9 +167,9 @@ describe('SharedRepoSection', () => {
     });
   });
 
-  // Ghost shared cards after disconnect (final whole-branch review, Important
-  // finding): invalidating sharedKeys.list() alone leaves its cached data in
-  // place once the list query is disabled (configured -> false), so the
+  // Ghost shared cards after disconnect: invalidating sharedKeys.list() alone
+  // leaves its cached data in place once the list query is disabled
+  // (configured -> false), so the
   // Projects page kept rendering the old shared cards. The disconnect
   // mutation must actively clear that cache entry, not just mark it stale.
   it('removes the shared list cache on a successful disconnect', async () => {

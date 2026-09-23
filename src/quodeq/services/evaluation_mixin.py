@@ -179,7 +179,7 @@ class FsEvaluationMixin:
         handler in the subprocess to write ``status.json`` to a terminal
         state. Without this wait, the API returns while observers reading
         ``status.json`` (UI dashboard query, SSE stream, etc.) still see
-        the run as ``in_progress`` for a window of ~100ms-1s, producing
+        the run as ``running`` for a window of ~100ms-1s, producing
         the "two running rows" UX after a cancel-then-start.
 
         When ``discard_partial`` is True the run must end up as if it never

@@ -45,7 +45,7 @@ def test_ensure_clone_and_refresh(tmp_path, monkeypatch):
 
 
 def test_clone_and_refresh_are_not_shallow(tmp_path, monkeypatch):
-    """Audit finding C1: a permanently-shallow (--depth 1) clone means
+    """A permanently-shallow (--depth 1) clone means
     `git log -1 -- path` on the shallow root commit attributes EVERY path
     to the tip commit, misattributing every project except the most
     recently pushed one. Both the initial clone and the refresh fetch must
@@ -170,7 +170,7 @@ def test_run_git_does_not_hang_on_credential_prompt(tmp_path):
 
 
 def test_refresh_shared_clone_returns_reason_on_fetch_failure(tmp_path, monkeypatch, caplog):
-    """Audit finding B3: refresh_shared_clone must surface WHY a refresh
+    """refresh_shared_clone must surface WHY a refresh
     failed (the git stderr tail), not just False -- without it, the UI can
     only render "Request failed: 502" for DNS failure vs auth failure vs a
     deleted origin. The failure must also be logged via logger.warning so a

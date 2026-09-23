@@ -96,7 +96,7 @@ function buildDisconnectMutationConfig({ disconnectShared, setError, setNewUrl, 
       // removing first guarantees there is no shared-repo data left to render
       // in that window, and no leftover entry from a since-disconnected repo
       // to flash on a later reconnect to a different URL (ghost shared cards
-      // after disconnect, final whole-branch review).
+      // after disconnect).
       queryClient.removeQueries({ queryKey: sharedKeys.list() });
       queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
     },

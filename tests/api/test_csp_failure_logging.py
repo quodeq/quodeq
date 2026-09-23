@@ -1,4 +1,4 @@
-"""Cluster 17 site 2 regression: CSP same-origin ws computation failures.
+"""CSP same-origin ws computation failures.
 
 ``_add_security_headers`` (api/security.py) runs on *every* response via
 ``after_request``. Before this fix, a failure inside
@@ -105,7 +105,7 @@ def test_csp_header_failure_log_is_rate_limited_across_responses(monkeypatch, se
 
 
 def test_csp_header_first_failure_logs_on_freshly_booted_machine(monkeypatch, security_caplog):
-    """Post-PR review M1: the throttle's "never logged yet" state must not be
+    """The throttle's "never logged yet" state must not be
     a plain 0.0, because time.monotonic() is seconds-since-boot on every
     platform we ship to. On a machine up for less than the cooldown window
     (a desktop app launched at login), ``now - 0.0 < 60`` was true and the

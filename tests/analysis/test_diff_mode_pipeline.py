@@ -66,5 +66,5 @@ def test_incremental_mode_uses_incremental_loop() -> None:
 
 
 # Removed save_dimension_fingerprint tests: V1's per-dim fingerprint
-# write is gone (B6). V2 writes per-file cache entries during dispatch
+# write is gone. V2 writes per-file cache entries during dispatch
 # and skip_scoring/diff-mode gating happens at the cache layer instead.

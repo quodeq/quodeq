@@ -35,7 +35,7 @@ def test_delete_config_clears(client, monkeypatch, tmp_path):
 
 
 def test_delete_config_removes_cache_dir(client, monkeypatch, tmp_path):
-    """Audit A4: disconnect must remove the clone's cache dir from disk, not
+    """Disconnect must remove the clone's cache dir from disk, not
     just clear settings -- otherwise a stale clone sits around forever."""
     monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
     origin = tmp_path / "origin.git"

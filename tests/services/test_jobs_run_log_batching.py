@@ -11,7 +11,7 @@ from tests.services._jobs_run_log_fixtures import _make_job
 
 
 # ---------------------------------------------------------------------------
-# Per-read batching (finding 5208)
+# Per-read batching
 # ---------------------------------------------------------------------------
 
 def _pipe_stream(payload: bytes) -> io.TextIOWrapper:

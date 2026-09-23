@@ -8,9 +8,14 @@ from __future__ import annotations
 import heapq
 import json
 
-from quodeq.assistant.tools import _read_tools as _facade
-from quodeq.assistant.tools import _read_tools_scope as _scope_facade
 from quodeq.assistant.tools._context import ToolContext
+from quodeq.assistant.tools._read_tools_common import raw_run_dims, requirement_of, validate_dimension
+from quodeq.assistant.tools._read_tools_scope import (
+    accumulated_dims,
+    has_run,
+    no_scope_error,
+    scored_run_dims,
+)
 from quodeq.assistant.tools.registry import ToolError
 from quodeq.core.standards.visibility import (
     hidden_ids_for_names,
@@ -36,7 +41,7 @@ _SEVERITY_RANK = {
 }
 
 
-def _available_names(ctx: ToolContext, dims: list[dict]) -> str:
+def available_names(ctx: ToolContext, dims: list[dict]) -> str:
     """Comma-joined visible dimension names for a not-found error message.
 
     Filtered so an error never discloses a dimension the user has hidden.
@@ -46,12 +51,12 @@ def _available_names(ctx: ToolContext, dims: list[dict]) -> str:
     return ", ".join(sorted(shown))
 
 
-def _hidden_ids(ctx: ToolContext, names: list[str]) -> list[str]:
+def hidden_ids(ctx: ToolContext, names: list[str]) -> list[str]:
     """Which of *names* the user has hidden. See ``hidden_ids_for_names``."""
     return hidden_ids_for_names(names, ctx.visible_standard_ids)
 
 
-def _visible_only(ctx: ToolContext, entries: list[dict],
+def visible_only(ctx: ToolContext, entries: list[dict],
                   key: str = "dimension") -> tuple[list[dict], list[str]]:
     """Drop entries whose dimension the user has hidden.
 
@@ -70,25 +75,15 @@ def _principle_of(v: dict):
     return v.get("principle") or v.get("practiceId")
 
 
-def _requirement_of(v: dict) -> str:
-    # The requirement id (Finding.req) is the FIRST element of the (req, file,
-    # line) identity that dismiss/verify and the suppression filter key on.
-    # Run-scoped eval JSON and the accumulated serialized-Finding payload both
-    # key it as "req"; accept "requirement" too for any producer that already
-    # renamed it. Often absent (req is optional; practiceId is the guaranteed
-    # identity), so it is normalized to "" rather than None so it round-trips
-    # as a valid dismiss key.
-    return str(v.get("req") or v.get("requirement") or "")
-
-
-def _trim_violation(v: dict) -> dict:
+def trim_violation(v: dict) -> dict:
+    """Reduce a raw violation to VIOLATION_FIELDS plus principle and requirement."""
     out = {k: v.get(k) for k in VIOLATION_FIELDS}
     out["principle"] = _principle_of(v)
     # Expose the requirement id so the model can form a correct dismiss/verify
     # key. Without it, get_report/get_violations only surfaced `principle`, and
     # a dismiss drafted from that data carried a wrong/empty req that never
     # matched the finding on the suppression read path (silent no-op).
-    out["requirement"] = _requirement_of(v)
+    out["requirement"] = requirement_of(v)
     return out
 
 
@@ -97,10 +92,12 @@ def _severity_key(v: dict):
     return (_SEVERITY_RANK.get(sev, 99), _principle_of(v) or "")
 
 
-def _get_violations(ctx: ToolContext, dimension: str | None = None,
+def get_violations(ctx: ToolContext, dimension: str | None = None,
                     limit: int = _VIOLATIONS_DEFAULT_LIMIT) -> dict:
+    """One page of violations for the run or overview scope, severity first,
+    with per-principle counts."""
     limit = max(1, min(int(limit), _VIOLATIONS_MAX_LIMIT))
-    if _scope_facade._has_run(ctx):
+    if has_run(ctx):
         raw, dim_out, hidden = _violations_from_run(ctx, dimension)
     else:
         raw, dim_out, hidden = _violations_from_accumulated(ctx, dimension)
@@ -115,7 +112,7 @@ def _get_violations(ctx: ToolContext, dimension: str | None = None,
     # nsmallest keeps sorted()'s stable tie order but skips ordering the
     # entries past `limit` that the page drops anyway.
     page = heapq.nsmallest(limit, raw, key=_severity_key)
-    trimmed = [_trim_violation(v) for v in page]
+    trimmed = [trim_violation(v) for v in page]
     return {"dimension": dim_out, "count": len(raw), "violations": trimmed,
             "by_principle": by_principle, "hiddenStandardIds": hidden}
 
@@ -123,14 +120,14 @@ def _get_violations(ctx: ToolContext, dimension: str | None = None,
 def _violations_from_run(ctx: ToolContext, dimension: str | None):
     eval_dir = ctx.run_dir / "evaluation"
     if dimension:
-        _facade._validate_dimension(dimension)
+        validate_dimension(dimension)
         path = eval_dir / f"{dimension}.json"
         if not path.is_file():
             raise ToolError(
                 f"no report for dimension: {dimension} in this run. "
                 "Check get_scores for available dimensions, or get_overview "
                 "for accumulated scores across runs.")
-        scored = _scope_facade._scored_run_dims(ctx)
+        scored = scored_run_dims(ctx)
         if scored is not None:
             entry = next((d for d in scored if d.get("dimension") == dimension), None)
             if entry is not None:
@@ -141,26 +138,26 @@ def _violations_from_run(ctx: ToolContext, dimension: str | None):
         raise ToolError(
             "no evaluation reports in this run. Try get_overview for "
             "accumulated scores across runs.")
-    scored = _scope_facade._scored_run_dims(ctx)
+    scored = scored_run_dims(ctx)
     if scored is None:
-        scored = _facade._raw_run_dims(eval_dir)
-    kept, hidden = _visible_only(ctx, scored)
+        scored = raw_run_dims(eval_dir)
+    kept, hidden = visible_only(ctx, scored)
     return [v for d in kept for v in (d.get("violations") or [])], None, hidden
 
 
 def _violations_from_accumulated(ctx: ToolContext, dimension: str | None):
-    dims = _scope_facade._accumulated_dims(ctx)
+    dims = accumulated_dims(ctx)
     if dims is None:
-        raise _scope_facade._no_scope_error()
+        raise no_scope_error()
     if dimension:
         entry = next((d for d in dims if d.get("dimension") == dimension), None)
         if entry is None:
-            avail = _available_names(ctx, dims)
+            avail = available_names(ctx, dims)
             raise ToolError(
                 f"no report for dimension: {dimension}. Available: "
                 f"{avail or '(none)'}. Or try get_overview for accumulated scores.")
         return entry.get("violations") or [], dimension, []
-    kept, hidden = _visible_only(ctx, dims)
+    kept, hidden = visible_only(ctx, dims)
     raw: list = []
     for d in kept:
         raw.extend(d.get("violations") or [])

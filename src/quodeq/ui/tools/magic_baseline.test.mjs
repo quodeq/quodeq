@@ -1,6 +1,6 @@
-// The magic-number ratchet burned its baseline to zero in maintainability
-// cycle 3 (PR 3). This pins it there: an entry creeping back in means a
-// new literal was grandfathered instead of named.
+// The magic-number ratchet burned its baseline to zero. This pins it
+// there: an entry creeping back in means a new literal was grandfathered
+// instead of named.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

@@ -57,7 +57,7 @@ def test_list_projects_returns_latest_run(tmp_path: Path) -> None:
 
     assert result["projects"], "expected projects to be listed"
     # The provider hands back ProjectEntry entities; the route serializes
-    # them to the camelCase wire shape (WS6 boundary).
+    # them to the camelCase wire shape at the API boundary.
     project = result["projects"][0]
     assert project.name == "proj"
     assert project.runs_count == 2

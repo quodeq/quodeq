@@ -1,7 +1,7 @@
 """Cancel path for external (CLI-started) evaluations.
 
 Dashboard-side detection and status inference for external runs now
-lives in ``services/run_index.py`` and ``data/sqlite/index_sync.py`` (Plan B1).
+lives in ``services/run_index.py`` and ``data/sqlite/index_sync.py``.
 Only the cancel path -- reading the ``.pid`` file and delivering signals --
 remains here.
 

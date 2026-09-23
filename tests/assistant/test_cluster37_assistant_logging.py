@@ -1,4 +1,4 @@
-"""Cluster 37: assistant, cli, and lifecycle best-effort handlers log at debug."""
+"""assistant, cli, and lifecycle best-effort handlers log at debug."""
 from __future__ import annotations
 
 import argparse
@@ -74,7 +74,7 @@ def test_accumulated_finding_keys_logs_and_never_calls_add(monkeypatch) -> None:
     def _raise(*_args, **_kwargs):
         raise OSError(5, "boom")
 
-    monkeypatch.setattr(_read_tools_scope, "_accumulated_dims", _raise)
+    monkeypatch.setattr(_read_tools_scope, "accumulated_dims", _raise)
     added: list = []
     with patch.object(_read_tools_scope._logger, "debug") as debug:
         _read_tools_scope._accumulated_finding_keys(None, added.append)

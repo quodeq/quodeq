@@ -68,7 +68,7 @@ def test_export_project_rejects_invalid_project_name(client):
 
 
 class TestUpdateProjectPathValidation:
-    """finding 5926: update_project_path's distinct failure modes (invalid
+    """update_project_path's distinct failure modes (invalid
     URL, non-directory target, missing project) get their own message
     instead of a blanket "Project not found" 404 for all of them."""
 

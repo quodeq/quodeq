@@ -5,7 +5,7 @@ origin + publish_project + sync_shared_index) and points settings at it —
 the recipe every shared-clone integration test in this directory needs.
 Moved here from ``test_routes_shared_read.py`` (its original home) so
 ``test_assistant_shared_sessions.py`` can reuse it without duplicating the
-fixture (Task 6, Step 0).
+fixture.
 """
 from __future__ import annotations
 

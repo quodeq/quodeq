@@ -1,8 +1,8 @@
 """Staging logic for publishing a project into the shared results repo.
 
 Split out of shared_publish.py: pure file-copy/merge operations
-plus stage_project's one exception, a `git config user.name` read (see
-audit finding C1). Invariants (spec):
+plus stage_project's one exception, a `git config user.name` read.
+Invariants (spec):
 - only completed runs (state == "done") are published
 - explicit allowlist of source-of-truth files, never derived artifacts
 - actions.jsonl is union-merged with the remote copy, never overwritten
@@ -109,8 +109,8 @@ def _publish_attribution(clone_root: Path) -> str:
     Reads git config rather than GIT_AUTHOR_NAME/GIT_COMMITTER_NAME: those
     env vars only affect a new commit's recorded author/committer identity,
     not `git config` lookups. Falls back to "unknown" (never raises) so a
-    missing git identity never blocks a publish -- audit finding C1 is about
-    truthful attribution when it IS known, not about requiring one.
+    missing git identity never blocks a publish -- attribution is about
+    truthfulness when it IS known, not about requiring one.
     """
     ok, out = run_git(["config", "user.name"], cwd=clone_root)
     author = out.strip() if ok else ""
@@ -138,7 +138,7 @@ def stage_project(project_dir: Path, dest_project_dir: Path) -> int:
     for run_dir in runs:
         copy_run(run_dir, dest_project_dir / run_dir.name)
 
-    # Record who published and when at publish time (audit finding C1),
+    # Record who published and when at publish time,
     # rather than relying solely on git-log against the shared clone, which
     # published_meta() still falls back to for dirs published before this
     # file existed. dest_project_dir is <clone>/evaluations/<project_id>, so

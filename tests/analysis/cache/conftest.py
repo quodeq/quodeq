@@ -1,6 +1,6 @@
 """Shared fixtures and test doubles for the test_dimension_runner* siblings.
 
-process_dimension_with_cache — V2 dimension processor. Composes the B4
+process_dimension_with_cache — V2 dimension processor. Composes the cache
 helpers (classify, persist, key) with the existing dispatcher boundary
 (process_dimension_with_subagents) into a cache-aware dimension runner.
 This module holds the scaffolding shared across the split test files:

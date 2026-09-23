@@ -1,6 +1,6 @@
 """Subagent processing path -- runs a dimension via N parallel subagents.
 
-Post-V2 (B6.2b): the verify-pool is gone. V2's content-addressed cache
+The verify-pool is gone. V2's content-addressed cache
 already invalidates on file/standards/prompts changes, triggering a
 full fresh dispatch. The V1 "carry-forward + verify-when-rules-change"
 optimization no longer earns its complexity.

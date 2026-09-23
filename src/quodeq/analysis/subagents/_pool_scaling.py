@@ -28,6 +28,7 @@ class ScaleUpContext:
     queue_path: Path
     submit_fn: Callable[[], None]
     deadline_at: float | None = None
+    run_deadline_at: float | None = None
 
 
 @dataclass
@@ -78,18 +79,26 @@ def get_queue(
 def should_respawn(
     queue: WorkQueue | None, queue_path: Path,
     pool_start: float, max_duration: float,
-    *, deadline_at: float | None = None,
+    *, deadline_at: float | None = None, run_deadline_at: float | None = None,
 ) -> int:
     """Return remaining file count if a new agent should be spawned, else 0.
 
     Spawning is gated by two ceilings:
     - the pool-local *max_duration* (elapsed since *pool_start*), and
-    - the run-level *deadline_at* (a monotonic wall-clock from the run config).
+    - *deadline_at*, a monotonic wall-clock from the run config: the run
+      deadline, or one dimension's slice of it when *run_deadline_at* (the
+      whole-run deadline) is later.
 
     Without the deadline gate, agents whose per-agent budget was clamped to
     "remaining run budget" (1s past the deadline) would die and immediately
     be respawned, producing an infinite stream of 1-second agents that never
     do useful work.
+
+    The "time budget reached" log names the gate "run deadline" rather than
+    "dimension slice" whenever *run_deadline_at* is None (consolidated mode
+    never sets it) or the auto-scale ratchet has moved *deadline_at* to or
+    past it, since only a *deadline_at* strictly earlier than the whole-run
+    deadline is actually a per-dimension slice.
     """
     remaining = get_queue(queue, queue_path).remaining()
     if cancellation.is_cancelled():
@@ -101,8 +110,10 @@ def should_respawn(
         return 0
     if deadline_at is not None and time.monotonic() >= deadline_at:
         if remaining > 0:
+            sliced = run_deadline_at is not None and deadline_at < run_deadline_at
+            budget = "dimension slice" if sliced else "run deadline"
             log_warning(
-                f"  Run deadline reached -- {remaining} files left, "
+                f"  Time budget reached ({budget}) -- {remaining} files left, "
                 f"not spawning new agents"
             )
         return 0
@@ -216,7 +227,7 @@ def maybe_scale_up(
         return False
     remaining = should_respawn(
         ctx.queue, ctx.queue_path, state.pool_start, state.max_duration,
-        deadline_at=ctx.deadline_at,
+        deadline_at=ctx.deadline_at, run_deadline_at=ctx.run_deadline_at,
     )
     for _ in range(compute_scale_up(remaining, n_agents - running)):
         ctx.submit_fn()

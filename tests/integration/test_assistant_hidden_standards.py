@@ -92,7 +92,7 @@ def _build_registry(tmp_path, repo_root, monkeypatch):
         "quodeq.assistant.tools._overview.get_accumulated",
         lambda *a: _ACCUMULATED)
     monkeypatch.setattr(
-        "quodeq.assistant.tools._read_tools.fs_reports.get_accumulated",
+        "quodeq.services.fs_reports.get_accumulated",
         lambda *a: _ACCUMULATED)
     repo = AssistantRepository(tmp_path / "assistant.db")
     repo.create_session(session_id="s1", provider="ollama")

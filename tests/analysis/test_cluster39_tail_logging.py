@@ -1,4 +1,4 @@
-"""Cluster 39: analysis silent fallbacks now leave a debug trace."""
+"""analysis silent fallbacks now leave a debug trace."""
 from __future__ import annotations
 
 from types import SimpleNamespace

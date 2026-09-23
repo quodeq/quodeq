@@ -34,6 +34,8 @@ class AnalysisConfig:
     time_limit: int = DEFAULT_TIME_LIMIT
     deadline_at: float | None = None
     """Absolute monotonic-clock deadline for the whole run. None = unlimited."""
+    run_deadline_at: float | None = None
+    """The whole-run deadline when ``deadline_at`` is a per-dimension slice."""
     compiled_dir: Path | None = None
     dimension: str | None = None
     queue_path: Path | None = None
@@ -61,12 +63,12 @@ class _AgentParams:
     # ``"unknown"`` / ``""`` at emit time.
     model_id: str | None = None
     language: str | None = None
-    # Final-review fix (params-fingerprint cross-boundary bug): the standards
-    # ROOT (``RunConfig.standards_dir``, parent of ``compiled/``) -- NOT
+    # The standards ROOT, not compiled_dir: the subprocess's cache writer must key
+    # under the same params_hash as ``build_cache_key_for_file``, which reads
+    # ``RunConfig.standards_dir`` (parent of ``compiled/``) -- NOT
     # ``compiled_dir`` above, which is already the ``compiled/`` subdirectory.
-    # Emitted as ``--standards-dir`` so the subprocess's cache writer keys
-    # under the same params_hash as ``build_cache_key_for_file``. ``None``
-    # when no ``RunConfig`` is carried (no params fingerprint folded in).
+    # Emitted as ``--standards-dir``. ``None`` when no ``RunConfig`` is
+    # carried (no params fingerprint folded in).
     standards_dir: Path | None = None
 
 

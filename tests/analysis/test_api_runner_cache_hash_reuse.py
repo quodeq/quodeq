@@ -1,4 +1,4 @@
-"""Regression tests for finding 5398: _build_cache_writer threads the
+"""Regression tests: _build_cache_writer threads the
 dimension's classify-time content hashes (stashed on RunConfig by
 classify_files_via_cache) through to the cache-write closure, so the write
 path reuses the hash classify already computed instead of re-hashing.

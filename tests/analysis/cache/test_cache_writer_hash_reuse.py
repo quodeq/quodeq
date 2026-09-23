@@ -1,4 +1,4 @@
-"""Regression tests for finding 5398: the cache-write closure reuses the
+"""Regression tests: the cache-write closure reuses the
 content hash the classify step already computed for a miss, instead of
 re-hashing the file's full content a second time.
 

@@ -60,7 +60,7 @@ class TestBuildMcpServerArgs:
         assert "--work-dir" in args
 
     def test_includes_cache_root_model_id_language(self, tmp_path):
-        """Task 3.5 #6: the args list passed to findings_server.py MUST include
+        """#6: the args list passed to findings_server.py MUST include
         --cache-root, --model-id, and --language so the subprocess can build a
         cache writer with the same fingerprint inputs as the parent's
         classify_files_via_cache. Without these flags, CLI-path and API-path
@@ -94,7 +94,7 @@ class TestBuildMcpServerArgs:
     def test_cache_flags_fall_back_when_no_run_config(self, tmp_path):
         """Without a RunConfig carrier, --cache-root is still emitted, model_id
         comes from AnalysisConfig.ai_model, and language is empty — matching
-        Task 5's contract that language="" means "unset" rather than missing.
+        The contract that language="" means "unset" rather than missing.
         """
         jsonl = tmp_path / "findings.jsonl"
         config = AnalysisConfig(jsonl_file=jsonl, ai_model="haiku")

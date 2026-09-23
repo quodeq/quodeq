@@ -45,6 +45,7 @@ class LoopContext:
     dimension_key: str
     submit_fn: Callable[[], None]
     deadline_at: float | None = None
+    run_deadline_at: float | None = None
     # Injectable cancellation check; the default binds the process-wide
     # signal here (the composition seam) so the loops never touch the
     # singleton themselves and tests can pass an isolated callable.
@@ -60,7 +61,7 @@ def _respawn_for_surplus(ctx: LoopContext, just_done: int) -> None:
     """
     remaining = should_respawn(
         ctx.queue, ctx.queue_path, ctx.pool_start, ctx.max_duration,
-        deadline_at=ctx.deadline_at,
+        deadline_at=ctx.deadline_at, run_deadline_at=ctx.run_deadline_at,
     )
     for _ in range(compute_scale_up(remaining - len(ctx.futures), just_done)):
         ctx.submit_fn()
@@ -84,7 +85,7 @@ def scout_loop(ctx: LoopContext) -> None:
             check_agent_failure_streak(ctx.results)
         scale_ctx = ScaleUpContext(
             ctx.queue, ctx.queue_path, ctx.submit_fn,
-            deadline_at=ctx.deadline_at,
+            deadline_at=ctx.deadline_at, run_deadline_at=ctx.run_deadline_at,
         )
         gate_was_open = state.scout_done
         state.scout_done = maybe_scale_up(
