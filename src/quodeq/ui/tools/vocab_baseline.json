@@ -1,9 +1,6 @@
 {
   "src/components/FileCopyBtn.jsx": 1,
   "src/features/assistant/useAssistantStream.js": 2,
-  "src/features/dashboard/components/projectCards/CardFooter.jsx": 2,
-  "src/features/dashboard/hooks/usePublish.js": 2,
-  "src/features/dashboard/hooks/usePublishPolling.js": 2,
   "src/features/dashboard/hooks/useSharedProjects.js": 1,
   "src/features/onboarding/components/steps/RepoScanStep.jsx": 1,
   "src/features/updates/useSelfUpdate.js": 1

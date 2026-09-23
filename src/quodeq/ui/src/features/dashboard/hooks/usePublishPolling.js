@@ -4,6 +4,13 @@ import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
 const POLL_INTERVAL_MS = 2000;
 
+// The global publish job's state machine, mirrored by the backend's own
+// publish/status payload (services/shared_publish.py's PublishStatus).
+// Re-exported from usePublish.js for the public interface.
+export const PUBLISH_STATE = Object.freeze({
+  IDLE: 'idle', RUNNING: 'running', DONE: 'done', ERROR: 'error',
+});
+
 // idle | running | done | error state, the polling refs, and the poll-tick
 // machinery for usePublish's global publish job. Extracted verbatim from
 // usePublish.js -- publishingRef and mountedRef stay owned by usePublish.js
@@ -45,7 +52,7 @@ function useRefreshListAfterCompletion(queryClient, sharedListProjects) {
 // forward-compatible the moment the backend starts emitting a discriminating
 // code.
 function applyPublishFailure(publish, finishedProject, setters) {
-  setters.setPublishState('error');
+  setters.setPublishState(PUBLISH_STATE.ERROR);
   setters.setPublishError(apiErrorMessage({ message: publish.error }, 'projects.publishFailed'));
   setters.setPublishErrorProject(finishedProject);
 }
@@ -58,7 +65,7 @@ function applyPublishFailure(publish, finishedProject, setters) {
 // banner under the card, since CardFooter keys showError on
 // publishErrorProject alone, not on publishState.
 async function applyPublishSuccess(finishedProject, setters, { applyOptimisticPublish, refreshListAfterCompletion }) {
-  setters.setPublishState('done');
+  setters.setPublishState(PUBLISH_STATE.DONE);
   setters.setPublishError(null);
   setters.setPublishErrorProject(null);
   // Flip the card BEFORE the network round trip below, then let the
@@ -82,11 +89,11 @@ function useCheckStatus({
     }
     if (!mountedRef.current) return;
     const publish = data?.publish || {};
-    if (publish.state === 'running') return; // keep polling
+    if (publish.state === PUBLISH_STATE.RUNNING) return; // keep polling
     stopPolling();
     const finishedProject = publish.project ?? publishingProjectRef.current;
     const setters = { setPublishState, setPublishError, setPublishErrorProject };
-    if (publish.state === 'error') {
+    if (publish.state === PUBLISH_STATE.ERROR) {
       applyPublishFailure(publish, finishedProject, setters);
     } else {
       await applyPublishSuccess(finishedProject, setters, { applyOptimisticPublish, refreshListAfterCompletion });
@@ -101,7 +108,7 @@ function useCheckStatus({
 // latest value instead of whatever was captured in its closure at creation
 // time.
 function usePublishJobState() {
-  const [publishState, setPublishState] = useState('idle');
+  const [publishState, setPublishState] = useState(PUBLISH_STATE.IDLE);
   const [publishingProject, setPublishingProject] = useState(null);
   const [publishError, setPublishError] = useState(null);
   const [publishErrorProject, setPublishErrorProject] = useState(null);

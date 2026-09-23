@@ -3,8 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { usePublishQueries } from './usePublishQueries.js';
-import { usePublishPolling } from './usePublishPolling.js';
+import { usePublishPolling, PUBLISH_STATE } from './usePublishPolling.js';
 import { useApplyOptimisticPublish } from './publishOptimisticCache.js';
+
+export { PUBLISH_STATE };
 
 /**
  * usePublish -- publish action + job progress for local cards on the merged
@@ -57,7 +59,7 @@ function usePublishTrigger({ publishProject, startPolling, publishingRef, publis
       // project's already-running job, so publishState/publishingProject
       // are set exclusively on confirmed outcomes (this success, or a poll
       // result), never optimistically before the POST resolves.
-      setPublishState('running');
+      setPublishState(PUBLISH_STATE.RUNNING);
       setPublishingProjectBoth(projectId);
       // Stashed for the done-branch's optimistic cache patch (see
       // applyOptimisticPublish) -- the caller's local project object is the
@@ -108,14 +110,14 @@ function useReconcilePublishStatus({ statusQueryData, setPublishState, setPublis
   useEffect(() => {
     const publish = statusQueryData?.publish;
     if (!publish) return;
-    if (publish.state === 'running') {
-      setPublishState('running');
+    if (publish.state === PUBLISH_STATE.RUNNING) {
+      setPublishState(PUBLISH_STATE.RUNNING);
       setPublishingProjectBoth(publish.project ?? null);
       startPolling();
     } else if (publishingProjectRef.current) {
       stopPolling();
-      if (publish.state === 'error') {
-        setPublishState('error');
+      if (publish.state === PUBLISH_STATE.ERROR) {
+        setPublishState(PUBLISH_STATE.ERROR);
         // No `code` on this payload either -- see usePublishPolling.js's
         // checkStatus for the full explanation (services/shared_publish.py's
         // PublishStatus never sets one). Routed through apiErrorMessage for
@@ -124,7 +126,7 @@ function useReconcilePublishStatus({ statusQueryData, setPublishState, setPublis
         setPublishError(apiErrorMessage({ message: publish.error }, 'projects.publishFailed'));
         setPublishErrorProject(publish.project ?? publishingProjectRef.current);
       } else {
-        setPublishState('done');
+        setPublishState(PUBLISH_STATE.DONE);
         setPublishError(null);
         setPublishErrorProject(null);
         const doneProject = publish.project ?? publishingProjectRef.current;
