@@ -6,17 +6,9 @@
 # Regenerate intentionally: python tools/check_vocab_literals.py --update-baseline
 quodeq/analysis/_run_lifecycle_support.py:116:pending
 quodeq/analysis/_run_lifecycle_support.py:116:running
-quodeq/analysis/cache/_jsonl_state.py:109:error
-quodeq/analysis/cache/_jsonl_state.py:109:ok
-quodeq/analysis/cache/_jsonl_state.py:54:ok
-quodeq/analysis/cache/consolidation.py:44:done
-quodeq/analysis/cache/failure_streak.py:159:ok
-quodeq/analysis/cache/failure_streak.py:162:error
-quodeq/analysis/mcp/router.py:225:skipped
 quodeq/api/_run_event_watcher.py:85:pending
 quodeq/api/_run_event_watcher.py:89:pending
 quodeq/api/_run_event_watcher.py:93:pending
-quodeq/core/evidence/merge.py:39:done
 quodeq/menubar/_health.py:92:running
 quodeq/services/_publish_staging.py:52:done
 quodeq/services/_scan_progress_dims.py:205:running

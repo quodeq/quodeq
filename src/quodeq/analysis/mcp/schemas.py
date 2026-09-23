@@ -33,12 +33,6 @@ class FileDoneStatus(StrEnum):
     SKIPPED = "skipped"
 
 
-# Aliases for importers still spelling the old constant names; delete each
-# one once its importers read FileDoneStatus directly.
-FILE_DONE_STATUS_OK = FileDoneStatus.OK
-FILE_DONE_STATUS_ERROR = FileDoneStatus.ERROR
-FILE_DONE_STATUS_SKIPPED = FileDoneStatus.SKIPPED
-
 REPORT_FINDING_NAME = "report_finding"
 REPORT_FINDING_DESC = (
     "Report a code quality finding (violation or compliance). "

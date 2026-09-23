@@ -8,7 +8,7 @@ from quodeq.analysis.errors import (
     REASON_AGENT_FAILURE_STREAK, REASON_PROVIDER_FATAL,
     EvaluationError, FatalProviderError,
 )
-from quodeq.analysis.mcp.schemas import FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_OK
+from quodeq.analysis.mcp.schemas import FileDoneStatus
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
@@ -143,13 +143,13 @@ def _tally_markers(jsonl_path: Path) -> tuple[int, int]:
                 file = entry.get("file")
                 status = entry.get("status")
                 if isinstance(file, str) and status in (
-                    FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR,
+                    FileDoneStatus.OK, FileDoneStatus.ERROR,
                 ):
                     last_status[file] = status
     except OSError:
         return 0, 0
-    ok = sum(1 for s in last_status.values() if s == FILE_DONE_STATUS_OK)
-    err = sum(1 for s in last_status.values() if s == FILE_DONE_STATUS_ERROR)
+    ok = sum(1 for s in last_status.values() if s == FileDoneStatus.OK)
+    err = sum(1 for s in last_status.values() if s == FileDoneStatus.ERROR)
     return ok, err
 
 

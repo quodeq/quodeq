@@ -19,9 +19,7 @@ from quodeq.analysis.mcp.enricher import (
     FileReader,
     FindingEnricher,
 )
-from quodeq.analysis.mcp.schemas import (
-    FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_OK, FILE_DONE_STATUS_SKIPPED,
-)
+from quodeq.analysis.mcp.schemas import FileDoneStatus
 from quodeq.shared.log_sink import SHARED_LOG
 from typing import TYPE_CHECKING, TextIO
 
@@ -186,7 +184,7 @@ class FindingsRouter:
             at all (API size cap / missing on disk) — an explicit record that
             the file was considered, not a transient failure to retry loudly.
         """
-        allowed = (FILE_DONE_STATUS_OK, FILE_DONE_STATUS_ERROR, FILE_DONE_STATUS_SKIPPED)
+        allowed = (FileDoneStatus.OK, FileDoneStatus.ERROR, FileDoneStatus.SKIPPED)
         if status not in allowed:
             names = ", ".join(repr(s) for s in allowed)
             raise ValueError(
@@ -199,7 +197,7 @@ class FindingsRouter:
         _locked_write(self._fh, line)
         if self._on_file_done is not None:
             accumulated = self._findings_by_file.pop(file, [])
-            if status == FILE_DONE_STATUS_OK:
+            if status == FileDoneStatus.OK:
                 try:
                     self._on_file_done(file, accumulated)
                 except Exception:  # noqa: BLE001 — callback failure must never lose the ok marker
@@ -222,4 +220,4 @@ def write_skip_markers(jsonl_file: Path, skipped: list[str], reason: str) -> Non
     with open(jsonl_file, "a", encoding="utf-8") as fh:
         router = FindingsRouter(fh)
         for f in skipped:
-            router.mark_file_done(file=f, status="skipped", reason=reason)
+            router.mark_file_done(file=f, status=FileDoneStatus.SKIPPED, reason=reason)

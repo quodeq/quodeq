@@ -31,6 +31,7 @@ from quodeq.analysis._api_enrichment import (
 )
 from quodeq.analysis.errors import FatalProviderError
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
+from quodeq.analysis.mcp.schemas import FileDoneStatus
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
@@ -185,7 +186,7 @@ def _mark_source_files_done(
     """
     if not source_file_paths:
         return
-    status = "error" if was_lossy else "ok"
+    status = FileDoneStatus.ERROR if was_lossy else FileDoneStatus.OK
     reason = None
     if fatal_exc is not None:
         reason = f"fatal provider error ({fatal_exc.reason}): {fatal_exc}"
