@@ -20,6 +20,7 @@ from quodeq.assistant.adapters._cli_spawn import (
     build_chat_env, external_sandbox_prefix, scratch_cwd, spawn_turn)
 from quodeq.assistant.adapters._cli_events import StreamOutcome, consume_stream_events
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
+from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.mcp import mcp_config
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.data.ports.assistant import AssistantStore
@@ -263,7 +264,7 @@ def run_cli_turn(*, messages: list[dict], config: CliTurnConfig,
     # error is not trustworthy). A non-empty answer with only a benign non-zero
     # exit is still success.
     if session.prior_session_id is not None and (outcome.final == "" or outcome.structured_error):
-        session.emit({"type": "warning", "message": "session rebuilt"})
+        session.emit({"type": FrameType.WARNING, "message": "session rebuilt"})
         outcome = _run_once(
             config, cli_cfg, replace(session, prior_session_id=None),
             _full_transcript(messages), str(uuid.uuid4()))

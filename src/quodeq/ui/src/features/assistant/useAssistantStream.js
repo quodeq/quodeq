@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { assistantEventsUrl } from '../../api/assistant.js';
 import { t } from '../../strings/index.js';
+import { FRAME_TYPE } from '../../vocab/frameType.js';
 
 const INACTIVITY_MS = 60000;
 // Max characters revealed per flush tick. Delta-streaming providers (ollama,
@@ -11,14 +12,6 @@ const CHARS_PER_TICK = 60;
 // Fallback flush cadence when no animation frame fires (e.g. a background
 // tab): keeps text revealing at a readable pace instead of stalling.
 const FLUSH_DEBOUNCE_MS = 50;
-
-// The assistant SSE frame's own type vocabulary -- a different domain from
-// the run/job/dim status vocab, even where a spelling coincides ('error',
-// 'done'). Kept local rather than forced into vocab/*.js.
-const FRAME_TYPE = Object.freeze({
-  TOKEN: 'token', TOOL_CALL: 'tool_call', ACTION_DRAFT: 'action_draft',
-  WARNING: 'warning', ERROR: 'error', STOPPED: 'stopped', DONE: 'done', HEARTBEAT: 'heartbeat',
-});
 
 /**
  * Pure frame-dispatch table: given a parsed SSE frame and the effect's

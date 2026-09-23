@@ -27,6 +27,7 @@ from quodeq.api._sse_log_helpers import sse_line
 from quodeq.api.assistant_turn_state import AssistantTurnState, turn_state
 from quodeq.api.helpers import json_error
 from quodeq.assistant.cancel import CancelToken
+from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.orchestrator import TurnRequest
 from quodeq.assistant.tools import ToolContext
 from quodeq.core.types.project_source import ProjectSource
@@ -103,7 +104,7 @@ def _sse_event_generator(repo, sid: str, after: int):
         if item is None:
             idle_ticks += 1
             if idle_ticks % _HEARTBEAT_IDLE_TICKS == 0:
-                yield sse_line(json.dumps({"type": "heartbeat"}))
+                yield sse_line(json.dumps({"type": FrameType.HEARTBEAT}))
             else:
                 yield ":keepalive\n\n"
         else:

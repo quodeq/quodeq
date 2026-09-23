@@ -12,6 +12,7 @@ import { DIM_STATE } from './dimState.js';
 import { FINDING_TYPE } from './findingType.js';
 import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from './projectSource.js';
 import { PROVIDER, LOCAL_API_PROVIDERS, WEB_TOOL_PROVIDERS } from './provider.js';
+import { FRAME_TYPE } from './frameType.js';
 
 test('vocab modules spell the wire values', () => {
   assert.deepEqual(RUN_STATE, {
@@ -43,7 +44,7 @@ test('vocab modules spell the wire values', () => {
 });
 
 test('vocab modules are frozen', () => {
-  for (const obj of [RUN_STATE, JOB_STATUS, EXIT_REASON, SEVERITY, GRADE, DIM_STATE, FINDING_TYPE, PROJECT_SOURCE]) {
+  for (const obj of [RUN_STATE, JOB_STATUS, EXIT_REASON, SEVERITY, GRADE, DIM_STATE, FINDING_TYPE, PROJECT_SOURCE, FRAME_TYPE]) {
     assert.equal(Object.isFrozen(obj), true);
   }
 });

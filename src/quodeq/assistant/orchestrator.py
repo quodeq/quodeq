@@ -12,6 +12,7 @@ from quodeq.assistant.adapters.capabilities import supports_native_tools
 from quodeq.assistant.adapters.cli import CliTurnConfig, CliTurnSession, run_cli_turn
 from quodeq.assistant.adapters.cli_config import load_cli_chat_config
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
+from quodeq.assistant.frame_type import FrameType
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.assistant.guard import (
     MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
@@ -257,7 +258,7 @@ def _execute_turn(request: TurnRequest, tool_ctx: ToolContext, deps: _EngineDeps
     """The happy path of one turn: persist, contextualize, run the engine, persist, emit."""
     skill, text, unknown_skill = _resolve_skill(request.text)
     if unknown_skill is not None:
-        deps.emit({"type": "error", "message": f"unknown skill: /{unknown_skill}"})
+        deps.emit({"type": FrameType.ERROR, "message": f"unknown skill: /{unknown_skill}"})
         return
     history = _persist_user_turn(request, deps.repository, text)
     # In-process web tools are local-API-only: claude gets NATIVE web
@@ -266,7 +267,7 @@ def _execute_turn(request: TurnRequest, tool_ctx: ToolContext, deps: _EngineDeps
     grants = _resolve_write_grant(request, deps.repository, tool_ctx, web_tools_on)
     final = _run_engine(request, _compose_messages(skill, grants, history), skill, grants, deps)
     deps.repository.add_message(request.session_id, "assistant", final)
-    deps.emit({"type": "done"})
+    deps.emit({"type": FrameType.DONE})
 
 
 def run_turn(request: TurnRequest, *, repository: AssistantStore,
@@ -287,7 +288,7 @@ def run_turn(request: TurnRequest, *, repository: AssistantStore,
         # the next turn's replayed history matches what the user saw.
         if exc.partial:
             repository.add_message(request.session_id, "assistant", exc.partial)
-        emit({"type": "stopped"})
+        emit({"type": FrameType.STOPPED})
     except Exception:  # noqa: BLE001 - turn thread must never die silently
         _logger.exception("assistant turn failed for session %s", request.session_id)
-        emit({"type": "error", "message": "The assistant hit an unexpected error. Check the server logs for details."})
+        emit({"type": FrameType.ERROR, "message": "The assistant hit an unexpected error. Check the server logs for details."})

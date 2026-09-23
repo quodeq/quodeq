@@ -10,6 +10,7 @@ from typing import IO, Callable, NamedTuple
 
 from quodeq.assistant.adapters import _stream
 from quodeq.assistant.adapters._linereader import iter_lines
+from quodeq.assistant.frame_type import FrameType
 
 _BENIGN_RAW_LINES = (
     "Reading additional input from stdin",
@@ -50,7 +51,7 @@ def _absorb_complete_message(event_texts: list[str], etype: str | None, state: _
                or (etype == "result" and joined == state.last_full))
     if not is_echo:
         for t in event_texts:
-            state.emit({"type": "token", "text": t})
+            state.emit({"type": FrameType.TOKEN, "text": t})
     state.last_full = joined
     state.partial_buf = ""
 
@@ -65,12 +66,12 @@ def _handle_stream_event(event: dict, state: _StreamState) -> None:
     delta = _stream.partial_text(event)
     if delta:
         state.partial_buf += delta
-        state.emit({"type": "token", "text": delta})
+        state.emit({"type": FrameType.TOKEN, "text": delta})
     event_texts = _stream.assistant_text(event)
     if event_texts:
         _absorb_complete_message(event_texts, etype, state)
     for tu in _stream.tool_use_details(event):
-        frame = {"type": "tool_call", "name": tu["name"]}
+        frame = {"type": FrameType.TOOL_CALL, "name": tu["name"]}
         if tu["args_summary"]:
             frame["argsSummary"] = tu["args_summary"]
         state.emit(frame)

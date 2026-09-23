@@ -17,6 +17,7 @@ from quodeq.core.run.exit_reason import ExitReason
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.run.state import RunState
 from quodeq.core.scoring.constants import Grade
+from quodeq.assistant.frame_type import FrameType
 from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.project_source import ProjectSource
 from quodeq.core.types.provider import Provider
@@ -37,6 +38,7 @@ _MIRRORS = [
     ("vocab/dimState.js", "DIM_STATE", DimState),
     ("vocab/findingType.js", "FINDING_TYPE", FindingType),
     ("vocab/projectSource.js", "PROJECT_SOURCE", ProjectSource),
+    ("vocab/frameType.js", "FRAME_TYPE", FrameType),
     ("features/dashboard/hooks/usePublishPolling.js", "PUBLISH_STATE", PublishState),
 ]
 
