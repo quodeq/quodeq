@@ -1,8 +1,8 @@
 """Evidence collection, deduplication, and parsing after subagent pool runs.
 
-Post-V2 (B6.2): the V1 per-dimension fingerprint write is gone. The
-V2 cache owns incremental state via per-file entries written during
-dispatch (see ``cache/dimension_helpers.py:persist_dispatch_results``).
+The V1 per-dimension fingerprint write is gone. The V2 cache owns
+incremental state via per-file entries written during dispatch (see
+``cache/dimension_helpers.py:persist_dispatch_results``).
 """
 from __future__ import annotations
 

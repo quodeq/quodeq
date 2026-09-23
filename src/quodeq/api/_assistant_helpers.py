@@ -105,10 +105,10 @@ def build_tool_context(
 ) -> ToolContext:
     """Build a ToolContext from a session row.
 
-    Plan 1 naming note: the session row's ``run_id`` column holds the UI's
-    ``runDir`` and ``project_uuid`` holds the UI's ``repoRoot`` — the
-    create-session route maps those request fields onto these columns.
-    Plan 3 revisits this naming with a schema v2 if needed.
+    The session row's ``run_id`` column holds the UI's ``runDir`` and
+    ``project_uuid`` holds the UI's ``repoRoot`` — the create-session route
+    maps those request fields onto these columns. This naming may be
+    revisited with a schema v2 if needed.
     """
     run_dir = session.get("run_id")
     source = session.get("source") or SESSION_SOURCE_LOCAL

@@ -128,7 +128,7 @@ def _build_cache_writer(
     path is actually enabled.
 
     When ``classify_files_via_cache`` has already stashed this dimension's
-    ClassifyResult (read back via ``RunConfig.classify_cache``, finding 5398), its
+    ClassifyResult (read back via ``RunConfig.classify_cache``), its
     ``miss_hashes`` is passed through so the writer reuses the hash classify
     already computed instead of re-hashing every dispatched file, together
     with its ``miss_stamps`` so the writer can tell a stale hash from a

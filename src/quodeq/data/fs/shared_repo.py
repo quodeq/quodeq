@@ -3,11 +3,11 @@
 The shared repo is a git remote holding an evaluations/ tree in the same
 layout as the local evaluations dir. We keep a full clone (no --depth,
 results repos are small; a shallow clone made git-log-based attribution
-misattribute every project to whoever pushed last -- audit finding C1)
+misattribute every project to whoever pushed last)
 under ~/.quodeq/cache/shared/<url-hash>/repo (QUODEQ_CACHE_ROOT overrides
 the base).
 
-Git-mutation serialization (audit finding C2): background refreshes and an
+Git-mutation serialization matters: background refreshes and an
 in-flight publish share one clone directory, so an unserialized fetch +
 hard-reset racing a stage/commit/push can tear a commit or contend on
 .git/index.lock. `clone_lock()` gives every mutator (refresh_shared_clone,
@@ -229,7 +229,7 @@ def refresh_shared_clone(
     refresh route, the ?refresh=1 listing branch) surface this so a failed
     refresh reads as "could not resolve host" or "authentication failed"
     instead of a bare "Request failed: 502" that can't distinguish DNS vs
-    auth vs a deleted origin (audit finding B3). Every failure is ALSO
+    auth vs a deleted origin. Every failure is ALSO
     logged via logger.warning, so a background/best-effort caller that
     discards *reason* (e.g. publish_project's internal refresh) still gets
     a diagnosable server-side trail.
@@ -243,7 +243,7 @@ def refresh_shared_clone(
     affect ensure_shared_clone's own (still 300s) clone timeout -- an
     initial clone can legitimately take much longer than a refresh.
 
-    Runs entirely under clone_lock (audit finding C2): without it, this
+    Runs entirely under clone_lock: without it, this
     fetch + hard-reset can interleave with an in-flight publish_project's
     stage/commit/push on the same clone directory, tearing a commit or
     contending on .git/index.lock.

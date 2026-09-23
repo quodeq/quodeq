@@ -19,7 +19,7 @@ from quodeq.shared.env import get_score_cache_path
 _logger = logging.getLogger(__name__)
 _BUSY_TIMEOUT_MS = 5000
 
-# Shared-root isolation seam (Phase 2): when serving read endpoints from a
+# Shared-root isolation seam: when serving read endpoints from a
 # second (shared) clone, the score cache must not mix rows with the local
 # clone's cache. Unset (None) in every normal code path, so the default
 # behavior below is byte-identical to before this seam existed.

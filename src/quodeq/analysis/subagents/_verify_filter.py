@@ -1,6 +1,6 @@
 """Pre-filter for prior findings — drops findings whose files no longer exist.
 
-Post-V2 (B6.2b): only ``_pre_filter_gone`` survives. The fingerprint-
+Only ``_pre_filter_gone`` survives. The fingerprint-
 based partition logic (``partition_findings_by_fingerprint``,
 ``_classify_findings``) was specific to the V1 verify-pool, which V2
 replaces with content-addressed cache invalidation.

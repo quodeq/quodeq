@@ -1,4 +1,4 @@
-"""V2 cache-aware dimension processor — composes B4 helpers with the
+"""V2 cache-aware dimension processor — composes the cache helpers with the
 existing dispatcher boundary.
 
 Flow: list source files -> classify via cache (hits return findings directly, misses go to
@@ -12,8 +12,8 @@ queue salvage) still runs for dispatched files. The cache supersedes V1's increm
 decisions but keeps the proven dispatch path intact.
 
 Known limitation: V1 carry-forward can duplicate findings V2 has already
-cached, when migrating a long-lived V1 install to V2; B6 cleanup removes
-V1's carry-forward once the V1 path is deleted.
+cached, when migrating a long-lived V1 install to V2; this is cleaned up by
+removing V1's carry-forward once the V1 path is deleted.
 
 Cache-replay lives in ``_replay.py``; the persist-watcher body, its persist
 callable and the hoisted provenance-hash computation live in

@@ -3,8 +3,8 @@
 Dismissals are keyed ``(req, file, line)``, so a refactor that shifts a line
 re-surfaces a finding the team already decided is acceptable. A rule matches
 by requirement + file glob instead, letting one decision cover a pattern
-("services importing quodeq.data.* is accepted per WS1") for as long as the
-decision holds, wherever the code moves.
+("services importing quodeq.data.* is accepted by the lean-architecture
+ADR") for as long as the decision holds, wherever the code moves.
 
 Rules are deliberately dumb: two globs and a mandatory human reason. Anything
 smarter (severity ranges, expiry dates) should be argued for on its own.

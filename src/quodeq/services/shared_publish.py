@@ -80,7 +80,7 @@ def _prepare_workspace(
         raise PublishError(f"project {project_id} not found in local evaluations")
 
     # Everything from here through the final push/rebase runs under one
-    # process-wide clone lock (audit finding C2), an RLock so the
+    # process-wide clone lock, an RLock so the
     # ensure_shared_clone/refresh_shared_clone calls inside _prepare_clone
     # (each of which acquires it again internally) reenter on this same
     # thread instead of deadlocking.

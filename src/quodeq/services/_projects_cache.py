@@ -66,7 +66,7 @@ class ProjectsCache:
             if self._is_fresh():
                 return self._payload  # type: ignore[return-value]
             projects = fs_projects.build_project_list(Path(reports_dir))
-            # Entities, not wire dicts: the route serializes per request (WS6).
+            # Entities, not wire dicts: the route owns serialization per request.
             # The cached part is the expensive disk walk; camelCase mapping is
             # cheap and belongs at the boundary.
             self._payload = {"projects": projects}

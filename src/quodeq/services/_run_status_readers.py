@@ -6,7 +6,7 @@ deadline, provider/model, time limit) are read straight from disk. All five
 readers, plus ``build_job_snapshot`` which assembles a ``JobSnapshot`` from
 an index ``RunRow`` using them, live here; ``_evaluations_index.py``
 re-exports every name for backward compatibility. ``_status_json_terminal``
-(the terminal-state check) also lives here (fix round) — ``_run_index_fs.py``
+(the terminal-state check) also lives here — ``_run_index_fs.py``
 needs it too, and putting it in ``_evaluations_index.py`` would have made
 that a circular import.
 """

@@ -69,7 +69,7 @@ def _compute_write_available(source: str, repo_root: str | None, provider: str) 
 def _resolve_session_scope(source: str, body: dict) -> tuple[str | None, str | None, str]:
     """``(run_dir, repo_root, repo_reason)`` for a new session.
 
-    Plan 1 mapping: runDir → run_id column, repoRoot → project_uuid column.
+    runDir maps to the run_id column, repoRoot to the project_uuid column.
     Client-supplied runDir/repoRoot are NOT honored: they'd flow to the MCP
     subprocess's --run-dir/--repo-root with no path jail, giving a remote
     API-key caller arbitrary server-side file access. The real UI never sends

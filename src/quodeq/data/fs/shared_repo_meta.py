@@ -202,7 +202,7 @@ def published_meta(url: str, env: dict | None = None) -> dict[str, dict]:
     published before that file existed. The fallback is only correct because the
     clone is full history (no --depth) -- a shallow clone made `git log -1
     -- path` return the tip commit for every path, misattributing every
-    project except the most recently pushed one (audit finding C1).
+    project except the most recently pushed one.
     """
     repo = shared_repo_path(url, env)
     root = shared_evaluations_root(url, env)

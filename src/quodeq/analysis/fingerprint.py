@@ -1,10 +1,10 @@
 """Content hashing helpers — file, standards, prompts.
 
-Post-V2 (B6.2c): the V1 fingerprint persistence machinery
-(``build_fingerprint``, ``save_fingerprint``, ``load_fingerprint``,
-``find_previous_fingerprint``, ``_queue_taken_files``) is gone. V2's
-content-addressed cache replaces it: per-file entries keyed by a
-SHA-256 of every input that affects analysis output.
+The V1 fingerprint persistence machinery (``build_fingerprint``,
+``save_fingerprint``, ``load_fingerprint``, ``find_previous_fingerprint``,
+``_queue_taken_files``) is gone. The V2 content-addressed cache replaces
+it: per-file entries keyed by a SHA-256 of every input that affects
+analysis output.
 
 What survives here are the hash primitives V2 uses to build cache
 keys (and that priority scoring uses to detect file changes).

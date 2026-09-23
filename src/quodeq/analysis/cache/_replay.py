@@ -1,6 +1,6 @@
 """Cache-replay path: writing cached findings back into a run's evidence.
 
-Split out of ``dimension_runner.py`` (B4/B5e/B6): everything here is about
+Split out of ``dimension_runner.py``: everything here is about
 turning cache entries (hits, consolidated or not) back into JSONL rows and
 ``events.jsonl`` entries, plus the small path helpers that path needs. The
 dispatch/orchestration side (classify, watchers, breaker) stays in

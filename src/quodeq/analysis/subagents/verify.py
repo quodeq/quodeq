@@ -1,6 +1,6 @@
 """Prior-findings reader — used by priority scoring and the V2 cache layer.
 
-Post-V2 (B6.2b): the verify-pool dispatch is gone. What remains in
+The verify-pool dispatch is gone. What remains in
 this module is the *reader*: ``load_previous_findings_for_dimension``
 loads, pre-filters, and returns prior findings for callers that want
 to use them as input (e.g., priority scoring weights newly-changed

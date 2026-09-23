@@ -1,1 +1,1 @@
-"""Provider turn adapters (API in Plan 1; CLI arrives in Plan 2)."""
+"""Provider turn adapters: the API path is implemented; a CLI path is coming."""
