@@ -106,9 +106,9 @@ def test_report_not_found_error_does_not_name_hidden_dimensions(tmp_path, monkey
 
 
 def test_violations_not_found_error_does_not_name_hidden_dimensions(tmp_path, monkeypatch):
-    from quodeq.assistant.tools._read_tools import _get_violations
+    from quodeq.assistant.tools._read_tools import get_violations
     ctx = _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=("security",))
     with pytest.raises(ToolError) as exc:
-        _get_violations(ctx, dimension="usability")
+        get_violations(ctx, dimension="usability")
     assert "reliability" not in str(exc.value)
     assert "security" in str(exc.value)
