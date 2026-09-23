@@ -81,4 +81,3 @@ def cli_environ(env: Mapping[str, str] | None = None) -> Mapping[str, str]:
 def no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
     """Return True if verification should be skipped (CLI flag or env var)."""
     return args.no_verify or cli_environ(env).get("QUODEQ_NO_VERIFY") == "1"
-
