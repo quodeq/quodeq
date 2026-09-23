@@ -11,9 +11,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.data.fs._index_cache import clear_index_cache
-from quodeq.data.fs._index_io import _load_index, _save_index
+from quodeq.data.fs._index_io import load_index, save_index
 from quodeq.data.fs._models import ProjectIdentity, ProjectRepository
-from quodeq.data.fs._resolution import _create_project, _find_existing_project
+from quodeq.data.fs._resolution import create_project, find_existing_project
 from quodeq.data.fs.children import find_children
 
 # Re-exports for backward compatibility
@@ -34,19 +34,19 @@ def _resolve_scoped(
         identity.project_name, resolved_path, identity.discipline, identity.location,
         remote_url=identity.remote_url,
     )
-    parent_uuid = _find_existing_project(reports_dir, parent_identity, load_fn, save_fn)
+    parent_uuid = find_existing_project(reports_dir, parent_identity, load_fn, save_fn)
     if not parent_uuid:
-        parent_uuid = _create_project(reports_dir, parent_identity, load_fn, save_fn)
+        parent_uuid = create_project(reports_dir, parent_identity, load_fn, save_fn)
 
     child_name = f"{identity.project_name}/{identity.scope_path}"
     child_identity = ProjectIdentity(
         child_name, resolved_path, identity.discipline, identity.location,
         scope_path=identity.scope_path, remote_url=identity.remote_url,
     )
-    existing = _find_existing_project(reports_dir, child_identity, load_fn, save_fn)
+    existing = find_existing_project(reports_dir, child_identity, load_fn, save_fn)
     if existing:
         return existing
-    return _create_project(
+    return create_project(
         reports_dir, child_identity, load_fn, save_fn, parent_uuid=parent_uuid,
     )
 
@@ -60,7 +60,7 @@ def _resolve_unscoped(
         identity.project_name, resolved_path, identity.discipline, identity.location,
         remote_url=identity.remote_url,
     )
-    existing = _find_existing_project(reports_dir, resolved, load_fn, save_fn)
+    existing = find_existing_project(reports_dir, resolved, load_fn, save_fn)
     if existing:
         if find_children(reports_dir, existing):
             dot_identity = ProjectIdentity(
@@ -68,14 +68,14 @@ def _resolve_unscoped(
                 identity.discipline, identity.location, scope_path=".",
                 remote_url=identity.remote_url,
             )
-            dot_existing = _find_existing_project(reports_dir, dot_identity, load_fn, save_fn)
+            dot_existing = find_existing_project(reports_dir, dot_identity, load_fn, save_fn)
             if dot_existing:
                 return dot_existing
-            return _create_project(
+            return create_project(
                 reports_dir, dot_identity, load_fn, save_fn, parent_uuid=existing,
             )
         return existing
-    return _create_project(reports_dir, resolved, load_fn, save_fn)
+    return create_project(reports_dir, resolved, load_fn, save_fn)
 
 
 def resolve_project_uuid(
@@ -103,8 +103,8 @@ def resolve_project_uuid(
     if not reports_dir.exists():
         reports_dir.mkdir(parents=True, exist_ok=True)
 
-    load_fn = repository.load_index if repository is not None else _load_index
-    save_fn = repository.save_index if repository is not None else _save_index
+    load_fn = repository.load_index if repository is not None else load_index
+    save_fn = repository.save_index if repository is not None else save_index
 
     if identity.scope_path:
         return _resolve_scoped(reports_dir, identity, resolved_path, load_fn, save_fn)

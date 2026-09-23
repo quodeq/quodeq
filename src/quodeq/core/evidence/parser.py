@@ -9,7 +9,7 @@ from quodeq.core.evidence._options import EvidenceParseOptions
 from quodeq.core.evidence.refs import enrich_judgment, resolve_llm_refs
 from quodeq.core.utils.io import open_text
 from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
-from quodeq.core.evidence.req_mapping import _GroupedJudgments, _group_judgments
+from quodeq.core.evidence.req_mapping import GroupedJudgments, group_judgments
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
 
 # Re-export for backward compatibility (external code imports these from parser)
@@ -35,7 +35,7 @@ class EvidenceContext:
 
 
 def _build_principles(
-    grouped: _GroupedJudgments, dimension_name: str, source_file_count: int = 0,
+    grouped: GroupedJudgments, dimension_name: str, source_file_count: int = 0,
 ) -> dict[str, PrincipleEvidence]:
     """Build scored PrincipleEvidence entries from grouped judgments."""
     all_keys = set(grouped.violations.keys()) | set(grouped.compliance.keys())
@@ -100,7 +100,7 @@ def parse_jsonl_to_evidence_by_dimension(
     result: dict[str, Evidence] = {}
     all_quarantined = []
     for dim, dj in by_dim.items():
-        grouped = _group_judgments(dj, dimension=dim, evaluators_dir=options.evaluators_dir,
+        grouped = group_judgments(dj, dimension=dim, evaluators_dir=options.evaluators_dir,
                                    compiled_dir=options.compiled_dir,
                                    req_map_reader=options.req_map_reader)
         all_quarantined.extend(grouped.quarantined_findings)
@@ -119,12 +119,12 @@ def parse_jsonl_to_evidence(
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object."""
     # NOTE: read_judgments materializes all judgments into a list.  This is
-    # intentional because _group_judgments needs random access and the caller
+    # intentional because group_judgments needs random access and the caller
     # indexes judgments[0] for the dimension name.  For streaming scenarios use
     # parse_jsonl_to_evidence_by_dimension which groups incrementally.
     judgments = read_judgments(jsonl_file, options)
     dim = judgments[0].dimension if judgments else ""
-    grouped = _group_judgments(judgments, dimension=dim, evaluators_dir=options.evaluators_dir,
+    grouped = group_judgments(judgments, dimension=dim, evaluators_dir=options.evaluators_dir,
                                compiled_dir=options.compiled_dir,
                                req_map_reader=options.req_map_reader)
     if options.on_quarantine is not None and grouped.quarantined_findings:

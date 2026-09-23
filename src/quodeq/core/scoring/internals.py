@@ -7,16 +7,16 @@ from typing import Any
 from quodeq.core.scoring.constants import (  # noqa: F401 — re-exports
     GRADE_LADDER,
     SCALE_TIER_NAMES,
-    _MAX_PENALTY_MULTIPLIER,
-    _RATIO_DAMPENING_TABLE,
-    _SCALE_TIERS,
-    _SEVERITY_WEIGHT,
-    _WEIGHT_DOUBLE,
-    _WEIGHT_TRIPLE,
+    MAX_PENALTY_MULTIPLIER,
+    RATIO_DAMPENING_TABLE,
+    SCALE_TIERS,
+    SEVERITY_WEIGHT,
+    WEIGHT_DOUBLE,
+    WEIGHT_TRIPLE,
     scale_multiplier,
 )
 from quodeq.core.scoring._tallies import (  # noqa: F401 — re-exports
-    _weighted_sum,
+    weighted_sum,
     evidence_has_taxonomy,
     tally_types,
 )
@@ -42,7 +42,7 @@ def violation_base(
     Uses a hyperbolic curve: ``base = 10 / (1 + K * weighted_violations)``
     Returns a value in [0, 10].
     """
-    wv = _weighted_sum(violation_type_counts, params.severity_weight)
+    wv = weighted_sum(violation_type_counts, params.severity_weight)
     if wv == 0:
         return 10.0
     return 10.0 / (1.0 + params.base_k * wv)
@@ -57,7 +57,7 @@ def compliance_lift(
 
     Returns a value in [0, 1] representing the fraction of the gap filled.
     """
-    wv = _weighted_sum(violation_type_counts, params.severity_weight)
+    wv = weighted_sum(violation_type_counts, params.severity_weight)
     cc = sum(compliance_type_counts.get(sev, 0) for sev in compliance_type_counts)
     if cc == 0 or wv == 0:
         return 0.0
@@ -73,7 +73,7 @@ def violation_ceiling(
 
     ``ceiling = 10 - log2(1 + wv) * CEIL_SCALE``
     """
-    wv = _weighted_sum(violation_type_counts, params.severity_weight)
+    wv = weighted_sum(violation_type_counts, params.severity_weight)
     if wv == 0:
         return 10.0
     return 10.0 - math.log2(1.0 + wv) * params.ceil_scale
@@ -166,19 +166,19 @@ def compliance_dampening(
     violation_type_counts: dict[str, int],
 ) -> float:
     """Legacy dampening multiplier for the non-numerical (graded) mode."""
-    weighted_compliance = _weighted_sum(compliance_type_counts)
-    weighted_violations = _weighted_sum(violation_type_counts)
+    weighted_compliance = weighted_sum(compliance_type_counts)
+    weighted_violations = weighted_sum(violation_type_counts)
 
     if weighted_violations == 0:
         return 1.0
     if weighted_compliance == 0:
-        return _MAX_PENALTY_MULTIPLIER
+        return MAX_PENALTY_MULTIPLIER
 
     ratio = weighted_compliance / weighted_violations
-    for threshold, multiplier in _RATIO_DAMPENING_TABLE:
+    for threshold, multiplier in RATIO_DAMPENING_TABLE:
         if ratio >= threshold:
             return multiplier
-    return _MAX_PENALTY_MULTIPLIER
+    return MAX_PENALTY_MULTIPLIER
 
 
 def drop_grade(grade: str, drops: int) -> str:
@@ -193,8 +193,8 @@ def drop_grade(grade: str, drops: int) -> str:
 
 def weight_as_multiplier(weight_str: str) -> int:
     """Extract the integer multiplier from a weight label like 'High (x3)'."""
-    if _WEIGHT_TRIPLE in weight_str:
+    if WEIGHT_TRIPLE in weight_str:
         return 3
-    if _WEIGHT_DOUBLE in weight_str:
+    if WEIGHT_DOUBLE in weight_str:
         return 2
     return 1

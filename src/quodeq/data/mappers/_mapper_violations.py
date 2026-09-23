@@ -14,28 +14,28 @@ from quodeq.core.types.violation import (
 
 from ._mapper_findings import parse_finding
 from ._mapper_helpers import (
-    _bool,
-    _int,
-    _opt_float,
-    _opt_str,
-    _require_str,
-    _str,
+    get_bool,
+    get_int,
+    get_opt_float,
+    get_opt_str,
+    require_str,
+    get_str,
 )
 
 
 def _parse_progress_info(raw: dict[str, object]) -> ProgressInfo:
     return ProgressInfo(
-        files_read=_int(raw, "filesRead"),
-        violation_count=_int(raw, "violationCount") or _int(raw, "violations"),
-        compliance_count=_int(raw, "complianceCount") or _int(raw, "compliance"),
+        files_read=get_int(raw, "filesRead"),
+        violation_count=get_int(raw, "violationCount") or get_int(raw, "violations"),
+        compliance_count=get_int(raw, "complianceCount") or get_int(raw, "compliance"),
     )
 
 
 def parse_violation_response(raw: dict[str, object]) -> ViolationResponse:
     """Parse a raw dict into a ViolationResponse dataclass."""
-    dim = _require_str(raw, "dimension", "ViolationResponse")
-    run_id = _require_str(raw, "runId", "ViolationResponse")
-    project = _require_str(raw, "project", "ViolationResponse")
+    dim = require_str(raw, "dimension", "ViolationResponse")
+    run_id = require_str(raw, "runId", "ViolationResponse")
+    project = require_str(raw, "project", "ViolationResponse")
 
     violations_raw = raw.get("violations")
     violations: list[Finding] = []
@@ -56,19 +56,19 @@ def parse_violation_response(raw: dict[str, object]) -> ViolationResponse:
         project=project,
         violations=violations,
         compliance=compliance,
-        partial=_bool(raw, "partial"),
+        partial=get_bool(raw, "partial"),
         progress=progress,
-        schema_version=_int(raw, "schemaVersion", VIOLATION_SCHEMA_VERSION),
+        schema_version=get_int(raw, "schemaVersion", VIOLATION_SCHEMA_VERSION),
     )
 
 
 def _parse_violation_file_entry(raw: dict[str, object]) -> ViolationFileEntry:
     return ViolationFileEntry(
-        path=_str(raw, "path"),
-        count=_int(raw, "count"),
-        critical=_int(raw, "critical"),
-        major=_int(raw, "major"),
-        minor=_int(raw, "minor"),
+        path=get_str(raw, "path"),
+        count=get_int(raw, "count"),
+        critical=get_int(raw, "critical"),
+        major=get_int(raw, "major"),
+        minor=get_int(raw, "minor"),
     )
 
 
@@ -80,27 +80,27 @@ def parse_violation_summary(raw: dict[str, object]) -> ViolationSummary:
         files = [_parse_violation_file_entry(f) for f in files_raw if isinstance(f, dict)]
 
     return ViolationSummary(
-        total=_int(raw, "total"),
-        critical=_int(raw, "critical"),
-        major=_int(raw, "major"),
-        minor=_int(raw, "minor"),
+        total=get_int(raw, "total"),
+        critical=get_int(raw, "critical"),
+        major=get_int(raw, "major"),
+        minor=get_int(raw, "minor"),
         files=files,
-        schema_version=_int(raw, "schemaVersion", VIOLATION_SCHEMA_VERSION),
+        schema_version=get_int(raw, "schemaVersion", VIOLATION_SCHEMA_VERSION),
     )
 
 
 def parse_trend_point(raw: dict[str, object]) -> TrendPoint:
     """Parse a raw dict into a TrendPoint dataclass."""
-    run_id = _require_str(raw, "runId", "TrendPoint")
+    run_id = require_str(raw, "runId", "TrendPoint")
     raw_dims = raw.get("dimensions")
     dims = tuple(raw_dims) if isinstance(raw_dims, list) else ()
     return TrendPoint(
         run_id=run_id,
-        date_iso=_opt_str(raw.get("dateIso")),
-        date_label=_str(raw, "dateLabel"),
-        dimensions_count=_int(raw, "dimensionsCount"),
+        date_iso=get_opt_str(raw.get("dateIso")),
+        date_label=get_str(raw, "dateLabel"),
+        dimensions_count=get_int(raw, "dimensionsCount"),
         dimensions=dims,
-        accumulated_dimensions_count=_int(raw, "accumulatedDimensionsCount"),
-        overall_grade=_opt_str(raw.get("overallGrade")),
-        numeric_average=_opt_float(raw.get("numericAverage")),
+        accumulated_dimensions_count=get_int(raw, "accumulatedDimensionsCount"),
+        overall_grade=get_opt_str(raw.get("overallGrade")),
+        numeric_average=get_opt_float(raw.get("numericAverage")),
     )

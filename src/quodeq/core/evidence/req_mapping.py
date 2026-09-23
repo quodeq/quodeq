@@ -37,7 +37,8 @@ QuarantineSink = Callable[[list[QuarantinedFinding]], None]
 
 
 @dataclass
-class _GroupedJudgments:
+class GroupedJudgments:
+    """Judgments grouped by principle, plus the findings quarantined on the way."""
     violations: dict[str, list[Judgment]]
     compliance: dict[str, list[Judgment]]
     severity: dict[str, str]
@@ -123,7 +124,7 @@ class PrincipleResolver:
     """Resolves a finding's raw principle/requirement ID to a canonical principle.
 
     The single source of truth for "does this finding belong to the dimension's
-    standard?". Both the report path (:func:`_group_judgments`) and the live
+    standard?". Both the report path (:func:`group_judgments`) and the live
     scan counters resolve through this, so the counters the UI shows mid-scan
     and the persisted evaluation JSON can never disagree on which findings count.
     """
@@ -199,13 +200,14 @@ def principle_names_for_dimension(
     return {p for p in mapping.values() if p}
 
 
-def _group_judgments(
+def group_judgments(
     judgments: list[Judgment],
     dimension: str = "",
     evaluators_dir: Path | None = None,
     compiled_dir: Path | None = None,
     *, req_map_reader: ReqMapReader | None = None,
-) -> _GroupedJudgments:
+) -> GroupedJudgments:
+    """Group *judgments* into violations, compliance and severity per principle."""
     resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir,
                                         req_map_reader=req_map_reader)
     sc_violations: dict[str, list[Judgment]] = {}
@@ -243,5 +245,5 @@ def _group_judgments(
         if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
             sc_severity[principle] = sev
 
-    return _GroupedJudgments(sc_violations, sc_compliance, sc_severity, quarantined,
+    return GroupedJudgments(sc_violations, sc_compliance, sc_severity, quarantined,
                               quarantined_findings)

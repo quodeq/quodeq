@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.core.evidence.req_mapping import QuarantinedFinding, _group_judgments
+from quodeq.core.evidence.req_mapping import QuarantinedFinding, group_judgments
 from quodeq.core.evidence.parser import (
     EvidenceContext,
     EvidenceParseOptions,
@@ -169,7 +169,7 @@ def test_quarantined_findings_count_matches_quarantined_counter(tmp_path):
         Judgment(practice_id="Modularity", verdict="violation", dimension="maintainability",
                  req="M-MOD-1", file="b.py", line=10, reason="x", severity="major"),
     ]
-    grouped = _group_judgments(
+    grouped = group_judgments(
         judgments, dimension="maintainability",
         req_map_reader=_read_map, evaluators_dir=compiled,
     )

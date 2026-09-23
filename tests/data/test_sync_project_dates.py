@@ -31,12 +31,12 @@ def test_syncs_started_at_and_is_mtime_gated(tmp_path, monkeypatch):
         # Second call, nothing changed on disk -> no upserts (mtime gate).
         calls = {"n": 0}
         import quodeq.data.sqlite.run_index as ri
-        real = ri._upsert_from_status
+        real = ri.upsert_from_status
 
         def counting(*a, **k):
             calls["n"] += 1
             return real(*a, **k)
-        monkeypatch.setattr(ri, "_upsert_from_status", counting)
+        monkeypatch.setattr(ri, "upsert_from_status", counting)
         sync_project_dates(db, proj, "proj")
         assert calls["n"] == 0, "unchanged runs must not be re-read/upserted"
     finally:

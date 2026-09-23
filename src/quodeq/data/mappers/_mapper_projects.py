@@ -6,54 +6,54 @@ from quodeq.core.types.job import JobSnapshot
 from quodeq.core.types.project import ProjectEntry, ProjectMetadata
 
 from ._mapper_helpers import (
-    _int,
-    _opt_float,
-    _opt_int,
-    _opt_str,
-    _require_str,
-    _str,
+    get_int,
+    get_opt_float,
+    get_opt_int,
+    get_opt_str,
+    require_str,
+    get_str,
 )
 
 
 def _project_identity_fields(raw: dict[str, object]) -> dict[str, str | None]:
     """The parent/display/discipline/path/location fields both project dataclasses carry."""
     return {
-        "parent": _opt_str(raw.get("parent")),
-        "display_name": _opt_str(raw.get("displayName")),
-        "discipline": _opt_str(raw.get("discipline")),
-        "path": _opt_str(raw.get("path")),
-        "location": _opt_str(raw.get("location")),
+        "parent": get_opt_str(raw.get("parent")),
+        "display_name": get_opt_str(raw.get("displayName")),
+        "discipline": get_opt_str(raw.get("discipline")),
+        "path": get_opt_str(raw.get("path")),
+        "location": get_opt_str(raw.get("location")),
     }
 
 
 def parse_project_metadata(raw: dict[str, object]) -> ProjectMetadata:
     """Parse a raw dict into a ProjectMetadata dataclass."""
-    name = _require_str(raw, "name", "ProjectMetadata")
+    name = require_str(raw, "name", "ProjectMetadata")
     return ProjectMetadata(name=name, **_project_identity_fields(raw))
 
 
 def parse_project_entry(raw: dict[str, object]) -> ProjectEntry:
     """Parse a raw dict into a ProjectEntry dataclass."""
-    pid = _require_str(raw, "id", "ProjectEntry")
-    name = _require_str(raw, "name", "ProjectEntry")
+    pid = require_str(raw, "id", "ProjectEntry")
+    name = require_str(raw, "name", "ProjectEntry")
     return ProjectEntry(
         id=pid,
         name=name,
         **_project_identity_fields(raw),
-        runs_count=_int(raw, "runsCount"),
-        latest_run_id=_opt_str(raw.get("latestRunId")),
-        latest_date=_opt_str(raw.get("latestDate")),
+        runs_count=get_int(raw, "runsCount"),
+        latest_run_id=get_opt_str(raw.get("latestRunId")),
+        latest_date=get_opt_str(raw.get("latestDate")),
         path_exists=raw.get("pathExists") if isinstance(raw.get("pathExists"), bool) else None,
-        files_count=_opt_int(raw.get("filesCount")),
-        latest_grade=_opt_str(raw.get("latestGrade")),
-        latest_score=_opt_float(raw.get("latestScore")),
+        files_count=get_opt_int(raw.get("filesCount")),
+        latest_grade=get_opt_str(raw.get("latestGrade")),
+        latest_score=get_opt_float(raw.get("latestScore")),
     )
 
 
 def parse_job_snapshot(raw: dict[str, object]) -> JobSnapshot:
     """Parse a raw dict into a JobSnapshot dataclass."""
-    job_id = _require_str(raw, "jobId", "JobSnapshot")
-    status = _require_str(raw, "status", "JobSnapshot")
+    job_id = require_str(raw, "jobId", "JobSnapshot")
+    status = require_str(raw, "status", "JobSnapshot")
 
     logs_raw = raw.get("logs")
     logs: list[str] = []
@@ -68,15 +68,15 @@ def parse_job_snapshot(raw: dict[str, object]) -> JobSnapshot:
     return JobSnapshot(
         job_id=job_id,
         status=status,
-        command=_str(raw, "command"),
-        started_at=_str(raw, "startedAt"),
-        ended_at=_opt_str(raw.get("endedAt")),
-        exit_code=_opt_int(raw.get("exitCode")),
+        command=get_str(raw, "command"),
+        started_at=get_str(raw, "startedAt"),
+        ended_at=get_opt_str(raw.get("endedAt")),
+        exit_code=get_opt_int(raw.get("exitCode")),
         logs=logs,
-        output_project=_opt_str(raw.get("outputProject")),
-        output_run_id=_opt_str(raw.get("outputRunId")),
-        phase=_opt_str(raw.get("phase")),
-        current_dimension=_opt_str(raw.get("currentDimension")),
+        output_project=get_opt_str(raw.get("outputProject")),
+        output_run_id=get_opt_str(raw.get("outputRunId")),
+        phase=get_opt_str(raw.get("phase")),
+        current_dimension=get_opt_str(raw.get("currentDimension")),
         dimensions=dims,
-        error=_opt_str(raw.get("error")),
+        error=get_opt_str(raw.get("error")),
     )

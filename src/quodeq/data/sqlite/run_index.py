@@ -19,11 +19,11 @@ from pathlib import Path
 
 from quodeq.core.run.job_status import external_job_id
 from quodeq.data.sqlite.index_sync import (
-    _check_stale_and_promote,
-    _delete_orphan_non_terminal_rows,
-    _status_mtime_ns,
-    _sync_legacy_run,
-    _upsert_from_status,
+    check_stale_and_promote,
+    delete_orphan_non_terminal_rows,
+    status_mtime_ns,
+    sync_legacy_run,
+    upsert_from_status,
 )
 from quodeq.data.sqlite._run_index_schema import (
     SCHEMA_VERSION,  # noqa: F401 — re-export
@@ -75,7 +75,7 @@ def _sync_status_backed_run(
     cached_mtimes: dict[str, int | None] | None = None,
 ) -> None:
     """Sync a run that has a ``status.json`` (the common, non-legacy case)."""
-    disk_mtime = _status_mtime_ns(run_dir)
+    disk_mtime = status_mtime_ns(run_dir)
     job_id = external_job_id(run_id)
     if cached_mtimes is not None:
         cached_value = cached_mtimes.get(job_id)
@@ -86,13 +86,13 @@ def _sync_status_backed_run(
         cached_value = row[0] if row is not None else None
     if cached_value is None or cached_value != disk_mtime:
         try:
-            _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+            upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
         except Exception as exc:  # noqa: BLE001 - one malformed status.json must not stop syncing the rest
             _logger.warning("skipping run %s: %s", run_dir, exc, exc_info=True)
             return
     # Always check staleness, even on mtime-unchanged runs.
     try:
-        _check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+        check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
     except Exception as exc:
         _logger.warning("stale-check failed for %s: %s", run_dir, exc, exc_info=True)
 
@@ -109,7 +109,7 @@ def _sync_one_run(
         )
     else:
         try:
-            _sync_legacy_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+            sync_legacy_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
         except Exception as exc:
             _logger.warning("legacy sync failed for %s: %s", run_dir, exc, exc_info=True)
 
@@ -134,7 +134,7 @@ def sync_index(db: sqlite3.Connection, evaluations_root: Path) -> None:
                 db, run_dir, project_uuid=project_uuid, run_id=run_id,
                 cached_mtimes=cached_mtimes,
             )
-        _delete_orphan_non_terminal_rows(db)
+        delete_orphan_non_terminal_rows(db)
 
 
 def sync_index_for_run(db: sqlite3.Connection, run_dir: Path) -> None:
@@ -172,11 +172,11 @@ def sync_project_dates(db: sqlite3.Connection, project_dir: Path, project_uuid: 
                 continue
             if not (run_dir / "status.json").exists():
                 continue
-            disk_mtime = _status_mtime_ns(run_dir)
+            disk_mtime = status_mtime_ns(run_dir)
             cached = cached_mtimes.get(run_dir.name)
             if cached is None or cached != disk_mtime:
                 try:
-                    _upsert_from_status(
+                    upsert_from_status(
                         db, run_dir, project_uuid=project_uuid, run_id=run_dir.name)
                 except Exception:  # noqa: BLE001 - one run's date-sync failure must not stop syncing the rest
                     _logger.warning("date-sync upsert failed for %s", run_dir, exc_info=True)

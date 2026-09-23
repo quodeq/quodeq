@@ -28,7 +28,6 @@ tests/analysis/cache/test_jsonl_state.py:20:private-module:quodeq.analysis.cache
 tests/analysis/cache/test_persist_dispatch_results_markers.py:28:private-module:quodeq.analysis.cache._key_provenance.hash_prompts_combined
 tests/analysis/cache/test_persist_dispatch_results_markers.py:9:private-module:quodeq.analysis.cache._persist_watcher.CachePersistProvenance
 tests/analysis/cache/test_persist_dispatch_results_markers.py:9:private-module:quodeq.analysis.cache._persist_watcher.CachePersistTarget
-tests/analysis/cache/test_standards_drift_degradation.py:14:private-name:quodeq.core.evidence.req_mapping._group_judgments
 tests/analysis/cache/test_telemetry.py:43:private-module:quodeq.analysis._dimensions.DimensionsConfig
 tests/analysis/cache/test_telemetry.py:51:private-module:quodeq.analysis._dimension_steps.build_dimension_prompt
 tests/analysis/cache/test_telemetry.py:51:private-module:quodeq.analysis._dimension_steps.parse_dimension_evidence
@@ -441,9 +440,9 @@ tests/api/test_log_stream_routes.py:91:private-name:quodeq.api._log_stream_route
 tests/api/test_power_selector_e2e.py:142:private-module:quodeq.analysis.subagents._pool_launcher.LaunchPoolParams
 tests/api/test_power_selector_e2e.py:142:private-name:quodeq.analysis.subagents._pool_launcher._build_pool_config
 tests/api/test_project_import_limits.py:106:private-module:quodeq.data.fs._models.ProjectIdentity
-tests/api/test_project_import_limits.py:107:private-name:quodeq.data.fs._resolution._index_key
+tests/api/test_project_import_limits.py:107:private-module:quodeq.data.fs._resolution.index_key
 tests/api/test_project_import_limits.py:137:private-module:quodeq.data.fs._models.ProjectIdentity
-tests/api/test_project_import_limits.py:138:private-name:quodeq.data.fs._resolution._index_key
+tests/api/test_project_import_limits.py:138:private-module:quodeq.data.fs._resolution.index_key
 tests/api/test_rate_limit_cross_process_lock.py:146:private-module:quodeq.api._rate_limit_file_store.store_mod
 tests/api/test_rate_limit_cross_process_lock.py:15:private-module:quodeq.api._rate_limit_file_store.FileRateLimitStore
 tests/api/test_rate_limit_cross_process_lock.py:162:private-module:quodeq.api._rate_limit_file_store.store_mod
@@ -620,7 +619,6 @@ tests/core/test_evidence_no_ambient_io.py:12:private-name:quodeq.core.evidence.r
 tests/core/test_evidence_parser.py:272:private-name:quodeq.core.evidence.parser._build_evidence
 tests/core/test_evidence_parser.py:282:private-name:quodeq.core.evidence.parser._build_evidence
 tests/core/test_evidence_parser_line.py:6:private-name:quodeq.core.evidence.parser._parse_jsonl_line
-tests/core/test_evidence_parser_unmapped_principle.py:15:private-name:quodeq.core.evidence.req_mapping._group_judgments
 tests/core/test_finding_marker_persistence.py:39:private-module:quodeq.analysis._report_assembly.build_report_json
 tests/core/test_finding_marker_persistence.py:40:private-module:quodeq.analysis._report_constants.VIOLATION_FIELDS
 tests/core/test_finding_marker_persistence.py:41:private-module:quodeq.analysis._report_findings.flatten_findings
@@ -639,7 +637,6 @@ tests/core/test_projector_scoring_parity.py:32:private-name:quodeq.services.resc
 tests/core/test_projector_scoring_parity.py:32:private-name:quodeq.services.rescore._score_all_principles
 tests/core/test_projector_scoring_parity.py:96:private-name:quodeq.services.rescore._group_by_principle
 tests/core/test_projector_scoring_parity.py:96:private-name:quodeq.services.rescore._score_all_principles
-tests/core/test_scoring_internals.py:17:private-name:quodeq.core.scoring.constants._MAX_PENALTY_MULTIPLIER
 tests/core/test_stream_events.py:98:private-module:quodeq.services._violations_jsonl.vj
 tests/core/test_stream_events.py:99:private-module:quodeq.services._violations_stream.vs
 tests/dashboard/_runner_helpers.py:11:private-module:quodeq.dashboard._probes.DashboardHooks
@@ -777,14 +774,14 @@ tests/data/fs/report_parser/test_report_parsing_exit_reason.py:7:private-module:
 tests/data/fs/report_parser/test_report_parsing_scope_downgrade.py:6:private-module:quodeq.data.fs.report_parser._report_parsing.build_finding
 tests/data/fs/report_parser/test_repository.py:4:private-module:quodeq.data.fs.report_parser._repository.build_repository_info
 tests/data/fs/test_index_io_except_narrowing.py:14:private-module:quodeq.data.fs._index_cache.IndexCache
-tests/data/fs/test_index_io_except_narrowing.py:15:private-name:quodeq.data.fs._index_io._save_index
+tests/data/fs/test_index_io_except_narrowing.py:15:private-module:quodeq.data.fs._index_io.save_index
 tests/data/fs/test_project_identity_remote.py:22:private-module:quodeq.data.fs._models.ProjectIdentity
 tests/data/fs/test_project_identity_remote.py:40:private-module:quodeq.data.fs._models.ProjectIdentity
 tests/data/fs/test_project_identity_remote.py:65:private-module:quodeq.data.fs._models.ProjectIdentity
 tests/data/fs/test_project_identity_remote.py:6:private-module:quodeq.data.fs._models.ProjectIdentity
 tests/data/fs/test_resolution_fail_clean.py:8:private-module:quodeq.data.fs._models.ProjectIdentity
+tests/data/fs/test_resolution_fail_clean.py:9:private-module:quodeq.data.fs._resolution.create_project
 tests/data/fs/test_resolution_fail_clean.py:9:private-name:quodeq.data.fs._resolution._REPO_INFO_FILENAME
-tests/data/fs/test_resolution_fail_clean.py:9:private-name:quodeq.data.fs._resolution._create_project
 tests/data/migrations/test_dismissed_json_to_actions_log.py:88:private-name:quodeq.data.migrations.dismissed_json_to_actions_log._DEFAULT_LOCKS
 tests/data/migrations/test_dismissed_json_to_actions_log.py:88:private-name:quodeq.data.migrations.dismissed_json_to_actions_log._MigrationLocks
 tests/data/projection/test_grade_projector.py:6:private-name:quodeq.data.projection.grade_projector._read_source_file_count
@@ -816,12 +813,7 @@ tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._cach
 tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._git_env
 tests/data/test_git_cli.py:215:private-module:quodeq.analysis.subagents._git_scoring.git_scoring
 tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite.index_sync._is_pid_alive
-tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite.index_sync._sync_legacy_run
-tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite.index_sync._upsert_from_status
-tests/data/test_index_sync_missing_state.py:14:private-name:quodeq.data.sqlite.index_sync._check_stale_and_promote
-tests/data/test_index_sync_stale.py:15:private-name:quodeq.data.sqlite.index_sync._check_stale_and_promote
 tests/data/test_index_sync_stale.py:15:private-name:quodeq.data.sqlite.index_sync._is_pid_alive
-tests/data/test_index_sync_stale.py:15:private-name:quodeq.data.sqlite.index_sync._upsert_from_status
 tests/data/test_mapper_totals_density.py:3:private-module:quodeq.data.mappers._mapper_findings.parse_totals
 tests/data/test_project_files.py:170:private-name:quodeq.services.fs_project_helpers._backfill_onboarding_field
 tests/data/test_run_files.py:82:private-module:quodeq.services._accumulated_data.run_fingerprint
@@ -1112,7 +1104,6 @@ tests/services/test_run_status_readers.py:188:private-name:quodeq.services._run_
 tests/services/test_run_status_readers.py:198:private-name:quodeq.services._run_status_readers._tail_run_log
 tests/services/test_run_status_readers.py:7:private-name:quodeq.services._run_status_readers._read_enriched_status_fields
 tests/services/test_runs_unit.py:5:private-name:quodeq.services.runs_unit._row_to_run_entry
-tests/services/test_scan_counter_report_parity.py:27:private-name:quodeq.core.evidence.req_mapping._group_judgments
 tests/services/test_scan_progress_live_tally.py:175:private-module:quodeq.services._scan_progress_dims.dims
 tests/services/test_scan_progress_live_tally.py:20:private-module:quodeq.services._scan_progress_dims.forget_live_tallies
 tests/services/test_scan_progress_live_tally.py:20:private-module:quodeq.services._scan_progress_dims.live_tally

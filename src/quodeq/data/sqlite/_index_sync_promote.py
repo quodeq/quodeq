@@ -4,7 +4,7 @@ Split out of ``index_sync.py`` purely to keep that module under the size
 cap (an intra-file extraction there would have pushed it over 300 lines).
 ``force_promote_to_cancelled_stale`` is re-exported from ``index_sync`` --
 that is the stable entry point callers use. The few names shared with
-``index_sync`` (``_logger``, ``_upsert_from_status``) are looked up via a
+``index_sync`` (``logger``, ``upsert_from_status``) are looked up via a
 deferred import inside each function body, so this module carries no
 top-level dependency back on ``index_sync`` and there is no import cycle.
 """
@@ -47,7 +47,7 @@ def _promote_via_status_write(
     Returns True on success. On a write failure, logs and returns False so
     the caller can fall back to the DB-only path.
     """
-    from quodeq.data.sqlite.index_sync import _logger, _upsert_from_status
+    from quodeq.data.sqlite.index_sync import logger, upsert_from_status
 
     try:
         existing = read_status(run_dir) or {}
@@ -66,12 +66,12 @@ def _promote_via_status_write(
             time_limit_s=None,
         )
         write_status(run_dir, status)
-        _upsert_from_status(
+        upsert_from_status(
             db, run_dir, project_uuid=row.project_uuid, run_id=row.run_id,
         )
         return True
     except (OSError, UnsupportedSchemaError) as exc:
-        _logger.warning(
+        logger.warning(
             "force-promote: status.json write failed for %s (%s); "
             "falling back to index-only update", job_id, exc,
         )

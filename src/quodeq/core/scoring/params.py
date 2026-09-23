@@ -11,12 +11,12 @@ from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
 from quodeq.core.scoring.constants import (
-    _BASE_K,
-    _CEIL_SCALE,
-    _GRADE_THRESHOLDS,
-    _LIFT_COMPRESS,
-    _SEVERITY_GRADE_FLOOR,
-    _SEVERITY_WEIGHT,
+    BASE_K,
+    CEIL_SCALE,
+    GRADE_THRESHOLDS,
+    LIFT_COMPRESS,
+    SEVERITY_GRADE_FLOOR,
+    SEVERITY_WEIGHT,
     Grade,
     MAX_SCORE,
 )
@@ -79,13 +79,13 @@ class ScoringParams:
 
 
 DEFAULT_PARAMS = ScoringParams(
-    severity_weight=dict(_SEVERITY_WEIGHT),
-    base_k=_BASE_K,
-    lift_compress=_LIFT_COMPRESS,
-    ceil_scale=_CEIL_SCALE,
-    floor_minor=_SEVERITY_GRADE_FLOOR["minor"],
-    floor_major=_SEVERITY_GRADE_FLOOR["major"],
-    grade_thresholds=tuple((float(t), label) for t, label in _GRADE_THRESHOLDS),
+    severity_weight=dict(SEVERITY_WEIGHT),
+    base_k=BASE_K,
+    lift_compress=LIFT_COMPRESS,
+    ceil_scale=CEIL_SCALE,
+    floor_minor=SEVERITY_GRADE_FLOOR["minor"],
+    floor_major=SEVERITY_GRADE_FLOOR["major"],
+    grade_thresholds=tuple((float(t), label) for t, label in GRADE_THRESHOLDS),
 )
 
 

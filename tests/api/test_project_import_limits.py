@@ -104,7 +104,7 @@ class TestUpdateIndexDI:
         instead of the default _load_index/_save_index filesystem helpers."""
         from quodeq.api.import_project import update_index
         from quodeq.data.fs._models import ProjectIdentity
-        from quodeq.data.fs._resolution import _index_key
+        from quodeq.data.fs._resolution import index_key
 
         captured_loads: list = []
         captured_saves: list = []
@@ -128,14 +128,14 @@ class TestUpdateIndexDI:
         assert len(captured_saves) == 1
         saved_dir, saved_index = captured_saves[0]
         assert saved_dir == tmp_path
-        assert saved_index[_index_key(identity)] == project_uuid
+        assert saved_index[index_key(identity)] == project_uuid
 
     def test_no_repository_uses_filesystem(self, tmp_path):
         """Without a repository, update_index writes to project_index.json on disk."""
         import json
         from quodeq.api.import_project import update_index
         from quodeq.data.fs._models import ProjectIdentity
-        from quodeq.data.fs._resolution import _index_key
+        from quodeq.data.fs._resolution import index_key
 
         identity = ProjectIdentity(project_name="testrepo", repo_path="/tmp/testrepo")
         project_uuid = "11112222-3333-4444-5555-666677778888"
@@ -145,4 +145,4 @@ class TestUpdateIndexDI:
         index_file = tmp_path / "project_index.json"
         assert index_file.exists()
         data = json.loads(index_file.read_text())
-        assert data[_index_key(identity)] == project_uuid
+        assert data[index_key(identity)] == project_uuid

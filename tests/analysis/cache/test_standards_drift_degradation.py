@@ -11,7 +11,7 @@ separately-tracked "remap findings to correct req IDs" follow-up.)
 """
 from __future__ import annotations
 
-from quodeq.core.evidence.req_mapping import _group_judgments
+from quodeq.core.evidence.req_mapping import group_judgments
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.core.events.models import Judgment
 from quodeq.core.scoring.engine import score_evidence
@@ -33,7 +33,7 @@ def _ghost_judgment() -> Judgment:
 def test_grouping_does_not_crash_on_absent_requirement_id():
     # With no current mappings, an unknown practice_id falls back to itself
     # (orphan principle) instead of raising.
-    grouped = _group_judgments([_ghost_judgment()], dimension="security", evaluators_dir=None)
+    grouped = group_judgments([_ghost_judgment()], dimension="security", evaluators_dir=None)
     assert "GHOST-1" in grouped.violations
     assert len(grouped.violations["GHOST-1"]) == 1
 

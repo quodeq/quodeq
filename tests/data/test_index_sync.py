@@ -8,8 +8,8 @@ from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
 from quodeq.data.sqlite.run_index import open_index, sync_index
 from quodeq.data.sqlite.index_sync import (
     _is_pid_alive,
-    _sync_legacy_run,
-    _upsert_from_status,
+    sync_legacy_run,
+    upsert_from_status,
 )
 from tests.data._index_sync_helpers import _make_run_dir
 
@@ -27,7 +27,7 @@ def test_legacy_scan_json_present_is_done(tmp_path: Path) -> None:
     try:
         run = _make_run_dir(tmp_path, "p", "r1")
         (run / "scan.json").write_text("{}")
-        _sync_legacy_run(db, run, project_uuid="p", run_id="r1")
+        sync_legacy_run(db, run, project_uuid="p", run_id="r1")
         row = db.execute("SELECT state, exit_reason FROM runs WHERE job_id = ?", ("ext-r1",)).fetchone()
         assert row == ("done", None)
     finally:
@@ -39,7 +39,7 @@ def test_legacy_live_pid_is_running(tmp_path: Path) -> None:
     try:
         run = _make_run_dir(tmp_path, "p", "r2")
         (run / ".pid").write_text(str(os.getpid()))
-        _sync_legacy_run(db, run, project_uuid="p", run_id="r2")
+        sync_legacy_run(db, run, project_uuid="p", run_id="r2")
         row = db.execute("SELECT state, exit_reason FROM runs WHERE job_id = ?", ("ext-r2",)).fetchone()
         assert row[0] == "running"
         assert row[1] is None
@@ -52,7 +52,7 @@ def test_legacy_dead_pid_is_cancelled(tmp_path: Path) -> None:
     try:
         run = _make_run_dir(tmp_path, "p", "r3")
         (run / ".pid").write_text("999999999")
-        _sync_legacy_run(db, run, project_uuid="p", run_id="r3")
+        sync_legacy_run(db, run, project_uuid="p", run_id="r3")
         row = db.execute("SELECT state, exit_reason FROM runs WHERE job_id = ?", ("ext-r3",)).fetchone()
         assert row[0] == "cancelled"
         assert row[1] == "stale_legacy_pid_dead"
@@ -64,7 +64,7 @@ def test_legacy_no_pid_no_scan_is_cancelled(tmp_path: Path) -> None:
     db = open_index(tmp_path / "idx.db")
     try:
         run = _make_run_dir(tmp_path, "p", "r4")
-        _sync_legacy_run(db, run, project_uuid="p", run_id="r4")
+        sync_legacy_run(db, run, project_uuid="p", run_id="r4")
         row = db.execute("SELECT state, exit_reason FROM runs WHERE job_id = ?", ("ext-r4",)).fetchone()
         assert row[0] == "cancelled"
         assert row[1] == "stale_legacy_no_pid"
@@ -78,7 +78,7 @@ def test_upsert_from_status_inserts_new_row(tmp_path: Path) -> None:
         run = _make_run_dir(tmp_path, "p", "r5")
         write_status(run, RunStatus(state=RunState.PENDING, job_id="ext-r5",
                      started_at="2026-04-20T00:00:00+00:00", dimensions=["security"]))
-        _upsert_from_status(db, run, project_uuid="p", run_id="r5")
+        upsert_from_status(db, run, project_uuid="p", run_id="r5")
         row = db.execute(
             "SELECT state, project_uuid, run_id FROM runs WHERE job_id = ?",
             ("ext-r5",),
@@ -94,10 +94,10 @@ def test_upsert_updates_existing_row(tmp_path: Path) -> None:
         run = _make_run_dir(tmp_path, "p", "r6")
         write_status(run, RunStatus(state=RunState.RUNNING, job_id="ext-r6",
                      started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
-        _upsert_from_status(db, run, project_uuid="p", run_id="r6")
+        upsert_from_status(db, run, project_uuid="p", run_id="r6")
         write_status(run, RunStatus(state=RunState.DONE, job_id="ext-r6",
                      started_at="2026-04-20T00:00:00+00:00", dimensions=[]))
-        _upsert_from_status(db, run, project_uuid="p", run_id="r6")
+        upsert_from_status(db, run, project_uuid="p", run_id="r6")
         row = db.execute("SELECT state FROM runs WHERE job_id = ?", ("ext-r6",)).fetchone()
         assert row[0] == "done"
     finally:

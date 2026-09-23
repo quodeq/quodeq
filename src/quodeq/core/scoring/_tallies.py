@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from quodeq.core.scoring.constants import _SEVERITY_WEIGHT
+from quodeq.core.scoring.constants import SEVERITY_WEIGHT
 from quodeq.core.types.severity import Severity
 
 
@@ -40,12 +40,12 @@ def tally_types(items: list[dict]) -> dict[str, int]:
     return _tally_types_fallback(items, ("vt", "reason"))
 
 
-def _weighted_sum(
+def weighted_sum(
     type_counts: dict[str, int],
     severity_weight: Mapping[str, float] | None = None,
 ) -> float:
     """Sum type counts weighted by severity."""
-    weights = severity_weight if severity_weight is not None else _SEVERITY_WEIGHT
+    weights = severity_weight if severity_weight is not None else SEVERITY_WEIGHT
     fallback = weights.get("minor", 0.25)
     return sum(
         count * weights.get(sev, fallback)

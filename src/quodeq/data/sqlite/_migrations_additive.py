@@ -38,7 +38,7 @@ def _add_findings_column(conn: sqlite3.Connection, column: str, decl: str) -> No
         conn.execute(f"ALTER TABLE findings ADD COLUMN {column} {decl}")
 
 
-def _upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
+def upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
     """Add the provenance_downgrade column to findings (default 0, issue #656).
 
     Marks findings the deterministic provenance gate (#639) de-escalated from
@@ -49,7 +49,7 @@ def _upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
     _add_findings_column(conn, "provenance_downgrade", "INTEGER NOT NULL DEFAULT 0")
 
 
-def _upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
+def upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
     """Add the scope_downgrade_json column to findings (default NULL).
 
     Marks findings the deterministic scope gate de-escalated from major to
@@ -63,13 +63,13 @@ def _upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
     _add_findings_column(conn, "scope_downgrade_json", "TEXT")
 
 
-def _upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
+def upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
     """Add the (requirement, file, line) composite index to findings.
 
     read_finding_details() (findings_queries.py) used to scan every row and
     filter matching keys in Python; the index lets its SQL WHERE seek
     instead. Skip if findings doesn't exist yet (mirrors the
-    provenance_downgrade guard in _upgrade_v5_to_v6). IF NOT EXISTS makes a
+    provenance_downgrade guard in upgrade_v5_to_v6). IF NOT EXISTS makes a
     re-run safe if a crash landed the CREATE INDEX but not the later
     user_version bump (same idempotency shape as the other upgrades here).
     """
@@ -81,7 +81,7 @@ def _upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
     )
 
 
-def _upgrade_v8_to_v9(conn: sqlite3.Connection) -> None:
+def upgrade_v8_to_v9(conn: sqlite3.Connection) -> None:
     """Add the violation_type_raw column to findings (default '').
 
     Stores the model's violation-type tag as emitted so the taxonomy report

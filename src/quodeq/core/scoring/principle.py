@@ -140,7 +140,7 @@ def _build_context(
     )
 
 
-def _score_all_principles(
+def score_all_principles(
     raw_principles: dict, mode: str, scale_mult: int, files_read: int,
     params: ScoringParams = DEFAULT_PARAMS,
 ) -> dict[str, PrincipleScore]:

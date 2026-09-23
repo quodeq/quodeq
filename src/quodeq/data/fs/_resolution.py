@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
-from quodeq.data.fs._index_io import _MAX_LEGACY_SCAN
+from quodeq.data.fs._index_io import MAX_LEGACY_SCAN
 from quodeq.data.fs._models import ProjectIdentity
 
 _REPO_INFO_FILENAME = "repository_info.json"
@@ -16,7 +16,7 @@ _LOCATION_ONLINE = "online"
 _URL_PREFIXES = ("https://", "git@")
 
 
-def _index_key(identity: ProjectIdentity) -> str:
+def index_key(identity: ProjectIdentity) -> str:
     """Return a stable string key for the identity.
 
     When a git remote URL is present, use it as the primary key component so
@@ -49,7 +49,7 @@ def _scan_legacy_projects(
         if not entry.is_dir() or entry.name.startswith("."):
             continue
         scanned += 1
-        if scanned > _MAX_LEGACY_SCAN:
+        if scanned > MAX_LEGACY_SCAN:
             break
         info_file = entry / _REPO_INFO_FILENAME
         if not info_file.exists():
@@ -72,7 +72,7 @@ def _scan_legacy_projects(
     return None
 
 
-def _find_existing_project(
+def find_existing_project(
     reports_dir: Path,
     identity: ProjectIdentity,
     load_fn: Callable[[Path], dict[str, str]],
@@ -80,7 +80,7 @@ def _find_existing_project(
 ) -> str | None:
     """Look up project by identity in the index; fall back to directory scan for
     projects created before the index existed, updating the index on success."""
-    key = _index_key(identity)
+    key = index_key(identity)
     index = load_fn(reports_dir)
     if key in index:
         if (reports_dir / index[key]).is_dir():
@@ -92,7 +92,7 @@ def _find_existing_project(
     # path-based key that would have been used before remote-URL identity.
     if identity.remote_url:
         legacy_identity = replace(identity, remote_url=None)
-        legacy_key = _index_key(legacy_identity)
+        legacy_key = index_key(legacy_identity)
         if legacy_key in index and (reports_dir / index[legacy_key]).is_dir():
             uuid_value = index[legacy_key]
             index[key] = uuid_value
@@ -102,7 +102,7 @@ def _find_existing_project(
     return _scan_legacy_projects(reports_dir, identity, key, index, save_fn)
 
 
-def _create_project(
+def create_project(
     reports_dir: Path,
     identity: ProjectIdentity,
     load_fn: Callable[[Path], dict[str, str]],
@@ -145,6 +145,6 @@ def _create_project(
         )
         raise
     index = load_fn(reports_dir)
-    index[_index_key(identity)] = project_uuid
+    index[index_key(identity)] = project_uuid
     save_fn(reports_dir, index)
     return project_uuid

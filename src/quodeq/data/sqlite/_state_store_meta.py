@@ -11,7 +11,7 @@ _GRADES_ALGO_KEY = "grades_algo_version"
 T = TypeVar("T")
 
 
-class _StateStoreMetaMixin:
+class StateStoreMetaMixin:
     """Typed get/save pairs over the run_meta key/value table.
 
     Split out of ``SQLiteStateStore`` purely to keep that file under the

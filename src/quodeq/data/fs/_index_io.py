@@ -10,10 +10,10 @@ from pathlib import Path
 from quodeq.data.fs._index_cache import IndexCache, index_cache
 
 _INDEX_FILE = "project_index.json"
-_MAX_LEGACY_SCAN = 500
+MAX_LEGACY_SCAN = 500
 
 
-def _load_index(reports_dir: Path, *, cache: IndexCache | None = None) -> dict[str, str]:
+def load_index(reports_dir: Path, *, cache: IndexCache | None = None) -> dict[str, str]:
     """Load the project index file, returning an empty dict on missing/corrupt file.
 
     Uses mtime-based caching to avoid re-reading the file when it hasn't
@@ -46,7 +46,7 @@ def _cleanup_tmp(tmp: str) -> None:
         logging.getLogger(__name__).debug("Could not remove temp file %s: %s", tmp, exc)
 
 
-def _save_index(reports_dir: Path, index: dict[str, str], *, cache: IndexCache | None = None) -> None:
+def save_index(reports_dir: Path, index: dict[str, str], *, cache: IndexCache | None = None) -> None:
     """Write the project index file atomically."""
     cache = cache or index_cache
     index_path = reports_dir / _INDEX_FILE
