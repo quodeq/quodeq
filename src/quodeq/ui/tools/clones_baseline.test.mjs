@@ -1,6 +1,6 @@
-// The clone ratchet burned its baseline to zero in maintainability cycle 3
-// (PR 5): the Python clones went into shared helpers, the UI tool clones into
-// tools/_ratchet_common.mjs and tools/_token_utils.mjs. This pins it there --
+// The clone ratchet burned its baseline to zero: the Python clones went into
+// shared helpers, the UI tool clones into tools/_ratchet_common.mjs and
+// tools/_token_utils.mjs. This pins it there --
 // an entry creeping back in means a copy-paste was grandfathered instead of
 // extracted.
 import assert from 'node:assert/strict';

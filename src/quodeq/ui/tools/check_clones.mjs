@@ -55,8 +55,8 @@ const HINT =
   'module) instead of copy-pasting. Regenerate the baseline only with ' +
   'justification: npm run lint:clones:update';
 
-// The baseline was burned to zero in maintainability cycle 3 (PR 5): every
-// grandfathered clone is now a shared helper. NEVER raise this without a
+// The baseline was burned to zero: every grandfathered clone is now a
+// shared helper. NEVER raise this without a
 // justification reviewed in the PR that raises it -- at zero, any new clone
 // has to be extracted, not absorbed.
 const TOTAL_CEILING = 0;

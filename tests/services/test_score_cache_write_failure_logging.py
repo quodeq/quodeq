@@ -13,9 +13,9 @@ tests/tools/test_logging_boundary.py), so these tests pass a fake sink
 instead of using caplog.
 
 The tests above prove the mechanism works when a caller passes ``log=``.
-They do NOT prove any production caller actually does -- final review item B
-(fault-tolerance cycle 1) found that every production caller left ``log`` at
-its silent ``NULL_LOG`` default, so this logging never fired outside
+They do NOT prove any production caller actually does -- a review found that
+every production caller left ``log`` at its silent ``NULL_LOG`` default,
+so this logging never fired outside
 tests. ``TestProductionCallerReachesRealSink`` below drives a real production
 caller (``_fs_metadata.py``, which now threads ``log=SHARED_LOG``) with no
 ``log=`` override at all, to prove the wiring -- not just the mechanism --

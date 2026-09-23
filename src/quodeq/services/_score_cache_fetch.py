@@ -36,9 +36,8 @@ def _log_write_failure(operation: str, exc: sqlite3.Error, *, log: LogSink) -> N
     injected-LogSink discipline for inner layers -- see
     ``quodeq.core.observability``. ``_fs_metadata.py`` and ``trend_fetcher.py``
     thread ``log=SHARED_LOG`` through their calls to ``cached_project_summary``
-    and ``make_cache_backed_fetcher`` respectively (final review item B,
-    fault-tolerance cycle 1); ``scoring/_project_scores.py``'s call to
-    ``cached_accumulated`` still leaves it at the silent default.
+    and ``make_cache_backed_fetcher`` respectively; ``scoring/_project_scores.py``'s
+    call to ``cached_accumulated`` still leaves it at the silent default.
     """
     log.warning(f"score-cache write failed for {operation}, degrading to recompute: {exc}")
 

@@ -1,6 +1,4 @@
-"""Machine-readable error codes across the four assistant route modules
-(usability cycle 1, task 1; findings 6023-6031, 7235, 7238, 7239, 7242, 7243,
-7248, 7252, 7303, 7306, 7307, 7309).
+"""Machine-readable error codes across the four assistant route modules.
 
 Every error branch in assistant_action_routes.py, assistant_workspace_routes.py,
 assistant_session_routes.py, and assistant_turn_routes.py must return a "code"
@@ -52,7 +50,7 @@ def workspace_client(workspace_app):
     return workspace_app.test_client()
 
 
-# --- assistant_action_routes.py: apply/reject (findings 6023-6031) --------
+# --- assistant_action_routes.py: apply/reject -----------------------------
 
 def _setup_unknown(app, client):
     return "missing"
@@ -118,7 +116,7 @@ def test_action_route_error_has_code(action_app, action_client, route, setup, st
     assert resp.get_json()["code"] == code
 
 
-# --- assistant_workspace_routes.py (findings 7235, 7238, 7243, 7248, 7252) -
+# --- assistant_workspace_routes.py ----------------------------------------
 
 def test_workspace_unknown_session_has_code(action_client):  # 7235
     resp = action_client.get("/api/assistant/sessions/nope/workspace")
@@ -168,7 +166,7 @@ def test_workspace_discard_turn_busy_has_code(workspace_app, workspace_client, w
         state.release_turn(sid)
 
 
-# --- assistant_session_routes.py (findings 7239, 7242) --------------------
+# --- assistant_session_routes.py ------------------------------------------
 
 def test_create_session_unknown_provider_has_code(action_client):  # 7239
     resp = action_client.post("/api/assistant/sessions", json={"provider": "nope"})
@@ -183,7 +181,7 @@ def test_create_session_invalid_source_has_code(action_client):  # 7242
     assert resp.get_json()["code"] == "INVALID_SOURCE"
 
 
-# --- assistant_turn_routes.py (findings 7303, 7306, 7307, 7309) -----------
+# --- assistant_turn_routes.py ---------------------------------------------
 
 def test_post_message_unknown_session_has_code(action_client):  # 7303
     resp = action_client.post("/api/assistant/sessions/nope/messages", json={"text": "x"})

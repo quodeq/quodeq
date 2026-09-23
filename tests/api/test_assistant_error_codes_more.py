@@ -1,8 +1,7 @@
-"""More machine-readable error-code coverage for assistant_turn_routes.py
-(usability cycle 1, task 6 sweep): the three sites tools/check_error_codes.py
-(the zero-tolerance gate added in task 6) still found bare after task 1's
-pass -- missing text, stop-with-no-turn-running, and the events stream's
-unknown-session 404.
+"""More machine-readable error-code coverage for assistant_turn_routes.py:
+tools/check_error_codes.py's zero-tolerance gate still found three sites
+bare after the first pass -- missing text, stop-with-no-turn-running, and
+the events stream's unknown-session 404.
 
 Sibling of test_assistant_error_codes.py, which sits at 232 of its 240-line
 budget: new coverage goes in a new file instead of growing it. The ``app``

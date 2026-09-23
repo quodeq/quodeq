@@ -1,6 +1,6 @@
 """Live behavioral regression for the critical-severity provenance gate (issue #641).
 
-Run fa56db32 (model ``gemma4:26b-mlx``) rated 4 findings ``critical`` that are
+A real run (model ``gemma4:26b-mlx``) rated 4 findings ``critical`` that are
 false positives: the flagged value is provably INTERNAL (a defaulted prop/arg, a
 SHA-256 cache key). PR #636 added a provenance gate to ``evaluation_rules.md`` so
 those drop to ``major``/``minor`` while genuinely EXTERNAL input stays ``critical``.

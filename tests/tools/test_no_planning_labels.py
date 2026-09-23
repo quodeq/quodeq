@@ -12,9 +12,9 @@ Identifiers keep their own names: a test file called
 string that is data (a log message, an API payload, a UI label, a SQL row)
 is behaviour, not prose.
 
-Every shape has a positive and a negative case below. When a shape hits
-legitimate text (a principle id such as P1, a drawing phase), the shape
-narrows; the text stays.
+Every shape has a positive and a negative case in test_no_planning_labels_shapes.py.
+When a shape hits legitimate text (a principle id such as P1, a drawing
+phase), the shape narrows; the text stays.
 """
 from __future__ import annotations
 
@@ -23,15 +23,13 @@ import re
 import tokenize
 from pathlib import Path
 
-import pytest
-
 REPO = Path(__file__).resolve().parents[2]
 SRC = REPO / "src" / "quodeq"
 TESTS = REPO / "tests"
 SKIP_DIRS = frozenset({"node_modules", "dist", "generated", "__pycache__", "static", "fixtures"})
 
 SHAPES = (
-    r"\bTask \d+(?:\.\d+)?\b",                      # Task 4, Task 3.5
+    r"\b(?i:task) \d+(?:\.\d+)?\b",                 # Task 4, task 3.5 (case-insensitive)
     r"\bPlan[ -](?:\d+|[A-Z])\b",                   # Plan B, Plan 1, pre-Plan-A
     r"\b[Cc]luster ?\d+\b",                         # Cluster 12, Cluster36, cluster 25
     r"\bPhase \d+\b(?!:)",                          # Phase 2 (not "Phase 1:" draw steps)
@@ -39,15 +37,18 @@ SHAPES = (
     r"\bWS\d+\b",                                   # WS6
     r"\bP\d+-T\d+\b|(?:^|(?<=//)|(?<=#)|(?<=\())\s*P\d+\b(?=[:\s)])",  # P4-T2, "// P6:", "(P5 ..."
     r"\bB\d+(?:\.\d+)?[a-z]?\b",                    # B4, B5e, B6.2c
-    r"\b(?i:audit|review) (?i:findings?) [A-Z]?\d+",  # audit finding C1, Review findings 3
+    r"\b(?i:audit|review) (?i:findings?) [A-Za-z]?\d+",  # audit finding C1, review findings d3
     r"\bAudit [A-Z]\d+\b",                          # Audit A2
-    r"\b(?i:finding) \d{3,}\b",                     # finding 5398
-    r"\brun [0-9a-f]{8}\b",                         # run 838d807e
+    r"\b(?i:findings?) \d{3,}\b",                   # finding 5398, findings 5398 (plural-aware)
+    r"\b(?i:run) [0-9a-f]{8,}\b",                   # run 838d807e, Run fa56db32e1 (8+ hex)
     r"\b(?i:fix round)\b",
     r"\b(?i:whole-branch review)\b",
     r"\bCritical \d+\b",                            # Critical 1
     r"\b(?i:cluster|finding|review)s?\W{1,3}M\d+\b",  # review (M8), cluster M3
     r"\bPost-V\d\b",                                # Post-V2
+    r"\b(?i:(?:fault-tolerance|usability|maintainability|reliability|security"
+    r"|performance|flexibility|clean-arch(?:itecture)?|quality) cycle) \d+\b",
+    r"\b(?i:review) item [A-Z]\b",                  # review item B (final review item B)
 )
 LABEL = re.compile("|".join(f"(?:{shape})" for shape in SHAPES), re.MULTILINE)
 
@@ -55,8 +56,8 @@ _STATEMENT_START = (tokenize.INDENT, tokenize.DEDENT, tokenize.NEWLINE, tokenize
 
 
 def _iter_sources():
-    """Yield src/quodeq .py/.js/.jsx and tests .py files, vendored dirs and this file aside."""
-    for root, exts in ((SRC, ("*.py", "*.js", "*.jsx")), (TESTS, ("*.py",))):
+    """Yield src/quodeq .py/.js/.jsx/.mjs and tests .py files, vendored dirs and this file aside."""
+    for root, exts in ((SRC, ("*.py", "*.js", "*.jsx", "*.mjs")), (TESTS, ("*.py",))):
         for ext in exts:
             for path in sorted(root.rglob(ext)):
                 if SKIP_DIRS.isdisjoint(path.relative_to(root).parts) and path != Path(__file__).resolve():
@@ -87,21 +88,78 @@ def python_prose(source: str) -> list[tuple[int, str]]:
     return prose
 
 
-def js_prose(source: str) -> list[tuple[int, str]]:
-    """Return (lineno, text) for every `//` and `/* */` comment in *source*.
+_REGEX_PRECEDERS = frozenset(
+    "return typeof instanceof in of new delete void yield throw case do else await".split()
+)
 
-    A hand-rolled scanner rather than a regex, so a `//` inside a string or
-    a template literal is not read as a comment. Known limitation: a regex
-    literal containing `//` or `/*` would be, which no file here has.
+
+def _regex_starts_here(source: str, i: int) -> bool:
+    """Heuristic: does `/` at *i* start a regex literal rather than division?
+
+    True after an operator/opener/newline, or after a keyword that itself
+    precedes an expression (``return /x/``); false after a value.
     """
-    prose: list[tuple[int, str]] = []
-    i, line, n = 0, 1, len(source)
+    j = i - 1
+    while j >= 0 and source[j] in " \t":
+        j -= 1
+    if j < 0:
+        return True
+    c = source[j]
+    if c in "([{,;:=&|!?+-*%^~<>\n":
+        return True
+    if c.isalnum() or c in "_$":
+        k = j
+        while k >= 0 and (source[k].isalnum() or source[k] in "_$"):
+            k -= 1
+        return source[k + 1:j + 1] in _REGEX_PRECEDERS
+    return False
+
+
+def _skip_regex(source: str, i: int, n: int):
+    """Skip a regex literal opening at *i*; return the index past its
+    closing `/` and flags, or None if the line ends first (caller then
+    treats `/` as ordinary). A `[...]` class is tracked so a quote or
+    backtick inside it (``/[/\\:"<>]/``) never starts a fake string.
+    """
+    j, in_class = i + 1, False
+    while j < n and source[j] != "\n":
+        ch = source[j]
+        if ch == "\\":
+            j += 2
+            continue
+        if ch == "[":
+            in_class = True
+        elif ch == "]":
+            in_class = False
+        elif ch == "/" and not in_class:
+            j += 1
+            while j < n and source[j].isalpha():
+                j += 1
+            return j
+        j += 1
+    return None
+
+
+def _scan(source: str, i: int, n: int, line: int, prose: list, until):
+    """Scan from *i*, appending comments to *prose*. With ``until="}"``
+    (a `${...}` substitution) an unmatched `}` ends the scan; a `{` opened
+    inside is tracked so it doesn't. Returns (index after, current line).
+    """
+    depth = 0
     while i < n:
         ch = source[i]
         if ch == "\n":
             line += 1
             i += 1
-        elif ch in "'\"`":
+        elif until == "}" and ch == "{":
+            depth += 1
+            i += 1
+        elif until == "}" and ch == "}":
+            if depth == 0:
+                return i + 1, line
+            depth -= 1
+            i += 1
+        elif ch in "'\"":
             quote, i = ch, i + 1
             while i < n and source[i] != quote:
                 if source[i] == "\\":
@@ -110,6 +168,8 @@ def js_prose(source: str) -> list[tuple[int, str]]:
                     line += 1
                 i += 1
             i += 1
+        elif ch == "`":
+            i, line = _scan_template(source, i + 1, n, line, prose)
         elif source.startswith("//", i):
             end = source.find("\n", i)
             end = n if end == -1 else end
@@ -122,8 +182,49 @@ def js_prose(source: str) -> list[tuple[int, str]]:
             prose.append((line, body))
             line += body.count("\n")
             i = end
+        elif ch == "/" and _regex_starts_here(source, i):
+            skipped = _skip_regex(source, i, n)
+            i = skipped if skipped is not None else i + 1
         else:
             i += 1
+    return i, line
+
+
+def _scan_template(source: str, i: int, n: int, line: int, prose: list):
+    """Scan a template literal's body (just past its opening backtick) to
+    the matching closing one, handling `${...}` substitutions via `_scan`.
+    """
+    while i < n:
+        ch = source[i]
+        if ch == "`":
+            return i + 1, line
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == "\n":
+            line += 1
+            i += 1
+            continue
+        if ch == "$" and i + 1 < n and source[i + 1] == "{":
+            i, line = _scan(source, i + 2, n, line, prose, until="}")
+            continue
+        i += 1
+    return i, line
+
+
+def js_prose(source: str) -> list[tuple[int, str]]:
+    """Return (lineno, text) for every `//` and `/* */` comment in *source*.
+
+    A hand-rolled scanner, so a `//`/`` ` ``/`/` inside a string, a nested
+    `${...}` template substitution or a regex literal's `[...]` class is
+    never misread as a comment or a stray string opener.
+
+    Known limitation: `_regex_starts_here` is a heuristic (the character
+    before the `/`), so an unusual expression position could misjudge
+    regex vs. division; none of the files this gate scans hit that.
+    """
+    prose: list[tuple[int, str]] = []
+    _scan(source, 0, len(source), 1, prose, until=None)
     return prose
 
 
@@ -147,86 +248,6 @@ def collect_labels() -> list[str]:
                 context = " ".join(text.splitlines()[before.count("\n")].split())[:90]
                 hits.append(f"{path.relative_to(REPO)}:{at}: {match.group(0).strip()} -- {context}")
     return hits
-
-
-def test_python_prose_reads_comments_and_docstrings_only():
-    prose = python_prose(
-        '"""Module doc."""\n'
-        "# a comment\n"
-        "X = 'a value'\n"
-        "def f():\n"
-        "    '''Function doc.'''\n"
-        "    return 'another value'\n"
-        "rows = (\n"
-        "    'VALUES (1)'\n"
-        ")\n"
-    )
-    assert [text for _, text in prose] == [
-        '"""Module doc."""', "# a comment", "'''Function doc.'''",
-    ]
-
-
-def test_js_prose_ignores_slashes_inside_strings():
-    prose = js_prose(
-        "const url = 'https://example.com'; // trailing\n"
-        "/* block\n   continues */\n"
-        "const t = `a // b`;\n"
-    )
-    assert [(lineno, text.strip()) for lineno, text in prose] == [
-        (1, "// trailing"),
-        (2, "/* block\n   continues */"),
-    ]
-
-
-@pytest.mark.parametrize("text, expected", [
-    ("Task 4 follow-up", ["Task 4"]),
-    ("pins the Task 3.5 contract", ["Task 3.5"]),
-    ("Plan B precedence", ["Plan B"]),
-    ("pre-Plan-A runs", ["Plan-A"]),
-    ("Plan 1 naming note", ["Plan 1"]),
-    ("Cluster 12, Cluster36", ["Cluster 12", "Cluster36"]),
-    ("added in cluster 25", ["cluster 25"]),
-    ("until the Phase 2 action registry", ["Phase 2"]),
-    ("landed in Wave 3", ["Wave 3"]),
-    ("the route serializes (WS6)", ["WS6"]),
-    ("// P4-T2: Violations never received", ["P4-T2"]),
-    ("// P6: the Overview never dims", ["P6"]),
-    ("Finding 1 (P5 final review)", ["P5"]),
-    ("Split out (B4/B5e)", ["B4", "B5e"]),
-    ("Post-V2 (B6.2c): gone", ["Post-V2", "B6.2c"]),
-    ("misattributed -- audit finding C1", ["audit finding C1"]),
-    ("Review findings 3 & 4", ["Review findings 3"]),
-    ("Audit A2: a list that never loads", ["Audit A2"]),
-    ("reused (finding 5398)", ["finding 5398"]),
-    ("observed: run 838d807e", ["run 838d807e"]),
-    ("(fix round 1, a11y)", ["fix round"]),
-    ("final whole-branch review", ["whole-branch review"]),
-    ("Critical 1 (belt-and-braces)", ["Critical 1"]),
-    ("after the post-PR review (M8)", ["review (M8"]),
-])
-def test_label_shape_matches(text, expected):
-    assert labels_in(text) == expected
-
-
-@pytest.mark.parametrize("text", [
-    "tasks 4, planning, clustered",
-    "a Plan for the week",
-    "Phase 1: radial gradient background",
-    "orbiting particles (part of phase 3)",
-    "# Only P2 should appear, P1 has none",
-    "Security/P1: critical violation",
-    "class key is (security, P1, a.py)",
-    "a B2B deal",
-    "found in 42 files, finding 12",
-    "the run 12ab finished",
-    "the M8 model weights",
-    "V2 cache owns incremental state",
-    "the Critical path",
-    "review findings are listed",
-    "an audit of the store",
-])
-def test_label_shape_ignores_legitimate_text(text):
-    assert labels_in(text) == []
 
 
 def test_no_planning_labels_in_prose():
