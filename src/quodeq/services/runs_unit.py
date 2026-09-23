@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from quodeq.core.run.state import TERMINAL_STATES, RunState, parse_run_state
+from quodeq.core.run.state import ACTIVE_STATES, TERMINAL_STATES, RunState, parse_run_state
 from quodeq.data.fs.report_parser.grades import most_frequent_grade, parse_numeric_score
 from quodeq.data.fs.report_parser.runs import read_run_scalars
 from quodeq.data.sqlite.run_index import (
@@ -24,12 +24,17 @@ _log = logging.getLogger(__name__)
 
 
 def _row_status(state: str) -> RunState:
-    """The run state an index row means; unknown spellings read as DONE, logged."""
+    """The run-list status an index row means: a terminal state, or RUNNING for any live one.
+
+    The runs endpoint collapses every ACTIVE_STATES member to RUNNING; the UI
+    has no pending/finalizing row state. Unknown spellings read as DONE, logged.
+    """
     try:
-        return parse_run_state(state)
+        s = parse_run_state(state)
     except ValueError:
         _log.warning("index row with unknown state %r read as done", state)
         return RunState.DONE
+    return RunState.RUNNING if s in ACTIVE_STATES else s
 
 
 def _row_to_run_entry(row: RunRow) -> dict:

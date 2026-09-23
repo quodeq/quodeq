@@ -19,11 +19,11 @@ def _row(run_id="r1", state="done", started_at="2026-01-02T03:04:05Z"):
 
 @pytest.mark.parametrize("state,expected", [
     ("done", "done"), ("complete", "done"), ("finished", "done"),
-    ("running", "running"), ("in_progress", "running"), ("pending", "pending"), ("finalizing", "finalizing"),
+    ("running", "running"), ("in_progress", "running"), ("pending", "running"), ("finalizing", "running"),
     ("cancelled", "cancelled"), ("canceled", "cancelled"),
     ("failed", "failed"), ("error", "failed"), ("lost", "failed"),
 ])
-def test_row_status_is_the_parsed_run_state(state, expected):
+def test_row_status_is_the_run_list_status(state, expected):
     row = _row(run_id="r", state=state)
     assert _row_to_run_entry(row)["status"] == expected
 
