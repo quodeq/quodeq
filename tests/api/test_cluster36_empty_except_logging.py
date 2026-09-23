@@ -64,10 +64,13 @@ def test_project_scan_logs_rescan_on_corrupt_scan_json(client, tmp_path) -> None
 
 
 class _ProviderStub:
-    """Minimal stub providing get_log_run_dir but no in_memory_job lookup."""
+    """Minimal stub: a run dir on disk and no in-memory job."""
 
     def __init__(self, run_dir):
         self._run_dir = run_dir
+
+    def in_memory_job(self, job_id):
+        return None
 
     def get_log_run_dir(self, job_id):
         return self._run_dir

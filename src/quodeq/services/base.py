@@ -139,6 +139,13 @@ class EvaluationActions(Protocol):
         """Return current status of an evaluation job."""
         ...
 
+    def in_memory_job(self, job_id: str) -> JobSnapshot | None:
+        """Return the in-memory job view of *job_id*, never consulting the run index.
+
+        None for an ``ext-`` id or an id the JobManager does not hold.
+        """
+        ...
+
     def cancel_evaluation(
         self, job_id: str, reports_dir: str | None = None,
         *, discard_partial: bool = False,

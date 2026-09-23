@@ -129,6 +129,10 @@ class FilesystemActionProvider(ActionProvider):
         """Return one run's snapshot. ``ext-`` ids resolve from the index after a scoped sync."""
         return self._evaluations.get_status(job_id, reports_dir=reports_dir)
 
+    def in_memory_job(self, job_id: str) -> JobSnapshot | None:
+        """The in-memory JobManager view of *job_id*; None for an ``ext-`` or unknown id."""
+        return self._eval_handler.in_memory_job(job_id)
+
     def start_evaluation(
         self, repo: str, reports_dir: str, options: EvaluationOptions,
     ) -> JobSnapshot:
