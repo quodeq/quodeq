@@ -14,7 +14,7 @@ from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
 from quodeq.api.assistant_routes import release_app_turn, claim_app_turn
 from quodeq.api.helpers import json_error
 from quodeq.assistant.workspace_actions import (
-    OUTCOME_FAILED, PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
+    OutcomeKind, PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
 from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
 
 _logger = logging.getLogger(__name__)
@@ -93,11 +93,11 @@ def _turn_conflict(outcome):
 
     Shared by apply, pr and discard: same text, same status, same error code.
     """
-    if outcome.kind == "turn_busy":
+    if outcome.kind == OutcomeKind.TURN_BUSY:
         return json_error(
             "a turn or workspace action is in progress; wait for it to finish",
             409, "TURN_IN_PROGRESS")
-    if outcome.kind == "not_active":
+    if outcome.kind == OutcomeKind.NOT_ACTIVE:
         return json_error(f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
     return None
 
@@ -111,7 +111,7 @@ def _workspace_apply(app: Flask, sid: str):
     conflict = _turn_conflict(outcome)
     if conflict is not None:
         return conflict
-    if outcome.kind == OUTCOME_FAILED:
+    if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace apply failed for %s: %s", sid, outcome.detail)
         return json_error("failed to apply the workspace changes", 409, "WORKSPACE_APPLY_FAILED")
     return jsonify({"applied": True, "stats": outcome.stats})
@@ -128,7 +128,7 @@ def _workspace_pr(app: Flask, sid: str):
     conflict = _turn_conflict(outcome)
     if conflict is not None:
         return conflict
-    if outcome.kind == OUTCOME_FAILED:
+    if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace pr creation failed for %s: %s", sid, outcome.detail)
         return json_error("failed to create the pull request", 500, "WORKSPACE_PR_FAILED")
     return jsonify(outcome.result)
@@ -147,9 +147,9 @@ def _workspace_discard(app: Flask, sid: str):
     conflict = _turn_conflict(outcome)
     if conflict is not None:
         return conflict
-    if outcome.kind == "gone":
+    if outcome.kind == OutcomeKind.GONE:
         return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
-    if outcome.kind == OUTCOME_FAILED:
+    if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace discard failed for %s: %s", sid, outcome.detail)
         return json_error("failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")
     return jsonify({"discarded": True})
