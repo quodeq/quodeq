@@ -49,7 +49,7 @@ def _wait_for_terminal_status(
     lifecycle handler in the subprocess flushing ``status.json`` to
     terminal. Without this wait, observers reading from disk
     immediately after the API returns can still see the run as
-    ``in_progress`` for ~100ms-1s, producing a window where a
+    ``running`` for ~100ms-1s, producing a window where a
     follow-up "Start" surfaces two ``running`` rows in the UI.
     """
     deadline = time.monotonic() + timeout_s
