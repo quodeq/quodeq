@@ -45,7 +45,7 @@ HOME_MODULES = frozenset({
     "quodeq/core/types/severity.py",
     "quodeq/core/scoring/constants.py",
     "quodeq/analysis/mcp/schemas.py",
-    "quodeq/config/provider.py",
+    "quodeq/core/types/provider.py",
     "quodeq/core/types/finding_type.py",
 })
 

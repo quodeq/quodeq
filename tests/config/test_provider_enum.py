@@ -17,3 +17,16 @@ def test_plain_strings_still_look_up():
     # Callers pass raw request strings; StrEnum keys hash as their value.
     assert "claude" in PROVIDERS
     assert PROVIDERS.get("bogus") is None
+
+
+def test_config_reexports_the_core_provider():
+    from quodeq.core.types.provider import Provider as CoreProvider
+
+    assert Provider is CoreProvider
+
+
+def test_omlx_is_local_but_not_a_provider_member():
+    from quodeq.llm_bridge import LOCAL_PROVIDERS
+
+    assert "omlx" not in Provider
+    assert LOCAL_PROVIDERS == {"ollama", "llamacpp", "omlx"}

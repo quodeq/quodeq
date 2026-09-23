@@ -26,7 +26,6 @@ _logger = logging.getLogger(__name__)
 _CLI_MODEL_TIMEOUT_S = 8
 _CLI_OUTPUT_IGNORE_PREFIXES = {"#", "=", "-", "[", "("}
 _ANTHROPIC_API_TIMEOUT_S = 8
-_CUSTOM_PROVIDER_ID = "custom"  # user-defined endpoint; excluded from the client-discovery list
 _DEFAULT_CLIENT_SORT_ORDER = 50  # ai_providers.json's "order" default when unset
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _AI_DEFAULTS_PATH = _PACKAGE_ROOT / "config" / "ai_defaults.json"
@@ -133,7 +132,9 @@ class FsToolingMixin(FsBrowseMixin):
         # reads awkwardly (e.g. "Llamacpp" instead of "llama.cpp").
         api_label_overrides = {"llamacpp": "llama.cpp"}
         for provider_id, cfg in provider_configs.items():
-            if cfg.get("type") == "api" and provider_id != _CUSTOM_PROVIDER_ID:
+            # "custom" is the user-defined endpoint slot; it is configured in
+            # Settings, not offered in the client-discovery list.
+            if cfg.get("type") == "api" and provider_id != Provider.CUSTOM:
                 requires = cfg.get("requires_platform", "")
                 if requires and not _platform_matches(requires):
                     continue
