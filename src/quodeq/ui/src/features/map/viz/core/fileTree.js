@@ -1,3 +1,5 @@
+import { SEVERITY } from '../../../../vocab/severity.js';
+
 function createNode(name, path, isFile) {
   return {
     name, path, isFile,
@@ -94,12 +96,12 @@ export function treeNodeToFileObj(node, { severity } = {}) {
   let violations = items.filter((i) => i.type === 'violation');
   let compliance = items.filter((i) => i.type === 'compliance');
   if (severity && severity !== 'all') {
-    violations = violations.filter((v) => (v.severity || 'minor') === severity);
+    violations = violations.filter((v) => (v.severity || SEVERITY.MINOR) === severity);
     compliance = []; // severity filter shows only violations
   }
   const bySev = { critical: [], major: [], minor: [], unknown: [] };
   for (const v of violations) {
-    const sev = v.severity || 'minor';
+    const sev = v.severity || SEVERITY.MINOR;
     (bySev[sev] || bySev.unknown).push(v);
   }
   const dims = new Set(violations.map((v) => v.dimension).filter(Boolean));
@@ -126,7 +128,7 @@ export function buildFileTree(dimensions) {
       const filePath = v.file || '(unknown)';
       const node = ensurePath(root, filePath);
       node.violations++;
-      const sev = v.severity || 'minor';
+      const sev = v.severity || SEVERITY.MINOR;
       if (node.severity[sev] !== undefined) node.severity[sev]++;
       if (!node.dimensions[dimName]) node.dimensions[dimName] = { violations: 0, compliance: 0 };
       node.dimensions[dimName].violations++;

@@ -1,4 +1,5 @@
 import { t } from '../../../../strings/index.js';
+import { SEVERITY } from '../../../../vocab/severity.js';
 
 // The overlay's fixed styling, hoisted out of the JSX: one object per element
 // for the whole module instead of a fresh one on every panel render, and each
@@ -93,7 +94,7 @@ function computeSystemLevelInfo(scene, nav, projectName) {
     totalC += s.compliance;
     totalScore += s.score;
     for (const v of s._raw?.violations || []) {
-      const sev = v.severity || 'minor';
+      const sev = v.severity || SEVERITY.MINOR;
       if (sevCounts[sev] != null) sevCounts[sev]++;
     }
   }
@@ -119,7 +120,7 @@ function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
   const rawDim = dim._raw;
   const dimSev = { critical: 0, major: 0, minor: 0 };
   (rawDim?.violations || []).forEach(v => {
-    const sev = v.severity || 'minor';
+    const sev = v.severity || SEVERITY.MINOR;
     if (dimSev[sev] != null) dimSev[sev]++;
   });
   const dimLines = [

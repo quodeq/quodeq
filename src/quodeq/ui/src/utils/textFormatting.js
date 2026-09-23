@@ -1,3 +1,5 @@
+import { SEVERITY_ORDER as VOCAB_SEVERITY_ORDER } from '../vocab/severity.js';
+
 /**
  * Strip leading "Principle — " or "Principle - " prefix from reason text
  * to avoid duplication when the principle is shown separately.
@@ -11,7 +13,8 @@ export function stripPrinciplePrefix(reason, principle) {
   }
   return reason;
 }
-export const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
+// Every severity plus the bucket for a missing or unreadable one.
+export const SEVERITY_ORDER = [...VOCAB_SEVERITY_ORDER, 'unknown'];
 
 /**
  * Splits a `path:line` reference into its parts. An explicit `rawLine` wins

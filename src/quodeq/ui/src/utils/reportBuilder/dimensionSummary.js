@@ -48,7 +48,7 @@ export function buildTopOffendingFiles(accumulatedDimensions) {
       const f = v.file.split(':')[0];
       if (!fileMap[f]) fileMap[f] = { count: 0, critical: 0, major: 0, minor: 0 };
       fileMap[f].count++;
-      const s = (v.severity || 'minor').toLowerCase();
+      const s = (v.severity || SEVERITY.MINOR).toLowerCase();
       if (fileMap[f][s] !== undefined) fileMap[f][s]++;
     }
   }

@@ -8,6 +8,7 @@ import { t } from '../../../../strings/index.js';
 import { SCAN_MODE } from '../scanModes.js';
 import { SECONDS_PER_HOUR } from '../../../../utils/time.js';
 import { DIM_STATE } from '../../../../vocab/dimState.js';
+import { SEVERITY_ORDER } from '../../../../vocab/severity.js';
 
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
@@ -177,7 +178,7 @@ export function sumSeverities(liveViolations) {
 
 /** "1 critical · 4 major" — zero buckets omitted; "none yet" when all zero. */
 export function formatSevHint(counts) {
-  const parts = ['critical', 'major', 'minor']
+  const parts = SEVERITY_ORDER
     .filter((k) => counts?.[k] > 0)
     .map((k) => `${counts[k]} ${k}`);
   return parts.length > 0 ? parts.join(' · ') : 'none yet';
