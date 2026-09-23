@@ -2,8 +2,7 @@
 
 Heavy evaluation logic lives in ``quodeq.cli_evaluation`` and its siblings;
 this module re-exports their entry points under public spellings, so
-``from quodeq.cli import …`` never has to name an underscore. The underscore
-originals are still importable from the module that defines them.
+``from quodeq.cli import …`` never has to name an underscore.
 """
 
 from __future__ import annotations
@@ -17,8 +16,7 @@ from quodeq.update.checker import check_async, get_status, set_settings
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 
-# Re-export the evaluation entry points under their public spellings. The
-# underscore originals stay importable from the module that owns them.
+# Re-export the evaluation entry points under their public spellings.
 from quodeq._cli_env import (  # noqa: F401 — public re-exports
     ENV_MAX_DURATION,
     ENV_MAX_TURNS,
