@@ -2,8 +2,7 @@
 
 See ``README.md`` next to this file for the canonical model. Every
 public symbol here is a contract: callers depend on these names and
-behaviors, not on the internal structure of ``_states`` / ``_models``
-/ ``_resolution`` / ``_buckets``.
+behaviors, not on the internal structure of ``_states``.
 
 Internal modules carry leading underscores precisely because they're
 not the boundary. Reach **through** this ``__init__`` from anywhere
@@ -21,15 +20,6 @@ from ._states import (
     select_trend_runs,
 )
 
-# ---------------------------------------------------------------------------
-# Models — frozen carriers returned by the resolvers
-# ---------------------------------------------------------------------------
-from ._models import (
-    DimResolution,
-    BucketView,
-    RunSummary,
-)
-
 
 __all__ = [
     # Vocabulary
@@ -38,8 +28,4 @@ __all__ = [
     "is_eligible_for_default_view",
     "select_default_view_runs",
     "select_trend_runs",
-    # Models
-    "DimResolution",
-    "BucketView",
-    "RunSummary",
 ]

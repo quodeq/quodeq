@@ -54,7 +54,7 @@ files were *dispatched* (in `queue.taken`) but *no findings landed*
 (absent from JSONL). Counting them as analyzed lets the next run
 incorrectly skip them. The corrected rule: a file is "analyzed" only
 if both the queue dispatched it AND it produced any evidence (or a
-signal of clean inspection — open question, see `_resolution.py`).
+signal of clean inspection — still an open question).
 
 > Note: per-file success tracking is currently approximated by
 > `queue.taken ∪ jsonl.files`. Tightening this requires the agent pool
@@ -108,5 +108,6 @@ this package directly.
 `bucket_runs_by_day` and `pick_representative_run` were removed: a
 `grep -rn <name> src` inventory showed none had a production caller
 (the eval-file-provenance resolver and the score-history bucketing were
-never wired into a live view). `DimResolution` / `BucketView` stay in
-`_models.py` for whichever follow-up PR picks that work back up.
+never wired into a live view). The `_resolution.py` / `_buckets.py`
+stubs and the `DimResolution` / `BucketView` / `RunSummary` models they
+were meant to produce followed (2026-09-23): nothing produced them.

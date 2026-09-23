@@ -19,9 +19,4 @@ src/quodeq/core/types/dashboard.py:45:severity_critical
 src/quodeq/core/types/dashboard.py:46:severity_major
 src/quodeq/core/types/dashboard.py:47:severity_minor
 src/quodeq/core/types/project.py:40:scan_date
-src/quodeq/services/scoring_view/_models.py:103:dim_count
-src/quodeq/services/scoring_view/_models.py:81:bucket_label
-src/quodeq/services/scoring_view/_models.py:84:bucket_iso
-src/quodeq/services/scoring_view/_models.py:90:representative_run_id
-src/quodeq/services/scoring_view/_models.py:95:representative_run_date_iso
 src/quodeq/update/selfupdate.py:53:set_shutdown_callback

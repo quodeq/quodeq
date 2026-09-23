@@ -156,8 +156,6 @@ _.requirement_count  # core/types/standard.py: StandardMeta field; read by name 
 _.runId  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (704 refs).
 _.runNumericAverage  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (9 refs).
 _.runOverallGrade  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (7 refs).
-_.run_date_iso  # services/scoring_view/_models.py: DimResolution field; read by name through serialization or a dict key (1 refs).
-_.run_state  # services/scoring_view/_models.py: DimResolution field; read by name through serialization or a dict key (4 refs).
 _.runs_count  # core/types/project.py: ProjectEntry field; read by name through serialization or a dict key (10 refs).
 _.sample  # core/finding_markers.py: FindingMarker field; read by name through serialization or a dict key (35 refs).
 _.severity_drops  # core/types/scoring.py: PrincipleScore field; read by name through serialization or a dict key (5 refs).
