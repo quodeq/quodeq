@@ -270,14 +270,6 @@ _.RUN_COMPLETED  # core/events/models.py: EventType member; decoded from its sto
 _.RUN_STARTED  # core/events/models.py: EventType member; decoded from its stored string value.
 _.get_model_for_tier  # config/ai_models.py: ModelTier member; decoded from its stored string value.
 
-# Closed-vocabulary seams. Each names one home module's derived set or
-# parser; the readers still compare bare strings, so today the tests in
-# tests/core are the only static callers. Delete an entry as its readers
-# move onto it.
-_.ACTIVE_STATES  # core/run/state.py: RunState subset; tests/core/run/test_state_parse.py is its only caller.
-_.JOB_TERMINAL  # core/run/job_status.py: JobStatus subset; tests/core/run/test_job_status.py is its only caller.
-_.parse_severity  # core/types/severity.py: lenient severity parser; tests/core/types/test_severity.py is its only caller.
-
 # PyObjC selectors. AppKit dispatches them by the selector string, never by the Python name.
 _.didExitFullScreen_  # dashboard/_webview_window_fullscreen.py: PyObjC selector on None; AppKit dispatches it by name.
 _.openHelp_  # dashboard/_webview_window_help_menu.py: PyObjC selector on None; AppKit dispatches it by name.

@@ -9,4 +9,3 @@ export const RUN_STATE = Object.freeze({
   CANCELLED: 'cancelled',
 });
 export const TERMINAL_RUN_STATES = Object.freeze(new Set([RUN_STATE.DONE, RUN_STATE.FAILED, RUN_STATE.CANCELLED]));
-export const ACTIVE_RUN_STATES = Object.freeze(new Set([RUN_STATE.PENDING, RUN_STATE.RUNNING, RUN_STATE.FINALIZING]));

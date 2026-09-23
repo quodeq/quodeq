@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { ACTIVE_RUN_STATES, RUN_STATE, TERMINAL_RUN_STATES } from './runState.js';
+import { RUN_STATE, TERMINAL_RUN_STATES } from './runState.js';
 import { JOB_STATUS, JOB_TERMINAL, JOB_FINISHED } from './jobStatus.js';
 import { EXIT_REASON } from './exitReason.js';
 import { SEVERITY, SEVERITY_ORDER } from './severity.js';
@@ -16,7 +16,6 @@ test('vocab modules spell the wire values', () => {
     DONE: 'done', FAILED: 'failed', CANCELLED: 'cancelled',
   });
   assert.deepEqual([...TERMINAL_RUN_STATES], ['done', 'failed', 'cancelled']);
-  assert.deepEqual([...ACTIVE_RUN_STATES], ['pending', 'running', 'finalizing']);
   assert.deepEqual(JOB_STATUS, {
     RUNNING: 'running', DONE: 'done', FAILED: 'failed', CANCELLED: 'cancelled', LOST: 'lost',
   });
