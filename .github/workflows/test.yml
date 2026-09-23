@@ -149,6 +149,14 @@ jobs:
         # `npm run lint:magic:update`.
         run: npm run lint:magic
 
+      - name: Check UI vocabulary literals (vocab ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on bare run-state / severity / grade strings in comparisons
+        # beyond the per-file counts in tools/vocab_baseline.json, or a
+        # baseline total above its committed ceiling. Shrunk counts are
+        # locked in with `npm run lint:vocab:update`.
+        run: npm run lint:vocab
+
       - name: Check UI accessibility (a11y ratchet)
         working-directory: src/quodeq/ui
         # Fails on eslint-plugin-jsx-a11y violations in production code beyond
