@@ -1,6 +1,6 @@
 import { clearDraft, markWelcomeSkipped } from './useWizardDraft.js';
 import { STEP_ORDER, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
-import { SCAN_SUB_STATE } from './useWizardState.js';
+import { SCAN_SUB_STATE } from '../onboardingVocab.js';
 
 /**
  * OnboardingWizard.jsx's exit/launch/navigation handlers, extracted

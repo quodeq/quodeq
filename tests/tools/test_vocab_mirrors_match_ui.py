@@ -1,5 +1,6 @@
-"""Every closed vocabulary is spelled twice: the Python StrEnum and its UI
-mirror under ui/src/vocab/*.js (plus PUBLISH_STATE in usePublishPolling.js).
+"""Every closed vocabulary shared with Python is spelled twice: the Python
+StrEnum and its UI mirror (under ui/src/vocab/*.js, or in the feature module
+that owns it, like PUBLISH_STATE in features/dashboard/dashboardVocab.js).
 The UI's own node test only pins literals, so a value renamed on one side
 alone would pass both suites. This reads the JS objects and compares them
 member for member with the enums.
@@ -41,7 +42,7 @@ _MIRRORS = [
     ("vocab/projectSource.js", "PROJECT_SOURCE", ProjectSource),
     ("vocab/frameType.js", "FRAME_TYPE", FrameType),
     ("vocab/scopeGateRule.js", "SCOPE_GATE_RULE", ScopeGateRule),
-    ("features/dashboard/hooks/usePublishPolling.js", "PUBLISH_STATE", PublishState),
+    ("features/dashboard/dashboardVocab.js", "PUBLISH_STATE", PublishState),
 ]
 
 _PAIR = re.compile(r"(\w+)\s*:\s*'([^']*)'")

@@ -1,11 +1,8 @@
 import { useReducer, useCallback } from 'react';
 import { STEP_WELCOME } from '../wizardSteps.js';
+import { SCAN_SUB_STATE } from '../onboardingVocab.js';
 
 const DEFAULT_TIME_LIMIT_S = 600; // 10 minutes
-
-/** The wizard's repo-scan sub-step states (`repoScanSubState`). Its own
- *  vocabulary, not the run/job/dim one in src/vocab. */
-export const SCAN_SUB_STATE = Object.freeze({ IDLE: 'idle', SCANNING: 'scanning', SCANNED: 'scanned', ERROR: 'error' });
 
 function initialState(initial = {}) {
   return {

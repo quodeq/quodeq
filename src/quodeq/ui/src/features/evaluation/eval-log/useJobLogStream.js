@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../../../strings/index.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
-
-// This hook's own SSE-connection lifecycle, distinct from the job/run status
-// vocabulary: 'done' here means "the stream closed", not JOB_STATUS.DONE
-// (though the two do coincide on a clean finish). Kept local rather than
-// forced into vocab/jobStatus.js.
-export const LOG_STREAM_STATUS = Object.freeze({
-  IDLE: 'idle', STREAMING: 'streaming', DONE: 'done', ERROR: 'error',
-});
+import { LOG_STREAM_STATUS } from '../evaluationVocab.js';
 
 const MAX_LINES = 5000;
 const INACTIVITY_MS = 60000;

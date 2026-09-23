@@ -3,10 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { usePublishQueries } from './usePublishQueries.js';
-import { usePublishPolling, PUBLISH_STATE } from './usePublishPolling.js';
+import { usePublishPolling } from './usePublishPolling.js';
+import { PUBLISH_STATE } from '../dashboardVocab.js';
 import { useApplyOptimisticPublish } from './publishOptimisticCache.js';
-
-export { PUBLISH_STATE };
 
 /**
  * usePublish -- publish action + job progress for local cards on the merged

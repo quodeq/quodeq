@@ -4,7 +4,7 @@ import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 import CloneTargetStep from './CloneTargetStep.jsx';
 import { RepoScanSummary } from './RepoScanSummary.jsx';
 import { useRepoScanStep } from '../../hooks/useRepoScanStep.js';
-import { SCAN_SUB_STATE } from '../../hooks/useWizardState.js';
+import { SCAN_SUB_STATE } from '../../onboardingVocab.js';
 import { t } from '../../../../strings/index.js';
 
 function RepoScanInputRow({ sub, state, actions, handleSubmit, setFolderBrowserOpen }) {
