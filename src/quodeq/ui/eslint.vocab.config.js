@@ -44,6 +44,11 @@ export default [
         { selector: `CallExpression[callee.property.name=/^(includes|has)$/] > ${VALUE}.arguments`, message: MESSAGE },
         { selector: `Property[key.name=/^(${KEYS.join('|')})$/] > ${VALUE}.value`, message: MESSAGE },
         { selector: `JSXAttribute[name.name=/^(${KEYS.join('|')})$/] > ${VALUE}`, message: MESSAGE },
+        // Write positions, symmetric with the reads above: `state = 'running'`,
+        // `row.status = 'done'`, `const severity = 'critical'`.
+        { selector: `AssignmentExpression[left.name=/^(${KEYS.join('|')})$/] > ${VALUE}.right`, message: MESSAGE },
+        { selector: `AssignmentExpression[left.property.name=/^(${KEYS.join('|')})$/] > ${VALUE}.right`, message: MESSAGE },
+        { selector: `VariableDeclarator[id.name=/^(${KEYS.join('|')})$/] > ${VALUE}.init`, message: MESSAGE },
       ],
     },
   },

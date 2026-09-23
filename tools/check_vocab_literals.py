@@ -5,8 +5,10 @@ Closed vocabularies (run state, job status, exit reason, severity, grade,
 file-done status, dimension state, provider) are StrEnums in one home module
 each (HOME_MODULES). Writing one of their values as a bare string where the
 code branches on it -- `s == "running"`, `s in {"done", "failed"}`,
-`case "cancelled":`, `status="done"`, `{"status": "done"}` -- is what this
-gate flags (maintainability M-MDF-1, and the typo class nothing else catches).
+`case "cancelled":`, `status="done"`, `{"status": "done"}` -- or writes it
+into a variable or attribute named for the vocabulary -- `self.status =
+"done"`, `state = "running"` -- is what this gate flags (maintainability
+M-MDF-1, and the typo class nothing else catches).
 The fix is the enum member: `s == RunState.RUNNING`.
 
 Not flagged: dict keys, f-strings, docstrings, log/message arguments, and
@@ -91,8 +93,32 @@ def _match_constants(pattern: ast.AST) -> list[ast.Constant]:
     return out
 
 
+def _is_vocab_target(node: ast.AST) -> bool:
+    """True for an assignment target named for one of the vocabularies."""
+    if isinstance(node, ast.Name):
+        return node.id in VOCAB_KEYWORDS
+    if isinstance(node, ast.Attribute):
+        return node.attr in VOCAB_KEYWORDS
+    return False
+
+
+def _assigned_constants(target: ast.AST, value: ast.AST | None) -> list[ast.Constant]:
+    """The vocabulary constants *value* writes into a vocabulary-named target.
+
+    A tuple target is paired with a tuple value element by element, so
+    ``grade, other = "Poor", x`` reports only the grade.
+    """
+    if value is None:
+        return []
+    if isinstance(target, (ast.Tuple, ast.List)):
+        if isinstance(value, (ast.Tuple, ast.List)) and len(target.elts) == len(value.elts):
+            return [c for t, v in zip(target.elts, value.elts) for c in _assigned_constants(t, v)]
+        return _vocab_constants(value) if any(_is_vocab_target(t) for t in target.elts) else []
+    return _vocab_constants(value) if _is_vocab_target(target) else []
+
+
 class _Finder(ast.NodeVisitor):
-    """Collects every vocabulary constant sitting in a branching position."""
+    """Collects every vocabulary constant sitting in a branching or write position."""
 
     def __init__(self) -> None:
         self.found: list[ast.Constant] = []
@@ -116,6 +142,19 @@ class _Finder(ast.NodeVisitor):
         for key, value in zip(node.keys, node.values):
             if isinstance(key, ast.Constant) and key.value in VOCAB_KEYWORDS:
                 self.found.extend(_vocab_constants(value))
+        self.generic_visit(node)
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        for target in node.targets:
+            self.found.extend(_assigned_constants(target, node.value))
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        self.found.extend(_assigned_constants(node.target, node.value))
+        self.generic_visit(node)
+
+    def visit_AugAssign(self, node: ast.AugAssign) -> None:
+        self.found.extend(_assigned_constants(node.target, node.value))
         self.generic_visit(node)
 
 

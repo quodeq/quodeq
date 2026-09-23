@@ -69,3 +69,26 @@ def test_non_vocabulary_words_are_not_flagged(tmp_path):
         'def f(s):\n    return s == "utf-8" or s in ("name", "type")\n',
     )
     assert check_vocab_literals.scan_tree(tmp_path / "src") == []
+
+
+def test_flags_writes_to_vocabulary_targets(tmp_path):
+    _write(tmp_path, "src/quodeq/services/x.py", (
+        'class C:\n'
+        '    def f(self, other):\n'
+        '        self.status = "done"\n'
+        '        state = "running"\n'
+        '        severity: str = "critical"\n'
+        '        grade, other.exit_reason = "Poor", "cancelled"\n'
+    ))
+    hits = check_vocab_literals.scan_tree(tmp_path / "src")
+    assert [(h.line, h.literal) for h in hits] == [
+        (3, "done"), (4, "running"), (5, "critical"), (6, "Poor"), (6, "cancelled"),
+    ]
+
+
+def test_writes_to_non_vocabulary_targets_are_not_flagged(tmp_path):
+    _write(
+        tmp_path, "src/quodeq/services/x.py",
+        'def f(obj):\n    name = "done"\n    obj.label = "running"\n    return name\n',
+    )
+    assert check_vocab_literals.scan_tree(tmp_path / "src") == []
