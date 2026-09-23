@@ -17,6 +17,6 @@ def _diag_path() -> Path:
 
 try:
     _diag_path().parent.mkdir(parents=True, exist_ok=True)
-    _diag = _diag_path().open("a", encoding="utf-8")  # noqa: SIM115 — lives for the process
+    diag = _diag_path().open("a", encoding="utf-8")  # noqa: SIM115 — lives for the process
 except OSError:
-    _diag = sys.stderr
+    diag = sys.stderr

@@ -82,19 +82,19 @@ def _fake_appkit_with_broken_app() -> types.ModuleType:
 
 def test_set_macos_app_identity_logs_bundle_patch_failure(monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "AppKit", _fake_appkit_with_broken_bundle())
-    monkeypatch.setattr(about, "_icon_path", lambda ext: None)  # stop after the bundle patch
+    monkeypatch.setattr(about, "icon_path", lambda ext: None)  # stop after the bundle patch
     messages: list[str] = []
     monkeypatch.setattr(about, "log_debug", messages.append)
-    about._set_macos_app_identity()
+    about.set_macos_app_identity()
     assert any("bundle name patch skipped" in m for m in messages)
 
 
 def test_set_macos_app_identity_logs_dock_icon_failure(monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "AppKit", _fake_appkit_with_broken_app())
-    monkeypatch.setattr(about, "_icon_path", lambda ext: "/tmp/fake.icns")
+    monkeypatch.setattr(about, "icon_path", lambda ext: "/tmp/fake.icns")
     messages: list[str] = []
     monkeypatch.setattr(about, "log_debug", messages.append)
-    about._set_macos_app_identity()
+    about.set_macos_app_identity()
     assert any("dock icon not set" in m for m in messages)
 
 
@@ -109,11 +109,11 @@ class _Raising:
 
 def test_set_app_icon_logs_windows_taskbar_failure(monkeypatch) -> None:
     monkeypatch.setattr(about.sys, "platform", "win32")
-    monkeypatch.setattr(about, "_icon_path", lambda ext: "quodeq.ico")
+    monkeypatch.setattr(about, "icon_path", lambda ext: "quodeq.ico")
     monkeypatch.setattr(ctypes, "windll", _Raising(), raising=False)
     messages: list[str] = []
     monkeypatch.setattr(about, "log_debug", messages.append)
-    about._set_app_icon()
+    about.set_app_icon()
     assert any("windows taskbar icon not set" in m for m in messages)
 
 
@@ -123,7 +123,7 @@ def test_kill_api_logs_when_process_is_already_gone(monkeypatch) -> None:
 
     monkeypatch.setattr(native_ops.os, "kill", _raise)
     with patch.object(native_ops._logger, "debug") as debug:
-        native_ops._kill_api(424242)  # signature: _kill_api(pid: int) -> None
+        native_ops.kill_api(424242)  # signature: _kill_api(pid: int) -> None
     assert debug.called
     assert "already gone" in debug.call_args.args[0]
 
@@ -170,7 +170,7 @@ def test_wait_for_process_logs_once_across_multiple_timeouts(monkeypatch) -> Non
         def wait(self, timeout=None):
             raise subprocess.TimeoutExpired("x", 1)
 
-    _process._wait_for_process(_FakeProcess())  # signature: (proc: subprocess.Popen) -> None
+    _process.wait_for_process(_FakeProcess())  # signature: (proc: subprocess.Popen) -> None
     # Two TimeoutExpired pacing iterations must yield exactly one debug log.
     assert len(messages) == 1
     assert "still running after" in messages[0]
@@ -193,7 +193,7 @@ def test_handle_tstp_logs_when_sigcont_kill_fails(monkeypatch) -> None:
 def test_serve_blocking_logs_on_keyboard_interrupt() -> None:
     mock_proc = MagicMock()
     mock_stop = MagicMock()
-    with patch.object(server, "_wait_for_process", side_effect=KeyboardInterrupt):
+    with patch.object(server, "wait_for_process", side_effect=KeyboardInterrupt):
         with patch.object(server._logger, "debug") as debug:
             server._serve_blocking(mock_proc, mock_stop)
     mock_stop.assert_called_once()
@@ -218,8 +218,8 @@ def test_apply_macos_fullscreen_chrome_logs_toolbar_failure(monkeypatch) -> None
     class _FakeWindow:
         native = _FakeNative()
 
-    monkeypatch.setattr(webview_window, "_set_macos_fullscreen_class", lambda *_a, **_k: None)
+    monkeypatch.setattr(webview_window, "set_macos_fullscreen_class", lambda *_a, **_k: None)
     with patch.object(webview_window._logger, "debug") as debug:
-        webview_window._apply_macos_fullscreen_chrome(_FakeWindow(), True)
+        webview_window.apply_macos_fullscreen_chrome(_FakeWindow(), True)
     assert debug.called
     assert "fullscreen chrome not applied" in debug.call_args.args[0]

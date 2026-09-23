@@ -45,7 +45,7 @@ def _setup_dashboard(
     (static_dist / "index.html").write_text("ok")
 
     monkeypatch.setattr(
-        runner, "_ensure_action_api",
+        runner, "ensure_action_api",
         lambda *_args, **_kwargs: (f"http://127.0.0.1:{TEST_PORT}", DummyProcess()),
     )
     hooks = DashboardHooks(

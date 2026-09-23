@@ -53,10 +53,10 @@ class TestKillStaleActionApi:
         pid_file.write_text(pid_file_body, encoding="utf-8")
         with patch("quodeq.dashboard._process._get_pid_file", return_value=pid_file), \
              patch("quodeq.dashboard._process.action_api_healthy", return_value=healthy) as health, \
-             patch("quodeq.dashboard._process._is_port_open", return_value=False), \
+             patch("quodeq.dashboard._process.port_is_open", return_value=False), \
              patch("quodeq.dashboard._process._terminate_pid") as kill:
-            from quodeq.dashboard._process import _kill_stale_action_api
-            _kill_stale_action_api("127.0.0.1", request_port)
+            from quodeq.dashboard._process import kill_stale_action_api
+            kill_stale_action_api("127.0.0.1", request_port)
         return kill, health, pid_file
 
     def test_healthy_api_is_left_alone(self, tmp_path):
@@ -105,14 +105,14 @@ class TestKillStaleActionApi:
 
 class TestWaitForProcess:
     def test_process_already_done(self):
-        from quodeq.dashboard._process import _wait_for_process
+        from quodeq.dashboard._process import wait_for_process
         proc = MagicMock()
         proc.poll.return_value = 0
-        _wait_for_process(proc)
+        wait_for_process(proc)
 
     def test_process_waits(self):
-        from quodeq.dashboard._process import _wait_for_process
+        from quodeq.dashboard._process import wait_for_process
         proc = MagicMock()
         proc.poll.side_effect = [None, 0]
         proc.wait.side_effect = [subprocess.TimeoutExpired("cmd", 5), 0]
-        _wait_for_process(proc)
+        wait_for_process(proc)

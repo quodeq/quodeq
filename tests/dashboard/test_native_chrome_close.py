@@ -24,7 +24,7 @@ class TestOnClosing:
         api._get_running_evaluation.return_value = job
         window = MagicMock()
         with patch.object(ww.sys, "platform", platform):
-            on_closing = ww._make_on_closing(api, window)
+            on_closing = ww.make_on_closing(api, window)
         return on_closing, window, api
 
     @staticmethod
@@ -40,7 +40,7 @@ class TestOnClosing:
 
     def test_no_job_closes_without_prompt(self):
         on_closing, window, api = self._wire(job=None)
-        with patch.object(wwc, "_ask_close_choice") as choose:
+        with patch.object(wwc, "ask_close_choice") as choose:
             assert on_closing() is True
         choose.assert_not_called()
 
@@ -50,7 +50,7 @@ class TestOnClosing:
         # the closing handler (which runs ON the GUI thread) self-deadlocks. The
         # handler vetoes this close and shows the dialog on a worker thread.
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(wwc, "_ask_close_choice", return_value="stay") as choose:
+        with patch.object(wwc, "ask_close_choice", return_value="stay") as choose:
             assert on_closing() is False
             self._join(on_closing)
         choose.assert_called_once()
@@ -65,7 +65,7 @@ class TestOnClosing:
             seen["tid"] = threading.get_ident()
             return "stay"
 
-        with patch.object(wwc, "_ask_close_choice", side_effect=_choose):
+        with patch.object(wwc, "ask_close_choice", side_effect=_choose):
             assert on_closing() is False
             self._join(on_closing)
         assert seen["tid"] != caller
@@ -82,7 +82,7 @@ class TestOnClosing:
             release.wait()
             return "keep"
 
-        with patch.object(wwc, "_ask_close_choice", side_effect=_choose):
+        with patch.object(wwc, "ask_close_choice", side_effect=_choose):
             result = []
             caller = threading.Thread(target=lambda: result.append(on_closing()))
             caller.start()
@@ -96,7 +96,7 @@ class TestOnClosing:
 
     def test_keep_scanning_closes_window_without_cancelling(self):
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(wwc, "_ask_close_choice", return_value="keep"):
+        with patch.object(wwc, "ask_close_choice", return_value="keep"):
             on_closing()
             self._join(on_closing)
         window.destroy.assert_called_once()
@@ -106,7 +106,7 @@ class TestOnClosing:
 
     def test_cancel_scan_and_quit_cancels_then_closes(self):
         on_closing, window, api = self._wire(job={"jobId": "job-42"})
-        with patch.object(wwc, "_ask_close_choice", return_value="cancel"):
+        with patch.object(wwc, "ask_close_choice", return_value="cancel"):
             on_closing()
             self._join(on_closing)
         api._cancel_evaluation.assert_called_once_with("job-42")
@@ -115,7 +115,7 @@ class TestOnClosing:
 
     def test_stay_keeps_window_open_and_can_reprompt(self):
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(wwc, "_ask_close_choice", return_value="stay") as choose:
+        with patch.object(wwc, "ask_close_choice", return_value="stay") as choose:
             assert on_closing() is False
             self._join(on_closing)
             window.destroy.assert_not_called()
@@ -139,7 +139,7 @@ class TestOnClosing:
             release.wait()
             return "keep"
 
-        with patch.object(wwc, "_ask_close_choice", side_effect=_choose):
+        with patch.object(wwc, "ask_close_choice", side_effect=_choose):
             assert on_closing() is False
             first_worker = on_closing._worker
             for _ in range(200):  # wait until the worker is actually prompting
@@ -167,7 +167,7 @@ class TestOnClosing:
             release.wait()
 
         api._cancel_evaluation.side_effect = _cancel
-        with patch.object(wwc, "_ask_close_choice", return_value="cancel") as choose:
+        with patch.object(wwc, "ask_close_choice", return_value="cancel") as choose:
             assert on_closing() is False
             first_worker = on_closing._worker
             assert cancel_started.wait(budget(2))  # worker is now inside the cancel call
@@ -184,7 +184,7 @@ class TestOnClosing:
         # If the choice can't be obtained, fall through to closing the window
         # (treat as 'keep') rather than leaving it un-closeable.
         on_closing, window, api = self._wire(job={"jobId": "x"})
-        with patch.object(wwc, "_ask_close_choice", side_effect=RuntimeError("no GUI")):
+        with patch.object(wwc, "ask_close_choice", side_effect=RuntimeError("no GUI")):
             assert on_closing() is False
             self._join(on_closing)
         window.destroy.assert_called_once()

@@ -60,7 +60,7 @@ class TestServeBlocking:
         mock_proc = MagicMock()
         mock_stop = MagicMock()
 
-        with patch("quodeq.dashboard._server._wait_for_process", side_effect=KeyboardInterrupt):
+        with patch("quodeq.dashboard._server.wait_for_process", side_effect=KeyboardInterrupt):
             _serve_blocking(mock_proc, mock_stop)
         mock_stop.assert_called_once()
 
@@ -77,7 +77,7 @@ class TestServeBlocking:
         from quodeq.dashboard._server import _serve_blocking
         mock_proc = MagicMock()
         mock_stop = MagicMock()
-        with patch("quodeq.dashboard._server._wait_for_process"):
+        with patch("quodeq.dashboard._server.wait_for_process"):
             _serve_blocking(mock_proc, mock_stop)
         mock_stop.assert_called_once()
 
@@ -129,7 +129,7 @@ class TestServeNative:
         mock_popen = MagicMock(return_value=window_proc)
 
         shell = self._shell(make_instance=lambda: mock_instance, spawn_window=mock_popen)
-        with patch.object(_webview_token, "_get_webview_token", return_value="s3cret-token"):
+        with patch.object(_webview_token, "get_webview_token", return_value="s3cret-token"):
             _serve_native("http://localhost:8000", mock_proc, MagicMock(), shell=shell)
 
         argv = mock_popen.call_args[0][0]
@@ -156,7 +156,7 @@ class TestServeNative:
         mock_popen = MagicMock(return_value=window_proc)
 
         shell = self._shell(make_instance=lambda: mock_instance, spawn_window=mock_popen)
-        with patch.object(_webview_token, "_get_webview_token", return_value="s3cret-token"):
+        with patch.object(_webview_token, "get_webview_token", return_value="s3cret-token"):
             _serve_native("http://localhost:8000", MagicMock(), MagicMock(), shell=shell)
 
         window_proc.stdin.close.assert_called_once()

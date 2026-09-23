@@ -36,7 +36,7 @@ def test_detect_memory_logs_and_returns_zero(monkeypatch) -> None:
     monkeypatch.setattr(_ollama.platform, "system", lambda: "Linux")
     monkeypatch.setattr(_ollama.subprocess, "check_output", _missing)
     with patch.object(_ollama._log, "debug") as debug:
-        assert _ollama._detect_memory() == 0
+        assert _ollama.detect_memory() == 0
     assert debug.called
     assert "memory detection failed" in debug.call_args.args[0]
 

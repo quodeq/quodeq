@@ -17,12 +17,12 @@ if TYPE_CHECKING:
 
 from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
-from quodeq.dashboard._networking import _choose_ui_port
+from quodeq.dashboard._networking import choose_ui_port
 from quodeq.dashboard._probes import ApiProbes, DashboardHooks
 from quodeq.dashboard import _server as _server_mod
 from quodeq.dashboard._server import (
-    _ensure_action_api,
-    _ensure_action_api_forced,
+    ensure_action_api,
+    ensure_action_api_forced,
 )
 from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.config_loader import get_default_host as _get_default_host
@@ -60,7 +60,7 @@ def _resolve_paths_and_build(
     reports_dir = resolve_path(str(config.reports_dir))
     repo_root = resolve_path(str(config.repo_root))
 
-    chosen_port = _choose_ui_port(config.server.port)
+    chosen_port = choose_ui_port(config.server.port)
     if chosen_port != config.server.port:
         log_warning(f"Port {config.server.port} is in use. Using {chosen_port} instead.")
 
@@ -109,12 +109,12 @@ def _start_action_api(
     action_api_host = config.server.api_host or _get_default_host()
     action_api_port = config.server.api_port or config.server.port
     if config.server.api_forced:
-        return _ensure_action_api_forced(
+        return ensure_action_api_forced(
             action_api_host, action_api_port, static_dist=api_config.static_dist,
             evaluations_dir=api_config.evaluations_dir, probes=probes,
         )
     hooks.kill_stale(action_api_host, action_api_port)
-    return _ensure_action_api(
+    return ensure_action_api(
         action_api_host, action_api_port, api_config=api_config, probes=probes,
     )
 

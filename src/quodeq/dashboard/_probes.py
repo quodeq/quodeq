@@ -24,8 +24,8 @@ from typing import TYPE_CHECKING
 from quodeq.dashboard._api_health_check import action_api_healthy
 from quodeq.dashboard._build import maybe_build_ui
 from quodeq.dashboard._instance import InstanceController
-from quodeq.dashboard._networking import _is_port_open, _local_hosts
-from quodeq.dashboard._process import _kill_stale_action_api, _spawn_and_wait_local
+from quodeq.dashboard._networking import port_is_open, local_host_names
+from quodeq.dashboard._process import kill_stale_action_api, spawn_and_wait_local
 from quodeq.shared.prereqs import check_dashboard_dev_prereqs
 
 if TYPE_CHECKING:
@@ -36,11 +36,11 @@ if TYPE_CHECKING:
 class ApiProbes:
     """Injectable seam for ``_server.py``'s API-startup collaborators."""
 
-    is_port_open: Callable[[str, int], bool] = _is_port_open
+    is_port_open: Callable[[str, int], bool] = port_is_open
     api_healthy: Callable[[str], bool] = action_api_healthy
-    local_hosts: Callable[..., frozenset[str]] = _local_hosts
-    kill_stale: Callable[[str, int], None] = _kill_stale_action_api
-    spawn: Callable[[int, str, "ApiConfig | None"], tuple[str, "subprocess.Popen"]] = _spawn_and_wait_local
+    local_hosts: Callable[..., frozenset[str]] = local_host_names
+    kill_stale: Callable[[str, int], None] = kill_stale_action_api
+    spawn: Callable[[int, str, "ApiConfig | None"], tuple[str, "subprocess.Popen"]] = spawn_and_wait_local
 
 
 @dataclass(frozen=True)
@@ -52,7 +52,7 @@ class DashboardHooks:
     resolves to ``_start_action_api`` at the ``run_dashboard`` call site.
     """
 
-    kill_stale: Callable[[str, int], None] = _kill_stale_action_api
+    kill_stale: Callable[[str, int], None] = kill_stale_action_api
     ensure_api: Callable[..., tuple[str, "subprocess.Popen | None"]] | None = None
     build_ui: Callable[..., Path] = maybe_build_ui
     check_prereqs: Callable[[], None] = check_dashboard_dev_prereqs

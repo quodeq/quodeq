@@ -1,38 +1,38 @@
 """macOS app identity: dock icon, bundle name, and the rich About panel.
 
-The webview's user-agent string lives in ``_webview_user_agent`` and is
+The webview's user-agent string lives in ``webview_user_agent`` and is
 re-exported here, where ``_webview_window`` and the drift tests have always
 imported it from.
 
 The About-panel install writes its progress to the webview diagnostic log
-(``_webview_diag``), which this module re-exports as ``_diag`` for the help
+(``_webview_diag``), which this module re-exports as ``diag`` for the help
 menu that writes to the same file.
 
 Leaf module for _webview_window.py — self-contained AppKit setup with no
 patch-tested cross-function co-location requirements (see
 tests/dashboard/test_native_chrome.py's TestMacAppIdentityIdempotent, which
-only calls _set_macos_app_identity directly). The facade re-exports
-_set_macos_app_identity and _icon_path, which it also calls itself.
+only calls set_macos_app_identity directly). The facade re-exports
+set_macos_app_identity and icon_path, which it also calls itself.
 """
 from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from quodeq.dashboard._webview_diag import _diag
+from quodeq.dashboard._webview_diag import diag
 from quodeq.dashboard._webview_user_agent import (
-    _WEBVIEW_TOKEN_UA_PREFIX, _WEBVIEW_UA_MARKER, _quodeq_version,
-    _webview_user_agent,
+    WEBVIEW_TOKEN_UA_PREFIX, WEBVIEW_UA_MARKER, quodeq_version,
+    webview_user_agent,
 )
 from quodeq.shared.logging import log_debug
 
 __all__ = [
-    "_icon_path", "_install_about_panel_override", "_set_app_icon",
-    "_set_macos_app_identity",
+    "icon_path", "install_about_panel_override", "set_app_icon",
+    "set_macos_app_identity",
     # Re-exported: _webview_window and the drift tests have always imported
     # these from here.
-    "_WEBVIEW_TOKEN_UA_PREFIX", "_WEBVIEW_UA_MARKER", "_diag",
-    "_quodeq_version", "_webview_user_agent",
+    "WEBVIEW_TOKEN_UA_PREFIX", "WEBVIEW_UA_MARKER", "diag",
+    "quodeq_version", "webview_user_agent",
 ]
 
 _APP_DISPLAY_NAME = "quodeq"
@@ -53,7 +53,7 @@ _QUODEQ_WEBSITE = "https://quodeq.com"
 _QUODEQ_REPO = "https://github.com/quodeq/quodeq"
 
 
-def _icon_path(ext: str) -> str | None:
+def icon_path(ext: str) -> str | None:
     """Resolve the quodeq icon path for the given extension (.icns or .ico).
 
     Icons live in package data (`quodeq/data/icons/`) so they ship in the
@@ -102,13 +102,13 @@ def _build_about_credits() -> object | None:
 
 def _build_about_handler() -> object:
     """Build (but do not install) the ObjC handler whose showAbout_ shows the
-    rich About panel. Split out of _install_about_panel_override so neither
+    rich About panel. Split out of install_about_panel_override so neither
     half exceeds the function-size cap.
     """
     from AppKit import NSApplication, NSObject  # noqa: PLC0415
 
     import datetime as _dt  # noqa: PLC0415
-    version = _quodeq_version()
+    version = quodeq_version()
     copyright_line = f"© {_dt.date.today().year} quodeq"
 
     class _AboutHandler(NSObject):
@@ -151,7 +151,7 @@ def _stop_poll_timer(state: dict) -> None:
 
 def _schedule_about_install_poller(target: object) -> None:
     """Poll (via NSTimer) until the About menu item exists, then retarget it
-    at *target*. See _install_about_panel_override for why polling is needed.
+    at *target*. See install_about_panel_override for why polling is needed.
     """
     from AppKit import NSApplication, NSObject  # noqa: PLC0415
     from Foundation import NSTimer  # noqa: PLC0415
@@ -166,21 +166,21 @@ def _schedule_about_install_poller(target: object) -> None:
             if main_menu is None or main_menu.numberOfItems() == 0:
                 if state["attempts"] >= max_attempts:
                     print(f"[quodeq-about] gave up after {state['attempts']} attempts — no main menu",
-                          file=_diag, flush=True)
+                          file=diag, flush=True)
                     _stop_poll_timer(state)
                 return
             about_items = _find_about_items(main_menu)
             if not about_items:
                 if state["attempts"] >= max_attempts:
                     print(f"[quodeq-about] gave up — no About item found after {state['attempts']} attempts",
-                          file=_diag, flush=True)
+                          file=diag, flush=True)
                     _stop_poll_timer(state)
                 return
             for item in about_items:
                 item.setTarget_(target)
                 item.setAction_("showAbout:")
             print(f"[quodeq-about] retargeted {len(about_items)} About item(s) on attempt {state['attempts']}",
-                  file=_diag, flush=True)
+                  file=diag, flush=True)
             _stop_poll_timer(state)
 
     poller = _InstallPoller.alloc().init()
@@ -192,10 +192,10 @@ def _schedule_about_install_poller(target: object) -> None:
         )
         state["timer"] = timer
     except (AttributeError, ValueError) as exc:
-        print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=_diag, flush=True)
+        print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=diag, flush=True)
 
 
-def _install_about_panel_override() -> None:
+def install_about_panel_override() -> None:
     """Point the Apple-menu 'About …' at a handler that shows a rich panel.
 
     The app main menu is built lazily by NSApp during the Cocoa run loop.
@@ -219,7 +219,7 @@ def _install_about_panel_override() -> None:
     _schedule_about_install_poller(_STATE.about_target)
 
 
-def _set_macos_app_identity() -> None:
+def set_macos_app_identity() -> None:
     """Set dock icon, menu-bar app name, and About-panel icon on macOS.
 
     Called both at startup (early) and after pywebview is shown — pywebview
@@ -246,7 +246,7 @@ def _set_macos_app_identity() -> None:
             info["CFBundleDisplayName"] = _APP_DISPLAY_NAME
     except (AttributeError, TypeError) as exc:
         log_debug(f"bundle name patch skipped: {exc}")
-    path = _icon_path(".icns")
+    path = icon_path(".icns")
     if not path:
         return
     try:
@@ -264,17 +264,17 @@ def _set_macos_app_identity() -> None:
     # standard panel reads from Info.plist and ignores setApplicationIconImage_
     # for non-bundled apps, so we wire a custom action on the first-responder
     # chain using orderFrontStandardAboutPanelWithOptions_.
-    _install_about_panel_override()
+    install_about_panel_override()
 
 
-def _set_app_icon() -> None:
+def set_app_icon() -> None:
     """Set the application icon (dock on macOS, taskbar on Windows)."""
     if sys.platform == "darwin":
-        _set_macos_app_identity()
+        set_macos_app_identity()
     elif sys.platform == "win32":
         try:
             import ctypes  # noqa: PLC0415
-            path = _icon_path(".ico")
+            path = icon_path(".ico")
             if path:
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("quodeq.dashboard")
                 # Load icon and set for the process

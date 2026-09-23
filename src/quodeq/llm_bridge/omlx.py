@@ -19,7 +19,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.config.llm_bridge_env import omlx_api_key, omlx_base_url
-from quodeq.llm_bridge._ollama import DEFAULT_MEMORY_FRACTION, _detect_memory, estimate_max_agents
+from quodeq.llm_bridge._ollama import DEFAULT_MEMORY_FRACTION, detect_memory, estimate_max_agents
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ def list_omlx_models(base_url: str | None = None, api_key: str | None = None) ->
 
 def run_concurrency_test(_model: str, base_url: str | None = None, api_key: str | None = None) -> dict:
     """Estimate max parallel agents for the omlx server."""
-    gpu_memory = _detect_memory()
+    gpu_memory = detect_memory()
     models = list_omlx_models(base_url, api_key)
     if not models:
         return {

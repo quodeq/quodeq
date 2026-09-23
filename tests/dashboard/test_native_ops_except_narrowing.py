@@ -1,9 +1,9 @@
 """Except narrowing for two `_webview_window_native_ops`
 call sites (R-FT-7):
 
-* ``_fetch_running_evaluation`` (urllib fetch + ``json.loads``) — narrowed
+* ``fetch_running_evaluation`` (urllib fetch + ``json.loads``) — narrowed
   from bare ``Exception`` to ``(OSError, ValueError)``.
-* ``_download_via_dialog`` (urllib fetch + file write) — the tuple
+* ``download_via_dialog`` (urllib fetch + file write) — the tuple
   ``(OSError, Exception)`` was a no-op (``OSError`` is already an
   ``Exception`` subclass); narrowed to plain ``OSError``, matching
   ``_save_via_dialog``'s equivalent file-write catch immediately above it.
@@ -16,13 +16,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from quodeq.dashboard._webview_window import (
-    _download_via_dialog,
-    _fetch_running_evaluation,
+    download_via_dialog,
+    fetch_running_evaluation,
 )
 
 
 # ---------------------------------------------------------------------------
-# _fetch_running_evaluation
+# fetch_running_evaluation
 # ---------------------------------------------------------------------------
 
 
@@ -33,7 +33,7 @@ class TestFetchRunningEvaluationExceptNarrowing:
             "urllib.request.urlopen",
             side_effect=urllib.error.URLError("connection refused"),
         ):
-            assert _fetch_running_evaluation("http://127.0.0.1:7863") is None
+            assert fetch_running_evaluation("http://127.0.0.1:7863") is None
 
     def test_malformed_json_is_caught_and_returns_none(self):
         """A realistic response-shape failure (non-JSON body) is swallowed."""
@@ -43,18 +43,18 @@ class TestFetchRunningEvaluationExceptNarrowing:
         mock_response.__exit__.return_value = False
 
         with patch("urllib.request.urlopen", return_value=mock_response):
-            assert _fetch_running_evaluation("http://127.0.0.1:7863") is None
+            assert fetch_running_evaluation("http://127.0.0.1:7863") is None
 
     def test_out_of_scope_error_propagates(self):
         """R-FT-7 — an error outside (OSError, ValueError) (e.g. a
         programming bug) must now propagate instead of being swallowed."""
         with patch("urllib.request.urlopen", side_effect=RuntimeError("boom")):
             with pytest.raises(RuntimeError, match="boom"):
-                _fetch_running_evaluation("http://127.0.0.1:7863")
+                fetch_running_evaluation("http://127.0.0.1:7863")
 
 
 # ---------------------------------------------------------------------------
-# _download_via_dialog
+# download_via_dialog
 # ---------------------------------------------------------------------------
 
 
@@ -74,7 +74,7 @@ class TestDownloadViaDialogExceptNarrowing:
         mock_response.__exit__.return_value = False
 
         with patch("urllib.request.urlopen", return_value=mock_response):
-            result = _download_via_dialog(
+            result = download_via_dialog(
                 window, "http://127.0.0.1:7863", "/api/export", "output.txt",
             )
 
@@ -87,7 +87,7 @@ class TestDownloadViaDialogExceptNarrowing:
             "urllib.request.urlopen",
             side_effect=urllib.error.URLError("connection refused"),
         ):
-            result = _download_via_dialog(
+            result = download_via_dialog(
                 window, "http://127.0.0.1:7863", "/api/export", "output.txt",
             )
 
@@ -102,7 +102,7 @@ class TestDownloadViaDialogExceptNarrowing:
 
         with patch("urllib.request.urlopen", side_effect=RuntimeError("boom")):
             with pytest.raises(RuntimeError, match="boom"):
-                _download_via_dialog(
+                download_via_dialog(
                     window, "http://127.0.0.1:7863", "/api/export", "output.txt",
                 )
 
@@ -120,7 +120,7 @@ class TestDownloadViaDialogExceptNarrowing:
         mock_response.__exit__.return_value = False
 
         with patch("urllib.request.urlopen", return_value=mock_response):
-            result = _download_via_dialog(
+            result = download_via_dialog(
                 window, "http://127.0.0.1:7863", "/api/export", "output.txt",
             )
 
@@ -132,7 +132,7 @@ class TestDownloadViaDialogExceptNarrowing:
         window = self._window(str(tmp_path / "output.txt"))
 
         with patch("urllib.request.urlopen", side_effect=ValueError("unknown url type")):
-            result = _download_via_dialog(
+            result = download_via_dialog(
                 window, "http://127.0.0.1:7863", "/api/export", "output.txt",
             )
 

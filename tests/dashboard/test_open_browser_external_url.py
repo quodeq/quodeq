@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 from quodeq.dashboard import _webview_window as ww
 
 
-def _bound_api(base_url: str = "http://127.0.0.1:7863") -> ww._WindowApi:
-    api = ww._WindowApi()
+def _bound_api(base_url: str = "http://127.0.0.1:7863") -> ww.WindowApi:
+    api = ww.WindowApi()
     api.bind(MagicMock(), base_url=base_url)
     return api
 

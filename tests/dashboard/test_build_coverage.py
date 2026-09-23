@@ -51,7 +51,7 @@ class TestMaybeBuildUi:
         dev_static.mkdir()
         (dev_static / "index.html").write_text("<html></html>")
         with patch("quodeq.dashboard._build.resolve_dev_source", return_value=dev_source), \
-             patch("quodeq.dashboard._build._dev_static_dir", return_value=dev_static):
+             patch("quodeq.dashboard._build.dev_static_dir", return_value=dev_static):
             result = maybe_build_ui(no_build=True, reinstall=False, dev=True)
             assert result == dev_static
 
@@ -61,7 +61,7 @@ class TestMaybeBuildUi:
         dev_source.mkdir()
         dev_static = tmp_path / "dev_static"
         with patch("quodeq.dashboard._build.resolve_dev_source", return_value=dev_source), \
-             patch("quodeq.dashboard._build._dev_static_dir", return_value=dev_static):
+             patch("quodeq.dashboard._build.dev_static_dir", return_value=dev_static):
             with pytest.raises(FileNotFoundError, match="No cached"):
                 maybe_build_ui(no_build=True, reinstall=False, dev=True)
 
@@ -71,7 +71,7 @@ class TestMaybeBuildUi:
         dev_source.mkdir()
         dev_static = tmp_path / "dev_static"
         with patch("quodeq.dashboard._build.resolve_dev_source", return_value=dev_source), \
-             patch("quodeq.dashboard._build._dev_static_dir", return_value=dev_static), \
+             patch("quodeq.dashboard._build.dev_static_dir", return_value=dev_static), \
              patch("quodeq.dashboard._build.needs_rebuild", return_value=False), \
              patch("quodeq.dashboard._build.run_npm_build") as mock_build:
             result = maybe_build_ui(no_build=False, reinstall=False, dev=True)
@@ -84,7 +84,7 @@ class TestMaybeBuildUi:
         dev_source.mkdir()
         dev_static = tmp_path / "dev_static"
         with patch("quodeq.dashboard._build.resolve_dev_source", return_value=dev_source), \
-             patch("quodeq.dashboard._build._dev_static_dir", return_value=dev_static), \
+             patch("quodeq.dashboard._build.dev_static_dir", return_value=dev_static), \
              patch("quodeq.dashboard._build.needs_rebuild", return_value=True), \
              patch("quodeq.dashboard._build.run_npm_build") as mock_build, \
              patch("quodeq.dashboard._build.compute_source_hash", return_value="abc123"):
@@ -95,13 +95,13 @@ class TestMaybeBuildUi:
 
 class TestBuildNpmHelpers:
     def test_quodeq_dir_default(self):
-        from quodeq.dashboard._build_npm import _quodeq_dir
-        result = _quodeq_dir(env={})
+        from quodeq.dashboard._build_npm import quodeq_dir
+        result = quodeq_dir(env={})
         assert result == Path.home() / ".quodeq"
 
     def test_quodeq_dir_from_env(self, tmp_path):
-        from quodeq.dashboard._build_npm import _quodeq_dir
-        result = _quodeq_dir(env={"QUODEQ_DIR": str(tmp_path)})
+        from quodeq.dashboard._build_npm import quodeq_dir
+        result = quodeq_dir(env={"QUODEQ_DIR": str(tmp_path)})
         assert result == tmp_path
 
     def test_sync_source_to_workdir(self, tmp_path):
@@ -112,7 +112,7 @@ class TestBuildNpmHelpers:
         (source / "src" / "file.ts").write_text("code")
         (source / "package.json").write_text("{}")
         workdir = tmp_path / "workdir"
-        with patch("quodeq.dashboard._build_npm._SYNC_ITEMS", ["src", "package.json"]):
+        with patch("quodeq.dashboard._build_npm.SYNC_ITEMS", ["src", "package.json"]):
             sync_source_to_workdir(source, workdir)
             assert (workdir / "package.json").exists()
             assert (workdir / "src" / "file.ts").exists()

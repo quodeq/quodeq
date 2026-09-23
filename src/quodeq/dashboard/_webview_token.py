@@ -11,12 +11,12 @@ import typing
 _logger = logging.getLogger(__name__)
 # Env var read by quodeq.api.security to gate the webview-only CSP
 # relaxation. Must match quodeq.api.security._ENV_WEBVIEW_TOKEN.
-_ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
+ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
 
 _webview_token: str | None = None
 
 
-def _get_webview_token() -> str:
+def get_webview_token() -> str:
     """Return this process's launch token, generating it on first use.
 
     Memoized so the API subprocess (started via _ensure_action_api[_forced],
@@ -30,7 +30,7 @@ def _get_webview_token() -> str:
     return _webview_token
 
 
-def _warn_reused_api_token_mismatch(base_url: str) -> None:
+def warn_reused_api_token_mismatch(base_url: str) -> None:
     """Explain why the desktop shell's CSP relaxation will not be granted.
 
     The token is only handed to an API process we spawn ourselves. A reused
@@ -76,7 +76,7 @@ def _send_token(window_proc: subprocess.Popen | None) -> None:
     if stdin is None:
         return
     try:
-        stdin.write(f"{_get_webview_token()}\n".encode())
+        stdin.write(f"{get_webview_token()}\n".encode())
         stdin.flush()
     except (OSError, ValueError) as exc:
         _logger.debug("webview token handoff failed: %s", exc)

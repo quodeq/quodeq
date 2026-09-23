@@ -61,7 +61,7 @@ def test_force_action_api_host_port(monkeypatch):
         captured["port"] = port
         return f"http://{host}:{port}", FakeProcess()
 
-    monkeypatch.setattr(runner, "_ensure_action_api_forced", fake_ensure)
+    monkeypatch.setattr(runner, "ensure_action_api_forced", fake_ensure)
     monkeypatch.setattr(runner, "validate_paths", lambda *_args, **_kwargs: None)
     hooks = DashboardHooks(
         build_ui=lambda *_args, **_kwargs: Path("ui/web/dist"),

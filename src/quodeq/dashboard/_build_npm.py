@@ -9,7 +9,7 @@ from pathlib import Path
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.logging import log_info
 
-from quodeq.dashboard._build_hash import _SYNC_ITEMS
+from quodeq.dashboard._build_hash import SYNC_ITEMS
 
 
 def _npm_install_timeout_s(env: Mapping[str, str] | None = None) -> int:
@@ -22,28 +22,28 @@ def _npm_build_timeout_s(env: Mapping[str, str] | None = None) -> int:
     return int(resolve_env(env).get("QUODEQ_NPM_BUILD_TIMEOUT_S", "600"))
 
 
-def _quodeq_dir(env: Mapping[str, str] | None = None) -> Path:
+def quodeq_dir(env: Mapping[str, str] | None = None) -> Path:
     """Return the base Quodeq directory, overridable via QUODEQ_DIR env var."""
     return Path(resolve_env(env).get("QUODEQ_DIR", str(Path.home() / ".quodeq")))
 
 
-def _build_workdir() -> Path:
-    return _quodeq_dir() / "ui_build"
+def build_workdir() -> Path:
+    return quodeq_dir() / "ui_build"
 
 
-def _static_dir() -> Path:
-    return _quodeq_dir() / "static"
+def default_static_dir() -> Path:
+    return quodeq_dir() / "static"
 
 
-def _dev_static_dir() -> Path:
-    return _quodeq_dir() / "static-dev"
+def dev_static_dir() -> Path:
+    return quodeq_dir() / "static-dev"
 
 
-def _dev_build_workdir() -> Path:
-    return _quodeq_dir() / "ui_build_dev"
+def dev_build_workdir() -> Path:
+    return quodeq_dir() / "ui_build_dev"
 
 
-def _get_ui_source_dir() -> Path:
+def get_ui_source_dir() -> Path:
     """Return the path to the UI source bundled inside the package."""
     return Path(__file__).resolve().parent.parent / "ui"
 
@@ -54,7 +54,7 @@ def sync_source_to_workdir(source_dir: Path, workdir: Path) -> None:
     Preserves ``node_modules/`` in *workdir* if it already exists.
     """
     workdir.mkdir(parents=True, exist_ok=True)
-    for item_name in _SYNC_ITEMS:
+    for item_name in SYNC_ITEMS:
         src_item = source_dir / item_name
         dst_item = workdir / item_name
         if not src_item.exists():
@@ -83,7 +83,7 @@ def run_npm_build(
 
     log_info("Installing npm dependencies...")
     # Use `npm ci` to enforce lockfile-pinned installs (refuses to mutate
-    # package-lock.json, errors if it's out of sync). `_SYNC_ITEMS` in
+    # package-lock.json, errors if it's out of sync). `SYNC_ITEMS` in
     # `_build_hash.py` copies package-lock.json into the workdir before this
     # runs, so a lockfile is always present. `--no-audit` skips the live,
     # uncached POST to the npm advisories endpoint, which is purely

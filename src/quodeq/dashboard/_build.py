@@ -17,17 +17,17 @@ from quodeq.shared.logging import log_info
 
 # Re-exports so existing importers keep working
 from quodeq.dashboard._build_hash import (
-    _HASH_FILE,
+    HASH_FILE,
     compute_source_hash,
     needs_rebuild,
 )
 from quodeq.dashboard._build_npm import (  # noqa: F401
-    _build_workdir,
-    _dev_build_workdir,
-    _dev_static_dir,
-    _get_ui_source_dir,
-    _quodeq_dir,
-    _static_dir,
+    build_workdir,
+    dev_build_workdir,
+    dev_static_dir,
+    get_ui_source_dir,
+    quodeq_dir,
+    default_static_dir,
     resolve_dev_source,
     run_npm_build,
     sync_source_to_workdir,
@@ -62,7 +62,7 @@ def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
     """
     if dev:
         source_dir = resolve_dev_source()
-        static_dir = _dev_static_dir()
+        static_dir = dev_static_dir()
         log_info(f"Dev mode: building from {source_dir}")
 
         if no_build:
@@ -80,7 +80,7 @@ def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
         log_info("Building web UI (source changed)...")
         static_dir.mkdir(parents=True, exist_ok=True)
         run_npm_build(source_dir, static_dir)
-        (static_dir / _HASH_FILE).write_text(compute_source_hash(source_dir), encoding="utf-8")
+        (static_dir / HASH_FILE).write_text(compute_source_hash(source_dir), encoding="utf-8")
         return static_dir
 
     # Production: the wheel ships a pre-built UI. Never invoke npm here.

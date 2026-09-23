@@ -3,7 +3,7 @@ from quodeq.dashboard._build import (
     compute_source_hash,
     needs_rebuild,
     sync_source_to_workdir,
-    _HASH_FILE,
+    HASH_FILE,
 )
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
 import pytest
@@ -58,7 +58,7 @@ class TestNeedsRebuild:
         static.mkdir()
         (static / "index.html").write_text("ok")
         current_hash = compute_source_hash(src)
-        (static / _HASH_FILE).write_text(current_hash)
+        (static / HASH_FILE).write_text(current_hash)
         assert needs_rebuild(src, static, False) is False
 
     def test_reinstall_forces_rebuild(self, tmp_path):
@@ -69,7 +69,7 @@ class TestNeedsRebuild:
         static.mkdir()
         (static / "index.html").write_text("ok")
         current_hash = compute_source_hash(src)
-        (static / _HASH_FILE).write_text(current_hash)
+        (static / HASH_FILE).write_text(current_hash)
         assert needs_rebuild(src, static, True) is True
 
 
@@ -119,7 +119,7 @@ class TestVersionTriggersRebuild:
         (static / "index.html").write_text("ok")
         # Write hash for current version
         current_hash = compute_source_hash(src)
-        (static / _HASH_FILE).write_text(current_hash)
+        (static / HASH_FILE).write_text(current_hash)
         assert needs_rebuild(src, static, False) is False
         # Simulate version upgrade
         with patch("quodeq.dashboard._build_hash.__version__", "99.0.0"):
@@ -162,7 +162,7 @@ class TestStaticDistDefaulted:
             build_ui=fake_build, check_prereqs=lambda: None, kill_stale=lambda *a, **k: None,
         )
         monkeypatch.setattr(
-            runner, "_ensure_action_api",
+            runner, "ensure_action_api",
             lambda *a, **k: ("http://127.0.0.1:7863", DummyProcess()),
         )
         monkeypatch.setattr(_server_mod, "serve_and_wait", lambda *a: None)
@@ -187,7 +187,7 @@ class TestStaticDistDefaulted:
             build_ui=fake_build, check_prereqs=lambda: None, kill_stale=lambda *a, **k: None,
         )
         monkeypatch.setattr(
-            runner, "_ensure_action_api",
+            runner, "ensure_action_api",
             lambda *a, **k: ("http://127.0.0.1:7863", DummyProcess()),
         )
         monkeypatch.setattr(_server_mod, "serve_and_wait", lambda *a: None)

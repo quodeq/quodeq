@@ -14,44 +14,44 @@ class TestOnClosingChoice:
     def test_ask_close_choice_macos_dispatches_to_native_alert(self):
         window = MagicMock()
         with patch.object(ww.sys, "platform", "darwin"), \
-             patch.object(wwc, "_macos_confirm_close", return_value="cancel") as mac:
-            assert ww._ask_close_choice(window) == "cancel"
+             patch.object(wwc, "macos_confirm_close", return_value="cancel") as mac:
+            assert ww.ask_close_choice(window) == "cancel"
         mac.assert_called_once_with(window)
 
     def test_ask_close_choice_non_macos_ok_is_keep(self):
         window = MagicMock()
         window.create_confirmation_dialog.return_value = True
         with patch.object(ww.sys, "platform", "linux"):
-            assert ww._ask_close_choice(window) == "keep"
+            assert ww.ask_close_choice(window) == "keep"
 
     def test_ask_close_choice_non_macos_cancel_is_stay(self):
         window = MagicMock()
         window.create_confirmation_dialog.return_value = False
         with patch.object(ww.sys, "platform", "linux"):
-            assert ww._ask_close_choice(window) == "stay"
+            assert ww.ask_close_choice(window) == "stay"
 
     def test_ask_close_choice_non_macos_dialog_error_is_keep(self):
         window = MagicMock()
         window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
         with patch.object(ww.sys, "platform", "linux"):
-            assert ww._ask_close_choice(window) == "keep"
+            assert ww.ask_close_choice(window) == "keep"
 
     # --- NSAlert return -> choice mapping (pure) ----------------------------
 
     def test_alert_return_to_choice_mapping(self):
-        assert ww._alert_return_to_choice(1000, 1000, 1001) == "keep"
-        assert ww._alert_return_to_choice(1001, 1000, 1001) == "cancel"
-        assert ww._alert_return_to_choice(1002, 1000, 1001) == "stay"
+        assert ww.alert_return_to_choice(1000, 1000, 1001) == "keep"
+        assert ww.alert_return_to_choice(1001, 1000, 1001) == "cancel"
+        assert ww.alert_return_to_choice(1002, 1000, 1001) == "stay"
 
     def test_macos_confirm_close_off_macos_is_safe_default(self):
         # macOS-only path: off darwin it must degrade without touching AppKit.
         with patch.object(ww.sys, "platform", "linux"):
-            assert ww._macos_confirm_close(MagicMock()) == "keep"
+            assert ww.macos_confirm_close(MagicMock()) == "keep"
 
     # --- _cancel_evaluation -------------------------------------------------
 
     def test_cancel_evaluation_issues_delete_with_origin(self):
-        api = ww._WindowApi()
+        api = ww.WindowApi()
         api._base_url = "http://127.0.0.1:7863"
         captured = {}
 
@@ -75,7 +75,7 @@ class TestOnClosingChoice:
         assert captured["origin"] == "http://127.0.0.1:7863"
 
     def test_cancel_evaluation_noop_without_job_or_base_url(self):
-        api = ww._WindowApi()
+        api = ww.WindowApi()
         with patch("urllib.request.urlopen") as uo:
             api._base_url = ""
             api._cancel_evaluation("job-42")   # no base url
@@ -87,7 +87,7 @@ class TestOnClosingChoice:
         # Best-effort: a failed cancel must not propagate (the worker destroys
         # the window right after, so a raise would trap the user mid-close).
         import urllib.error
-        api = ww._WindowApi()
+        api = ww.WindowApi()
         api._base_url = "http://127.0.0.1:7863"
         with patch("urllib.request.urlopen",
                     side_effect=urllib.error.URLError("boom")):
@@ -125,7 +125,7 @@ class TestMacConfirmClose:
              patch.object(AppHelper, "callAfter", side_effect=lambda f, *a: f()), \
              patch.object(ww.sys, "platform", "darwin"):
             NSAlert.alloc.return_value.init.return_value = alert
-            choice = ww._macos_confirm_close(MagicMock())
+            choice = ww.macos_confirm_close(MagicMock())
         return choice, added, keyeq
 
     def test_buttons_added_in_order_keep_cancel_stay(self):

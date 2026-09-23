@@ -22,8 +22,8 @@ from quodeq.menubar._process import (
     kill_port_processes as _kill_port_processes,
     open_stderr_log as _open_stderr_log,
     wait_for_dashboard as _wait_for_dashboard,
-    _ERROR_DISPLAY_MAX,
-    _STDERR_READ_MAX,
+    ERROR_DISPLAY_MAX,
+    STDERR_READ_MAX,
 )
 
 _logger = _logging.getLogger(__name__)
@@ -107,10 +107,10 @@ class DashboardLifecycleMixin:
         stderr_log.close()
         try:
             with open(stderr_log.name, encoding="utf-8") as f:
-                err = f.read(_STDERR_READ_MAX).strip()
+                err = f.read(STDERR_READ_MAX).strip()
         except OSError:
             err = "unknown error"
-        sanitized = err[:_ERROR_DISPLAY_MAX].replace("\n", " ").strip()
+        sanitized = err[:ERROR_DISPLAY_MAX].replace("\n", " ").strip()
         if sanitized:
             # Keep the crash detail in the local log for troubleshooting, but
             # do not surface raw dashboard stderr (which may include tokens or

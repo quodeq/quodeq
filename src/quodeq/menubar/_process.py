@@ -22,8 +22,8 @@ _logger = logging.getLogger(__name__)
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
 _HEALTH_POLL_INTERVAL_S = 0.5
-_STDERR_READ_MAX = 500
-_ERROR_DISPLAY_MAX = 200
+STDERR_READ_MAX = 500
+ERROR_DISPLAY_MAX = 200
 
 
 class DashboardCallbacks(NamedTuple):

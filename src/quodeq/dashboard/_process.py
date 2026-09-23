@@ -9,14 +9,14 @@ import time
 from pathlib import Path
 
 from quodeq.dashboard._api_health import ApiConfig, action_api_healthy, spawn_and_wait
-from quodeq.dashboard._networking import _is_port_open
+from quodeq.dashboard._networking import port_is_open
 from quodeq.shared.env_paths import get_run_dir
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import IS_WIN32
 
 _POLL_INTERVAL_S = 0.1
-_PROCESS_WAIT_TIMEOUT_S = 5
+PROCESS_WAIT_TIMEOUT_S = 5
 _STALE_KILL_DEADLINE_S = 3
 
 
@@ -67,7 +67,7 @@ def _is_pid(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
-def _kill_stale_action_api(host: str, port: int) -> None:
+def kill_stale_action_api(host: str, port: int) -> None:
     """Kill a *stale* action API recorded in the PID file.
 
     An API that still answers /api/health is left alone. It used to be killed
@@ -94,7 +94,7 @@ def _kill_stale_action_api(host: str, port: int) -> None:
         except OSError as exc:
             log_debug(f"Could not remove stale PID file: {exc}")
     deadline = time.monotonic() + _STALE_KILL_DEADLINE_S
-    while _is_port_open(host, port) and time.monotonic() < deadline:
+    while port_is_open(host, port) and time.monotonic() < deadline:
         time.sleep(_POLL_INTERVAL_S)
 
 
@@ -105,20 +105,20 @@ def _recorded_api_healthy(record: dict, fallback_host: str, fallback_port: int) 
     return action_api_healthy(f"http://{api_host}:{api_port}")
 
 
-def _spawn_and_wait_local(
+def spawn_and_wait_local(
     port: int, base_url: str, api_config: ApiConfig | None = None,
 ) -> tuple[str, subprocess.Popen]:
     """Spawn the action API on *port* and wait for it to become healthy."""
     return spawn_and_wait(port, base_url, _get_pid_file(), _get_default_host(), api_config)
 
 
-def _wait_for_process(proc: subprocess.Popen) -> None:
+def wait_for_process(proc: subprocess.Popen) -> None:
     """Block until *proc* terminates, polling every 5 seconds."""
     logged = False
     while proc.poll() is None:
         try:
-            proc.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
+            proc.wait(timeout=PROCESS_WAIT_TIMEOUT_S)
         except subprocess.TimeoutExpired as exc:
             if not logged:
-                log_debug(f"dashboard process still running after {_PROCESS_WAIT_TIMEOUT_S}s; waiting: {exc}")
+                log_debug(f"dashboard process still running after {PROCESS_WAIT_TIMEOUT_S}s; waiting: {exc}")
                 logged = True
