@@ -52,7 +52,7 @@ _WEBVIEW_UA_MARKER = "QuodeqDesktop"
 _ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
 
 # UA prefix the webview puts ahead of the token (see
-# _webview_window_about._webview_user_agent). Must match there.
+# _webview_window_about.webview_user_agent). Must match there.
 _WEBVIEW_TOKEN_UA_PREFIX = "QuodeqWebviewToken/"
 
 

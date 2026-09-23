@@ -45,7 +45,7 @@ from quodeq.data.fs.dimension_report.report_io import write_dimension_report  # 
 # from tests/core), so adding the edge here would make httpx/pydantic
 # transitively reachable from inner-layer test files
 # (tests/tools/test_no_framework_transitivity.py). evaluation_mixin.py keeps
-# a narrowly-scoped deferred import instead (see its ``_open_cache``).
+# a narrowly-scoped deferred import instead (see its ``open_cache``).
 
 # Run-directory readers and discard-time cleanup mechanics.
 from quodeq.data.fs.run_files import (  # noqa: F401
