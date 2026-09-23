@@ -57,7 +57,7 @@ describe('LoadingScreen tips', () => {
         firstTips.add(container.querySelector('.loading-tip').textContent);
         unmount();
       }
-      // 8 independent shuffles of 14 tips all opening identically has odds
+      // 8 independent shuffles of 19 tips all opening identically has odds
       // of ~1e-8; a sequential rotation always opens with the same tip.
       expect(firstTips.size).toBeGreaterThan(1);
     } finally {
@@ -73,11 +73,11 @@ describe('LoadingScreen tips', () => {
       // Land mid-cycle so each sample sits between two swaps.
       await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
       const seen = [];
-      for (let i = 0; i < 14; i++) {
+      for (let i = 0; i < 19; i++) {
         seen.push(container.querySelector('.loading-tip').textContent);
         await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
       }
-      expect(new Set(seen).size).toBe(14);
+      expect(new Set(seen).size).toBe(19);
     } finally {
       vi.useRealTimers();
     }

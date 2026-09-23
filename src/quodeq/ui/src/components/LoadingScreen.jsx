@@ -5,11 +5,13 @@ import { t } from '../strings/index.js';
 // One plain sentence each. The 8s rotation leaves reading time for about
 // fifteen words; anything longer gets split into two tips.
 const TIP_KEYS = [
-  'loading.tips.warmup', 'loading.tips.incremental', 'loading.tips.carryforward',
-  'loading.tips.dimensions', 'loading.tips.dismiss', 'loading.tips.fixplans',
-  'loading.tips.standards', 'loading.tips.ignore', 'loading.tips.history',
-  'loading.tips.compliance', 'loading.tips.shared', 'loading.tips.matrix',
-  'loading.tips.duel', 'loading.tips.standardsToggle',
+  'loading.tips.warmup', 'loading.tips.incremental', 'loading.tips.cleanScan',
+  'loading.tips.fixplans', 'loading.tips.dismiss', 'loading.tips.ignore',
+  'loading.tips.assistant', 'loading.tips.riskMatrix', 'loading.tips.architecture',
+  'loading.tips.compliance', 'loading.tips.stale', 'loading.tips.matrix',
+  'loading.tips.duel', 'loading.tips.standards', 'loading.tips.customStandard',
+  'loading.tips.prReview', 'loading.tips.ollama', 'loading.tips.monorepo',
+  'loading.tips.shared',
 ];
 const TIPS_DELAY_MS = 300;
 const TIPS_ROTATE_MS = 8000;
