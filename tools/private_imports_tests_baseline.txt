@@ -167,11 +167,8 @@ tests/analysis/test_dry_run_pipeline.py:197:private-module:quodeq.analysis._pipe
 tests/analysis/test_dry_run_pipeline.py:42:private-module:quodeq.analysis._pipeline.run_per_dimension
 tests/analysis/test_dry_run_pipeline.py:59:private-module:quodeq.analysis._pipeline.run_per_dimension
 tests/analysis/test_dry_run_pipeline.py:82:private-module:quodeq.analysis._pipeline.run_per_dimension
-tests/analysis/test_dry_run_wiring.py:102:private-name:quodeq.cli_evaluation._build_run_config
 tests/analysis/test_dry_run_wiring.py:103:private-module:quodeq._cli_resolution.ResolvedInputs
-tests/analysis/test_dry_run_wiring.py:35:private-name:quodeq.cli_evaluation._build_run_config
 tests/analysis/test_dry_run_wiring.py:36:private-module:quodeq._cli_resolution.ResolvedInputs
-tests/analysis/test_dry_run_wiring.py:68:private-name:quodeq.cli_evaluation._build_run_config
 tests/analysis/test_dry_run_wiring.py:69:private-module:quodeq._cli_resolution.ResolvedInputs
 tests/analysis/test_env_injection_sites.py:102:private-module:quodeq.analysis._config.AnalysisConfig
 tests/analysis/test_env_injection_sites.py:103:private-name:quodeq.analysis.subprocess._resolve_provider_config
@@ -503,7 +500,6 @@ tests/assistant/test_cli_stream.py:2:private-module:quodeq.assistant.adapters._s
 tests/assistant/test_cluster37_assistant_logging.py:113:private-module:quodeq._cli_lifecycle.lifecycle
 tests/assistant/test_cluster37_assistant_logging.py:114:private-name:quodeq.cli_evaluation._lifecycle_hooks
 tests/assistant/test_cluster37_assistant_logging.py:132:private-module:quodeq._cli_lifecycle.lifecycle
-tests/assistant/test_cluster37_assistant_logging.py:133:private-name:quodeq.cli_evaluation._run_pipeline_with_cleanup
 tests/assistant/test_cluster37_assistant_logging.py:13:private-module:quodeq.llm_bridge._ollama
 tests/assistant/test_cluster37_assistant_logging.py:51:private-module:quodeq.assistant._worktree_manager
 tests/assistant/test_cluster37_assistant_logging.py:72:private-module:quodeq.assistant.tools._read_tools_scope
@@ -1160,7 +1156,6 @@ tests/terminal/test_pty_windows_smoke.py:12:private-module:quodeq.terminal._pty_
 tests/terminal/test_pty_windows_smoke.py:12:private-module:quodeq.terminal._pty_windows.resolve_shell
 tests/test_cli_consolidation_wiring.py:19:private-module:quodeq._cli_resolution.ResolvedInputs
 tests/test_cli_diff_from_wiring.py:10:private-module:quodeq._cli_resolution.ResolvedInputs
-tests/test_cli_diff_from_wiring.py:9:private-name:quodeq.cli_evaluation._build_run_config
 tests/test_cli_env_injection.py:102:private-name:quodeq.cli_evaluation._resolve_run_config_locals
 tests/test_cli_env_injection.py:103:private-module:quodeq._cli_resolution.ResolvedInputs
 tests/test_cli_env_injection.py:119:private-name:quodeq.cli_evaluation._resolve_run_config_locals
