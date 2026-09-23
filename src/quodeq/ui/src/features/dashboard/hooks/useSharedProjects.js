@@ -51,6 +51,10 @@ import { t } from '../../../strings/index.js';
 import { useCoalescedRefresh } from './useCoalescedRefresh.js';
 import { useSharedActions } from './useSharedActions.js';
 
+// react-query's own query-state status ('pending'|'error'|'success'), not
+// the run/job/dim vocabulary -- kept local rather than forced into vocab/*.js.
+const QUERY_STATUS_ERROR = 'error';
+
 // One refresh round: POST, then let the caller re-list. Failures keep the
 // page's data and flag it stale instead of rejecting.
 function makeRefreshCore({ refreshShared, queryClient, setStaleOverride }) {
@@ -68,7 +72,7 @@ function makeRefreshCore({ refreshShared, queryClient, setStaleOverride }) {
     try {
       await queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
       const listState = queryClient.getQueryState(sharedKeys.list());
-      setStaleOverride(listState?.status === 'error');
+      setStaleOverride(listState?.status === QUERY_STATUS_ERROR);
     } catch (err) {
       console.warn('[useSharedProjects] post-refresh invalidate failed:', err);
       setStaleOverride(true);

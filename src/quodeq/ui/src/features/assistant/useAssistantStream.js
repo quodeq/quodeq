@@ -12,6 +12,14 @@ const CHARS_PER_TICK = 60;
 // tab): keeps text revealing at a readable pace instead of stalling.
 const FLUSH_DEBOUNCE_MS = 50;
 
+// The assistant SSE frame's own type vocabulary -- a different domain from
+// the run/job/dim status vocab, even where a spelling coincides ('error',
+// 'done'). Kept local rather than forced into vocab/*.js.
+const FRAME_TYPE = Object.freeze({
+  TOKEN: 'token', TOOL_CALL: 'tool_call', ACTION_DRAFT: 'action_draft',
+  WARNING: 'warning', ERROR: 'error', STOPPED: 'stopped', DONE: 'done', HEARTBEAT: 'heartbeat',
+});
+
 /**
  * Pure frame-dispatch table: given a parsed SSE frame and the effect's
  * (already-bound) per-type handlers, calls the one matching frame.type.
@@ -19,17 +27,17 @@ const FLUSH_DEBOUNCE_MS = 50;
 export function applyFrame(frame, handlers) {
   if (!frame || typeof frame !== 'object') return;
   const { onToken, onToolCall, onActionDraft, onWarning, onError, onStopped, onDone, onHeartbeat } = handlers;
-  if (frame.type === 'token') onToken(frame);
-  else if (frame.type === 'tool_call') onToolCall(frame);
-  else if (frame.type === 'action_draft') onActionDraft(frame);
-  else if (frame.type === 'warning') onWarning(frame);
-  else if (frame.type === 'error') onError(frame);
+  if (frame.type === FRAME_TYPE.TOKEN) onToken(frame);
+  else if (frame.type === FRAME_TYPE.TOOL_CALL) onToolCall(frame);
+  else if (frame.type === FRAME_TYPE.ACTION_DRAFT) onActionDraft(frame);
+  else if (frame.type === FRAME_TYPE.WARNING) onWarning(frame);
+  else if (frame.type === FRAME_TYPE.ERROR) onError(frame);
   // User-initiated stop: terminal like done (turn over, stream stays
   // open), plus a visible marker so the truncated answer isn't mistaken
   // for a complete one.
-  else if (frame.type === 'stopped') onStopped(frame);
-  else if (frame.type === 'done') onDone(frame);
-  else if (frame.type === 'heartbeat') onHeartbeat?.(frame); // liveness only: resetInactivity() already ran by the caller
+  else if (frame.type === FRAME_TYPE.STOPPED) onStopped(frame);
+  else if (frame.type === FRAME_TYPE.DONE) onDone(frame);
+  else if (frame.type === FRAME_TYPE.HEARTBEAT) onHeartbeat?.(frame); // liveness only: resetInactivity() already ran by the caller
 }
 
 // One SSE stream serves the whole session, so revealed text lands in the last
