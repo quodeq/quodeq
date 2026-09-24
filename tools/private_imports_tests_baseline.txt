@@ -804,7 +804,6 @@ tests/data/test_index_sync_stale.py:15:private-name:quodeq.data.sqlite.index_syn
 tests/data/test_mapper_totals_density.py:3:private-module:quodeq.data.mappers._mapper_findings.parse_totals
 tests/data/test_run_files.py:116:private-module:quodeq.services._accumulated_data.run_fingerprint
 tests/data/test_run_index_concurrency.py:24:private-module:quodeq.data.sqlite._run_index_schema
-tests/data/test_run_index_remove.py:6:private-module:quodeq.services._run_index_fs.remove_run_directory
 tests/integration/_cancel_resume_fixtures.py:54:private-module:quodeq.analysis._dimensions.DimensionsConfig
 tests/integration/_cancel_resume_fixtures.py:66:private-module:quodeq.analysis._dimension_steps.build_dimension_prompt
 tests/integration/_cancel_resume_fixtures.py:66:private-module:quodeq.analysis._dimension_steps.parse_dimension_evidence

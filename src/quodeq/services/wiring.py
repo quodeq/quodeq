@@ -72,6 +72,9 @@ from quodeq.data.fs.run_files import (  # noqa: F401
     run_fingerprint,
 )
 
+# Run-directory removal (rmtree) and reports-root fallback scanning.
+from quodeq.data.fs.run_dirs import remove_run_directory, scan_reports_root_for_run  # noqa: F401
+
 # Run-artifact copy/replace mechanics (shared-repo publish staging).
 from quodeq.data.fs.run_artifacts import (  # noqa: F401
     copy_file_if_exists,
@@ -87,6 +90,7 @@ from quodeq.data.fs.repo_index_store import read_repo_index, write_repo_index  #
 # Agent stream files.
 from quodeq.data.fs.stream_files import (  # noqa: F401
     count_active_agent_streams,
+    iter_stream_lines,
     latest_dim_activity_mtime,
 )
 
@@ -124,6 +128,7 @@ from quodeq.data.fs.standards_store import (  # noqa: F401
 from quodeq.data.actions_log import (  # noqa: F401
     ACTIONS_LOG_FILENAME,
     ActionLogWriter,
+    merge_action_log_files,
     read_action_events,
 )
 from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_needed  # noqa: F401
@@ -252,7 +257,7 @@ from quodeq.data.fs.evidence_tally import (  # noqa: F401
 )
 
 # Local git repo statistics.
-from quodeq.data.fs.git_stats import count_commits_since  # noqa: F401
+from quodeq.data.fs.git_stats import count_commits_since, last_fetched_mtime  # noqa: F401
 
 # Project-identity index (project_index.json): load/save + the identity key
 # a project resolves to. The api layer reaches this via the public facade

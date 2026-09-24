@@ -17,6 +17,7 @@ from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult, group_findings_by_file
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.trust_model import TrustModel
+from quodeq.data.fs.stream_files import append_jsonl_strict
 from quodeq.data.ports.events import EventEmitter
 
 _logger = logging.getLogger(__name__)
@@ -194,15 +195,13 @@ def _stamp_and_write_findings(
     cache, making a later fresh scan of the same file look carried.
 
     Consolidated first, then unconsolidated, so the JSONL keeps reading
-    foundation-then-new. Returns the stamped list for event mirroring.
+    foundation-then-new. Returns the stamped list for event mirroring. The
+    actual file write is the data layer's ``append_jsonl_strict``; this
+    function owns only the stamping rule.
     """
     stamped = [{**finding, "carried_forward": True} for finding in findings]
     stamped += [dict(finding) for finding in pending]
-    jsonl.parent.mkdir(parents=True, exist_ok=True)
-    mode = "a" if append else "w"
-    with jsonl.open(mode, encoding="utf-8") as out:
-        for finding in stamped:
-            out.write(json.dumps(finding) + "\n")
+    append_jsonl_strict(jsonl, stamped, append=append)
     return stamped
 
 

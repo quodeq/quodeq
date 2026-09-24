@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Iterator
+from typing import Iterable, Iterator
 
 from quodeq.core.events.models import EVENT_MODEL_MAP, BaseEvent, EventType
 from quodeq.data.events.codec import event_from_dict
@@ -34,6 +34,45 @@ class ActionLogWriter(JsonlAppendMixin):
 
     def _emit_what(self, event: BaseEvent) -> str:
         return str(event.event_type)
+
+
+def _timestamp_key(line: str) -> tuple[int, str]:
+    """Sort key for a raw actions-log JSON line: timestamped lines first,
+    ordered by timestamp; anything unparseable or missing a timestamp
+    sorts last, in original order."""
+    try:
+        ts = json.loads(line).get("timestamp")
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        return (1, "")
+    if not ts:
+        return (1, "")
+    return (0, str(ts))
+
+
+def merge_action_log_files(dst: Path, srcs: Iterable[Path]) -> None:
+    """Union-merge *srcs* actions.jsonl files into *dst*, deduped and sorted.
+
+    Missing sources are skipped. Nothing is written when the union is empty
+    (a caller staging a project with no actions log at all must not create
+    one). Raises ``ValueError`` (a plain ``UnicodeDecodeError``) if any
+    source is not valid UTF-8 -- callers that need a user-facing error
+    (rather than a raw decode error) catch this themselves.
+    """
+    seen: set[str] = set()
+    lines: list[str] = []
+    for source in srcs:
+        if not source.exists():
+            continue
+        for raw in source.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if line and line not in seen:
+                seen.add(line)
+                lines.append(line)
+    if not lines:
+        return
+    lines.sort(key=_timestamp_key)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def read_action_events(project_dir: Path, *, from_offset: int = 0) -> Iterator[BaseEvent]:
