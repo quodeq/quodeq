@@ -178,8 +178,8 @@ def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> N
 
     try:
         writer = EventLogWriter(jsonl_path.parent.parent / "events.jsonl")
-        for j in judgments:
-            writer.emit(JudgmentCreatedEvent(payload=j))
+        writer.emit_many(
+            JudgmentCreatedEvent(payload=j) for j in judgments)
     except Exception:  # the findings are already in the evidence
         _logger.warning("checks: could not mirror findings to the event log", exc_info=True)
 
