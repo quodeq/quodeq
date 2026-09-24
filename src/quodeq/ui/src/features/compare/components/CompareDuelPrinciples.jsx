@@ -1,4 +1,4 @@
-import { SectionLabel } from '../../../components/terminal/index.js';
+import ComparePanel from './ComparePanel.jsx';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import { DuelBars, gapClass, SideScore, signed1 } from './compareDuelShared.jsx';
@@ -56,11 +56,7 @@ export default function CompareDuelPrinciples({ principles, dimensions, aName, b
   // Dimension lookup keyed once, not a find() per principle group.
   const dimByKey = new Map(dimensions.map((d) => [d.key, d]));
   return (
-    <section className="compare-panel" aria-label={t('compare.duelPrinciplesAria')}>
-      <div className="compare-panel__head">
-        <SectionLabel>{t('compare.duelPrinciplesHeader', { count })}</SectionLabel>
-        <span className="compare-panel__note">{t('compare.duelPrinciplesNote')}</span>
-      </div>
+    <ComparePanel ariaLabel={t('compare.duelPrinciplesAria')} header={t('compare.duelPrinciplesHeader', { count })} note={t('compare.duelPrinciplesNote')}>
       {principles.length ? (
         <div className="compare-duel-principles">
           {principles.map((group) => (
@@ -76,6 +72,6 @@ export default function CompareDuelPrinciples({ principles, dimensions, aName, b
       ) : (
         <p className="compare-panel__fallback">{t('compare.duelNoShared')}</p>
       )}
-    </section>
+    </ComparePanel>
   );
 }

@@ -6,9 +6,8 @@ import FileDetailHeader from './FileDetailHeader.jsx';
 import { GroupHeader, LowConfidenceToggle, estimateItemSize, itemKey } from './fileDetailWidgets.jsx';
 import { useFileDetailFiltering } from './useFileDetailFiltering.js';
 import { useFileDetailWindowSpecs } from './useFileDetailWindowSpecs.jsx';
-import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
-import DeferredMount from './DeferredMount.jsx';
-import CardListSkeleton from './CardListSkeleton.jsx';
+import { useDashboardScrollElement } from './VirtualList.jsx';
+import DeferredViolationList from './DeferredViolationList.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
@@ -59,20 +58,14 @@ function FileDetailBody({
         />
       )}
 
-      {/* Same two-commit split as PrincipleDetailPage: this page is param-fed
-          (no fetch), so the first paint would otherwise wait for the visible
-          cards' pretext layout effects. */}
-      <DeferredMount fallback={<CardListSkeleton />}>
-        <VirtualList
-          key={virtualKey}
-          items={items}
-          scrollElement={scrollElement}
-          estimateSize={estimateItemSize(items)}
-          getItemKey={itemKey(items)}
-          label={t('explorer.violationsListAria')}
-          renderItem={(item) => renderFileDetailItem(item, { onDismiss, handleDismiss, setLowConfExpanded })}
-        />
-      </DeferredMount>
+      <DeferredViolationList
+        resetKey={virtualKey}
+        items={items}
+        scrollElement={scrollElement}
+        estimateSize={estimateItemSize(items)}
+        getItemKey={itemKey(items)}
+        renderItem={(item) => renderFileDetailItem(item, { onDismiss, handleDismiss, setLowConfExpanded })}
+      />
     </>
   );
 }

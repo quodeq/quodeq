@@ -4,8 +4,9 @@ import {
 } from '../core/galaxyCore.js';
 import { newCueBatch, collectSeverityCue, drawCueBatch } from './galaxyFolderCues.js';
 import { CANVAS_FONT_FAMILY } from '../core/galaxyTunables.js';
+import { fillBackgroundGradient } from './galaxyStarfield.js';
 import {
-  BACKGROUND, STAR, NEBULA, NEBULA_SCENE_BLOBS, NEBULA_FOLDER_BLOBS,
+  STAR, NEBULA, NEBULA_SCENE_BLOBS, NEBULA_FOLDER_BLOBS,
   VIOLATION_ORBS, LABEL_ALPHA, FOLDER_NEBULA, FOLDER_NEBULA_DASH,
   FOLDER_STAR, FOLDER_LABEL,
 } from './galaxyTuning.js';
@@ -26,12 +27,7 @@ export { drawStarfield } from './galaxyStarfield.js';
 export function drawScene(ctx, params) {
   const { W, H, canvasRef } = params;
   const tc = getThemeColors(canvasRef.current?.parentElement);
-
-  // Background gradient
-  const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * BACKGROUND.gradientRadiusFraction);
-  grad.addColorStop(0, tc.bgAlt); grad.addColorStop(1, tc.bg);
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-
+  fillBackgroundGradient(ctx, tc, { W, H });
   return { tc };
 }
 

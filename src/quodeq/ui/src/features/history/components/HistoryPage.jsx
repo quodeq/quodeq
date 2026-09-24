@@ -12,9 +12,11 @@ import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { useHistoryDeleteRun } from '../hooks/useHistoryDeleteRun.js';
 import { HistoryContent } from './HistoryContent.jsx';
 import {
-  HistoryEmptyShell, NoProjectsEmptyContent, NoProjectSelectedEmptyContent,
-  LoadingEmptyContent, ErrorEmptyContent, SharedNoEvalsEmptyContent, NoEvalsEmptyContent,
+  HistoryEmptyShell, NoProjectSelectedEmptyContent, LoadingEmptyContent, SharedNoEvalsEmptyContent,
 } from './HistoryEmptyStates.jsx';
+import {
+  LoadProjectFailedEmptyState, NoEvalsEmptyState, NoProjectsEmptyState,
+} from '../../../components/ProjectEmptyStates.jsx';
 import { assembleHistoryRows, visibleHistoryRows } from './historyRowAssembly.js';
 
 export { assembleHistoryRows, visibleHistoryRows };
@@ -58,7 +60,7 @@ function renderNoRowsEmptyState({
   if (error) {
     return (
       <HistoryEmptyShell sub={t('violations.subError')}>
-        <ErrorEmptyContent error={error} onRetry={onRetry} />
+        <LoadProjectFailedEmptyState error={error} onRetry={onRetry} />
       </HistoryEmptyShell>
     );
   }
@@ -76,7 +78,7 @@ function renderNoRowsEmptyState({
   const projectName = projectInfo?.displayName || projectInfo?.name || selectedProject;
   return (
     <HistoryEmptyShell sub={t('violations.subNoEvals')} refreshing={isRefreshing}>
-      <NoEvalsEmptyContent projectName={projectName} onNavigate={onNavigate} />
+      <NoEvalsEmptyState projectName={projectName} onNavigate={onNavigate} />
     </HistoryEmptyShell>
   );
 }
@@ -96,7 +98,7 @@ function renderHistoryEmptyState({
   if (projects.length === 0 && selectedSource !== PROJECT_SOURCE.SHARED) {
     return (
       <HistoryEmptyShell sub={t('violations.subNoProjects')}>
-        <NoProjectsEmptyContent onNavigate={onNavigate} />
+        <NoProjectsEmptyState onNavigate={onNavigate} />
       </HistoryEmptyShell>
     );
   }
