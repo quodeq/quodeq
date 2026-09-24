@@ -55,7 +55,22 @@ function useExplorerPageData({ project, dimension, runId, dateLabel, refreshSign
     [d.evalData, d.complianceByPrinciple, project, activeRunId, activeDateLabel]
   );
 
-  return { d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel, buildEvalPrincipal };
+  // Both builds walk every violation and compliance item; they only depend
+  // on the fetched data, not on granularity or the selected history bar.
+  const { evalData, allViolations, complianceByPrinciple, principleGrades } = d;
+  const dimFile = useMemo(
+    () => (evalData ? buildDimensionRootFile(evalData, allViolations, complianceByPrinciple) : null),
+    [evalData, allViolations, complianceByPrinciple],
+  );
+  const principleViews = useMemo(() => ({
+    radialPrinciples: buildRadialPrinciples(principleGrades),
+    enrichedPrinciples: buildEnrichedPrinciples(principleGrades, allViolations, complianceByPrinciple),
+  }), [principleGrades, allViolations, complianceByPrinciple]);
+
+  return {
+    d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel,
+    buildEvalPrincipal, dimFile, principleViews,
+  };
 }
 
 /**
@@ -65,15 +80,18 @@ function useExplorerPageData({ project, dimension, runId, dateLabel, refreshSign
  * file opened from a cross-project explorer dismisses into ITS project,
  * not the global selection.
  */
-function buildExplorerCardNavigation({ d, onNavigate, project, activeRunId, activeDateLabel, sourceTab }) {
+function buildDimensionRootFile(evalData, allViolations, complianceByPrinciple) {
   const allCompliance = [];
-  if (d.complianceByPrinciple) {
-    for (const items of d.complianceByPrinciple.values()) allCompliance.push(...items);
+  if (complianceByPrinciple) {
+    for (const items of complianceByPrinciple.values()) allCompliance.push(...items);
   }
-  const dimFile = buildProjectRootFile(
-    [{ dimension: d.evalData.dimension, violations: d.allViolations, compliance: allCompliance }],
-    d.evalData.dimension,
+  return buildProjectRootFile(
+    [{ dimension: evalData.dimension, violations: allViolations, compliance: allCompliance }],
+    evalData.dimension,
   );
+}
+
+function buildExplorerCardNavigation({ dimFile, onNavigate, project, activeRunId, activeDateLabel, sourceTab }) {
   const handleCardNavigate = (kind) => {
     if (!onNavigate) return;
     const severityFilter = kind === 'violations' ? 'all' : kind;
@@ -164,11 +182,11 @@ function ExplorerPageBody({
  * principle click from a Violations-tab drill-in falls back to the
  * Overview tab, force-remounting the whole content subtree (App.jsx keys
  * it on activeTab) and jumping the sidebar highlight. */
-function buildExplorerViewData(d, onNavigate, sourceTab, buildEvalPrincipal) {
+function buildExplorerViewData(d, onNavigate, sourceTab, buildEvalPrincipal, principleViews) {
   return {
     dim: String(d.evalData.dimension || '').toLowerCase(),
-    radialPrinciples: buildRadialPrinciples(d.principleGrades),
-    enrichedPrinciples: buildEnrichedPrinciples(d.principleGrades, d.allViolations, d.complianceByPrinciple),
+    radialPrinciples: principleViews.radialPrinciples,
+    enrichedPrinciples: principleViews.enrichedPrinciples,
     onPrincipleClick: (name) => onNavigate?.('evalprinciple', { evalPrincipal: buildEvalPrincipal(name), sourceTab }),
     overallScoreNum: parseFloat(d.overallGrade?.score),
     isRefreshing: d.isFetching && !!d.evalData,
@@ -188,8 +206,10 @@ export default function ExplorerPage({
   granularity = 'day',
   onGranularityChange,
 }) {
-  const { d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel, buildEvalPrincipal } =
-    useExplorerPageData({ project, dimension, runId, dateLabel, refreshSignal, selectedSource });
+  const {
+    d, standardDescription, activeRunId, setActiveRunId, activeDateLabel, setActiveDateLabel,
+    buildEvalPrincipal, dimFile, principleViews,
+  } = useExplorerPageData({ project, dimension, runId, dateLabel, refreshSignal, selectedSource });
 
   useExplorerPageSpecs({
     evalData: d.evalData, principleGrades: d.principleGrades, allViolations: d.allViolations,
@@ -200,12 +220,12 @@ export default function ExplorerPage({
   if (status) return status;
 
   const { handleCardNavigate, onSeverityBadge } = buildExplorerCardNavigation({
-    d, onNavigate, project, activeRunId, activeDateLabel, sourceTab,
+    dimFile, onNavigate, project, activeRunId, activeDateLabel, sourceTab,
   });
 
   const {
     dim, radialPrinciples, enrichedPrinciples, onPrincipleClick, overallScoreNum, isRefreshing,
-  } = buildExplorerViewData(d, onNavigate, sourceTab, buildEvalPrincipal);
+  } = buildExplorerViewData(d, onNavigate, sourceTab, buildEvalPrincipal, principleViews);
 
   return (
     <ExplorerPageBody

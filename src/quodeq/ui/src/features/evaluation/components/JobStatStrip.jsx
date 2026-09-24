@@ -5,7 +5,7 @@ import {
   buildJobStatCells, computeRate, buildEtaHint,
   buildDimensionCycle, sumSeverities, deriveScanMode,
 } from './buildJobStatCells.js';
-import { recordRateSample, getRateSamples } from './rateSampleStore.js';
+import { recordRateSample, getRateSamples, forgetJob } from './rateSampleStore.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useRunElapsed } from '../hooks/useRunElapsed.js';
 import { JOB_TERMINAL } from '../../../vocab/jobStatus.js';
@@ -68,6 +68,12 @@ export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount =
     if (!(totalFiles > 0)) return;
     recordRateSample(jobId, Date.now(), takenFiles);
   }, [dataUpdatedAt, isTerminal, progress, jobId]);
+
+  // A terminal job neither records nor reads a rate again, so drop its
+  // samples; otherwise every job viewed in a session stays in the store.
+  useEffect(() => {
+    if (isTerminal && jobId) forgetJob(jobId);
+  }, [isTerminal, jobId]);
 
   const cells = useMemo(
     () => computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal, elapsedS, hiddenCarriedCount }),

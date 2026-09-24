@@ -1,5 +1,5 @@
-import { render, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, fireEvent, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Stub heavy sub-components used by EvaluateScreen
 vi.mock('./EvaluationStatus.jsx', () => ({ default: () => null }));
@@ -74,5 +74,23 @@ describe('readBudgetSeconds', () => {
 
   it('honours an explicitly stored unlimited value', () => {
     expect(readBudgetSeconds(storage({ 'active-provider': 'claude', 'claude-time-limit': '0' }))).toBe(0);
+  });
+});
+
+describe('ErrorToast auto-dismiss', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('hides 5 s after it appeared even if the screen re-renders meanwhile', () => {
+    const screenFor = (evaluation) => (
+      <EvaluateScreen evaluation={evaluation} context={baseContext} actions={baseActions} />
+    );
+    const { rerender } = render(screenFor({ ...baseEvaluation, jobError: 'boom' }));
+    expect(document.querySelector('.job-error-toast')).not.toBeNull();
+    act(() => { vi.advanceTimersByTime(3000); });
+    // A live update: new evaluation object, same error.
+    rerender(screenFor({ ...baseEvaluation, jobError: 'boom', liveViolations: [] }));
+    act(() => { vi.advanceTimersByTime(2500); });
+    expect(document.querySelector('.job-error-toast')).toBeNull();
   });
 });
