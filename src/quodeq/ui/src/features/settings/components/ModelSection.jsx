@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { DEFAULT_MODELS, MODEL_STORAGE_PREFIX } from '../../evaluation/components/powerLevels.js';
 import { AI_CMD_STORAGE_KEY } from '../../../constants.js';
+import { AI_CLIENT_TYPE } from '../../../api/providers.js';
 import { t } from '../../../strings/index.js';
 
 const AI_MODEL_STORAGE_KEY = 'cc-ai-model';
@@ -52,8 +53,8 @@ function NoProvidersDetected() {
 
 function ClientSelector({ aiCmd = {}, availableClients }) {
   const { value, onApply } = aiCmd;
-  const cliClients = useMemo(() => (availableClients ?? []).filter((c) => c.type === 'cli' || !c.type), [availableClients]);
-  const apiClients = useMemo(() => (availableClients ?? []).filter((c) => c.type === 'api'), [availableClients]);
+  const cliClients = useMemo(() => (availableClients ?? []).filter((c) => c.type === AI_CLIENT_TYPE.CLI || !c.type), [availableClients]);
+  const apiClients = useMemo(() => (availableClients ?? []).filter((c) => c.type === AI_CLIENT_TYPE.API), [availableClients]);
 
   if (availableClients == null) return <ClientSelectorDetecting />;
 

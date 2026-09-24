@@ -11,6 +11,7 @@ import { t } from '../../../strings/index.js';
 import { TimeLimitSetting } from './ProviderSettings.jsx';
 import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
 import { SERVER_STATUS } from '../settingsVocab.js';
+import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
 
 /**
  * @param {object} props
@@ -43,7 +44,7 @@ export function LocalApiTabLayout({
       />
       {modelsError && <div className="settings-row"><span className="settings-error">{modelsError}</span></div>}
       {modelRow}
-      <TimeLimitSetting state={state} update={update} providerType="local-api" />
+      <TimeLimitSetting state={state} update={update} providerType={PROVIDER_CLASSIFICATION.LOCAL_API} />
       <LocalApiAdvancedPanel
         subagentsDescription={subagentsDescription}
         subagentsAriaLabel={subagentsAriaLabel}

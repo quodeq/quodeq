@@ -6,7 +6,10 @@ import { t } from '../../../strings/index.js';
 
 export { PROVIDER_CONFIGURED_MARKER };
 
-const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'time-limit', 'per-dimension', 'verify', 'api-key', 'api-base', 'cmd-path'];
+// This hook's own provider-settings state key for the stored API credential.
+const SETTING_KEY_API_KEY = 'api-key';
+
+const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'time-limit', 'per-dimension', 'verify', SETTING_KEY_API_KEY, 'api-base', 'cmd-path'];
 const DEFAULTS = {
   'model': '',
   'model-analysis': '',
@@ -19,7 +22,7 @@ const DEFAULTS = {
   // per-dimension for an untouched toggle.
   'per-dimension': 'false',
   'verify': 'true',
-  'api-key': '',
+  [SETTING_KEY_API_KEY]: '',
   'api-base': '',
   'cmd-path': '',
 };
@@ -41,7 +44,7 @@ export function loadProviderState(providerId, overrides, storage = localStorage,
   const state = {};
   for (const key of SETTINGS) {
     let value = storage.getItem(providerKey(providerId, key));
-    if (key === 'api-key' && value === PROVIDER_CONFIGURED_MARKER) {
+    if (key === SETTING_KEY_API_KEY && value === PROVIDER_CONFIGURED_MARKER) {
       // The sentinel means "the backend holds a key", not "here is a key".
       // Consumers of state['api-key'] (OmlxTab hands it straight to
       // getOmlxModels / testOmlxConcurrency as a real credential) would
@@ -94,7 +97,7 @@ export async function saveProviderApiKey(providerId, apiKey, storage = localStor
   try {
     const { stored } = await saveProviderKey(providerId, apiKey);
     if (!stored) throw new Error('Provider key was not stored');
-    storage.setItem(providerKey(providerId, 'api-key'), PROVIDER_CONFIGURED_MARKER);
+    storage.setItem(providerKey(providerId, SETTING_KEY_API_KEY), PROVIDER_CONFIGURED_MARKER);
     return true;
   } catch (err) {
     console.warn('[useProviderSettings] Could not save provider API key:', err);
@@ -134,7 +137,7 @@ export default function useProviderSettings(providerId, defaults, { storage = lo
   const update = useCallback((key, value) => {
     setState(prev => ({ ...prev, [key]: String(value) }));
     const onPersistError = () => showToast(t('settings.persistError'));
-    if (key === 'api-key') {
+    if (key === SETTING_KEY_API_KEY) {
       // Fire and forget: saveProviderApiKey catches its own failures, reports
       // them through onPersistError and resolves false, so there is nothing
       // left here to reject.

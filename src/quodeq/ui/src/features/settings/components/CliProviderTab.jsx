@@ -4,6 +4,8 @@ import { CliAdvancedPanel, CliModelInput } from './CliAdvancedPanel.jsx';
 import { useCliProviderTab } from '../hooks/useCliProviderTab.js';
 import { t } from '../../../strings/index.js';
 import { CopilotModelStatus } from './CopilotModelSelect.jsx';
+import { PROVIDER } from '../../../vocab/provider.js';
+import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
 
 export default function CliProviderTab({ providerId, state, update }) {
   const {
@@ -12,7 +14,7 @@ export default function CliProviderTab({ providerId, state, update }) {
 
   return (
     <>
-      {providerId === 'copilot' && <CopilotModelStatus />}
+      {providerId === PROVIDER.COPILOT && <CopilotModelStatus />}
       <div className="settings-row">
         <SettingsRowLabel
           label={t('settings.modelLabel')}
@@ -25,7 +27,7 @@ export default function CliProviderTab({ providerId, state, update }) {
           {!state.model && <span className="settings-model-hint">{t('settings.pickModelToStart')}</span>}
         </div>
       </div>
-      <TimeLimitSetting state={state} update={update} providerType="cli" />
+      <TimeLimitSetting state={state} update={update} providerType={PROVIDER_CLASSIFICATION.CLI} />
       <RemoteSubagentsRow state={state} update={update} clampSubagents={clampSubagents} />
       <CliAdvancedPanel
         providerId={providerId} state={state} update={update} analysisHint={analysisHint}

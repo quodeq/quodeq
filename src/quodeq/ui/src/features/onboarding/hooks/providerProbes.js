@@ -12,15 +12,12 @@
  * isolation.
  */
 
+import { AI_CLIENT_TYPE } from '../../../api/providers.js';
+
 // Onboarding-side IDs differ from the server's ai_providers.json IDs.
 const CLI_SERVER_ID = { 'codex-cli': 'codex', 'claude-code': 'claude' };
 /** How long each detection probe waits before aborting its fetch. */
 export const PROBE_TIMEOUT_MS = 5000;
-
-// This probe's classification (also the /api/ai-clients response's own
-// per-client `type` field, which detectCliProvider checks the fetched
-// client against).
-const PROBE_CLASSIFICATION_CLI = 'cli';
 
 // Promise.allSettled's own per-result status for a resolved promise.
 const SETTLED_FULFILLED = 'fulfilled';
@@ -43,9 +40,9 @@ async function probe(id, classification, url, read) {
 
 async function detectCliProvider(id) {
   const serverId = CLI_SERVER_ID[id] || id;
-  return probe(id, PROBE_CLASSIFICATION_CLI, '/api/ai-clients', async (res) => {
+  return probe(id, AI_CLIENT_TYPE.CLI, '/api/ai-clients', async (res) => {
     const data = await res.json();
-    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === PROBE_CLASSIFICATION_CLI && c.installed !== false);
+    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === AI_CLIENT_TYPE.CLI && c.installed !== false);
     return { detected, defaultModel: null };
   });
 }

@@ -1,9 +1,13 @@
 import { useState, useCallback, useMemo } from 'react';
 import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT } from '../../../constants.js';
 import { broadcastSettingsChange, useSettingsChangeSync } from './settingsSync.js';
+import { STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
 export const ASSISTANT_MODE_KEY = 'cc-assistant-mode';
+// The two modes stored under ASSISTANT_MODE_KEY: DEFAULT mirrors the
+// analysis gate live, CUSTOM uses the assistant-scoped provider/model.
+export const ASSISTANT_MODE = Object.freeze({ DEFAULT: 'default', CUSTOM: 'custom' });
 // The assistant is ON by default: the toolbar launcher shows until the user
 // explicitly disables it in Settings.
 export const ASSISTANT_ENABLED_KEY = 'cc-assistant-enabled';
@@ -18,12 +22,12 @@ const CHANGE_EVENT = 'assistant-provider-changed';
 // - custom mode: use the assistant-scoped provider/model, falling back to the
 //   analysis selection when the assistant keys are unset.
 function loadState(storage) {
-  const mode = storage.getItem(ASSISTANT_MODE_KEY) === 'custom' ? 'custom' : 'default';
+  const mode = storage.getItem(ASSISTANT_MODE_KEY) === ASSISTANT_MODE.CUSTOM ? ASSISTANT_MODE.CUSTOM : ASSISTANT_MODE.DEFAULT;
   const analysisActive = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
   // Default ON: only an explicit opt-out ('false') disables it.
-  const enabled = storage.getItem(ASSISTANT_ENABLED_KEY) !== 'false';
+  const enabled = storage.getItem(ASSISTANT_ENABLED_KEY) !== STORED_FALSE;
 
-  if (mode === 'default') {
+  if (mode === ASSISTANT_MODE.DEFAULT) {
     const model = analysisActive
       ? (storage.getItem(providerKey(analysisActive, 'model')) || '')
       : '';
@@ -44,7 +48,7 @@ function loadState(storage) {
 function makeSetEnabled(storage, setState, broadcast) {
   return (value) => {
     try {
-      storage.setItem(ASSISTANT_ENABLED_KEY, value ? 'true' : 'false');
+      storage.setItem(ASSISTANT_ENABLED_KEY, value ? STORED_TRUE : STORED_FALSE);
     } catch (err) {
       console.warn('[useAssistantProvider] Could not persist assistant enabled:', err);
     }
@@ -56,7 +60,7 @@ function makeSetEnabled(storage, setState, broadcast) {
 function makeSetMode(storage, setState, broadcast) {
   return (mode) => {
     try {
-      storage.setItem(ASSISTANT_MODE_KEY, mode === 'custom' ? 'custom' : 'default');
+      storage.setItem(ASSISTANT_MODE_KEY, mode === ASSISTANT_MODE.CUSTOM ? ASSISTANT_MODE.CUSTOM : ASSISTANT_MODE.DEFAULT);
     } catch (err) {
       console.warn('[useAssistantProvider] Could not persist assistant mode:', err);
     }

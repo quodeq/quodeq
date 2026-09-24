@@ -5,6 +5,8 @@ import AssistantModelPicker from './AssistantModelPicker.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
 import { CopilotModelStatus } from './CopilotModelSelect.jsx';
+import { PROVIDER } from '../../../vocab/provider.js';
+import { ASSISTANT_MODE } from '../hooks/useAssistantProvider.js';
 
 function AssistantEnableRow({ enabled, setEnabled }) {
   return (
@@ -61,7 +63,7 @@ function AssistantCustomProviderSection({ clients, activeProvider, setActiveProv
           })}
         </div>
       </div>
-      {active?.id === 'copilot' && <CopilotModelStatus />}
+      {active?.id === PROVIDER.COPILOT && <CopilotModelStatus />}
       {active && (
         <div className="settings-row settings-row--last">
           <div className="settings-row-label">
@@ -97,7 +99,7 @@ export default function AssistantProviderTabs({ providerConfigs }) {
 
       <AssistantModeRows enabled={enabled} mode={mode} setMode={setMode} active={active} activeProvider={activeProvider} model={model} />
 
-      {enabled && mode === 'custom' && (
+      {enabled && mode === ASSISTANT_MODE.CUSTOM && (
         <AssistantCustomProviderSection
           clients={clients} activeProvider={activeProvider} setActiveProvider={setActiveProvider}
           active={active} providerConfigs={providerConfigs} model={model} setModel={setModel}
