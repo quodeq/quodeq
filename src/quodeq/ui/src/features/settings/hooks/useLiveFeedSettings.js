@@ -1,19 +1,15 @@
 import { useState, useCallback } from 'react';
-import { readString, writeString } from '../../../adapters/storage.js';
+import { readString, writeString, STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
 import { broadcastSettingsChange, useSettingsChangeSync } from './settingsSync.js';
 
 export const NEW_FINDINGS_ONLY_KEY = 'cc-eval-new-findings-only';
 const CHANGE_EVENT = 'live-feed-settings-changed';
 const SYNC_EVENTS = [CHANGE_EVENT];
-// How the boolean is encoded in localStorage. Read and write must agree, so
-// both go through these rather than spelling the strings out twice.
-const STORED_ON = 'true';
-const STORED_OFF = 'false';
 
 function loadNewOnly(storage) {
   // On by default: only an explicit opt-out ('false') shows findings
   // carried forward from the incremental cache.
-  return readString(NEW_FINDINGS_ONLY_KEY, null, storage) !== STORED_OFF;
+  return readString(NEW_FINDINGS_ONLY_KEY, null, storage) !== STORED_FALSE;
 }
 
 /**
@@ -29,7 +25,7 @@ export default function useLiveFeedSettings({ storage = localStorage } = {}) {
   const [newOnly, setNewOnlyState] = useState(() => loadNewOnly(storage));
 
   const setNewOnly = useCallback((value) => {
-    const ok = writeString(NEW_FINDINGS_ONLY_KEY, value ? STORED_ON : STORED_OFF, storage);
+    const ok = writeString(NEW_FINDINGS_ONLY_KEY, value ? STORED_TRUE : STORED_FALSE, storage);
     if (!ok) console.warn('[useLiveFeedSettings] could not persist new-findings-only setting');
     setNewOnlyState(value);
     broadcastSettingsChange(CHANGE_EVENT);

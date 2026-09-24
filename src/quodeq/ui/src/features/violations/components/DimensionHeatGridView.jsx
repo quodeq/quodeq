@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import HeatGridCells, { HEAT_GRID_VARIANT } from '../../../components/HeatGridCells.jsx';
-import { buildRows, COL_NAME, COL_VIOLATIONS, COL_HEALTH, ROW_TYPE } from './dimensionHeatGridModel.js';
+import HeatGridCells, {
+  HEAT_GRID_VARIANT, COL_NAME, COL_VIOLATIONS, COL_HEALTH, COL_ALIGN_LEFT, makeColumnSortHandler,
+} from '../../../components/HeatGridCells.jsx';
+import { buildRows, ROW_TYPE } from './dimensionHeatGridModel.js';
 import { activateOnKey } from '../../../utils/a11y.js';
 import { t } from '../../../strings/index.js';
-import { SORT_DIR, makeColumnSortHandler } from '../../../vocab/sortDirection.js';
+import { SORT_DIR } from '../../../vocab/sortDirection.js';
 
 const PRINCIPLE_INDENT_PX = 24;
-// This view's own column-header alignment values (only NAME is ever non-default).
-const COL_ALIGN_LEFT = 'left';
 
 function ariaSort(isActive, sortDir) {
   if (!isActive) return 'none';

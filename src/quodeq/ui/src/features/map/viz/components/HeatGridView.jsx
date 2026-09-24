@@ -1,20 +1,17 @@
 import { useMemo, useState } from 'react';
-import HeatGridCells, { HEAT_GRID_VARIANT } from '../../../../components/HeatGridCells.jsx';
+import HeatGridCells, {
+  HEAT_GRID_VARIANT, COL_NAME, COL_VIOLATIONS, COL_HEALTH, COL_ALIGN_LEFT, makeColumnSortHandler,
+} from '../../../../components/HeatGridCells.jsx';
 import { ICON_FOLDER } from '../../../../constants/navigation.jsx';
 import { activateOnKey } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
-import { SORT_DIR, makeColumnSortHandler } from '../../../../vocab/sortDirection.js';
+import { SORT_DIR } from '../../../../vocab/sortDirection.js';
 
-const COL_NAME = 'name';
+// This module's own severity column ids (the rest of its columns are
+// covered by HeatGridCells.jsx's shared COL_NAME/COL_VIOLATIONS/COL_HEALTH).
 const COL_CRITICAL = 'critical';
 const COL_MAJOR = 'major';
 const COL_MINOR = 'minor';
-const COL_VIOLATIONS = 'violations';
-const COL_HEALTH = 'health';
-
-// This module's own column-header alignment values (only NAME is ever
-// non-default).
-const COL_ALIGN_LEFT = 'left';
 
 const COLUMNS = [
   { id: COL_NAME, label: t('map.colFileFolder'), align: COL_ALIGN_LEFT },

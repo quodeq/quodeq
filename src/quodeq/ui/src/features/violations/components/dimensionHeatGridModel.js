@@ -5,15 +5,10 @@
  */
 import { SEVERITY } from '../../../vocab/severity.js';
 import { SORT_DIR } from '../../../vocab/sortDirection.js';
+import { COL_NAME, COL_VIOLATIONS, COL_HEALTH } from '../../../components/heatGridColumns.js';
 
 export const DEFAULT_SEVERITY = SEVERITY.MINOR;
 const UNKNOWN_PRINCIPLE = '(unknown)'; // findings that name no principle share one synthetic row
-
-// This grid's column ids, shared with DimensionHeatGridView.jsx's COLUMNS
-// (the rest of COLUMNS are severity ids, already covered by vocab/severity.js).
-export const COL_NAME = 'name';
-export const COL_VIOLATIONS = 'violations';
-export const COL_HEALTH = 'health';
 
 // A flattened row's own kind: the dimension summary row, or one of its
 // principle rows indented under it.
