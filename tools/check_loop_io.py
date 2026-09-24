@@ -43,6 +43,8 @@ Known limits, documented rather than closed:
     function is not calling it).
   - a `while` loop has no target, so every IO call in its body is flagged;
     a poll loop is a legitimate baseline entry.
+  - taint tracking is flow-insensitive: a name assigned an IO handle
+    anywhere in the function counts as that handle everywhere in it.
 """
 from __future__ import annotations
 
@@ -64,8 +66,8 @@ _PATH_METHODS = frozenset({"open", "read_text", "write_text", "read_bytes", "wri
 # Callees that open a file or database named by their first argument.
 _OPENERS = frozenset({"open", "connect"})
 _OPENER_PREFIX = "open_"
-# One event-log append or one lock acquisition per item: never exempt.
-_SHARED = frozenset({"emit", "get_file_lock"})
+# One event-log append, one lock acquisition or one DB commit per item: never exempt.
+_SHARED = frozenset({"emit", "get_file_lock", "commit"})
 # A literal iterable this short is a fixed handful of resources, not data.
 _SMALL_LITERAL_MAX = 3
 
@@ -133,7 +135,11 @@ def _per_item_names(targets: set[str], parts: list[ast.AST]) -> set[str]:
 
 
 def _is_small_literal(node: ast.expr) -> bool:
-    return isinstance(node, (ast.Tuple, ast.List, ast.Set)) and len(node.elts) <= _SMALL_LITERAL_MAX
+    if not isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        return False
+    if any(isinstance(elt, ast.Starred) for elt in node.elts):
+        return False
+    return len(node.elts) <= _SMALL_LITERAL_MAX
 
 
 def _comprehension_parts(node: ast.expr) -> tuple[list[ast.AST], set[str]] | None:

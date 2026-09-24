@@ -144,6 +144,16 @@ def test_literal_longer_than_the_limit_is_scanned():
     assert _sites(src) == [(3, "read_text")]
 
 
+def test_starred_literal_is_not_treated_as_small():
+    # `*many` can unpack to any number of elements, so this is not a fixed
+    # handful of known resources even though the literal has 2 elts.
+    src = """
+    for source in (*many, extra):
+        lines = log_path.read_text()
+    """
+    assert _sites(src) == [(3, "read_text")]
+
+
 def test_nested_function_body_is_not_scanned():
     src = """
     for item in items:
