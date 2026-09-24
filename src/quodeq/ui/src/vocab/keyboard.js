@@ -9,3 +9,10 @@ export const KEY = Object.freeze({
   ARROW_LEFT: 'ArrowLeft',
   ARROW_RIGHT: 'ArrowRight',
 });
+
+// KeyboardEvent.code values the UI branches on: physical-key identity
+// (layout-independent), unlike KEY above which is the character/name from
+// .key. Only the drawer's Ctrl/Cmd+` toggle (useDrawerHotkeys.js) and the
+// embedded terminal's matching guard (terminalSetup.js) need one, so they
+// don't fire the shortcut back into the terminal itself.
+export const KEY_CODE = Object.freeze({ BACKQUOTE: 'Backquote' });

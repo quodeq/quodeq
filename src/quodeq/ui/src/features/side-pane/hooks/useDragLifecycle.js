@@ -1,5 +1,9 @@
 import { useCallback } from 'react';
 
+// Pointer-drag DOM events every drag/resize gesture in the app watches:
+// window pointermove during the gesture, pointerup to end it.
+export const POINTER_EVENT = Object.freeze({ MOVE: 'pointermove', UP: 'pointerup' });
+
 /**
  * The pointer-drag lifecycle the side pane's two resizers share: take over
  * the body cursor and text selection, follow the rest of the gesture on the
@@ -37,8 +41,8 @@ export function useDragLifecycle({ setResizingFlag, activeDragCleanupRef }) {
       setResizingFlag(false);
       document.body.style.cursor = prevCursor;
       document.body.style.userSelect = prevSelect;
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener(POINTER_EVENT.MOVE, handleMove);
+      window.removeEventListener(POINTER_EVENT.UP, handleUp);
       activeDragCleanupRef.current = null;
     };
     const handleUp = (ev) => {
@@ -46,8 +50,8 @@ export function useDragLifecycle({ setResizingFlag, activeDragCleanupRef }) {
       cleanup();
     };
 
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp);
+    window.addEventListener(POINTER_EVENT.MOVE, handleMove);
+    window.addEventListener(POINTER_EVENT.UP, handleUp);
     activeDragCleanupRef.current = cleanup;
     return cleanup;
   }, [setResizingFlag, activeDragCleanupRef]);
