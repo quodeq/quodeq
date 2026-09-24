@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from quodeq.assistant.worktree import WorktreeError, WorktreeManager
+from quodeq.assistant.worktree import WorktreeError, WorktreeManager, WorktreeStatus
 from quodeq.data.ports.assistant import AssistantStore
 
 _logger = logging.getLogger(__name__)
@@ -73,14 +73,14 @@ def apply_workspace(
         return ApplyOutcome(OutcomeKind.TURN_BUSY)
     try:
         row = repo.get_worktree(sid)  # re-read under the claim
-        if row is None or row["status"] != "active":
+        if row is None or row["status"] != WorktreeStatus.ACTIVE:
             return ApplyOutcome(OutcomeKind.NOT_ACTIVE, detail=row["status"] if row else "gone")
         manager = _manager(row)
         try:
             stats = manager.apply_to_repo()
         except WorktreeError as exc:
             return ApplyOutcome(OutcomeKind.FAILED, detail=str(exc))
-        repo.set_worktree_status(sid, "applied")
+        repo.set_worktree_status(sid, WorktreeStatus.APPLIED)
         try:
             manager.remove()
         except WorktreeError:
@@ -124,7 +124,7 @@ def create_workspace_pr(
         return PrOutcome(OutcomeKind.TURN_BUSY)
     try:
         row = repo.get_worktree(sid)  # re-read under the claim
-        if row is None or row["status"] != "active":
+        if row is None or row["status"] != WorktreeStatus.ACTIVE:
             return PrOutcome(OutcomeKind.NOT_ACTIVE, detail=row["status"] if row else "gone")
         manager = _manager(row)
         try:
@@ -132,7 +132,7 @@ def create_workspace_pr(
         except WorktreeError as exc:
             return PrOutcome(OutcomeKind.FAILED, detail=str(exc))
         if result.get("prUrl"):
-            repo.set_worktree_status(sid, "pr_created")
+            repo.set_worktree_status(sid, WorktreeStatus.PR_CREATED)
             try:
                 manager.remove(delete_branch=False)  # branch lives on the remote PR
             except WorktreeError:
@@ -168,13 +168,13 @@ def discard_workspace(
         row = repo.get_worktree(sid)  # re-read under the claim
         if row is None:
             return DiscardOutcome(OutcomeKind.GONE)
-        if row["status"] not in ("active", "stale"):
+        if row["status"] not in (WorktreeStatus.ACTIVE, WorktreeStatus.STALE):
             return DiscardOutcome(OutcomeKind.NOT_ACTIVE, detail=row["status"])
         try:
             _manager(row).remove()
         except WorktreeError as exc:
             return DiscardOutcome(OutcomeKind.FAILED, detail=str(exc))
-        repo.set_worktree_status(sid, "discarded")
+        repo.set_worktree_status(sid, WorktreeStatus.DISCARDED)
         return DiscardOutcome(OutcomeKind.DISCARDED)
     finally:
         release_turn(sid)
