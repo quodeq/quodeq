@@ -16,6 +16,8 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
+from quodeq.core.run.state import RunState, parse_run_state
+
 _logger = logging.getLogger(__name__)
 
 _FINGERPRINT_DIRS = ("evaluation", "evidence")
@@ -43,23 +45,23 @@ def count_eval_files(run_dir: Path) -> int | None:
         return None
 
 
-def read_run_state(run_dir: Path) -> str | None:
-    """The ``state`` string from ``status.json``, or None when absent,
-    corrupt, non-dict, or non-string.
+def read_run_state(run_dir: Path) -> RunState | None:
+    """The run's current ``RunState``, from ``status.json``.
 
-    Unlike ``run_status_store.read_status`` this never raises (no schema
-    check): it feeds cache guards, where any read problem must degrade to
-    "no signal".
+    None when the file is absent, corrupt, non-dict, or its ``state`` value
+    is not a recognized (current or legacy) spelling. Unlike
+    ``run_status_store.read_status`` this never raises (no schema check): it
+    feeds cache guards and status readers, where any read problem must
+    degrade to "no signal".
     """
-    path = run_dir / "status.json"
-    if not path.is_file():
+    data = read_run_status_json(run_dir)
+    state = data.get("state") if isinstance(data, dict) else None
+    if not isinstance(state, str):
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        return parse_run_state(state)
+    except ValueError:
         return None
-    state = data.get("state") if isinstance(data, dict) else None
-    return state if isinstance(state, str) else None
 
 
 def list_dimension_evidence(run_dir: Path) -> list[tuple[str, Path, int]] | None:

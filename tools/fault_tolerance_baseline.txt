@@ -123,7 +123,7 @@ src/quodeq/services/_mutation_scoring.py:108:broad-except
 src/quodeq/services/_mutation_scoring.py:86:broad-except
 src/quodeq/services/_post_run_hook.py:37:broad-except
 src/quodeq/services/_post_run_hook.py:45:broad-except
-src/quodeq/services/_run_discard.py:138:broad-except
+src/quodeq/services/_run_discard.py:135:broad-except
 src/quodeq/services/active_evaluation.py:69:broad-except
 src/quodeq/services/background.py:141:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except

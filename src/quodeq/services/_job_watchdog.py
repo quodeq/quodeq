@@ -14,11 +14,12 @@ copy and silently escape that patch. The same deferred pattern is used for
 """
 from __future__ import annotations
 
-import json
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from quodeq.services.wiring import read_run_status_json
 
 if TYPE_CHECKING:
     from quodeq.services._job_model import Job, JobStore
@@ -53,10 +54,7 @@ def run_status_exit_reason(job: "Job | None", reports_root: Path | None) -> str 
     """
     if job is None or not job.output_project or not job.output_run_id or reports_root is None:
         return None
-    status_path = reports_root / job.output_project / job.output_run_id / "status.json"
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    reason = data.get("exit_reason")
+    run_dir = reports_root / job.output_project / job.output_run_id
+    data = read_run_status_json(run_dir)
+    reason = data.get("exit_reason") if isinstance(data, dict) else None
     return reason if isinstance(reason, str) else None

@@ -4,7 +4,12 @@ The API layer does not import ``data/`` directly (see ARCHITECTURE.md import
 rules); this facade exposes the Event Log reader through services, mirroring
 how ``services/grade_formula.py`` fronts the params store.
 """
-from quodeq.services.wiring import EventLogReader, read_dimensions  # noqa: F401 — re-exported API
+from quodeq.services.wiring import (  # noqa: F401 — re-exported API
+    EventLogReader,
+    read_dimensions,
+    read_run_state,
+    read_run_status_json,
+)
 
 
 def read_run_dim_states(reports_dir, project: str, run_id: str) -> dict:
