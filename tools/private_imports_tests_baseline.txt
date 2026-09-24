@@ -309,8 +309,8 @@ tests/analysis/test_report_scoring_coverage.py:7:private-module:quodeq.analysis.
 tests/analysis/test_runner_dispatch.py:8:private-module:quodeq.analysis._config.AnalysisConfig
 tests/analysis/test_source_gathering.py:6:private-module:quodeq.analysis._api_standards_text
 tests/analysis/test_source_gathering.py:7:private-module:quodeq.analysis._config.AnalysisConfig
-tests/analysis/test_subagent_pool.py:13:private-module:quodeq.analysis.subagents._pool_worker.WorkerContext
-tests/analysis/test_subagent_pool.py:13:private-module:quodeq.analysis.subagents._pool_worker.build_agent_config
+tests/analysis/test_subagent_pool.py:15:private-module:quodeq.analysis.subagents._pool_worker.WorkerContext
+tests/analysis/test_subagent_pool.py:15:private-module:quodeq.analysis.subagents._pool_worker.build_agent_config
 tests/analysis/test_subagent_pool_advanced.py:13:private-module:quodeq.analysis.subagents._pool_models.ScaleUpState
 tests/analysis/test_subagent_pool_advanced.py:14:private-module:quodeq.analysis.subagents._pool_scaling.ScaleUpContext
 tests/analysis/test_subagent_pool_advanced.py:14:private-module:quodeq.analysis.subagents._pool_scaling.compute_scale_up
