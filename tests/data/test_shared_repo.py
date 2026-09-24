@@ -4,7 +4,6 @@ import time
 from pathlib import Path
 
 from quodeq.data.fs.shared_repo import (
-    _git_env,
     ensure_shared_clone,
     refresh_shared_clone,
     remove_clone_dir,
@@ -12,6 +11,7 @@ from quodeq.data.fs.shared_repo import (
     shared_cache_dir,
     shared_repo_path,
 )
+from quodeq.data.fs.shared_repo_git import git_env
 from tests.data._shared_repo_helpers import _make_origin
 
 
@@ -144,7 +144,7 @@ def test_git_env_disables_terminal_prompt_and_keeps_lfs_skip():
     fast instead of trying to read a prompt from a terminal that (with
     stdin=DEVNULL) no longer exists.
     """
-    env = _git_env()
+    env = git_env()
     assert env["GIT_TERMINAL_PROMPT"] == "0"
     assert env["GIT_LFS_SKIP_SMUDGE"] == "1"
     # GIT_SSH_COMMAND must NOT be set here: overriding it would silently

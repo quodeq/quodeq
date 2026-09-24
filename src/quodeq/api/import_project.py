@@ -35,7 +35,7 @@ from quodeq.api.zip import (
 )
 from quodeq.services.project_index import ProjectIdentity
 
-from ._import_extract import safe_extract  # re-export
+from ._import_extract import StrandedBackupError, safe_extract, swap_into_place  # safe_extract re-exported
 from ._import_identity import (
     REPO_INFO_FILENAME,
     find_identity_collision,
@@ -103,11 +103,13 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
 
 def _resolve_import_conflict(
     reports_root: Path, top_dir: str, action: str | None, identity: ProjectIdentity,
-) -> str | ImportOutcome:
+) -> tuple[str, bool] | ImportOutcome:
     """Resolve a UUID or identity collision for an incoming import.
 
-    Returns the UUID to import under, or an ``ImportOutcome`` (a CONFLICT or
-    the AMBIGUOUS_REPLACE error) for the caller to return immediately.
+    Returns ``(target_uuid, replace_existing)``, or an ``ImportOutcome`` (a
+    CONFLICT or the AMBIGUOUS_REPLACE error) for the caller to return
+    immediately. Deletes nothing: a replace swaps the old project out only
+    once the new one is extracted (see ``_stage_and_commit``).
     """
     same_uuid_path = reports_root / top_dir
     same_uuid_collision = same_uuid_path.is_dir()
@@ -117,10 +119,9 @@ def _resolve_import_conflict(
     # prompt the user.
     if same_uuid_collision:
         if action == _ACTION_REPLACE:
-            shutil.rmtree(same_uuid_path, ignore_errors=False)
-            return top_dir
+            return top_dir, True
         if action == _ACTION_COPY:
-            return str(_uuid.uuid4())
+            return str(_uuid.uuid4()), False
         return ImportOutcome(HTTPStatus.CONFLICT, {
             "error": "Project already exists",
             "code": "PROJECT_EXISTS",
@@ -132,7 +133,7 @@ def _resolve_import_conflict(
         if action == _ACTION_COPY:
             # No UUID collision, so the incoming UUID is fine — both
             # projects coexist (different UUIDs, same repo identity).
-            return top_dir
+            return top_dir, False
         if action == _ACTION_REPLACE:
             # 'replace' on identity collision is ambiguous (two UUIDs for
             # the same repo). Refuse rather than guess.
@@ -148,7 +149,7 @@ def _resolve_import_conflict(
             "existingProjectId": same_identity_uuid,
             "projectName": identity.project_name,
         })
-    return top_dir
+    return top_dir, False
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +164,7 @@ class _ImportTarget:
     top_dir: str
     target_uuid: str
     identity: ProjectIdentity
+    replace_existing: bool = False
 
 
 def _stage_and_commit(
@@ -171,17 +173,25 @@ def _stage_and_commit(
     """Extract into a staging dir, atomically rename into place, then update
     the repository_info.json UUID (if renamed) and the project index."""
     staging = Path(tempfile.mkdtemp(prefix="quodeq_import_", dir=str(target.reports_root)))
+    keep_staging = False  # set when the staging dir holds the only copy of the old project
     try:
         safe_extract(zf, members, staging)
         staged_project = staging / target.top_dir
         if not staged_project.is_dir():
             raise bad_request("Archive missing top-level project directory.", "BAD_LAYOUT")
         final_path = target.reports_root / target.target_uuid
-        if final_path.exists():  # extremely narrow race window after the replace check above
-            raise bad_request("Target project directory already exists.", "RACE")
-        staged_project.rename(final_path)
+        if target.replace_existing and final_path.exists():
+            swap_into_place(staged_project, final_path, staging)
+        else:
+            if final_path.exists():  # extremely narrow race window after the collision check
+                raise bad_request("Target project directory already exists.", "RACE")
+            staged_project.rename(final_path)
+    except StrandedBackupError:
+        keep_staging = True
+        raise
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        if not keep_staging:
+            shutil.rmtree(staging, ignore_errors=True)
 
     if target.target_uuid != target.top_dir:
         rewrite_repository_info(final_path, target.target_uuid)
@@ -260,7 +270,8 @@ def import_zip_stream(
             resolution = _resolve_import_conflict(reports_root, top_dir, action, identity)
             if isinstance(resolution, ImportOutcome):
                 return resolution
-            target = _ImportTarget(reports_root, top_dir, resolution, identity)
+            target_uuid, replace_existing = resolution
+            target = _ImportTarget(reports_root, top_dir, target_uuid, identity, replace_existing)
             _stage_and_commit(zf, members, target)
     except ImportValidationError as exc:
         return _error_outcome(exc.public_message, exc.status, exc.code)

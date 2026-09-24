@@ -47,38 +47,35 @@ const principleBySeverity = {
   minor:    [principleViolations[2]],
 };
 
-test('buildPrinciplePlanText with no severityFilter includes all severities (object form)', () => {
-  const md = buildPrinciplePlanText({ principle: 'SRP', violations: principleViolations });
+const splitArgs = (extra = {}) => ({
+  principle: 'SRP', violations: principleViolations, violationsBySeverity: principleBySeverity, ...extra,
+});
+
+test('buildPrinciplePlanText with no severityFilter includes all severities', () => {
+  const md = buildPrinciplePlanText(splitArgs());
   assert.match(md, /P-Crit/);
   assert.match(md, /P-Maj/);
   assert.match(md, /P-Min/);
 });
 
-test("buildPrinciplePlanText with severityFilter='critical' includes only critical (split form)", () => {
-  const md = buildPrinciplePlanText('SRP', principleViolations, principleBySeverity, undefined, 'critical');
+test("buildPrinciplePlanText with severityFilter='critical' includes only critical", () => {
+  const md = buildPrinciplePlanText(splitArgs({ severityFilter: 'critical' }));
   assert.match(md, /P-Crit/);
   assert.doesNotMatch(md, /P-Maj/);
   assert.doesNotMatch(md, /P-Min/);
   assert.match(md, /\*\*Total violations:\*\* 1/);
 });
 
-test("buildPrinciplePlanText with severityFilter='all' equals no filter (split form)", () => {
-  const a = buildPrinciplePlanText('SRP', principleViolations, principleBySeverity, undefined, 'all');
-  const b = buildPrinciplePlanText('SRP', principleViolations, principleBySeverity);
-  assert.equal(a, b);
+test("buildPrinciplePlanText with severityFilter='all' equals no filter", () => {
+  assert.equal(buildPrinciplePlanText(splitArgs({ severityFilter: 'all' })), buildPrinciplePlanText(splitArgs()));
 });
 
 test("buildPrinciplePlanText with severityFilter='compliance' returns the empty-state body", () => {
-  const md = buildPrinciplePlanText('SRP', principleViolations, principleBySeverity, undefined, 'compliance');
+  const md = buildPrinciplePlanText(splitArgs({ severityFilter: 'compliance' }));
   assert.equal(md, '_No violations match the current filter._');
 });
 
-test("buildPrinciplePlanText object form ignores severityFilter (it's split-form only)", () => {
-  // The object form does not take a positional severityFilter; consumers
-  // using the object form pre-filter their input. This pins down that
-  // calling the object form does not crash and renders all the violations
-  // it was given.
-  const md = buildPrinciplePlanText({ principle: 'SRP', violations: principleViolations.slice(0, 1) });
-  assert.match(md, /P-Crit/);
-  assert.doesNotMatch(md, /P-Maj/);
+test('buildPrinciplePlanText passes principleData.findings as context', () => {
+  const md = buildPrinciplePlanText(splitArgs({ principleData: { findings: 'CTX-NOTE' } }));
+  assert.match(md, /\*\*Context:\*\* CTX-NOTE/);
 });
