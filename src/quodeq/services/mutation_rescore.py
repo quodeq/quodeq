@@ -36,6 +36,10 @@ from quodeq.shared.log_sink import LoggerSink
 logger = logging.getLogger(__name__)
 # What the LogSink-typed callees get. A bare Logger has no ``success``.
 _log_sink = LoggerSink(logger)
+# One bounded runner for every fallback projection in the process. It holds
+# no threads while idle (workers exit on an empty queue), so a module-level
+# instance costs nothing until a fallback actually fires.
+_SHARED_RUNNER = ThreadBackgroundRunner(log=_log_sink)
 
 
 def _mutation_envelope(
@@ -156,13 +160,17 @@ def rescore_with_fallback(
     Shared by the findings mutation routes and the assistant's
     dismiss_finding action apply. See rescore_run for the slim payload.
     *runner* lets callers/tests inject a synchronous or fake BackgroundRunner;
-    production defaults to a fresh ThreadBackgroundRunner per call (it holds
-    no state, so there is nothing to share between calls).
+    production uses the module's one bounded ``_SHARED_RUNNER``. No task is
+    submitted while a projection for *project* already holds its lock: that
+    projection covers the latest actions, and queueing a duplicate would only
+    fill the bounded queue.
     """
     scores = rescore_run(evaluations_dir, project, run_id, log=_log_sink)
     if scores is None:
         proj_dir = resolve_project_dir(evaluations_dir, project)
         lock = get_projection_lock(project)
+        if lock.locked():
+            return scores
 
         def _bg_project() -> None:
             # Non-blocking acquire on purpose: skip rather than queue.
@@ -193,7 +201,7 @@ def rescore_with_fallback(
             finally:
                 lock.release()
 
-        (runner or ThreadBackgroundRunner(log=_log_sink)).submit(
+        (runner or _SHARED_RUNNER).submit(
             _bg_project, name=f"rescore-project-{project}",
         )
     return scores
