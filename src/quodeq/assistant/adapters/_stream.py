@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 from quodeq.core.stream.events import (
+    BLOCK_TYPE_OUTPUT_TEXT, BLOCK_TYPE_TEXT, BLOCK_TYPE_TOOL_USE, ITEM_TYPE_AGENT_MESSAGE,
     EVENT_TYPE_ASSISTANT, EVENT_TYPE_ASSISTANT_MESSAGE, EVENT_TYPE_ERROR, EVENT_TYPE_ITEM_COMPLETED,
     EVENT_TYPE_RESULT, EVENT_TYPE_TOOL_EXECUTION_START, EVENT_TYPE_TURN_FAILED,
     copilot_error, copilot_event_data, texts_from_copilot,
 )
 
-_TEXT_TYPES = ("text", "output_text")
+_TEXT_TYPES = (BLOCK_TYPE_TEXT, BLOCK_TYPE_OUTPUT_TEXT)
 _ARGS_SUMMARY_MAX_CHARS = 80  # display truncation width for a tool call's args/command summary
 
 # Wire-format "type" values this dialect-agnostic parser branches on. Not in
@@ -21,10 +22,8 @@ _EVENT_TYPE_ITEM_STARTED = "item.started"  # codex: a tool call begins
 _EVENT_TYPE_SESSION_START = "session.start"  # copilot: session/thread id announced
 _BLOCK_TYPE_CONTENT_BLOCK_DELTA = "content_block_delta"  # Anthropic SSE delta block type
 _DELTA_TYPE_TEXT_DELTA = "text_delta"  # Anthropic SSE delta's own type
-_ITEM_TYPE_AGENT_MESSAGE = "agent_message"  # codex item.completed: a complete assistant message
 _ITEM_TYPE_MCP_TOOL_CALL = "mcp_tool_call"  # codex item type: an MCP tool invocation
 _ITEM_TYPE_COMMAND_EXECUTION = "command_execution"  # codex item type: a shell command
-_BLOCK_TYPE_TOOL_USE = "tool_use"  # Claude assistant-message content block type
 
 
 def parse_line(line: str) -> dict | None:
@@ -104,7 +103,7 @@ def assistant_text(event: dict) -> list[str]:
     if etype == EVENT_TYPE_ITEM_COMPLETED:
         item = event.get("item")
         item = item if isinstance(item, dict) else {}
-        if item.get("type") == _ITEM_TYPE_AGENT_MESSAGE:
+        if item.get("type") == ITEM_TYPE_AGENT_MESSAGE:
             if isinstance(item.get("text"), str):
                 return [item["text"]]
             return _texts_from_blocks(item.get("content"))
@@ -157,7 +156,7 @@ def tool_use_details(event: dict) -> list[dict]:
     details = []
     if isinstance(blocks, list):
         for b in blocks:
-            if isinstance(b, dict) and b.get("type") == _BLOCK_TYPE_TOOL_USE and isinstance(b.get("name"), str):
+            if isinstance(b, dict) and b.get("type") == BLOCK_TYPE_TOOL_USE and isinstance(b.get("name"), str):
                 details.append({"name": b["name"], "args_summary": _args_summary(b.get("input"))})
     return details
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify
 
-from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_FORBIDDEN
+from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_CONFLICT, ERROR_CODE_FORBIDDEN
 from quodeq.api.helpers import json_object_or_error, sanitize_for_log, error_response
 from quodeq.services.import_validator import StandardImportValidationError
 from quodeq.services.standards import IMPORT_STATUS_CONFLICT
@@ -45,7 +45,7 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
         return error_response(
             "A standard with this ID already exists from a different source. "
             "Duplicate it to customize your own copy, or delete the existing one, then retry.",
-            HTTPStatus.CONFLICT, IMPORT_STATUS_CONFLICT,
+            HTTPStatus.CONFLICT, ERROR_CODE_CONFLICT,
         )
     except (OSError, ValueError, http.client.HTTPException) as exc:
         # See list_library: HTTPException is urllib's truncated/malformed

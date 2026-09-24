@@ -13,10 +13,10 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from quodeq.services.dashboard import LATEST_RUN
 from quodeq.services.deleted import deleted_keys as load_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as load_dismissed_keys
 from quodeq.services.rescore import rescore_dimensions
+from quodeq.services.run_constants import LATEST_RUN
 from quodeq.services.run_reports import list_runs, read_run_data
 from quodeq.services.suppression import load_suppression_rules
 from quodeq.services.suppression_keys import SuppressionKeys

@@ -24,7 +24,7 @@ from quodeq.dashboard._server import (
     ensure_action_api,
     ensure_action_api_forced,
 )
-from quodeq.shared.constants import PLATFORM_DARWIN
+from quodeq.shared.constants import ENV_TRUTHY, PLATFORM_DARWIN
 from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_info, log_warning
@@ -198,7 +198,7 @@ def _resolve_environ(
     """Apply config-derived variables to *env* (``os.environ`` by default) and return it."""
     environ: MutableMapping[str, str] = resolve_env_mut(env)
     if config.build.verbose:
-        environ["QUODEQ_VERBOSE"] = "1"
+        environ["QUODEQ_VERBOSE"] = ENV_TRUTHY
     return environ
 
 

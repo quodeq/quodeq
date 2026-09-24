@@ -5,12 +5,12 @@ from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
+from quodeq.shared.constants import GIT_DIR_NAME
 
 _MAX_FILE_BYTES = 65_536
 _MAX_DIR_ENTRIES = 500
 _DENY_BASENAMES = (".env", "id_rsa", "id_ed25519", ".netrc", ".npmrc", ".pypirc")
 _DENY_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".keystore")
-_GIT_DIR_NAME = ".git"
 
 
 def jail(ctx: ToolContext, rel_path: str) -> Path:
@@ -29,7 +29,7 @@ def jail(ctx: ToolContext, rel_path: str) -> Path:
     name = target.name.lower()
     if name.startswith(_DENY_BASENAMES) or name.endswith(_DENY_SUFFIXES):
         raise ToolError("path is on the secrets denylist")
-    if target.name.lower() == _GIT_DIR_NAME or _GIT_DIR_NAME in {p.name.lower() for p in target.parents}:
+    if target.name.lower() == GIT_DIR_NAME or GIT_DIR_NAME in {p.name.lower() for p in target.parents}:
         raise ToolError("path is inside the .git directory")
     return target
 

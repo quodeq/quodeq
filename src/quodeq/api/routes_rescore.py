@@ -6,6 +6,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import CODE_INVALID_PARAM, CODE_MISSING_PARAM, CODE_NOT_FOUND
 from quodeq.api.helpers import json_error
 from quodeq.services.rescore_run import RescoreStatus, rescore_project_run
 from quodeq.shared.utils import get_evaluations_dir
@@ -18,9 +19,9 @@ def _eval_dir_from_app(app: Flask) -> str:
 # Use-case outcome -> (message, HTTP status, code). The route owns only this
 # mapping plus query parsing; the rules live in services.rescore_run.
 _OUTCOME_ERRORS = {
-    RescoreStatus.INVALID_PARAM: ("Invalid project or run parameter", HTTPStatus.BAD_REQUEST, "INVALID_PARAM"),
-    RescoreStatus.PROJECT_NOT_FOUND: ("No runs found for project", HTTPStatus.NOT_FOUND, "NOT_FOUND"),
-    RescoreStatus.RUN_NOT_FOUND: ("Run data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND"),
+    RescoreStatus.INVALID_PARAM: ("Invalid project or run parameter", HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM),
+    RescoreStatus.PROJECT_NOT_FOUND: ("No runs found for project", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND),
+    RescoreStatus.RUN_NOT_FOUND: ("Run data not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND),
 }
 
 
@@ -38,7 +39,7 @@ def register_rescore_routes(app: Flask) -> None:
         if not project:
             return json_error(
                 "project query parameter is required; add ?project=<name> to the query string",
-                HTTPStatus.BAD_REQUEST, "MISSING_PARAM",
+                HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM,
             )
         run_id = request.args.get("run", "")
         eval_dir = _eval_dir_from_app(app)

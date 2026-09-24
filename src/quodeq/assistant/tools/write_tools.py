@@ -11,10 +11,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._constants import ENCODING_UTF8, JSON_SCHEMA_TYPE_OBJECT, JSON_SCHEMA_TYPE_STRING
+from quodeq.assistant.tools._constants import JSON_SCHEMA_TYPE_OBJECT, JSON_SCHEMA_TYPE_STRING
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.assistant.tools._repo_tools import jail
 from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
+from quodeq.shared.utils import TEXT_ENCODING
 
 _MAX_CONTENT_BYTES = 65_536
 _MAX_DIFF_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON headroom
@@ -42,7 +43,7 @@ def _edit_repo_file(ctx: ToolContext, path: str, old_string: str,
     if b"\x00" in raw[:1024]:
         raise ToolError("cannot edit a binary file")
     try:
-        text = raw.decode(ENCODING_UTF8)
+        text = raw.decode(TEXT_ENCODING)
     except UnicodeDecodeError as exc:
         raise ToolError("cannot edit a non-UTF-8 file, rewrite it with write_repo_file instead") from exc
     count = text.count(old_string) if old_string else 0
@@ -52,7 +53,7 @@ def _edit_repo_file(ctx: ToolContext, path: str, old_string: str,
         raise ToolError(
             f"old_string matches {count} times, add surrounding context to make it unique")
     new_text = text.replace(old_string, new_string, 1)
-    encoded = new_text.encode(ENCODING_UTF8)
+    encoded = new_text.encode(TEXT_ENCODING)
     if len(encoded) > _MAX_CONTENT_BYTES:
         raise ToolError(f"edited file would exceed {_MAX_CONTENT_BYTES} bytes")
     # write_bytes, not write_text: text mode translates "\n" to the platform
@@ -64,7 +65,7 @@ def _edit_repo_file(ctx: ToolContext, path: str, old_string: str,
 
 
 def _write_repo_file(ctx: ToolContext, path: str, content: str) -> dict:
-    data = content.encode(ENCODING_UTF8)
+    data = content.encode(TEXT_ENCODING)
     if len(data) > _MAX_CONTENT_BYTES:
         raise ToolError(f"content exceeds {_MAX_CONTENT_BYTES} bytes")
     target = _jail_write(ctx, path)

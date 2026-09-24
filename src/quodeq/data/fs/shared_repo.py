@@ -35,12 +35,12 @@ from pathlib import Path
 # straight from quodeq.data.fs.repo_validation for the same reason.
 from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
 from quodeq.data.fs.shared_repo_git import (  # noqa: F401 -- re-exported for existing callers
-    GIT_DIR_NAME,
     run_git,
     shared_cache_dir,
     shared_evaluations_root,
     shared_repo_path,
 )
+from quodeq.shared.constants import GIT_DIR_NAME
 # Re-exported: format/bootstrap, index sync and publish attribution live in
 # shared_repo_meta.py; services/shared_repo.py and wiring.py import them
 # through this module.

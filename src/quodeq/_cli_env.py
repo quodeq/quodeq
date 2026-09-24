@@ -11,13 +11,14 @@ import os
 import sys
 from collections.abc import Mapping
 
+from quodeq.shared.constants import ENV_TRUTHY
+
 ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 ENV_POOL_BUDGET = "QUODEQ_POOL_BUDGET"
 _ENV_TIME_LIMIT = "QUODEQ_TIME_LIMIT"
 ENV_NO_CONSOLIDATE = "QUODEQ_NO_CONSOLIDATE"
 _POOL_BUDGET_FLAG = "--pool-budget"  # deprecated CLI flag, replaced by --time-limit
-_ENV_TRUTHY = "1"  # QUODEQ_NO_VERIFY truthy value
 _ENV_SUBAGENT_MODEL = "SUBAGENT_MODEL"
 
 
@@ -83,4 +84,4 @@ def cli_environ(env: Mapping[str, str] | None = None) -> Mapping[str, str]:
 
 def no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
     """Return True if verification should be skipped (CLI flag or env var)."""
-    return args.no_verify or cli_environ(env).get("QUODEQ_NO_VERIFY") == _ENV_TRUTHY
+    return args.no_verify or cli_environ(env).get("QUODEQ_NO_VERIFY") == ENV_TRUTHY

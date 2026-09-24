@@ -20,6 +20,7 @@ from quodeq.analysis.manifest_serialization import manifest_to_dict
 from quodeq.analysis.runner import RunConfig, run
 from quodeq.analysis.scoring_pipeline import run_full
 from quodeq.services.grade_formula import load_params
+from quodeq.shared.constants import MANIFEST_FILENAME
 from quodeq.shared.logging import log_error, log_info
 from quodeq.shared.utils import write_text
 from quodeq._cli_scoring import print_scores
@@ -73,6 +74,6 @@ def save_manifest(manifest, evidence_dir: Path) -> None:
     """Save manifest for debugging (best-effort)."""
     if manifest and evidence_dir:
         try:
-            write_text(evidence_dir / "manifest.json", json.dumps(manifest_to_dict(manifest), indent=2))
+            write_text(evidence_dir / MANIFEST_FILENAME, json.dumps(manifest_to_dict(manifest), indent=2))
         except OSError as exc:
             _logger.debug("Could not write manifest: %s", exc)

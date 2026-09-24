@@ -9,11 +9,11 @@ for its existing callers/tests) is a thin static-method delegate to it. The
 from __future__ import annotations
 
 from quodeq.services.base import EvaluationOptions
+from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.provider_env import provider_env_exports
 
 _OMLX_PROVIDER_ID = "omlx"  # a provider-config id with no Provider member (see llm_bridge._providers)
-_ENV_TRUE = "1"  # env vars are always str; the truthy spelling these flags use
 
 
 def _apply_provider_credentials(built_env: dict[str, str], options: EvaluationOptions) -> None:
@@ -45,7 +45,7 @@ def build_eval_env(
     call-site module (``evaluation_mixin``).
     """
     base = resolve_env(env)
-    built_env = {**base, "PYTHONUNBUFFERED": _ENV_TRUE}
+    built_env = {**base, "PYTHONUNBUFFERED": ENV_TRUTHY}
     built_env["AI_CMD"] = ai_cmd
     # Validated at the API boundary (validate_ai_cmd_path); the scan
     # subprocess spawns it as argv[0] while AI_CMD keeps keying the
@@ -60,7 +60,7 @@ def build_eval_env(
     if subagent_model:
         built_env["SUBAGENT_MODEL"] = subagent_model
     if not options.verify_findings:
-        built_env["QUODEQ_NO_VERIFY"] = _ENV_TRUE
+        built_env["QUODEQ_NO_VERIFY"] = ENV_TRUTHY
     # Always propagate the limit, including 0 (unlimited). The CLI
     # subprocess uses positive values to set the run-level deadline
     # (lifecycle.set_deadline + analyzing_start marker) that the
@@ -70,7 +70,7 @@ def build_eval_env(
     if options.time_limit is not None and options.time_limit >= 0:
         built_env["QUODEQ_TIME_LIMIT"] = str(options.time_limit)
     if options.per_dimension:
-        built_env["QUODEQ_NO_CONSOLIDATE"] = _ENV_TRUE
+        built_env["QUODEQ_NO_CONSOLIDATE"] = ENV_TRUTHY
     if options.context_size > 0:
         built_env["QUODEQ_CONTEXT_SIZE"] = str(options.context_size)
     _apply_provider_credentials(built_env, options)

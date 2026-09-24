@@ -8,6 +8,9 @@ from __future__ import annotations
 ERROR_CODE_BAD_REQUEST = "bad_request"
 ERROR_CODE_NOT_FOUND = "not_found"
 ERROR_CODE_FORBIDDEN = "forbidden"
+# Same spelling as services IMPORT_STATUS_CONFLICT, but a different contract:
+# this is the error_response ``code``, that is the import result ``status``.
+ERROR_CODE_CONFLICT = "conflict"
 
 # request.args values are always str, never bool, so boolean query-param
 # flags (``?confirm=true``, ``?discard=true``, ``?dryRun=1``, ``?refresh=1``)

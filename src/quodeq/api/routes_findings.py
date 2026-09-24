@@ -17,7 +17,7 @@ from typing import Any, Callable
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import CODE_MISSING_PARAM, QUERY_FLAG_TRUE
+from quodeq.api._constants import CODE_INVALID_PARAM, CODE_MISSING_PARAM, CODE_NOT_FOUND, QUERY_FLAG_TRUE
 from quodeq.api.helpers import json_error, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed_listing import load_dismissed
@@ -114,7 +114,7 @@ def _finding_target_or_error(
         return None, (jsonify({"error": "project, req, file, and line are required", "code": CODE_MISSING_PARAM}), 400)
     type_err = _invalid_body_fields(body, ("project", "req", "file", "fingerprint"), ("line",))
     if type_err:
-        return None, (jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400)
+        return None, (jsonify({"error": type_err, "code": CODE_INVALID_PARAM}), 400)
     return {"project": project, "req": req, "file": file, "line": line}, None
 
 
@@ -217,7 +217,7 @@ def _delete(app: Flask) -> tuple[Response, int]:
         return jsonify({"error": "project, dimension, principle, and file are required", "code": CODE_MISSING_PARAM}), 400
     type_err = _invalid_body_fields(body, ("project", "dimension", "principle", "file"))
     if type_err:
-        return jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400
+        return jsonify({"error": type_err, "code": CODE_INVALID_PARAM}), 400
     swept = delete_finding(_project_dir(_eval_dir(app), project), body)
     scores = _scores_with_fallback(app, project, run_id)
     delta = delete_delta(
@@ -252,7 +252,7 @@ def register_findings_routes(app: Flask) -> None:
         # Same {"error", "code"} shape every other error branch in this
         # file returns, instead of Flask's default 404 HTML page that the
         # bare abort() _project_dir used to call would give.
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
 
     @app.get("/api/findings/dismissed")
     def list_dismissed() -> Response | tuple[dict[str, Any], int]:

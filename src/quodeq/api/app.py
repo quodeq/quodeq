@@ -20,6 +20,7 @@ from quodeq.api.routes_registry import register_all_routes
 from quodeq.api.security import configure_security
 from quodeq.config.paths import default_paths
 from quodeq.services.base import ActionProvider
+from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_static_dist
@@ -30,7 +31,6 @@ _DEFAULT_EVALUATION_RATE_LIMIT_WINDOW = 300
 _DEFAULT_EVALUATION_RATE_LIMIT_MAX = 10
 _MULTIPART_FRAMING_HEADROOM_BYTES = 1 * 1024 * 1024  # 1 MiB over the zip cap for multipart overhead
 
-_VERBOSE_ENV_TRUE = "1"  # QUODEQ_VERBOSE truthy value
 _BIND_HOST_ANY = "0.0.0.0"  # binds to every interface
 _BIND_HOST_LOOPBACK = "127.0.0.1"  # binds to loopback only
 
@@ -56,7 +56,7 @@ def _configure_logging(
     log_buffer = LogBuffer()
     app.extensions["log_buffer"] = log_buffer
 
-    verbose = resolve_env(env).get("QUODEQ_VERBOSE") == _VERBOSE_ENV_TRUE
+    verbose = resolve_env(env).get("QUODEQ_VERBOSE") == ENV_TRUTHY
     for name in ("werkzeug", "quodeq.api"):
         lgr = logging.getLogger(name)
         lgr.handlers = [log_buffer.handler]

@@ -12,6 +12,7 @@ PLATFORM_DARWIN = "darwin"
 # ("Darwin"/"Linux" vs "darwin"/"win32").
 SYSTEM_DARWIN = "Darwin"
 SYSTEM_LINUX = "Linux"
+MACHINE_ARM64 = "arm64"  # platform.machine() on Apple silicon (Homebrew prefix, native tooling picks)
 
 # URL schemes the app's fetchers and SSRF guards allow.
 SCHEME_HTTP = "http"
@@ -55,6 +56,19 @@ SECRET_SUFFIX_CHARS = 4  # how many trailing credential characters a log or sett
 # stream files. Named by analysis/data/services alike (analysis writes it,
 # data and services read it), so it lives here rather than in one layer.
 EVIDENCE_DIRNAME = "evidence"
+
+# The run's evidence manifest (evidence/manifest.json) and the project-export
+# zip's top-level manifest share this filename. Written by the CLI pipeline,
+# read by data/services, copied by publish staging and zipped by api/zip.py.
+MANIFEST_FILENAME = "manifest.json"
+
+# git argv pieces and the repo metadata directory, used by the CLI worktree
+# helpers, assistant/worktree.py, data/git_cli.py and the shared-repo cache.
+GIT_BIN = "git"  # argv[0] for a git subprocess
+GIT_FLAG_C = "-C"  # git's global "run as if started in <path>" flag
+GIT_DIR_NAME = ".git"  # a checkout's metadata directory (also a path segment the assistant jail refuses)
+
+ENV_TRUTHY = "1"  # the spelling quodeq's on/off env flags use (QUODEQ_VERBOSE, QUODEQ_NO_VERIFY, ...)
 
 # Synthetic dimension id for a consolidated run (multiple dimensions handled
 # by one agent pool/prompt instead of one pool per dimension). Used as the

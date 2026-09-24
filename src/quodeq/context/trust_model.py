@@ -75,11 +75,12 @@ NETWORK_EXPOSURES: frozenset[str] = frozenset(
 )
 
 _TOPOLOGY_SINGLE_HOST = "single-host"
+_TOPOLOGY_DISTRIBUTED = "distributed"  # the conservative default and the other declarable topology
 
 #: Topology is never detected, for the same reason exposure is not: a
 #: single-host deployment and a horizontally scaled one are byte-identical on
 #: disk. Only a human declaration may relax F-SCL-1/2/4.
-DEPLOYMENT_TOPOLOGIES: frozenset[str] = frozenset({_TOPOLOGY_SINGLE_HOST, "distributed"})
+DEPLOYMENT_TOPOLOGIES: frozenset[str] = frozenset({_TOPOLOGY_SINGLE_HOST, _TOPOLOGY_DISTRIBUTED})
 
 
 @dataclass(frozen=True)
@@ -102,7 +103,7 @@ class TrustModel:
 #: What an undeclared, undetectable project gets. Deliberately the most
 #: pessimistic model, so absence of information never relaxes a finding.
 CONSERVATIVE = TrustModel(
-    multi_tenant=True, network_exposure="public", deployment_topology="distributed")
+    multi_tenant=True, network_exposure=NetworkExposure.PUBLIC.value, deployment_topology=_TOPOLOGY_DISTRIBUTED)
 
 
 def _read_profile(project_root: Path) -> dict:

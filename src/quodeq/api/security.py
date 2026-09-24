@@ -11,6 +11,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import CODE_FORBIDDEN
 from quodeq.api._rate_limit import RateLimitStore
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.constants import SECRET_SUFFIX_CHARS
@@ -166,10 +167,10 @@ def _check_csrf() -> Response | tuple[Response, int] | None:
         return None
     origin = request.headers.get("Origin")
     if not origin:
-        return jsonify({"error": "Origin header required", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+        return jsonify({"error": "Origin header required", "code": CODE_FORBIDDEN}), HTTPStatus.FORBIDDEN
     allowed = {f"http://{request.host}", f"https://{request.host}"}
     if origin not in allowed:
-        return jsonify({"error": "Origin not allowed", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+        return jsonify({"error": "Origin not allowed", "code": CODE_FORBIDDEN}), HTTPStatus.FORBIDDEN
     return None
 
 

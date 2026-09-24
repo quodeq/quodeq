@@ -15,6 +15,7 @@ from quodeq.data.fs.report_parser._run_info import safe_read_dir
 from quodeq.data.fs.report_parser.finding_response import finding_to_response_dict
 from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+from quodeq.shared.constants import EVIDENCE_DIRNAME, MANIFEST_FILENAME
 from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ def _load_run_metadata(run_dir: Path) -> dict[str, Any]:
         "discipline": None,
     }
 
-    manifest_path = run_dir / "evidence" / "manifest.json"
+    manifest_path = run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME
     if manifest_path.is_file():
         try:
             data = read_json(manifest_path)

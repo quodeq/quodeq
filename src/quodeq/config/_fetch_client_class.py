@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
-from quodeq.shared.constants import SCHEME_HTTP, SCHEME_HTTPS
+from quodeq.shared.constants import ENV_TRUTHY, SCHEME_HTTP, SCHEME_HTTPS
 from quodeq.shared.ssrf import is_private_address as _is_private_hostname
 
 _logger = logging.getLogger(__name__)
@@ -20,7 +20,6 @@ _logger = logging.getLogger(__name__)
 # streams enough within that window to exhaust memory. Sized far above any real
 # payload this client fetches (standards documents, release metadata).
 _DEFAULT_MAX_BODY_BYTES = 10 * 1024 * 1024
-_ENV_TRUTHY = "1"  # QUODEQ_ALLOW_PRIVATE_URLS truthy value
 
 
 class FetchClient:
@@ -59,7 +58,7 @@ class FetchClient:
         if allow_private is not None:
             self._allow_private: bool = allow_private
         else:
-            self._allow_private = _e.get("QUODEQ_ALLOW_PRIVATE_URLS") == _ENV_TRUTHY
+            self._allow_private = _e.get("QUODEQ_ALLOW_PRIVATE_URLS") == ENV_TRUTHY
 
     def fetch(self, url: str, headers: dict | None = None) -> str | None:
         """Fetch *url* and return body text, or None on failure.

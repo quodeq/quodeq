@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from enum import StrEnum
 from pathlib import Path
 from typing import TextIO
 
@@ -15,19 +14,11 @@ from quodeq.assistant.tools.registry import ToolRegistry
 from quodeq.assistant.tools.write_tools import register_write_tools
 from quodeq.assistant import AssistantRepository
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
+from quodeq.core.mcp_method import McpMethod
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
 _PROTOCOL = "2024-11-05"
 _SERVER_NAME = "quodeq-assistant"
-
-
-class _McpMethod(StrEnum):
-    """JSON-RPC method names this stdio server understands (MCP protocol)."""
-
-    INITIALIZE = "initialize"
-    TOOLS_LIST = "tools/list"
-    TOOLS_CALL = "tools/call"
-    PING = "ping"
 
 
 def _tools_list(registry: ToolRegistry) -> dict:
@@ -61,15 +52,15 @@ def serve(registry: ToolRegistry, *, stdin: TextIO, stdout: TextIO, stderr: Text
             break
         method, req_id = msg.get("method"), msg.get("id")
         try:
-            if method == _McpMethod.INITIALIZE:
+            if method == McpMethod.INITIALIZE:
                 _jsonrpc.send(_jsonrpc.ok(req_id, {
                     "protocolVersion": _PROTOCOL, "capabilities": {"tools": {}},
                     "serverInfo": {"name": _SERVER_NAME, "version": "1"}}), stdout)
-            elif method == _McpMethod.TOOLS_LIST:
+            elif method == McpMethod.TOOLS_LIST:
                 _jsonrpc.send(_jsonrpc.ok(req_id, _tools_list(registry)), stdout)
-            elif method == _McpMethod.TOOLS_CALL:
+            elif method == McpMethod.TOOLS_CALL:
                 _jsonrpc.send(_jsonrpc.ok(req_id, _tools_call(registry, msg.get("params", {}))), stdout)
-            elif method == _McpMethod.PING:
+            elif method == McpMethod.PING:
                 _jsonrpc.send(_jsonrpc.ok(req_id, {}), stdout)
             elif method and method.startswith("notifications/"):
                 continue

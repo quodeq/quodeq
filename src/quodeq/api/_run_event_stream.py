@@ -28,7 +28,6 @@ from quodeq.api._run_event_serializers import (  # noqa: F401 — re-export
 )
 from quodeq.api._run_event_watcher import (  # noqa: F401 — re-export
     DEFAULT_FINDINGS_BATCH,
-    DIM_FILENAME_SUFFIX,
     STATUS_MTIME_MISSING,
     EventTuple,
     WatcherState,

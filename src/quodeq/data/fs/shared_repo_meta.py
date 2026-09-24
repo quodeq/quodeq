@@ -12,12 +12,12 @@ from pathlib import Path
 
 from quodeq.data.fs.shared_repo_git import (
     EVALUATIONS_DIRNAME,
-    GIT_DIR_NAME,
     run_git,
     shared_cache_dir,
     shared_evaluations_root,
     shared_repo_path,
 )
+from quodeq.shared.constants import GIT_DIR_NAME
 
 MARKER_FILENAME = "quodeq.json"
 FORMAT_NAME = "quodeq-shared-evaluations"

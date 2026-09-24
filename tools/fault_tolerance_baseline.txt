@@ -40,7 +40,7 @@ src/quodeq/analysis/mcp/router.py:205:broad-except
 src/quodeq/analysis/subagents/_pool_launcher.py:85:broad-except
 src/quodeq/api/_assistant_hygiene.py:61:broad-except
 src/quodeq/api/_index_routes.py:24:broad-except
-src/quodeq/api/_run_event_watcher.py:154:broad-except
+src/quodeq/api/_run_event_watcher.py:153:broad-except
 src/quodeq/api/_scores_routes.py:41:broad-except
 src/quodeq/api/_scores_routes.py:75:broad-except
 src/quodeq/api/_sse_log_helpers.py:82:broad-except
@@ -53,12 +53,12 @@ src/quodeq/api/routes_compare.py:36:broad-except
 src/quodeq/api/routes_evaluations_item.py:72:broad-except
 src/quodeq/api/routes_runs.py:31:broad-except
 src/quodeq/api/routes_shared_mirrors.py:91:broad-except
-src/quodeq/api/security.py:276:broad-except
+src/quodeq/api/security.py:277:broad-except
 src/quodeq/assistant/adapters/api.py:121:broad-except
 src/quodeq/assistant/adapters/capabilities.py:57:broad-except
 src/quodeq/assistant/cancel.py:53:broad-except
 src/quodeq/assistant/cancel.py:66:broad-except
-src/quodeq/assistant/mcp/server.py:78:broad-except
+src/quodeq/assistant/mcp/server.py:69:broad-except
 src/quodeq/assistant/orchestrator.py:294:broad-except
 src/quodeq/assistant/tools/_read_tools_scope.py:128:broad-except
 src/quodeq/assistant/tools/_read_tools_scope.py:88:broad-except
@@ -74,8 +74,8 @@ src/quodeq/context/precedent_corpus.py:295:broad-except
 src/quodeq/context/precedent_corpus.py:92:broad-except
 src/quodeq/context/precedent_store.py:93:broad-except
 src/quodeq/context/project_shape.py:59:broad-except
-src/quodeq/context/trust_model.py:124:broad-except
-src/quodeq/context/trust_model.py:191:broad-except
+src/quodeq/context/trust_model.py:125:broad-except
+src/quodeq/context/trust_model.py:192:broad-except
 src/quodeq/dashboard/_webview_token.py:86:suppress
 src/quodeq/dashboard/_webview_user_agent.py:17:broad-except
 src/quodeq/dashboard/_webview_window_chrome.py:145:broad-except

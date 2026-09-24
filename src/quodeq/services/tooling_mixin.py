@@ -16,7 +16,7 @@ from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.config.provider import Provider, ProviderType
 from quodeq.services._browse_mixin import FsBrowseMixin
 from quodeq.services.wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
-from quodeq.shared.constants import PLATFORM_DARWIN
+from quodeq.shared.constants import MACHINE_ARM64, PLATFORM_DARWIN
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
 from quodeq.shared.log_sink import SHARED_LOG
@@ -31,7 +31,6 @@ _DEFAULT_CLIENT_SORT_ORDER = 50  # ai_providers.json's "order" default when unse
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _AI_DEFAULTS_PATH = _PACKAGE_ROOT / "config" / "ai_defaults.json"
 _REQUIRES_PLATFORM_DARWIN_ARM64 = "darwin-arm64"  # ai_providers.json's "requires_platform" value
-_MACHINE_ARM64 = "arm64"  # platform.machine() value
 
 
 def _load_fallback_claude_models() -> list[str]:
@@ -78,7 +77,7 @@ def _platform_matches(requires: str) -> bool:
     """Return True if the current platform satisfies the requires_platform constraint."""
     if requires == _REQUIRES_PLATFORM_DARWIN_ARM64:
         is_darwin = sys.platform == PLATFORM_DARWIN
-        return is_darwin and _platform_module.machine() == _MACHINE_ARM64
+        return is_darwin and _platform_module.machine() == MACHINE_ARM64
     return True
 
 

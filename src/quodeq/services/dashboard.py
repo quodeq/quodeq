@@ -59,8 +59,7 @@ from quodeq.services._dashboard_response import (  # noqa: F401
     build_dashboard_result,
     slim_history_dim,
 )
-
-LATEST_RUN = "latest"  # public: services/rescore_run.py's run_id sentinel shares this value
+from quodeq.services.run_constants import LATEST_RUN
 
 
 def _rescore_run_dimensions(

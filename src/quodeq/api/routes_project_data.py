@@ -10,6 +10,7 @@ from quodeq.api.helpers import json_error
 from quodeq.api.routes_common import reports_dir
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
+from quodeq.services.run_constants import LATEST_RUN
 from quodeq.shared.validation import validate_path_segment
 
 
@@ -36,7 +37,7 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         err = _validate_params(project=project)
         if err:
             return err
-        run = request.args.get("run", "latest")
+        run = request.args.get("run", LATEST_RUN)
         try:
             payload = provider.get_dashboard(reports_dir(), project, run)
         except FileNotFoundError:

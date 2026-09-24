@@ -16,13 +16,13 @@ from pathlib import Path
 
 from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services.wiring import safe_read_dir
-from quodeq.shared.constants import EVIDENCE_DIRNAME
+from quodeq.shared.constants import EVIDENCE_DIRNAME, MANIFEST_FILENAME
 
 
 def read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, int]:
     """Read language_stats from the latest run's manifest.json."""
     for run in runs:
-        manifest_path = reports_root / entry_name / run.run_id / EVIDENCE_DIRNAME / "manifest.json"
+        manifest_path = reports_root / entry_name / run.run_id / EVIDENCE_DIRNAME / MANIFEST_FILENAME
         try:
             data = json.loads(manifest_path.read_text(encoding="utf-8"))
             stats = data.get("language_stats") or {}

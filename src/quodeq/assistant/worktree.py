@@ -15,11 +15,9 @@ from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path
 
-from quodeq.assistant._constants import ENCODING_UTF8
+from quodeq.shared.constants import GIT_BIN, GIT_FLAG_C
 from quodeq.shared.env_resolve import resolve_env
-
-GIT_BIN = "git"  # argv[0] for every git invocation in this module and _worktree_manager.py
-GIT_FLAG_C = "-C"  # -C <path>: run git against that repo without cd'ing there
+from quodeq.shared.utils import TEXT_ENCODING
 
 
 class WorktreeStatus(StrEnum):
@@ -77,15 +75,15 @@ def run_git_bytes(argv: list[str], *, cwd: Path | None = None) -> bytes:
     except subprocess.TimeoutExpired as exc:
         raise WorktreeError(f"{argv[0]} timed out") from exc
     if proc.returncode != 0:
-        err = (proc.stderr or b"").decode(ENCODING_UTF8, errors="replace")
-        out = (proc.stdout or b"").decode(ENCODING_UTF8, errors="replace")
+        err = (proc.stderr or b"").decode(TEXT_ENCODING, errors="replace")
+        out = (proc.stdout or b"").decode(TEXT_ENCODING, errors="replace")
         raise WorktreeError((err or out).strip() or f"{argv[0]} failed")
     return proc.stdout or b""
 
 
 def run_git(argv: list[str], *, cwd: Path | None = None) -> str:
     """Run *argv* and return its stdout decoded as UTF-8."""
-    return run_git_bytes(argv, cwd=cwd).decode(ENCODING_UTF8, errors="replace")
+    return run_git_bytes(argv, cwd=cwd).decode(TEXT_ENCODING, errors="replace")
 
 
 def diff_text(worktree: Path) -> str:

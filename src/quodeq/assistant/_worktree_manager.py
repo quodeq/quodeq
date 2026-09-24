@@ -19,8 +19,8 @@ from pathlib import Path
 
 from quodeq.assistant.worktree import (
     WorktreeError, WorktreeStatus, run_git, run_git_bytes, diff_stats, diff_text, worktrees_base,
-    GIT_BIN, GIT_FLAG_C,
 )
+from quodeq.shared.constants import GIT_BIN, GIT_DIR_NAME, GIT_FLAG_C
 
 _logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class WorktreeManager:
                    branch=f"{_BRANCH_PREFIX}{short}")
 
     def exists(self) -> bool:
-        return self.path.is_dir() and (self.path / ".git").exists()
+        return self.path.is_dir() and (self.path / GIT_DIR_NAME).exists()
 
     def create(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

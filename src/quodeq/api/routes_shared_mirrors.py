@@ -24,6 +24,7 @@ from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_m
 from quodeq.core.types.project_source import ProjectSource
 from quodeq.services import fs_reports, fs_projects
 from quodeq.services.compare import build_compare_summary
+from quodeq.services.run_constants import LATEST_RUN
 from quodeq.services.runs_unit import build_runs_unit
 from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.services.shared_repo import (
@@ -37,7 +38,6 @@ from quodeq.shared.serialization import to_camel_dict
 from .routes_shared_common import logger, validate_segment, with_shared_root
 
 _PROJECT_NOT_FOUND = "Project not found"  # repeated across the shared-mirror read routes
-_DEFAULT_RUN = "latest"  # ?run= default, mirroring the local routes' own default
 
 
 def _shared_projects(
@@ -143,7 +143,7 @@ def shared_dashboard(project: str, eval_root: Path):
     err = validate_segment(project)
     if err:
         return err
-    run = request.args.get("run", _DEFAULT_RUN)
+    run = request.args.get("run", LATEST_RUN)
     try:
         payload = fs_reports.get_dashboard(str(eval_root), project, run, log=SHARED_LOG)
     except FileNotFoundError:
@@ -220,7 +220,7 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
     202 with ``waiting`` set when the dimension is still being written, so the
     UI polls instead of showing an error.
     """
-    run_id = request.args.get("run", _DEFAULT_RUN)
+    run_id = request.args.get("run", LATEST_RUN)
     err = validate_segment(project, dim, run_id)
     if err:
         return err
@@ -235,7 +235,7 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
 @with_shared_root
 def shared_violations(project: str, eval_root: Path):
     """Return one shared run's violations, camelCased for the UI."""
-    run_id = request.args.get("run", _DEFAULT_RUN)
+    run_id = request.args.get("run", LATEST_RUN)
     err = validate_segment(project, run_id)
     if err:
         return err

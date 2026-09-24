@@ -22,12 +22,12 @@ from dataclasses import dataclass
 from quodeq.core.checks._judgments import compliance, violation
 from quodeq.core.checks.layers import is_inner_layer_path
 from quodeq.core.checks.model import ImportEdge, ImportGraph, SourceLocation, top_level
+from quodeq.core.constants import INIT_STEM
 from quodeq.core.events.models import Judgment
 
 REQ_DIRECT = "CLEA-FRM-01"
 REQ_TRANSITIVE = "CLEA-DEP-06"
 _SOURCE_SUFFIXES = (".py", ".pyi", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
-_INIT_STEM = "__init__"  # Python's package-marker module; not a segment of the dotted package name
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +52,7 @@ def _module_name(path: str, first_party: frozenset[str]) -> str | None:
             normalized = normalized[: -len(suffix)]
             break
     segments = [s for s in normalized.split("/") if s]
-    if segments and segments[-1] == _INIT_STEM:
+    if segments and segments[-1] == INIT_STEM:
         segments.pop()
     for i, segment in enumerate(segments):
         if segment in first_party:

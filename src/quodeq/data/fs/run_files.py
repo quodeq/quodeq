@@ -20,7 +20,7 @@ from quodeq.shared.constants import EVIDENCE_DIRNAME, JSON_SUFFIX
 
 _logger = logging.getLogger(__name__)
 
-_FINGERPRINT_DIRS = ("evaluation", "evidence")
+_FINGERPRINT_DIRS = ("evaluation", EVIDENCE_DIRNAME)
 # Files whose contents feed read_run_data for a single run. A completed run is
 # not immutable: dismissing a finding or applying a grade formula rewrites the
 # SQL grade tables that overlay_sql_grades reads back, so the fingerprint has
