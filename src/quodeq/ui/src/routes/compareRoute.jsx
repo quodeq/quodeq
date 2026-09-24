@@ -27,11 +27,11 @@ export function compareRoute(params, props) {
       onSwitchDimension={(key) => props.navigation.handleNavigateReplace(NAV_TAB.COMPARE, { dimension: key })}
       // Cross-project principle jump: the evalPrincipal carries its own
       // project, so the selection doesn't change and back pops to Compare.
-      onOpenEvalPrincipal={(evalPrincipal) => props.navigation.handleNavigate('evalprinciple', { evalPrincipal, sourceTab: NAV_TAB.COMPARE })}
+      onOpenEvalPrincipal={(evalPrincipal) => props.navigation.handleNavigate(NAV_TAB.EVAL_PRINCIPLE, { evalPrincipal, sourceTab: NAV_TAB.COMPARE })}
       // Standings row -> that project's own screen of the SAME dimension
       // (the explorer's cross-project fromProject entry), pushed for the
       // same back-pops-to-Compare contract.
-      onOpenProjectDimension={(target) => props.navigation.handleNavigate('explorer', {
+      onOpenProjectDimension={(target) => props.navigation.handleNavigate(NAV_TAB.EXPLORER, {
         dimension: target.dimName,
         runId: target.runId,
         dateLabel: target.dateLabel,

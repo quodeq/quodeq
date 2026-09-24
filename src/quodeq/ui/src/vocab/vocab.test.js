@@ -79,6 +79,7 @@ test('NAV_TAB spells the nav-stack page ids', () => {
     OVERVIEW: 'overview', VIOLATIONS: 'violations', MAP: 'map', HISTORY: 'history',
     PROJECTS: 'projects', EVALUATE: 'evaluate', STANDARDS: 'standards', HELP: 'help',
     SETTINGS: 'settings', COMPARE: 'compare', HISTORY_RUN: 'history-run', RUN: 'run',
+    EXPLORER: 'explorer', EVAL_PRINCIPLE: 'evalprinciple', EVAL_PRINCIPLE_DETAIL: 'eval-principle-detail',
   });
   assert.equal(Object.isFrozen(NAV_TAB), true);
 });

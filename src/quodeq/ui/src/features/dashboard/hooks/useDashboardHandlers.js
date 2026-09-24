@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 /**
  * The Overview's navigation callbacks (dimension card, accumulated dimension,
@@ -11,10 +12,10 @@ export function useDashboardHandlers(onNavigate, dashboard) {
     handleDimensionCardClick: (item, runId) => {
       if (!onNavigate) return;
       const dateLabel = dashboard?.selectedRun?.dateLabel || item.fromDateLabel;
-      onNavigate('explorer', { dimension: item.dimension, runId: runId || item.fromRunId, dateLabel, fromProject: item.fromProject });
+      onNavigate(NAV_TAB.EXPLORER, { dimension: item.dimension, runId: runId || item.fromRunId, dateLabel, fromProject: item.fromProject });
     },
     handleAccumulatedDimensionClick: (item) => {
-      if (onNavigate) onNavigate('explorer', { dimension: item.dimension, runId: item.fromRunId, dateLabel: item.fromDateLabel, fromProject: item.fromProject });
+      if (onNavigate) onNavigate(NAV_TAB.EXPLORER, { dimension: item.dimension, runId: item.fromRunId, dateLabel: item.fromDateLabel, fromProject: item.fromProject });
     },
     handleFileClick: (fileObj) => { if (onNavigate) onNavigate('file', { file: fileObj }); },
   }), [onNavigate, dashboard]);

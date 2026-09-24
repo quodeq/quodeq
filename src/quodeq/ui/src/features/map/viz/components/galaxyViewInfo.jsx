@@ -1,5 +1,6 @@
 import { t } from '../../../../strings/index.js';
 import { SEVERITY } from '../../../../vocab/severity.js';
+import { NAV_TAB } from '../../../../vocab/navTab.js';
 
 // The overlay's fixed styling, hoisted out of the JSX: one object per element
 // for the whole module instead of a fresh one on every panel render, and each
@@ -135,7 +136,7 @@ function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
     detailAction: () => {
       const d = scene.stars[navRef.current.dim]?._raw;
       if (!d) return;
-      onNavigate?.('explorer', { dimension: d.dimension, runId: d.fromRunId, dateLabel: d.fromDateLabel, fromProject: d.fromProject, sourceTab: 'map' });
+      onNavigate?.(NAV_TAB.EXPLORER, { dimension: d.dimension, runId: d.fromRunId, dateLabel: d.fromDateLabel, fromProject: d.fromProject, sourceTab: 'map' });
     },
   };
 }
@@ -158,7 +159,7 @@ function computePrincipleLevelInfo(scene, nav, navRef, onNavigate) {
       const p = scene.principles[navRef.current.dim]?.[navRef.current.prin];
       const d = scene.stars[navRef.current.dim];
       if (!p || !d) return;
-      onNavigate?.('evalprinciple', {
+      onNavigate?.(NAV_TAB.EVAL_PRINCIPLE, {
         evalPrincipal: {
           principle: p.name,
           score: p.rawScore || (p.score != null ? p.score.toFixed(1) : null),

@@ -26,7 +26,7 @@ export function historyRoute(params, props) {
       availableRuns={runs}
       callbacks={{
         onRunClick: (runId, dateLabel) => props.navigation.handleNavigate(NAV_TAB.HISTORY_RUN, { runId, dateLabel }),
-        onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
+        onDimensionClick: (dim) => props.navigation.handleNavigate(NAV_TAB.EXPLORER, { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
         onNavigate: props.navigation.handleNavigate,
         onRunChange: props.navigation.setHistorySelectedRun,
         // Run deletion changes the accumulated rollup the Overview grade is

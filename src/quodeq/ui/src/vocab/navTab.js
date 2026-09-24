@@ -16,4 +16,9 @@ export const NAV_TAB = Object.freeze({
   // Drill-down pages, not top-level tabs (not part of KNOWN_TABS).
   HISTORY_RUN: 'history-run',
   RUN: 'run',
+  EXPLORER: 'explorer',
+  EVAL_PRINCIPLE: 'evalprinciple',
+  // Legacy id predating the EVAL_PRINCIPLE rename, still reachable via saved
+  // links/history.
+  EVAL_PRINCIPLE_DETAIL: 'eval-principle-detail',
 });

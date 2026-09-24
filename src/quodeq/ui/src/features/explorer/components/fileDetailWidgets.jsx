@@ -1,4 +1,4 @@
-import { headerRowKey } from './findingListRows.js';
+import { headerRowKey, ROW_KIND } from './findingListRows.js';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
 // Re-exported so the file-detail pane keeps importing its row widgets from
@@ -23,8 +23,8 @@ export function estimateItemSize(items) {
   return (i) => {
     const item = items[i];
     if (!item) return ROW_HEIGHT_PX.FALLBACK;
-    if (item.kind === 'sev-header' || item.kind === 'compliance-header') return ROW_HEIGHT_PX.HEADER;
-    if (item.kind === 'low-conf-toggle') return ROW_HEIGHT_PX.HEADER;
+    if (item.kind === ROW_KIND.SEV_HEADER || item.kind === ROW_KIND.COMPLIANCE_HEADER) return ROW_HEIGHT_PX.HEADER;
+    if (item.kind === ROW_KIND.LOW_CONF_TOGGLE) return ROW_HEIGHT_PX.HEADER;
     return ROW_HEIGHT_PX.VIOLATION;
   };
 }
@@ -45,9 +45,9 @@ export function itemKey(items) {
     if (!item) return i;
     const header = headerRowKey(item);
     if (header) return header;
-    if (item.kind === 'low-conf-toggle') return 'h-lowconf';
+    if (item.kind === ROW_KIND.LOW_CONF_TOGGLE) return 'h-lowconf';
     if (item.kind === FINDING_TYPE.VIOLATION) return findingKey('v', item.v);
-    if (item.kind === 'low-conf-row') return findingKey('lc', item.v);
+    if (item.kind === ROW_KIND.LOW_CONF_ROW) return findingKey('lc', item.v);
     if (item.kind === FINDING_TYPE.COMPLIANCE) return complianceKey(item.c);
     return i;
   };

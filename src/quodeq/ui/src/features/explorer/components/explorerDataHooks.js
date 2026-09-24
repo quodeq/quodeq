@@ -10,6 +10,11 @@ import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 export { computeComplianceByPrinciple, buildEvalPrincipalFn };
 
+// A principleGrades entry with no `isOverall` flag (older payloads) still
+// carries this word in its principle name for the synthetic dimension-wide
+// row; matched as a fallback wherever isOverall is checked.
+const OVERALL_PRINCIPLE_MARKER = 'Overall';
+
 export function computeAllViolations(evalData) {
   if (!evalData) return [];
   if (evalData.violations?.length > 0) return evalData.violations;
@@ -42,7 +47,7 @@ function mergeRescoreIntoEval(prev, dimData) {
   const rescPrinciples = dimData.principles || [];
   const rescMap = new Map(rescPrinciples.map(rp => [rp.principle, rp]));
   const updatedGrades = (prev.principleGrades || []).map((pg) => {
-    if (pg.isOverall || pg.principle?.includes('Overall')) {
+    if (pg.isOverall || pg.principle?.includes(OVERALL_PRINCIPLE_MARKER)) {
       return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
     }
     const match = rescMap.get(pg.principle);
@@ -102,8 +107,8 @@ export function useExplorerData(project, dimension, runId, refreshSignal, select
   const isFetching = evalQuery.isFetching || scoresQuery.isFetching;
   const error = evalQuery.isError ? apiErrorMessage(evalQuery.error, 'explorer.loadFailed') : null;
 
-  const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
-  const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
+  const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes(OVERALL_PRINCIPLE_MARKER)), [evalData]);
+  const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes(OVERALL_PRINCIPLE_MARKER)), [evalData]);
   const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);
   const stats = useDerivedExplorerStats(evalData, allViolations);
   return {

@@ -12,6 +12,9 @@ import { useExplorerPageSpecs } from './useExplorerPageSpecs.jsx';
 import { buildRadialPrinciples, buildEnrichedPrinciples } from './explorerPrincipleView.js';
 import { t } from '../../../strings/index.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
+import { HERO_CARD_KIND } from '../../dashboard/dashboardVocab.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 /** Empty/loading/error states, checked in order — extracted so the main
  * render stays a single happy-path return. */
@@ -76,7 +79,7 @@ function buildExplorerCardNavigation({ d, onNavigate, project, activeRunId, acti
   );
   const handleCardNavigate = (kind) => {
     if (!onNavigate) return;
-    const severityFilter = kind === 'violations' ? 'all' : kind;
+    const severityFilter = kind === HERO_CARD_KIND.VIOLATIONS ? SEVERITY_FILTER_ALL : kind;
     onNavigate('file', { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project });
   };
   const onSeverityBadge = (level) => () => handleCardNavigate(level);
@@ -169,7 +172,7 @@ function buildExplorerViewData(d, onNavigate, sourceTab, buildEvalPrincipal) {
     dim: String(d.evalData.dimension || '').toLowerCase(),
     radialPrinciples: buildRadialPrinciples(d.principleGrades),
     enrichedPrinciples: buildEnrichedPrinciples(d.principleGrades, d.allViolations, d.complianceByPrinciple),
-    onPrincipleClick: (name) => onNavigate?.('evalprinciple', { evalPrincipal: buildEvalPrincipal(name), sourceTab }),
+    onPrincipleClick: (name) => onNavigate?.(NAV_TAB.EVAL_PRINCIPLE, { evalPrincipal: buildEvalPrincipal(name), sourceTab }),
     overallScoreNum: parseFloat(d.overallGrade?.score),
     isRefreshing: d.isFetching && !!d.evalData,
   };
