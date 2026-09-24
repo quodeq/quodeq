@@ -18,14 +18,7 @@ def strip_credentials(url: str) -> str:
     Only applies to scheme'd URLs (``https://user@host/...``). scp-style
     remotes (``git@github.com:org/repo.git``) are left untouched, since the
     leading ``git@`` there is a username convention, not a credential.
-
-    Userinfo ends at the LAST "@" of the authority (RFC 3986), so the search
-    runs from the right. A "/" before that "@" usually means the authority
-    already ended and the "@" belongs to a path segment -- but only when the
-    text before that "/" is itself a plausible host. Real credentials
-    (base64-derived tokens, JWTs, CI PATs) often contain a literal "/", and
-    bounding the search by the first "/" would then hide the real "@" and
-    let the whole credential through unstripped.
+    ``split_userinfo`` documents how the credential boundary is found.
     """
     parts = split_userinfo(url)
     if parts is None:

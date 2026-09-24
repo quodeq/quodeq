@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react';
-import { SectionLabel } from '../../../components/terminal/index.js';
+import ComparePanel from './ComparePanel.jsx';
 import { scoreGradeColorVar } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 
@@ -52,23 +52,24 @@ export default function CompareAttentionStrip({ ariaLabel, noteText, items }) {
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
   const shown = open ? items : items.slice(0, VISIBLE_COUNT);
+  const toggle = items.length > VISIBLE_COUNT && (
+    <button
+      type="button"
+      className="compare-attention__toggle"
+      onClick={() => setOpen((v) => !v)}
+    >
+      {open
+        ? `${t('compare.attentionLess')} ▾`
+        : `${t('compare.attentionMore', { count: items.length - VISIBLE_COUNT })} ▸`}
+    </button>
+  );
   return (
-    <section className="compare-panel" aria-label={ariaLabel}>
-      <div className="compare-panel__head">
-        <SectionLabel>{t('compare.attentionHeader', { count: items.length })}</SectionLabel>
-        <span className="compare-panel__note">{noteText}</span>
-        {items.length > VISIBLE_COUNT && (
-          <button
-            type="button"
-            className="compare-attention__toggle"
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open
-              ? `${t('compare.attentionLess')} ▾`
-              : `${t('compare.attentionMore', { count: items.length - VISIBLE_COUNT })} ▸`}
-          </button>
-        )}
-      </div>
+    <ComparePanel
+      ariaLabel={ariaLabel}
+      header={t('compare.attentionHeader', { count: items.length })}
+      note={noteText}
+      headExtra={toggle}
+    >
       <div className="compare-attention compare-attention--strip">
         {shown.map((item, i) => (
           <Fragment key={item.key}>
@@ -79,6 +80,6 @@ export default function CompareAttentionStrip({ ariaLabel, noteText, items }) {
           </Fragment>
         ))}
       </div>
-    </section>
+    </ComparePanel>
   );
 }

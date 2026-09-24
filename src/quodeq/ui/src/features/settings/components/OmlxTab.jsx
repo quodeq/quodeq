@@ -1,5 +1,5 @@
 import { useApi } from '../../../api/ApiContext.jsx';
-import { LocalApiTabLayout, LocalApiModelRow, ModelPickerSelect } from './LocalApiTabLayout.jsx';
+import { LocalApiTabLayout, LocalApiModelSelectRow, ModelPickerSelect } from './LocalApiTabLayout.jsx';
 import { useOmlxModels } from '../hooks/useOmlxModels.js';
 import { useLocalApiTabTest } from '../hooks/useLocalApiTabTest.js';
 import { t } from '../../../strings/index.js';
@@ -61,14 +61,7 @@ export default function OmlxTab({ state, update }) {
       serverStatus={omlxStatus}
       offlineMessage={<span>{tRich('settings.omlxOffline')}</span>}
       modelsError={modelsError}
-      modelRow={(
-        <LocalApiModelRow
-          hint={tRich('settings.omlxModelHint')}
-          renderControl={(labelId) => (
-            <ModelSelector value={state.model} models={models} onChange={(v) => update('model', v)} labelId={labelId} />
-          )}
-        />
-      )}
+      modelRow={<LocalApiModelSelectRow hint={tRich('settings.omlxModelHint')} Control={ModelSelector} state={state} update={update} models={models} />}
       state={state}
       update={update}
       subagentsDescription={t('settings.omlxSubagentsDesc')}

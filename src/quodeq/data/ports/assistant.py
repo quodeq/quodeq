@@ -91,7 +91,9 @@ class AssistantStore(Protocol):
 
         With ``expected`` the write is a compare-and-set
         (``WHERE id=? AND status=?``), so a caller can atomically claim a
-        transition. Without ``expected`` the write is unconditional.
+        transition, so two concurrent applies of the same action can't both
+        win and double-run the side effect. Without ``expected`` the write
+        is unconditional (back-compat for the rollback path).
         """
         ...
 

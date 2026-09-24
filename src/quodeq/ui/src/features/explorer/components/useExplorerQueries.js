@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { projectKeys, samePlaceholderScope } from '../../../api/queryKeys.js';
+import { projectKeys } from '../../../api/queryKeys.js';
+import { useScopedPlaceholder } from '../../../hooks/useScopedPlaceholder.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 /**
@@ -17,11 +18,7 @@ export function useExplorerQueries(project, dimension, runId, refreshSignal, sel
   const fetchDimensionEval = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetDimensionEval : getDimensionEval;
   const fetchRunScores = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetRunScores : getRunScores;
   const queryClient = useQueryClient();
-  const projectKey = project || '_none_';
-  const keepInScope = useCallback(
-    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
-    [projectKey, selectedSource],
-  );
+  const { projectKey, keepInScope } = useScopedPlaceholder(project, selectedSource);
 
   const evalQuery = useQuery({
     queryKey: projectKeys.dimensionEval(projectKey, runId, dimension, selectedSource),

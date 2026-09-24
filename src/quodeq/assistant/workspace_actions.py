@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from quodeq.assistant.worktree import WorktreeError, WorktreeManager
+from quodeq.assistant.worktree import WorktreeError, WorktreeManager, WorktreeStatus
 from quodeq.data.ports.assistant import AssistantStore
 
 _logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def _manager(row: dict) -> WorktreeManager:
                            path=Path(row["path"]), branch=row["branch"])
 
 
-_ACTIVE_ONLY = ("active",)
+_ACTIVE_ONLY = (WorktreeStatus.ACTIVE,)
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +70,7 @@ class _Claim:
 @contextmanager
 def _claimed_row(
     repo: AssistantStore, sid: str, claim_turn: ClaimTurn, release_turn: ReleaseTurn,
-    allowed: tuple[str, ...],
+    allowed: tuple[WorktreeStatus, ...],
 ) -> Iterator[_Claim]:
     """Claim the turn slot, re-read the row (state may have moved since the
     route's lookup) and gate it on *allowed*. Releases on every exit path
@@ -132,7 +132,7 @@ def apply_workspace(
             stats = manager.apply_to_repo()
         except WorktreeError as exc:
             return ApplyOutcome(OutcomeKind.FAILED, detail=str(exc))
-        repo.set_worktree_status(sid, "applied")
+        repo.set_worktree_status(sid, WorktreeStatus.APPLIED)
         _remove_quietly(manager, sid, "apply")
         return ApplyOutcome(OutcomeKind.APPLIED, stats=stats)
 
@@ -176,7 +176,7 @@ def create_workspace_pr(
         except WorktreeError as exc:
             return PrOutcome(OutcomeKind.FAILED, detail=str(exc))
         if result.get("prUrl"):
-            repo.set_worktree_status(sid, "pr_created")
+            repo.set_worktree_status(sid, WorktreeStatus.PR_CREATED)
             _remove_quietly(manager, sid, "pr", delete_branch=False)  # branch lives on the remote PR
         return PrOutcome(OutcomeKind.CREATED, result=result)
 
@@ -201,12 +201,14 @@ def discard_workspace(
     apply (overwriting "applied" with "discarded" while the changes sat in
     the user's real tree) and pulled the worktree out from under a running
     write turn."""
-    with _claimed_row(repo, sid, claim_turn, release_turn, ("active", "stale")) as claim:
+    with _claimed_row(
+        repo, sid, claim_turn, release_turn, (WorktreeStatus.ACTIVE, WorktreeStatus.STALE),
+    ) as claim:
         if claim.refusal is not None:
             return DiscardOutcome(claim.refusal, detail=claim.detail)
         try:
             _manager(claim.row).remove()
         except WorktreeError as exc:
             return DiscardOutcome(OutcomeKind.FAILED, detail=str(exc))
-        repo.set_worktree_status(sid, "discarded")
+        repo.set_worktree_status(sid, WorktreeStatus.DISCARDED)
         return DiscardOutcome(OutcomeKind.DISCARDED)
