@@ -209,11 +209,19 @@ def build_review_summary(
     return "\n".join(lines)
 
 
+# Findings in these dimensions are posted as review comments but never turn
+# the verdict into REQUEST_CHANGES: the bot runs them on a local model to flag
+# regressions early, and one noisy critical must not block a merge.
+_COMMENT_ONLY_DIMENSIONS = frozenset({"performance"})
+
+
 def determine_verdict(new_violations: list[dict]) -> str:
     """Determine the review verdict based on NEW violation severities.
 
     Existing (pre-existing baseline) violations do not influence the verdict —
-    this PR is only responsible for what it introduces.
+    this PR is only responsible for what it introduces. Findings in
+    _COMMENT_ONLY_DIMENSIONS (performance) never request changes; a violation
+    without a dimension counts.
 
     Returns: 'COMMENT' or 'REQUEST_CHANGES'.
 
@@ -223,10 +231,11 @@ def determine_verdict(new_violations: list[dict]) -> str:
     runs post a COMMENT review instead; the summary body carries the "no
     new violations" message and no blocking changes are requested.
     """
-    if not new_violations:
+    blocking = [v for v in new_violations if v.get("dimension") not in _COMMENT_ONLY_DIMENSIONS]
+    if not blocking:
         return "COMMENT"
 
-    severities = {v.get("severity", Severity.MINOR) for v in new_violations}
+    severities = {v.get("severity", Severity.MINOR) for v in blocking}
     if severities & {"critical", "high"}:
         return "REQUEST_CHANGES"
     return "COMMENT"
