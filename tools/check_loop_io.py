@@ -21,17 +21,19 @@ clauses; the first iterable runs once), whose callee is one of:
   - `connect(...)` and `X.connect(...)` (sqlite3.connect included)
   - any `open_*(...)` / `X.open_*(...)` helper (open_evaluation_db,
     open_index, open_text, ...)
-  - `X.emit(...)` and `get_file_lock(...)` / `X.get_file_lock(...)`
+  - `X.emit(...)`, `get_file_lock(...)` / `X.get_file_lock(...)`, and
+    `commit(...)` / `X.commit(...)`
 
 Two exemptions keep the gate on the pattern that costs something (the same
 resource reopened per item) and off IO that is inherent per item:
-  - per-item resource: a file/database call (every kind above except emit
-    and get_file_lock) whose resource expression (the receiver of a Path
-    method, else the first positional argument) mentions the loop target
-    or a name the loop body derives from it. `for p in d.glob("*.json"):
+  - per-item resource: a file/database call (every kind above except emit,
+    get_file_lock and commit) whose resource expression (the receiver of a
+    Path method, else the first positional argument) mentions the loop
+    target or a name the loop body derives from it. `for p in d.glob("*.json"):
     p.read_text()` reads each file once; there is nothing to batch.
-    emit and get_file_lock are never exempt: one append or one lock per
-    item is what emit_many and a hoisted lock exist to remove.
+    emit, get_file_lock and commit are never exempt: one append, one lock
+    or one DB commit per item is what emit_many, a hoisted lock and a
+    batched commit exist to remove.
   - small literal: a loop over a tuple/list/set literal of at most
     _SMALL_LITERAL_MAX elements (`for src in (ours, theirs):`) walks a fixed
     handful of known resources, not data.
@@ -41,10 +43,17 @@ Known limits, documented rather than closed:
     gate is lexical by design.
   - nested def/lambda/class bodies inside a loop are skipped (defining a
     function is not calling it).
-  - a `while` loop has no target, so every IO call in its body is flagged;
-    a poll loop is a legitimate baseline entry.
+  - a `while` loop has no target, so every IO call in its body is flagged,
+    including one an inner `for`'s own per-item rule would exempt on its
+    own: `while more(): for q in d.glob(...): q.read_text()` still flags
+    `read_text`, the same as the two-loop `for`-in-`for` case above (the
+    while's iteration can repeat the inner loop's work exactly like an
+    outer for's can); a poll loop is a legitimate baseline entry.
   - taint tracking is flow-insensitive: a name assigned an IO handle
     anywhere in the function counts as that handle everywhere in it.
+  - emit and commit are matched by name on any receiver: a logging
+    handler's emit, a signal's emit, or git's commit trip the gate the
+    same as the ones it targets.
 """
 from __future__ import annotations
 
@@ -184,7 +193,15 @@ def _is_per_item(call: ast.Call, callee: str, per_item: set[str]) -> bool:
     if callee in _SHARED:
         return False
     subject = _subject(call, callee)
-    return subject is not None and bool(_names(subject) & per_item)
+    if subject is not None and bool(_names(subject) & per_item):
+        return True
+    # `open` is ambiguous: `path_obj.open()` takes the resource as its
+    # receiver, but `gzip.open(p)` / `tarfile.open(p)` / `io.open(p)` /
+    # `os.open(p)` take it as their module call's first argument, with the
+    # receiver naming the module instead. Check the argument too.
+    if callee == "open" and call.args:
+        return bool(_names(call.args[0]) & per_item)
+    return False
 
 
 def scan_tree(tree: ast.AST, rel: str) -> set[Violation]:

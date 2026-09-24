@@ -144,6 +144,24 @@ def test_literal_longer_than_the_limit_is_scanned():
     assert _sites(src) == [(3, "read_text")]
 
 
+def test_module_opener_on_the_loop_item_is_exempt():
+    # gzip.open/tarfile.open/io.open/os.open take the resource as their
+    # first argument, not as the receiver; the receiver is the module.
+    src = """
+    for p in paths:
+        gzip.open(p)
+    """
+    assert _sites(src) == []
+
+
+def test_module_opener_on_a_fixed_path_is_flagged():
+    src = """
+    for p in paths:
+        gzip.open(fixed_path)
+    """
+    assert _sites(src) == [(3, "open")]
+
+
 def test_starred_literal_is_not_treated_as_small():
     # `*many` can unpack to any number of elements, so this is not a fixed
     # handful of known resources even though the literal has 2 elts.
@@ -201,6 +219,18 @@ def test_inner_loop_over_shared_files_is_flagged_by_the_outer_loop():
     for dim in dims:
         for path in standards_dir.glob("*.json"):
             path.read_text()
+    """
+    assert _sites(src) == [(4, "read_text")]
+
+
+def test_while_wrapping_a_for_still_flags_the_inner_exempt_call():
+    # Documented limit: a while has no target, so it is scanned like the
+    # for-in-for case above, and a call the inner for's own per-item rule
+    # would exempt on its own is still flagged through the while.
+    src = """
+    while more():
+        for q in d.glob("*.json"):
+            q.read_text()
     """
     assert _sites(src) == [(4, "read_text")]
 
