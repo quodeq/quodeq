@@ -8,6 +8,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_FORBIDDEN, ERROR_CODE_NOT_FOUND
 from quodeq.api.helpers import json_object_or_error, error_response
+from quodeq.services.ports import StandardNotFoundError, StandardProtectedError
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ def _store_error_response(exc: Exception, standard_id: str, operation: str) -> R
     A missing standard is a 404; a permission error is logged under
     ``standards.<operation>`` and answered with a 403.
     """
-    if isinstance(exc, FileNotFoundError):
+    if isinstance(exc, StandardNotFoundError):
         return error_response(f"Standard not found: {standard_id}", HTTPStatus.NOT_FOUND, ERROR_CODE_NOT_FOUND)
     logger.warning("standards.%s permission error: %s", operation, exc)
     return error_response("Permission denied", HTTPStatus.FORBIDDEN, ERROR_CODE_FORBIDDEN)
@@ -65,7 +66,7 @@ def _handle_update(get_service, app: Flask, standard_id: str) -> Response:
     logger.info("standards.update id=%s", standard_id)
     try:
         detail = svc.update_standard(standard_id, payload)
-    except (FileNotFoundError, PermissionError) as exc:
+    except (StandardNotFoundError, StandardProtectedError) as exc:
         return _store_error_response(exc, standard_id, "update")
     return jsonify(to_camel_dict(detail))
 
@@ -76,7 +77,7 @@ def _handle_delete(get_service, app: Flask, standard_id: str) -> tuple[str, int]
     logger.info("standards.delete id=%s", standard_id)
     try:
         svc.delete_standard(standard_id)
-    except (FileNotFoundError, PermissionError) as exc:
+    except (StandardNotFoundError, StandardProtectedError) as exc:
         return _store_error_response(exc, standard_id, "delete")
     return "", HTTPStatus.NO_CONTENT
 

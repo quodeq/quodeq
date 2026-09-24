@@ -78,16 +78,16 @@ class SuppressionMatcher:
                           principle=self.principle_for(raw), file=file)
 
 
-def load_req_to_principle(
-    dimension: str, evaluators_dir: Path | None = None,
-) -> dict[str, str]:
+def load_req_to_principle(dimension: str, evaluators_dir: Path) -> dict[str, str]:
     """Load the req ID -> principle name mapping for a custom evaluator.
+
+    *evaluators_dir* is required: this is a pure reader, not a config
+    resolver -- callers (``build_matcher``) resolve the production default
+    at call time and hand it in, so this function never reads global config.
 
     Empty dict when the evaluator is absent or malformed: built-in dimensions
     already emit principle names in ``p``, so an empty map is the identity.
     """
-    if evaluators_dir is None:
-        evaluators_dir = default_paths().evaluators_dir
     if not evaluators_dir.is_dir():
         return {}
     validate_path_segment(dimension)
@@ -122,12 +122,13 @@ def build_matcher(
     if not dismissed and not deleted and not rules:
         # Nothing to map against, so skip the evaluator read entirely.
         return SuppressionMatcher(dimension=dimension)
+    resolved_dir = evaluators_dir if evaluators_dir is not None else default_paths().evaluators_dir
     return SuppressionMatcher(
         dimension=dimension,
         dismissed=dismissed,
         deleted=deleted,
         rules=rules,
-        req_to_principle=load_req_to_principle(dimension, evaluators_dir),
+        req_to_principle=load_req_to_principle(dimension, resolved_dir),
     )
 
 

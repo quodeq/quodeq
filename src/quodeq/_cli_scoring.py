@@ -24,7 +24,7 @@ from quodeq.core.types import ScoringResult
 from quodeq.data.fs.report_parser.finding_details import read_eval_report
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.evidence_rescore import EvidenceScoreRequest
+from quodeq.services.evidence_rescore import EvidenceScoreRequest, standard_dirs
 
 _logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ def _adjusted_score(
             run_dir, dim, EvidenceScoreRequest(
                 dismissed=dismissed, deleted=deleted,
                 source_file_count=source_file_count, files_read=files_read,
-                params=params,
+                params=params, standard_dirs_fn=standard_dirs,
             ),
             # Nothing excluded means the stored grade already is the answer
             # (see the return below), so don't pay for a scoring pass.

@@ -11,7 +11,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.core.types.standard import StandardDetail
-from quodeq.services.ports import StandardsStore
+from quodeq.services.ports import StandardNotFoundError, StandardProtectedError, StandardsStore
 from quodeq.services._standards_io import (
     TYPE_CUSTOM, build_custom_meta, build_detail, count_principles_and_requirements,
 )
@@ -58,9 +58,9 @@ def update(standard_id: str, data: dict, evaluators_dir: Path, store: StandardsS
     _validate_id(standard_id)
     path = store.path(evaluators_dir, standard_id)
     if not store.exists(evaluators_dir, standard_id):
-        raise FileNotFoundError(f"Standard not found: {standard_id}")
+        raise StandardNotFoundError(f"Standard not found: {standard_id}")
     if store.read(path).get("managed", False):
-        raise PermissionError(f"Cannot edit managed standard '{standard_id}'")
+        raise StandardProtectedError(f"Cannot edit managed standard '{standard_id}'")
     payload = {**data, "id": standard_id, "type": TYPE_CUSTOM, "managed": False}
     store.write(path, payload)
     return build_detail(payload)
@@ -73,10 +73,10 @@ def delete(standard_id: str, evaluators_dir: Path, compiled_dir: Path,
     path = store.path(evaluators_dir, standard_id)
     if not store.exists(evaluators_dir, standard_id):
         if store.compiled_exists(compiled_dir, standard_id) or is_builtin(standard_id):
-            raise PermissionError(f"Cannot delete built-in standard '{standard_id}'")
-        raise FileNotFoundError(f"Standard not found: {standard_id}")
+            raise StandardProtectedError(f"Cannot delete built-in standard '{standard_id}'")
+        raise StandardNotFoundError(f"Standard not found: {standard_id}")
     if store.read(path).get("managed", False):
-        raise PermissionError(f"Cannot delete managed standard '{standard_id}'")
+        raise StandardProtectedError(f"Cannot delete managed standard '{standard_id}'")
     store.remove(evaluators_dir, standard_id)
 
 
@@ -113,7 +113,7 @@ def import_from_file(data: dict, force: bool, evaluators_dir: Path, store: Stand
         return {"status": "conflict", "detail": None,
                 "existing": build_custom_meta(existing, p, r), "warnings": warnings}
     if existing is not None and existing.get("managed", False):
-        raise PermissionError(f"Cannot overwrite managed standard '{standard_id}'")
+        raise StandardProtectedError(f"Cannot overwrite managed standard '{standard_id}'")
     store.ensure_dir(evaluators_dir)
     detail = _write_and_load_detail(store, path, {**cleaned, **_CUSTOM_DEFAULTS})
     return {"status": "imported", "detail": detail,

@@ -1094,7 +1094,7 @@ tests/services/test_standards_io_coverage.py:8:private-module:quodeq.services._s
 tests/services/test_standards_io_coverage.py:8:private-module:quodeq.services._standards_io.is_builtin_id
 tests/services/test_standards_io_coverage.py:8:private-module:quodeq.services._standards_io.load_cwe_entries
 tests/services/test_standards_queries_list_builtin.py:6:private-module:quodeq.services._standards_queries.list_builtin
-tests/services/test_suppression.py:121:private-name:quodeq.services._violations_jsonl._parse_jsonl_findings
+tests/services/test_suppression.py:168:private-name:quodeq.services._violations_jsonl._parse_jsonl_findings
 tests/services/test_suppression_coherence.py:18:private-module:quodeq.analysis._report_io.write_dimension_report
 tests/services/test_suppression_coherence.py:23:private-module:quodeq.ci._suppressions.filter_suppressed_violations
 tests/services/test_tooling_mixin.py:10:private-name:quodeq.services.tooling_mixin._DEFAULT_CLIENT_IDS

@@ -16,7 +16,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Callable
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, current_app, jsonify, request
 
 from quodeq.api.helpers import json_error
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
@@ -220,7 +220,11 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
     err = validate_segment(project, dim, run_id)
     if err:
         return err
-    payload = fs_reports.get_dimension_eval(str(eval_root), project, run_id, dim)
+    evaluators_dir = current_app.config.get("STANDARDS_EVALUATORS_DIR")
+    payload = fs_reports.get_dimension_eval(
+        str(eval_root), project, run_id, dim,
+        evaluators_dir=Path(evaluators_dir) if evaluators_dir else None,
+    )
     if payload is None:
         return json_error("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
     if payload.get("waiting"):

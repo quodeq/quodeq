@@ -89,9 +89,11 @@ class FilesystemActionProvider(ActionProvider):
         compiled_dir: Path | None = None,
         index_db_path: Path | None = None,
         reports_root: Path | None = None,
+        evaluators_dir: Path | None = None,
     ) -> None:
         self._reports_root = _resolve_reports_root(reports_root)
         self._compiled_dir = compiled_dir
+        self._evaluators_dir = evaluators_dir
         self._jobs = job_manager if job_manager is not None else _default_job_manager(self._reports_root)
         self._projects = ProjectsCache()
         self._evaluations = EvaluationsIndex(
@@ -233,9 +235,11 @@ class FilesystemActionProvider(ActionProvider):
     def get_dimension_eval(
         self, reports_dir: str, project: str, run_id: str, dimension: str,
     ) -> dict[str, Any] | None:
-        """Return one dimension's parsed evaluation, resolved against ``_compiled_dir``."""
+        """Return one dimension's parsed evaluation, resolved against
+        ``_compiled_dir`` and ``_evaluators_dir``."""
         return fs_reports.get_dimension_eval(
-            reports_dir, project, run_id, dimension, compiled_dir=self._compiled_dir,
+            reports_dir, project, run_id, dimension,
+            compiled_dir=self._compiled_dir, evaluators_dir=self._evaluators_dir,
         )
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:

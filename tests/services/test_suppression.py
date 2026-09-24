@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from quodeq.services.suppression import SuppressionMatcher, matcher_for
+from quodeq.services.suppression import SuppressionMatcher, build_matcher, load_req_to_principle, matcher_for
 from quodeq.services.suppression_keys import SuppressionKeys
 
 
@@ -83,6 +83,53 @@ class TestSuppressionMatcher:
             deleted=frozenset({("reliability", "Fault Tolerance", "a.py")}),
         )
         assert not m.is_suppressed(_evidence(t="compliance", req="R-FT-1"))
+
+
+class TestLoadReqToPrinciple:
+    """evaluators_dir is required (CLEA-DEP-07, row 9184): this reader never
+    falls back to global config -- callers resolve the production default."""
+
+    def test_evaluators_dir_is_required(self):
+        with pytest.raises(TypeError):
+            load_req_to_principle("reliability")  # missing evaluators_dir
+
+    def test_reads_the_requirement_to_principle_map(self, tmp_path):
+        (tmp_path / "reliability.json").write_text(json.dumps({
+            "principles": [{"name": "Fault Tolerance", "requirements": [{"id": "R-FT-1"}]}],
+        }))
+        assert load_req_to_principle("reliability", tmp_path) == {"R-FT-1": "Fault Tolerance"}
+
+    def test_missing_dir_returns_empty_map(self, tmp_path):
+        assert load_req_to_principle("reliability", tmp_path / "nope") == {}
+
+
+class TestBuildMatcherResolvesEvaluatorsDir:
+    def test_explicit_evaluators_dir_feeds_req_to_principle(self, tmp_path):
+        (tmp_path / "reliability.json").write_text(json.dumps({
+            "principles": [{"name": "Fault Tolerance", "requirements": [{"id": "R-FT-1"}]}],
+        }))
+        m = build_matcher(
+            "reliability", dismissed=frozenset({("R-FT-1", "a.py", 1)}), deleted=frozenset(),
+            evaluators_dir=tmp_path,
+        )
+        assert m.req_to_principle == {"R-FT-1": "Fault Tolerance"}
+
+    def test_default_evaluators_dir_used_when_none_passed(self, monkeypatch, tmp_path):
+        """None still resolves to the production default at call time --
+        the call-time-default seam moved from load_req_to_principle up into
+        build_matcher, not dropped."""
+        import quodeq.services.suppression as suppression_mod
+
+        monkeypatch.setattr(suppression_mod, "default_paths", lambda: type(
+            "P", (), {"evaluators_dir": tmp_path},
+        )())
+        (tmp_path / "reliability.json").write_text(json.dumps({
+            "principles": [{"name": "Fault Tolerance", "requirements": [{"id": "R-FT-1"}]}],
+        }))
+        m = build_matcher(
+            "reliability", dismissed=frozenset({("R-FT-1", "a.py", 1)}), deleted=frozenset(),
+        )
+        assert m.req_to_principle == {"R-FT-1": "Fault Tolerance"}
 
 
 class TestMatcherFor:

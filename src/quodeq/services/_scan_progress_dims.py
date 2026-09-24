@@ -238,7 +238,7 @@ def _dim_exit_reason(record: dict | None) -> str | None:
 
 
 def _dim_evidence_tally(dim_id: str, ctx: ProgressContext, dismissed, deleted):
-    matcher = build_matcher(dim_id, dismissed, deleted)
+    matcher = build_matcher(dim_id, dismissed, deleted, evaluators_dir=ctx.evaluators_dir)
     stamp = _suppression_stamp(dismissed, deleted)
     memo_key = None if stamp is None else (
         dim_id, stamp,
