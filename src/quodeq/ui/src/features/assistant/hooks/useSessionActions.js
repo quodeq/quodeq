@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
+import { MESSAGE_ROLE } from '../messageRole.js';
 
 /**
  * Assistant session actions: send a message, stop the in-flight turn, and
@@ -13,7 +14,7 @@ export function useSessionActions({ sessionId, turnActive, stream, webEnabled, w
   const sendMessage = useCallback(async (text, uiState) => {
     if (!sessionId) return;
     setLocalError(null);
-    setUserTurns((prev) => [...prev, { role: 'user', text, atIndex: stream.messages.length }]);
+    setUserTurns((prev) => [...prev, { role: MESSAGE_ROLE.USER, text, atIndex: stream.messages.length }]);
     setTurnActive(true);  // turn is now in flight until the stream's done/error
     try {
       await postAssistantMessage(sessionId, { text, uiState, webEnabled, writeEnabled });
@@ -41,8 +42,8 @@ export function useSessionActions({ sessionId, turnActive, stream, webEnabled, w
   // turn and the local response in the transcript without any server call.
   const addLocalExchange = useCallback((userText, responseText) => {
     setUserTurns((prev) => [...prev,
-      { role: 'user', text: userText, atIndex: stream.messages.length },
-      { role: 'local', text: responseText, atIndex: stream.messages.length },
+      { role: MESSAGE_ROLE.USER, text: userText, atIndex: stream.messages.length },
+      { role: MESSAGE_ROLE.LOCAL, text: responseText, atIndex: stream.messages.length },
     ]);
   }, [stream.messages.length]);
 

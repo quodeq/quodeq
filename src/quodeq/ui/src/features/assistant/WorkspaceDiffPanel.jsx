@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { t } from '../../strings/index.js';
 import { confirmDialog } from '../../utils/confirmDialog.js';
-import { useWorkspaceDiff } from './hooks/useWorkspaceDiff.js';
+import { useWorkspaceDiff, WORKSPACE_OUTCOME } from './hooks/useWorkspaceDiff.js';
 
 export function classifyDiffLine(line) {
   if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git')) return 'wsdiff-file';
@@ -15,9 +15,9 @@ function WorkspaceDiffOutcome({ outcome }) {
   return (
     <div className="workspace-diff">
       <p className="workspace-diff-outcome" role="status" aria-live="polite">
-        {outcome.kind === 'applied' && t('assistant.outcomeApplied')}
-        {outcome.kind === 'discarded' && t('assistant.outcomeDiscarded')}
-        {outcome.kind === 'pr' && (outcome.prUrl
+        {outcome.kind === WORKSPACE_OUTCOME.APPLIED && t('assistant.outcomeApplied')}
+        {outcome.kind === WORKSPACE_OUTCOME.DISCARDED && t('assistant.outcomeDiscarded')}
+        {outcome.kind === WORKSPACE_OUTCOME.PR && (outcome.prUrl
           ? <>{t('assistant.prCreated')} <a href={outcome.prUrl} target="_blank" rel="noreferrer">{outcome.prUrl}</a></>
           : (outcome.message || t('assistant.outcomeBranchKept')))}
       </p>

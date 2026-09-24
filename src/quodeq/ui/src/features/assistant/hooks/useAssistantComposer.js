@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { buildMetaResponse, matchCommands, parseMetaCommand } from '../commands.js';
+import { buildMetaResponse, matchCommands, parseMetaCommand, META_COMMAND_NAME } from '../commands.js';
 import { KEY } from '../../../vocab/keyboard.js';
 
 // Must equal the `.assistant-drawer-input` max-height in assistant.css: the
@@ -82,7 +82,7 @@ export function useAssistantComposer({ active, streaming, catalog, readOnly, uiS
     const text = draft.trim();
     if (!text || streaming) return;
     const meta = parseMetaCommand(text);
-    if (meta === 'clear') { resetConversation(); setDraft(''); return; }
+    if (meta === META_COMMAND_NAME.CLEAR) { resetConversation(); setDraft(''); return; }
     if (meta) { addLocalExchange(text, buildMetaResponse(meta, catalog, { readOnly })); setDraft(''); return; }
     sendMessage(text, uiState);
     setDraft('');

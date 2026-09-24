@@ -3,12 +3,16 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 
+// The workspace action's outcome.kind: WorkspaceDiffPanel.jsx switches on
+// this to pick the right confirmation copy.
+export const WORKSPACE_OUTCOME = Object.freeze({ APPLIED: 'applied', DISCARDED: 'discarded', PR: 'pr' });
+
 // PR fail-soft: branch kept, worktree still active. Do NOT lock the panel;
 // surface the message and let the user retry, apply, or discard.
 function applyPrOutcome(res, setOutcome, setError) {
   if (res.pushed) {
     // Branch is on the remote; local apply is moot. Terminal message.
-    setOutcome({ kind: 'pr', message: res.message || null, prUrl: null });
+    setOutcome({ kind: WORKSPACE_OUTCOME.PR, message: res.message || null, prUrl: null });
   } else {
     // Push failed: changes restored to the worktree; keep buttons to retry/apply/discard.
     setError(res.message || t('assistant.prNotCreated'));
@@ -18,7 +22,7 @@ function applyPrOutcome(res, setOutcome, setError) {
 async function runWorkspaceAction(fn, kind, { setOutcome, setError, onChanged }) {
   try {
     const res = await fn();
-    if (kind === 'pr' && !res.prUrl) {
+    if (kind === WORKSPACE_OUTCOME.PR && !res.prUrl) {
       applyPrOutcome(res, setOutcome, setError);
     } else {
       setOutcome({ kind, message: res.message || null, prUrl: res.prUrl || null });
@@ -38,17 +42,17 @@ function useBoundWorkspaceActions(act, sessionId, api) {
   const { applyAssistantWorkspace, createAssistantWorkspacePr, discardAssistantWorkspace } = api;
 
   const applyToRepo = useCallback(
-    () => act(() => applyAssistantWorkspace(sessionId), 'applied'),
+    () => act(() => applyAssistantWorkspace(sessionId), WORKSPACE_OUTCOME.APPLIED),
     [act, applyAssistantWorkspace, sessionId],
   );
 
   const discard = useCallback(
-    () => act(() => discardAssistantWorkspace(sessionId), 'discarded'),
+    () => act(() => discardAssistantWorkspace(sessionId), WORKSPACE_OUTCOME.DISCARDED),
     [act, discardAssistantWorkspace, sessionId],
   );
 
   const createPr = useCallback(
-    (title, body) => act(() => createAssistantWorkspacePr(sessionId, { title, body }), 'pr'),
+    (title, body) => act(() => createAssistantWorkspacePr(sessionId, { title, body }), WORKSPACE_OUTCOME.PR),
     [act, createAssistantWorkspacePr, sessionId],
   );
 
