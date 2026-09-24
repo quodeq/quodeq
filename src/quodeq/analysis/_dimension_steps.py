@@ -12,6 +12,7 @@ from quodeq.analysis.evidence_parser import parse_evidence_file
 from quodeq.core.evidence.model import Evidence
 from quodeq.analysis.prompts.builder import build_analysis_prompt, prompt_context
 from quodeq.analysis.runner_markers import make_heartbeat
+from quodeq.data.fs.run_files import evidence_file_size
 from quodeq.shared.logging import log_warning
 
 
@@ -65,7 +66,7 @@ def _try_parse_stream_evidence(stream_file: Path, jsonl_file: Path) -> int:
 
     Returns the number of files read.
     """
-    mcp_produced = jsonl_file.exists() and jsonl_file.stat().st_size > 0
+    mcp_produced = evidence_file_size(jsonl_file) > 0
     mcp_status = get_mcp_status(stream_file)
     if mcp_status and mcp_status != "connected":
         log_warning(f"MCP findings server {mcp_status} — falling back to stream extraction")

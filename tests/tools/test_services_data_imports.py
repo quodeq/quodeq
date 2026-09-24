@@ -22,7 +22,6 @@ _BASELINE = frozenset({
     "_violations_jsonl.py:quodeq.data.fs.standards_loader",
     "_violations_jsonl.py:quodeq.data.fs.stream_files",
     "cache.py:quodeq.data.fs.report_parser.runs",
-    "cache.py:quodeq.data.fs.run_files",
     "cache_maintenance.py:quodeq.data.cache_store.local",
     "cache_maintenance.py:quodeq.data.cache_store.migrate",
     "dashboard_trend.py:quodeq.data.fs.report_parser.runs",

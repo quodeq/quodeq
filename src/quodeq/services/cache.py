@@ -14,7 +14,7 @@ from typing import Callable
 
 from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.data.fs.report_parser.runs import read_run_data
-from quodeq.data.fs.run_files import count_eval_files, read_run_status_json
+from quodeq.services.wiring import count_eval_files, read_run_status_json
 from quodeq.core.types import DimensionResult
 
 _logger = logging.getLogger(__name__)

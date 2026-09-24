@@ -10,7 +10,12 @@ from typing import Any
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.core.types.severity import Severity
 from quodeq.shared.utils import env_int, read_text
-from quodeq.services.wiring import is_known_dimension, parse_eval_from_json, parse_eval_markdown
+from quodeq.services.wiring import (
+    dimension_evidence_file,
+    is_known_dimension,
+    parse_eval_from_json,
+    parse_eval_markdown,
+)
 from quodeq.services.violation_context import ViolationContext  # re-export
 from quodeq.services._violation_filters import (  # noqa: F401 — re-exported for tests
     deleted_key_for_violation,
@@ -58,7 +63,7 @@ def _try_evidence_formats(
             keys.deleted, dimension,
         )
 
-    jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
+    jsonl_path = dimension_evidence_file(base, dimension)
     stream_path = base / "evidence" / f"{dimension}_live.stream"
     if opts.exists_fn(jsonl_path) and opts.stat_fn(jsonl_path).st_size > 0:
         return parse_violations_from_jsonl(

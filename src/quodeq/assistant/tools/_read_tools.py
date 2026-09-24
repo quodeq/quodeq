@@ -24,6 +24,7 @@ from quodeq.assistant.tools._read_tools_violations import (
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_visible
 from quodeq.data.fs.report_parser.finding_details import read_eval_report
+from quodeq.data.fs.run_files import count_eval_files
 from quodeq.services.standards import StandardsService
 
 # Cap violations embedded in a full report so a single get_report stays small.
@@ -59,12 +60,11 @@ def _get_scores(ctx: ToolContext) -> dict:
     # A specific run selected → that run's dims. Otherwise the accumulated
     # (per-dimension-latest) scores — the default dashboard/overview view.
     if has_run(ctx):
-        eval_dir = ctx.run_dir / "evaluation"
-        if not eval_dir.is_dir():
+        if count_eval_files(ctx.run_dir) is None:
             raise ToolError("no evaluation reports in this run")
         scored = scored_run_dims(ctx)
         if scored is None:
-            scored = raw_run_dims(eval_dir)
+            scored = raw_run_dims(ctx.run_dir / "evaluation")
         kept, hidden = visible_only(ctx, scored)
         return {
             "scores": {d["dimension"]: {

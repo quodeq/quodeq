@@ -13,7 +13,7 @@ from quodeq.services.grade_formula import load_params
 from quodeq.services.ports import StoreUnreadableError
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
-from quodeq.services.wiring import SQLiteStateStore, SqliteFindingsRepository
+from quodeq.services.wiring import SQLiteStateStore, SqliteFindingsRepository, count_eval_files
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.scoring._response_builders import (
     build_response_from_eval_files,
@@ -43,12 +43,11 @@ def _prefer_eval_rescore(deps: ScoringDeps, project_dir: Path, run_dir: Path) ->
         (deps.dismissed_keys or dismissed_keys)(project_dir)
         or (deps.deleted_keys or deleted_keys)(project_dir)
     )
-    eval_dir = run_dir / "evaluation"
-    return (
-        has_project_wide_filters
-        and eval_dir.is_dir()
-        and any(p.suffix == ".json" for p in eval_dir.iterdir())
-    )
+    # strict=True: an eval dir that exists but can't be listed (a permissions
+    # problem, say) must still raise here, not silently read as "no eval
+    # files" -- this mirrors the OSError propagation the old inline
+    # eval_dir.iterdir() call had.
+    return has_project_wide_filters and (count_eval_files(run_dir, strict=True) or 0) > 0
 
 
 def _scores_from_sql_grade_tables(

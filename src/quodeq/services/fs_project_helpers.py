@@ -15,6 +15,7 @@ from quodeq.core.run.state import RunState
 from quodeq.core.types import ProjectEntry
 from quodeq.services.wiring import (
     RunInfo,
+    list_project_dirs,
     read_repository_info,
     repository_info_exists,
     write_repository_info,
@@ -262,14 +263,13 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
         index.pop(key, None)
         save_repo_index(reports_path, index)
 
-    for child in reports_path.iterdir():
-        if not child.is_dir():
-            continue
+    for name in sorted(list_project_dirs(reports_path)):
+        child = reports_path / name
         if not _repo_identity_matches(child, expected_name, repo_resolved, scope_path):
             continue
-        index[key] = child.name
+        index[key] = name
         save_repo_index(reports_path, index)
-        return child.name
+        return name
     return None
 
 

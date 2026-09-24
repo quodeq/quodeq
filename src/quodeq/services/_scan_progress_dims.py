@@ -199,7 +199,7 @@ def consolidated_dim_progress(run_dir: Path) -> DimProgress:
     will show.
     """
     evidence_dir = run_dir / "evidence"
-    queue = read_queue_state(evidence_dir / "consolidated_queue.json") or {}
+    queue = read_queue_state(dimension_queue_file(run_dir, "consolidated")) or {}
     tally = live_tally(evidence_dir / "consolidated_evidence.jsonl",
                        suppressed=None, make_resolver=None, memo_key=("consolidated",))
     return DimProgress(

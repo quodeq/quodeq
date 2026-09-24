@@ -52,6 +52,7 @@ from quodeq.data.fs.dimension_report.report_io import write_dimension_report  # 
 
 # Run-directory readers and discard-time cleanup mechanics.
 from quodeq.data.fs.run_files import (  # noqa: F401
+    count_eval_files,
     dimension_evidence_file,
     dimension_queue_file,
     dimension_report_exists,

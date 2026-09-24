@@ -12,6 +12,7 @@ from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._read_tools_common import default_findings_repo_factory, requirement_of
 from quodeq.assistant.tools.registry import ToolError
 from quodeq.data.ports.findings import FindingsRepository
+from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME
 from quodeq.services import fs_reports
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
@@ -120,7 +121,7 @@ def _sql_finding_keys(ctx: ToolContext, keys: set[tuple]) -> None:
     only an EXISTING db so a read-only draft never creates evaluation.db or
     kicks a projection on a run that has none -- when there is no db there
     are no SQL findings to miss anyway."""
-    if not (ctx.run_dir / "evaluation.db").is_file():
+    if not (ctx.run_dir / EVALUATION_DB_FILENAME).is_file():
         return
     try:
         for req, file, line in findings_repo(ctx, ctx.run_dir).list_keys():

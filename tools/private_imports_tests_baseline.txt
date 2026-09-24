@@ -526,8 +526,8 @@ tests/assistant/test_tool_context_visibility.py:210:private-name:quodeq.assistan
 tests/assistant/test_tool_context_visibility.py:227:private-name:quodeq.assistant.mcp.server._build_registry_from_args
 tests/assistant/test_tools_overview.py:6:private-module:quodeq.assistant.tools._context.ToolContext
 tests/assistant/test_tools_overview.py:7:private-name:quodeq.assistant.tools._overview._get_overview
-tests/assistant/test_tools_read.py:120:private-module:quodeq.assistant.tools._read_tools.rt
-tests/assistant/test_tools_read.py:156:private-module:quodeq.assistant.tools._read_tools_violations
+tests/assistant/test_tools_read.py:132:private-module:quodeq.assistant.tools._read_tools.rt
+tests/assistant/test_tools_read.py:168:private-module:quodeq.assistant.tools._read_tools_violations
 tests/assistant/test_tools_read_accumulated.py:102:private-name:quodeq.assistant.tools._read_tools._list_standards
 tests/assistant/test_tools_read_accumulated.py:110:private-name:quodeq.assistant.tools._read_tools._list_standards
 tests/assistant/test_tools_read_accumulated.py:119:private-name:quodeq.assistant.tools._read_tools._get_standard
@@ -802,7 +802,7 @@ tests/data/test_git_cli.py:215:private-module:quodeq.analysis.subagents._git_sco
 tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite.index_sync._is_pid_alive
 tests/data/test_index_sync_stale.py:15:private-name:quodeq.data.sqlite.index_sync._is_pid_alive
 tests/data/test_mapper_totals_density.py:3:private-module:quodeq.data.mappers._mapper_findings.parse_totals
-tests/data/test_run_files.py:82:private-module:quodeq.services._accumulated_data.run_fingerprint
+tests/data/test_run_files.py:116:private-module:quodeq.services._accumulated_data.run_fingerprint
 tests/data/test_run_index_concurrency.py:24:private-module:quodeq.data.sqlite._run_index_schema
 tests/data/test_run_index_remove.py:6:private-module:quodeq.services._run_index_fs.remove_run_directory
 tests/integration/_cancel_resume_fixtures.py:54:private-module:quodeq.analysis._dimensions.DimensionsConfig

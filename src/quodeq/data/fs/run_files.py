@@ -30,11 +30,17 @@ _FINGERPRINT_FILES = ("evaluation.db", "evaluation.db-wal", "events.jsonl")
 _EVIDENCE_SUFFIX = "_evidence.jsonl"
 
 
-def count_eval_files(run_dir: Path) -> int | None:
+def count_eval_files(run_dir: Path, *, strict: bool = False) -> int | None:
     """Number of ``evaluation/*.json`` files, or None when the dir is absent.
 
     None vs 0 matters: callers anchored on the directory existing (unit
     tests that pre-seed caches) must treat "no directory" as "no signal".
+
+    *strict*: when the directory exists but listing it raises OSError (e.g.
+    a permissions problem), the default swallows that to None -- "no
+    signal", like every other read in this module. ``strict=True``
+    re-raises instead, for callers where an unreadable (as opposed to
+    absent) eval dir must not silently look like "nothing to see here".
     """
     eval_dir = run_dir / "evaluation"
     if not eval_dir.is_dir():
@@ -42,6 +48,8 @@ def count_eval_files(run_dir: Path) -> int | None:
     try:
         return sum(1 for p in eval_dir.iterdir() if p.suffix == ".json")
     except OSError:
+        if strict:
+            raise
         return None
 
 
