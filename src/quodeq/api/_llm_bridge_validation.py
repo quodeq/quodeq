@@ -6,6 +6,9 @@ handler to return as-is, or None when the input is acceptable.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from flask import Response, jsonify, request
 
 from quodeq.shared.url_validation import url_safety_error
@@ -22,6 +25,14 @@ def json_body() -> dict | None:
     """
     data = request.get_json(silent=True)
     return data if isinstance(data, dict) else None
+
+
+def string_fields_error(data: Mapping[str, Any], names: tuple[str, ...]) -> tuple[Response, int] | None:
+    """A 400 for the first of *names* present in *data* with a non-string value."""
+    for name in names:
+        if name in data and not isinstance(data[name], str):
+            return jsonify({"error": f"{name} must be a string", "code": "INVALID_PARAM"}), 400
+    return None
 
 
 def invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:

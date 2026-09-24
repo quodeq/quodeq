@@ -35,3 +35,53 @@ def test_post_projects_non_object_body_has_code(client):  # 2686
     assert resp.status_code == 400
     assert resp.is_json
     assert resp.get_json()["code"] == "INVALID_INPUT"
+
+
+def _created_result():
+    return CreateProjectResult(status="created", project_id="x", scan_data={})
+
+
+def test_post_projects_non_string_repo_returns_400(client):
+    with patch(
+        "quodeq.services.filesystem.FilesystemActionProvider.create_project",
+        return_value=_created_result(),
+    ) as mock_create:
+        resp = client.post("/api/projects", json={"repo": 5}, headers=_ORIGIN)
+    assert resp.status_code == 400
+    assert resp.is_json
+    assert resp.get_json()["code"]
+    mock_create.assert_not_called()
+
+
+def test_post_projects_non_string_clone_dest_returns_400(client):
+    with patch(
+        "quodeq.services.filesystem.FilesystemActionProvider.create_project",
+        return_value=_created_result(),
+    ) as mock_create:
+        resp = client.post(
+            "/api/projects",
+            json={"repo": "https://x/y.git", "cloneDest": ["a"]},
+            headers=_ORIGIN,
+        )
+    assert resp.status_code == 400
+    assert resp.is_json
+    assert resp.get_json()["code"]
+    mock_create.assert_not_called()
+
+
+def test_post_projects_non_string_discipline_returns_400(client):
+    # ephemeral: True avoids the unrelated "cloneDest is required" branch, so
+    # this isolates the discipline-specific type check.
+    with patch(
+        "quodeq.services.filesystem.FilesystemActionProvider.create_project",
+        return_value=_created_result(),
+    ) as mock_create:
+        resp = client.post(
+            "/api/projects",
+            json={"repo": "https://x/y.git", "ephemeral": True, "discipline": 3},
+            headers=_ORIGIN,
+        )
+    assert resp.status_code == 400
+    assert resp.is_json
+    assert resp.get_json()["code"]
+    mock_create.assert_not_called()

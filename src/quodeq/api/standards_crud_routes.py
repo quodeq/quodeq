@@ -67,6 +67,8 @@ def _handle_update(get_service, app: Flask, standard_id: str) -> Response:
         detail = svc.update_standard(standard_id, payload)
     except (FileNotFoundError, PermissionError) as exc:
         return _store_error_response(exc, standard_id, "update")
+    except ValueError:
+        return error_response(f"Invalid standard id: {standard_id!r}", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     return jsonify(to_camel_dict(detail))
 
 
@@ -78,6 +80,8 @@ def _handle_delete(get_service, app: Flask, standard_id: str) -> tuple[str, int]
         svc.delete_standard(standard_id)
     except (FileNotFoundError, PermissionError) as exc:
         return _store_error_response(exc, standard_id, "delete")
+    except ValueError:
+        return error_response(f"Invalid standard id: {standard_id!r}", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     return "", HTTPStatus.NO_CONTENT
 
 
@@ -88,8 +92,8 @@ def _handle_duplicate(get_service, app: Flask, standard_id: str) -> tuple[Respon
     if not isinstance(payload, dict):
         return payload
     new_id = payload.get("newId") or payload.get("new_id")
-    if not new_id:
-        return error_response("newId is required", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+    if not isinstance(new_id, str) or not new_id:
+        return error_response("newId must be a non-empty string", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     logger.info("standards.duplicate id=%s new_id=%s", standard_id, new_id)
     try:
         detail = svc.duplicate_standard(standard_id, new_id)

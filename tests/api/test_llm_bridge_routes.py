@@ -171,3 +171,20 @@ class TestEstimateAgentsValidation:
         )
         assert resp.status_code == 400
         assert resp.get_json()["code"] == "INVALID_PARAM"
+
+
+class TestProviderTestFieldTypes:
+    """A non-string provider/api_base/api_key/model must 400, not 500."""
+
+    @pytest.mark.parametrize("body", [
+        {"provider": ["x"]},
+        {"api_base": 5},
+        {"api_key": 1},
+        {"model": {}},
+    ])
+    def test_non_string_field_returns_400(self, client, body):
+        resp = client.post(
+            "/api/provider/test", json=body, headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
