@@ -60,13 +60,10 @@ def test_write_settings_logs_when_quodeq_dir_is_a_file(tmp_path, recording_log) 
     assert "shared settings write failed" in recording_log.debug_messages[0]
 
 
-def test_rollback_new_dirs_warns_when_rmtree_fails(tmp_path, recording_log, monkeypatch) -> None:
+def test_rollback_new_dirs_warns_when_removal_fails(tmp_path, recording_log, monkeypatch) -> None:
     (tmp_path / "new-project").mkdir()
 
-    def _denied(path, *_a, **_k):
-        raise OSError(13, "Permission denied", str(path))
-
-    monkeypatch.setattr(project_registration.shutil, "rmtree", _denied)
+    monkeypatch.setattr(project_registration, "remove_project_dir", lambda _path: False)
     project_registration._rollback_new_dirs(str(tmp_path), before=set(), log=recording_log)
     assert recording_log.warning_messages
     assert "rollback could not remove" in recording_log.warning_messages[0]

@@ -99,7 +99,7 @@ def test_apply_to_all_runs_reports_failed_runs_and_continues(tmp_path, formula_p
             raise RuntimeError("database is locked")
 
     monkeypatch.setattr(
-        "quodeq.data.projection.grade_projector.recompute_grades", flaky,
+        "quodeq.services.grade_formula.recompute_grades", flaky,
     )
     cleared = {"n": 0}
     monkeypatch.setattr(

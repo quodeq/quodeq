@@ -6,7 +6,7 @@ from typing import Any
 from quodeq.core.run.exit_reason import ExitReason
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
-from quodeq.data.fs.report_parser.grades import most_frequent_grade, parse_numeric_score
+from quodeq.core.scoring.report_grades import most_frequent_grade, parse_numeric_score
 
 
 def _accumulate_dimension_totals(

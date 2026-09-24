@@ -7,8 +7,10 @@ from __future__ import annotations
 import functools
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from http import HTTPStatus
+from typing import Any
 
 import httpx
 import openai
@@ -210,7 +212,12 @@ def _handle_call_exception(exc: Exception, config: ApiRunnerConfig, start: float
         )
 
 
-def call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
+def call_api(
+    prompt: str,
+    config: ApiRunnerConfig,
+    *,
+    client_factory: Callable[..., Any] | None = None,
+) -> tuple[list[dict], bool]:
     """Call the LLM raw, validate each finding independently, return ``(findings, was_lossy)``.
 
     ``was_lossy`` is True when we failed to REACH the model (network/timeout)
@@ -226,6 +233,9 @@ def call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     The OpenAI client owns an httpx connection pool whose sockets count
     against the process FD limit; the ``with`` block closes it so a long
     scan (one call per file) doesn't exhaust the FD soft cap.
+
+    *client_factory* builds the OpenAI-compatible client (``openai.OpenAI``
+    by default); tests pass a fake.
     """
     if config.api_base and config.api_base != _OLLAMA_DEFAULT_BASE:
         validate_url_safe(config.api_base, allow_private=True)
@@ -234,7 +244,7 @@ def call_api(prompt: str, config: ApiRunnerConfig) -> tuple[list[dict], bool]:
     timeout = _resolve_timeout(config, is_openai=is_openai)
     _log.debug("Calling %s model=%s (per-finding parse)", config.api_base, config.model)
     start = time.monotonic()
-    with openai.OpenAI(
+    with (client_factory or openai.OpenAI)(
         base_url=config.api_base,
         api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
         timeout=timeout,

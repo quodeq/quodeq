@@ -18,8 +18,10 @@ def _make_runs(root: Path, names: list[str]) -> None:
 
 
 def _stub_recompute(monkeypatch, seen: list[str]) -> None:
+    # grade_formula binds recompute_grades at import time (via wiring), so the
+    # stub must target that binding, not quodeq.data.projection.grade_projector.
     monkeypatch.setattr(
-        "quodeq.data.projection.grade_projector.recompute_grades",
+        "quodeq.services.grade_formula.recompute_grades",
         lambda run_dir, params=None: seen.append(run_dir.name),
     )
 

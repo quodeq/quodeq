@@ -3,9 +3,11 @@
 Convention (documented in ARCHITECTURE.md): services import data-layer
 functions from this module instead of reaching into ``quodeq.data.*``
 directly, so every services -> data edge is visible in one place. The
-layer checker allows any services -> data import — this is a convention,
-not an enforcement point — but new or edited services code goes through
-here. Contents are plain re-exports grouped by concern; the Protocols
+layer checker allows any services -> data import — a convention on its
+own, but tests/tools/test_services_data_imports.py now enforces it as a
+shrink-only ratchet baselining today's edges — new or edited services
+code goes through here. Contents are plain re-exports grouped by
+concern; the Protocols
 services accept as injected seams live in ``services/ports.py`` instead —
 this module carries only default concretions, never interface types. Most
 re-exported adapters are dependency-light, but a few (the filesystem report
@@ -19,6 +21,7 @@ from __future__ import annotations
 
 # Per-project JSON artifacts: repository_info.json, scan.json.
 from quodeq.data.fs.project_files import (  # noqa: F401
+    list_project_dirs,
     read_repository_info,
     read_scan_json,
     read_scan_total_files,
@@ -118,8 +121,23 @@ from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_need
 # Per-project suppression_rules.json pattern store.
 from quodeq.data.fs.suppression_rules import load_suppression_rules  # noqa: F401
 
-# Evaluator req-id -> principle-name mapping.
-from quodeq.data.fs.standards_loader import read_req_to_principle_map  # noqa: F401
+# Evaluator req-id -> principle-name mapping, compiled-refs lookup, and the
+# closed-dimension-set check.
+from quodeq.data.fs.standards_loader import (  # noqa: F401
+    is_known_dimension,
+    load_compiled_refs,
+    read_req_to_principle_map,
+)
+
+# Filesystem report parser: JSON/markdown eval-report parsing.
+from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown  # noqa: F401
+
+# Event Log reader.
+from quodeq.data.events.reader import EventLogReader  # noqa: F401
+
+# SQLite run index (module) + the stale-run cancellation helper.
+from quodeq.data.sqlite import run_index  # noqa: F401
+from quodeq.data.sqlite.index_sync import force_promote_to_cancelled_stale  # noqa: F401
 
 # AI client discovery: CLI ``/models`` subprocess + Anthropic HTTP API.
 from quodeq.data.cli_models import run_cli_models_command  # noqa: F401
@@ -133,14 +151,6 @@ from quodeq.data.fs.report_parser.runs import (  # noqa: F401
     read_run_data,
     read_run_scalars,
     safe_read_dir,
-)
-
-# Grade calculation, scoring, and dimension summary helpers.
-from quodeq.data.fs.report_parser.grades import (  # noqa: F401
-    calculate_trend,
-    most_frequent_grade,
-    parse_numeric_score,
-    summarize_dimensions,
 )
 
 # Repo-URL validation + child-project discovery.
@@ -198,7 +208,11 @@ from quodeq.data.sqlite.score_cache_store import (  # noqa: F401
 )
 
 # Live evidence tally (heartbeat + scan-progress counters).
-from quodeq.data.fs.evidence_tally import tally_unique_findings  # noqa: F401
+from quodeq.data.fs.evidence_tally import (  # noqa: F401
+    FindingTally,
+    IncrementalTally,
+    tally_unique_findings,
+)
 
 # Local git repo statistics.
 from quodeq.data.fs.git_stats import count_commits_since  # noqa: F401
@@ -220,3 +234,20 @@ from quodeq.data.fs.project_index import (  # noqa: F401
 from quodeq.data.git_cli import remote_origin_url_raw  # noqa: F401
 from quodeq.data.fs.project_resolver import resolve_project_uuid  # noqa: F401
 from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
+
+# Grade-formula params file + grade recomputation over a run's event log.
+from quodeq.data.fs.grade_formula_store import (  # noqa: F401
+    clear_rescore_pending,
+    grade_formula_path,
+    is_custom,
+    load_params,
+    mark_rescore_pending,
+    rescore_marker_path,
+    rescore_pending,
+    reset_params,
+    save_params,
+)
+from quodeq.data.projection.grade_projector import (  # noqa: F401
+    compute_run_grades,
+    recompute_grades,
+)

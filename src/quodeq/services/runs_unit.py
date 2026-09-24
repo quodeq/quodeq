@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 
 from quodeq.core.run.state import ACTIVE_STATES, TERMINAL_STATES, RunState, parse_run_state
-from quodeq.data.fs.report_parser.grades import most_frequent_grade, parse_numeric_score
+from quodeq.core.scoring.report_grades import most_frequent_grade, parse_numeric_score
 from quodeq.data.fs.report_parser.runs import read_run_scalars
 from quodeq.data.sqlite.run_index import (
     RunRow,
