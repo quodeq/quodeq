@@ -1049,7 +1049,7 @@ tests/services/test_provenance_downgrade_read_paths.py:25:private-module:quodeq.
 tests/services/test_provenance_downgrade_read_paths.py:26:private-module:quodeq.analysis._report_findings.flatten_findings
 tests/services/test_provenance_downgrade_read_paths.py:28:private-module:quodeq.data.fs.report_parser._report_parsing.build_finding
 tests/services/test_provenance_downgrade_read_paths.py:28:private-module:quodeq.data.fs.report_parser._report_parsing.parse_report_json
-tests/services/test_registration_scan.py:14:private-module:quodeq.services._registration_scan.scan_parent_project
+tests/services/test_registration_scan.py:15:private-module:quodeq.services._registration_scan.scan_parent_project
 tests/services/test_registration_url.py:10:private-module:quodeq.services._registration_url.strip_credentials
 tests/services/test_response_builders_seam.py:13:private-module:quodeq.services.scoring._response_builders
 tests/services/test_response_builders_seam.py:14:private-module:quodeq.services.scoring._response_builders.build_response_from_grade_tables

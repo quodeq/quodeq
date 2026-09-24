@@ -81,8 +81,8 @@ from quodeq.data.fs.run_artifacts import (  # noqa: F401
     replace_json_file,
 )
 
-# Repo-identity index (.repo_index.json) raw JSON read mechanics.
-from quodeq.data.fs.repo_index_store import read_repo_index  # noqa: F401
+# Repo-identity index (.repo_index.json) raw JSON read/write mechanics.
+from quodeq.data.fs.repo_index_store import read_repo_index, write_repo_index  # noqa: F401
 
 # Agent stream files.
 from quodeq.data.fs.stream_files import (  # noqa: F401

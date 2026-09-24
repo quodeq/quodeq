@@ -40,4 +40,7 @@ def scan_parent_project(
     if parent_uuid:
         parent_dir = reports_path / parent_uuid
         if not scan_json_exists(parent_dir):
-            scan_project(repo_path, output_dir=parent_dir)
+            try:
+                scan_project(repo_path, output_dir=parent_dir)
+            except OSError as exc:
+                log.warning(f"Could not scan parent project for {info_path}: {exc}")
