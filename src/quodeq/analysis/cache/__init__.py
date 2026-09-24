@@ -29,6 +29,7 @@ from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
     build_cache_key_for_file,
     classify_files_via_cache,
+    count_cache_misses,
     format_provenance_drift,
     persist_dispatch_results,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "analyze_unit",
     "build_cache_key_for_file",
     "classify_files_via_cache",
+    "count_cache_misses",
     "collect_legacy_entries",
     "compute_key",
     "default_cache_root",
