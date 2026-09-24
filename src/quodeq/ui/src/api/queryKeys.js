@@ -133,3 +133,10 @@ export const sharedKeys = {
   status: () => ["shared", "status"],
   list: () => ["shared", "list"],
 };
+
+// The grade-formula editor's rescore-progress poll. Outside the `project`
+// scope on purpose: when a pass lands the editor drops projectKeys.all(),
+// and that must not also refetch the poll that noticed it.
+export const gradeFormulaKeys = {
+  rescore: () => ["gradeFormula", "rescore"],
+};

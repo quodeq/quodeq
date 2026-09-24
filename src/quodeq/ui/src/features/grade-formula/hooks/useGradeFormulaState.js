@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGradeFormula } from '../../../api/index.js';
 import { projectKeys } from '../../../api/queryKeys.js';
+import { RESCORE_STATE } from '../../../vocab/rescoreState.js';
 import { t } from '../../../strings/index.js';
 
 // The named writes the editor makes, so no consumer ever sees a raw setter.
@@ -53,6 +54,9 @@ export function useGradeFormulaState() {
   // evaluation.db). Those runs keep the OLD formula's grades, so warn rather
   // than let the mismatch look like a bug.
   const [partialNotice, setPartialNotice] = useState(null);
+  // The mount GET's payload when a background rescore is already running
+  // (the user left mid-pass and came back), so the editor resumes polling.
+  const [resumeFrom, setResumeFrom] = useState(null);
   const debounceRef = useRef(null);
   // State, not a ref: useGradePreview's trigger effect depends on it, and a
   // ref would never re-run that effect when the initial GET lands.
@@ -77,6 +81,7 @@ export function useGradeFormulaState() {
       .then((d) => {
         setDefaults(d.defaults);
         adoptServerFormula(d.current, d.isCustom);
+        if (d.rescore?.state === RESCORE_STATE.RUNNING) setResumeFrom(d);
         setLoaded(true);
       })
       .catch(() => setError(t('gradeFormula.loadFailed')));
@@ -87,6 +92,6 @@ export function useGradeFormulaState() {
 
   return {
     saved, draft, isCustom, defaults, preview, busy, error, partialNotice,
-    debounceRef, loaded, invalidateScoreQueries, ...intents,
+    debounceRef, loaded, resumeFrom, invalidateScoreQueries, ...intents,
   };
 }

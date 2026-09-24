@@ -632,6 +632,7 @@
   "gradeFormula.partialRescoreOne": "Applied, but {count} run could not be rescored and still shows the old formula. Try applying again.",
   "gradeFormula.plainMean": "when off, the overall grade is a plain mean across dimensions",
   "gradeFormula.previewOf": "preview: {project}",
+  "gradeFormula.rescoreFailed": "Rescore failed. Some runs may still show the old formula. Try applying again.",
   "gradeFormula.resetFailed": "Reset failed",
   "gradeFormula.resetQ": "RESET Q²",
   "gradeFormula.scoreCurves": "Score curves",

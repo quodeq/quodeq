@@ -47,11 +47,16 @@ const CURRENT = {
 };
 const DEFAULTS = { ...CURRENT };
 
+// A pass that already landed: the hook settles on the first render after the
+// write, so these tests see the post-rescore effects without polling.
+const LANDED_RESCORE = { state: 'idle', generation: 1, appliedGeneration: 1, done: 3, total: 3, failed: 0 };
+const IDLE_RESCORE = { state: 'idle', generation: 0, appliedGeneration: 0, done: 0, total: 0, failed: 0 };
+
 beforeEach(() => {
   vi.clearAllMocks();
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-  getGradeFormula.mockResolvedValue({ current: CURRENT, defaults: DEFAULTS, isCustom: false });
+  getGradeFormula.mockResolvedValue({ current: CURRENT, defaults: DEFAULTS, isCustom: false, rescore: IDLE_RESCORE });
   previewGradeFormula.mockResolvedValue({
     project: 'proj', runId: 'r1',
     before: { overall: { score: 7, grade: 'Good' }, dimensions: [] },
@@ -137,7 +142,7 @@ describe('useGradeFormula', () => {
       gradeThresholds: [[8, 'Exemplary'], [6, 'Good'], [4, 'Adequate'], [2, 'Poor']],
     };
     saveGradeFormula.mockResolvedValue({
-      current: saved, defaults: DEFAULTS, isCustom: true, applied: 3,
+      current: saved, defaults: DEFAULTS, isCustom: true, rescore: LANDED_RESCORE,
     });
     const { result } = renderGradeFormula('proj');
     await waitFor(() => expect(result.current.draft).toEqual(CURRENT));
@@ -147,18 +152,18 @@ describe('useGradeFormula', () => {
 
     expect(saveGradeFormula).toHaveBeenCalledWith(CURRENT);
     expect(defaultGradeThresholdsStore.set).toHaveBeenCalledWith(saved.gradeThresholds);
-    expect(applied).toBe(3);
+    expect(applied).toEqual(LANDED_RESCORE);
     expect(result.current.isCustom).toBe(true);
     expect(result.current.draft).toEqual(saved);
     expect(result.current.isDirty).toBeFalsy();
     // Apply rewrote every run's grades server-side: the cached score/dashboard
     // queries must be invalidated so they refetch.
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() }));
   });
 
   it('resetToDefaults() restores defaults and reseeds the thresholds store', async () => {
     resetGradeFormula.mockResolvedValue({
-      current: DEFAULTS, defaults: DEFAULTS, isCustom: false, applied: 2,
+      current: DEFAULTS, defaults: DEFAULTS, isCustom: false, rescore: LANDED_RESCORE,
     });
     const { result } = renderGradeFormula('proj');
     await waitFor(() => expect(result.current.draft).toEqual(CURRENT));
@@ -169,7 +174,7 @@ describe('useGradeFormula', () => {
     expect(defaultGradeThresholdsStore.set).toHaveBeenCalledWith(DEFAULTS.gradeThresholds);
     expect(result.current.isCustom).toBe(false);
     // Reset also re-baked grades server-side: invalidate the score caches.
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() }));
   });
 
   it('surfaces a load error when the initial GET rejects', async () => {
