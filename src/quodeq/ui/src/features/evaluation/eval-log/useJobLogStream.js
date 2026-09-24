@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../../../strings/index.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
-import { LOG_STREAM_STATUS } from '../evaluationVocab.js';
+import { LOG_STREAM_STATUS } from '../../../vocab/logStreamStatus.js';
 
 const MAX_LINES = 5000;
 const INACTIVITY_MS = 60000;
