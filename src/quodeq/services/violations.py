@@ -7,11 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown
-from quodeq.data.fs.standards_loader import is_known_dimension
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.core.types.severity import Severity
 from quodeq.shared.utils import env_int, read_text
+from quodeq.services.wiring import is_known_dimension, parse_eval_from_json, parse_eval_markdown
 from quodeq.services.violation_context import ViolationContext  # re-export
 from quodeq.services._violation_filters import (  # noqa: F401 — re-exported for tests
     deleted_key_for_violation,

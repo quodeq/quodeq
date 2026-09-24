@@ -118,8 +118,23 @@ from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_need
 # Per-project suppression_rules.json pattern store.
 from quodeq.data.fs.suppression_rules import load_suppression_rules  # noqa: F401
 
-# Evaluator req-id -> principle-name mapping.
-from quodeq.data.fs.standards_loader import read_req_to_principle_map  # noqa: F401
+# Evaluator req-id -> principle-name mapping, compiled-refs lookup, and the
+# closed-dimension-set check.
+from quodeq.data.fs.standards_loader import (  # noqa: F401
+    is_known_dimension,
+    load_compiled_refs,
+    read_req_to_principle_map,
+)
+
+# Filesystem report parser: JSON/markdown eval-report parsing.
+from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown  # noqa: F401
+
+# Event Log reader.
+from quodeq.data.events.reader import EventLogReader  # noqa: F401
+
+# SQLite run index (module) + the stale-run cancellation helper.
+from quodeq.data.sqlite import run_index  # noqa: F401
+from quodeq.data.sqlite.index_sync import force_promote_to_cancelled_stale  # noqa: F401
 
 # AI client discovery: CLI ``/models`` subprocess + Anthropic HTTP API.
 from quodeq.data.cli_models import run_cli_models_command  # noqa: F401
@@ -190,7 +205,11 @@ from quodeq.data.sqlite.score_cache_store import (  # noqa: F401
 )
 
 # Live evidence tally (heartbeat + scan-progress counters).
-from quodeq.data.fs.evidence_tally import tally_unique_findings  # noqa: F401
+from quodeq.data.fs.evidence_tally import (  # noqa: F401
+    FindingTally,
+    IncrementalTally,
+    tally_unique_findings,
+)
 
 # Local git repo statistics.
 from quodeq.data.fs.git_stats import count_commits_since  # noqa: F401
