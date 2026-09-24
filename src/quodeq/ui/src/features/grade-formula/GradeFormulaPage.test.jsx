@@ -184,6 +184,12 @@ describe('GradeFormulaPage', () => {
     expect(screen.getByLabelText('critical')).toBeEnabled();
   });
 
+  it('shows a plain rescoring message before the pass has counted its runs', () => {
+    mockHook({ rescoreProgress: { done: 0, total: 0 } });
+    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    expect(screen.getByRole('status')).toHaveTextContent(/^Rescoring…$/);
+  });
+
   it('keeps the rescore live region mounted and empty when no pass runs', () => {
     mockHook({ rescoreProgress: null });
     render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);

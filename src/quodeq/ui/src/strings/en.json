@@ -634,6 +634,7 @@
   "gradeFormula.previewOf": "preview: {project}",
   "gradeFormula.rescoreFailed": "Rescore failed. Some runs may still show the old formula. Try applying again.",
   "gradeFormula.rescoring": "Rescoring {done} of {total} runs",
+  "gradeFormula.rescoringStarting": "Rescoring…",
   "gradeFormula.resetFailed": "Reset failed",
   "gradeFormula.resetQ": "RESET Q²",
   "gradeFormula.scoreCurves": "Score curves",

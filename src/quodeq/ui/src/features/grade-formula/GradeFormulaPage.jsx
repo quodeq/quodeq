@@ -77,12 +77,19 @@ function TabBody({ busy, ActiveBody, draft, update, activeTabId }) {
   );
 }
 
+function rescoreMessage(progress) {
+  if (!progress) return null;
+  // total stays 0 until the pass has listed its runs; "0 of 0" reads as done.
+  if (progress.total === 0) return t('gradeFormula.rescoringStarting');
+  return t('gradeFormula.rescoring', { done: progress.done, total: progress.total });
+}
+
 // Pre-mounted live region: screen readers announce text changes inside a
 // region that already exists, not one that mounts with its first message.
 function RescoreStatus({ progress }) {
   return (
     <span className="gf-dirty-hint" role="status">
-      {progress ? t('gradeFormula.rescoring', { done: progress.done, total: progress.total }) : null}
+      {rescoreMessage(progress)}
     </span>
   );
 }
