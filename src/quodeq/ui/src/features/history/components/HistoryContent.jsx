@@ -6,6 +6,7 @@ import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 import { EvaluationsTable } from './EvaluationsTable.jsx';
 import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 // Deferred so the History page's first paint doesn't carry the chart library.
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
@@ -66,7 +67,7 @@ function HistoryTopHeader({ trend, languageSub, selectedSource, availableRuns, r
       <TermHeader
         name={t('history.termName')}
         sub={`${trend.length === 1 ? t('history.evalsCountOne', { count: trend.length }) : t('history.evalsCountMany', { count: trend.length })}${languageSub ? ` · ${languageSub}` : ''}`}
-        badge={selectedSource === 'shared' ? <SharedReadOnlyBadge /> : null}
+        badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
       />
       {availableRuns && availableRuns.length > 0 && (
         <div className="history-run-nav">

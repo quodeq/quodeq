@@ -1,4 +1,5 @@
 import { SEVERITY } from '../../../../vocab/severity.js';
+import { FINDING_TYPE } from '../../../../vocab/findingType.js';
 
 function createNode(name, path, isFile) {
   return {
@@ -93,8 +94,8 @@ function collapseSingleChildren(node, _depth = 0) {
  *  severity: null = all violations, 'critical'|'major'|'minor' = filtered, 'all' = violations + compliance */
 export function treeNodeToFileObj(node, { severity } = {}) {
   const items = collectItems(node);
-  let violations = items.filter((i) => i.type === 'violation');
-  let compliance = items.filter((i) => i.type === 'compliance');
+  let violations = items.filter((i) => i.type === FINDING_TYPE.VIOLATION);
+  let compliance = items.filter((i) => i.type === FINDING_TYPE.COMPLIANCE);
   if (severity && severity !== 'all') {
     violations = violations.filter((v) => (v.severity || SEVERITY.MINOR) === severity);
     compliance = []; // severity filter shows only violations
@@ -132,7 +133,7 @@ export function buildFileTree(dimensions) {
       if (node.severity[sev] !== undefined) node.severity[sev]++;
       if (!node.dimensions[dimName]) node.dimensions[dimName] = { violations: 0, compliance: 0 };
       node.dimensions[dimName].violations++;
-      node.items.push({ ...v, dimension: dimName, type: 'violation' });
+      node.items.push({ ...v, dimension: dimName, type: FINDING_TYPE.VIOLATION });
     }
     for (const c of dim.compliance || []) {
       const filePath = c.file || '(unknown)';
@@ -140,7 +141,7 @@ export function buildFileTree(dimensions) {
       node.compliance++;
       if (!node.dimensions[dimName]) node.dimensions[dimName] = { violations: 0, compliance: 0 };
       node.dimensions[dimName].compliance++;
-      node.items.push({ ...c, dimension: dimName, type: 'compliance' });
+      node.items.push({ ...c, dimension: dimName, type: FINDING_TYPE.COMPLIANCE });
     }
   }
   aggregateUp(root);

@@ -33,6 +33,7 @@ from quodeq.services.fs_project_helpers import (
 )
 from quodeq.services.fs_scan import scan_project
 from quodeq.shared.validation import validate_path_segment
+from quodeq.core.types.project_source import ProjectLocation
 
 _logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ def _local_scan_root(project_dir: Path) -> tuple[Path | None, tuple[Response, in
     if info is None:
         return None, json_error(
             "Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
-    if info.get("location") != "local" or not info.get("path"):
+    if info.get("location") != ProjectLocation.LOCAL or not info.get("path"):
         return None, json_error(
             "Scan only available for local projects", HTTPStatus.BAD_REQUEST, "NOT_LOCAL")
     project_path = Path(info["path"])

@@ -25,6 +25,7 @@ import { readStoredScope } from '../compareScopeStorage.js';
 import CompareFleetView from './CompareFleetView.jsx';
 import CompareDimensionView from './CompareDimensionView.jsx';
 import CompareDuelView from './CompareDuelView.jsx';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 function buildSharedProps({
   rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir, setSortDir,
@@ -73,7 +74,7 @@ function useFleetProjects(projects) {
     return entries.map((e) => {
       if (e.local) return e.local;
       const raw = e.shared.id || e.shared.name;
-      return { ...e.shared, id: `shared:${raw}`, sourceId: raw, source: 'shared' };
+      return { ...e.shared, id: `shared:${raw}`, sourceId: raw, source: PROJECT_SOURCE.SHARED };
     });
   }, [localProjects, sharedProjects]);
   return { localProjects, fleetProjects };

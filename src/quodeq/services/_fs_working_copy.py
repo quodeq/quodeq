@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from quodeq.core.types.project_source import ProjectLocation
+
 
 def _derive_last_fetched_at(repo_path: str | None) -> str | None:
     """Return ISO-8601 mtime of .git/FETCH_HEAD (or .git/HEAD as fallback), or None."""
@@ -42,6 +44,6 @@ def annotate_working_copy(info: dict[str, Any]) -> None:
 def online_path_missing(info: dict[str, Any]) -> bool:
     """True for an online project whose stored path is not a remote URL."""
     return (
-        info.get("location") == "online"
+        info.get("location") == ProjectLocation.ONLINE
         and not (info.get("path", "").startswith(("https://", "git@")))
     )

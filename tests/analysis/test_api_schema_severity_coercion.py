@@ -80,3 +80,22 @@ class TestSeverityCoercion:
 
         assert dropped == 0
         assert [f["severity"] for f in findings] == ["major", "minor"]
+
+
+class TestFindingTypeNormalisation:
+    """Model output: case and space noise on "t" lands on the canonical type;
+    any other spelling is a dropped finding, never a guess."""
+
+    @pytest.mark.parametrize("raw", ["Violation", " VIOLATION ", "violation"])
+    def test_case_and_space_land_on_the_canonical_type(self, raw):
+        node = {**_COMPLIANCE_FINDING, "t": raw, "severity": "major"}
+        findings, dropped = parse_findings(json.dumps(node))
+        assert dropped == 0
+        assert findings[0]["t"] == "violation"
+        assert json.dumps(findings[0]["t"]) == '"violation"'
+
+    @pytest.mark.parametrize("raw", ["violations", "dismissed"])
+    def test_other_spellings_are_dropped_not_guessed(self, raw):
+        findings, dropped = parse_findings(json.dumps({**_COMPLIANCE_FINDING, "t": raw}))
+        assert findings == []
+        assert dropped == 1

@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { sharedKeys } from '../../../api/queryKeys.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 /**
  * Indexes a shared project list by id to its publish timestamp, for the
@@ -47,7 +48,7 @@ export function upsertPublishedProject(projects, id, local) {
     publishedBy: null, // backend's published.json is authoritative; the UI
     // shows "published <relative time>" regardless (see PublishedMeta/
     // LocalPublishedMeta -- both render gracefully with no publishedBy).
-    source: 'shared',
+    source: PROJECT_SOURCE.SHARED,
     latestRunId: carryOver(local, existing, 'latestRunId', null),
     latestDoneRunId: carryOver(local, existing, 'latestDoneRunId', null),
     originUrl: carryOver(local, existing, 'originUrl', null),

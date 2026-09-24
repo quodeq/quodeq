@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
-import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER } from '../../../utils/formatters.js';
+import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
 import { filterTitleSuffix } from './usePrincipleReportSpec.jsx';
 import { SEVERITY } from '../../../vocab/severity.js';
@@ -14,7 +14,7 @@ export function usePrincipleFixPlanSpec({
     if (!principle || filteredViolations.length === 0) return null;
     const buildBySeverity = () => {
       const bucket = {};
-      for (const sev of EVAL_SEVERITY_ORDER) {
+      for (const sev of KNOWN_SEVERITIES) {
         bucket[sev] = filteredViolations.filter((v) => (v.severity || SEVERITY.MINOR).toLowerCase() === sev);
       }
       return bucket;

@@ -16,14 +16,17 @@ import { projectKeys } from '../api/queryKeys.js';
 // useEvaluation, so the eval-completion regression below can drive `job`
 // directly without a real evaluation API, and without useServerHealth's
 // real network polling.
-vi.mock('../features/evaluation/hooks/useEvaluation.js', () => ({
-  useEvaluation: () => ({
-    job: null, jobError: null, liveViolations: {},
-    startEvaluation: vi.fn(), clearJob: vi.fn(), cancelEvaluation: vi.fn(),
-    startedProject: null,
-  }),
-  LOCAL_API_PROVIDERS: new Set(['ollama', 'llamacpp', 'omlx']),
-}));
+vi.mock('../features/evaluation/hooks/useEvaluation.js', async () => {
+  const actual = await vi.importActual('../features/evaluation/hooks/useEvaluation.js');
+  return {
+    ...actual,
+    useEvaluation: () => ({
+      job: null, jobError: null, liveViolations: {},
+      startEvaluation: vi.fn(), clearJob: vi.fn(), cancelEvaluation: vi.fn(),
+      startedProject: null,
+    }),
+  };
+});
 vi.mock('./useServerHealth.js', () => ({
   useServerHealth: () => [true, vi.fn(), null],
 }));

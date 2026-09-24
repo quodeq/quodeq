@@ -8,8 +8,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
+from quodeq.core.types.project_source import ProjectSource
 from quodeq.data.ports.assistant import SessionScope
-from quodeq.shared.constants import SESSION_SOURCE_LOCAL
 from quodeq.data.sqlite._assistant_schema import (
     ASSISTANT_DDL,
     ASSISTANT_MIGRATIONS,
@@ -96,7 +96,7 @@ class AssistantRepository:
                 self._conn = None
 
     def create_session(self, *, session_id: str, provider: str,
-                       model: str | None = None, source: str = SESSION_SOURCE_LOCAL,
+                       model: str | None = None, source: str = ProjectSource.LOCAL,
                        scope: SessionScope | None = None) -> dict:
         """INSERT into ``sessions``, then read the row back for its defaults.
 

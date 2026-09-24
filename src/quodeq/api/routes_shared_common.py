@@ -18,6 +18,7 @@ from flask import Response
 from quodeq.api.helpers import json_error
 from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.shared_repo import (
+    RepoFormat,
     read_state,
     shared_evaluations_root,
     shared_score_cache_path,
@@ -56,20 +57,20 @@ def with_shared_root(fn):
                 "no shared repository configured", HTTPStatus.CONFLICT, "NO_SHARED_REPO"
             )
         state = read_state(settings.url)
-        if state == "unsupported_version":
+        if state == RepoFormat.UNSUPPORTED_VERSION:
             return json_error(
                 "this shared repository requires a newer version of quodeq",
                 HTTPStatus.CONFLICT,
                 "UNSUPPORTED_VERSION",
             )
-        if state == "foreign":
+        if state == RepoFormat.FOREIGN:
             return json_error(
                 "the configured repository does not look like a quodeq results repository"
                 " — reconnect it in Settings",
                 HTTPStatus.CONFLICT,
                 "FOREIGN_REPO",
             )
-        if state == "missing":
+        if state == RepoFormat.MISSING:
             return json_error(
                 "the shared repository has not been cloned yet — reconnect it in Settings",
                 HTTPStatus.SERVICE_UNAVAILABLE,

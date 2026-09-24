@@ -8,7 +8,7 @@ import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js'
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import { t } from '../../../strings/index.js';
 import { formatRunDateTime } from '../../../utils/formatters.js';
-import { PROJECT_SOURCE } from '../../../constants.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { useHistoryDeleteRun } from '../hooks/useHistoryDeleteRun.js';
 import { HistoryContent } from './HistoryContent.jsx';
 import {

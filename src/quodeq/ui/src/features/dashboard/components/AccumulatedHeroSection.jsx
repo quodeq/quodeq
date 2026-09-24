@@ -6,6 +6,7 @@ import LastFetchedLine from '../../../components/LastFetchedLine.jsx';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import SeverityBadgeRow from './SeverityBadgeRow.jsx';
 import { t } from '../../../strings/index.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 const MAX_LANGS_IN_SUB = 5;
 
@@ -87,7 +88,7 @@ export function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, proj
         <TermHeader
           name={t('overview.termName')}
           sub={heroSubLine(projectInfo, lastDate)}
-          badge={selectedSource === 'shared' ? <SharedReadOnlyBadge publishedBy={projectInfo?.publishedBy} /> : null}
+          badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge publishedBy={projectInfo?.publishedBy} /> : null}
         />
         <LastFetchedLine lastFetchedAt={projectInfo?.lastFetchedAt} />
       </>}

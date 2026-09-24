@@ -1,4 +1,5 @@
 import { headerRowKey } from './findingListRows.js';
+import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
 // Re-exported so the file-detail pane keeps importing its row widgets from
 // one module.
@@ -45,9 +46,9 @@ export function itemKey(items) {
     const header = headerRowKey(item);
     if (header) return header;
     if (item.kind === 'low-conf-toggle') return 'h-lowconf';
-    if (item.kind === 'violation') return findingKey('v', item.v);
+    if (item.kind === FINDING_TYPE.VIOLATION) return findingKey('v', item.v);
     if (item.kind === 'low-conf-row') return findingKey('lc', item.v);
-    if (item.kind === 'compliance') return complianceKey(item.c);
+    if (item.kind === FINDING_TYPE.COMPLIANCE) return complianceKey(item.c);
     return i;
   };
 }

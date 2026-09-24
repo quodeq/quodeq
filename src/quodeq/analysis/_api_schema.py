@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import json
 import re
-from enum import Enum as _Enum
 
 from pydantic import BaseModel, Field, field_validator
 
+from quodeq.core.types.finding_type import FindingType, parse_finding_type
 from quodeq.core.types.severity import Severity, parse_severity
 
 SYSTEM_PROMPT = (
@@ -28,14 +28,9 @@ SYSTEM_PROMPT = (
 )
 
 
-class _FindingType(str, _Enum):
-    violation = "violation"
-    compliance = "compliance"
-
-
 class _Finding(BaseModel):
     req: str = Field(description="Requirement ID (e.g. P-TIM-1, S-CON-3)")
-    t: _FindingType = Field(description="violation or compliance")
+    t: FindingType = Field(description="violation or compliance")
     file: str = Field(description="File path relative to repo root")
     line: int = Field(description="1-indexed line number of the offending expression. MUST be > 0.", gt=0)
     end_line: int | None = Field(
@@ -102,6 +97,17 @@ class _Finding(BaseModel):
         default. Non-string input (``null``, a number) is the default too.
         """
         return parse_severity(value) if isinstance(value, str) else Severity.MINOR
+
+    @field_validator("t", mode="before")
+    @classmethod
+    def _normalise_finding_type(cls, value: object) -> object:
+        """Land ``"Violation"`` or ``" compliance "`` on the canonical type.
+
+        Case and surrounding space are model noise, like severity's. Any
+        other value (``"violations"``, a list) passes through unchanged so the
+        enum still rejects it and the finding counts as dropped.
+        """
+        return parse_finding_type(value) or value
 
 
 # A dict that fails `_Finding` validation but carries the required, domain-specific

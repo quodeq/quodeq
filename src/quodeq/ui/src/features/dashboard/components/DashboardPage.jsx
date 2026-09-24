@@ -6,6 +6,7 @@ import { preloadRunHistoryPanel } from './AccumulatedOverviewPanel.jsx';
 import { renderDashboardGate } from './dashboardGate.jsx';
 import { renderDashboardBody } from './dashboardBody.jsx';
 import { ProjectsLoadFailedState } from './DashboardPageEmptyStates.jsx';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 // ---------------------------------------------------------------------------
 // DashboardPage — body only, header is rendered by App.jsx
@@ -30,7 +31,7 @@ import { ProjectsLoadFailedState } from './DashboardPageEmptyStates.jsx';
 // without mounting the whole page (which needs a SidePaneProvider and more).
 export function selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo }) {
   const localProjectInfo = (projects || []).find((p) => (p.id || p.name) === selectedProject) || null;
-  return selectedSource === 'shared' ? (sharedProjectInfo || null) : localProjectInfo;
+  return selectedSource === PROJECT_SOURCE.SHARED ? (sharedProjectInfo || null) : localProjectInfo;
 }
 
 // After a successful clone-on-add migration the project's repository_info.json

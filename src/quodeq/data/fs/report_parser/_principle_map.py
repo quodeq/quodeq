@@ -7,8 +7,10 @@ from typing import Any
 from quodeq.core.finding_builder import format_file_line
 from quodeq.core.types.severity import Severity
 
-_FINDING_TYPE_VIOLATIONS = "violations"
-_FINDING_TYPE_COMPLIANCE = "compliance"
+# The report's two finding buckets: keys of a principle entry and of the
+# report JSON, not finding types (hence the plural "violations").
+_BUCKET_VIOLATIONS = "violations"
+_BUCKET_COMPLIANCE = "compliance"
 
 
 def _empty_principle(key: str) -> dict:
@@ -36,11 +38,11 @@ def _seed_principles(principles: list[dict], principle_map: dict[str, Any]) -> N
 
 
 def _collect_findings(
-    items: list[dict], principle_map: dict[str, Any], finding_type: str,
+    items: list[dict], principle_map: dict[str, Any], bucket: str,
 ) -> None:
     """Append normalized finding dicts to the appropriate principle entries.
 
-    *finding_type* must be ``"violations"`` or ``"compliance"``.
+    *bucket* must be ``"violations"`` or ``"compliance"``.
     """
     for item in items:
         key = item.get("principle", "")
@@ -55,7 +57,7 @@ def _collect_findings(
             "title": item.get("title", ""),
             "reason": item.get("reason", ""),
         }
-        if finding_type == _FINDING_TYPE_VIOLATIONS:
+        if bucket == _BUCKET_VIOLATIONS:
             entry["severity"] = item.get("severity", Severity.MINOR)
         if item.get("cwe"):
             entry["cwe"] = item["cwe"]
@@ -63,13 +65,13 @@ def _collect_findings(
             entry["req"] = item["req"]
         if item.get("req_refs"):
             entry["reqRefs"] = item["req_refs"]
-        principle_map[key][finding_type].append(entry)
+        principle_map[key][bucket].append(entry)
 
 
 def build_principle_map(data: dict[str, Any]) -> dict[str, Any]:
     """Build a mapping from principle name to its aggregated violations/compliance."""
     principle_map: dict[str, Any] = {}
     _seed_principles(data.get("principles", []), principle_map)
-    _collect_findings(data.get("violations", []), principle_map, _FINDING_TYPE_VIOLATIONS)
-    _collect_findings(data.get("compliance", []), principle_map, _FINDING_TYPE_COMPLIANCE)
+    _collect_findings(data.get("violations", []), principle_map, _BUCKET_VIOLATIONS)
+    _collect_findings(data.get("compliance", []), principle_map, _BUCKET_COMPLIANCE)
     return principle_map

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.finding_mappings import finding_to_response_dict
+from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.data.fs.report_parser._run_info import safe_read_dir
 from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME
@@ -93,10 +94,10 @@ def load_evidence_map_from_db(run_dir: Path) -> dict[str, dict[str, Any]]:
             "compliance": [],
         })
         finding_dict = finding_to_response_dict(j)
-        if j.verdict == "violation":
+        if j.verdict == FindingType.VIOLATION:
             entry["violations"].append(finding_dict)
             result[dimension]["violation_count"] += 1
-        elif j.verdict == "compliance":
+        elif j.verdict == FindingType.COMPLIANCE:
             entry["compliance"].append(finding_dict)
             result[dimension]["compliance_count"] += 1
         else:

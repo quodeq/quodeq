@@ -21,6 +21,7 @@ import { sharedListProjects, sharedGetCompareSummary } from '../../../api/shared
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { projectKeys, sharedKeys } from '../../../api/queryKeys.js';
 import { applyVisibleStandards } from '../compareModel.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 // A cold project's first summary can take as long as its Overview takes to
 // compute (the accumulated walk). Match the projects-list ceiling rather
@@ -52,10 +53,10 @@ export function useCompareData(projects) {
       // the RAW project id; `id` stays the fleet-unique row key. The key's
       // source segment keeps a same-named local project's cache separate.
       const raw = p.sourceId || id;
-      const remote = p.source === 'shared';
+      const remote = p.source === PROJECT_SOURCE.SHARED;
       return {
         ...QUERY_DEFAULTS,
-        queryKey: projectKeys.compareSummary(raw, remote ? 'shared' : 'local'),
+        queryKey: projectKeys.compareSummary(raw, remote ? PROJECT_SOURCE.SHARED : PROJECT_SOURCE.LOCAL),
         queryFn: () => (remote ? sharedGetCompareSummary(raw) : getCompareSummary(raw)),
       };
     }),

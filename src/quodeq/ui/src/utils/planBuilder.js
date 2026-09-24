@@ -1,4 +1,3 @@
-import { SEVERITY_ORDER } from './formatters.js';
 import {
   PLAN_SYSTEM_PREAMBLE,
   PLAN_OUTPUT_INSTRUCTIONS,
@@ -235,7 +234,7 @@ export function buildGroupPlanText({ title, violations, violationsBySeverity, co
 
   const render = renderEntry || defaultRenderEntry;
 
-  SEVERITY_ORDER.forEach((sev) => {
+  KNOWN_SEVERITIES.forEach((sev) => {
     const vs = violationsBySeverity[sev];
     if (!vs || vs.length === 0) return;
     lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`);

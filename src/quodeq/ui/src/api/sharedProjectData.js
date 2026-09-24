@@ -10,6 +10,7 @@ import { createDashboard } from '../models/dashboard.js';
 import { createDimensionEval } from '../models/dimension.js';
 import { epochSecondsToMs } from './sharedStatus.js';
 import { asOfQuery, parseAccumulated, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 // ── Project List & Info ─────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ export async function sharedListProjects({ refresh = false } = {}) {
       if (list[idx]) {
         proj.publishedBy = list[idx].publishedBy ?? null;
         proj.publishedAt = epochSecondsToMs(list[idx].publishedAt);
-        proj.source = list[idx].source ?? 'shared';
+        proj.source = list[idx].source ?? PROJECT_SOURCE.SHARED;
       }
     });
   }
@@ -61,7 +62,7 @@ export async function sharedGetProjectInfo(projectId) {
   const project = createProject(data);
   project.publishedBy = data?.publishedBy ?? null;
   project.publishedAt = epochSecondsToMs(data?.publishedAt);
-  project.source = data?.source ?? 'shared';
+  project.source = data?.source ?? PROJECT_SOURCE.SHARED;
   return project;
 }
 

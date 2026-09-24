@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER } from '../../../utils/formatters.js';
+import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { usePrincipleData } from './explorerDataHooks.js';
 import { SEVERITY } from '../../../vocab/severity.js';
 
@@ -10,7 +10,7 @@ export function computeEvalPrincipleData(evalPrincipal) {
   const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet);
   const violationsBySeverity = {};
   const sevCounts = { critical: 0, major: 0, minor: 0 };
-  for (const sev of EVAL_SEVERITY_ORDER) violationsBySeverity[sev] = [];
+  for (const sev of KNOWN_SEVERITIES) violationsBySeverity[sev] = [];
   for (const v of violations) {
     const sev = (v.severity || SEVERITY.MINOR).toLowerCase();
     if (violationsBySeverity[sev]) violationsBySeverity[sev].push(v);

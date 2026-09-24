@@ -17,6 +17,7 @@ import pytest
 from quodeq.services import rescore_run
 from quodeq.services.rescore_run import (
     RescoreOutcome,
+    RescoreStatus,
     rescore_project_run,
     resolve_latest_run_id,
 )
@@ -128,3 +129,15 @@ def test_rescore_receives_the_resolved_run_dir(reports_root, quiet_collaborators
     outcome = rescore_project_run(reports_root, _PROJECT, _RUN)
     assert outcome.status == "ok"
     assert quiet_collaborators["rescore"]["run_dir"] == reports_root / _PROJECT / _RUN
+
+
+def test_rescore_status_is_one_enum_with_the_route_spellings():
+    assert {s.name: s.value for s in RescoreStatus} == {
+        "OK": "ok", "INVALID_PARAM": "invalid_param",
+        "PROJECT_NOT_FOUND": "project_not_found", "RUN_NOT_FOUND": "run_not_found",
+    }
+
+
+def test_outcomes_carry_the_enum_member(reports_root: Path):
+    assert rescore_project_run(reports_root, "../escape", "").status is RescoreStatus.INVALID_PARAM
+    assert rescore_project_run(reports_root, "nope", "").status is RescoreStatus.PROJECT_NOT_FOUND

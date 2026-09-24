@@ -1,5 +1,5 @@
 // src/quodeq/ui/src/utils/reportBuilder/fileBuilder.js
-import { SEVERITY_ORDER } from '../formatters.js';
+import { KNOWN_SEVERITIES } from '../constants.js';
 import { formatDate, buildComplianceSection, buildViolationsSection, severityMatches, showsCompliance } from './shared.js';
 import { complianceRatio } from '../textFormatting.js';
 
@@ -16,7 +16,7 @@ function buildFileSummarySection(file, totalViolations, totalCompliance) {
 }
 
 function buildFileViolationsSection(file, severityFilter) {
-  const total = SEVERITY_ORDER
+  const total = KNOWN_SEVERITIES
     .filter((sev) => severityMatches(severityFilter, sev))
     .reduce((n, sev) => n + (file.violationsBySeverity?.[sev] || []).length, 0);
   return buildViolationsSection({ total, bySeverity: file.violationsBySeverity, severityFilter });

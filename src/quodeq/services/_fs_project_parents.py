@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from quodeq.core.types import ProjectEntry
+from quodeq.core.types.project_source import ProjectLocation
 from quodeq.shared.utils import env_int
 
 _DEFAULT_MAX_PROJECTS_LISTED = 200
@@ -39,13 +40,13 @@ def max_projects_listed(override: int | None = None, env: dict[str, str] | None 
 
 def auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:
     """Return projects with parent set for local projects sharing a path prefix."""
-    local_with_path = [p for p in projects if p.location == "local" and p.path]
+    local_with_path = [p for p in projects if p.location == ProjectLocation.LOCAL and p.path]
     local_with_path.sort(key=lambda p: len(p.path), reverse=True)
     parent_map: dict[str, str] = {}
     for project in projects:
         if project.parent is not None:
             continue
-        if project.location != "local" or not project.path:
+        if project.location != ProjectLocation.LOCAL or not project.path:
             continue
         best = find_best_parent(project.path.rstrip("/"), project.id, local_with_path)
         if best:

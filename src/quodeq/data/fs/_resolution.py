@@ -8,11 +8,11 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
+from quodeq.core.types.project_source import ProjectLocation
 from quodeq.data.fs._index_io import MAX_LEGACY_SCAN
 from quodeq.data.fs._models import ProjectIdentity
 
 _REPO_INFO_FILENAME = "repository_info.json"
-_LOCATION_ONLINE = "online"
 _URL_PREFIXES = ("https://", "git@")
 
 
@@ -111,7 +111,7 @@ def create_project(
     parent_uuid: str | None = None,
 ) -> str:
     """Create a new UUID project directory, write repository_info.json, and index it."""
-    if identity.location == _LOCATION_ONLINE and not identity.repo_path.startswith(_URL_PREFIXES):
+    if identity.location == ProjectLocation.ONLINE and not identity.repo_path.startswith(_URL_PREFIXES):
         logging.getLogger(__name__).warning(
             "Online project '%s' has a non-URL path '%s'; expected a remote URL.",
             identity.project_name,

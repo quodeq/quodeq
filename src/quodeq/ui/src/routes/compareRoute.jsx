@@ -3,6 +3,7 @@
  * verbatim (move-only refactor).
  */
 import { lazy } from 'react';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 const ComparePage = lazy(() => import('../features/compare/components/ComparePage.jsx'));
 
@@ -12,7 +13,7 @@ export function compareRoute(params, props) {
       projects={props.navigation.projects}
       projectsLoaded={props.navigation.projectsLoaded}
       dimension={params.dimension || null}
-      onOpenProject={(id, source = 'local') => {
+      onOpenProject={(id, source = PROJECT_SOURCE.LOCAL) => {
         // Remote fleet rows open through the shared source; the same
         // machinery the projects drawer uses for shared selections.
         props.navigation.handleProjectChange(id, source);
@@ -37,7 +38,7 @@ export function compareRoute(params, props) {
         // The entry's own source, like its own project: the explorer must
         // read a local fromProject from the local API even while the
         // global selection sits on the shared source (and vice versa).
-        fromSource: target.source || 'local',
+        fromSource: target.source || PROJECT_SOURCE.LOCAL,
         sourceTab: 'compare',
       })}
       // Head-to-head is a push like the dimension drill-down: back returns

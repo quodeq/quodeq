@@ -13,9 +13,8 @@ from quodeq.services._violations_shared import (
     build_finding_entry,
     build_violation_response,
     ResponseOptions,
-    FINDING_TYPES,
-    TYPE_VIOLATION,
 )
+from quodeq.core.types.finding_type import FINDING_TYPES, FindingType
 from quodeq.shared.utils import open_text
 
 _logger = logging.getLogger(__name__)
@@ -55,7 +54,7 @@ def _parse_entries_from_texts(
             if result is None:
                 continue
             finding_type, entry = result
-            if finding_type == TYPE_VIOLATION:
+            if finding_type == FindingType.VIOLATION:
                 violations.append(entry)
             else:
                 compliance.append(entry)

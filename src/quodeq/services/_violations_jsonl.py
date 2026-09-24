@@ -19,9 +19,8 @@ from quodeq.services._violations_shared import (
     build_finding_entry,
     build_violation_response,
     ResponseOptions,
-    FINDING_TYPES,
-    TYPE_VIOLATION,
 )
+from quodeq.core.types.finding_type import FINDING_TYPES, FindingType
 from quodeq.shared.utils import open_text
 
 _logger = logging.getLogger(__name__)
@@ -102,7 +101,7 @@ def _parse_jsonl_findings(
         if resolved_obj is None:
             continue
         entry = build_finding_entry(resolved_obj, dimension, req_refs_lookup)
-        if resolved_obj["t"] == TYPE_VIOLATION:
+        if resolved_obj["t"] == FindingType.VIOLATION:
             violations.append(entry)
         else:
             compliance.append(entry)

@@ -29,13 +29,13 @@ import { apiErrorMessage } from "../../../strings/apiErrors.js";
 import { confirmCancelEvaluation } from "../cancelDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
 import { evaluationKeys } from "../../../api/queryKeys.js";
-import { LOCAL_API_PROVIDERS } from "../../../constants.js";
+import { LOCAL_API_PROVIDERS } from "../../../vocab/provider.js";
 import { findingsRefetchInterval } from "./useEvaluation.helpers.js";
 import { useEvaluationQueries } from "./useEvaluationQueries.js";
 import { useEvaluationMutations } from "./useEvaluationMutations.js";
 
 export { findingsRefetchInterval };
-// Re-exported for the existing importers; the set itself lives in constants.js
+// Re-exported for the existing importers; the set itself lives in vocab/provider.js
 // so the Evaluate header resolves unset limits exactly like the start payload.
 export { LOCAL_API_PROVIDERS };
 

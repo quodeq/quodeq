@@ -1,7 +1,4 @@
 /** Pure filter/selection logic for DimensionCard's severity/principle/file filters. */
-import { SEVERITY_ORDER } from '../../../vocab/severity.js';
-
-export const SEVERITY_OPTIONS = [...SEVERITY_ORDER, 'unknown'];
 
 export function toggleInList(list, value) {
   return list.includes(value)

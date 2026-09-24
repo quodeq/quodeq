@@ -15,6 +15,7 @@ from quodeq.services.project_index import (
     load_index,
     save_index,
 )
+from quodeq.core.types.project_source import ProjectLocation
 
 from ._import_validation import logger
 
@@ -26,7 +27,7 @@ def identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
         project_name=str(info.get("name") or ""),
         repo_path=str(info.get("path") or ""),
         discipline=info.get("discipline") if isinstance(info.get("discipline"), str) else None,
-        location=str(info.get("location") or "local"),
+        location=str(info.get("location") or ProjectLocation.LOCAL),
         scope_path=info.get("scopePath") if isinstance(info.get("scopePath"), str) else None,
         remote_url=info.get("remote_url") if isinstance(info.get("remote_url"), str) else None,
     )

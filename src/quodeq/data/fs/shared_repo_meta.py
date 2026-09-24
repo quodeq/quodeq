@@ -7,6 +7,7 @@ turn, ``services/shared_repo.py``) so existing import sites are unaffected.
 from __future__ import annotations
 
 import json
+from enum import StrEnum
 from pathlib import Path
 
 from quodeq.data.fs.shared_repo_git import run_git, shared_cache_dir, shared_evaluations_root, shared_repo_path
@@ -18,20 +19,23 @@ PUBLISHED_META_FILENAME = "published.json"
 
 _GITIGNORE_CONTENT = "**/evaluation.db\n*.log\n"
 
-# Repo-format/clone-state vocabulary. A local closed set distinct from the
-# core run/job/severity/grade vocabularies core.run/core.types/core.scoring
-# own (tools/check_vocab_literals.py only ratchets those); named here so the
-# handful of comparison call sites below and in api/_assistant_helpers.py,
-# api/assistant_routes.py and services/shared_connect.py spell these out
-# once rather than retyping "ok"/"foreign"/... as bare strings.
-REPO_FORMAT_OK = "ok"
-REPO_FORMAT_EMPTY = "empty"
-REPO_FORMAT_FOREIGN = "foreign"
-REPO_FORMAT_UNSUPPORTED_VERSION = "unsupported_version"
-REPO_STATE_MISSING = "missing"
+
+class RepoFormat(StrEnum):
+    """State of a shared-results clone.
+
+    :func:`check_repo_format` classifies an existing clone as one of the
+    first four; :func:`read_state` adds MISSING when no clone is on disk.
+    The value is what ``repoState`` carries on the wire.
+    """
+
+    OK = "ok"
+    EMPTY = "empty"
+    FOREIGN = "foreign"
+    UNSUPPORTED_VERSION = "unsupported_version"
+    MISSING = "missing"
 
 
-def check_repo_format(repo_root: Path) -> str:
+def check_repo_format(repo_root: Path) -> RepoFormat:
     """Classify a clone from its marker file: ok | empty | foreign | unsupported_version.
 
     "empty" means a clone holding nothing but .git, which is publishable.
@@ -44,30 +48,30 @@ def check_repo_format(repo_root: Path) -> str:
         try:
             data = json.loads(marker.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-            return REPO_FORMAT_FOREIGN
+            return RepoFormat.FOREIGN
 
         # Marker JSON must be a dict; if not, it's foreign.
         if not isinstance(data, dict):
-            return REPO_FORMAT_FOREIGN
+            return RepoFormat.FOREIGN
 
         if data.get("format") != FORMAT_NAME:
-            return REPO_FORMAT_FOREIGN
+            return RepoFormat.FOREIGN
 
         # Try to parse version as int; if it fails or is non-numeric, unsupported.
         try:
             version = int(data.get("version", 0))
         except (ValueError, TypeError):
-            return REPO_FORMAT_UNSUPPORTED_VERSION
+            return RepoFormat.UNSUPPORTED_VERSION
 
         if version > FORMAT_VERSION:
-            return REPO_FORMAT_UNSUPPORTED_VERSION
-        return REPO_FORMAT_OK
+            return RepoFormat.UNSUPPORTED_VERSION
+        return RepoFormat.OK
 
     try:
         entries = [p for p in repo_root.iterdir() if p.name != ".git"]
     except OSError:
-        return REPO_FORMAT_FOREIGN
-    return REPO_FORMAT_EMPTY if not entries else REPO_FORMAT_FOREIGN
+        return RepoFormat.FOREIGN
+    return RepoFormat.EMPTY if not entries else RepoFormat.FOREIGN
 
 
 def bootstrap_repo_layout(repo_root: Path) -> None:
@@ -110,13 +114,13 @@ def sync_shared_index(url: str, env: dict | None = None) -> None:
         db.close()
 
 
-def read_state(url: str, env: dict | None = None) -> str:
+def read_state(url: str, env: dict | None = None) -> RepoFormat:
     """State of the local shared clone: ok | empty | foreign |
     unsupported_version | missing. "empty" (cloned, never published into)
     is servable -- routes return an empty listing for it."""
     repo = shared_repo_path(url, env)
     if not (repo / ".git").exists():
-        return REPO_STATE_MISSING
+        return RepoFormat.MISSING
     return check_repo_format(repo)
 
 

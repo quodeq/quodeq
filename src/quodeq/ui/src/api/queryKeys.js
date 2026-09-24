@@ -18,7 +18,7 @@
  * (no source) still prefix-matches every subkey for the *local* source only;
  * pass the caller's source explicitly if it should also match shared entries.
  */
-import { DEFAULT_PROJECT_SOURCE } from '../constants.js';
+import { DEFAULT_PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 // Stand-in job/run id for queries kept mounted with `enabled: false`:
 // react-query still wants a stable key, and routing the placeholder through

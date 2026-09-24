@@ -15,7 +15,9 @@ import { SEVERITY_ORDER } from '../../../vocab/severity.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
-const KNOWN_SEVERITIES = new Set(SEVERITY_ORDER);
+// The 3 real severities (as opposed to a missing/unrecognised one), for
+// deciding whether SevBadge (which only knows those 3) can render this row.
+const REAL_SEVERITY_SET = new Set(SEVERITY_ORDER);
 
 function ViolationLiveRow({ violation, index }) {
   const [open, setOpen] = useState(false);
@@ -41,7 +43,7 @@ function ViolationLiveRow({ violation, index }) {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
       >
         <span className="vlive-rail" aria-hidden="true" />
-        {KNOWN_SEVERITIES.has(v.severity)
+        {REAL_SEVERITY_SET.has(v.severity)
           ? <SevBadge level={v.severity} format="long" />
           : <span className={`severity-tag ${v.severity}`}>{severityLabel(v.severity)}</span>}
         <span className="vrow-rule">{v.principle || ''}</span>

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.core.types import ProjectEntry
+from quodeq.core.types.project_source import ProjectLocation
 from quodeq.core.utils.io import is_within
 from quodeq.services._filesystem_helpers import list_available_dimensions_for_discipline
 from quodeq.shared.log_sink import SHARED_LOG
@@ -175,7 +176,7 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
         if not is_valid_repo_url(new_path):
             return False
         resolved_path = new_path
-        location = "online"
+        location = ProjectLocation.ONLINE
     else:
         # Reject path-traversal attempts in the raw input before resolving.
         if ".." in Path(new_path).parts:
@@ -184,7 +185,7 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
         if not resolved.is_absolute() or not resolved.is_dir():
             return False
         resolved_path = str(resolved)
-        location = "local"
+        location = ProjectLocation.LOCAL
 
     info = read_repository_info(project_dir)
     if info is None:

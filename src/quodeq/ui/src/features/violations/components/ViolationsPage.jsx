@@ -8,7 +8,7 @@ import { useViolationsPageState } from '../hooks/useViolationsPageState.js';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 import { walkTree } from '../../../utils/treeWalk.js';
-import { PROJECT_SOURCE } from '../../../constants.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 function findSubtree(root, path) {
   if (!path) return root;

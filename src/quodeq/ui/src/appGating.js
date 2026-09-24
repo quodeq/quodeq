@@ -4,7 +4,7 @@
  * sidebar/topbar/landing wiring. All exported so they stay unit-testable
  * without mounting the whole App (which needs ~8 providers).
  */
-import { PROJECT_SOURCE } from './constants.js';
+import { PROJECT_SOURCE } from './vocab/projectSource.js';
 
 // Project-data tabs (overview/violations/map/history) — module scope so both
 // the App component's bounce effect and the exported shouldBounceToEvaluate

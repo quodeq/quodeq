@@ -16,10 +16,13 @@ const evaluationState = {
   cancelEvaluation: vi.fn(),
   startedProject: null,
 };
-vi.mock("../features/evaluation/hooks/useEvaluation.js", () => ({
-  useEvaluation: () => evaluationState,
-  LOCAL_API_PROVIDERS: new Set(["ollama", "llamacpp", "omlx"]),
-}));
+vi.mock("../features/evaluation/hooks/useEvaluation.js", async () => {
+  const actual = await vi.importActual("../features/evaluation/hooks/useEvaluation.js");
+  return {
+    ...actual,
+    useEvaluation: () => evaluationState,
+  };
+});
 
 import { useEvaluationLifecycle } from "./useEvaluationLifecycle.js";
 

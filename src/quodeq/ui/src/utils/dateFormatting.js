@@ -1,6 +1,7 @@
 import { isoWeekKey, localDayKey, YEAR_MONTH_KEY_LENGTH } from './dailyGrouping.js';
 import { LOCALE, t } from '../strings/index.js';
 import { SECONDS_PER_HOUR } from './time.js';
+import { GRANULARITY } from './granularity.js';
 
 // Intl formatters are comparatively expensive to construct, and these run in
 // list renders. Build once at module scope.
@@ -95,10 +96,10 @@ export function formatDurationCoarse(s) {
  * @param {'day'|'week'|'month'} [granularity='day']
  * @returns {string}
  */
-export function formatPeriodLabel(entry, granularity = 'day') {
+export function formatPeriodLabel(entry, granularity = GRANULARITY.DAY) {
   const iso = entry?.dateISO || '';
   const fallback = entry?.dateLabel || iso;
-  if (granularity === 'month') {
+  if (granularity === GRANULARITY.MONTH) {
     const [y, m] = localDayKey(iso).slice(0, YEAR_MONTH_KEY_LENGTH).split('-');
     if (!y || !m) return fallback;
     // Format the local calendar day, not the raw instant: the bucket is a
@@ -106,7 +107,7 @@ export function formatPeriodLabel(entry, granularity = 'day') {
     const d = new Date(Number(y), Number(m) - 1, 1);
     return Number.isNaN(d.getTime()) ? fallback : MONTH_YEAR.format(d);
   }
-  if (granularity === 'week') {
+  if (granularity === GRANULARITY.WEEK) {
     const key = isoWeekKey(iso); // 'YYYY-Www' or ''
     const [y, w] = key.split('-W');
     // Intl has no week-of-year format, so this one stays a catalog pattern.

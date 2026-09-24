@@ -157,6 +157,14 @@ jobs:
         # locked in with `npm run lint:vocab:update`.
         run: npm run lint:vocab
 
+      - name: Check UI naming style (naming ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on a module constant holding a literal or frozen object that is
+        # not UPPER_SNAKE_CASE, or a module function that is not camelCase
+        # (PascalCase components in .jsx). Landed at zero with an empty
+        # tools/naming_baseline.json and a ceiling of 0.
+        run: npm run lint:naming
+
       - name: Check UI accessibility (a11y ratchet)
         working-directory: src/quodeq/ui
         # Fails on eslint-plugin-jsx-a11y violations in production code beyond

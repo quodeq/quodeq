@@ -1,6 +1,6 @@
 import { it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useAssistantStream } from './useAssistantStream.js';
+import { applyFrame, useAssistantStream } from './useAssistantStream.js';
 
 class MockES {
   static instances = [];
@@ -245,4 +245,11 @@ it('a stopped frame ends the turn with a stop marker, not an error', () => {
   expect(result.current.messages.some((m) => m.role === 'warning' && /stopped/i.test(m.message))).toBe(true);
   // the connection survives for the next turn, like done
   expect(es.closed).toBeFalsy();
+});
+
+it('applyFrame calls no handler for a frame type it does not know', () => {
+  const names = ['onToken', 'onToolCall', 'onActionDraft', 'onWarning', 'onError', 'onStopped', 'onDone', 'onHeartbeat'];
+  const handlers = Object.fromEntries(names.map((n) => [n, vi.fn()]));
+  expect(() => applyFrame({ type: 'future_frame', text: 'x' }, handlers)).not.toThrow();
+  for (const fn of Object.values(handlers)) expect(fn).not.toHaveBeenCalled();
 });
