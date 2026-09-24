@@ -5,8 +5,12 @@ import { standardsKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
 import { KEY } from '../../../vocab/keyboard.js';
 
-const EDITABLE_REF_TYPES = ['cwe', 'book', 'url', 'other'];
-const BUILTIN_REF_TYPES = ['cwe', 'asvs', 'cert', 'cisq', 'wcag22'];
+// The one reference type with its own lookup UI (searchable CWE picker);
+// the rest are plain name/url fields.
+const REF_TYPE_CWE = 'cwe';
+
+const EDITABLE_REF_TYPES = [REF_TYPE_CWE, 'book', 'url', 'other'];
+const BUILTIN_REF_TYPES = [REF_TYPE_CWE, 'asvs', 'cert', 'cisq', 'wcag22'];
 
 const URL_TEMPLATES = {
   cwe: (id) => `https://cwe.mitre.org/data/definitions/${id}.html`,
@@ -186,7 +190,7 @@ function RefRemoveButton({ index, onRemove }) {
 
 function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
   const ref = normalizeRef(refData);
-  const isCwe = ref.type === 'cwe';
+  const isCwe = ref.type === REF_TYPE_CWE;
   const typeOptions = disabled
     ? [...new Set([ref.type, ...BUILTIN_REF_TYPES, ...EDITABLE_REF_TYPES])]
     : EDITABLE_REF_TYPES;
@@ -195,7 +199,7 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
     onChange(index, { ...ref, type: newType, refId: '', name: '', url: '' });
   };
   const handleCweSelect = (cwe) => {
-    onChange(index, { type: 'cwe', refId: String(cwe.id), name: cwe.name, url: URL_TEMPLATES.cwe(cwe.id) });
+    onChange(index, { type: REF_TYPE_CWE, refId: String(cwe.id), name: cwe.name, url: URL_TEMPLATES.cwe(cwe.id) });
   };
   const handleFieldChange = (field, value) => {
     onChange(index, { ...ref, [field]: value });
@@ -228,7 +232,7 @@ export default function ReferenceEditor({ refs, onChange, disabled }) {
   };
 
   const handleAdd = () => {
-    onChange([...refs, { type: 'cwe', refId: '', name: '', url: '' }]);
+    onChange([...refs, { type: REF_TYPE_CWE, refId: '', name: '', url: '' }]);
   };
 
   const handleRemove = (index) => {

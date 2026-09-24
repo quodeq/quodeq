@@ -1,6 +1,5 @@
 import { request, BASE } from './request.js';
-
-const HTTPS_PROTOCOL = 'https:'; // URL.protocol includes the trailing colon
+import { URL_PROTOCOL } from '../constants.js';
 
 /**
  * The WebSocket URL for the embedded terminal, derived from the page origin
@@ -11,7 +10,7 @@ const HTTPS_PROTOCOL = 'https:'; // URL.protocol includes the trailing colon
  */
 export function terminalSocketUrl(loc = window.location, sessionId = null) {
   const u = new URL(`${BASE}/terminal/ws`, loc.href);
-  u.protocol = (loc.protocol === HTTPS_PROTOCOL || u.protocol === HTTPS_PROTOCOL) ? 'wss:' : 'ws:';
+  u.protocol = (loc.protocol === URL_PROTOCOL.HTTPS || u.protocol === URL_PROTOCOL.HTTPS) ? 'wss:' : 'ws:';
   if (sessionId) u.searchParams.set('session', sessionId);
   return u.toString();
 }

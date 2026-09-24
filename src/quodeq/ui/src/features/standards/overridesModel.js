@@ -27,6 +27,10 @@ export function countCustomizedRequirements(standard, overrides) {
   return Object.keys(overrides).filter((id) => reqIds.has(id)).length;
 }
 
+// decideSave's outright-save sentinel; the other outcome is an
+// { confirm: string[] } object, not a member of this set.
+export const SAVE_DECISION_COMMIT = 'commit';
+
 /**
  * Save-vs-impact-dialog decision for StandardEditor's handleSave. An
  * undrafted overrides state (`!overridesDirty`) has nothing to preview and
@@ -35,7 +39,7 @@ export function countCustomizedRequirements(standard, overrides) {
  * confirmation dialog, an empty (or missing) set commits straight through.
  */
 export function decideSave({ overridesDirty, impact }) {
-  if (!overridesDirty) return 'commit';
+  if (!overridesDirty) return SAVE_DECISION_COMMIT;
   const changed = impact?.changedDimensions || [];
-  return changed.length === 0 ? 'commit' : { confirm: changed };
+  return changed.length === 0 ? SAVE_DECISION_COMMIT : { confirm: changed };
 }

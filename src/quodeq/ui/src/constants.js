@@ -106,6 +106,11 @@ export const PYWEBVIEW_READY_EVENT = 'pywebviewready';
 // against res.status / err.status.
 export const HTTP_STATUS = Object.freeze({ CONFLICT: 409, NOT_FOUND: 404 });
 
+// URL.protocol values (trailing colon included, per the URL spec) the UI
+// branches on: openExternal's web-scheme allowlist and terminalSocketUrl's
+// http(s) -> ws(s) upgrade.
+export const URL_PROTOCOL = Object.freeze({ HTTP: 'http:', HTTPS: 'https:' });
+
 // Run-id sentinel meaning "the most recently completed run" -- the
 // default/fallback wherever a specific run id has not been selected
 // (query keys, the run navigator, route params). Never a real run id.

@@ -10,16 +10,21 @@
 import { generateRequirementId } from './utils.js';
 import { deepClone } from '../../utils/deepClone.js';
 
+// selectedNode.type: which level of the standard tree is selected. Read
+// back by StandardDetail.jsx (which form to render) and produced here, by
+// StandardTree.jsx's onSelectNode calls and useStandardDetail.js.
+export const NODE_TYPE = Object.freeze({ ROOT: 'root', PRINCIPLE: 'principle', REQUIREMENT: 'requirement' });
+
 export function addPrincipleToStandard(standard) {
   const next = deepClone(standard);
   next.principles.push({ name: '', description: '', requirements: [] });
-  return { standard: next, selectedNode: { type: 'principle', index: next.principles.length - 1 } };
+  return { standard: next, selectedNode: { type: NODE_TYPE.PRINCIPLE, index: next.principles.length - 1 } };
 }
 
 export function removePrincipleFromStandard(standard, index) {
   const next = deepClone(standard);
   next.principles.splice(index, 1);
-  return { standard: next, selectedNode: { type: 'root' } };
+  return { standard: next, selectedNode: { type: NODE_TYPE.ROOT } };
 }
 
 export function addRequirementToStandard(standard, principleIndex) {
@@ -27,7 +32,7 @@ export function addRequirementToStandard(standard, principleIndex) {
   const principle = next.principles[principleIndex];
   // Absent principle (stale/out-of-range index): skip the mutation and land
   // the selection back at root rather than indexing into undefined.
-  if (!principle) return { standard: next, selectedNode: { type: 'root' } };
+  if (!principle) return { standard: next, selectedNode: { type: NODE_TYPE.ROOT } };
   // The principle itself may exist without a requirements array yet
   // (e.g. hand-edited/imported data); default it before pushing.
   principle.requirements ??= [];
@@ -36,7 +41,7 @@ export function addRequirementToStandard(standard, principleIndex) {
   principle.requirements.push({ id: autoId, text: '', description: '', refs: [] });
   return {
     standard: next,
-    selectedNode: { type: 'requirement', principleIndex, reqIndex: principle.requirements.length - 1 },
+    selectedNode: { type: NODE_TYPE.REQUIREMENT, principleIndex, reqIndex: principle.requirements.length - 1 },
   };
 }
 
@@ -49,7 +54,7 @@ export function removeRequirementFromStandard(standard, principleIndex, reqIndex
     principle.requirements ??= [];
     principle.requirements.splice(reqIndex, 1);
   }
-  return { standard: next, selectedNode: { type: 'principle', index: principleIndex } };
+  return { standard: next, selectedNode: { type: NODE_TYPE.PRINCIPLE, index: principleIndex } };
 }
 
 /** Set a nested field by path (e.g. ['principles', 0, 'name']). No selection change. */
