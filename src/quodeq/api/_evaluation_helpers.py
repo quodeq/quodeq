@@ -101,13 +101,8 @@ def coerce_int(value: object, default: int, field: str) -> int:
 def sanitize_url(url: str) -> str:
     """Remove embedded credentials from a URL for safe logging/error messages.
 
-    Userinfo ends at the LAST "@" of the authority (RFC 3986), so the search
-    runs from the right. A "/" before that "@" usually means the authority
-    already ended and the "@" belongs to a path segment -- but only when the
-    text before that "/" is itself a plausible host. Real credentials
-    (base64-derived tokens, JWTs, CI PATs) often contain a literal "/", and
-    bounding the search by the first "/" would then hide the real "@" and
-    let the whole credential through unmasked.
+    The userinfo is masked as ``***@``. ``split_userinfo`` documents how the
+    credential boundary is found.
     """
     parts = split_userinfo(url)
     if parts is None:

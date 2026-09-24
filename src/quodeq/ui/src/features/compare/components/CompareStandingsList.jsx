@@ -1,4 +1,4 @@
-import { SectionLabel } from '../../../components/terminal/index.js';
+import ComparePanel from './ComparePanel.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
@@ -95,11 +95,7 @@ function StandingRow({ s, i, view, onOpenProject, onOpenProjectDimension, setFoc
 
 export default function CompareStandingsList({ view, onOpenProject, onOpenProjectDimension, setFocusId }) {
   return (
-    <section className="compare-panel" aria-label={t('compare.standingsAria')}>
-      <div className="compare-panel__head">
-        <SectionLabel>{t('compare.standingsHeader', { count: view.standings.length })}</SectionLabel>
-        <span className="compare-panel__note">{t('compare.standingsNote', { dim: view.label })}</span>
-      </div>
+    <ComparePanel ariaLabel={t('compare.standingsAria')} header={t('compare.standingsHeader', { count: view.standings.length })} note={t('compare.standingsNote', { dim: view.label })}>
       <ul className="compare-standings">
         {view.standings.map((s, i) => (
           <StandingRow
@@ -113,6 +109,6 @@ export default function CompareStandingsList({ view, onOpenProject, onOpenProjec
           />
         ))}
       </ul>
-    </section>
+    </ComparePanel>
   );
 }

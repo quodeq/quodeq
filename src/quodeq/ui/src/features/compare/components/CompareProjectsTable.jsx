@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SectionLabel } from '../../../components/terminal/index.js';
+import ComparePanel from './ComparePanel.jsx';
 import { ViolationsCellBody } from './severityCells.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
@@ -59,15 +59,17 @@ export default function CompareProjectsTable({
 }) {
   const [showUnevaluated, setShowUnevaluated] = useState(false);
   return (
-    <section className="compare-panel" aria-label={t('compare.projectsAria')}>
-      <div className="compare-panel__head">
-        <SectionLabel>{t('compare.projectsHeader', { count: scopeCount })}</SectionLabel>
-        <span className="compare-panel__note">
+    <ComparePanel
+      ariaLabel={t('compare.projectsAria')}
+      header={t('compare.projectsHeader', { count: scopeCount })}
+      note={(
+        <>
           {sortDir === 'desc' ? t('compare.sortNoteScore') : t('compare.sortNoteScoreAsc')}
           {' · '}
           {t('compare.rowOpenHint')}
-        </span>
-      </div>
+        </>
+      )}
+    >
       <div className="compare-table" role="table">
         <div className="compare-row compare-row--head" role="row">
           <span className="compare-row__stripe" />
@@ -97,6 +99,6 @@ export default function CompareProjectsTable({
         )}
         {fleet.scoredCount > 1 && <ScopeAverageRow fleet={fleet} />}
       </div>
-    </section>
+    </ComparePanel>
   );
 }

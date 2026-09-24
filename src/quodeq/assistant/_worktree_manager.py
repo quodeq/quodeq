@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.assistant.worktree import (
-    WorktreeError, run_git, run_git_bytes, diff_stats, diff_text, worktrees_base,
+    WorktreeError, WorktreeStatus, run_git, run_git_bytes, diff_stats, diff_text, worktrees_base,
 )
 
 _logger = logging.getLogger(__name__)
@@ -172,7 +172,7 @@ def ensure_session_worktree(repository, *, repo_root: Path, project_id: str | No
                             session_id: str, base: Path | None = None) -> WorktreeManager:
     """Return the session's active worktree, creating one when needed."""
     row = repository.get_worktree(session_id)
-    if row and row["status"] == "active" and Path(row["path"]).is_dir():
+    if row and row["status"] == WorktreeStatus.ACTIVE and Path(row["path"]).is_dir():
         return WorktreeManager(repo_root=Path(row["repo_root"]),
                                path=Path(row["path"]), branch=row["branch"])
     manager = WorktreeManager.for_session(repo_root, project_id or "project",

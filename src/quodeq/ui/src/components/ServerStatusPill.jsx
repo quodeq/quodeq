@@ -1,9 +1,10 @@
 import ConsoleButton from './ConsoleButton.jsx';
 import { t } from '../strings/index.js';
+import { SERVER_STATUS } from '../features/settings/settingsVocab.js';
 
 const STATUS_LABEL = {
-  online: 'Running',
-  offline: t('common.connectionLost'),
+  [SERVER_STATUS.ONLINE]: 'Running',
+  [SERVER_STATUS.OFFLINE]: t('common.connectionLost'),
 };
 
 export default function ServerStatusPill({
@@ -14,7 +15,7 @@ export default function ServerStatusPill({
   consoleOpen = false,
   showDot = false,
 }) {
-  const isOnline = status === 'online';
+  const isOnline = status === SERVER_STATUS.ONLINE;
   const showConsole = isOnline && typeof onToggleConsole === 'function';
   const statusClass = isOnline ? 'server-status--online' : 'server-status--offline';
   const dotClass = isOnline ? 'server-dot--online' : 'server-dot--offline';
@@ -24,7 +25,7 @@ export default function ServerStatusPill({
         <span className={`server-dot ${dotClass}`} />
         {!isOnline && offlineMessage
           ? offlineMessage
-          : <span>{STATUS_LABEL[isOnline ? 'online' : 'offline']}</span>}
+          : <span>{STATUS_LABEL[isOnline ? SERVER_STATUS.ONLINE : SERVER_STATUS.OFFLINE]}</span>}
         {isOnline && address && (
           <span className="server-address">{address}</span>
         )}

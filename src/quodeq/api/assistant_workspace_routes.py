@@ -15,7 +15,7 @@ from quodeq.api.assistant_routes import release_app_turn, claim_app_turn
 from quodeq.api.helpers import json_error
 from quodeq.assistant.workspace_actions import (
     OutcomeKind, PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
-from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
+from quodeq.assistant.worktree import WorktreeError, WorktreeStatus, diff_stats, diff_text
 
 _logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def _lookup(app: Flask, sid: str):
 def _worktree_summary(row) -> dict | None:
     if row is None:
         return None
-    active = row["status"] == "active" and Path(row["path"]).is_dir()
+    active = row["status"] == WorktreeStatus.ACTIVE and Path(row["path"]).is_dir()
     stats = []
     if active:
         try:
@@ -52,7 +52,7 @@ def _workspace_status(app: Flask, sid: str):
         return err
     session = repo.get_session(sid)
     pending = [{"sessionId": r["session_id"], "branch": r["branch"]}
-               for r in repo.list_worktrees("active",
+               for r in repo.list_worktrees(WorktreeStatus.ACTIVE,
                                             project_id=session.get("project_id"))
                if r["session_id"] != sid]
     return jsonify({"worktree": _worktree_summary(row), "pending": pending})
@@ -62,7 +62,7 @@ def _workspace_diff(app: Flask, sid: str):
     repo, row, err = _lookup(app, sid)
     if err:
         return err
-    if row is None or row["status"] != "active":
+    if row is None or row["status"] != WorktreeStatus.ACTIVE:
         return json_error("no active worktree", 404, "NO_ACTIVE_WORKTREE")
     try:
         text = diff_text(Path(row["path"]))
