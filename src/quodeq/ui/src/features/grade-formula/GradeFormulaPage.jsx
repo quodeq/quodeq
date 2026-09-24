@@ -59,6 +59,9 @@ function TabButtons({ tab, setTab }) {
 // div-based sliders. GradeBoundaryBar.startDrag guards against
 // fieldset[disabled] in JS, and base.css adds pointer-events:none
 // on .gf-tab-body:disabled .gf-boundary-divider as a CSS companion.
+// The fieldset is disabled only while the PUT/DELETE request itself is
+// in flight, not while the background rescore pass runs after it lands:
+// sliders stay usable and a second Apply restarts the pass.
 function TabBody({ busy, ActiveBody, draft, update, activeTabId }) {
   return (
     <fieldset
@@ -74,7 +77,19 @@ function TabBody({ busy, ActiveBody, draft, update, activeTabId }) {
   );
 }
 
-function FormulaActions({ isDirty, busy, isCustom, error, partialNotice, onApply, onReset }) {
+// Pre-mounted live region: screen readers announce text changes inside a
+// region that already exists, not one that mounts with its first message.
+function RescoreStatus({ progress }) {
+  return (
+    <span className="gf-dirty-hint" role="status">
+      {progress ? t('gradeFormula.rescoring', { done: progress.done, total: progress.total }) : null}
+    </span>
+  );
+}
+
+function FormulaActions({
+  isDirty, busy, isCustom, error, partialNotice, rescoreProgress, onApply, onReset,
+}) {
   return (
     <div className="gf-actions">
       <button
@@ -92,6 +107,7 @@ function FormulaActions({ isDirty, busy, isCustom, error, partialNotice, onApply
         {isDirty ? t('gradeFormula.unsavedHint')
           : isCustom ? t('gradeFormula.customActive') : t('gradeFormula.defaultsActive')}
       </span>
+      <RescoreStatus progress={rescoreProgress} />
       {error ? <span className="gf-dirty-hint">{error}</span> : null}
       {partialNotice ? <span className="gf-dirty-hint" role="alert">{partialNotice}</span> : null}
     </div>
@@ -118,7 +134,8 @@ export default function GradeFormulaPage({ navigation }) {
   const projectId = navigation?.selectedProject || null;
   const [tab, setTab] = useState(DEFAULT_TAB_ID);
   const {
-    draft, isCustom, isDirty, preview, busy, error, partialNotice, update, apply, resetToDefaults,
+    draft, isCustom, isDirty, preview, busy, error, partialNotice, rescoreProgress,
+    update, apply, resetToDefaults,
   } = useGradeFormula(projectId);
 
   const onApply = makeOnApply(apply);
@@ -152,7 +169,7 @@ export default function GradeFormulaPage({ navigation }) {
       />
       <FormulaActions
         isDirty={isDirty} busy={busy} isCustom={isCustom} error={error} partialNotice={partialNotice}
-        onApply={onApply} onReset={onReset}
+        rescoreProgress={rescoreProgress} onApply={onApply} onReset={onReset}
       />
       <p className="settings-description" style={{ marginTop: 8 }}>
         {t('gradeFormula.insufficientNote')}

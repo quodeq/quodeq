@@ -633,6 +633,7 @@
   "gradeFormula.plainMean": "when off, the overall grade is a plain mean across dimensions",
   "gradeFormula.previewOf": "preview: {project}",
   "gradeFormula.rescoreFailed": "Rescore failed. Some runs may still show the old formula. Try applying again.",
+  "gradeFormula.rescoring": "Rescoring {done} of {total} runs",
   "gradeFormula.resetFailed": "Reset failed",
   "gradeFormula.resetQ": "RESET Q²",
   "gradeFormula.scoreCurves": "Score curves",
