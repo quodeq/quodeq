@@ -178,3 +178,26 @@ class TestDownloadViaDialogExceptNarrowing:
         assert result is False
         assert target.read_text() == "keep me"
         assert not (tmp_path / "output.txt.part").exists()
+        # no temp file left behind either: the directory holds only the target
+        assert [p.name for p in tmp_path.iterdir()] == ["output.txt"]
+
+    def test_a_pre_existing_partial_file_survives_a_failed_request(self, tmp_path):
+        """R-M5: a request that fails before any temp file is created must
+        not delete an unrelated file the user already has sitting at the
+        `<target>.part` path (cleanup must only ever remove a temp file
+        this call itself created)."""
+        target = tmp_path / "output.txt"
+        stray_partial = tmp_path / "output.txt.part"
+        stray_partial.write_text("not ours")
+
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=urllib.error.URLError("connection refused"),
+        ):
+            result = download_via_dialog(
+                self._window(str(target)), "http://127.0.0.1:7863", "/api/export", "output.txt",
+            )
+
+        assert result is False
+        assert stray_partial.read_text() == "not ours"
+        assert not target.exists()

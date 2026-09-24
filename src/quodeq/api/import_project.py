@@ -266,6 +266,8 @@ def import_zip_stream(
             return _error_outcome("reports directory does not exist", HTTPStatus.INTERNAL_SERVER_ERROR, "NO_REPORTS_DIR")
         try:
             with zipfile.ZipFile(upload) as zf:
+                # An OSError reading the archive up to here is not caught: it
+                # propagates as a read failure, not the write failure below.
                 top_dir, members = validate_archive(zf, max_total_bytes=size_limit * EXTRACT_HEADROOM)
                 repo_info = _read_and_validate_member_payloads(zf, members, top_dir)
                 identity = identity_from_info(repo_info)
@@ -274,19 +276,20 @@ def import_zip_stream(
                     return resolution
                 target_uuid, replace_existing = resolution
                 target = _ImportTarget(reports_root, top_dir, target_uuid, identity, replace_existing)
-                _stage_and_commit(zf, members, target)
+                try:
+                    _stage_and_commit(zf, members, target)
+                except OSError as exc:
+                    logger.warning("import: filesystem error: %s", exc)
+                    return _error_outcome(
+                        "Failed to write imported project. Check disk space and permissions.",
+                        HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR",
+                    )
         except ImportValidationError as exc:
             return _error_outcome(exc.public_message, exc.status, exc.code)
         except zipfile.BadZipFile:
             return _error_outcome(
                 "File is not a valid zip archive.",
                 HTTPStatus.BAD_REQUEST, "BAD_ZIP",
-            )
-        except OSError as exc:
-            logger.warning("import: filesystem error: %s", exc)
-            return _error_outcome(
-                "Failed to write imported project. Check disk space and permissions.",
-                HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR",
             )
 
     return _build_success_outcome(target, action, remote_addr)
