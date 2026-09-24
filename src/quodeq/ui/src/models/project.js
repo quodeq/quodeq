@@ -29,6 +29,14 @@
 
 import { fromFieldSpec } from './fieldSpec.js';
 
+// project.location values. ONLINE is the legacy "registered but never
+// cloned" state (repository_info.json written by pre-clone registration;
+// IncompleteSetupCard offers to complete it). Coincidentally spelled like
+// vocab/projectSource.js's PROJECT_SOURCE.LOCAL, but a different domain:
+// that one is where a project's *data* lives (this machine vs the shared
+// repo), this is whether a checkout exists on disk at all.
+export const PROJECT_LOCATION = Object.freeze({ LOCAL: 'local', ONLINE: 'online' });
+
 /**
  * Field table for {@link createProject}: output key -> [raw spelling(s), default].
  */

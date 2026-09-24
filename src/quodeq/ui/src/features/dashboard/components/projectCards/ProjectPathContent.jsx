@@ -4,6 +4,7 @@ import { t } from '../../../../strings/index.js';
 import { formatPath } from './projectDisplayHelpers.js';
 import { copyToClipboard } from '../../../../utils/clipboard.js';
 import { KEY } from '../../../../vocab/keyboard.js';
+import { PROJECT_LOCATION } from '../../../../models/project.js';
 
 function RelocateRow({ id, relocatePath, relocateError, setRelocatePath, submitRelocate, setRelocating }) {
   return (
@@ -19,14 +20,14 @@ function RelocateRow({ id, relocatePath, relocateError, setRelocatePath, submitR
 export function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
   const { relocating, relocatePath, relocateError, setRelocatePath, submitRelocate, setRelocating, startRelocate } = relocateActions;
   const path = formatPath(p.path);
-  const pathMissing = p.location === 'local' && p.pathExists === false;
+  const pathMissing = p.location === PROJECT_LOCATION.LOCAL && p.pathExists === false;
   if (relocating === id) {
     return <RelocateRow id={id} relocatePath={relocatePath} relocateError={relocateError} setRelocatePath={setRelocatePath} submitRelocate={submitRelocate} setRelocating={setRelocating} />;
   }
   return (
     <div className="project-path-row">
       {pathMissing && <span className="project-path-missing">{t('projects.pathNotFound')}</span>}
-      {p.location === 'online' && p.path ? (
+      {p.location === PROJECT_LOCATION.ONLINE && p.path ? (
         <span onClick={(e) => e.stopPropagation()}>
           <CopyButton label={path} onClick={() => copyToClipboard(p.path)} />
         </span>

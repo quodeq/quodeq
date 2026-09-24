@@ -5,12 +5,13 @@ import { disciplineLabel, formatDate } from './projectDisplayHelpers.js';
 import { GradeChip, LanguageNumbers, ProjectCardChips, PublishedMeta, LocalPublishedMeta } from './ProjectCardParts.jsx';
 import { PROJECT_SOURCE } from '../../../../vocab/projectSource.js';
 import { KEY } from '../../../../vocab/keyboard.js';
+import { PROJECT_LOCATION } from '../../../../models/project.js';
 
 function ProjectCardTopLeft({ project, id, name, grade, score, onResumeSetup }) {
   return (
     <div className="project-card-top-left">
       <span className="project-card-name">{project.displayName || name}</span>
-      {project.location === 'online' && (
+      {project.location === PROJECT_LOCATION.ONLINE && (
         <Badge
           variant="tag"
           tone="warning"

@@ -8,6 +8,8 @@ import { withDimensionsStr } from '../../../utils/dimensionUtils.js';
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
 import { DEFAULT_SCORE_HISTORY_GRANULARITY } from '../../../constants.js';
+import { HERO_CARD_KIND } from '../dashboardVocab.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 import { useAccumulatedComputations, computeAccumulatedStats } from '../hooks/useAccumulatedComputations.js';
 import { AccumulatedHeroSection } from './AccumulatedHeroSection.jsx';
 import { useAccumulatedReportSpec } from './accumulatedReportSpecs.jsx';
@@ -101,7 +103,7 @@ function makeCardNavigate({ onNavigate, filteredDimensions, reportProjectName })
   if (!onNavigate) return undefined;
   return (kind) => {
     const projectFile = buildProjectRootFile(filteredDimensions || [], reportProjectName);
-    const severityFilter = kind === 'violations' ? 'all' : kind;
+    const severityFilter = kind === HERO_CARD_KIND.VIOLATIONS ? SEVERITY_FILTER_ALL : kind;
     onNavigate('file', { file: projectFile, severityFilter });
   };
 }
