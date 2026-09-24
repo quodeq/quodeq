@@ -46,26 +46,29 @@ class AssistantRepository:
     def _open_connection(self) -> sqlite3.Connection:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        conn.execute("PRAGMA journal_mode = WAL")
-        # NORMAL is durable against app crashes under WAL and skips the
-        # per-commit fsync. CLI streaming writes one event row per text
-        # delta, so a FULL fsync per commit would pace the reader thread.
-        conn.execute("PRAGMA synchronous = NORMAL")
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version == 0:
-            conn.executescript(ASSISTANT_DDL)
-        elif version > ASSISTANT_SCHEMA_VERSION:
-            raise sqlite3.DatabaseError(
-                f"assistant.db schema v{version} is newer than supported "
-                f"v{ASSISTANT_SCHEMA_VERSION}"
-            )
-        elif version < ASSISTANT_SCHEMA_VERSION:
-            for target, sql in ASSISTANT_MIGRATIONS:
-                if version < target:
-                    conn.executescript(sql)
-        conn.row_factory = _dict_row
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+            # NORMAL is durable against app crashes under WAL and skips the
+            # per-commit fsync; CLI streaming writes one event row per text
+            # delta, so a FULL fsync per commit would pace the reader thread.
+            conn.execute("PRAGMA synchronous = NORMAL")
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+            version = conn.execute("PRAGMA user_version").fetchone()[0]
+            if version == 0:
+                conn.executescript(ASSISTANT_DDL)
+            elif version > ASSISTANT_SCHEMA_VERSION:
+                raise sqlite3.DatabaseError(
+                    f"assistant.db schema v{version} is newer than supported v{ASSISTANT_SCHEMA_VERSION}")
+            elif version < ASSISTANT_SCHEMA_VERSION:
+                for target, sql in ASSISTANT_MIGRATIONS:
+                    if version < target:
+                        conn.executescript(sql)
+            conn.row_factory = _dict_row
+        except BaseException:
+            # A newer schema or a failed migration must not pin a half-opened connection to the file.
+            conn.close()
+            raise
         return conn
 
     @contextmanager

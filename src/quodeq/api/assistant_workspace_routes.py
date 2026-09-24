@@ -23,12 +23,13 @@ _MAX_DIFF_CHARS = 2_000_000  # a diff this size is pathological; the UI never sh
 
 
 def _lookup(app: Flask, sid: str):
-    """(repo, row, error_response); runs one-shot worktree/db hygiene first."""
+    """(repo, session, row, error_response); runs one-shot worktree/db hygiene first."""
     repo = get_repository(app)
-    if repo.get_session(sid) is None:
-        return None, None, json_error("unknown session", 404, "UNKNOWN_SESSION")
+    session = repo.get_session(sid)
+    if session is None:
+        return None, None, None, json_error("unknown session", 404, "UNKNOWN_SESSION")
     run_assistant_hygiene(app)
-    return repo, repo.get_worktree(sid), None
+    return repo, session, repo.get_worktree(sid), None
 
 
 def _worktree_summary(row) -> dict | None:
@@ -47,10 +48,9 @@ def _worktree_summary(row) -> dict | None:
 
 
 def _workspace_status(app: Flask, sid: str):
-    repo, row, err = _lookup(app, sid)
+    repo, session, row, err = _lookup(app, sid)
     if err:
         return err
-    session = repo.get_session(sid)
     pending = [{"sessionId": r["session_id"], "branch": r["branch"]}
                for r in repo.list_worktrees("active",
                                             project_id=session.get("project_id"))
@@ -59,7 +59,7 @@ def _workspace_status(app: Flask, sid: str):
 
 
 def _workspace_diff(app: Flask, sid: str):
-    repo, row, err = _lookup(app, sid)
+    repo, _session, row, err = _lookup(app, sid)
     if err:
         return err
     if row is None or row["status"] != "active":
@@ -80,7 +80,7 @@ def _workspace_target(app: Flask, sid: str):
     Folds the lookup and the "no worktree" 404 that apply, pr and discard all
     answer with before they touch the worktree.
     """
-    repo, row, err = _lookup(app, sid)
+    repo, _session, row, err = _lookup(app, sid)
     if err:
         return None, None, err
     if row is None:

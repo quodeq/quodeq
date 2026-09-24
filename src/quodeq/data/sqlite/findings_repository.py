@@ -112,6 +112,18 @@ class SqliteFindingsRepository:
             ).fetchall()
         return [row_to_finding(r) for r in rows]
 
+    def list_keys(self) -> list[tuple[str | None, str | None, object]]:
+        """Return ``(requirement, file, line)`` for every finding in one narrow query.
+
+        The identity check needs only these three columns; ``list_all`` would
+        build a full ``Finding`` per row. Every verdict is included, like
+        ``list_all``, so an already-dismissed finding still matches.
+        """
+        self._ensure_fresh()
+        with open_evaluation_db(self._run_dir) as conn:
+            return [tuple(r) for r in conn.execute(
+                "SELECT requirement, file, line FROM findings ORDER BY id")]
+
     def count_by_dimension(self) -> dict[str, int]:
         """Return ``COUNT(*) GROUP BY dimension``, dismissed rows included.
 
