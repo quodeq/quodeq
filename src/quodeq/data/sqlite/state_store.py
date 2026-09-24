@@ -17,6 +17,7 @@ from quodeq.core.types.finding_type import FindingType
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
+from quodeq.data.sqlite._schema import INSERT_FINDING_SQL
 from quodeq.data.sqlite.row_mappers import judgment_to_row
 from quodeq.data.sqlite._state_store_meta import StateStoreMetaMixin
 
@@ -39,19 +40,6 @@ _CHECKPOINT_KEY = "projection_checkpoint"
 _PROJECTED_SIZE_KEY = "projection_event_log_size"
 _ACTIONS_SIZE_KEY = "actions_log_projected_size"
 
-_INSERT_FINDING = """
-INSERT OR IGNORE INTO findings (
-    schema_version, practice_id, dimension, requirement, verdict, severity,
-    file, line, end_line, title, reason, snippet, violation_type, violation_type_raw, context,
-    scope, req_refs_json, dedup_key, confidence, provenance_downgrade,
-    scope_downgrade_json
-) VALUES (
-    :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
-    :file, :line, :end_line, :title, :reason, :snippet, :violation_type, :violation_type_raw, :context,
-    :scope, :req_refs_json, :dedup_key, :confidence, :provenance_downgrade,
-    :scope_downgrade_json
-)
-"""
 
 # Compliance rows are never dismissed, so they are not read back.
 _SELECT_VERDICT_ROWS = (
@@ -99,7 +87,7 @@ class SQLiteStateStore(StateStoreMetaMixin):
         """
         row = judgment_to_row(payload)
         with self._db() as conn:
-            conn.execute(_INSERT_FINDING, row)
+            conn.execute(INSERT_FINDING_SQL, row)
             conn.commit()
 
     def clear_all(self) -> None:

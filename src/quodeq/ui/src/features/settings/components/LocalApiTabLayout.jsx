@@ -77,6 +77,22 @@ export function LocalApiModelRow({ hint, renderControl }) {
 }
 
 /**
+ * A model row whose control is a picker over the server's models, bound to
+ * `state.model`. `Control` is the tab's own picker component; it gets
+ * `{ value, models, onChange, labelId }`.
+ */
+export function LocalApiModelSelectRow({ hint, Control, state, update, models }) {
+  return (
+    <LocalApiModelRow
+      hint={hint}
+      renderControl={(labelId) => (
+        <Control value={state.model} models={models} onChange={(v) => update('model', v)} labelId={labelId} />
+      )}
+    />
+  );
+}
+
+/**
  * The picker over the models a local-API server reports, with the empty
  * "pick a model" entry the tabs rely on to express "nothing chosen yet".
  */

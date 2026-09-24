@@ -2,12 +2,12 @@ import {
   TAU, getThemeColors, drawGlow, drawParticles, rgba,
 } from '../core/galaxyCore.js';
 import { ZOOM_DIMENSION_LEVEL, ZOOM_PRINCIPLE_LEVEL, CANVAS_FONT_FAMILY } from '../core/galaxyTunables.js';
-import { drawStarfield } from './galaxyStarfield.js';
+import { drawStarfield, fillBackgroundGradient } from './galaxyStarfield.js';
 import {
   clusterDimming, selectedZoomFade, principleParticleFade, principleLabelAlpha, PRINCIPLE_FADE_SPAN,
 } from './galaxyFade.js';
 import {
-  BACKGROUND, STAR, VIOLATION_ORBS, MIN_VISIBLE_ALPHA, LABEL_ALPHA,
+  STAR, VIOLATION_ORBS, MIN_VISIBLE_ALPHA, LABEL_ALPHA,
   FOCUS_RING, FOCUS_RING_DASH, UNFOCUSED_CLUSTER_MIN_ALPHA, DIM_FADE_SPAN,
   CONSTELLATION, CONSTELLATION_RING_DASH, CONSTELLATION_LINE_DASH,
   DIM_PARTICLE, DIM_LABEL, PRINCIPLE,
@@ -52,10 +52,7 @@ export function drawFrame(ctx, scene, cam, nav, opts) {
 
 /** Phase 1: radial gradient background + background star field. */
 function drawBackground(ctx, scene, opts, tc) {
-  const { W, H } = opts;
-  const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * BACKGROUND.gradientRadiusFraction);
-  grad.addColorStop(0, tc.bgAlt); grad.addColorStop(1, tc.bg);
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+  fillBackgroundGradient(ctx, tc, opts);
   drawStarfield(ctx, scene.bg, tc, opts);
 }
 

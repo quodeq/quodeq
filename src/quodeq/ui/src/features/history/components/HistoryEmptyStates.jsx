@@ -18,17 +18,6 @@ export function HistoryEmptyShell({ sub, children, refreshing }) {
   );
 }
 
-export function NoProjectsEmptyContent({ onNavigate }) {
-  return (
-    <EmptyState
-      title={t('overview.noProjectsTitle')}
-      description={t('overview.noProjectsDesc')}
-      actionLabel={t('overview.addProject')}
-      onAction={() => onNavigate?.('projects')}
-    />
-  );
-}
-
 export function NoProjectSelectedEmptyContent({ onNavigate }) {
   return (
     <EmptyState
@@ -44,33 +33,11 @@ export function LoadingEmptyContent() {
   return <HistorySkeleton />;
 }
 
-export function ErrorEmptyContent({ error, onRetry }) {
-  return (
-    <EmptyState
-      title={t('overview.loadProjectFailedTitle')}
-      description={error}
-      actionLabel={t('overview.retry')}
-      onAction={() => onRetry?.()}
-    />
-  );
-}
-
 export function SharedNoEvalsEmptyContent() {
   return (
     <EmptyState
       title={t('overview.noCompletedEvalTitle')}
       description={t('overview.noCompletedEvalSharedDesc')}
-    />
-  );
-}
-
-export function NoEvalsEmptyContent({ projectName, onNavigate }) {
-  return (
-    <EmptyState
-      title={t('overview.noEvalsTitle')}
-      description={t('overview.noEvalsDesc', { name: projectName })}
-      actionLabel={t('overview.startEvaluation')}
-      onAction={() => onNavigate?.('evaluate')}
     />
   );
 }
