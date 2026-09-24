@@ -11,19 +11,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from quodeq.services._filesystem_helpers import (
-    _read_dimensions_from_file,
-    list_available_dimensions_for_discipline,
-    reset_dimensions_cache,
-)
+from quodeq.services._filesystem_helpers import reset_dimensions_cache
+from quodeq.services.fs_projects import list_available_dimensions_for_discipline
 
 
 @pytest.fixture(autouse=True)
 def _clear_caches():
-    _read_dimensions_from_file.cache_clear()
     reset_dimensions_cache()
     yield
-    _read_dimensions_from_file.cache_clear()
     reset_dimensions_cache()
 
 

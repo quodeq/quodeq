@@ -45,8 +45,14 @@ _dimensions_cache = _DimensionsCache()
 
 
 def reset_dimensions_cache() -> None:
-    """Reset the dimensions cache. Useful for test isolation."""
+    """Reset the dimensions cache. Useful for test isolation.
+
+    Also clears :func:`_read_dimensions_from_file`'s ``lru_cache`` so a test
+    that points *paths* at a file it then rewrites doesn't need to reach
+    into that private cache itself.
+    """
     _dimensions_cache.reset()
+    _read_dimensions_from_file.cache_clear()
 
 
 def list_available_dimensions_for_discipline(

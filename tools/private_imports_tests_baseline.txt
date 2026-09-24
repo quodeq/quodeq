@@ -962,6 +962,7 @@ tests/services/test_external_jobs_pid.py:40:private-module:quodeq.services._exte
 tests/services/test_external_jobs_pid.py:53:private-module:quodeq.services._external_jobs.cancel_external_run
 tests/services/test_external_jobs_pid.py:6:private-module:quodeq.services._external_jobs.is_safe_run_segment
 tests/services/test_external_jobs_pid.py:6:private-module:quodeq.services._external_jobs.resolve_external_pid
+tests/services/test_filesystem_helpers_dimensions.py:14:private-module:quodeq.services._filesystem_helpers.reset_dimensions_cache
 tests/services/test_fs_metadata_accumulated.py:16:private-module:quodeq.services._fs_metadata.read_accumulated_summary
 tests/services/test_fs_metadata_accumulated.py:86:private-name:quodeq.services._fs_metadata._compute_summary
 tests/services/test_fs_metadata_accumulated_card.py:14:private-module:quodeq.services._fs_metadata.read_accumulated_summary

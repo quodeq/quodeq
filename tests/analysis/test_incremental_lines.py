@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.analysis.stream._incremental_lines import iter_line_batches
+from quodeq.analysis.stream.progress_reader import iter_line_batches
 
 
 def test_multibyte_char_split_across_chunks_decodes_cleanly(tmp_path: Path):
