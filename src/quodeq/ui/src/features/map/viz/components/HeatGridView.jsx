@@ -3,7 +3,7 @@ import HeatGridCells, { HEAT_GRID_VARIANT } from '../../../../components/HeatGri
 import { ICON_FOLDER } from '../../../../constants/navigation.jsx';
 import { activateOnKey } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
-import { SORT_DIR } from '../../../../vocab/sortDirection.js';
+import { SORT_DIR, makeColumnSortHandler } from '../../../../vocab/sortDirection.js';
 
 const COL_NAME = 'name';
 const COL_CRITICAL = 'critical';
@@ -53,14 +53,7 @@ function useHeatGridSort(node) {
     return sortRows(filtered, sortCol, sortDir);
   }, [node, sortCol, sortDir]);
 
-  const handleSort = (col) => {
-    if (sortCol === col) {
-      setSortDir((d) => d === SORT_DIR.ASC ? SORT_DIR.DESC : SORT_DIR.ASC);
-    } else {
-      setSortCol(col);
-      setSortDir(col === COL_NAME ? SORT_DIR.ASC : SORT_DIR.DESC);
-    }
-  };
+  const handleSort = makeColumnSortHandler({ sortCol, setSortCol, setSortDir, ascCol: COL_NAME });
 
   return { rows, sortCol, sortDir, handleSort };
 }
