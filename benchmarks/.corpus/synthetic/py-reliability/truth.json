@@ -1,7 +1,7 @@
 {
   "language": "python",
   "exhaustive": true,
-  "clean_files": ["pipeline.py", "boundary.py"],
+  "clean_files": ["pipeline.py", "boundary.py", "atomic_write.py"],
   "labels": [
     {"file": "worker.py", "line": 9, "anchor": "except:",
      "dimension": "reliability", "cwes": [703, 396, 390], "reqs": ["R-FT-1", "R-FT-7", "R-FT-14"],

@@ -39,3 +39,9 @@ def test_carve_out_keeps_ordinary_logic_a_violation() -> None:
     assert "partially-updated state" in line
     assert "around ordinary logic" in line
     assert "r-ft-7" in line
+
+
+def test_carve_out_exempts_a_generic_catch_that_re_raises() -> None:
+    line = _not_a_violation_line()
+    assert "re-raises the caught exception" in line
+    assert "rethrows every other one" in line
