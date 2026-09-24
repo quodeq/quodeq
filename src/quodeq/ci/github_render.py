@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from quodeq.core.types.severity import Severity
+from quodeq.core.types.severity import Severity, parse_severity
 from quodeq.shared.serialization import coerce_line
 
 
@@ -209,11 +209,24 @@ def build_review_summary(
     return "\n".join(lines)
 
 
+_BLOCKING = frozenset({Severity.CRITICAL, Severity.MAJOR})
+
+
+def _verdict_severity(raw: object) -> Severity:
+    # "high" is the legacy spelling of major (see ci/sarif.py's rank table).
+    text = str(raw or "").strip().lower()
+    return Severity.MAJOR if text == "high" else parse_severity(text)
+
+
 def determine_verdict(new_violations: list[dict]) -> str:
     """Determine the review verdict based on NEW violation severities.
 
     Existing (pre-existing baseline) violations do not influence the verdict —
     this PR is only responsible for what it introduces.
+
+    Blocks (REQUEST_CHANGES) when any new violation is critical or major
+    severity; everything else (including the legacy "high" spelling, which
+    is treated as major) only comments.
 
     Returns: 'COMMENT' or 'REQUEST_CHANGES'.
 
@@ -226,7 +239,6 @@ def determine_verdict(new_violations: list[dict]) -> str:
     if not new_violations:
         return "COMMENT"
 
-    severities = {v.get("severity", Severity.MINOR) for v in new_violations}
-    if severities & {"critical", "major"}:
+    if any(_verdict_severity(v.get("severity")) in _BLOCKING for v in new_violations):
         return "REQUEST_CHANGES"
     return "COMMENT"

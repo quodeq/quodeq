@@ -1,6 +1,8 @@
 """Tests for quodeq.ci.review_builder."""
 from __future__ import annotations
 
+import pytest
+
 from quodeq.ci.review_builder import (
     ReviewOptions,
     build_review_summary,
@@ -61,9 +63,14 @@ def test_determine_verdict_critical():
     assert determine_verdict(violations) == "REQUEST_CHANGES"
 
 
-def test_determine_verdict_major():
-    violations = [{"severity": "major"}]
-    assert determine_verdict(violations) == "REQUEST_CHANGES"
+@pytest.mark.parametrize("sev", ["major", "high", "CRITICAL", " critical "])
+def test_determine_verdict_blocks_on_critical_and_major(sev):
+    assert determine_verdict([{"severity": sev}]) == "REQUEST_CHANGES"
+
+
+@pytest.mark.parametrize("sev", ["minor", "low", None, "weird"])
+def test_determine_verdict_comments_below_major(sev):
+    assert determine_verdict([{"severity": sev}]) == "COMMENT"
 
 
 def test_determine_verdict_no_violations():
