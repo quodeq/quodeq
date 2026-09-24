@@ -2,30 +2,3 @@
 # against) and rule R (the same string 3+ times in one module). The fix
 # is a named constant or an enum member. Burn to zero; never add.
 # Regenerate intentionally: python tools/check_magic_strings.py --update-baseline
-quodeq/dashboard/_api_spawn.py:C:1
-quodeq/dashboard/_build_npm.py:R:ui
-quodeq/dashboard/_instance.py:R:utf-8
-quodeq/dashboard/_networking.py:C:1
-quodeq/dashboard/_webview_window.py:C:dark
-quodeq/dashboard/_webview_window.py:C:light
-quodeq/dashboard/_webview_window_about.py:C:.icns
-quodeq/dashboard/_webview_window_about.py:C:.ico
-quodeq/dashboard/_webview_window_close.py:C:cancel
-quodeq/dashboard/_webview_window_close.py:C:stay
-quodeq/dashboard/_webview_window_close.py:R:keep
-quodeq/dashboard/_webview_window_close.py:R:stay
-quodeq/dashboard/_webview_window_help_menu.py:R:Help
-quodeq/dashboard/_webview_window_native_ops.py:C:127.0.0.1
-quodeq/dashboard/_webview_window_native_ops.py:C:::1
-quodeq/dashboard/_webview_window_native_ops.py:C:http
-quodeq/dashboard/_webview_window_native_ops.py:C:https
-quodeq/dashboard/_webview_window_native_ops.py:C:localhost
-quodeq/menubar/_app_lifecycle.py:R:Stopped
-quodeq/menubar/app.py:R:Quodeq
-quodeq/terminal/links.py:C:startfile
-quodeq/update/channel.py:C:frozen
-quodeq/update/compare.py:C:V
-quodeq/update/compare.py:C:v
-quodeq/update/selfupdate.py:R:hdiutil
-quodeq/update/source.py:C:frozen
-quodeq/update/source.py:C:wheel

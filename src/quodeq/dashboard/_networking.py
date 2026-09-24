@@ -10,6 +10,7 @@ _DEFAULT_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
 MAX_PORT_SCAN_TRIES = 20
 _PORT_CHECK_TIMEOUT_S = 2
 _MAX_PORT = 65535
+_ENV_TRUE = "1"  # QUODEQ_ALLOW_PLAINTEXT_HTTP truthy value
 
 
 def local_host_names(
@@ -51,4 +52,4 @@ def allow_plaintext_http(
     """
     if override is not None:
         return override
-    return resolve_env(env).get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"
+    return resolve_env(env).get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == _ENV_TRUE

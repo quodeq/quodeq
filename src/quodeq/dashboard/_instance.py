@@ -18,6 +18,7 @@ _RELOAD_PREFIX = "reload:"
 _MAX_UNIX_SOCK_PATH_LEN = 100
 _TCP_LOCALHOST = "127.0.0.1"
 _RECV_BUFFER_SIZE = 4096
+_ENCODING_UTF8 = "utf-8"
 # listen(1) is too tight on macOS: the probe inside try_acquire() and a
 # follow-up send_reload() on the same path can fill the 1-slot backlog
 # before the listener thread drains it, returning ECONNREFUSED. Linux
@@ -178,7 +179,7 @@ class InstanceController:
             while not self._shutdown_event.is_set():
                 try:
                     conn, _ = self._server_sock.accept()
-                    data = conn.recv(_RECV_BUFFER_SIZE).decode("utf-8", errors="replace")
+                    data = conn.recv(_RECV_BUFFER_SIZE).decode(_ENCODING_UTF8, errors="replace")
                     conn.close()
                     if data.startswith(_RELOAD_PREFIX):
                         url = data[len(_RELOAD_PREFIX):]
@@ -216,13 +217,13 @@ class InstanceController:
             sock.settimeout(_SOCK_TIMEOUT)
             with sock:
                 sock.connect((_TCP_LOCALHOST, self._tcp_port))
-                sock.sendall(payload.encode("utf-8"))
+                sock.sendall(payload.encode(_ENCODING_UTF8))
         else:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(_SOCK_TIMEOUT)
             with sock:
                 self._connect_to_sock(sock)
-                sock.sendall(payload.encode("utf-8"))
+                sock.sendall(payload.encode(_ENCODING_UTF8))
 
     def shutdown(self) -> None:
         """Stop listening and clean up.

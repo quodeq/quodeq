@@ -17,6 +17,7 @@ import logging
 import sys
 import threading
 from collections.abc import Callable
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
@@ -25,6 +26,19 @@ if TYPE_CHECKING:
     from quodeq.dashboard._webview_window import WindowApi
 
 _logger = logging.getLogger(__name__)
+
+
+class CloseChoice(StrEnum):
+    """How the user answered the close-confirmation dialog.
+
+    KEEP: quit, the scan keeps running in the background. CANCEL: stop the
+    scan, then quit (macOS 3-button alert only). STAY: don't close.
+    """
+
+    KEEP = "keep"
+    CANCEL = "cancel"
+    STAY = "stay"
+
 
 CLOSE_CONFIRM_TITLE = "Quit quodeq?"
 # 2-button backends (OK = quit and keep scanning, Cancel = stay open).
@@ -44,10 +58,10 @@ def alert_return_to_choice(ret: int, first: int, second: int) -> str:
     scan, then quit), anything else (third/Stay/Escape) -> 'stay'.
     """
     if ret == first:
-        return "keep"
+        return CloseChoice.KEEP
     if ret == second:
-        return "cancel"
-    return "stay"
+        return CloseChoice.CANCEL
+    return CloseChoice.STAY
 
 
 def macos_confirm_close(_window: object) -> str:
@@ -64,13 +78,13 @@ def macos_confirm_close(_window: object) -> str:
     unused here.
     """
     if sys.platform != PLATFORM_DARWIN:
-        return "keep"
+        return CloseChoice.KEEP
     try:
         import AppKit  # noqa: PLC0415, F401 — import-availability guard
         from PyObjCTools import AppHelper  # noqa: PLC0415
     except ImportError:
-        return "keep"
-    result = {"choice": "keep"}
+        return CloseChoice.KEEP
+    result = {"choice": CloseChoice.KEEP}
     done = threading.Semaphore(0)
     AppHelper.callAfter(lambda: _show_macos_close_alert(result, done))
     done.acquire()
@@ -105,7 +119,7 @@ def _show_macos_close_alert(result: dict, done: threading.Semaphore) -> None:
             AppKit.NSAlertSecondButtonReturn,
         )
     except Exception:
-        result["choice"] = "keep"
+        result["choice"] = CloseChoice.KEEP
     finally:
         done.release()
 
@@ -131,8 +145,8 @@ def ask_close_choice(window: object) -> str:
             CLOSE_CONFIRM_TITLE, CLOSE_CONFIRM_BODY,
         ))
     except Exception:
-        return "keep"
-    return "keep" if ok else "stay"
+        return CloseChoice.KEEP
+    return CloseChoice.KEEP if ok else CloseChoice.STAY
 
 
 def prompt_close_choice_and_finish(
@@ -147,11 +161,11 @@ def prompt_close_choice_and_finish(
     try:
         choice = ask_close_choice(window)  # 'keep' | 'cancel' | 'stay'
     except Exception:
-        choice = "keep"  # never trap the user on an unexpected dialog error
-    if choice == "stay":
+        choice = CloseChoice.KEEP  # never trap the user on an unexpected dialog error
+    if choice == CloseChoice.STAY:
         state["prompting"] = False  # re-promptable: a later close asks again
         return
-    if choice == "cancel":
+    if choice == CloseChoice.CANCEL:
         api._cancel_evaluation(job_id)
     # Set `confirmed` BEFORE destroy(): on GTK/Qt/winforms window.destroy()
     # re-fires the closing event, and the guard in _on_closing is what lets

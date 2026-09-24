@@ -16,10 +16,13 @@ from quodeq.shared.env_resolve import resolve_env
 _PACKAGE = "quodeq"
 _FALLBACK = f"pip install -U {_PACKAGE}"
 
+CHANNEL_FROZEN = "frozen"  # bundled app (PyInstaller etc.)
+CHANNEL_WHEEL = "wheel"  # pip-style install
+
 
 def detect_channel() -> str:
-    """Return "frozen" for the bundled app, "wheel" for a pip-style install."""
-    return "frozen" if getattr(sys, "frozen", False) else "wheel"
+    """Return CHANNEL_FROZEN for the bundled app, CHANNEL_WHEEL for a pip-style install."""
+    return CHANNEL_FROZEN if getattr(sys, "frozen", False) else CHANNEL_WHEEL
 
 
 def upgrade_command(
@@ -32,7 +35,7 @@ def upgrade_command(
     in the path picks that tool's command. Anything unrecognised falls back to
     ``pip install -U``. *env* and *package_file* exist for tests.
     """
-    if detect_channel() == "frozen":
+    if detect_channel() == CHANNEL_FROZEN:
         return ""
     environ = resolve_env(env)
     try:

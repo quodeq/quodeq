@@ -16,6 +16,7 @@ from quodeq.shared.constants import PLATFORM_DARWIN
 
 _help_target: object | None = None  # keep the Help-menu handler alive (menu item holds a weak ref)
 _help_menu_installed = False  # the _HelpHandler ObjC class may only be defined once
+_HELP_MENU_TITLE = "Help"
 
 # Payload both native shells dispatch to open the help tab; routed by the
 # React useNativeNavBridge hook (detail must be a KNOWN_TABS entry).
@@ -50,13 +51,13 @@ def _build_help_menu(app: object, main_menu: object, target: object) -> None:
     """
     from AppKit import NSMenu, NSMenuItem  # noqa: PLC0415
 
-    help_menu = NSMenu.alloc().initWithTitle_("Help")
+    help_menu = NSMenu.alloc().initWithTitle_(_HELP_MENU_TITLE)
     item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
         "quodeq Help", "openHelp:", "?",
     )
     item.setTarget_(target)
     help_menu.addItem_(item)
-    top_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Help", None, "")
+    top_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(_HELP_MENU_TITLE, None, "")
     top_item.setSubmenu_(help_menu)
     main_menu.addItem_(top_item)
     app.setHelpMenu_(help_menu)
@@ -167,4 +168,4 @@ def non_macos_menu(window: object) -> "list[object] | None":
                 logger.debug("help-menu navigation failed", exc_info=True)
         threading.Thread(target=_run, daemon=True).start()
 
-    return [wm.Menu("Help", [wm.MenuAction("quodeq Help", _open_help)])]
+    return [wm.Menu(_HELP_MENU_TITLE, [wm.MenuAction("quodeq Help", _open_help)])]

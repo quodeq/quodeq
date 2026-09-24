@@ -23,6 +23,7 @@ import rumps
 from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.frozen import source_user_path as _source_user_path
+from quodeq.menubar._constants import STATUS_STOPPED
 from quodeq.menubar import control as _control
 from quodeq.menubar import state as _state
 from quodeq.menubar._app_lifecycle import DashboardLifecycleMixin
@@ -37,6 +38,7 @@ from quodeq.menubar._process import find_running_port as _find_running_port_cach
 _DEFAULT_APP_PORT = 7863
 _POLL_INTERVAL = env_int("QUODEQ_POLL_INTERVAL", 5)
 _DEFAULT_PORTS = "7863,7864,7865,7866,7867,7868,7869"
+_APP_NAME = "Quodeq"
 
 
 def _set_menu_item(item, callback) -> None:
@@ -77,7 +79,7 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
 
     def __init__(self, env: Mapping[str, str] | None = None):
         super().__init__(
-            "Quodeq", icon=_find_icon("menubar_iconTemplate.png"), template=True,
+            _APP_NAME, icon=_find_icon("menubar_iconTemplate.png"), template=True,
             quit_button=None,
         )
         self._app_port, self._ports = _load_config(env)
@@ -90,7 +92,7 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
         self._icon_stopped = _find_icon("menubar_iconTemplate.png")
         self._icon_running = _find_icon("menubar_icon_running.png")
         self._icon_evaluating = _find_icon("menubar_icon_evaluating.png")
-        self._status_item = rumps.MenuItem("Stopped")
+        self._status_item = rumps.MenuItem(STATUS_STOPPED)
         self._open_item = rumps.MenuItem("Open Dashboard", callback=None)
         self._start_item = rumps.MenuItem("Start", callback=self._on_start)
         self._stop_item = rumps.MenuItem("Stop", callback=None)
@@ -146,11 +148,11 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
             status = get_status()
             if status.get("update_available"):
                 rumps.notification(
-                    "Quodeq", "Update available",
+                    _APP_NAME, "Update available",
                     f"{status['current']} → {status['latest']}",
                 )
             else:
-                rumps.notification("Quodeq", "Up to date", f"You're on {status['current']}.")
+                rumps.notification(_APP_NAME, "Up to date", f"You're on {status['current']}.")
         except Exception:
             _logging.getLogger(__name__).debug("update check failed", exc_info=True)
 
@@ -190,7 +192,7 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
             with self._state_lock:
                 self._port = None
             if not self._starting:
-                self._status_item.title = "Stopped"
+                self._status_item.title = STATUS_STOPPED
             self.icon = self._icon_stopped
             self.template = True
             self._set_ui_state(running=False)

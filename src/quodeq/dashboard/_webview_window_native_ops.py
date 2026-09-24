@@ -23,13 +23,17 @@ from pathlib import Path
 
 import webview
 
-from quodeq.shared.constants import PLATFORM_WIN32
+from quodeq.shared.constants import LOCALHOST, PLATFORM_WIN32, SCHEME_HTTP, SCHEME_HTTPS
 
 _logger = logging.getLogger(__name__)
 
 _EVAL_CHECK_TIMEOUT_S = 0.5
 _CANCEL_TIMEOUT_S = 5.0
 _DOWNLOAD_TIMEOUT_S = 120
+_LOOPBACK_IPV4 = "127.0.0.1"
+_LOOPBACK_IPV6 = "::1"
+_SAFE_RELOAD_SCHEMES = frozenset({SCHEME_HTTP, SCHEME_HTTPS})
+_SAFE_RELOAD_HOSTS = frozenset({LOCALHOST, _LOOPBACK_IPV4, _LOOPBACK_IPV6})
 
 
 def fetch_running_evaluation(base_url: str) -> dict | None:
@@ -150,11 +154,7 @@ def is_safe_reload_url(url: str) -> bool:
         parsed = urllib.parse.urlparse(url)
     except ValueError:
         return False
-    return parsed.scheme in {"http", "https"} and parsed.hostname in {
-        "127.0.0.1",
-        "localhost",
-        "::1",
-    }
+    return parsed.scheme in _SAFE_RELOAD_SCHEMES and parsed.hostname in _SAFE_RELOAD_HOSTS
 
 
 def _current_url(window: object) -> str | None:

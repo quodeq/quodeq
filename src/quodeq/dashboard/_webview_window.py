@@ -74,6 +74,8 @@ _WINDOW_WIDTH = 1280
 _WINDOW_HEIGHT = 800
 _WINDOW_BG_COLOR = '#0d1117'
 _ARGV_API_PID = 3  # optional argv slot: pid of the API process to watch
+_TITLEBAR_THEME_DARK = "dark"
+_TITLEBAR_THEME_LIGHT = "light"
 
 
 class WindowApi:
@@ -133,9 +135,9 @@ class WindowApi:
         pywebviewready. Linux titlebars are window-manager controlled, so
         this is a no-op there.
         """
-        if mode not in ("dark", "light"):
+        if mode not in (_TITLEBAR_THEME_DARK, _TITLEBAR_THEME_LIGHT):
             return
-        dark = mode == "dark"
+        dark = mode == _TITLEBAR_THEME_DARK
         if sys.platform == PLATFORM_DARWIN:
             _chrome.set_macos_titlebar_appearance(self._window, dark)
         elif sys.platform == PLATFORM_WIN32:

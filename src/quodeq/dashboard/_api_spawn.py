@@ -17,6 +17,7 @@ _ENV_ACTION_API_PORT = "QUODEQ_ACTION_API_PORT"
 _ENV_ACTION_API_HOST = "QUODEQ_ACTION_API_HOST"
 _ENV_STATIC_DIST = "QUODEQ_STATIC_DIST"
 _ENV_EVALUATIONS_DIR = "QUODEQ_EVALUATIONS_DIR"
+_ENV_TRUE = "1"  # QUODEQ_VERBOSE truthy value
 
 
 @dataclass(frozen=True)
@@ -55,7 +56,7 @@ def spawn_action_api(
     if cfg.static_dist:
         child_env[_ENV_STATIC_DIST] = str(cfg.static_dist)
     child_env[_ENV_EVALUATIONS_DIR] = cfg.evaluations_dir or get_evaluations_dir(env=env)
-    verbose = child_env.get("QUODEQ_VERBOSE") == "1"
+    verbose = child_env.get("QUODEQ_VERBOSE") == _ENV_TRUE
     proc = subprocess.Popen(
         subprocess_cmd("api"),
         env=child_env,

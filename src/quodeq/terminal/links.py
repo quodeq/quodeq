@@ -40,6 +40,7 @@ _CURSOR_CANDIDATES = (
     "/usr/local/bin/cursor",
     "/Applications/Cursor.app/Contents/Resources/app/bin/cursor",
 )
+_EDITOR_STARTFILE = "startfile"  # Windows os.startfile sentinel: no argv form
 
 
 @dataclass(frozen=True)
@@ -202,7 +203,7 @@ def detect_editor(
         return Editor(name="open", path=which("open") or "/usr/bin/open", supports_line=False)
     if platform == PLATFORM_WIN32:
         # No argv — the caller routes this to os.startfile.
-        return Editor(name="startfile", path="startfile", supports_line=False)
+        return Editor(name=_EDITOR_STARTFILE, path=_EDITOR_STARTFILE, supports_line=False)
     opener = which("xdg-open")
     if opener:
         return Editor(name="xdg-open", path=opener, supports_line=False)
@@ -216,7 +217,7 @@ def build_open_argv(
 
     Returns None for the Windows ``startfile`` sentinel, which has no argv form.
     """
-    if editor.name == "startfile":
+    if editor.name == _EDITOR_STARTFILE:
         return None
     if editor.supports_line:
         target = path

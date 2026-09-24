@@ -37,7 +37,7 @@ _ALLOWLIST: set[str] = {
     # wrapped in `except (..., subprocess.SubprocessError)`, so Windows never
     # runs it and a missing lsof degrades to None. Used to resolve clickable
     # terminal links against the shell's live cwd.
-    "terminal/links.py:83",
+    "terminal/links.py:84",
     # quodeq/menubar/ is darwin-only by construction: control.is_supported()
     # gates every spawn on sys.platform == "darwin", and app/_app_lifecycle
     # only run inside the rumps process that spawn starts. lsof/killpg/pkill/ps
@@ -46,8 +46,8 @@ _ALLOWLIST: set[str] = {
     # pids from find_pids_on_port, which returns [] off-darwin.
     "menubar/_process.py:84",
     "menubar/_process.py:96",
-    "menubar/_app_lifecycle.py:157",
-    "menubar/_app_lifecycle.py:169",
+    "menubar/_app_lifecycle.py:158",
+    "menubar/_app_lifecycle.py:170",
 }
 
 
