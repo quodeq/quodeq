@@ -55,6 +55,10 @@ export const projectKeys = {
   all: () => [PROJECT_SCOPE],
   project: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source),
   scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "scores", asOf || "latest"),
+  complianceDetail: (projectId, asOf, dimension, generation, scope = {}) => projectScope(
+    projectId, DEFAULT_PROJECT_SOURCE, "complianceDetail", asOf || "latest", dimension, generation,
+    scope.principle ?? null, scope.pathPrefix ?? null,
+  ),
   dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dashboard", run || "latest"),
   runs: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runs"),
   info: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "info"),
