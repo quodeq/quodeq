@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { render, renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import useGradeFormula from './useGradeFormula.js';
-import { RESCORE_POLL_MS } from './hooks/useRescoreProgress.js';
+import { RESCORE_POLL_MS } from './rescore/useRescoreOwner.js';
+import { RescoreTrackerProvider } from './rescore/RescoreTrackerProvider.jsx';
 import { projectKeys } from '../../api/queryKeys.js';
 
 vi.mock('../../api/index.js', () => ({
@@ -39,8 +40,23 @@ const LANDED = rescore({ state: 'idle', appliedGeneration: 1, done: 3 });
 let queryClient;
 let invalidateSpy;
 
+// The app shell mounts the rescore tracker once, above every page.
 function wrapper({ children }) {
-  return createElement(QueryClientProvider, { client: queryClient }, children);
+  return createElement(QueryClientProvider, { client: queryClient },
+    createElement(RescoreTrackerProvider, null, children));
+}
+
+// The editor as a child of a tracker that outlives it, so a test can leave
+// the page (showEditor: false) while the app shell stays mounted.
+function renderAppWithEditor() {
+  const latest = { current: null };
+  function Editor() {
+    latest.current = useGradeFormula('proj');
+    return null;
+  }
+  const shell = (showEditor) => wrapper({ children: showEditor ? createElement(Editor) : null });
+  const view = render(shell(true));
+  return { latest, leavePage: () => view.rerender(shell(false)), unmount: view.unmount };
 }
 
 async function tick(times = 1) {
@@ -101,7 +117,7 @@ describe('useGradeFormula background rescore', () => {
     expect(getGradeFormula.mock.calls.length).toBe(polls);
   });
 
-  it('stops polling on unmount', async () => {
+  it('stops polling when the app-level tracker unmounts', async () => {
     getGradeFormula.mockResolvedValue(payload(SAVED, rescore({ done: 1 })));
     const { unmount } = await mountAndApply();
     await tick();
@@ -110,6 +126,35 @@ describe('useGradeFormula background rescore', () => {
     await tick(5);
     expect(getGradeFormula.mock.calls.length).toBe(polls);
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it('still invalidates the score queries once when the pass lands after leaving the page', async () => {
+    getGradeFormula.mockResolvedValue(payload(SAVED, rescore({ done: 1 })));
+    const app = renderAppWithEditor();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => { await app.latest.current.apply(); });
+    await tick();
+    app.leavePage();
+    await tick();
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
+    getGradeFormula.mockResolvedValue(payload(SAVED, LANDED));
+    await tick(3);
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
+    const polls = getGradeFormula.mock.calls.length;
+    await tick(3);
+    expect(getGradeFormula.mock.calls.length).toBe(polls);
+    app.unmount();
+  });
+
+  it('shows the rescore failure on mount when the last pass errored', async () => {
+    getGradeFormula.mockReset();
+    getGradeFormula.mockResolvedValue(payload(SAVED, rescore({ state: 'error' })));
+    const { result } = renderHook(() => useGradeFormula('proj'), { wrapper });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(result.current.error).toBe('Rescore failed. Some runs may still show the old formula. Try applying again.');
+    expect(result.current.rescoreProgress).toBeNull();
   });
 
   it('shows the partial-failure notice when the landed pass has failed runs', async () => {

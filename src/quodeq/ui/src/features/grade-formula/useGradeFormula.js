@@ -16,14 +16,14 @@ function noticeFor(rescore) {
     : null;
 }
 
-// Once the server's pass for the latest apply has landed (or given up):
-// warn about runs that kept the old grades, drop the stale score caches, and
-// refresh the preview, whose "before" side reads the rewritten grades.
-function settleRescore(payload, { failWith, notePartialRescore, invalidateScoreQueries, requestPreview }) {
+// Once the server's pass for the latest apply has landed (or given up) while
+// the editor is open: warn about runs that kept the old grades and refresh
+// the preview, whose "before" side reads the rewritten grades. The app-level
+// tracker drops the stale score caches whether or not the editor is open.
+function settleRescore(payload, { failWith, notePartialRescore, requestPreview }) {
   const { rescore } = payload;
   if (rescore.state === RESCORE_STATE.ERROR) failWith(t('gradeFormula.rescoreFailed'));
   else notePartialRescore(noticeFor(rescore));
-  invalidateScoreQueries();
   requestPreview(payload.current);
 }
 
@@ -37,14 +37,14 @@ function settleRescore(payload, { failWith, notePartialRescore, invalidateScoreQ
  *
  * Split into hooks/useGradeFormulaState.js (server/draft/preview/busy/error
  * state + the initial load), hooks/useGradePreview.js (the debounced preview
- * request + update()) and hooks/useRescoreProgress.js (the poll after an
- * apply/reset, which the server answers with 202 and finishes in the
- * background). This file composes them and owns apply/resetToDefaults.
+ * request + update()) and hooks/useRescoreProgress.js (the page's view of
+ * the app-level rescore tracker in rescore/, which polls after an
+ * apply/reset: the server answers with 202 and finishes in the background). This file composes them and owns apply/resetToDefaults.
  */
 export default function useGradeFormula(projectId, thresholdsStore = defaultGradeThresholdsStore) {
   const {
     saved, draft, isCustom, defaults, preview, busy, error, partialNotice,
-    debounceRef, loaded, resumeFrom, invalidateScoreQueries,
+    debounceRef, loaded, resumeFrom,
     adoptServerFormula, beginRequest, endRequest, failWith, notePartialRescore,
     updateDraft, showPreview,
   } = useGradeFormulaState();
@@ -54,7 +54,7 @@ export default function useGradeFormula(projectId, thresholdsStore = defaultGrad
   const { requestPreview, update } = useGradePreview({ projectId, draft, updateDraft, showPreview, debounceRef, loaded });
 
   const { rescoreProgress, track } = useRescoreProgress(
-    (payload) => settleRescore(payload, { failWith, notePartialRescore, invalidateScoreQueries, requestPreview }),
+    (payload) => settleRescore(payload, { failWith, notePartialRescore, requestPreview }),
     resumeFrom,
   );
 

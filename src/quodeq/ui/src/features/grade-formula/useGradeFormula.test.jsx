@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import useGradeFormula from './useGradeFormula.js';
 import { projectKeys } from '../../api/queryKeys.js';
+import { RescoreTrackerProvider } from './rescore/RescoreTrackerProvider.jsx';
 
 vi.mock('../../api/index.js', () => ({
   getGradeFormula: vi.fn(),
@@ -25,14 +26,16 @@ import {
 } from '../../api/index.js';
 import { defaultGradeThresholdsStore } from '../../utils/gradeThresholds.js';
 
-// The hook lives inside the React Query provider tree in the real app, so the
-// tests wrap renderHook in a QueryClientProvider. invalidateSpy lets the
-// apply/reset tests assert the score caches are dropped.
+// The hook lives inside the React Query provider tree and the app-level
+// rescore tracker in the real app, so the tests wrap renderHook in both.
+// invalidateSpy lets the apply/reset tests assert the score caches are
+// dropped.
 let queryClient;
 let invalidateSpy;
 
 function wrapper({ children }) {
-  return createElement(QueryClientProvider, { client: queryClient }, children);
+  return createElement(QueryClientProvider, { client: queryClient },
+    createElement(RescoreTrackerProvider, null, children));
 }
 
 function renderGradeFormula(projectId) {

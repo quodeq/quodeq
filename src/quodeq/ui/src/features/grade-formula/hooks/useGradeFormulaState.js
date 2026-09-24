@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { getGradeFormula } from '../../../api/index.js';
-import { projectKeys } from '../../../api/queryKeys.js';
 import { RESCORE_STATE } from '../../../vocab/rescoreState.js';
 import { t } from '../../../strings/index.js';
 
@@ -36,7 +34,7 @@ function useFormulaIntents({ setSaved, setDraft, setIsCustom, setPreview, setBus
 
 /**
  * useGradeFormula.js's server/draft/preview/busy/error state, the initial
- * GET-on-mount effect, and the score-query invalidation helper.
+ * GET-on-mount effect.
  *
  * The setters stay inside: callers get the named intents from
  * useFormulaIntents above, so the request choreography reads as what it
@@ -61,20 +59,11 @@ export function useGradeFormulaState() {
   // State, not a ref: useGradePreview's trigger effect depends on it, and a
   // ref would never re-run that effect when the initial GET lands.
   const [loaded, setLoaded] = useState(false);
-  const queryClient = useQueryClient();
 
   const intents = useFormulaIntents({
     setSaved, setDraft, setIsCustom, setPreview, setBusy, setError, setPartialNotice,
   });
   const { adoptServerFormula } = intents;
-
-  // Applying or resetting the formula rewrites the SQL grade tables for every
-  // run across every project (server-side apply_to_all_runs), so the cached
-  // dashboard / accumulated-scores / project-card queries are now stale. Drop
-  // the whole `project` subtree (scores + dashboard + runs) so they refetch.
-  const invalidateScoreQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: projectKeys.all() });
-  }, [queryClient]);
 
   useEffect(() => {
     getGradeFormula()
@@ -82,6 +71,8 @@ export function useGradeFormulaState() {
         setDefaults(d.defaults);
         adoptServerFormula(d.current, d.isCustom);
         if (d.rescore?.state === RESCORE_STATE.RUNNING) setResumeFrom(d);
+        // A pass that failed while the editor was closed: say so on return.
+        if (d.rescore?.state === RESCORE_STATE.ERROR) setError(t('gradeFormula.rescoreFailed'));
         setLoaded(true);
       })
       .catch(() => setError(t('gradeFormula.loadFailed')));
@@ -92,6 +83,6 @@ export function useGradeFormulaState() {
 
   return {
     saved, draft, isCustom, defaults, preview, busy, error, partialNotice,
-    debounceRef, loaded, resumeFrom, invalidateScoreQueries, ...intents,
+    debounceRef, loaded, resumeFrom, ...intents,
   };
 }
