@@ -9,6 +9,7 @@ LOCAL project's data into an already-connected clone.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.shared_repo import (
@@ -22,10 +23,23 @@ from quodeq.services.shared_repo import (
 from quodeq.services.shared_settings import SharedSettings, write_settings
 
 
+class ConnectStatus(StrEnum):
+    """The two connect outcomes that never reach ``check_repo_format``.
+
+    ``ConnectOutcome.status`` also carries ``RepoFormat.OK`` /
+    ``RepoFormat.FOREIGN`` / ``RepoFormat.UNSUPPORTED_VERSION`` once a clone
+    exists; these two cover the earlier failures (bad URL, clone itself
+    failed) that never get that far.
+    """
+
+    INVALID_URL = "invalid_url"
+    CLONE_FAILED = "clone_failed"
+
+
 @dataclass(frozen=True)
 class ConnectOutcome:
     """Result of attempting to connect to a shared results repository."""
-    status: str  # ok | invalid_url | clone_failed | foreign | unsupported_version
+    status: RepoFormat | ConnectStatus
     url: str | None = None
     detail: str = ""  # ValueError text, only set for invalid_url
 
@@ -42,7 +56,7 @@ def connect_shared_repo(url: str, *, log: LogSink = NULL_LOG) -> ConnectOutcome:
     try:
         validate_remote_url(url)
     except ValueError as exc:
-        return ConnectOutcome(status="invalid_url", url=url, detail=str(exc))
+        return ConnectOutcome(status=ConnectStatus.INVALID_URL, url=url, detail=str(exc))
     # Reconnecting to a URL whose cache dir is already
     # on disk (a prior connect, possibly stale) must not silently keep
     # serving whatever was last fetched -- ensure_shared_clone below
@@ -53,7 +67,7 @@ def connect_shared_repo(url: str, *, log: LogSink = NULL_LOG) -> ConnectOutcome:
     pre_existing = read_state(url) != RepoFormat.MISSING
     repo = ensure_shared_clone(url)
     if repo is None:
-        return ConnectOutcome(status="clone_failed", url=url)
+        return ConnectOutcome(status=ConnectStatus.CLONE_FAILED, url=url)
     if pre_existing:
         refresh_shared_clone(url)  # best effort; failure just leaves the pre-existing clone as-is, reason already logged internally
     # Format validation only makes sense once the clone actually exists,

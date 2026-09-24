@@ -10,7 +10,7 @@ from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.services.shared_connect import connect_shared_repo
+from quodeq.services.shared_connect import ConnectStatus, connect_shared_repo
 from quodeq.services.shared_publish import get_publish_status
 from quodeq.services.shared_repo import RepoFormat, disconnect_shared_repo, last_synced_at, read_state
 from quodeq.services.shared_settings import read_settings
@@ -65,9 +65,9 @@ def shared_config_put() -> Response | tuple[Response, int]:
     if not url:
         return json_error("url is required", 400, "URL_REQUIRED")
     outcome = connect_shared_repo(url, log=SHARED_LOG)
-    if outcome.status == "invalid_url":
+    if outcome.status == ConnectStatus.INVALID_URL:
         return json_error(outcome.detail, 400, "INVALID_URL")
-    if outcome.status == "clone_failed":
+    if outcome.status == ConnectStatus.CLONE_FAILED:
         return json_error(
             f"could not clone the repository, check that git can access {outcome.url}",
             502,
