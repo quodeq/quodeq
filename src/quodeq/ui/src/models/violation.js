@@ -29,6 +29,7 @@
  * @property {boolean}       provenanceDowngrade  true when the provenance gate (#639) de-escalated this from critical to major
  * @property {Object|null}   scopeDowngrade  {rule, from, to} when the scope gate capped this from major to minor per the declared trust model; null when not gated
  * @property {boolean}       carriedForward  true when replayed from the incremental cache rather than produced by the running scan
+ * @property {boolean}       detailDeferred  true on a /scores compliance item whose reason/snippet/context were left out (see api/complianceDetail.js)
  */
 
 import { fromFieldSpec } from './fieldSpec.js';
@@ -60,6 +61,7 @@ const VIOLATION_FIELDS = {
   provenanceDowngrade: [['provenanceDowngrade', 'provenance_downgrade'], false],
   scopeDowngrade:      [['scopeDowngrade', 'scope_downgrade'], null],
   carriedForward:      [['carriedForward', 'carried_forward'], false],
+  detailDeferred:      ['detailDeferred', false],
 };
 
 /**
