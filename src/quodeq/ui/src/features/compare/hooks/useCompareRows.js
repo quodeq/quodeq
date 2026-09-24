@@ -4,6 +4,7 @@ import {
   buildDimensionView, buildDuelView, sortRows,
 } from '../compareModel.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { COMPARE_VIEW_FLEET } from '../compareModel.js';
 
 /**
  * Every row + its "open this project" affordance: rows carry their own
@@ -63,7 +64,7 @@ export function useCompareRows({
   const attention = useMemo(() => buildAttention(scopeRows), [scopeRows]);
   const orderedRows = useMemo(() => sortRows(scopeRows, sortDir), [scopeRows, sortDir]);
   const dimensionView = useMemo(
-    () => (view === 'fleet' ? null : buildDimensionView(view, scopeRows, now, summariesById)),
+    () => (view === COMPARE_VIEW_FLEET ? null : buildDimensionView(view, scopeRows, now, summariesById)),
     [view, scopeRows, now, summariesById],
   );
   // Duel rows come from `rows`, not `scopeRows` — see the module doc above.

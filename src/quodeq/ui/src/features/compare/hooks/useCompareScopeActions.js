@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { consequenceOf, consequenceLevel } from '../compareModel.js';
+import { CONSEQUENCE_LEVEL } from '../compareFleet.js';
 import { storeScope } from '../compareScopeStorage.js';
 
 /** Scope-selection actions: toggle one project, select all, select flagged. */
@@ -19,7 +20,7 @@ export function useCompareScopeActions({ scopeIds, setScopeIds, rows }) {
 
   const selectFlagged = useCallback(() => {
     const flagged = rows
-      .filter((r) => consequenceLevel(consequenceOf(r)) !== 'clear')
+      .filter((r) => consequenceLevel(consequenceOf(r)) !== CONSEQUENCE_LEVEL.CLEAR)
       .map((r) => r.id);
     updateScope(flagged.length ? flagged : null);
   }, [rows, updateScope]);

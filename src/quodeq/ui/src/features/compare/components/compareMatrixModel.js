@@ -3,6 +3,8 @@
  * extremes (for the min/max border treatment). Split out so the component
  * only owns rendering.
  */
+import { SORT_DIR } from '../../../vocab/sortDirection.js';
+
 export const OVERALL = '__overall';
 
 function valueOf(row, key) {
@@ -35,7 +37,7 @@ export function computeMatrixExtremes(columns, matrixRows) {
  */
 export function sortMatrixRows(matrixRows, sort) {
   if (!sort) return matrixRows;
-  const dir = sort.dir === 'asc' ? 1 : -1;
+  const dir = sort.dir === SORT_DIR.ASC ? 1 : -1;
   return matrixRows.slice().sort((a, b) => {
     const av = valueOf(a, sort.key);
     const bv = valueOf(b, sort.key);
