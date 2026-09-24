@@ -17,6 +17,7 @@ from quodeq.services.project_registration import (
 from quodeq.services.project_registration import (
     register_project as _register_project,
 )
+from quodeq.shared.env import get_clones_dir
 
 
 def _read_info(reports_root: Path, uuid: str) -> dict:
@@ -102,6 +103,7 @@ def test_register_url_ephemeral_clones_under_clones_root(tmp_path, monkeypatch):
         uuid = _register_project(
             str(reports),
             NewProjectSpec("https://github.com/example/repo.git", None, ephemeral=True),
+            clones_dir=get_clones_dir(),
         )
 
     info = _read_info(reports, uuid)
@@ -244,6 +246,7 @@ def test_register_url_revalidates_immediately_before_clone(tmp_path, monkeypatch
             _register_project(
                 str(reports),
                 NewProjectSpec("https://github.com/example/repo.git", None, ephemeral=True),
+                clones_dir=get_clones_dir(),
             )
 
     assert len(validate_calls) == 2

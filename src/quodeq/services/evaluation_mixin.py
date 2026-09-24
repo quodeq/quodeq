@@ -19,6 +19,7 @@ from quodeq.services._job_model import JobLaunchOptions
 from quodeq.services.base import EvaluationOptions, NewProjectSpec
 from quodeq.services.project_registration import mark_onboarding_complete, register_project
 from quodeq.services.score_run import score_completed_evidence
+from quodeq.shared.env import get_clones_dir
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url
 
 from quodeq.services._evaluation_dispatch import EvaluationDispatcher, SubprocessDispatcher, build_evaluate_cmd  # re-export
@@ -100,8 +101,15 @@ class FsEvaluationMixin:
     def _register_target_project(
         repo: str, reports_dir: str, options: EvaluationOptions,
     ) -> None:
+        # repo is always a local path here (the caller's _resolve_repo_target
+        # rejects URLs first), so clones_dir is never actually read by
+        # register_project on this path -- resolved anyway, for the same
+        # reason _build_eval_env resolves get_ai_cmd()/get_ai_model() inline:
+        # this mixin has no composition-time source for it (no constructor
+        # param), so it is the call-time-default shape's owner here.
         project_uuid = register_project(
             reports_dir, NewProjectSpec(repo, options.discipline, scope_path=options.scope_path),
+            clones_dir=get_clones_dir(),
         )
         # Launching an evaluation is the terminal step of project setup, so
         # the 'Resume setup' badge must clear here. Without this stamp the

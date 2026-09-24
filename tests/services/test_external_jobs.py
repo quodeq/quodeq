@@ -268,8 +268,9 @@ class TestCancelGraceReadPerCall:
     env and calling the public cancel path (cancel_external_run) is enough
     to observe the fallback."""
 
-    def test_invalid_value_falls_back_through_cancel_external_run(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("QUODEQ_CANCEL_GRACE_S", "abc")
+    def _observed_timeout(self, monkeypatch, tmp_path) -> float:
+        """Cancel a fake pid through the public path; return the grace value
+        _wait_for_exit was actually called with."""
         run_dir = tmp_path / "proj" / "run"
         run_dir.mkdir(parents=True)
         (run_dir / ".pid").write_text(str(os.getpid()))
@@ -284,6 +285,16 @@ class TestCancelGraceReadPerCall:
         control = ProcessControl(kill_tree=lambda *_a: None, pid_alive=lambda _pid: False)
 
         result = cancel_external_run("proj", "run", tmp_path, control=control)
-
         assert result is True
-        assert captured["timeout"] == 30.0
+        return captured["timeout"]
+
+    def test_invalid_value_falls_back_through_cancel_external_run(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("QUODEQ_CANCEL_GRACE_S", "abc")
+        assert self._observed_timeout(monkeypatch, tmp_path) == 30.0
+
+    def test_valid_value_reaches_cancel_external_run(self, monkeypatch, tmp_path):
+        """Pins the per-call read: a valid override must reach the wait
+        loop, not just the fallback default (which a no-op resolver would
+        also produce)."""
+        monkeypatch.setenv("QUODEQ_CANCEL_GRACE_S", "2.5")
+        assert self._observed_timeout(monkeypatch, tmp_path) == 2.5

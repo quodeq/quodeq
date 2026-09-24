@@ -16,6 +16,7 @@ from __future__ import annotations
 import importlib
 
 from quodeq.config.clone_env import git_clone_timeout_s
+from quodeq.services.dashboard import run_dim_cache_max
 from quodeq.services.jobs import JobManager
 from quodeq.services.scoring import max_history_runs
 
@@ -58,6 +59,23 @@ class TestMaxHistoryRuns:
     def test_valid_value_is_used(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_MAX_HISTORY_RUNS", "7")
         assert max_history_runs() == 7
+
+
+class TestRunDimCacheMax:
+    """No ``env=`` injected -- the real process env, through the public
+    ``run_dim_cache_max()`` entry point make_run_dimension_fetcher calls."""
+
+    def test_valid_value_is_used(self, monkeypatch):
+        monkeypatch.setenv("QUODEQ_RUN_DIM_CACHE_MAX", "3")
+        assert run_dim_cache_max() == 3
+
+    def test_zero_is_a_real_value(self, monkeypatch):
+        monkeypatch.setenv("QUODEQ_RUN_DIM_CACHE_MAX", "0")
+        assert run_dim_cache_max() == 0
+
+    def test_invalid_value_falls_back(self, monkeypatch):
+        monkeypatch.setenv("QUODEQ_RUN_DIM_CACHE_MAX", "lots")
+        assert run_dim_cache_max() == 256
 
 
 class TestImportTimeConstants:

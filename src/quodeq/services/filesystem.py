@@ -35,6 +35,7 @@ from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.jobs import JobManager
 from quodeq.services.project_registration import register_project_with_rollback
 from quodeq.services.tooling_mixin import FsToolingMixin
+from quodeq.shared.env import get_clones_dir
 from quodeq.shared.log_sink import SHARED_LOG
 
 
@@ -90,10 +91,12 @@ class FilesystemActionProvider(ActionProvider):
         index_db_path: Path | None = None,
         reports_root: Path | None = None,
         evaluators_dir: Path | None = None,
+        clones_dir: Path | None = None,
     ) -> None:
         self._reports_root = _resolve_reports_root(reports_root)
         self._compiled_dir = compiled_dir
         self._evaluators_dir = evaluators_dir
+        self._clones_dir = clones_dir
         self._jobs = job_manager if job_manager is not None else _default_job_manager(self._reports_root)
         self._projects = ProjectsCache()
         self._evaluations = EvaluationsIndex(
@@ -205,8 +208,17 @@ class FilesystemActionProvider(ActionProvider):
         self._projects.invalidate()
 
     def create_project(self, reports_dir: str, spec: NewProjectSpec) -> CreateProjectResult:
-        """Clone if needed, scan, and register a project, rolling back every step on failure."""
-        return register_project_with_rollback(reports_dir, spec, log=SHARED_LOG)
+        """Clone if needed, scan, and register a project, rolling back every step on failure.
+
+        *clones_dir* (where an ephemeral URL clone lands) is resolved here --
+        the provider composition point -- from the constructor override, else
+        QUODEQ_CLONES_DIR: ``register_project``/``_project_registration_steps``
+        never read that env var themselves.
+        """
+        clones_dir = self._clones_dir if self._clones_dir is not None else get_clones_dir()
+        return register_project_with_rollback(
+            reports_dir, spec, clones_dir=clones_dir, log=SHARED_LOG,
+        )
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
         """Repoint a registered project at *new_path*. Return True on success."""

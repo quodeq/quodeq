@@ -38,9 +38,12 @@ def _resolve_target_path(request: MaterializeRequest) -> Path:
 
     For a URL input, clones into an ephemeral cache dir or the caller's
     chosen ``clone_dest``. For a local path input, resolves in place -- the
-    directory must already exist. ``request.clones_dir`` is always a
-    concrete path here: the coordinator (``register_project``) resolves the
-    QUODEQ_CLONES_DIR default once, before this step runs.
+    directory must already exist. ``request.clones_dir`` must be a concrete
+    path whenever ``request.ephemeral`` is set (the only branch that reads
+    it): the provider composing the registration call
+    (``FilesystemActionProvider``/``FsEvaluationMixin``) resolves the
+    QUODEQ_CLONES_DIR default once and passes it in -- this module, and
+    ``register_project`` above it, never read that env var themselves.
     """
     if request.is_url:
         if request.ephemeral:
@@ -142,7 +145,7 @@ class MaterializeRequest:
     is_url: bool
     ephemeral: bool
     clone_dest: str | None
-    clones_dir: Path
+    clones_dir: Path | None
     log: LogSink = NULL_LOG
 
 
