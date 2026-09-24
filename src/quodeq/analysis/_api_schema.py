@@ -240,18 +240,17 @@ def parse_findings(
     findings: list[dict] = []
     dropped: list[dict] = dropped_sink if dropped_sink is not None else []
     i = 0
-    try:
-        while (opener := _JSON_OPENER_RE.search(raw_json, i)) is not None:
-            start = opener.start()
-            try:
-                node, end = decoder.raw_decode(raw_json, start)
-            except json.JSONDecodeError:
-                i = start + 1
-                continue
+    while (opener := _JSON_OPENER_RE.search(raw_json, i)) is not None:
+        start = opener.start()
+        try:
+            node, end = decoder.raw_decode(raw_json, start)
             _extract_finding_dicts(node, findings, dropped, drop_reasons)
-            i = end
-    except RecursionError:
-        # Pathologically nested output: stop the walk instead of aborting the
-        # caller. What was harvested before it stands; the rest is lost.
-        return findings, len(dropped)
+        except json.JSONDecodeError:
+            i = start + 1
+            continue
+        except RecursionError:
+            # Pathologically nested output: stop the walk instead of aborting
+            # the caller. What was harvested before it stands; the rest is lost.
+            break
+        i = end
     return findings, len(dropped)

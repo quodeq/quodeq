@@ -139,8 +139,8 @@ def classify_files_via_cache(
     its result there on the first call for a given ``(dimension, files)``
     pair and short-circuits the second call. The stash MUST NOT short-
     circuit when ``bypass_reads`` is True — clean-scan deletes entries
-    immediately before this call, so an upfront classify's hits are
-    stale by the time the dim runner asks again.
+    after this call, so an upfront classify's hits are stale by the
+    time the dim runner asks again.
     """
     files_tuple = tuple(files)
     run_cache = config.classify_stash

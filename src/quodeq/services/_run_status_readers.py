@@ -205,7 +205,7 @@ def build_job_snapshot(row: "_run_index.RunRow", *, with_logs: bool = True) -> J
     """Assemble a ``JobSnapshot`` from an index row, enriched from status.json.
 
     ``with_logs=False`` leaves ``logs`` empty instead of tailing run.log.
-    List reads pass it for finished rows only: the dashboard adopts a
+    List reads pass it for non-running rows only: the dashboard adopts a
     running CLI job straight from the list and shows its logs.
     """
     logs: list[str] = []
