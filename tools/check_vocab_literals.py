@@ -3,18 +3,17 @@
 
 Closed vocabularies (run state, job status, exit reason, severity, grade,
 file-done status, dimension state, provider, finding type) are StrEnums in one
-home module each (HOME_MODULES). Writing one of their values as a bare string
-where the
-code branches on it -- `s == "running"`, `s in {"done", "failed"}`,
-`case "cancelled":`, `status="done"`, `{"status": "done"}` -- or writes it
-into a variable or attribute named for the vocabulary -- `self.status =
-"done"`, `state = "running"` -- or reads it as the fallback of a
-vocabulary-named key -- `d.get("state", "running")` -- is what this gate
-flags (maintainability M-MDF-1, and the typo class nothing else catches).
-A set/tuple/list literal holding two or more words of the same vocabulary
-is flagged wherever it sits: `_TERMINAL = frozenset({"done", "failed"})` is
-a hand-copied subset of the enum.
-The fix is the enum member: `s == RunState.RUNNING`.
+home module each (HOME_MODULES). Writing one of their values as a bare
+string where the code branches on it -- `s == "running"`,
+`s in {"done", "failed"}`, `case "cancelled":`, `status="done"`,
+`{"status": "done"}` -- or writes it into a variable or attribute named for
+the vocabulary -- `self.status = "done"`, `state = "running"` -- or reads it
+as the fallback of a vocabulary-named key -- `d.get("state", "running")` --
+is what this gate flags (maintainability M-MDF-1, and the typo class nothing
+else catches). A set/tuple/list literal holding two or more words of the
+same vocabulary is flagged wherever it sits: `_TERMINAL = frozenset({"done",
+"failed"})` is a hand-copied subset of the enum. The fix is the enum
+member: `s == RunState.RUNNING`.
 
 Not flagged: dict keys, the left operand of `in`/`not in` (`"error" in
 payload` is a key test), f-strings, docstrings, log/message arguments, and

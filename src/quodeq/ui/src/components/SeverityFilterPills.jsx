@@ -35,6 +35,7 @@ export default function SeverityFilterPills({ counts, complianceCount = 0, activ
       )}
       {complianceCount > 0 && (
         <FlagPill
+          // FlagPill's `--compliance` style key, not the FINDING_TYPE vocabulary.
           flag="compliance"
           count={complianceCount}
           active={activeFilter === FINDING_TYPE.COMPLIANCE}

@@ -1,6 +1,7 @@
 // src/quodeq/ui/src/utils/reportBuilder/shared.js
 import { KNOWN_SEVERITIES } from '../constants.js';
 import { SEVERITY } from '../../vocab/severity.js';
+import { FINDING_TYPE } from '../../vocab/findingType.js';
 
 const SNIPPET_MAX_LINES = 5;
 // Short run-id shown in report headers ("**Run:** 3f9c1a2b").
@@ -163,7 +164,7 @@ export function severityMatches(severityFilter, severity) {
  * @returns {boolean}
  */
 export function showsCompliance(severityFilter) {
-  return severityMatches(severityFilter, 'compliance');
+  return severityMatches(severityFilter, FINDING_TYPE.COMPLIANCE);
 }
 
 /**
