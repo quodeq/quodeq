@@ -14,7 +14,7 @@ from typing import Callable
 
 from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.data.fs.report_parser.runs import read_run_data
-from quodeq.data.fs.run_files import count_eval_files, read_run_state
+from quodeq.data.fs.run_files import count_eval_files, read_run_status_json
 from quodeq.core.types import DimensionResult
 
 _logger = logging.getLogger(__name__)
@@ -53,13 +53,19 @@ def _run_is_in_progress(reports_root: Path, project: str, run_id: str) -> bool:
     """True when the run's ``status.json`` reports a non-terminal state.
 
     A missing or unreadable status.json counts as terminal: legacy runs never
-    wrote one and their data is immutable. The PID-liveness refinement in
-    ``data/fs/report_parser/runs.py`` is deliberately not replicated here -- a
-    run that crashed without flipping its state reads fresh forever, which is
-    the safe direction for a cache guard.
+    wrote one and their data is immutable. An unrecognized ``state`` string
+    (a corrupt file, or a schema this code predates) counts as non-terminal
+    instead -- deliberately the raw string, not ``run_files.read_run_state``'s
+    normalized ``RunState`` (which maps an unrecognized string to None, and
+    None means terminal here): staying cautious about a state this code can't
+    make sense of is the safe direction for a cache guard, same as the
+    PID-liveness refinement in ``data/fs/report_parser/runs.py`` (deliberately
+    not replicated here) leaving a crashed-without-flipping-state run reading
+    fresh forever.
     """
-    state = read_run_state(reports_root / project / run_id)
-    return state is not None and state not in TERMINAL_STATES
+    data = read_run_status_json(reports_root / project / run_id)
+    state = data.get("state") if isinstance(data, dict) else None
+    return isinstance(state, str) and state not in TERMINAL_STATES
 
 
 def _cached_entry_is_stale(
