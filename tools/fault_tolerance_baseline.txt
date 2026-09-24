@@ -130,7 +130,7 @@ src/quodeq/services/background.py:132:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except
 src/quodeq/services/cache_maintenance.py:40:broad-except
 src/quodeq/services/evidence_rescore.py:190:broad-except
-src/quodeq/services/grade_formula.py:110:broad-except
+src/quodeq/services/grade_formula.py:114:broad-except
 src/quodeq/services/mutation_rescore.py:188:broad-except
 src/quodeq/services/project_registration.py:168:broad-except
 src/quodeq/services/shared_publish.py:195:broad-except

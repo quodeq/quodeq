@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -70,9 +70,13 @@ class ApplyResult:
     was PARTIAL: those runs keep their old-formula grades and disagree with
     their rescored siblings, so the caller must surface it rather than
     report a silent success.
+
+    ``aborted`` is True when ``should_abort`` stopped the pass between runs.
+    The runs before the stop were rewritten; the caller starts over.
     """
     rescored: int
     failed: list[str]
+    aborted: bool = False
 
 
 # Transient failures (a momentarily-locked evaluation.db while a background
@@ -120,26 +124,56 @@ def _recompute_with_retries(run_dir: Path, params: ScoringParams) -> bool:
     return False
 
 
-def apply_to_all_runs(reports_root: Path) -> ApplyResult:
+def apply_to_all_runs(
+    reports_root: Path,
+    *,
+    progress: Callable[[int, int], None] | None = None,
+    should_abort: Callable[[], bool] | None = None,
+) -> ApplyResult:
     """Rescore every run that has an events.jsonl with the currently saved params.
 
-    Always clears the dashboard cache (even when nothing was rescored, e.g.
-    when *reports_root* does not exist). Returns an ``ApplyResult`` with the
-    rescored count and the run-dir names that failed after retries — a
-    partial apply is reported, not swallowed, so the UI can warn the user
-    that some runs still show the old formula.
+    Returns an ``ApplyResult`` with the rescored count and the run-dir names
+    that failed after retries: a partial apply is reported, not swallowed,
+    so the UI can warn that some runs still show the old formula.
+
+    *progress* gets ``(done, total)``: once with ``done=0`` after the run
+    list is built (so ``total`` is known before the first recompute), then
+    after every run. *should_abort* is checked before each run; True stops
+    the pass there with ``aborted=True``. The dashboard cache is cleared on
+    every exit (aborted and raising included), because even a partial pass
+    has rewritten some runs.
     """
     from quodeq.services.dashboard import clear_shared_dimension_cache  # noqa: PLC0415
 
-    params = load_params()
+    try:
+        params = load_params()
+        run_dirs = list(_iter_event_log_runs(reports_root))
+        return _rescore_runs(run_dirs, params, progress, should_abort)
+    finally:
+        clear_shared_dimension_cache()
+
+
+def _rescore_runs(
+    run_dirs: list[Path],
+    params: ScoringParams,
+    progress: Callable[[int, int], None] | None,
+    should_abort: Callable[[], bool] | None,
+) -> ApplyResult:
+    """Rescore *run_dirs* in order, reporting progress and honoring an abort request."""
+    total = len(run_dirs)
     rescored = 0
     failed: list[str] = []
-    for run_dir in _iter_event_log_runs(reports_root):
+    if progress is not None:
+        progress(0, total)
+    for done, run_dir in enumerate(run_dirs, start=1):
+        if should_abort is not None and should_abort():
+            return ApplyResult(rescored=rescored, failed=failed, aborted=True)
         if _recompute_with_retries(run_dir, params):
             rescored += 1
         else:
             failed.append(run_dir.name)
-    clear_shared_dimension_cache()
+        if progress is not None:
+            progress(done, total)
     return ApplyResult(rescored=rescored, failed=failed)
 
 
