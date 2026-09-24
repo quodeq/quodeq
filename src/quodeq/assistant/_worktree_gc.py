@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.assistant._worktree_manager import WorktreeManager
-from quodeq.assistant.worktree import WorktreeError, worktree_ttl_hours
+from quodeq.assistant.worktree import WorktreeError, WorktreeStatus, worktree_ttl_hours
 
 _logger = logging.getLogger(__name__)
 
@@ -64,17 +64,17 @@ def gc_worktrees(repository, ttl_hours: int | None = None) -> None:
     try:
         rows = repository.list_all_worktrees()
     except AttributeError:  # older repository without the new method
-        rows = repository.list_worktrees("active")
+        rows = repository.list_worktrees(WorktreeStatus.ACTIVE)
     for row in rows:
         dir_exists = Path(row["path"]).is_dir()
-        if row["status"] == "active":
+        if row["status"] == WorktreeStatus.ACTIVE:
             if not dir_exists:
-                repository.set_worktree_status(row["session_id"], "stale")
+                repository.set_worktree_status(row["session_id"], WorktreeStatus.STALE)
                 continue
             age = _row_age_hours(row["created_at"], now)
             if ttl <= 0 or (age is not None and age >= ttl):
                 _remove_worktree_row(row)
-                repository.set_worktree_status(row["session_id"], "discarded")
+                repository.set_worktree_status(row["session_id"], WorktreeStatus.DISCARDED)
         elif dir_exists:
             # Terminal row whose worktree a failed remove left behind: retry.
             _remove_worktree_row(row)

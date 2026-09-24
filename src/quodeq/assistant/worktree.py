@@ -12,9 +12,27 @@ import subprocess
 # which requires that dotted path to resolve.
 import shutil  # noqa: F401 - patch target attribute holder
 from collections.abc import Mapping
+from enum import StrEnum
 from pathlib import Path
 
 from quodeq.shared.env_resolve import resolve_env
+
+
+class WorktreeStatus(StrEnum):
+    """A session's fix-worktree row lifecycle.
+
+    data/sqlite/_assistant_schema.py's ``worktrees.status`` CHECK mirrors
+    these values (SQL text can't reference this name, so the two are kept
+    equal by tests/data/sqlite/test_assistant_schema.py instead). Distinct
+    from workspace_actions.OutcomeKind even where a word ("applied") coincides.
+    """
+
+    ACTIVE = "active"
+    APPLIED = "applied"
+    PR_CREATED = "pr_created"
+    DISCARDED = "discarded"
+    STALE = "stale"
+
 
 _GIT_TIMEOUT_S = 120
 

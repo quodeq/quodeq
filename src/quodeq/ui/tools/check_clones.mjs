@@ -61,9 +61,9 @@ const HINT =
 // has to be extracted, not absorbed.
 const TOTAL_CEILING = 0;
 
-/** Map a jscpd file name (relative to *baseDir*) to a repo-relative one. */
+/** Map a jscpd file name (absolute, or relative to *baseDir*) to a repo-relative one. */
 function relative(name, baseDir, repoRoot) {
-  const absolute = path.normalize(path.join(baseDir, name));
+  const absolute = path.resolve(baseDir, name);
   return path.relative(repoRoot, absolute).split(path.sep).join('/');
 }
 
@@ -97,7 +97,9 @@ export function describe(clone) {
 }
 
 function jscpdArgs(outputDir) {
-  return ['--no-install', 'jscpd', '--config', CONFIG_PATH, '--reporters', 'json', '--output', outputDir, '--silent'];
+  // --absolute: jscpd 4 named files relative to its cwd, jscpd 5 relative to
+  // the scanned path. Absolute names make the mapping independent of either.
+  return ['--no-install', 'jscpd', '--config', CONFIG_PATH, '--absolute', '--reporters', 'json', '--output', outputDir, '--silent'];
 }
 
 /** Run jscpd from this package and return its parsed JSON report. */

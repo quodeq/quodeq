@@ -12,20 +12,8 @@ from quodeq.data.sqlite.row_mappers import (
     row_to_finding,
 )
 from quodeq.data.sqlite.connection import open_evaluation_db
+from quodeq.data.sqlite._schema import INSERT_FINDING_SQL
 
-_INSERT_SQL = """
-INSERT OR IGNORE INTO findings (
-    schema_version, practice_id, dimension, requirement, verdict, severity,
-    file, line, end_line, title, reason, snippet,
-    violation_type, violation_type_raw, context, scope, req_refs_json, dedup_key, confidence,
-    provenance_downgrade, scope_downgrade_json
-) VALUES (
-    :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
-    :file, :line, :end_line, :title, :reason, :snippet,
-    :violation_type, :violation_type_raw, :context, :scope, :req_refs_json, :dedup_key, :confidence,
-    :provenance_downgrade, :scope_downgrade_json
-)
-"""
 
 _SELECT_COLUMNS = (
     "id, practice_id, dimension, requirement, verdict, severity, "
@@ -80,7 +68,7 @@ class SqliteFindingsRepository:
         """
         row = finding_dict_to_row(finding)
         with open_evaluation_db(self._run_dir) as conn:
-            cur = conn.execute(_INSERT_SQL, row)
+            cur = conn.execute(INSERT_FINDING_SQL, row)
             conn.commit()
             return cur.rowcount == 1
 

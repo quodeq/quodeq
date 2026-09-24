@@ -1,4 +1,4 @@
-import { SectionLabel } from '../../../components/terminal/index.js';
+import ComparePanel from './ComparePanel.jsx';
 import { scoreColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import { DuelBars, gapClass, SideScore, signed1 } from './compareDuelShared.jsx';
@@ -11,11 +11,7 @@ import { DuelBars, gapClass, SideScore, signed1 } from './compareDuelShared.jsx'
  */
 export default function CompareDuelDimensionsTable({ dimensions, aName, bName }) {
   return (
-    <section className="compare-panel" aria-label={t('compare.duelDimsAria')}>
-      <div className="compare-panel__head">
-        <SectionLabel>{t('compare.dimensionsHeader', { count: dimensions.length })}</SectionLabel>
-        <span className="compare-panel__note">{t('compare.duelDimsNote')}</span>
-      </div>
+    <ComparePanel ariaLabel={t('compare.duelDimsAria')} header={t('compare.dimensionsHeader', { count: dimensions.length })} note={t('compare.duelDimsNote')}>
       <ul className="compare-duel-dims">
         {dimensions.map((d) => (
           <li key={d.key} className="compare-duel-dims__row">
@@ -39,6 +35,6 @@ export default function CompareDuelDimensionsTable({ dimensions, aName, bName })
           </li>
         ))}
       </ul>
-    </section>
+    </ComparePanel>
   );
 }

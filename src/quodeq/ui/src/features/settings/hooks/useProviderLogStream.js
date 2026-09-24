@@ -6,6 +6,7 @@
  * states live here and each provider only names its URL.
  */
 import { useEffect, useState } from 'react';
+import { LOG_STREAM_STATUS } from '../../../vocab/logStreamStatus.js';
 
 // Keep the tail of the log only: the panel is a viewer, not an archive, and
 // an unbounded array would grow without limit on a chatty server.
@@ -26,16 +27,16 @@ const READYSTATE_CLOSED = 2;
  */
 export function useProviderLogStream(url, active) {
   const [logs, setLogs] = useState([]);
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState(LOG_STREAM_STATUS.IDLE);
 
   useEffect(() => {
     if (!active) {
       setLogs([]);
-      setStatus('idle');
+      setStatus(LOG_STREAM_STATUS.IDLE);
       return undefined;
     }
     setLogs([]);
-    setStatus('streaming');
+    setStatus(LOG_STREAM_STATUS.STREAMING);
     const es = new EventSource(url);
 
     es.onmessage = (e) => {
@@ -45,11 +46,11 @@ export function useProviderLogStream(url, active) {
       });
     };
     es.addEventListener('done', () => {
-      setStatus('done');
+      setStatus(LOG_STREAM_STATUS.DONE);
       es.close();
     });
     es.onerror = () => {
-      if (es.readyState === READYSTATE_CLOSED) setStatus('error');
+      if (es.readyState === READYSTATE_CLOSED) setStatus(LOG_STREAM_STATUS.ERROR);
     };
 
     return () => { es.close(); };

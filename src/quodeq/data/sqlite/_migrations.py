@@ -53,6 +53,8 @@ def _upgrade_v2_to_v3(conn: sqlite3.Connection) -> None:
     OperationalError the scoring/dashboard read seams don't catch, permanently
     bricking the run. IF NOT EXISTS makes the re-run a no-op and self-heal.
     """
+    # Frozen v3 snapshot, overlaps _schema.py by design (see _migrations_ddl).
+    # jscpd:ignore-start
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS principle_grades (
             dimension        TEXT NOT NULL,
@@ -67,6 +69,7 @@ def _upgrade_v2_to_v3(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_principle_grades_dimension ON principle_grades(dimension);
     """)
+    # jscpd:ignore-end
 
 
 def _recover_v4_rebuild_state(conn: sqlite3.Connection) -> None:

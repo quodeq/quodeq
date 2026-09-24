@@ -10,6 +10,7 @@ import { SettingsRowLabel } from './settingsRowParts.jsx';
 import { t } from '../../../strings/index.js';
 import { TimeLimitSetting } from './ProviderSettings.jsx';
 import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
+import { SERVER_STATUS } from '../settingsVocab.js';
 
 /**
  * @param {object} props
@@ -34,7 +35,7 @@ export function LocalApiTabLayout({
   return (
     <>
       <ServerStatusPill
-        status={serverStatus?.status ?? 'offline'}
+        status={serverStatus?.status ?? SERVER_STATUS.OFFLINE}
         address={serverStatus?.address}
         offlineMessage={offlineMessage}
         onToggleConsole={onToggleConsole}
@@ -73,6 +74,22 @@ export function LocalApiModelRow({ hint, renderControl }) {
       />
       {renderControl(labelId)}
     </div>
+  );
+}
+
+/**
+ * A model row whose control is a picker over the server's models, bound to
+ * `state.model`. `Control` is the tab's own picker component; it gets
+ * `{ value, models, onChange, labelId }`.
+ */
+export function LocalApiModelSelectRow({ hint, Control, state, update, models }) {
+  return (
+    <LocalApiModelRow
+      hint={hint}
+      renderControl={(labelId) => (
+        <Control value={state.model} models={models} onChange={(v) => update('model', v)} labelId={labelId} />
+      )}
+    />
   );
 }
 

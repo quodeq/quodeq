@@ -9,9 +9,8 @@ import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
 import { usePrincipleFiltering } from './principleFiltering.js';
 import { usePrincipleReportSpec } from './usePrincipleReportSpec.jsx';
 import { usePrincipleFixPlanSpec } from './usePrincipleFixPlanSpec.jsx';
-import VirtualList, { useDashboardScrollElement } from './VirtualList.jsx';
-import DeferredMount from './DeferredMount.jsx';
-import CardListSkeleton from './CardListSkeleton.jsx';
+import { useDashboardScrollElement } from './VirtualList.jsx';
+import DeferredViolationList from './DeferredViolationList.jsx';
 import { t } from '../../../strings/index.js';
 import { GRADE } from '../../../vocab/grade.js';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
@@ -158,21 +157,14 @@ function PrincipleDetailBody({
           onFilterChange={setActiveSevFilter}
         />
       )}
-      {/* This page gets all its data through nav params — nothing fetches, so
-          without this split the first paint waits for every visible card's
-          pretext layout effect and the click that navigated here looks
-          ignored. Header first, cards one commit later. */}
-      <DeferredMount fallback={<CardListSkeleton />}>
-        <VirtualList
-          key={virtualKey}
-          items={items}
-          scrollElement={scrollElement}
-          estimateSize={estimateItemSize(items)}
-          getItemKey={itemKey(items)}
-          label={t('explorer.violationsListAria')}
-          renderItem={(item) => renderPrincipleItem(item, { principle, cardDismiss })}
-        />
-      </DeferredMount>
+      <DeferredViolationList
+        resetKey={virtualKey}
+        items={items}
+        scrollElement={scrollElement}
+        estimateSize={estimateItemSize(items)}
+        getItemKey={itemKey(items)}
+        renderItem={(item) => renderPrincipleItem(item, { principle, cardDismiss })}
+      />
     </>
   );
 }

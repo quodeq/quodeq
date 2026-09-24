@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
+from quodeq.assistant.action_status import ActionStatus
 from quodeq.assistant.tools.actions import ACTIONS, ActionConflict, ActionContext, ActionSpec
 from quodeq.core.types.project_source import ProjectSource
 from quodeq.data.ports.assistant import AssistantStore
@@ -58,7 +59,7 @@ def apply_drafted_action(
         return ApplyOutcome(ActionOutcomeKind.UNKNOWN_ACTION)
     if _is_read_only_action(repo, action):
         return ApplyOutcome(ActionOutcomeKind.READ_ONLY)
-    if action["status"] != "drafted":
+    if action["status"] != ActionStatus.DRAFTED:
         return ApplyOutcome(ActionOutcomeKind.ALREADY, detail=action["status"])
     spec = actions.get(action["action_type"])
     if spec is None:
@@ -68,17 +69,17 @@ def apply_drafted_action(
     # twice (which double-ran the dismiss rescore). The loser sees a
     # non-drafted row and 409s. On failure we release back to drafted so
     # the user can retry.
-    if not repo.set_action_status(action_id, "applied", expected="drafted"):
+    if not repo.set_action_status(action_id, ActionStatus.APPLIED, expected=ActionStatus.DRAFTED):
         fresh = repo.get_action(action_id)
         state = fresh["status"] if fresh else "gone"
         return ApplyOutcome(ActionOutcomeKind.ALREADY, detail=state)
     try:
         result = spec.apply(action["payload"], context)
     except ValueError as exc:
-        repo.set_action_status(action_id, "drafted")
+        repo.set_action_status(action_id, ActionStatus.DRAFTED)
         return ApplyOutcome(ActionOutcomeKind.INVALID, detail=str(exc))
     except ActionConflict as exc:
-        repo.set_action_status(action_id, "drafted")
+        repo.set_action_status(action_id, ActionStatus.DRAFTED)
         return ApplyOutcome(ActionOutcomeKind.CONFLICT, detail=str(exc))
     return ApplyOutcome(ActionOutcomeKind.APPLIED, result=result)
 
@@ -100,7 +101,7 @@ def reject_drafted_action(repo: AssistantStore, action_id: str) -> RejectOutcome
     # Same replay guard as apply, made atomic: an applied action must not
     # flip to rejected on a stale card click, SSE replay, or a race with a
     # concurrent apply. The compare-and-set wins at most once.
-    if not repo.set_action_status(action_id, "rejected", expected="drafted"):
+    if not repo.set_action_status(action_id, ActionStatus.REJECTED, expected=ActionStatus.DRAFTED):
         fresh = repo.get_action(action_id)
         state = fresh["status"] if fresh else "gone"
         return RejectOutcome(ActionOutcomeKind.ALREADY, detail=state)

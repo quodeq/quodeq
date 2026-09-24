@@ -10,7 +10,8 @@
 import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/ApiContext.jsx";
-import { projectKeys, samePlaceholderScope } from "../api/queryKeys.js";
+import { projectKeys } from "../api/queryKeys.js";
+import { useScopedPlaceholder } from "./useScopedPlaceholder.js";
 import { resolveAsOf, deriveAvailableRuns } from './projectScoresDerived.js';
 import { t } from '../strings/index.js';
 import { STALE_TIME_MS, refetchWhileError } from './queryDefaults.js';
@@ -103,14 +104,7 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
   const { getProjectScores, sharedGetProjectScores } = useApi();
   const fetchScores = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetProjectScores : getProjectScores;
   const queryClient = useQueryClient();
-  const projectKey = selectedProject || "_none_";
-  // Reuse the previous payload only within the same project+source subtree —
-  // see samePlaceholderScope for why an unguarded (prev) => prev shows the
-  // PREVIOUS project's overview after a project switch.
-  const keepInScope = useCallback(
-    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
-    [projectKey, selectedSource],
-  );
+  const { projectKey, keepInScope } = useScopedPlaceholder(selectedProject, selectedSource);
 
   const latestQuery = useQuery(buildLatestQueryConfig({ projectKey, selectedSource, fetchScores, selectedProject, keepInScope }));
 
