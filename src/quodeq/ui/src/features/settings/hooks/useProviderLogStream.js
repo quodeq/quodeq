@@ -6,10 +6,8 @@
  * states live here and each provider only names its URL.
  */
 import { useEffect, useState } from 'react';
+import { EMPTY_LOG_BUFFER, LOG_BUFFER_MAX_LINES, appendLines, clearLines } from '../../../utils/logBuffer.js';
 
-// Keep the tail of the log only: the panel is a viewer, not an archive, and
-// an unbounded array would grow without limit on a chatty server.
-const MAX_LINES = 5000;
 // EventSource.CLOSED — an onerror at any other readyState is a reconnect the
 // browser handles itself, not a failure worth surfacing.
 const READYSTATE_CLOSED = 2;
@@ -22,27 +20,24 @@ const READYSTATE_CLOSED = 2;
  *
  * @param {string} url SSE endpoint serving the provider's log lines.
  * @param {boolean} active Whether the panel is open and should be streaming.
- * @returns {{logs: string[], status: 'idle'|'streaming'|'done'|'error'}}
+ * @returns {{logs: string[], firstSeq: number, status: 'idle'|'streaming'|'done'|'error'}}
+ *   `firstSeq` is the sequence number of `logs[0]` (see utils/logBuffer.js).
  */
 export function useProviderLogStream(url, active) {
-  const [logs, setLogs] = useState([]);
+  const [buf, setBuf] = useState(EMPTY_LOG_BUFFER);
   const [status, setStatus] = useState('idle');
 
   useEffect(() => {
+    setBuf(clearLines);
     if (!active) {
-      setLogs([]);
       setStatus('idle');
       return undefined;
     }
-    setLogs([]);
     setStatus('streaming');
     const es = new EventSource(url);
 
     es.onmessage = (e) => {
-      setLogs((prev) => {
-        const next = prev.length >= MAX_LINES ? prev.slice(prev.length - MAX_LINES + 1) : prev;
-        return [...next, e.data];
-      });
+      setBuf((prev) => appendLines(prev, [e.data], LOG_BUFFER_MAX_LINES));
     };
     es.addEventListener('done', () => {
       setStatus('done');
@@ -55,5 +50,5 @@ export function useProviderLogStream(url, active) {
     return () => { es.close(); };
   }, [url, active]);
 
-  return { logs, status };
+  return { logs: buf.lines, firstSeq: buf.firstSeq, status };
 }
