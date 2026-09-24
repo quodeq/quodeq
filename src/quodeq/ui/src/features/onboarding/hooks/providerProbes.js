@@ -17,6 +17,14 @@ const CLI_SERVER_ID = { 'codex-cli': 'codex', 'claude-code': 'claude' };
 /** How long each detection probe waits before aborting its fetch. */
 export const PROBE_TIMEOUT_MS = 5000;
 
+// This probe's classification (also the /api/ai-clients response's own
+// per-client `type` field, which detectCliProvider checks the fetched
+// client against).
+const PROBE_CLASSIFICATION_CLI = 'cli';
+
+// Promise.allSettled's own per-result status for a resolved promise.
+const SETTLED_FULFILLED = 'fulfilled';
+
 // Every probe is a timed GET whose failure is "not detected", never an
 // error the caller has to handle: one unreachable provider must not fail the
 // whole detection pass. `read` turns a successful response into the probe's
@@ -35,9 +43,9 @@ async function probe(id, classification, url, read) {
 
 async function detectCliProvider(id) {
   const serverId = CLI_SERVER_ID[id] || id;
-  return probe(id, 'cli', '/api/ai-clients', async (res) => {
+  return probe(id, PROBE_CLASSIFICATION_CLI, '/api/ai-clients', async (res) => {
     const data = await res.json();
-    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === 'cli' && c.installed !== false);
+    const detected = (data.clients || []).some((c) => c.id === serverId && c.type === PROBE_CLASSIFICATION_CLI && c.installed !== false);
     return { detected, defaultModel: null };
   });
 }
@@ -71,5 +79,5 @@ export async function runDetection() {
     detectStoredCloudKey('openai'),
     detectStoredCloudKey('anthropic'),
   ]);
-  return probes.map((p) => (p.status === 'fulfilled' ? p.value : { detected: false }));
+  return probes.map((p) => (p.status === SETTLED_FULFILLED ? p.value : { detected: false }));
 }

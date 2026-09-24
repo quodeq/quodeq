@@ -14,3 +14,6 @@ export const STEP_STANDARD_LAUNCH = 'standard-launch';
 export const STEP_ORDER = [STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH];
 
 export const SKIPPED_KEY = 'quodeq_onboarding_skipped';
+// The only value ever written under SKIPPED_KEY (absence, not 'false', means
+// not skipped): useWizardDraft.js writes it, useWizardLifecycle.js reads it.
+export const SKIPPED_VALUE = 'true';
