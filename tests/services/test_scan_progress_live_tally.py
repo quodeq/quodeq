@@ -178,12 +178,12 @@ def test_one_run_s_advance_does_not_block_another_run_s_poll(tmp_path):
     dims.IncrementalTally = _BlockingTally
     try:
         slow = threading.Thread(target=lambda: live_tally(
-            tmp_path / "blocked.jsonl", suppressed=None, resolver=None, memo_key=("a",)))
+            tmp_path / "blocked.jsonl", suppressed=None, make_resolver=None, memo_key=("a",)))
         slow.start()
         done = threading.Event()
 
         def _other_poll():
-            live_tally(tmp_path / "other.jsonl", suppressed=None, resolver=None, memo_key=("b",))
+            live_tally(tmp_path / "other.jsonl", suppressed=None, make_resolver=None, memo_key=("b",))
             done.set()
 
         other = threading.Thread(target=_other_poll)
@@ -259,3 +259,38 @@ def test_forget_live_tallies_matches_keys_whatever_the_separator(tmp_path):
     forget_live_tallies(win_run)
 
     assert _LIVE_TALLIES.keys() == [other_key]
+
+
+def test_a_memo_hit_never_builds_a_resolver(tmp_path):
+    _LIVE_TALLIES.clear()
+    path = tmp_path / "e.jsonl"
+    path.write_text(_row("P1", "a.py", 1))
+    built: list[int] = []
+    make = lambda: built.append(1)  # noqa: E731 - trivial counter, not worth a def
+    live_tally(path, suppressed=None, make_resolver=make, memo_key=("k",))
+    live_tally(path, suppressed=None, make_resolver=make, memo_key=("k",))
+    assert built == [1]
+
+
+def test_an_unkeyed_tally_builds_its_resolver_every_call(tmp_path):
+    path = tmp_path / "e.jsonl"
+    path.write_text(_row("P1", "a.py", 1))
+    built: list[int] = []
+    make = lambda: built.append(1)  # noqa: E731 - trivial counter, not worth a def
+    live_tally(path, suppressed=None, make_resolver=make, memo_key=None)
+    live_tally(path, suppressed=None, make_resolver=make, memo_key=None)
+    assert built == [1, 1]
+
+
+def test_repeat_dim_polls_build_the_resolver_once(tmp_path, monkeypatch):
+    _LIVE_TALLIES.clear()
+    run_dir = tmp_path / "run"
+    _seed_evidence(run_dir, "security")
+    ctx = _ctx(run_dir, tmp_path / "no_such_evaluators", tmp_path / "no_such_compiled")
+    builds: list[str] = []
+    counting = lambda dim_id, *a, **k: builds.append(dim_id)  # noqa: E731
+    monkeypatch.setattr(
+        "quodeq.services._scan_progress_dims.build_principle_resolver", counting)
+    for _ in range(3):
+        _dim_evidence_tally("security", ctx, frozenset(), frozenset())
+    assert builds == ["security"]
