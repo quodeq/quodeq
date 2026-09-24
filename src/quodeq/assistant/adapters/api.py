@@ -20,6 +20,7 @@ from quodeq.assistant.adapters._fallback import (
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, guard_tool_result
+from quodeq.assistant.message_role import MessageRole
 from quodeq.assistant.tools.registry import ToolRegistry
 from quodeq.shared.env_resolve import resolve_env
 
@@ -185,7 +186,7 @@ def _dispatch_tool_calls(
     appended before any tool-result message, and each call's emit/convo-append
     pair must land before the next call's is dispatched.
     """
-    convo.append({"role": "assistant", "content": text or None,
+    convo.append({"role": MessageRole.ASSISTANT, "content": text or None,
                   "tool_calls": [
                       {"id": c["id"], "type": "function",
                        "function": {"name": c["name"],
@@ -200,7 +201,7 @@ def _dispatch_tool_calls(
         emit(frame)
         fenced, warnings = guard_tool_result(result, call["name"])
         _emit_warnings(emit, warnings)
-        convo.append({"role": "tool", "tool_call_id": call["id"],
+        convo.append({"role": MessageRole.TOOL, "tool_call_id": call["id"],
                       "content": fenced})
 
 
@@ -212,8 +213,8 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
     if not config.native_tools:
         contract = fallback_contract(registry.openai_tools())
         convo = [dict(convo[0], content=convo[0]["content"] + contract),
-                 *convo[1:]] if convo and convo[0]["role"] == "system" else (
-            [{"role": "system", "content": contract.strip()}, *convo])
+                 *convo[1:]] if convo and convo[0]["role"] == MessageRole.SYSTEM else (
+            [{"role": MessageRole.SYSTEM, "content": contract.strip()}, *convo])
     factory = client_factory or _default_client
     text = ""
     with factory(config) as client:
@@ -240,8 +241,8 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
                 emit(frame)
                 fenced, warnings = guard_tool_result(result, name)
                 _emit_warnings(emit, warnings)
-                convo.append({"role": "assistant", "content": text})
-                convo.append({"role": "user", "content": fenced})
+                convo.append({"role": MessageRole.ASSISTANT, "content": text})
+                convo.append({"role": MessageRole.USER, "content": fenced})
                 continue
             if not tool_calls:
                 return text

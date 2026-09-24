@@ -35,13 +35,17 @@ _DANGEROUS_FLAGS = (
 # This flag is therefore permitted ONLY when both conditions hold in the argv.
 _BYPASS_SANDBOX_FLAG = "--dangerously-bypass-approvals-and-sandbox"
 _EXTERNAL_SANDBOX_LAUNCHERS = ("sandbox-exec", "bwrap", "firejail")
+_FLAG_DISABLE = "--disable"
+_SHELL_TOOL_ARG = "shell_tool"
+_FLAG_DISABLE_SHELL_TOOL_EQ = "--disable=shell_tool"  # codex: single-token disable spelling
+_CONFIG_SHELL_TOOL_FALSE = "features.shell_tool=false"  # codex: config-override disable spelling
 
 
 def _shell_tool_disabled(argv: list[str]) -> bool:
     for i, token in enumerate(argv):
-        if token in ("--disable=shell_tool", "features.shell_tool=false"):
+        if token in (_FLAG_DISABLE_SHELL_TOOL_EQ, _CONFIG_SHELL_TOOL_FALSE):
             return True
-        if token == "--disable" and i + 1 < len(argv) and argv[i + 1] == "shell_tool":
+        if token == _FLAG_DISABLE and i + 1 < len(argv) and argv[i + 1] == _SHELL_TOOL_ARG:
             return True
     return False
 

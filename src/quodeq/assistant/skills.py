@@ -32,6 +32,7 @@ RESERVED_COMMANDS: tuple[tuple[str, str], ...] = (
     ("clear", "Start a new conversation"),
 )
 _RESERVED_NAMES = frozenset(name for name, _ in RESERVED_COMMANDS)
+_FRONT_MATTER_TRUE = "true"  # requires_write front-matter boolean spelling
 
 
 @dataclass(frozen=True)
@@ -63,7 +64,7 @@ def _parse(text: str) -> Skill | None:
     views = tuple(v.strip() for v in meta.get("views", "").split(",") if v.strip())
     return Skill(meta["name"], meta["description"], body.strip(),
                  argument_hint=meta.get("argument_hint", ""), views=views,
-                 requires_write=meta.get("requires_write", "").strip().lower() == "true")
+                 requires_write=meta.get("requires_write", "").strip().lower() == _FRONT_MATTER_TRUE)
 
 
 def load_skills(

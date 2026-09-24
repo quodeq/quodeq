@@ -22,6 +22,7 @@ from quodeq.assistant.adapters._cli_events import StreamOutcome, consume_stream_
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.mcp import mcp_config
+from quodeq.assistant.message_role import MessageRole
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.data.ports.assistant import AssistantStore
 from quodeq.shared.process_kill import kill_proc_tree as _kill_proc_tree
@@ -61,7 +62,7 @@ class CliTurnSession:
 
 def _latest_user(messages: list[dict]) -> str:
     for m in reversed(messages):
-        if m["role"] == "user":
+        if m["role"] == MessageRole.USER:
             return m["content"]
     return ""
 
