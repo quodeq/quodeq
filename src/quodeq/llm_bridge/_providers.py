@@ -1,9 +1,20 @@
 """Provider detection, configuration, and type classification."""
 from __future__ import annotations
 
+from enum import StrEnum
+
 from quodeq.analysis.provider_cache import get_provider_configs as _get_cached_configs
 from quodeq.config.llm_bridge_env import api_key as _api_key, local_api_markers
 from quodeq.config.provider import Provider, ProviderType
+
+
+class _ProviderClass(StrEnum):
+    """classify_provider()'s own classification -- not the provider config's
+    cli/api ``type`` field (see ``ProviderType``)."""
+
+    CLI = "cli"
+    LOCAL_API = "local-api"
+    CLOUD_API = "cloud-api"
 
 
 def get_provider_configs() -> dict[str, dict]:
@@ -53,10 +64,10 @@ def classify_provider(provider_id: str, *, markers: frozenset[str] | None = None
     """Classify a provider as 'cli', 'local-api', or 'cloud-api'."""
     ptype = get_provider_type(provider_id)
     if ptype == ProviderType.CLI:
-        return ProviderType.CLI
+        return _ProviderClass.CLI
     if _is_local_api(provider_id, markers=markers):
-        return "local-api"
-    return "cloud-api"
+        return _ProviderClass.LOCAL_API
+    return _ProviderClass.CLOUD_API
 
 
 def resolve_api_key_env(provider_id: str = "", api_base: str = "") -> str:

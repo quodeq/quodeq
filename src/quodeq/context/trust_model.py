@@ -71,7 +71,7 @@ class NetworkExposure(StrEnum):
 
 
 NETWORK_EXPOSURES: frozenset[str] = frozenset(
-    {NetworkExposure.LOOPBACK, NetworkExposure.LAN, NetworkExposure.PUBLIC},
+    {NetworkExposure.LOOPBACK.value, NetworkExposure.LAN.value, NetworkExposure.PUBLIC.value},
 )
 
 _TOPOLOGY_SINGLE_HOST = "single-host"
