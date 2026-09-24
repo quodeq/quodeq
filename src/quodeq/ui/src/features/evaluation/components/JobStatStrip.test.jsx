@@ -7,7 +7,7 @@ vi.mock('../../../api/index.js', () => ({
   getEvaluationProgress: vi.fn(),
 }));
 import { getEvaluationProgress } from '../../../api/index.js';
-import { recordRateSample, _resetRateSamples } from './rateSampleStore.js';
+import { recordRateSample, getRateSamples, _resetRateSamples } from './rateSampleStore.js';
 
 function renderWithClient(ui) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -180,5 +180,28 @@ describe('JobStatStrip', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('forgets the throughput samples of a terminal job', async () => {
+    recordRateSample('job-2', 1000, 5);
+    getEvaluationProgress.mockResolvedValue({
+      dimensions: [{ state: 'done', files: { taken: 220, total: 220 } }],
+      totalElapsedS: 272,
+    });
+    renderWithClient(<JobStatStrip job={doneJob} liveViolations={{}} />);
+    expect(await screen.findByText('SCANNED')).toBeInTheDocument();
+    expect(getRateSamples('job-2')).toEqual([]);
+  });
+
+  it('keeps the samples of a running job', async () => {
+    recordRateSample('job-1', 1000, 5);
+    getEvaluationProgress.mockResolvedValue({
+      currentDimension: 'security',
+      dimensions: [{ id: 'security', state: 'running', files: { taken: 10, total: 20 } }],
+      totalElapsedS: 5,
+    });
+    renderWithClient(<JobStatStrip job={runningJob} liveViolations={{}} />);
+    expect(await screen.findByText('security')).toBeInTheDocument();
+    expect(getRateSamples('job-1').length).toBeGreaterThanOrEqual(1);
   });
 });

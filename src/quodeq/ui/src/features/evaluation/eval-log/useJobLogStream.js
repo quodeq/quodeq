@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { t } from '../../../strings/index.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { LOG_STREAM_STATUS } from '../../../vocab/logStreamStatus.js';
+import { EMPTY_LOG_BUFFER, LOG_BUFFER_MAX_LINES, appendLines, clearLines } from '../../../utils/logBuffer.js';
 
-const MAX_LINES = 5000;
 const INACTIVITY_MS = 60000;
 // Timer fallback for the rAF batching below: browsers throttle rAF to 0 in
 // background tabs, so without this the queue would never drain there.
@@ -19,20 +19,14 @@ function clearRef(ref, canceller) {
 // Coalesce bursts of SSE messages into one render per frame. Each `onmessage`
 // is its own task, so without batching a chatty stream commits N times in
 // 16ms — which means N reconciliations of the entire log list.
-function makeFlush({ rafRef, timerRef, pendingRef, setLogs }) {
+function makeFlush({ rafRef, timerRef, pendingRef, setBuf }) {
   return () => {
     clearRef(rafRef, cancelAnimationFrame);
     clearRef(timerRef, clearTimeout);
     const batch = pendingRef.current;
     if (batch.length === 0) return;
     pendingRef.current = [];
-    setLogs((prev) => {
-      const merged = prev.length === 0 ? batch.slice() : prev.concat(batch);
-      if (merged.length > MAX_LINES) {
-        return merged.slice(merged.length - MAX_LINES);
-      }
-      return merged;
-    });
+    setBuf((prev) => appendLines(prev, batch, LOG_BUFFER_MAX_LINES));
   };
 }
 
@@ -102,7 +96,7 @@ function teardownStream({ es, finishedBox, inactivityRef, rafRef, timerRef, pend
 }
 
 export function useJobLogStream(jobId) {
-  const [logs, setLogs] = useState([]);
+  const [buf, setBuf] = useState(EMPTY_LOG_BUFFER);
   const [status, setStatus] = useState(LOG_STREAM_STATUS.IDLE);
   const [terminalState, setTerminalState] = useState(null);
   const pendingRef = useRef([]);
@@ -111,7 +105,7 @@ export function useJobLogStream(jobId) {
   const inactivityRef = useRef(null);
 
   useEffect(() => {
-    setLogs([]);
+    setBuf(clearLines);
     setTerminalState(null);
     pendingRef.current = [];
     clearRef(rafRef, cancelAnimationFrame);
@@ -125,7 +119,7 @@ export function useJobLogStream(jobId) {
     const url = `/api/jobs/${encodeURIComponent(jobId)}/logs/stream`;
     const es = new EventSource(url);
 
-    const flush = makeFlush({ rafRef, timerRef, pendingRef, setLogs });
+    const flush = makeFlush({ rafRef, timerRef, pendingRef, setBuf });
     const append = makeAppend({ pendingRef, rafRef, timerRef, flush });
     const resetInactivity = makeResetInactivity({ inactivityRef, es, setStatus });
     resetInactivity();
@@ -142,5 +136,5 @@ export function useJobLogStream(jobId) {
     return () => teardownStream({ es, finishedBox, inactivityRef, rafRef, timerRef, pendingRef });
   }, [jobId]);
 
-  return { logs, status, terminalState };
+  return { logs: buf.lines, firstSeq: buf.firstSeq, status, terminalState };
 }

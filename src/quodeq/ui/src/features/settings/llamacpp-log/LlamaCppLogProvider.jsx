@@ -16,12 +16,12 @@ const STATUS_LABEL = {
   [LOG_STREAM_STATUS.ERROR]: t('settings.logUnavailable'),
 };
 
-function buildSpec(logs, status) {
+function buildSpec(logs, status, firstSeq) {
   return {
     id: WINDOW_ID,
     type: WINDOW_ID,
     title: `${t('settings.llamaCppLogTitle')}${STATUS_LABEL[status] || ''}`,
-    render: () => <ConsoleLogViewer logs={logs} />,
+    render: () => <ConsoleLogViewer logs={logs} firstSeq={firstSeq} />,
   };
 }
 
@@ -46,12 +46,12 @@ export function LlamaCppLogProvider({ children }) {
   const { getLlamacppLogAvailable } = useApi();
   const [open, setOpen] = useState(false);
   const [available, setAvailable] = useState(false);
-  const { logs, status } = useLlamaCppLogStream(open);
+  const { logs, firstSeq, status } = useLlamaCppLogStream(open);
   const { addWindow, removeWindow, replaceWindow, hasWindow } = useSidePane();
 
   useLlamaCppAvailabilityProbe(getLlamacppLogAvailable, setAvailable);
 
-  const spec = useMemo(() => (open ? buildSpec(logs, status) : null), [open, logs, status]);
+  const spec = useMemo(() => (open ? buildSpec(logs, status, firstSeq) : null), [open, logs, status, firstSeq]);
 
   useEffect(() => {
     if (spec) replaceWindow(spec);
@@ -59,7 +59,7 @@ export function LlamaCppLogProvider({ children }) {
 
   const openLog = useCallback(() => {
     setOpen(true);
-    const fresh = buildSpec([], LOG_STREAM_STATUS.STREAMING);
+    const fresh = buildSpec([], LOG_STREAM_STATUS.STREAMING, 0);
     addWindow(fresh);
     replaceWindow(fresh);
   }, [addWindow, replaceWindow]);

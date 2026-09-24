@@ -5,8 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useServerLogPoll } from './useServerLogPoll.js';
 
 function Probe({ active }) {
-  const { logs } = useServerLogPoll(active);
-  return <div data-testid="logs">{logs.join('|')}</div>;
+  const { logs, firstSeq } = useServerLogPoll(active);
+  return (
+    <div>
+      <div data-testid="logs">{logs.join('|')}</div>
+      <div data-testid="first-seq">{String(firstSeq)}</div>
+    </div>
+  );
 }
 
 function renderProbe(active) {
@@ -163,5 +168,12 @@ describe('useServerLogPoll', () => {
     });
     expect(screen.getByTestId('logs')).toBeEmptyDOMElement();
     warnSpy.mockRestore();
+  });
+
+  it('exposes firstSeq 0 for a fresh buffer', async () => {
+    mockFetchOnce({ lines: [{ index: 1, timestamp: '', line: 'only' }] });
+    renderProbe(true);
+    await waitFor(() => expect(screen.getByTestId('logs')).toHaveTextContent('only'));
+    expect(screen.getByTestId('first-seq')).toHaveTextContent('0');
   });
 });

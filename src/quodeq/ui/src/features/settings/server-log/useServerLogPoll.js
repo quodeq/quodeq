@@ -9,9 +9,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { BASE } from '../../../api/request.js';
+import { EMPTY_LOG_BUFFER, LOG_BUFFER_MAX_LINES, appendLines, clearLines } from '../../../utils/logBuffer.js';
 
 const POLL_MS = 2000;
-const MAX_LINES = 5000;
 const ISO_TIME_START = 11;
 const ISO_TIME_END = 19;
 
@@ -21,13 +21,13 @@ function format(entry) {
 }
 
 export function useServerLogPoll(active) {
-  const [logs, setLogs] = useState([]);
+  const [buf, setBuf] = useState(EMPTY_LOG_BUFFER);
   const sinceRef = useRef(-1);
 
   // Reset whenever `active` toggles; on toggle-on the next queryFn picks up
   // since=-1. Both branches were identical, so the reset is unconditional.
   useEffect(() => {
-    setLogs([]);
+    setBuf(clearLines);
     sinceRef.current = -1;
   }, [active]);
 
@@ -49,10 +49,7 @@ export function useServerLogPoll(active) {
       if (!data || !data.lines) return null;
       if (data.lines.length) {
         const formatted = data.lines.map(format);
-        setLogs((prev) => {
-          const merged = prev.concat(formatted);
-          return merged.length > MAX_LINES ? merged.slice(merged.length - MAX_LINES) : merged;
-        });
+        setBuf((prev) => appendLines(prev, formatted, LOG_BUFFER_MAX_LINES));
         sinceRef.current = data.lines[data.lines.length - 1].index;
       }
       // Return a tick value so TanStack treats the query as fresh data
@@ -65,5 +62,5 @@ export function useServerLogPoll(active) {
     retry: false,
   });
 
-  return { logs };
+  return { logs: buf.lines, firstSeq: buf.firstSeq };
 }

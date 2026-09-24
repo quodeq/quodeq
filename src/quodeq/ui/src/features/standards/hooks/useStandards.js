@@ -74,20 +74,22 @@ export function useStandards({ onDuplicated } = {}) {
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState(null);
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: standardsKeys.list(),
     queryFn: () => listStandards(),
   });
 
   const standards = data || [];
 
+  // invalidateQueries already refetches the mounted list query and its
+  // promise settles when that fetch does; a second refetch() would cancel
+  // it and fetch again.
   const refresh = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: standardsKeys.list() });
     // The Evaluate picker keeps its own merged plugin+standards list outside
     // React Query; tell it the set of standards may have changed.
     notifyStandardsChanged(STANDARDS_CHANGED_REASON.LIST);
-    return refetch();
-  }, [queryClient, refetch]);
+    return queryClient.invalidateQueries({ queryKey: standardsKeys.list() });
+  }, [queryClient]);
 
   const handleDelete = useCallback(
     makeHandleDelete({ deleteStandard, setMutationError, refresh }),
