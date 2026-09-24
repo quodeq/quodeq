@@ -28,9 +28,9 @@ from quodeq.core.events.models import FindingDismissed, FindingDismissedEvent
 from quodeq.core.finding_identity import snippet_fingerprint
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.ports.actions_log import ActionLog
-from quodeq.services.wiring import ACTIONS_LOG_FILENAME
 from quodeq.services._run_recency import run_dirs_newest_first, run_started_at
 from quodeq.services.wiring import (
+    ACTIONS_LOG_FILENAME,
     MARKER_FILENAME,
     ActionLogWriter,
     read_action_events,

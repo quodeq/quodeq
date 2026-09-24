@@ -20,6 +20,7 @@ from quodeq.core.run.state import RunState
 from quodeq.core.scoring.constants import Grade
 from quodeq.analysis.mcp.scope_gate_rules import ScopeGateRule
 from quodeq.assistant.frame_type import FrameType
+from quodeq.assistant.tools.actions import ACTIONS
 from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.project_source import ProjectSource
 from quodeq.core.types.provider import Provider
@@ -62,14 +63,34 @@ def test_ui_mirror_matches_python_enum(rel: str, name: str, enum: type[StrEnum])
 
 
 def test_every_vocab_module_is_covered():
-    covered = {rel for rel, _, _ in _MIRRORS if rel.startswith("vocab/")} | _SPECIAL_VOCAB_MODULES
+    covered = (
+        {rel for rel, _, _ in _MIRRORS if rel.startswith("vocab/")}
+        | _SPECIAL_VOCAB_MODULES
+        | _UI_ONLY_VOCAB_MODULES
+    )
     present = {f"vocab/{p.name}" for p in _VOCAB_DIR.glob("*.js") if not p.name.endswith(".test.js")}
     assert present == covered
 
 
 _PROVIDER_JS = _UI_SRC / "vocab" / "provider.js"
-# vocab/ modules with a mirror shape _MIRRORS cannot express; each has its own test below.
-_SPECIAL_VOCAB_MODULES = {"vocab/provider.js", "vocab/logStreamStatus.js"}
+# vocab/ modules with a Python backend concept, but in a mirror shape _MIRRORS
+# cannot express (a subset, or a Set rather than a StrEnum); each has its own
+# test below.
+_SPECIAL_VOCAB_MODULES = {"vocab/provider.js", "vocab/logStreamStatus.js", "vocab/actionType.js"}
+
+# vocab/ modules with no Python backend concept at all: purely client-side UI
+# vocab (a DOM event/key spelling, or a presentational/routing choice this
+# repo never sends over the wire to or from Python). A member-pinning test is
+# optional here; vocab.test.js already pins some of these (KEY, NAV_TAB) --
+# don't duplicate what it covers.
+_UI_ONLY_VOCAB_MODULES = {
+    "vocab/keyboard.js",       # KeyboardEvent .key/.code spellings (DOM spec, not Python)
+    "vocab/navTab.js",         # nav-stack page ids: purely client-side routing
+    "vocab/theme.js",          # theme mode/family: purely presentational choice
+    "vocab/pointerEvent.js",   # pointer-drag DOM event names (DOM spec, not Python)
+    "vocab/sortDirection.js",  # sort-toggle direction: purely client-side UI concept
+    "vocab/dialogVariant.js",  # dialog action-button style: purely presentational choice
+}
 
 
 def test_ui_log_stream_status_has_expected_members():
@@ -78,6 +99,18 @@ def test_ui_log_stream_status_has_expected_members():
     assert _js_object(_UI_SRC / "vocab" / "logStreamStatus.js", "LOG_STREAM_STATUS") == {
         "IDLE": "idle", "STREAMING": "streaming", "DONE": "done", "ERROR": "error",
     }
+
+
+def test_ui_action_type_mirrors_a_subset_of_the_backend_action_types():
+    """ACTION_TYPE names only the two action types the UI branches on by name
+    (assistantAppBridge.js, verifiedFindingsContext.jsx, ActionPreviewCard.jsx);
+    create_standard has no such UI-side effect, so it's absent by design. Not a
+    full mirror (and ACTIONS is dict keys, not a StrEnum), so not in _MIRRORS --
+    but every value present must still match a real assistant/tools/actions.py
+    ACTIONS key exactly."""
+    ui = _js_object(_UI_SRC / "vocab" / "actionType.js", "ACTION_TYPE")
+    assert ui == {"DISMISS_FINDING": "dismiss_finding", "VERIFY_FINDING": "verify_finding"}
+    assert set(ui.values()) <= set(ACTIONS)
 
 
 def _js_provider_set(name: str, members: dict[str, str], known: dict[str, set[str]]) -> set[str]:
