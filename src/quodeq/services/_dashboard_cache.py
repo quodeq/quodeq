@@ -16,6 +16,7 @@ from typing import Callable
 
 from quodeq.core.types import DimensionResult
 from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 
 
@@ -41,10 +42,7 @@ def run_dim_cache_max(override: int | None = None, env: dict[str, str] | None = 
     """Return the run-dimension cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    try:
-        return int(resolve_env(env).get("QUODEQ_RUN_DIM_CACHE_MAX", str(DEFAULT_RUN_DIM_CACHE_MAX)))
-    except (ValueError, TypeError):
-        return DEFAULT_RUN_DIM_CACHE_MAX
+    return env_int("QUODEQ_RUN_DIM_CACHE_MAX", DEFAULT_RUN_DIM_CACHE_MAX, env=resolve_env(env))
 
 
 class DimensionCache:
