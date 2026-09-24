@@ -27,6 +27,7 @@ from quodeq.services.wiring import (
     read_queue_state,
 )
 from quodeq.services.suppression import build_matcher
+from quodeq.shared.constants import CONSOLIDATED_DIMENSION_KEY
 from quodeq.shared.lru import LRUDict
 
 _AGENT_ACTIVE_WINDOW_S = 30
@@ -200,16 +201,16 @@ def consolidated_dim_progress(run_dir: Path) -> DimProgress:
     evidence_dir = run_dir / "evidence"
     queue = read_queue_state(evidence_dir / "consolidated_queue.json") or {}
     tally = live_tally(evidence_dir / "consolidated_evidence.jsonl",
-                       suppressed=None, resolver=None, memo_key=("consolidated",))
+                       suppressed=None, resolver=None, memo_key=(CONSOLIDATED_DIMENSION_KEY,))
     return DimProgress(
-        id="consolidated",
+        id=CONSOLIDATED_DIMENSION_KEY,
         state=DimState.RUNNING,
         files=_queue_file_counts(queue),
         violations=tally.violations,
         compliance=tally.compliance,
         duplicates=tally.duplicates,
-        elapsed_s=dim_elapsed_s("consolidated", run_dir, DimState.RUNNING),
-        active_agents=_active_agents(evidence_dir, "consolidated"),
+        elapsed_s=dim_elapsed_s(CONSOLIDATED_DIMENSION_KEY, run_dir, DimState.RUNNING),
+        active_agents=_active_agents(evidence_dir, CONSOLIDATED_DIMENSION_KEY),
     )
 
 

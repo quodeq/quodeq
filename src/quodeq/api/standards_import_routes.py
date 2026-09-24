@@ -11,12 +11,11 @@ from flask import Flask, Response, jsonify
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_FORBIDDEN
 from quodeq.api.helpers import json_object_or_error, sanitize_for_log, error_response
 from quodeq.services.import_validator import StandardImportValidationError
+from quodeq.services.standards import IMPORT_STATUS_CONFLICT
 from quodeq.services.standards_library import StandardImportConflictError
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
-
-_STATUS_CONFLICT = "conflict"  # import_from_file's/error_response's shared collision status
 
 
 def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, int]:
@@ -46,7 +45,7 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
         return error_response(
             "A standard with this ID already exists from a different source. "
             "Duplicate it to customize your own copy, or delete the existing one, then retry.",
-            HTTPStatus.CONFLICT, _STATUS_CONFLICT,
+            HTTPStatus.CONFLICT, IMPORT_STATUS_CONFLICT,
         )
     except (OSError, ValueError, http.client.HTTPException) as exc:
         # See list_library: HTTPException is urllib's truncated/malformed
@@ -111,9 +110,9 @@ def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
     except PermissionError as exc:
         logger.warning("standards.import permission error: %s", exc)
         return error_response("Permission denied", HTTPStatus.FORBIDDEN, ERROR_CODE_FORBIDDEN)
-    if result["status"] == _STATUS_CONFLICT:
+    if result["status"] == IMPORT_STATUS_CONFLICT:
         return jsonify({
-            "status": _STATUS_CONFLICT,
+            "status": IMPORT_STATUS_CONFLICT,
             "existing": to_camel_dict(result["existing"]),
             "warnings": result["warnings"],
         }), HTTPStatus.CONFLICT

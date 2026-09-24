@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING
 
 from flask import Response, request
 
-from quodeq.api._constants import CLIENT_TYPE_API
 from quodeq.api.helpers import ClientMessageError, json_error
+from quodeq.core.types.provider import ProviderType
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.repo import split_userinfo
@@ -131,7 +131,7 @@ def validate_ai_model(
     ai_cmd: str | None, ai_model: str | None, provider_configs: Mapping[str, dict],
 ) -> tuple[Response, int] | None:
     """API-type providers require an explicit model."""
-    if ai_cmd and provider_configs.get(ai_cmd, {}).get("type") == CLIENT_TYPE_API and not ai_model:
+    if ai_cmd and provider_configs.get(ai_cmd, {}).get("type") == ProviderType.API and not ai_model:
         return json_error(
             "No model selected. Go to Settings and select one.",
             HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",

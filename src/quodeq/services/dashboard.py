@@ -60,7 +60,7 @@ from quodeq.services._dashboard_response import (  # noqa: F401
     slim_history_dim,
 )
 
-_LATEST_RUN = "latest"
+LATEST_RUN = "latest"  # public: services/rescore_run.py's run_id sentinel shares this value
 
 
 def _rescore_run_dimensions(
@@ -132,7 +132,7 @@ _LATEST_FALLBACK_ORDER = (
 def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent.
 
-    For ``run == _LATEST_RUN``, prefer the most recent ``done`` run.
+    For ``run == LATEST_RUN``, prefer the most recent ``done`` run.
     Running and cancelled runs are skipped: the overview waits for a
     run to terminate cleanly before promoting it to the default
     landing-page view. The eligibility predicate is the shared
@@ -154,7 +154,7 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     Note: run IDs are opaque UUIDs (no sensitive data), safe to include in
     error messages.
     """
-    if run == _LATEST_RUN:
+    if run == LATEST_RUN:
         selected_run = None
         for accept in _LATEST_FALLBACK_ORDER:
             selected_run = next((r for r in runs if accept(r.status)), None)

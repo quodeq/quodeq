@@ -13,7 +13,7 @@ from quodeq.core.scoring.internals import finding_to_scoring_dict, principle_sco
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.report import PrincipleGrade
-from quodeq.core.types.scoring import PrincipleScore
+from quodeq.core.types.scoring import ConfidenceLevel, PrincipleScore
 
 
 def _score_principle(
@@ -42,7 +42,7 @@ def _score_principle(
         scale_multiplier=scale_multiplier,
         source_file_count=source_file_count,
     )
-    if confidence == "low":
+    if confidence == ConfidenceLevel.LOW:
         return None, "Insufficient"
 
     return principle_score_and_grade(vt_counts, ct_counts, params=params)

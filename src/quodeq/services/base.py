@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from quodeq.core.types import JobSnapshot, ViolationSummary
@@ -51,14 +52,20 @@ class NewProjectSpec:
     ephemeral: bool = False
 
 
+class CreateProjectStatus(StrEnum):
+    """``CreateProjectResult.status``: drives the route's HTTP translation."""
+
+    CREATED = "created"
+    DUPLICATE = "duplicate"
+    INVALID_REPO = "invalid_repo"
+    CLONE_FAILED = "clone_failed"
+    INTERNAL_ERROR = "internal_error"
+
+
 @dataclass(frozen=True)
 class CreateProjectResult:
-    """Outcome of ``ProjectActions.create_project``.
-
-    ``status`` drives the route's HTTP translation:
-    created | duplicate | invalid_repo | clone_failed | internal_error.
-    """
-    status: str
+    """Outcome of ``ProjectActions.create_project``. See ``CreateProjectStatus``."""
+    status: CreateProjectStatus
     project_id: str | None = None
     scan_data: dict | None = None
     existing_project_id: str | None = None

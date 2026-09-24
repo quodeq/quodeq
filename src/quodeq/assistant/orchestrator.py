@@ -6,7 +6,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from quodeq.assistant import get_provider_configs
-from quodeq.assistant._constants import PROVIDER_CLIENT_TYPE_CLI
 from quodeq.assistant._context import build_system_prompt, build_turn_message
 from quodeq.assistant.adapters.api import ApiTurnConfig, ApiTurnSession, run_api_turn
 from quodeq.assistant.adapters.capabilities import supports_native_tools
@@ -15,6 +14,7 @@ from quodeq.assistant.adapters.cli_config import load_cli_chat_config
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.frame_type import FrameType
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
+from quodeq.config.provider import ProviderType
 from quodeq.assistant.guard import (
     MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
 from quodeq.assistant.message_role import MessageRole
@@ -81,7 +81,7 @@ def _split_skill(text: str):
 
 
 def _provider_type(provider: str) -> str:
-    return get_provider_configs().get(provider, {}).get("type", PROVIDER_CLIENT_TYPE_CLI)
+    return get_provider_configs().get(provider, {}).get("type", ProviderType.CLI)
 
 
 # MCP config styles scoped to a single invocation: a per-turn temp config file
@@ -96,7 +96,7 @@ def write_safe_provider(provider: str) -> bool:
     """Whether the write grant may activate for this provider. API providers
     register tools in-process (no MCP config involved); CLI providers qualify
     only when their MCP config is per-invocation isolated."""
-    if _provider_type(provider) != PROVIDER_CLIENT_TYPE_CLI:
+    if _provider_type(provider) != ProviderType.CLI:
         return True
     try:
         return load_cli_chat_config(provider).mcp_style in _ISOLATED_MCP_STYLES
@@ -251,7 +251,7 @@ def _compose_messages(skill, grants: _TurnGrants, history: list[dict]) -> list[d
 
 def _run_engine(request: TurnRequest, messages: list[dict], skill,
                 grants: _TurnGrants, deps: _EngineDeps) -> str:
-    if _provider_type(request.provider) == PROVIDER_CLIENT_TYPE_CLI:
+    if _provider_type(request.provider) == ProviderType.CLI:
         return _run_cli_engine(request, grants.tool_ctx, messages, skill, deps)
     return _run_api_engine(request, messages, skill, grants, deps)
 

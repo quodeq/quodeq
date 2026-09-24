@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown
+from quodeq.data.fs.report_parser import OVERALL_PRINCIPLE, parse_eval_from_json, parse_eval_markdown
 from quodeq.data.fs.standards_loader import is_known_dimension
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.core.types.severity import Severity
@@ -26,6 +26,7 @@ from quodeq.services.violations_parsing import (
     parse_violations_from_jsonl,
     parse_violations_from_stream,
 )
+from quodeq.shared.constants import EVIDENCE_DIRNAME
 
 _logger = logging.getLogger(__name__)
 
@@ -52,15 +53,15 @@ def _try_evidence_formats(
     base: Path, dimension: str, ctx: ViolationContext, opts: ResolveOptions, keys: SuppressionKeys,
 ) -> ViolationResponse | dict[str, Any] | None:
     """Try evidence file formats (JSON, JSONL, stream) as fallbacks."""
-    evidence_path = base / "evidence" / f"{dimension}_evidence.json"
+    evidence_path = base / EVIDENCE_DIRNAME / f"{dimension}_evidence.json"
     if opts.exists_fn(evidence_path):
         return filter_dismissed_from_result(
             parse_violations_from_evidence(evidence_path, ctx), keys.dismissed,
             keys.deleted, dimension,
         )
 
-    jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
-    stream_path = base / "evidence" / f"{dimension}_live.stream"
+    jsonl_path = base / EVIDENCE_DIRNAME / f"{dimension}_evidence.jsonl"
+    stream_path = base / EVIDENCE_DIRNAME / f"{dimension}_live.stream"
     if opts.exists_fn(jsonl_path) and opts.stat_fn(jsonl_path).st_size > 0:
         return parse_violations_from_jsonl(
             jsonl_path, stream_path, ctx, compiled_dir=opts.compiled_dir, keys=keys,
@@ -106,7 +107,7 @@ def _apply_rescored_grades(
 
     principle_grade = {p.principle: (p.score, p.grade) for p in dim.principles}
     for pg in result.get("principleGrades", []):
-        if pg.get("isOverall") or pg.get("principle") == "Overall":
+        if pg.get("isOverall") or pg.get("principle") == OVERALL_PRINCIPLE:
             pg["score"] = dim.overall_score
             pg["grade"] = dim.overall_grade
         elif pg.get("principle") in principle_grade:

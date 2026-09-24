@@ -9,11 +9,6 @@ ERROR_CODE_BAD_REQUEST = "bad_request"
 ERROR_CODE_NOT_FOUND = "not_found"
 ERROR_CODE_FORBIDDEN = "forbidden"
 
-# Provider-config ``type`` values (data/config/ai_providers.json): whether a
-# provider is driven over HTTP or by spawning a CLI subprocess.
-CLIENT_TYPE_API = "api"
-CLIENT_TYPE_CLI = "cli"
-
 # request.args values are always str, never bool, so boolean query-param
 # flags (``?confirm=true``, ``?discard=true``, ``?dryRun=1``, ``?refresh=1``)
 # compare against these string forms.

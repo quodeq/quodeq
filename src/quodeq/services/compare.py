@@ -27,6 +27,7 @@ _HEAVY_DIMENSION_KEYS = ("violations", "compliance")
 # Trend entries are already slim except dimensionDetails, which carries
 # per-dimension grade/delta strings Compare doesn't need.
 _TREND_DETAIL_KEYS = ("dimension", "score")
+_DIMENSION_DETAILS_KEY = "dimensionDetails"
 
 
 def _slim_dimension(dim: dict[str, Any]) -> dict[str, Any]:
@@ -34,8 +35,8 @@ def _slim_dimension(dim: dict[str, Any]) -> dict[str, Any]:
 
 
 def _slim_trend_entry(entry: dict[str, Any]) -> dict[str, Any]:
-    slim = {k: v for k, v in entry.items() if k != "dimensionDetails"}
-    slim["dimensionDetails"] = [
+    slim = {k: v for k, v in entry.items() if k != _DIMENSION_DETAILS_KEY}
+    slim[_DIMENSION_DETAILS_KEY] = [
         {k: d.get(k) for k in _TREND_DETAIL_KEYS}
         for d in entry.get("dimensionDetails") or []
     ]

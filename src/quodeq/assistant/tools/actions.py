@@ -20,13 +20,6 @@ class ActionConflict(Exception):
     """Apply-time domain conflict; the endpoint maps it to HTTP 409."""
 
 
-# services.standards.StandardsService.import_from_file()'s result["status"]
-# value on a name collision. services has no shared home for this yet
-# (api/standards_import_routes.py keeps an equivalent private _STATUS_CONFLICT
-# for the same reason); reconcile both into one services-owned home later.
-_STATUS_CONFLICT = "conflict"
-
-
 @dataclass(frozen=True)
 class ActionContext:
     """Everything an action's ``apply`` needs from server configuration.
@@ -67,11 +60,11 @@ def _summarize_create_standard(canonical: dict) -> dict:
 
 
 def _apply_create_standard(payload: dict, ctx: ActionContext) -> dict:
-    from quodeq.services.standards import StandardsService  # noqa: PLC0415
+    from quodeq.services.standards import IMPORT_STATUS_CONFLICT, StandardsService  # noqa: PLC0415
 
     service = StandardsService(ctx.evaluators_dir, ctx.compiled_dir, ctx.dimensions_file)
     result = service.import_from_file(payload, force=False)
-    if result.get("status") == _STATUS_CONFLICT:
+    if result.get("status") == IMPORT_STATUS_CONFLICT:
         raise ActionConflict("standard id already exists")
     return result
 

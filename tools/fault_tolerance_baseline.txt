@@ -10,7 +10,7 @@
 # introduced in the same change.
 src/quodeq/_cli_evaluate_finalize.py:71:broad-except
 src/quodeq/_cli_scoring.py:127:broad-except
-src/quodeq/analysis/_api_call.py:247:broad-except
+src/quodeq/analysis/_api_call.py:249:broad-except
 src/quodeq/analysis/_api_runner.py:105:broad-except
 src/quodeq/analysis/_loop_steps.py:108:broad-except
 src/quodeq/analysis/_loop_steps.py:139:broad-except
@@ -75,8 +75,8 @@ src/quodeq/context/precedent_corpus.py:295:broad-except
 src/quodeq/context/precedent_corpus.py:92:broad-except
 src/quodeq/context/precedent_store.py:93:broad-except
 src/quodeq/context/project_shape.py:59:broad-except
-src/quodeq/context/trust_model.py:108:broad-except
-src/quodeq/context/trust_model.py:175:broad-except
+src/quodeq/context/trust_model.py:124:broad-except
+src/quodeq/context/trust_model.py:191:broad-except
 src/quodeq/dashboard/_webview_token.py:86:suppress
 src/quodeq/dashboard/_webview_user_agent.py:17:broad-except
 src/quodeq/dashboard/_webview_window_chrome.py:145:broad-except
@@ -134,7 +134,7 @@ src/quodeq/services/grade_formula.py:110:broad-except
 src/quodeq/services/mutation_rescore.py:180:broad-except
 src/quodeq/services/project_registration.py:168:broad-except
 src/quodeq/services/shared_publish.py:195:broad-except
-src/quodeq/services/shared_publish.py:221:broad-except
+src/quodeq/services/shared_publish.py:229:broad-except
 src/quodeq/services/warmup.py:168:broad-except
 src/quodeq/services/warmup.py:174:broad-except
 src/quodeq/services/warmup.py:99:broad-except

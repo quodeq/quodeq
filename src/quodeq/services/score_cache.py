@@ -62,6 +62,8 @@ from quodeq.shared.env import get_score_cache_path  # noqa: F401 — facade re-e
 if TYPE_CHECKING:
     from quodeq.core.dismissals import DismissedKeys
 
+_ENCODING_UTF8 = "utf-8"  # every version hash below encodes its JSON payload with this
+
 
 def _params_fingerprint(params: ScoringParams) -> str:
     """Deterministic serialization of the grade-formula params (sorted maps)."""
@@ -95,7 +97,7 @@ def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
         ],
         "params": _params_fingerprint(params),
     }, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(_ENCODING_UTF8)).hexdigest()
 
 
 def run_scoped_version(
@@ -120,7 +122,7 @@ def run_scoped_version(
         "deleted": sorted(str(k) for k in (deleted_all & run_class_keys)),
         "params": _params_fingerprint(params),
     }, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(_ENCODING_UTF8)).hexdigest()
 
 
 def accumulated_cache_version(
@@ -166,7 +168,7 @@ def accumulated_cache_version(
         "as_of": as_of or "",
         **({} if visible_dims is None else {"visible": sorted(visible_dims)}),
     }, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(_ENCODING_UTF8)).hexdigest()
 
 
 _IN_FLIGHT = frozenset({RunState.PENDING, RunState.RUNNING, RunState.FINALIZING})
@@ -187,7 +189,7 @@ def accumulated_stale_scope(
               for rid, status, version in run_versions]
     payload = json.dumps({"acc": accumulated_cache_version(params, masked, as_of),
                           "suppression": suppression_fp}, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(_ENCODING_UTF8)).hexdigest()
 
 
 def per_run_versions(

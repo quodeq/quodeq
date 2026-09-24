@@ -17,16 +17,9 @@ from pathlib import Path
 from flask import Response, jsonify, request
 
 from quodeq.api.helpers import json_error, scan_target_error as _scan_target_error
-from quodeq.services.base import ActionProvider, NewProjectSpec
+from quodeq.services.base import ActionProvider, CreateProjectStatus, NewProjectSpec
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import contained_path, relative_scope_error
-
-# quodeq.services.base.CreateProjectResult.status values this route branches
-# on (see that dataclass's docstring for the full set).
-_STATUS_DUPLICATE = "duplicate"
-_STATUS_INVALID_REPO = "invalid_repo"
-_STATUS_CLONE_FAILED = "clone_failed"
-_STATUS_INTERNAL_ERROR = "internal_error"
 
 
 def _reports_dir() -> str:
@@ -146,7 +139,7 @@ def _validate_local_create_project_repo(repo: str, reports_root: str) -> tuple[R
 def _create_project_error_response(result) -> tuple[Response, int] | None:
     """Map a non-success ActionProvider.create_project result to an error
     response. Returns None for a successful result (caller handles that)."""
-    if result.status == _STATUS_DUPLICATE:
+    if result.status == CreateProjectStatus.DUPLICATE:
         return (
             jsonify({
                 "error": "Project already exists",
@@ -155,9 +148,9 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
             }),
             HTTPStatus.CONFLICT,
         )
-    if result.status == _STATUS_INVALID_REPO:
+    if result.status == CreateProjectStatus.INVALID_REPO:
         return json_error(result.message, HTTPStatus.BAD_REQUEST, "INVALID_REPO")
-    if result.status == _STATUS_CLONE_FAILED:
+    if result.status == CreateProjectStatus.CLONE_FAILED:
         code_map = {
             "auth": ("AUTH_REQUIRED", HTTPStatus.BAD_REQUEST),
             "network": ("NETWORK_ERROR", HTTPStatus.BAD_GATEWAY),
@@ -168,7 +161,7 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
         }
         code, status = code_map.get(result.clone_error_kind, ("CLONE_FAILED", HTTPStatus.BAD_GATEWAY))
         return json_error(result.message, status, code)
-    if result.status == _STATUS_INTERNAL_ERROR:
+    if result.status == CreateProjectStatus.INTERNAL_ERROR:
         # Return a generic message; the exception detail (which can carry
         # filesystem paths or backend internals) is already logged by the
         # provider, not sent to the remote caller.
