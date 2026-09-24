@@ -74,12 +74,16 @@ class SQLiteStateStore(StateStoreMetaMixin):
         The projection applies the dismissed state and then saves the
         projected size; without this, every call opens/configures/closes its
         own connection (measured: ~21s of pure connection churn for a 100-run
-        project back when the replay ran one UPDATE per event).
+        project back when the replay ran one UPDATE per event). Findings
+        recorded inside the block are committed once, on normal exit; if the
+        block raises, nothing it recorded since the last explicit commit is
+        kept, and the replay re-reads those events next time.
         """
         with open_evaluation_db(self._run_dir) as conn:
             self._held = conn
             try:
                 yield conn
+                conn.commit()
             finally:
                 self._held = None
 
@@ -100,7 +104,8 @@ class SQLiteStateStore(StateStoreMetaMixin):
         row = judgment_to_row(payload)
         with self._db() as conn:
             conn.execute(_INSERT_FINDING, row)
-            conn.commit()
+            if self._held is None:  # a held batch commits once, in connection()
+                conn.commit()
 
     def clear_all(self) -> None:
         """Reset everything the projection owns for this run.
