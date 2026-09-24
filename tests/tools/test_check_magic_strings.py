@@ -89,3 +89,8 @@ def test_keys_carry_no_line_numbers(tmp_path):
     first = _keys(tmp_path, "def f(s):\n    return s == 'alpha'\n")
     moved = _keys(tmp_path, "\n\n\ndef f(s):\n    return s == 'alpha'\n")
     assert first == moved == {"quodeq/mod.py:C:alpha"}
+
+
+def test_baseline_is_empty():
+    lines = [l for l in (TOOLS / "magic_strings_baseline.txt").read_text().splitlines() if l.strip() and not l.startswith("#")]
+    assert lines == []
