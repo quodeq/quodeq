@@ -101,7 +101,7 @@ src/quodeq/data/cache_store/entry.py:37:broad-except
 src/quodeq/data/events/reader.py:62:broad-except
 src/quodeq/data/fs/compiled_standards.py:36:broad-except
 src/quodeq/data/fs/report_parser/run_dates.py:43:broad-except
-src/quodeq/data/fs/run_artifacts.py:60:suppress
+src/quodeq/data/fs/run_artifacts.py:75:suppress
 src/quodeq/data/fs/standards_prefs.py:116:broad-except
 src/quodeq/data/fs/standards_prefs.py:41:broad-except
 src/quodeq/data/fs/standards_prefs.py:86:broad-except

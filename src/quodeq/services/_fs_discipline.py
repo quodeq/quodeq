@@ -14,20 +14,19 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.services.wiring import RunInfo, safe_read_dir
+from quodeq.services.wiring import RunInfo, has_fingerprint_files, read_run_manifest, safe_read_dir
 
 
 def read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, int]:
     """Read language_stats from the latest run's manifest.json."""
     for run in runs:
-        manifest_path = reports_root / entry_name / run.run_id / "evidence" / "manifest.json"
-        try:
-            data = json.loads(manifest_path.read_text(encoding="utf-8"))
-            stats = data.get("language_stats") or {}
-            if stats:
-                return {k.lstrip("."): v for k, v in stats.items()}
-        except (json.JSONDecodeError, OSError):
+        run_dir = reports_root / entry_name / run.run_id
+        data = read_run_manifest(run_dir)
+        if data is None:
             continue
+        stats = data.get("language_stats") or {}
+        if stats:
+            return {k.lstrip("."): v for k, v in stats.items()}
     return {}
 
 
@@ -70,7 +69,7 @@ def project_has_fingerprints(reports_root: Path, project: str) -> bool:
             evidence_dir = run_dir / "evidence"
             if not evidence_dir.is_dir():
                 continue
-            if any(f.name.endswith("_fingerprint.json") for f in evidence_dir.iterdir()):
+            if has_fingerprint_files(evidence_dir):
                 return True
     except OSError as e:
         from quodeq.services._fs_metadata import logger

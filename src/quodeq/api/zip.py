@@ -14,6 +14,7 @@ from pathlib import Path
 from flask import Response, after_this_request, send_file
 
 from quodeq.api.helpers import ClientMessageError, json_error
+from quodeq.services.fs_project_helpers import read_project_record
 from quodeq.shared.env import env_int
 
 _logger = logging.getLogger(__name__)
@@ -45,13 +46,7 @@ def _build_manifest(project_path: Path) -> dict[str, object]:
     """Build the export manifest payload from a project's repository_info.json."""
     from quodeq import __version__ as _qd_version
 
-    info: dict[str, object] = {}
-    info_path = project_path / "repository_info.json"
-    if info_path.exists():
-        try:
-            info = json.loads(info_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            info = {}
+    info: dict[str, object] = read_project_record(project_path) or {}
     return {
         "schema": MANIFEST_SCHEMA,
         "kind": MANIFEST_KIND,

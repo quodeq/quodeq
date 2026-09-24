@@ -72,6 +72,31 @@ def read_run_state(run_dir: Path) -> RunState | None:
         return None
 
 
+def read_run_manifest(run_dir: Path) -> dict | None:
+    """Parsed ``evidence/manifest.json`` for one run.
+
+    None when absent, corrupt, or not a JSON object -- mirrors
+    ``project_files.read_repository_info``'s contract.
+    """
+    manifest_path = run_dir / "evidence" / "manifest.json"
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def has_fingerprint_files(evidence_dir: Path) -> bool:
+    """True when *evidence_dir* holds any ``*_fingerprint.json`` file.
+
+    Raises OSError when the directory exists but cannot be listed (e.g. a
+    permissions problem): callers that need to distinguish "no
+    fingerprints" from "couldn't check" must see the failure, not a silent
+    False.
+    """
+    return any(f.name.endswith("_fingerprint.json") for f in evidence_dir.iterdir())
+
+
 def list_dimension_evidence(run_dir: Path) -> list[tuple[str, Path, int]] | None:
     """``(dim_id, jsonl_path, size_bytes)`` per ``evidence/<dim>_evidence.jsonl``.
 

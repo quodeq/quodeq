@@ -27,6 +27,7 @@ from quodeq.data.fs.project_files import (  # noqa: F401
     read_scan_total_files,
     remove_project_dir,
     repository_info_exists,
+    scan_json_exists,
     write_repository_info,
 )
 
@@ -58,11 +59,13 @@ from quodeq.data.fs.run_files import (  # noqa: F401
     dimension_report_exists,
     evidence_file_size,
     file_mtime,
+    has_fingerprint_files,
     list_dimension_evidence,
     queue_file_exists,
     read_dispatched_cache_keys,
     read_queue_files_count,
     read_queue_state,
+    read_run_manifest,
     read_run_state,
     read_run_status_json,
     remove_matching_files,
@@ -74,8 +77,12 @@ from quodeq.data.fs.run_artifacts import (  # noqa: F401
     copy_file_if_exists,
     copy_matching_files,
     ensure_dir,
+    read_json_object,
     replace_json_file,
 )
+
+# Repo-identity index (.repo_index.json) raw JSON read mechanics.
+from quodeq.data.fs.repo_index_store import read_repo_index  # noqa: F401
 
 # Agent stream files.
 from quodeq.data.fs.stream_files import (  # noqa: F401

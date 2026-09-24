@@ -5,7 +5,7 @@ each ``repository_info.json``; this index makes the duplicate check a
 lookup.
 
 Mirrors the import-identity index
-(``api/_import_identity.py`` + ``data/fs/project_index.py``): index-first
+(``services/project_import_identity.py`` + ``data/fs/project_index.py``): index-first
 lookup, directory-walk fallback for entries the index doesn't have yet (a
 project created before this index existed, or an index write that failed),
 and self-heal -- a fallback hit is written back into the index so the next
@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.services.wiring import read_repo_index as _read_repo_index_file
 
 _INDEX_FILENAME = ".repo_index.json"
 
@@ -57,11 +58,7 @@ class RepoIdentity:
 
 def load_repo_index(reports_root: Path) -> dict[str, str]:
     """Load the repo-identity index, returning {} on a missing/corrupt file."""
-    try:
-        data = json.loads((reports_root / _INDEX_FILENAME).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    return _read_repo_index_file(reports_root / _INDEX_FILENAME)
 
 
 def save_repo_index(reports_root: Path, index: dict[str, str], *, log: LogSink = NULL_LOG) -> None:

@@ -18,7 +18,6 @@ decorator form and the direct-call form both end up calling
 from __future__ import annotations
 
 import dataclasses
-import json
 import logging
 import os
 from http import HTTPStatus
@@ -29,7 +28,9 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api.helpers import path_from_body, json_error, scan_target_error as _scan_target_error
 from quodeq.services.fs_project_helpers import (
     project_record_exists,
+    read_cached_scan,
     read_project_record,
+    scan_json_exists,
 )
 from quodeq.services.fs_scan import scan_project
 from quodeq.shared.validation import validate_path_segment
@@ -75,14 +76,13 @@ def _scan_inputs(project: str) -> tuple[Path | None, tuple[Response, int] | None
 
 def _cached_scan_response(project_dir: Path) -> Response | None:
     """The project's existing scan.json as a response, or None to rescan."""
-    scan_path = project_dir / "scan.json"
-    if not scan_path.exists():
+    if not scan_json_exists(project_dir):
         return None
-    try:
-        return jsonify(json.loads(scan_path.read_text(encoding="utf-8")))
-    except (json.JSONDecodeError, OSError) as exc:
-        _logger.debug("existing scan.json for %s unreadable, rescanning: %s", project_dir.name, exc)
+    scan = read_cached_scan(project_dir)
+    if scan is None:
+        _logger.debug("existing scan.json for %s unreadable, rescanning: %s", project_dir.name, "invalid JSON")
         return None
+    return jsonify(scan)
 
 
 def _local_scan_root(project_dir: Path) -> tuple[Path | None, tuple[Response, int] | None]:

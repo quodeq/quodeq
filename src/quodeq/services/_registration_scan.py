@@ -5,11 +5,11 @@ Split out of project_registration.py.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.fs_scan import scan_project
+from quodeq.services.wiring import read_repository_info, scan_json_exists
 
 
 def zero_run_scan_fallback() -> dict:
@@ -32,11 +32,12 @@ def scan_parent_project(
 ) -> None:
     """Scan the parent project directory if it lacks a scan.json."""
     info_path = project_dir / "repository_info.json"
-    try:
-        parent_uuid = json.loads(info_path.read_text(encoding="utf-8")).get("parent")
-        if parent_uuid:
-            parent_dir = reports_path / parent_uuid
-            if not (parent_dir / "scan.json").exists():
-                scan_project(repo_path, output_dir=parent_dir)
-    except (json.JSONDecodeError, OSError) as exc:
-        log.warning(f"Could not scan parent project for {info_path}: {exc}")
+    info = read_repository_info(project_dir)
+    if info is None:
+        log.warning(f"Could not scan parent project for {info_path}: missing or invalid repository_info.json")
+        return
+    parent_uuid = info.get("parent")
+    if parent_uuid:
+        parent_dir = reports_path / parent_uuid
+        if not scan_json_exists(parent_dir):
+            scan_project(repo_path, output_dir=parent_dir)

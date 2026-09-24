@@ -17,7 +17,9 @@ from quodeq.services.wiring import (
     RunInfo,
     list_project_dirs,
     read_repository_info,
+    read_scan_json,
     repository_info_exists,
+    scan_json_exists,  # noqa: F401 — re-export, so api routes never import wiring directly
     write_repository_info,
 )
 from quodeq.services._fs_metadata import (
@@ -286,3 +288,12 @@ def project_record_exists(project_dir: Path) -> bool:
 def read_project_record(project_dir: Path) -> dict | None:
     """The project's repository record; None when absent or unreadable."""
     return read_repository_info(project_dir)
+
+
+def read_cached_scan(project_dir: Path) -> dict | None:
+    """The project's existing scan.json; None when absent or unreadable.
+
+    Gives the API layer a service-level entry so scan routes keep zero
+    filesystem code (mirrors :func:`read_project_record`).
+    """
+    return read_scan_json(project_dir)

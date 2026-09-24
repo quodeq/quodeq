@@ -42,6 +42,21 @@ def copy_matching_files(src_dir: Path, dest_dir: Path, pattern: str) -> None:
         shutil.copy2(src, dest_dir / src.name)
 
 
+def read_json_object(path: Path) -> dict | None:
+    """Parsed JSON object at *path*.
+
+    None when the file is absent, not valid JSON, not a JSON object, or not
+    UTF-8 text. A generic counterpart to ``project_files``'s per-artifact
+    readers, for JSON stores outside the per-project ``repository_info.json``
+    / ``scan.json`` pair.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def replace_json_file(path: Path, data: dict) -> None:
     """Write *data* as JSON via a same-directory temp file + atomic replace.
 
