@@ -626,6 +626,7 @@ tests/core/test_projector_scoring_custom.py:122:private-module:quodeq.services.s
 tests/core/test_projector_scoring_custom.py:142:private-module:quodeq.services.scoring._summary.recompute_summary
 tests/core/test_projector_scoring_custom.py:165:private-module:quodeq.data.fs.report_parser._run_info.RunInfo
 tests/core/test_projector_scoring_custom.py:62:private-module:quodeq.data.fs.report_parser._summary.summarize_dimensions
+tests/core/test_report_grades.py:38:private-module:quodeq.analysis._report_scoring.grade_from_score
 tests/core/test_stream_events.py:98:private-module:quodeq.services._violations_jsonl.vj
 tests/core/test_stream_events.py:99:private-module:quodeq.services._violations_stream.vs
 tests/dashboard/_runner_helpers.py:11:private-module:quodeq.dashboard._probes.DashboardHooks

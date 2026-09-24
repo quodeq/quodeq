@@ -136,7 +136,7 @@ from quodeq.data.fs.report_parser.runs import (  # noqa: F401
 )
 
 # Grade calculation, scoring, and dimension summary helpers.
-from quodeq.data.fs.report_parser.grades import (  # noqa: F401
+from quodeq.core.scoring.report_grades import (  # noqa: F401
     calculate_trend,
     most_frequent_grade,
     parse_numeric_score,
