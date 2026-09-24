@@ -145,8 +145,8 @@ class TestProductionCallerReachesRealSink:
 def test_both_entry_points_share_one_read_through(monkeypatch, entry, kind):
     seen: list[tuple[str, str, str]] = []
 
-    def fake_read_through(table, project, version, compute, cacheable, log):
-        seen.append((table.kind, project, version))
+    def fake_read_through(slot, compute, cacheable, log, enabled):
+        seen.append((slot.table.kind, slot.project, slot.version))
         return {"via": "read_through"}
 
     monkeypatch.setattr(_score_cache_fetch, "read_through", fake_read_through)

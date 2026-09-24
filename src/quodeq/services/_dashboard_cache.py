@@ -14,9 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.config.services_env import RUN_DIM_CACHE_MAX_DEFAULT
+from quodeq.config.services_env import run_dim_cache_max as _resolve_run_dim_cache_max
 from quodeq.core.types import DimensionResult
 from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
-from quodeq.shared.env_resolve import resolve_env
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,17 +35,12 @@ class DashboardCacheConfig:
     version: str = ""
 
 
-DEFAULT_RUN_DIM_CACHE_MAX = 256
+DEFAULT_RUN_DIM_CACHE_MAX = RUN_DIM_CACHE_MAX_DEFAULT
 
 
 def run_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the run-dimension cache size limit. *override* bypasses env for testing."""
-    if override is not None:
-        return override
-    try:
-        return int(resolve_env(env).get("QUODEQ_RUN_DIM_CACHE_MAX", str(DEFAULT_RUN_DIM_CACHE_MAX)))
-    except (ValueError, TypeError):
-        return DEFAULT_RUN_DIM_CACHE_MAX
+    return override if override is not None else _resolve_run_dim_cache_max(env=env)
 
 
 class DimensionCache:

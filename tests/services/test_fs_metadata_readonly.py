@@ -14,6 +14,7 @@ from unittest.mock import patch
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.fs.report_parser._run_info import RunInfo
 from quodeq.services._fs_metadata import _compute_summary, read_accumulated_summary, warm_project_summary
+from quodeq.services.fs_project_helpers import build_project_entry
 
 
 def _project(tmp_path: Path, name: str = "proj") -> Path:
@@ -121,16 +122,35 @@ def test_compute_on_miss_keeps_inline_behavior_for_shared_path(tmp_path, monkeyp
     assert (grade, score, files, pending) == ("C", 5.0, 4, False)
 
 
-def test_kill_switch_keeps_inline_compute(tmp_path, monkeypatch):
-    monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+def test_cache_disabled_param_keeps_inline_compute(tmp_path):
+    """``cache_enabled=False`` is the resolved kill switch, passed in by the
+    caller -- read_accumulated_summary itself never reads the environment."""
     _project(tmp_path)
     with patch(
         "quodeq.services._fs_metadata._compute_summary",
         return_value={"grade": "A", "score": 9.0, "files": 3},
     ):
         grade, score, files, pending = read_accumulated_summary(
-            tmp_path, "proj", _runs(), DEFAULT_PARAMS)
+            tmp_path, "proj", _runs(), DEFAULT_PARAMS, cache_enabled=False)
     assert (grade, score, files, pending) == ("A", 9.0, 3, False)
+
+
+def test_kill_switch_reaches_inline_compute_through_build_project_entry(tmp_path, monkeypatch):
+    """QUODEQ_DISABLE_SCORE_CACHE still forces inline compute end to end: the
+    public entry point (build_project_entry, the provider composition)
+    resolves it once via score_cache_disabled() and threads cache_enabled
+    through to read_accumulated_summary."""
+    monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
+    project_dir = _project(tmp_path)
+    (project_dir / "repository_info.json").write_text(
+        json.dumps({"name": "proj", "location": "local", "path": None}))
+    with patch(
+        "quodeq.services._fs_metadata._compute_summary",
+        return_value={"grade": "A", "score": 9.0, "files": 3},
+    ) as compute:
+        entry = build_project_entry(tmp_path, "proj", _runs())
+    compute.assert_called_once()
+    assert (entry.latest_grade, entry.latest_score, entry.summary_pending) == ("A", 9.0, False)
 
 
 def test_metadata_read_failure_is_logged(caplog, tmp_path):

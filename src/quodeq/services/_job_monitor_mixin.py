@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from quodeq.config.services_env import job_timeout_cap_s as _resolve_job_timeout_cap_s
 from quodeq.services._job_log_tee import TeeContext, consume_stream, drain_pre_marker_buffer, tee_run_log
 from quodeq.services._job_model import (
     Job, JobStore, REPORT_PATH_RE,
@@ -30,7 +31,6 @@ from quodeq.core.observability import LogSink
 from quodeq.core.run.exit_reason import DEADLINE_EXIT_REASONS, ExitReason
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
-from quodeq.shared.env import env_float
 from quodeq.shared.run_log import RunLogWriter
 from quodeq.shared.constants import (
     CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_DEADLINE_EXTENDED,
@@ -165,7 +165,7 @@ class JobMonitorMixin:
         """
         if self._job_timeout_cap_s_override is not None:
             return self._job_timeout_cap_s_override
-        return env_float("QUODEQ_JOB_TIMEOUT_S", 0.0, minimum=0.0)
+        return _resolve_job_timeout_cap_s()
 
     def _watchdog_should_kill(self, job_id: str, started_at: float) -> bool:
         """Return True when the watchdog should SIGKILL the job process now."""

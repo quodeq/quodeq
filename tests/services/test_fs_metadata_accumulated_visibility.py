@@ -20,16 +20,13 @@ class TestReadAccumulatedSummary:
     @patch("quodeq.services._fs_metadata.summarize_dimensions")
     @patch("quodeq.services._fs_metadata.read_run_data")
     def test_card_summary_keeps_dims_not_in_latest_config(
-        self, mock_read, mock_summarize, tmp_path, monkeypatch,
+        self, mock_read, mock_summarize, tmp_path,
     ):
         """Dims absent from the latest run's config are KEPT (show all,
         count all) so the card grade matches the accumulated overview."""
         from quodeq.core.types import DimensionResult
         from quodeq.data.fs.report_parser.runs import RunInfo
 
-        # Bypass the persisted project-summary cache so we observe the fresh
-        # computation (the cache is keyed by project name, not reports_root).
-        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         reports_root = tmp_path / "evaluations"
         project = "proj"
         latest_dir = reports_root / project / "run-new"
@@ -52,7 +49,9 @@ class TestReadAccumulatedSummary:
         )()
 
         runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
-        read_accumulated_summary(reports_root, project, runs)
+        # Bypass the persisted project-summary cache so we observe the fresh
+        # computation (the cache is keyed by project name, not reports_root).
+        read_accumulated_summary(reports_root, project, runs, cache_enabled=False)
 
         # summarize_dimensions must see ALL (visible) dims, including the one
         # missing from the latest config.
@@ -63,7 +62,7 @@ class TestReadAccumulatedSummary:
     @patch("quodeq.services._fs_metadata.summarize_dimensions")
     @patch("quodeq.services._fs_metadata.read_run_data")
     def test_card_summary_excludes_hidden_standards(
-        self, mock_read, mock_summarize, tmp_path, monkeypatch,
+        self, mock_read, mock_summarize, tmp_path,
     ):
         """Dims outside the visible-standards selection must not move the
         card grade: the Overview headline excludes them (the client filters
@@ -72,7 +71,6 @@ class TestReadAccumulatedSummary:
         from quodeq.data.fs.report_parser.runs import RunInfo
         from quodeq.data.fs.standards_prefs import save_visible_standard_ids
 
-        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         reports_root = tmp_path / "evaluations"
         project = "proj"
         (reports_root / project / "run-new").mkdir(parents=True)
@@ -92,7 +90,7 @@ class TestReadAccumulatedSummary:
         )()
 
         runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
-        read_accumulated_summary(reports_root, project, runs)
+        read_accumulated_summary(reports_root, project, runs, cache_enabled=False)
 
         # Matching is case-insensitive (the selection stores lowercase ids).
         called_dims = mock_summarize.call_args[0][0]
@@ -101,7 +99,7 @@ class TestReadAccumulatedSummary:
     @patch("quodeq.services._fs_metadata.summarize_dimensions")
     @patch("quodeq.services._fs_metadata.read_run_data")
     def test_card_summary_default_selection_hides_non_iso_dims(
-        self, mock_read, mock_summarize, tmp_path, monkeypatch,
+        self, mock_read, mock_summarize, tmp_path,
     ):
         """Without a visibility file the six ISO defaults apply, so a retired
         non-default dim (clean-architecture) no longer drags the card grade
@@ -109,7 +107,6 @@ class TestReadAccumulatedSummary:
         from quodeq.core.types import DimensionResult
         from quodeq.data.fs.report_parser.runs import RunInfo
 
-        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         reports_root = tmp_path / "evaluations"
         project = "proj"
         (reports_root / project / "run-new").mkdir(parents=True)
@@ -122,7 +119,7 @@ class TestReadAccumulatedSummary:
         )()
 
         runs = [RunInfo(run_id="run-new", date_iso="2026-01-02", date_label="Jan 02")]
-        read_accumulated_summary(reports_root, project, runs)
+        read_accumulated_summary(reports_root, project, runs, cache_enabled=False)
 
         called_dims = mock_summarize.call_args[0][0]
         assert [d.dimension for d in called_dims] == ["security"]

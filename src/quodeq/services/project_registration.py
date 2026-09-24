@@ -34,6 +34,7 @@ from quodeq.services._project_registration_steps import (
 )
 from quodeq.services._repo_index import RepoIdentity, add_repo_index_entry
 from quodeq.services.base import CreateProjectResult, NewProjectSpec
+from quodeq.shared.env import get_clones_dir
 from quodeq.shared.utils import is_repo_url
 
 
@@ -82,6 +83,9 @@ def register_project(
     is_url = is_repo_url(spec.repo)
     _validate_clone_target(spec.repo, is_url, spec.ephemeral, spec.clone_dest)
     reports_path = Path(reports_dir)
+    # Resolved once here, the coordinator, rather than by the materialize
+    # step re-reading QUODEQ_CLONES_DIR itself on every ephemeral clone.
+    resolved_clones_dir = clones_dir if clones_dir is not None else get_clones_dir()
 
     project_uuid, project_dir, project_name, repo_resolved = resolve_project_slot(
         spec.repo, spec.discipline, reports_path, spec.scope_path,
@@ -91,7 +95,7 @@ def register_project(
         repo=spec.repo, repo_resolved=repo_resolved, project_name=project_name,
         project_uuid=project_uuid, project_dir=project_dir, reports_path=reports_path,
         scope_path=spec.scope_path, is_url=is_url, ephemeral=spec.ephemeral,
-        clone_dest=spec.clone_dest, clones_dir=clones_dir, log=log,
+        clone_dest=spec.clone_dest, clones_dir=resolved_clones_dir, log=log,
     ))
 
     _sync_repo_index_on_create(

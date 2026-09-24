@@ -20,13 +20,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.config.services_env import cancel_grace_s
 from quodeq.shared.process_kill import kill_tree as _kill_tree
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.core.run.job_status import strip_external_prefix
 from quodeq.services._run_index_fs import (
     scan_reports_root_for_run, sync_external_run_by_scan,
 )
-from quodeq.shared.env import env_float
 from quodeq.shared.process import is_pid_alive
 from quodeq.services.wiring import (
     is_safe_run_segment,
@@ -36,11 +36,6 @@ from quodeq.services.wiring import (
 
 _logger = logging.getLogger(__name__)
 
-# Time to wait for the process to honor SIGTERM before escalating to SIGKILL.
-# Long enough that graceful shutdown (per-dim scoring on cancel, status.json
-# finalize, cache flush) finishes; short enough that the user isn't left
-# waiting on a hung run. Overridable for ops via env var.
-_DEFAULT_GRACE_PERIOD_S = env_float("QUODEQ_CANCEL_GRACE_S", 30.0, minimum=0.0)
 _POLL_INTERVAL_S = 0.05
 # Settle window after SIGKILL, so a caller that reads status.json right
 # after cancel sees a finished state rather than a half-written one.
@@ -99,11 +94,17 @@ def cancel_external_run(
 ) -> bool:
     """Stop an external run's process tree; escalate SIGTERM to SIGKILL after grace.
 
+    *grace_period_s* defaults to ``config.services_env.cancel_grace_s()``
+    (QUODEQ_CANCEL_GRACE_S, 30s): time to wait for the process to honor
+    SIGTERM before escalating to SIGKILL. Long enough that graceful shutdown
+    (per-dim scoring on cancel, status.json finalize, cache flush) finishes;
+    short enough that the user isn't left waiting on a hung run.
+
     Returns True once the process is gone (either honored SIGTERM or was
     killed). Returns False only when there was nothing to cancel or signal
     delivery failed at the OS level.
     """
-    grace = grace_period_s if grace_period_s is not None else _DEFAULT_GRACE_PERIOD_S
+    grace = grace_period_s if grace_period_s is not None else cancel_grace_s()
     control = control or ProcessControl()
     project_dir = resolve_child_dir(reports_root, project_uuid)
     if project_dir is None:

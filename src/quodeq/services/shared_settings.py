@@ -12,7 +12,7 @@ from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.wiring import ensure_dir, read_json_object, replace_json_file
-from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.env_paths import get_quodeq_dir
 
 _FILENAME = "shared.json"
 
@@ -29,10 +29,7 @@ def shared_settings_path(env: Mapping[str, str] | None = None) -> Path:
 
     Honors QUODEQ_DIR environment variable if set, otherwise uses ~/.quodeq.
     """
-    e = resolve_env(env)
-    base = e.get("QUODEQ_DIR")
-    root = Path(base) if base else Path.home() / ".quodeq"
-    return root / _FILENAME
+    return get_quodeq_dir(env) / _FILENAME
 
 
 def read_settings(env: Mapping[str, str] | None = None) -> SharedSettings:

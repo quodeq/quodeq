@@ -1,10 +1,15 @@
 """Defensive env parsing: malformed values fall back instead of raising.
 
 Covers these env sites: QUODEQ_JOB_TIMEOUT_S,
-QUODEQ_CANCEL_GRACE_S, QUODEQ_GIT_CLONE_TIMEOUT_S (config.clone_env, read
-lazily per call by services._fs_clone and by the _cli_resolution import-time
-constant), and QUODEQ_MAX_HISTORY_RUNS. Import-time constants are exercised
-via importlib.reload with the env var set, then restored.
+QUODEQ_CANCEL_GRACE_S (config.services_env, read lazily per call by
+services._external_jobs.cancel_external_run -- no longer an import-time
+module constant; see
+tests/services/test_external_jobs.py::TestCancelGraceReadPerCall, which is
+already grandfathered for the private ``_external_jobs`` import this needs),
+QUODEQ_GIT_CLONE_TIMEOUT_S (config.clone_env, read lazily per call by
+services._fs_clone and by the _cli_resolution import-time constant), and
+QUODEQ_MAX_HISTORY_RUNS. Import-time constants are exercised via
+importlib.reload with the env var set, then restored.
 """
 from __future__ import annotations
 
@@ -56,13 +61,6 @@ class TestMaxHistoryRuns:
 
 
 class TestImportTimeConstants:
-    def test_cancel_grace_invalid_falls_back(self, monkeypatch):
-        value = _reload_attr(
-            monkeypatch, "quodeq.services._external_jobs",
-            "QUODEQ_CANCEL_GRACE_S", "abc", "_DEFAULT_GRACE_PERIOD_S",
-        )
-        assert value == 30.0
-
     def test_clone_timeout_invalid_falls_back(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_GIT_CLONE_TIMEOUT_S", "fast")
         assert git_clone_timeout_s() == 300

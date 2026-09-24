@@ -36,6 +36,7 @@ from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
 )
 from quodeq.services._registration_url import strip_credentials
 from quodeq.services._repo_index import load_repo_index, repo_index_key, save_repo_index
+from quodeq.shared.env import score_cache_disabled
 
 _logger = logging.getLogger(__name__)
 
@@ -165,11 +166,9 @@ def build_project_entry(
 ) -> ProjectEntry:
     """Build a frozen ProjectEntry from its directory and run list.
 
-    ``options.inline_summaries`` mirrors ``build_project_list``'s parameter of
-    the same name, forwarded to ``read_accumulated_summary`` as
-    ``compute_on_miss``: the shared-repo route has no warm-up engine, so it
-    keeps computing a missing summary inline instead of reporting it pending.
-    See ``_backfill_and_read_meta`` for the ``options.backfill`` rationale.
+    ``options.inline_summaries`` mirrors ``build_project_list``'s ``compute_on_miss``
+    forward; QUODEQ_DISABLE_SCORE_CACHE is resolved once here as ``cache_enabled``.
+    See ``_backfill_and_read_meta`` for ``options.backfill``.
     *pre_read_info*: when provided, uses this dict instead of reading from disk.
     """
     info, meta = _backfill_and_read_meta(
@@ -177,6 +176,7 @@ def build_project_entry(
     )
     latest_grade, latest_score, files_count, summary_pending = read_accumulated_summary(
         reports_root, entry_name, runs, compute_on_miss=options.inline_summaries,
+        cache_enabled=not score_cache_disabled(),
     )
     latest_done_run_id = _derive_latest_done_run_id(runs)
     return ProjectEntry(

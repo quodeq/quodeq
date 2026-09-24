@@ -100,6 +100,10 @@ class JobManager(JobMonitorMixin, JobCapacityMixin):
         # Injection seam for the hard job-duration cap; None means "fall back
         # to the QUODEQ_JOB_TIMEOUT_S env var" (see _job_timeout_cap_s below).
         self._job_timeout_cap_s_override = seams.job_timeout_cap_s
+        # Injection seam for the concurrency cap; None means "fall back to
+        # the QUODEQ_MAX_CONCURRENT_JOBS env var" (see _max_concurrent_jobs
+        # in _job_capacity_mixin.py).
+        self._max_concurrent_jobs_override = seams.max_concurrent_jobs
         # _run_log_writers and _pre_marker_buffer are owned exclusively by the
         # per-job _consume_stream thread started in start_job(). No other code
         # path may read or mutate these dicts — doing so reintroduces the

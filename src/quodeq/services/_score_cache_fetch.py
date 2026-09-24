@@ -79,19 +79,36 @@ class CacheTable:
     write_name: str
 
 
+@dataclass(frozen=True)
+class CacheSlot:
+    """One read-through cache slot: which table, and the (project, version) key.
+
+    Bundled so ``read_through`` -- which also takes compute/cacheable/log/
+    enabled -- stays within the 6-parameter limit.
+    """
+
+    table: CacheTable
+    project: str
+    version: str
+
+
 def read_through(
-    table: CacheTable, project: str, version: str, compute: Callable[[], dict],
-    cacheable: Callable[[dict], bool] | None, log: LogSink,
+    slot: CacheSlot, compute: Callable[[], dict],
+    cacheable: Callable[[dict], bool] | None, log: LogSink, enabled: bool,
 ) -> dict:
     """Hit -> the cached payload. Miss -> compute, cache best-effort, return.
 
-    The kill switch and a failed first read degrade to a plain compute.
-    Concurrent misses on one (table, project, version) share one compute;
-    the waiter re-checks the cache before computing. *cacheable* returning
-    False serves the result without persisting it. A failed write is logged
-    through *log* and the computed result is still returned.
+    *enabled* is the resolved kill-switch state (the caller reads
+    QUODEQ_DISABLE_SCORE_CACHE once and passes the result in -- this function
+    never reads the environment itself). False, or a failed first read,
+    degrades to a plain compute. Concurrent misses on one (table, project,
+    version) share one compute; the waiter re-checks the cache before
+    computing. *cacheable* returning False serves the result without
+    persisting it. A failed write is logged through *log* and the computed
+    result is still returned.
     """
-    if score_cache_disabled():
+    table, project, version = slot.table, slot.project, slot.version
+    if not enabled:
         return compute()
     try:
         with open_score_cache() as conn:
@@ -153,8 +170,12 @@ def cached_accumulated(
     """
     table = CacheTable("accumulated", "accumulated", read_cached_accumulated,
                         write_cached_accumulated, "write_cached_accumulated")
-    if stale_scope is None or score_cache_disabled():
-        return read_through(table, project, version, compute, cacheable, log)
+    # Resolved once here (the composition point for this read-through call),
+    # not inside read_through, which takes the resolved bool.
+    enabled = not score_cache_disabled()
+    cache_slot = CacheSlot(table, project, version)
+    if stale_scope is None or not enabled:
+        return read_through(cache_slot, compute, cacheable, log, enabled)
     slot = (table.kind, project, stale_scope)
     hit = _peek(table, project, version)
     if hit is not None:
@@ -162,7 +183,7 @@ def cached_accumulated(
         return hit
 
     def fresh() -> dict:
-        return read_through(table, project, version, compute, cacheable, log)
+        return read_through(cache_slot, compute, cacheable, log, enabled)
 
     stale = recall(slot)
     if stale is None:
@@ -186,7 +207,9 @@ def cached_project_summary(
     """
     table = CacheTable("summary", "project summary", read_cached_project_summary,
                         write_cached_project_summary, "write_cached_project_summary")
-    return read_through(table, project, version, compute, None, log)
+    return read_through(
+        CacheSlot(table, project, version), compute, None, log, not score_cache_disabled(),
+    )
 
 
 def make_cache_backed_fetcher(

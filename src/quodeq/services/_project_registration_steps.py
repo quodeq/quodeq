@@ -30,7 +30,6 @@ from quodeq.services.wiring import (
     write_repository_info,
 )
 from quodeq.core.types.project_source import ProjectLocation
-from quodeq.shared.env import get_clones_dir
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
 
@@ -39,11 +38,13 @@ def _resolve_target_path(request: MaterializeRequest) -> Path:
 
     For a URL input, clones into an ephemeral cache dir or the caller's
     chosen ``clone_dest``. For a local path input, resolves in place -- the
-    directory must already exist.
+    directory must already exist. ``request.clones_dir`` is always a
+    concrete path here: the coordinator (``register_project``) resolves the
+    QUODEQ_CLONES_DIR default once, before this step runs.
     """
     if request.is_url:
         if request.ephemeral:
-            target_path = (request.clones_dir or get_clones_dir()) / request.project_uuid
+            target_path = request.clones_dir / request.project_uuid
         else:
             target_path = Path(request.clone_dest).resolve() / request.project_name
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -141,7 +142,7 @@ class MaterializeRequest:
     is_url: bool
     ephemeral: bool
     clone_dest: str | None
-    clones_dir: Path | None
+    clones_dir: Path
     log: LogSink = NULL_LOG
 
 

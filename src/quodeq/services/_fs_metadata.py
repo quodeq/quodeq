@@ -231,7 +231,8 @@ def _read_settled_or_pending_summary(
 
 def read_accumulated_summary(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
-    params: "ScoringParams | None" = None, *, compute_on_miss: bool = False,
+    params: "ScoringParams | None" = None, *,
+    compute_on_miss: bool = False, cache_enabled: bool = True,
 ) -> tuple[str | None, float | None, int | None, bool]:
     """Compute accumulated grade and score across all runs. Returns (grade, score, files, pending).
 
@@ -249,6 +250,10 @@ def read_accumulated_summary(
     selection is folded into the cache version so toggling a standard
     invalidates the cached card.
 
+    *cache_enabled* is the resolved QUODEQ_DISABLE_SCORE_CACHE kill switch
+    (default True): the provider composition resolves it once via
+    ``score_cache_disabled()`` and passes it in.
+
     See ``_compute_on_miss_summary`` and ``_read_settled_or_pending_summary``
     for the two branches' cache-hit/miss rationale.
     """
@@ -256,9 +261,8 @@ def read_accumulated_summary(
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
 
-    from quodeq.shared.env import score_cache_disabled  # noqa: PLC0415
     scope = _summary_version(reports_root, entry_name, runs, params)
-    if compute_on_miss or score_cache_disabled():
+    if compute_on_miss or not cache_enabled:
         return _compute_on_miss_summary(reports_root, entry_name, runs, params, scope)
     return _read_settled_or_pending_summary(entry_name, runs, scope.version)
 

@@ -948,11 +948,10 @@ tests/services/test_evaluations_index_is_complete.py:17:private-module:quodeq.se
 tests/services/test_evaluations_index_is_complete.py:17:private-module:quodeq.services._job_model.Job
 tests/services/test_evaluations_index_safety.py:13:private-module:quodeq.services._evaluations_index.EvaluationsIndex
 tests/services/test_evaluations_index_safety.py:14:private-module:quodeq.services._job_model.InMemoryJobStore
-tests/services/test_external_jobs.py:106:private-module:quodeq.services._external_jobs.cancel_external_run
-tests/services/test_external_jobs.py:138:private-module:quodeq.services._external_jobs.cancel_external_run
-tests/services/test_external_jobs.py:13:private-module:quodeq.services._external_jobs.ProcessControl
-tests/services/test_external_jobs.py:14:private-name:quodeq.services._external_jobs._wait_for_exit
-tests/services/test_external_jobs.py:178:private-module:quodeq.services._external_jobs.cancel_external_run
+tests/services/test_external_jobs.py:13:private-module:quodeq.services._external_jobs
+tests/services/test_external_jobs.py:14:private-module:quodeq.services._external_jobs.ProcessControl
+tests/services/test_external_jobs.py:14:private-module:quodeq.services._external_jobs.cancel_external_run
+tests/services/test_external_jobs.py:15:private-name:quodeq.services._external_jobs._wait_for_exit
 tests/services/test_external_jobs_pid.py:14:private-module:quodeq.services._external_jobs.resolve_external_pid
 tests/services/test_external_jobs_pid.py:21:private-module:quodeq.services._external_jobs.resolve_external_pid
 tests/services/test_external_jobs_pid.py:30:private-module:quodeq.services._external_jobs.resolve_external_pid
