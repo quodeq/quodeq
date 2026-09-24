@@ -7,6 +7,10 @@ a warning and falls back to defaults rather than breaking every score read.
 The apply/preview orchestration lives in ``services/grade_formula.py``; this
 module is only the filesystem store, so the data layer (grade projector) can
 read saved params without depending on the services layer.
+
+It also owns the rescore-pending marker next to the params file: written
+when a rescore pass is requested, removed when a pass completes with nothing
+pending, so a pass cut short by an app quit is resumed on the next start.
 """
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ from quodeq.core.scoring.params import (
     params_to_dict,
     validate_params,
 )
+from quodeq.data.fs.run_artifacts import replace_json_file
 from quodeq.shared.env import get_grade_formula_path
 
 _logger = logging.getLogger(__name__)
@@ -29,6 +34,28 @@ _logger = logging.getLogger(__name__)
 def grade_formula_path() -> Path:
     """Location of the custom-params file (env-overridable, see shared/env)."""
     return Path(get_grade_formula_path())
+
+
+def rescore_marker_path() -> Path:
+    """Location of the rescore-pending marker, beside the params file."""
+    return grade_formula_path().with_suffix(".rescore-pending.json")
+
+
+def mark_rescore_pending() -> None:
+    """Record that a rescore pass is owed (atomic write). Raises OSError."""
+    path = rescore_marker_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    replace_json_file(path, {"pending": True})
+
+
+def clear_rescore_pending() -> None:
+    """Remove the rescore-pending marker; absent is fine. Raises OSError."""
+    rescore_marker_path().unlink(missing_ok=True)
+
+
+def rescore_pending() -> bool:
+    """True when a rescore pass was requested and never completed."""
+    return rescore_marker_path().is_file()
 
 
 def load_params() -> ScoringParams:

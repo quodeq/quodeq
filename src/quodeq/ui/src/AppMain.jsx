@@ -14,6 +14,7 @@ import { EvalLogProvider } from './features/evaluation/eval-log/EvalLogProvider.
 import { ServerLogProvider } from './features/settings/server-log/ServerLogProvider.jsx';
 import { OllamaLogProvider } from './features/settings/ollama-log/OllamaLogProvider.jsx';
 import { LlamaCppLogProvider } from './features/settings/llamacpp-log/LlamaCppLogProvider.jsx';
+import { RescoreTrackerProvider } from './features/grade-formula/rescore/RescoreTrackerProvider.jsx';
 import { MainContent } from './routes/renderers.jsx';
 import { buildSidebarProps, buildTopBarProps } from './appShellProps.js';
 import { JOB_STATUS } from './vocab/jobStatus.js';
@@ -163,26 +164,30 @@ export default function AppMain({ shell }) {
           <OllamaLogProvider>
             <LlamaCppLogProvider>
               <VerifiedFindingsProvider project={state.selectedProject} source={state.selectedSource}>
-                <AppShell
-                  navPending={state.navPending}
-                  booting={shell.showStartupLoader}
-                  drawer={<BottomDrawer uiState={assistantCtx.uiState} projectName={resolvedDisplayName}
-                    onOpenSettings={() => navTab('settings')} />}
-                  sidebar={<AppSidebar shell={shell} />}
-                  header={<AppTopBar shell={shell} />}
-                  content={<AppRouteContent shell={shell} />}
-                  startupLoader={
-                    /* One stable mount for the startup loader, OUTSIDE the
-                       routed Suspense: inside it, a lazy chunk's suspension
-                       unmounts the loader itself and the plain fallback
-                       restarts the fade and tips from zero (a loader-to-loader
-                       flash). Out here it covers chunk loads AND holds through
-                       the Overview's first data (shouldShowStartupLoader), so
-                       boot goes loader -> content with no skeleton in
-                       between. */
-                    <FadingLoadingScreen show={shell.showStartupLoader} variant="shell" tips />
-                  }
-                />
+                {/* Above every page: a grade-formula rescore keeps polling and
+                    drops the stale score caches after the user leaves the page. */}
+                <RescoreTrackerProvider>
+                  <AppShell
+                    navPending={state.navPending}
+                    booting={shell.showStartupLoader}
+                    drawer={<BottomDrawer uiState={assistantCtx.uiState} projectName={resolvedDisplayName}
+                      onOpenSettings={() => navTab('settings')} />}
+                    sidebar={<AppSidebar shell={shell} />}
+                    header={<AppTopBar shell={shell} />}
+                    content={<AppRouteContent shell={shell} />}
+                    startupLoader={
+                      /* One stable mount for the startup loader, OUTSIDE the
+                         routed Suspense: inside it, a lazy chunk's suspension
+                         unmounts the loader itself and the plain fallback
+                         restarts the fade and tips from zero (a loader-to-loader
+                         flash). Out here it covers chunk loads AND holds through
+                         the Overview's first data (shouldShowStartupLoader), so
+                         boot goes loader -> content with no skeleton in
+                         between. */
+                      <FadingLoadingScreen show={shell.showStartupLoader} variant="shell" tips />
+                    }
+                  />
+                </RescoreTrackerProvider>
               </VerifiedFindingsProvider>
             </LlamaCppLogProvider>
           </OllamaLogProvider>
