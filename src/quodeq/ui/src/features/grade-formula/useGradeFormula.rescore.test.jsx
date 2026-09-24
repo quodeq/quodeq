@@ -76,7 +76,10 @@ beforeEach(() => {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
   getGradeFormula.mockReset();
-  getGradeFormula.mockResolvedValueOnce(payload(CURRENT, IDLE_START));
+  // Two mount GETs: the editor's and the app-level tracker's.
+  getGradeFormula
+    .mockResolvedValueOnce(payload(CURRENT, IDLE_START))
+    .mockResolvedValueOnce(payload(CURRENT, IDLE_START));
   saveGradeFormula.mockResolvedValue(payload(SAVED, rescore()));
   previewGradeFormula.mockResolvedValue({
     project: 'proj', runId: 'r1',
@@ -145,6 +148,32 @@ describe('useGradeFormula background rescore', () => {
     const polls = getGradeFormula.mock.calls.length;
     await tick(3);
     expect(getGradeFormula.mock.calls.length).toBe(polls);
+    app.unmount();
+  });
+
+  it('tracks a pass already running when the app mounts, with no editor open', async () => {
+    getGradeFormula.mockReset();
+    getGradeFormula
+      .mockResolvedValueOnce(payload(SAVED, rescore({ done: 1 })))
+      .mockResolvedValue(payload(SAVED, LANDED));
+    const view = render(wrapper({ children: null }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    await tick(3);
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
+    view.unmount();
+  });
+
+  it('treats the editor mount GET for the pass the app already tracks as a no-op', async () => {
+    getGradeFormula.mockReset();
+    getGradeFormula.mockResolvedValue(payload(SAVED, rescore({ done: 1 })));
+    const cancelSpy = vi.spyOn(queryClient, 'cancelQueries');
+    const app = renderAppWithEditor();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(getGradeFormula.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(cancelSpy).toHaveBeenCalledTimes(1);
+    expect(app.latest.current.rescoreProgress).toEqual({ done: 1, total: 3 });
     app.unmount();
   });
 

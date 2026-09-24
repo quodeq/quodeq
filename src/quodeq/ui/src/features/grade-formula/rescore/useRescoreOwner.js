@@ -45,6 +45,9 @@ async function readProgress(queryClient) {
 export function useRescoreOwner() {
   const queryClient = useQueryClient();
   const [target, setTarget] = useState(null);
+  // Mirrors target for track(), which must stay a stable callback.
+  const targetRef = useRef(null);
+  targetRef.current = target;
   const listenersRef = useRef(new Set());
 
   const { data } = useQuery({
@@ -58,6 +61,10 @@ export function useRescoreOwner() {
   });
 
   const track = useCallback((payload) => {
+    // The app mount GET and the editor mount GET can both report the same
+    // running pass: the second one changes nothing.
+    if (targetRef.current === payload.rescore.generation) return;
+    targetRef.current = payload.rescore.generation;
     // Fire-and-forget by design (see useRunEventStream.js): a poll GET
     // already in flight for the PREVIOUS target must not land after this
     // setQueryData and overwrite it with a stale generation -- isRescoreSettled
@@ -69,6 +76,15 @@ export function useRescoreOwner() {
     queryClient.setQueryData(gradeFormulaKeys.rescore(), payload);
     setTarget(payload.rescore.generation);
   }, [queryClient]);
+
+  // One GET at app mount: the server may have resumed a pass the last
+  // process left unfinished, and the dashboards that load meanwhile must
+  // still be invalidated when it lands.
+  useEffect(() => {
+    getGradeFormula()
+      .then((d) => { if (d?.rescore?.state === RESCORE_STATE.RUNNING) track(d); })
+      .catch((err) => console.warn('[useRescoreOwner] mount rescore check failed:', err));
+  }, [track]);
 
   const subscribe = useCallback((listener) => {
     listenersRef.current.add(listener);
