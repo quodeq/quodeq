@@ -137,3 +137,44 @@ class TestDownloadViaDialogExceptNarrowing:
             )
 
         assert result is False
+
+    def test_download_streams_in_chunks(self, tmp_path):
+        import io
+
+        target = tmp_path / "output.bin"
+        body = io.BytesIO(b"x" * 300_000)
+        sizes: list[int] = []
+        mock_response = MagicMock()
+        mock_response.read.side_effect = lambda n=-1: (sizes.append(n), body.read(n))[1]
+        mock_response.__enter__.return_value = mock_response
+        mock_response.__exit__.return_value = False
+
+        with patch("urllib.request.urlopen", return_value=mock_response):
+            result = download_via_dialog(
+                self._window(str(target)), "http://127.0.0.1:7863", "/api/export", "output.bin",
+            )
+
+        assert result is True
+        assert target.read_bytes() == b"x" * 300_000
+        # never an unbounded read(); several chunks (64 KiB on POSIX, 1 MiB on Windows)
+        assert len(sizes) >= 2 and all(n > 0 for n in sizes)
+        assert not (tmp_path / "output.bin.part").exists()
+
+    def test_a_truncated_download_keeps_the_existing_file(self, tmp_path):
+        import http.client
+
+        target = tmp_path / "output.txt"
+        target.write_text("keep me")
+        mock_response = MagicMock()
+        mock_response.read.side_effect = http.client.IncompleteRead(b"partial")
+        mock_response.__enter__.return_value = mock_response
+        mock_response.__exit__.return_value = False
+
+        with patch("urllib.request.urlopen", return_value=mock_response):
+            result = download_via_dialog(
+                self._window(str(target)), "http://127.0.0.1:7863", "/api/export", "output.txt",
+            )
+
+        assert result is False
+        assert target.read_text() == "keep me"
+        assert not (tmp_path / "output.txt.part").exists()

@@ -85,3 +85,17 @@ class TestFormatReasons:
 
     def test_empty_histogram_reads_as_a_sentence(self):
         assert format_reasons({}) == "reason not recorded"
+
+
+_DEPTH = 200_000
+
+
+class TestPathologicalNesting:
+    def test_a_deeply_nested_response_yields_no_findings(self):
+        deep = "[" * _DEPTH + "]" * _DEPTH
+        assert parse_findings(deep) == ([], 0)
+
+    def test_findings_before_the_nesting_are_kept(self):
+        deep = "[" * _DEPTH + "]" * _DEPTH
+        findings, dropped = parse_findings(_raw(_VALID) + deep)
+        assert (len(findings), dropped) == (1, 0)

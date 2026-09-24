@@ -232,18 +232,26 @@ def parse_findings(
     sits inside the SEP-06 no-logging boundary. Pass *dropped_sink* to also
     receive the rejected dicts themselves, so the caller can attempt a repair
     re-ask instead of only counting the loss.
+
+    A response nested deeper than the interpreter's recursion limit stops the
+    walk; findings harvested before it are returned.
     """
     decoder = json.JSONDecoder()
     findings: list[dict] = []
     dropped: list[dict] = dropped_sink if dropped_sink is not None else []
     i = 0
-    while (opener := _JSON_OPENER_RE.search(raw_json, i)) is not None:
-        start = opener.start()
-        try:
-            node, end = decoder.raw_decode(raw_json, start)
-        except json.JSONDecodeError:
-            i = start + 1
-            continue
-        _extract_finding_dicts(node, findings, dropped, drop_reasons)
-        i = end
+    try:
+        while (opener := _JSON_OPENER_RE.search(raw_json, i)) is not None:
+            start = opener.start()
+            try:
+                node, end = decoder.raw_decode(raw_json, start)
+            except json.JSONDecodeError:
+                i = start + 1
+                continue
+            _extract_finding_dicts(node, findings, dropped, drop_reasons)
+            i = end
+    except RecursionError:
+        # Pathologically nested output: stop the walk instead of aborting the
+        # caller. What was harvested before it stands; the rest is lost.
+        return findings, len(dropped)
     return findings, len(dropped)

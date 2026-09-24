@@ -14,6 +14,7 @@ import http.client
 import json
 import logging
 import os
+import shutil
 import signal
 import sys
 import urllib.parse
@@ -28,6 +29,7 @@ _logger = logging.getLogger(__name__)
 _EVAL_CHECK_TIMEOUT_S = 0.5
 _CANCEL_TIMEOUT_S = 5.0
 _DOWNLOAD_TIMEOUT_S = 120
+_PARTIAL_SUFFIX = ".part"  # sibling file a download streams into before it replaces the target
 
 
 def fetch_running_evaluation(base_url: str) -> dict | None:
@@ -116,8 +118,7 @@ def download_via_dialog(window: object, base_url: str, path: str, filename: str)
         url = urllib.parse.urljoin(base_url, path)
         if not is_safe_reload_url(url):
             return False
-        with urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT_S) as resp:
-            Path(save_path).write_bytes(resp.read())
+        _stream_to(url, Path(save_path))
         return True
     except (OSError, ValueError, http.client.HTTPException):
         # OSError: connection/URLError/write failures. ValueError: a URL
@@ -126,6 +127,22 @@ def download_via_dialog(window: object, base_url: str, path: str, filename: str)
         # are "download failed" to the user; anything else is a bug and
         # propagates to the js_api bridge.
         return False
+
+
+def _stream_to(url: str, target: Path) -> None:
+    """Stream *url* into *target* in fixed-size chunks.
+
+    The body lands in a sibling ``.part`` file and replaces *target* only once
+    complete, so a failed download never truncates a file the user chose to
+    overwrite. The partial file is always removed.
+    """
+    partial = target.with_name(target.name + _PARTIAL_SUFFIX)
+    try:
+        with urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT_S) as resp, partial.open("wb") as out:
+            shutil.copyfileobj(resp, out)
+        os.replace(partial, target)
+    finally:
+        partial.unlink(missing_ok=True)
 
 
 def kill_api(pid: int) -> None:
