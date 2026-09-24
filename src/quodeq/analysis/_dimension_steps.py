@@ -38,6 +38,7 @@ def run_dimension_analysis(
     heartbeat = config.options.heartbeat_callback or make_heartbeat(dim_id, idx, ctx.total)
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+    opts = config.options
     ac_kwargs: dict[str, Any] = dict(
         ai_cmd=config.ai_cmd,
         ai_cmd_path=config.options.ai_cmd_path,
@@ -48,10 +49,13 @@ def run_dimension_analysis(
         heartbeat_callback=heartbeat,
         compiled_dir=compiled_dir,
         dimension=dim_id,
+        # The run's single-agent ceilings apply when no explicit cap was set.
+        max_turns=opts.max_turns if opts.max_turns is not None else opts.default_max_turns,
+        max_duration=opts.max_duration if opts.max_duration is not None else opts.default_max_duration,
     )
     # Left out rather than passed as None so AnalysisConfig's own defaults win
     # for every budget the run did not set.
-    for name in ("max_turns", "max_duration", "time_limit", "deadline_at"):
+    for name in ("time_limit", "deadline_at"):
         value = getattr(config.options, name)
         if value is not None:
             ac_kwargs[name] = value

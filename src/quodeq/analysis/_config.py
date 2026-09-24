@@ -1,11 +1,10 @@
 """Analysis configuration dataclasses and type aliases."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from quodeq.config.analysis_env import default_max_duration, default_max_turns
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 
 if TYPE_CHECKING:
@@ -34,8 +33,10 @@ class AnalysisConfig:
     # Result-cache root the findings server writes under (``--cache-root``).
     # ``run_analysis`` fills it from the environment when the caller left it unset.
     cache_root: Path | None = None
-    max_turns: int | None = field(default_factory=default_max_turns)
-    max_duration: int | None = field(default_factory=default_max_duration)
+    # None = no ceiling. The single-agent dimension step fills the run's
+    # QUODEQ_DEFAULT_MAX_TURNS/DURATION ceilings; pool agents keep None.
+    max_turns: int | None = None
+    max_duration: int | None = None
     time_limit: int = DEFAULT_TIME_LIMIT
     deadline_at: float | None = None
     """Absolute monotonic-clock deadline for the whole run. None = unlimited."""

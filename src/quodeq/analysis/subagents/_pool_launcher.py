@@ -191,6 +191,7 @@ def launch_pool(
             prompt=params.prompt,
             dimension=dim_id,
             scout_first=_use_scout_mode(env),
+            agent_failure_streak_limit=config.options.agent_failure_streak_limit,
         ),
         config=base_ac,
     )

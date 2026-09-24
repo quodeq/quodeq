@@ -183,3 +183,23 @@ class TestCliRunSettingsReachTheDimensionConfig:
         assert ac.ai_cmd == "codex"
         assert ac.ai_cmd_path == "/opt/bin/codex-wrapper"
         assert ac.cache_root == tmp_path / "root" / "results"
+
+    def test_single_agent_ceilings_come_from_the_run(self, tmp_path, monkeypatch):
+        from quodeq.cli import build_run_config
+
+        monkeypatch.setenv("QUODEQ_DEFAULT_MAX_TURNS", "42")
+        monkeypatch.setenv("QUODEQ_DEFAULT_MAX_DURATION", "77")
+        inputs = TestBuildRunConfigAiModel._make_inputs(tmp_path)
+        run_config = build_run_config(
+            TestBuildRunConfigAiModel._make_args(), inputs=inputs, evidence_dir=tmp_path,
+        )
+        monkeypatch.setenv("QUODEQ_DEFAULT_MAX_TURNS", "5")
+        ac = self._dimension_config(tmp_path, run_config)
+        assert (ac.max_turns, ac.max_duration) == (42, 77)
+
+        explicit = build_run_config(
+            TestBuildRunConfigAiModel._make_args(max_turns=10, max_duration=300),
+            inputs=inputs, evidence_dir=tmp_path,
+        )
+        ac = self._dimension_config(tmp_path, explicit)
+        assert (ac.max_turns, ac.max_duration) == (10, 300)

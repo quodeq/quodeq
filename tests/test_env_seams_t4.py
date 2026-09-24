@@ -10,31 +10,28 @@ from __future__ import annotations
 
 
 class TestAnalysisConfigDefaults:
-    def test_max_turns_reads_env_at_construction(self, monkeypatch):
-        from quodeq.analysis._config import AnalysisConfig
+    """The single-agent ceilings resolve once per run at the CLI; the
+    per-construction AnalysisConfig default no longer reads the env."""
+
+    def test_ceilings_are_resolved_by_the_cli(self, monkeypatch):
+        from quodeq.config.analysis_env import default_max_duration, default_max_turns
 
         monkeypatch.setenv("QUODEQ_DEFAULT_MAX_TURNS", "42")
-        assert AnalysisConfig().max_turns == 42
-
-    def test_max_duration_reads_env_at_construction(self, monkeypatch):
-        from quodeq.analysis._config import AnalysisConfig
-
         monkeypatch.setenv("QUODEQ_DEFAULT_MAX_DURATION", "77")
-        assert AnalysisConfig().max_duration == 77
+        assert (default_max_turns(), default_max_duration()) == (42, 77)
 
     def test_defaults_without_env(self, monkeypatch):
-        from quodeq.analysis._config import AnalysisConfig
+        from quodeq.config.analysis_env import default_max_duration, default_max_turns
 
         monkeypatch.delenv("QUODEQ_DEFAULT_MAX_TURNS", raising=False)
         monkeypatch.delenv("QUODEQ_DEFAULT_MAX_DURATION", raising=False)
-        cfg = AnalysisConfig()
-        assert (cfg.max_turns, cfg.max_duration) == (200, 1800)
+        assert (default_max_turns(), default_max_duration()) == (200, 1800)
 
     def test_malformed_env_falls_back(self, monkeypatch):
-        from quodeq.analysis._config import AnalysisConfig
+        from quodeq.config.analysis_env import default_max_turns
 
         monkeypatch.setenv("QUODEQ_DEFAULT_MAX_TURNS", "not-a-number")
-        assert AnalysisConfig().max_turns == 200
+        assert default_max_turns() == 200
 
 
 class TestProvidersPath:

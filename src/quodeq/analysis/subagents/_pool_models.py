@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.config.analysis_env import AGENT_FAILURE_STREAK_DEFAULT
+
 AGENT_ID_PREFIX = "agent"
 FUTURE_POLL_INTERVAL_S = 0.5
 HEARTBEAT_JOIN_TIMEOUT_S = 2
@@ -39,6 +41,8 @@ class PoolOptions:
     dimension: str | list[str]
     scout_first: bool = True
     phase: str = "ANALYSIS"
+    # The run's AnalysisOptions.agent_failure_streak_limit.
+    agent_failure_streak_limit: int = AGENT_FAILURE_STREAK_DEFAULT
 
 
 @dataclass

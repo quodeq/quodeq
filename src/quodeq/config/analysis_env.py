@@ -60,18 +60,18 @@ def context_size_override(env: Mapping[str, str] | None = None) -> int | None:
     return int(raw) if raw.isdigit() else None
 
 
-_DEFAULT_MAX_TURNS = 200
-_DEFAULT_MAX_DURATION_S = 1800  # 30 minutes
+DEFAULT_MAX_TURNS_DEFAULT = 200
+DEFAULT_MAX_DURATION_DEFAULT = 1800  # 30 minutes
 
 
 def default_max_turns(env: Mapping[str, str] | None = None) -> int:
-    """Turn ceiling per agent, resolved per construction (not at import)."""
-    return env_int("QUODEQ_DEFAULT_MAX_TURNS", _DEFAULT_MAX_TURNS, env=env)
+    """Turn ceiling per single-agent dimension, resolved once per run by the CLI."""
+    return env_int("QUODEQ_DEFAULT_MAX_TURNS", DEFAULT_MAX_TURNS_DEFAULT, env=env)
 
 
 def default_max_duration(env: Mapping[str, str] | None = None) -> int:
-    """Wall-clock ceiling per agent in seconds (30 min), resolved per construction."""
-    return env_int("QUODEQ_DEFAULT_MAX_DURATION", _DEFAULT_MAX_DURATION_S, env=env)
+    """Wall-clock ceiling per single-agent dimension in seconds (30 min), resolved once per run."""
+    return env_int("QUODEQ_DEFAULT_MAX_DURATION", DEFAULT_MAX_DURATION_DEFAULT, env=env)
 
 
 _REPAIR_DISABLE_TRUTHY = frozenset({"1", "true", "yes", "on"})
@@ -103,6 +103,7 @@ AI_TOOLS_DEFAULT = "Glob,Grep,Read"
 BASE_AI_ARGS_DEFAULT = "--print --output-format stream-json --verbose"
 NON_SCOUT_PROVIDERS_DEFAULT = "codex,gemini"
 AGENT_FAILURE_STREAK_DEFAULT = 5
+FAILURE_STREAK_THRESHOLD_DEFAULT = 5  # consecutive file_done errors that trip the dim breaker
 
 
 def _capped_int(environ: Mapping[str, str], var: str, default: int) -> int:

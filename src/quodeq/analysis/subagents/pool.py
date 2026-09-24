@@ -58,6 +58,7 @@ class SubagentPool:
         )
         self._scout_first, self._jsonl_lock = options.scout_first, threading.Lock()
         self._phase = options.phase
+        self._agent_failure_streak_limit = options.agent_failure_streak_limit
         self._futures: dict[Future[SubagentResult], int] = {}
         self._finished: dict[str, bool] = {}
         self._next_idx = 0
@@ -161,6 +162,7 @@ class SubagentPool:
                 submit_fn=lambda: self._submit_agent(pool),
                 deadline_at=self._base_config.deadline_at,
                 run_deadline_at=self._base_config.run_deadline_at,
+                agent_failure_streak_limit=self._agent_failure_streak_limit,
             )
             if self._scout_first:
                 scout_loop(ctx)

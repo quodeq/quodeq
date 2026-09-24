@@ -142,6 +142,7 @@ def process_consolidated_dimensions(
             n_agents=config.options.max_subagents,
             prompt=prompt,
             dimension=dimensions,
+            agent_failure_streak_limit=config.options.agent_failure_streak_limit,
         ),
         config=base_ac,
     )

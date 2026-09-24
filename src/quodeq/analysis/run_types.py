@@ -16,6 +16,10 @@ from quodeq.analysis._dimensions import DimensionsConfig
 from quodeq.analysis.dispatch_policy import DispatchPolicy, default_dispatch_policy
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis._config import HeartbeatCallback
+from quodeq.config.analysis_env import (
+    AGENT_FAILURE_STREAK_DEFAULT, DEFAULT_MAX_DURATION_DEFAULT, DEFAULT_MAX_TURNS_DEFAULT,
+    FAILURE_STREAK_THRESHOLD_DEFAULT,
+)
 from quodeq.config.paths import default_paths
 
 if TYPE_CHECKING:
@@ -66,9 +70,17 @@ class AnalysisOptions:
     ai_cmd_path: str | None = None
     cache_root: Path | None = None
     # Consecutive `file_done: error` markers that trip the dim-runner's
-    # circuit breaker. 0 disables. The QUODEQ_FAILURE_STREAK env var,
-    # when set, overrides this default at runtime.
-    failure_streak_threshold: int = 5
+    # circuit breaker. 0 disables. The CLI resolves the QUODEQ_FAILURE_STREAK
+    # override into this field once per run.
+    failure_streak_threshold: int = FAILURE_STREAK_THRESHOLD_DEFAULT
+    # Consecutive whole-agent failures before the pool cancels the run
+    # (QUODEQ_AGENT_FAILURE_STREAK, resolved by the CLI). 0 disables.
+    agent_failure_streak_limit: int = AGENT_FAILURE_STREAK_DEFAULT
+    # Single-agent dimension ceilings when ``max_turns``/``max_duration`` are
+    # unset (QUODEQ_DEFAULT_MAX_TURNS/DURATION, resolved by the CLI). Pool
+    # agents never read them.
+    default_max_turns: int = DEFAULT_MAX_TURNS_DEFAULT
+    default_max_duration: int = DEFAULT_MAX_DURATION_DEFAULT
 
 
 @dataclass

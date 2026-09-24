@@ -166,3 +166,90 @@ class TestRunScopedSettings:
         monkeypatch.setenv("QUODEQ_MAX_API_FILE_SIZE", "1000")
         files, _ext, excluded = list_source_files(run_config, "security", prioritize=False)
         assert (files, excluded) == (["small.py"], ["big.py"])
+
+
+class TestAgentFailureStreakReachesThePool:
+    """QUODEQ_AGENT_FAILURE_STREAK: resolved once by the CLI, carried on the
+    pool's options, applied by the dispatch loops."""
+
+    def test_cli_resolves_it_once_per_run(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "2")
+        run_config = _cli_run_config(tmp_path)
+        monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "9")
+        assert run_config.options.agent_failure_streak_limit == 2
+
+    def test_both_launchers_hand_it_to_the_pool(self, tmp_path, monkeypatch):
+        from quodeq.analysis.subagents import runner as subagent_runner
+
+        monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "3")
+        run_config = _cli_run_config(tmp_path)
+        (tmp_path / "a.py").write_text("x = 1\n")
+        run_config.manifest = SimpleNamespace(source_files=["a.py"], language_stats={}, category=None)
+        seen: list[int] = []
+
+        def fake_pool(*, paths, options, config):
+            seen.append(options.agent_failure_streak_limit)
+            return MagicMock(run=MagicMock(side_effect=RuntimeError("stop here")))
+
+        with patch("quodeq.analysis.subagents._pool_launcher.SubagentPool", side_effect=fake_pool), \
+             patch("quodeq.analysis.subagents._consolidated.SubagentPool", side_effect=fake_pool), \
+             patch("quodeq.analysis.subagents._consolidated._build_prompt", return_value="p"), \
+             patch("quodeq.analysis.subagents._pool_launcher.emit_marker"):
+            with pytest.raises(RuntimeError, match="stop here"):
+                subagent_runner.launch_pool(run_config, "security", subagent_runner.LaunchPoolParams(
+                    evidence_dir=tmp_path, queue_path=tmp_path / "q.json", prompt="p", all_files=["a.py"],
+                ))
+            with pytest.raises(RuntimeError, match="stop here"):
+                subagent_runner.process_consolidated_dimensions(
+                    run_config, ["security"], SimpleNamespace(total=1),
+                )
+        assert seen == [3, 3]
+
+    @pytest.mark.parametrize("scout_first", [False, True])
+    def test_the_pool_cancels_after_the_runs_limit(self, tmp_path, scout_first):
+        from quodeq.analysis.errors import REASON_AGENT_FAILURE_STREAK
+        from quodeq.analysis.subagents.file_queue import FileQueue
+        from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+        from quodeq.analysis.subprocess import AnalysisError
+        from quodeq.shared import cancellation
+
+        cancellation.reset()
+        queue_path = tmp_path / "q.json"
+        FileQueue(queue_path, [f"f{i}.py" for i in range(20)])
+        pool = SubagentPool(
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
+            options=PoolOptions(
+                n_agents=1, prompt="p", dimension="security", scout_first=scout_first,
+                agent_failure_streak_limit=2,
+            ),
+            config=AnalysisConfig(ai_cmd="claude"),
+        )
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis",
+                   side_effect=AnalysisError("boom")) as run:
+            try:
+                pool.run()
+                assert cancellation.cancel_reason() == REASON_AGENT_FAILURE_STREAK
+                assert run.call_count == 2  # the default limit would allow 5
+            finally:
+                cancellation.reset()
+
+
+def test_pool_agents_keep_no_turn_ceiling(tmp_path, monkeypatch):
+    """QUODEQ_DEFAULT_MAX_TURNS/DURATION only bound the single-agent path."""
+    from quodeq.analysis.subagents import runner as subagent_runner
+
+    monkeypatch.setenv("QUODEQ_DEFAULT_MAX_TURNS", "42")
+    monkeypatch.setenv("QUODEQ_DEFAULT_MAX_DURATION", "77")
+    run_config = _cli_run_config(tmp_path)
+    seen: list[AnalysisConfig] = []
+
+    def fake_pool(*, paths, options, config):
+        seen.append(config)
+        return MagicMock(run=MagicMock(return_value=[]))
+
+    with patch("quodeq.analysis.subagents._pool_launcher.SubagentPool", side_effect=fake_pool), \
+         patch("quodeq.analysis.subagents._pool_launcher.emit_marker"):
+        subagent_runner.launch_pool(run_config, "security", subagent_runner.LaunchPoolParams(
+            evidence_dir=tmp_path, queue_path=tmp_path / "q.json", prompt="p", all_files=["a.py"],
+        ))
+    assert (seen[0].max_turns, seen[0].max_duration) == (None, None)

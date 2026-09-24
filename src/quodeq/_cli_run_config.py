@@ -16,6 +16,7 @@ does not reach this module.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -24,6 +25,10 @@ from quodeq.analysis.cache.local import default_cache_root
 from quodeq.analysis.dimension_aliases import expand_dimension_aliases
 from quodeq.analysis.dispatch_policy import DispatchPolicy, default_dispatch_policy
 from quodeq.analysis.runner import AnalysisOptions
+from quodeq.config.analysis_env import (
+    FAILURE_STREAK_THRESHOLD_DEFAULT, agent_failure_streak_limit, default_max_duration,
+    default_max_turns, failure_streak_override,
+)
 from quodeq.shared.logging import log_info
 from quodeq.shared.utils import get_ai_cmd_path
 
@@ -55,6 +60,10 @@ class _RunLimits:
     dispatch_policy: DispatchPolicy
     ai_cmd_path: str | None
     cache_root: Path
+    failure_streak_threshold: int
+    agent_failure_streak_limit: int
+    default_max_turns: int
+    default_max_duration: int
 
 
 def resolve_limits(args: argparse.Namespace, env: dict[str, str] | None = None) -> _RunLimits:
@@ -70,7 +79,17 @@ def resolve_limits(args: argparse.Namespace, env: dict[str, str] | None = None) 
         dispatch_policy=default_dispatch_policy(env=environ),
         ai_cmd_path=get_ai_cmd_path(environ),
         cache_root=default_cache_root(environ),
+        failure_streak_threshold=_failure_streak_threshold(environ),
+        agent_failure_streak_limit=agent_failure_streak_limit(environ),
+        default_max_turns=default_max_turns(environ),
+        default_max_duration=default_max_duration(environ),
     )
+
+
+def _failure_streak_threshold(environ: Mapping[str, str]) -> int:
+    """QUODEQ_FAILURE_STREAK when set (negative clamps to 0 downstream), else the default."""
+    override = failure_streak_override(environ)
+    return FAILURE_STREAK_THRESHOLD_DEFAULT if override is None else override
 
 
 def build_analysis_options(
@@ -95,6 +114,10 @@ def build_analysis_options(
         skip_scoring=resolved.skip_scoring,
         ai_cmd_path=limits.ai_cmd_path,
         cache_root=limits.cache_root,
+        failure_streak_threshold=limits.failure_streak_threshold,
+        agent_failure_streak_limit=limits.agent_failure_streak_limit,
+        default_max_turns=limits.default_max_turns,
+        default_max_duration=limits.default_max_duration,
     )
 
 

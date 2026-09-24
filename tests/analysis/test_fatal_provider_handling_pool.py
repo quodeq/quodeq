@@ -56,16 +56,16 @@ class TestAgentFailureStreak:
         check_agent_failure_streak([_result(False)] * 4)
         assert not cancellation.is_cancelled()
 
-    def test_env_override(self, monkeypatch):
-        monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "2")
-        check_agent_failure_streak([_result(False)])
+    def test_run_limit_applies(self, monkeypatch):
+        # The run's limit arrives resolved; an exported value is not re-read.
+        monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "50")
+        check_agent_failure_streak([_result(False)], limit=2)
         assert not cancellation.is_cancelled()
-        check_agent_failure_streak([_result(False)] * 2)
+        check_agent_failure_streak([_result(False)] * 2, limit=2)
         assert cancellation.is_cancelled()
 
-    def test_zero_disables(self, monkeypatch):
-        monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "0")
-        check_agent_failure_streak([_result(False)] * 50)
+    def test_zero_disables(self):
+        check_agent_failure_streak([_result(False)] * 50, limit=0)
         assert not cancellation.is_cancelled()
 
 

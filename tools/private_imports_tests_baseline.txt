@@ -96,7 +96,7 @@ tests/analysis/test_api_runner_router_context.py:10:private-module:quodeq.analys
 tests/analysis/test_api_runner_router_context.py:10:private-module:quodeq.analysis._api_runner.run_api_analysis
 tests/analysis/test_api_runner_router_context.py:10:private-name:quodeq.analysis._api_runner._build_router_context
 tests/analysis/test_api_runner_router_context.py:111:private-module:quodeq.analysis._api_runner.api_runner_module
-tests/analysis/test_api_runner_router_context.py:137:private-module:quodeq.analysis._api_runner.api_runner_module
+tests/analysis/test_api_runner_router_context.py:139:private-module:quodeq.analysis._api_runner.api_runner_module
 tests/analysis/test_api_schema_drop_reasons.py:12:private-module:quodeq.analysis._api_schema.parse_findings
 tests/analysis/test_api_schema_drop_reasons.py:13:private-module:quodeq.analysis._drop_stats.format_reasons
 tests/analysis/test_api_schema_severity_coercion.py:19:private-module:quodeq.analysis._api_schema.parse_findings
@@ -129,8 +129,6 @@ tests/analysis/test_command_coverage.py:6:private-module:quodeq.analysis._comman
 tests/analysis/test_command_coverage.py:6:private-name:quodeq.analysis._command._mcp_server_name
 tests/analysis/test_command_coverage_mcp_args.py:6:private-name:quodeq.analysis._command._build_mcp_server_args
 tests/analysis/test_command_coverage_mcp_args.py:7:private-module:quodeq.analysis._config.AnalysisConfig
-tests/analysis/test_config.py:10:private-module:quodeq.analysis._config.AnalysisConfig
-tests/analysis/test_config.py:17:private-module:quodeq.analysis._config.AnalysisConfig
 tests/analysis/test_consolidated_coverage.py:9:private-name:quodeq.analysis.subagents._consolidated._ConsolidatedPaths
 tests/analysis/test_consolidated_coverage.py:9:private-name:quodeq.analysis.subagents._consolidated._build_consolidated_config
 tests/analysis/test_consolidated_coverage.py:9:private-name:quodeq.analysis.subagents._consolidated._build_prompt
@@ -170,8 +168,8 @@ tests/analysis/test_dry_run_pipeline.py:82:private-module:quodeq.analysis._pipel
 tests/analysis/test_dry_run_wiring.py:103:private-module:quodeq._cli_resolution.ResolvedInputs
 tests/analysis/test_dry_run_wiring.py:36:private-module:quodeq._cli_resolution.ResolvedInputs
 tests/analysis/test_dry_run_wiring.py:69:private-module:quodeq._cli_resolution.ResolvedInputs
-tests/analysis/test_env_injection_sites.py:102:private-module:quodeq.analysis._config.AnalysisConfig
-tests/analysis/test_env_injection_sites.py:103:private-name:quodeq.analysis.subprocess._resolve_provider_config
+tests/analysis/test_env_injection_sites.py:95:private-module:quodeq.analysis._config.AnalysisConfig
+tests/analysis/test_env_injection_sites.py:96:private-name:quodeq.analysis.subprocess._resolve_provider_config
 tests/analysis/test_env_injection_sites.py:14:private-module:quodeq.analysis._api_standards_text.api_prompt_char_budget
 tests/analysis/test_env_injection_sites.py:14:private-module:quodeq.analysis._api_standards_text.standards_char_budget
 tests/analysis/test_env_injection_sites.py:15:private-module:quodeq.analysis._command.build_analysis_env
@@ -182,7 +180,6 @@ tests/analysis/test_env_injection_sites.py:18:private-name:quodeq.analysis.prere
 tests/analysis/test_env_injection_sites.py:18:private-name:quodeq.analysis.prereqs._is_provider_explicitly_configured
 tests/analysis/test_env_injection_sites.py:19:private-module:quodeq.analysis.subagents._pool_launcher.default_subagent_model
 tests/analysis/test_env_injection_sites.py:19:private-name:quodeq.analysis.subagents._pool_launcher._non_scout_providers
-tests/analysis/test_env_injection_sites.py:23:private-name:quodeq.analysis.subagents._pool_scaling._agent_failure_streak_limit
 tests/analysis/test_evidence_collector_exit_reason.py:6:private-module:quodeq.analysis.subagents._evidence_collector.CollectionContext
 tests/analysis/test_evidence_collector_exit_reason.py:6:private-module:quodeq.analysis.subagents._evidence_collector.collect_evidence
 tests/analysis/test_fatal_provider_handling.py:11:private-name:quodeq.analysis._api_call._classify_fatal_api_error
@@ -1180,12 +1177,8 @@ tests/test_env_seams_accessors.py:46:private-name:quodeq.dashboard._build_npm._n
 tests/test_env_seams_accessors.py:55:private-module:quodeq.llm_bridge._llamacpp
 tests/test_env_seams_accessors.py:69:private-name:quodeq.services._job_file_store._default_persist_dir
 tests/test_env_seams_accessors.py:75:private-name:quodeq.shared.provider_env._DEFAULT_PATH
-tests/test_env_seams_t4.py:14:private-module:quodeq.analysis._config.AnalysisConfig
-tests/test_env_seams_t4.py:20:private-module:quodeq.analysis._config.AnalysisConfig
-tests/test_env_seams_t4.py:26:private-module:quodeq.analysis._config.AnalysisConfig
-tests/test_env_seams_t4.py:34:private-module:quodeq.analysis._config.AnalysisConfig
-tests/test_env_seams_t4.py:59:private-name:quodeq.analysis.subagents._pool_launcher._non_scout_providers
-tests/test_env_seams_t4.py:65:private-name:quodeq.analysis.subagents._pool_launcher._non_scout_providers
-tests/test_env_seams_t4.py:73:private-name:quodeq.services.plugin_discovery._PluginCache
-tests/test_env_seams_t4.py:79:private-name:quodeq.services.plugin_discovery._PluginCache
-tests/test_env_seams_t4.py:87:private-name:quodeq.services.plugin_discovery._PluginCache
+tests/test_env_seams_t4.py:56:private-name:quodeq.analysis.subagents._pool_launcher._non_scout_providers
+tests/test_env_seams_t4.py:62:private-name:quodeq.analysis.subagents._pool_launcher._non_scout_providers
+tests/test_env_seams_t4.py:70:private-name:quodeq.services.plugin_discovery._PluginCache
+tests/test_env_seams_t4.py:76:private-name:quodeq.services.plugin_discovery._PluginCache
+tests/test_env_seams_t4.py:84:private-name:quodeq.services.plugin_discovery._PluginCache

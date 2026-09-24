@@ -59,7 +59,6 @@ from quodeq.analysis.subagents.runner import (
     DimensionCallbacks,
     process_dimension_with_subagents,
 )
-from quodeq.config.analysis_env import failure_streak_override
 from quodeq.core.evidence.model import Evidence
 
 _logger = logging.getLogger(__name__)
@@ -148,9 +147,8 @@ def _start_watchers(
 
     breaker = FailureStreakWatcher(
         cctx.jsonl,
-        threshold=resolve_failure_streak_threshold(
-            config.options, override=failure_streak_override(),
-        ),
+        # The CLI already folded QUODEQ_FAILURE_STREAK into the options.
+        threshold=resolve_failure_streak_threshold(config.options),
     )
     breaker.start()
     return stop_event, watcher, breaker
