@@ -109,6 +109,21 @@ class TestParseViolationsFromStream:
         result = parse_violations_from_stream(tmp_path / "missing.stream", ctx)
         assert result is None
 
+    def test_missing_file_logs_a_warning(self, tmp_path, caplog):
+        """A missing stream file must still log the read-failure warning,
+        exactly as it did before ``iter_stream_lines`` existed -- a plain
+        early return (with no log call) would silently drop this signal."""
+        import logging
+        from quodeq.services._violations_stream import parse_violations_from_stream
+        from quodeq.services.violation_context import ViolationContext
+        ctx = ViolationContext(dimension="sec", run_id="r1", project="p1")
+        missing = tmp_path / "missing.stream"
+        with caplog.at_level(logging.WARNING, logger="quodeq.services._violations_stream"):
+            result = parse_violations_from_stream(missing, ctx)
+        assert result is None
+        assert "Failed to read stream file" in caplog.text
+        assert str(missing) in caplog.text
+
     def test_valid_stream_file(self, tmp_path):
         from quodeq.services._violations_stream import parse_violations_from_stream
         from quodeq.services.violation_context import ViolationContext

@@ -117,13 +117,18 @@ def append_jsonl_strict(path: Path, rows: Iterable[dict], *, append: bool = True
             out.write(json.dumps(row) + "\n")
 
 
-def iter_stream_lines(path: Path) -> Iterator[str]:
+def iter_stream_lines(path: Path, *, missing_ok: bool = True) -> Iterator[str]:
     """Yield stripped, non-empty lines from *path*.
 
-    Yields nothing when *path* does not exist. Any other read failure
-    (permissions, a mid-read I/O error) raises ``OSError`` to the caller.
+    ``missing_ok=True`` (the default): yields nothing when *path* does not
+    exist. ``missing_ok=False``: a missing *path* raises ``FileNotFoundError``
+    (an ``OSError``) when the file is opened instead -- for a caller that
+    needs to tell "missing" apart from "empty" (e.g. to log a warning only
+    once, from one ``except OSError``, instead of a separate existence
+    pre-check that would race a concurrent delete). Any other read failure
+    (permissions, a mid-read I/O error) always raises ``OSError``.
     """
-    if not path.exists():
+    if missing_ok and not path.exists():
         return
     with open_text(path) as f:
         for raw_line in f:

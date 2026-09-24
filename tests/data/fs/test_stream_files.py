@@ -44,7 +44,19 @@ class TestIterStreamLines:
     def test_missing_file_yields_nothing(self, tmp_path):
         assert list(iter_stream_lines(tmp_path / "missing.stream")) == []
 
+    def test_missing_file_yields_nothing_with_missing_ok_true_explicit(self, tmp_path):
+        assert list(iter_stream_lines(tmp_path / "missing.stream", missing_ok=True)) == []
+
     def test_yields_stripped_nonempty_lines(self, tmp_path):
         path = tmp_path / "stream.jsonl"
         path.write_text('  {"a": 1}  \n\n{"b": 2}\n')
         assert list(iter_stream_lines(path)) == ['{"a": 1}', '{"b": 2}']
+
+    def test_missing_ok_false_raises_filenotfounderror_on_missing_file(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            list(iter_stream_lines(tmp_path / "missing.stream", missing_ok=False))
+
+    def test_missing_ok_false_still_yields_lines_for_an_existing_file(self, tmp_path):
+        path = tmp_path / "stream.jsonl"
+        path.write_text('{"a": 1}\n')
+        assert list(iter_stream_lines(path, missing_ok=False)) == ['{"a": 1}']

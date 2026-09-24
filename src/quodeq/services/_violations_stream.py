@@ -87,11 +87,9 @@ def _parse_stream_line(stripped: str, acc: _StreamAccumulator) -> None:
 
 def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> ViolationResponse | None:
     """Extract violations from a live-stream event log file."""
-    if not stream_path.exists():
-        return None
     acc = _StreamAccumulator(dimension=ctx.dimension)
     try:
-        for stripped in iter_stream_lines(stream_path):
+        for stripped in iter_stream_lines(stream_path, missing_ok=False):
             _parse_stream_line(stripped, acc)
     except OSError as exc:
         _logger.warning("Failed to read stream file: %s", exc)
