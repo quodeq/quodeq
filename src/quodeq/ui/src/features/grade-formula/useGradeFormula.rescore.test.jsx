@@ -151,7 +151,38 @@ describe('useGradeFormula background rescore', () => {
     await mountAndApply();
     await tick(3);
     expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it('does not let a stale in-flight poll from the first apply settle the second', async () => {
+    // The first apply's poll is left pending (not yet resolved) so it is
+    // still in flight when the second apply lands with a newer generation.
+    let resolveStalePoll;
+    const stalePoll = new Promise((resolve) => { resolveStalePoll = resolve; });
+    getGradeFormula.mockImplementationOnce(() => stalePoll);
+    saveGradeFormula
+      .mockResolvedValueOnce(payload(SAVED, rescore({ generation: 1 })))
+      .mockResolvedValueOnce(payload(SAVED, rescore({ generation: 2, done: 1 })));
+
+    const hook = await mountAndApply(); // 202 for generation 1; starts the poll, which stays pending on `stalePoll`
+    await tick();
+
+    await act(async () => { await hook.result.current.apply(); }); // 202 for generation 2
+    // The stale generation-1 payload lands after the second apply already
+    // moved the target to 2. If the poll for generation 1 was not cancelled,
+    // this would be adopted and isRescoreSettled would read
+    // `generation(1) < target(2)` as a server restart and settle at once.
+    await act(async () => { resolveStalePoll(payload(SAVED, rescore({ generation: 1, appliedGeneration: 1, done: 3 }))); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(hook.result.current.rescoreProgress).not.toBeNull();
+
+    getGradeFormula.mockResolvedValue(payload(SAVED, rescore({ generation: 2, appliedGeneration: 2, state: 'idle', done: 3 })));
+    await tick(2);
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.all() });
   });
 
   it('resumes polling on mount when a pass is already running', async () => {

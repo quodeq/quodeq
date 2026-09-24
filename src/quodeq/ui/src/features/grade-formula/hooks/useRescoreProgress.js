@@ -59,6 +59,14 @@ export function useRescoreProgress(onSettled, resumeFrom) {
   });
 
   const track = useCallback((payload) => {
+    // Fire-and-forget by design (see useRunEventStream.js): a poll GET
+    // already in flight for the PREVIOUS target must not land after this
+    // setQueryData and overwrite it with a stale generation -- isRescoreSettled
+    // would then read `generation < target` as a server restart and settle
+    // at once. Still log a rejection instead of letting it vanish silently.
+    queryClient.cancelQueries({ queryKey: gradeFormulaKeys.rescore() }).catch((err) => {
+      console.warn('[useRescoreProgress] cancelQueries failed:', err);
+    });
     queryClient.setQueryData(gradeFormulaKeys.rescore(), payload);
     setTarget(payload.rescore.generation);
   }, [queryClient]);
