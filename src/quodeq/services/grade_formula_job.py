@@ -17,6 +17,12 @@ swallows failures at debug level, and a failed pass must be visible (state
 the injected ``LogSink``, with the traceback in the message because the sink
 has no ``exc_info``. The worker starts on the first ``request()``, so
 building one (every ``create_app``, every test app) costs no thread.
+
+The owed pass is durable: ``request()`` writes a marker file beside the
+params file and only a completed pass with nothing pending removes it (an
+abort or an error keeps it). ``resume_pending()`` at app start requests a
+pass when the marker is there, so quitting mid-pass does not leave runs on
+the old formula for good.
 """
 from __future__ import annotations
 
@@ -97,13 +103,24 @@ class GradeFormulaRescorer:
     def request(self, reports_root: Path) -> RescoreSnapshot:
         """Ask for a pass over *reports_root* with the params saved now; returns at once."""
         with self._cond:
+            self._write_marker_locked(grade_formula.mark_rescore_pending, "record")
             self._reports_root = reports_root
             self._generation += 1
             self._pending = True
+            if self._state is not RescoreState.RUNNING:
+                # A fresh pass: do not report the last pass's done/total.
+                self._done = self._total = 0
             self._state = RescoreState.RUNNING
             self._ensure_worker_locked()
             self._cond.notify_all()
             return self._snapshot_locked()
+
+    def resume_pending(self, reports_root: Path) -> RescoreSnapshot | None:
+        """Request a pass when an earlier process left one owed; None (and no thread) otherwise."""
+        if not grade_formula.rescore_pending():
+            return None
+        self._log.info("Resuming a grade-formula rescore pass left unfinished by the last run")
+        return self.request(reports_root)
 
     def snapshot(self) -> RescoreSnapshot:
         """Current state, for GET /api/grade-formula."""
@@ -137,8 +154,26 @@ class GradeFormulaRescorer:
     def _ensure_worker_locked(self) -> None:
         if self._stopping or (self._thread is not None and self._thread.is_alive()):
             return
-        self._thread = threading.Thread(target=self._worker, name=WORKER_THREAD_NAME, daemon=True)
-        self._thread.start()
+        thread = threading.Thread(target=self._worker, name=WORKER_THREAD_NAME, daemon=True)
+        try:
+            thread.start()
+        except RuntimeError as exc:
+            # The OS refused the thread. Nothing will run the pass, so say
+            # so instead of reporting running forever; the marker stays, so
+            # the next request or app start tries again.
+            self._thread = None
+            self._pending = False
+            self._state = RescoreState.ERROR
+            self._log.warning(f"Grade-formula rescore worker failed to start: {exc}")
+            return
+        self._thread = thread
+
+    def _write_marker_locked(self, write: Callable[[], None], action: str) -> None:
+        try:
+            write()
+        except OSError as exc:
+            # The pass itself still runs; only resume-after-quit is lost.
+            self._log.warning(f"Could not {action} the grade-formula rescore marker: {exc}")
 
     def _worker(self) -> None:
         while True:
@@ -181,6 +216,8 @@ class GradeFormulaRescorer:
             if generation is not None:
                 self._applied_generation = generation
                 self._failed = failed
+                if not self._pending:
+                    self._write_marker_locked(grade_formula.clear_rescore_pending, "clear")
             # A request that arrived during this pass is already pending: the
             # job is still running from the client's point of view.
             self._state = RescoreState.RUNNING if self._pending else outcome

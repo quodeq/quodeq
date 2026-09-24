@@ -15,9 +15,13 @@ from pathlib import Path
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.fs.grade_formula_store import (  # noqa: F401 — re-exported API
+    clear_rescore_pending,
     grade_formula_path,
     is_custom,
     load_params,
+    mark_rescore_pending,
+    rescore_marker_path,
+    rescore_pending,
     reset_params,
     save_params,
 )

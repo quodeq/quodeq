@@ -106,10 +106,15 @@ def _configure_extensions(app: Flask) -> None:
     app.extensions["background"] = ThreadBackgroundRunner(log=SHARED_LOG)
 
     # One background grade-formula rescorer per app. It starts its worker
-    # thread on the first PUT/DELETE, so create_app stays thread-free for
-    # tests and embedding.
+    # thread on the first PUT/DELETE, or here when the last process quit
+    # mid-pass and left the pending marker. With no marker create_app stays
+    # thread-free for tests and embedding.
+    from pathlib import Path
+    from quodeq.api.routes_common import reports_dir
     from quodeq.services.grade_formula_job import GradeFormulaRescorer
-    app.extensions["grade_formula_rescore"] = GradeFormulaRescorer(log=SHARED_LOG)
+    rescorer = GradeFormulaRescorer(log=SHARED_LOG)
+    app.extensions["grade_formula_rescore"] = rescorer
+    rescorer.resume_pending(Path(reports_dir()))
 
     from quodeq.api.standards_read_routes import CweCache
     app.extensions["cwe_cache"] = CweCache()

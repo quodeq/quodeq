@@ -5,89 +5,18 @@ import dataclasses
 import threading
 from pathlib import Path
 
-import pytest
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.services import grade_formula
 from quodeq.services.grade_formula_job import (
     WORKER_THREAD_NAME,
-    GradeFormulaRescorer,
     RescoreState,
 )
 from tests._timeouts import budget
 from tests.services._grade_formula_fixtures import formula_path  # noqa: F401 -- pytest fixture
+from tests.services._rescorer_fixtures import GatedApply, RecordingSink, make_rescorer  # noqa: F401 -- make_rescorer is a fixture
 
 _ROOT = Path("reports-root")
-
-
-class _Sink:
-    """LogSink that records warnings and infos."""
-
-    def __init__(self):
-        self.warnings: list[str] = []
-        self.infos: list[str] = []
-
-    def warning(self, message):
-        self.warnings.append(message)
-
-    def info(self, message):
-        self.infos.append(message)
-
-    def debug(self, message):
-        pass
-
-    def error(self, message):
-        pass
-
-    def success(self, message):
-        pass
-
-
-class _GatedApply:
-    """Fake apply_to_all_runs. Pass N blocks until released when N is gated."""
-
-    def __init__(self, gated_passes=(), failed=()):
-        self.params_seen: list[float] = []
-        self.roots: list[Path] = []
-        self.started = {n: threading.Event() for n in gated_passes}
-        self.release = {n: threading.Event() for n in gated_passes}
-        self.failed = list(failed)
-        self.threads: list[threading.Thread] = []
-
-    def __call__(self, root, *, progress, should_abort):
-        n = len(self.params_seen)
-        self.params_seen.append(grade_formula.load_params().base_k)
-        self.roots.append(root)
-        self.threads.append(threading.current_thread())
-        progress(0, 2)
-        if n in self.started:
-            self.started[n].set()
-            self.release[n].wait(budget(5))
-        if should_abort():
-            return grade_formula.ApplyResult(rescored=0, failed=[], aborted=True)
-        progress(2, 2)
-        return grade_formula.ApplyResult(rescored=2, failed=list(self.failed))
-
-    def release_all(self):
-        for event in self.release.values():
-            event.set()
-
-
-@pytest.fixture
-def make_rescorer():
-    """Build rescorers; teardown releases every gate and stops every worker."""
-    made: list[tuple[GradeFormulaRescorer, object]] = []
-
-    def _make(apply_fn, log=None):
-        rescorer = GradeFormulaRescorer(apply_fn, log=log or _Sink())
-        made.append((rescorer, apply_fn))
-        return rescorer
-
-    yield _make
-    for rescorer, apply_fn in made:
-        if isinstance(apply_fn, _GatedApply):
-            apply_fn.release_all()
-        rescorer.stop()
 
 
 def _save(base_k: float) -> None:
@@ -101,7 +30,7 @@ def _new_workers(before: set[threading.Thread]) -> list[threading.Thread]:
 
 def test_no_worker_thread_until_the_first_request(make_rescorer):
     before = set(threading.enumerate())
-    rescorer = make_rescorer(_GatedApply())
+    rescorer = make_rescorer(GatedApply())
 
     assert rescorer.snapshot().to_payload() == {
         "state": "idle", "generation": 0, "appliedGeneration": 0,
@@ -111,7 +40,7 @@ def test_no_worker_thread_until_the_first_request(make_rescorer):
 
 
 def test_request_mid_pass_restarts_with_the_latest_params(make_rescorer, formula_path):
-    apply = _GatedApply(gated_passes=(0,))
+    apply = GatedApply(gated_passes=(0,))
     rescorer = make_rescorer(apply)
     before = set(threading.enumerate())
     _save(0.2)
@@ -131,7 +60,7 @@ def test_request_mid_pass_restarts_with_the_latest_params(make_rescorer, formula
 
 
 def test_many_requests_mid_pass_collapse_into_one_restart(make_rescorer, formula_path):
-    apply = _GatedApply(gated_passes=(0,))
+    apply = GatedApply(gated_passes=(0,))
     rescorer = make_rescorer(apply)
     rescorer.request(_ROOT)
     assert apply.started[0].wait(budget(5))
@@ -181,7 +110,7 @@ def test_a_pass_that_raises_sets_error_and_the_next_request_recovers(make_rescor
             raise RuntimeError("reports dir vanished")
         return grade_formula.ApplyResult(rescored=1, failed=[])
 
-    sink = _Sink()
+    sink = RecordingSink()
     rescorer = make_rescorer(flaky, log=sink)
     rescorer.request(_ROOT)
     assert rescorer.wait_idle(budget(5))
@@ -196,7 +125,7 @@ def test_a_pass_that_raises_sets_error_and_the_next_request_recovers(make_rescor
 
 
 def test_per_run_failures_land_in_failed(make_rescorer, formula_path):
-    rescorer = make_rescorer(_GatedApply(failed=["run-bad"]))
+    rescorer = make_rescorer(GatedApply(failed=["run-bad"]))
     rescorer.request(_ROOT)
 
     assert rescorer.wait_idle(budget(5))
@@ -206,7 +135,7 @@ def test_per_run_failures_land_in_failed(make_rescorer, formula_path):
 
 
 def test_request_passes_the_reports_root_through(make_rescorer, formula_path):
-    apply = _GatedApply()
+    apply = GatedApply()
     rescorer = make_rescorer(apply)
     rescorer.request(Path("somewhere"))
 
@@ -215,7 +144,7 @@ def test_request_passes_the_reports_root_through(make_rescorer, formula_path):
 
 
 def test_stop_joins_the_worker(make_rescorer, formula_path):
-    apply = _GatedApply()
+    apply = GatedApply()
     rescorer = make_rescorer(apply)
     rescorer.request(_ROOT)
     assert rescorer.wait_idle(budget(5))

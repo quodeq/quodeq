@@ -49,3 +49,25 @@ def test_put_through_create_app_runs_on_the_app_rescorer(app, monkeypatch):
     assert resp.status_code == 202
     assert rescorer.wait_idle(budget(5))
     assert rescorer.snapshot().applied_generation == 1
+
+
+def test_create_app_resumes_a_pass_left_pending_by_the_last_process(monkeypatch):
+    roots = []
+
+    def apply(root, *, progress, should_abort):
+        roots.append(root)
+        return grade_formula.ApplyResult(rescored=0, failed=[])
+
+    monkeypatch.setattr(grade_formula, "apply_to_all_runs", apply)
+    grade_formula.mark_rescore_pending()
+    application = create_app(StubProvider())
+    rescorer = application.extensions["grade_formula_rescore"]
+    try:
+        assert rescorer.wait_idle(budget(5))
+        snap = rescorer.snapshot()
+    finally:
+        rescorer.stop()
+
+    assert (snap.generation, snap.applied_generation) == (1, 1)
+    assert len(roots) == 1
+    assert not grade_formula.rescore_pending()
