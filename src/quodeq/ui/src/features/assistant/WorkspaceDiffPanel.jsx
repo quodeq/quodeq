@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { t } from '../../strings/index.js';
 import { confirmDialog } from '../../utils/confirmDialog.js';
 import { useWorkspaceDiff, WORKSPACE_OUTCOME } from './hooks/useWorkspaceDiff.js';
+import { DIALOG_VARIANT } from '../../vocab/dialogVariant.js';
 
 export function classifyDiffLine(line) {
   if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git')) return 'wsdiff-file';
@@ -117,7 +118,7 @@ function WorkspaceDiffActions({ diff, empty, busy, prOpen, setPrOpen, prTitle, s
             const ok = await confirmDialog({
               title: t('assistant.discardConfirmTitle'),
               message: t('assistant.discardConfirmMessage'),
-              variant: 'danger',
+              variant: DIALOG_VARIANT.DANGER,
             });
             if (!ok) return;
             discard();

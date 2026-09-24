@@ -1,3 +1,8 @@
+// A dimension heat-grid row's own kind: the dimension summary row, or one of
+// its principle rows indented under it. Here (not in dimensionHeatGridModel.js)
+// so routes/violationsRoute.jsx can branch on it without the lazy chunk.
+export const ROW_TYPE = Object.freeze({ DIMENSION: 'dimension', PRINCIPLE: 'principle' });
+
 // The Violations page's own sub-tab route param: which view of the
 // violations list is showing. Not a NAV_TAB member (a page-local concept,
 // not a nav-stack page). Lives here, not on ViolationsPage.jsx, since that

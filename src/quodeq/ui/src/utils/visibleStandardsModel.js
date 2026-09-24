@@ -3,6 +3,10 @@
  * Zero imports so it is node-testable without a DOM.
  */
 
+// decideHydration's decision.kind: push the local cache to the server, or
+// adopt the server's ids. visibleStandards.js branches on it.
+export const HYDRATION_KIND = Object.freeze({ MIGRATE: 'migrate', ADOPT: 'adopt' });
+
 /**
  * Whether two id lists hold the same ids, order and duplicates ignored.
  * Anything that is not a pair of arrays counts as different.
@@ -49,8 +53,8 @@ export function decideHydration({ serverIds, isDefault, serverDefaults, cachedId
   if (isDefault && !alreadyMigrated && Array.isArray(cachedIds)) {
     const isoDefaults = Array.isArray(serverDefaults) ? serverDefaults : fallbackDefaults;
     if (!sameIdSet(cachedIds, isoDefaults)) {
-      return { kind: 'migrate', ids: cachedIds };
+      return { kind: HYDRATION_KIND.MIGRATE, ids: cachedIds };
     }
   }
-  return { kind: 'adopt', ids: serverIds, markMigrated: !isDefault };
+  return { kind: HYDRATION_KIND.ADOPT, ids: serverIds, markMigrated: !isDefault };
 }

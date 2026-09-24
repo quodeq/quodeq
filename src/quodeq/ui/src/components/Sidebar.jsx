@@ -15,6 +15,7 @@ import {
   LOGO_NEEDLE_DARK_D,
   LogoNeedleMask,
 } from './brandLogoArt.jsx';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 // Unique per component: the onboarding carousel draws the same mark with its
 // own mask, and two elements sharing a DOM id would collide when both are
@@ -116,16 +117,16 @@ function ProjectTabsNav({ showProjectTabs, showCompareTab, activeTab, handleNav,
   return (
     <nav className="sidebar-nav sidebar-block">
       {showProjectTabs && (
-        <NavButton id="overview" label="overview" icon={ICON_OVERVIEW} activeTab={activeTab} onNavTab={handleNav} />
+        <NavButton id={NAV_TAB.OVERVIEW} label="overview" icon={ICON_OVERVIEW} activeTab={activeTab} onNavTab={handleNav} />
       )}
       {showCompareTab && (
-        <NavButton id="compare" label="compare" icon={ICON_COMPARE} activeTab={activeTab} onNavTab={handleNav} />
+        <NavButton id={NAV_TAB.COMPARE} label="compare" icon={ICON_COMPARE} activeTab={activeTab} onNavTab={handleNav} />
       )}
       {showProjectTabs && (
         <>
-          <NavButton id="violations" label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
-          <NavButton id="map"        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
-          <NavButton id="history"    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
+          <NavButton id={NAV_TAB.VIOLATIONS} label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
+          <NavButton id={NAV_TAB.MAP}        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
+          <NavButton id={NAV_TAB.HISTORY}    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
         </>
       )}
     </nav>
@@ -144,9 +145,9 @@ function SidebarFooter({ lastEvalStr, activeTab, handleNav, standardsCount }) {
         )}
       </div>
       <div className="sidebar-nav sidebar-block sidebar-block--flush">
-        <NavButton id="settings" label="settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={handleNav} />
-        <NavButton id="standards" label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
-        <NavButton id="help" label="help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
+        <NavButton id={NAV_TAB.SETTINGS} label="settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={handleNav} />
+        <NavButton id={NAV_TAB.STANDARDS} label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
+        <NavButton id={NAV_TAB.HELP} label="help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
       </div>
     </div>
   );
@@ -169,7 +170,7 @@ function EvaluateNav({ selectedSource, activeTab, handleNav }) {
   if (!isEvaluatableSource(selectedSource)) return null;
   return (
     <nav className="sidebar-nav sidebar-block">
-      <NavButton id="evaluate" label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
+      <NavButton id={NAV_TAB.EVALUATE} label="evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={handleNav} />
     </nav>
   );
 }
@@ -182,7 +183,7 @@ function repoNameOf(projectInfo) {
 function ProjectsNav({ repoName, activeTab, handleNav }) {
   return (
     <nav className="sidebar-nav sidebar-block">
-      <NavButton id="projects" label={repoName || 'project'} icon={ICON_FOLDER} activeTab={activeTab} onNavTab={handleNav} />
+      <NavButton id={NAV_TAB.PROJECTS} label={repoName || 'project'} icon={ICON_FOLDER} activeTab={activeTab} onNavTab={handleNav} />
     </nav>
   );
 }

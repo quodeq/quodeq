@@ -1,3 +1,5 @@
+import { KEY } from '../../vocab/keyboard.js';
+
 /**
  * TermInput — terminal-style text input prefixed with a shell prompt
  * (e.g. `$ grep -r [input...]`).
@@ -13,8 +15,6 @@
  * @param {string}  [props.name]
  * @param {string}  [props.ariaLabel]
  */
-import { KEY } from '../../vocab/keyboard.js';
-
 export default function TermInput({
   prompt = '$',
   command,

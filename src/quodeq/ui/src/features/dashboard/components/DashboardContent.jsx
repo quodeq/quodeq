@@ -5,6 +5,7 @@ import EmptyState from '../../../components/EmptyState.jsx';
 import { t } from '../../../strings/index.js';
 import { RUN_STATE } from '../../../vocab/runState.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }) {
   const hasRunning = availableRuns.some((r) => r?.status === RUN_STATE.RUNNING);
@@ -17,7 +18,7 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
         title={t('overview.firstEvalTitle')}
         description={t('overview.firstEvalDesc')}
         actionLabel={t('overview.openHistory')}
-        onAction={() => onNavigate?.('history')}
+        onAction={() => onNavigate?.(NAV_TAB.HISTORY)}
       />
     );
   }
@@ -39,7 +40,7 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
       title={t('overview.noCompletedEvalTitle')}
       description={t('overview.noCompletedEvalDesc')}
       actionLabel={t('overview.startEvaluation')}
-      onAction={() => onNavigate?.('evaluate')}
+      onAction={() => onNavigate?.(NAV_TAB.EVALUATE)}
     />
   );
 }

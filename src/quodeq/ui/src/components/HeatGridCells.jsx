@@ -3,9 +3,6 @@ import { t } from '../strings/index.js';
 import { activateOnKey } from '../utils/a11y.js';
 import { SEVERITY_ORDER } from '../vocab/severity.js';
 import { SORT_DIR } from '../vocab/sortDirection.js';
-import { COL_NAME, COL_VIOLATIONS, COL_HEALTH, COL_ALIGN_LEFT } from './heatGridColumns.js';
-
-export { COL_NAME, COL_VIOLATIONS, COL_HEALTH, COL_ALIGN_LEFT };
 
 // The catalog has no pluralisation, so a count of one takes its own key. An
 // unnamed row gets its fallback from the catalog too, not a bare literal.

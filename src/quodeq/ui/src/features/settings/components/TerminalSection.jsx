@@ -5,6 +5,7 @@ import { t } from '../../../strings/index.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { SettingsPillTabs } from './settingsRowParts.jsx';
 import { TERMINAL_RESTART_EVENT } from '../../../constants.js';
+import { DIALOG_VARIANT } from '../../../vocab/dialogVariant.js';
 
 export default function TerminalSection() {
   const { enabled, setEnabled } = useTerminalSettings();
@@ -18,7 +19,7 @@ export default function TerminalSection() {
     const ok = await confirmDialog({
       title: t('settings.restartTerminalConfirmTitle'),
       message: t('settings.restartTerminalConfirmMessage'),
-      variant: 'danger',
+      variant: DIALOG_VARIANT.DANGER,
     });
     if (!ok) return;
     killTerminal()

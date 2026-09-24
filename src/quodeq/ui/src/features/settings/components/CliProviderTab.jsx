@@ -6,6 +6,7 @@ import { t } from '../../../strings/index.js';
 import { CopilotModelStatus } from './CopilotModelSelect.jsx';
 import { PROVIDER } from '../../../vocab/provider.js';
 import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
+import { PROVIDER_SETTING_KEY } from '../../../constants.js';
 
 export default function CliProviderTab({ providerId, state, update }) {
   const {
@@ -23,7 +24,7 @@ export default function CliProviderTab({ providerId, state, update }) {
           description={t('settings.pickModelYouWant')}
         />
         <div className="settings-model-field">
-          <CliModelInput providerId={providerId} value={state.model} onChange={(v) => update('model', v)} required />
+          <CliModelInput providerId={providerId} value={state.model} onChange={(v) => update(PROVIDER_SETTING_KEY.MODEL, v)} required />
           {!state.model && <span className="settings-model-hint">{t('settings.pickModelToStart')}</span>}
         </div>
       </div>

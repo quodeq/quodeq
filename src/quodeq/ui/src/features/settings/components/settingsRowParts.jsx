@@ -6,7 +6,7 @@
  * per tab before this extraction; the controls stay with their tabs because
  * that is where they actually differ.
  */
-import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
+import { MIN_SUBAGENTS, MAX_SUBAGENTS, PROVIDER_SETTING_KEY } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { SUBAGENTS_HINT_REMOTE } from './ProviderSettings.jsx';
 import { t } from '../../../strings/index.js';
@@ -48,8 +48,8 @@ export function RemoteSubagentsRow({ state, update, clampSubagents }) {
         min={MIN_SUBAGENTS}
         max={MAX_SUBAGENTS}
         value={state.subagents ?? ''}
-        onChange={(e) => update('subagents', e.target.value)}
-        onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }}
+        onChange={(e) => update(PROVIDER_SETTING_KEY.SUBAGENTS, e.target.value)}
+        onBlur={(e) => { if (e.target.value !== '') update(PROVIDER_SETTING_KEY.SUBAGENTS, clampSubagents(e.target.value)); }}
         aria-label={t('settings.maxParallelAgents')}
       />
     </div>

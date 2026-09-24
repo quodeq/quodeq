@@ -4,6 +4,7 @@ import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import { formatRunId } from '../../../utils/formatters.js';
 import { GRANULARITY } from '../../../utils/granularity.js';
+import { LATEST_RUN_ID } from '../../../constants.js';
 
 // Sparkline history length for the per-dimension period series (matches the
 // old DimensionScorePanel SPARKLINE_LIMIT).
@@ -59,7 +60,7 @@ function useOverviewRunSelection({ trend, periodTrend, dayRuns, overviewRunIndex
     return periodTrend[0]?.runId || null;
   }, [selectedRunId, trend, periodTrend, granularity]);
 
-  const currentOverviewRun = effectiveSelectedId || dayRuns[overviewRunIndex]?.runId || 'latest';
+  const currentOverviewRun = effectiveSelectedId || dayRuns[overviewRunIndex]?.runId || LATEST_RUN_ID;
   const selectedDayDimNames = useMemo(
     () => collectPeriodDimensions(trend, currentOverviewRun, granularity) || collectPeriodDimensions(trend, selectedRunId, granularity),
     [trend, currentOverviewRun, selectedRunId, granularity]

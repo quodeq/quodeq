@@ -1,4 +1,5 @@
 import { STORAGE_KEY as POWER_KEY } from '../features/evaluation/components/powerLevels.js';
+import { PROVIDER_SETTING_KEY } from '../constants.js';
 
 const TIER_NAMES = ['fast', 'balanced', 'thorough'];
 const DEFAULT_ANALYSIS_POWER = 2;
@@ -46,9 +47,9 @@ export function writeAnalysisPower(storage, level) {
  * Falls back to the orchestrator model if no analysis-specific model is set.
  */
 export function resolveSubagentModel({ get, analysisPower }) {
-  const analysisModel = get('model-analysis');
+  const analysisModel = get(PROVIDER_SETTING_KEY.MODEL_ANALYSIS);
   if (analysisModel) return analysisModel;
-  return get(`model-${TIER_NAMES[analysisPower - 1]}`) || get('model') || undefined;
+  return get(`model-${TIER_NAMES[analysisPower - 1]}`) || get(PROVIDER_SETTING_KEY.MODEL) || undefined;
 }
 
 export { DEFAULT_ANALYSIS_POWER };

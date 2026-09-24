@@ -12,6 +12,7 @@ import { TimeLimitSetting } from './ProviderSettings.jsx';
 import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
 import { SERVER_STATUS } from '../settingsVocab.js';
 import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
+import { PROVIDER_SETTING_KEY } from '../../../constants.js';
 
 /**
  * @param {object} props
@@ -88,7 +89,7 @@ export function LocalApiModelSelectRow({ hint, Control, state, update, models })
     <LocalApiModelRow
       hint={hint}
       renderControl={(labelId) => (
-        <Control value={state.model} models={models} onChange={(v) => update('model', v)} labelId={labelId} />
+        <Control value={state.model} models={models} onChange={(v) => update(PROVIDER_SETTING_KEY.MODEL, v)} labelId={labelId} />
       )}
     />
   );

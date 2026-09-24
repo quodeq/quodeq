@@ -75,6 +75,11 @@ function useRotatingTip(enabled) {
   return { tipKey: started ? order[idx] : null, fading };
 }
 
+// Non-default `variant` values (the default is 'fullscreen' -- see the
+// LoadingScreen doc below).
+const VARIANT_INLINE = 'inline';
+const VARIANT_SHELL = 'shell';
+
 /**
  * @param {{ message?: string, variant?: 'fullscreen'|'shell'|'inline', tips?: boolean }} props
  *
@@ -95,11 +100,6 @@ function useRotatingTip(enabled) {
  * `tips` rotates a help tip under the logo once a wait drags past a few
  * seconds.
  */
-// Non-default `variant` values (the default is 'fullscreen' -- see the
-// class-name doc above).
-const VARIANT_INLINE = 'inline';
-const VARIANT_SHELL = 'shell';
-
 export default function LoadingScreen({ message, variant = 'fullscreen', tips = false, leaving = false }) {
   const { tipKey, fading } = useRotatingTip(tips);
   const classes = ['loading-screen'];

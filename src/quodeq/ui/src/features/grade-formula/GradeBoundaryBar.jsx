@@ -44,11 +44,11 @@ function makeStartDrag({ barRef, ascRef, thresholds, onChange }) {
     const stop = () => {
       window.removeEventListener(POINTER_EVENT.MOVE, move);
       window.removeEventListener(POINTER_EVENT.UP, stop);
-      window.removeEventListener('pointercancel', stop);
+      window.removeEventListener(POINTER_EVENT.CANCEL, stop);
     };
     window.addEventListener(POINTER_EVENT.MOVE, move);
     window.addEventListener(POINTER_EVENT.UP, stop);
-    window.addEventListener('pointercancel', stop);
+    window.addEventListener(POINTER_EVENT.CANCEL, stop);
   };
 }
 

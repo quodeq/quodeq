@@ -6,13 +6,10 @@
 import { SEVERITY } from '../../../vocab/severity.js';
 import { SORT_DIR } from '../../../vocab/sortDirection.js';
 import { COL_NAME, COL_VIOLATIONS, COL_HEALTH } from '../../../components/heatGridColumns.js';
+import { ROW_TYPE } from '../violationsVocab.js';
 
 export const DEFAULT_SEVERITY = SEVERITY.MINOR;
 const UNKNOWN_PRINCIPLE = '(unknown)'; // findings that name no principle share one synthetic row
-
-// A flattened row's own kind: the dimension summary row, or one of its
-// principle rows indented under it.
-export const ROW_TYPE = Object.freeze({ DIMENSION: 'dimension', PRINCIPLE: 'principle' });
 
 export function getSortValue(row, col) {
   switch (col) {

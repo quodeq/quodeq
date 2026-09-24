@@ -18,6 +18,8 @@ export const NAV_TAB = Object.freeze({
   RUN: 'run',
   EXPLORER: 'explorer',
   EVAL_PRINCIPLE: 'evalprinciple',
+  FILE: 'file',
+  GRADE_FORMULA: 'grade-formula',
   // Legacy id predating the EVAL_PRINCIPLE rename, still reachable via saved
   // links/history.
   EVAL_PRINCIPLE_DETAIL: 'eval-principle-detail',

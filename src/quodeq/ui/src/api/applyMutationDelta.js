@@ -69,8 +69,8 @@ function patchDimScore(dim, scoreByDim) {
 // rest (restore/delete and their -all bulk forms) can't cheaply/correctly
 // reconstruct the violation-list change, so they invalidate the run-detail
 // violation source and let it refetch on next view.
-const KNOWN_KINDS = new Set(["dismiss", "restore", "delete", "restore_all", "delete_all"]);
-const MUTATION_KIND_DISMISS = "dismiss"; // only "dismiss" splices the cached violation list locally (see KNOWN_KINDS above)
+const MUTATION_KIND_DISMISS = "dismiss"; // the one kind that splices the cached violation list locally
+const KNOWN_KINDS = new Set([MUTATION_KIND_DISMISS, "restore", "delete", "restore_all", "delete_all"]);
 
 // Patch dim score/grade in place, preserving referential identity for
 // untouched dims. ``spliceDismissed`` additionally removes the dismissed

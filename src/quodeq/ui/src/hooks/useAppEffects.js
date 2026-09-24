@@ -106,7 +106,7 @@ export function useInitialLandingEffect({ state, sharedSignal, activeTab, navTab
       sharedHasContent: sharedSignal.hasContent,
       activeTab,
     })) {
-      navTab('projects');
+      navTab(NAV_TAB.PROJECTS);
     }
   }, [state.projectsLoaded, state.projects.length, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent, activeTab, navTab]);
 }

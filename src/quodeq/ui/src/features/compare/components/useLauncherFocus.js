@@ -4,7 +4,7 @@ import { KEY } from '../../../vocab/keyboard.js';
 
 // Focus mechanics for the duel and dimension launcher popovers, the other
 // half of useLauncherDismiss (which owns Escape and outside pointer/scroll).
-const ARROW_STEP = { ArrowDown: 1, ArrowUp: -1 };
+const ARROW_STEP = { [KEY.ARROW_DOWN]: 1, [KEY.ARROW_UP]: -1 };
 const MENUITEM_SELECTOR = '[role="menuitem"]';
 
 /** Where focus lands on open: the first option, else anything focusable. */

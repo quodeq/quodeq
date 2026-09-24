@@ -27,7 +27,7 @@ export function providerKey(providerId, setting) {
   return `cc-${providerId}-${setting}`;
 }
 
-// Written under providerKey(id, 'api-key') instead of the raw credential once
+// Written under providerKey(id, PROVIDER_SETTING_KEY.API_KEY) instead of the raw credential once
 // the backend confirms it stored one, so "configured" survives a reload
 // without the key itself ever going back into localStorage. Lives here, next
 // to providerKey, because both the settings hook that writes it and the
@@ -42,9 +42,23 @@ export const PROVIDER_CONFIGURED_MARKER = '•configured•';
 // providerKey() setting-name suffixes shared across the provider-settings
 // hook, its tabs, the legacy migration, the onboarding active-provider
 // reader and the effective-settings resolver — one home so all of them read
-// the same suffix.
-export const SETTING_KEY_TIME_LIMIT = 'time-limit';
-export const SETTING_KEY_API_KEY = 'api-key';
+// the same suffix. POOL_BUDGET is the legacy name TIME_LIMIT replaced, still
+// read as a fallback.
+export const PROVIDER_SETTING_KEY = Object.freeze({
+  MODEL: 'model',
+  MODEL_ANALYSIS: 'model-analysis',
+  MODEL_FAST: 'model-fast',
+  MODEL_BALANCED: 'model-balanced',
+  MODEL_THOROUGH: 'model-thorough',
+  SUBAGENTS: 'subagents',
+  TIME_LIMIT: 'time-limit',
+  PER_DIMENSION: 'per-dimension',
+  VERIFY: 'verify',
+  API_KEY: 'api-key',
+  API_BASE: 'api-base',
+  CMD_PATH: 'cmd-path',
+  POOL_BUDGET: 'pool-budget',
+});
 
 // Fired (same-tab) whenever any provider setting is written — the analysis
 // active-provider or a per-provider model. The assistant gate listens for it
@@ -132,3 +146,7 @@ export const LATEST_RUN_ID = 'latest';
 // (registerProject) and api/sharedPublish.js (pullSharedProject) both treat
 // either as "the request timed out or was aborted", not a real server error.
 export const FETCH_ERROR_NAME = Object.freeze({ TIMEOUT: 'TimeoutError', ABORT: 'AbortError' });
+
+// Promise.allSettled()'s result.status for a resolved promise: the health
+// port scan (hooks/useServerHealth.js) and onboarding's provider probes.
+export const SETTLED_FULFILLED = 'fulfilled';

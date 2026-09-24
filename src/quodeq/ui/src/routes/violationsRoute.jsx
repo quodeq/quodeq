@@ -12,11 +12,9 @@
 import { lazy } from 'react';
 import { buildProjectRootFile } from '../utils/explorerUtils.js';
 import { NAV_TAB } from '../vocab/navTab.js';
-import { VIOLATIONS_SUB_TAB } from '../features/violations/violationsVocab.js';
+import { ROW_TYPE, VIOLATIONS_SUB_TAB } from '../features/violations/violationsVocab.js';
 
 const ViolationsPage = lazy(() => import('../features/violations/components/ViolationsPage.jsx'));
-
-const HEAT_GRID_ROW_TYPE_PRINCIPLE = 'principle'; // dimensionHeatGridModel.js's row.type for a principle row (vs a dimension row)
 
 // Exported so unit tests can pin the runId-threading contract without having
 // to mount the whole App. Callers from the Violations page must pass the
@@ -54,7 +52,7 @@ function makeNavigateToPrinciple({ dimMap, principleMap, nav }) {
     nav(NAV_TAB.EVAL_PRINCIPLE, {
       evalPrincipal: buildEvalPrincipal(principleObj, pg, dim?.fromRunId),
       severity,
-      sourceTab: 'violations',
+      sourceTab: NAV_TAB.VIOLATIONS,
     });
   };
 }
@@ -69,12 +67,12 @@ function makeNavigateToDimension({ dimMap, nav }) {
     // aggregated from the dimension, with the chosen severity preselected.
     const dimFile = buildProjectRootFile([dim], dim.dimension);
     const severityFilter = severity || 'all';
-    nav('file', {
+    nav(NAV_TAB.FILE, {
       file: dimFile,
       severityFilter,
       runId: dim.fromRunId,
       dateLabel: dim.fromDateLabel,
-      sourceTab: 'violations',
+      sourceTab: NAV_TAB.VIOLATIONS,
     });
   };
 }
@@ -108,10 +106,10 @@ function buildViolationsData({ props, acc, dims }) {
 // in useDashboard.js.
 function buildViolationsCallbacks({ props, nav, navigateToPrinciple, navigateToDimension }) {
   return {
-    onDimensionClick: (dim) => nav(NAV_TAB.EXPLORER, { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
-    onFileClick: (fileObj, opts) => nav('file', { file: fileObj, sourceTab: 'violations', severityFilter: opts?.severity || null }),
+    onDimensionClick: (dim) => nav(NAV_TAB.EXPLORER, { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: NAV_TAB.VIOLATIONS }),
+    onFileClick: (fileObj, opts) => nav(NAV_TAB.FILE, { file: fileObj, sourceTab: NAV_TAB.VIOLATIONS, severityFilter: opts?.severity || null }),
     onCellClick: ({ row, severity }) => {
-      if (row.type === HEAT_GRID_ROW_TYPE_PRINCIPLE && row.principleObj) {
+      if (row.type === ROW_TYPE.PRINCIPLE && row.principleObj) {
         navigateToPrinciple(row.principleObj, severity);
       } else {
         navigateToDimension(row, severity);
@@ -135,7 +133,7 @@ function buildViolationsPageProps({ params, props, acc, dims, nav, navigateToPri
     // it, but flipping replaces (never pushes) so history doesn't grow.
     // Params are spread forward so _tabKey survives the flip.
     subTab: params.subTab || VIOLATIONS_SUB_TAB.DIMENSION,
-    onSubTabChange: (v) => props.navigation.handleNavigateReplace('violations', { ...params, subTab: v }),
+    onSubTabChange: (v) => props.navigation.handleNavigateReplace(NAV_TAB.VIOLATIONS, { ...params, subTab: v }),
   };
 }
 

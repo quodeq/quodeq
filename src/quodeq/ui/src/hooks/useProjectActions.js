@@ -18,6 +18,7 @@ import { chooseDialog } from '../utils/chooseDialog.js';
 import { t } from '../strings/index.js';
 import { apiErrorMessage } from '../strings/apiErrors.js';
 import { HTTP_STATUS } from '../constants.js';
+import { DIALOG_VARIANT } from '../vocab/dialogVariant.js';
 
 // Strip filesystem-unfriendly characters so a project name like
 // "foo/bar" or "..\\evil" can't influence the download path.
@@ -116,9 +117,9 @@ function makeResolveImportConflict(attemptImport) {
     const actions = isSameUuid
       ? [
           { key: 'copy', label: t('projects.importAsCopy'), variant: 'default' },
-          { key: 'replace', label: t('projects.replace'), variant: 'danger' },
+          { key: 'replace', label: t('projects.replace'), variant: DIALOG_VARIANT.DANGER },
         ]
-      : [{ key: 'copy', label: t('projects.importAsCopy'), variant: 'primary' }];
+      : [{ key: 'copy', label: t('projects.importAsCopy'), variant: DIALOG_VARIANT.PRIMARY }];
     const choice = await chooseDialog({
       title: t('projects.alreadyExistsTitle'),
       message,

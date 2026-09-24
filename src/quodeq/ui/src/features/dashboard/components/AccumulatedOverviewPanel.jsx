@@ -13,6 +13,7 @@ import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 import { useAccumulatedComputations, computeAccumulatedStats } from '../hooks/useAccumulatedComputations.js';
 import { AccumulatedHeroSection } from './AccumulatedHeroSection.jsx';
 import { useAccumulatedReportSpec } from './accumulatedReportSpecs.jsx';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 const runHistoryPanelImport = () => import('./RunHistoryPanel.jsx');
 const RunHistoryPanel = lazy(runHistoryPanelImport);
@@ -93,7 +94,7 @@ function OffendingFilesSection({ topFiles, onNavigate }) {
       </div>
       <TopOffendingFilesTable
         files={topFiles}
-        onFileClick={onNavigate ? (f) => onNavigate('file', { file: f }) : undefined}
+        onFileClick={onNavigate ? (f) => onNavigate(NAV_TAB.FILE, { file: f }) : undefined}
       />
     </section>
   );
@@ -104,7 +105,7 @@ function makeCardNavigate({ onNavigate, filteredDimensions, reportProjectName })
   return (kind) => {
     const projectFile = buildProjectRootFile(filteredDimensions || [], reportProjectName);
     const severityFilter = kind === HERO_CARD_KIND.VIOLATIONS ? SEVERITY_FILTER_ALL : kind;
-    onNavigate('file', { file: projectFile, severityFilter });
+    onNavigate(NAV_TAB.FILE, { file: projectFile, severityFilter });
   };
 }
 

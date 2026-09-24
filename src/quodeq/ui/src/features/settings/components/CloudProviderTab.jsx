@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { MIN_SUBAGENTS } from '../../../constants.js';
+import { MIN_SUBAGENTS, PROVIDER_SETTING_KEY } from '../../../constants.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 import { SettingsRowLabel, RemoteSubagentsRow } from './settingsRowParts.jsx';
 import { clampSubagentsTo } from './localApiSubagents.js';
@@ -34,7 +34,7 @@ function ModelRow({ hint, browseUrl, state, update, testing, testResult, runTest
           className={`settings-model-input${!state.model ? ' settings-model-input--required' : ''}`}
           value={state.model || ''}
           placeholder={t('settings.typeModelId')}
-          onChange={(e) => update('model', e.target.value)}
+          onChange={(e) => update(PROVIDER_SETTING_KEY.MODEL, e.target.value)}
           aria-label={t('settings.modelIdentifierAria')}
           autoCapitalize="off"
           autoCorrect="off"

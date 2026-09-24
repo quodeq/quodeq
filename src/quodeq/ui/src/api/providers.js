@@ -5,11 +5,6 @@
 
 import { request } from './request.js';
 
-// getAiClients()'s per-client `type` field: a CLI tool detected on PATH, or
-// an already-configured API-key provider. Read back by onboarding's
-// providerProbes.js and settings' ModelSection.jsx.
-export const AI_CLIENT_TYPE = Object.freeze({ CLI: 'cli', API: 'api' });
-
 /** @returns {Promise<Object[]>} */
 export function getAiClients() {
   return request('/ai-clients');

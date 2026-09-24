@@ -23,7 +23,7 @@ from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.tools.actions import ACTIONS
 from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.project_source import ProjectSource
-from quodeq.core.types.provider import Provider
+from quodeq.core.types.provider import Provider, ProviderType
 from quodeq.core.types.severity import Severity
 from quodeq.llm_bridge import LOCAL_PROVIDERS
 from quodeq.services.shared_publish import PublishState
@@ -45,6 +45,7 @@ _MIRRORS = [
     ("vocab/frameType.js", "FRAME_TYPE", FrameType),
     ("vocab/scopeGateRule.js", "SCOPE_GATE_RULE", ScopeGateRule),
     ("vocab/rescoreState.js", "RESCORE_STATE", RescoreState),
+    ("vocab/providerType.js", "PROVIDER_TYPE", ProviderType),
     ("features/dashboard/dashboardVocab.js", "PUBLISH_STATE", PublishState),
 ]
 

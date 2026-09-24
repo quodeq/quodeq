@@ -1,5 +1,6 @@
 import EmptyState from './EmptyState.jsx';
 import { t } from '../strings/index.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 /**
  * Project-level empty states the overview and history pages both show.
@@ -12,7 +13,7 @@ export function NoProjectsEmptyState({ onNavigate }) {
       title={t('overview.noProjectsTitle')}
       description={t('overview.noProjectsDesc')}
       actionLabel={t('overview.addProject')}
-      onAction={() => onNavigate?.('projects')}
+      onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
     />
   );
 }
@@ -34,7 +35,7 @@ export function NoEvalsEmptyState({ projectName, onNavigate }) {
       title={t('overview.noEvalsTitle')}
       description={t('overview.noEvalsDesc', { name: projectName })}
       actionLabel={t('overview.startEvaluation')}
-      onAction={() => onNavigate?.('evaluate')}
+      onAction={() => onNavigate?.(NAV_TAB.EVALUATE)}
     />
   );
 }

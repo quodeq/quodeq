@@ -3,6 +3,7 @@ import { t } from '../../../strings/index.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { EXTERNAL_JOB_PREFIX, isExternalJobId } from '../../../vocab/jobStatus.js';
+import { DIALOG_VARIANT } from '../../../vocab/dialogVariant.js';
 
 /**
  * HistoryPage.jsx's run-delete handler, extracted verbatim. A failed delete
@@ -23,7 +24,7 @@ export function useHistoryDeleteRun({ selectedSource, deleteEvaluation, onRunDel
       message: t('history.deleteRunConfirmMsg', { label }),
       confirmLabel: t('violations.delete'),
       cancelLabel: t('history.keep'),
-      variant: 'danger',
+      variant: DIALOG_VARIANT.DANGER,
     });
     if (!ok) return;
     const jobId = isExternalJobId(runId) ? runId : `${EXTERNAL_JOB_PREFIX}${runId}`;

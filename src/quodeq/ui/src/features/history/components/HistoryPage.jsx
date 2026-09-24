@@ -9,6 +9,7 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import { t } from '../../../strings/index.js';
 import { formatRunDateTime } from '../../../utils/formatters.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { LATEST_RUN_ID } from '../../../constants.js';
 import { useHistoryDeleteRun } from '../hooks/useHistoryDeleteRun.js';
 import { HistoryContent } from './HistoryContent.jsx';
 import {
@@ -137,7 +138,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   const handleDeleteRun = useHistoryDeleteRun({ selectedSource, deleteEvaluation, onRunDeleted });
 
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
-    selectedRun: selectedRunId || 'latest',
+    selectedRun: selectedRunId || LATEST_RUN_ID,
     availableRuns: availableRuns || [],
     onRunChange: onRunChange || (() => {}),
     onNavigate: onNavigate || (() => {}),

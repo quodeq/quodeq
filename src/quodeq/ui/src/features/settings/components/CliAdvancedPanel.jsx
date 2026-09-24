@@ -4,13 +4,14 @@ import { AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 import { t } from '../../../strings/index.js';
 import { SettingsRowLabel } from './settingsRowParts.jsx';
 import CopilotModelSelect from './CopilotModelSelect.jsx';
+import { PROVIDER_SETTING_KEY } from '../../../constants.js';
 
 // The three analysis tiers, in the order the panel lists them: the settings
 // field each writes and the key of the label beside its input.
 const ANALYSIS_TIERS = [
-  { field: 'model-fast', labelKey: 'settings.fast' },
-  { field: 'model-balanced', labelKey: 'settings.balanced' },
-  { field: 'model-thorough', labelKey: 'settings.thorough' },
+  { field: PROVIDER_SETTING_KEY.MODEL_FAST, labelKey: 'settings.fast' },
+  { field: PROVIDER_SETTING_KEY.MODEL_BALANCED, labelKey: 'settings.balanced' },
+  { field: PROVIDER_SETTING_KEY.MODEL_THOROUGH, labelKey: 'settings.thorough' },
 ];
 
 // The one CLI provider whose models come from a live account lookup instead
@@ -98,9 +99,9 @@ function CmdOverrideRow({ providerId, state, update, cmdPathError, validateCmdPa
         <input
           type="text"
           className="settings-model-input"
-          value={state['cmd-path'] || ''}
+          value={state[PROVIDER_SETTING_KEY.CMD_PATH] || ''}
           placeholder={providerId}
-          onChange={(e) => update('cmd-path', e.target.value.trim())}
+          onChange={(e) => update(PROVIDER_SETTING_KEY.CMD_PATH, e.target.value.trim())}
           onBlur={validateCmdPath}
           aria-label={t('settings.cmdOverride')}
           autoCapitalize="off"

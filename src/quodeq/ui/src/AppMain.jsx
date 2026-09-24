@@ -18,6 +18,7 @@ import { RescoreTrackerProvider } from './features/grade-formula/rescore/Rescore
 import { MainContent } from './routes/renderers.jsx';
 import { buildSidebarProps, buildTopBarProps } from './appShellProps.js';
 import { JOB_STATUS } from './vocab/jobStatus.js';
+import { NAV_TAB } from './vocab/navTab.js';
 
 const OnboardingWizard = lazy(() => import('./features/onboarding/components/OnboardingWizard.jsx'));
 
@@ -98,7 +99,7 @@ function AppTopBar({ shell }) {
         sidebarModel,
         selectedSource: state.selectedSource,
         projectsCount: state.projects?.length,
-        onEvaluateClick: () => navTab('evaluate', { preselectDims: deriveEvaluatePreselect(activePage) }),
+        onEvaluateClick: () => navTab(NAV_TAB.EVALUATE, { preselectDims: deriveEvaluatePreselect(activePage) }),
         evaluating: state.evalLifecycle?.job?.status === JOB_STATUS.RUNNING,
         topbarRunProgress,
         navTab,
@@ -108,7 +109,7 @@ function AppTopBar({ shell }) {
             stack={navStack}
             onGoTo={navGoTo}
             projectName={resolvedDisplayName}
-            onSelectProject={() => navTab('projects')}
+            onSelectProject={() => navTab(NAV_TAB.PROJECTS)}
             siblingsFor={breadcrumbSiblingsFor}
           />
         ),
@@ -171,7 +172,7 @@ export default function AppMain({ shell }) {
                     navPending={state.navPending}
                     booting={shell.showStartupLoader}
                     drawer={<BottomDrawer uiState={assistantCtx.uiState} projectName={resolvedDisplayName}
-                      onOpenSettings={() => navTab('settings')} />}
+                      onOpenSettings={() => navTab(NAV_TAB.SETTINGS)} />}
                     sidebar={<AppSidebar shell={shell} />}
                     header={<AppTopBar shell={shell} />}
                     content={<AppRouteContent shell={shell} />}

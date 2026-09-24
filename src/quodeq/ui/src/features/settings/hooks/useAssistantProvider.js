@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT, PROVIDER_SETTING_KEY } from '../../../constants.js';
 import { broadcastSettingsChange, useSettingsChangeSync } from './settingsSync.js';
 import { STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
 import { ASSISTANT_MODE } from '../settingsVocab.js';
@@ -27,7 +27,7 @@ function loadState(storage) {
 
   if (mode === ASSISTANT_MODE.DEFAULT) {
     const model = analysisActive
-      ? (storage.getItem(providerKey(analysisActive, 'model')) || '')
+      ? (storage.getItem(providerKey(analysisActive, PROVIDER_SETTING_KEY.MODEL)) || '')
       : '';
     return { enabled, mode, activeProvider: analysisActive, model, followsAnalysis: true };
   }
@@ -39,7 +39,7 @@ function loadState(storage) {
     : null;
   const model = explicitModel !== null
     ? explicitModel
-    : (activeProvider ? (storage.getItem(providerKey(activeProvider, 'model')) || '') : '');
+    : (activeProvider ? (storage.getItem(providerKey(activeProvider, PROVIDER_SETTING_KEY.MODEL)) || '') : '');
   return { enabled, mode, activeProvider, model, followsAnalysis: false };
 }
 

@@ -98,7 +98,7 @@ function buildExplorerCardNavigation({ dimFile, onNavigate, project, activeRunId
   const handleCardNavigate = (kind) => {
     if (!onNavigate) return;
     const severityFilter = kind === HERO_CARD_KIND.VIOLATIONS ? SEVERITY_FILTER_ALL : kind;
-    onNavigate('file', { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project });
+    onNavigate(NAV_TAB.FILE, { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project });
   };
   const onSeverityBadge = (level) => () => handleCardNavigate(level);
   return { handleCardNavigate, onSeverityBadge };
@@ -172,7 +172,7 @@ function ExplorerPageBody({
         </div>
         <TopOffendingFilesTable
           files={d.topFiles}
-          onFileClick={(f) => onNavigate?.('file', { file: f, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project })}
+          onFileClick={(f) => onNavigate?.(NAV_TAB.FILE, { file: f, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project })}
         />
       </section>
     </div>

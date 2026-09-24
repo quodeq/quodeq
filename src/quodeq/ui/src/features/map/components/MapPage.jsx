@@ -15,6 +15,7 @@ import { DATA_THEME_ATTR } from '../../../constants.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { VIEW_MODES, VIZ_STYLE, GALAXY_MODE } from '../mapVocab.js';
 import { THEME_FAMILY } from '../../../vocab/theme.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 // data-theme attr for forcing the viz dark while the app is light: keep the
 // active theme family, swap the mode suffix. Attribute values: absent =
@@ -205,7 +206,7 @@ function MapNoEvaluationsState({ selectedSource, selectedProject, projectName, i
         title={t('map.noEvaluationsYet')}
         description={t('map.runEvaluationDesc', { project: projectName || selectedProject })}
         actionLabel={t('map.startEvaluation')}
-        onAction={() => onNavigate?.('evaluate')}
+        onAction={() => onNavigate?.(NAV_TAB.EVALUATE)}
       />
     </MapEmpty>
   );
@@ -234,7 +235,7 @@ function MapNoProjectsState({ onNavigate }) {
         title={t('map.noProjectsYet')}
         description={t('map.addProjectDesc')}
         actionLabel={t('map.addProject')}
-        onAction={() => onNavigate?.('projects')}
+        onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
       />
     </MapEmpty>
   );
@@ -247,7 +248,7 @@ function MapNoProjectSelectedState({ onNavigate }) {
         title={t('map.noProjectSelected')}
         description={t('map.pickProjectDesc')}
         actionLabel={t('map.chooseProject')}
-        onAction={() => onNavigate?.('projects')}
+        onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
       />
     </MapEmpty>
   );

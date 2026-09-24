@@ -9,11 +9,7 @@
  * this module.
  */
 import {
-  ACTIVE_PROVIDER_KEY,
-  DEFAULT_MAX_SUBAGENTS,
-  DEFAULT_TIME_LIMIT_S,
-  providerKey,
-  SETTING_KEY_TIME_LIMIT,
+  ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S, providerKey, PROVIDER_SETTING_KEY,
 } from '../constants.js';
 import { LOCAL_API_PROVIDERS } from '../vocab/provider.js';
 import { readString, STORED_TRUE, STORED_FALSE } from '../adapters/storage.js';
@@ -55,7 +51,7 @@ export function readActiveProviderSelection(storage) {
 /** The model stored for `providerId`, or null when unset or no provider. */
 export function readActiveProviderModel(providerId, storage) {
   if (!providerId) return null;
-  return readString(providerKey(providerId, 'model'), null, storage);
+  return readString(providerKey(providerId, PROVIDER_SETTING_KEY.MODEL), null, storage);
 }
 
 /**
@@ -66,12 +62,12 @@ export function readActiveProviderModel(providerId, storage) {
 export function resolveProviderSettings(providerId, storage = localStorage) {
   const defaults = effectiveProviderDefaults(providerId);
   const get = (key) => storage.getItem(providerKey(providerId, key));
-  const subagents = readInt(storage, providerId, 'subagents');
+  const subagents = readInt(storage, providerId, PROVIDER_SETTING_KEY.SUBAGENTS);
   // Read the new key first; fall back to the legacy 'pool-budget' key.
-  const timeLimitS = readInt(storage, providerId, SETTING_KEY_TIME_LIMIT)
-    ?? readInt(storage, providerId, 'pool-budget');
-  const perDimensionRaw = get('per-dimension');
-  const verifyRaw = get('verify');
+  const timeLimitS = readInt(storage, providerId, PROVIDER_SETTING_KEY.TIME_LIMIT)
+    ?? readInt(storage, providerId, PROVIDER_SETTING_KEY.POOL_BUDGET);
+  const perDimensionRaw = get(PROVIDER_SETTING_KEY.PER_DIMENSION);
+  const verifyRaw = get(PROVIDER_SETTING_KEY.VERIFY);
   return {
     subagents: subagents ?? defaults.subagents,
     timeLimitS: timeLimitS ?? defaults.timeLimitS,

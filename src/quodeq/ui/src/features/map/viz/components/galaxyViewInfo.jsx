@@ -136,7 +136,7 @@ function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
     detailAction: () => {
       const d = scene.stars[navRef.current.dim]?._raw;
       if (!d) return;
-      onNavigate?.(NAV_TAB.EXPLORER, { dimension: d.dimension, runId: d.fromRunId, dateLabel: d.fromDateLabel, fromProject: d.fromProject, sourceTab: 'map' });
+      onNavigate?.(NAV_TAB.EXPLORER, { dimension: d.dimension, runId: d.fromRunId, dateLabel: d.fromDateLabel, fromProject: d.fromProject, sourceTab: NAV_TAB.MAP });
     },
   };
 }
@@ -173,7 +173,7 @@ function computePrincipleLevelInfo(scene, nav, navRef, onNavigate) {
           dimViolations: p._rawViolations,
           dimCompliance: p._rawCompliance,
         },
-        sourceTab: 'map',
+        sourceTab: NAV_TAB.MAP,
       });
     },
   };

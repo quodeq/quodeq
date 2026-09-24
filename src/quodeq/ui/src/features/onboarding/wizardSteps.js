@@ -3,10 +3,12 @@
 // SKIPPED_KEY is the localStorage flag set when the user dismisses the
 // welcome step ("Maybe later").
 //
-// Leaf module by design (no imports): routes/navigationBundle.js,
-// useWizardLifecycle.js, EmptyStateWithTour.jsx and useWizardState.js are in
-// the entry chunk and read these ids; importing them from the handlers hook
+// Leaf module by design (imports only the import-free storage adapter):
+// routes/navigationBundle.js, useWizardLifecycle.js, EmptyStateWithTour.jsx
+// and useWizardState.js are in the entry chunk and read these ids; importing them from the handlers hook
 // or the draft-persistence module would pull the lazy wizard in with them.
+import { STORED_TRUE } from '../../adapters/storage.js';
+
 export const STEP_WELCOME = 'welcome';
 export const STEP_REPO_SCAN = 'repo-scan';
 export const STEP_PROVIDER = 'provider';
@@ -16,4 +18,4 @@ export const STEP_ORDER = [STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STA
 export const SKIPPED_KEY = 'quodeq_onboarding_skipped';
 // The only value ever written under SKIPPED_KEY (absence, not 'false', means
 // not skipped): useWizardDraft.js writes it, useWizardLifecycle.js reads it.
-export const SKIPPED_VALUE = 'true';
+export const SKIPPED_VALUE = STORED_TRUE;

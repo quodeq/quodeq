@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import HeatGridCells, {
-  HEAT_GRID_VARIANT, COL_NAME, COL_VIOLATIONS, COL_HEALTH, COL_ALIGN_LEFT, makeColumnSortHandler,
-} from '../../../components/HeatGridCells.jsx';
-import { buildRows, ROW_TYPE } from './dimensionHeatGridModel.js';
+import HeatGridCells, { HEAT_GRID_VARIANT, makeColumnSortHandler } from '../../../components/HeatGridCells.jsx';
+import { COL_NAME, COL_VIOLATIONS, COL_HEALTH, COL_ALIGN_LEFT } from '../../../components/heatGridColumns.js';
+import { buildRows } from './dimensionHeatGridModel.js';
+import { ROW_TYPE } from '../violationsVocab.js';
 import { activateOnKey } from '../../../utils/a11y.js';
 import { t } from '../../../strings/index.js';
 import { SORT_DIR } from '../../../vocab/sortDirection.js';

@@ -17,6 +17,6 @@ export function useDashboardHandlers(onNavigate, dashboard) {
     handleAccumulatedDimensionClick: (item) => {
       if (onNavigate) onNavigate(NAV_TAB.EXPLORER, { dimension: item.dimension, runId: item.fromRunId, dateLabel: item.fromDateLabel, fromProject: item.fromProject });
     },
-    handleFileClick: (fileObj) => { if (onNavigate) onNavigate('file', { file: fileObj }); },
+    handleFileClick: (fileObj) => { if (onNavigate) onNavigate(NAV_TAB.FILE, { file: fileObj }); },
   }), [onNavigate, dashboard]);
 }
