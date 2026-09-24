@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { t } from '../../strings/index.js';
 import { confirmDialog } from '../../utils/confirmDialog.js';
 import { useWorkspaceDiff } from './hooks/useWorkspaceDiff.js';
@@ -9,6 +9,27 @@ export function classifyDiffLine(line) {
   if (line.startsWith('+')) return 'wsdiff-add';
   if (line.startsWith('-')) return 'wsdiff-del';
   return 'wsdiff-ctx';
+}
+
+// Diff lines mounted at once. The backend caps a diff at 2 MB of text but not
+// by line count, so one diff can mean tens of thousands of spans. Past this
+// the panel asks before mounting more. Not virtualized: what is shown stays
+// one <pre>, so select, copy and find keep working.
+export const DIFF_LINE_RENDER_CAP = 2000;
+
+// Lines to show for this diff. The expansion is remembered per diff string,
+// so a Refresh that brings a new diff starts from the cap again.
+function useDiffLineWindow(diff) {
+  const lines = useMemo(() => (diff === null ? [] : diff.split('\n')), [diff]);
+  const [expanded, setExpanded] = useState({ diff: null, count: DIFF_LINE_RENDER_CAP });
+  const limit = expanded.diff === diff ? expanded.count : DIFF_LINE_RENDER_CAP;
+  const shownCount = Math.min(lines.length, limit);
+  const rendered = useMemo(() => lines.slice(0, shownCount).map((line, i) => (
+    // eslint-disable-next-line react/no-array-index-key
+    <span key={i} className={classifyDiffLine(line)}>{line}{'\n'}</span>
+  )), [lines, shownCount]);
+  const showMore = () => setExpanded({ diff, count: shownCount + DIFF_LINE_RENDER_CAP });
+  return { rendered, shownCount, totalCount: lines.length, showMore };
 }
 
 function WorkspaceDiffOutcome({ outcome }) {
@@ -26,15 +47,8 @@ function WorkspaceDiffOutcome({ outcome }) {
 }
 
 function WorkspaceDiffBody({ diff, truncated, error, empty }) {
-  const diffLines = useMemo(() => {
-    if (diff === null) {
-      return [];
-    }
-    return diff.split('\n').map((line, i) => (
-      // eslint-disable-next-line react/no-array-index-key
-      <span key={i} className={classifyDiffLine(line)}>{line}{'\n'}</span>
-    ));
-  }, [diff]);
+  const { rendered, shownCount, totalCount, showMore } = useDiffLineWindow(diff);
+  const capped = shownCount < totalCount;
 
   return (
     <>
@@ -47,9 +61,17 @@ function WorkspaceDiffBody({ diff, truncated, error, empty }) {
       {diff === null && !error && <p aria-live="polite">{t('assistant.loadingDiff')}</p>}
       {empty && <p className="workspace-diff-empty">{t('assistant.noChanges')}</p>}
       {diff !== null && !empty && (
-        <pre className="workspace-diff-body">
-          {diffLines}
-        </pre>
+        <>
+          {capped && (
+            <p className="workspace-diff-warning">
+              {t('assistant.diffShowingLines', { shown: shownCount, total: totalCount })}
+            </p>
+          )}
+          <pre className="workspace-diff-body">{rendered}</pre>
+          {capped && (
+            <button type="button" onClick={showMore}>{t('assistant.diffShowMore')}</button>
+          )}
+        </>
       )}
     </>
   );
