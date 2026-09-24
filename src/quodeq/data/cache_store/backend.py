@@ -4,12 +4,13 @@ Implementations:
 - ``LocalFileBackend`` — atomic file writes under ``~/.quodeq/cache/results``.
 - ``RemoteHTTPBackend`` (future) — opt-in shared cache via signed URLs.
 
-The protocol is deliberately minimal: get/put/has/delete plus stats.
-Anything richer (bulk ops, prefix queries) can be added when a concrete
-need shows up.
+The protocol is deliberately minimal: get/put/has/delete/delete_many plus
+stats. Anything richer (prefix queries) can be added when a concrete need
+shows up.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -41,6 +42,10 @@ class CacheBackend(Protocol):
 
     def delete(self, key: str) -> None:
         """Drop *key*. A missing key is not an error."""
+        ...
+
+    def delete_many(self, keys: Iterable[str]) -> int:
+        """Drop every key; return how many entries were removed. Missing keys are no-ops."""
         ...
 
     def stats(self) -> CacheStats:

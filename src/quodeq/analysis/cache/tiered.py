@@ -7,6 +7,7 @@ small, isolated change rather than a refactor.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 
 from quodeq.analysis.cache.backend import CacheBackend, CacheStats
 from quodeq.analysis.cache.entry import CacheEntry
@@ -70,6 +71,20 @@ class TieredCache:
     def delete(self, key: str) -> None:
         """Drop *key* from both tiers. A failing remote delete is logged, not raised."""
         self._local.delete(key)
+        self._delete_remote(key)
+
+    def delete_many(self, keys: Iterable[str]) -> int:
+        """Drop every key: one local batch, then each key from remote best-effort.
+
+        Returns how many local entries were removed.
+        """
+        batch = list(keys)
+        removed = self._local.delete_many(batch)
+        for key in batch:
+            self._delete_remote(key)
+        return removed
+
+    def _delete_remote(self, key: str) -> None:
         if self._remote is None:
             return
         try:
