@@ -143,6 +143,17 @@ def content_hash_for(
     return hash_file(resolved) or ""
 
 
+def _content_hash(config: RunConfig, file_path: str) -> str:
+    """The file's content hash, through ``config.content_hash_memo`` when set."""
+    memo = config.content_hash_memo
+    if memo is None:
+        return hash_file(config.src / file_path) or ""
+    cached = memo.get(file_path)
+    if cached is None:
+        cached = memo[file_path] = hash_file(config.src / file_path) or ""
+    return cached
+
+
 def build_cache_key_struct(config: RunConfig, file_path: str, dimension: str) -> CacheKey:
     """The ``CacheKey`` for a (file, dimension) pair under ``config``.
 
@@ -159,7 +170,7 @@ def build_cache_key_struct(config: RunConfig, file_path: str, dimension: str) ->
     ``CacheKey`` is the single source of truth and all three populate exactly
     its fields.
     """
-    content_hash = hash_file(config.src / file_path) or ""
+    content_hash = _content_hash(config, file_path)
     params_hash, _ = dimension_params_state(config.standards_dir, dimension, config.src)
     return CacheKey(
         schema_version=SCHEMA_VERSION,

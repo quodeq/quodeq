@@ -33,11 +33,15 @@ def _resolve_priority_category(config: RunConfig) -> str | None:
 
 def list_source_files(
     config: RunConfig, dim_id: str, *, ignore_file_filter: bool = False,
+    prioritize: bool = True,
 ) -> tuple[list[str], set[str], list[str]]:
     """List source files for the subagent queue from the target or manifest.
 
     Returns (files, extensions, excluded) or ([], set(), []) if none found.
-    Files are returned in priority order (most important first).
+    Files are returned in priority order (most important first), or in
+    source order with ``prioritize=False``. Prioritizing reads every file and
+    the git log but never adds or drops one, so callers that only count the
+    files can skip it.
 
     ``excluded`` holds files the active provider can never dispatch (API
     size cap) — kept out of ``files`` so queues, estimates, and coverage
@@ -54,17 +58,17 @@ def list_source_files(
         if not files:
             return [], extensions, excluded
 
-    # Prioritize files: most important first
-    evidence_dir = config.work_dir or config.src
-    files = prioritize_files(
-        files, config.src, dim_id,
-        context=PriorityContext(
-            category=_resolve_priority_category(config),
-            language=config.language,
-            evidence_dir=evidence_dir,
-            config=config,
-        ),
-    )
+    if prioritize:
+        evidence_dir = config.work_dir or config.src
+        files = prioritize_files(
+            files, config.src, dim_id,
+            context=PriorityContext(
+                category=_resolve_priority_category(config),
+                language=config.language,
+                evidence_dir=evidence_dir,
+                config=config,
+            ),
+        )
 
     # Incremental mode: filter to only changed + dependent files
     if not ignore_file_filter and config.options.incremental_file_filter is not None:
