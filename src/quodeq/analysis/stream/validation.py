@@ -50,16 +50,21 @@ def get_mcp_status(stream_file: Path, *, log: LogSink = NULL_LOG) -> str | None:
     try:
         with open_text(stream_file) as f:
             for line in f:
-                d = json.loads(line)
-                servers = _event_servers(d) if isinstance(d, dict) else None
+                try:
+                    d = json.loads(line)
+                except json.JSONDecodeError:
+                    log.debug(f"Skipping malformed stream line in {stream_file}")
+                    continue
+                if not isinstance(d, dict):
+                    continue
+                servers = _event_servers(d)
                 if not isinstance(servers, list):
-                    if isinstance(d, dict):
-                        log.debug(f"Invalid MCP server list in {stream_file}")
+                    log.debug(f"Invalid MCP server list in {stream_file}")
                     continue
                 status = _findings_server_status(servers, stream_file, log)
                 if status is not None:
                     return status
-    except (json.JSONDecodeError, OSError) as exc:
+    except OSError as exc:
         log.debug(f"Failed to read MCP status from {stream_file}: {exc}")
     return None
 

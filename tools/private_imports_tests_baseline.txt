@@ -1110,8 +1110,8 @@ tests/services/test_violations_jsonl_coverage.py:142:private-module:quodeq.servi
 tests/services/test_violations_jsonl_coverage.py:9:private-name:quodeq.services._violations_jsonl._parse_jsonl_findings
 tests/services/test_violations_resolve_phases.py:14:private-name:quodeq.services.violations._resolve_from_source
 tests/services/test_violations_resolve_phases.py:14:private-name:quodeq.services.violations._suppression_keys
-tests/services/test_violations_stream_coverage.py:106:private-module:quodeq.services._violations_stream.parse_violations_from_stream
-tests/services/test_violations_stream_coverage.py:113:private-module:quodeq.services._violations_stream.parse_violations_from_stream
+tests/services/test_violations_stream_coverage.py:118:private-module:quodeq.services._violations_stream.parse_violations_from_stream
+tests/services/test_violations_stream_coverage.py:125:private-module:quodeq.services._violations_stream.parse_violations_from_stream
 tests/services/test_violations_stream_coverage.py:14:private-name:quodeq.services._violations_stream._try_parse_text_line
 tests/services/test_violations_stream_coverage.py:19:private-name:quodeq.services._violations_stream._try_parse_text_line
 tests/services/test_violations_stream_coverage.py:24:private-name:quodeq.services._violations_stream._try_parse_text_line
