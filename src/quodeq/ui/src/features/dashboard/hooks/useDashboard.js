@@ -7,6 +7,7 @@ import { isFrozenRun } from '../../../models/runRules.js';
 import { t } from '../../../strings/index.js';
 import { useDashboardInvalidation } from './useDashboardInvalidation.js';
 import { STALE_TIME_MS, refetchWhileError } from '../../../hooks/queryDefaults.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 const EMPTY_TREND = [];
 
@@ -44,7 +45,7 @@ function buildSharedProjectInfoQueryConfig({ projectKey, selectedSource, sharedG
   return {
     queryKey: projectKeys.info(projectKey, selectedSource),
     queryFn: () => sharedGetProjectInfo(selectedProject),
-    enabled: selectedSource === "shared" && !!selectedProject,
+    enabled: selectedSource === PROJECT_SOURCE.SHARED && !!selectedProject,
   };
 }
 
@@ -147,9 +148,9 @@ function mergeTrendIntoDashboard(dashboardData, fallbackTrend) {
  * which History turns off because flashing a neighbouring run is misleading
  * there. Placeholders never cross a project or source boundary.
  */
-export function useDashboard({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
+export function useDashboard({ selectedProject, selectedRun, selectedSource = PROJECT_SOURCE.LOCAL, keepPlaceholder = true } = {}) {
   const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
-  const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
+  const fetchDashboard = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetDashboard : getDashboard;
   const queryClient = useQueryClient();
   const projectKey = selectedProject || "_none_";
   const keepInScope = useCallback(

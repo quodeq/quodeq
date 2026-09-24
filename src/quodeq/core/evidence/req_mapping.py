@@ -237,9 +237,9 @@ def group_judgments(
             ))
             quarantined += 1
             continue
-        if j.verdict == "violation":
+        if j.is_violation():
             sc_violations.setdefault(principle, []).append(j)
-        elif j.verdict == "compliance":
+        elif j.is_compliance():
             sc_compliance.setdefault(principle, []).append(j)
         sev = j.severity or DEFAULT_SEVERITY
         if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):

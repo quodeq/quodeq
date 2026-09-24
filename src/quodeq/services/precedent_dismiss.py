@@ -22,6 +22,7 @@ from quodeq.core.dismissals import DismissedKeys, restored_fingerprints
 from quodeq.core.events.models import FindingDismissed, FindingDismissedEvent
 from quodeq.core.finding_identity import coerce_line, snippet_fingerprint
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.types.finding_type import FindingType
 from quodeq.data.actions_log import ActionLogWriter, read_action_events
 from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services.dismissed import dismissed_keys
@@ -46,7 +47,7 @@ class PrecedentAutoDismisser:
 
     def record(self, finding: dict) -> bool:
         """Dismiss *finding* on precedent. True when an event was written."""
-        if finding.get("t") != "violation":
+        if finding.get("t") != FindingType.VIOLATION:
             return False
         req = str(finding.get("req") or "")
         file = str(finding.get("file") or "")

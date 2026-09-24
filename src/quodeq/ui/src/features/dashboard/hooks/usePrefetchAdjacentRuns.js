@@ -10,7 +10,7 @@
  */
 import { useCallback } from "react";
 import { usePrefetchRun } from "./usePrefetchRun.js";
-import { DEFAULT_PROJECT_SOURCE } from "../../../constants.js";
+import { DEFAULT_PROJECT_SOURCE } from "../../../vocab/projectSource.js";
 
 /**
  * Mouse-enter handlers for the run navigator that warm the adjacent runs'

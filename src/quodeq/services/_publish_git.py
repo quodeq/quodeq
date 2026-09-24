@@ -17,6 +17,7 @@ from pathlib import Path
 
 from quodeq.services.wiring import (
     PUBLISHED_META_FILENAME,
+    RepoFormat,
     check_repo_format,
     ensure_shared_clone,
     refresh_shared_clone,
@@ -48,9 +49,9 @@ def prepare_clone(url: str, env: dict | None) -> tuple[Path, str]:
     refresh_shared_clone(url, env)  # best effort, publish is still guarded by push
 
     fmt = check_repo_format(repo)
-    if fmt == "unsupported_version":
+    if fmt == RepoFormat.UNSUPPORTED_VERSION:
         raise PublishError("this shared repository requires a newer version of quodeq")
-    if fmt == "foreign":
+    if fmt == RepoFormat.FOREIGN:
         raise PublishError(
             "the configured repository does not look like a quodeq results repository, "
             "refusing to publish into it"

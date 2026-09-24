@@ -3,6 +3,7 @@ import {
   buildRow, buildFleet, buildDimensionsBoard, buildAttention,
   buildDimensionView, buildDuelView, sortRows,
 } from '../compareModel.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 /**
  * Every row + its "open this project" affordance: rows carry their own
@@ -29,7 +30,7 @@ function useFleetRows({ fleetProjects, summariesById, now, onOpenProject }) {
 
   const openProject = useCallback((rowId) => {
     const row = rows.find((r) => r.id === rowId);
-    onOpenProject?.(row?.sourceId ?? rowId, row?.source ?? 'local');
+    onOpenProject?.(row?.sourceId ?? rowId, row?.source ?? PROJECT_SOURCE.LOCAL);
   }, [rows, onOpenProject]);
 
   return { rows, openProject };

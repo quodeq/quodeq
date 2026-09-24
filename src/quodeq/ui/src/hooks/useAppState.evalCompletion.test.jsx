@@ -18,10 +18,13 @@ const evaluationState = {
   startEvaluation: vi.fn(), clearJob: vi.fn(), cancelEvaluation: vi.fn(),
   startedProject: null,
 };
-vi.mock('../features/evaluation/hooks/useEvaluation.js', () => ({
-  useEvaluation: () => evaluationState,
-  LOCAL_API_PROVIDERS: new Set(['ollama', 'llamacpp', 'omlx']),
-}));
+vi.mock('../features/evaluation/hooks/useEvaluation.js', async () => {
+  const actual = await vi.importActual('../features/evaluation/hooks/useEvaluation.js');
+  return {
+    ...actual,
+    useEvaluation: () => evaluationState,
+  };
+});
 // Mutable so the reconnect re-arm regression below can flip connectivity;
 // defaults to connected for every other test.
 const healthState = { connected: true };

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from quodeq.shared.constants import SESSION_SOURCE_LOCAL
+from quodeq.core.types.project_source import ProjectSource
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ class AssistantStore(Protocol):
     # -- sessions -----------------------------------------------------------
 
     def create_session(self, *, session_id: str, provider: str,
-                       model: str | None = None, source: str = SESSION_SOURCE_LOCAL,
+                       model: str | None = None, source: str = ProjectSource.LOCAL,
                        scope: SessionScope | None = None) -> dict:
         """Create a session row and return it."""
         ...

@@ -7,6 +7,7 @@
  */
 import { lazy } from 'react';
 import { findProject, makeDismissHandler } from './dismissWiring.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 const EvaluateScreen = lazy(() => import('../features/evaluation/components/EvaluateScreen.jsx'));
 const SettingsPage = lazy(() => import('../features/settings/components/SettingsPage.jsx'));
@@ -74,10 +75,10 @@ export function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnecte
  * whole App.
  */
 export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects }) {
-  if (selectedSource !== 'shared') return null;
+  if (selectedSource !== PROJECT_SOURCE.SHARED) return null;
   const first = (projects || [])[0];
   const id = first ? (first.id || first.name || first) : '';
-  return { id, source: 'local' };
+  return { id, source: PROJECT_SOURCE.LOCAL };
 }
 
 /**

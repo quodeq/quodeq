@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { readString } from '../../adapters/storage.js';
 import { STEP_WELCOME, SKIPPED_KEY } from './wizardSteps.js';
+import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 
 /**
  * Whether the first-paint onboarding-wizard auto-open effect should fire.
@@ -24,7 +25,7 @@ import { STEP_WELCOME, SKIPPED_KEY } from './wizardSteps.js';
 export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating, sharedSettled = true, sharedHasContent = false }) {
   if (!projectsLoaded) return false;
   if ((projectsCount ?? 0) > 0) return false;
-  if (selectedSource === 'shared') return false;
+  if (selectedSource === PROJECT_SOURCE.SHARED) return false;
   if (isEvaluating) return false;
   if (!sharedSettled) return false;
   if (sharedHasContent) return false;

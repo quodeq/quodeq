@@ -23,6 +23,8 @@
     "lint:magic:update": "node tools/check_magic.mjs --update",
     "lint:vocab": "node tools/check_vocab.mjs",
     "lint:vocab:update": "node tools/check_vocab.mjs --update",
+    "lint:naming": "node tools/check_naming.mjs",
+    "lint:naming:update": "node tools/check_naming.mjs --update",
     "lint:a11y": "node tools/check_a11y.mjs",
     "lint:a11y:update": "node tools/check_a11y.mjs --update",
     "lint:clones": "node tools/check_clones.mjs",

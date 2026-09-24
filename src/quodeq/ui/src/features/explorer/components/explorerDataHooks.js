@@ -6,6 +6,7 @@ import { computeComplianceByPrinciple, buildEvalPrincipalFn } from '../../../uti
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { violationKey } from '../../../utils/violationKey.js';
 import { SEVERITY } from '../../../vocab/severity.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 export { computeComplianceByPrinciple, buildEvalPrincipalFn };
 
@@ -83,7 +84,7 @@ function mergeRescoreIntoEval(prev, dimData) {
  * in useDashboard.js), which marks these stale too, so the cached page
  * refetches after user actions exactly like the Overview does.
  */
-export function useExplorerData(project, dimension, runId, refreshSignal, selectedSource = 'local') {
+export function useExplorerData(project, dimension, runId, refreshSignal, selectedSource = PROJECT_SOURCE.LOCAL) {
   const { evalQuery, scoresQuery } = useExplorerQueries(project, dimension, runId, refreshSignal, selectedSource);
 
   const evalData = useMemo(() => {

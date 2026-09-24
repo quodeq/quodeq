@@ -14,6 +14,9 @@ from quodeq.shared.url_validation import validate_url_safe
 _log = logging.getLogger(__name__)
 
 _TIMEOUT_S = 3
+# The /health body's own status word (llama-server and omlx both send it);
+# not a quodeq vocabulary.
+HEALTH_OK = "ok"
 _MAX_PARALLEL_AGENTS = 5
 _SYSCTL_TIMEOUT_S = 3
 _NVIDIA_SMI_TIMEOUT_S = 5

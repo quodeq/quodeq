@@ -1,6 +1,6 @@
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { t } from '../../../strings/index.js';
-import { PROJECT_SOURCE } from '../../../constants.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { EXTERNAL_JOB_PREFIX, isExternalJobId } from '../../../vocab/jobStatus.js';
 

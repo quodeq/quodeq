@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from quodeq.analysis.mcp.schemas import FINDING_TYPE_VIOLATION
+from quodeq.core.types.finding_type import FindingType
 from quodeq.context.precedent import (
     PrecedentCorpus,
     fingerprint as _precedent_fingerprint,
@@ -60,7 +60,7 @@ def _precedent_probe(
     None when the semantic lookup is skipped: not a violation, already
     exact-fingerprint matched, or ineligible (see `_semantic_eligible`).
     """
-    if finding.get("t") != FINDING_TYPE_VIOLATION:
+    if finding.get("t") != FindingType.VIOLATION:
         return False, None
     req = finding.get("req")
     snippet = finding.get("snippet")

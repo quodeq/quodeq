@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { mergeProjects, deriveAction } from '../projectsMerge.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 const COMPARATORS = {
   activity: (a, b) => (b.lastActivity ?? 0) - (a.lastActivity ?? 0),
@@ -29,8 +30,8 @@ export function useMergedProjects({ localProjects = [], sharedProjects = [], con
         (e) => (e.displayName || '').toLowerCase().includes(q) || (e.name || '').toLowerCase().includes(q),
       );
     }
-    if (location === 'local') entries = entries.filter((e) => e.local);
-    else if (location === 'shared') entries = entries.filter((e) => e.shared);
+    if (location === PROJECT_SOURCE.LOCAL) entries = entries.filter((e) => e.local);
+    else if (location === PROJECT_SOURCE.SHARED) entries = entries.filter((e) => e.shared);
     entries.sort(COMPARATORS[sort] || COMPARATORS.activity);
     return entries.map((e) => ({ ...e, action: deriveAction(e, { configured }) }));
   }, [localProjects, sharedProjects, configured, query, location, sort]);

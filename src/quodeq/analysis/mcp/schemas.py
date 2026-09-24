@@ -7,14 +7,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.severity import Severity
-
-# report_finding's "t" enum -- the gates in this package (scope_gate.py,
-# provenance_gate.py, precedent_downweight.py, enricher.py) read and write
-# the same finding dict, so they import this rather than retyping the
-# values the schema declares valid. "severity" uses Severity directly.
-FINDING_TYPE_VIOLATION = "violation"
-FINDING_TYPE_COMPLIANCE = "compliance"
 
 
 class FileDoneStatus(StrEnum):
@@ -42,7 +36,7 @@ REPORT_FINDING_SCHEMA = {
     "type": "object",
     "properties": {
         "req": {"type": "string", "description": "Requirement ID from the standards checklist (e.g. 'M-MOD-1', 'S-CON-3'). Server auto-fills principle name and dimension from this."},
-        "t": {"type": "string", "enum": [FINDING_TYPE_VIOLATION, FINDING_TYPE_COMPLIANCE], "description": "Finding type"},
+        "t": {"type": "string", "enum": [t.value for t in FindingType], "description": "Finding type"},
         "file": {"type": "string", "description": "File path relative to repo root"},
         "line": {"type": "integer", "description": "Line number"},
         "end_line": {"type": "integer", "description": "Last line of the violation pattern (omit if single line)"},

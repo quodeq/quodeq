@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import logging
 
-from quodeq.analysis.mcp.schemas import FINDING_TYPE_VIOLATION
+from quodeq.core.types.finding_type import FindingType
 from quodeq.analysis.mcp.scope_gate_rules import matched_rule
 from quodeq.context.trust_model import TrustModel
 from quodeq.core.finding_markers import SCOPE_DOWNGRADE
@@ -147,7 +147,7 @@ def apply_scope_gate(finding: dict, model: TrustModel | None) -> bool:
     write the same field at the same severity would make the outcome depend
     on call order.
     """
-    if finding.get("t") != FINDING_TYPE_VIOLATION:
+    if finding.get("t") != FindingType.VIOLATION:
         return False
 
     marker = finding.get(SCOPE_DOWNGRADE_MARKER)

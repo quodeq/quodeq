@@ -2,7 +2,7 @@
  * useProjectState.js's localStorage read/write helpers and the boot-time
  * selection-resolution logic.
  */
-import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from '../constants.js';
+import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from '../vocab/projectSource.js';
 import { writeString } from '../adapters/storage.js';
 
 export const STORAGE_KEY = 'quodeq_selected_project';

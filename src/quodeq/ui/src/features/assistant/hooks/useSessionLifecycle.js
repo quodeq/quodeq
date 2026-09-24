@@ -3,6 +3,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { useAssistantStream } from '../useAssistantStream.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 /**
  * Assistant session lifecycle: create/reset sessions (with the latest-wins
@@ -24,7 +25,7 @@ import { apiErrorMessage } from '../../../strings/apiErrors.js';
  * before this extraction.
  */
 export function sessionKey(ctx) {
-  return `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}:${ctx?.source || 'local'}`;
+  return `${ctx?.provider}:${ctx?.model}:${ctx?.projectId}:${ctx?.runId}:${ctx?.source || PROJECT_SOURCE.LOCAL}`;
 }
 // Groups useSessionLifecycle's own useState/useRef declarations so the outer
 // hook's body stays under the function-length cap; still called

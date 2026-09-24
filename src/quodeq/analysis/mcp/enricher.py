@@ -20,7 +20,7 @@ from quodeq.analysis.mcp.precedent_downweight import (
     notify_precedent_match,
 )
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
-from quodeq.analysis.mcp.schemas import FINDING_TYPE_VIOLATION
+from quodeq.core.types.finding_type import FindingType
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.path_role import NON_PROD_ROLES, path_role
 from quodeq.context.precedent import PrecedentCorpus
@@ -81,7 +81,7 @@ def _apply_path_role_downweight(finding: dict[str, object]) -> None:
     Skipped when the LLM emitted an explicit confidence below 100 and for
     compliance findings (downweighting "code is fine" makes no sense).
     """
-    if finding.get("t") != FINDING_TYPE_VIOLATION:
+    if finding.get("t") != FindingType.VIOLATION:
         return
     role = path_role(finding.get("file"))
     if role not in NON_PROD_ROLES:
@@ -104,7 +104,7 @@ def _apply_shape_downweight(
     finding: dict[str, object], shape: ProjectShape | None,
 ) -> None:
     """Downweight findings that assume a hosted service when the project isn't one."""
-    if finding.get("t") != FINDING_TYPE_VIOLATION:
+    if finding.get("t") != FindingType.VIOLATION:
         return
     if not _shape_irrelevant_to_hosted_service(shape):
         return

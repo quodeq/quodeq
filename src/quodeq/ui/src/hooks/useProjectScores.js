@@ -14,6 +14,7 @@ import { projectKeys, samePlaceholderScope } from "../api/queryKeys.js";
 import { resolveAsOf, deriveAvailableRuns } from './projectScoresDerived.js';
 import { t } from '../strings/index.js';
 import { STALE_TIME_MS, refetchWhileError } from './queryDefaults.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 /**
  * @param {{
@@ -98,9 +99,9 @@ function buildProjectScoresResult({ scoresQuery, latestQuery, availableRuns, ref
  *
  * @returns {{...queryState, availableRuns: object[], refreshScores: Function}}
  */
-export function useProjectScores({ selectedProject, selectedRun, selectedSource = "local", keepPlaceholder = true } = {}) {
+export function useProjectScores({ selectedProject, selectedRun, selectedSource = PROJECT_SOURCE.LOCAL, keepPlaceholder = true } = {}) {
   const { getProjectScores, sharedGetProjectScores } = useApi();
-  const fetchScores = selectedSource === "shared" ? sharedGetProjectScores : getProjectScores;
+  const fetchScores = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetProjectScores : getProjectScores;
   const queryClient = useQueryClient();
   const projectKey = selectedProject || "_none_";
   // Reuse the previous payload only within the same project+source subtree —

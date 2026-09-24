@@ -1,15 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { PUBLISH_STATE } from '../dashboardVocab.js';
 
 const POLL_INTERVAL_MS = 2000;
-
-// The global publish job's state machine, mirrored by the backend's own
-// publish/status payload (services/shared_publish.py's PublishStatus).
-// Re-exported from usePublish.js for the public interface.
-export const PUBLISH_STATE = Object.freeze({
-  IDLE: 'idle', RUNNING: 'running', DONE: 'done', ERROR: 'error',
-});
 
 // idle | running | done | error state, the polling refs, and the poll-tick
 // machinery for usePublish's global publish job. Extracted verbatim from

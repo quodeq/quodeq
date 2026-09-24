@@ -26,6 +26,7 @@ import gradeFormulaDark from '../../../assets/help/grade-formula.dark.webp';
 import gradeFormulaLight from '../../../assets/help/grade-formula.light.webp';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
+import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
 // `informative: true` means the figure's own svg already carries an
 // accessible name (role="img"/aria-label) that must reach the accessibility
@@ -60,7 +61,7 @@ const ICON_PREFIX = 'icon:';
 const TAG_PREFIX = 'tag:';
 
 function badgeLabel(kind) {
-  return kind === 'compliance'
+  return kind === FINDING_TYPE.COMPLIANCE
     ? t('explorer.compliantBadge')
     : severityLabel(kind).toUpperCase();
 }

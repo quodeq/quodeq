@@ -225,3 +225,10 @@ def test_events_stream_too_many_streams_has_code(action_app, action_client):  # 
     finally:
         for _ in range(slots_taken):
             state.close_sse_stream()
+
+
+def test_create_session_rejects_the_location_word_online_as_a_source(action_client):
+    resp = action_client.post(
+        "/api/assistant/sessions", json={"provider": "ollama", "source": "online"})
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "INVALID_SOURCE"

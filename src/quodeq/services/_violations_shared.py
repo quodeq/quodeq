@@ -14,10 +14,6 @@ from quodeq.core.types import Finding, ProgressInfo, ViolationResponse
 from quodeq.core.evidence.parser import resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base
 
-TYPE_VIOLATION = "violation"
-TYPE_COMPLIANCE = "compliance"
-FINDING_TYPES = frozenset({TYPE_VIOLATION, TYPE_COMPLIANCE})
-
 
 @dataclass(frozen=True)
 class ResponseOptions:

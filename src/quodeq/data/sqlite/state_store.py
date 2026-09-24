@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 from quodeq.core.events.models import Judgment
 from quodeq.core.dismissals import DismissedKeys
+from quodeq.core.types.finding_type import FindingType
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
@@ -132,7 +133,7 @@ class SQLiteStateStore(StateStoreMetaMixin):
             for fid, req, practice_id, file, line, snippet, verdict in rows:
                 hidden = dismissed.matches(
                     req=req, principle=practice_id, file=file, line=line, snippet=snippet)
-                wanted = "dismissed" if hidden else "violation"
+                wanted = "dismissed" if hidden else FindingType.VIOLATION
                 if wanted != verdict:
                     changes.append((wanted, fid))
             if changes:

@@ -145,3 +145,31 @@ def test_left_operand_of_membership_is_a_key_test(tmp_path):
     ))
     hits = check_vocab_literals.scan_tree(tmp_path / "src")
     assert [(h.line, h.literal) for h in hits] == [(6, "failed"), (6, "ok")]
+
+
+def test_flags_finding_type_comparisons_and_verdict_writes(tmp_path):
+    _write(tmp_path, "src/quodeq/services/x.py", (
+        'def f(j, row):\n'
+        '    if j.verdict == "violation":\n'
+        '        pass\n'
+        '    ok = row.get("t") not in ("violation", "compliance")\n'
+        '    return ok, dict(verdict="compliance")\n'
+    ))
+    hits = check_vocab_literals.scan_tree(tmp_path / "src")
+    assert [(h.line, h.literal) for h in hits] == [
+        (2, "violation"), (4, "compliance"), (4, "violation"), (5, "compliance"),
+    ]
+
+
+def test_report_bucket_keys_are_not_finding_types(tmp_path):
+    _write(tmp_path, "src/quodeq/services/x.py", (
+        'KEYS = ("violations", "compliance")\n'
+        'def f(d):\n'
+        '    return d.get("violations", []), {"violation": 0, "compliance": 0}\n'
+    ))
+    assert check_vocab_literals.scan_tree(tmp_path / "src") == []
+
+
+def test_the_finding_type_home_is_exempt(tmp_path):
+    _write(tmp_path, "src/quodeq/core/types/finding_type.py", 'def f(s):\n    return s == "violation"\n')
+    assert check_vocab_literals.scan_tree(tmp_path / "src") == []

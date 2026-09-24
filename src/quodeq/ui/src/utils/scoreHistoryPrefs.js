@@ -1,8 +1,8 @@
 import {
   SCORE_HISTORY_GRANULARITY_STORAGE_KEY,
-  SCORE_HISTORY_GRANULARITIES,
   DEFAULT_SCORE_HISTORY_GRANULARITY,
 } from '../constants.js';
+import { GRANULARITY } from './granularity.js';
 
 /**
  * Read the persisted score-history grouping granularity.
@@ -11,7 +11,7 @@ import {
 export function readScoreHistoryGranularity(storage = localStorage) {
   try {
     const raw = storage.getItem(SCORE_HISTORY_GRANULARITY_STORAGE_KEY);
-    return SCORE_HISTORY_GRANULARITIES.includes(raw) ? raw : DEFAULT_SCORE_HISTORY_GRANULARITY;
+    return Object.values(GRANULARITY).includes(raw) ? raw : DEFAULT_SCORE_HISTORY_GRANULARITY;
   } catch (err) {
     console.warn('[scoreHistoryPrefs] could not read granularity:', err);
     return DEFAULT_SCORE_HISTORY_GRANULARITY;
@@ -20,7 +20,7 @@ export function readScoreHistoryGranularity(storage = localStorage) {
 
 /** Persist the granularity. Silently ignores invalid values and storage errors. */
 export function writeScoreHistoryGranularity(value, storage = localStorage) {
-  if (!SCORE_HISTORY_GRANULARITIES.includes(value)) return;
+  if (!Object.values(GRANULARITY).includes(value)) return;
   try {
     storage.setItem(SCORE_HISTORY_GRANULARITY_STORAGE_KEY, value);
   } catch (err) {

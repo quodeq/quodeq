@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from quodeq.core.types.project_source import ProjectLocation
+
 
 class ProjectRepository(Protocol):
     """Abstraction over the storage layer used to persist project identities.
@@ -29,6 +31,6 @@ class ProjectIdentity:
     project_name: str
     repo_path: str
     discipline: str | None = None
-    location: str = "local"
+    location: str = ProjectLocation.LOCAL
     scope_path: str | None = None
     remote_url: str | None = None

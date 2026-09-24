@@ -9,7 +9,8 @@ from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.evidence._options import EvidenceParseOptions, MalformedLineSink
 from quodeq.core.evidence.refs import enrich_judgment
 from quodeq.core.finding_coercions import coerce_confidence, coerce_scope_downgrade
-from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment, VALID_VERDICTS
+from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
+from quodeq.core.types.finding_type import FINDING_TYPES
 from quodeq.core.types.req_ref import ReqRef
 from quodeq.core.utils.io import open_text
 
@@ -34,7 +35,7 @@ def parse_jsonl_line(
 
     practice_id = obj.get("p") or obj.get("req")
     verdict = obj.get("t")
-    if not practice_id or verdict not in VALID_VERDICTS:
+    if not practice_id or verdict not in FINDING_TYPES:
         return None
 
     pre_resolved = obj.get("req_refs")

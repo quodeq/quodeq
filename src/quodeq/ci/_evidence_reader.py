@@ -11,6 +11,7 @@ import json
 import logging
 from pathlib import Path
 
+from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.severity import Severity
 
 _logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ def _judgment_to_violation(obj: dict) -> dict | None:
 
     Returns None for non-violation verdicts or malformed rows.
     """
-    if obj.get("t") != "violation":
+    if obj.get("t") != FindingType.VIOLATION:
         return None
     file = obj.get("file")
     if not file:

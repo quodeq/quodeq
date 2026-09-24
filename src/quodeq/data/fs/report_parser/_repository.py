@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from quodeq.core.types.project_source import ProjectLocation
 from quodeq.shared.utils import is_repo_url
 
 _GIT_SUFFIX = ".git"
@@ -21,13 +22,13 @@ def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | 
         return {
             "name": name,
             "discipline": discipline,
-            "location": "online",
+            "location": ProjectLocation.ONLINE,
             "path": repo,
         }
     resolved = Path(repo).resolve()
     return {
         "name": resolved.name,
         "discipline": discipline,
-        "location": "local",
+        "location": ProjectLocation.LOCAL,
         "path": resolved.name,
     }

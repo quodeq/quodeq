@@ -37,7 +37,7 @@ from quodeq.assistant import LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant.orchestrator import TurnRequest, run_turn
 from quodeq.assistant.tools import ToolContext
-from quodeq.services.shared_repo import REPO_FORMAT_EMPTY, REPO_FORMAT_OK, read_state
+from quodeq.services.shared_repo import RepoFormat, read_state
 from quodeq.services.shared_settings import read_settings
 
 
@@ -65,7 +65,7 @@ def _shared_source_error() -> tuple[Response, int] | None:
         body, status = error_response("no shared repository configured", 409, "NO_SHARED_REPO")
         return jsonify(body), status
     state = read_state(settings.url)
-    if state not in (REPO_FORMAT_OK, REPO_FORMAT_EMPTY):
+    if state not in (RepoFormat.OK, RepoFormat.EMPTY):
         body, status = error_response(f"shared repository unavailable: {state}", 409, "SHARED_REPO_UNAVAILABLE")
         return jsonify(body), status
     return None

@@ -21,11 +21,7 @@ from quodeq.assistant import SessionScope
 from quodeq.assistant.orchestrator import write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, cached_skills
 from quodeq.assistant.tools.actions import ACTION_DESCRIPTIONS, ACTION_TYPES
-from quodeq.shared.constants import (
-    SESSION_SOURCE_LOCAL,
-    SESSION_SOURCE_SHARED,
-    SESSION_SOURCES,
-)
+from quodeq.core.types.project_source import ProjectSource
 
 
 @dataclass(frozen=True)
@@ -48,11 +44,11 @@ def _validate_session_request(
         body_, status = error_response(
             "unknown or unsupported provider", 400, "INVALID_PROVIDER")
         return (jsonify(body_), status), ""
-    source = str(body.get("source") or SESSION_SOURCE_LOCAL)
-    if source not in SESSION_SOURCES:
+    source = str(body.get("source") or ProjectSource.LOCAL)
+    if source not in ProjectSource:
         body_, status = error_response("invalid source", 400, "INVALID_SOURCE")
         return (jsonify(body_), status), source
-    if source == SESSION_SOURCE_SHARED:
+    if source == ProjectSource.SHARED:
         shared_error = gates.shared_source_error()
         if shared_error is not None:
             return shared_error, source
@@ -60,7 +56,7 @@ def _validate_session_request(
 
 
 def _compute_write_available(source: str, repo_root: str | None, provider: str) -> bool:
-    return (source == SESSION_SOURCE_LOCAL
+    return (source == ProjectSource.LOCAL
             and bool(repo_root)
             and (Path(repo_root) / ".git").exists()
             and write_safe_provider(provider))
@@ -85,7 +81,7 @@ def _resolve_session_scope(source: str, body: dict) -> tuple[str | None, str | N
       project_id + reports_dir.
     """
     project_id = body.get("projectId")
-    if source == SESSION_SOURCE_SHARED:
+    if source == ProjectSource.SHARED:
         run_dir = None
         if project_id and body.get("runId"):
             run_dir = _assistant_helpers.resolve_shared_run_location(
@@ -129,7 +125,7 @@ def register_assistant_session_routes(app: Flask, gates: SessionGates) -> None:
         return jsonify({"sessionId": session_id,
                         "repoAttached": repo_root is not None,
                         "repoReason": repo_reason,
-                        "readOnly": source == SESSION_SOURCE_SHARED,
+                        "readOnly": source == ProjectSource.SHARED,
                         "writeAvailable": write_available}), 201
 
     @app.get("/api/assistant/skills")

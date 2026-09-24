@@ -1,3 +1,5 @@
+import { GRANULARITY } from './utils/granularity.js';
+
 export const ISO_25010_URL = 'https://www.iso.org/';
 
 // Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).
@@ -13,12 +15,6 @@ export const AI_CMD_STORAGE_KEY = 'cc-ai-cmd';
 export const PER_DIMENSION_STORAGE_KEY = 'cc-per-dimension';
 
 export const ACTIVE_PROVIDER_KEY = 'cc-active-provider';
-
-// Providers that talk to a local model server. They default to no time limit
-// (Settings renders them as "Unlimited" and only writes the key once the user
-// edits it), so every reader of the stored limit must agree on the list or the
-// UI and the run disagree about whether the run is limited at all.
-export const LOCAL_API_PROVIDERS = new Set(['ollama', 'llamacpp', 'omlx']);
 
 export function providerKey(providerId, setting) {
   return `cc-${providerId}-${setting}`;
@@ -73,14 +69,7 @@ export const DEFAULT_VISIBLE_STANDARDS = [
 ];
 
 export const SCORE_HISTORY_GRANULARITY_STORAGE_KEY = 'quodeq-score-history-granularity';
-export const SCORE_HISTORY_GRANULARITIES = ['day', 'week', 'month'];
-export const DEFAULT_SCORE_HISTORY_GRANULARITY = 'day';
-
-// Where a selected project's data lives: this machine's evaluations or the
-// shared repository mirror. Wire value and the cache-key segment (queryKeys).
-export const PROJECT_SOURCE = Object.freeze({ LOCAL: 'local', SHARED: 'shared' });
-// What every source-taking factory and hook falls back to when none is passed.
-export const DEFAULT_PROJECT_SOURCE = PROJECT_SOURCE.LOCAL;
+export const DEFAULT_SCORE_HISTORY_GRANULARITY = GRANULARITY.DAY;
 
 // Fired (same-tab) by the assistant's ActionPreviewCard after a successful
 // apply, with { actionType, scores, delta } as detail. App-level effects and

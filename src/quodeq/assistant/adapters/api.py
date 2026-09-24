@@ -18,6 +18,7 @@ from quodeq.assistant.adapters._fallback import (
     fallback_contract,
 )
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
+from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, guard_tool_result
 from quodeq.assistant.tools.registry import ToolRegistry
 from quodeq.shared.env_resolve import resolve_env
@@ -152,7 +153,7 @@ def _stream_once(client, config, messages, session: ApiTurnSession):
             delta = chunk.choices[0].delta
             if getattr(delta, "content", None):
                 text_parts.append(delta.content)
-                session.emit({"type": "token", "text": delta.content})
+                session.emit({"type": FrameType.TOKEN, "text": delta.content})
             for tc in getattr(delta, "tool_calls", None) or []:
                 slot = calls.setdefault(tc.index, {"id": None, "name": None, "arguments": ""})
                 if tc.id:
@@ -193,7 +194,7 @@ def _dispatch_tool_calls(
     for call in tool_calls:
         arguments = _parse_args(call["arguments"])
         result = registry.dispatch(call["name"], arguments)
-        frame = {"type": "tool_call", "name": call["name"], "ok": result["ok"]}
+        frame = {"type": FrameType.TOOL_CALL, "name": call["name"], "ok": result["ok"]}
         if _args_summary(arguments):
             frame["argsSummary"] = _args_summary(arguments)
         emit(frame)
@@ -233,7 +234,7 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
                     return text
                 name, arguments = prompted
                 result = registry.dispatch(name, arguments)
-                frame = {"type": "tool_call", "name": name, "ok": result["ok"]}
+                frame = {"type": FrameType.TOOL_CALL, "name": name, "ok": result["ok"]}
                 if _args_summary(arguments):
                     frame["argsSummary"] = _args_summary(arguments)
                 emit(frame)
@@ -262,4 +263,4 @@ def _parse_args(raw: str) -> dict:
 
 def _emit_warnings(emit, warnings):
     for warning in warnings:
-        emit({"type": "warning", "message": warning})
+        emit({"type": FrameType.WARNING, "message": warning})

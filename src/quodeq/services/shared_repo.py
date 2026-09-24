@@ -9,11 +9,7 @@ from __future__ import annotations
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.shared_repo import (  # noqa: F401 — re-exported API
-    REPO_FORMAT_EMPTY,
-    REPO_FORMAT_FOREIGN,
-    REPO_FORMAT_OK,
-    REPO_FORMAT_UNSUPPORTED_VERSION,
-    REPO_STATE_MISSING,
+    RepoFormat,
     check_repo_format,
     clone_lock,
     ensure_shared_clone,

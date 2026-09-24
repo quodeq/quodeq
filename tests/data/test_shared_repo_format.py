@@ -5,6 +5,7 @@ import subprocess
 from quodeq.data.fs.shared_repo import (
     FORMAT_NAME,
     MARKER_FILENAME,
+    RepoFormat,
     bootstrap_repo_layout,
     check_repo_format,
     ensure_shared_clone,
@@ -164,3 +165,19 @@ def test_read_state_distinguishes_empty_and_foreign(tmp_path, monkeypatch):
     assert ok_repo is not None
     bootstrap_repo_layout(ok_repo)
     assert read_state(ok_url) == "ok"
+
+
+def test_check_repo_format_returns_the_enum_member(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    assert check_repo_format(repo) is RepoFormat.EMPTY
+    bootstrap_repo_layout(repo)
+    assert check_repo_format(repo) is RepoFormat.OK
+
+
+def test_read_state_missing_is_the_enum_member_and_serializes_as_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "cache"))
+    state = read_state("file:///nonexistent/repo.git")
+    assert state is RepoFormat.MISSING
+    assert json.dumps({"repoState": state}) == '{"repoState": "missing"}'
+    assert state not in (RepoFormat.OK, RepoFormat.EMPTY)

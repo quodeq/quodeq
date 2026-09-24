@@ -27,10 +27,11 @@ from quodeq.api._sse_log_helpers import sse_line
 from quodeq.api.assistant_turn_state import AssistantTurnState, turn_state
 from quodeq.api.helpers import json_error
 from quodeq.assistant.cancel import CancelToken
+from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.orchestrator import TurnRequest
 from quodeq.assistant.tools import ToolContext
+from quodeq.core.types.project_source import ProjectSource
 from quodeq.services.score_cache import score_cache_path_override
-from quodeq.shared.constants import SESSION_SOURCE_LOCAL, SESSION_SOURCE_SHARED
 
 
 @dataclass(frozen=True)
@@ -103,7 +104,7 @@ def _sse_event_generator(repo, sid: str, after: int):
         if item is None:
             idle_ticks += 1
             if idle_ticks % _HEARTBEAT_IDLE_TICKS == 0:
-                yield sse_line(json.dumps({"type": "heartbeat"}))
+                yield sse_line(json.dumps({"type": FrameType.HEARTBEAT}))
             else:
                 yield ":keepalive\n\n"
         else:
@@ -124,7 +125,7 @@ def _build_turn_request(sid: str, session: dict, body: dict, text: str,
         model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
         web_enabled=bool(body.get("webEnabled", False)),
         write_enabled=(bool(body.get("writeEnabled", False))
-                       and (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_LOCAL),
+                       and (session.get("source") or ProjectSource.LOCAL) == ProjectSource.LOCAL),
     )
 
 
@@ -139,7 +140,7 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
         return json_error("text required", 400, "MISSING_PARAM")
     if local_provider_busy(session["provider"]):
         return json_error("model busy with analysis", 409, "PROVIDER_BUSY")
-    if (session.get("source") or SESSION_SOURCE_LOCAL) == SESSION_SOURCE_SHARED:
+    if (session.get("source") or ProjectSource.LOCAL) == ProjectSource.SHARED:
         shared_error = gates.shared_source_error()
         if shared_error is not None:
             return shared_error

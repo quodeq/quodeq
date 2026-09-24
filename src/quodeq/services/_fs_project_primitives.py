@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from quodeq.core.types.project_source import ProjectLocation
 from quodeq.services.wiring import read_repository_info, read_scan_json
 
 
@@ -23,7 +24,7 @@ def read_scan_summary(reports_root: Path, entry_name: str) -> dict[str, Any]:
 
 def check_path_exists(path: str | None, location: str | None) -> bool | None:
     """Return whether a local path exists, or None if not applicable."""
-    if location == "local" and path:
+    if location == ProjectLocation.LOCAL and path:
         return Path(path).exists()
     return None
 
@@ -58,7 +59,7 @@ def local_repo_root(reports_root: Path, entry_name: str) -> Path | None:
     path = info.get("path")
     if not path or not isinstance(path, str):
         return None
-    if str(info.get("location", "")).lower() == "online" or "://" in path:
+    if str(info.get("location", "")).lower() == ProjectLocation.ONLINE or "://" in path:
         return None
     root = Path(path)
     return root if root.is_dir() else None

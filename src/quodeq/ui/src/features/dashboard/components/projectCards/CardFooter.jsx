@@ -1,6 +1,6 @@
 import { DownloadGlyph, TrashGlyph } from '../../../../components/glyphs.jsx';
 import { t } from '../../../../strings/index.js';
-import { PUBLISH_STATE } from '../../hooks/usePublish.js';
+import { PUBLISH_STATE } from '../../dashboardVocab.js';
 
 const ACTION_ICON_SIZE = 13;
 

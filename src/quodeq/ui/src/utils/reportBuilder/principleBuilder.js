@@ -1,6 +1,7 @@
 // src/quodeq/ui/src/utils/reportBuilder/principleBuilder.js
 import { formatDate, groupBySeverity, buildComplianceSection, buildViolationsSection, showsCompliance, runSuffix } from './shared.js';
 import { SEVERITY } from '../../vocab/severity.js';
+import { FINDING_TYPE } from '../../vocab/findingType.js';
 
 function buildPrincipleHeaderSection({ principle, dimension, score, grade, runId, dateLabel, principleData }) {
   const date = dateLabel || formatDate();
@@ -42,7 +43,7 @@ export function buildPrincipleReport({ principle, dimension, score, grade, viola
 
   const lines = buildPrincipleHeaderSection({ principle, dimension, score, grade, runId, dateLabel, principleData });
 
-  const showViolations = severityFilter !== 'compliance';
+  const showViolations = severityFilter !== FINDING_TYPE.COMPLIANCE;
   const showCompliance = showsCompliance(severityFilter);
 
   const filteredViolations = (showViolations && severityFilter && severityFilter !== 'all')

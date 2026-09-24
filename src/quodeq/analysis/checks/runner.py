@@ -124,7 +124,7 @@ def _merge_into_evidence(evidence: Evidence, judgments: list[Judgment],
             )
             evidence.principles[principle] = pe
         row = [judgment_to_dict(j)]
-        if j.verdict == "compliance":
+        if j.is_compliance():
             pe.add_compliance(row)
         else:
             pe.add_violations(row)

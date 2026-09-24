@@ -4,6 +4,7 @@ import { BRAND_NAME } from '../strings/brand.js';
 import { t, LOCALE } from '../strings/index.js';
 import { isEvaluatableSource } from '../appGating.js';
 import { useSidebarPin } from '../hooks/useSidebarPin.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 import {
   LOGO_VIEWBOX,
   LOGO_PATH_TRANSFORM,
@@ -217,7 +218,7 @@ export default function Sidebar({
   lastEvalAt = null,
   isPinned: controlledPinned,
   onPinChange,
-  selectedSource = 'local',
+  selectedSource = PROJECT_SOURCE.LOCAL,
   showCompareTab = false,
   inert = undefined,
 }) {

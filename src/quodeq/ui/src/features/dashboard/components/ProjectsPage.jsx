@@ -9,6 +9,7 @@ import { ProjectCardGroup, useRelocateDialog } from './projectCards/ProjectCardG
 import { OnlineCardFooter } from './projectCards/OnlineCardFooter.jsx';
 import { ProjectsToolbar } from './ProjectsToolbar.jsx';
 import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 const EVAL_BLOCKED_TITLE = t('projects.evalBlockedTitle');
 
@@ -142,9 +143,9 @@ function SharedProjectEntry({ entry, ctx }) {
     <ProjectCard
       key={entry.key}
       project={entry.shared}
-      chips="shared"
+      chips={PROJECT_SOURCE.SHARED}
       cardProps={{
-        onSelect: (pid) => onSelect?.(pid, 'shared'),
+        onSelect: (pid) => onSelect?.(pid, PROJECT_SOURCE.SHARED),
         footer: (
           <OnlineCardFooter
             projectId={sharedId}

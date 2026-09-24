@@ -3,6 +3,7 @@ import { t } from '../../../../strings/index.js';
 import Badge from '../../../../components/Badge.jsx';
 import { disciplineLabel, formatDate } from './projectDisplayHelpers.js';
 import { GradeChip, LanguageNumbers, ProjectCardChips, PublishedMeta, LocalPublishedMeta } from './ProjectCardParts.jsx';
+import { PROJECT_SOURCE } from '../../../../vocab/projectSource.js';
 
 function ProjectCardTopLeft({ project, id, name, grade, score, onResumeSetup }) {
   return (
@@ -50,7 +51,7 @@ function ProjectCardBottom({ project, chips, resolvedPublishedAt, cardChildren }
   return (
     <div className="project-card-bottom">
       <LanguageNumbers stats={project.languageStats} filesCount={project.filesCount} />
-      {chips === 'shared' ? (
+      {chips === PROJECT_SOURCE.SHARED ? (
         <PublishedMeta publishedBy={project.publishedBy} publishedAt={resolvedPublishedAt} />
       ) : (
         <LocalPublishedMeta publishedAt={resolvedPublishedAt} />

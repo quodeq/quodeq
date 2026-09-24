@@ -19,14 +19,12 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.config.llm_bridge_env import omlx_api_key, omlx_base_url
-from quodeq.llm_bridge._ollama import DEFAULT_MEMORY_FRACTION, detect_memory, estimate_max_agents
+from quodeq.llm_bridge._ollama import DEFAULT_MEMORY_FRACTION, HEALTH_OK, detect_memory, estimate_max_agents
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
 _TIMEOUT_S = 3
-# The /health body's own status word; not a quodeq vocabulary.
-_HEALTH_OK = "ok"
 
 
 def read_omlx_api_key(env: Mapping[str, str] | None = None) -> str:
@@ -83,7 +81,7 @@ def get_omlx_status(base_url: str | None = None) -> dict:
                 data = {}
             return {
                 "running": True,
-                "status": data.get("status", _HEALTH_OK),
+                "status": data.get("status", HEALTH_OK),
                 "address": root.replace("http://", ""),
             }
     except (urllib.error.URLError, ConnectionRefusedError, OSError, ValueError) as exc:
