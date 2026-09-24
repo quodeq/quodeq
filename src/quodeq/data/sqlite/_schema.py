@@ -1,4 +1,4 @@
-"""DDL strings for evaluation.db. Constants only — no logic."""
+"""SQL strings for evaluation.db. Constants only — no logic."""
 from __future__ import annotations
 
 SCHEMA_VERSION = 9
@@ -108,3 +108,20 @@ CREATE INDEX idx_principle_grades_dimension ON principle_grades(dimension);
 """
 
 EVALUATION_DDL = f"PRAGMA user_version = {SCHEMA_VERSION};\n" + _DDL_BODY
+
+# The one INSERT for a findings row. Both writers (the repository and the
+# projection's state store) bind the same named columns, so the column list
+# lives next to the table it has to match.
+INSERT_FINDING_SQL = """
+INSERT OR IGNORE INTO findings (
+    schema_version, practice_id, dimension, requirement, verdict, severity,
+    file, line, end_line, title, reason, snippet,
+    violation_type, violation_type_raw, context, scope, req_refs_json, dedup_key, confidence,
+    provenance_downgrade, scope_downgrade_json
+) VALUES (
+    :schema_version, :practice_id, :dimension, :requirement, :verdict, :severity,
+    :file, :line, :end_line, :title, :reason, :snippet,
+    :violation_type, :violation_type_raw, :context, :scope, :req_refs_json, :dedup_key, :confidence,
+    :provenance_downgrade, :scope_downgrade_json
+)
+"""

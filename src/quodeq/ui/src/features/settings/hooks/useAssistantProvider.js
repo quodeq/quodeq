@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT } from '../../../constants.js';
+import { broadcastSettingsChange, useSettingsChangeSync } from './settingsSync.js';
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
 export const ASSISTANT_MODE_KEY = 'cc-assistant-mode';
@@ -91,20 +92,9 @@ function makeSetModel(storage, setState, broadcast) {
 
 // Analysis-gate changes (provider/model) fire PROVIDER_SETTINGS_CHANGED_EVENT
 // so Default mode, which mirrors the analysis selection, updates its display live.
-function useProviderChangeSync(storage, setState) {
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const handleChange = () => setState(loadState(storage));
-    window.addEventListener(CHANGE_EVENT, handleChange);
-    window.addEventListener(PROVIDER_SETTINGS_CHANGED_EVENT, handleChange);
-    window.addEventListener('storage', handleChange);
-    return () => {
-      window.removeEventListener(CHANGE_EVENT, handleChange);
-      window.removeEventListener(PROVIDER_SETTINGS_CHANGED_EVENT, handleChange);
-      window.removeEventListener('storage', handleChange);
-    };
-  }, [storage]);
-}
+// The analysis provider settings feed the default mode, so their change
+// event re-reads this hook's state too.
+const SYNC_EVENTS = [CHANGE_EVENT, PROVIDER_SETTINGS_CHANGED_EVENT];
 
 function buildAssistantProviderResult(state, setEnabled, setMode, setActiveProvider, setModel) {
   return {
@@ -132,11 +122,7 @@ function buildAssistantProviderResult(state, setEnabled, setMode, setActiveProvi
 export function useAssistantProvider({ storage = localStorage } = {}) {
   const [state, setState] = useState(() => loadState(storage));
 
-  const broadcast = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event(CHANGE_EVENT));
-    }
-  }, []);
+  const broadcast = useCallback(() => broadcastSettingsChange(CHANGE_EVENT), []);
 
   // useMemo, not useCallback: the factories must run only when their inputs
   // change, where useCallback(factory(...), deps) rebuilds the closure every
@@ -146,7 +132,7 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
   const setActiveProvider = useMemo(() => makeSetActiveProvider(storage, setState, broadcast), [storage, broadcast]);
   const setModel = useMemo(() => makeSetModel(storage, setState, broadcast), [storage, broadcast]);
 
-  useProviderChangeSync(storage, setState);
+  useSettingsChangeSync(SYNC_EVENTS, { load: loadState, setState, storage });
 
   return buildAssistantProviderResult(state, setEnabled, setMode, setActiveProvider, setModel);
 }

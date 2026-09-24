@@ -178,14 +178,7 @@ class AssistantRepository:
     def set_action_status(
         self, action_id: str, status: str, *, expected: str | None = None,
     ) -> bool:
-        """Set an action's status; return whether a row was updated.
-
-        With ``expected`` the write is a compare-and-set
-        (``WHERE id=? AND status=?``), so a caller can atomically claim a
-        transition — two concurrent applies of the same action can't both
-        win and double-run the side effect. Without ``expected`` the write
-        is unconditional (back-compat for the rollback path).
-        """
+        """Contract in ``AssistantStore.set_action_status``."""
         with self._connect() as conn:
             if expected is None:
                 cur = conn.execute(

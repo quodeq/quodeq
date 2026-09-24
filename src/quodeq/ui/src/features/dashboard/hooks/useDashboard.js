@@ -1,8 +1,9 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { useProjectScores } from "../../../hooks/useProjectScores.js";
-import { projectKeys, samePlaceholderScope } from "../../../api/queryKeys.js";
+import { projectKeys } from "../../../api/queryKeys.js";
+import { useScopedPlaceholder } from "../../../hooks/useScopedPlaceholder.js";
 import { isFrozenRun } from '../../../models/runRules.js';
 import { t } from '../../../strings/index.js';
 import { useDashboardInvalidation } from './useDashboardInvalidation.js';
@@ -152,11 +153,7 @@ export function useDashboard({ selectedProject, selectedRun, selectedSource = PR
   const { getDashboard, sharedGetDashboard, sharedGetProjectInfo } = useApi();
   const fetchDashboard = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetDashboard : getDashboard;
   const queryClient = useQueryClient();
-  const projectKey = selectedProject || "_none_";
-  const keepInScope = useCallback(
-    (prev, prevQuery) => (samePlaceholderScope(prevQuery, projectKey, selectedSource) ? prev : undefined),
-    [projectKey, selectedSource],
-  );
+  const { projectKey, keepInScope } = useScopedPlaceholder(selectedProject, selectedSource);
 
   const sharedProjectInfoQuery = useQuery(buildSharedProjectInfoQueryConfig({ projectKey, selectedSource, sharedGetProjectInfo, selectedProject }));
 

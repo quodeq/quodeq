@@ -1,6 +1,7 @@
 import IncompleteSetupCard from './IncompleteSetupCard.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
+import { NoEvalsEmptyState } from '../../../components/ProjectEmptyStates.jsx';
 import { t } from '../../../strings/index.js';
 
 // These render only the *contents* of DashboardPage's `.dashboard-page` div
@@ -38,17 +39,6 @@ export function NoLocalProjectsSharedContent({ onNavigate }) {
   );
 }
 
-export function NoProjectsContent({ onNavigate }) {
-  return (
-    <EmptyState
-      title={t('overview.noProjectsTitle')}
-      description={t('overview.noProjectsDesc')}
-      actionLabel={t('overview.addProject')}
-      onAction={() => onNavigate?.('projects')}
-    />
-  );
-}
-
 export function NoProjectSelectedContent({ onNavigate }) {
   return (
     <EmptyState
@@ -69,17 +59,6 @@ export function LoadingProjectContent({ projectName }) {
   );
 }
 
-export function LoadProjectFailedContent({ error, onRetry }) {
-  return (
-    <EmptyState
-      title={t('overview.loadProjectFailedTitle')}
-      description={error}
-      actionLabel={t('overview.retry')}
-      onAction={() => onRetry?.()}
-    />
-  );
-}
-
 // Covers both the settled no-runs state and a background refetch of an
 // empty project (isFetching true, dashboard still null -- previously a
 // visually blank .dashboard-page with no dim and no loader), plus the
@@ -90,12 +69,7 @@ export function NoRunsEmptyContent({ projectInfo, onComplete, projectName, onNav
   return (
     <>
       <IncompleteSetupCard projectInfo={projectInfo} onComplete={onComplete} />
-      <EmptyState
-        title={t('overview.noEvalsTitle')}
-        description={t('overview.noEvalsDesc', { name: projectName })}
-        actionLabel={t('overview.startEvaluation')}
-        onAction={() => onNavigate?.('evaluate')}
-      />
+      <NoEvalsEmptyState projectName={projectName} onNavigate={onNavigate} />
     </>
   );
 }

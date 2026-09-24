@@ -53,10 +53,7 @@ def _is_gin_line(line: str) -> bool:
 def register_ollama_log_routes(app: Flask, env: Mapping[str, str] | None = None) -> None:
     """Register the /api/ollama/logs/stream SSE endpoint.
 
-    Auth: inherits protection from the global before_request hook.
-
-    *env* is captured once here, at app-creation time, rather than read per
-    request; ``None`` keeps the per-request lookup against ``os.environ``.
+    Auth and *env* capture work as in ``configure_security``.
     """
 
     @app.get("/api/ollama/logs/stream")

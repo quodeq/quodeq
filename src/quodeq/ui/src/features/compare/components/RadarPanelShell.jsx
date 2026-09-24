@@ -1,4 +1,4 @@
-import { SectionLabel } from '../../../components/terminal/index.js';
+import ComparePanel from './ComparePanel.jsx';
 import { t } from '../../../strings/index.js';
 
 const MIN_RADAR_AXES = 3;
@@ -11,14 +11,10 @@ const MIN_RADAR_AXES = 3;
  */
 export default function RadarPanelShell({ ariaLabel, header, note, items, minItems = MIN_RADAR_AXES, children }) {
   return (
-    <section className="compare-panel" aria-label={ariaLabel}>
-      <div className="compare-panel__head">
-        <SectionLabel>{header}</SectionLabel>
-        <span className="compare-panel__note">{note}</span>
-      </div>
+    <ComparePanel ariaLabel={ariaLabel} header={header} note={note}>
       {items.length >= minItems
         ? children
         : <p className="compare-panel__fallback">{t('compare.radialTooFew')}</p>}
-    </section>
+    </ComparePanel>
   );
 }
