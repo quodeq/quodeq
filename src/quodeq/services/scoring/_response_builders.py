@@ -8,7 +8,7 @@ callers and patch targets are unchanged.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from quodeq.shared.serialization import to_camel_dict
@@ -165,14 +165,15 @@ def _default_grade_tables_reader(run_dir: Path) -> GradeTablesReader:
 def build_response_from_grade_tables(
     run_dir: Path, params: ScoringParams = DEFAULT_PARAMS,
     store_factory: Callable[[Path], GradeTablesReader] | None = None,
+    findings_reader: Callable[[Path], Iterable[dict]] | None = None,
 ) -> dict:
     """Build the full scores response from SQL grade tables + findings.
 
     Reads dimension_scores and principle_grades from the grade-tables reader
     built by *store_factory* (the SQLite state store by default), reads
-    active (non-dismissed) findings via the adapter-side
-    ``read_active_findings``, and assembles the same camelCase dict shape as
-    the legacy rescore path.
+    active (non-dismissed) findings via *findings_reader* (the adapter-side
+    ``read_active_findings`` by default), and assembles the same camelCase
+    dict shape as the legacy rescore path.
     """
     store = (store_factory or _default_grade_tables_reader)(run_dir)
     dim_rows = store.read_dimension_scores()
@@ -186,7 +187,7 @@ def build_response_from_grade_tables(
     # Active findings grouped by dimension and verdict.
     violations_by_dim: dict[str, list[Finding]] = {}
     compliance_by_dim: dict[str, list[Finding]] = {}
-    for row in read_active_findings(run_dir):
+    for row in (findings_reader or read_active_findings)(run_dir):
         f = row_to_finding(row)
         dim = f.dimension or ""
         if f.verdict == FindingType.VIOLATION:
