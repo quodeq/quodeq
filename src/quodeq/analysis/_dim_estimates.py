@@ -30,7 +30,7 @@ from enum import StrEnum
 from typing import Any
 
 from quodeq.analysis.run_types import RunConfig
-from quodeq.analysis.cache import LocalFileBackend, classify_files_via_cache
+from quodeq.analysis.cache import LocalFileBackend, classify_files_via_cache, count_cache_misses
 from quodeq.analysis.dispatch_policy import api_file_size_cap
 from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.core.observability import NULL_LOG, LogSink
@@ -77,11 +77,13 @@ def _log_excluded_once(log: LogSink, n_excluded: int, excluded_logged: bool) -> 
 
 def _estimate_incremental(
     config: RunConfig, dim_id: str, files: list[str],
-    cache: LocalFileBackend, n_excluded: int,
+    cache: LocalFileBackend, n_excluded: int, *, count_only: bool = False,
 ) -> dict[str, Any]:
     """Estimate one dim's count/reason for an incremental (cache-aware) run."""
-    classify = classify_files_via_cache(config, dim_id, files, cache)
-    miss_count = len(classify.misses)
+    if count_only:
+        miss_count = count_cache_misses(config, dim_id, files, cache)
+    else:
+        miss_count = len(classify_files_via_cache(config, dim_id, files, cache).misses)
     if miss_count == len(files):
         # Every file is a miss → cache cold for this dim.
         reason = DimEstimateReason.FIRST_RUN
@@ -112,6 +114,7 @@ def _estimate_non_incremental(
 
 def compute_dim_estimates(
     config: RunConfig, dimensions: list[str], *, log: LogSink = NULL_LOG,
+    count_only: bool = False,
 ) -> dict[str, dict[str, Any]]:
     """Estimate per-dim file count + reason, before any dim runs.
 
@@ -119,13 +122,21 @@ def compute_dim_estimates(
     ``count`` is the number of cache misses per dimension — exactly what V2
     will dispatch on this run. ``total`` and ``cached`` describe overall
     project coverage (see module docstring).
+
+    ``count_only=True`` is for callers that only report the counts (the
+    /estimates endpoint): files are listed unordered and cache hits are an
+    existence check. The pipeline keeps the default because the dim runner
+    reuses this classification through ``RunConfig.classify_stash``, which
+    needs the findings and the same ordered file list.
     """
     estimates: dict[str, dict[str, Any]] = {}
     file_filter = config.options.incremental_file_filter
     cache = LocalFileBackend()
     excluded_logged = False
     for dim_id in dimensions:
-        files, _ext, excluded = list_source_files(config, dim_id, ignore_file_filter=True)
+        files, _ext, excluded = list_source_files(
+            config, dim_id, ignore_file_filter=True, prioritize=not count_only,
+        )
         n_excluded = len(excluded)
         excluded_logged = _log_excluded_once(log, n_excluded, excluded_logged)
         if not files:
@@ -135,7 +146,9 @@ def compute_dim_estimates(
             }
             continue
         if config.options.incremental:
-            estimates[dim_id] = _estimate_incremental(config, dim_id, files, cache, n_excluded)
+            estimates[dim_id] = _estimate_incremental(
+                config, dim_id, files, cache, n_excluded, count_only=count_only,
+            )
         else:
             estimates[dim_id] = _estimate_non_incremental(files, file_filter, n_excluded)
     return estimates

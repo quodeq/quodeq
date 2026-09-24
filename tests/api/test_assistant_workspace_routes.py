@@ -222,3 +222,21 @@ def test_workspace_apply_requires_csrf_origin(tmp_path, monkeypatch):
     resp = client.post("/api/assistant/sessions/x/workspace/apply",
                        headers={"Origin": "http://evil.example"})
     assert resp.status_code == 403
+
+
+def test_workspace_status_reads_the_session_once(app, client, repo, monkeypatch):
+    from quodeq.data.sqlite.assistant_repository import AssistantRepository
+    sid, _store, _manager = _session_with_worktree(app, client, repo)
+    calls: list[str] = []
+    real = AssistantRepository.get_session
+
+    def counting(self, session_id):
+        calls.append(session_id)
+        return real(self, session_id)
+
+    monkeypatch.setattr(AssistantRepository, "get_session", counting)
+
+    resp = client.get(f"/api/assistant/sessions/{sid}/workspace")
+
+    assert resp.status_code == 200
+    assert calls == [sid]

@@ -111,21 +111,84 @@ def _init(path: Path) -> sqlite3.Connection:
 # -shm). Only open/rebuild is serialized — yielded connections stay concurrent.
 _OPEN_LOCK = threading.Lock()
 
+# Files this process has fully initialized, keyed by
+# (path, st_dev, st_ino, CACHE_WRITER_EPOCH). A hit skips the DDL, the commit
+# and the epoch purge. The inode is in the key so a deleted and recreated file
+# misses; path plus epoch alone would skip the DDL on a fresh empty file.
+_INITIALIZED: set[tuple[str, int, int, str]] = set()
+
+
+def _identity(path: Path) -> tuple[str, int, int, str] | None:
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (str(path), st.st_dev, st.st_ino, CACHE_WRITER_EPOCH)
+
+
+def _connect_initialized(path: Path) -> sqlite3.Connection:
+    """Fast path for a file already initialized here: connect, set the busy
+    timeout, and prove the schema is still there with one single-row read
+    (an inode can be reused by a brand-new file)."""
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+        row = conn.execute(
+            "SELECT value FROM cache_meta WHERE key='writer_epoch'"
+        ).fetchone()
+    except sqlite3.DatabaseError:
+        conn.close()
+        raise
+    if row is None or row[0] != CACHE_WRITER_EPOCH:
+        conn.close()
+        raise sqlite3.DatabaseError("score cache not initialized for this epoch")
+    return conn
+
+
+def _open_locked(path: Path) -> sqlite3.Connection:
+    """Open *path*, running the full init only on a memo miss. Caller holds _OPEN_LOCK."""
+    ident = _identity(path)
+    if ident in _INITIALIZED:
+        try:
+            return _connect_initialized(path)
+        except sqlite3.DatabaseError:
+            _INITIALIZED.discard(ident)
+    try:
+        conn = _init(path)
+    except sqlite3.DatabaseError:
+        _logger.warning("score cache at %s unreadable; rebuilding", path)
+        path.unlink(missing_ok=True)
+        conn = _init(path)
+    ident = _identity(path)
+    if ident is not None:
+        _INITIALIZED.add(ident)
+    return conn
+
+
+def _forget(path: Path) -> None:
+    """Drop every memo entry for *path*, so its next open runs the full init."""
+    key = str(path)
+    with _OPEN_LOCK:
+        _INITIALIZED.difference_update({i for i in _INITIALIZED if i[0] == key})
+
 
 @contextmanager
 def open_score_cache() -> Iterator[sqlite3.Connection]:
-    """Open the score cache DB (WAL). Rebuilds from scratch if corrupt/older-schema."""
+    """Open the score cache DB (WAL). Rebuilds from scratch if corrupt/older-schema.
+
+    The first open of a file in this process runs the full init; later opens
+    of the same file only connect. A DatabaseError raised inside the block
+    forgets the file, so the next open runs the full init again.
+    """
     override = _CACHE_PATH_OVERRIDE.get()
     path = Path(override) if override else Path(get_score_cache_path())
     path.parent.mkdir(parents=True, exist_ok=True)
     with _OPEN_LOCK:
-        try:
-            conn = _init(path)
-        except sqlite3.DatabaseError:
-            _logger.warning("score cache at %s unreadable; rebuilding", path)
-            path.unlink(missing_ok=True)
-            conn = _init(path)
+        conn = _open_locked(path)
     try:
         yield conn
+    except sqlite3.DatabaseError:
+        _forget(path)
+        raise
     finally:
         conn.close()

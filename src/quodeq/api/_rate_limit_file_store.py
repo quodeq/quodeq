@@ -24,6 +24,19 @@ _DEFAULT_PATH = str(default_rate_limit_path())
 _LOCK_TIMEOUT_S = 1.5
 
 
+def _drop_idle_ips(data: dict, now: float, window: float) -> None:
+    """Remove every IP with no timestamp inside *window*, so the state file
+    stops growing with every client ever seen. Values that are not a list of
+    numbers (the file is user-writable) are dropped too."""
+    idle = [
+        ip for ip, stamps in data.items()
+        if not isinstance(stamps, list) or not any(
+            isinstance(t, (int, float)) and now - t < window for t in stamps)
+    ]
+    for ip in idle:
+        del data[ip]
+
+
 class FileRateLimitStore:
     """Rate-limit store backed by a JSON file, with a short in-memory cache.
 
@@ -143,6 +156,7 @@ class FileRateLimitStore:
                 data[ip] = pruned
             else:
                 data.pop(ip, None)
+            _drop_idle_ips(data, now, self._window)
             self._dirty = True
             self._flush(now, force=False)
 
@@ -219,6 +233,7 @@ class FileRateLimitStore:
         if not limited:
             timestamps.append(now)
             data[ip] = timestamps
+            _drop_idle_ips(data, now, self._window)
             self._save(data)
             self._last_flush = now
             self._dirty = False

@@ -16,7 +16,7 @@ from quodeq.core.types.finding import Finding
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.scoring.overall import weighted_overall, MODE_NUMERICAL
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
-from quodeq.data.fs.report_parser.grades import summarize_dimensions
+from quodeq.core.scoring.report_grades import summarize_dimensions
 from quodeq.services import grade_formula
 from quodeq.services._rescore_legacy import group_by_principle, score_all_principles
 from quodeq.services.dismissed import recount_totals

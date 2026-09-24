@@ -72,6 +72,27 @@ def classify_one_file(
     return key, struct.file_content_hash, hit, adopted
 
 
+def count_cache_misses(
+    config: RunConfig, dimension: str, files: list[str], cache: CacheBackend,
+) -> int:
+    """How many of ``files`` would miss the cache, without reading any entry.
+
+    Same keys and adoption as :func:`classify_one_file`, but a hit is only an
+    existence check. For callers that need the count, not the findings (the
+    /estimates endpoint). A corrupt entry, which ``get`` treats as a miss,
+    counts as a hit here.
+    """
+    misses = 0
+    for f in files:
+        struct = build_cache_key_struct(config, f, dimension)
+        key = compute_key(struct)
+        if cache.has(key):
+            continue
+        if try_adopt(cache, struct, key, language=config.language or "") is None:
+            misses += 1
+    return misses
+
+
 def partition_files_by_cache(
     config: RunConfig, dimension: str, files: list[str], cache: CacheBackend,
     *, bypass_reads: bool,
@@ -139,8 +160,8 @@ def classify_files_via_cache(
     its result there on the first call for a given ``(dimension, files)``
     pair and short-circuits the second call. The stash MUST NOT short-
     circuit when ``bypass_reads`` is True — clean-scan deletes entries
-    immediately before this call, so an upfront classify's hits are
-    stale by the time the dim runner asks again.
+    after this call, so an upfront classify's hits are stale by the
+    time the dim runner asks again.
     """
     files_tuple = tuple(files)
     run_cache = config.classify_stash

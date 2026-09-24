@@ -58,6 +58,10 @@ export const projectKeys = {
   all: () => [PROJECT_SCOPE],
   project: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source),
   scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "scores", asOf || LATEST_RUN_ID),
+  complianceDetail: (projectId, asOf, dimension, generation, scope = {}) => projectScope(
+    projectId, DEFAULT_PROJECT_SOURCE, "complianceDetail", asOf || LATEST_RUN_ID, dimension, generation,
+    scope.principle ?? null, scope.pathPrefix ?? null,
+  ),
   dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dashboard", run || LATEST_RUN_ID),
   runs: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runs"),
   info: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "info"),
@@ -143,4 +147,11 @@ export const sharedKeys = {
   all: () => [SHARED_SCOPE],
   status: () => [SHARED_SCOPE, "status"],
   list: () => [SHARED_SCOPE, "list"],
+};
+
+// The grade-formula editor's rescore-progress poll. Outside the `project`
+// scope on purpose: when a pass lands the editor drops projectKeys.all(),
+// and that must not also refetch the poll that noticed it.
+export const gradeFormulaKeys = {
+  rescore: () => ["gradeFormula", "rescore"],
 };

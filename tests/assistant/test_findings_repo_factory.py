@@ -31,6 +31,9 @@ class FakeFindingsRepo:
     def list_all(self) -> list[Finding]:
         return list(self._findings)
 
+    def list_keys(self) -> list[tuple]:
+        return [(f.req, f.file, f.line) for f in self._findings]
+
     def count_by_dimension(self) -> dict[str, int]:
         out: dict[str, int] = {}
         for f in self._findings:
@@ -111,3 +114,16 @@ def test_finding_keys_in_scope_guard_skips_factory_without_db(tmp_path):
 
     assert finding_keys_in_scope(ctx) == set()
     assert not (ctx.run_dir / "evaluation.db").exists()
+
+
+def test_finding_keys_in_scope_reads_keys_not_full_rows(tmp_path):
+    fake = FakeFindingsRepo([_finding()])
+
+    def no_full_rows():
+        raise AssertionError("list_all must not be used for identity keys")
+
+    fake.list_all = no_full_rows
+    ctx = _ctx(tmp_path, lambda run_dir: fake)
+    (ctx.run_dir / "evaluation.db").touch()
+
+    assert ("req-1", "src/a.py", 3) in finding_keys_in_scope(ctx)

@@ -17,7 +17,7 @@ from pathlib import Path
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types.job import JobSnapshot
-from quodeq.data.sqlite import run_index as _run_index
+from quodeq.services.wiring import run_index as _run_index
 from quodeq.services._run_status_readers import status_json_terminal
 from quodeq.core.utils.io import is_within
 

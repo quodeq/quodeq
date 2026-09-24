@@ -12,9 +12,9 @@ from typing import Any
 
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
+from quodeq.core.scoring.report_grades import calculate_trend, most_frequent_grade, parse_numeric_score
 from quodeq.core.types import DimensionResult
 from quodeq.shared.serialization import to_camel_dict
-from quodeq.services.wiring import calculate_trend, most_frequent_grade, parse_numeric_score
 
 
 def numeric_average(

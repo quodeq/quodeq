@@ -19,6 +19,7 @@ phase), the shape narrows; the text stays.
 from __future__ import annotations
 
 import io
+import os
 import re
 import tokenize
 from pathlib import Path
@@ -56,12 +57,20 @@ _STATEMENT_START = (tokenize.INDENT, tokenize.DEDENT, tokenize.NEWLINE, tokenize
 
 
 def _iter_sources():
-    """Yield src/quodeq .py/.js/.jsx/.mjs and tests .py files, vendored dirs and this file aside."""
-    for root, exts in ((SRC, ("*.py", "*.js", "*.jsx", "*.mjs")), (TESTS, ("*.py",))):
-        for ext in exts:
-            for path in sorted(root.rglob(ext)):
-                if SKIP_DIRS.isdisjoint(path.relative_to(root).parts) and path != Path(__file__).resolve():
-                    yield path
+    """Yield src/quodeq .py/.js/.jsx/.mjs and tests .py files, vendored dirs and this file aside.
+
+    One walk per root, pruned before descending, so node_modules and the
+    other SKIP_DIRS are never listed.
+    """
+    this_file = Path(__file__).resolve()
+    for root, suffixes in ((SRC, (".py", ".js", ".jsx", ".mjs")), (TESTS, (".py",))):
+        found: list[Path] = []
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+            found.extend(Path(dirpath) / name for name in filenames if name.endswith(suffixes))
+        for path in sorted(found):
+            if path != this_file:
+                yield path
 
 
 def python_prose(source: str) -> list[tuple[int, str]]:

@@ -15,16 +15,17 @@ from typing import Any
 
 from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.core.run.dimensions import DimState
-from quodeq.data.fs.evidence_tally import FindingTally, IncrementalTally
-from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services._scan_progress_elapsed import dim_elapsed_s
 from quodeq.services._scan_progress_types import DimProgress, ProgressContext
 from quodeq.services.wiring import (
+    FindingTally,
+    IncrementalTally,
     count_active_agent_streams,
     dimension_evidence_file,
     dimension_queue_file,
     dimension_report_exists,
     read_queue_state,
+    read_req_to_principle_map,
 )
 from quodeq.services.suppression import build_matcher
 from quodeq.shared.constants import CONSOLIDATED_DIMENSION_KEY
@@ -97,21 +98,21 @@ def _standards_stamp(directory: Path | None) -> tuple[str, int]:
         return (str(directory), 0)
 
 
-def live_tally(path: Path, *, suppressed, resolver, memo_key: tuple | None) -> FindingTally:
+def live_tally(path: Path, *, suppressed, make_resolver, memo_key: tuple | None) -> FindingTally:
     """The file's tally, resumed from the last poll when *memo_key* is unchanged.
 
-    ``memo_key=None`` means this state cannot be keyed (see
-    ``_suppression_stamp``): the file is tallied from scratch and nothing is
-    stored.
+    *make_resolver* (zero-arg, or None) is called only when a new tally is
+    built. ``memo_key=None`` means this state cannot be keyed (see
+    ``_suppression_stamp``): the file is tallied from scratch, nothing stored.
     """
     if memo_key is None:
-        return IncrementalTally(path, suppressed=suppressed, resolver=resolver).advance()
+        return IncrementalTally(path, suppressed=suppressed, resolver=make_resolver and make_resolver()).advance()
     key = (str(path), memo_key)
     with _LIVE_TALLIES_LOCK:
         guarded = _LIVE_TALLIES.get(key)
         if guarded is None:
             guarded = _GuardedTally(
-                IncrementalTally(path, suppressed=suppressed, resolver=resolver))
+                IncrementalTally(path, suppressed=suppressed, resolver=make_resolver and make_resolver()))
             _LIVE_TALLIES.put(key, guarded)
     return guarded.advance()
 
@@ -201,7 +202,7 @@ def consolidated_dim_progress(run_dir: Path) -> DimProgress:
     evidence_dir = run_dir / "evidence"
     queue = read_queue_state(evidence_dir / "consolidated_queue.json") or {}
     tally = live_tally(evidence_dir / "consolidated_evidence.jsonl",
-                       suppressed=None, resolver=None, memo_key=(CONSOLIDATED_DIMENSION_KEY,))
+                       suppressed=None, make_resolver=None, memo_key=(CONSOLIDATED_DIMENSION_KEY,))
     return DimProgress(
         id=CONSOLIDATED_DIMENSION_KEY,
         state=DimState.RUNNING,
@@ -247,8 +248,8 @@ def _dim_evidence_tally(dim_id: str, ctx: ProgressContext, dismissed, deleted):
     return live_tally(
         dimension_evidence_file(ctx.run_dir, dim_id),
         suppressed=matcher.is_suppressed if matcher.active else None,
-        resolver=build_principle_resolver(dim_id, ctx.evaluators_dir, ctx.compiled_dir,
-                                          req_map_reader=read_req_to_principle_map),
+        make_resolver=lambda: build_principle_resolver(
+            dim_id, ctx.evaluators_dir, ctx.compiled_dir, req_map_reader=read_req_to_principle_map),
         memo_key=memo_key,
     )
 

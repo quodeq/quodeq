@@ -132,7 +132,7 @@ class TestDownloadViaDialogUrlValidation:
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = MagicMock()
-            mock_response.read.return_value = b"test data"
+            mock_response.read.side_effect = [b"test data", b""]
             mock_response.__enter__.return_value = mock_response
             mock_response.__exit__.return_value = False
             mock_urlopen.return_value = mock_response
@@ -188,7 +188,7 @@ class TestDownloadViaDialogUrlValidation:
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_response = MagicMock()
-            mock_response.read.return_value = b"test data"
+            mock_response.read.side_effect = [b"test data", b""]
             mock_response.__enter__.return_value = mock_response
             mock_response.__exit__.return_value = False
             mock_urlopen.return_value = mock_response

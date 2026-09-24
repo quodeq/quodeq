@@ -10,6 +10,7 @@ from unittest import mock
 
 from quodeq.data.cache_store.index import close_all_for_tests
 from quodeq.data.fs._index_cache import clear_index_cache
+from quodeq.services.dashboard import clear_shared_dimension_cache
 from quodeq.services.score_cache import clear_stale_payloads
 
 # Deep enough to exhaust the C JSON decoder's call stack on a default 8MB
@@ -145,6 +146,18 @@ def _fresh_stale_payloads() -> None:
     "stale" to the next test that reuses the name.
     """
     clear_stale_payloads()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _fresh_dimension_caches() -> None:
+    """Clear the process-wide run-dimension caches before every test.
+
+    The trend scalar cache lives for the process and is keyed by the reports
+    root, so a test that reuses a root (or injects a fake reader) would
+    otherwise see entries a previous test stored.
+    """
+    clear_shared_dimension_cache()
     yield
 
 

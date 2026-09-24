@@ -68,6 +68,7 @@ _.plain_logs  # api/_log_stream_routes.py: Flask view function; the route decora
 _.post_assistant_message  # api/assistant_turn_routes.py: Flask view function; the route decorator is its only caller.
 _.preview_grade_formula  # api/_grade_formula_routes.py: Flask view function; the route decorator is its only caller.
 _.project_compare_summary  # api/routes_compare.py: Flask view function; the route decorator is its only caller.
+_.project_compliance_detail  # api/_scores_routes.py: Flask view function; the route decorator is its only caller.
 _.project_info  # api/routes_project_list.py: Flask view function; the route decorator is its only caller.
 _.project_run_scores  # api/_scores_routes.py: Flask view function; the route decorator is its only caller.
 _.project_runs  # api/routes_runs.py: Flask view function; the route decorator is its only caller.
@@ -204,6 +205,7 @@ _.tb  # shared/run_log.py: Referenced only from tests/, which this scan does not
 _.tool_uses  # assistant/adapters/_stream.py: Referenced only from tests/, which this scan does not cover (6 refs).
 _.update_verdict  # data/sqlite/state_store.py: Referenced only from tests/, which this scan does not cover (12 refs).
 _.wait_for_trip  # analysis/cache/failure_streak.py: Referenced only from tests/, which this scan does not cover (3 refs).
+_.wait_idle  # services/grade_formula_job.py: Referenced only from tests/, which this scan does not cover (7 refs).
 
 # Names reached through a library, a Protocol annotation or a re-export rather than a direct call.
 _.StandardReference  # core/types/standard.py: Referenced as a name or key elsewhere (4 refs outside the definition).

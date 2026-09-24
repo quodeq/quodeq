@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 from quodeq.core.run.state import RunState
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
+from quodeq.core.scoring.report_grades import calculate_trend
 from quodeq.core.types import DimensionResult, DimensionSummary
 
 from quodeq.services._dashboard_cache import DashboardCacheConfig, make_run_dimension_fetcher
@@ -20,7 +21,7 @@ from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services.dashboard_trend import build_accumulated_trend
 from quodeq.services.scoring_deps import ScoringDeps
 from quodeq.services.trend_fetcher import make_trend_fetcher
-from quodeq.services.wiring import RunInfo, calculate_trend, read_run_status_json
+from quodeq.services.wiring import RunInfo, read_run_status_json
 from quodeq.services.scoring_view import select_trend_runs
 from quodeq.shared.env_resolve import resolve_env
 
@@ -177,9 +178,9 @@ def _make_history_fetcher(
     rescoring FULL data for every history run (up to max_history_runs())
     was the ~2s cost this replaces.
 
-    In-progress freshness is preserved: the fast path re-reads each request
-    (fresh per-call cache), and the heavy path's cacheable_run_ids guard makes
-    in-progress runs compute-through without persisting a partial set. Stale-
+    In-progress freshness is preserved: on both paths the cacheable_run_ids
+    guard makes in-progress runs compute-through without persisting a
+    partial set. Stale-
     partial detection is preserved inside read_run_scalars, which falls back to
     full read_run_data whenever the SQL scalar projection disagrees with the
     on-disk evaluation/*.json count -- the same self-heal the old status-aware

@@ -4,6 +4,7 @@ import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
 import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 import { ROW_KIND } from './findingListRows.js';
+import { useHydratedCompliance } from '../hooks/useHydratedCompliance.js';
 
 const dismissKey = (v) => `${v.file}:${v.line}`;
 
@@ -87,6 +88,7 @@ export function useFileDetailFiltering({ file, onDismiss, activeFilter, lowConfE
     [file.violationsBySeverity, dismissedSet],
   );
 
+  const compliance = useHydratedCompliance(file.compliance);
   const totalCompliance = file.compliance?.length || 0;
   const distinctSeverities = KNOWN_SEVERITIES.filter((s) => liveSevCounts[s] > 0).length;
   const showFilters = distinctSeverities > 1 || (distinctSeverities >= 1 && totalCompliance > 0);
@@ -96,9 +98,9 @@ export function useFileDetailFiltering({ file, onDismiss, activeFilter, lowConfE
   const items = useMemo(
     () => buildFileDetailItems({
       showViolations, showCompliance, activeFilter, highConfidenceBySeverity,
-      lowConfidenceViolations, lowConfExpanded, compliance: file.compliance, totalCompliance,
+      lowConfidenceViolations, lowConfExpanded, compliance, totalCompliance,
     }),
-    [showViolations, showCompliance, activeFilter, highConfidenceBySeverity, lowConfidenceViolations, lowConfExpanded, file.compliance, totalCompliance],
+    [showViolations, showCompliance, activeFilter, highConfidenceBySeverity, lowConfidenceViolations, lowConfExpanded, compliance, totalCompliance],
   );
 
   return {

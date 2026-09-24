@@ -33,7 +33,6 @@ class _PrincipleContext:
     pct: float
     vt_counts: dict[str, int]
     ct_counts: dict[str, int]
-    dampening: float
     using_taxonomy: bool
     conf_level: str
     ci: dict
@@ -109,10 +108,12 @@ def _score_graded(
             grade=Grade.INSUFFICIENT,
         )
     drops = count_grade_drops(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
+    # Graded mode is the only reader of the legacy dampening multiplier.
+    dampening = compliance_dampening(ctx.ct_counts, ctx.vt_counts)
     return PrincipleScore(
         **kwargs, base_grade=Grade.EXEMPLARY, severity_drops=drops,
-        dampening_multiplier=ctx.dampening,
-        grade=drop_grade(Grade.EXEMPLARY, int(drops * ctx.dampening)),
+        dampening_multiplier=dampening,
+        grade=drop_grade(Grade.EXEMPLARY, int(drops * dampening)),
     )
 
 
@@ -134,7 +135,7 @@ def _build_context(
     )
     return _PrincipleContext(
         key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
-        ct_counts=ct_counts, dampening=compliance_dampening(ct_counts, vt_counts),
+        ct_counts=ct_counts,
         using_taxonomy=using_taxonomy, conf_level=conf_level, ci=ci,
         scale_mult=scale_mult,
     )

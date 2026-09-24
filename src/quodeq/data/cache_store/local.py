@@ -22,7 +22,7 @@ import os
 import re
 import shutil
 import time
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from quodeq.data.cache_store.backend import CacheStats
@@ -177,6 +177,34 @@ class LocalFileBackend:
         self._mark_mutated()
         if self._index is not None:
             self._index.forget(key)
+
+    def delete_many(self, keys: Iterable[str]) -> int:
+        """Remove each key's entry directory, then drop their index rows in one transaction.
+
+        Same per-key rules as :meth:`delete`: a missing key is a no-op and a
+        failed removal is logged and keeps its index row. An invalid key is
+        logged and skipped. Returns how many entries were removed.
+        """
+        removed: list[str] = []
+        for key in keys:
+            try:
+                target_dir = self._dir_for(key)
+            except ValueError as exc:
+                _logger.debug("cache delete skipped an invalid key: %s", exc)
+                continue
+            if not target_dir.exists():
+                continue
+            try:
+                shutil.rmtree(target_dir)
+            except OSError as exc:
+                _logger.warning("cache delete failed for %s: %s", key, exc)
+                continue
+            removed.append(key)
+        if removed:
+            self._mark_mutated()
+            if self._index is not None:
+                self._index.forget_many(removed)
+        return len(removed)
 
     def find_by_content(
         self, content_hash: str, dimension: str, params_hash: str,

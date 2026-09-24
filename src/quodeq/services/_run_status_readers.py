@@ -176,17 +176,20 @@ def read_provider_model_from_status(run_dir: Path) -> tuple[str | None, str | No
 
 
 def _read_enriched_status_fields(
-    run_dir: Path,
+    run_dir: Path, *, with_logs: bool = True,
 ) -> tuple[list[str], list[str] | None, str | None, str | None, str | None, int | None]:
     """Best-effort read of (logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s).
 
     Reads and parses status.json once, deriving all four status-backed
-    fields from the same dict instead of four independent reads.
+    fields from the same dict instead of four independent reads. With
+    ``with_logs=False`` the 500-line run-log tail is skipped and logs is [].
     """
-    try:
-        logs = tail_run_log(run_dir)
-    except (OSError, ValueError):
-        logs = []
+    logs: list[str] = []
+    if with_logs:
+        try:
+            logs = tail_run_log(run_dir)
+        except (OSError, ValueError):
+            logs = []
     try:
         data = _load_status_json(run_dir)
     except (OSError, ValueError):
@@ -198,8 +201,13 @@ def _read_enriched_status_fields(
     return logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s
 
 
-def build_job_snapshot(row: "_run_index.RunRow") -> JobSnapshot:
-    """Assemble a ``JobSnapshot`` from an index row, enriched from status.json."""
+def build_job_snapshot(row: "_run_index.RunRow", *, with_logs: bool = True) -> JobSnapshot:
+    """Assemble a ``JobSnapshot`` from an index row, enriched from status.json.
+
+    ``with_logs=False`` leaves ``logs`` empty instead of tailing run.log.
+    List reads pass it for non-running rows only: the dashboard adopts a
+    running CLI job straight from the list and shows its logs.
+    """
     logs: list[str] = []
     dimensions: list[str] | None = None
     deadline_at: str | None = None
@@ -208,7 +216,7 @@ def build_job_snapshot(row: "_run_index.RunRow") -> JobSnapshot:
     time_limit_s: int | None = None
     if row.run_dir:
         logs, dimensions, deadline_at, ai_provider, ai_model, time_limit_s = (
-            _read_enriched_status_fields(Path(row.run_dir))
+            _read_enriched_status_fields(Path(row.run_dir), with_logs=with_logs)
         )
     return JobSnapshot(
         job_id=row.job_id,

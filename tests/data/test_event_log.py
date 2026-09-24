@@ -3,8 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload, EventType
+from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload, EventType, Judgment
 from quodeq.data.events.writer import EventLogWriter
+from quodeq.analysis.checks import runner
 
 
 @pytest.fixture
@@ -83,3 +84,65 @@ def test_judgment_payload_req_defaults_to_none():
         reason="too long",
     )
     assert p.req is None
+
+
+class _CountingLock:
+    """Stands in for the platform file lock; records how often a write took it."""
+
+    def __init__(self) -> None:
+        self.acquired = 0
+
+    def acquire(self, f) -> None:
+        self.acquired += 1
+
+    def release(self, f) -> None:
+        pass
+
+
+def _judgments(n: int) -> list[Judgment]:
+    return [
+        Judgment(practice_id="P1", verdict="violation", dimension="security",
+                 file="a.py", line=i, reason="r")
+        for i in range(1, n + 1)
+    ]
+
+
+def test_emit_many_appends_every_event_under_one_lock(tmp_path: Path, monkeypatch):
+    lock = _CountingLock()
+    monkeypatch.setattr("quodeq.data.events.writer.get_file_lock", lambda: lock)
+    log = tmp_path / "events.jsonl"
+
+    EventLogWriter(log).emit_many(JudgmentCreatedEvent(payload=j) for j in _judgments(5))
+
+    lines = log.read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["payload"]["line"] for line in lines] == [1, 2, 3, 4, 5]
+    assert lock.acquired == 1
+
+
+def test_emit_many_with_no_events_creates_no_file(tmp_path: Path):
+    log = tmp_path / "events.jsonl"
+    EventLogWriter(log).emit_many([])
+    assert not log.exists()
+
+
+def test_emit_many_serializes_first_so_a_bad_event_leaves_the_log_untouched(tmp_path: Path):
+    log = tmp_path / "events.jsonl"
+    good = JudgmentCreatedEvent(payload=_judgments(1)[0])
+    with pytest.raises(Exception):
+        EventLogWriter(log).emit_many([good, object()])  # type: ignore[list-item]
+    assert not log.exists()
+
+
+def test_persist_mirrors_every_judgment_with_one_lock(tmp_path: Path, monkeypatch):
+    lock = _CountingLock()
+    monkeypatch.setattr("quodeq.data.events.writer.get_file_lock", lambda: lock)
+    jsonl = tmp_path / "evidence" / "security.jsonl"
+    jsonl.parent.mkdir()
+    judgments = _judgments(4)
+    rows = [{"p": "P1", "file": "a.py", "line": j.line} for j in judgments]
+
+    runner._persist(jsonl, judgments, rows)
+
+    events = (tmp_path / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(events) == 4
+    assert lock.acquired == 1

@@ -39,7 +39,7 @@ function buildPrincipleHeaderSection({ principle, dimension, score, grade, runId
  */
 export function buildPrincipleReport({ principle, dimension, score, grade, violations, violationsBySeverity, compliance, principleData, runId, dateLabel, severityFilter }) {
   const rawViolations = violations || [];
-  const complianceList = (compliance || []).filter((c) => c.file || c.reason || c.snippet);
+  const complianceList = (compliance || []).filter((c) => c.file || c.reason || c.snippet || c.detailDeferred);
 
   const lines = buildPrincipleHeaderSection({ principle, dimension, score, grade, runId, dateLabel, principleData });
 

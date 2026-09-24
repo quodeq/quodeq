@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 import _private_imports_rules as rules
 import check_private_imports
 
@@ -166,9 +168,21 @@ def test_update_baseline_cli_calls_both_writers(monkeypatch):
     assert written == {"src": True, "tests": True}
 
 
-def test_no_new_src_violations():
+@pytest.fixture(scope="module")
+def src_violations() -> set[str]:
+    """One src scan shared by the new-violation and stale-entry checks."""
+    return set(check_private_imports.collect_src_violations())
+
+
+@pytest.fixture(scope="module")
+def tests_violations() -> set[str]:
+    """One tests scan shared by the new-violation and stale-entry checks."""
+    return set(check_private_imports.collect_tests_violations())
+
+
+def test_no_new_src_violations(src_violations):
     baseline = check_private_imports._ratchet.load_baseline(check_private_imports.SRC_BASELINE_PATH)
-    new = sorted(set(check_private_imports.collect_src_violations()) - baseline)
+    new = sorted(src_violations - baseline)
     assert new == [], (
         "New private-import violation(s) in src/quodeq. Either "
         "make the name public (drop the underscore) or stop importing it:\n"
@@ -176,24 +190,22 @@ def test_no_new_src_violations():
     )
 
 
-def test_no_new_tests_violations():
+def test_no_new_tests_violations(tests_violations):
     baseline = check_private_imports._ratchet.load_baseline(check_private_imports.TESTS_BASELINE_PATH)
-    new = sorted(set(check_private_imports.collect_tests_violations()) - baseline)
+    new = sorted(tests_violations - baseline)
     assert new == [], "New private-import violation(s) in tests/:\n" + "\n".join(new)
 
 
-def test_src_baseline_has_no_stale_entries():
-    current = set(check_private_imports.collect_src_violations())
-    stale = sorted(check_private_imports._ratchet.load_baseline(check_private_imports.SRC_BASELINE_PATH) - current)
+def test_src_baseline_has_no_stale_entries(src_violations):
+    stale = sorted(check_private_imports._ratchet.load_baseline(check_private_imports.SRC_BASELINE_PATH) - src_violations)
     assert stale == [], (
         "src baseline lists imports that no longer exist; regenerate with "
         "python tools/check_private_imports.py --update-baseline:\n" + "\n".join(stale)
     )
 
 
-def test_tests_baseline_has_no_stale_entries():
-    current = set(check_private_imports.collect_tests_violations())
-    stale = sorted(check_private_imports._ratchet.load_baseline(check_private_imports.TESTS_BASELINE_PATH) - current)
+def test_tests_baseline_has_no_stale_entries(tests_violations):
+    stale = sorted(check_private_imports._ratchet.load_baseline(check_private_imports.TESTS_BASELINE_PATH) - tests_violations)
     assert stale == [], (
         "tests baseline lists imports that no longer exist; regenerate with "
         "python tools/check_private_imports.py --update-baseline:\n" + "\n".join(stale)

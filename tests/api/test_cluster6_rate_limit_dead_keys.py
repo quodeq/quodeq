@@ -109,3 +109,33 @@ def test_ip_key_removed_when_pop_branch_taken(tmp_path: Path):
     # No empty lists anywhere.
     for ip, ts in data.items():
         assert ts, f"IP {ip!r} has an empty timestamp list — fix must remove such keys."
+
+
+def test_enforced_request_prunes_every_idle_ip_before_saving(tmp_path: Path):
+    store_path = tmp_path / "rl.json"
+    store_path.write_text(json.dumps({"1.1.1.1": [0.0], "2.2.2.2": [1.0], "3.3.3.3": [95.0]}))
+    store = FileRateLimitStore(path=store_path, window=10.0, max_requests=5)
+
+    assert store.check_and_record("4.4.4.4", now=100.0) is False
+
+    assert _read_data(store_path) == {"3.3.3.3": [95.0], "4.4.4.4": [100.0]}
+
+
+def test_record_prunes_every_idle_ip_on_flush(tmp_path: Path):
+    store_path = tmp_path / "rl.json"
+    store = FileRateLimitStore(path=store_path, window=10.0)
+    store.record("1.1.1.1", now=0.0)  # flushed at once (first flush)
+
+    store.record("3.3.3.3", now=50.0)  # reloads, prunes 1.1.1.1, flushes
+
+    assert _read_data(store_path) == {"3.3.3.3": [50.0]}
+
+
+def test_malformed_entries_are_dropped_not_crashed_on(tmp_path: Path):
+    store_path = tmp_path / "rl.json"
+    store_path.write_text(json.dumps({"x": "junk", "y": [], "z": [95.0, "bad"]}))
+    store = FileRateLimitStore(path=store_path, window=10.0, max_requests=5)
+
+    store.check_and_record("q", now=100.0)
+
+    assert _read_data(store_path) == {"z": [95.0, "bad"], "q": [100.0]}

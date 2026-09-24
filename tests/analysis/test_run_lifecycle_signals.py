@@ -63,22 +63,25 @@ def test_signal_handlers_installed_before_first_status_write(tmp_path: Path) -> 
     handler and kill the run with the status stuck at pending.
     """
     from quodeq.analysis import run_lifecycle as rl
+    from quodeq.analysis.run_lifecycle import LifecycleDeps
+    from quodeq.data.fs.run_status_store import write_status as real_write
 
     order: list[str] = []
     real_signal = signal.signal
-    real_write = rl.write_status
 
     def recording_signal(sig, handler):
         order.append("install")
         return real_signal(sig, handler)
 
-    def recording_write(*args, **kwargs):
+    def recording_write(run_dir, status):
         order.append("write")
-        return real_write(*args, **kwargs)
+        return real_write(run_dir, status)
 
-    with patch.object(rl.signal, "signal", side_effect=recording_signal), \
-         patch.object(rl, "write_status", side_effect=recording_write):
-        with _ctx(tmp_path):
+    with patch.object(rl.signal, "signal", side_effect=recording_signal):
+        with RunLifecycleContext(
+            run_dir=tmp_path, job_id="ext-order", dimensions=[],
+            deps=LifecycleDeps(write_status=recording_write),
+        ):
             pass
 
     assert "install" in order and "write" in order

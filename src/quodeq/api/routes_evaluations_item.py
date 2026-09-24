@@ -75,7 +75,9 @@ def _score_completed_dims_in_bg(app: Flask, job_id: str, job: Any) -> None:
                 _score_args.get("outputRunId"), exc,
             )
 
-    _background(app).submit(_score_in_bg, name=f"score-{job_id}")
+    if not _background(app).submit(_score_in_bg, name=f"score-{job_id}"):
+        # Dropped (queue full): give the claim back so the next GET retries.
+        release_scoring(job_id)
 
 
 _INTENT_CANCEL = "cancel"  # ?intent= values the query declares

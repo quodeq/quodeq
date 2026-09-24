@@ -27,6 +27,7 @@ from quodeq.core.types.provider import Provider
 from quodeq.core.types.severity import Severity
 from quodeq.llm_bridge import LOCAL_PROVIDERS
 from quodeq.services.shared_publish import PublishState
+from quodeq.services.grade_formula_job import RescoreState
 
 _UI_SRC = Path(__file__).resolve().parents[2] / "src" / "quodeq" / "ui" / "src"
 _VOCAB_DIR = _UI_SRC / "vocab"
@@ -43,6 +44,7 @@ _MIRRORS = [
     ("vocab/projectSource.js", "PROJECT_SOURCE", ProjectSource),
     ("vocab/frameType.js", "FRAME_TYPE", FrameType),
     ("vocab/scopeGateRule.js", "SCOPE_GATE_RULE", ScopeGateRule),
+    ("vocab/rescoreState.js", "RESCORE_STATE", RescoreState),
     ("features/dashboard/dashboardVocab.js", "PUBLISH_STATE", PublishState),
 ]
 

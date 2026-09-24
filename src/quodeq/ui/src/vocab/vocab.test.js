@@ -14,6 +14,7 @@ import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from './projectSource.js';
 import { PROVIDER, LOCAL_API_PROVIDERS, WEB_TOOL_PROVIDERS } from './provider.js';
 import { FRAME_TYPE } from './frameType.js';
 import { SCOPE_GATE_RULE } from './scopeGateRule.js';
+import { RESCORE_STATE } from './rescoreState.js';
 import { LOG_STREAM_STATUS } from './logStreamStatus.js';
 import { KEY } from './keyboard.js';
 import { NAV_TAB } from './navTab.js';
@@ -45,11 +46,12 @@ test('vocab modules spell the wire values', () => {
   assert.deepEqual(FINDING_TYPE, { VIOLATION: 'violation', COMPLIANCE: 'compliance' });
   assert.deepEqual(PROJECT_SOURCE, { LOCAL: 'local', SHARED: 'shared' });
   assert.equal(DEFAULT_PROJECT_SOURCE, 'local');
+  assert.deepEqual(RESCORE_STATE, { IDLE: 'idle', RUNNING: 'running', ERROR: 'error' });
   assert.deepEqual(LOG_STREAM_STATUS, { IDLE: 'idle', STREAMING: 'streaming', DONE: 'done', ERROR: 'error' });
 });
 
 test('vocab modules are frozen', () => {
-  for (const obj of [RUN_STATE, JOB_STATUS, EXIT_REASON, SEVERITY, GRADE, DIM_STATE, FINDING_TYPE, PROJECT_SOURCE, FRAME_TYPE, SCOPE_GATE_RULE, LOG_STREAM_STATUS]) {
+  for (const obj of [RUN_STATE, JOB_STATUS, EXIT_REASON, SEVERITY, GRADE, DIM_STATE, FINDING_TYPE, PROJECT_SOURCE, FRAME_TYPE, SCOPE_GATE_RULE, RESCORE_STATE, LOG_STREAM_STATUS]) {
     assert.equal(Object.isFrozen(obj), true);
   }
 });

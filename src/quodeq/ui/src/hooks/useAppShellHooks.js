@@ -109,16 +109,17 @@ export function useAppWizardBounce({ state, selectedProjectInfo, isEvaluating, s
   return { wizardEntry, setWizardEntry, wizardHandlers, hasCurrentProjectRuns };
 }
 
-/**
- * Startup-loader gating, the one-shot initial-landing redirect, the native
- * macOS Help-menu nav bridge, and the two selected-project-keyed sync
- * effects (scroll reset, visible-standards hydration).
- */
-export function useAppNavBoot({ state, activeTab, navTab, sharedSignal }) {
+/** The sidebar's active provider/model, read fresh on every render. */
+export function useSidebarProviderSelection() {
   // NOT memoized on purpose: a per-render read is what makes this pick up a
   // Settings change (active provider/model) without its own change listener.
   const sidebarProvider = readActiveProviderSelection();
   const sidebarModel = readActiveProviderModel(sidebarProvider);
+  return { sidebarProvider, sidebarModel };
+}
+
+/** Whether the startup loader should still cover the app shell. */
+export function useAppStartupGate({ state, activeTab }) {
   const showStartupLoader = useStartupLoader({
     projectsLoaded: state.projectsLoaded,
     projectsLoadFailed: state.projectsLoadFailed,
@@ -131,11 +132,19 @@ export function useAppNavBoot({ state, activeTab, navTab, sharedSignal }) {
     error: state.error,
     loading: state.loading,
   });
+  return { showStartupLoader };
+}
+
+/** The one-shot initial-landing redirect and the native macOS Help-menu nav bridge. */
+export function useAppNavigationEffects({ state, activeTab, navTab, sharedSignal }) {
   useInitialLandingEffect({ state, sharedSignal, activeTab, navTab });
   useNativeNavBridge(navTab);
-  useProjectScrollResetEffect(state.selectedProject);
-  useVisibleStandardsHydrationEffect(state.selectedProject);
-  return { sidebarProvider, sidebarModel, showStartupLoader };
+}
+
+/** Selected-project-keyed sync effects: scroll reset and visible-standards hydration. */
+export function useSelectedProjectSyncEffects(selectedProject) {
+  useProjectScrollResetEffect(selectedProject);
+  useVisibleStandardsHydrationEffect(selectedProject);
 }
 
 /**

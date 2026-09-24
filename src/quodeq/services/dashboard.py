@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from quodeq.core.run.state import RunState
 from quodeq.core.scoring.params import ScoringParams
+from quodeq.core.scoring.report_grades import summarize_dimensions
 from quodeq.core.types import DimensionResult
 
 from quodeq.services.deleted import deleted_keys
@@ -27,7 +28,6 @@ from quodeq.services.wiring import (
     list_runs,
     load_suppression_rules,
     read_run_data,
-    summarize_dimensions,
 )
 from quodeq.services.rescore import rescore_dimension
 from quodeq.services.suppression_keys import SuppressionKeys

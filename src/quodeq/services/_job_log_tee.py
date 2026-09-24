@@ -19,12 +19,13 @@ from __future__ import annotations
 
 import codecs
 import io
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Iterator
 
 from quodeq.core.observability import LogSink
-from quodeq.services._job_model import JobStore, CC_MARKER_PREFIX
+from quodeq.services._job_model import JobStore, CC_MARKER_PREFIX, MAX_LOG_LINES
 from quodeq.shared.run_log import RunLogWriter
 
 
@@ -33,14 +34,20 @@ class TeeContext:
     """Collaborators consume_stream/_read_and_tee_loop/tee_run_log share.
 
     All fields are owned and mutated by JobManager; see the module docstring
-    for the invariant governing who else may touch the dicts.
+    for the invariant governing who else may touch the dicts. Pre-marker
+    lines are capped at ``MAX_LOG_LINES`` per job, like the job log.
     """
     store: JobStore
     reports_root: Path | None
     run_log_writers: dict[str, RunLogWriter]
-    pre_marker_buffer: dict[str, list[str]]
+    pre_marker_buffer: dict[str, deque[str]]
     log: LogSink
     flush_batch: Callable[[str, list[str]], bool]
+
+
+def _new_buffer() -> deque[str]:
+    """An empty pre-marker buffer, capped like the in-memory job log."""
+    return deque(maxlen=MAX_LOG_LINES)
 
 
 def _iter_line_batches(stream: Iterable[str]) -> Iterator[list[str]]:
@@ -118,7 +125,7 @@ def consume_stream(
 ) -> None:
     if stream is None:
         return
-    ctx.pre_marker_buffer.setdefault(job_id, [])
+    ctx.pre_marker_buffer.setdefault(job_id, _new_buffer())
     try:
         if _read_and_tee_loop(job_id, stream, ctx):
             # Final drain: if the report_path marker arrived in the last
@@ -170,7 +177,7 @@ def drain_pre_marker_buffer(job_id: str, ctx: TeeContext) -> None:
             writer.write(pending)
     except OSError as exc:  # IOError is OSError; BrokenPipeError is a subclass
         ctx.log.warning(f"Drain write error for job {job_id}: {exc}")
-    ctx.pre_marker_buffer[job_id] = []
+    ctx.pre_marker_buffer[job_id] = _new_buffer()
 
 
 def tee_run_log(job_id: str, line: str, ctx: TeeContext) -> None:
@@ -188,10 +195,10 @@ def tee_run_log(job_id: str, line: str, ctx: TeeContext) -> None:
         # Try to resolve run_dir from the job snapshot now.
         writer = _open_run_log_writer(job_id, ctx)
         if writer is None:
-            ctx.pre_marker_buffer.setdefault(job_id, []).append(line)
+            ctx.pre_marker_buffer.setdefault(job_id, _new_buffer()).append(line)
             return
         # Flush any buffered pre-marker lines.
         for pending in ctx.pre_marker_buffer.get(job_id, []):
             writer.write(pending)
-        ctx.pre_marker_buffer[job_id] = []
+        ctx.pre_marker_buffer[job_id] = _new_buffer()
     writer.write(line)

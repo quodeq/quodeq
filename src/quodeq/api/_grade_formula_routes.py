@@ -1,15 +1,14 @@
 """Grade formula endpoints.
 
-GET    /api/grade-formula          -- current + defaults + isCustom
-PUT    /api/grade-formula          -- validate, save, rescore all runs
-DELETE /api/grade-formula          -- reset to Q2 defaults, rescore all runs
+GET    /api/grade-formula          -- current + defaults + isCustom + rescore progress
+PUT    /api/grade-formula          -- validate, save, start a background rescore (202)
+DELETE /api/grade-formula          -- reset to Q2 defaults, start a background rescore (202)
 POST   /api/grade-formula/preview  -- read-only before/after for one project
 """
 from __future__ import annotations
 
 from http import HTTPStatus
 from pathlib import Path
-from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
@@ -24,6 +23,7 @@ from quodeq.core.scoring.params import (
     validate_params,
 )
 from quodeq.services import grade_formula
+from quodeq.services.grade_formula_job import GradeFormulaRescorer, RescoreSnapshot
 from quodeq.shared.validation import validate_path_segment
 
 
@@ -48,49 +48,56 @@ def _parse_params(data: dict) -> tuple:
     return params, None
 
 
-def _state_payload(result: "grade_formula.ApplyResult | None" = None) -> dict:
-    payload = {
+def _state_payload(rescore: RescoreSnapshot) -> dict:
+    return {
         "current": params_to_dict(grade_formula.load_params()),
         "defaults": params_to_dict(DEFAULT_PARAMS),
         "isCustom": grade_formula.is_custom(),
+        # Progress of the background rescore pass. The client polls GET
+        # until appliedGeneration reaches the generation its PUT/DELETE got,
+        # and warns when failed > 0: those runs keep the old formula.
+        "rescore": rescore.to_payload(),
     }
-    if result is not None:
-        payload["applied"] = result.rescored
-        # Surface a partial apply so the client can warn that some runs still
-        # show the old formula, instead of the endpoint claiming full success.
-        payload["failed"] = len(result.failed)
-    return payload
 
 
 def register_grade_formula_routes(
-    app: Flask,
-    apply_to_all_runs: Callable[[Path], grade_formula.ApplyResult] = grade_formula.apply_to_all_runs,
+    app: Flask, rescorer: GradeFormulaRescorer | None = None,
 ) -> None:
-    """Register grade formula endpoints."""
+    """Register grade formula endpoints.
+
+    *rescorer* defaults to ``app.extensions["grade_formula_rescore"]``
+    (``create_app`` puts one there); a bare test app gets a fresh one.
+    """
+    if rescorer is not None:
+        app.extensions["grade_formula_rescore"] = rescorer
+    job: GradeFormulaRescorer = app.extensions.setdefault(
+        "grade_formula_rescore", GradeFormulaRescorer(),
+    )
 
     @app.get("/api/grade-formula")
     def get_grade_formula() -> Response:
-        return jsonify(_state_payload())
+        return jsonify(_state_payload(job.snapshot()))
 
     @app.put("/api/grade-formula")
-    def put_grade_formula() -> Response | tuple[Response, int]:
+    def put_grade_formula() -> tuple[Response, int]:
         params, err = _parse_params(request.get_json(silent=True))
         if err:
             return err
+        # Save first: a pass that starts after the generation bump loads these.
         grade_formula.save_params(params)
-        result = apply_to_all_runs(Path(reports_dir()))
-        return jsonify(_state_payload(result=result))
+        snap = job.request(Path(reports_dir()))
+        return jsonify(_state_payload(snap)), HTTPStatus.ACCEPTED
 
     @app.delete("/api/grade-formula")
-    def delete_grade_formula() -> Response | tuple[Response, int]:
+    def delete_grade_formula() -> tuple[Response, int]:
         if request.args.get("confirm") != QUERY_FLAG_TRUE:
             return json_error(
                 "Use ?confirm=true to confirm resetting the grade formula and rescoring every run",
                 HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
             )
         grade_formula.reset_params()
-        result = apply_to_all_runs(Path(reports_dir()))
-        return jsonify(_state_payload(result=result))
+        snap = job.request(Path(reports_dir()))
+        return jsonify(_state_payload(snap)), HTTPStatus.ACCEPTED
 
     @app.post("/api/grade-formula/preview")
     def preview_grade_formula() -> Response | tuple[Response, int]:

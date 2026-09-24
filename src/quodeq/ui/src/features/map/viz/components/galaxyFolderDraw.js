@@ -85,17 +85,21 @@ export function drawNebula(ctx, curNode, frame) {
 }
 
 /**
- * Draw constellation lines between stars.
+ * Draw constellation lines between stars. They share one style, so all
+ * segments go into one path and one stroke() per frame.
  */
 export function drawConstellationLines(ctx, activeScene, tc, w2s) {
+  const { lines, rootStars } = activeScene;
+  if (lines.length === 0) return;
   const { r: mr, g: mg, b: mb } = tc.textMuted;
-  activeScene.lines.forEach(l => {
-    const sa = w2s(activeScene.rootStars[l.a].x, activeScene.rootStars[l.a].y);
-    const sb = w2s(activeScene.rootStars[l.b].x, activeScene.rootStars[l.b].y);
-    ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y);
-    ctx.strokeStyle = `rgba(${mr},${mg},${mb},0.25)`;
-    ctx.lineWidth = 0.8; ctx.stroke();
-  });
+  ctx.beginPath();
+  for (const l of lines) {
+    const sa = w2s(rootStars[l.a].x, rootStars[l.a].y);
+    const sb = w2s(rootStars[l.b].x, rootStars[l.b].y);
+    ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y);
+  }
+  ctx.strokeStyle = `rgba(${mr},${mg},${mb},0.25)`;
+  ctx.lineWidth = 0.8; ctx.stroke();
 }
 
 /**

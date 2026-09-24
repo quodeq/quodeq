@@ -9,10 +9,10 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.finding_mappings import finding_to_response_dict
 from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.data.fs.report_parser._run_info import safe_read_dir
+from quodeq.data.fs.report_parser.finding_response import finding_to_response_dict
 from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.shared.utils import read_json

@@ -1,11 +1,13 @@
 """RunLifecycleContext — the run's lifecycle context manager.
 
 Composed from collaborators that each own one concern: ``_StatusWriter``
-(every status.json write), ``SignalGuard`` (install/restore of the run's
-signal handlers), ``AtexitGuard`` (the process-exit fallback hook), plus the
-shared heartbeat/resource samplers. The context wires them together and keeps
-the exception→state mapping in ``__exit__`` — deciding which terminal state
-an exit maps to is the context manager's own job.
+(every status.json write, in ``_run_lifecycle_support.py``), ``SignalGuard``
+(install/restore of the run's signal handlers), ``AtexitGuard`` (the
+process-exit fallback hook), plus the shared heartbeat/resource samplers. The
+context takes these collaborators via a ``LifecycleDeps`` bundle (None =
+production default) and wires them together, keeping the exception→state
+mapping in ``__exit__`` — deciding which terminal state an exit maps to is
+the context manager's own job.
 
 Intended usage:
 
@@ -25,7 +27,6 @@ from __future__ import annotations
 
 import logging
 import signal  # noqa: F401 -- test_run_lifecycle.py patches `rl.signal.signal`
-from datetime import datetime, timezone
 from pathlib import Path
 from types import TracebackType
 from typing import Any
@@ -37,78 +38,20 @@ from quodeq.shared.resource_sampler import ResourceSampler
 from quodeq.shared.run_heartbeat import HeartbeatThread
 from quodeq.analysis._run_lifecycle_support import (
     AtexitGuard,
+    LifecycleDeps,
     SignalGuard,
     finalize_run_on_atexit,
     is_circuit_breaker_error,
     is_named_error,
     mark_unfinished_dims_incomplete,
+    new_status_writer,
     run_signal_shutdown,
     seed_dimension_states,
 )
-from quodeq.data.fs.run_status_store import (
-    RunState,
-    RunStatus,
-    TERMINAL_STATES,
-    validate_transition,
-    write_status,
-)
+from quodeq.core.run.state import RunState, TERMINAL_STATES, validate_transition
+from quodeq.data.fs.run_status_store import write_status
 
 _logger = logging.getLogger(__name__)
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-class _StatusWriter:
-    """Owns every status.json write for one run.
-
-    The run's identity (dir, job, start time, dimensions) is fixed at
-    construction; the presentation fields (phase, deadline, ...) are plain
-    mutable attributes the context updates as the run progresses. ``write``
-    is the single place that knows the full status row, so the normal-path,
-    signal-path, and atexit-path writes cannot drift apart.
-
-    Kept in this module (not the sibling support module): it calls
-    ``write_status`` by bare name, patched by tests at
-    ``quodeq.analysis.run_lifecycle.write_status``.
-    """
-
-    def __init__(
-        self,
-        run_dir: Path,
-        job_id: str,
-        dimensions: list[str],
-        *,
-        ai_provider: str | None = None,
-        ai_model: str | None = None,
-    ) -> None:
-        self.run_dir = run_dir
-        self.job_id = job_id
-        self.started_at = _now_iso()
-        self.dimensions = list(dimensions)
-        self.phase: str | None = None
-        self.current_dimension: str | None = None
-        self.deadline_at: str | None = None
-        self.time_limit_s: int | None = None
-        self.ai_provider = ai_provider
-        self.ai_model = ai_model
-
-    def write(self, state: RunState, *, exit_reason: str | None = None) -> None:
-        status = RunStatus(
-            state=state,
-            job_id=self.job_id,
-            started_at=self.started_at,
-            dimensions=self.dimensions,
-            phase=self.phase,
-            current_dimension=self.current_dimension,
-            exit_reason=exit_reason,
-            deadline_at=self.deadline_at,
-            ai_provider=self.ai_provider,
-            ai_model=self.ai_model,
-            time_limit_s=self.time_limit_s,
-        )
-        write_status(self.run_dir, status)
 
 
 class RunLifecycleContext:
@@ -122,16 +65,19 @@ class RunLifecycleContext:
         *,
         ai_provider: str | None = None,
         ai_model: str | None = None,
+        deps: LifecycleDeps | None = None,
     ) -> None:
+        deps = deps or LifecycleDeps()
         self._run_dir = run_dir
         self._dimensions = list(dimensions)
         self._current_state = RunState.PENDING
-        self._status = _StatusWriter(
+        self._status = new_status_writer(
             run_dir, job_id, dimensions,
             ai_provider=ai_provider, ai_model=ai_model,
+            write_status=deps.write_status or write_status,
         )
-        self._heartbeat = HeartbeatThread(run_dir)
-        self._resources = ResourceSampler()
+        self._heartbeat = (deps.heartbeat_factory or HeartbeatThread)(run_dir)
+        self._resources = (deps.resources_factory or ResourceSampler)()
         self._signals = SignalGuard(self._handle_signal, log=_logger)
         self._atexit = AtexitGuard(self._finalize_on_atexit)
         self._pending_exit_reason: str | None = None

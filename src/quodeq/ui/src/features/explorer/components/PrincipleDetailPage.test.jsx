@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidePaneProvider } from '../../side-pane/index.js';
 import PrincipleDetailPage from './PrincipleDetailPage.jsx';
+import { withQueryClient, withStableQueryApi } from '../../../test-utils/withQueryClient.jsx';
 
 // Pins the eval-principle detail route's dismiss-button gating contract.
 // App.jsx's evalprinciple/eval-principle-detail renderer passes onDismiss as
@@ -29,9 +30,32 @@ function renderPage(onDismiss) {
   return render(
     <SidePaneProvider>
       <PrincipleDetailPage evalPrincipal={EVAL_PRINCIPAL} severityFilter={null} onDismiss={onDismiss} />
-    </SidePaneProvider>
+    </SidePaneProvider>,
+    { wrapper: withQueryClient() },
   );
 }
+
+describe('PrincipleDetailPage deferred compliance detail', () => {
+  it('fetches and shows the detail /scores left out of a compliance card', async () => {
+    const ref = { project: 'proj', asOf: null, dimension: 'Security', generation: 1 };
+    const slim = {
+      file: 'b.py', line: 3, endLine: null, principle: 'Input Validation', title: 'Validated',
+      reason: null, snippet: null, context: null, reqRefs: [], detailDeferred: true, detailRef: ref,
+    };
+    const getComplianceDetail = vi.fn(async () => [{ ...slim, detailRef: undefined, detailDeferred: false, reason: 'Input is checked before use' }]);
+    render(
+      <SidePaneProvider>
+        <PrincipleDetailPage evalPrincipal={{ ...EVAL_PRINCIPAL, dimCompliance: [slim] }} severityFilter={null} onDismiss={vi.fn()} />
+      </SidePaneProvider>,
+      { wrapper: withStableQueryApi({ getComplianceDetail, getStandard: vi.fn(async () => null) }) },
+    );
+
+    expect(await screen.findByText('Input is checked before use')).toBeInTheDocument();
+    await waitFor(() => expect(getComplianceDetail).toHaveBeenCalledWith(
+      'proj', { dimension: 'Security', asOf: null, principle: 'Input Validation', pathPrefix: 'b.py' },
+    ));
+  });
+});
 
 describe('PrincipleDetailPage dismiss-button gating', () => {
   it('shows the dismiss button when onDismiss is provided (local project)', () => {

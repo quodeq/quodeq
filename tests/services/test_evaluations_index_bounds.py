@@ -132,3 +132,86 @@ def test_get_status_falls_back_to_a_scan_when_the_run_is_not_yet_indexed(
 
     assert snapshot is not None
     assert snapshot.output_run_id == run_id
+
+
+def _seed_internal(reports_root: Path, project: str, run_id: str, job_id: str) -> None:
+    run_dir = reports_root / project / run_id
+    run_dir.mkdir(parents=True)
+    write_status(
+        run_dir,
+        RunStatus(state=RunState.DONE, job_id=job_id,
+                  started_at="2026-05-22T19:00:00+00:00", dimensions=["security"]),
+    )
+
+
+def test_get_status_of_an_indexed_internal_run_skips_the_full_sync(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    reports_root = tmp_path / "reports"
+    _seed_internal(reports_root, "proj", "run-1", "job-abc")
+    _seed_status(reports_root, "proj", "other", RunState.DONE)
+    index = _make_index(tmp_path, reports_root)
+    index.list(reports_dir=reports_root)
+
+    def no_full_sync(db, root):
+        raise AssertionError("full sync for a run the index already knows")
+
+    monkeypatch.setattr(_run_index, "sync_index", no_full_sync)
+
+    snapshot = index.get_status("job-abc", reports_dir=reports_root)
+
+    assert snapshot is not None
+    assert snapshot.output_run_id == "run-1"
+
+
+def test_get_status_of_an_unindexed_internal_run_falls_back_to_the_full_sync(
+    tmp_path: Path,
+) -> None:
+    reports_root = tmp_path / "reports"
+    _seed_internal(reports_root, "proj", "run-1", "job-abc")
+    index = _make_index(tmp_path, reports_root)
+
+    snapshot = index.get_status("job-abc", reports_dir=reports_root)
+
+    assert snapshot is not None
+    assert snapshot.output_run_id == "run-1"
+
+
+def _spy_tail(monkeypatch) -> list[Path]:
+    tailed: list[Path] = []
+
+    def spy(run_dir, max_lines=500):
+        tailed.append(run_dir)
+        return ["log line"]
+
+    monkeypatch.setattr("quodeq.services._run_status_readers.tail_run_log", spy)
+    return tailed
+
+
+def test_list_tails_the_run_log_only_for_running_rows(tmp_path: Path, monkeypatch) -> None:
+    reports_root = tmp_path / "reports"
+    for i in range(3):
+        _seed_status(reports_root, "p", f"done-{i}", RunState.DONE)
+    _seed_status(reports_root, "p", "live-1", RunState.RUNNING)
+    index = _make_index(tmp_path, reports_root)
+    tailed = _spy_tail(monkeypatch)
+
+    entries = index.list(reports_dir=reports_root)
+
+    by_run = {e.output_run_id: e for e in entries}
+    assert [p.name for p in tailed] == ["live-1"]
+    assert by_run["live-1"].logs == ["log line"]
+    assert by_run["done-0"].logs == []
+
+
+def test_get_status_still_tails_the_log_of_a_finished_run(tmp_path: Path, monkeypatch) -> None:
+    reports_root = tmp_path / "reports"
+    _seed_status(reports_root, "p", "done-0", RunState.DONE)
+    index = _make_index(tmp_path, reports_root)
+    tailed = _spy_tail(monkeypatch)
+
+    snapshot = index.get_status("ext-done-0", reports_dir=reports_root)
+
+    assert snapshot is not None
+    assert snapshot.logs == ["log line"]
+    assert len(tailed) == 1

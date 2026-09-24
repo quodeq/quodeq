@@ -6,15 +6,37 @@
 import { createDashboard } from '../models/dashboard.js';
 import { createDimensionEval } from '../models/dimension.js';
 import { request } from './request.js';
+import { attachComplianceDetailRefs } from './complianceDetail.js';
+import { createViolations } from '../models/violation.js';
 import { asOfQuery, parseAccumulated, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
 import { LATEST_RUN_ID } from '../constants.js';
 
 // ── Unified Scores ─────────────────────────────────────────────────────
 
+// Numbers each /scores response, so compliance detail fetched for one
+// response is never merged into another (see attachComplianceDetailRefs).
+let scoresGeneration = 0;
+
 /** @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>} */
 export async function getProjectScores(projectId, asOfRun = null) {
   const data = await request(`/projects/${encodeURIComponent(projectId)}/scores${asOfQuery(asOfRun)}`);
-  return parseUnifiedScores(data);
+  scoresGeneration += 1;
+  return attachComplianceDetailRefs(parseUnifiedScores(data), projectId, asOfRun, scoresGeneration);
+}
+
+/**
+ * Full compliance items /scores deferred, for one accumulated dimension.
+ * @param {string} projectId
+ * @param {{dimension: string, asOf?: string|null, principle?: string, pathPrefix?: string}} scope
+ * @returns {Promise<import('../models/violation.js').Violation[]>}
+ */
+export async function getComplianceDetail(projectId, { dimension, asOf, principle, pathPrefix }) {
+  const params = new URLSearchParams({ dimension });
+  if (asOf) params.set('asOf', asOf);
+  if (principle) params.set('principle', principle);
+  if (pathPrefix) params.set('pathPrefix', pathPrefix);
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/compliance-detail?${params}`);
+  return createViolations(data?.items);
 }
 
 /** @returns {Promise<{dimensions: Array, summary: Object}>} */

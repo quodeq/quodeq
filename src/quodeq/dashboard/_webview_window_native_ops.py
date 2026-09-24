@@ -14,8 +14,10 @@ import http.client
 import json
 import logging
 import os
+import shutil
 import signal
 import sys
+import tempfile
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
@@ -34,6 +36,7 @@ _LOOPBACK_IPV4 = "127.0.0.1"  # loopback address a reload URL may target
 _LOOPBACK_IPV6 = "::1"  # loopback address (IPv6) a reload URL may target
 _SAFE_RELOAD_SCHEMES = frozenset({SCHEME_HTTP, SCHEME_HTTPS})  # is_safe_reload_url's allowed schemes
 _SAFE_RELOAD_HOSTS = frozenset({LOCALHOST, _LOOPBACK_IPV4, _LOOPBACK_IPV6})  # is_safe_reload_url's allowed hosts
+_PARTIAL_SUFFIX = ".part"  # suffix on the uniquely-named temp file a download streams into
 
 
 def fetch_running_evaluation(base_url: str) -> dict | None:
@@ -122,8 +125,7 @@ def download_via_dialog(window: object, base_url: str, path: str, filename: str)
         url = urllib.parse.urljoin(base_url, path)
         if not is_safe_reload_url(url):
             return False
-        with urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT_S) as resp:
-            Path(save_path).write_bytes(resp.read())
+        _stream_to(url, Path(save_path))
         return True
     except (OSError, ValueError, http.client.HTTPException):
         # OSError: connection/URLError/write failures. ValueError: a URL
@@ -132,6 +134,26 @@ def download_via_dialog(window: object, base_url: str, path: str, filename: str)
         # are "download failed" to the user; anything else is a bug and
         # propagates to the js_api bridge.
         return False
+
+
+def _stream_to(url: str, target: Path) -> None:
+    """Stream *url* into *target* in fixed-size chunks.
+
+    The body lands in a uniquely named temp file in *target*'s directory
+    (``tempfile.mkstemp``, so it can never collide with a file that already
+    exists there) and replaces *target* only once complete, so a failed
+    download never truncates a file the user chose to overwrite. Cleanup
+    only ever removes the temp file this call created, never a pre-existing
+    file of the user's, even one that happens to end in ``.part``.
+    """
+    fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=f"{target.name}.", suffix=_PARTIAL_SUFFIX)
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as out, urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT_S) as resp:
+            shutil.copyfileobj(resp, out)
+        os.replace(tmp_path, target)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def kill_api(pid: int) -> None:

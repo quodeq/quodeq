@@ -1,3 +1,5 @@
+import pytest
+
 from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
 
@@ -218,3 +220,27 @@ def test_pooled_connection_survives_across_repository_instance_lifetime(tmp_path
     repo.create_session(session_id="s1", provider="ollama")
     repo.add_message("s1", "user", "hi")
     assert repo.list_messages("s1") == [{"role": "user", "content": "hi"}]
+
+
+def test_a_newer_schema_closes_the_half_opened_connection(tmp_path, monkeypatch):
+    import sqlite3
+
+    path = tmp_path / "assistant.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute("PRAGMA user_version = 999")
+    opened: list[sqlite3.Connection] = []
+    real_connect = sqlite3.connect
+
+    def spy(*args, **kwargs):
+        conn = real_connect(*args, **kwargs)
+        opened.append(conn)
+        return conn
+
+    monkeypatch.setattr(sqlite3, "connect", spy)
+
+    with pytest.raises(sqlite3.DatabaseError):
+        AssistantRepository(path).get_session("s1")
+
+    assert len(opened) == 1
+    with pytest.raises(sqlite3.ProgrammingError):
+        opened[0].execute("SELECT 1")

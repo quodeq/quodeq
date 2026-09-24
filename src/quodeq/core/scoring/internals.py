@@ -58,7 +58,7 @@ def compliance_lift(
     Returns a value in [0, 1] representing the fraction of the gap filled.
     """
     wv = weighted_sum(violation_type_counts, params.severity_weight)
-    cc = sum(compliance_type_counts.get(sev, 0) for sev in compliance_type_counts)
+    cc = sum(compliance_type_counts.values())
     if cc == 0 or wv == 0:
         return 0.0
     raw_lift = cc / (cc + wv)
