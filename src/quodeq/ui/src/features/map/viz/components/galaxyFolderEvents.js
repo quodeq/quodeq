@@ -1,4 +1,5 @@
 import { getThemeColors } from '../core/galaxyCore.js';
+import { HIT_TARGET_TYPE } from '../core/galaxyHitTypes.js';
 import { buildFolderScene } from './galaxyFolderScene.js';
 import { createTooltipUpdater } from './galaxyFolderTooltip.js';
 import { handleNodeClick, handleEmptySpaceClick } from './galaxyFolderClickHandlers.js';
@@ -52,7 +53,7 @@ function makeActivateStarHandler(refs, params) {
     const starIdx = stars.findIndex((s) => (s.path || s.name) === starPath);
     if (starIdx < 0) return;
     const s = stars[starIdx];
-    handleNodeClick(refs, { type: s.isFolder ? 'folder' : 'file', starIdx, data: s }, { startTransition, saveNav });
+    handleNodeClick(refs, { type: s.isFolder ? HIT_TARGET_TYPE.FOLDER : HIT_TARGET_TYPE.FILE, starIdx, data: s }, { startTransition, saveNav });
   };
 }
 

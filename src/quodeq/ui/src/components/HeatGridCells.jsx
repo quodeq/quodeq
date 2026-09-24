@@ -84,12 +84,14 @@ function HealthCell({ row, total, rate, flat }) {
   );
 }
 
-const VARIANT_FLAT = 'flat'; // the only non-default 'heat' variant
+// The two render treatments this component and its callers (HeatGridView,
+// DimensionHeatGridView, ViolationsPage) pass as `variant`.
+export const HEAT_GRID_VARIANT = Object.freeze({ HEAT: 'heat', FLAT: 'flat' });
 
-export default function HeatGridCells({ row, onCellClick, variant = 'heat' }) {
+export default function HeatGridCells({ row, onCellClick, variant = HEAT_GRID_VARIANT.HEAT }) {
   const total = row.violations + row.compliance;
   const rate = total > 0 ? Math.round(row.complianceRate * 100) + '%' : '—';
-  const flat = variant === VARIANT_FLAT;
+  const flat = variant === HEAT_GRID_VARIANT.FLAT;
 
   return (
     <>

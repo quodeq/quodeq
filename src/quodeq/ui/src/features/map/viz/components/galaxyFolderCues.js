@@ -26,6 +26,11 @@ const CUE_MIN_PARTICLE_SIZE = 0.15; // what drawParticles itself paints down to
 const CUE_ALPHA = 0.9;
 const ARC_STRIDE = 3; // x, y, r per queued arc
 
+// This module's own severity-shape cues: the three differ by outline, not
+// brightness. DOT is the plain dot drawParticles already paints, so
+// collectSeverityCue below skips it — only RING/DOUBLE_RING queue an arc.
+const CUE_SHAPE = Object.freeze({ DOT: 'dot', RING: 'ring', DOUBLE_RING: 'double-ring' });
+
 /**
  * Shape cue for a violation particle's severity, so severity does not ride
  * on colour alone (U-ACC-2). The three differ by outline, not brightness:
@@ -34,9 +39,9 @@ const ARC_STRIDE = 3; // x, y, r per queued arc
  */
 export function starShapeFor(severity) {
   switch (severity) {
-    case SEVERITY.CRITICAL: return 'double-ring';
-    case SEVERITY.MAJOR: return 'ring';
-    default: return 'dot';
+    case SEVERITY.CRITICAL: return CUE_SHAPE.DOUBLE_RING;
+    case SEVERITY.MAJOR: return CUE_SHAPE.RING;
+    default: return CUE_SHAPE.DOT;
   }
 }
 
@@ -64,12 +69,12 @@ export function newCueBatch() {
 export function collectSeverityCue(batch, p, sc, scale, t) {
   const shape = starShapeFor(p.sev);
   const size = p.sz * scale;
-  if (shape === 'dot' || size < CUE_MIN_PARTICLE_SIZE) return;
+  if (shape === CUE_SHAPE.DOT || size < CUE_MIN_PARTICLE_SIZE) return;
   const angle = t * p.os + p.op;
   const px = sc.x + Math.cos(angle) * p.or * p.ec * scale;
   const py = sc.y + Math.sin(angle) * p.or * scale;
   const inner = Math.max(size * CUE_RING_RADIUS_RATIO, CUE_RING_MIN_RADIUS);
-  const radii = shape === 'double-ring'
+  const radii = shape === CUE_SHAPE.DOUBLE_RING
     ? [inner, Math.max(size * CUE_RING2_RADIUS_RATIO, inner + CUE_RING_GAP_MIN)]
     : [inner];
   const lineWidth = Math.max(CUE_RING_WIDTH_MIN, size * CUE_RING_WIDTH_RATIO);
