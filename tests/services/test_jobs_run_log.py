@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from collections import deque
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -239,7 +240,7 @@ def test_drain_pre_marker_buffer_survives_broken_pipe(tmp_path: Path) -> None:
         store=store,
         reports_root=tmp_path,
         run_log_writers={},
-        pre_marker_buffer={job_id: ["buffered-1", "buffered-2"]},
+        pre_marker_buffer={job_id: deque(["buffered-1", "buffered-2"])},
         log=log,
         flush_batch=MagicMock(),
     )
@@ -253,4 +254,4 @@ def test_drain_pre_marker_buffer_survives_broken_pipe(tmp_path: Path) -> None:
     log.warning.assert_called_once()
     assert job_id in log.warning.call_args[0][0]
     # Buffer is still cleared even though the write failed.
-    assert ctx.pre_marker_buffer[job_id] == []
+    assert ctx.pre_marker_buffer[job_id] == deque()
