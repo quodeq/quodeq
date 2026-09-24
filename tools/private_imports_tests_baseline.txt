@@ -509,6 +509,7 @@ tests/assistant/test_constants_provider_style.py:86:private-module:quodeq.assist
 tests/assistant/test_constants_provider_style.py:92:private-name:quodeq.assistant.orchestrator._ISOLATED_MCP_STYLES
 tests/assistant/test_context.py:1:private-module:quodeq.assistant._context.build_system_prompt
 tests/assistant/test_context.py:1:private-module:quodeq.assistant._context.build_turn_message
+tests/assistant/test_copilot_events.py:3:private-module:quodeq.assistant.adapters._stream
 tests/assistant/test_env_seams_t5.py:11:private-module:quodeq.assistant.adapters._cli_spawn.build_chat_env
 tests/assistant/test_env_seams_t5.py:13:private-name:quodeq.assistant.worktree._DEFAULT_WORKTREE_TTL_H
 tests/assistant/test_fallback.py:1:private-module:quodeq.assistant.adapters._fallback.extract_prompted_tool_call
@@ -608,7 +609,6 @@ tests/conftest.py:12:private-module:quodeq.data.fs._index_cache.clear_index_cach
 tests/context/test_precedent_corpus.py:26:private-name:quodeq.context.precedent_store._backfill_missing
 tests/core/test_confidence_not_scored.py:17:private-module:quodeq.analysis._report_constants.COMPLIANCE_FIELDS
 tests/core/test_confidence_not_scored.py:17:private-module:quodeq.analysis._report_constants.VIOLATION_FIELDS
-tests/core/test_copilot_events.py:3:private-module:quodeq.assistant.adapters._stream
 tests/core/test_enrich_judgment_refs_reader.py:11:private-module:quodeq.core.evidence._options.EvidenceParseOptions
 tests/core/test_evidence_no_ambient_io.py:12:private-name:quodeq.core.evidence.req_mapping._resolve_req_to_principle_map
 tests/core/test_evidence_parser.py:272:private-name:quodeq.core.evidence.parser._build_evidence
