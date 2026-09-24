@@ -188,7 +188,10 @@ def render_standards_grouped(data: object, overrides: dict | None = None) -> str
         if not isinstance(p, dict):
             continue
         requirements = []
-        for r in p.get("requirements", []):
+        raw_requirements = p.get("requirements")
+        if not isinstance(raw_requirements, list):
+            raw_requirements = []
+        for r in raw_requirements:
             if not isinstance(r, dict) or not isinstance(r.get("id"), str):
                 continue
             requirements.append({

@@ -197,3 +197,17 @@ class TestRenderStandardsGroupedMalformedShapes:
         (tmp_path / "security.md").write_text("# Security Standards\n- Validate inputs")
         result = load_standards_text(tmp_path, "security")
         assert "Security Standards" in result
+
+    def test_none_requirements_treated_as_empty(self):
+        data = {"principles": [{"name": "P", "requirements": None}]}
+        result = render_standards_grouped(data)
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert parsed[0]["requirements"] == []
+
+    def test_non_list_scalar_requirements_treated_as_empty(self):
+        data = {"principles": [{"name": "P", "requirements": "not-a-list"}]}
+        result = render_standards_grouped(data)
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert parsed[0]["requirements"] == []
