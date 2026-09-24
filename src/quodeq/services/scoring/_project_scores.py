@@ -21,9 +21,15 @@ from quodeq.services.grade_formula import is_custom, load_params
 from quodeq.services.scoring_view import select_trend_runs
 from quodeq.services.score_cache import (
     accumulated_cache_version,
+    accumulated_stale_scope,
     cached_accumulated,
     per_run_versions,
+    suppression_state_fingerprint,
 )
+from quodeq.services.deleted import deleted_keys
+from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.suppression_keys import SuppressionKeys
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.services.wiring import find_children, list_runs
 from quodeq.services.scoring import _fetchers
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
@@ -64,16 +70,19 @@ def _resolve_accumulated(
         # payload, which the project-scoped cache version can't see -- bypass
         # the cache for parents to avoid serving stale data.
         return _compute_accumulated_payload(req, rescore_complete)
-    acc_version = accumulated_cache_version(
-        req.params,
-        per_run_versions(req.reports_root / req.project, req.project, req.params,
-                         [(r.run_id, r.status) for r in all_runs]),
-        req.as_of,
+    project_dir = req.reports_root / req.project
+    keys = SuppressionKeys(dismissed_keys(project_dir), deleted_keys(project_dir))
+    run_versions = per_run_versions(project_dir, req.project, req.params,
+                                    [(r.run_id, r.status) for r in all_runs], keys=keys)
+    stale_scope = accumulated_stale_scope(
+        req.params, run_versions, req.as_of,
+        suppression_state_fingerprint(req.params, keys.dismissed, keys.deleted),
     )
     return (req.deps.cached_accumulated or cached_accumulated)(
-        req.project, acc_version,
+        req.project, accumulated_cache_version(req.params, run_versions, req.as_of),
         lambda: _compute_accumulated_payload(req, rescore_complete),
         cacheable=lambda _payload: rescore_complete[0],
+        stale_scope=stale_scope, log=SHARED_LOG,
     )
 
 

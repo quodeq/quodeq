@@ -177,6 +177,7 @@ _.check_npm  # shared/prereqs.py: Referenced only from tests/, which this scan d
 _.choose_highest_priority  # config/_discipline_detection.py: Referenced only from tests/, which this scan does not cover (1 refs).
 _.clear_cached_queues  # analysis/subagents/_pool_scaling.py: Referenced only from tests/, which this scan does not cover (1 refs).
 _.clear_grades  # data/sqlite/state_store.py: Referenced only from tests/, which this scan does not cover (1 refs).
+_.clear_stale_payloads  # services/_score_cache_stale.py: Referenced only from tests/, which this scan does not cover (1 refs).
 _.confidence_label  # core/scoring/engine.py: Referenced only from tests/, which this scan does not cover (7 refs).
 _.get_current_provider  # config/ai_provider.py: Referenced only from tests/, which this scan does not cover (6 refs).
 _.get_latest_timestamp  # data/events/reader.py: Referenced only from tests/, which this scan does not cover (5 refs).

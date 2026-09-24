@@ -14,6 +14,7 @@ from typing import Callable, Iterator
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import DimensionResult
+from quodeq.services._score_cache_stale import recall, refresh_in_background, remember
 from quodeq.services.wiring import (
     open_score_cache,
     read_all_cached_rows,
@@ -34,10 +35,10 @@ def _log_write_failure(operation: str, exc: sqlite3.Error, *, log: LogSink) -> N
     signal anywhere. The caller still degrades exactly as before; this only
     adds visibility. ``log`` defaults to :data:`NULL_LOG`, matching the
     injected-LogSink discipline for inner layers -- see
-    ``quodeq.core.observability``. ``_fs_metadata.py`` and ``trend_fetcher.py``
-    thread ``log=SHARED_LOG`` through their calls to ``cached_project_summary``
-    and ``make_cache_backed_fetcher`` respectively; ``scoring/_project_scores.py``'s
-    call to ``cached_accumulated`` still leaves it at the silent default.
+    ``quodeq.core.observability``. ``_fs_metadata.py``, ``trend_fetcher.py``
+    and ``scoring/_project_scores.py`` thread ``log=SHARED_LOG`` through their
+    calls to ``cached_project_summary``, ``make_cache_backed_fetcher`` and
+    ``cached_accumulated`` respectively.
     """
     log.warning(f"score-cache write failed for {operation}, degrading to recompute: {exc}")
 
@@ -119,10 +120,19 @@ def read_through(
         return result
 
 
+def _peek(table: CacheTable, project: str, version: str) -> dict | None:
+    """The exact-version cached payload, or None on a miss or SQLite error."""
+    try:
+        with open_score_cache() as conn:
+            return table.read(conn, project, version)
+    except sqlite3.Error:
+        return None
+
+
 def cached_accumulated(
     project: str, version: str, compute: Callable[[], dict],
     cacheable: Callable[[dict], bool] | None = None,
-    *, log: LogSink = NULL_LOG,
+    *, stale_scope: str | None = None, log: LogSink = NULL_LOG,
 ) -> dict:
     """Read-through cache for the accumulated payload (see ``read_through``).
 
@@ -132,13 +142,35 @@ def cached_accumulated(
     covered only part of the dimensions), which would otherwise freeze under a
     version hash that cannot self-invalidate.
 
-    *log* receives a warning if the best-effort cache write fails; defaults to
-    a silent no-op (``NULL_LOG``) since no current caller of this entry point
-    threads a real sink here -- see ``_log_write_failure``.
+    *stale_scope* (``score_cache.accumulated_stale_scope``) opts into
+    stale-while-revalidate: an exact-version miss inside the same scope serves
+    the scope's last payload and refreshes it once in the background (see
+    ``_score_cache_stale``). Without a stored payload, the miss computes
+    synchronously as before.
+
+    *log* receives a warning if the best-effort cache write or a background
+    refresh fails; defaults to a silent no-op (``NULL_LOG``).
     """
     table = CacheTable("accumulated", "accumulated", read_cached_accumulated,
                         write_cached_accumulated, "write_cached_accumulated")
-    return read_through(table, project, version, compute, cacheable, log)
+    if stale_scope is None or score_cache_disabled():
+        return read_through(table, project, version, compute, cacheable, log)
+    slot = (table.kind, project, stale_scope)
+    hit = _peek(table, project, version)
+    if hit is not None:
+        remember(slot, hit)
+        return hit
+
+    def fresh() -> dict:
+        return read_through(table, project, version, compute, cacheable, log)
+
+    stale = recall(slot)
+    if stale is None:
+        payload = fresh()
+        remember(slot, payload)
+        return payload
+    refresh_in_background(slot, fresh, log)
+    return stale
 
 
 def cached_project_summary(
