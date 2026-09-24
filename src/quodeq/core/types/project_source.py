@@ -10,7 +10,12 @@ from enum import StrEnum
 
 
 class ProjectSource(StrEnum):
-    """An assistant session's data source: the user's own evaluations or the read-only shared mirror."""
+    """Where project data comes from: the user's own evaluations or the read-only shared mirror.
+
+    Also the project listing's/project card's ``source`` field, spelling
+    where that project's evaluations were read from (see
+    api/routes_shared_mirrors.py, api/routes_project_list.py).
+    """
 
     LOCAL = "local"
     SHARED = "shared"

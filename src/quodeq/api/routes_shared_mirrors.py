@@ -20,6 +20,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import json_error
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
+from quodeq.core.types.project_source import ProjectSource
 from quodeq.services import fs_reports, fs_projects
 from quodeq.services.compare import build_compare_summary
 from quodeq.services.runs_unit import build_runs_unit
@@ -70,7 +71,7 @@ def _shared_projects(
     for project in listing["projects"]:
         key = project.get("id") or project.get("name")
         project.update(meta.get(key, {}))
-        project["source"] = "shared"
+        project["source"] = ProjectSource.SHARED
     listing["lastSynced"] = last_synced_at(url)
     if stale is not None:
         listing["stale"] = stale
@@ -113,7 +114,7 @@ def shared_project_info(project: str, eval_root: Path, url: str):
     # indexes by.
     meta = published_meta(url)
     info.update(meta.get(project, {}))
-    info["source"] = "shared"
+    info["source"] = ProjectSource.SHARED
     return jsonify(info)
 
 
