@@ -15,7 +15,7 @@ import { main } from './ratchet.mjs';
 
 // Revise DOWNWARD as burn-down tasks land; NEVER raise without a
 // justification reviewed in the PR that raises it.
-const TOTAL_CEILING = 214; // Task 8 sweep (keyboard vocab + shared-layer constants): 360 -> 214; burning to 0 in this PR
+const TOTAL_CEILING = 0; // burned to zero in the magic-string sweep
 
 main({
   script: 'check_magic_strings.mjs',
