@@ -196,11 +196,8 @@ def mark_unfinished_dims_incomplete(
     complete one: the scored dimensions were averaged into a run grade
     with no record that the rest never ran.
     """
-    from quodeq.data.fs.dimensions_state_store import (  # noqa: PLC0415 — signal path
-        DimState,
-        read_dimensions,
-        write_dim_state,
-    )
+    from quodeq.core.run.dimensions import DimState  # noqa: PLC0415 — signal path
+    from quodeq.data.fs.dimensions_state_store import read_dimensions, write_dim_state
     try:
         entries = read_dimensions(run_dir).get("dimensions", {})
     except Exception:  # noqa: BLE001 — a failing flip must not mask the exit
@@ -236,7 +233,8 @@ def seed_dimension_states(
     run_dir: Path, dimensions: list[str], *, log: LogSink,
 ) -> None:
     """Initialise dimensions.json with one PENDING entry per dim."""
-    from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state  # noqa: PLC0415
+    from quodeq.core.run.dimensions import DimState  # noqa: PLC0415
+    from quodeq.data.fs.dimensions_state_store import write_dim_state  # noqa: PLC0415
     for dim in dimensions:
         try:
             write_dim_state(run_dir, dim, DimState.PENDING)

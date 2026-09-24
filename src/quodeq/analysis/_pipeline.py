@@ -23,7 +23,7 @@ from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-expo
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
 from quodeq.analysis.subprocess import get_provider_type
 from quodeq.core.evidence.model import Evidence
-from quodeq.data.fs.dimensions_state_store import DimState
+from quodeq.core.run.dimensions import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis.runner_markers import emit_marker
 from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_SCORING, CC_PHASE_SETUP

@@ -14,7 +14,8 @@ from quodeq.analysis.errors import (
 )
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
-from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state, IllegalDimTransitionError
+from quodeq.core.run.dimensions import DimState, IllegalDimTransitionError
+from quodeq.data.fs.dimensions_state_store import write_dim_state
 
 
 @dataclass(frozen=True, slots=True)

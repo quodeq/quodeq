@@ -9,7 +9,7 @@ from quodeq.analysis._drop_stats import DropStatsCounter, report_run_drop_stats
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import LogSink
-from quodeq.data.fs.dimensions_state_store import DimState
+from quodeq.core.run.dimensions import DimState
 from quodeq.analysis._loop_state import (
     DimTransition,
     run_dir_for,
