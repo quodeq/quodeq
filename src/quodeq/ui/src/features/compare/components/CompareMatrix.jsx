@@ -15,7 +15,7 @@
  * so everything stays on screen. Horizontal scroll remains only as a last
  * resort at widths where even the minimum group cannot fit.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.js';
 import { SectionLabel } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
@@ -162,14 +162,17 @@ export default function CompareMatrix({ ariaLabel, header, note, columns, matrix
   const [hoverKey, setHoverKey] = useState(null);
   const { wrapRef, chunks } = useMatrixColumnChunks(columns, matrixRows.length >= 2 && columns.length >= 1);
 
-  const displayRows = sortMatrixRows(matrixRows, sort);
+  // None of these depend on hoverKey, and hover re-renders on every cell
+  // entered, so compute them only when the data or the sort changes. They
+  // sit above the guard below: hooks must run on every render.
+  const displayRows = useMemo(() => sortMatrixRows(matrixRows, sort), [matrixRows, sort]);
+  const shortLabels = useMemo(() => makeShortLabels(columns), [columns]);
+  const extremes = useMemo(() => computeMatrixExtremes(columns, matrixRows), [columns, matrixRows]);
 
   // Two projects make a comparison; a single column is still a grid worth
   // having (overall beside the one dimension the scope shares).
   if (matrixRows.length < 2 || columns.length < 1) return null;
 
-  const shortLabels = makeShortLabels(columns);
-  const extremes = computeMatrixExtremes(columns, matrixRows);
   const { hoverClass, headerCell, scoreCell } = buildMatrixCellHelpers(sort, setSort, hoverKey, setHoverKey, extremes);
 
   return (
