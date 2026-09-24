@@ -190,6 +190,16 @@ class _Finder(ast.NodeVisitor):
             self.values.append(node)
 
 
+def _key_literal(value: str) -> str:
+    """The literal as it appears in a baseline key: one line, always.
+
+    A printable literal is kept verbatim so ordinary keys stay readable; one
+    with a newline, tab or other control character is backslash-escaped, so
+    the baseline stays one key per line.
+    """
+    return value if value.isprintable() else value.encode("unicode_escape").decode("ascii")
+
+
 def _scan_module(tree: ast.AST) -> list[tuple[str, ast.Constant]]:
     """(rule, constant) pairs for one parsed module."""
     finder = _Finder(_docstring_ids(tree))
@@ -220,7 +230,7 @@ def scan_tree(src_root: Path) -> list[Hit]:
             continue
         lines = text.splitlines()
         for rule, const in _scan_module(tree):
-            key = f"{rel}:{rule}:{const.value}"
+            key = f"{rel}:{rule}:{_key_literal(const.value)}"
             if key not in hits:
                 src = lines[const.lineno - 1].strip() if const.lineno <= len(lines) else ""
                 hits[key] = Hit(py, const.lineno, rule, const.value, key, src)

@@ -91,6 +91,32 @@ def test_keys_carry_no_line_numbers(tmp_path):
     assert first == moved == {"quodeq/mod.py:C:alpha"}
 
 
+def test_function_and_class_docstrings_are_not_flagged(tmp_path):
+    body = (
+        "class K:\n"
+        "    'alpha'\n"
+        "def f(s):\n"
+        "    'alpha'\n"
+        "    return s\n"
+        "async def g(s):\n"
+        "    'alpha'\n"
+        "    return s\n"
+        "def h(s):\n"
+        "    return s == 'beta'\n"
+    )
+    assert _keys(tmp_path, body) == {"quodeq/mod.py:C:beta"}
+
+
+def test_control_characters_are_escaped_in_the_key(tmp_path):
+    keys = _keys(tmp_path, "def f(s):\n    return s == 'a\\nb', s == 'c\\td'\n")
+    assert keys == {"quodeq/mod.py:C:a\\nb", "quodeq/mod.py:C:c\\td"}
+    assert all("\n" not in k and "\t" not in k for k in keys)
+
+
+def test_printable_literals_keep_their_key_verbatim(tmp_path):
+    assert _keys(tmp_path, "def f(s):\n    return s == 'caf\u00e9 a\\\\b'\n") == {"quodeq/mod.py:C:caf\u00e9 a\\b"}
+
+
 def test_baseline_is_empty():
     lines = [l for l in (TOOLS / "magic_strings_baseline.txt").read_text().splitlines() if l.strip() and not l.startswith("#")]
     assert lines == []
