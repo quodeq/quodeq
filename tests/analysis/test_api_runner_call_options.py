@@ -1,6 +1,7 @@
 """API runner call options: timeouts, thinking knobs, output caps, truncation."""
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -196,3 +197,40 @@ class TestTruncationDetection:
             findings, was_lossy = call_api("prompt", api_config)
         assert was_lossy is False
         assert len(findings) == 1
+
+
+class _FactoryFakeClient:
+    """Fake OpenAI-compatible client for asserting ``call_api`` builds its
+    client through ``client_factory`` instead of calling ``openai.OpenAI``
+    directly."""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def _create(self, **kwargs):
+        msg = SimpleNamespace(content='{"findings": []}')
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason="stop", message=msg)])
+
+
+class TestClientFactory:
+    """``call_api`` builds its OpenAI-compatible client through an injectable
+    ``client_factory`` so callers/tests can substitute a fake."""
+
+    def test_call_api_builds_client_through_factory(self, api_config):
+        built = []
+
+        def factory(**kwargs):
+            built.append(kwargs)
+            return _FactoryFakeClient(**kwargs)
+
+        findings, lossy = call_api("prompt", api_config, client_factory=factory)
+        assert built and built[0]["max_retries"] == 0
+        assert lossy is False
+        assert findings == []

@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { applyMutationDelta } from '../api/applyMutationDelta.js';
 import {
-  computeIsEvaluating, useAppBootExtras, useAppWizardBounce, useAppNavBoot, useAppDerived, useAppEvalProgress,
+  computeIsEvaluating, useAppBootExtras, useAppWizardBounce, useAppDerived, useAppEvalProgress,
+  useSidebarProviderSelection, useAppStartupGate, useAppNavigationEffects, useSelectedProjectSyncEffects,
 } from './useAppShellHooks.js';
 import { useAssistantActionAppliedEffect } from './useAppEffects.js';
 
@@ -35,8 +36,11 @@ export function useAppChrome({ state, sharedSignal }) {
   const isEvaluating = computeIsEvaluating(state);
   const wizard = useAppWizardBounce({ state, selectedProjectInfo, isEvaluating, sharedSignal });
   const { activePage, navSwapAt, navTab, activeTab } = state;
-  const navBoot = useAppNavBoot({ state, activeTab, navTab, sharedSignal });
+  const sidebar = useSidebarProviderSelection();
+  const startup = useAppStartupGate({ state, activeTab });
+  useAppNavigationEffects({ state, activeTab, navTab, sharedSignal });
+  useSelectedProjectSyncEffects(state.selectedProject);
   const derived = useAppDerived({ state, navTab, navSwapAt, activePage });
   const topbarRunProgress = useAppEvalProgress({ state, isEvaluating });
-  return { selectedProjectInfo, isEvaluating, ...wizard, ...navBoot, ...derived, topbarRunProgress };
+  return { selectedProjectInfo, isEvaluating, ...wizard, ...sidebar, ...startup, ...derived, topbarRunProgress };
 }

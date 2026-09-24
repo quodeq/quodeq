@@ -15,16 +15,17 @@ from typing import Any
 
 from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.core.run.dimensions import DimState
-from quodeq.data.fs.evidence_tally import FindingTally, IncrementalTally
-from quodeq.data.fs.standards_loader import read_req_to_principle_map
 from quodeq.services._scan_progress_elapsed import dim_elapsed_s
 from quodeq.services._scan_progress_types import DimProgress, ProgressContext
 from quodeq.services.wiring import (
+    FindingTally,
+    IncrementalTally,
     count_active_agent_streams,
     dimension_evidence_file,
     dimension_queue_file,
     dimension_report_exists,
     read_queue_state,
+    read_req_to_principle_map,
 )
 from quodeq.services.suppression import build_matcher
 from quodeq.shared.lru import LRUDict

@@ -1,8 +1,9 @@
 """Centralized conversions between Finding-shape representations.
 
 This is the only module that knows how to convert between the LLM wire format,
-the canonical Judgment, the read-side Finding view, and the API response dict.
-SQL row mapping lives in data/sqlite/row_mappers.py.
+the canonical Judgment, and the read-side Finding view. The Finding -> API
+response dict shape lives in data/fs/report_parser/finding_response.py (its
+only caller); SQL row mapping lives in data/sqlite/row_mappers.py.
 """
 from __future__ import annotations
 
@@ -99,26 +100,3 @@ def judgment_to_finding(j: Judgment, *, dismissed: bool = False) -> Finding:
         provenance_downgrade=j.provenance_downgrade,
         scope_downgrade=j.scope_downgrade,
     )
-
-
-def finding_to_response_dict(f: Finding) -> dict[str, Any]:
-    """Render a Finding as the dict shape expected by SSE and REST clients."""
-    req_refs = (
-        [{"label": r.label, "url": r.url} for r in f.req_refs]
-        if f.req_refs else None
-    )
-    return {
-        "practice_id": f.practice_id,
-        "file": f.file,
-        "line": f.line,
-        "end_line": f.end_line,
-        "snippet": f.snippet,
-        "verdict": f.verdict,
-        "severity": f.severity,
-        "reason": f.reason,
-        "title": f.title,
-        "req": f.req,
-        "req_refs": req_refs,
-        "provenance_downgrade": f.provenance_downgrade,
-        "scope_downgrade": f.scope_downgrade,
-    }

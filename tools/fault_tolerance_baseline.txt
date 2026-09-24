@@ -10,16 +10,16 @@
 # introduced in the same change.
 src/quodeq/_cli_evaluate_finalize.py:71:broad-except
 src/quodeq/_cli_scoring.py:127:broad-except
-src/quodeq/analysis/_api_call.py:247:broad-except
+src/quodeq/analysis/_api_call.py:257:broad-except
 src/quodeq/analysis/_api_runner.py:105:broad-except
 src/quodeq/analysis/_loop_steps.py:108:broad-except
 src/quodeq/analysis/_loop_steps.py:139:broad-except
 src/quodeq/analysis/_loop_steps.py:182:broad-except
 src/quodeq/analysis/_loop_steps.py:184:broad-except
 src/quodeq/analysis/_loops.py:132:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:112:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:120:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:149:broad-except
+src/quodeq/analysis/_run_lifecycle_support.py:206:broad-except
+src/quodeq/analysis/_run_lifecycle_support.py:214:broad-except
+src/quodeq/analysis/_run_lifecycle_support.py:243:broad-except
 src/quodeq/analysis/cache/_persist_watcher.py:152:broad-except
 src/quodeq/analysis/cache/_persist_watcher.py:157:broad-except
 src/quodeq/analysis/cache/_replay.py:129:broad-except
@@ -128,11 +128,11 @@ src/quodeq/services/active_evaluation.py:69:broad-except
 src/quodeq/services/background.py:141:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except
 src/quodeq/services/cache_maintenance.py:40:broad-except
-src/quodeq/services/evidence_rescore.py:190:broad-except
-src/quodeq/services/grade_formula.py:118:broad-except
+src/quodeq/services/evidence_rescore.py:196:broad-except
+src/quodeq/services/grade_formula.py:121:broad-except
 src/quodeq/services/grade_formula_job.py:197:broad-except
 src/quodeq/services/mutation_rescore.py:188:broad-except
-src/quodeq/services/project_registration.py:168:broad-except
+src/quodeq/services/project_registration.py:164:broad-except
 src/quodeq/services/shared_publish.py:195:broad-except
 src/quodeq/services/shared_publish.py:221:broad-except
 src/quodeq/services/warmup.py:168:broad-except

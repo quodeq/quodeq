@@ -14,18 +14,23 @@ from pathlib import Path
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.scoring.projector_scoring import compute_run_score
-from quodeq.data.fs.grade_formula_store import (  # noqa: F401 — re-exported API
+from quodeq.services.ports import GradeTablesReader
+from quodeq.services.wiring import (  # noqa: F401 — grade_formula_store names are re-exported API
+    SQLiteStateStore,
+    UnsupportedSchemaError,
     clear_rescore_pending,
+    compute_run_grades,
     grade_formula_path,
     is_custom,
     load_params,
     mark_rescore_pending,
+    read_status,
+    recompute_grades,
     rescore_marker_path,
     rescore_pending,
     reset_params,
     save_params,
 )
-from quodeq.data.fs.run_status_store import UnsupportedSchemaError, read_status
 
 _logger = logging.getLogger(__name__)
 
@@ -109,8 +114,6 @@ def _recompute_with_retries(run_dir: Path, params: ScoringParams) -> bool:
     Returns True on success. On exhausting the retries, logs the failure
     itself and returns False -- the caller decides what to do with that.
     """
-    from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
-
     for attempt in range(_APPLY_RETRIES + 1):
         try:
             recompute_grades(run_dir, params=params)
@@ -183,17 +186,17 @@ def _rescore_runs(
 
 def preview_scores(
     reports_root: Path, project: str, params: ScoringParams,
+    *, store_factory: Callable[[Path], GradeTablesReader] | None = None,
 ) -> dict | None:
     """Recompute the project's latest event-log run in memory with *params*.
 
     Read-only: never writes evaluation.db. Returns None when the project has
     no run with an events.jsonl. The ``before`` numbers use the currently
     SAVED params (what the dashboard shows today); the ``after`` numbers use
-    the candidate *params* being previewed.
+    the candidate *params* being previewed. *store_factory* lets callers
+    inject a fake ``GradeTablesReader`` instead of a real SQLite file;
+    defaults to ``SQLiteStateStore``.
     """
-    from quodeq.data.projection.grade_projector import compute_run_grades  # noqa: PLC0415
-    from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: PLC0415
-
     project_dir = reports_root / project
     if not project_dir.is_dir():
         return None
@@ -203,7 +206,7 @@ def preview_scores(
     run_dir = run_dirs[0]
 
     saved = load_params()
-    store = SQLiteStateStore(run_dir)
+    store = (store_factory or SQLiteStateStore)(run_dir)
     before_dims = store.read_dimension_scores()
     before_overall = compute_run_score(before_dims, params=saved)
 

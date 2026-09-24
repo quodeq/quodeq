@@ -1,23 +1,9 @@
-"""Score/grade conversion and score-lookup building for reports."""
+"""Score-lookup building for reports; grade_from_score is re-exported from core."""
 from __future__ import annotations
-
-import re
 
 from quodeq.core.types import ScoringResult
 from quodeq.shared.serialization import to_camel_dict
-from quodeq.core.scoring.internals import score_to_grade_label
-
-
-def grade_from_score(score: str | None) -> str | None:
-    """Convert a numeric score string (e.g. '7/10') to a letter grade."""
-    if not score:
-        return None
-
-    hit = re.match(r"(\d+(?:\.\d+)?)", str(score))
-    if not hit:
-        return None
-
-    return score_to_grade_label(float(hit.group(1)))
+from quodeq.core.scoring.report_grades import grade_from_score  # noqa: F401 — re-exported API
 
 
 def build_score_lookup(per_principle_scores: dict) -> dict:

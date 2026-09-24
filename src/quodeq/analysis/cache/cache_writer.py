@@ -25,6 +25,7 @@ from typing import Callable, Mapping
 
 from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache._key_provenance import content_hash_for
+from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_helpers import hash_prompts_combined
 from quodeq.analysis.cache.entry import CacheEntry, build_provenance, quodeq_version
 from quodeq.analysis.cache.key import SCHEMA_VERSION, CacheKey, compute_key
@@ -58,7 +59,7 @@ class CacheWriteTarget:
     stamped on it: the backend, the project root file content is hashed
     against, and the dimension/language/model on every entry it writes."""
 
-    cache: LocalFileBackend
+    cache: CacheBackend
     src_root: Path
     dimension: str
     language: str
@@ -90,6 +91,8 @@ class CacheWriterSpec:
     # threaded straight through to them.
     content_hashes: Mapping[str, str] = field(default_factory=dict)
     content_stamps: Mapping[str, tuple[int, int]] = field(default_factory=dict)
+    # None builds the on-disk LocalFileBackend at *cache_root*.
+    backend_factory: Callable[[Path], CacheBackend] | None = None
 
     @classmethod
     def from_run_config(
@@ -206,6 +209,11 @@ def _write_cache_entry(
     target.cache.put(key, entry)
 
 
+def _local_backend(root: Path) -> CacheBackend:
+    """Default ``backend_factory``: the on-disk backend at *root*."""
+    return LocalFileBackend(root=root)
+
+
 def build_cache_writer(spec: CacheWriterSpec) -> Callable[[str, list[dict]], None]:
     """Return a closure that writes a per-file cache entry on each ok marker.
 
@@ -220,7 +228,7 @@ def build_cache_writer(spec: CacheWriterSpec) -> Callable[[str, list[dict]], Non
     out of the closure. The router catches them and logs; the JSONL marker
     write already succeeded, so the run continues.
     """
-    cache = LocalFileBackend(root=spec.cache_root)
+    cache = (spec.backend_factory or _local_backend)(spec.cache_root)
     provenance = _resolve_writer_provenance(
         spec.dimension, spec.src_root, spec.standards_dir, spec.prompts_dir,
     )

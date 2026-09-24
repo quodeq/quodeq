@@ -19,7 +19,7 @@ from pathlib import Path
 
 from quodeq.core.run.job_status import JOB_FINISHED, JobStatus, external_job_id, is_external_job_id, strip_external_prefix
 from quodeq.core.types.job import JobSnapshot
-from quodeq.data.sqlite import run_index as _run_index
+from quodeq.services.wiring import run_index as _run_index
 from quodeq.services._external_jobs import sync_external_run, sync_indexed_run
 from quodeq.services.jobs import JobManager
 from quodeq.services._run_index_fs import (
@@ -191,7 +191,7 @@ class EvaluationsIndex:
         if snapshot.status != JobStatus.RUNNING:
             return False
 
-        from quodeq.data.sqlite.index_sync import force_promote_to_cancelled_stale
+        from quodeq.services.wiring import force_promote_to_cancelled_stale
 
         run_dir: Path | None = None
         if snapshot.output_project and snapshot.output_run_id and reports_dir:
