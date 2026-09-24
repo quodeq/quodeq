@@ -15,8 +15,8 @@
     {"file": "tempfile_io.py", "line": 2, "anchor": "open(path)",
      "dimension": "reliability", "cwes": [772, 404], "reqs": ["R-REC-1", "R-REC-6"],
      "severity": "minor", "note": "file handle never closed"},
-    {"file": "settings.py", "line": 7, "anchor": "except Exception:",
-     "dimension": "reliability", "cwes": [396, 390], "reqs": ["R-FT-7", "R-FT-14"],
-     "severity": "minor", "note": "generic catch around ordinary parsing, silent default"}
+    {"file": "settings.py", "line": 10, "anchor": "except Exception:",
+     "dimension": "reliability", "cwes": [396], "reqs": ["R-FT-7"],
+     "severity": "minor", "note": "generic catch around ordinary parsing; the traceback at warning does not make it a boundary"}
   ]
 }

@@ -171,7 +171,7 @@
         },
         {
           "id": "R-FT-7",
-          "text": "Catch blocks MUST target specific exception types, not generic Exception. A generic catch is compliant only at a fault-isolation boundary (a thread or task entry point, one iteration of an event loop or work queue, or a call into third-party or plugin code) that records the error with its stack trace at warning level or above and does not continue with partially-updated state; a generic catch around ordinary logic is a violation",
+          "text": "Catch blocks MUST target specific exception types, not generic Exception. A generic catch is compliant only at a fault-isolation boundary (a thread or task entry point, one iteration of an event loop or work queue, or a third-party or plugin callback) that records the error with its stack trace at warning level or above and does not continue with partially-updated state; a generic catch around ordinary logic is a violation",
           "cwe": [
             396
           ]

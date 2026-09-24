@@ -25,7 +25,7 @@ def test_carve_out_names_the_boundary_kinds() -> None:
     assert "fault-isolation boundary" in line
     assert "thread or task entry point" in line
     assert "event loop or work queue" in line
-    assert "third-party or plugin" in line
+    assert "third-party or plugin callback" in line
 
 
 def test_carve_out_requires_traceback_at_warning_or_above() -> None:
