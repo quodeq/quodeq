@@ -6,16 +6,16 @@ traversal, absolute paths, symlinks, special files, oversize entries, and
 zip-bomb compression ratios before a single byte is extracted (see
 _import_validation.py and _import_extract.py for the checks themselves).
 
-Split into three collaborator modules plus this orchestrator:
+Split into four collaborator modules plus this orchestrator:
   - _import_validation.py: archive/member/manifest/repo-info validation.
   - _import_identity.py: identity-collision detection and index updates.
   - _import_extract.py: ``safe_extract``, the hardened extraction step.
+  - _import_upload.py: ``open_upload``, the bounded view of the uploaded archive.
 This module re-exports every moved name so existing imports and patches
 (tests/api/test_project_import.py) keep working unchanged.
 """
 from __future__ import annotations
 
-import io
 import shutil
 import tempfile
 import uuid as _uuid
@@ -55,6 +55,7 @@ from ._import_validation import (
     validate_member_name,  # noqa: F401 — re-export
     validate_repository_info,
 )
+from ._import_upload import open_upload
 
 _ACTION_REPLACE = "replace"
 _ACTION_COPY = "copy"
@@ -243,9 +244,10 @@ def import_zip_stream(
 ) -> ImportOutcome:
     """Validate and materialize a project zip *stream* into *reports_dir*.
 
-    Framework-free (*stream* need only support ``.read(n)``); returns a
-    plain :class:`ImportOutcome`. *action* is ``"replace"``/``"copy"`` to
-    resolve a 409 collision; *remote_addr* is only for the audit log.
+    Framework-free (*stream* needs ``.read(n)``; a seekable one is sized in
+    place, see ``_import_upload.open_upload``); returns a plain
+    :class:`ImportOutcome`. *action* is ``"replace"``/``"copy"`` to resolve a
+    409 collision; *remote_addr* is only for the audit log.
     """
     if action is not None and action not in _ALLOWED_ACTIONS:
         return _error_outcome(
@@ -253,39 +255,39 @@ def import_zip_stream(
             HTTPStatus.BAD_REQUEST, "INVALID_ACTION",
         )
     size_limit = max_zip_size_bytes()
-    raw = stream.read(size_limit + 1)
-    if len(raw) > size_limit:
-        return _error_outcome(
-            f"Archive exceeds the {size_limit // (1024 * 1024)} MB import limit.",
-            HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE",
-        )
-    reports_root = Path(reports_dir).resolve()
-    if not reports_root.is_dir():
-        return _error_outcome("reports directory does not exist", HTTPStatus.INTERNAL_SERVER_ERROR, "NO_REPORTS_DIR")
-    try:
-        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-            top_dir, members = validate_archive(zf, max_total_bytes=size_limit * EXTRACT_HEADROOM)
-            repo_info = _read_and_validate_member_payloads(zf, members, top_dir)
-            identity = identity_from_info(repo_info)
-            resolution = _resolve_import_conflict(reports_root, top_dir, action, identity)
-            if isinstance(resolution, ImportOutcome):
-                return resolution
-            target_uuid, replace_existing = resolution
-            target = _ImportTarget(reports_root, top_dir, target_uuid, identity, replace_existing)
-            _stage_and_commit(zf, members, target)
-    except ImportValidationError as exc:
-        return _error_outcome(exc.public_message, exc.status, exc.code)
-    except zipfile.BadZipFile:
-        return _error_outcome(
-            "File is not a valid zip archive.",
-            HTTPStatus.BAD_REQUEST, "BAD_ZIP",
-        )
-    except OSError as exc:
-        logger.warning("import: filesystem error: %s", exc)
-        return _error_outcome(
-            "Failed to write imported project. Check disk space and permissions.",
-            HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR",
-        )
+    with open_upload(stream, size_limit) as upload:
+        if upload is None:
+            return _error_outcome(
+                f"Archive exceeds the {size_limit // (1024 * 1024)} MB import limit.",
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE",
+            )
+        reports_root = Path(reports_dir).resolve()
+        if not reports_root.is_dir():
+            return _error_outcome("reports directory does not exist", HTTPStatus.INTERNAL_SERVER_ERROR, "NO_REPORTS_DIR")
+        try:
+            with zipfile.ZipFile(upload) as zf:
+                top_dir, members = validate_archive(zf, max_total_bytes=size_limit * EXTRACT_HEADROOM)
+                repo_info = _read_and_validate_member_payloads(zf, members, top_dir)
+                identity = identity_from_info(repo_info)
+                resolution = _resolve_import_conflict(reports_root, top_dir, action, identity)
+                if isinstance(resolution, ImportOutcome):
+                    return resolution
+                target_uuid, replace_existing = resolution
+                target = _ImportTarget(reports_root, top_dir, target_uuid, identity, replace_existing)
+                _stage_and_commit(zf, members, target)
+        except ImportValidationError as exc:
+            return _error_outcome(exc.public_message, exc.status, exc.code)
+        except zipfile.BadZipFile:
+            return _error_outcome(
+                "File is not a valid zip archive.",
+                HTTPStatus.BAD_REQUEST, "BAD_ZIP",
+            )
+        except OSError as exc:
+            logger.warning("import: filesystem error: %s", exc)
+            return _error_outcome(
+                "Failed to write imported project. Check disk space and permissions.",
+                HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR",
+            )
 
     return _build_success_outcome(target, action, remote_addr)
 
