@@ -50,3 +50,18 @@ DEFAULT_LLAMACPP_BASE_URL = "http://localhost:8080"
 OMLX_DEFAULT_BASE_URL = "http://localhost:8000"
 
 SECRET_SUFFIX_CHARS = 4  # how many trailing credential characters a log or settings mask may show
+
+# Per-run subdirectory holding evidence/*.jsonl, manifest.json and the live
+# stream files. Named by analysis/data/services alike (analysis writes it,
+# data and services read it), so it lives here rather than in one layer.
+EVIDENCE_DIRNAME = "evidence"
+
+# Synthetic dimension id for a consolidated run (multiple dimensions handled
+# by one agent pool/prompt instead of one pool per dimension). Used as the
+# evidence-file prefix and progress-tracking id by analysis/subagents/pool.py
+# and read back by services/_scan_progress_dims.py.
+CONSOLIDATED_DIMENSION_KEY = "consolidated"
+
+# Suffix of a run's per-dimension scored report files under its evaluation/
+# directory. Checked by data/fs/report_parser and services/scoring alike.
+JSON_SUFFIX = ".json"

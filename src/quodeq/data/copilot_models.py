@@ -22,6 +22,7 @@ _OS_NAME_NT = "nt"  # os.name value
 _STOP_TIMEOUT_S = 2
 _MAX_MESSAGE_BYTES = 1024 * 1024
 _REQUEST_ID = "quodeq-models"
+_POLICY_STATE_ENABLED = "enabled"  # Copilot's model-policy state for an account-available model
 
 # LSP-style RPC framing: the writer builds the header from these, the reader
 # checks/strips the same prefix and terminator, so both sides stay in sync.
@@ -57,7 +58,7 @@ def _model_ids(result: object) -> list[str]:
         if policy is not None:
             if not isinstance(policy, dict):
                 raise _ModelDiscoveryError("Copilot returned an invalid model policy.")
-            if policy.get("state") != "enabled":
+            if policy.get("state") != _POLICY_STATE_ENABLED:
                 continue
         available.append(model_id)
     if not available:

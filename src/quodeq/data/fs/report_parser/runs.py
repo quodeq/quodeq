@@ -19,6 +19,7 @@ from quodeq.data.mappers import parse_dimension_result
 from quodeq.data.fs.report_parser._evaluations import load_evaluations
 from quodeq.data.fs.report_parser.external_pid import resolve_external_pid
 from quodeq.data.fs.report_parser._evidence import load_evidence_map
+from quodeq.shared.constants import JSON_SUFFIX
 from quodeq.data.fs.report_parser._repository import (
     build_repository_info as build_repository_info,
 )
@@ -127,7 +128,7 @@ def _read_run_scalars_from_sql(run_dir: Path) -> "tuple[list[dict], list[dict]] 
 
     eval_dir = run_dir / "evaluation"
     on_disk = (
-        sum(1 for p in eval_dir.iterdir() if p.suffix == ".json")
+        sum(1 for p in eval_dir.iterdir() if p.suffix == JSON_SUFFIX)
         if eval_dir.is_dir() else 0
     )
     if on_disk and len(dim_rows) != on_disk:

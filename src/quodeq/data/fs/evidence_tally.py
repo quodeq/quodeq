@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Callable
 
@@ -18,6 +19,19 @@ from quodeq.core.types.finding_type import FINDING_TYPES, FindingType
 from quodeq.shared.utils import open_text
 
 _logger = logging.getLogger(__name__)
+
+
+class _RowClass(StrEnum):
+    """_classify_finding_row's non-finding-type outcomes (see its docstring).
+
+    A finding row classifies as one of these, or as FindingType.VIOLATION /
+    FindingType.COMPLIANCE.
+    """
+
+    SKIP = "skip"
+    DUPLICATE = "duplicate"
+    QUARANTINED = "quarantined"
+    SUPPRESSED = "suppressed"
 
 
 @dataclass(frozen=True)
@@ -71,28 +85,28 @@ def _classify_finding_row(
     """
     stripped = raw.strip()
     if not stripped:
-        return "skip"
+        return _RowClass.SKIP
     try:
         obj = json.loads(stripped)
     except json.JSONDecodeError:
-        return "skip"
+        return _RowClass.SKIP
     if not isinstance(obj, dict):
-        return "skip"  # valid JSON but not an object (a bare list/number)
+        return _RowClass.SKIP  # valid JSON but not an object (a bare list/number)
     t = obj.get("t")
     key = (obj.get("p"), obj.get("file"), obj.get("line"), t)
     if key in seen:
-        return "duplicate"
+        return _RowClass.DUPLICATE
     seen.add(key)
     if t not in FINDING_TYPES:
         # Non-finding rows (e.g. the file_done markers the pool appends)
         # still occupy a dedup key but classify as neither.
-        return "skip"
+        return _RowClass.SKIP
     # Mirror parse_jsonl_line: `p` wins, `req` is the fallback.
     if resolver is not None and resolver.resolve(obj.get("p") or obj.get("req")) is None:
-        return "quarantined"
+        return _RowClass.QUARANTINED
     if t == FindingType.VIOLATION:
         if suppressed is not None and suppressed(obj):
-            return "suppressed"
+            return _RowClass.SUPPRESSED
         return FindingType.VIOLATION
     return FindingType.COMPLIANCE
 
@@ -128,11 +142,11 @@ def tally_unique_findings(
                 kind = _classify_finding_row(
                     raw, seen, suppressed=suppressed, resolver=resolver,
                 )
-                if kind == "duplicate":
+                if kind == _RowClass.DUPLICATE:
                     duplicates += 1
-                elif kind == "quarantined":
+                elif kind == _RowClass.QUARANTINED:
                     quarantined += 1
-                elif kind == "suppressed":
+                elif kind == _RowClass.SUPPRESSED:
                     hidden += 1
                 elif kind == FindingType.VIOLATION:
                     violations += 1

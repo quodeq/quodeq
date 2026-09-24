@@ -125,3 +125,7 @@ INSERT OR IGNORE INTO findings (
     :provenance_downgrade, :scope_downgrade_json
 )
 """
+
+# state_store.py clears this table from three call sites (clear_all,
+# write_grades, clear_grades); one literal avoids drift on a rename.
+DELETE_DIMENSION_SCORES_SQL = "DELETE FROM dimension_scores"

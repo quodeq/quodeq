@@ -19,6 +19,7 @@ from quodeq.shared.repo import normalize_remote_url
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT_S = 10
+_GIT_FLAG_CHANGE_DIR = "-C"  # git's global "run as if started in <path>" flag
 
 
 def run_git(
@@ -98,7 +99,7 @@ def _tracked_rels(
     """Tracked paths as git reports them, or None when it cannot answer."""
     try:
         out = run_git(
-            ["-C", str(path), "ls-files", "-z", "--cached", *pathspec], timeout=timeout,
+            [_GIT_FLAG_CHANGE_DIR, str(path), "ls-files", "-z", "--cached", *pathspec], timeout=timeout,
         )
     except UnicodeDecodeError:
         # run_git decodes stdout as strict UTF-8; a tracked path carrying
@@ -115,7 +116,7 @@ def list_branches(repo_dir: Path, *, timeout: float = _DEFAULT_TIMEOUT_S) -> lis
     if not (repo_dir / ".git").exists():
         return []
     out = run_git(
-        ["-C", str(repo_dir), "branch", "--format=%(refname:short)"],
+        [_GIT_FLAG_CHANGE_DIR, str(repo_dir), "branch", "--format=%(refname:short)"],
         timeout=timeout,
     )
     if out is None:
@@ -126,7 +127,7 @@ def list_branches(repo_dir: Path, *, timeout: float = _DEFAULT_TIMEOUT_S) -> lis
 
 def remote_origin_url_raw(repo_dir: Path | str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> str | None:
     """``git remote get-url origin`` verbatim, or None when absent/unreadable."""
-    out = run_git(["-C", str(repo_dir), "remote", "get-url", "origin"], timeout=timeout)
+    out = run_git([_GIT_FLAG_CHANGE_DIR, str(repo_dir), "remote", "get-url", "origin"], timeout=timeout)
     if out is None:
         return None
     origin = out.strip()
@@ -141,7 +142,7 @@ def git_remote_url(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> st
     ``host/owner/repo`` via ``shared._repo.normalize_remote_url``.
     """
     out = run_git(
-        ["-C", repo_path, "config", "--get", "remote.origin.url"], timeout=timeout,
+        [_GIT_FLAG_CHANGE_DIR, repo_path, "config", "--get", "remote.origin.url"], timeout=timeout,
     )
     if out is None:
         return None

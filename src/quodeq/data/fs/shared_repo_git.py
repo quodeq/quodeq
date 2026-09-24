@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 CACHE_ENV = "QUODEQ_CACHE_ROOT"
 # Seconds; a first clone of a results repo can legitimately take minutes.
 DEFAULT_GIT_TIMEOUT_S = 300
+GIT_DIR_NAME = ".git"  # shared_repo.py and shared_repo_meta.py both check for this
+EVALUATIONS_DIRNAME = "evaluations"  # the clone's evaluations/ tree; see shared_evaluations_root
 
 
 def git_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -93,4 +95,4 @@ def shared_repo_path(url: str, env: Mapping[str, str] | None = None) -> Path:
 
 def shared_evaluations_root(url: str, env: Mapping[str, str] | None = None) -> Path:
     """The clone's evaluations/ tree, laid out like the local evaluations dir."""
-    return shared_repo_path(url, env) / "evaluations"
+    return shared_repo_path(url, env) / EVALUATIONS_DIRNAME

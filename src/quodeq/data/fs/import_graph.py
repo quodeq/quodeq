@@ -22,6 +22,7 @@ from quodeq.core.checks.model import ImportEdge, ImportGraph
 
 _logger = logging.getLogger(__name__)
 _PY_SUFFIXES = (".py", ".pyi")
+_INIT_STEM = "__init__"  # Python's package-marker module; not a segment of the dotted package name
 
 
 def relative_python_files(root: Path, files: Iterable[Path]) -> list[str]:
@@ -90,7 +91,7 @@ def _own_package(rel: str, package_roots: set[str]) -> str | None:
     path = Path(rel)
     segments = list(path.parts)
     segments[-1] = path.stem
-    is_init = segments[-1] == "__init__"
+    is_init = segments[-1] == _INIT_STEM
     if is_init:
         segments.pop()
     for prefix in sorted(package_roots, key=len, reverse=True):

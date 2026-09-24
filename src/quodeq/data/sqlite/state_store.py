@@ -17,7 +17,7 @@ from quodeq.core.types.finding_type import FindingType
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.data.sqlite.connection import open_evaluation_db
-from quodeq.data.sqlite._schema import INSERT_FINDING_SQL
+from quodeq.data.sqlite._schema import DELETE_DIMENSION_SCORES_SQL, INSERT_FINDING_SQL
 from quodeq.data.sqlite.row_mappers import judgment_to_row
 from quodeq.data.sqlite._state_store_meta import StateStoreMetaMixin
 
@@ -98,7 +98,7 @@ class SQLiteStateStore(StateStoreMetaMixin):
         """
         with self._db() as conn:
             conn.execute("DELETE FROM findings")
-            conn.execute("DELETE FROM dimension_scores")
+            conn.execute(DELETE_DIMENSION_SCORES_SQL)
             conn.execute(
                 "DELETE FROM run_meta WHERE key IN (?, ?, ?)",
                 (_CHECKPOINT_KEY, _PROJECTED_SIZE_KEY, _ACTIONS_SIZE_KEY),
@@ -211,7 +211,7 @@ class SQLiteStateStore(StateStoreMetaMixin):
                 (``{"dimension": ..., "score": ..., "grade": ...}``).
         """
         with self._db() as conn:
-            conn.execute("DELETE FROM dimension_scores")
+            conn.execute(DELETE_DIMENSION_SCORES_SQL)
             conn.execute("DELETE FROM principle_grades")
             # One prepared statement per table instead of one Python/SQLite
             # round-trip per row; rows land in the order given.
@@ -239,7 +239,7 @@ class SQLiteStateStore(StateStoreMetaMixin):
     def clear_grades(self) -> None:
         """Empty both grade tables. Findings are left alone."""
         with self._db() as conn:
-            conn.execute("DELETE FROM dimension_scores")
+            conn.execute(DELETE_DIMENSION_SCORES_SQL)
             conn.execute("DELETE FROM principle_grades")
             conn.commit()
 
