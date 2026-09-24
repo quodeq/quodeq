@@ -14,6 +14,7 @@ import logging
 import stat
 import uuid as _uuid
 import zipfile
+from dataclasses import dataclass
 from http import HTTPStatus
 from typing import Any
 
@@ -21,6 +22,20 @@ from quodeq.api.helpers import ClientMessageError
 from quodeq.api.zip import MANIFEST_KIND, MANIFEST_SCHEMA
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ImportOutcome:
+    """Plain result of ``import_zip_stream``: HTTP status + JSON-safe body.
+
+    Framework-free by design — the Flask wrappers (``import_project`` in
+    import_project.py, ``shared_pull`` in routes_shared) convert it via
+    ``jsonify`` exactly once.
+    """
+
+    status: int
+    body: dict[str, Any]
+
 
 _MAX_MEMBERS = 50_000
 _MAX_PER_MEMBER_BYTES = 1 * 1024 * 1024 * 1024  # 1 GiB uncompressed cap per file

@@ -44,6 +44,7 @@ from ._import_identity import (
     update_index,
 )
 from ._import_validation import (
+    ImportOutcome,  # re-export
     ImportValidationError,
     bad_request,
     is_symlink_entry,  # noqa: F401 — re-export
@@ -60,18 +61,7 @@ from ._import_upload import open_upload
 _ACTION_REPLACE = "replace"
 _ACTION_COPY = "copy"
 _ALLOWED_ACTIONS = frozenset({_ACTION_REPLACE, _ACTION_COPY})
-
-
-@dataclass(frozen=True)
-class ImportOutcome:
-    """Plain result of :func:`import_zip_stream`: HTTP status + JSON-safe body.
-
-    Framework-free by design — the Flask wrappers (``import_project`` here,
-    ``shared_pull`` in routes_shared) convert it via ``jsonify`` exactly once.
-    """
-
-    status: int
-    body: dict[str, Any]
+_IO_ERROR_MESSAGE = "Failed to write imported project. Check disk space and permissions."
 
 
 def _error_outcome(message: str, status: int, code: str) -> ImportOutcome:
@@ -90,7 +80,8 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
     Parses the multipart request for file and action parameters, then
     delegates validation and extraction to ``import_zip_stream`` and converts
     its plain ``ImportOutcome`` to a Flask response — the single place this
-    route touches ``jsonify``.
+    route touches ``jsonify``. Maps an uncaught ``OSError`` to the IO_ERROR
+    response too, since not every failure inside ``import_zip_stream`` is one.
     """
     upload = request.files.get("file")
     if upload is None or not upload.filename:
@@ -98,7 +89,11 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
         return jsonify(body), status
 
     action = (request.form.get("action") or "").strip().lower() or None
-    outcome = import_zip_stream(upload, reports_dir, action, remote_addr=request.remote_addr)
+    try:
+        outcome = import_zip_stream(upload, reports_dir, action, remote_addr=request.remote_addr)
+    except OSError as exc:
+        logger.warning("import: filesystem error: %s", exc)
+        outcome = _error_outcome(_IO_ERROR_MESSAGE, HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR")
     return jsonify(outcome.body), outcome.status
 
 
@@ -280,10 +275,7 @@ def import_zip_stream(
                     _stage_and_commit(zf, members, target)
                 except OSError as exc:
                     logger.warning("import: filesystem error: %s", exc)
-                    return _error_outcome(
-                        "Failed to write imported project. Check disk space and permissions.",
-                        HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR",
-                    )
+                    return _error_outcome(_IO_ERROR_MESSAGE, HTTPStatus.INTERNAL_SERVER_ERROR, "IO_ERROR")
         except ImportValidationError as exc:
             return _error_outcome(exc.public_message, exc.status, exc.code)
         except zipfile.BadZipFile:

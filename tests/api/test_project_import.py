@@ -5,6 +5,7 @@ import io
 import json
 import uuid
 import zipfile
+from unittest.mock import patch
 
 import pytest
 
@@ -178,3 +179,17 @@ def test_import_accepts_missing_manifest(app_client):
         resp = _post_zip(c, data)
     assert resp.status_code == 200, resp.get_json()
     assert (eval_dir / project_uuid / "repository_info.json").exists()
+
+
+def test_import_direct_upload_os_error_returns_io_error(app_client):
+    """A read failure before extraction is not caught inside import_zip_stream
+    (see the comment there); the direct-upload route must still turn it into
+    the same IO_ERROR JSON response as a write failure, not an unhandled 500."""
+    c, home, _ = app_client
+    data = _make_zip()
+    with _patch_home(home), patch(
+        "quodeq.api.import_project.validate_archive", side_effect=OSError("disk read error"),
+    ):
+        resp = _post_zip(c, data)
+    assert resp.status_code == 500
+    assert resp.get_json()["code"] == "IO_ERROR"
