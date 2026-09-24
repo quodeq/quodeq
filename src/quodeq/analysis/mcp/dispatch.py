@@ -5,6 +5,7 @@ Re-exports public API for backward compatibility.
 """
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from quodeq.analysis.mcp.jsonrpc_io import ok as _ok, send as _send, read_message
@@ -36,6 +37,22 @@ __all__ = [
 ]
 
 
+class _JsonRpcMethod(StrEnum):
+    """The JSON-RPC ``method`` values this MCP server handles."""
+
+    INITIALIZE = "initialize"
+    NOTIFICATIONS_INITIALIZED = "notifications/initialized"
+    NOTIFICATIONS_CANCELLED = "notifications/cancelled"
+    TOOLS_LIST = "tools/list"
+    TOOLS_CALL = "tools/call"
+    PING = "ping"
+
+
+_IGNORED_NOTIFICATIONS = (
+    _JsonRpcMethod.NOTIFICATIONS_INITIALIZED, _JsonRpcMethod.NOTIFICATIONS_CANCELLED,
+)
+
+
 def dispatch(
     msg: dict, router: FindingsRouter,
     queue: FileQueue | None = None, agent_id: str = "",
@@ -44,15 +61,15 @@ def dispatch(
     method = msg.get("method", "")
     req_id = msg.get("id")
 
-    if method in ("notifications/initialized", "notifications/cancelled"):
+    if method in _IGNORED_NOTIFICATIONS:
         return
-    if method == "initialize":
+    if method == _JsonRpcMethod.INITIALIZE:
         _send(handle_initialize(req_id, msg))
-    elif method == "tools/list":
+    elif method == _JsonRpcMethod.TOOLS_LIST:
         _send(handle_tools_list(req_id, has_queue=queue is not None))
-    elif method == "tools/call":
+    elif method == _JsonRpcMethod.TOOLS_CALL:
         _send(handle_tools_call(req_id, msg.get("params", {}), router, queue, agent_id))
-    elif method == "ping":
+    elif method == _JsonRpcMethod.PING:
         _send(_ok(req_id, {}))
     else:
         handle_unknown_method(req_id, method)

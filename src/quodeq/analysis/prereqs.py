@@ -13,7 +13,7 @@ import urllib.request
 
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.config.analysis_env import provider_explicitly_configured
-from quodeq.config.provider import Provider
+from quodeq.config.provider import Provider, ProviderType
 from quodeq.config.llm_bridge_env import api_key, llamacpp_base_url, ollama_base_url
 from quodeq.shared.prereqs import SAFE_CMD_TOKEN_RE, run_version_cmd
 from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path
@@ -183,9 +183,9 @@ def check_evaluate_prereqs() -> None:
     provider = get_ai_cmd()
     configs = get_provider_configs()
     provider_cfg = configs.get(provider, {})
-    provider_type = provider_cfg.get("type", "cli")
+    provider_type = provider_cfg.get("type", ProviderType.CLI)
 
-    if provider_type == "cli":
+    if provider_type == ProviderType.CLI:
         _check_cli_provider(provider)
-    elif provider_type == "api":
+    elif provider_type == ProviderType.API:
         _check_api_provider(provider)

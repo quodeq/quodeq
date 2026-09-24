@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import BinaryIO
 
-from quodeq.analysis.mcp.schemas import FileDoneStatus
+from quodeq.analysis.mcp.schemas import JSONL_MARKER_FILE_DONE, FileDoneStatus
 
 # Trailing bytes of the consumed prefix kept for the rewrite guard. Longer
 # than any realistic run of repeated bytes in a findings JSONL, so a shifted
@@ -107,7 +107,7 @@ class DispatchJsonlState:
         f = entry.get("file")
         if not isinstance(f, str):
             return
-        if entry.get("_marker") == "file_done":
+        if entry.get("_marker") == JSONL_MARKER_FILE_DONE:
             if entry.get("status") in (FileDoneStatus.OK, FileDoneStatus.ERROR):
                 self.last_status[f] = entry["status"]
                 self.dirty.add(f)

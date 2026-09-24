@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
-from quodeq.analysis.mcp.schemas import FileDoneStatus
+from quodeq.analysis.mcp.schemas import JSONL_MARKER_FILE_DONE, FileDoneStatus
 from quodeq.shared import cancellation
 
 _logger = logging.getLogger(__name__)
@@ -154,7 +154,7 @@ class FailureStreakWatcher:
                 continue
             if not isinstance(entry, dict):
                 continue
-            if entry.get("_marker") != "file_done":
+            if entry.get("_marker") != JSONL_MARKER_FILE_DONE:
                 continue
             status = entry.get("status")
             if status == FileDoneStatus.OK:

@@ -21,7 +21,7 @@ from quodeq.analysis.mcp.enricher import (
     FileReader,
     FindingEnricher,
 )
-from quodeq.analysis.mcp.schemas import FileDoneStatus
+from quodeq.analysis.mcp.schemas import JSONL_MARKER_FILE_DONE, FileDoneStatus
 from quodeq.shared.log_sink import SHARED_LOG
 from typing import TYPE_CHECKING, TextIO
 
@@ -192,7 +192,7 @@ class FindingsRouter:
             raise ValueError(
                 f"mark_file_done: status must be one of {names}, got {status!r}"
             )
-        payload: dict = {"_marker": "file_done", "file": file, "status": status}
+        payload: dict = {"_marker": JSONL_MARKER_FILE_DONE, "file": file, "status": status}
         if reason is not None:
             payload["reason"] = reason
         line = json.dumps(payload) + "\n"

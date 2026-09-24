@@ -46,6 +46,13 @@ def provider_exit_reason(reason: str | None) -> str:
     return COPILOT_MCP_POLICY_REASON if reason == COPILOT_MCP_POLICY_REASON else REASON_PROVIDER_FATAL
 
 
+# classify_fatal_provider_message's reason codes that _api_call.py's own
+# 429/402 classification also produces, so both paths agree on the same
+# value. "auth" and "policy" are produced here too but never compared
+# elsewhere, so they stay bare.
+REASON_QUOTA = "quota"
+REASON_PAYMENT = "payment"
+
 # Fatal-message classification shared by the CLI path (stderr of the claude/
 # codex/gemini CLIs) and the API path (429 bodies). Patterns are deliberately
 # conservative: a false "fatal" aborts the whole run, while a miss only means

@@ -15,7 +15,9 @@ import openai
 
 from quodeq.analysis._api_response import finish_call, repair_snippetless
 from quodeq.analysis._api_schema import SYSTEM_PROMPT
-from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
+from quodeq.analysis.errors import (
+    REASON_PAYMENT, REASON_QUOTA, FatalProviderError, classify_fatal_provider_message,
+)
 from quodeq.config.analysis_env import (
     api_read_timeout_override, context_size_override, max_output_tokens_override,
 )
@@ -126,10 +128,10 @@ def _classify_fatal_api_error(exc: Exception) -> tuple[str, str] | None:
         return "auth", "permission denied (403)"
     if isinstance(exc, openai.APIStatusError):
         if exc.status_code == HTTPStatus.PAYMENT_REQUIRED:
-            return "payment", "out of credits (402 payment required)"
+            return REASON_PAYMENT, "out of credits (402 payment required)"
         if exc.status_code == HTTPStatus.TOO_MANY_REQUESTS:
             reason = classify_fatal_provider_message(str(exc))
-            if reason in ("quota", "payment"):
+            if reason in (REASON_QUOTA, REASON_PAYMENT):
                 return reason, "quota/credits exhausted (429)"
     return None
 

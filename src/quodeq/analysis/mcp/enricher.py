@@ -13,6 +13,7 @@ from typing import Callable, Protocol, runtime_checkable
 from quodeq.analysis.mcp._enricher_rules import apply_downweight, resolve_principle
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.precedent_downweight import (
+    PRECEDENT_TIER_EXACT,
     UNSET_SCORE,
     MaybeScore,
     apply_precedent_downweight,
@@ -259,7 +260,7 @@ class FindingEnricher:
             score=precedent_score, log=self._log,
         )
         apply_severity_gates(finding, self._trust_model)
-        if tier == "exact":
+        if tier == PRECEDENT_TIER_EXACT:
             notify_precedent_match(self._on_precedent_match, finding, log=self._log)
 
     def enrich(self, args: dict, *, precedent_score: MaybeScore = UNSET_SCORE) -> dict:

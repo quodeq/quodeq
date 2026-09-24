@@ -26,6 +26,7 @@ analysis.
 """
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any
 
 from quodeq.analysis.run_types import RunConfig
@@ -41,10 +42,21 @@ from quodeq.shared.dim_estimates_io import (
 
 __all__ = [
     "DIM_ESTIMATES_FILENAME",
+    "DimEstimateReason",
     "compute_dim_estimates",
     "read_dim_estimates",
     "write_dim_estimates",
 ]
+
+
+class DimEstimateReason(StrEnum):
+    """Why a dim's estimate has the shape it does (see module docstring)."""
+
+    FULL = "full"
+    DIFF = "diff"
+    INCREMENTAL = "incremental"
+    FIRST_RUN = "first-run"
+    EMPTY = "empty"
 
 
 def _log_excluded_once(log: LogSink, n_excluded: int, excluded_logged: bool) -> bool:
@@ -72,9 +84,9 @@ def _estimate_incremental(
     miss_count = len(classify.misses)
     if miss_count == len(files):
         # Every file is a miss → cache cold for this dim.
-        reason = "first-run"
+        reason = DimEstimateReason.FIRST_RUN
     else:
-        reason = "incremental"
+        reason = DimEstimateReason.INCREMENTAL
     return {
         "count": miss_count, "reason": reason,
         "total": len(files), "cached": len(files) - miss_count,
@@ -89,11 +101,11 @@ def _estimate_non_incremental(
     if file_filter is not None:
         count = sum(1 for f in files if f in file_filter)
         return {
-            "count": count, "reason": "diff", "total": count, "cached": 0,
+            "count": count, "reason": DimEstimateReason.DIFF, "total": count, "cached": 0,
             "excluded": n_excluded,
         }
     return {
-        "count": len(files), "reason": "full", "total": len(files), "cached": 0,
+        "count": len(files), "reason": DimEstimateReason.FULL, "total": len(files), "cached": 0,
         "excluded": n_excluded,
     }
 
@@ -118,7 +130,7 @@ def compute_dim_estimates(
         excluded_logged = _log_excluded_once(log, n_excluded, excluded_logged)
         if not files:
             estimates[dim_id] = {
-                "count": 0, "reason": "empty", "total": 0, "cached": 0,
+                "count": 0, "reason": DimEstimateReason.EMPTY, "total": 0, "cached": 0,
                 "excluded": n_excluded,
             }
             continue
