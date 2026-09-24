@@ -227,6 +227,6 @@ def determine_verdict(new_violations: list[dict]) -> str:
         return "COMMENT"
 
     severities = {v.get("severity", Severity.MINOR) for v in new_violations}
-    if severities & {"critical", "high"}:
+    if severities & {"critical", "major"}:
         return "REQUEST_CHANGES"
     return "COMMENT"

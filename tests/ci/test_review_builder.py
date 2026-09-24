@@ -61,6 +61,11 @@ def test_determine_verdict_critical():
     assert determine_verdict(violations) == "REQUEST_CHANGES"
 
 
+def test_determine_verdict_major():
+    violations = [{"severity": "major"}]
+    assert determine_verdict(violations) == "REQUEST_CHANGES"
+
+
 def test_determine_verdict_no_violations():
     # GitHub Actions' default token cannot submit APPROVE reviews
     # (HTTP 422 "not permitted to approve"), so zero-violation runs
