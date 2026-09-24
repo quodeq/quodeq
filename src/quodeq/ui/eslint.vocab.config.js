@@ -28,6 +28,8 @@ const VOCABULARIES = {
   findingType: ['violation', 'compliance'],
 };
 const WORDS = [...new Set(Object.values(VOCABULARIES).flat())];
+// Read by tools/magic_string_rules.mjs so a vocabulary word has one gate.
+export const VOCAB_WORDS = new Set(WORDS);
 const literal = (words) => `Literal[value=/^(${words.join('|')})$/]`;
 const KEYS = ['status', 'state', 'severity', 'grade', 'exitReason', 'runState'];
 const VALUE = literal(WORDS);
