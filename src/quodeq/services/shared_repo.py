@@ -2,13 +2,13 @@
 
 The git-clone-mirror adapter itself lives in ``data/fs/shared_repo.py``; the
 API layer does not import ``data/`` directly (see ARCHITECTURE.md import
-rules), so the symbols its routes need are re-exported here. Service-layer
-code imports ``quodeq.data.fs.shared_repo`` directly.
+rules), so the symbols its routes need are re-exported here, through
+``services/wiring.py``.
 """
 from __future__ import annotations
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.data.fs.shared_repo import (  # noqa: F401 — re-exported API
+from quodeq.services.wiring import (  # noqa: F401 — re-exported API
     RepoFormat,
     check_repo_format,
     clone_lock,

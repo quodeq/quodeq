@@ -64,6 +64,7 @@ from quodeq.data.fs.run_files import (  # noqa: F401
     read_queue_state,
     read_run_status_json,
     remove_matching_files,
+    run_fingerprint,
 )
 
 # Run-artifact copy/replace mechanics (shared-repo publish staging).
@@ -129,15 +130,32 @@ from quodeq.data.fs.standards_loader import (  # noqa: F401
     read_req_to_principle_map,
 )
 
+# Per-project standards-visibility preferences.
+from quodeq.data.fs.standards_prefs import load_visible_standard_ids  # noqa: F401
+
 # Filesystem report parser: JSON/markdown eval-report parsing.
 from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown  # noqa: F401
 
 # Event Log reader.
 from quodeq.data.events.reader import EventLogReader  # noqa: F401
 
-# SQLite run index (module) + the stale-run cancellation helper.
+# SQLite run index (module, for its attribute-style callers) + the specific
+# names services import by name, plus the stale-run cancellation helper.
 from quodeq.data.sqlite import run_index  # noqa: F401
+from quodeq.data.sqlite.run_index import (  # noqa: F401
+    RunRow,
+    list_runs_for_project,
+    open_index,
+    sync_index,
+)
 from quodeq.data.sqlite.index_sync import force_promote_to_cancelled_stale  # noqa: F401
+
+# External (CLI-started) run liveness resolution: safe run-id segment check
+# and the .pid file read.
+from quodeq.data.fs.report_parser.external_pid import (  # noqa: F401
+    is_safe_run_segment,
+    resolve_external_pid,
+)
 
 # AI client discovery: CLI ``/models`` subprocess + Anthropic HTTP API.
 from quodeq.data.cli_models import run_cli_models_command  # noqa: F401
@@ -157,7 +175,8 @@ from quodeq.data.fs.report_parser.runs import (  # noqa: F401
 from quodeq.data.fs.repo_handler import is_valid_repo_url  # noqa: F401
 from quodeq.data.fs.children import find_children  # noqa: F401
 
-# Shared-results repo: clone lifecycle, git invocation, layout + format checks.
+# Shared-results repo: clone lifecycle, git invocation, layout + format
+# checks, path/state lookups, and remote-URL validation.
 from quodeq.data.fs.shared_repo import (  # noqa: F401
     MARKER_FILENAME,
     PUBLISHED_META_FILENAME,
@@ -166,9 +185,18 @@ from quodeq.data.fs.shared_repo import (  # noqa: F401
     check_repo_format,
     clone_lock,
     ensure_shared_clone,
+    last_synced_at,
+    published_meta,
+    read_state,
     refresh_shared_clone,
     remove_clone_dir,
     run_git,
+    shared_cache_dir,
+    shared_evaluations_root,
+    shared_index_db_path,
+    shared_score_cache_path,
+    sync_shared_index,
+    validate_remote_url,
 )
 
 # Run status + dim-state file names and readers.

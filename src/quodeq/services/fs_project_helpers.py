@@ -14,6 +14,7 @@ from pathlib import Path
 from quodeq.core.run.state import RunState
 from quodeq.core.types import ProjectEntry
 from quodeq.services.wiring import (
+    RunInfo,
     read_repository_info,
     repository_info_exists,
     write_repository_info,
@@ -30,7 +31,6 @@ from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
     find_best_parent,
     max_projects_listed,
 )
-from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services._registration_url import strip_credentials
 from quodeq.services._repo_index import load_repo_index, repo_index_key, save_repo_index
 

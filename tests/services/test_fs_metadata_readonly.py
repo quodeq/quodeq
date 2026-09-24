@@ -79,7 +79,7 @@ def test_warm_cancelled_only_then_read_hits_without_pending(tmp_path, monkeypatc
         "quodeq.services._fs_metadata._compute_summary",
         return_value={"grade": "D", "score": 4.0, "files": 2},
     ) as compute, patch(
-        "quodeq.data.fs.report_parser.runs.list_runs", return_value=_cancelled_runs(),
+        "quodeq.services.wiring.list_runs", return_value=_cancelled_runs(),
     ):
         warm_project_summary(tmp_path, "proj")
         assert compute.call_count == 1
@@ -96,7 +96,7 @@ def test_warm_then_read_hits_without_pending(tmp_path, monkeypatch):
         "quodeq.services._fs_metadata._compute_summary",
         return_value={"grade": "B", "score": 7.5, "files": 10},
     ) as compute, patch(
-        "quodeq.data.fs.report_parser.runs.list_runs", return_value=_runs(),
+        "quodeq.services.wiring.list_runs", return_value=_runs(),
     ):
         warm_project_summary(tmp_path, "proj")
         assert compute.call_count == 1

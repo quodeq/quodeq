@@ -18,7 +18,7 @@ from pathlib import Path
 from quodeq.core.run.job_status import is_external_job_id
 from quodeq.core.run.state import TERMINAL_STATES, parse_run_state
 from quodeq.core.types.job import JobSnapshot
-from quodeq.data.sqlite import run_index as _run_index
+from quodeq.services.wiring import run_index as _run_index
 
 
 def status_json_terminal(run_dir: Path) -> bool:
@@ -101,7 +101,7 @@ def _dimensions_from_data(run_dir: Path, data: dict | None) -> list[str] | None:
     if dims:
         return dims
     from quodeq.shared.dim_estimates_io import read_dim_estimates
-    from quodeq.data.fs.dimensions_state_store import read_dimensions
+    from quodeq.services.wiring import read_dimensions
     recovered: dict[str, None] = {}
     dim_records = read_dimensions(run_dir).get("dimensions")
     record_keys = dim_records.keys() if isinstance(dim_records, dict) else ()

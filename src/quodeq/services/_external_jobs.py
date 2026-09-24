@@ -23,16 +23,16 @@ from typing import Callable
 from quodeq.shared.process_kill import kill_tree as _kill_tree
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.core.run.job_status import strip_external_prefix
-from quodeq.data.fs.report_parser.external_pid import (  # noqa: F401 — re-exported API
-    is_safe_run_segment,
-    resolve_external_pid,
-)
 from quodeq.services._run_index_fs import (
     scan_reports_root_for_run, sync_external_run_by_scan,
 )
 from quodeq.shared.env import env_float
 from quodeq.shared.process import is_pid_alive
-from quodeq.data.sqlite import run_index as _run_index
+from quodeq.services.wiring import (
+    is_safe_run_segment,
+    resolve_external_pid,
+    run_index as _run_index,
+)
 
 _logger = logging.getLogger(__name__)
 

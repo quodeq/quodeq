@@ -20,10 +20,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from quodeq.data.fs.standards_prefs import load_visible_standard_ids
 from quodeq.services._accumulated_data import has_valid_score
 from quodeq.core.scoring.report_grades import summarize_dimensions
-from quodeq.services.wiring import RunInfo, read_run_data
+from quodeq.services.wiring import RunInfo, load_visible_standard_ids, read_run_data
 from quodeq.services._fs_project_primitives import local_repo_root
 from quodeq.services._fs_project_primitives import (  # noqa: F401 — re-export
     check_path_exists,
@@ -274,7 +273,7 @@ def warm_project_summary(reports_root: Path, entry_name: str) -> None:
     status-stamped (``_summary_version`` -> ``per_run_versions``), so an
     in-progress run's cached row self-invalidates once it completes.
     """
-    from quodeq.data.fs.report_parser.runs import list_runs  # noqa: PLC0415
+    from quodeq.services.wiring import list_runs  # noqa: PLC0415
     from quodeq.services import grade_formula  # noqa: PLC0415
     from quodeq.services.score_cache import cached_project_summary  # noqa: PLC0415
 
