@@ -202,4 +202,41 @@ describe('WorkspaceDiffPanel render cap', () => {
     await waitFor(() => expect(screen.getByText('+b')).toBeTruthy());
     expect(screen.queryByText('Show more')).toBeNull();
   });
+
+  it('does not count the trailing empty line after a final newline', async () => {
+    const api = await import('../../api/assistant.js');
+    // Exactly DIFF_LINE_RENDER_CAP real lines, ending with a newline (as a
+    // real diff always does). Before the fix this counted as 2001 lines and
+    // wrongly showed a cap note and a Show more button.
+    const diff = `${bigDiff(DIFF_LINE_RENDER_CAP, 'a')}\n`;
+    api.fetchAssistantWorkspaceDiff.mockResolvedValueOnce({ diff, truncated: false, stats: [] });
+    const { container } = render(<WorkspaceDiffPanel sessionId="s1" onChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('+a1999')).toBeTruthy());
+    expect(shownSpans(container)).toBe(DIFF_LINE_RENDER_CAP);
+    expect(screen.queryByText('Show more')).toBeNull();
+    expect(screen.queryByText(/Showing \d+ of/)).toBeNull();
+  });
+
+  it('keeps the cap note in a pre-mounted live region and focuses the diff after the last Show more', async () => {
+    const api = await import('../../api/assistant.js');
+    api.fetchAssistantWorkspaceDiff.mockResolvedValueOnce({ diff: bigDiff(2500, 'a'), truncated: false, stats: [] });
+    const { container } = render(<WorkspaceDiffPanel sessionId="s1" onChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Show more')).toBeTruthy());
+
+    const note = container.querySelector('.workspace-diff-warning[aria-live="polite"]');
+    expect(note).toBeTruthy();
+    expect(note.textContent).toBe('Showing 2000 of 2500 lines.');
+
+    fireEvent.click(screen.getByText('Show more'));
+
+    // Same node, still mounted, now empty; the button is gone.
+    const noteAfter = container.querySelector('.workspace-diff-warning[aria-live="polite"]');
+    expect(noteAfter).toBe(note);
+    expect(noteAfter.textContent).toBe('');
+    expect(screen.queryByText('Show more')).toBeNull();
+
+    // Focus moved to the diff instead of falling to <body>.
+    const pre = container.querySelector('pre.workspace-diff-body');
+    expect(document.activeElement).toBe(pre);
+  });
 });

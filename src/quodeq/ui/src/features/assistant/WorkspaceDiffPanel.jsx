@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { t } from '../../strings/index.js';
 import { confirmDialog } from '../../utils/confirmDialog.js';
 import { useWorkspaceDiff } from './hooks/useWorkspaceDiff.js';
@@ -20,7 +20,16 @@ export const DIFF_LINE_RENDER_CAP = 2000;
 // Lines to show for this diff. The expansion is remembered per diff string,
 // so a Refresh that brings a new diff starts from the cap again.
 function useDiffLineWindow(diff) {
-  const lines = useMemo(() => (diff === null ? [] : diff.split('\n')), [diff]);
+  const lines = useMemo(() => {
+    if (diff === null) return [];
+    const split = diff.split('\n');
+    // A trailing newline in the diff text produces one extra empty element
+    // at the end of split(); that is not a real line, so drop it. Without
+    // this a 2000-line diff (which always ends with a newline) reads
+    // "Showing 2000 of 2001 lines" and shows a needless Show more button.
+    if (diff.endsWith('\n')) split.pop();
+    return split;
+  }, [diff]);
   const [expanded, setExpanded] = useState({ diff: null, count: DIFF_LINE_RENDER_CAP });
   const limit = expanded.diff === diff ? expanded.count : DIFF_LINE_RENDER_CAP;
   const shownCount = Math.min(lines.length, limit);
@@ -28,8 +37,9 @@ function useDiffLineWindow(diff) {
     // eslint-disable-next-line react/no-array-index-key
     <span key={i} className={classifyDiffLine(line)}>{line}{'\n'}</span>
   )), [lines, shownCount]);
+  const isFinalPage = shownCount + DIFF_LINE_RENDER_CAP >= lines.length;
   const showMore = () => setExpanded({ diff, count: shownCount + DIFF_LINE_RENDER_CAP });
-  return { rendered, shownCount, totalCount: lines.length, showMore };
+  return { rendered, shownCount, totalCount: lines.length, showMore, isFinalPage };
 }
 
 function WorkspaceDiffOutcome({ outcome }) {
@@ -47,8 +57,17 @@ function WorkspaceDiffOutcome({ outcome }) {
 }
 
 function WorkspaceDiffBody({ diff, truncated, error, empty }) {
-  const { rendered, shownCount, totalCount, showMore } = useDiffLineWindow(diff);
+  const { rendered, shownCount, totalCount, showMore, isFinalPage } = useDiffLineWindow(diff);
   const capped = shownCount < totalCount;
+  const preRef = useRef(null);
+
+  const handleShowMore = () => {
+    const wasFinalPage = isFinalPage;
+    showMore();
+    // The button that triggered this unmounts once the diff is no longer
+    // capped. Move focus to the diff itself so it does not fall to <body>.
+    if (wasFinalPage) preRef.current?.focus();
+  };
 
   return (
     <>
@@ -62,14 +81,15 @@ function WorkspaceDiffBody({ diff, truncated, error, empty }) {
       {empty && <p className="workspace-diff-empty">{t('assistant.noChanges')}</p>}
       {diff !== null && !empty && (
         <>
+          {/* Pre-mounted so a screen reader announces the count change on
+              every Show more, including the last one, instead of hearing
+              nothing when the note would otherwise unmount. */}
+          <p className="workspace-diff-warning" aria-live="polite">
+            {capped ? t('assistant.diffShowingLines', { shown: shownCount, total: totalCount }) : ''}
+          </p>
+          <pre className="workspace-diff-body" ref={preRef} tabIndex={-1}>{rendered}</pre>
           {capped && (
-            <p className="workspace-diff-warning">
-              {t('assistant.diffShowingLines', { shown: shownCount, total: totalCount })}
-            </p>
-          )}
-          <pre className="workspace-diff-body">{rendered}</pre>
-          {capped && (
-            <button type="button" onClick={showMore}>{t('assistant.diffShowMore')}</button>
+            <button type="button" onClick={handleShowMore}>{t('assistant.diffShowMore')}</button>
           )}
         </>
       )}
