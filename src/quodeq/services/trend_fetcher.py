@@ -25,14 +25,12 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from collections import OrderedDict
 from pathlib import Path
-from threading import Lock
 from typing import Callable
 
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult
-from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.services._trend_scalar_fetcher import make_scalar_trend_fetcher
 from quodeq.services.scoring_deps import ScoringDeps, NO_DEPS
 from quodeq.services.deleted import deleted_keys as _default_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as _default_dismissed_keys
@@ -203,22 +201,24 @@ def make_trend_fetcher(
     """Return the dimension fetcher for the history trend / previous / stale path.
 
     Fast path (no active dismissals/deletions): read only per-run scalar grades
-    via *deps.read_run_scalars* through a fresh per-call LRU cache, so scalar
-    (findings-less) results never collide with the shared full-data cache used
-    for the selected run.
+    via *deps.read_run_scalars* through the process-wide trend scalar cache,
+    kept apart from the shared full-data cache used for the selected run.
+    Findings are dropped before caching (only scalars are consumed), and each
+    entry is keyed on the inputs that can change a finished run's grades (see
+    ``_scalar_version_for``).
 
     Heavy path (dismissals/deletions active): see _make_heavy_trend_fetcher.
 
-    ``cacheable_run_ids`` restricts which runs the heavy-path cache may
+    ``cacheable_run_ids`` restricts which runs either path's cache may
     *persist*: only terminal (complete) runs are safe. An in-progress run's
     scalar set grows as dims finish, and the version hash can't see that, so
     persisting its partial set would strand a stale row. When ``None`` every run
-    is cacheable (fast path persists nothing anyway).
+    is cacheable.
 
     In-progress freshness: both paths read in-progress runs fresh every request.
-    Fast path uses a per-call cache (re-read next request); heavy path's
-    ``cacheable_run_ids`` guard makes in-progress runs compute-through without
-    persisting. Stale-partial detection is preserved inside ``read_run_scalars``,
+    The ``cacheable_run_ids`` guard makes in-progress runs compute-through
+    without persisting, and the fast path's cache also bypasses runs whose
+    ``status.json`` is non-terminal. Stale-partial detection is preserved inside ``read_run_scalars``,
     which falls back to full ``read_run_data`` whenever the SQL scalar projection
     disagrees with the on-disk ``evaluation/*.json`` count.
 
@@ -236,8 +236,7 @@ def make_trend_fetcher(
             reports_root, project, params, cacheable_run_ids, deps,
         )
 
-    ctx = DimensionCacheContext(
-        cache=OrderedDict(), lock=Lock(), max_size=deps.max_history,
-        reader=deps.read_run_scalars or _default_read_run_scalars,
+    return make_scalar_trend_fetcher(
+        reports_root, project, cacheable_run_ids,
+        deps.read_run_scalars or _default_read_run_scalars,
     )
-    return make_lru_dimension_fetcher(reports_root, project, ctx)

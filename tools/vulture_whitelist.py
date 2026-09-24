@@ -68,6 +68,7 @@ _.plain_logs  # api/_log_stream_routes.py: Flask view function; the route decora
 _.post_assistant_message  # api/assistant_turn_routes.py: Flask view function; the route decorator is its only caller.
 _.preview_grade_formula  # api/_grade_formula_routes.py: Flask view function; the route decorator is its only caller.
 _.project_compare_summary  # api/routes_compare.py: Flask view function; the route decorator is its only caller.
+_.project_compliance_detail  # api/_scores_routes.py: Flask view function; the route decorator is its only caller.
 _.project_info  # api/routes_project_list.py: Flask view function; the route decorator is its only caller.
 _.project_run_scores  # api/_scores_routes.py: Flask view function; the route decorator is its only caller.
 _.project_runs  # api/routes_runs.py: Flask view function; the route decorator is its only caller.
