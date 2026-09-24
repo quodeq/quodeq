@@ -1,4 +1,4 @@
-"""Score/grade conversion and score-lookup building for reports."""
+"""Score-lookup building for reports; grade_from_score is re-exported from core."""
 from __future__ import annotations
 
 from quodeq.core.types import ScoringResult

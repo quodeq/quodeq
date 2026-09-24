@@ -29,4 +29,7 @@ def test_injected_readers_are_used(tmp_path: Path):
         req_map_reader=req_map_reader, refs_reader=refs_reader,
     )
     score_dimension_from_evidence(tmp_path, "clean-architecture", request)
-    assert "req_map" in calls
+    assert {"req_map", "refs"} <= set(calls), (
+        "req_map_reader groups the violation; refs_reader enriches the "
+        "judgment because compiled_dir, req, and dimension are all set"
+    )

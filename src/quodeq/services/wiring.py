@@ -3,9 +3,11 @@
 Convention (documented in ARCHITECTURE.md): services import data-layer
 functions from this module instead of reaching into ``quodeq.data.*``
 directly, so every services -> data edge is visible in one place. The
-layer checker allows any services -> data import — this is a convention,
-not an enforcement point — but new or edited services code goes through
-here. Contents are plain re-exports grouped by concern; the Protocols
+layer checker allows any services -> data import — a convention on its
+own, but tests/tools/test_services_data_imports.py now enforces it as a
+shrink-only ratchet baselining today's edges — new or edited services
+code goes through here. Contents are plain re-exports grouped by
+concern; the Protocols
 services accept as injected seams live in ``services/ports.py`` instead —
 this module carries only default concretions, never interface types. Most
 re-exported adapters are dependency-light, but a few (the filesystem report

@@ -115,7 +115,10 @@ def new_status_writer(
 
 @dataclass(frozen=True)
 class LifecycleDeps:
-    """Collaborators a RunLifecycleContext drives. None = production default."""
+    """Collaborators a RunLifecycleContext drives. None = production default.
+    The support helpers still read status.json from disk (read_status, e.g.
+    the atexit finalize path), so injecting write_status doesn't fully isolate it.
+    """
 
     write_status: Callable[[Path, RunStatus], None] | None = None
     heartbeat_factory: Callable[[Path], Any] | None = None
