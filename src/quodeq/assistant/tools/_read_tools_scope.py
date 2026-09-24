@@ -164,15 +164,17 @@ _RUN_KEYS_MEMO_SIZE = 64
 # A file modified this recently may change again inside the filesystem's
 # mtime granularity (coarse on Linux) with the same size, so a stamp taken
 # over it cannot prove freshness: such reads are served but not memoized.
-_SETTLE_NS = 2_000_000_000
+_SETTLE_NS = 3_000_000_000
 _RUN_KEY_SOURCES = ("evaluation.db", "evaluation.db-wal", "events.jsonl")
 _run_keys_memo: LRUDict[tuple, tuple[tuple, frozenset[tuple]]] = LRUDict(_RUN_KEYS_MEMO_SIZE)
 _run_keys_lock = threading.Lock()
 
 
 def _source_stamp(run_dir: Path) -> tuple:
-    """(name, mtime_ns, size) for every file the run-scope keys come from;
-    a missing file stamps as (name, None, None)."""
+    """(name, mtime_ns, size, ino) for every file the run-scope keys come
+    from; a missing file stamps as (name, None, None, None). The inode
+    catches a file replaced in place (same mtime, same size, new content)
+    that an mtime/size stamp alone would miss."""
     eval_dir = run_dir / "evaluation"
     paths = sorted(eval_dir.glob("*.json")) if eval_dir.is_dir() else []
     paths.extend(run_dir / name for name in _RUN_KEY_SOURCES)
@@ -181,14 +183,14 @@ def _source_stamp(run_dir: Path) -> tuple:
         try:
             st = path.stat()
         except OSError:
-            stamp.append((path.name, None, None))
+            stamp.append((path.name, None, None, None))
         else:
-            stamp.append((path.name, st.st_mtime_ns, st.st_size))
+            stamp.append((path.name, st.st_mtime_ns, st.st_size, st.st_ino))
     return tuple(stamp)
 
 
 def _is_settled(stamp: tuple) -> bool:
-    newest = max((mtime for _name, mtime, _size in stamp if mtime is not None), default=0)
+    newest = max((mtime for _name, mtime, _size, _ino in stamp if mtime is not None), default=0)
     return newest < time.time_ns() - _SETTLE_NS
 
 

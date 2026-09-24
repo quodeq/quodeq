@@ -161,6 +161,44 @@ def test_recently_written_sources_are_not_memoized(tmp_path):
     assert repo.reads == 2
 
 
+def test_same_size_rewrite_with_new_inode_is_reread(tmp_path):
+    ctx = _ctx(tmp_path, CountingRepo([]))
+    path = _write_eval(ctx.run_dir, "security.json", [3])
+    assert not _draft(ctx, "R1", "src/a.py", 40)
+
+    # Same byte length as the original, different content, and rewritten via
+    # replace-over-original so the file gets a new inode. If mtime happened
+    # to land on the same value too, a (name, mtime, size) stamp alone would
+    # not see the change; the inode must.
+    old_bytes = path.read_bytes()
+    new_text = json.dumps({"violations": [
+        {"req": "R1", "file": "src/a.py", "line": 40}]}, separators=(",", ": "))
+    new_bytes = new_text.encode("utf-8").ljust(len(old_bytes), b" ")
+    assert len(new_bytes) == len(old_bytes)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_bytes(new_bytes)
+    os.replace(tmp, path)
+    _age(path)  # same mtime as before the rewrite
+
+    assert _draft(ctx, "R1", "src/a.py", 40)
+
+
+def test_events_jsonl_change_forces_a_recheck(tmp_path):
+    # events.jsonl is one of the stamped sources even though its content is
+    # never parsed for keys here; touching it must still bust the memo.
+    repo = CountingRepo([("R2", "src/b.py", 7)])
+    ctx = _ctx(tmp_path, repo)
+    assert _draft(ctx, "R2", "src/b.py", 7)
+    assert repo.reads == 1
+
+    events = ctx.run_dir / "events.jsonl"
+    events.write_text('{"type": "note"}\n', encoding="utf-8")
+    _age(events, _OLD_NS + 1)
+
+    assert _draft(ctx, "R2", "src/b.py", 7)
+    assert repo.reads == 2
+
+
 def test_memo_is_per_run(tmp_path):
     first = _ctx(tmp_path / "one", CountingRepo([]))
     _write_eval(first.run_dir, "security.json", [3])
