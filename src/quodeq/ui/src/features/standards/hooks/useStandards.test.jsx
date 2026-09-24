@@ -140,4 +140,29 @@ describe('useStandards', () => {
     });
     expect(result.current.error).toBe('cannot delete');
   });
+
+  it('refresh fetches the list once, not twice', async () => {
+    fakeApi.listStandards.mockResolvedValue([]);
+    const { result } = renderHook(() => useStandards(), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fakeApi.listStandards).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(fakeApi.listStandards).toHaveBeenCalledTimes(2);
+  });
+
+  it('refresh resolves only after the new list has landed', async () => {
+    fakeApi.listStandards.mockResolvedValueOnce([]);
+    fakeApi.listStandards.mockResolvedValueOnce([{ id: 'n', name: 'N', type: STANDARD_TYPES.CUSTOM }]);
+    const { result } = renderHook(() => useStandards(), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.refresh();
+    });
+    // react-query notifies observers through a real setTimeout(0), so the
+    // hook's own re-render can land one tick after refresh()'s promise
+    // settles; waitFor covers that tick instead of asserting mid-flight.
+    await waitFor(() => expect(result.current.standards).toHaveLength(1));
+  });
 });
