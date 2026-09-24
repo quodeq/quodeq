@@ -28,9 +28,14 @@ def json_body() -> dict | None:
 
 
 def string_fields_error(data: Mapping[str, Any], names: tuple[str, ...]) -> tuple[Response, int] | None:
-    """A 400 for the first of *names* present in *data* with a non-string value."""
+    """A 400 for the first of *names* present in *data* with a non-string value.
+
+    An explicit JSON ``null`` is treated as absent, not as a type error,
+    matching ``routes_project_create``'s ``x is not None and not isinstance(...)``
+    pattern for optional fields.
+    """
     for name in names:
-        if name in data and not isinstance(data[name], str):
+        if name in data and data[name] is not None and not isinstance(data[name], str):
             return jsonify({"error": f"{name} must be a string", "code": "INVALID_PARAM"}), 400
     return None
 

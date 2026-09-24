@@ -112,7 +112,7 @@ src/quodeq/data/sqlite/run_index.py:113:broad-except
 src/quodeq/data/sqlite/run_index.py:181:broad-except
 src/quodeq/data/sqlite/run_index.py:90:broad-except
 src/quodeq/data/sqlite/run_index.py:96:broad-except
-src/quodeq/llm_bridge/_cloud.py:66:broad-except
+src/quodeq/llm_bridge/_cloud.py:67:broad-except
 src/quodeq/menubar/app.py:135:broad-except
 src/quodeq/menubar/app.py:154:broad-except
 src/quodeq/menubar/app.py:205:broad-except

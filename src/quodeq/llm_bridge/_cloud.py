@@ -19,7 +19,8 @@ _MIN_KEY_LEN_FOR_REDACTION = 8
 _MAX_ERROR_BRIEF_LEN = 120
 # Short timeout and no SDK retry: this is a connection *check*, not a call the
 # app depends on, so a slow or flaky endpoint should fail fast and report
-# back rather than silently retrying (as embeddings.py's client does).
+# back rather than retrying. Matches embeddings.py's client: short timeout,
+# no SDK retries.
 _CHECK_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 
 

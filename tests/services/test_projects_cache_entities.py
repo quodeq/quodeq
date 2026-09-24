@@ -219,7 +219,7 @@ def test_list_never_returns_none_when_invalidated_mid_fast_path(tmp_path, monkey
 
 def test_paginated_list_never_returns_none_when_invalidated_mid_fast_path(tmp_path, monkeypatch):
     """Same race, for the paginated (index + hydrate) tier: the hook fires
-    inside ``_index_fresh()``'s own monotonic() call. ``_hydrated_fresh()``
+    inside ``_fresh_index()``'s own monotonic() call. ``_hydrated_fresh()``
     calls monotonic() again later in the same request, but the hook has
     already disarmed by then -- one invalidate per request exposes it."""
     index = [ProjectEntry(id="p1", name="proj")]

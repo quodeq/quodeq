@@ -225,8 +225,8 @@ def determine_verdict(new_violations: list[dict]) -> str:
     this PR is only responsible for what it introduces.
 
     Blocks (REQUEST_CHANGES) when any new violation is critical or major
-    severity; everything else (including the legacy "high" spelling, which
-    is treated as major) only comments.
+    severity (the legacy "high" spelling counts as major). Everything else
+    only comments.
 
     Returns: 'COMMENT' or 'REQUEST_CHANGES'.
 
