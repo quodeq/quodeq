@@ -24,6 +24,9 @@ _logger = logging.getLogger(__name__)
 # succeed, so it must not loop — only unexpected drops are retried.
 WS_CLOSE_NOT_FOUND = 4004  # unknown session id; client reconciles via /sessions
 
+_WS_TAG_DATA = "0"  # server->client / client->server data frame prefix
+_WS_TAG_CONTROL = "1"  # client->server control frame tag (resize)
+
 
 def resolve_ws_session(registry: TerminalSessionRegistry, sid: str | None):
     """Look up (or create) the terminal session for a WS handshake.
@@ -50,7 +53,7 @@ def pump_terminal_out(manager, ws, stop: threading.Event) -> None:
                 break
             continue
         try:
-            ws.send("0" + data)
+            ws.send(_WS_TAG_DATA + data)
         except Exception:
             break
     stop.set()
@@ -66,7 +69,7 @@ def setup_terminal_session(manager, ws) -> bool:
         # never holds a torn multi-byte character.
         sb = manager.scrollback()
         if sb:
-            ws.send("0" + sb)
+            ws.send(_WS_TAG_DATA + sb)
         return True
     except Exception:
         # Spawn failure or early disconnect must not propagate past
@@ -93,9 +96,9 @@ def terminal_read_loop(ws, manager, stop: threading.Event, apply_control) -> Non
             if msg is None:
                 continue
             tag, payload = msg[:1], msg[1:]
-            if tag == "0":
+            if tag == _WS_TAG_DATA:
                 manager.write(payload.encode("utf-8"))
-            elif tag == "1":
+            elif tag == _WS_TAG_CONTROL:
                 apply_control(manager, payload)
     except Exception:
         # A write to a dead/killed process (or any other failure in this

@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import CODE_MISSING_PARAM, QUERY_FLAG_TRUE
 from quodeq.api.helpers import json_error, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed_listing import load_dismissed
@@ -110,7 +111,7 @@ def _finding_target_or_error(
     file = body.get("file", "")
     line = body.get("line")
     if not project or not req or not file or line is None:
-        return None, (jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400)
+        return None, (jsonify({"error": "project, req, file, and line are required", "code": CODE_MISSING_PARAM}), 400)
     type_err = _invalid_body_fields(body, ("project", "req", "file", "fingerprint"), ("line",))
     if type_err:
         return None, (jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400)
@@ -182,7 +183,7 @@ def _mutate_project(
     project = body.get("project", "")
     run_id = _run_id(body)
     if not project:
-        return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
+        return jsonify({"error": "project is required", "code": CODE_MISSING_PARAM}), 400
     count = mutate(_project_dir(_eval_dir(app), project))
     scores = _scores_with_fallback(app, project, run_id)
     delta = delta_for(_eval_dir(app), project, run_id)
@@ -213,7 +214,7 @@ def _delete(app: Flask) -> tuple[Response, int]:
     file = body.get("file", "")
     run_id = _run_id(body)
     if not project or not dimension or not principle or not file:
-        return jsonify({"error": "project, dimension, principle, and file are required", "code": "MISSING_PARAM"}), 400
+        return jsonify({"error": "project, dimension, principle, and file are required", "code": CODE_MISSING_PARAM}), 400
     type_err = _invalid_body_fields(body, ("project", "dimension", "principle", "file"))
     if type_err:
         return jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400
@@ -227,7 +228,7 @@ def _delete(app: Flask) -> tuple[Response, int]:
 
 
 def _delete_all(app: Flask) -> tuple[Response, int]:
-    if request.args.get("confirm") != "true":
+    if request.args.get("confirm") != QUERY_FLAG_TRUE:
         return json_error(
             "Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
         )

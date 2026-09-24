@@ -48,6 +48,7 @@ from quodeq.shared.env_resolve import resolve_env
 # module import (it logs and falls back to 15s). minimum=0.1 keeps a bogus
 # tiny/negative value from turning every tick into a keepalive frame.
 _HEARTBEAT_S = env_float("QUODEQ_SSE_HEARTBEAT_S", 15.0, minimum=0.1)
+_EVENT_TYPE_STATUS = "status"  # compute_tick's event tuple tag for a status.json change
 
 
 def _tick_ms(env: Mapping[str, str] | None = None) -> int:
@@ -85,7 +86,7 @@ def _format_tick_frames(
     terminal_state = ""
     for event_type, payload, event_id in events:
         frames.append(sse_line(payload, event=event_type, event_id=event_id))
-        if event_type == "status":
+        if event_type == _EVENT_TYPE_STATUS:
             done, terminal = _is_terminal(payload)
             if done:
                 terminal_state = terminal

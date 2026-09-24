@@ -20,6 +20,10 @@ from quodeq.shared.validation import path_segment_error
 from .helpers import json_error
 from .routes_common import reports_dir
 
+# services.shared_publish.start_publish's return values (see its docstring).
+_PUBLISH_ALREADY_RUNNING = "already_running"
+_PUBLISH_STARTED = "started"
+
 
 def shared_status() -> Response:
     """Report the shared repo connection, last sync, clone health and publish progress.
@@ -128,9 +132,9 @@ def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tu
             "no shared repository configured", 400, "NO_SHARED_REPO"
         )
     outcome = start_publish(project, settings.url, evaluations_root=Path(reports_dir()))
-    if outcome == "already_running":
+    if outcome == _PUBLISH_ALREADY_RUNNING:
         return json_error("a publish is already running", 409, "PUBLISH_IN_PROGRESS")
-    if outcome != "started":
+    if outcome != _PUBLISH_STARTED:
         return json_error(
             "could not start the publish job, see server logs", 500, "PUBLISH_START_FAILED"
         )

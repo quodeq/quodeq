@@ -16,6 +16,8 @@ from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
 
+_STATUS_CONFLICT = "conflict"  # import_from_file's/error_response's shared collision status
+
 
 def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, int]:
     library = get_library_client(app)
@@ -44,7 +46,7 @@ def _do_import_from_library(app: Flask, get_library_client) -> tuple[Response, i
         return error_response(
             "A standard with this ID already exists from a different source. "
             "Duplicate it to customize your own copy, or delete the existing one, then retry.",
-            HTTPStatus.CONFLICT, "conflict",
+            HTTPStatus.CONFLICT, _STATUS_CONFLICT,
         )
     except (OSError, ValueError, http.client.HTTPException) as exc:
         # See list_library: HTTPException is urllib's truncated/malformed
@@ -109,9 +111,9 @@ def _do_import_standard(app: Flask, get_service) -> tuple[Response, int]:
     except PermissionError as exc:
         logger.warning("standards.import permission error: %s", exc)
         return error_response("Permission denied", HTTPStatus.FORBIDDEN, ERROR_CODE_FORBIDDEN)
-    if result["status"] == "conflict":
+    if result["status"] == _STATUS_CONFLICT:
         return jsonify({
-            "status": "conflict",
+            "status": _STATUS_CONFLICT,
             "existing": to_camel_dict(result["existing"]),
             "warnings": result["warnings"],
         }), HTTPStatus.CONFLICT

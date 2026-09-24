@@ -13,6 +13,7 @@ from typing import Callable
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import QUERY_FLAG_TRUE
 from quodeq.api.helpers import json_error
 from quodeq.api.routes_common import reports_dir
 from quodeq.core.scoring.params import (
@@ -82,7 +83,7 @@ def register_grade_formula_routes(
 
     @app.delete("/api/grade-formula")
     def delete_grade_formula() -> Response | tuple[Response, int]:
-        if request.args.get("confirm") != "true":
+        if request.args.get("confirm") != QUERY_FLAG_TRUE:
             return json_error(
                 "Use ?confirm=true to confirm resetting the grade formula and rescoring every run",
                 HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",

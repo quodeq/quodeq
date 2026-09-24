@@ -5,6 +5,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import QUERY_FLAG_TRUTHY
 from quodeq.api._evaluation_helpers import ai_cmd_path_error
 from quodeq.api.helpers import json_error
 from quodeq.shared.serialization import to_camel_dict
@@ -26,7 +27,7 @@ _BROWSE_ERROR_DEFAULT = (HTTPStatus.NOT_FOUND, "INVALID_INPUT", "Path not found 
 def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle GET /api/browse."""
     path = request.args.get("path")
-    include_files = request.args.get("files", "").lower() in ("1", "true")
+    include_files = request.args.get("files", "").lower() in QUERY_FLAG_TRUTHY
     payload = provider.browse_repo(path, include_files=include_files)
     if "error" in payload:
         http_status, code, safe_msg = _BROWSE_ERROR_MAP.get(

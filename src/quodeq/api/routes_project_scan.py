@@ -26,6 +26,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import QUERY_FLAG_TRUE
 from quodeq.api.helpers import path_from_body, json_error, scan_target_error as _scan_target_error
 from quodeq.services.fs_project_helpers import (
     project_record_exists,
@@ -144,7 +145,7 @@ def project_estimates(project: str) -> Response | tuple[Response, int]:
 
     raw_dims = request.args.get("dimensions", "")
     requested = [d.strip() for d in raw_dims.split(",") if d.strip()] or None
-    clean_scan = request.args.get("cleanScan", "false").strip().lower() == "true"
+    clean_scan = request.args.get("cleanScan", "false").strip().lower() == QUERY_FLAG_TRUE
     return jsonify(project_estimates_payload(project_dir, requested, clean_scan))
 
 

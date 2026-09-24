@@ -8,3 +8,29 @@ from __future__ import annotations
 ERROR_CODE_BAD_REQUEST = "bad_request"
 ERROR_CODE_NOT_FOUND = "not_found"
 ERROR_CODE_FORBIDDEN = "forbidden"
+
+# Provider-config ``type`` values (data/config/ai_providers.json): whether a
+# provider is driven over HTTP or by spawning a CLI subprocess.
+CLIENT_TYPE_API = "api"
+CLIENT_TYPE_CLI = "cli"
+
+# request.args values are always str, never bool, so boolean query-param
+# flags (``?confirm=true``, ``?discard=true``, ``?dryRun=1``, ``?refresh=1``)
+# compare against these string forms.
+QUERY_FLAG_TRUE = "true"
+QUERY_FLAG_TRUE_NUMERIC = "1"
+QUERY_FLAG_TRUTHY = (QUERY_FLAG_TRUE_NUMERIC, QUERY_FLAG_TRUE)  # accepted truthy spellings
+
+# Machine-readable ``code`` values for the evaluations/findings/assistant/
+# shared-mirror routes' own {"error", "code"} shape. A distinct, SCREAMING_
+# SNAKE wire vocabulary from the lower-case ERROR_CODE_* family above (those
+# routes predate the standards_* CRUD split and never adopted it) -- the
+# values are API contract and must not change.
+CODE_INVALID_INPUT = "INVALID_INPUT"
+CODE_INVALID_PARAM = "INVALID_PARAM"
+CODE_MISSING_PARAM = "MISSING_PARAM"
+CODE_NOT_FOUND = "NOT_FOUND"
+CODE_FORBIDDEN = "FORBIDDEN"
+CODE_UNKNOWN_SESSION = "UNKNOWN_SESSION"
+CODE_NO_ACTIVE_WORKTREE = "NO_ACTIVE_WORKTREE"
+MESSAGE_UNKNOWN_SESSION = "unknown session"
