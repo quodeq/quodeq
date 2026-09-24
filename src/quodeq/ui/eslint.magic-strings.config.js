@@ -4,23 +4,11 @@
 // grandfather a violation is tools/magic_strings_baseline.json, which may
 // only shrink.
 import magicStringRules from './tools/magic_string_rules.mjs';
+import { SRC_JS_JSX_BASE } from './tools/eslint_shared_config.mjs';
 
 export default [
   {
-    files: ['src/**/*.js', 'src/**/*.jsx'],
-    ignores: [
-      'src/vocab/**',
-      'src/strings/**',
-      'src/**/*.test.js',
-      'src/**/*.test.jsx',
-      'src/**/*.fixtures.js',
-      'src/**/*.fixtures.jsx',
-    ],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
+    ...SRC_JS_JSX_BASE,
     plugins: { 'magic-str': magicStringRules },
     rules: {
       'magic-str/compared-literal': 'error',
