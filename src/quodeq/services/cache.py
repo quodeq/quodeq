@@ -198,6 +198,7 @@ def make_lru_dimension_fetcher(
     project: str,
     ctx: DimensionCacheContext,
     version: str = "",
+    version_for: Callable[[str], str] | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a callable that fetches dimension data for a run.
 
@@ -208,6 +209,9 @@ def make_lru_dimension_fetcher(
     that at most one thread performs disk I/O for any given cache key.  Other
     threads that request the same key while I/O is in progress wait on the
     event and then read the result from the cache.
+
+    *version_for*, when given, replaces *version* with a per-run value, for
+    callers whose entries go stale on per-run inputs (see the trend fetcher).
 
     Self-healing guards (every caller inherits them, so a request landing
     mid-run can never freeze a partial dim list in the cache):
@@ -223,6 +227,7 @@ def make_lru_dimension_fetcher(
        cache, so the next request also reads fresh.
     """
     def get_run_dimensions(run_id: str) -> list[DimensionResult]:
-        return _get_run_dimensions(run_id, reports_root, project, version, ctx)
+        run_version = version if version_for is None else version_for(run_id)
+        return _get_run_dimensions(run_id, reports_root, project, run_version, ctx)
 
     return get_run_dimensions
