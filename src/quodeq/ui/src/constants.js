@@ -1,8 +1,6 @@
 import { GRANULARITY } from './utils/granularity.js';
 
-// typeof sentinel for the "are we in a browser" guard the event-dispatch
-// helpers below share.
-const UNDEFINED_TYPEOF = 'undefined';
+const UNDEFINED_TYPEOF = 'undefined'; // typeof sentinel for the event-dispatch helpers' "are we in a browser" guard
 
 export const ISO_25010_URL = 'https://www.iso.org/';
 

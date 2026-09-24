@@ -26,7 +26,7 @@ import { LATEST_RUN_ID } from '../constants.js';
 // the factories below keeps it in the same cache subtree as the real entries.
 export const NO_JOB_ID = "_none_";
 
-const EVALUATION_SCOPE = "evaluation";
+const EVALUATION_SCOPE = "evaluation"; // query-key prefix for the evaluationKeys.* subtree below
 
 export const evaluationKeys = {
   all: () => [EVALUATION_SCOPE],
@@ -105,7 +105,7 @@ export function samePlaceholderScope(previousQuery, projectId, source = DEFAULT_
   return key[PROJECT_ID_INDEX] === projectId && key[PROJECT_SOURCE_INDEX] === source;
 }
 
-const SYSTEM_SCOPE = "system";
+const SYSTEM_SCOPE = "system"; // query-key prefix for the systemKeys.* subtree below
 
 export const systemKeys = {
   all: () => [SYSTEM_SCOPE],
@@ -115,7 +115,7 @@ export const systemKeys = {
   omlx: () => [SYSTEM_SCOPE, "omlx"],
 };
 
-const STANDARDS_SCOPE = "standards";
+const STANDARDS_SCOPE = "standards"; // query-key prefix for the standardsKeys.* subtree below
 
 export const standardsKeys = {
   all: () => [STANDARDS_SCOPE],
@@ -125,7 +125,7 @@ export const standardsKeys = {
   overrides: (projectId) => [STANDARDS_SCOPE, "overrides", projectId],
 };
 
-const SETTINGS_SCOPE = "settings";
+const SETTINGS_SCOPE = "settings"; // query-key prefix for the settingsKeys.* subtree below
 
 export const settingsKeys = {
   all: () => [SETTINGS_SCOPE],
@@ -137,7 +137,7 @@ export const settingsKeys = {
   omlxModels: () => [SETTINGS_SCOPE, "omlxModels"],
 };
 
-const SHARED_SCOPE = "shared";
+const SHARED_SCOPE = "shared"; // query-key prefix for the sharedKeys.* subtree below
 
 export const sharedKeys = {
   all: () => [SHARED_SCOPE],

@@ -62,8 +62,7 @@ export function useAppBootExtras() {
   return { sharedSignal, sidebarPinned, setSidebarPinned, dismissRefreshKey, bumpDismissRefresh };
 }
 
-// features/drawer's assistant panel id (features/assistant/drawerPanelsModel.js).
-const DRAWER_TAB_ASSISTANT = 'assistant';
+const DRAWER_TAB_ASSISTANT = 'assistant'; // features/drawer's assistant panel id (features/assistant/drawerPanelsModel.js)
 
 /**
  * Live assistant context: the pure derivation reuses the app-state object

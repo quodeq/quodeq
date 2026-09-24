@@ -14,6 +14,7 @@
  */
 import { projectKeys } from "./queryKeys";
 import { violationKey } from "../utils/violationKey.js";
+import { LATEST_RUN_ID } from "../constants.js";
 
 function clampNonNegative(n) {
   return Math.max(0, n | 0);
@@ -69,8 +70,7 @@ function patchDimScore(dim, scoreByDim) {
 // reconstruct the violation-list change, so they invalidate the run-detail
 // violation source and let it refetch on next view.
 const KNOWN_KINDS = new Set(["dismiss", "restore", "delete", "restore_all", "delete_all"]);
-// Only "dismiss" splices the cached violation list locally (see KNOWN_KINDS above).
-const MUTATION_KIND_DISMISS = "dismiss";
+const MUTATION_KIND_DISMISS = "dismiss"; // only "dismiss" splices the cached violation list locally (see KNOWN_KINDS above)
 
 // Patch dim score/grade in place, preserving referential identity for
 // untouched dims. ``spliceDismissed`` additionally removes the dismissed
@@ -162,7 +162,7 @@ function applyRunScopedPatches({ runId, projectId, patchScores, invalidateViolat
 
 function applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims, splices }) {
   if (!delta.isLatest) return;
-  patchScores(projectKeys.dashboard(projectId, "latest"), { spliceDismissed: splices });
+  patchScores(projectKeys.dashboard(projectId, LATEST_RUN_ID), { spliceDismissed: splices });
   if (delta.accumulated) {
     // A caller supplied the authoritative rollup — prefer it.
     patchAccumulated(projectKeys.scores(projectId, null), delta.accumulated);

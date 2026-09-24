@@ -10,14 +10,11 @@ import { useLinger } from './useLinger.js';
 import { PREFERS_DARK_QUERY, PYWEBVIEW_READY_EVENT } from '../constants.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 import { THEME_MODE } from '../vocab/theme.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 // How long the startup loader stays opaque after its data-hold releases,
 // covering the overview's final commit (lazy chart first render).
 export const STARTUP_LOADER_LINGER_MS = 250;
-
-// Same value as hooks/useAppState.js's TAB_OVERVIEW, kept local: useAppState.js
-// imports this module, so importing back would cycle.
-const TAB_OVERVIEW = 'overview';
 
 /**
  * Returns whether the app is currently rendering dark, taking the saved
@@ -91,7 +88,7 @@ export function shouldShowStartupLoader({
 }) {
   if (projectsLoadFailed) return false;
   if (!projectsLoaded) return true;
-  if (activeTab !== TAB_OVERVIEW) return false;
+  if (activeTab !== NAV_TAB.OVERVIEW) return false;
   if ((projectsCount ?? 0) === 0 && selectedSource !== PROJECT_SOURCE.SHARED) return false;
   if (!selectedProject) return false;
   if (error) return false;

@@ -97,9 +97,7 @@ function makeAttemptImport(importProject) {
   };
 }
 
-// Backend import-conflict kind: the project's uuid already exists locally
-// (see tests/api/test_project_import_collisions.py).
-const IMPORT_CONFLICT_SAME_UUID = 'same_uuid';
+const IMPORT_CONFLICT_SAME_UUID = 'same_uuid'; // backend import-conflict kind: same project uuid already exists locally
 
 function makeResolveImportConflict(attemptImport) {
   return async function _resolveImportConflict(file, err) {

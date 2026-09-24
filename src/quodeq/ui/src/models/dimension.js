@@ -52,9 +52,7 @@
 import { createViolations } from './violation.js';
 import { createPrinciple, createPrincipleGrade } from './principle.js';
 
-// typeof sentinel for the "is this a plain object" guard shared by every
-// raw-payload factory below.
-const OBJECT_TYPE_NAME = 'object';
+const OBJECT_TYPE_NAME = 'object'; // typeof sentinel shared by every raw-payload factory's "is this a plain object" guard below
 
 /**
  * Create a canonical Dimension from a raw dashboard API object.

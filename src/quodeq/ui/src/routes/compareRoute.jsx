@@ -4,12 +4,9 @@
  */
 import { lazy } from 'react';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 const ComparePage = lazy(() => import('../features/compare/components/ComparePage.jsx'));
-
-// This route's own nav-stack page id, used for both push (open/duel) and
-// replace (dimension switch) navigation below.
-const PAGE_COMPARE = 'compare';
 
 export function compareRoute(params, props) {
   return (
@@ -21,16 +18,16 @@ export function compareRoute(params, props) {
         // Remote fleet rows open through the shared source; the same
         // machinery the projects drawer uses for shared selections.
         props.navigation.handleProjectChange(id, source);
-        props.navigation.navTab('overview');
+        props.navigation.navTab(NAV_TAB.OVERVIEW);
       }}
       // Drill-down is a real nav-stack entry: push from the fleet so the
       // browser back button returns there; replace when switching between
       // dimensions so tab-hopping doesn't grow history.
-      onOpenDimension={(key) => props.navigation.handleNavigate(PAGE_COMPARE, { dimension: key })}
-      onSwitchDimension={(key) => props.navigation.handleNavigateReplace(PAGE_COMPARE, { dimension: key })}
+      onOpenDimension={(key) => props.navigation.handleNavigate(NAV_TAB.COMPARE, { dimension: key })}
+      onSwitchDimension={(key) => props.navigation.handleNavigateReplace(NAV_TAB.COMPARE, { dimension: key })}
       // Cross-project principle jump: the evalPrincipal carries its own
       // project, so the selection doesn't change and back pops to Compare.
-      onOpenEvalPrincipal={(evalPrincipal) => props.navigation.handleNavigate('evalprinciple', { evalPrincipal, sourceTab: 'compare' })}
+      onOpenEvalPrincipal={(evalPrincipal) => props.navigation.handleNavigate('evalprinciple', { evalPrincipal, sourceTab: NAV_TAB.COMPARE })}
       // Standings row -> that project's own screen of the SAME dimension
       // (the explorer's cross-project fromProject entry), pushed for the
       // same back-pops-to-Compare contract.
@@ -43,12 +40,12 @@ export function compareRoute(params, props) {
         // read a local fromProject from the local API even while the
         // global selection sits on the shared source (and vice versa).
         fromSource: target.source || PROJECT_SOURCE.LOCAL,
-        sourceTab: 'compare',
+        sourceTab: NAV_TAB.COMPARE,
       })}
       // Head-to-head is a push like the dimension drill-down: back returns
       // to the fleet with the two-project scope still selected.
       duel={params.duel || null}
-      onOpenDuel={(ids) => props.navigation.handleNavigate(PAGE_COMPARE, { duel: ids })}
+      onOpenDuel={(ids) => props.navigation.handleNavigate(NAV_TAB.COMPARE, { duel: ids })}
       onBack={props.navigation.navPop}
     />
   );

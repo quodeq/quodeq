@@ -84,8 +84,7 @@ function HealthCell({ row, total, rate, flat }) {
   );
 }
 
-// The only non-default 'heat' variant.
-const VARIANT_FLAT = 'flat';
+const VARIANT_FLAT = 'flat'; // the only non-default 'heat' variant
 
 export default function HeatGridCells({ row, onCellClick, variant = 'heat' }) {
   const total = row.violations + row.compliance;

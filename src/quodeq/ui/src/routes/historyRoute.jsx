@@ -4,6 +4,7 @@
  */
 import { lazy } from 'react';
 import { LATEST_RUN_ID } from '../constants.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 const HistoryPage = lazy(() => import('../features/history/components/HistoryPage.jsx'));
 
@@ -24,7 +25,7 @@ export function historyRoute(params, props) {
       }}
       availableRuns={runs}
       callbacks={{
-        onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
+        onRunClick: (runId, dateLabel) => props.navigation.handleNavigate(NAV_TAB.HISTORY_RUN, { runId, dateLabel }),
         onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
         onNavigate: props.navigation.handleNavigate,
         onRunChange: props.navigation.setHistorySelectedRun,

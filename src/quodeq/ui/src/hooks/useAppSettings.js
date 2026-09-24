@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { resolveDataTheme } from '../utils/themeResolver.js';
 import { readString, removeKey, writeString } from '../adapters/storage.js';
 import { DATA_THEME_ATTR, PREFERS_DARK_QUERY } from '../constants.js';
-import { THEME_MODE } from '../vocab/theme.js';
+import { THEME_MODE, THEME_FAMILY } from '../vocab/theme.js';
 
 const MODE_KEY = 'cc-theme-mode';
 const FAMILY_KEY = 'cc-theme-family';
 const OLD_THEME_KEY = 'cc-theme';
 
-const VALID_MODES = ['system', 'light', 'dark'];
-const VALID_FAMILIES = ['daruma', 'neo', 'galadriel', 'ifrit', 'deckard'];
+// Same order as THEME_MODE/THEME_FAMILY's own declaration order (both
+// frozen objects), which VALID_MODES/VALID_FAMILIES used to spell out by hand.
+const VALID_MODES = Object.values(THEME_MODE);
+const VALID_FAMILIES = Object.values(THEME_FAMILY);
 
 const FAMILY_RENAMES = { 'default': 'daruma', 'midnight': 'daruma', 'flynn': 'daruma', 'forest': 'galadriel', 'ember': 'ifrit', 'cyber': 'deckard' };
 
@@ -74,7 +76,7 @@ export function useAppSettings() {
   useState(() => migrateOldTheme());
 
   const [themeMode, setThemeMode] = useState(safeGet(MODE_KEY, THEME_MODE.SYSTEM));
-  const [themeFamily, setThemeFamily] = useState(safeGet(FAMILY_KEY, 'daruma'));
+  const [themeFamily, setThemeFamily] = useState(safeGet(FAMILY_KEY, THEME_FAMILY.DARUMA));
 
   // Listen for OS color scheme changes when in system mode
   useEffect(() => {

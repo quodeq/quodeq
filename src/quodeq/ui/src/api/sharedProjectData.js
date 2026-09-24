@@ -9,6 +9,7 @@ import { createProject } from '../models/project.js';
 import { createDashboard } from '../models/dashboard.js';
 import { createDimensionEval } from '../models/dimension.js';
 import { epochSecondsToMs } from './sharedStatus.js';
+import { LATEST_RUN_ID } from '../constants.js';
 import { asOfQuery, parseAccumulated, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
@@ -83,7 +84,7 @@ export function sharedGetRuns(projectId) {
  * @param {string} [run='latest']
  * @returns {Promise<import('../models/dashboard.js').Dashboard>}
  */
-export async function sharedGetDashboard(projectId, run = 'latest') {
+export async function sharedGetDashboard(projectId, run = LATEST_RUN_ID) {
   const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/dashboard${runQuery(run)}`);
   return createDashboard(data);
 }

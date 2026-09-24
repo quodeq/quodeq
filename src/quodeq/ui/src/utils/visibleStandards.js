@@ -17,9 +17,7 @@ import { decideHydration } from './visibleStandardsModel.js';
 // fake storage per test.
 const VISIBLE_STANDARDS_MIGRATED_KEY = 'quodeq-visible-standards-migrated';
 
-// decideHydration's (visibleStandardsModel.js) decision.kind value naming the
-// "push local cache to server" branch.
-const HYDRATION_KIND_MIGRATE = 'migrate';
+const HYDRATION_KIND_MIGRATE = 'migrate'; // decideHydration's decision.kind for the "push local cache to server" branch
 
 /**
  * Read the visible standard IDs from localStorage.

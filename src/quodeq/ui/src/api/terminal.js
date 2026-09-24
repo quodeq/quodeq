@@ -1,7 +1,6 @@
 import { request, BASE } from './request.js';
 
-// URL.protocol includes the trailing colon.
-const HTTPS_PROTOCOL = 'https:';
+const HTTPS_PROTOCOL = 'https:'; // URL.protocol includes the trailing colon
 
 /**
  * The WebSocket URL for the embedded terminal, derived from the page origin

@@ -16,12 +16,9 @@
  *   });
  */
 import { t } from '../strings/index.js';
-import { buildDialogShell } from './domDialogBuilder.js';
+import { buildDialogShell, BUTTON_TYPE } from './domDialogBuilder.js';
 import { DIALOG_VARIANT } from '../vocab/dialogVariant.js';
 const _ALLOWED_VARIANTS = new Set([DIALOG_VARIANT.DEFAULT, DIALOG_VARIANT.DANGER]);
-// <button type="button"> avoids the implicit type="submit" default; also the
-// element tag passed to createElement below.
-const BUTTON_TYPE = 'button';
 
 function createCheckbox(dialog, { checkboxLabel, checkboxHint, checkboxDefault }) {
   if (!checkboxLabel) return null;

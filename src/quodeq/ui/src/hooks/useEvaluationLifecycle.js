@@ -44,9 +44,7 @@ function makeStartEvaluationHandler({ job, setBlockedStartError, storage, analys
   };
 }
 
-// handleEvalDismiss's action param naming the "jump to the evaluated
-// project's results" choice.
-const DISMISS_ACTION_VIEW = 'view';
+const DISMISS_ACTION_VIEW = 'view'; // handleEvalDismiss's action param naming the "jump to results" choice
 
 function makeEvalDismissHandler({ job, startedProject, selectedProject, selectProjectAndRun, navReset, setBlockedStartError, clearJob }) {
   return function handleEvalDismiss(action) {

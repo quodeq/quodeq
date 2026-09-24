@@ -24,8 +24,7 @@
 // Scopes are project ids, so this is "how many projects' page state to keep".
 export const MAX_SCOPES_PER_NAMESPACE = 50;
 
-// Key used when no scope (project id) is given.
-const GLOBAL_SCOPE_KEY = '__global__';
+const GLOBAL_SCOPE_KEY = '__global__'; // key used when no scope (project id) is given
 
 const STORES = new Map(); // namespace -> Map<scope, state object>, oldest first
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LATEST_RUN_ID } from '../constants.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 // Builds the prev/next/latest/view/select handlers that operate on the
 // overview run index.
@@ -22,7 +23,7 @@ function makeRunNavigatorHandlers({ overviewRunIndex, setOverviewRunIndex, avail
   }
 
   function handleRunView() {
-    onNavigate('run', { runId: currentOverviewRun });
+    onNavigate(NAV_TAB.RUN, { runId: currentOverviewRun });
   }
 
   function handleRunSelect(runId) {

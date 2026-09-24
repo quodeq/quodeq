@@ -16,6 +16,7 @@ import { FRAME_TYPE } from './frameType.js';
 import { SCOPE_GATE_RULE } from './scopeGateRule.js';
 import { LOG_STREAM_STATUS } from './logStreamStatus.js';
 import { KEY } from './keyboard.js';
+import { NAV_TAB } from './navTab.js';
 
 test('vocab modules spell the wire values', () => {
   assert.deepEqual(RUN_STATE, {
@@ -71,4 +72,13 @@ test('KEY mirrors the DOM KeyboardEvent.key spellings', () => {
     ARROW_UP: 'ArrowUp', ARROW_DOWN: 'ArrowDown', ARROW_LEFT: 'ArrowLeft', ARROW_RIGHT: 'ArrowRight',
   });
   assert.equal(Object.isFrozen(KEY), true);
+});
+
+test('NAV_TAB spells the nav-stack page ids', () => {
+  assert.deepEqual(NAV_TAB, {
+    OVERVIEW: 'overview', VIOLATIONS: 'violations', MAP: 'map', HISTORY: 'history',
+    PROJECTS: 'projects', EVALUATE: 'evaluate', STANDARDS: 'standards', HELP: 'help',
+    SETTINGS: 'settings', COMPARE: 'compare', HISTORY_RUN: 'history-run', RUN: 'run',
+  });
+  assert.equal(Object.isFrozen(NAV_TAB), true);
 });

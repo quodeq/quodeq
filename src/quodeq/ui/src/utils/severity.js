@@ -12,8 +12,7 @@
  */
 import { KNOWN_SEVERITIES } from './constants.js';
 
-// Fallback bucket for a severity value KNOWN_SEVERITIES doesn't recognise.
-const UNKNOWN_SEVERITY = 'unknown';
+const UNKNOWN_SEVERITY = 'unknown'; // fallback bucket for a severity value KNOWN_SEVERITIES doesn't recognise
 
 /**
  * Coerces any severity value to one of the four known ones, mapping anything

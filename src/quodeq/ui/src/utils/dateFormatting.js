@@ -4,8 +4,7 @@ import { SECONDS_PER_HOUR } from './time.js';
 import { GRANULARITY } from './granularity.js';
 import { LATEST_RUN_ID } from '../constants.js';
 
-// Default `where` tag for the warn-log callers below.
-const DEFAULT_CALLER_NAME = 'dateFormatting';
+const DEFAULT_CALLER_NAME = 'dateFormatting'; // default `where` tag for the warn-log callers below
 
 // Intl formatters are comparatively expensive to construct, and these run in
 // list renders. Build once at module scope.

@@ -16,16 +16,20 @@ import { useAppSettings } from './useAppSettings.js';
 import { useEvaluationLifecycle } from './useEvaluationLifecycle.js';
 import { useProjectActions } from './useProjectActions.js';
 import { useVisibleRuns } from './useVisibleRuns.js';
+import { LATEST_RUN_ID } from '../constants.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
-export const TAB_OVERVIEW = 'overview';
-export const TAB_HISTORY = 'history';
-const TAB_HISTORY_RUN = 'history-run';
-// The run-detail drill-down page id (handleNavigate('run', {runId}) below and
-// hooks/useRunNavigator.js's handleRunView) -- distinct from the tabs above.
-const PAGE_RUN = 'run';
+// Kept for the existing test/hook imports below (useAppState.reconcile.test.jsx,
+// useNativeNavBridge.js) -- the values themselves live in vocab/navTab.js,
+// this file's own comparisons read NAV_TAB directly.
+export const TAB_OVERVIEW = NAV_TAB.OVERVIEW;
 // 'compare' is appended AFTER the first four on purpose: PROJECT_TABS is a
 // positional slice of the head of this list.
-export const KNOWN_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history', 'projects', 'evaluate', 'standards', 'help', 'settings', 'compare'];
+export const KNOWN_TABS = [
+  NAV_TAB.OVERVIEW, NAV_TAB.VIOLATIONS, NAV_TAB.MAP, NAV_TAB.HISTORY,
+  NAV_TAB.PROJECTS, NAV_TAB.EVALUATE, NAV_TAB.STANDARDS, NAV_TAB.HELP, NAV_TAB.SETTINGS,
+  NAV_TAB.COMPARE,
+];
 // 'compare' is appended after these four on purpose (see comment above).
 const PROJECT_TAB_COUNT = 4;
 export const PROJECT_TABS = KNOWN_TABS.slice(0, PROJECT_TAB_COUNT);
@@ -124,10 +128,10 @@ function useAppNavigation() {
     }
   }, [serverConnected]); // eslint-disable-line react-hooks/exhaustive-deps
   const { setSelectedRun, handleRunChange } = projectBundle;
-  const [historySelectedRun, setHistorySelectedRun] = useState('latest');
+  const [historySelectedRun, setHistorySelectedRun] = useState(LATEST_RUN_ID);
   function handleNavigate(page, params = {}) {
-    if (page === PAGE_RUN && params.runId) setSelectedRun(params.runId);
-    if (page === TAB_HISTORY_RUN && params.runId) setHistorySelectedRun(params.runId);
+    if (page === NAV_TAB.RUN && params.runId) setSelectedRun(params.runId);
+    if (page === NAV_TAB.HISTORY_RUN && params.runId) setHistorySelectedRun(params.runId);
     navPush({ page, ...params });
   }
   function handleNavigateReplace(page, params = {}) {
@@ -181,7 +185,7 @@ export function useOverviewReturnReconcile({ rootTab, selectedProject, selectedS
   const queryClient = useQueryClient();
   const prevTabRef = useRef(rootTab);
   useEffect(() => {
-    const cameToOverview = prevTabRef.current !== TAB_OVERVIEW && rootTab === TAB_OVERVIEW;
+    const cameToOverview = prevTabRef.current !== NAV_TAB.OVERVIEW && rootTab === NAV_TAB.OVERVIEW;
     prevTabRef.current = rootTab;
     if (!cameToOverview || !selectedProject) return;
     queryClient.refetchQueries({
@@ -208,8 +212,8 @@ export function useOverviewReturnReconcile({ rootTab, selectedProject, selectedS
 export function resolveActiveTab(activePage) {
   if (KNOWN_TABS.includes(activePage.page)) return activePage.page;
   if (activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab)) return activePage.sourceTab;
-  if (activePage.page === TAB_HISTORY_RUN) return TAB_HISTORY;
-  return TAB_OVERVIEW;
+  if (activePage.page === NAV_TAB.HISTORY_RUN) return NAV_TAB.HISTORY;
+  return NAV_TAB.OVERVIEW;
 }
 
 // A display preference, not run data: the chosen bucket size survives a
@@ -250,8 +254,8 @@ export function useAppState() {
   } = projectBundle;
   const settings = useAppSettings();
   const { granularity, onGranularityChange } = useScoreHistoryGranularity();
-  const isHistoryRun = activePage.page === TAB_HISTORY_RUN;
-  const isHistoryTab = activePage.page === TAB_HISTORY;
+  const isHistoryRun = activePage.page === NAV_TAB.HISTORY_RUN;
+  const isHistoryTab = activePage.page === NAV_TAB.HISTORY;
   const effectiveRun = isHistoryRun ? historySelectedRun : selectedRun;
   // History views (the History tab and its run-detail page) show specific
   // past runs in a comparison-oriented mental model — flashing the previous
@@ -277,7 +281,7 @@ export function useAppState() {
 
   const activeTab = resolveActiveTab(activePage);
   const showProjectHeader = PROJECT_TABS.includes(activeTab) && projects.length > 0 && !!selectedProject;
-  const showRunNav = activeTab === TAB_OVERVIEW && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
+  const showRunNav = activeTab === NAV_TAB.OVERVIEW && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
 
   useOverviewReturnReconcile({ rootTab: navStack[0]?.page, selectedProject, selectedSource });
 

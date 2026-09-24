@@ -14,9 +14,7 @@ import { buildProjectRootFile } from '../utils/explorerUtils.js';
 
 const ViolationsPage = lazy(() => import('../features/violations/components/ViolationsPage.jsx'));
 
-// features/violations/components/dimensionHeatGridModel.js's row.type value
-// for a principle row (as opposed to a dimension row).
-const HEAT_GRID_ROW_TYPE_PRINCIPLE = 'principle';
+const HEAT_GRID_ROW_TYPE_PRINCIPLE = 'principle'; // dimensionHeatGridModel.js's row.type for a principle row (vs a dimension row)
 
 // Exported so unit tests can pin the runId-threading contract without having
 // to mount the whole App. Callers from the Violations page must pass the

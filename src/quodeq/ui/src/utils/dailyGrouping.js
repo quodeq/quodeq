@@ -3,8 +3,7 @@ import { RUN_STATE } from '../vocab/runState.js';
 import { GRANULARITY } from './granularity.js';
 
 const DAYS_PER_WEEK = 7;
-// padStart fill for two-digit month/day/week segments.
-const PAD_CHAR = '0';
+const PAD_CHAR = '0'; // padStart fill for two-digit month/day/week segments
 // ISO weeks are anchored on Thursday: shifting any date in the week to its
 // Thursday and reading that Thursday's year/week gives the correct ISO week
 // even when the week spans a year boundary.

@@ -3,10 +3,14 @@ import { KEY } from '../vocab/keyboard.js';
 
 // Distinct title/message ids per dialog for aria-labelledby / aria-describedby.
 let dialogSeq = 0;
-// Element.tagName is always upper-case.
-const BUTTON_TAG_NAME = 'BUTTON';
-// Element tag for the shell's overlay/dialog/actions wrapper below.
-const DIV_TAG = 'div';
+// Element.tagName is always upper-case; exported so chooseDialog.js and
+// confirmDialog.js's own <button> elements share one home for both the tag
+// and the type value instead of each defining their own.
+export const BUTTON_TAG_NAME = 'BUTTON';
+// <button type="button"> avoids the implicit type="submit" default; also the
+// element tag chooseDialog.js/confirmDialog.js pass to createElement.
+export const BUTTON_TYPE = 'button';
+const DIV_TAG = 'div'; // element tag for the shell's overlay/dialog/actions wrapper below
 
 // True when the event started on one of the dialog's own action buttons. Such
 // a button decides Enter through its own click, so the dialog-wide

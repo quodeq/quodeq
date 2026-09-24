@@ -7,8 +7,7 @@
  * @param {string | string[]} props.keys
  * @param {'plus'|'space'} [props.joiner='space']
  */
-// The only non-default `joiner` value (the default is 'space').
-const JOINER_PLUS = 'plus';
+const JOINER_PLUS = 'plus'; // the only non-default `joiner` value (the default is 'space')
 
 export default function KeyHint({ keys, joiner = 'space' }) {
   const arr = Array.isArray(keys) ? keys : [keys];
