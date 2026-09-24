@@ -17,7 +17,7 @@
  */
 import { useMemo, useState } from 'react';
 import { scoreColorClass, scoreGradeColorVar } from '../../../utils/formatters.js';
-import { SectionLabel } from '../../../components/terminal/index.js';
+import ComparePanel from './ComparePanel.jsx';
 import { t } from '../../../strings/index.js';
 import { OVERALL, computeMatrixExtremes, sortMatrixRows } from './compareMatrixModel.js';
 import { useMatrixColumnChunks } from './useMatrixColumnChunks.js';
@@ -176,11 +176,7 @@ export default function CompareMatrix({ ariaLabel, header, note, columns, matrix
   const { hoverClass, headerCell, scoreCell } = buildMatrixCellHelpers(sort, setSort, hoverKey, setHoverKey, extremes);
 
   return (
-    <section className="compare-panel" aria-label={ariaLabel}>
-      <div className="compare-panel__head">
-        <SectionLabel>{header}</SectionLabel>
-        <span className="compare-panel__note">{note}</span>
-      </div>
+    <ComparePanel ariaLabel={ariaLabel} header={header} note={note}>
       <div className="compare-matrix" ref={wrapRef}>
         {chunks.map((chunkCols, ci) => (
           <CompareMatrixTable
@@ -199,6 +195,6 @@ export default function CompareMatrix({ ariaLabel, header, note, columns, matrix
           />
         ))}
       </div>
-    </section>
+    </ComparePanel>
   );
 }

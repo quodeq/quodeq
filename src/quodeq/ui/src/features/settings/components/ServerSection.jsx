@@ -7,6 +7,7 @@ import { systemKeys } from '../../../api/queryKeys.js';
 import { getHealth } from '../../../api/index.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
+import { SERVER_STATUS } from '../settingsVocab.js';
 
 const LOCAL_SERVER_HINT = t('settings.localServerHint');
 
@@ -47,7 +48,7 @@ export default function ServerSection() {
     refetchOnWindowFocus: false,
   });
 
-  const status = isLoading && !health ? 'checking' : (health ? 'online' : 'offline');
+  const status = isLoading && !health ? 'checking' : (health ? SERVER_STATUS.ONLINE : SERVER_STATUS.OFFLINE);
 
   return (
     <section className="panel settings-section">
@@ -59,7 +60,7 @@ export default function ServerSection() {
       </div>
 
       <ServerStatusPill
-        status={status === 'online' ? 'online' : 'offline'}
+        status={status === SERVER_STATUS.ONLINE ? SERVER_STATUS.ONLINE : SERVER_STATUS.OFFLINE}
         address={health?.address}
         offlineMessage={
           status === 'checking'
@@ -70,9 +71,9 @@ export default function ServerSection() {
         consoleOpen={serverLog.open}
       />
 
-      {status === 'online' && health && <ServerDetails health={health} />}
+      {status === SERVER_STATUS.ONLINE && health && <ServerDetails health={health} />}
 
-      {status === 'offline' && <OfflineRestartHint />}
+      {status === SERVER_STATUS.OFFLINE && <OfflineRestartHint />}
     </section>
   );
 }

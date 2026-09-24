@@ -1,7 +1,8 @@
 import {
-  NoLocalProjectsSharedContent, NoProjectsContent, NoProjectSelectedContent,
-  LoadingProjectContent, LoadProjectFailedContent, NoRunsEmptyContent, RunLoadFailedContent,
+  NoLocalProjectsSharedContent, NoProjectSelectedContent,
+  LoadingProjectContent, NoRunsEmptyContent, RunLoadFailedContent,
 } from './DashboardPageEmptyStates.jsx';
+import { LoadProjectFailedEmptyState, NoProjectsEmptyState } from '../../../components/ProjectEmptyStates.jsx';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 // The early-return ladder of DashboardPage, as plain functions and not as
@@ -36,7 +37,7 @@ function renderNoProjectsGate({ sharedHasContent, onNavigate, readyClass }) {
   if (sharedHasContent) {
     return gateFrame(readyClass, <NoLocalProjectsSharedContent onNavigate={onNavigate} />);
   }
-  return gateFrame(readyClass, <NoProjectsContent onNavigate={onNavigate} />);
+  return gateFrame(readyClass, <NoProjectsEmptyState onNavigate={onNavigate} />);
 }
 
 function renderProjectErrorGate({ isFetching, projectName, error, onRetry, readyClass }) {
@@ -48,7 +49,7 @@ function renderProjectErrorGate({ isFetching, projectName, error, onRetry, ready
   if (isFetching) {
     return gateFrame(readyClass, <LoadingProjectContent projectName={projectName} />);
   }
-  return gateFrame(readyClass, <LoadProjectFailedContent error={error} onRetry={onRetry} />);
+  return gateFrame(readyClass, <LoadProjectFailedEmptyState error={error} onRetry={onRetry} />);
 }
 
 function renderRunModeGate({ isFetching, projectName, onRetry, readyClass }) {

@@ -3,7 +3,7 @@ import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import ConsoleLogViewer from '../components/ConsoleLogViewer.jsx';
 import { EvalLogContext, EvalLogLogsContext, useEvalLogLogs } from './EvalLogContext.js';
 import { useJobLogStream } from './useJobLogStream.js';
-import { LOG_STREAM_STATUS } from '../evaluationVocab.js';
+import { LOG_STREAM_STATUS } from '../../../vocab/logStreamStatus.js';
 import { JOB_STATUS_WORD, terminalLine } from './logPresentation.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { t } from '../../../strings/index.js';

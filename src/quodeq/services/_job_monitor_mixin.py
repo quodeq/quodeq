@@ -174,14 +174,7 @@ class JobMonitorMixin:
         )
 
     def _run_status_exit_reason(self, job: Job | None) -> str | None:
-        """Best-effort read of the run's ``status.json`` ``exit_reason``.
-
-        The analysis loops break out at the deadline without raising, and the
-        lifecycle records ``exit_reason="deadline"`` (see
-        ``cli_evaluation.record_deadline_if_hit``). When the process then
-        exits nonzero without the job watchdog ever firing, this is the only
-        signal that the exit was a time-limit truncation, not a failure.
-        """
+        """Delegate to ``_job_watchdog.run_status_exit_reason`` (which says why it exists)."""
         return run_status_exit_reason(job, self._reports_root)
 
     def _classify_exit(self, job_id: str, exit_code: int, watchdog_killed: bool) -> str | None:

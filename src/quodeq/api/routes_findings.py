@@ -151,46 +151,58 @@ def _list_project_entries(
     return jsonify(lister(project_dir, offset=offset, limit=limit))
 
 
-def _dismiss(app: Flask) -> tuple[Response, int]:
+def _mutate_finding(
+    app: Flask,
+    mutate: Callable[[Path, dict[str, Any], str | None], object],
+    delta_for: Callable[..., Any],
+) -> tuple[Response, int]:
+    """Apply *mutate* to the finding named in the request body, then rescore."""
     body = request.get_json(silent=True) or {}
     target, err = _finding_target_or_error(body)
     if err is not None:
         return err
     run_id = _run_id(body)
-    dismiss_finding(_project_dir(_eval_dir(app), target["project"]), body, run_id=run_id)
+    mutate(_project_dir(_eval_dir(app), target["project"]), body, run_id)
     scores = _scores_with_fallback(app, target["project"], run_id)
-    delta = dismiss_delta(
+    delta = delta_for(
         _eval_dir(app), target["project"], run_id,
         {"req": target["req"], "file": target["file"], "line": target["line"]},
     )
     return jsonify({"scores": scores, "delta": delta}), 200
 
 
-def _restore(app: Flask) -> tuple[Response, int]:
-    body = request.get_json(silent=True) or {}
-    target, err = _finding_target_or_error(body)
-    if err is not None:
-        return err
-    run_id = _run_id(body)
-    restore_finding(_project_dir(_eval_dir(app), target["project"]), body)
-    scores = _scores_with_fallback(app, target["project"], run_id)
-    delta = restore_delta(
-        _eval_dir(app), target["project"], run_id,
-        {"req": target["req"], "file": target["file"], "line": target["line"]},
-    )
-    return jsonify({"scores": scores, "delta": delta}), 200
-
-
-def _restore_all(app: Flask) -> tuple[Response, int]:
+def _mutate_project(
+    app: Flask,
+    mutate: Callable[[Path], int],
+    delta_for: Callable[..., Any],
+    count_key: str,
+) -> tuple[Response, int]:
+    """Apply *mutate* to every entry of the request body's project, then rescore."""
     body = request.get_json(silent=True) or {}
     project = body.get("project", "")
     run_id = _run_id(body)
     if not project:
         return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
-    count = restore_all_findings(_project_dir(_eval_dir(app), project))
+    count = mutate(_project_dir(_eval_dir(app), project))
     scores = _scores_with_fallback(app, project, run_id)
-    delta = restore_all_delta(_eval_dir(app), project, run_id)
-    return jsonify({"ok": True, "restored": count, "scores": scores, "delta": delta}), 200
+    delta = delta_for(_eval_dir(app), project, run_id)
+    return jsonify({"ok": True, count_key: count, "scores": scores, "delta": delta}), 200
+
+
+def _dismiss(app: Flask) -> tuple[Response, int]:
+    return _mutate_finding(
+        app, lambda project_dir, body, run_id: dismiss_finding(project_dir, body, run_id=run_id), dismiss_delta,
+    )
+
+
+def _restore(app: Flask) -> tuple[Response, int]:
+    return _mutate_finding(
+        app, lambda project_dir, body, _run_id: restore_finding(project_dir, body), restore_delta,
+    )
+
+
+def _restore_all(app: Flask) -> tuple[Response, int]:
+    return _mutate_project(app, restore_all_findings, restore_all_delta, "restored")
 
 
 def _delete(app: Flask) -> tuple[Response, int]:
@@ -219,15 +231,7 @@ def _delete_all(app: Flask) -> tuple[Response, int]:
         return json_error(
             "Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
         )
-    body = request.get_json(silent=True) or {}
-    project = body.get("project", "")
-    run_id = _run_id(body)
-    if not project:
-        return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
-    count = delete_all_dismissed(_project_dir(_eval_dir(app), project))
-    scores = _scores_with_fallback(app, project, run_id)
-    delta = delete_all_delta(_eval_dir(app), project, run_id)
-    return jsonify({"ok": True, "deleted": count, "scores": scores, "delta": delta}), 200
+    return _mutate_project(app, delete_all_dismissed, delete_all_delta, "deleted")
 
 
 def _unverify(app: Flask) -> tuple[Response, int]:

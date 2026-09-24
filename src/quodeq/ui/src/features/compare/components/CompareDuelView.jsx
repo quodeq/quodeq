@@ -8,12 +8,13 @@
  * Sides are fixed for the whole screen: A is always the left/first project
  * (accent), B the right/second (info), and every gap reads A minus B.
  */
-import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
+import { TermHeader } from '../../../components/terminal/index.js';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t } from '../../../strings/index.js';
+import ComparePanel from './ComparePanel.jsx';
 import CompareDuelTrend from './CompareDuelTrend.jsx';
 import CompareDuelDimensionsTable from './CompareDuelDimensionsTable.jsx';
 import CompareDuelShapePanel from './CompareDuelShapePanel.jsx';
@@ -60,11 +61,7 @@ function VersusSide({ side, row, onOpenProject }) {
 function DuelTrendPanel({ trend, a, b, onOpenProject }) {
   const trendPoints = trend.a.length + trend.b.length;
   return (
-    <section className="compare-panel" aria-label={t('compare.duelTrendAria')}>
-      <div className="compare-panel__head">
-        <SectionLabel>{t('compare.duelTrendHeader')}</SectionLabel>
-        <span className="compare-panel__note">{t('compare.duelTrendNote')}</span>
-      </div>
+    <ComparePanel ariaLabel={t('compare.duelTrendAria')} header={t('compare.duelTrendHeader')} note={t('compare.duelTrendNote')}>
       {trendPoints >= 2 ? (
         <>
           <CompareDuelTrend a={trend.a} b={trend.b} aName={a.name} bName={b.name} />
@@ -88,7 +85,7 @@ function DuelTrendPanel({ trend, a, b, onOpenProject }) {
       ) : (
         <p className="compare-panel__fallback">{t('compare.duelTrendTooFew')}</p>
       )}
-    </section>
+    </ComparePanel>
   );
 }
 

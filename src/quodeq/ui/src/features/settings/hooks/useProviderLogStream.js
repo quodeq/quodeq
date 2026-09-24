@@ -7,6 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import { EMPTY_LOG_BUFFER, LOG_BUFFER_MAX_LINES, appendLines, clearLines } from '../../../utils/logBuffer.js';
+import { LOG_STREAM_STATUS } from '../../../vocab/logStreamStatus.js';
 
 // EventSource.CLOSED — an onerror at any other readyState is a reconnect the
 // browser handles itself, not a failure worth surfacing.
@@ -25,26 +26,26 @@ const READYSTATE_CLOSED = 2;
  */
 export function useProviderLogStream(url, active) {
   const [buf, setBuf] = useState(EMPTY_LOG_BUFFER);
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState(LOG_STREAM_STATUS.IDLE);
 
   useEffect(() => {
     setBuf(clearLines);
     if (!active) {
-      setStatus('idle');
+      setStatus(LOG_STREAM_STATUS.IDLE);
       return undefined;
     }
-    setStatus('streaming');
+    setStatus(LOG_STREAM_STATUS.STREAMING);
     const es = new EventSource(url);
 
     es.onmessage = (e) => {
       setBuf((prev) => appendLines(prev, [e.data], LOG_BUFFER_MAX_LINES));
     };
     es.addEventListener('done', () => {
-      setStatus('done');
+      setStatus(LOG_STREAM_STATUS.DONE);
       es.close();
     });
     es.onerror = () => {
-      if (es.readyState === READYSTATE_CLOSED) setStatus('error');
+      if (es.readyState === READYSTATE_CLOSED) setStatus(LOG_STREAM_STATUS.ERROR);
     };
 
     return () => { es.close(); };

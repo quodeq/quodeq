@@ -1,5 +1,5 @@
 import { useApi } from '../../../api/ApiContext.jsx';
-import { LocalApiTabLayout, LocalApiModelRow, ModelPickerSelect } from './LocalApiTabLayout.jsx';
+import { LocalApiTabLayout, LocalApiModelSelectRow, ModelPickerSelect } from './LocalApiTabLayout.jsx';
 import { useOllamaModels } from '../hooks/useOllamaModels.js';
 import { useLocalApiTabTest } from '../hooks/useLocalApiTabTest.js';
 import { useOllamaLog } from '../ollama-log/OllamaLogContext.js';
@@ -46,14 +46,7 @@ export default function OllamaTab({ state, update }) {
       onToggleConsole={() => (ollamaLog.open ? ollamaLog.closeLog() : ollamaLog.openLog())}
       consoleOpen={ollamaLog.open}
       modelsError={modelsError}
-      modelRow={(
-        <LocalApiModelRow
-          hint={OLLAMA_MODEL_HINT}
-          renderControl={(labelId) => (
-            <ModelSelector value={state.model} models={models} onChange={(v) => update('model', v)} labelId={labelId} />
-          )}
-        />
-      )}
+      modelRow={<LocalApiModelSelectRow hint={OLLAMA_MODEL_HINT} Control={ModelSelector} state={state} update={update} models={models} />}
       state={state}
       update={update}
       subagentsDescription={t('settings.ollamaSubagentsDesc')}

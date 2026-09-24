@@ -1,5 +1,5 @@
 /**
- * The background star field both galaxy canvases draw.
+ * The background both galaxy canvases draw: gradient and star field.
  *
  * The galaxy view and the folder view render different scenes but share the
  * same backdrop: a field of pre-seeded stars twinkling between two alphas in
@@ -26,4 +26,19 @@ export function drawStarfield(ctx, bg, tc, frame) {
     ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.sz, 0, TAU);
     ctx.fillStyle = `rgba(${mr},${mg},${mb},${a})`; ctx.fill();
   });
+}
+
+/**
+ * Fill the canvas with the backdrop's radial gradient, from the alt
+ * background at the centre to the page background at the edge.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} tc Theme colours, as returned by getThemeColors.
+ * @param {{W: number, H: number}} size Canvas size.
+ */
+export function fillBackgroundGradient(ctx, tc, size) {
+  const { W, H } = size;
+  const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * BACKGROUND.gradientRadiusFraction);
+  grad.addColorStop(0, tc.bgAlt); grad.addColorStop(1, tc.bg);
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
 }

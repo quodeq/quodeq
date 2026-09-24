@@ -8,6 +8,10 @@ from __future__ import annotations
 
 # Rebuild of the `findings` table used by `_upgrade_v3_to_v4` to widen the
 # severity CHECK constraint (SQLite cannot ALTER a CHECK in place).
+#
+# Frozen v4 snapshot: it overlaps _schema.py by design and must not share
+# text with it, or a later schema edit would rewrite this migration.
+# jscpd:ignore-start
 V4_REBUILD_DDL = """
     -- Drop triggers and FTS index that reference the old table by name.
     DROP TRIGGER IF EXISTS findings_ai;
@@ -86,3 +90,4 @@ V4_REBUILD_DDL = """
         VALUES (new.id, new.reason, new.snippet);
     END;
 """
+# jscpd:ignore-end
