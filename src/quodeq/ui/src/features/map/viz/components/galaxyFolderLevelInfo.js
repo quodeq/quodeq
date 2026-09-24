@@ -40,8 +40,9 @@ export function buildLevelInfo({ scene, currentNode, zoomedFileRef, navRef, proj
     };
   }
   const cn = currentNode;
-  const folderCount = scene.rootStars.filter(s => s.isFolder).length;
-  const fileCount = scene.rootStars.filter(s => !s.isFolder).length;
+  let folderCount = 0;
+  for (const s of scene.rootStars) if (s.isFolder) folderCount += 1;
+  const fileCount = scene.rootStars.length - folderCount;
   const rate = cn.complianceRate;
   const isRoot = navRef.current.path.length <= 1;
   const lines = [

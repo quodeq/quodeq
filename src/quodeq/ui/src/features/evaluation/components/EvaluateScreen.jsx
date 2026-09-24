@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
 import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
@@ -93,6 +93,9 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
   const { onStart: onStartEvaluation, onDismiss, onCancel, onGoToProjects, onGoToSettings } = actions;
   const [toastKey, setToastKey] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
+  // Stable identity: ErrorToast's timer effect depends on onDismiss, and a
+  // fresh arrow per render (live job updates) would restart the 5 s timer.
+  const hideToast = useCallback(() => setToastVisible(false), []);
 
   useEffect(() => {
     if (jobError) setToastVisible(true);
@@ -130,7 +133,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
       </div>
 
       {jobError && toastVisible && (
-        <ErrorToast key={toastKey} message={jobError} onDismiss={() => setToastVisible(false)} />
+        <ErrorToast key={toastKey} message={jobError} onDismiss={hideToast} />
       )}
     </section>
   );

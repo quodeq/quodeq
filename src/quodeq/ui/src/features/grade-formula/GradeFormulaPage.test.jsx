@@ -174,4 +174,25 @@ describe('GradeFormulaPage', () => {
       expect(state.update).toHaveBeenCalled();
     });
   });
+
+  it('shows rescore progress in a live region and keeps APPLY and the sliders enabled', () => {
+    mockHook({ isDirty: true, rescoreProgress: { done: 2, total: 5 } });
+    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Rescoring 2 of 5 runs');
+    expect(screen.getByRole('button', { name: 'APPLY' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /RESET/ })).toBeEnabled();
+    expect(screen.getByLabelText('critical')).toBeEnabled();
+  });
+
+  it('shows a plain rescoring message before the pass has counted its runs', () => {
+    mockHook({ rescoreProgress: { done: 0, total: 0 } });
+    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    expect(screen.getByRole('status')).toHaveTextContent(/^Rescoring…$/);
+  });
+
+  it('keeps the rescore live region mounted and empty when no pass runs', () => {
+    mockHook({ rescoreProgress: null });
+    render(<GradeFormulaPage navigation={{ selectedProject: 'proj-1' }} />);
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
 });

@@ -18,13 +18,13 @@ const STATUS_LABEL = {
 // useLogWindow builds before useOllamaLogStream's own effect has flipped
 // status from 'idle' to 'streaming' — without it the freshly opened window
 // would paint with no status suffix for one commit.
-function buildSpec({ logs, status }, { open: opening } = {}) {
+function buildSpec({ logs, firstSeq, status }, { open: opening } = {}) {
   const effectiveStatus = opening ? LOG_STREAM_STATUS.STREAMING : status;
   return {
     id: WINDOW_ID,
     type: WINDOW_ID,
     title: `${t('settings.ollamaLogTitle')}${STATUS_LABEL[effectiveStatus] || ''}`,
-    render: () => <ConsoleLogViewer logs={logs} />,
+    render: () => <ConsoleLogViewer logs={logs} firstSeq={firstSeq} />,
   };
 }
 

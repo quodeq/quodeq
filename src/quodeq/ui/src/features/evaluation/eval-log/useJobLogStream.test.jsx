@@ -41,12 +41,13 @@ class MockEventSource {
 }
 
 function Probe({ jobId }) {
-  const { logs, status, terminalState } = useJobLogStream(jobId);
+  const { logs, firstSeq, status, terminalState } = useJobLogStream(jobId);
   return (
     <div>
       <div data-testid="status">{status}</div>
       <div data-testid="terminal-state">{terminalState ?? ''}</div>
       <div data-testid="logs">{logs.join('|')}</div>
+      <div data-testid="first-seq">{String(firstSeq)}</div>
     </div>
   );
 }
@@ -148,5 +149,27 @@ describe('useJobLogStream', () => {
     render(<Probe jobId={null} />);
     expect(MockEventSource.instances).toHaveLength(0);
     expect(screen.getByTestId('status')).toHaveTextContent('idle');
+  });
+
+  it('advances firstSeq by the lines trimmed at the 5000-line cap', () => {
+    render(<Probe jobId="j1" />);
+    const es = MockEventSource.instances[0];
+    act(() => {
+      for (let i = 0; i < 5003; i += 1) es.emit('message', { data: `l${i}` });
+    });
+    flushBatched();
+    expect(screen.getByTestId('first-seq')).toHaveTextContent('3');
+    expect(screen.getByTestId('logs').textContent.startsWith('l3|')).toBe(true);
+  });
+
+  it('a jobId switch empties logs and moves firstSeq past the old lines', () => {
+    const { rerender } = render(<Probe jobId="j1" />);
+    const es = MockEventSource.instances[0];
+    act(() => { es.emit('message', { data: 'a' }); es.emit('message', { data: 'b' }); });
+    flushBatched();
+    expect(screen.getByTestId('first-seq')).toHaveTextContent('0');
+    rerender(<Probe jobId="j2" />);
+    expect(screen.getByTestId('logs').textContent).toBe('');
+    expect(screen.getByTestId('first-seq')).toHaveTextContent('2');
   });
 });

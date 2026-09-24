@@ -1,30 +1,23 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import usePretextHeight from '../../../hooks/usePretextHeight.js';
 import { t } from '../../../strings/index.js';
+import { advancePipeline, trailerText } from './consoleLogPipeline.js';
 
 /**
- * ConsoleLogViewer — renders streaming job logs as one-line-per-row, with
+ * ConsoleLogViewer, renders streaming job logs as one-line-per-row, with
  * each row's height pre-measured via pretext so vertical layout stays
  * stable as new lines append. A floating "follow" toggle (bottom-right,
  * outside the scroll content) pins the scroll to the bottom; manual
  * scrolling away from the bottom turns it off so the user can read past
  * output without being yanked back down.
  *
- * Logs from the runner can carry SGR escape sequences (colourised level
- * tokens, etc.). We render the visible terminal output, not the raw
- * bytes, so we strip both real ESC-prefixed CSI sequences and the bare
- * `[0;34m`-style remnants that show up when the ESC byte was lost in
- * transport. Consecutive identical lines are also collapsed — the runner
- * sometimes emits the same status both via a coloured logger and a plain
- * stdout echo, which doubled every row in the live view.
+ * Cleaning (SGR escape stripping) and consecutive-duplicate folding live in
+ * consoleLogPipeline.js, which does them incrementally: each batch cleans
+ * only its new lines, and rows keep their sequence number as the React key
+ * so a front trim at the source's line cap does not re-render every row.
  */
 
 const SCROLL_BOTTOM_TOLERANCE = 8;
-// Real ANSI: \x1b[ ... <letter>. Bare CSI fallback: [0;34m, [0m, etc.
-// Digits are required — [m (no digits) would also match SGR reset but would
-// incorrectly strip the leading [m from dimension names like [maintainability].
-const ANSI_ESC_RE = /\x1b\[[\d;?]*[A-Za-z]/g;
-const ANSI_BARE_RE = /\[\d+(?:;\d+)*m/g;
 
 // Match http(s) URLs in log lines. Trailing punctuation is excluded so a
 // URL at the end of a sentence ("see https://x.com.") doesn't pull the
@@ -76,51 +69,9 @@ function snapToBottom(el, programmaticScroll, lastScrollHeight) {
   requestAnimationFrame(() => { programmaticScroll.current = false; });
 }
 
-function cleanLine(text) {
-  if (text == null) return '';
-  return String(text)
-    .replace(ANSI_ESC_RE, '')
-    .replace(ANSI_BARE_RE, '')
-    // Collapse runs of inner whitespace introduced where escape codes
-    // hugged a token (e.g. "[0m   [performance]" → "   [performance]").
-    .replace(/[ \t]{2,}/g, ' ')
-    .trimEnd();
-}
-
-// Match severity prefixes the runner's logger adds. The same payload often
-// arrives twice — once via stdout from the dimension runner, once echoed
-// through the logging system with this prefix — so we normalize it away
-// for dedup-key purposes (the visible line keeps whichever copy lands first).
-const LEVEL_PREFIX_RE = /^\s*\[(?:INFO|WARN|WARNING|ERROR|DEBUG|TRACE)\]\s*/i;
-
-// Heartbeat lines like `  [reliability] 4m50s | 1 active (11 total) | …`
-// reprint every 10s, often with identical state. Strip the duration so
-// consecutive identical-state heartbeats collapse to a single row in the
-// view; the next emitted heartbeat appears as soon as the state actually
-// changes.
-const HEARTBEAT_DURATION_RE = /(\[[\w-]+\])\s+\d+m\d+s\s+(?=\|)/;
-
-function normalizeForDedup(line) {
-  return line
-    .replace(LEVEL_PREFIX_RE, '')
-    .replace(HEARTBEAT_DURATION_RE, '$1 ')
-    .trim();
-}
-
-function dedupeConsecutive(lines) {
-  if (!lines || lines.length === 0) return lines;
-  const out = [];
-  let prev = null;
-  for (const line of lines) {
-    const key = normalizeForDedup(line);
-    if (key && key === prev) continue;
-    out.push(line);
-    prev = key;
-  }
-  return out;
-}
-
-function LogLine({ text }) {
+// Memoized: with stable seq keys an existing row's text never changes, so
+// a new batch re-renders (and re-measures via pretext) only the new rows.
+const LogLine = memo(function LogLine({ text }) {
   const ref = useRef(null);
   const { height } = usePretextHeight(ref, text || ' ');
   return (
@@ -128,7 +79,7 @@ function LogLine({ text }) {
       {renderLineWithLinks(text)}
     </div>
   );
-}
+});
 
 function FollowToggle({ active, onToggle }) {
   return (
@@ -230,21 +181,51 @@ function useConsoleAutoScroll(logCount) {
   return { scrollRef, contentRef, follow, handleToggle };
 }
 
-export default function ConsoleLogViewer({ logs }) {
-  const cleanedLogs = useMemo(
-    () => dedupeConsecutive((logs ?? []).map(cleanLine)),
-    [logs],
-  );
-  const { scrollRef, contentRef, follow, handleToggle } = useConsoleAutoScroll(cleanedLogs.length);
+const TRAILER_KEY = 'trailer';
+
+// The pipeline state lives in a ref so each batch builds on the last one.
+// advancePipeline never mutates its input and is keyed by seqs, not by
+// render history, so a doubled (StrictMode) or discarded render is harmless.
+//
+// `sourceId` covers advancePipeline's blind spot: it tells appended lines
+// from trimmed ones by comparing (firstSeq, endSeq) pairs, which cannot
+// tell two DIFFERENT sources apart if one happens to reuse the seq range
+// the other left off at (e.g. two hook instances that both start counting
+// at 0). A caller whose source can be swapped out while this component
+// stays mounted (a job id, a provider identity) passes it so a swap
+// throws the ref away instead of feeding it to advancePipeline as if it
+// were a continuation of the old source.
+function useLogRows(logs, firstSeq, sourceId) {
+  const stateRef = useRef(null);
+  const sourceIdRef = useRef(sourceId);
+  return useMemo(() => {
+    if (sourceId !== sourceIdRef.current) {
+      stateRef.current = null;
+      sourceIdRef.current = sourceId;
+    }
+    stateRef.current = advancePipeline(stateRef.current, logs, firstSeq);
+    return stateRef.current;
+  }, [logs, firstSeq, sourceId]);
+}
+
+export default function ConsoleLogViewer({ logs, firstSeq, trailer = null, sourceId }) {
+  const pipeline = useLogRows(logs, firstSeq, sourceId);
+  const trailerLine = trailerText(pipeline, trailer);
+  // Same count the auto-scroll hook always got: visible rows incl. the trailer.
+  const lineCount = pipeline.rows.length + (trailerLine == null ? 0 : 1);
+  const { scrollRef, contentRef, follow, handleToggle } = useConsoleAutoScroll(lineCount);
 
   return (
     <div className="console-shell">
       <div className="console-scroll" ref={scrollRef}>
         <div className="console-content" ref={contentRef}>
-          {cleanedLogs.length === 0 ? (
+          {lineCount === 0 ? (
             <div className="console-log-empty">{t('evaluate.waitingForOutput')}</div>
           ) : (
-            cleanedLogs.map((line, i) => <LogLine key={i} text={line} />)
+            <>
+              {pipeline.rows.map((row) => <LogLine key={row.seq} text={row.text} />)}
+              {trailerLine != null && <LogLine key={TRAILER_KEY} text={trailerLine} />}
+            </>
           )}
         </div>
       </div>

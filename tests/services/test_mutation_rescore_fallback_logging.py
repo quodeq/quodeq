@@ -25,8 +25,8 @@ failures (``services/_mutation_projection.py:108``).
 
 These tests exercise the real fallback path (run_id=None -> rescore_run
 short-circuits -> the background projection sweep, via the REAL, un-injected
-``ThreadBackgroundRunner``) and assert the failure is observable WITHOUT
-lowering the logger below its production default level.
+module-level ``_SHARED_RUNNER``) and assert the failure is observable
+WITHOUT lowering the logger below its production default level.
 """
 from __future__ import annotations
 
@@ -37,37 +37,19 @@ import time
 from quodeq.services import mutation_rescore
 
 
-def test_rescore_with_fallback_wires_module_logger_into_background_runner(monkeypatch, caplog):
-    """Deterministic check of the wiring itself: production code (no
-    ``runner=`` injected) must construct its ThreadBackgroundRunner with a
-    sink over the module's own _logger, not the silent default. This is
-    defense in depth (see module docstring) -- it does not by itself make the
-    common failure path production-visible; the ``_bg_project`` warning-level
-    catch below does that.
+def test_rescore_with_fallback_wires_module_logger_into_background_runner(caplog):
+    """Deterministic check of the wiring itself: the shared runner the
+    production path uses (no ``runner=`` injected) logs through a sink over
+    the module's own _logger, not the silent default. Defense in depth (see
+    module docstring); the ``_bg_project`` warning-level catch below is what
+    makes the common failure production-visible.
 
-    The runner is typed ``log: LogSink`` and a bare
-    ``logging.Logger`` has no ``success``, so the module hands it a
-    ``LoggerSink`` wrapper. What matters is that lines written through that
-    sink still land on ``quodeq.services.mutation_rescore``.
+    The runner is typed ``log: LogSink`` and a bare ``logging.Logger`` has
+    no ``success``, so the module hands it a ``LoggerSink`` wrapper. What
+    matters is that lines written through that sink still land on
+    ``quodeq.services.mutation_rescore``.
     """
-    captured = {}
-    real_runner_cls = mutation_rescore.ThreadBackgroundRunner
-
-    class _SpyRunner(real_runner_cls):
-        def __init__(self, *, log=None):
-            captured["log"] = log
-            super().__init__(log=log)
-
-        def submit(self, fn, *, name=""):
-            # Don't actually spawn a thread for this test -- only the
-            # constructor wiring is under test here.
-            pass
-
-    monkeypatch.setattr(mutation_rescore, "ThreadBackgroundRunner", _SpyRunner)
-
-    mutation_rescore.rescore_with_fallback("evaluations", "cluster17-wiring-proj", None)
-
-    sink = captured["log"]
+    sink = mutation_rescore._SHARED_RUNNER._log
     assert sink is mutation_rescore._log_sink
     assert callable(getattr(sink, "success"))  # the LogSink surface a Logger lacks
     with caplog.at_level(logging.DEBUG, logger=mutation_rescore.logger.name):

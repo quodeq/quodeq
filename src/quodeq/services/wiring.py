@@ -237,9 +237,13 @@ from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
 
 # Grade-formula params file + grade recomputation over a run's event log.
 from quodeq.data.fs.grade_formula_store import (  # noqa: F401
+    clear_rescore_pending,
     grade_formula_path,
     is_custom,
     load_params,
+    mark_rescore_pending,
+    rescore_marker_path,
+    rescore_pending,
     reset_params,
     save_params,
 )

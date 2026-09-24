@@ -48,8 +48,8 @@ src/quodeq/api/_sse_log_helpers.py:82:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:100:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:54:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:71:broad-except
-src/quodeq/api/app.py:123:broad-except
-src/quodeq/api/app.py:258:broad-except
+src/quodeq/api/app.py:134:broad-except
+src/quodeq/api/app.py:269:broad-except
 src/quodeq/api/routes_compare.py:36:broad-except
 src/quodeq/api/routes_evaluations_item.py:71:broad-except
 src/quodeq/api/routes_runs.py:31:broad-except
@@ -126,12 +126,13 @@ src/quodeq/services/_post_run_hook.py:37:broad-except
 src/quodeq/services/_post_run_hook.py:45:broad-except
 src/quodeq/services/_run_discard.py:138:broad-except
 src/quodeq/services/active_evaluation.py:69:broad-except
-src/quodeq/services/background.py:44:broad-except
+src/quodeq/services/background.py:141:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except
 src/quodeq/services/cache_maintenance.py:40:broad-except
 src/quodeq/services/evidence_rescore.py:196:broad-except
-src/quodeq/services/grade_formula.py:113:broad-except
-src/quodeq/services/mutation_rescore.py:180:broad-except
+src/quodeq/services/grade_formula.py:121:broad-except
+src/quodeq/services/grade_formula_job.py:197:broad-except
+src/quodeq/services/mutation_rescore.py:188:broad-except
 src/quodeq/services/project_registration.py:164:broad-except
 src/quodeq/services/shared_publish.py:195:broad-except
 src/quodeq/services/shared_publish.py:221:broad-except
