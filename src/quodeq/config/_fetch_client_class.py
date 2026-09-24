@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import ssl as _ssl
 import threading
 import time
@@ -105,7 +106,7 @@ class FetchClient:
                 last_exc = exc
                 if retry < self._MAX_RETRIES - 1:
                     _logger.debug("Fetch retry %d/%d after: %s", retry + 1, self._MAX_RETRIES, exc)
-                    time.sleep(self._RETRY_BACKOFF_S * (retry + 1))
+                    time.sleep(self._RETRY_BACKOFF_S * (2 ** retry) + random.uniform(0, self._RETRY_BACKOFF_S))
 
         if last_exc is not None:
             self._record_failure(last_exc)

@@ -54,7 +54,7 @@ src/quodeq/api/routes_evaluations_item.py:71:broad-except
 src/quodeq/api/routes_runs.py:31:broad-except
 src/quodeq/api/routes_shared_mirrors.py:87:broad-except
 src/quodeq/api/security.py:275:broad-except
-src/quodeq/assistant/adapters/api.py:120:broad-except
+src/quodeq/assistant/adapters/api.py:125:broad-except
 src/quodeq/assistant/adapters/capabilities.py:57:broad-except
 src/quodeq/assistant/cancel.py:53:broad-except
 src/quodeq/assistant/cancel.py:66:broad-except
@@ -113,7 +113,7 @@ src/quodeq/data/sqlite/run_index.py:113:broad-except
 src/quodeq/data/sqlite/run_index.py:181:broad-except
 src/quodeq/data/sqlite/run_index.py:90:broad-except
 src/quodeq/data/sqlite/run_index.py:96:broad-except
-src/quodeq/llm_bridge/_cloud.py:60:broad-except
+src/quodeq/llm_bridge/_cloud.py:66:broad-except
 src/quodeq/menubar/app.py:135:broad-except
 src/quodeq/menubar/app.py:154:broad-except
 src/quodeq/menubar/app.py:205:broad-except
@@ -144,6 +144,6 @@ src/quodeq/update/checker.py:84:broad-except
 src/quodeq/update/checker.py:87:broad-except
 src/quodeq/update/checker.py:95:broad-except
 src/quodeq/update/first_launch.py:72:broad-except
-src/quodeq/update/selfupdate.py:175:broad-except
-src/quodeq/update/selfupdate.py:238:broad-except
-src/quodeq/update/selfupdate.py:282:broad-except
+src/quodeq/update/selfupdate.py:160:broad-except
+src/quodeq/update/selfupdate.py:226:broad-except
+src/quodeq/update/selfupdate.py:270:broad-except

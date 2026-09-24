@@ -4,6 +4,8 @@ from __future__ import annotations
 import logging
 import time
 
+import httpx
+
 from quodeq.shared.url_validation import validate_url_safe
 
 try:
@@ -15,6 +17,10 @@ _log = logging.getLogger(__name__)
 
 _MIN_KEY_LEN_FOR_REDACTION = 8
 _MAX_ERROR_BRIEF_LEN = 120
+# Short timeout and no SDK retry: this is a connection *check*, not a call the
+# app depends on, so a slow or flaky endpoint should fail fast and report
+# back rather than silently retrying (as embeddings.py's client does).
+_CHECK_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 
 
 def _create_client(api_base: str, api_key: str) -> "openai.OpenAI":
@@ -23,7 +29,7 @@ def _create_client(api_base: str, api_key: str) -> "openai.OpenAI":
     Extracted as a factory so callers can override or mock client creation
     (e.g. for testing or custom transport adapters).
     """
-    return openai.OpenAI(base_url=api_base, api_key=api_key)
+    return openai.OpenAI(base_url=api_base, api_key=api_key, timeout=_CHECK_TIMEOUT, max_retries=0)
 
 
 def check_cloud_connection(

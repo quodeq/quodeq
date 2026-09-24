@@ -198,3 +198,13 @@ class TestFetchResponseSizeCap:
         with patch("urllib.request.urlopen", opener), patch("time.sleep"):
             c.fetch("https://example.com")
         assert opener.call_count == 1
+
+
+class TestFetchRetryBackoff:
+    def test_backoff_is_exponential_with_jitter(self):
+        c = FetchClient(allow_private=True, env={"QUODEQ_MAX_RETRIES": "3"})
+        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("net error")), \
+             patch("time.sleep") as mock_sleep, \
+             patch("random.uniform", return_value=0):
+            c.fetch("https://example.com")
+        assert [call.args[0] for call in mock_sleep.call_args_list] == [0.5, 1.0]

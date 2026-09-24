@@ -83,11 +83,16 @@ _OLLAMA_DEFAULT_API_KEY = "ollama"
 
 
 def _default_client(config: ApiTurnConfig):
+    # max_retries=2, unlike analysis/_api_call.py's 0: that path re-dispatches
+    # a lossy failure on the next run, so it leaves retries to the caller. The
+    # assistant has no later re-dispatch for a turn, and the SDK only retries
+    # before any response chunk has streamed, so a retry here cannot replay
+    # partial output or double-call a tool.
     return openai.OpenAI(
         base_url=config.api_base,
         api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
         timeout=_TIMEOUT,
-        max_retries=0,
+        max_retries=2,
     )
 
 
