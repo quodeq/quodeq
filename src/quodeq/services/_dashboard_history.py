@@ -178,9 +178,9 @@ def _make_history_fetcher(
     rescoring FULL data for every history run (up to max_history_runs())
     was the ~2s cost this replaces.
 
-    In-progress freshness is preserved: the fast path re-reads each request
-    (fresh per-call cache), and the heavy path's cacheable_run_ids guard makes
-    in-progress runs compute-through without persisting a partial set. Stale-
+    In-progress freshness is preserved: on both paths the cacheable_run_ids
+    guard makes in-progress runs compute-through without persisting a
+    partial set. Stale-
     partial detection is preserved inside read_run_scalars, which falls back to
     full read_run_data whenever the SQL scalar projection disagrees with the
     on-disk evaluation/*.json count -- the same self-heal the old status-aware
