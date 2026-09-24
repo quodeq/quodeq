@@ -167,7 +167,6 @@ _.updated_at  # data/sqlite/run_index.py: RunRow field; read by name through ser
 _.violations_per100_files  # core/types/finding.py: Totals field; read by name through serialization or a dict key (19 refs).
 
 # Seams whose only caller lives in tests/, which this scan does not cover (src/quodeq is the scanned tree).
-_.GradeFormulaRescorer  # services/grade_formula_job.py: Referenced only from tests/, which this scan does not cover (4 refs).
 _.RESUME_STYLE_EXEC  # assistant/adapters/cli_config.py: Referenced only from tests/, which this scan does not cover (2 refs).
 _._build_agent_config  # analysis/subagents/pool.py: Referenced only from tests/, which this scan does not cover (2 refs).
 _._make_rescoring_fetcher  # services/scoring/__init__.py: Referenced only from tests/, which this scan does not cover (1 refs).
@@ -202,7 +201,6 @@ _.reset_hash_caches  # analysis/fingerprint.py: Referenced only from tests/, whi
 _.reset_provider_config_cache  # analysis/provider_cache.py: Referenced only from tests/, which this scan does not cover (3 refs).
 _.store_api_key_secure  # config/ai_provider.py: Referenced only from tests/, which this scan does not cover (21 refs).
 _.tb  # shared/run_log.py: Referenced only from tests/, which this scan does not cover (2 refs).
-_.to_payload  # services/grade_formula_job.py: Referenced only from tests/, which this scan does not cover (2 refs).
 _.tool_uses  # assistant/adapters/_stream.py: Referenced only from tests/, which this scan does not cover (6 refs).
 _.update_verdict  # data/sqlite/state_store.py: Referenced only from tests/, which this scan does not cover (12 refs).
 _.wait_for_trip  # analysis/cache/failure_streak.py: Referenced only from tests/, which this scan does not cover (3 refs).

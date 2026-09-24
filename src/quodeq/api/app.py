@@ -95,7 +95,7 @@ def _configure_upload_limits(app: Flask) -> None:
 
 def _configure_extensions(app: Flask) -> None:
     """Set up per-app extensions: assistant turn/SSE registry, background
-    task runner, and the CWE lookup cache."""
+    task runner, grade-formula rescorer, and the CWE lookup cache."""
     # Per-app assistant turn/SSE registry (composition root for the state the
     # assistant routes used to keep in module globals).
     from quodeq.api.assistant_routes import AssistantTurnState
@@ -104,6 +104,12 @@ def _configure_extensions(app: Flask) -> None:
     from quodeq.services.background import ThreadBackgroundRunner
     from quodeq.shared.log_sink import SHARED_LOG
     app.extensions["background"] = ThreadBackgroundRunner(log=SHARED_LOG)
+
+    # One background grade-formula rescorer per app. It starts its worker
+    # thread on the first PUT/DELETE, so create_app stays thread-free for
+    # tests and embedding.
+    from quodeq.services.grade_formula_job import GradeFormulaRescorer
+    app.extensions["grade_formula_rescore"] = GradeFormulaRescorer(log=SHARED_LOG)
 
     from quodeq.api.standards_read_routes import CweCache
     app.extensions["cwe_cache"] = CweCache()
