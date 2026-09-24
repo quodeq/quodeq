@@ -1,5 +1,5 @@
-"""Signal-guard, atexit-guard, and exit-classification helpers for
-RunLifecycleContext.
+"""Signal-guard, atexit-guard, exit-classification, and status-write helpers
+for RunLifecycleContext.
 
 Split out of ``run_lifecycle.py`` (file-size ratchet): these are
 self-contained process-level primitives and pure helpers with no dependency
@@ -7,28 +7,119 @@ on the lifecycle state machine itself (the exception -> state mapping in
 ``__exit__``), so they compose cleanly as standalone collaborators owned by
 ``RunLifecycleContext``.
 
-``_StatusWriter`` stays in ``run_lifecycle.py`` rather than moving here: it
-calls ``write_status`` by bare name, and
-``tests/analysis/test_run_lifecycle.py`` patches that name at
-``quodeq.analysis.run_lifecycle.write_status`` -- moving the caller would
-silently break that patch.
+``_StatusWriter`` and ``LifecycleDeps`` live here too: the context takes its
+collaborators (status writer, heartbeat, resource sampler) via a
+``LifecycleDeps`` bundle, defaulting to the production implementations, so
+tests can inject recorders/stubs without patching module attributes.
 """
 from __future__ import annotations
 
 import atexit
 import signal
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
-from quodeq.data.fs.run_status_store import RunState, TERMINAL_STATES, read_status
+from quodeq.core.run.state import RunState, RunStatus, TERMINAL_STATES
+from quodeq.data.fs.run_status_store import read_status
 
 _SIGNALS_TO_HANDLE = (signal.SIGINT, signal.SIGTERM)
 # SIGHUP is POSIX-only. Included conditionally below.
 if hasattr(signal, "SIGHUP"):
     _SIGNALS_TO_HANDLE = _SIGNALS_TO_HANDLE + (signal.SIGHUP,)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+class _StatusWriter:
+    """Owns every status.json write for one run.
+
+    The run's identity (dir, job, start time, dimensions) is fixed at
+    construction; the presentation fields (phase, deadline, ...) are plain
+    mutable attributes the context updates as the run progresses. ``write``
+    is the single place that knows the full status row, so the normal-path,
+    signal-path, and atexit-path writes cannot drift apart.
+
+    ``write_status`` is taken as a constructor keyword rather than called by
+    bare name, so tests inject a recorder via ``LifecycleDeps`` instead of
+    patching a module attribute. Built via ``new_status_writer`` below, not
+    imported directly by name.
+    """
+
+    def __init__(
+        self,
+        run_dir: Path,
+        job_id: str,
+        dimensions: list[str],
+        *,
+        ai_provider: str | None = None,
+        ai_model: str | None = None,
+        write_status: Callable[[Path, RunStatus], None],
+    ) -> None:
+        self.run_dir = run_dir
+        self.job_id = job_id
+        self.started_at = _now_iso()
+        self.dimensions = list(dimensions)
+        self.phase: str | None = None
+        self.current_dimension: str | None = None
+        self.deadline_at: str | None = None
+        self.time_limit_s: int | None = None
+        self.ai_provider = ai_provider
+        self.ai_model = ai_model
+        self._write_status = write_status
+
+    def write(self, state: RunState, *, exit_reason: str | None = None) -> None:
+        status = RunStatus(
+            state=state,
+            job_id=self.job_id,
+            started_at=self.started_at,
+            dimensions=self.dimensions,
+            phase=self.phase,
+            current_dimension=self.current_dimension,
+            exit_reason=exit_reason,
+            deadline_at=self.deadline_at,
+            ai_provider=self.ai_provider,
+            ai_model=self.ai_model,
+            time_limit_s=self.time_limit_s,
+        )
+        self._write_status(self.run_dir, status)
+
+
+def new_status_writer(
+    run_dir: Path,
+    job_id: str,
+    dimensions: list[str],
+    *,
+    ai_provider: str | None = None,
+    ai_model: str | None = None,
+    write_status: Callable[[Path, RunStatus], None],
+) -> _StatusWriter:
+    """Build a ``_StatusWriter``.
+
+    A public wrapper so ``run_lifecycle.py`` never imports the leading-
+    underscore class name directly (the private-import gate treats that as
+    a violation even between sibling files in the same package).
+    """
+    return _StatusWriter(
+        run_dir, job_id, dimensions,
+        ai_provider=ai_provider, ai_model=ai_model,
+        write_status=write_status,
+    )
+
+
+@dataclass(frozen=True)
+class LifecycleDeps:
+    """Collaborators a RunLifecycleContext drives. None = production default."""
+
+    write_status: Callable[[Path, RunStatus], None] | None = None
+    heartbeat_factory: Callable[[Path], Any] | None = None
+    resources_factory: Callable[[], Any] | None = None
 
 
 class SignalGuard:
