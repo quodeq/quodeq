@@ -52,11 +52,13 @@ class _GatedApply:
         self.started = {n: threading.Event() for n in gated_passes}
         self.release = {n: threading.Event() for n in gated_passes}
         self.failed = list(failed)
+        self.threads: list[threading.Thread] = []
 
     def __call__(self, root, *, progress, should_abort):
         n = len(self.params_seen)
         self.params_seen.append(grade_formula.load_params().base_k)
         self.roots.append(root)
+        self.threads.append(threading.current_thread())
         progress(0, 2)
         if n in self.started:
             self.started[n].set()
@@ -92,29 +94,32 @@ def _save(base_k: float) -> None:
     grade_formula.save_params(dataclasses.replace(DEFAULT_PARAMS, base_k=base_k))
 
 
-def _worker_threads() -> list[threading.Thread]:
-    return [t for t in threading.enumerate() if t.name == WORKER_THREAD_NAME]
+def _new_workers(before: set[threading.Thread]) -> list[threading.Thread]:
+    """Worker threads started since *before*, so a worker leaked elsewhere does not count."""
+    return [t for t in threading.enumerate() if t.name == WORKER_THREAD_NAME and t not in before]
 
 
 def test_no_worker_thread_until_the_first_request(make_rescorer):
+    before = set(threading.enumerate())
     rescorer = make_rescorer(_GatedApply())
 
     assert rescorer.snapshot().to_payload() == {
         "state": "idle", "generation": 0, "appliedGeneration": 0,
         "done": 0, "total": 0, "failed": 0,
     }
-    assert _worker_threads() == []
+    assert _new_workers(before) == []
 
 
 def test_request_mid_pass_restarts_with_the_latest_params(make_rescorer, formula_path):
     apply = _GatedApply(gated_passes=(0,))
     rescorer = make_rescorer(apply)
+    before = set(threading.enumerate())
     _save(0.2)
     first = rescorer.request(_ROOT)
     assert apply.started[0].wait(budget(5))
     _save(0.3)
     second = rescorer.request(_ROOT)
-    workers_mid_pass = len(_worker_threads())
+    workers_mid_pass = len(_new_workers(before))
     apply.release_all()
 
     assert rescorer.wait_idle(budget(5))
@@ -139,6 +144,32 @@ def test_many_requests_mid_pass_collapse_into_one_restart(make_rescorer, formula
     assert len(apply.params_seen) == 2
     assert apply.params_seen[-1] == 0.5
     assert rescorer.snapshot().applied_generation == 4
+
+
+def test_a_request_after_the_last_run_is_not_counted_as_applied(make_rescorer, formula_path):
+    holder: list = []
+    seen_in_second_pass = []
+    passes: list[int] = []
+
+    def apply(root, *, progress, should_abort):
+        passes.append(len(passes))
+        if len(passes) == 2:
+            seen_in_second_pass.append(holder[0].snapshot())
+        if should_abort():
+            return grade_formula.ApplyResult(rescored=0, failed=[], aborted=True)
+        progress(1, 1)
+        if len(passes) == 1:
+            holder[0].request(root)  # lands after the last abort check, before the result is recorded
+        return grade_formula.ApplyResult(rescored=1, failed=[])
+
+    rescorer = make_rescorer(apply)
+    holder.append(rescorer)
+    rescorer.request(_ROOT)
+
+    assert rescorer.wait_idle(budget(5))
+    assert passes == [0, 1]
+    assert seen_in_second_pass[0].applied_generation == 1
+    assert rescorer.snapshot().applied_generation == 2
 
 
 def test_a_pass_that_raises_sets_error_and_the_next_request_recovers(make_rescorer, formula_path):
@@ -184,9 +215,12 @@ def test_request_passes_the_reports_root_through(make_rescorer, formula_path):
 
 
 def test_stop_joins_the_worker(make_rescorer, formula_path):
-    rescorer = make_rescorer(_GatedApply())
+    apply = _GatedApply()
+    rescorer = make_rescorer(apply)
     rescorer.request(_ROOT)
     assert rescorer.wait_idle(budget(5))
+    (worker,) = apply.threads
 
     rescorer.stop()
-    assert _worker_threads() == []
+    assert worker.name == WORKER_THREAD_NAME
+    assert not worker.is_alive()
