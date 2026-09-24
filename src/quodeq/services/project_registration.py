@@ -10,15 +10,16 @@ Split into two sibling modules plus this orchestrator:
 from __future__ import annotations
 
 import functools
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.wiring import (
+    list_project_dirs,
     read_repository_info,
     read_scan_json,
+    remove_project_dir,
     validate_remote_url,
     write_repository_info,
 )
@@ -114,14 +115,9 @@ def _sync_repo_index_on_create(
 def _rollback_new_dirs(reports_root: str, before: set[str], *, log: LogSink = NULL_LOG) -> None:
     """Delete any project directories created since *before* was captured."""
     reports_path = Path(reports_root)
-    if not reports_path.is_dir():
-        return
-    after = {p.name for p in reports_path.iterdir() if p.is_dir()}
-    for new in after - before:
-        try:
-            shutil.rmtree(reports_path / new)
-        except OSError as exc:
-            log.warning(f"registration rollback could not remove {reports_path / new}: {exc}")
+    for new in list_project_dirs(reports_path) - before:
+        if not remove_project_dir(reports_path / new):
+            log.warning(f"registration rollback could not remove {reports_path / new}")
 
 
 def _rollback_and_report(
@@ -135,7 +131,7 @@ def _rollback_and_report(
 def _snapshot_project_dirs(reports_path: Path) -> set[str]:
     """Names of project dirs present before registration, so a failed
     scan/clone can be rolled back to exactly what existed before."""
-    return {p.name for p in reports_path.iterdir() if p.is_dir()} if reports_path.is_dir() else set()
+    return list_project_dirs(reports_path)
 
 
 def register_project_with_rollback(

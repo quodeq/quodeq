@@ -19,6 +19,7 @@ from __future__ import annotations
 
 # Per-project JSON artifacts: repository_info.json, scan.json.
 from quodeq.data.fs.project_files import (  # noqa: F401
+    list_project_dirs,
     read_repository_info,
     read_scan_json,
     read_scan_total_files,

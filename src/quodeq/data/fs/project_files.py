@@ -89,3 +89,10 @@ def remove_project_dir(project_dir: Path) -> bool:
     except OSError:
         return False
     return True
+
+
+def list_project_dirs(reports_path: Path) -> set[str]:
+    """Names of the project directories directly under *reports_path*."""
+    if not reports_path.is_dir():
+        return set()
+    return {p.name for p in reports_path.iterdir() if p.is_dir()}
