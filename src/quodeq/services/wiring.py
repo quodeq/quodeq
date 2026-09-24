@@ -231,3 +231,16 @@ from quodeq.data.fs.project_index import (  # noqa: F401
 from quodeq.data.git_cli import remote_origin_url_raw  # noqa: F401
 from quodeq.data.fs.project_resolver import resolve_project_uuid  # noqa: F401
 from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
+
+# Grade-formula params file + grade recomputation over a run's event log.
+from quodeq.data.fs.grade_formula_store import (  # noqa: F401
+    grade_formula_path,
+    is_custom,
+    load_params,
+    reset_params,
+    save_params,
+)
+from quodeq.data.projection.grade_projector import (  # noqa: F401
+    compute_run_grades,
+    recompute_grades,
+)
