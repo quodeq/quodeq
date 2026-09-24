@@ -42,7 +42,7 @@ def run_dim_cache_max(override: int | None = None, env: dict[str, str] | None = 
     """Return the run-dimension cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return env_int("QUODEQ_RUN_DIM_CACHE_MAX", DEFAULT_RUN_DIM_CACHE_MAX, env=resolve_env(env))
+    return env_int("QUODEQ_RUN_DIM_CACHE_MAX", DEFAULT_RUN_DIM_CACHE_MAX, minimum=0, env=resolve_env(env))
 
 
 class DimensionCache:

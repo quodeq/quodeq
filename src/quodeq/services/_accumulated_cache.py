@@ -13,6 +13,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 
 from quodeq.core.types import DimensionResult
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.utils import env_int
 
 _DEFAULT_ACC_CACHE_MAX = 256
@@ -39,7 +40,7 @@ def walk_cache_max(override: int | None = None, env: dict[str, str] | None = Non
     """Return the walk-cache size limit (entries)."""
     if override is not None:
         return override
-    return env_int("QUODEQ_ACC_WALK_CACHE_MAX", _DEFAULT_WALK_CACHE_MAX, env=env)
+    return env_int("QUODEQ_ACC_WALK_CACHE_MAX", _DEFAULT_WALK_CACHE_MAX, minimum=0, env=resolve_env(env))
 
 
 def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
@@ -51,7 +52,7 @@ def acc_dim_cache_max(override: int | None = None, env: dict[str, str] | None = 
     """Return the accumulated-view cache size limit."""
     if override is not None:
         return override
-    return env_int("QUODEQ_ACC_CACHE_MAX", _DEFAULT_ACC_CACHE_MAX, env=env)
+    return env_int("QUODEQ_ACC_CACHE_MAX", _DEFAULT_ACC_CACHE_MAX, minimum=0, env=resolve_env(env))
 
 
 @dataclass
