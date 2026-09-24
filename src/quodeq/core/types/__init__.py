@@ -14,11 +14,12 @@ from .json import JsonObject, JsonValue
 from .plugin import PluginDimension, PluginInfo
 from .project import ProjectEntry, ProjectMetadata
 from .report import ParsedReport, PrincipleGrade, PrincipleGradeWithOverall
-from .scoring import Deductions, OverallScore, PrincipleScore, ScaleInfo, ScoringResult
+from .scoring import ConfidenceLevel, Deductions, OverallScore, PrincipleScore, ScaleInfo, ScoringResult
 from .violation import ProgressInfo, ViolationFileEntry, ViolationResponse, ViolationSummary
 
 __all__ = [
     "AccumulatedSummary",
+    "ConfidenceLevel",
     "DashboardSummary",
     "Deductions",
     "DimensionResult",

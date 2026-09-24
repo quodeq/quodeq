@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from quodeq.analysis.provider_cache import get_provider_configs as _get_cached_configs
 from quodeq.config.llm_bridge_env import api_key as _api_key, local_api_markers
-from quodeq.config.provider import Provider
+from quodeq.config.provider import Provider, ProviderType
 
 
 def get_provider_configs() -> dict[str, dict]:
@@ -14,7 +14,7 @@ def get_provider_configs() -> dict[str, dict]:
 def get_provider_type(provider_id: str) -> str:
     """Return 'cli' or 'api' for a provider ID."""
     configs = get_provider_configs()
-    return configs.get(provider_id, {}).get("type", "cli")
+    return configs.get(provider_id, {}).get("type", ProviderType.CLI)
 
 
 # Fixed-endpoint local model servers. The assistant's in-process web tools
@@ -52,8 +52,8 @@ def _is_local_api(provider_id: str, *, markers: frozenset[str] | None = None) ->
 def classify_provider(provider_id: str, *, markers: frozenset[str] | None = None) -> str:
     """Classify a provider as 'cli', 'local-api', or 'cloud-api'."""
     ptype = get_provider_type(provider_id)
-    if ptype == "cli":
-        return "cli"
+    if ptype == ProviderType.CLI:
+        return ProviderType.CLI
     if _is_local_api(provider_id, markers=markers):
         return "local-api"
     return "cloud-api"

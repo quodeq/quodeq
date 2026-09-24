@@ -44,6 +44,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from quodeq.context.project_shape import Deployment, detect_shape
@@ -54,16 +55,31 @@ PROFILE_RELPATH = Path(".quodeq") / "project-profile.json"
 
 SUPPORTED_VERSION = 1
 
-# Only ``loopback`` relaxes anything. ``lan`` is accepted so a team can describe
-# itself honestly rather than mis-declaring as loopback, and so a later rule can
-# use it without a file-format migration, but it grants nothing today: a LAN is
-# not a trust boundary this code can reason about.
-NETWORK_EXPOSURES: frozenset[str] = frozenset({"loopback", "lan", "public"})
+
+class NetworkExposure(StrEnum):
+    """project-profile.json's declared "networkExposure" values.
+
+    Only ``LOOPBACK`` relaxes anything. ``LAN`` is accepted so a team can
+    describe itself honestly rather than mis-declaring as loopback, and so a
+    later rule can use it without a file-format migration, but it grants
+    nothing today: a LAN is not a trust boundary this code can reason about.
+    """
+
+    LOOPBACK = "loopback"
+    LAN = "lan"
+    PUBLIC = "public"
+
+
+NETWORK_EXPOSURES: frozenset[str] = frozenset(
+    {NetworkExposure.LOOPBACK, NetworkExposure.LAN, NetworkExposure.PUBLIC},
+)
+
+_TOPOLOGY_SINGLE_HOST = "single-host"
 
 #: Topology is never detected, for the same reason exposure is not: a
 #: single-host deployment and a horizontally scaled one are byte-identical on
 #: disk. Only a human declaration may relax F-SCL-1/2/4.
-DEPLOYMENT_TOPOLOGIES: frozenset[str] = frozenset({"single-host", "distributed"})
+DEPLOYMENT_TOPOLOGIES: frozenset[str] = frozenset({_TOPOLOGY_SINGLE_HOST, "distributed"})
 
 
 @dataclass(frozen=True)
@@ -76,11 +92,11 @@ class TrustModel:
 
     def relaxes_remote(self) -> bool:
         """True when no untrusted party can open a socket to this process."""
-        return self.network_exposure == "loopback"
+        return self.network_exposure == NetworkExposure.LOOPBACK
 
     def is_single_host(self) -> bool:
         """True when the team declared this runs as one process on one host."""
-        return self.deployment_topology == "single-host"
+        return self.deployment_topology == _TOPOLOGY_SINGLE_HOST
 
 
 #: What an undeclared, undetectable project gets. Deliberately the most

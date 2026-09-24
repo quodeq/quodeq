@@ -27,6 +27,7 @@ from quodeq.core.events.models import Judgment
 REQ_DIRECT = "CLEA-FRM-01"
 REQ_TRANSITIVE = "CLEA-DEP-06"
 _SOURCE_SUFFIXES = (".py", ".pyi", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
+_INIT_STEM = "__init__"  # Python's package-marker module; not a segment of the dotted package name
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +52,7 @@ def _module_name(path: str, first_party: frozenset[str]) -> str | None:
             normalized = normalized[: -len(suffix)]
             break
     segments = [s for s in normalized.split("/") if s]
-    if segments and segments[-1] == "__init__":
+    if segments and segments[-1] == _INIT_STEM:
         segments.pop()
     for i, segment in enumerate(segments):
         if segment in first_party:
