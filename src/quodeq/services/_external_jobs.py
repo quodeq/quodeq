@@ -127,20 +127,30 @@ def cancel_external_run(
     return not control.pid_alive(pid)
 
 
+def sync_indexed_run(db, job_id: str) -> bool:
+    """Sync the run directory the index already knows for *job_id*.
+
+    Returns False when there is no row or its run_dir is blank or gone, so
+    the caller falls back to a wider sync. A blank run_dir counts as unknown:
+    ``Path("")`` is ``Path(".")``, whose ``is_dir()`` is True, so it would
+    sync the process cwd as if it were the run.
+    """
+    known = _run_index.get_run(db, job_id)
+    run_dir = Path(known.run_dir) if known is not None and known.run_dir else None
+    if run_dir is None or not run_dir.is_dir():
+        return False
+    _run_index.sync_index_for_run(db, run_dir)
+    return True
+
+
 def sync_external_run(db, job_id: str, reports_dir: Path) -> bool:
     """Bring the index row for an external run up to date; False if the id is unsafe.
 
-    Prefers the run directory the index already knows. A blank run_dir falls
-    through to the scan: ``Path("")`` is ``Path(".")``, whose ``is_dir()`` is
-    True, so it would sync the process cwd as if it were the run.
+    Prefers the run directory the index already knows, else scans for it.
     """
     run_id = strip_external_prefix(job_id)
     if not is_safe_run_segment(run_id):
         return False
-    known = _run_index.get_run(db, job_id)
-    run_dir = Path(known.run_dir) if known is not None and known.run_dir else None
-    if run_dir is not None and run_dir.is_dir():
-        _run_index.sync_index_for_run(db, run_dir)
-    else:
+    if not sync_indexed_run(db, job_id):
         sync_external_run_by_scan(db, reports_dir, run_id)
     return True
