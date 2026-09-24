@@ -24,6 +24,7 @@ access. Both read a name the AST never spells out.
 from __future__ import annotations
 
 import ast
+import functools
 from pathlib import Path
 from typing import Iterator
 
@@ -38,8 +39,13 @@ from _private_imports_rules import (
 )
 
 
+@functools.lru_cache(maxsize=None)
 def _is_module_at(package_dir: Path, name: str) -> bool:
-    """True if `name` is a module or package directly inside `package_dir`."""
+    """True if `name` is a module or package directly inside `package_dir`.
+
+    Memoized: the same (package, name) pairs recur across ~1900 scanned files
+    and the tree does not change during one gate run.
+    """
     return (package_dir / f"{name}.py").exists() or (package_dir / name / "__init__.py").exists()
 
 

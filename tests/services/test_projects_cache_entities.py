@@ -96,8 +96,8 @@ def test_concurrent_cold_reads_share_one_build(tmp_path):
 def test_service_module_does_no_serialization():
     """The declared wire-boundary entry is retired: no to_camel_dict here."""
     import quodeq.services._projects_cache as mod
-
-    assert "to_camel_dict" not in open(mod.__file__).read()
+    from pathlib import Path
+    assert "to_camel_dict" not in Path(mod.__file__).read_text(encoding="utf-8")
 
 
 def test_route_serializes_entities_to_camel_case(tmp_path):
