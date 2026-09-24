@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from quodeq.analysis.dimension_aliases import DIMENSION_ALIASES
 from quodeq.core.types.severity import Severity
 from quodeq.shared.serialization import coerce_line
 
@@ -131,6 +132,11 @@ def _violation_breakdown_lines(new_violations: list[dict], existing_violations: 
         parts = [f"{n} {sev}" for sev, n in new_severity_counts.items() if n > 0]
         if parts:
             lines.append(f"New violations by severity: {', '.join(parts)}")
+        if any(_normalized_dimension(v) in _COMMENT_ONLY_DIMENSIONS for v in new_violations):
+            lines.append(
+                "_Performance findings are advisory: they're posted as comments "
+                "but never request changes._"
+            )
         lines.append("")
     return lines
 
@@ -215,13 +221,27 @@ def build_review_summary(
 _COMMENT_ONLY_DIMENSIONS = frozenset({"performance"})
 
 
+def _normalized_dimension(violation: dict) -> str | None:
+    """violation's dimension, lowercased and alias-expanded ("perf" ->
+    "performance"). The enricher keeps a finding's model-declared dimension
+    verbatim when its requirement doesn't resolve one to reroute to
+    (analysis/mcp/enricher.py), so "perf" and "Performance" reach here
+    alongside the canonical "performance"."""
+    dimension = violation.get("dimension")
+    if not dimension:
+        return dimension
+    lowered = dimension.lower()
+    return DIMENSION_ALIASES.get(lowered, lowered)
+
+
 def determine_verdict(new_violations: list[dict]) -> str:
     """Determine the review verdict based on NEW violation severities.
 
     Existing (pre-existing baseline) violations do not influence the verdict —
     this PR is only responsible for what it introduces. Findings in
-    _COMMENT_ONLY_DIMENSIONS (performance) never request changes; a violation
-    without a dimension counts.
+    _COMMENT_ONLY_DIMENSIONS (performance) never request changes, matched
+    after lowercasing and alias-expanding the finding's dimension; a
+    violation without a dimension counts.
 
     Returns: 'COMMENT' or 'REQUEST_CHANGES'.
 
@@ -231,7 +251,9 @@ def determine_verdict(new_violations: list[dict]) -> str:
     runs post a COMMENT review instead; the summary body carries the "no
     new violations" message and no blocking changes are requested.
     """
-    blocking = [v for v in new_violations if v.get("dimension") not in _COMMENT_ONLY_DIMENSIONS]
+    blocking = [
+        v for v in new_violations if _normalized_dimension(v) not in _COMMENT_ONLY_DIMENSIONS
+    ]
     if not blocking:
         return "COMMENT"
 

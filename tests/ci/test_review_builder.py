@@ -143,6 +143,21 @@ def test_build_review_summary_shows_new_and_existing_counts():
     assert "1 pre-existing" in summary.lower() or "1 Pre-existing" in summary or "**1 pre-existing**" in summary
 
 
+def test_build_review_summary_notes_performance_is_advisory():
+    reports = [{"dimension": "security", "overallScore": "7.5/10", "overallGrade": "B"}]
+    new = [{"severity": "critical", "dimension": "performance"}, {"severity": "critical", "dimension": "security"}]
+    summary = build_review_summary(reports, new, [], options=ReviewOptions(duration_seconds=60))
+    assert "advisory" in summary.lower()
+    assert "never request changes" in summary.lower()
+
+
+def test_build_review_summary_no_advisory_note_without_performance_findings():
+    reports = [{"dimension": "security", "overallScore": "7.5/10", "overallGrade": "B"}]
+    new = [{"severity": "critical", "dimension": "security"}]
+    summary = build_review_summary(reports, new, [], options=ReviewOptions(duration_seconds=60))
+    assert "advisory" not in summary.lower()
+
+
 def test_build_review_summary_shows_no_baseline_note_when_unavailable():
     reports = [{"dimension": "security", "overallScore": "8/10", "overallGrade": "A"}]
     summary = build_review_summary(reports, [], [], options=ReviewOptions(baseline_available=False))

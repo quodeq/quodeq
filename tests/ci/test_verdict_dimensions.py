@@ -16,6 +16,14 @@ def test_critical_without_a_dimension_still_requests_changes():
     assert determine_verdict([{"severity": "critical"}]) == "REQUEST_CHANGES"
 
 
+def test_performance_alias_does_not_request_changes():
+    # The enricher keeps the model's declared dimension verbatim when a
+    # requirement can't reroute it (analysis/mcp/enricher.py), so "perf" or
+    # "Performance" reach the verdict as-is, not the canonical "performance".
+    assert determine_verdict([{"severity": "critical", "dimension": "perf"}]) == "COMMENT"
+    assert determine_verdict([{"severity": "critical", "dimension": "Performance"}]) == "COMMENT"
+
+
 def test_security_critical_blocks_next_to_performance_noise():
     violations = [
         {"severity": "critical", "dimension": "performance"},
