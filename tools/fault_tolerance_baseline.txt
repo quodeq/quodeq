@@ -17,9 +17,9 @@ src/quodeq/analysis/_loop_steps.py:139:broad-except
 src/quodeq/analysis/_loop_steps.py:182:broad-except
 src/quodeq/analysis/_loop_steps.py:184:broad-except
 src/quodeq/analysis/_loops.py:132:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:112:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:120:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:149:broad-except
+src/quodeq/analysis/_run_lifecycle_support.py:113:broad-except
+src/quodeq/analysis/_run_lifecycle_support.py:121:broad-except
+src/quodeq/analysis/_run_lifecycle_support.py:150:broad-except
 src/quodeq/analysis/cache/_dimension_context.py:67:broad-except
 src/quodeq/analysis/cache/_persist_watcher.py:152:broad-except
 src/quodeq/analysis/cache/_persist_watcher.py:157:broad-except
