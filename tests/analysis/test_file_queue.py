@@ -9,9 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.subagents._file_lock import lock_file
-from quodeq.analysis.subagents._queue_state import locked
 from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
+from quodeq.data.file_lock import lock_file, unlock_file
 
 
 SAMPLE_FILES = [f"src/file_{i}.py" for i in range(30)]
@@ -173,12 +172,13 @@ class TestLockNeverUnlinkedWhileHeld:
         q = tmp_path / "queue.json"
         FileQueue(q, files=["a.py"])
         lock_path = q.with_suffix(".lock")
-        # The lock file is only ever created lazily, on first use (``locked()``
+        # The lock file is only ever created lazily, on first use (locking it
         # opens it with O_CREAT) -- construction alone never creates it.
-        os.close(os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600))
+        holder_fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
         old = time.time() - 3600
         os.utime(lock_path, (old, old))
-        with locked(lock_path):
+        lock_file(holder_fd)
+        try:
             ino = lock_path.stat().st_ino
             FileQueue(q)
             assert lock_path.stat().st_ino == ino
@@ -188,6 +188,9 @@ class TestLockNeverUnlinkedWhileHeld:
                     lock_file(fd, timeout_s=0)
             finally:
                 os.close(fd)
+        finally:
+            unlock_file(holder_fd)
+            os.close(holder_fd)
 
 
 class TestConcurrency:

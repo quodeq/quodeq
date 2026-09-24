@@ -10,6 +10,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import quodeq.services._projects_cache as mod
 from quodeq.core.types import ProjectEntry
 from quodeq.services._projects_cache import ProjectsCache
 
@@ -123,7 +124,6 @@ def test_concurrent_cold_reads_share_one_build(tmp_path):
 
 def test_service_module_does_no_serialization():
     """The declared wire-boundary entry is retired: no to_camel_dict here."""
-    import quodeq.services._projects_cache as mod
     from pathlib import Path
     assert "to_camel_dict" not in Path(mod.__file__).read_text(encoding="utf-8")
 
@@ -208,8 +208,6 @@ def test_list_never_returns_none_when_invalidated_mid_fast_path(tmp_path, monkey
     check's own ``time.monotonic()`` call -- after it commits to "payload is
     not None" but before it re-reads ``self._payload`` to return it.
     ``list()`` must never surface that as a fake cache miss returning None."""
-    import quodeq.services._projects_cache as mod
-
     monkeypatch.setattr(mod.fs_projects, "build_project_list", lambda _p: [_entry()])
     cache = mod.ProjectsCache(ttl_s=60)
     cache.list(str(tmp_path))
@@ -224,8 +222,6 @@ def test_paginated_list_never_returns_none_when_invalidated_mid_fast_path(tmp_pa
     inside ``_index_fresh()``'s own monotonic() call. ``_hydrated_fresh()``
     calls monotonic() again later in the same request, but the hook has
     already disarmed by then -- one invalidate per request exposes it."""
-    import quodeq.services._projects_cache as mod
-
     index = [ProjectEntry(id="p1", name="proj")]
     monkeypatch.setattr(mod._fs_project_index, "build_project_index", lambda _p: index)
     monkeypatch.setattr(

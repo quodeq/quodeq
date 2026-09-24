@@ -199,8 +199,6 @@ tests/analysis/test_fatal_provider_handling_pool.py:17:private-module:quodeq.ana
 tests/analysis/test_fatal_provider_handling_pool.py:17:private-module:quodeq.analysis.subagents._pool_scaling.should_respawn
 tests/analysis/test_fatal_provider_handling_pool.py:21:private-module:quodeq.analysis.subagents._pool_worker.WorkerContext
 tests/analysis/test_fatal_provider_handling_pool.py:21:private-module:quodeq.analysis.subagents._pool_worker.run_single_agent
-tests/analysis/test_file_queue.py:12:private-module:quodeq.analysis.subagents._file_lock.lock_file
-tests/analysis/test_file_queue.py:13:private-module:quodeq.analysis.subagents._queue_state.locked
 tests/analysis/test_heartbeat_coverage.py:8:private-module:quodeq.analysis.subagents._heartbeat.HeartbeatContext
 tests/analysis/test_heartbeat_coverage.py:8:private-module:quodeq.analysis.subagents._heartbeat.heartbeat_loop
 tests/analysis/test_heartbeat_coverage.py:8:private-name:quodeq.analysis.subagents._heartbeat._HEARTBEAT_FMT
@@ -1045,10 +1043,8 @@ tests/services/test_per_run_versions_memo.py:15:private-name:quodeq.services.tre
 tests/services/test_plugin_discovery.py:6:private-name:quodeq.services.plugin_discovery._discover_from_detection
 tests/services/test_post_run_hook.py:14:private-module:quodeq.services._post_run_hook.PostRunHook
 tests/services/test_project_summary_cache.py:5:private-module:quodeq.services._fs_metadata
-tests/services/test_projects_cache_entities.py:126:private-module:quodeq.services._projects_cache.mod
-tests/services/test_projects_cache_entities.py:14:private-module:quodeq.services._projects_cache.ProjectsCache
-tests/services/test_projects_cache_entities.py:211:private-module:quodeq.services._projects_cache.mod
-tests/services/test_projects_cache_entities.py:227:private-module:quodeq.services._projects_cache.mod
+tests/services/test_projects_cache_entities.py:13:private-module:quodeq.services._projects_cache.mod
+tests/services/test_projects_cache_entities.py:15:private-module:quodeq.services._projects_cache.ProjectsCache
 tests/services/test_provenance_downgrade_read_paths.py:24:private-module:quodeq.analysis._report_assembly.build_report_json
 tests/services/test_provenance_downgrade_read_paths.py:25:private-module:quodeq.analysis._report_constants.VIOLATION_FIELDS
 tests/services/test_provenance_downgrade_read_paths.py:26:private-module:quodeq.analysis._report_findings.flatten_findings
