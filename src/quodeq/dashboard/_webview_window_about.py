@@ -53,8 +53,8 @@ _STATE = _MacAppState()
 _QUODEQ_WEBSITE = "https://quodeq.com"
 _QUODEQ_REPO = "https://github.com/quodeq/quodeq"
 
-_ICON_EXT_ICNS = ".icns"
-_ICON_EXT_ICO = ".ico"
+_ICON_EXT_ICNS = ".icns"  # macOS dock/About-panel icon format
+_ICON_EXT_ICO = ".ico"  # Windows taskbar icon format
 
 
 def icon_path(ext: str) -> str | None:

@@ -36,7 +36,7 @@ EXPECTED_TEAM_ID: str = ""
 # The only asset the dashboard app may replace itself with.
 _ASSET_PREFIX = "Quodeq-"
 _ASSET_SUFFIX = "-macOS.dmg"
-_HDIUTIL = "hdiutil"
+_HDIUTIL = "hdiutil"  # macOS disk-image CLI to mount/unmount the downloaded update
 
 _ACTIVE_PHASES = frozenset({"downloading", "verifying", "installing", "relaunching"})
 

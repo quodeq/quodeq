@@ -74,8 +74,8 @@ _WINDOW_WIDTH = 1280
 _WINDOW_HEIGHT = 800
 _WINDOW_BG_COLOR = '#0d1117'
 _ARGV_API_PID = 3  # optional argv slot: pid of the API process to watch
-_TITLEBAR_THEME_DARK = "dark"
-_TITLEBAR_THEME_LIGHT = "light"
+_TITLEBAR_THEME_DARK = "dark"  # mode value set_titlebar_theme accepts from the frontend
+_TITLEBAR_THEME_LIGHT = "light"  # mode value set_titlebar_theme accepts from the frontend
 
 
 class WindowApi:

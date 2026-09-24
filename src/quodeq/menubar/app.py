@@ -38,7 +38,7 @@ from quodeq.menubar._process import find_running_port as _find_running_port_cach
 _DEFAULT_APP_PORT = 7863
 _POLL_INTERVAL = env_int("QUODEQ_POLL_INTERVAL", 5)
 _DEFAULT_PORTS = "7863,7864,7865,7866,7867,7868,7869"
-_APP_NAME = "Quodeq"
+_APP_NAME = "Quodeq"  # rumps app title and notification sender name
 
 
 def _set_menu_item(item, callback) -> None:

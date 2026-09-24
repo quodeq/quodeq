@@ -18,7 +18,7 @@ _RELOAD_PREFIX = "reload:"
 _MAX_UNIX_SOCK_PATH_LEN = 100
 _TCP_LOCALHOST = "127.0.0.1"
 _RECV_BUFFER_SIZE = 4096
-_ENCODING_UTF8 = "utf-8"
+_ENCODING_UTF8 = "utf-8"  # charset for the reload-socket payload and port-file contents
 # listen(1) is too tight on macOS: the probe inside try_acquire() and a
 # follow-up send_reload() on the same path can fill the 1-slot backlog
 # before the listener thread drains it, returning ECONNREFUSED. Linux

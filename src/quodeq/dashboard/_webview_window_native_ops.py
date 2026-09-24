@@ -30,10 +30,10 @@ _logger = logging.getLogger(__name__)
 _EVAL_CHECK_TIMEOUT_S = 0.5
 _CANCEL_TIMEOUT_S = 5.0
 _DOWNLOAD_TIMEOUT_S = 120
-_LOOPBACK_IPV4 = "127.0.0.1"
-_LOOPBACK_IPV6 = "::1"
-_SAFE_RELOAD_SCHEMES = frozenset({SCHEME_HTTP, SCHEME_HTTPS})
-_SAFE_RELOAD_HOSTS = frozenset({LOCALHOST, _LOOPBACK_IPV4, _LOOPBACK_IPV6})
+_LOOPBACK_IPV4 = "127.0.0.1"  # loopback address a reload URL may target
+_LOOPBACK_IPV6 = "::1"  # loopback address (IPv6) a reload URL may target
+_SAFE_RELOAD_SCHEMES = frozenset({SCHEME_HTTP, SCHEME_HTTPS})  # is_safe_reload_url's allowed schemes
+_SAFE_RELOAD_HOSTS = frozenset({LOCALHOST, _LOOPBACK_IPV4, _LOOPBACK_IPV6})  # is_safe_reload_url's allowed hosts
 
 
 def fetch_running_evaluation(base_url: str) -> dict | None:
