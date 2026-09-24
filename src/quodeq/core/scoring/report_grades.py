@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import re
 from typing import Any
 
@@ -11,8 +10,6 @@ from quodeq.core.scoring.internals import GRADE_LADDER, score_to_grade_label
 from quodeq.core.scoring.dimension_summary import build_dimension_summary
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.types import DimensionResult, DimensionSummary
-
-_logger = logging.getLogger(__name__)
 
 # "Critical" is the lowest label older numeric reports wrote; it has no Grade member.
 NUMERIC_GRADE_ORDER = ["Critical", Grade.POOR, Grade.ADEQUATE, Grade.GOOD, Grade.EXEMPLARY]
@@ -35,7 +32,6 @@ def parse_numeric_score(score_text: str | None) -> float | None:
         return None
     match = _SCORE_RE.search(str(score_text))
     if not match:
-        _logger.debug("No numeric score found in %r; expected format like '7.5/10'", score_text)
         return None
     return float(match.group(1))
 
@@ -117,9 +113,6 @@ def summarize_dimensions(
     )
 
 
-_LEADING_SCORE_RE = re.compile(r"(\d+(?:\.\d+)?)")
-
-
 def grade_from_score(score: str | None) -> str | None:
     """Convert a numeric score string (e.g. '7/10') to a grade label.
 
@@ -127,7 +120,7 @@ def grade_from_score(score: str | None) -> str | None:
     """
     if not score:
         return None
-    hit = _LEADING_SCORE_RE.match(str(score))
+    hit = _SCORE_RE.match(str(score))
     if not hit:
         return None
     return score_to_grade_label(float(hit.group(1)))

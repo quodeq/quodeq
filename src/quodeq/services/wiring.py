@@ -135,14 +135,6 @@ from quodeq.data.fs.report_parser.runs import (  # noqa: F401
     safe_read_dir,
 )
 
-# Grade calculation, scoring, and dimension summary helpers.
-from quodeq.core.scoring.report_grades import (  # noqa: F401
-    calculate_trend,
-    most_frequent_grade,
-    parse_numeric_score,
-    summarize_dimensions,
-)
-
 # Repo-URL validation + child-project discovery.
 from quodeq.data.fs.repo_handler import is_valid_repo_url  # noqa: F401
 from quodeq.data.fs.children import find_children  # noqa: F401

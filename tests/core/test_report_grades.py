@@ -35,7 +35,7 @@ def test_summarize_dimensions_uses_numeric_average():
 
 
 def test_old_paths_re_export_the_core_objects():
-    from quodeq.analysis._report_scoring import grade_from_score as a
+    from quodeq.analysis.report import grade_from_score as a
     from quodeq.data.fs.dimension_report.report_scoring import grade_from_score as b
     from quodeq.data.fs.report_parser.grades import (
         calculate_trend, most_frequent_grade, parse_numeric_score, summarize_dimensions,

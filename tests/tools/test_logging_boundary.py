@@ -90,7 +90,6 @@ DECLARED_LOGGING_SITES: dict[str, str] = {
     'config/_fetch_client_class.py': _out_of_scope('Thread-safe HTTP fetcher with circuit breaker and retry'),
     'config/ai_provider.py': _out_of_scope('AI provider selection and configuration persistence'),
     'config/prompt_templates.py': _out_of_scope('Simple mustache-style template rendering for prompt files'),
-    'core/scoring/report_grades.py': "Score-string parsing, grade ranking, trend and dimension roll-up - moved from data/fs/report_parser/_scoring.py (clean-arch cycle 4 PR1 Task 2); its pre-existing 'import logging' debug call was carried over unchanged, out of scope for this sweep",
     'core/standards/overrides.py': _out_of_scope('Per-project overrides for declared numeric requirement parameters'),
     'core/utils/file_lock.py': "Platform file-locking helpers (fcntl/msvcrt dispatch) - moved inward from data/file_lock.py so api/ can use it per the check_imports layer rule, same as core/utils/io.py; its pre-existing 'import logging' was carried over unchanged, out of scope for this sweep",
     'core/utils/io.py': _out_of_scope('Low-level text/JSON read helpers with centralized encoding'),
