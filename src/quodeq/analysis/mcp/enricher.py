@@ -13,9 +13,7 @@ from typing import Callable, Protocol, runtime_checkable
 from quodeq.analysis.mcp._enricher_rules import apply_downweight, resolve_principle
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.precedent_downweight import (
-    PRECEDENT_TIER_EXACT,
-    UNSET_SCORE,
-    MaybeScore,
+    PRECEDENT_TIER_EXACT, UNSET_SCORE, MaybeScore,
     apply_precedent_downweight,
     precedent_scores as _compute_precedent_scores,
     notify_precedent_match,

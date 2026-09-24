@@ -185,9 +185,7 @@ def _deadline_has_passed(deadline_at: str | None) -> bool:
     return datetime.now(timezone.utc) >= deadline
 
 
-def mark_unfinished_dims_incomplete(
-    run_dir: Path, reason: str, *, log: LogSink,
-) -> int:
+def mark_unfinished_dims_incomplete(run_dir: Path, reason: str, *, log: LogSink) -> int:
     """Flip non-terminal dims to INCOMPLETE and return how many were flipped.
 
     Covers ``pending`` as well as ``running``. A dimension the run never
