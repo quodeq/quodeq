@@ -90,9 +90,21 @@ class ThreadBackgroundRunner:
         # picked up the task (e.g. a request thread checking that a mocked
         # collaborator was reached before it returns the response).
         if spawn_id is not None:
-            threading.Thread(
-                target=self._work, name=f"{WORKER_THREAD_PREFIX}{spawn_id}", daemon=True,
-            ).start()
+            try:
+                threading.Thread(
+                    target=self._work, name=f"{WORKER_THREAD_PREFIX}{spawn_id}", daemon=True,
+                ).start()
+            except RuntimeError as exc:
+                # The OS refused a new thread (e.g. process thread limit hit).
+                # Release the slot we reserved so it does not stay charged
+                # against a worker that never came up -- otherwise every
+                # later submit keeps finding the runner "at capacity" and
+                # drops, even once resources recover. The task itself is
+                # still queued; a later submit that spawns successfully
+                # picks it up.
+                with self._lock:
+                    self._active -= 1
+                self._log.warning(f"Background worker thread failed to start: {exc}")
         if not accepted:
             self._log.warning(
                 f"Background queue full ({self._queue.maxsize} waiting); dropped task {name or fn}"

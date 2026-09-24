@@ -7,6 +7,7 @@ submit that finds the queue full drops the task with a warning.
 from __future__ import annotations
 
 import threading
+from unittest.mock import patch
 
 from quodeq.services.background import WORKER_THREAD_PREFIX, ThreadBackgroundRunner
 from tests._timeouts import budget
@@ -122,3 +123,35 @@ def test_idle_runner_holds_no_threads_and_a_later_submit_starts_a_worker():
     runner.submit(second.set, name="second")
     assert second.wait(budget(5))
     _join_new_workers(before)
+
+
+def test_a_failed_thread_start_releases_its_slot_and_a_later_submit_still_runs():
+    sink = _Sink()
+    runner = ThreadBackgroundRunner(log=sink)
+    before = _worker_snapshot()
+    real_start = threading.Thread.start
+    raised = threading.Event()
+
+    def _fail_once_then_start(self):
+        if not raised.is_set():
+            raised.set()
+            raise RuntimeError("can't start new thread")
+        real_start(self)
+
+    first, second = threading.Event(), threading.Event()
+
+    with patch.object(threading.Thread, "start", _fail_once_then_start):
+        runner.submit(first.set, name="first")
+
+    # The failed start must not block or raise past submit(), and the
+    # runner must not still think a worker is running for it.
+    assert not first.wait(0.01)
+
+    runner.submit(second.set, name="second")
+    assert second.wait(budget(5))
+    _join_new_workers(before)
+
+    # The task queued before the failed start was not lost: a later,
+    # successful worker still picks it up.
+    assert first.is_set()
+    assert any("failed to start" in line for line in sink.warnings)
