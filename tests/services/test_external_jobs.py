@@ -179,13 +179,20 @@ def test_cancel_external_run_kills_child_processes_in_same_group(tmp_path):
 
     # Parent process spawns a long-sleeping child in the same session.
     # We print the child PID then sleep so the test can poll the child too.
+    # Written via temp-file-then-rename (matching the atomic-write pattern
+    # used across the codebase, e.g. quodeq.shared.json_state): a plain
+    # open(path, 'w').write(...) truncates/creates the file before the
+    # content is written, so a concurrent reader can observe the file
+    # existing but empty and crash on int(""). Renaming into place only
+    # after the write completes means the file is never visible half-written.
+    child_pid_path = str(tmp_path / "child.pid")
+    child_pid_tmp = child_pid_path + ".tmp"
     script = (
         "import os, sys, signal, subprocess, time;"
         "signal.signal(signal.SIGTERM, lambda s, f: None);"
         "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']);"
-        "open('"
-        + str(tmp_path / "child.pid")
-        + "', 'w').write(str(child.pid));"
+        "open('" + child_pid_tmp + "', 'w').write(str(child.pid));"
+        "os.replace('" + child_pid_tmp + "', '" + child_pid_path + "');"
         "time.sleep(60)"
     )
     proc = _spawn_test_process(script)
@@ -195,9 +202,14 @@ def test_cancel_external_run_kills_child_processes_in_same_group(tmp_path):
         run_dir.mkdir(parents=True)
         (run_dir / ".pid").write_text(str(proc.pid))
 
-        # Wait for the child PID file to appear.
+        # Wait for the child PID file to appear. Scaled through budget():
+        # this was a fixed 50 x 0.05s = 2.5s wall-clock wait, the only
+        # unscaled wait in this test, while a loaded-runner spawn of a
+        # nested Python subprocess can take longer than that under
+        # contention (see tests/_timeouts.py).
         child_pid_file = tmp_path / "child.pid"
-        for _ in range(50):
+        deadline = time.monotonic() + budget(2.5)
+        while time.monotonic() < deadline:
             if child_pid_file.exists():
                 break
             time.sleep(0.05)
