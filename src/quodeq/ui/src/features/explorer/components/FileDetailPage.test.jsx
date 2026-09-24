@@ -10,6 +10,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import FileDetailPage from './FileDetailPage.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
+import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { t } from '../../../strings/index.js';
 
 function makeFile(overrides = {}) {
@@ -33,6 +34,7 @@ function renderPage(props = {}) {
     <SidePaneProvider>
       <FileDetailPage file={makeFile()} runId="run-1" dateLabel="2026-08-01" onDismiss={vi.fn()} {...props} />
     </SidePaneProvider>,
+    { wrapper: withQueryClient() },
   );
 }
 

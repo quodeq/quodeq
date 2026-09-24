@@ -41,8 +41,8 @@ src/quodeq/analysis/subagents/_pool_launcher.py:85:broad-except
 src/quodeq/api/_assistant_hygiene.py:61:broad-except
 src/quodeq/api/_index_routes.py:24:broad-except
 src/quodeq/api/_run_event_watcher.py:154:broad-except
-src/quodeq/api/_scores_routes.py:45:broad-except
-src/quodeq/api/_scores_routes.py:65:broad-except
+src/quodeq/api/_scores_routes.py:41:broad-except
+src/quodeq/api/_scores_routes.py:75:broad-except
 src/quodeq/api/_sse_log_helpers.py:82:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:100:broad-except
 src/quodeq/api/_terminal_ws_helpers.py:54:broad-except
