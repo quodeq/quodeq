@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { SERVER_STATUS } from '../settingsVocab.js';
 
 /**
  * Invalidate `queryKey` when `status` transitions into 'online'.
@@ -14,10 +15,10 @@ import { useQueryClient } from '@tanstack/react-query';
  */
 export function useInvalidateOnOnline(status, queryKey) {
   const queryClient = useQueryClient();
-  const prevStatusRef = useRef(status ?? 'offline');
+  const prevStatusRef = useRef(status ?? SERVER_STATUS.OFFLINE);
   useEffect(() => {
-    const current = status ?? 'offline';
-    if (prevStatusRef.current !== 'online' && current === 'online') {
+    const current = status ?? SERVER_STATUS.OFFLINE;
+    if (prevStatusRef.current !== SERVER_STATUS.ONLINE && current === SERVER_STATUS.ONLINE) {
       queryClient.invalidateQueries({ queryKey });
     }
     prevStatusRef.current = current;
