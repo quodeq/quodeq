@@ -28,3 +28,10 @@ def test_post_projects_duplicate_has_code(client):
     body = resp.get_json()
     assert body["code"] == "PROJECT_EXISTS"
     assert body["existingProjectId"] == "abc123"
+
+
+def test_post_projects_non_object_body_has_code(client):  # 2686
+    resp = client.post("/api/projects", json=[1], headers=_ORIGIN)
+    assert resp.status_code == 400
+    assert resp.is_json
+    assert resp.get_json()["code"] == "INVALID_INPUT"

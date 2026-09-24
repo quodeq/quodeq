@@ -14,9 +14,13 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import Response, jsonify, request
+from flask import Response, jsonify
 
-from quodeq.api.helpers import json_error, scan_target_error as _scan_target_error
+from quodeq.api.helpers import (
+    json_error,
+    optional_json_object_or_error,
+    scan_target_error as _scan_target_error,
+)
 from quodeq.services.base import ActionProvider, NewProjectSpec
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import contained_path, relative_scope_error
@@ -196,7 +200,10 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
     or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
     ``ephemeral`` are ignored.
     """
-    parsed, error = _parse_create_project_request(request.get_json(silent=True) or {})
+    body = optional_json_object_or_error("INVALID_INPUT")
+    if not isinstance(body, dict):
+        return body
+    parsed, error = _parse_create_project_request(body)
     if error is not None:
         return error
 

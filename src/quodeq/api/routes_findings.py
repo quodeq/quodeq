@@ -17,7 +17,7 @@ from typing import Any, Callable
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import json_error, page_params
+from quodeq.api.helpers import json_error, optional_json_object_or_error, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services.dismissed import dismiss_finding, restore_finding, restore_all_findings
@@ -157,7 +157,9 @@ def _mutate_finding(
     delta_for: Callable[..., Any],
 ) -> tuple[Response, int]:
     """Apply *mutate* to the finding named in the request body, then rescore."""
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_error("INVALID_PARAM")
+    if not isinstance(body, dict):
+        return body
     target, err = _finding_target_or_error(body)
     if err is not None:
         return err
@@ -178,7 +180,9 @@ def _mutate_project(
     count_key: str,
 ) -> tuple[Response, int]:
     """Apply *mutate* to every entry of the request body's project, then rescore."""
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_error("INVALID_PARAM")
+    if not isinstance(body, dict):
+        return body
     project = body.get("project", "")
     run_id = _run_id(body)
     if not project:
@@ -206,7 +210,9 @@ def _restore_all(app: Flask) -> tuple[Response, int]:
 
 
 def _delete(app: Flask) -> tuple[Response, int]:
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_error("INVALID_PARAM")
+    if not isinstance(body, dict):
+        return body
     project = body.get("project", "")
     dimension = body.get("dimension", "")
     principle = body.get("principle", "")
@@ -235,7 +241,9 @@ def _delete_all(app: Flask) -> tuple[Response, int]:
 
 
 def _unverify(app: Flask) -> tuple[Response, int]:
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_error("INVALID_PARAM")
+    if not isinstance(body, dict):
+        return body
     target, err = _finding_target_or_error(body)
     if err is not None:
         return err

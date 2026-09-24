@@ -6,7 +6,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._evaluation_helpers import ai_cmd_path_error
-from quodeq.api.helpers import json_error
+from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
 from quodeq.services.plugin_discovery import discover_plugins
@@ -58,9 +58,9 @@ def _handle_browse_mkdir(provider: ActionProvider) -> Response | tuple[Response,
     non-string value (or a non-object body) is treated as missing
     rather than raising an unhandled 500.
     """
-    data = request.get_json(silent=True)
+    data = optional_json_object_or_error("INVALID_INPUT")
     if not isinstance(data, dict):
-        data = {}
+        return data
     parent = data.get("path")
     parent = parent.strip() if isinstance(parent, str) else ""
     name = data.get("name")
