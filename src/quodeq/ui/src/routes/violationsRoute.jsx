@@ -11,6 +11,8 @@
  */
 import { lazy } from 'react';
 import { buildProjectRootFile } from '../utils/explorerUtils.js';
+import { NAV_TAB } from '../vocab/navTab.js';
+import { VIOLATIONS_SUB_TAB } from '../features/violations/violationsVocab.js';
 
 const ViolationsPage = lazy(() => import('../features/violations/components/ViolationsPage.jsx'));
 
@@ -49,7 +51,7 @@ function makeNavigateToPrinciple({ dimMap, principleMap, nav }) {
     // backend can rescore and project the action into SQL — without this the
     // PrincipleDetail score never moves on dismiss and the entry never lands
     // on the Dismissed tab.
-    nav('evalprinciple', {
+    nav(NAV_TAB.EVAL_PRINCIPLE, {
       evalPrincipal: buildEvalPrincipal(principleObj, pg, dim?.fromRunId),
       severity,
       sourceTab: 'violations',
@@ -106,7 +108,7 @@ function buildViolationsData({ props, acc, dims }) {
 // in useDashboard.js.
 function buildViolationsCallbacks({ props, nav, navigateToPrinciple, navigateToDimension }) {
   return {
-    onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
+    onDimensionClick: (dim) => nav(NAV_TAB.EXPLORER, { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
     onFileClick: (fileObj, opts) => nav('file', { file: fileObj, sourceTab: 'violations', severityFilter: opts?.severity || null }),
     onCellClick: ({ row, severity }) => {
       if (row.type === HEAT_GRID_ROW_TYPE_PRINCIPLE && row.principleObj) {
@@ -132,7 +134,7 @@ function buildViolationsPageProps({ params, props, acc, dims, nav, navigateToPri
     // screen: it lives in the route entry so back/forward and the crumb see
     // it, but flipping replaces (never pushes) so history doesn't grow.
     // Params are spread forward so _tabKey survives the flip.
-    subTab: params.subTab || 'dimension',
+    subTab: params.subTab || VIOLATIONS_SUB_TAB.DIMENSION,
     onSubTabChange: (v) => props.navigation.handleNavigateReplace('violations', { ...params, subTab: v }),
   };
 }

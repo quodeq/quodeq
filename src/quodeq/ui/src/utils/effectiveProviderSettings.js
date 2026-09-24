@@ -13,6 +13,7 @@ import {
   DEFAULT_MAX_SUBAGENTS,
   DEFAULT_TIME_LIMIT_S,
   providerKey,
+  SETTING_KEY_TIME_LIMIT,
 } from '../constants.js';
 import { LOCAL_API_PROVIDERS } from '../vocab/provider.js';
 import { readString, STORED_TRUE, STORED_FALSE } from '../adapters/storage.js';
@@ -67,7 +68,7 @@ export function resolveProviderSettings(providerId, storage = localStorage) {
   const get = (key) => storage.getItem(providerKey(providerId, key));
   const subagents = readInt(storage, providerId, 'subagents');
   // Read the new key first; fall back to the legacy 'pool-budget' key.
-  const timeLimitS = readInt(storage, providerId, 'time-limit')
+  const timeLimitS = readInt(storage, providerId, SETTING_KEY_TIME_LIMIT)
     ?? readInt(storage, providerId, 'pool-budget');
   const perDimensionRaw = get('per-dimension');
   const verifyRaw = get('verify');

@@ -1,12 +1,13 @@
 import { readString, removeKey, writeString } from '../../adapters/storage.js';
+import { SETTING_KEY_TIME_LIMIT } from '../../constants.js';
 
 export const MIGRATION_DONE_KEY = 'cc-provider-tabs-migrated';
 export const LEGACY_AI_CMD_KEY = 'cc-ai-cmd';
 export const LEGACY_SETTING_MIGRATIONS = {
   'cc-max-subagents': 'subagents',
   // Legacy global key — migrate to provider-scoped 'time-limit' suffix.
-  'cc-pool-budget': 'time-limit',
-  'cc-time-limit': 'time-limit',
+  'cc-pool-budget': SETTING_KEY_TIME_LIMIT,
+  'cc-time-limit': SETTING_KEY_TIME_LIMIT,
   'cc-per-dimension': 'per-dimension',
   'cc-ai-model': 'model',
 };

@@ -4,7 +4,7 @@ import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
 import AssistantHeader from '../assistant/AssistantHeader.jsx';
 import { t } from '../../strings/index.js';
 import { DRAWER_PANEL } from '../assistant/drawerPanelsModel.js';
-import { POINTER_EVENT } from '../side-pane/hooks/useDragLifecycle.js';
+import { POINTER_EVENT } from '../../vocab/pointerEvent.js';
 
 const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
 

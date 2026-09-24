@@ -1,5 +1,6 @@
-import { DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S } from '../../../constants.js';
+import { DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT_S, SETTING_KEY_TIME_LIMIT } from '../../../constants.js';
 import { PROVIDER } from '../../../vocab/provider.js';
+import { AI_CLIENT_TYPE } from '../../../api/providers.js';
 
 // Re-exported for callers already importing provider helpers from here.
 export { providerSupportsWebTools, WEB_TOOL_PROVIDERS } from '../../../models/provider.js';
@@ -17,20 +18,22 @@ export const PROVIDER_CLASSIFICATION = Object.freeze({
 const LOCAL_MARKERS = ['11434', 'localhost', '127.0.0.1', 'ollama'];
 
 export function classifyProvider(id, type, config) {
-  if (type === PROVIDER_CLASSIFICATION.CLI || !type) return PROVIDER_CLASSIFICATION.CLI;
+  // `type` is the ai-clients response's own per-client type field
+  // (api/providers.js's AI_CLIENT_TYPE), not a PROVIDER_CLASSIFICATION value.
+  if (type === AI_CLIENT_TYPE.CLI || !type) return PROVIDER_CLASSIFICATION.CLI;
   const apiBase = (config?.api_base || '').toLowerCase();
   if (LOCAL_MARKERS.some((m) => apiBase.includes(m))) return PROVIDER_CLASSIFICATION.LOCAL_API;
   return PROVIDER_CLASSIFICATION.CLOUD_API;
 }
 
-const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'time-limit': String(DEFAULT_TIME_LIMIT_S) };
-const OLLAMA_DEFAULTS = { 'time-limit': '0' };
-const LLAMACPP_DEFAULTS = { 'time-limit': '0' };
-const OMLX_DEFAULTS = { 'time-limit': '0' };
+const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), [SETTING_KEY_TIME_LIMIT]: String(DEFAULT_TIME_LIMIT_S) };
+const OLLAMA_DEFAULTS = { [SETTING_KEY_TIME_LIMIT]: '0' };
+const LLAMACPP_DEFAULTS = { [SETTING_KEY_TIME_LIMIT]: '0' };
+const OMLX_DEFAULTS = { [SETTING_KEY_TIME_LIMIT]: '0' };
 // Every cloud provider runs with the CLI-style effective defaults
 // (5 subagents / 600s — see resolveProviderSettings); the tab must display
 // them for unset keys or Settings claims values the run won't use.
-const CLOUD_FALLBACK_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'time-limit': String(DEFAULT_TIME_LIMIT_S) };
+const CLOUD_FALLBACK_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), [SETTING_KEY_TIME_LIMIT]: String(DEFAULT_TIME_LIMIT_S) };
 const CLOUD_DEFAULTS_BY_ID = {
   openrouter: { 'model': 'baidu/cobuddy:free' },
 };

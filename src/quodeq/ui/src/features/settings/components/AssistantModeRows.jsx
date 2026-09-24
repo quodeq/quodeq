@@ -1,5 +1,5 @@
 import { t } from '../../../strings/index.js';
-import { ASSISTANT_MODE } from '../hooks/useAssistantProvider.js';
+import { ASSISTANT_MODE } from '../settingsVocab.js';
 
 const MODE_OPTIONS = [
   { value: ASSISTANT_MODE.DEFAULT, label: t('settings.modeDefault') },

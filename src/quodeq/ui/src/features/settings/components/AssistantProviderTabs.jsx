@@ -6,7 +6,7 @@ import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
 import { CopilotModelStatus } from './CopilotModelSelect.jsx';
 import { PROVIDER } from '../../../vocab/provider.js';
-import { ASSISTANT_MODE } from '../hooks/useAssistantProvider.js';
+import { ASSISTANT_MODE } from '../settingsVocab.js';
 
 function AssistantEnableRow({ enabled, setEnabled }) {
   return (

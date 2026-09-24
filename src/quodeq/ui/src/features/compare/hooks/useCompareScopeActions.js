@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
-import { consequenceOf, consequenceLevel } from '../compareModel.js';
-import { CONSEQUENCE_LEVEL } from '../compareFleet.js';
+import { consequenceOf, consequenceLevel, CONSEQUENCE_LEVEL } from '../compareFleet.js';
 import { storeScope } from '../compareScopeStorage.js';
 
 /** Scope-selection actions: toggle one project, select all, select flagged. */

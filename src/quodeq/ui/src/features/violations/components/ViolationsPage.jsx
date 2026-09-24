@@ -9,10 +9,7 @@ import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 import { walkTree } from '../../../utils/treeWalk.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
-
-// This page's own sub-tab route param: which view of the violations list is
-// showing. Not a NAV_TAB member (a page-local concept, not a nav-stack page).
-export const VIOLATIONS_SUB_TAB = Object.freeze({ DIMENSION: 'dimension', FILE: 'file', DISMISSED: 'dismissed' });
+import { VIOLATIONS_SUB_TAB } from '../violationsVocab.js';
 
 function findSubtree(root, path) {
   if (!path) return root;

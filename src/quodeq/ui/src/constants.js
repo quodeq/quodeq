@@ -39,6 +39,13 @@ export function providerKey(providerId, setting) {
 // on files that never touch it).
 export const PROVIDER_CONFIGURED_MARKER = '•configured•';
 
+// providerKey() setting-name suffixes shared across the provider-settings
+// hook, its tabs, the legacy migration, the onboarding active-provider
+// reader and the effective-settings resolver — one home so all of them read
+// the same suffix.
+export const SETTING_KEY_TIME_LIMIT = 'time-limit';
+export const SETTING_KEY_API_KEY = 'api-key';
+
 // Fired (same-tab) whenever any provider setting is written — the analysis
 // active-provider or a per-provider model. The assistant gate listens for it
 // so that in Default mode (which mirrors the analysis provider/model) the

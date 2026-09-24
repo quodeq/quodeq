@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react';
-import { DEFAULT_TIME_LIMIT_S } from '../../../constants.js';
+import { DEFAULT_TIME_LIMIT_S, SETTING_KEY_TIME_LIMIT } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { t } from '../../../strings/index.js';
 import { STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
 import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
-
-// This tab's own provider-settings state key for the time-budget field.
-const SETTING_KEY_TIME_LIMIT = 'time-limit';
 
 const SECONDS_PER_MINUTE = 60;
 const MIN_MINUTES = 1;

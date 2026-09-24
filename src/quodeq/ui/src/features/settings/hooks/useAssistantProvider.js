@@ -2,12 +2,10 @@ import { useState, useCallback, useMemo } from 'react';
 import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_SETTINGS_CHANGED_EVENT } from '../../../constants.js';
 import { broadcastSettingsChange, useSettingsChangeSync } from './settingsSync.js';
 import { STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
+import { ASSISTANT_MODE } from '../settingsVocab.js';
 
 export const ASSISTANT_ACTIVE_PROVIDER_KEY = 'cc-assistant-active-provider';
 export const ASSISTANT_MODE_KEY = 'cc-assistant-mode';
-// The two modes stored under ASSISTANT_MODE_KEY: DEFAULT mirrors the
-// analysis gate live, CUSTOM uses the assistant-scoped provider/model.
-export const ASSISTANT_MODE = Object.freeze({ DEFAULT: 'default', CUSTOM: 'custom' });
 // The assistant is ON by default: the toolbar launcher shows until the user
 // explicitly disables it in Settings.
 export const ASSISTANT_ENABLED_KEY = 'cc-assistant-enabled';

@@ -4,6 +4,7 @@
  */
 import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
 import { roundScore1 } from './compareFormatters.js';
+import { CONSEQUENCE_LEVEL } from './compareFleet.js';
 
 // Score scale: every dimension/principle score is 0-10.
 const MAX_SCORE = 10;
@@ -55,7 +56,7 @@ export function buildDimensionAttention(view) {
     items.push({
       kind: ATTENTION_KIND.OUTLIER,
       name: worst.name,
-      level: worst.score < OUTLIER_FLOOR_SCORE || gap >= OUTLIER_ELEVATED_GAP_THRESHOLD ? 'elevated' : 'watch',
+      level: worst.score < OUTLIER_FLOOR_SCORE || gap >= OUTLIER_ELEVATED_GAP_THRESHOLD ? CONSEQUENCE_LEVEL.ELEVATED : CONSEQUENCE_LEVEL.WATCH,
       principleLabel: p.label,
       score: worst.score,
       gap: gap >= OUTLIER_GAP_THRESHOLD ? gap : null,
@@ -68,7 +69,7 @@ export function buildDimensionAttention(view) {
     items.push({
       kind: ATTENTION_KIND.DROP,
       name: s.row.name,
-      level: s.delta <= DROP_ELEVATED_DELTA_THRESHOLD ? 'elevated' : 'watch',
+      level: s.delta <= DROP_ELEVATED_DELTA_THRESHOLD ? CONSEQUENCE_LEVEL.ELEVATED : CONSEQUENCE_LEVEL.WATCH,
       delta: s.delta,
       row: s.row,
       weight: Math.abs(s.delta) * DROP_WEIGHT_FACTOR + (MAX_SCORE - (s.score ?? MAX_SCORE)),

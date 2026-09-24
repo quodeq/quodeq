@@ -1,8 +1,5 @@
 import { useCallback } from 'react';
-
-// Pointer-drag DOM events every drag/resize gesture in the app watches:
-// window pointermove during the gesture, pointerup to end it.
-export const POINTER_EVENT = Object.freeze({ MOVE: 'pointermove', UP: 'pointerup' });
+import { POINTER_EVENT } from '../../../vocab/pointerEvent.js';
 
 /**
  * The pointer-drag lifecycle the side pane's two resizers share: take over

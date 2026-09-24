@@ -17,6 +17,7 @@ import { historyRoute } from './historyRoute.jsx';
 import { compareRoute } from './compareRoute.jsx';
 import { buildDashboardDataBundle } from './dashboardDataBundle.js';
 import { buildNavigationBundle } from './navigationBundle.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 import {
   EvaluateCase, SettingsCase, renderEvalPrincipleDetail,
   resolveSelectionAfterSharedDisconnect,
@@ -136,8 +137,8 @@ export const ROUTE_RENDERERS = {
       })}
     />
   ),
-  evalprinciple: renderEvalPrincipleDetail,
-  'eval-principle-detail': renderEvalPrincipleDetail,
+  [NAV_TAB.EVAL_PRINCIPLE]: renderEvalPrincipleDetail,
+  [NAV_TAB.EVAL_PRINCIPLE_DETAIL]: renderEvalPrincipleDetail,
   finding: (params, props) => (
     <FindingDetailPage
       finding={params.finding}

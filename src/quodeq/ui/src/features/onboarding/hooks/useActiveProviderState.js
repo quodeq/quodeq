@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getProviderConfigs } from '../../../api/index.js';
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, providerKey, SETTING_KEY_TIME_LIMIT } from '../../../constants.js';
 import { readString } from '../../../adapters/storage.js';
 
 // Poll interval for mirroring localStorage: ProviderTabs and its children
@@ -27,7 +27,7 @@ export function readActiveProviderState() {
     // ProviderTabs persists time-limit per provider as a stringified number of
     // seconds. Treat 0 as unlimited; missing key falls back to null so the
     // wizard's existing default applies.
-    const tlRaw = readString(providerKey(id, 'time-limit'), null);
+    const tlRaw = readString(providerKey(id, SETTING_KEY_TIME_LIMIT), null);
     const timeLimitS = tlRaw === null ? null : Number.parseInt(tlRaw, 10);
     return { id, model, timeLimitS: Number.isFinite(timeLimitS) ? timeLimitS : null };
   } catch (err) {

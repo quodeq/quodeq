@@ -4,6 +4,7 @@ import { useOmlxModels } from '../hooks/useOmlxModels.js';
 import { useLocalApiTabTest } from '../hooks/useLocalApiTabTest.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
+import { SETTING_KEY_API_KEY } from '../../../constants.js';
 
 function ModelSelector({ value, models, onChange, labelId }) {
   const needsModel = !value;
@@ -43,7 +44,7 @@ function ModelSelector({ value, models, onChange, labelId }) {
 export default function OmlxTab({ state, update }) {
   const { testOmlxConcurrency } = useApi();
   const apiBase = state['api-base'] || '';
-  const apiKey = state['api-key'] || '';
+  const apiKey = state[SETTING_KEY_API_KEY] || '';
   const { omlxStatus, models, modelsError } = useOmlxModels({ apiBase, apiKey });
 
   const concurrency = useLocalApiTabTest({

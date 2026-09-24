@@ -1,15 +1,15 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { providerKey, notifyProviderSettingsChanged, PROVIDER_CONFIGURED_MARKER } from '../../../constants.js';
+import {
+  providerKey, notifyProviderSettingsChanged, PROVIDER_CONFIGURED_MARKER,
+  SETTING_KEY_TIME_LIMIT, SETTING_KEY_API_KEY,
+} from '../../../constants.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { saveProviderKey } from '../../../api/providers.js';
 import { t } from '../../../strings/index.js';
 
 export { PROVIDER_CONFIGURED_MARKER };
 
-// This hook's own provider-settings state key for the stored API credential.
-const SETTING_KEY_API_KEY = 'api-key';
-
-const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'time-limit', 'per-dimension', 'verify', SETTING_KEY_API_KEY, 'api-base', 'cmd-path'];
+const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', SETTING_KEY_TIME_LIMIT, 'per-dimension', 'verify', SETTING_KEY_API_KEY, 'api-base', 'cmd-path'];
 const DEFAULTS = {
   'model': '',
   'model-analysis': '',
@@ -17,7 +17,7 @@ const DEFAULTS = {
   'model-balanced': '',
   'model-thorough': '',
   'subagents': '1',
-  'time-limit': '0',
+  [SETTING_KEY_TIME_LIMIT]: '0',
   // Grouped is the engine's actual default; the pill must not claim
   // per-dimension for an untouched toggle.
   'per-dimension': 'false',
@@ -28,7 +28,7 @@ const DEFAULTS = {
 };
 
 // Legacy storage key fallback, only consulted when the new key has no value.
-const LEGACY_KEY_MAP = { 'time-limit': 'pool-budget' };
+const LEGACY_KEY_MAP = { [SETTING_KEY_TIME_LIMIT]: 'pool-budget' };
 
 /**
  * Reads one provider's settings, falling back to `overrides` and then the

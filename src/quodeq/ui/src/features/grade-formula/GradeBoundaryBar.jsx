@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { KEY } from '../../vocab/keyboard.js';
+import { POINTER_EVENT } from '../../vocab/pointerEvent.js';
 
 // Upper bound of the 0-10 score axis: a number, so it needs no translation.
 const SCALE_MAX = 10;
@@ -41,12 +42,12 @@ function makeStartDrag({ barRef, ascRef, thresholds, onChange }) {
       applyAscValue(thresholds, live, dividerIdx, value, onChange);
     };
     const stop = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', stop);
+      window.removeEventListener(POINTER_EVENT.MOVE, move);
+      window.removeEventListener(POINTER_EVENT.UP, stop);
       window.removeEventListener('pointercancel', stop);
     };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', stop);
+    window.addEventListener(POINTER_EVENT.MOVE, move);
+    window.addEventListener(POINTER_EVENT.UP, stop);
     window.addEventListener('pointercancel', stop);
   };
 }

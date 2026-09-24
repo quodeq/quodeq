@@ -11,10 +11,11 @@
  * instead of leaning on a jsdom global.
  */
 
-// A boolean persisted as '1' (on) — the compact flag encoding several
-// features use for a toggle written with writeString/read back with
+// A boolean persisted as '1' (on) / '0' (off) — the compact flag encoding
+// several features use for a toggle written with writeString/read back with
 // readString, never JSON-parsed. Not the same encoding as STORED_TRUE below.
 export const STORAGE_FLAG_ON = '1';
+export const STORAGE_FLAG_OFF = '0';
 
 // localStorage read back as a raw string, never JSON-parsed: the string
 // forms of the two booleans callers persist as settings flags (distinct

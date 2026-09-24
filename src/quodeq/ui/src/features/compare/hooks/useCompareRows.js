@@ -1,10 +1,9 @@
 import { useMemo, useCallback } from 'react';
 import {
   buildRow, buildFleet, buildDimensionsBoard, buildAttention,
-  buildDimensionView, buildDuelView, sortRows,
+  buildDimensionView, buildDuelView, sortRows, COMPARE_VIEW_FLEET,
 } from '../compareModel.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
-import { COMPARE_VIEW_FLEET } from '../compareModel.js';
 
 /**
  * Every row + its "open this project" affordance: rows carry their own
