@@ -12,9 +12,11 @@ Bounded: at most ``max_workers`` daemon threads, fed by a
 ``queue.Queue(maxsize=max_queued)``, instead of one daemon thread per submit
 with no cap (a burst of mutations used to grow the thread count without
 limit). A submit that finds the queue full drops the task with a warning
-instead of blocking the caller. Both callers tolerate a drop: salvage
-scoring is claimed again by the next GET, and the projection fallback
-already skips while a projection for the project is running. Workers start
+instead of blocking the caller, and returns False so the caller can undo
+any bookkeeping. Both callers tolerate a drop: the salvage-scoring GET
+releases its claim, so the next GET claims and submits again, and the
+projection fallback already skips while a projection for the project is
+running. Workers start
 on demand and exit as soon as the queue is empty, so an idle runner holds no
 threads and tests or the CLI never leave one behind. Daemon threads, not
 ``ThreadPoolExecutor`` (its workers are non-daemon and would hold the
@@ -42,8 +44,11 @@ _Task = tuple[Callable[[], None], str]
 class BackgroundRunner(Protocol):
     """Abstraction for running a callable off the current thread."""
 
-    def submit(self, fn: Callable[[], None], *, name: str = "") -> None:
-        """Schedule *fn* to run in the background. Must never block/join."""
+    def submit(self, fn: Callable[[], None], *, name: str = "") -> bool:
+        """Schedule *fn* to run in the background. Must never block/join.
+
+        Returns False when the task was dropped and will never run.
+        """
         ...
 
 
@@ -72,8 +77,11 @@ class ThreadBackgroundRunner:
         self._lock = threading.Lock()
         self._active = 0
 
-    def submit(self, fn: Callable[[], None], *, name: str = "") -> None:
-        """Queue *fn* for a worker and return at once; drop it with a warning when the queue is full."""
+    def submit(self, fn: Callable[[], None], *, name: str = "") -> bool:
+        """Queue *fn* for a worker and return at once; drop it with a warning when the queue is full.
+
+        Returns whether the task was accepted.
+        """
         spawn_id = None
         with self._lock:
             try:
@@ -109,6 +117,7 @@ class ThreadBackgroundRunner:
             self._log.warning(
                 f"Background queue full ({self._queue.maxsize} waiting); dropped task {name or fn}"
             )
+        return accepted
 
     def _reserve_worker_slot_locked(self) -> int | None:
         if self._active >= self._max_workers:

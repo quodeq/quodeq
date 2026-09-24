@@ -13,6 +13,7 @@ class _SpyRunner:
 
     def submit(self, fn, *, name=""):
         self.names.append(name)
+        return True
 
 
 def test_default_path_submits_to_the_one_shared_runner(monkeypatch, tmp_path):

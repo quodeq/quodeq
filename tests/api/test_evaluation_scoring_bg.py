@@ -122,3 +122,29 @@ def test_get_evaluation_with_dict_shaped_failed_job_does_not_500(client):
     assert scoring_started.wait(timeout=budget(2)), (
         "Background scoring thread never started for the dict-shaped job."
     )
+
+
+class _DroppingRunner:
+    """Background runner whose queue is always full."""
+
+    def __init__(self):
+        self.submitted: list[str] = []
+
+    def submit(self, fn, *, name=""):
+        self.submitted.append(name)
+        return False
+
+
+def test_a_dropped_salvage_task_releases_its_claim_so_the_next_get_retries(monkeypatch, tmp_path):
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path))
+    app = create_app(_DictShapedFailedJobProvider())
+    app.extensions["reset_scored_jobs"]()
+    runner = _DroppingRunner()
+    app.extensions["background"] = runner
+    client = app.test_client()
+
+    client.get("/api/evaluations/j1")
+    client.get("/api/evaluations/j1")
+    app.extensions["reset_scored_jobs"]()
+
+    assert runner.submitted == ["score-j1", "score-j1"]

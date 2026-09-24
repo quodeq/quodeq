@@ -155,3 +155,23 @@ def test_a_failed_thread_start_releases_its_slot_and_a_later_submit_still_runs()
     # successful worker still picks it up.
     assert first.is_set()
     assert any("failed to start" in line for line in sink.warnings)
+
+
+def test_submit_reports_whether_the_task_was_accepted():
+    runner = ThreadBackgroundRunner(log=_Sink(), max_workers=1, max_queued=1)
+    gate = threading.Event()
+    started = threading.Event()
+
+    def blocking():
+        started.set()
+        gate.wait(budget(10))
+
+    before = _worker_snapshot()
+    first = runner.submit(blocking, name="running")
+    assert started.wait(budget(5))
+    queued = runner.submit(lambda: None, name="queued")
+    dropped = runner.submit(lambda: None, name="overflow")
+    gate.set()
+    _join_new_workers(before)
+
+    assert (first, queued, dropped) == (True, True, False)
