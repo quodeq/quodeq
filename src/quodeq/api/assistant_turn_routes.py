@@ -136,7 +136,7 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
         return json_error("unknown session", 404, "UNKNOWN_SESSION")
     body = optional_json_object_or_error("INVALID_PARAM")
     if not isinstance(body, dict):
-        return body
+        return jsonify(body[0]), body[1]
     text = str(body.get("text", "")).strip()
     if not text:
         return json_error("text required", 400, "MISSING_PARAM")

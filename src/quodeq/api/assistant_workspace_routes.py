@@ -123,7 +123,7 @@ def _workspace_pr(app: Flask, sid: str):
         return err
     req_body = optional_json_object_or_error("INVALID_PARAM")
     if not isinstance(req_body, dict):
-        return req_body
+        return jsonify(req_body[0]), req_body[1]
     draft = PrDraft(title=str(req_body.get("title", "")), body=str(req_body.get("body", "")))
     outcome = create_workspace_pr(
         repo, sid, draft, claim_turn=claim_app_turn, release_turn=release_app_turn)

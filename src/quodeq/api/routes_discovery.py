@@ -55,12 +55,12 @@ def _handle_browse_mkdir(provider: ActionProvider) -> Response | tuple[Response,
     Validation and the mkdir itself live in the provider (mirroring
     ``_handle_browse``); this handler only shapes the HTTP response.
     Body fields are type-checked before ``.strip()`` so a null or
-    non-string value (or a non-object body) is treated as missing
-    rather than raising an unhandled 500.
+    non-string value is treated as missing rather than raising an
+    unhandled 500; a non-object body answers a coded 400.
     """
     data = optional_json_object_or_error("INVALID_INPUT")
     if not isinstance(data, dict):
-        return data
+        return jsonify(data[0]), data[1]
     parent = data.get("path")
     parent = parent.strip() if isinstance(parent, str) else ""
     name = data.get("name")

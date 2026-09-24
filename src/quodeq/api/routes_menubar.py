@@ -28,7 +28,7 @@ def register_menubar_routes(app: Flask) -> None:
     def menubar_set() -> Response | tuple[Response, int]:
         body = optional_json_object_or_error("MISSING_PARAM")
         if not isinstance(body, dict):
-            return body
+            return jsonify(body[0]), body[1]
         enabled = body.get("enabled")
         if not isinstance(enabled, bool):
             return jsonify({"error": "enabled must be a boolean", "code": "MISSING_PARAM"}), 400

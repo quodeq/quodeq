@@ -202,7 +202,7 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
     """
     body = optional_json_object_or_error("INVALID_INPUT")
     if not isinstance(body, dict):
-        return body
+        return jsonify(body[0]), body[1]
     parsed, error = _parse_create_project_request(body)
     if error is not None:
         return error

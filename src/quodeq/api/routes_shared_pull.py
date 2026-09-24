@@ -85,7 +85,7 @@ def shared_pull(project: str, eval_root: Path) -> Response | tuple[Response, int
 
     payload = optional_json_object_or_error("INVALID_ACTION")
     if not isinstance(payload, dict):
-        return payload
+        return jsonify(payload[0]), payload[1]
     action = payload.get("action")
     if action is not None and not isinstance(action, str):
         body, status = error_response("action must be a string", HTTPStatus.BAD_REQUEST, "INVALID_ACTION")

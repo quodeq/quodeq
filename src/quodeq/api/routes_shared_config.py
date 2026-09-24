@@ -62,7 +62,7 @@ def shared_config_put() -> Response | tuple[Response, int]:
     """
     body = optional_json_object_or_error("INVALID_INPUT")
     if not isinstance(body, dict):
-        return body
+        return jsonify(body[0]), body[1]
     url = str(body.get("url") or "").strip()
     if not url:
         return json_error("url is required", 400, "URL_REQUIRED")

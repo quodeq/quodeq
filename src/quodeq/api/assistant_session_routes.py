@@ -111,7 +111,7 @@ def register_assistant_session_routes(app: Flask, gates: SessionGates) -> None:
         _assistant_helpers.run_assistant_hygiene(app)
         body = optional_json_object_or_error("INVALID_PARAM")
         if not isinstance(body, dict):
-            return body
+            return jsonify(body[0]), body[1]
         error, source = _validate_session_request(body, gates)
         if error is not None:
             return error

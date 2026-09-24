@@ -42,7 +42,7 @@ def register_update_routes(app: Flask) -> None:
     def update_dismiss() -> Response | tuple[Response, int]:
         body = optional_json_object_or_error("MISSING_PARAM")
         if not isinstance(body, dict):
-            return body
+            return jsonify(body[0]), body[1]
         version = body.get("version")
         if not version:
             return jsonify({"error": "version is required", "code": "MISSING_PARAM"}), 400
@@ -57,7 +57,7 @@ def register_update_routes(app: Flask) -> None:
     def update_settings() -> Response | tuple[Response, int]:
         body = optional_json_object_or_error("MISSING_PARAM")
         if not isinstance(body, dict):
-            return body
+            return jsonify(body[0]), body[1]
         set_settings(
             auto_check_enabled=body.get("auto_check_enabled"),
             disclosed=body.get("disclosed"),
