@@ -26,6 +26,10 @@ class FindingsRepository(Protocol):
         """Return every finding regardless of dimension, in insertion order."""
         ...
 
+    def list_keys(self) -> list[tuple[str | None, str | None, object]]:
+        """Return ``(requirement, file, line)`` for every finding, any verdict, in insertion order."""
+        ...
+
     def count_by_dimension(self) -> dict[str, int]:
         """Return total finding counts grouped by dimension."""
         ...

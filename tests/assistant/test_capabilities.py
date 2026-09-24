@@ -29,3 +29,46 @@ def test_ollama_probe_error_means_false():
         raise OSError("connection refused")
 
     assert not supports_native_tools("ollama", "http://localhost:11434/v1", "m", probe=probe_boom)
+
+
+def _counting_default_probe(monkeypatch, answer):
+    calls: list[str] = []
+
+    def probe(url, json):
+        calls.append(url)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr("quodeq.assistant.adapters.capabilities._default_probe", probe)
+    return calls
+
+
+def test_a_successful_probe_is_asked_once_per_model(monkeypatch):
+    calls = _counting_default_probe(monkeypatch, {"capabilities": ["tools"]})
+    base = "http://cache-hit-host:11434/v1"
+    assert supports_native_tools("ollama", base, "qwen3")
+    assert supports_native_tools("ollama", base, "qwen3")
+    assert supports_native_tools("ollama", base, "other-model")
+    assert len(calls) == 2
+
+
+def test_a_failed_probe_is_asked_again(monkeypatch):
+    calls = _counting_default_probe(monkeypatch, OSError("connection refused"))
+    base = "http://cache-miss-host:11434/v1"
+    assert not supports_native_tools("ollama", base, "qwen3")
+    assert not supports_native_tools("ollama", base, "qwen3")
+    assert len(calls) == 2
+
+
+def test_an_injected_probe_is_never_cached():
+    calls: list[str] = []
+
+    def probe(url, json):
+        calls.append(url)
+        return {"capabilities": ["tools"]}
+
+    base = "http://injected-host:11434/v1"
+    supports_native_tools("ollama", base, "qwen3", probe=probe)
+    supports_native_tools("ollama", base, "qwen3", probe=probe)
+    assert len(calls) == 2

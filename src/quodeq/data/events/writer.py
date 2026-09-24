@@ -5,14 +5,14 @@ import logging
 from pathlib import Path
 
 from quodeq.core.events.models import BaseEvent
-from quodeq.data.events.codec import event_to_json
+from quodeq.data.jsonl_append import JsonlAppendMixin
 from quodeq.data.locking import get_file_lock
 
 
 _logger = logging.getLogger(__name__)
 
 
-class EventLogWriter:
+class EventLogWriter(JsonlAppendMixin):
     """Thread-safe, append-only writer for the Quodeq Event Log (JSONL).
 
     Data-layer adapter: the sole writer of ``events.jsonl``, the immutable
@@ -25,30 +25,14 @@ class EventLogWriter:
         self.log_path = log_path
         self._ensure_dir()
         self._lock = get_file_lock()
+        self._logger = _logger
 
     def _ensure_dir(self) -> None:
         """Ensures the parent directory of the log file exists."""
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def emit(self, event: BaseEvent) -> None:
-        """
-        Appends a single event to the JSONL log.
-
-        Args:
-            event: An instance of a BaseEvent (or subclass).
-        """
-        try:
-            with open(self.log_path, mode="a", encoding="utf-8") as f:
-                self._lock.acquire(f)
-                try:
-                    line = event_to_json(event)
-                    f.write(line + "\n")
-                    f.flush()
-                finally:
-                    self._lock.release(f)
-        except Exception as e:
-            _logger.error(f"Failed to emit event {event.event_id} to {self.log_path}: {e}")
-            raise
+    def _emit_what(self, event: BaseEvent) -> str:
+        return f"event {event.event_id}"
 
     def __repr__(self) -> str:
         return f"<EventLogWriter(path={self.log_path})>"

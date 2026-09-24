@@ -107,12 +107,12 @@ def import_from_file(data: dict, force: bool, evaluators_dir: Path, store: Stand
     warnings = scan_injection(cleaned)
     standard_id = cleaned["id"]
     path = store.path(evaluators_dir, standard_id)
-    if store.exists(evaluators_dir, standard_id) and not force:
-        existing = store.read(path)
+    existing = store.read(path) if store.exists(evaluators_dir, standard_id) else None
+    if existing is not None and not force:
         p, r = count_principles_and_requirements(existing)
         return {"status": "conflict", "detail": None,
                 "existing": build_custom_meta(existing, p, r), "warnings": warnings}
-    if store.exists(evaluators_dir, standard_id) and force and store.read(path).get("managed", False):
+    if existing is not None and existing.get("managed", False):
         raise PermissionError(f"Cannot overwrite managed standard '{standard_id}'")
     store.ensure_dir(evaluators_dir)
     detail = _write_and_load_detail(store, path, {**cleaned, **_CUSTOM_DEFAULTS})

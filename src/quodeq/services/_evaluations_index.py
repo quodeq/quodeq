@@ -20,7 +20,7 @@ from pathlib import Path
 from quodeq.core.run.job_status import JOB_FINISHED, JobStatus, external_job_id, is_external_job_id, strip_external_prefix
 from quodeq.core.types.job import JobSnapshot
 from quodeq.services.wiring import run_index as _run_index
-from quodeq.services._external_jobs import sync_external_run
+from quodeq.services._external_jobs import sync_external_run, sync_indexed_run
 from quodeq.services.jobs import JobManager
 from quodeq.services._run_index_fs import (
     external_job_is_complete, merge_internal_jobs, remove_run_directory,
@@ -103,7 +103,7 @@ class EvaluationsIndex:
             rows = _run_index.list_runs(db, limit=db_limit, states=states or None)
         finally:
             db.close()
-        return [self._run_row_to_snapshot(r) for r in rows]
+        return [self._run_row_to_snapshot(r, with_logs=r.state == JobStatus.RUNNING) for r in rows]
 
     def delete(self, job_id: str, reports_dir: Path | None = None) -> bool:
         """Delete a run's on-disk dir and index row. Refuses running jobs."""
@@ -159,7 +159,7 @@ class EvaluationsIndex:
             if is_external:
                 if not sync_external_run(db, job_id, reports_dir):
                     return None
-            else:
+            elif not sync_indexed_run(db, job_id):
                 _run_index.sync_index(db, reports_dir)
             row = _run_index.get_run(db, job_id)
         finally:
@@ -291,5 +291,5 @@ class EvaluationsIndex:
             raise ValueError("EvaluationsIndex requires index_db_path to be set")
         return _run_index.open_index(self._index_db_path)
 
-    def _run_row_to_snapshot(self, row: "_run_index.RunRow") -> JobSnapshot:
-        return build_job_snapshot(row)
+    def _run_row_to_snapshot(self, row: "_run_index.RunRow", *, with_logs: bool = True) -> JobSnapshot:
+        return build_job_snapshot(row, with_logs=with_logs)

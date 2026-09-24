@@ -221,3 +221,26 @@ def test_pull_without_body_defaults_to_no_action(client, uuid_named_shared_clone
     _, project_uuid = uuid_named_shared_clone_fixture
     resp = client.post(f"/api/shared/projects/{project_uuid}/pull", headers=_ORIGIN)
     assert resp.status_code in (200, 201), resp.get_json()
+
+
+# --- read vs write error reporting ------------------------------------------
+
+def test_pull_read_failure_reports_a_read_error(
+    client, uuid_named_shared_clone_fixture, local_eval_dir, monkeypatch,
+):
+    """R-M7: an OSError reading the pulled zip's own bytes (e.g. a
+    filesystem hiccup on the shared repository's clone) must be reported
+    the way it was before the bounded-upload change: a read failure, not
+    "failed to write imported project"."""
+    _, project_uuid = uuid_named_shared_clone_fixture
+
+    def _raise(*_args, **_kwargs):
+        raise OSError("disk read error")
+
+    monkeypatch.setattr("quodeq.api.import_project.validate_archive", _raise)
+    resp = _pull(client, project_uuid)
+
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["code"] == "EXPORT_ERROR"
+    assert "read" in body["error"].lower()

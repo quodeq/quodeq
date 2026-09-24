@@ -25,7 +25,6 @@ from quodeq.analysis.cache._replay import dim_jsonl_path, write_replayed_keys_si
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_helpers import (
     ClassifyResult,
-    build_cache_key_for_file,
     classify_files_via_cache,
     format_provenance_drift,
 )
@@ -50,27 +49,20 @@ class CacheContext:
     jsonl: Path
 
 
-def _invalidate_for_clean_scan(
-    config: RunConfig, files: list[str], dim_id: str, cache: CacheBackend,
-) -> bool:
+def _invalidate_for_clean_scan(dim_id: str, classify: ClassifyResult, cache: CacheBackend) -> None:
     """Delete this dim's cache entries before a clean-scan dispatch, so a
     cancelled clean-scan + retry never short-circuits on stale entries
-    that pre-date the clean-scan."""
-    bypass_reads = not config.options.incremental
-    if bypass_reads:
-        wiped = 0
-        for f in files:
-            key = build_cache_key_for_file(config, f, dim_id)
-            try:
-                cache.delete(key)
-                wiped += 1
-            except Exception as exc:  # noqa: BLE001
-                _logger.debug("[%s] cache delete failed for %s: %s", dim_id, f, exc)
-        _logger.info(
-            "[%s] cache: invalidated %d entries before clean-scan dispatch",
-            dim_id, wiped,
-        )
-    return bypass_reads
+    that pre-date the clean-scan.
+
+    Runs after classify: with reads bypassed, classify reads nothing from the
+    cache and returns every file's key in ``miss_keys``, so each file is
+    hashed once and the entries go in one batch.
+    """
+    wiped = cache.delete_many(list(classify.miss_keys.values()))
+    _logger.info(
+        "[%s] cache: invalidated %d entries before clean-scan dispatch",
+        dim_id, wiped,
+    )
 
 
 def _classify_and_log(
@@ -113,8 +105,10 @@ def prepare_cache_context(
     if not files:
         return None
 
-    bypass_reads = _invalidate_for_clean_scan(config, files, dim_id, cache)
+    bypass_reads = not config.options.incremental
     classify = _classify_and_log(config, dim_id, files, cache, bypass_reads)
+    if bypass_reads:
+        _invalidate_for_clean_scan(dim_id, classify, cache)
     jsonl = dim_jsonl_path(config, dim_id)
     write_replayed_keys_sidecar(config, dim_id, classify.unconsolidated_hit_keys)
     return CacheContext(cache, trust_model, files, classify, jsonl)

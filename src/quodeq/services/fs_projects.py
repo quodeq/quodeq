@@ -125,9 +125,11 @@ def _classify_known_ids(
     if backfill:
         for name in dir_names:
             backfill_onboarding_field(reports_root / name, pre_read_data=info_by_name.get(name))
+    # info_by_name already holds every parseable record; only the dirs it
+    # lacks need the presence probe (a corrupt record still registers).
     registered_ids = {
         name for name in dir_names
-        if repository_info_exists(reports_root / name)
+        if name in info_by_name or repository_info_exists(reports_root / name)
     }
     return KnownProjectIds(registered_ids, parent_ids, subproject_ids), info_by_name
 

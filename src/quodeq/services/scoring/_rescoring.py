@@ -35,7 +35,7 @@ def rescore_runs_by_dimension(
     """Rescore each unique run and return a map of dim_key -> rescored dict.
 
     *keys* carries the project's dismissals and deletions; the pattern rules
-    are read from the project here, once per run.
+    are read from the project here, once.
     """
     validate_path_segment(project)
     dim_to_run: dict[str, str] = {}
@@ -46,6 +46,8 @@ def rescore_runs_by_dimension(
             dim_to_run[key] = rid
 
     fetcher = make_run_dimension_fetcher(reports_root, project)
+    # One project-wide rules read for every run below (the file is per project).
+    run_keys = replace(keys, rules=load_suppression_rules(reports_root / project)) if dim_to_run else keys
     rescored_by_dim: dict[str, dict] = {}
     seen_runs: dict[str, dict[str, dict]] = {}
     for dim_key, run_id in dim_to_run.items():
@@ -55,8 +57,7 @@ def rescore_runs_by_dimension(
             # Grouped per run, so this run's own directory is the evidence
             # basis for every dimension sourced from it.
             result = rescore_dimensions(
-                run_dims,
-                replace(keys, rules=load_suppression_rules(reports_root / project)),
+                run_dims, run_keys,
                 params=params, run_dir=reports_root / project / run_id)
             seen_runs[run_id] = {
                 (rd.get("dimension") or "").lower(): rd

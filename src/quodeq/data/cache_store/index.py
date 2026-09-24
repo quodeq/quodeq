@@ -55,6 +55,14 @@ CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 _BUILT_KEY = "built_for_schema"
 
 
+def _close_quietly(conn: sqlite3.Connection) -> None:
+    """Close *conn*, logging rather than raising (also runs from a GC finalizer)."""
+    try:
+        conn.close()
+    except sqlite3.Error as exc:
+        _logger.debug("cache index connection close failed: %s", exc)
+
+
 @dataclass(frozen=True)
 class IndexRow:
     """A hit from ``find``: which entry to look at, and where it came from.
@@ -93,6 +101,7 @@ class ContentIndex:
         self._lock = threading.Lock()
         self._conn: sqlite3.Connection | None = None
         self._broken = False
+        self._finalizer: weakref.finalize | None = None
         _live_instances.add(self)
 
     # -- connection -------------------------------------------------------
@@ -110,7 +119,11 @@ class ContentIndex:
         return conn
 
     def _connect(self) -> sqlite3.Connection | None:
-        """Return the connection, opening it lazily. None when unusable."""
+        """Return the connection, opening it lazily. None when unusable.
+
+        The connection is closed when this instance is garbage collected, so
+        a dropped index never pins its file.
+        """
         if self._conn is not None:
             return self._conn
         if self._broken:
@@ -132,17 +145,18 @@ class ContentIndex:
             _logger.debug("content index unavailable at %s: %s", self._path, exc)
             self._broken = True
             return None
+        self._finalizer = weakref.finalize(self, _close_quietly, self._conn)
         return self._conn
 
     def close(self) -> None:
         """Close the connection. The next operation reopens it."""
         with self._lock:
-            if self._conn is not None:
-                try:
-                    self._conn.close()
-                except sqlite3.Error as exc:
-                    _logger.debug("cache index connection close failed: %s", exc)
-                self._conn = None
+            finalizer, self._finalizer = self._finalizer, None
+            if finalizer is not None:
+                finalizer()  # closes the connection once, then goes dead
+            elif self._conn is not None:
+                _close_quietly(self._conn)
+            self._conn = None
 
     # -- writes -----------------------------------------------------------
 
@@ -174,13 +188,20 @@ class ContentIndex:
 
     def forget(self, key: str) -> None:
         """Drop the row for *key*, so a deleted entry stops being offered."""
+        self.forget_many([key])
+
+    def forget_many(self, keys: Iterable[str]) -> None:
+        """Drop the rows for every key in *keys* in one transaction."""
+        rows = [(key,) for key in keys]
+        if not rows:
+            return
         with self._lock:
             conn = self._connect()
             if conn is None:
                 return
             try:
                 with conn:
-                    conn.execute("DELETE FROM entries WHERE key = ?", (key,))
+                    conn.executemany("DELETE FROM entries WHERE key = ?", rows)
             except sqlite3.Error as exc:
                 _logger.debug("content index delete failed: %s", exc)
 

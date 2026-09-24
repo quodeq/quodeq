@@ -27,8 +27,9 @@ from quodeq.context.precedent import PrecedentCorpus
 from quodeq.context.project_shape import Deployment, ProjectShape
 from quodeq.context.trust_model import TrustModel
 from quodeq.core.observability import NULL_LOG, LogSink
-
+from quodeq.shared.lru import LRUDict
 _FINDING_SCHEMA_VERSION = 1
+_FILE_CACHE_CAPACITY = 512  # source files one enricher keeps; recency evicts past this
 # These downweights set `confidence`, a UI/triage signal ONLY: confidence drives
 # the dashboard's "Low confidence" grouping and does NOT affect the grade (it is
 # excluded from the scoring fields -- see _report_constants.VIOLATION_FIELDS and
@@ -149,13 +150,13 @@ class FindingEnricher:
         self._on_precedent_match = context.on_precedent_match
         self._log = log
         base_reader: Callable[[Path], str] = file_reader or _default_read_file
-        self._file_cache: dict[Path, str] = {}
+        self._file_cache: LRUDict[Path, str] = LRUDict(_FILE_CACHE_CAPACITY)
 
         def _cached_read_file(path: Path) -> str:
             cached = self._file_cache.get(path)
             if cached is None:
                 cached = base_reader(path)
-                self._file_cache[path] = cached
+                self._file_cache.put(path, cached)
             return cached
 
         self._read_file: Callable[[Path], str] = _cached_read_file
