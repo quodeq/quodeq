@@ -1,23 +1,26 @@
 import { useMemo, useState } from 'react';
-import HeatGridCells from '../../../components/HeatGridCells.jsx';
-import { buildRows } from './dimensionHeatGridModel.js';
+import HeatGridCells, { HEAT_GRID_VARIANT } from '../../../components/HeatGridCells.jsx';
+import { buildRows, COL_NAME, COL_VIOLATIONS, COL_HEALTH, ROW_TYPE } from './dimensionHeatGridModel.js';
 import { activateOnKey } from '../../../utils/a11y.js';
 import { t } from '../../../strings/index.js';
+import { SORT_DIR } from '../../../vocab/sortDirection.js';
 
 const PRINCIPLE_INDENT_PX = 24;
+// This view's own column-header alignment values (only NAME is ever non-default).
+const COL_ALIGN_LEFT = 'left';
 
 function ariaSort(isActive, sortDir) {
   if (!isActive) return 'none';
-  return sortDir === 'asc' ? 'ascending' : 'descending';
+  return sortDir === SORT_DIR.ASC ? 'ascending' : 'descending';
 }
 
 const COLUMNS = [
-  { id: 'name', label: t('violations.colDimensionPrinciple'), align: 'left' },
+  { id: COL_NAME, label: t('violations.colDimensionPrinciple'), align: COL_ALIGN_LEFT },
   { id: 'critical', label: t('violations.colCritical') },
   { id: 'major', label: t('violations.colMajor') },
   { id: 'minor', label: t('violations.colMinor') },
-  { id: 'violations', label: t('violations.colViolations') },
-  { id: 'health', label: t('violations.colHealth') },
+  { id: COL_VIOLATIONS, label: t('violations.colViolations') },
+  { id: COL_HEALTH, label: t('violations.colHealth') },
 ];
 
 function HeatGridHead({ sortCol, sortDir, handleSort }) {
@@ -27,7 +30,7 @@ function HeatGridHead({ sortCol, sortDir, handleSort }) {
         {COLUMNS.map((col) => (
           <th
             key={col.id}
-            className={`heat-grid-th-sort${col.align === 'left' ? ' left' : ''}`}
+            className={`heat-grid-th-sort${col.align === COL_ALIGN_LEFT ? ' left' : ''}`}
             aria-sort={ariaSort(sortCol === col.id, sortDir)}
           >
             {/* A real <button> so sorting is reachable from the keyboard (a <th>
@@ -38,7 +41,7 @@ function HeatGridHead({ sortCol, sortDir, handleSort }) {
               aria-label={t('violations.sortByAria', { column: col.label })}
               onClick={() => handleSort(col.id)}
             >
-              {col.label}{sortCol === col.id ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+              {col.label}{sortCol === col.id ? (sortDir === SORT_DIR.ASC ? ' ↑' : ' ↓') : ''}
             </button>
           </th>
         ))}
@@ -48,7 +51,7 @@ function HeatGridHead({ sortCol, sortDir, handleSort }) {
 }
 
 function HeatGridRow({ row, onDimensionClick, onPrincipleClick, onCellClick }) {
-  const isDim = row.type === 'dimension';
+  const isDim = row.type === ROW_TYPE.DIMENSION;
   return (
     <tr className={isDim ? 'heat-grid-dim-row' : undefined}>
       <td>
@@ -63,23 +66,23 @@ function HeatGridRow({ row, onDimensionClick, onPrincipleClick, onCellClick }) {
           {row.name}
         </div>
       </td>
-      <HeatGridCells row={row} onCellClick={onCellClick} variant="flat" />
+      <HeatGridCells row={row} onCellClick={onCellClick} variant={HEAT_GRID_VARIANT.FLAT} />
     </tr>
   );
 }
 
 export default function DimensionHeatGridView({ dimensions, onDimensionClick, onPrincipleClick, onCellClick }) {
-  const [sortCol, setSortCol] = useState('violations');
-  const [sortDir, setSortDir] = useState('desc');
+  const [sortCol, setSortCol] = useState(COL_VIOLATIONS);
+  const [sortDir, setSortDir] = useState(SORT_DIR.DESC);
 
   const rows = useMemo(() => buildRows(dimensions, sortCol, sortDir), [dimensions, sortCol, sortDir]);
 
   const handleSort = (col) => {
     if (sortCol === col) {
-      setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+      setSortDir((d) => d === SORT_DIR.ASC ? SORT_DIR.DESC : SORT_DIR.ASC);
     } else {
       setSortCol(col);
-      setSortDir(col === 'name' ? 'asc' : 'desc');
+      setSortDir(col === COL_NAME ? SORT_DIR.ASC : SORT_DIR.DESC);
     }
   };
 

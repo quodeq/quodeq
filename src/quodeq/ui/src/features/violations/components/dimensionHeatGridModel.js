@@ -4,18 +4,29 @@
  * and PRINCIPLE_INDENT_PX — stay in DimensionHeatGridView.jsx).
  */
 import { SEVERITY } from '../../../vocab/severity.js';
+import { SORT_DIR } from '../../../vocab/sortDirection.js';
 
 export const DEFAULT_SEVERITY = SEVERITY.MINOR;
 const UNKNOWN_PRINCIPLE = '(unknown)'; // findings that name no principle share one synthetic row
 
+// This grid's column ids, shared with DimensionHeatGridView.jsx's COLUMNS
+// (the rest of COLUMNS are severity ids, already covered by vocab/severity.js).
+export const COL_NAME = 'name';
+export const COL_VIOLATIONS = 'violations';
+export const COL_HEALTH = 'health';
+
+// A flattened row's own kind: the dimension summary row, or one of its
+// principle rows indented under it.
+export const ROW_TYPE = Object.freeze({ DIMENSION: 'dimension', PRINCIPLE: 'principle' });
+
 export function getSortValue(row, col) {
   switch (col) {
-    case 'name': return row.name || '';
+    case COL_NAME: return row.name || '';
     case SEVERITY.CRITICAL: return row.severity.critical;
     case SEVERITY.MAJOR: return row.severity.major;
     case SEVERITY.MINOR: return row.severity.minor;
-    case 'violations': return row.violations;
-    case 'health': return row.complianceRate;
+    case COL_VIOLATIONS: return row.violations;
+    case COL_HEALTH: return row.complianceRate;
     default: return 0;
   }
 }
@@ -24,10 +35,10 @@ export function comparator(col, dir) {
   return (a, b) => {
     const va = getSortValue(a, col);
     const vb = getSortValue(b, col);
-    if (col === 'name') {
-      return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    if (col === COL_NAME) {
+      return dir === SORT_DIR.ASC ? va.localeCompare(vb) : vb.localeCompare(va);
     }
-    const diff = dir === 'asc' ? va - vb : vb - va;
+    const diff = dir === SORT_DIR.ASC ? va - vb : vb - va;
     return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
   };
 }
@@ -56,7 +67,7 @@ function principleEntry(principleMap, name) {
 export function buildPrincipleRow(name, data, dim) {
   const total = data.violations + data.compliance;
   return {
-    type: 'principle',
+    type: ROW_TYPE.PRINCIPLE,
     name,
     violations: data.violations,
     compliance: data.compliance,
@@ -97,7 +108,7 @@ export function buildDimensionGroup(dim) {
 
   const dimTotal = violations.length + compliance.length;
   const dimRow = {
-    type: 'dimension', name: dim.dimension, violations: violations.length,
+    type: ROW_TYPE.DIMENSION, name: dim.dimension, violations: violations.length,
     compliance: compliance.length, severity: dimSev,
     complianceRate: dimTotal > 0 ? compliance.length / dimTotal : 0, raw: dim,
   };

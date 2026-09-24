@@ -10,6 +10,10 @@ import { t } from '../../../strings/index.js';
 import { walkTree } from '../../../utils/treeWalk.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
+// This page's own sub-tab route param: which view of the violations list is
+// showing. Not a NAV_TAB member (a page-local concept, not a nav-stack page).
+export const VIOLATIONS_SUB_TAB = Object.freeze({ DIMENSION: 'dimension', FILE: 'file', DISMISSED: 'dismissed' });
+
 function findSubtree(root, path) {
   if (!path) return root;
   return walkTree(root, (node) => node.path === path) || root;
@@ -120,9 +124,9 @@ function ViolationsHeader({ summary, visibleDimensions, topFilesCount, uniquePri
         badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
       />
       <div className="violations-flag-row">
-        <FlagPill flag={t('violations.flagByDimension')} active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
-        <FlagPill flag={t('violations.flagByFile')}      active={activeSubTab === 'file'}      onClick={() => setActiveSubTab('file')} />
-        <FlagPill flag={t('violations.flagDismissed')}   active={activeSubTab === 'dismissed'} count={dismissed.length || undefined} onClick={() => setActiveSubTab('dismissed')} />
+        <FlagPill flag={t('violations.flagByDimension')} active={activeSubTab === VIOLATIONS_SUB_TAB.DIMENSION} onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.DIMENSION)} />
+        <FlagPill flag={t('violations.flagByFile')}      active={activeSubTab === VIOLATIONS_SUB_TAB.FILE}      onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.FILE)} />
+        <FlagPill flag={t('violations.flagDismissed')}   active={activeSubTab === VIOLATIONS_SUB_TAB.DISMISSED} count={dismissed.length || undefined} onClick={() => setActiveSubTab(VIOLATIONS_SUB_TAB.DISMISSED)} />
       </div>
     </div>
   );
@@ -135,13 +139,13 @@ export function ViolationsSubTabContent(props) {
     handleRestore, handleRestoreAll, handleDelete, handleDeleteAll,
     selectedSource,
   } = props;
-  if (activeSubTab === 'file') {
+  if (activeSubTab === VIOLATIONS_SUB_TAB.FILE) {
     return <FileSubTab dimensions={visibleDimensions} onFileClick={callbacks.onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />;
   }
-  if (activeSubTab === 'dimension') {
+  if (activeSubTab === VIOLATIONS_SUB_TAB.DIMENSION) {
     return <DimensionHeatGridView dimensions={visibleDimensions} onDimensionClick={callbacks.onDimensionClick} onPrincipleClick={callbacks.onPrincipleClick} onCellClick={callbacks.onCellClick} />;
   }
-  if (activeSubTab === 'dismissed') {
+  if (activeSubTab === VIOLATIONS_SUB_TAB.DISMISSED) {
     // Shared projects have no mutation route on the backend — pass undefined
     // instead of the real handlers so DismissedSubTab hides the actions and
     // the list stays visible read-only. useDismissedFindings' own handlers
@@ -163,7 +167,7 @@ export function ViolationsSubTabContent(props) {
   return null;
 }
 
-export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = 'dimension', onSubTabChange }) {
+export default function ViolationsPage({ data, callbacks, tabKey = 0, subTab = VIOLATIONS_SUB_TAB.DIMENSION, onSubTabChange }) {
   const { accumulatedDimensions = [], selectedProject, dismissRefreshKey = 0, selectedSource = PROJECT_SOURCE.LOCAL } = data;
   const { projects = [], projectsLoaded, projectName, loading, isFetching, error } = data;
   const { onNavigate, onRefresh, onReconcile, onRetry } = callbacks;
