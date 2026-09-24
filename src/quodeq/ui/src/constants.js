@@ -2,6 +2,11 @@ import { GRANULARITY } from './utils/granularity.js';
 
 const UNDEFINED_TYPEOF = 'undefined'; // typeof sentinel for the event-dispatch helpers' "are we in a browser" guard
 
+// Vite env vars are always strings, never coerced to boolean; every reader
+// of a VITE_* boolean flag (VITE_USE_SSE_EVENTS) compares against this
+// instead of the literal 'true'.
+export const ENV_TRUE = 'true';
+
 export const ISO_25010_URL = 'https://www.iso.org/';
 
 // Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).

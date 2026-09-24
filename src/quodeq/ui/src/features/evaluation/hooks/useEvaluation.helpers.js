@@ -4,12 +4,12 @@
  * Split out of useEvaluation.js (see that file's header for the hook's
  * overall data-flow doc). Kept logic-identical to the pre-split version.
  */
-import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_CONFIGURED_MARKER } from "../../../constants.js";
+import { ACTIVE_PROVIDER_KEY, providerKey, PROVIDER_CONFIGURED_MARKER, ENV_TRUE } from "../../../constants.js";
 import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
 import { t } from "../../../strings/index.js";
 import { JOB_STATUS } from "../../../vocab/jobStatus.js";
 
-export const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === "true";
+export const SSE_ENABLED = import.meta.env?.VITE_USE_SSE_EVENTS === ENV_TRUE;
 const DIM_POLL_MS = 2000;
 
 /**

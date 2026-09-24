@@ -15,11 +15,7 @@ import {
   providerKey,
 } from '../constants.js';
 import { LOCAL_API_PROVIDERS } from '../vocab/provider.js';
-import { readString } from '../adapters/storage.js';
-
-// localStorage read back as a raw string, never JSON-parsed.
-const STORED_TRUE = 'true';
-const STORED_FALSE = 'false';
+import { readString, STORED_TRUE, STORED_FALSE } from '../adapters/storage.js';
 
 /**
  * Effective defaults for a provider when no key was ever written.

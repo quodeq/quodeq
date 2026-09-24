@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useReEvaluateCard } from '../hooks/useReEvaluateCard.js';
 import ScanModeCards from './ScanModeCards.jsx';
 import { CLEAN_PERSIST } from './scanModes.js';
-import DimensionSelector from './DimensionSelector.jsx';
+import DimensionSelector, { DIMENSION_SELECTOR_VARIANT } from './DimensionSelector.jsx';
 import { readActiveProviderModel } from './providerLabel.js';
 import { UrlRestoreSection, DetectedLine, BudgetChips, RunBar, IdentityHeader, ScopeBrowserOverlay } from './ReEvaluateCardParts.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
@@ -88,7 +88,7 @@ function ReEvaluateScanControls({ canStart, disabled, cleanScan, setCleanScan, a
 
       {allDimensions.length > 0 && (
         <DimensionSelector
-          variant="terminal"
+          variant={DIMENSION_SELECTOR_VARIANT.TERMINAL}
           allDimensions={allDimensions}
           selectedDims={selectedDims}
           onToggle={toggleDim}

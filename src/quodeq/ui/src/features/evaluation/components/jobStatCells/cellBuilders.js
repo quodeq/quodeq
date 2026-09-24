@@ -10,23 +10,31 @@ import { suppressedSuffix, carriedSuffix, formatSevHint } from './derivations.js
 import { SCAN_MODE } from '../scanModes.js';
 import { JOB_STATUS } from '../../../../vocab/jobStatus.js';
 
+// This module's own cell-tone values (JobStatStrip's tile accent color).
+const CELL_TONE = Object.freeze({
+  DEFAULT: 'default', WARNING: 'warning', SUCCESS: 'success', CRITICAL: 'critical', ACCENT: 'accent',
+});
+
+// Shared "still counting files" hint, shown while progress is unknown.
+const HINT_PREPARING = 'preparing…';
+
 const STATUS_TONE = {
-  [JOB_STATUS.RUNNING]: 'warning',
-  [JOB_STATUS.DONE]: 'success',
-  [JOB_STATUS.FAILED]: 'critical',
-  [JOB_STATUS.LOST]: 'critical',
-  [JOB_STATUS.CANCELLED]: 'default',
+  [JOB_STATUS.RUNNING]: CELL_TONE.WARNING,
+  [JOB_STATUS.DONE]: CELL_TONE.SUCCESS,
+  [JOB_STATUS.FAILED]: CELL_TONE.CRITICAL,
+  [JOB_STATUS.LOST]: CELL_TONE.CRITICAL,
+  [JOB_STATUS.CANCELLED]: CELL_TONE.DEFAULT,
 };
 
-function statusTone(s) { return STATUS_TONE[s] || 'default'; }
+function statusTone(s) { return STATUS_TONE[s] || CELL_TONE.DEFAULT; }
 
 function progressCell({ overallPct, takenFiles, totalFiles }) {
   const knownAny = totalFiles > 0;
   return {
     label: 'PROGRESS',
     value: knownAny ? `${overallPct}%` : '—',
-    hint: knownAny ? `${takenFiles} / ${totalFiles} files` : 'preparing…',
-    tone: 'default',
+    hint: knownAny ? `${takenFiles} / ${totalFiles} files` : HINT_PREPARING,
+    tone: CELL_TONE.DEFAULT,
   };
 }
 
@@ -35,7 +43,7 @@ function elapsedCell(elapsedS, label = 'ELAPSED', hint = null) {
     label,
     value: formatDuration(elapsedS),
     hint,
-    tone: 'default',
+    tone: CELL_TONE.DEFAULT,
   };
 }
 
@@ -44,7 +52,7 @@ function foundCell(liveCount, label = 'FOUND', hint = t('evaluate.liveViolations
     label,
     value: liveCount,
     hint: `${hint}${suppressedSuffix(suppressedCount)}${carriedSuffix(carriedCount)}`,
-    tone: liveCount > 0 ? 'critical' : 'default',
+    tone: liveCount > 0 ? CELL_TONE.CRITICAL : CELL_TONE.DEFAULT,
   };
 }
 
@@ -65,7 +73,7 @@ function severityHint(n) {
 function buildDoneCells(statusCell, inputs) {
   return [
     statusCell,
-    { label: 'SCANNED', value: inputs.totalFiles > 0 ? inputs.totalFiles : '—', hint: 'files', tone: 'default' },
+    { label: 'SCANNED', value: inputs.totalFiles > 0 ? inputs.totalFiles : '—', hint: 'files', tone: CELL_TONE.DEFAULT },
     foundCell(inputs.liveCount, 'VIOLATIONS', severityHint(inputs.liveCount), inputs.suppressedCount, inputs.carriedCount),
     elapsedCell(inputs.elapsedS, 'DURATION', 'total'),
   ];
@@ -88,15 +96,15 @@ function buildRunningCells(inputs) {
       value: dc?.current ?? '—',
       hint: dc
         ? `dim ${dc.index}/${dc.count}${dc.next ? ` · next: ${dc.next}` : ''}`
-        : 'preparing…',
-      tone: 'accent',
+        : HINT_PREPARING,
+      tone: CELL_TONE.ACCENT,
     },
     {
       label: t('evaluate.filesThisRun'),
       value: runKnown ? inputs.takenFiles : '—',
       trailing: runKnown ? `/ ${inputs.totalFiles}` : null,
-      hint: runKnown ? `${inputs.overallPct}%${modeHint}` : 'preparing…',
-      tone: 'default',
+      hint: runKnown ? `${inputs.overallPct}%${modeHint}` : HINT_PREPARING,
+      tone: CELL_TONE.DEFAULT,
     },
     foundCell(inputs.liveCount, 'violations', formatSevHint(inputs.sevCounts), inputs.suppressedCount, inputs.carriedCount),
     elapsedCell(inputs.elapsedS, 'elapsed', inputs.etaHint ?? null),
@@ -124,7 +132,7 @@ export function buildJobStatCells(status, inputs) {
   // error: agree with the header pill ("time limit reached") instead of
   // showing "user cancelled" / critical "see logs" under it.
   const timeLimit = isTimeLimitExit(inputs.exitReason);
-  const tone = timeLimit ? 'default' : statusTone(status);
+  const tone = timeLimit ? CELL_TONE.DEFAULT : statusTone(status);
   const statusCell = {
     label: 'STATUS',
     value: status,

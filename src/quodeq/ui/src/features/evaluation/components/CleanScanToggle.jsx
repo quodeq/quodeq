@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { t } from '../../../strings/index.js';
-import { readString, removeKey, writeString } from '../../../adapters/storage.js';
+import { readString, removeKey, writeString, STORAGE_FLAG_ON } from '../../../adapters/storage.js';
 import { CLEAN_PERSIST } from './scanModes.js';
 
 const STORAGE_KEY = 'quodeq.cleanScan.permanent';
 
 function readPermanent(storage) {
-  return readString(STORAGE_KEY, null, storage) === '1';
+  return readString(STORAGE_KEY, null, storage) === STORAGE_FLAG_ON;
 }
 
 function writePermanent(on, storage) {
-  if (on) writeString(STORAGE_KEY, '1', storage);
+  if (on) writeString(STORAGE_KEY, STORAGE_FLAG_ON, storage);
   else removeKey(STORAGE_KEY, storage);
 }
 
