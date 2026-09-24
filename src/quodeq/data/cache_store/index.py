@@ -151,9 +151,11 @@ class ContentIndex:
     def close(self) -> None:
         """Close the connection. The next operation reopens it."""
         with self._lock:
-            if self._finalizer is not None:
-                self._finalizer()  # closes the connection once, then goes dead
-                self._finalizer = None
+            finalizer, self._finalizer = self._finalizer, None
+            if finalizer is not None:
+                finalizer()  # closes the connection once, then goes dead
+            elif self._conn is not None:
+                _close_quietly(self._conn)
             self._conn = None
 
     # -- writes -----------------------------------------------------------
