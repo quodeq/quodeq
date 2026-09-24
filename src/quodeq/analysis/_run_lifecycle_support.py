@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.run.exit_reason import ExitReason
 from quodeq.shared import cancellation
 from quodeq.data.fs.run_status_store import RunState, TERMINAL_STATES, read_status
 
@@ -182,13 +183,13 @@ def run_signal_shutdown(
     except ValueError:
         name = f"signal_{signum}"
     deadline_enforced = _deadline_has_passed(status.deadline_at)
-    exit_reason = "deadline" if deadline_enforced else f"signal_{name}"
+    exit_reason = ExitReason.DEADLINE if deadline_enforced else f"signal_{name}"
     cancellation.request_cancel()
     heartbeat.stop()
     resources.stop()
     status.write(RunState.CANCELLED, exit_reason=exit_reason)
     mark_unfinished_dims_incomplete(
-        status.run_dir, "time_limit" if deadline_enforced else "cancelled", log=log)
+        status.run_dir, ExitReason.TIME_LIMIT if deadline_enforced else ExitReason.CANCELLED, log=log)
 
 
 def finalize_run_on_atexit(

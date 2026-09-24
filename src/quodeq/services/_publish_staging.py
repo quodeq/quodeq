@@ -38,6 +38,7 @@ _RUN_FILES = (STATUS_FILENAME, DIMENSIONS_FILENAME, "events.jsonl")
 _EVIDENCE_DIR = "evidence"
 _EVALUATION_DIR = "evaluation"
 _SCAN_FILENAME = "scan.json"
+_MANIFEST_FILENAME = "manifest.json"
 
 
 def list_completed_runs(project_dir: Path) -> list[Path]:
@@ -63,7 +64,7 @@ def copy_run(run_dir: Path, dest_run_dir: Path) -> None:
     if evidence.is_dir():
         dest_evidence = dest_run_dir / _EVIDENCE_DIR
         ensure_dir(dest_evidence)
-        copy_file_if_exists(evidence / "manifest.json", dest_evidence / "manifest.json")
+        copy_file_if_exists(evidence / _MANIFEST_FILENAME, dest_evidence / _MANIFEST_FILENAME)
         copy_matching_files(evidence, dest_evidence, "*_evidence.jsonl")
     evaluation = run_dir / _EVALUATION_DIR
     if evaluation.is_dir():

@@ -96,6 +96,11 @@ export function notifyAssistantActionApplied(detail) {
   }
 }
 
+// Fired (same-tab) after Settings kills every terminal session server-side,
+// so TerminalPane can reconcile its stale views. See TerminalSection.jsx
+// (dispatcher) and TerminalPane.jsx (listener).
+export const TERMINAL_RESTART_EVENT = 'quodeq:terminal-restart';
+
 // <html> attribute carrying the applied theme; every theme CSS selector keys on it.
 export const DATA_THEME_ATTR = 'data-theme';
 // OS dark-mode media query, consulted whenever the theme mode is 'system'.

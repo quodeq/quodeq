@@ -8,6 +8,7 @@ _rescore_from_evidence in rescore.py is preferred whenever a run's
 from __future__ import annotations
 
 from quodeq.core.evidence.model import classify_confidence_level
+from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.principle import compute_tallies
 from quodeq.core.scoring.internals import finding_to_scoring_dict, principle_score_and_grade
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
@@ -35,7 +36,7 @@ def _score_principle(
     c_dicts = [finding_to_scoring_dict(c) for c in compliance]
     vt_counts, ct_counts, _using_taxonomy = compute_tallies(v_dicts, c_dicts)
     if not vt_counts and not ct_counts:
-        return None, "Insufficient"
+        return None, Grade.INSUFFICIENT
 
     confidence = classify_confidence_level(
         len(violations), len(compliance),
@@ -43,7 +44,7 @@ def _score_principle(
         source_file_count=source_file_count,
     )
     if confidence == ConfidenceLevel.LOW:
-        return None, "Insufficient"
+        return None, Grade.INSUFFICIENT
 
     return principle_score_and_grade(vt_counts, ct_counts, params=params)
 

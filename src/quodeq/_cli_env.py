@@ -18,6 +18,7 @@ _ENV_TIME_LIMIT = "QUODEQ_TIME_LIMIT"
 ENV_NO_CONSOLIDATE = "QUODEQ_NO_CONSOLIDATE"
 _POOL_BUDGET_FLAG = "--pool-budget"  # deprecated CLI flag, replaced by --time-limit
 _ENV_TRUTHY = "1"  # QUODEQ_NO_VERIFY truthy value
+_ENV_SUBAGENT_MODEL = "SUBAGENT_MODEL"
 
 
 def resolve_time_limit(args: argparse.Namespace, env: dict[str, str] | None = None) -> int | None:
@@ -65,7 +66,7 @@ def cli_env_int(var: str, default: int | None, env: dict[str, str] | None = None
 
 def subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override from the environment, or None."""
-    return cli_environ(env).get("SUBAGENT_MODEL") or None
+    return cli_environ(env).get(_ENV_SUBAGENT_MODEL) or None
 
 
 def cli_environ(env: Mapping[str, str] | None = None) -> Mapping[str, str]:

@@ -38,7 +38,7 @@ def _slim_trend_entry(entry: dict[str, Any]) -> dict[str, Any]:
     slim = {k: v for k, v in entry.items() if k != _DIMENSION_DETAILS_KEY}
     slim[_DIMENSION_DETAILS_KEY] = [
         {k: d.get(k) for k in _TREND_DETAIL_KEYS}
-        for d in entry.get("dimensionDetails") or []
+        for d in entry.get(_DIMENSION_DETAILS_KEY) or []
     ]
     return slim
 
