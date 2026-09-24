@@ -24,6 +24,7 @@ from quodeq.dashboard._webview_user_agent import (
     WEBVIEW_TOKEN_UA_PREFIX, WEBVIEW_UA_MARKER, quodeq_version,
     webview_user_agent,
 )
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
 from quodeq.shared.logging import log_debug
 
 __all__ = [
@@ -269,9 +270,9 @@ def set_macos_app_identity() -> None:
 
 def set_app_icon() -> None:
     """Set the application icon (dock on macOS, taskbar on Windows)."""
-    if sys.platform == "darwin":
+    if sys.platform == PLATFORM_DARWIN:
         set_macos_app_identity()
-    elif sys.platform == "win32":
+    elif sys.platform == PLATFORM_WIN32:
         try:
             import ctypes  # noqa: PLC0415
             path = icon_path(".ico")

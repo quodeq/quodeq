@@ -11,7 +11,9 @@ import sys
 from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
-if sys.platform != "win32":
+from quodeq.shared.constants import PLATFORM_WIN32
+
+if sys.platform != PLATFORM_WIN32:
     import fcntl
 
 from quodeq.analysis.mcp.enricher import (
@@ -52,7 +54,7 @@ def _locked_write(fh: TextIO, line: str) -> None:
     write when the file handle doesn't support ``fileno()`` (e.g. StringIO
     in tests) or on Windows.
     """
-    use_lock = sys.platform != "win32"
+    use_lock = sys.platform != PLATFORM_WIN32
     if use_lock:
         try:
             fcntl.flock(fh, fcntl.LOCK_EX)

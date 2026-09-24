@@ -23,6 +23,8 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
+
 # Well-known CLI locations to probe IN ADDITION to $PATH. A macOS app launched
 # from Finder/Dock inherits a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin) that
 # usually lacks `code`/`cursor`, so a PATH-only lookup would silently fall back
@@ -74,7 +76,7 @@ def child_cwd(
     try:
         if platform.startswith("linux"):
             return readlink(f"/proc/{pid}/cwd")
-        if platform == "darwin":
+        if platform == PLATFORM_DARWIN:
             # -Fn = machine-readable, one field per line; the cwd path is the
             # 'n'-prefixed line of the 'cwd' fd record.
             proc = run(
@@ -196,9 +198,9 @@ def detect_editor(
         found = which(name) or next((c for c in candidates if isfile(c)), None)
         if found:
             return Editor(name=name, path=found, supports_line=True)
-    if platform == "darwin":
+    if platform == PLATFORM_DARWIN:
         return Editor(name="open", path=which("open") or "/usr/bin/open", supports_line=False)
-    if platform == "win32":
+    if platform == PLATFORM_WIN32:
         # No argv — the caller routes this to os.startfile.
         return Editor(name="startfile", path="startfile", supports_line=False)
     opener = which("xdg-open")

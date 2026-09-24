@@ -28,6 +28,8 @@ from pathlib import Path
 _logger = logging.getLogger(__name__)
 
 _WORKTREE_TIMEOUT_S = 30
+_GIT = "git"
+_GIT_DIR_FLAG = "-C"  # git -C <dir> ...
 
 
 def _fetch_branch(repo_dir: Path, branch: str) -> bool:
@@ -41,7 +43,7 @@ def _fetch_branch(repo_dir: Path, branch: str) -> bool:
     from quodeq import _cli_resolution as _facade
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo_dir), "fetch", "origin", f"{branch}:{branch}"],
+            [_GIT, _GIT_DIR_FLAG, str(repo_dir), "fetch", "origin", f"{branch}:{branch}"],
             capture_output=True, text=True, encoding="utf-8", timeout=_facade.FETCH_TIMEOUT_S,
         )
         return result.returncode == 0
@@ -62,7 +64,7 @@ def create_worktree(repo_dir: Path, branch: str) -> Path | None:
     for retried in (False, True):
         try:
             subprocess.run(
-                ["git", "-C", str(repo_dir), "worktree", "add", str(worktree_dir), "--", branch],
+                [_GIT, _GIT_DIR_FLAG, str(repo_dir), "worktree", "add", str(worktree_dir), "--", branch],
                 capture_output=True, text=True, encoding="utf-8", check=True, timeout=_WORKTREE_TIMEOUT_S,
             )
             return worktree_dir
@@ -80,7 +82,7 @@ def cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
     """Remove a temporary git worktree."""
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo_dir), "worktree", "remove", str(worktree_dir), "--force"],
+            [_GIT, _GIT_DIR_FLAG, str(repo_dir), "worktree", "remove", str(worktree_dir), "--force"],
             capture_output=True, text=True, encoding="utf-8", timeout=_WORKTREE_TIMEOUT_S,
         )
         if result.returncode != 0:

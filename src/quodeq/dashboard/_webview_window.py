@@ -66,6 +66,7 @@ from quodeq.dashboard._webview_window_native_ops import (  # noqa: F401 — re-e
     save_via_dialog,
     send_cancel_evaluation,
 )
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
 
 _logger = logging.getLogger(__name__)
 
@@ -135,9 +136,9 @@ class WindowApi:
         if mode not in ("dark", "light"):
             return
         dark = mode == "dark"
-        if sys.platform == "darwin":
+        if sys.platform == PLATFORM_DARWIN:
             _chrome.set_macos_titlebar_appearance(self._window, dark)
-        elif sys.platform == "win32":
+        elif sys.platform == PLATFORM_WIN32:
             _chrome.set_windows_titlebar(dark)
 
 
@@ -155,7 +156,7 @@ def _create_window(url: str, api: "WindowApi") -> "webview.Window":
     """
     return webview.create_window(
         "quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
-        frameless=(sys.platform == "darwin"), easy_drag=False,
+        frameless=(sys.platform == PLATFORM_DARWIN), easy_drag=False,
         background_color=_WINDOW_BG_COLOR, hidden=True, js_api=api,
     )
 

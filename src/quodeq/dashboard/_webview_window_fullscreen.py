@@ -16,6 +16,8 @@ from __future__ import annotations
 import logging
 import sys
 
+from quodeq.shared.constants import PLATFORM_DARWIN
+
 _logger = logging.getLogger(__name__)
 _macos_fullscreen_observer: object | None = None  # keep the ObjC observer alive
 _macos_fullscreen_observer_installed = False  # register the notifications once
@@ -96,7 +98,7 @@ def install_macos_fullscreen_observer(window: object) -> None:
     macOS or before the native handle exists. Call from the ``loaded`` event.
     """
     global _macos_fullscreen_handler_class
-    if sys.platform != "darwin":
+    if sys.platform != PLATFORM_DARWIN:
         return
     try:
         from PyObjCTools import AppHelper  # noqa: PLC0415

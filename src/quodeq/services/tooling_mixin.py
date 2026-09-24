@@ -16,6 +16,7 @@ from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.config.provider import Provider
 from quodeq.services._browse_mixin import FsBrowseMixin
 from quodeq.services.wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
+from quodeq.shared.constants import PLATFORM_DARWIN
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
 from quodeq.shared.log_sink import SHARED_LOG
@@ -74,7 +75,8 @@ def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
 def _platform_matches(requires: str) -> bool:
     """Return True if the current platform satisfies the requires_platform constraint."""
     if requires == "darwin-arm64":
-        return sys.platform == "darwin" and _platform_module.machine() == "arm64"
+        is_darwin = sys.platform == PLATFORM_DARWIN
+        return is_darwin and _platform_module.machine() == "arm64"
     return True
 
 

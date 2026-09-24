@@ -7,6 +7,8 @@ from pathlib import Path
 
 from quodeq.config.standards_env import evaluators_dir as _default_evaluators_dir
 
+_CONFIG_SUBDIR = "config"  # subdir under root holding the discipline/detection/dimension configs
+
 
 @dataclass(frozen=True)
 class ConfigPaths:
@@ -25,17 +27,17 @@ class ConfigPaths:
     @property
     def disciplines_conf(self) -> Path:
         """Return the path to the disciplines configuration file."""
-        return self.root / "config" / "disciplines.conf"
+        return self.root / _CONFIG_SUBDIR / "disciplines.conf"
 
     @property
     def detection_file(self) -> Path:
         """Return the path to the universal detection.json config."""
-        return self.root / "config" / "detection.json"
+        return self.root / _CONFIG_SUBDIR / "detection.json"
 
     @property
     def dimensions_file(self) -> Path:
         """Return the path to the universal dimensions.json config."""
-        return self.root / "config" / "dimensions.json"
+        return self.root / _CONFIG_SUBDIR / "dimensions.json"
 
     @classmethod
     def from_root(cls, root: Path) -> "ConfigPaths":

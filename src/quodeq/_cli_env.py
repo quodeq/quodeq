@@ -16,6 +16,8 @@ ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 ENV_POOL_BUDGET = "QUODEQ_POOL_BUDGET"
 _ENV_TIME_LIMIT = "QUODEQ_TIME_LIMIT"
 ENV_NO_CONSOLIDATE = "QUODEQ_NO_CONSOLIDATE"
+_POOL_BUDGET_FLAG = "--pool-budget"  # deprecated CLI flag, replaced by --time-limit
+_ENV_TRUTHY = "1"  # QUODEQ_NO_VERIFY truthy value
 
 
 def resolve_time_limit(args: argparse.Namespace, env: dict[str, str] | None = None) -> int | None:
@@ -29,7 +31,7 @@ def resolve_time_limit(args: argparse.Namespace, env: dict[str, str] | None = No
     if getattr(args, "pool_budget", None) is not None:
         # argparse stores both --time-limit and --pool-budget on the same dest;
         # detect deprecated form by scanning the original argv.
-        if any(a == "--pool-budget" or a.startswith("--pool-budget=") for a in sys.argv[1:]):
+        if any(a == _POOL_BUDGET_FLAG or a.startswith(f"{_POOL_BUDGET_FLAG}=") for a in sys.argv[1:]):
             sys.stderr.write(
                 "warning: --pool-budget is deprecated, use --time-limit instead\n"
             )
@@ -80,4 +82,4 @@ def cli_environ(env: Mapping[str, str] | None = None) -> Mapping[str, str]:
 
 def no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
     """Return True if verification should be skipped (CLI flag or env var)."""
-    return args.no_verify or cli_environ(env).get("QUODEQ_NO_VERIFY") == "1"
+    return args.no_verify or cli_environ(env).get("QUODEQ_NO_VERIFY") == _ENV_TRUTHY

@@ -9,6 +9,7 @@ import threading
 from pathlib import Path
 from typing import Callable
 
+from quodeq.shared.constants import PLATFORM_WIN32
 from quodeq.shared.env_paths import get_run_dir
 
 _logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ _RECV_BUFFER_SIZE = 4096
 # silently rounds up so this only surfaces on Darwin. A small backlog is
 # plenty — we only ever expect a handful of pending reloads.
 _LISTEN_BACKLOG = 8
-_IS_WIN32 = sys.platform == "win32"
+_IS_WIN32 = sys.platform == PLATFORM_WIN32
 _WIN_PORT_FILE = "dashboard.port"
 
 

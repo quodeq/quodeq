@@ -24,6 +24,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from quodeq.shared.constants import PLATFORM_DARWIN
+
 _logger = logging.getLogger(__name__)
 
 # Apple Developer Team ID that release DMGs are signed with. Filled in once
@@ -105,7 +107,7 @@ def describe(
     bundle = bundle_path(executable)
     if not is_frozen:
         reason = "not_frozen"
-    elif plat != "darwin":
+    elif plat != PLATFORM_DARWIN:
         reason = "not_macos"
     elif not team:
         reason = "no_team_id"

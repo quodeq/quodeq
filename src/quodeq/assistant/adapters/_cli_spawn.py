@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Callable
 from quodeq.config.provider import Provider
+from quodeq.shared.constants import SYSTEM_DARWIN, SYSTEM_LINUX
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.copilot import build_copilot_env
 
@@ -123,7 +124,7 @@ def external_sandbox_prefix(*, writable_dirs: list[str],
     codex never runs unsandboxed with its internal sandbox bypassed.
     """
     system = platform.system()
-    if system == "Darwin":
+    if system == SYSTEM_DARWIN:
         profile = _seatbelt_profile(writable_dirs=writable_dirs, writable_files=writable_files)
         tmp = tempfile.NamedTemporaryFile("w", suffix=".sb", delete=False)
         tmp.write(profile)
@@ -132,7 +133,7 @@ def external_sandbox_prefix(*, writable_dirs: list[str],
         def _cleanup() -> None:
             Path(tmp.name).unlink(missing_ok=True)
         return ["sandbox-exec", "-f", tmp.name], _cleanup
-    if system == "Linux":
+    if system == SYSTEM_LINUX:
         if shutil.which("bwrap"):
             return _bwrap_prefix(writable_dirs, writable_files), lambda: None
         if shutil.which("firejail"):

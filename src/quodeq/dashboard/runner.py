@@ -24,6 +24,7 @@ from quodeq.dashboard._server import (
     ensure_action_api,
     ensure_action_api_forced,
 )
+from quodeq.shared.constants import PLATFORM_DARWIN
 from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_info, log_warning
@@ -169,7 +170,7 @@ def _prepare_frozen_macos_launch() -> bool:
     move-to-Applications prompt when running from the DMG or a translocated
     path. True means the app relaunched from /Applications: exit this process.
     """
-    if not (getattr(sys, "frozen", False) and sys.platform == "darwin"):
+    if not (getattr(sys, "frozen", False) and sys.platform == PLATFORM_DARWIN):
         return False
     try:
         from quodeq.update import first_launch, selfupdate

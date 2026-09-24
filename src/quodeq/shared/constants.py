@@ -1,7 +1,25 @@
 """Cross-layer constants shared across bounded contexts."""
-# House-standard, and it also keeps this import-less module indexed by
-# core/checks/framework_deps (edge-keyed; see the follow-up on ImportGraph.files).
 from __future__ import annotations
+
+# core may not import shared, but shared may import core -- re-exported here
+# so callers outside core keep one import path for every PLATFORM_* name.
+from quodeq.core.constants import PLATFORM_WIN32  # noqa: F401
+
+# sys.platform values for cross-platform branches.
+PLATFORM_DARWIN = "darwin"
+
+# platform.system() values -- a different vocabulary from sys.platform
+# ("Darwin"/"Linux" vs "darwin"/"win32").
+SYSTEM_DARWIN = "Darwin"
+SYSTEM_LINUX = "Linux"
+
+# URL schemes the app's fetchers and SSRF guards allow.
+SCHEME_HTTP = "http"
+SCHEME_HTTPS = "https"
+
+# Loopback hostnames blocked/allowed by SSRF and authority checks.
+LOCALHOST = "localhost"
+LOCALHOST_LOCALDOMAIN = "localhost.localdomain"  # glibc's alternate loopback hostname
 
 # Pool / subagent defaults
 DEFAULT_MAX_SUBAGENTS = 5

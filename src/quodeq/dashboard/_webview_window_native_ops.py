@@ -23,6 +23,8 @@ from pathlib import Path
 
 import webview
 
+from quodeq.shared.constants import PLATFORM_WIN32
+
 _logger = logging.getLogger(__name__)
 
 _EVAL_CHECK_TIMEOUT_S = 0.5
@@ -131,7 +133,7 @@ def download_via_dialog(window: object, base_url: str, path: str, filename: str)
 def kill_api(pid: int) -> None:
     """Terminate the Flask API process."""
     try:
-        sig = signal.SIGTERM if sys.platform != "win32" else signal.CTRL_BREAK_EVENT
+        sig = signal.SIGTERM if sys.platform != PLATFORM_WIN32 else signal.CTRL_BREAK_EVENT
         os.kill(pid, sig)
     except (OSError, ProcessLookupError) as exc:
         _logger.debug("action API process already gone or not killable: %s", exc)

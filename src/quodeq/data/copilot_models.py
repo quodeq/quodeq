@@ -18,6 +18,7 @@ from quodeq.shared.utils import sanitize_sensitive
 
 _log = logging.getLogger(__name__)
 _DISCOVERY_TIMEOUT_S = 15
+_OS_NAME_NT = "nt"  # os.name value
 _STOP_TIMEOUT_S = 2
 _MAX_MESSAGE_BYTES = 1024 * 1024
 _REQUEST_ID = "quodeq-models"
@@ -130,7 +131,7 @@ async def _query_models(
                 "--disable-builtin-mcps", "--no-custom-instructions", "--no-ask-user",
                 cwd=Path(directory), env=env, stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == _OS_NAME_NT else 0,
             )
             if process.stdin is None or process.stdout is None:
                 raise RuntimeError("Could not open Copilot model discovery pipes.")

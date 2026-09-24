@@ -19,6 +19,8 @@ import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
+
 if TYPE_CHECKING:
     from quodeq.dashboard._webview_window import WindowApi
 
@@ -61,7 +63,7 @@ def macos_confirm_close(_window: object) -> str:
     is accepted only for call-site symmetry with the 2-button branch and is
     unused here.
     """
-    if sys.platform != "darwin":
+    if sys.platform != PLATFORM_DARWIN:
         return "keep"
     try:
         import AppKit  # noqa: PLC0415, F401 — import-availability guard
@@ -122,7 +124,7 @@ def ask_close_choice(window: object) -> str:
     which is patch-tested the same way — both live here so a patch on either
     is visible to the other.
     """
-    if sys.platform == "darwin":
+    if sys.platform == PLATFORM_DARWIN:
         return macos_confirm_close(window)
     try:
         ok = bool(window.create_confirmation_dialog(
@@ -260,6 +262,6 @@ def make_on_closing(api: "WindowApi", window: object) -> "Callable[[], bool]":
       _make_on_closing_inline). winforms doesn't self-block, so there is no
       deadlock.
     """
-    if sys.platform == "win32":
+    if sys.platform == PLATFORM_WIN32:
         return _make_on_closing_inline(api, window)
     return _make_on_closing_async(api, window)

@@ -12,6 +12,7 @@ import threading
 
 from quodeq.dashboard._webview_window_about import diag
 from quodeq.dashboard._webview_window_chrome import logger
+from quodeq.shared.constants import PLATFORM_DARWIN
 
 _help_target: object | None = None  # keep the Help-menu handler alive (menu item holds a weak ref)
 _help_menu_installed = False  # the _HelpHandler ObjC class may only be defined once
@@ -149,7 +150,7 @@ def non_macos_menu(window: object) -> "list[object] | None":
     on macOS — a pywebview menu there would append a duplicate Help menu.
     pywebview's menu API has no keyboard accelerators, so no shortcut.
     """
-    if sys.platform == "darwin":
+    if sys.platform == PLATFORM_DARWIN:
         return None
     try:
         import webview.menu as wm  # noqa: PLC0415

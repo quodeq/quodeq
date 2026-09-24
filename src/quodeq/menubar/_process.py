@@ -16,6 +16,7 @@ import time
 from typing import NamedTuple
 
 from quodeq.menubar._health import health_check as _health_check
+from quodeq.shared.constants import PLATFORM_DARWIN
 
 _logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ def find_pids_on_port(port: int) -> list[int]:
 
     macOS-only: relies on ``lsof`` which is available on macOS by default.
     """
-    if sys.platform != "darwin":
+    if sys.platform != PLATFORM_DARWIN:
         return []
     try:
         # int() enforces the argv boundary: whatever the caller passed, only a
