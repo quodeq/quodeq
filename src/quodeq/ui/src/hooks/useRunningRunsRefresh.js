@@ -26,6 +26,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { projectKeys } from '../api/queryKeys.js';
 import { pollIntervalForRuns } from '../utils/runPolling.js';
 import { RUN_STATE } from '../vocab/runState.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 const SSE_ENABLED = () => import.meta.env?.VITE_USE_SSE_EVENTS === 'true';
 
@@ -47,7 +48,7 @@ function invalidateHistoryScope(queryClient, selectedProject, availableRuns, sel
  * source's cache stale (only local projects ever have running runs, but
  * History can be viewing either source's data when this fires).
  */
-export function useRunningRunsRefresh({ selectedProject, selectedSource = 'local', availableRuns }) {
+export function useRunningRunsRefresh({ selectedProject, selectedSource = PROJECT_SOURCE.LOCAL, availableRuns }) {
   const queryClient = useQueryClient();
   const interval = pollIntervalForRuns(availableRuns);
 

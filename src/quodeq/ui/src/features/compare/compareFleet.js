@@ -8,6 +8,7 @@
 import {
   STALE_AFTER_DAYS, nameKey, parseScore10, daysBetween, trendDelta, mean,
 } from './compareModel.js';
+import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 
 // Consequence thresholds. The score scales as
 // (10 - score) * log10(files + 10) * staleness, i.e. roughly 0..45 across
@@ -71,9 +72,9 @@ function _buildRowDims(summary) {
 function _rowIdentity(project, id) {
   return {
     id,
-    source: project.source === 'shared' ? 'shared' : 'local',
+    source: project.source === PROJECT_SOURCE.SHARED ? PROJECT_SOURCE.SHARED : PROJECT_SOURCE.LOCAL,
     sourceId: project.sourceId || id,
-    remote: project.source === 'shared',
+    remote: project.source === PROJECT_SOURCE.SHARED,
     name: project.displayName || project.name || id,
   };
 }

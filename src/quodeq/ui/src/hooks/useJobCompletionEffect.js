@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { projectKeys } from '../api/queryKeys.js';
 import { JOB_STATUS } from '../vocab/jobStatus.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 /**
  * useEvaluationLifecycle.js's job-completion effect: on-start nav, the
@@ -37,12 +38,12 @@ export function useJobCompletionEffect({ job, navTab, loadProjects, setProjects,
       // Unconditional on outputProject: invalidating an inactive observer's
       // query just marks it stale (no fetch), so this is a harmless no-op
       // when nobody is looking at that project.
-      queryClient.invalidateQueries({ queryKey: projectKeys.scores(job.outputProject, null, 'local') });
+      queryClient.invalidateQueries({ queryKey: projectKeys.scores(job.outputProject, null, PROJECT_SOURCE.LOCAL) });
       // The Compare tab holds one slim summary per project; without this a
       // finished run on ANY project leaves its fleet row stale until the
       // staleTime expires or the tab remounts. Same harmless-no-op rule as
       // above when Compare isn't mounted.
-      queryClient.invalidateQueries({ queryKey: projectKeys.compareSummary(job.outputProject, 'local') });
+      queryClient.invalidateQueries({ queryKey: projectKeys.compareSummary(job.outputProject, PROJECT_SOURCE.LOCAL) });
       // Only move the selection to the finished run when the user is
       // already on that project (or has none selected, e.g. first-eval
       // onboarding). Unconditional switching yanked a user browsing

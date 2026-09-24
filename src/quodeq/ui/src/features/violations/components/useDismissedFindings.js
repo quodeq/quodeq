@@ -12,6 +12,7 @@ import { applyMutationDelta } from '../../../api/applyMutationDelta.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 /**
  * @param {object} options
@@ -143,10 +144,10 @@ function makeHandleDeleteAll({ selectedProject, isShared, dismissedCount, applyD
   };
 }
 
-export function useDismissedFindings({ selectedProject, setRestoreError, refreshKey = 0, selectedSource = 'local', onReconcile }) {
+export function useDismissedFindings({ selectedProject, setRestoreError, refreshKey = 0, selectedSource = PROJECT_SOURCE.LOCAL, onReconcile }) {
   const [dismissed, setDismissed] = useState([]);
   const queryClient = useQueryClient();
-  const isShared = selectedSource === 'shared';
+  const isShared = selectedSource === PROJECT_SOURCE.SHARED;
 
   // Fold the mutation-delta from a restore/delete response into the React Query
   // caches so dimension scores/grades update instantly and the run-detail

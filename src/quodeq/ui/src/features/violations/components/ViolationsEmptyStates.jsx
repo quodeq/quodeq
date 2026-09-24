@@ -3,6 +3,7 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import ViolationsSkeleton from './ViolationsSkeleton.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 function ViolationsSkeletonState() {
   return (
@@ -44,7 +45,7 @@ function renderNoDimensionDataState({
   // locally, so "Start evaluation" has nowhere useful to send a
   // shared-project viewer (see DashboardPage's NoCompletedEvalPanel, the
   // precedent this mirrors).
-  if (selectedSource === 'shared') {
+  if (selectedSource === PROJECT_SOURCE.SHARED) {
     return (
       <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <TermHeader name={t('violations.termName')} sub={t('violations.subNoEvals')} />
@@ -82,7 +83,7 @@ export function renderViolationsEmptyState({
   // viewing a shared project (they may have never added a local project of
   // their own) -- gate this wall on the local list only for local selections,
   // so a shared selection falls through to the normal shared data flow below.
-  if (projects.length === 0 && selectedSource !== 'shared') {
+  if (projects.length === 0 && selectedSource !== PROJECT_SOURCE.SHARED) {
     return (
       <div className="violations-page violations-page--terminal">
         <TermHeader name={t('violations.termName')} sub={t('violations.subNoProjects')} />

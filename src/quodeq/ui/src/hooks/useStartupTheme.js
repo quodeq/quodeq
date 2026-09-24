@@ -8,6 +8,7 @@ import { syncNativeTitlebar } from '../utils/nativeTitlebar.js';
 import { useOneShotGate } from './useOneShotGate.js';
 import { useLinger } from './useLinger.js';
 import { PREFERS_DARK_QUERY, PYWEBVIEW_READY_EVENT } from '../constants.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 // How long the startup loader stays opaque after its data-hold releases,
 // covering the overview's final commit (lazy chart first render).
@@ -86,7 +87,7 @@ export function shouldShowStartupLoader({
   if (projectsLoadFailed) return false;
   if (!projectsLoaded) return true;
   if (activeTab !== 'overview') return false;
-  if ((projectsCount ?? 0) === 0 && selectedSource !== 'shared') return false;
+  if ((projectsCount ?? 0) === 0 && selectedSource !== PROJECT_SOURCE.SHARED) return false;
   if (!selectedProject) return false;
   if (error) return false;
   if (dashboard && accumulated) return false;

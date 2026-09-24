@@ -2,6 +2,7 @@ import {
   NoLocalProjectsSharedContent, NoProjectsContent, NoProjectSelectedContent,
   LoadingProjectContent, LoadProjectFailedContent, NoRunsEmptyContent, RunLoadFailedContent,
 } from './DashboardPageEmptyStates.jsx';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 // The early-return ladder of DashboardPage, as plain functions and not as
 // components: DashboardPage.fadeOnceIdentity.test.jsx pins the .dashboard-page
@@ -69,7 +70,7 @@ export function renderDashboardGate({ data, callbacks, runMode, projectName, pro
   const { projects = [], selectedSource, sharedHasContent = false, selectedProject, dashboard, loading, error, isFetching } = data;
   const { onNavigate, onRetry } = callbacks;
   const readyClass = dashboardPageClassName({ appearClass: pageState.dashboardAppearClass });
-  if (projects.length === 0 && selectedSource !== 'shared') {
+  if (projects.length === 0 && selectedSource !== PROJECT_SOURCE.SHARED) {
     return renderNoProjectsGate({ sharedHasContent, onNavigate, readyClass });
   }
   if (!selectedProject) {

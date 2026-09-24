@@ -1,5 +1,6 @@
 import { useAppState } from '../../hooks/useAppState.js';
 import { useAssistantProvider } from '../settings/hooks/useAssistantProvider.js';
+import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 
 /**
  * Canonical id/name for the selected project, so the session key and the
@@ -64,7 +65,7 @@ export function deriveAssistantContext(appState, gate) {
     // still rides along in uiState so "this run" resolves, but it does not
     // scope the session.
     runId: selectedRun || undefined,
-    source: selectedSource || 'local',
+    source: selectedSource || PROJECT_SOURCE.LOCAL,
     uiState: buildUiState(state, activePage?.dimension),
   };
 }

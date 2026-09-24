@@ -4,6 +4,7 @@ import RunOverviewPanel from './RunOverviewPanel.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { t } from '../../../strings/index.js';
 import { RUN_STATE } from '../../../vocab/runState.js';
+import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
 function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }) {
   const hasRunning = availableRuns.some((r) => r?.status === RUN_STATE.RUNNING);
@@ -25,7 +26,7 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
   // evaluation" CTA has nowhere useful to send a shared-project viewer. Show
   // the same empty shell without the button and with copy that doesn't imply
   // there's an action to take here.
-  if (selectedSource === 'shared') {
+  if (selectedSource === PROJECT_SOURCE.SHARED) {
     return (
       <EmptyState
         title={t('overview.noCompletedEvalTitle')}

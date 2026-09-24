@@ -4,6 +4,7 @@
  * else the same normalized git origin URL. Name-only collisions stay
  * separate on purpose (forks, same-named repos).
  */
+import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 
 const GIT_SUFFIX_LENGTH = 4; // ".git"
 
@@ -47,7 +48,7 @@ function entryNames(local, shared) {
 /** Which side(s) the entry was found on, for the row's chips. */
 function entrySides(local, shared) {
   if (local && shared) return 'both';
-  return local ? 'local' : 'shared';
+  return local ? PROJECT_SOURCE.LOCAL : PROJECT_SOURCE.SHARED;
 }
 
 function makeEntry(local, shared) {

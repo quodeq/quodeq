@@ -19,6 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { projectKeys } from "../../../api/queryKeys.js";
 import { STALE_TIME_MS } from "../../../hooks/queryDefaults.js";
+import { PROJECT_SOURCE } from "../../../vocab/projectSource.js";
 
 export const PREFETCH_DWELL_MS = 150;
 
@@ -29,11 +30,11 @@ export const PREFETCH_DWELL_MS = 150;
  *   the local ones, and is folded into the cache keys so a source flip
  *   never warms/reads the other source's cache slot.
  */
-export function usePrefetchRun(selectedProject, selectedSource = "local") {
+export function usePrefetchRun(selectedProject, selectedSource = PROJECT_SOURCE.LOCAL) {
   const queryClient = useQueryClient();
   const { getDashboard, sharedGetDashboard, getProjectScores, sharedGetProjectScores } = useApi();
-  const fetchDashboard = selectedSource === "shared" ? sharedGetDashboard : getDashboard;
-  const fetchScores = selectedSource === "shared" ? sharedGetProjectScores : getProjectScores;
+  const fetchDashboard = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetDashboard : getDashboard;
+  const fetchScores = selectedSource === PROJECT_SOURCE.SHARED ? sharedGetProjectScores : getProjectScores;
   const timerRef = useRef(null);
 
   const cancelPrefetch = useCallback(() => {

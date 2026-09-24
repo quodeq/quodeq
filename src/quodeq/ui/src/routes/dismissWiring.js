@@ -9,6 +9,7 @@
  * here, once.
  */
 import { dismissWithReconcile } from '../features/findings/dismissFlow.js';
+import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 /**
  * Whether the selection points at the shared repository mirror.
@@ -17,7 +18,7 @@ import { dismissWithReconcile } from '../features/findings/dismissFlow.js';
  * @returns {boolean}
  */
 export function isSharedSource(selectedSource) {
-  return selectedSource === 'shared';
+  return selectedSource === PROJECT_SOURCE.SHARED;
 }
 
 /**
