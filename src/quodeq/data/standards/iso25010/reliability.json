@@ -1,11 +1,13 @@
 {
   "id": "reliability",
   "name": "Reliability",
+  "description": "How dependably the system performs its required functions over time. Maturity, fault tolerance, and recoverability keep failures rare, contained, and easy to bounce back from when they happen.",
   "iso_25010": "Reliability",
   "version": "2023",
   "sub_characteristics": [
     {
       "name": "Maturity",
+      "description": "How rarely the system fails under normal use. Higher maturity comes from tests, type checks, and disciplined error handling on every path so defects do not reach production.",
       "requirements": [
         {
           "id": "R-MAT-1",
@@ -79,6 +81,7 @@
     },
     {
       "name": "Availability",
+      "description": "How often the system is operational and reachable when users need it. Availability suffers when single points of failure, slow startups, or unbounded resources take the system offline.",
       "requirements": [
         {
           "id": "R-AVL-1",
@@ -119,6 +122,7 @@
     },
     {
       "name": "Fault Tolerance",
+      "description": "How well the system keeps working when something goes wrong. Errors are isolated, retries and timeouts are explicit, and a misbehaving dependency does not bring everything down.",
       "requirements": [
         {
           "id": "R-FT-1",
@@ -167,7 +171,7 @@
         },
         {
           "id": "R-FT-7",
-          "text": "Catch blocks MUST target specific exception types, not generic Exception",
+          "text": "Catch blocks MUST target specific exception types, not generic Exception. A generic catch is compliant only at a fault-isolation boundary (a thread or task entry point, one iteration of an event loop or work queue, or a call into third-party or plugin code) that records the error with its stack trace at warning level or above and does not continue with partially-updated state; a generic catch around ordinary logic is a violation",
           "cwe": [
             396
           ]
@@ -261,6 +265,7 @@
     },
     {
       "name": "Recoverability",
+      "description": "How quickly the system returns to a known good state after a failure. Backups, replayable state, idempotent operations, and predictable shutdown make recovery routine rather than heroic.",
       "requirements": [
         {
           "id": "R-REC-1",
