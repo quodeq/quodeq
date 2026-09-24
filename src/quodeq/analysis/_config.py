@@ -29,6 +29,11 @@ class AnalysisConfig:
     heartbeat_callback: HeartbeatCallback | None = None
     ai_cmd: str | None = None
     ai_model: str | None = None
+    # Binary override for the CLI spawn (AI_CMD_PATH); None spawns ``ai_cmd``.
+    ai_cmd_path: str | None = None
+    # Result-cache root the findings server writes under (``--cache-root``).
+    # ``run_analysis`` fills it from the environment when the caller left it unset.
+    cache_root: Path | None = None
     max_turns: int | None = field(default_factory=default_max_turns)
     max_duration: int | None = field(default_factory=default_max_duration)
     time_limit: int = DEFAULT_TIME_LIMIT
@@ -70,6 +75,9 @@ class AgentParams:
     # Emitted as ``--standards-dir``. ``None`` when no ``RunConfig`` is
     # carried (no params fingerprint folded in).
     standards_dir: Path | None = None
+    # Emitted as ``--cache-root``; None omits the flag (``run_analysis``
+    # always resolves one before any spawn).
+    cache_root: Path | None = None
 
 
 @dataclass(frozen=True)

@@ -31,6 +31,10 @@ from quodeq.analysis._api_standards_text import (
 )
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.api_prompt_assembly import ProjectBrief, assemble_api_prompt
+from quodeq.config.analysis_env import (
+    api_read_timeout_override, context_size_override, finding_repair_disabled,
+    max_output_tokens_override,
+)
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.shared import cancellation
 
@@ -130,14 +134,25 @@ def _dispatch_one_batch(
 
 def build_batch_api_config(
     cfg: AnalysisConfig, model: str, api_base: str, api_key: str,
+    env: Mapping[str, str],
 ) -> ApiRunnerConfig:
-    """Build the one ApiRunnerConfig shared by every batch in a dimension."""
+    """Build the one ApiRunnerConfig shared by every batch in a dimension.
+
+    The operator overrides are resolved here, once per dimension, from *env*
+    (``run_analysis``'s resolved environment), so the per-call code in
+    ``_api_call`` never reads the environment. QUODEQ_CONTEXT_SIZE only
+    applies when the run did not configure a context size.
+    """
     from quodeq.analysis._api_runner import ApiRunnerConfig  # noqa: PLC0415
 
     max_subagents = getattr(getattr(cfg.run_config, "options", None), "max_subagents", 1)
+    context_size = cfg.context_size if cfg.context_size > 0 else (context_size_override(env) or 0)
     return ApiRunnerConfig(
         model=model, api_base=api_base, api_key=api_key,
-        context_size=cfg.context_size, n_subagents=max(1, max_subagents),
+        context_size=context_size, n_subagents=max(1, max_subagents),
+        max_tokens_override=max_output_tokens_override(env),
+        read_timeout_s=api_read_timeout_override(env),
+        repair_enabled=not finding_repair_disabled(env),
     )
 
 

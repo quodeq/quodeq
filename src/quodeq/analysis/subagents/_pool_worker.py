@@ -62,6 +62,7 @@ def build_agent_config(
         jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
         heartbeat_interval=bc.heartbeat_interval, heartbeat_callback=bc.heartbeat_callback,
         ai_cmd=bc.ai_cmd, ai_model=bc.ai_model, max_turns=bc.max_turns,
+        ai_cmd_path=bc.ai_cmd_path, cache_root=bc.cache_root,
         max_duration=agent_dur,
         compiled_dir=bc.compiled_dir, dimension=wctx.dimension,
         queue_path=wctx.queue_path, agent_id=agent_id,

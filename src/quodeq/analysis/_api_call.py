@@ -18,9 +18,6 @@ import openai
 from quodeq.analysis._api_response import finish_call, repair_snippetless
 from quodeq.analysis._api_schema import SYSTEM_PROMPT
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
-from quodeq.config.analysis_env import (
-    api_read_timeout_override, context_size_override, max_output_tokens_override,
-)
 from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL, OLLAMA_DEFAULT_PORT
 from quodeq.shared.url_validation import validate_url_safe
 
@@ -54,6 +51,14 @@ class ApiRunnerConfig:
     context_size: int = 0
     n_subagents: int = 1
     """Pool size this call competes with; scales the local read timeout."""
+    # Operator overrides, resolved from the environment by the caller that
+    # builds this config (``_api_batch.build_batch_api_config``), never here.
+    max_tokens_override: int | None = None
+    """QUODEQ_MAX_OUTPUT_TOKENS: replaces the local default cap; 0 disables it."""
+    read_timeout_s: int | None = None
+    """QUODEQ_API_READ_TIMEOUT: a positive value replaces the read budget outright."""
+    repair_enabled: bool = True
+    """False (QUODEQ_DISABLE_FINDING_REPAIR) skips the snippet repair re-ask."""
 
 
 @functools.lru_cache(maxsize=8)
@@ -75,14 +80,14 @@ def _resolve_max_tokens(config: ApiRunnerConfig, *, is_openai: bool) -> int | No
     """Output budget for one completion call.
 
     Explicit config wins; otherwise local calls get a default cap and cloud
-    calls stay uncapped. QUODEQ_MAX_OUTPUT_TOKENS overrides the local default
-    (0 disables the cap).
+    calls stay uncapped. ``max_tokens_override`` (QUODEQ_MAX_OUTPUT_TOKENS)
+    replaces the local default (0 disables the cap).
     """
     if config.max_tokens is not None:
         return config.max_tokens
     if is_openai:
         return None
-    override = max_output_tokens_override()
+    override = config.max_tokens_override
     if override is not None:
         return override or None
     return _DEFAULT_LOCAL_MAX_TOKENS
@@ -96,10 +101,11 @@ def _resolve_timeout(config: ApiRunnerConfig, *, is_openai: bool) -> httpx.Timeo
     a fixed budget times out queued-but-healthy calls, and each timeout burns
     the whole budget for zero findings. Scale the read budget linearly with N.
     Cloud backends parallelize, so their budget stays fixed.
-    QUODEQ_API_READ_TIMEOUT (whole seconds) overrides the read budget outright.
+    ``read_timeout_s`` (QUODEQ_API_READ_TIMEOUT, whole seconds) overrides the
+    read budget outright.
     """
     base = _CLOUD_TIMEOUT if is_openai else _LOCAL_TIMEOUT
-    override = api_read_timeout_override()
+    override = config.read_timeout_s
     if override is not None and override > 0:
         read = float(override)
     else:
@@ -149,8 +155,6 @@ def _build_create_kwargs(prompt: str, config: ApiRunnerConfig) -> tuple[dict, bo
     if not is_openai:
         extra_body["chat_template_kwargs"] = {"enable_thinking": False}
     ctx_size = config.context_size
-    if ctx_size <= 0:
-        ctx_size = context_size_override() or 0
     if ctx_size > 0:
         # Kept for proxies (LiteLLM-style) that forward it to Ollama's native
         # API; direct Ollama ignores it on /v1, hence the warning.
@@ -227,7 +231,8 @@ def call_api(
     call succeeded end-to-end. Dropped malformed findings are logged (count)
     but do not set ``was_lossy``. Findings dropped only for a missing
     ``snippet`` get one repair re-ask (see ``repair_snippetless``) before
-    they count as dropped; QUODEQ_DISABLE_FINDING_REPAIR turns that off.
+    they count as dropped; ``config.repair_enabled`` False
+    (QUODEQ_DISABLE_FINDING_REPAIR) turns that off.
     See ``run_api_analysis`` for the marker contract.
 
     The OpenAI client owns an httpx connection pool whose sockets count
@@ -263,5 +268,8 @@ def call_api(
         text = (choice.message.content or "") if choice else ""
         # Finishing inside the with block keeps the client open for the
         # snippet repair re-ask finish_call may make through this partial.
-        reask = functools.partial(repair_snippetless, client, create_kwargs, config.model)
+        reask = (
+            functools.partial(repair_snippetless, client, create_kwargs, config.model)
+            if config.repair_enabled else None
+        )
         return finish_call(config.model, finish_reason, text, start, reask=reask)

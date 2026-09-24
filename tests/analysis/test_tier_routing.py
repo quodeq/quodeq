@@ -150,3 +150,36 @@ class TestSubagentModelEnvVar:
 
     def test_pool_launcher_returns_none_when_unset(self):
         assert default_subagent_model(env={}) is None
+
+
+class TestCliRunSettingsReachTheDimensionConfig:
+    """The CLI resolves the command settings once per run (from the process
+    environment here, no injected env) and the single-agent dimension step
+    copies them onto the AnalysisConfig it spawns with."""
+
+    @staticmethod
+    def _dimension_config(tmp_path, run_config) -> AnalysisConfig:
+        ctx = AnalysisContext(
+            dimensions_data={}, date_str="2026-04-03", template="", subagent_template="", total=1,
+        )
+        with patch("quodeq.analysis._dimension_steps.run_analysis") as mock_run:
+            run_dimension_analysis(run_config, "security", "test prompt", 0, ctx)
+        return mock_run.call_args.kwargs["config"]
+
+    def test_ai_cmd_binary_override_and_cache_root(self, tmp_path, monkeypatch):
+        from quodeq.cli import build_run_config
+
+        monkeypatch.setenv("AI_CMD", "codex")
+        monkeypatch.setenv("AI_CMD_PATH", "/opt/bin/codex-wrapper")
+        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "root"))
+        args = TestBuildRunConfigAiModel._make_args()
+        run_config = build_run_config(
+            args, inputs=TestBuildRunConfigAiModel._make_inputs(tmp_path), evidence_dir=tmp_path,
+        )
+        # Read once per run: a later change to the process env is not seen.
+        monkeypatch.setenv("AI_CMD", "gemini")
+        monkeypatch.setenv("AI_CMD_PATH", "/elsewhere")
+        ac = self._dimension_config(tmp_path, run_config)
+        assert ac.ai_cmd == "codex"
+        assert ac.ai_cmd_path == "/opt/bin/codex-wrapper"
+        assert ac.cache_root == tmp_path / "root" / "results"
