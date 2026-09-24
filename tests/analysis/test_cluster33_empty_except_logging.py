@@ -57,28 +57,6 @@ def test_prioritize_files_logs_unreadable_file_size(tmp_path, recording_log) -> 
     assert "missing.py" in recording_log.debug_messages[0]
 
 
-def test_cleanup_stale_lock_logs_when_unlink_finds_it_already_gone() -> None:
-    """The stat-then-unlink pair races with another process's own cleanup.
-
-    A duck-typed stand-in gives a deterministic "stat succeeds, unlink then
-    discovers the lock file is already gone" sequence without depending on
-    real filesystem timing.
-    """
-    class _RacyLockPath:
-        def stat(self):
-            from types import SimpleNamespace
-            return SimpleNamespace(st_mtime=0.0)
-
-        def unlink(self):
-            raise FileNotFoundError("already removed")
-
-    with patch.object(_queue_state._log, "debug") as debug:
-        result = _queue_state.cleanup_stale_lock(_RacyLockPath(), threshold=0)
-
-    assert result is True
-    assert any("already removed" in call.args[0] for call in debug.call_args_list)
-
-
 def test_write_state_logs_cleanup_failure_after_replace_error(tmp_path, monkeypatch) -> None:
     """os.replace fails and the tmp file is gone by the time cleanup runs."""
     state_path = tmp_path / "queue.json"

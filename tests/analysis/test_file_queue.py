@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 
+from quodeq.analysis.subagents._file_lock import lock_file
+from quodeq.analysis.subagents._queue_state import locked
 from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
 
 
@@ -156,6 +160,34 @@ class TestCorruptionHandling:
         qp.write_text(json.dumps({"version": 1, "pending": []}))
         with pytest.raises(FileQueueError, match="taken"):
             FileQueue(qp).remaining()
+
+
+class TestLockNeverUnlinkedWhileHeld:
+    def test_constructing_a_queue_never_unlinks_a_held_lock(self, tmp_path: Path) -> None:
+        """Under flock/msvcrt the kernel releases a dead holder's lock, so a
+        leftover lock file left by a crash never blocks anyone -- there is
+        nothing to clean up. Before the fix, a background process opening
+        the SAME queue while a live holder had the lock open would see an
+        old mtime (the file's mtime never updates while flock holds it) and
+        unlink the lock out from under that live holder."""
+        q = tmp_path / "queue.json"
+        FileQueue(q, files=["a.py"])
+        lock_path = q.with_suffix(".lock")
+        # The lock file is only ever created lazily, on first use (``locked()``
+        # opens it with O_CREAT) -- construction alone never creates it.
+        os.close(os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600))
+        old = time.time() - 3600
+        os.utime(lock_path, (old, old))
+        with locked(lock_path):
+            ino = lock_path.stat().st_ino
+            FileQueue(q)
+            assert lock_path.stat().st_ino == ino
+            fd = os.open(str(lock_path), os.O_WRONLY)
+            try:
+                with pytest.raises((TimeoutError, OSError)):
+                    lock_file(fd, timeout_s=0)
+            finally:
+                os.close(fd)
 
 
 class TestConcurrency:

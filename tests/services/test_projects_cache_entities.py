@@ -7,6 +7,7 @@ mapping happens per request at the route boundary.
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from quodeq.core.types import ProjectEntry
@@ -15,6 +16,33 @@ from quodeq.services._projects_cache import ProjectsCache
 
 def _entry(pid: str = "p1") -> ProjectEntry:
     return ProjectEntry(id=pid, name="proj", runs_count=2, latest_run_id="r2")
+
+
+def _fake_clock():
+    """Deterministic stand-in for time.monotonic(): a small counter, not the
+    real (unspecified-magnitude, uptime-scale) system clock -- zeroing a
+    stamp and resubtracting a real reading almost never lands back under a
+    TTL, so a real clock would silently fail to reproduce the race below."""
+    state = {"t": 0.0}
+
+    def _tick() -> float:
+        state["t"] += 0.01
+        return state["t"]
+
+    return _tick
+
+
+def _invalidate_once_then(cache, fake):
+    """Clock function: fires cache.invalidate() on its first call, then just ticks."""
+    armed = {"on": True}
+
+    def hook():
+        if armed["on"]:
+            armed["on"] = False
+            cache.invalidate()
+        return fake()
+
+    return hook
 
 
 def test_cache_returns_entities_not_wire_dicts(tmp_path):
@@ -173,6 +201,43 @@ def test_paginated_hydration_gets_the_index_auto_detected_parent():
     entry = out["projects"][0]
     assert entry.parent == "parent"
     assert entry.runs_count == 3, "the rest of the hydrated entry must be untouched"
+
+
+def test_list_never_returns_none_when_invalidated_mid_fast_path(tmp_path, monkeypatch):
+    """A one-shot hook fires ``invalidate()`` from inside the freshness
+    check's own ``time.monotonic()`` call -- after it commits to "payload is
+    not None" but before it re-reads ``self._payload`` to return it.
+    ``list()`` must never surface that as a fake cache miss returning None."""
+    import quodeq.services._projects_cache as mod
+
+    monkeypatch.setattr(mod.fs_projects, "build_project_list", lambda _p: [_entry()])
+    cache = mod.ProjectsCache(ttl_s=60)
+    cache.list(str(tmp_path))
+
+    monkeypatch.setattr(mod, "time", SimpleNamespace(monotonic=_invalidate_once_then(cache, _fake_clock())))
+    result = cache.list(str(tmp_path))
+    assert result is not None and len(result["projects"]) == 1
+
+
+def test_paginated_list_never_returns_none_when_invalidated_mid_fast_path(tmp_path, monkeypatch):
+    """Same race, for the paginated (index + hydrate) tier: the hook fires
+    inside ``_index_fresh()``'s own monotonic() call. ``_hydrated_fresh()``
+    calls monotonic() again later in the same request, but the hook has
+    already disarmed by then -- one invalidate per request exposes it."""
+    import quodeq.services._projects_cache as mod
+
+    index = [ProjectEntry(id="p1", name="proj")]
+    monkeypatch.setattr(mod._fs_project_index, "build_project_index", lambda _p: index)
+    monkeypatch.setattr(
+        mod._fs_project_index, "build_project_entries",
+        lambda _p, ids: [_entry(pid) for pid in ids],
+    )
+    cache = mod.ProjectsCache(ttl_s=60)
+    cache.list(str(tmp_path), offset=0, limit=1)
+
+    monkeypatch.setattr(mod, "time", SimpleNamespace(monotonic=_invalidate_once_then(cache, _fake_clock())))
+    result = cache.list(str(tmp_path), offset=0, limit=1)
+    assert result is not None and len(result["projects"]) == 1
 
 
 def test_hydrate_read_cannot_observe_a_concurrent_invalidate_mid_fill():
