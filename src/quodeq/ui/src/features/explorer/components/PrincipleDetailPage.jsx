@@ -1,5 +1,6 @@
 import { memo, useMemo, useEffect } from 'react';
-import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeLetter } from '../../../utils/formatters.js';
+import { gradeLetter } from '../../../utils/formatters.js';
+import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import { headerRowKey } from './findingListRows.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
@@ -29,7 +30,7 @@ function showsComplianceSection(activeSevFilter) {
 function buildListItems({ displayedBySeverity, compliance, activeSevFilter }) {
   const arr = [];
   if (activeSevFilter !== FINDING_TYPE.COMPLIANCE) {
-    for (const sev of EVAL_SEVERITY_ORDER) {
+    for (const sev of KNOWN_SEVERITIES) {
       const vs = displayedBySeverity[sev];
       if (!vs || vs.length === 0) continue;
       arr.push({ kind: 'sev-header', sev, count: vs.length });

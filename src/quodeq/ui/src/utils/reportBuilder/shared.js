@@ -1,5 +1,5 @@
 // src/quodeq/ui/src/utils/reportBuilder/shared.js
-import { SEVERITY_ORDER } from '../formatters.js';
+import { KNOWN_SEVERITIES } from '../constants.js';
 import { SEVERITY } from '../../vocab/severity.js';
 
 const SNIPPET_MAX_LINES = 5;
@@ -91,11 +91,11 @@ export function formatPrincipleTable(principleGrades) {
 
 /**
  * Buckets violations by severity, with every known severity present as an
- * empty array so callers can iterate SEVERITY_ORDER without guarding.
+ * empty array so callers can iterate KNOWN_SEVERITIES without guarding.
  */
 export function groupBySeverity(violations) {
   const groups = {};
-  for (const sev of SEVERITY_ORDER) groups[sev] = [];
+  for (const sev of KNOWN_SEVERITIES) groups[sev] = [];
   for (const v of violations) {
     const s = (v.severity || SEVERITY.MINOR).toLowerCase();
     (groups[s] || (groups[s] = [])).push(v);
@@ -121,7 +121,7 @@ export function buildViolationsSection({ total, bySeverity, severityFilter }) {
     lines.push('');
     return lines;
   }
-  for (const sev of SEVERITY_ORDER) {
+  for (const sev of KNOWN_SEVERITIES) {
     if (!severityMatches(severityFilter, sev)) continue;
     const vs = bySeverity?.[sev] || [];
     if (vs.length === 0) continue;

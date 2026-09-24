@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { SEVERITY_ORDER } from '../../../utils/formatters.js';
+import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
@@ -12,7 +12,7 @@ function computeLiveBuckets(violationsBySeverity, dismissedSet) {
   const high = {};
   const counts = { critical: 0, major: 0, minor: 0 };
   let total = 0;
-  for (const sev of SEVERITY_ORDER) {
+  for (const sev of KNOWN_SEVERITIES) {
     const bucket = (violationsBySeverity?.[sev] || []).filter((v) => !dismissedSet.has(dismissKey(v)));
     const highBucket = [];
     for (const v of bucket) {
@@ -28,7 +28,7 @@ function computeLiveBuckets(violationsBySeverity, dismissedSet) {
 
 // Header + rows for each severity bucket the active filter lets through.
 function pushSeverityRows(arr, { highConfidenceBySeverity, activeFilter }) {
-  for (const sev of SEVERITY_ORDER) {
+  for (const sev of KNOWN_SEVERITIES) {
     const bucket = highConfidenceBySeverity[sev] || [];
     if (bucket.length === 0) continue;
     if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) continue;
@@ -86,7 +86,7 @@ export function useFileDetailFiltering({ file, onDismiss, activeFilter, lowConfE
   );
 
   const totalCompliance = file.compliance?.length || 0;
-  const distinctSeverities = SEVERITY_ORDER.filter((s) => liveSevCounts[s] > 0).length;
+  const distinctSeverities = KNOWN_SEVERITIES.filter((s) => liveSevCounts[s] > 0).length;
   const showFilters = distinctSeverities > 1 || (distinctSeverities >= 1 && totalCompliance > 0);
   const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === FINDING_TYPE.COMPLIANCE;
   const showViolations = activeFilter !== FINDING_TYPE.COMPLIANCE;
