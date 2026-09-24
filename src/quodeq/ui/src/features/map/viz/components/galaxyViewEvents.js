@@ -3,6 +3,7 @@ import { pushSeverityRows, showTooltip } from './galaxyTooltipDom.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { t } from '../../../../strings/index.js';
 import { SEVERITY } from '../../../../vocab/severity.js';
+import { KEY } from '../../../../vocab/keyboard.js';
 
 const CLUSTER_HIT_PADDING = 40; // world units of fat-finger slack around a constellation's spread
 
@@ -222,16 +223,16 @@ function makeHandleKeyDown({ animRef, move, activate, goUp }) {
   return (e) => {
     if (animRef.current) return; // mid-transition: let the camera settle first
     switch (e.key) {
-      case 'ArrowRight':
-      case 'ArrowDown':
+      case KEY.ARROW_RIGHT:
+      case KEY.ARROW_DOWN:
         e.preventDefault(); move(1); break;
-      case 'ArrowLeft':
-      case 'ArrowUp':
+      case KEY.ARROW_LEFT:
+      case KEY.ARROW_UP:
         e.preventDefault(); move(-1); break;
-      case 'Enter':
+      case KEY.ENTER:
       case ' ':
         e.preventDefault(); activate(); break;
-      case 'Escape':
+      case KEY.ESCAPE:
         if (goUp() !== false) e.preventDefault();
         break;
       default: break;

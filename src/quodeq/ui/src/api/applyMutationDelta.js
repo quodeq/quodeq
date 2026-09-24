@@ -69,6 +69,8 @@ function patchDimScore(dim, scoreByDim) {
 // reconstruct the violation-list change, so they invalidate the run-detail
 // violation source and let it refetch on next view.
 const KNOWN_KINDS = new Set(["dismiss", "restore", "delete", "restore_all", "delete_all"]);
+// Only "dismiss" splices the cached violation list locally (see KNOWN_KINDS above).
+const MUTATION_KIND_DISMISS = "dismiss";
 
 // Patch dim score/grade in place, preserving referential identity for
 // untouched dims. ``spliceDismissed`` additionally removes the dismissed
@@ -201,7 +203,7 @@ export function applyMutationDelta(queryClient, projectId, delta) {
   const dismissed = delta.dismissed || {};
   // Only dismiss can splice locally — it carries the full violation key and is
   // a single-finding removal. Every other kind invalidates instead.
-  const splices = delta.kind === "dismiss";
+  const splices = delta.kind === MUTATION_KIND_DISMISS;
   const runId = delta.runId;
 
   const patchScores = makePatchScores(queryClient, scoreByDim, dismissed);

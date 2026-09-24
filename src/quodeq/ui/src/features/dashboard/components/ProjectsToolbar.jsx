@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { relativeTime } from '../../../components/LastFetchedLine.jsx';
 import { t } from '../../../strings/index.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 // -- Toolbar: name search, filter pills, sync status -----------------------
 // Controlled entirely by the `filters` prop -- state lives one level up in
@@ -16,7 +17,7 @@ function FilterPill({ label, value, options, valueLabels = {}, onChange }) {
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false); };
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    const onKey = (e) => { if (e.key === KEY.ESCAPE) setOpen(false); };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
     return () => {

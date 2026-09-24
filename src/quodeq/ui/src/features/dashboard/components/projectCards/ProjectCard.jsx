@@ -4,6 +4,7 @@ import Badge from '../../../../components/Badge.jsx';
 import { disciplineLabel, formatDate } from './projectDisplayHelpers.js';
 import { GradeChip, LanguageNumbers, ProjectCardChips, PublishedMeta, LocalPublishedMeta } from './ProjectCardParts.jsx';
 import { PROJECT_SOURCE } from '../../../../vocab/projectSource.js';
+import { KEY } from '../../../../vocab/keyboard.js';
 
 function ProjectCardTopLeft({ project, id, name, grade, score, onResumeSetup }) {
   return (
@@ -82,7 +83,7 @@ export function ProjectCard({ project, isSelected, cardProps = {}, children: car
         role="button"
         tabIndex={0}
         onClick={() => onSelect?.(id)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}
+        onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}
       >
         <div className="project-card-top">
           <ProjectCardTopLeft project={project} id={id} name={name} grade={grade} score={score} onResumeSetup={onResumeSetup} />

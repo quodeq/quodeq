@@ -97,9 +97,13 @@ function makeAttemptImport(importProject) {
   };
 }
 
+// Backend import-conflict kind: the project's uuid already exists locally
+// (see tests/api/test_project_import_collisions.py).
+const IMPORT_CONFLICT_SAME_UUID = 'same_uuid';
+
 function makeResolveImportConflict(attemptImport) {
   return async function _resolveImportConflict(file, err) {
-    const isSameUuid = err.kind === 'same_uuid';
+    const isSameUuid = err.kind === IMPORT_CONFLICT_SAME_UUID;
     // Four whole sentences rather than one with an optional ` "name"` spliced
     // in: the quoting style is locale-dependent (guillemets, low-high quotes)
     // and the name does not sit in the same place in every word order.

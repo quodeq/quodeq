@@ -14,6 +14,10 @@ import { buildProjectRootFile } from '../utils/explorerUtils.js';
 
 const ViolationsPage = lazy(() => import('../features/violations/components/ViolationsPage.jsx'));
 
+// features/violations/components/dimensionHeatGridModel.js's row.type value
+// for a principle row (as opposed to a dimension row).
+const HEAT_GRID_ROW_TYPE_PRINCIPLE = 'principle';
+
 // Exported so unit tests can pin the runId-threading contract without having
 // to mount the whole App. Callers from the Violations page must pass the
 // dimension's ``fromRunId`` — see ``ViolationsRoute.navigateToPrinciple`` for
@@ -107,7 +111,7 @@ function buildViolationsCallbacks({ props, nav, navigateToPrinciple, navigateToD
     onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
     onFileClick: (fileObj, opts) => nav('file', { file: fileObj, sourceTab: 'violations', severityFilter: opts?.severity || null }),
     onCellClick: ({ row, severity }) => {
-      if (row.type === 'principle' && row.principleObj) {
+      if (row.type === HEAT_GRID_ROW_TYPE_PRINCIPLE && row.principleObj) {
         navigateToPrinciple(row.principleObj, severity);
       } else {
         navigateToDimension(row, severity);

@@ -3,6 +3,8 @@ import { RUN_STATE } from '../vocab/runState.js';
 import { GRANULARITY } from './granularity.js';
 
 const DAYS_PER_WEEK = 7;
+// padStart fill for two-digit month/day/week segments.
+const PAD_CHAR = '0';
 // ISO weeks are anchored on Thursday: shifting any date in the week to its
 // Thursday and reading that Thursday's year/week gives the correct ISO week
 // even when the week spans a year boundary.
@@ -30,8 +32,8 @@ export function localDayKey(dateISO) {
   if (Number.isNaN(d.getTime())) return s.slice(0, 10);
   return [
     d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
+    String(d.getMonth() + 1).padStart(2, PAD_CHAR),
+    String(d.getDate()).padStart(2, PAD_CHAR),
   ].join('-');
 }
 
@@ -56,7 +58,7 @@ export function isoWeekKey(dateISO) {
   const isoYear = date.getUTCFullYear();
   const yearStart = new Date(Date.UTC(isoYear, 0, 1));
   const weekNo = Math.ceil(((date - yearStart) / MS_PER_DAY + 1) / DAYS_PER_WEEK);
-  return `${isoYear}-W${String(weekNo).padStart(2, '0')}`;
+  return `${isoYear}-W${String(weekNo).padStart(2, PAD_CHAR)}`;
 }
 
 /**

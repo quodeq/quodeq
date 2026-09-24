@@ -27,6 +27,8 @@ const PORT_SCAN_SPAN = 5; // enough for a few stacked relaunches, not all 20 sca
 const HEALTH_CHECK_TIMEOUT_MS = 2000;
 const HEALTH_POLL_INTERVAL_MS = 5000;
 const HEALTH_ENDPOINT = '/api/health';
+// Promise.allSettled() result.status for a resolved probe.
+const SETTLED_FULFILLED = 'fulfilled';
 
 async function probeAltPort(port, baseUrl) {
   const ac = new AbortController();
@@ -57,7 +59,7 @@ export function altPortCandidates(currentPort) {
 
 async function tryFindPort(candidates, baseUrl) {
   const results = await Promise.allSettled(candidates.map((p) => probeAltPort(p, baseUrl)));
-  const found = results.find((r) => r.status === 'fulfilled' && r.value !== null);
+  const found = results.find((r) => r.status === SETTLED_FULFILLED && r.value !== null);
   return found ? found.value : null;
 }
 

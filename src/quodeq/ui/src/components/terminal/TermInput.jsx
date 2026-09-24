@@ -13,6 +13,8 @@
  * @param {string}  [props.name]
  * @param {string}  [props.ariaLabel]
  */
+import { KEY } from '../../vocab/keyboard.js';
+
 export default function TermInput({
   prompt = '$',
   command,
@@ -38,7 +40,7 @@ export default function TermInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && onSubmit) onSubmit();
+          if (e.key === KEY.ENTER && onSubmit) onSubmit();
         }}
         spellCheck={false}
         autoComplete="off"

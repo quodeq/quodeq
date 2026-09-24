@@ -62,6 +62,9 @@ export function useAppBootExtras() {
   return { sharedSignal, sidebarPinned, setSidebarPinned, dismissRefreshKey, bumpDismissRefresh };
 }
 
+// features/drawer's assistant panel id (features/assistant/drawerPanelsModel.js).
+const DRAWER_TAB_ASSISTANT = 'assistant';
+
 /**
  * Live assistant context: the pure derivation reuses the app-state object
  * we already hold (calling useAssistantContext() would spin up a second
@@ -84,7 +87,7 @@ export function useAppAssistant(state) {
   const { isOpen: assistantOpen, activeTab: drawerTab, startSession: startAssistantSession } = useAssistantDrawer();
   const { provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId, source: asstSource } = assistantCtx;
   useEffect(() => {
-    if (!assistantOpen || drawerTab !== 'assistant') return;
+    if (!assistantOpen || drawerTab !== DRAWER_TAB_ASSISTANT) return;
     startAssistantSession(buildAssistantSessionPayload({
       provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId, source: asstSource,
     }));

@@ -24,6 +24,9 @@
 // Scopes are project ids, so this is "how many projects' page state to keep".
 export const MAX_SCOPES_PER_NAMESPACE = 50;
 
+// Key used when no scope (project id) is given.
+const GLOBAL_SCOPE_KEY = '__global__';
+
 const STORES = new Map(); // namespace -> Map<scope, state object>, oldest first
 
 function storeFor(namespace) {
@@ -48,7 +51,7 @@ function touch(store, key, value) {
  * scope as recently used.
  */
 export function readCachedState(namespace, scope, defaults) {
-  const key = scope || '__global__';
+  const key = scope || GLOBAL_SCOPE_KEY;
   const store = storeFor(namespace);
   const existing = store.get(key);
   if (!existing) return { ...defaults };
@@ -61,7 +64,7 @@ export function readCachedState(namespace, scope, defaults) {
  * used scope once the namespace passes MAX_SCOPES_PER_NAMESPACE.
  */
 export function writeCachedState(namespace, scope, patch) {
-  const key = scope || '__global__';
+  const key = scope || GLOBAL_SCOPE_KEY;
   const store = storeFor(namespace);
   const prev = store.get(key) || {};
   touch(store, key, { ...prev, ...patch });
@@ -73,7 +76,7 @@ export function writeCachedState(namespace, scope, patch) {
  * "user clicked the tab itself" reset.
  */
 export function resetCachedScope(namespace, scope) {
-  storeFor(namespace).delete(scope || '__global__');
+  storeFor(namespace).delete(scope || GLOBAL_SCOPE_KEY);
 }
 
 /**

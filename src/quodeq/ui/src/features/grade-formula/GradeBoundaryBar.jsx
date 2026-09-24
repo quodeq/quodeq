@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { KEY } from '../../vocab/keyboard.js';
 
 // Upper bound of the 0-10 score axis: a number, so it needs no translation.
 const SCALE_MAX = 10;
@@ -121,8 +122,8 @@ function Segment({ i, width, hasDivider, dividerValue, onDrag, onStepKey }) {
           tabIndex={0}
           onPointerDown={onDrag(i)}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); onStepKey(i, MIN_GAP); }
-            else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); onStepKey(i, -MIN_GAP); }
+            if (e.key === KEY.ARROW_RIGHT || e.key === KEY.ARROW_UP) { e.preventDefault(); onStepKey(i, MIN_GAP); }
+            else if (e.key === KEY.ARROW_LEFT || e.key === KEY.ARROW_DOWN) { e.preventDefault(); onStepKey(i, -MIN_GAP); }
           }}
         />
       ) : null}

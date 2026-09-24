@@ -7,6 +7,10 @@ import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
 const ComparePage = lazy(() => import('../features/compare/components/ComparePage.jsx'));
 
+// This route's own nav-stack page id, used for both push (open/duel) and
+// replace (dimension switch) navigation below.
+const PAGE_COMPARE = 'compare';
+
 export function compareRoute(params, props) {
   return (
     <ComparePage
@@ -22,8 +26,8 @@ export function compareRoute(params, props) {
       // Drill-down is a real nav-stack entry: push from the fleet so the
       // browser back button returns there; replace when switching between
       // dimensions so tab-hopping doesn't grow history.
-      onOpenDimension={(key) => props.navigation.handleNavigate('compare', { dimension: key })}
-      onSwitchDimension={(key) => props.navigation.handleNavigateReplace('compare', { dimension: key })}
+      onOpenDimension={(key) => props.navigation.handleNavigate(PAGE_COMPARE, { dimension: key })}
+      onSwitchDimension={(key) => props.navigation.handleNavigateReplace(PAGE_COMPARE, { dimension: key })}
       // Cross-project principle jump: the evalPrincipal carries its own
       // project, so the selection doesn't change and back pops to Compare.
       onOpenEvalPrincipal={(evalPrincipal) => props.navigation.handleNavigate('evalprinciple', { evalPrincipal, sourceTab: 'compare' })}
@@ -44,7 +48,7 @@ export function compareRoute(params, props) {
       // Head-to-head is a push like the dimension drill-down: back returns
       // to the fleet with the two-project scope still selected.
       duel={params.duel || null}
-      onOpenDuel={(ids) => props.navigation.handleNavigate('compare', { duel: ids })}
+      onOpenDuel={(ids) => props.navigation.handleNavigate(PAGE_COMPARE, { duel: ids })}
       onBack={props.navigation.navPop}
     />
   );

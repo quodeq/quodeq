@@ -3,11 +3,12 @@
  * verbatim (move-only refactor).
  */
 import { lazy } from 'react';
+import { LATEST_RUN_ID } from '../constants.js';
 
 const HistoryPage = lazy(() => import('../features/history/components/HistoryPage.jsx'));
 
 function resolveHistorySelectedRunId(selectedRun, trend) {
-  if (selectedRun && selectedRun !== 'latest' && trend.some((t) => t.runId === selectedRun)) return selectedRun;
+  if (selectedRun && selectedRun !== LATEST_RUN_ID && trend.some((t) => t.runId === selectedRun)) return selectedRun;
   return trend.length > 0 ? trend[0].runId : null;
 }
 

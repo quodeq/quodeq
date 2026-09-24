@@ -95,11 +95,16 @@ function useRotatingTip(enabled) {
  * `tips` rotates a help tip under the logo once a wait drags past a few
  * seconds.
  */
+// Non-default `variant` values (the default is 'fullscreen' -- see the
+// class-name doc above).
+const VARIANT_INLINE = 'inline';
+const VARIANT_SHELL = 'shell';
+
 export default function LoadingScreen({ message, variant = 'fullscreen', tips = false, leaving = false }) {
   const { tipKey, fading } = useRotatingTip(tips);
   const classes = ['loading-screen'];
-  if (variant === 'inline') classes.push('loading-screen--inline');
-  if (variant === 'shell') classes.push('loading-screen--shell');
+  if (variant === VARIANT_INLINE) classes.push('loading-screen--inline');
+  if (variant === VARIANT_SHELL) classes.push('loading-screen--shell');
   // Known at mount, so the logo is lifted from the first frame and never
   // jumps when the first tip arrives.
   if (tips) classes.push('loading-screen--tips');

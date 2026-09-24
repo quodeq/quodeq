@@ -1,3 +1,10 @@
+// Nav-stack page ids that carry standard context. 'eval-principle-detail' is
+// a legacy id predating the 'evalprinciple' rename, still reachable via saved
+// links/history.
+const PAGE_EXPLORER = 'explorer';
+const PAGE_EVAL_PRINCIPLE = 'evalprinciple';
+const PAGE_EVAL_PRINCIPLE_DETAIL = 'eval-principle-detail';
+
 /**
  * Maps the active nav-stack entry to the standard ids the evaluate screen
  * should preselect. Returns [] for any page that carries no standard context
@@ -9,11 +16,11 @@
 export function deriveEvaluatePreselect(activePage) {
   if (!activePage) return [];
   const { page } = activePage;
-  if (page === 'explorer' && activePage.dimension) {
+  if (page === PAGE_EXPLORER && activePage.dimension) {
     return [activePage.dimension];
   }
   if (
-    (page === 'evalprinciple' || page === 'eval-principle-detail') &&
+    (page === PAGE_EVAL_PRINCIPLE || page === PAGE_EVAL_PRINCIPLE_DETAIL) &&
     activePage.evalPrincipal?.dimension
   ) {
     return [activePage.evalPrincipal.dimension];

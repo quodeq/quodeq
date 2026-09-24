@@ -1,5 +1,8 @@
 import { request, BASE } from './request.js';
 
+// URL.protocol includes the trailing colon.
+const HTTPS_PROTOCOL = 'https:';
+
 /**
  * The WebSocket URL for the embedded terminal, derived from the page origin
  * so it follows the dev proxy and https. Pass `sessionId` to attach to an
@@ -9,7 +12,7 @@ import { request, BASE } from './request.js';
  */
 export function terminalSocketUrl(loc = window.location, sessionId = null) {
   const u = new URL(`${BASE}/terminal/ws`, loc.href);
-  u.protocol = (loc.protocol === 'https:' || u.protocol === 'https:') ? 'wss:' : 'ws:';
+  u.protocol = (loc.protocol === HTTPS_PROTOCOL || u.protocol === HTTPS_PROTOCOL) ? 'wss:' : 'ws:';
   if (sessionId) u.searchParams.set('session', sessionId);
   return u.toString();
 }

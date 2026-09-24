@@ -1,5 +1,9 @@
 import { GRANULARITY } from './utils/granularity.js';
 
+// typeof sentinel for the "are we in a browser" guard the event-dispatch
+// helpers below share.
+const UNDEFINED_TYPEOF = 'undefined';
+
 export const ISO_25010_URL = 'https://www.iso.org/';
 
 // Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).
@@ -40,7 +44,7 @@ export const PROVIDER_CONFIGURED_MARKER = '•configured•';
 export const PROVIDER_SETTINGS_CHANGED_EVENT = 'cc-provider-settings-changed';
 
 export function notifyProviderSettingsChanged() {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== UNDEFINED_TYPEOF) {
     window.dispatchEvent(new Event(PROVIDER_SETTINGS_CHANGED_EVENT));
   }
 }
@@ -54,7 +58,7 @@ export const STANDARDS_CHANGED_EVENT = 'quodeq:standards-changed';
 export const STANDARDS_CHANGED_REASON = Object.freeze({ VISIBILITY: 'visibility', LIST: 'list' });
 
 export function notifyStandardsChanged(reason) {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== UNDEFINED_TYPEOF) {
     window.dispatchEvent(new CustomEvent(STANDARDS_CHANGED_EVENT, { detail: { reason } }));
   }
 }
@@ -77,7 +81,7 @@ export const DEFAULT_SCORE_HISTORY_GRANULARITY = GRANULARITY.DAY;
 export const ASSISTANT_ACTION_APPLIED_EVENT = 'quodeq:assistant-action-applied';
 
 export function notifyAssistantActionApplied(detail) {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== UNDEFINED_TYPEOF) {
     window.dispatchEvent(new CustomEvent(ASSISTANT_ACTION_APPLIED_EVENT, { detail }));
   }
 }
@@ -98,3 +102,13 @@ export const PYWEBVIEW_READY_EVENT = 'pywebviewready';
 // gone-missing). Not a full status enum, only the codes callers compare
 // against res.status / err.status.
 export const HTTP_STATUS = Object.freeze({ CONFLICT: 409, NOT_FOUND: 404 });
+
+// Run-id sentinel meaning "the most recently completed run" -- the
+// default/fallback wherever a specific run id has not been selected
+// (query keys, the run navigator, route params). Never a real run id.
+export const LATEST_RUN_ID = 'latest';
+
+// Fetch/DOMException .name values from AbortSignal.timeout(): api/projects.js
+// (registerProject) and api/sharedPublish.js (pullSharedProject) both treat
+// either as "the request timed out or was aborted", not a real server error.
+export const FETCH_ERROR_NAME = Object.freeze({ TIMEOUT: 'TimeoutError', ABORT: 'AbortError' });

@@ -28,7 +28,9 @@ import { pollIntervalForRuns } from '../utils/runPolling.js';
 import { RUN_STATE } from '../vocab/runState.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 
-const SSE_ENABLED = () => import.meta.env?.VITE_USE_SSE_EVENTS === 'true';
+// Vite env vars are always strings, never coerced to boolean.
+const ENV_TRUE = 'true';
+const SSE_ENABLED = () => import.meta.env?.VITE_USE_SSE_EVENTS === ENV_TRUE;
 
 function invalidateHistoryScope(queryClient, selectedProject, availableRuns, selectedSource) {
   queryClient.invalidateQueries({ queryKey: projectKeys.scores(selectedProject, null, selectedSource) });

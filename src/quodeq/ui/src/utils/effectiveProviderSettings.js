@@ -17,6 +17,10 @@ import {
 import { LOCAL_API_PROVIDERS } from '../vocab/provider.js';
 import { readString } from '../adapters/storage.js';
 
+// localStorage read back as a raw string, never JSON-parsed.
+const STORED_TRUE = 'true';
+const STORED_FALSE = 'false';
+
 /**
  * Effective defaults for a provider when no key was ever written.
  * Local-API providers run one model on the user's own hardware: a single
@@ -76,9 +80,9 @@ export function resolveProviderSettings(providerId, storage = localStorage) {
     timeLimitS: timeLimitS ?? defaults.timeLimitS,
     perDimension: perDimensionRaw === null || perDimensionRaw === undefined
       ? defaults.perDimension
-      : perDimensionRaw === 'true',
+      : perDimensionRaw === STORED_TRUE,
     verify: verifyRaw === null || verifyRaw === undefined
       ? defaults.verify
-      : verifyRaw !== 'false',
+      : verifyRaw !== STORED_FALSE,
   };
 }

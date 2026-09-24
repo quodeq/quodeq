@@ -52,6 +52,10 @@
 import { createViolations } from './violation.js';
 import { createPrinciple, createPrincipleGrade } from './principle.js';
 
+// typeof sentinel for the "is this a plain object" guard shared by every
+// raw-payload factory below.
+const OBJECT_TYPE_NAME = 'object';
+
 /**
  * Create a canonical Dimension from a raw dashboard API object.
  *
@@ -59,7 +63,7 @@ import { createPrinciple, createPrincipleGrade } from './principle.js';
  * @returns {Dimension}
  */
 export function createDimension(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
+  if (!raw || typeof raw !== OBJECT_TYPE_NAME) return raw;
   return { ...raw, ...canonicalFindings(raw) };
 }
 
@@ -89,7 +93,7 @@ function canonicalFindings(raw) {
  * @returns {Dimension}
  */
 export function createSlimDimension(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
+  if (!raw || typeof raw !== OBJECT_TYPE_NAME) return raw;
   return {
     ...raw,
     violations: Array.isArray(raw.violations) ? createViolations(raw.violations) : raw.violations,
@@ -105,7 +109,7 @@ export function createSlimDimension(raw) {
  * @returns {DimensionEval}
  */
 export function createDimensionEval(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
+  if (!raw || typeof raw !== OBJECT_TYPE_NAME) return raw;
   return {
     ...raw,
     ...canonicalFindings(raw),

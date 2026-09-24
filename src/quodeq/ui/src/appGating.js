@@ -6,10 +6,16 @@
  */
 import { PROJECT_SOURCE } from './vocab/projectSource.js';
 
+// Same value as hooks/useAppState.js's TAB_OVERVIEW, kept local rather than
+// imported: useAppState.js imports hooks/useStartupTheme.js, and this module
+// stays dependency-light on purpose (its own docstring: unit-testable
+// without mounting the whole App).
+const TAB_OVERVIEW = 'overview';
+
 // Project-data tabs (overview/violations/map/history) — module scope so both
 // the App component's bounce effect and the exported shouldBounceToEvaluate
 // helper below share one definition.
-const PROJECT_DATA_TABS = ['overview', 'violations', 'map', 'history'];
+const PROJECT_DATA_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history'];
 
 /**
  * Whether the "no runs yet" bounce-to-Evaluate effect should fire. Exported
@@ -132,5 +138,5 @@ export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCou
   if ((projectsCount ?? 0) > 0) return false;
   if (selectedSource === PROJECT_SOURCE.SHARED) return false;
   if (!sharedHasContent) return false;
-  return activeTab === 'overview';
+  return activeTab === TAB_OVERVIEW;
 }

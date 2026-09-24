@@ -17,6 +17,10 @@ import { decideHydration } from './visibleStandardsModel.js';
 // fake storage per test.
 const VISIBLE_STANDARDS_MIGRATED_KEY = 'quodeq-visible-standards-migrated';
 
+// decideHydration's (visibleStandardsModel.js) decision.kind value naming the
+// "push local cache to server" branch.
+const HYDRATION_KIND_MIGRATE = 'migrate';
+
 /**
  * Read the visible standard IDs from localStorage.
  * Returns the default ISO dimensions if nothing is stored.
@@ -113,7 +117,7 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
       alreadyMigrated: !!storage.getItem(VISIBLE_STANDARDS_MIGRATED_KEY),
       fallbackDefaults: DEFAULT_VISIBLE_STANDARDS,
     });
-    if (decision.kind === 'migrate') {
+    if (decision.kind === HYDRATION_KIND_MIGRATE) {
       const saved = await putStandardsVisibility(projectId, decision.ids);
       if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
       const ids = saved?.visibleStandardIds ?? decision.ids;

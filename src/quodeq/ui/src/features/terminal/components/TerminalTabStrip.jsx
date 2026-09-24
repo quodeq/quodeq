@@ -1,8 +1,9 @@
 import { PlusIcon, XIcon } from '../../../components/CopyButton.jsx';
 import { t } from '../../../strings/index.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 function onTabKeyDown(e, id, selectSession) {
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectSession(id); }
+  if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); selectSession(id); }
 }
 
 /**

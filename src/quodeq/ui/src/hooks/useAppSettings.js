@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { resolveDataTheme } from '../utils/themeResolver.js';
 import { readString, removeKey, writeString } from '../adapters/storage.js';
 import { DATA_THEME_ATTR, PREFERS_DARK_QUERY } from '../constants.js';
+import { THEME_MODE } from '../vocab/theme.js';
 
 const MODE_KEY = 'cc-theme-mode';
 const FAMILY_KEY = 'cc-theme-family';
@@ -72,15 +73,15 @@ export function useAppSettings() {
   // Run migration once before reading new keys
   useState(() => migrateOldTheme());
 
-  const [themeMode, setThemeMode] = useState(safeGet(MODE_KEY, 'system'));
+  const [themeMode, setThemeMode] = useState(safeGet(MODE_KEY, THEME_MODE.SYSTEM));
   const [themeFamily, setThemeFamily] = useState(safeGet(FAMILY_KEY, 'daruma'));
 
   // Listen for OS color scheme changes when in system mode
   useEffect(() => {
     const mql = window.matchMedia(PREFERS_DARK_QUERY);
     const handler = (e) => {
-      if (themeMode === 'system') {
-        applyDataTheme(resolveDataTheme('system', themeFamily, e.matches));
+      if (themeMode === THEME_MODE.SYSTEM) {
+        applyDataTheme(resolveDataTheme(THEME_MODE.SYSTEM, themeFamily, e.matches));
       }
     };
     mql.addEventListener('change', handler);

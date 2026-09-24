@@ -6,6 +6,9 @@ import { lazy } from 'react';
 
 const MapPage = lazy(() => import('../features/map/components/MapPage.jsx'));
 
+// This route's own nav-stack page id.
+const PAGE_MAP = 'map';
+
 export function mapRoute(params, props) {
   const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
   const isDirectNav = props.navigation.navStackLength === 1;
@@ -19,15 +22,15 @@ export function mapRoute(params, props) {
     const current = params.path || '';
     if (path === current) return;
     const stack = props.navigation.navStack || [];
-    for (let i = stack.length - 2; i >= 0 && stack[i].page === 'map'; i--) {
+    for (let i = stack.length - 2; i >= 0 && stack[i].page === PAGE_MAP; i--) {
       if ((stack[i].path || '') === path) {
         props.navigation.navGoTo(i);
         return;
       }
     }
-    props.navigation.handleNavigate('map', { ...params, path });
+    props.navigation.handleNavigate(PAGE_MAP, { ...params, path });
   };
-  const replaceView = (patch) => props.navigation.handleNavigateReplace('map', { ...params, ...patch });
+  const replaceView = (patch) => props.navigation.handleNavigateReplace(PAGE_MAP, { ...params, ...patch });
   return <MapPage
     data={{
       accumulated: acc,

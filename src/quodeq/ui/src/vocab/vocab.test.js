@@ -15,6 +15,7 @@ import { PROVIDER, LOCAL_API_PROVIDERS, WEB_TOOL_PROVIDERS } from './provider.js
 import { FRAME_TYPE } from './frameType.js';
 import { SCOPE_GATE_RULE } from './scopeGateRule.js';
 import { LOG_STREAM_STATUS } from './logStreamStatus.js';
+import { KEY } from './keyboard.js';
 
 test('vocab modules spell the wire values', () => {
   assert.deepEqual(RUN_STATE, {
@@ -62,4 +63,12 @@ test('provider sets derive from PROVIDER', () => {
   assert.deepEqual([...LOCAL_API_PROVIDERS].sort(), ['llamacpp', 'ollama', 'omlx']);
   assert.deepEqual([...WEB_TOOL_PROVIDERS].sort(), ['claude', 'llamacpp', 'ollama', 'omlx']);
   assert.equal(Object.isFrozen(PROVIDER), true);
+});
+
+test('KEY mirrors the DOM KeyboardEvent.key spellings', () => {
+  assert.deepEqual(KEY, {
+    ENTER: 'Enter', ESCAPE: 'Escape', TAB: 'Tab',
+    ARROW_UP: 'ArrowUp', ARROW_DOWN: 'ArrowDown', ARROW_LEFT: 'ArrowLeft', ARROW_RIGHT: 'ArrowRight',
+  });
+  assert.equal(Object.isFrozen(KEY), true);
 });

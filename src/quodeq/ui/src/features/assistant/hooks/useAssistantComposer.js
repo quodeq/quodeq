@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildMetaResponse, matchCommands, parseMetaCommand } from '../commands.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 // Must equal the `.assistant-drawer-input` max-height in assistant.css: the
 // auto-grow below stops where the CSS cap would clip anyway.
@@ -38,12 +39,12 @@ function useComposerFocusEffects({ active, streaming, draft, inputRef }) {
 // accept). Returns true when it handled the event, so the caller skips the
 // plain Enter-to-send branch.
 function handleMenuKeyDown({ event, suggestions, menuIndex, setMenuIndex, setMenuDismissed, acceptSuggestion, draft }) {
-  if (event.key === 'ArrowDown') { event.preventDefault(); setMenuIndex((i) => (i + 1) % suggestions.length); return true; }
-  if (event.key === 'ArrowUp') { event.preventDefault(); setMenuIndex((i) => (i - 1 + suggestions.length) % suggestions.length); return true; }
-  if (event.key === 'Escape') { event.preventDefault(); setMenuDismissed(true); return true; }
-  if (event.key === 'Tab') { event.preventDefault(); acceptSuggestion(suggestions[menuIndex]); return true; }
+  if (event.key === KEY.ARROW_DOWN) { event.preventDefault(); setMenuIndex((i) => (i + 1) % suggestions.length); return true; }
+  if (event.key === KEY.ARROW_UP) { event.preventDefault(); setMenuIndex((i) => (i - 1 + suggestions.length) % suggestions.length); return true; }
+  if (event.key === KEY.ESCAPE) { event.preventDefault(); setMenuDismissed(true); return true; }
+  if (event.key === KEY.TAB) { event.preventDefault(); acceptSuggestion(suggestions[menuIndex]); return true; }
   // Enter completes a partial prefix; once the draft IS the command it sends.
-  if (event.key === 'Enter' && !event.shiftKey && draft.trim() !== `/${suggestions[menuIndex].name}`) {
+  if (event.key === KEY.ENTER && !event.shiftKey && draft.trim() !== `/${suggestions[menuIndex].name}`) {
     event.preventDefault(); acceptSuggestion(suggestions[menuIndex]); return true;
   }
   return false;
@@ -91,7 +92,7 @@ export function useAssistantComposer({ active, streaming, catalog, readOnly, uiS
     if (menuVisible && handleMenuKeyDown({ event, suggestions, menuIndex, setMenuIndex, setMenuDismissed, acceptSuggestion, draft })) {
       return;
     }
-    if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); handleSend(); }
+    if (event.key === KEY.ENTER && !event.shiftKey) { event.preventDefault(); handleSend(); }
   }, [menuVisible, suggestions, menuIndex, draft, acceptSuggestion, handleSend]);
 
   const handleChange = useCallback((event) => {

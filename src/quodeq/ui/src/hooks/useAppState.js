@@ -18,7 +18,11 @@ import { useProjectActions } from './useProjectActions.js';
 import { useVisibleRuns } from './useVisibleRuns.js';
 
 export const TAB_OVERVIEW = 'overview';
+export const TAB_HISTORY = 'history';
 const TAB_HISTORY_RUN = 'history-run';
+// The run-detail drill-down page id (handleNavigate('run', {runId}) below and
+// hooks/useRunNavigator.js's handleRunView) -- distinct from the tabs above.
+const PAGE_RUN = 'run';
 // 'compare' is appended AFTER the first four on purpose: PROJECT_TABS is a
 // positional slice of the head of this list.
 export const KNOWN_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history', 'projects', 'evaluate', 'standards', 'help', 'settings', 'compare'];
@@ -122,8 +126,8 @@ function useAppNavigation() {
   const { setSelectedRun, handleRunChange } = projectBundle;
   const [historySelectedRun, setHistorySelectedRun] = useState('latest');
   function handleNavigate(page, params = {}) {
-    if (page === 'run' && params.runId) setSelectedRun(params.runId);
-    if (page === 'history-run' && params.runId) setHistorySelectedRun(params.runId);
+    if (page === PAGE_RUN && params.runId) setSelectedRun(params.runId);
+    if (page === TAB_HISTORY_RUN && params.runId) setHistorySelectedRun(params.runId);
     navPush({ page, ...params });
   }
   function handleNavigateReplace(page, params = {}) {
@@ -204,7 +208,7 @@ export function useOverviewReturnReconcile({ rootTab, selectedProject, selectedS
 export function resolveActiveTab(activePage) {
   if (KNOWN_TABS.includes(activePage.page)) return activePage.page;
   if (activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab)) return activePage.sourceTab;
-  if (activePage.page === TAB_HISTORY_RUN) return 'history';
+  if (activePage.page === TAB_HISTORY_RUN) return TAB_HISTORY;
   return TAB_OVERVIEW;
 }
 
@@ -246,8 +250,8 @@ export function useAppState() {
   } = projectBundle;
   const settings = useAppSettings();
   const { granularity, onGranularityChange } = useScoreHistoryGranularity();
-  const isHistoryRun = activePage.page === 'history-run';
-  const isHistoryTab = activePage.page === 'history';
+  const isHistoryRun = activePage.page === TAB_HISTORY_RUN;
+  const isHistoryTab = activePage.page === TAB_HISTORY;
   const effectiveRun = isHistoryRun ? historySelectedRun : selectedRun;
   // History views (the History tab and its run-detail page) show specific
   // past runs in a comparison-oriented mental model — flashing the previous

@@ -17,7 +17,11 @@
  */
 import { t } from '../strings/index.js';
 import { buildDialogShell } from './domDialogBuilder.js';
-const _ALLOWED_VARIANTS = new Set(['default', 'danger']);
+import { DIALOG_VARIANT } from '../vocab/dialogVariant.js';
+const _ALLOWED_VARIANTS = new Set([DIALOG_VARIANT.DEFAULT, DIALOG_VARIANT.DANGER]);
+// <button type="button"> avoids the implicit type="submit" default; also the
+// element tag passed to createElement below.
+const BUTTON_TYPE = 'button';
 
 function createCheckbox(dialog, { checkboxLabel, checkboxHint, checkboxDefault }) {
   if (!checkboxLabel) return null;
@@ -42,13 +46,13 @@ function createCheckbox(dialog, { checkboxLabel, checkboxHint, checkboxDefault }
 }
 
 function createConfirmButtons(actionsEl, { cancelLabel, confirmLabel, safeVariant }) {
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
+  const cancelBtn = document.createElement(BUTTON_TYPE);
+  cancelBtn.type = BUTTON_TYPE;
   cancelBtn.className = 'qd-confirm-btn qd-confirm-btn--cancel';
   cancelBtn.textContent = cancelLabel;
 
-  const confirmBtn = document.createElement('button');
-  confirmBtn.type = 'button';
+  const confirmBtn = document.createElement(BUTTON_TYPE);
+  confirmBtn.type = BUTTON_TYPE;
   confirmBtn.className = `qd-confirm-btn qd-confirm-btn--confirm qd-confirm-btn--${safeVariant}`;
   confirmBtn.textContent = confirmLabel;
 
@@ -69,7 +73,7 @@ export function confirmDialog({
   message = t('common.areYouSure'),
   confirmLabel = t('common.confirm'),
   cancelLabel = t('common.cancel'),
-  variant = 'default', // 'default' | 'danger'
+  variant = DIALOG_VARIANT.DEFAULT, // 'default' | 'danger'
   checkboxLabel = null,
   checkboxHint = '',
   checkboxDefault = false,
@@ -79,7 +83,7 @@ export function confirmDialog({
       resolve(false);
       return;
     }
-    const safeVariant = _ALLOWED_VARIANTS.has(variant) ? variant : 'default';
+    const safeVariant = _ALLOWED_VARIANTS.has(variant) ? variant : DIALOG_VARIANT.DEFAULT;
 
     function close(ok) {
       shell.unmount();
@@ -104,6 +108,6 @@ export function confirmDialog({
     cancelBtn.addEventListener('click', () => close(false));
     confirmBtn.addEventListener('click', () => close(true));
     shell.mount();
-    (safeVariant === 'danger' ? cancelBtn : confirmBtn).focus();
+    (safeVariant === DIALOG_VARIANT.DANGER ? cancelBtn : confirmBtn).focus();
   });
 }

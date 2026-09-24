@@ -44,9 +44,13 @@ function makeStartEvaluationHandler({ job, setBlockedStartError, storage, analys
   };
 }
 
+// handleEvalDismiss's action param naming the "jump to the evaluated
+// project's results" choice.
+const DISMISS_ACTION_VIEW = 'view';
+
 function makeEvalDismissHandler({ job, startedProject, selectedProject, selectProjectAndRun, navReset, setBlockedStartError, clearJob }) {
   return function handleEvalDismiss(action) {
-    if (action === 'view') {
+    if (action === DISMISS_ACTION_VIEW) {
       // The completion effect deliberately leaves the selection alone when
       // the user browsed to another project mid-run; this button is the
       // explicit jump to the evaluated project's results. Prefer the job's

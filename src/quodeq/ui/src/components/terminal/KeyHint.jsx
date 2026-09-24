@@ -7,9 +7,12 @@
  * @param {string | string[]} props.keys
  * @param {'plus'|'space'} [props.joiner='space']
  */
+// The only non-default `joiner` value (the default is 'space').
+const JOINER_PLUS = 'plus';
+
 export default function KeyHint({ keys, joiner = 'space' }) {
   const arr = Array.isArray(keys) ? keys : [keys];
-  const sep = joiner === 'plus' ? '+' : ' ';
+  const sep = joiner === JOINER_PLUS ? '+' : ' ';
   return (
     <span className="term-key-hint">
       {arr.map((k, i) => (

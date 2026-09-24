@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 const EDITABLE_REF_TYPES = ['cwe', 'book', 'url', 'other'];
 const BUILTIN_REF_TYPES = ['cwe', 'asvs', 'cert', 'cisq', 'wcag22'];
@@ -29,7 +30,7 @@ function CweList({ filtered, onSelect, onClose }) {
           key={c.id}
           className="cwe-browser-item"
           onClick={() => { onSelect(c); onClose(); }}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(c); onClose(); } }}
+          onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onSelect(c); onClose(); } }}
           role="button"
           tabIndex={0}
         >

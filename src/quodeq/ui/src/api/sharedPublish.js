@@ -4,6 +4,7 @@
  */
 
 import { request, BASE } from './request.js';
+import { FETCH_ERROR_NAME } from '../constants.js';
 
 // Generous: a pull imports a zip stream from the shared repository, but a
 // stalled connection must not leave the pull pending forever.
@@ -46,7 +47,7 @@ export async function pullSharedProject(projectId, action) {
       signal: AbortSignal.timeout(PULL_TIMEOUT_MS),
     });
   } catch (e) {
-    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+    if (e?.name === FETCH_ERROR_NAME.TIMEOUT || e?.name === FETCH_ERROR_NAME.ABORT) {
       throw new Error('Pull timed out. Check the shared repository connection and try again.');
     }
     throw e;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { resolveRequirementText } from '../resolveRequirementText.js';
 import { t } from '../../../strings/index.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 function TreeExpandIcon({ showExpand, expanded }) {
   if (!showExpand) return <span className="tree-expand-btn tree-expand-btn--invisible" />;
@@ -48,7 +49,7 @@ function TreeNodeRow({ node, actions, titles, expand }) {
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === KEY.ENTER || e.key === ' ') {
           e.preventDefault();
           onClick();
           if (showExpand) setExpanded((v) => !v);

@@ -1,6 +1,6 @@
 import { buildGroupPlanText } from './planBuilder.js';
 import { KNOWN_SEVERITIES } from './constants.js';
-import { SEVERITY } from '../vocab/severity.js';
+import { SEVERITY, SEVERITY_FILTER_ALL } from '../vocab/severity.js';
 import { FINDING_TYPE } from '../vocab/findingType.js';
 
 const addEntryTitle = (v) => ({ ...v, _entryTitle: v.principle || 'Violation' });
@@ -18,7 +18,7 @@ export function buildFilePlanText(file, severityFilter) {
   const allViolations = [];
   const violationsBySeverity = {};
   for (const sev of KNOWN_SEVERITIES) {
-    if (severityFilter && severityFilter !== 'all' && severityFilter !== sev) {
+    if (severityFilter && severityFilter !== SEVERITY_FILTER_ALL && severityFilter !== sev) {
       violationsBySeverity[sev] = [];
       continue;
     }
@@ -51,7 +51,7 @@ export function buildPrinciplePlanText({ principle, violations, violationsBySeve
   }
   let filteredViolations = violations;
   let filteredBySeverity = violationsBySeverity;
-  if (severityFilter && severityFilter !== 'all') {
+  if (severityFilter && severityFilter !== SEVERITY_FILTER_ALL) {
     filteredViolations = (violations || []).filter(
       (v) => (v.severity || SEVERITY.MINOR).toLowerCase() === severityFilter,
     );

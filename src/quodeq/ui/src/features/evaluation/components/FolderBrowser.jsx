@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 function FileIcon() {
   return (
@@ -23,7 +24,7 @@ function FolderDirItems({ directories, selectedFolder, setSelectedFolder, naviga
       onClick={() => setSelectedFolder(dir.path)}
       onDoubleClick={() => navigate(dir.path)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') navigate(dir.path);
+        if (e.key === KEY.ENTER) navigate(dir.path);
         if (e.key === ' ') { e.preventDefault(); setSelectedFolder(dir.path); }
       }}
     >
@@ -111,7 +112,7 @@ function FolderPathBar({ data, loading, pathInput, setPathInput, onNavigate, onN
         className="folder-path-input"
         value={pathInput}
         onChange={(e) => setPathInput(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') onNavigate(pathInput); }}
+        onKeyDown={(e) => { if (e.key === KEY.ENTER) onNavigate(pathInput); }}
         placeholder={t('evaluate.pathPlaceholder')}
         aria-label={t('evaluate.pathAria')}
       />
@@ -175,8 +176,8 @@ function NewFolderInput({ currentPath, navigate, onClose }) {
         onKeyDown={(e) => {
           // Fire-and-forget: handleCreate already catches its own errors and
           // sets the inline error state, same as the button's onClick below.
-          if (e.key === 'Enter') void handleCreate();
-          if (e.key === 'Escape') onClose();
+          if (e.key === KEY.ENTER) void handleCreate();
+          if (e.key === KEY.ESCAPE) onClose();
         }}
         placeholder={t('evaluate.folderNamePlaceholder')} autoFocus
       />

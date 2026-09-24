@@ -19,18 +19,21 @@
  * pass the caller's source explicitly if it should also match shared entries.
  */
 import { DEFAULT_PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { LATEST_RUN_ID } from '../constants.js';
 
 // Stand-in job/run id for queries kept mounted with `enabled: false`:
 // react-query still wants a stable key, and routing the placeholder through
 // the factories below keeps it in the same cache subtree as the real entries.
 export const NO_JOB_ID = "_none_";
 
+const EVALUATION_SCOPE = "evaluation";
+
 export const evaluationKeys = {
-  all: () => ["evaluation"],
-  evaluation: (jobId) => ["evaluation", jobId],
-  status: (jobId) => ["evaluation", jobId, "status"],
-  findings: (jobId) => ["evaluation", jobId, "findings"],
-  dimensions: (jobId) => ["evaluation", jobId, "dimensions"],
+  all: () => [EVALUATION_SCOPE],
+  evaluation: (jobId) => [EVALUATION_SCOPE, jobId],
+  status: (jobId) => [EVALUATION_SCOPE, jobId, "status"],
+  findings: (jobId) => [EVALUATION_SCOPE, jobId, "findings"],
+  dimensions: (jobId) => [EVALUATION_SCOPE, jobId, "dimensions"],
 };
 
 // The project-key layout: ["project", projectId, source, ...subkey]. Every
@@ -54,8 +57,8 @@ function projectScope(projectId, source, ...subkey) {
 export const projectKeys = {
   all: () => [PROJECT_SCOPE],
   project: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source),
-  scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "scores", asOf || "latest"),
-  dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dashboard", run || "latest"),
+  scores: (projectId, asOf, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "scores", asOf || LATEST_RUN_ID),
+  dashboard: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dashboard", run || LATEST_RUN_ID),
   runs: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runs"),
   info: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "info"),
   // Explorer (dimension detail) queries. Distinct from `scores`: that one is
@@ -63,7 +66,7 @@ export const projectKeys = {
   // runScores is the slim GET /projects/<p>/scores/<run> used for the rescore
   // merge. Both sit inside the project subtree on purpose, so every existing
   // mutation invalidation (dismiss/delete/formula reconcile) reaches them.
-  runScores: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runScores", run || "latest"),
+  runScores: (projectId, run, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "runScores", run || LATEST_RUN_ID),
   // Compare tab's slim per-project payload. Lives inside the project subtree
   // on purpose: dismiss/delete/formula invalidations must reach it, or the
   // fleet table would keep showing pre-dismissal scores.
@@ -71,7 +74,7 @@ export const projectKeys = {
   // Per-project enabled-standards set, fetched by Compare so every row is
   // filtered to that project's own visible dimensions (as Overview does).
   standardsVisibility: (projectId, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "standardsVisibility"),
-  dimensionEval: (projectId, run, dimension, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dimensionEval", run || "latest", dimension),
+  dimensionEval: (projectId, run, dimension, source = DEFAULT_PROJECT_SOURCE) => projectScope(projectId, source, "dimensionEval", run || LATEST_RUN_ID, dimension),
 };
 
 /**
@@ -102,34 +105,42 @@ export function samePlaceholderScope(previousQuery, projectId, source = DEFAULT_
   return key[PROJECT_ID_INDEX] === projectId && key[PROJECT_SOURCE_INDEX] === source;
 }
 
+const SYSTEM_SCOPE = "system";
+
 export const systemKeys = {
-  all: () => ["system"],
-  health: () => ["system", "health"],
-  ollama: () => ["system", "ollama"],
-  llamacpp: () => ["system", "llamacpp"],
-  omlx: () => ["system", "omlx"],
+  all: () => [SYSTEM_SCOPE],
+  health: () => [SYSTEM_SCOPE, "health"],
+  ollama: () => [SYSTEM_SCOPE, "ollama"],
+  llamacpp: () => [SYSTEM_SCOPE, "llamacpp"],
+  omlx: () => [SYSTEM_SCOPE, "omlx"],
 };
+
+const STANDARDS_SCOPE = "standards";
 
 export const standardsKeys = {
-  all: () => ["standards"],
-  list: () => ["standards", "list"],
-  library: () => ["standards", "library"],
-  cwes: () => ["standards", "cwes"],
-  overrides: (projectId) => ["standards", "overrides", projectId],
+  all: () => [STANDARDS_SCOPE],
+  list: () => [STANDARDS_SCOPE, "list"],
+  library: () => [STANDARDS_SCOPE, "library"],
+  cwes: () => [STANDARDS_SCOPE, "cwes"],
+  overrides: (projectId) => [STANDARDS_SCOPE, "overrides", projectId],
 };
+
+const SETTINGS_SCOPE = "settings";
 
 export const settingsKeys = {
-  all: () => ["settings"],
-  aiClients: () => ["settings", "aiClients"],
-  clientModels: (clientId) => ["settings", "clientModels", clientId],
-  knownModels: (providerId) => ["settings", "knownModels", providerId],
-  ollamaModels: () => ["settings", "ollamaModels"],
-  llamacppModels: () => ["settings", "llamacppModels"],
-  omlxModels: () => ["settings", "omlxModels"],
+  all: () => [SETTINGS_SCOPE],
+  aiClients: () => [SETTINGS_SCOPE, "aiClients"],
+  clientModels: (clientId) => [SETTINGS_SCOPE, "clientModels", clientId],
+  knownModels: (providerId) => [SETTINGS_SCOPE, "knownModels", providerId],
+  ollamaModels: () => [SETTINGS_SCOPE, "ollamaModels"],
+  llamacppModels: () => [SETTINGS_SCOPE, "llamacppModels"],
+  omlxModels: () => [SETTINGS_SCOPE, "omlxModels"],
 };
 
+const SHARED_SCOPE = "shared";
+
 export const sharedKeys = {
-  all: () => ["shared"],
-  status: () => ["shared", "status"],
-  list: () => ["shared", "list"],
+  all: () => [SHARED_SCOPE],
+  status: () => [SHARED_SCOPE, "status"],
+  list: () => [SHARED_SCOPE, "list"],
 };

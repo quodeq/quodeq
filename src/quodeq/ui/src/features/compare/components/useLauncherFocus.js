@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { focusables, restoreFocus } from '../../../utils/a11y.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 // Focus mechanics for the duel and dimension launcher popovers, the other
 // half of useLauncherDismiss (which owns Escape and outside pointer/scroll).
@@ -24,7 +25,7 @@ function moveFocus(menu, delta) {
 
 function launcherKeydown(menu, btn, close) {
   return (e) => {
-    if (e.key === 'Tab') {
+    if (e.key === KEY.TAB) {
       e.preventDefault();
       close();
       restoreFocus(btn);
