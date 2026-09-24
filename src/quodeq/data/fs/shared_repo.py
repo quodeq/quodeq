@@ -20,12 +20,10 @@ project that is one publish stale, never a half-written published.json.
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import shutil
 import stat
-import subprocess
 import threading
 from collections.abc import Mapping
 from pathlib import Path
@@ -36,12 +34,31 @@ from pathlib import Path
 # not api -> data). services/evaluation_mixin.py imports the same function
 # straight from quodeq.data.fs.repo_validation for the same reason.
 from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
-from quodeq.shared.env_resolve import resolve_env
+from quodeq.data.fs.shared_repo_git import (  # noqa: F401 -- re-exported for existing callers
+    run_git,
+    shared_cache_dir,
+    shared_evaluations_root,
+    shared_repo_path,
+)
+# Re-exported: format/bootstrap, index sync and publish attribution live in
+# shared_repo_meta.py; services/shared_repo.py and wiring.py import them
+# through this module.
+from quodeq.data.fs.shared_repo_meta import (  # noqa: F401
+    FORMAT_NAME,
+    FORMAT_VERSION,
+    MARKER_FILENAME,
+    PUBLISHED_META_FILENAME,
+    RepoFormat,
+    bootstrap_repo_layout,
+    check_repo_format,
+    published_meta,
+    read_state,
+    shared_index_db_path,
+    shared_score_cache_path,
+    sync_shared_index,
+)
 
 logger = logging.getLogger(__name__)
-
-_CACHE_ENV = "QUODEQ_CACHE_ROOT"
-_DEFAULT_GIT_TIMEOUT_S = 300
 
 
 def _clear_readonly_and_retry(func, path, exc):  # noqa: ARG001
@@ -65,83 +82,6 @@ def remove_clone_dir(path: Path | str) -> None:
     if not os.path.lexists(path):
         return
     shutil.rmtree(path, onexc=_clear_readonly_and_retry)
-
-
-def _git_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
-    """Environment for git subprocess calls, layered over *env*.
-
-    GIT_LFS_SKIP_SMUDGE avoids pulling LFS blobs we don't need. GIT_TERMINAL_PROMPT=0
-    stops git from blocking on an interactive credential or passphrase prompt, since
-    these subprocess calls have stdin closed (see run_git) and nobody is there to answer.
-
-    Known limitation: GIT_TERMINAL_PROMPT only covers prompts issued by git
-    itself. ssh reads from /dev/tty directly, so a first-contact host-key
-    confirmation or a key passphrase without a loaded agent still blocks, and
-    the call only dies at the run_git timeout. ssh remotes need the host in
-    known_hosts and the key in an agent (or use an https remote instead).
-    """
-    return {**resolve_env(env), "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"}
-
-
-def run_git(
-    args: list[str], *, cwd: Path | None = None, timeout: int = _DEFAULT_GIT_TIMEOUT_S,
-    env: Mapping[str, str] | None = None,
-) -> tuple[bool, str]:
-    """Run a git command and return ``(ok, output)``.
-
-    *output* is the merged stdout+stderr of a git command that actually ran,
-    which is safe to surface to a caller. A process that never ran (git
-    missing, the timeout fired) is logged server-side and reported as a
-    generic reason instead, since its exception text can carry local paths and
-    errno detail. Never raises. stdin is closed, so git can never block on a
-    prompt.
-    """
-    try:
-        proc = subprocess.run(
-            ["git", *args],
-            cwd=str(cwd) if cwd else None,
-            env=_git_env(env),
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-        )
-        return proc.returncode == 0, (proc.stdout or "") + (proc.stderr or "")
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        # Unlike a failed git command (whose stdout/stderr is safe, expected
-        # user-facing text -- see refresh_shared_clone's docstring), this
-        # branch only fires for process-launch failures (git missing, a
-        # timeout). str(exc) there can include local details (the resolved
-        # command line, filesystem errno text) that callers surface straight
-        # into HTTP error responses, so keep it out of the returned reason
-        # and log it server-side instead.
-        logger.warning("run_git: %s failed to launch/complete: %s", args, exc)
-        return False, "git command failed to run"
-
-
-def _cache_base(env: Mapping[str, str] | None = None) -> Path:
-    e = resolve_env(env)
-    base = e.get(_CACHE_ENV)
-    root = Path(base) if base else Path.home() / ".quodeq" / "cache"
-    return root / "shared"
-
-
-def shared_cache_dir(url: str, env: Mapping[str, str] | None = None) -> Path:
-    """Per-remote cache directory, named by a 16-char digest of *url*."""
-    digest = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()[:16]
-    return _cache_base(env) / digest
-
-
-def shared_repo_path(url: str, env: Mapping[str, str] | None = None) -> Path:
-    """Clone directory for *url*. Also the key ``clone_lock`` locks on."""
-    return shared_cache_dir(url, env) / "repo"
-
-
-def shared_evaluations_root(url: str, env: Mapping[str, str] | None = None) -> Path:
-    """The clone's evaluations/ tree, laid out like the local evaluations dir."""
-    return shared_repo_path(url, env) / "evaluations"
 
 
 _CLONE_LOCKS: dict[str, threading.RLock] = {}
@@ -268,25 +208,3 @@ def last_synced_at(url: str, env: Mapping[str, str] | None = None) -> float | No
         except OSError:
             continue
     return None
-
-
-# Re-exported: format/bootstrap, index sync, and publish attribution moved to
-# shared_repo_meta.py to keep this module under 300 lines. Placed at the
-# bottom (not the top) of this file so run_git / shared_cache_dir /
-# shared_evaluations_root / shared_repo_path -- which shared_repo_meta.py
-# imports back from here -- are already defined on this (still-initializing)
-# module by the time that import runs; no true cycle.
-from quodeq.data.fs.shared_repo_meta import (  # noqa: F401, E402
-    FORMAT_NAME,
-    FORMAT_VERSION,
-    MARKER_FILENAME,
-    PUBLISHED_META_FILENAME,
-    RepoFormat,
-    bootstrap_repo_layout,
-    check_repo_format,
-    published_meta,
-    read_state,
-    shared_index_db_path,
-    shared_score_cache_path,
-    sync_shared_index,
-)

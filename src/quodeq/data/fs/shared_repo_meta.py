@@ -1,9 +1,8 @@
 """Shared-repo format/bootstrap, index sync, and publish attribution.
 
-Split from ``shared_repo.py`` to keep that file under the size ratchet's
-300-line cap. Moved verbatim; re-exported from ``shared_repo.py`` (and, in
-turn, from ``services/shared_repo.py``) so existing import sites are
-unaffected.
+Split from ``shared_repo.py``; imports the git layer from
+``shared_repo_git.py`` and is re-exported from ``shared_repo.py`` (and, in
+turn, ``services/shared_repo.py``) so existing import sites are unaffected.
 """
 from __future__ import annotations
 
@@ -11,7 +10,7 @@ import json
 from enum import StrEnum
 from pathlib import Path
 
-from quodeq.data.fs.shared_repo import run_git, shared_cache_dir, shared_evaluations_root, shared_repo_path
+from quodeq.data.fs.shared_repo_git import run_git, shared_cache_dir, shared_evaluations_root, shared_repo_path
 
 MARKER_FILENAME = "quodeq.json"
 FORMAT_NAME = "quodeq-shared-evaluations"

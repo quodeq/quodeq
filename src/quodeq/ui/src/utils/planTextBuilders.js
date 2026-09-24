@@ -36,48 +36,34 @@ export function buildFilePlanText(file, severityFilter) {
 /**
  * Build plan text for a principle's violations.
  *
- * Supports two calling conventions:
- * 1. Pre-split data: `buildPrinciplePlanText(principleName, violations, violationsBySeverity, principleData)`
- *    where `principle` is a string name and violations/violationsBySeverity are provided explicitly.
- * 2. Principle object: `buildPrinciplePlanText(principleObj)` where `principleObj` has `.principle`,
- *    `.violations`, etc. — violations are derived automatically.
- *
- * @param {string|Object} principle - Principle name (string) or principle object with `.principle` and `.violations`.
- * @param {Array} [violations] - Flat array of violation objects (convention 1 only).
- * @param {Object} [violationsBySeverity] - Violations keyed by severity (convention 1 only).
- * @param {Object} [principleData] - Optional extra data (e.g. `.findings`) for convention 1.
- * @param {string} [severityFilter] - Optional severity filter; values: null/'all' (no filter),
- *   'critical'/'major'/'minor' (only that bucket), or 'compliance' (returns the empty-state
- *   string `_No violations match the current filter._`). Split form only.
+ * @param {Object} args
+ * @param {string} args.principle - Principle name, used as the plan title.
+ * @param {Array} args.violations - Flat array of violation objects.
+ * @param {Object} args.violationsBySeverity - The same violations keyed by severity.
+ * @param {Object} [args.principleData] - Extra principle data; `.findings` becomes the plan context.
+ * @param {string} [args.severityFilter] - null/'all' (no filter), 'critical'/'major'/'minor'
+ *   (only that bucket), or 'compliance' (returns `_No violations match the current filter._`).
  * @returns {string} Formatted plan text.
  */
-export function buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData, severityFilter) {
-  if (violations !== undefined) {
-    if (severityFilter === FINDING_TYPE.COMPLIANCE) {
-      return '_No violations match the current filter._';
-    }
-    let filteredViolations = violations;
-    let filteredBySeverity = violationsBySeverity;
-    if (severityFilter && severityFilter !== 'all') {
-      filteredViolations = (violations || []).filter(
-        (v) => (v.severity || SEVERITY.MINOR).toLowerCase() === severityFilter,
-      );
-      filteredBySeverity = {};
-      for (const sev of KNOWN_SEVERITIES) {
-        filteredBySeverity[sev] = sev === severityFilter ? (violationsBySeverity?.[sev] || []) : [];
-      }
-    }
-    return buildGroupPlanText({
-      title: principle,
-      violations: filteredViolations,
-      violationsBySeverity: filteredBySeverity,
-      context: principleData?.findings || undefined,
-    });
+export function buildPrinciplePlanText({ principle, violations, violationsBySeverity, principleData, severityFilter }) {
+  if (severityFilter === FINDING_TYPE.COMPLIANCE) {
+    return '_No violations match the current filter._';
   }
-  const allViolations = principle.violations || [];
-  const bySeverity = {};
-  for (const sev of KNOWN_SEVERITIES) {
-    bySeverity[sev] = allViolations.filter((v) => (v.severity || SEVERITY.MINOR).toLowerCase() === sev);
+  let filteredViolations = violations;
+  let filteredBySeverity = violationsBySeverity;
+  if (severityFilter && severityFilter !== 'all') {
+    filteredViolations = (violations || []).filter(
+      (v) => (v.severity || SEVERITY.MINOR).toLowerCase() === severityFilter,
+    );
+    filteredBySeverity = {};
+    for (const sev of KNOWN_SEVERITIES) {
+      filteredBySeverity[sev] = sev === severityFilter ? (violationsBySeverity?.[sev] || []) : [];
+    }
   }
-  return buildGroupPlanText({ title: principle.principle, violations: allViolations, violationsBySeverity: bySeverity });
+  return buildGroupPlanText({
+    title: principle,
+    violations: filteredViolations,
+    violationsBySeverity: filteredBySeverity,
+    context: principleData?.findings || undefined,
+  });
 }

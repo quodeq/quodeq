@@ -3,15 +3,19 @@
 Split out of import_project.py. ``safe_extract`` runs after
 ``_import_validation.validate_archive`` has already rejected traversal,
 symlinks, and oversize members; it still double-checks each target path
-before writing, as a second line of defense.
+before writing, as a second line of defense. ``swap_into_place`` moves a
+staged project over an existing one without ever leaving neither on disk.
 """
 from __future__ import annotations
 
+import logging
 import shutil
 import zipfile
 from pathlib import Path
 
 from ._import_validation import bad_request
+
+logger = logging.getLogger(__name__)
 
 
 def safe_extract(zf: zipfile.ZipFile, members: dict[str, zipfile.ZipInfo], dest: Path) -> None:
@@ -24,3 +28,31 @@ def safe_extract(zf: zipfile.ZipFile, members: dict[str, zipfile.ZipInfo], dest:
         target.parent.mkdir(parents=True, exist_ok=True)
         with zf.open(info) as src, open(target, "wb") as dst:
             shutil.copyfileobj(src, dst, length=64 * 1024)
+
+
+_REPLACED_BACKUP = ".replaced"
+
+
+class StrandedBackupError(OSError):
+    """The old project could not be moved back and now lives only in the
+    staging dir's backup, so the caller must not delete that dir."""
+
+
+def swap_into_place(staged: Path, final: Path, staging: Path) -> None:
+    """Move *final* aside into *staging*, then *staged* into its place.
+
+    The old project is restored if the second move fails, so a failed
+    replace never loses it. The backup is dropped with *staging*.
+    """
+    backup = staging / _REPLACED_BACKUP
+    final.rename(backup)
+    try:
+        staged.rename(final)
+    except OSError:
+        try:
+            backup.rename(final)
+        except OSError as restore_exc:
+            logger.error("import: could not restore %s (%s); the old project is kept at %s",
+                         final, restore_exc, backup)
+            raise StrandedBackupError("old project kept in the staging backup") from restore_exc
+        raise

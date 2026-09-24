@@ -798,8 +798,6 @@ tests/data/test_db_stamp_memo.py:10:private-module:quodeq.data.sqlite._db_stamp_
 tests/data/test_db_stamp_memo.py:10:private-module:quodeq.data.sqlite._db_stamp_memo.memoized_by_db_stamp
 tests/data/test_db_stamp_memo.py:10:private-name:quodeq.data.sqlite._db_stamp_memo._DEFAULT_CACHE
 tests/data/test_db_stamp_memo.py:10:private-name:quodeq.data.sqlite._db_stamp_memo._StampCache
-tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._cache_base
-tests/data/test_env_seams_t5.py:13:private-name:quodeq.data.fs.shared_repo._git_env
 tests/data/test_git_cli.py:215:private-module:quodeq.analysis.subagents._git_scoring.git_scoring
 tests/data/test_index_sync.py:9:private-name:quodeq.data.sqlite.index_sync._is_pid_alive
 tests/data/test_index_sync_stale.py:15:private-name:quodeq.data.sqlite.index_sync._is_pid_alive
@@ -807,7 +805,6 @@ tests/data/test_mapper_totals_density.py:3:private-module:quodeq.data.mappers._m
 tests/data/test_run_files.py:82:private-module:quodeq.services._accumulated_data.run_fingerprint
 tests/data/test_run_index_concurrency.py:24:private-module:quodeq.data.sqlite._run_index_schema
 tests/data/test_run_index_remove.py:6:private-module:quodeq.services._run_index_fs.remove_run_directory
-tests/data/test_shared_repo.py:6:private-name:quodeq.data.fs.shared_repo._git_env
 tests/integration/_cancel_resume_fixtures.py:54:private-module:quodeq.analysis._dimensions.DimensionsConfig
 tests/integration/_cancel_resume_fixtures.py:66:private-module:quodeq.analysis._dimension_steps.build_dimension_prompt
 tests/integration/_cancel_resume_fixtures.py:66:private-module:quodeq.analysis._dimension_steps.parse_dimension_evidence

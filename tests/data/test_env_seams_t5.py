@@ -10,7 +10,7 @@ from pathlib import Path
 
 from quodeq.data.cache_store.local import LocalFileBackend, default_cache_root
 from quodeq.data.fs.repo_clone import GitCloneClient, cleanup_cloned_repo, prepare_repository
-from quodeq.data.fs.shared_repo import _cache_base, _git_env, run_git
+from quodeq.data.fs.shared_repo_git import git_env, run_git, shared_cache_base
 
 
 class TestDefaultCacheRoot:
@@ -111,17 +111,17 @@ class TestGitCloneClientEnv:
 class TestGitEnv:
     def test_uses_the_injected_value(self, monkeypatch):
         monkeypatch.setenv("VAR", "from-process")
-        env = _git_env({"VAR": "from-env"})
+        env = git_env({"VAR": "from-env"})
         assert env["VAR"] == "from-env"
         assert env["GIT_TERMINAL_PROMPT"] == "0"
 
     def test_empty_injected_env_ignores_the_process(self, monkeypatch):
         monkeypatch.setenv("VAR", "from-process")
-        assert "VAR" not in _git_env({})
+        assert "VAR" not in git_env({})
 
 
 class TestRunGitPassesEnvThrough:
-    """run_git's env reaches git via _git_env, pins included."""
+    """run_git's env reaches git via git_env, pins included."""
 
     def _captured_env(self, monkeypatch, env) -> dict[str, str]:
         seen: dict[str, str] = {}
@@ -135,7 +135,7 @@ class TestRunGitPassesEnvThrough:
             seen.update(kwargs["env"])
             return _Proc()
 
-        monkeypatch.setattr("quodeq.data.fs.shared_repo.subprocess.run", fake_run)
+        monkeypatch.setattr("quodeq.data.fs.shared_repo_git.subprocess.run", fake_run)
         run_git(["status"], env=env)
         return seen
 
@@ -156,11 +156,11 @@ class TestSharedCacheBase:
     def test_uses_the_injected_value(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "from-process"))
         injected = tmp_path / "from-env"
-        assert _cache_base({"QUODEQ_CACHE_ROOT": str(injected)}) == injected / "shared"
+        assert shared_cache_base({"QUODEQ_CACHE_ROOT": str(injected)}) == injected / "shared"
 
     def test_empty_injected_env_ignores_the_process(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "from-process"))
-        assert _cache_base({}) == Path.home() / ".quodeq" / "cache" / "shared"
+        assert shared_cache_base({}) == Path.home() / ".quodeq" / "cache" / "shared"
 
     def test_empty_string_falls_back_to_the_default_root(self):
-        assert _cache_base({"QUODEQ_CACHE_ROOT": ""}) == Path.home() / ".quodeq" / "cache" / "shared"
+        assert shared_cache_base({"QUODEQ_CACHE_ROOT": ""}) == Path.home() / ".quodeq" / "cache" / "shared"
