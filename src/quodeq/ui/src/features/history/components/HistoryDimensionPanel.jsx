@@ -14,9 +14,8 @@ import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx
 import { cssVar } from '../../../components/scoreChartHelpers.js';
 import { fallbackDelta } from '../../../utils/dimensionUtils.js';
 import { t } from '../../../strings/index.js';
+import { scoreBarColorVar } from './scoreBarColor.js';
 
-// Domain constants that match backend scoring tiers (see grading.py).
-const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
 const CHART_LEFT_MARGIN = -16;
 const CHART_HEIGHT = 160;
 const CHART_MAX_BAR_SIZE = 40;
@@ -38,13 +37,7 @@ const DELTA_LABEL_Y_OFFSET = 25;
 const ARROW_LABEL_Y_OFFSET = 14;
 
 function scoreBarColor(score) {
-  const n = parseFloat(score);
-  if (isNaN(n)) return cssVar('--color-accent');
-  if (n >= SCORE_THRESHOLDS.exemplary) return cssVar('--color-grade-top-text');
-  if (n >= SCORE_THRESHOLDS.good) return cssVar('--color-grade-high-text');
-  if (n >= SCORE_THRESHOLDS.adequate) return cssVar('--color-grade-mid-text');
-  if (n >= SCORE_THRESHOLDS.poor) return cssVar('--color-grade-low-text');
-  return cssVar('--color-grade-bottom-text');
+  return cssVar(scoreBarColorVar(score));
 }
 
 function trendColorClass(angle) {
