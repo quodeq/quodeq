@@ -98,7 +98,6 @@ src/quodeq/dashboard/runner.py:179:broad-except
 src/quodeq/dashboard/runner.py:190:broad-except
 src/quodeq/data/cache_store/_migrate_params.py:42:broad-except
 src/quodeq/data/cache_store/entry.py:37:broad-except
-src/quodeq/data/events/reader.py:62:broad-except
 src/quodeq/data/fs/compiled_standards.py:36:broad-except
 src/quodeq/data/fs/report_parser/run_dates.py:43:broad-except
 src/quodeq/data/fs/run_artifacts.py:60:suppress

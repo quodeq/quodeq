@@ -1,10 +1,12 @@
+import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from quodeq.core.events.models import JudgmentCreatedEvent, JudgmentPayload
+from quodeq.data.events import reader as reader_module
 from quodeq.data.events.reader import EventLogReader
 from quodeq.data.events.writer import EventLogWriter
 
@@ -128,3 +130,60 @@ def test_latest_timestamp_out_of_scope_error_propagates(
 
     with pytest.raises(RuntimeError, match="boom"):
         reader.get_latest_timestamp()
+
+
+def test_non_object_json_lines_are_skipped(
+    writer: EventLogWriter, reader: EventLogReader, log_path: Path,
+):
+    """A list, null or bare string is valid JSON but not an event object.
+    Each must be skipped like any other malformed line, not raise."""
+    payload = JudgmentPayload(practice_id="p1", verdict="compliance", dimension="D1", file="f1", line=1, reason="r1")
+    writer.emit(JudgmentCreatedEvent(payload=payload))
+
+    with open(log_path, "a") as f:
+        f.write("[1]\n")
+        f.write("null\n")
+        f.write('"x"\n')
+
+    events = list(reader.stream())
+    assert len(events) == 1
+    assert events[0].payload.practice_id == "p1"
+
+
+def test_naive_timestamp_against_aware_since_is_skipped_not_raised(
+    log_path: Path, reader: EventLogReader,
+):
+    """A stored event with a naive timestamp compared against an aware
+    since_timestamp raises TypeError from the ``<=`` comparison. That
+    TypeError is part of the narrow handler's realistic surface, so the
+    line is skipped, not propagated."""
+    raw_line = json.dumps({
+        "event_type": "JUDGMENT_CREATED",
+        "timestamp": "2024-01-01T00:00:00",
+        "payload": {
+            "practice_id": "p1", "verdict": "compliance", "dimension": "D1",
+            "file": "f1", "line": 1, "reason": "r1",
+        },
+    })
+    log_path.write_text(raw_line + "\n", encoding="utf-8")
+
+    since = datetime(2023, 1, 1, tzinfo=timezone.utc)
+    assert list(reader.stream(since_timestamp=since)) == []
+
+
+def test_runtime_error_propagates_narrow_handler(
+    writer: EventLogWriter, reader: EventLogReader, monkeypatch,
+):
+    """R-FT-7: the per-line handler is narrow. An error outside its declared
+    exceptions (e.g. a programming bug inside event_from_dict) must
+    propagate out of stream(), not be swallowed and logged as a skip."""
+    payload = JudgmentPayload(practice_id="p1", verdict="compliance", dimension="D1", file="f1", line=1, reason="r1")
+    writer.emit(JudgmentCreatedEvent(payload=payload))
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(reader_module, "event_from_dict", _boom)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        list(reader.stream())

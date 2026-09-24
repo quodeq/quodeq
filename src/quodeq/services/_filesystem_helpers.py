@@ -11,15 +11,18 @@ from quodeq.core.observability import NULL_LOG, LogSink
 
 @functools.lru_cache(maxsize=4)
 def _read_dimensions_from_file(dims_file: str) -> tuple[str, ...]:
-    """Read dimension IDs from a dimensions.json file (cached by path)."""
-    try:
-        p = Path(dims_file)
-        if p.exists():
-            data = json.loads(p.read_text(encoding="utf-8"))
-            return tuple(d["id"] for d in data.get("applies", []))
-        return ()
-    except (OSError, json.JSONDecodeError, KeyError, TypeError):
-        return ()
+    """Read dimension IDs from a dimensions.json file (cached by path).
+
+    Raises on a read/parse failure instead of catching it here: ``lru_cache``
+    only memoises a successful return, so a failing read is retried on the
+    next call rather than getting stuck returning ``()`` forever for that
+    path once the file is fixed.
+    """
+    p = Path(dims_file)
+    if p.exists():
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return tuple(d["id"] for d in data.get("applies", []))
+    return ()
 
 
 class _DimensionsCache:
@@ -59,7 +62,7 @@ def list_available_dimensions_for_discipline(
     try:
         resolved = paths or default_paths()
         result = _read_dimensions_from_file(str(resolved.dimensions_file))
-    except (OSError, TypeError) as exc:
+    except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
         log.warning(f"Failed to load dimensions config: {exc}")
         return ()
     if paths is None:
