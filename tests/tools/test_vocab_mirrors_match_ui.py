@@ -69,7 +69,15 @@ def test_every_vocab_module_is_covered():
 
 _PROVIDER_JS = _UI_SRC / "vocab" / "provider.js"
 # vocab/ modules with a mirror shape _MIRRORS cannot express; each has its own test below.
-_SPECIAL_VOCAB_MODULES = {"vocab/provider.js"}
+_SPECIAL_VOCAB_MODULES = {"vocab/provider.js", "vocab/logStreamStatus.js"}
+
+
+def test_ui_log_stream_status_has_expected_members():
+    """LOG_STREAM_STATUS has no Python enum (the SSE stream is UI-only): pin
+    its members directly instead of comparing against an enum."""
+    assert _js_object(_UI_SRC / "vocab" / "logStreamStatus.js", "LOG_STREAM_STATUS") == {
+        "IDLE": "idle", "STREAMING": "streaming", "DONE": "done", "ERROR": "error",
+    }
 
 
 def _js_provider_set(name: str, members: dict[str, str], known: dict[str, set[str]]) -> set[str]:

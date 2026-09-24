@@ -10,6 +10,7 @@ import { SettingsRowLabel } from './settingsRowParts.jsx';
 import { t } from '../../../strings/index.js';
 import { TimeLimitSetting } from './ProviderSettings.jsx';
 import { LocalApiAdvancedPanel } from './LocalApiAdvancedPanel.jsx';
+import { SERVER_STATUS } from '../settingsVocab.js';
 
 /**
  * @param {object} props
@@ -34,7 +35,7 @@ export function LocalApiTabLayout({
   return (
     <>
       <ServerStatusPill
-        status={serverStatus?.status ?? 'offline'}
+        status={serverStatus?.status ?? SERVER_STATUS.OFFLINE}
         address={serverStatus?.address}
         offlineMessage={offlineMessage}
         onToggleConsole={onToggleConsole}

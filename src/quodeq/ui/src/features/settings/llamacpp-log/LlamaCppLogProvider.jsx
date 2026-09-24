@@ -5,14 +5,15 @@ import { LlamaCppLogContext } from './LlamaCppLogContext.js';
 import { useLlamaCppLogStream } from './useLlamaCppLogStream.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
+import { LOG_STREAM_STATUS } from '../../../vocab/logStreamStatus.js';
 
 const WINDOW_ID = 'llamacpp-log';
 
 const STATUS_LABEL = {
-  idle: '',
-  streaming: ' · running',
-  done: ' · stopped',
-  error: t('settings.logUnavailable'),
+  [LOG_STREAM_STATUS.IDLE]: '',
+  [LOG_STREAM_STATUS.STREAMING]: ' · running',
+  [LOG_STREAM_STATUS.DONE]: ' · stopped',
+  [LOG_STREAM_STATUS.ERROR]: t('settings.logUnavailable'),
 };
 
 function buildSpec(logs, status) {
@@ -58,7 +59,7 @@ export function LlamaCppLogProvider({ children }) {
 
   const openLog = useCallback(() => {
     setOpen(true);
-    const fresh = buildSpec([], 'streaming');
+    const fresh = buildSpec([], LOG_STREAM_STATUS.STREAMING);
     addWindow(fresh);
     replaceWindow(fresh);
   }, [addWindow, replaceWindow]);

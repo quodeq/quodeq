@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.assistant.action_status import ActionStatus
 from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
@@ -220,7 +221,7 @@ def _draft_action(ctx: ToolContext, action_type: str, payload: dict) -> dict:
         "type": FrameType.ACTION_DRAFT, "actionId": action_id, "actionType": action_type,
         "summary": spec.summarize(canonical),
     })
-    return {"action_id": action_id, "status": "drafted", "action_type": action_type}
+    return {"action_id": action_id, "status": ActionStatus.DRAFTED, "action_type": action_type}
 
 
 def register_action_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
