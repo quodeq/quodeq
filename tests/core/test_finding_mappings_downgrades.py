@@ -2,12 +2,7 @@
 from __future__ import annotations
 
 from quodeq.core.events.models import Judgment
-from quodeq.core.finding_mappings import (
-    finding_to_response_dict,
-    judgment_to_finding,
-    wire_dict_to_judgment,
-)
-from quodeq.core.types.finding import Finding
+from quodeq.core.finding_mappings import judgment_to_finding, wire_dict_to_judgment
 
 
 class TestProvenanceDowngradeField:
@@ -34,17 +29,6 @@ class TestProvenanceDowngradeField:
         )
         f = judgment_to_finding(j)
         assert f.provenance_downgrade is True
-
-    def test_finding_to_response_dict_includes_downgrade(self):
-        f = Finding(
-            practice_id="P1", verdict="violation", file="f", line=1,
-            reason="r", severity="major", provenance_downgrade=True,
-        )
-        assert finding_to_response_dict(f)["provenance_downgrade"] is True
-
-    def test_response_dict_downgrade_false_by_default(self):
-        f = Finding(practice_id="P1", verdict="violation", file="f", line=1)
-        assert finding_to_response_dict(f)["provenance_downgrade"] is False
 
 
 class TestScopeDowngradeField:
@@ -81,32 +65,3 @@ class TestScopeDowngradeField:
         )
         f = judgment_to_finding(j)
         assert f.scope_downgrade == {"rule": "cross_principal", "from": "major", "to": "minor"}
-
-    def test_finding_to_response_dict_includes_downgrade(self):
-        f = Finding(
-            practice_id="P1", verdict="violation", file="f", line=1,
-            reason="r", severity="minor",
-            scope_downgrade={"rule": "sourceless_path", "from": "major", "to": "minor"},
-        )
-        assert finding_to_response_dict(f)["scope_downgrade"] == {
-            "rule": "sourceless_path", "from": "major", "to": "minor",
-        }
-
-    def test_response_dict_downgrade_none_by_default(self):
-        f = Finding(practice_id="P1", verdict="violation", file="f", line=1)
-        assert finding_to_response_dict(f)["scope_downgrade"] is None
-
-    def test_round_trip_names_the_rule(self):
-        """Full wire -> Judgment -> Finding -> response round trip must still
-        name the rule -- a marker that only says "something moved this" does
-        not let anyone recover what was waived."""
-        d = {
-            "p": "P1", "t": "violation", "d": "Security", "file": "f", "line": 1,
-            "reason": "r", "severity": "minor",
-            "scope_downgrade": {"rule": "sourceless_path", "from": "major", "to": "minor"},
-        }
-        j = wire_dict_to_judgment(d)
-        f = judgment_to_finding(j)
-        response = finding_to_response_dict(f)
-        assert response["scope_downgrade"]["rule"] == "sourceless_path"
-        assert response["scope_downgrade"]["from"] == "major"

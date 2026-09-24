@@ -4,11 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from quodeq.core.events.models import Judgment
-from quodeq.core.finding_mappings import (
-    finding_to_response_dict,
-    judgment_to_finding,
-    wire_dict_to_judgment,
-)
+from quodeq.core.finding_mappings import judgment_to_finding, wire_dict_to_judgment
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.req_ref import ReqRef
 
@@ -152,58 +148,3 @@ class TestJudgmentToFinding:
         j = self._judgment(severity="")
         f = judgment_to_finding(j)
         assert f.severity == "minor"
-
-
-class TestFindingToResponseDict:
-    def _finding(self, **overrides):
-        defaults = {
-            "practice_id": "P1", "verdict": "violation", "file": "src/auth.py",
-            "line": 42, "reason": "hardcoded secret", "title": "Secret",
-            "severity": "high",
-        }
-        defaults.update(overrides)
-        return Finding(**defaults)
-
-    def test_shape_matches_legacy_evidence_dict(self):
-        f = self._finding(snippet="API_KEY = 'abc'", end_line=42)
-        d = finding_to_response_dict(f)
-        assert d["practice_id"] == "P1"
-        assert d["file"] == "src/auth.py"
-        assert d["line"] == 42
-        assert d["end_line"] == 42
-        assert d["snippet"] == "API_KEY = 'abc'"
-        assert d["verdict"] == "violation"
-        assert d["severity"] == "high"
-        assert d["title"] == "Secret"
-        assert d["reason"] == "hardcoded secret"
-
-    def test_req_refs_serialized_as_dicts(self):
-        refs = [ReqRef(label="CWE-798", url="https://x"),
-                ReqRef(label="OWASP", url="https://y")]
-        f = self._finding(req_refs=refs)
-        d = finding_to_response_dict(f)
-        assert d["req_refs"] == [
-            {"label": "CWE-798", "url": "https://x"},
-            {"label": "OWASP", "url": "https://y"},
-        ]
-
-    def test_empty_req_refs_render_as_none(self):
-        f = self._finding()
-        d = finding_to_response_dict(f)
-        assert d["req_refs"] is None
-
-
-class TestRoundTrip:
-    def test_wire_dict_to_finding_via_judgment(self):
-        d = {
-            "p": "P1", "t": "violation", "d": "Security",
-            "file": "auth.py", "line": 1, "reason": "r",
-            "w": "Title",
-            "req_refs": [{"label": "CWE-1", "url": "https://x"}],
-        }
-        j = wire_dict_to_judgment(d)
-        f = judgment_to_finding(j)
-        response = finding_to_response_dict(f)
-        assert response["practice_id"] == "P1"
-        assert response["title"] == "Title"
-        assert response["req_refs"] == [{"label": "CWE-1", "url": "https://x"}]
