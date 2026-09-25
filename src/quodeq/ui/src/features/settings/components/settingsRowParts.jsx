@@ -8,7 +8,7 @@
  */
 import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
-import { SUBAGENTS_HINT_REMOTE } from './ProviderSettings.jsx';
+import { SUBAGENTS_HINT_REMOTE } from './subagentsHints.jsx';
 import { t } from '../../../strings/index.js';
 
 /**

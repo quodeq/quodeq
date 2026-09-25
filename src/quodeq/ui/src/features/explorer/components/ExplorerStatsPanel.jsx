@@ -1,5 +1,6 @@
 import { Stat, SevBadge } from '../../../components/terminal/index.js';
 import { complianceRatio } from '../../../utils/formatters.js';
+import { formatScoreDisplay } from '../../../utils/gradeFormatting.js';
 import StatGrid2x2 from './StatGrid2x2.jsx';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
 import { t } from '../../../strings/index.js';
@@ -16,7 +17,7 @@ export default function ExplorerStatsPanel({
       <StatGrid2x2>
         <Stat
           label={t('overview.statScore')}
-          value={Number.isNaN(overallScoreNum) ? '—' : overallScoreNum.toFixed(1)}
+          value={formatScoreDisplay(overallScoreNum)}
           hint={overallGrade?.grade ? t('overview.gradeHint', { letter: overallGrade.grade }) : null}
         />
         <Stat

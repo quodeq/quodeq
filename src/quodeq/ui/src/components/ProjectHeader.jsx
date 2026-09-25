@@ -1,4 +1,4 @@
-import RunNavigator from '../features/dashboard/components/RunNavigator.jsx';
+import RunNavigator from './RunNavigator.jsx';
 import { formatRunId, extDisplayName } from '../utils/formatters.js';
 import { t, LOCALE } from '../strings/index.js';
 import { activateOnKey } from '../utils/a11y.js';

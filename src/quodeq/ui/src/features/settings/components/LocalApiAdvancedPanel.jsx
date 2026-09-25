@@ -1,6 +1,7 @@
 import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
-import { AdvancedAnalysisSettings, SUBAGENTS_HINT_OLLAMA } from './ProviderSettings.jsx';
+import { AdvancedAnalysisSettings } from './ProviderSettings.jsx';
+import { SUBAGENTS_HINT_OLLAMA } from './subagentsHints.jsx';
 import { clampSubagents } from './localApiSubagents.js';
 import { t } from '../../../strings/index.js';
 

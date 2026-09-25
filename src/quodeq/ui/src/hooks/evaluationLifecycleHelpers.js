@@ -1,4 +1,4 @@
-import { STORAGE_KEY as POWER_KEY } from '../features/evaluation/components/powerLevels.js';
+import { ANALYSIS_POWER_STORAGE_KEY as POWER_KEY } from '../constants.js';
 
 const TIER_NAMES = ['fast', 'balanced', 'thorough'];
 const DEFAULT_ANALYSIS_POWER = 2;
