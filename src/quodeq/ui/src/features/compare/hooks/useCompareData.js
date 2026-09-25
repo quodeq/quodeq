@@ -16,8 +16,8 @@
  */
 import { useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { getCompareSummary } from '../../../api/index.js';
-import { sharedListProjects, sharedGetCompareSummary } from '../../../api/shared.js';
+import { useApi } from '../../../api/ApiContext.jsx';
+import { sharedListProjects } from '../../../api/shared.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { projectKeys, sharedKeys } from '../../../api/queryKeys.js';
 import { applyVisibleStandards } from '../compareModel.js';
@@ -45,6 +45,7 @@ const QUERY_DEFAULTS = {
  * @returns {{summariesById: object, errorsById: object}}
  */
 export function useCompareData(projects) {
+  const { getCompareSummary, sharedGetCompareSummary } = useApi();
   const list = (projects || []).filter((p) => p && (p.id || p.name));
   const summaryResults = useQueries({
     queries: list.map((p) => {

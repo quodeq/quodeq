@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useMapDimensionFilter } from './useMapDimensionFilter.js';
 import { writeVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { readCachedState } from '../../../utils/pageStateCache.js';
+import * as pageStateCache from '../../../utils/pageStateCache.js';
 
 const dims = (...names) => names.map((dimension) => ({ dimension, id: dimension }));
 
@@ -71,6 +72,21 @@ describe('useMapDimensionFilter', () => {
     act(() => { result.current.handleToggleDimension('Security'); });
     expect(readCachedState('map', 'p1').selectedDimensionsArr.sort())
       .toEqual(['Maintainability', 'Performance']);
+  });
+
+  it('does not write to the page-state cache on initial mount', () => {
+    const spy = vi.spyOn(pageStateCache, 'writeCachedState');
+    setup({ cachedSelectedArr: ['Security'] });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('writes again after a later toggle following mount', () => {
+    const spy = vi.spyOn(pageStateCache, 'writeCachedState');
+    const { result } = setup();
+    expect(spy).not.toHaveBeenCalled();
+    act(() => { result.current.handleToggleDimension('Security'); });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith('map', 'p1', { selectedDimensionsArr: ['Maintainability', 'Performance'] });
   });
 
   // The visibility memo must key on the visible ids, not on allDimensions:
