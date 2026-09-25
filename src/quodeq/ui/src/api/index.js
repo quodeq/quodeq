@@ -25,9 +25,9 @@ export {
   sharedGetDashboard, sharedGetAccumulated, sharedGetProjectScores,
   sharedGetRunScores, sharedGetDimensionEval, sharedGetViolations,
   sharedListDismissedFindings, sharedListVerifiedFindings,
-  publishProject, pullSharedProject,
+  publishProject, pullSharedProject, sharedGetCompareSummary,
 } from './shared.js';
-export { listTerminalSessions, createTerminalSession, killTerminalSession } from './terminal.js';
+export { listTerminalSessions, createTerminalSession, killTerminalSession, killTerminal } from './terminal.js';
 
 export {
   getHealth, listProjects, getProjectInfo, getProjectScan, deleteProject,

@@ -43,4 +43,13 @@ describe('request() error envelope', () => {
     stubFetch(200, { ok: true, value: 3 });
     await expect(request('/x')).resolves.toEqual({ ok: true, value: 3 });
   });
+
+  it('attaches the raw envelope as err.body, additive, so a caller can read a route-specific field', async () => {
+    stubFetch(409, { error: 'already registered', code: 'PROJECT_EXISTS', existingProjectId: 'p1' });
+    await expect(request('/x')).rejects.toMatchObject({
+      code: 'PROJECT_EXISTS',
+      status: 409,
+      body: { error: 'already registered', code: 'PROJECT_EXISTS', existingProjectId: 'p1' },
+    });
+  });
 });
