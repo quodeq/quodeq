@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 
 # tools/ is importable via conftest.py sys.path insert
 
@@ -60,3 +61,50 @@ class TestMigrateFileNonDict:
         v, c = migrate_file(f, {}, apply=False)
         assert v == 0
         assert c == 0
+
+
+class TestMigrateFileWriteFailure:
+    def test_write_failure_returns_none(self, tmp_path: Path, monkeypatch) -> None:
+        from migrate_cwe_title import migrate_file
+        f = tmp_path / "eval.json"
+        f.write_text(json.dumps({"violations": [{"cwe": 79}]}), encoding="utf-8")
+
+        def _raise(self, *args, **kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(Path, "write_text", _raise)
+
+        assert migrate_file(f, {79: "XSS"}, apply=True) is None
+
+
+class TestMainExitsNonZeroOnWriteFailures:
+    def test_write_failure_causes_exit_1(self, tmp_path: Path, monkeypatch) -> None:
+        import sys
+
+        import migrate_cwe_title
+
+        evaluations = tmp_path / "evaluations"
+        (evaluations / "proj" / "evaluation").mkdir(parents=True)
+        eval_file = evaluations / "proj" / "evaluation" / "run.json"
+        eval_file.write_text(json.dumps({"violations": [{"cwe": 79}]}), encoding="utf-8")
+
+        standards = tmp_path / "standards"
+        standards.mkdir()
+        (standards / "sec.json").write_text(
+            json.dumps({"principles": [{"cwes": [{"id": 79, "name": "XSS"}]}]}),
+            encoding="utf-8",
+        )
+
+        def _raise(self, *args, **kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(Path, "write_text", _raise)
+        monkeypatch.setattr(sys, "argv", [
+            "migrate_cwe_title.py", "--apply",
+            "--dir", str(evaluations), "--standards", str(standards),
+        ])
+
+        with pytest.raises(SystemExit) as exc_info:
+            migrate_cwe_title.main()
+
+        assert exc_info.value.code == 1

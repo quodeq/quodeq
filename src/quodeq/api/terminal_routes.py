@@ -22,7 +22,8 @@ from quodeq.api._terminal_ws_helpers import (
     setup_terminal_session,
     terminal_read_loop,
 )
-from quodeq.api.helpers import json_error
+from quodeq.api._constants import CODE_INVALID_INPUT
+from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.terminal.links import (
     build_open_argv,
     detect_editor,
@@ -131,7 +132,9 @@ def _terminal_resolve(registry: TerminalSessionRegistry):
     single-user localhost app whose terminal already grants a full shell)."""
     if gate_reason() is not None:
         return forbidden()
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_error(CODE_INVALID_INPUT)
+    if not isinstance(body, dict):
+        return jsonify(body[0]), body[1]
     paths = body.get("paths")
     if not isinstance(paths, list):
         return json_error("paths must be a list", 400, "INVALID_INPUT")
@@ -168,7 +171,9 @@ def _terminal_open(registry: TerminalSessionRegistry):
     raising, so a missing editor never surfaces as a 500."""
     if gate_reason() is not None:
         return forbidden()
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_error(CODE_INVALID_INPUT)
+    if not isinstance(body, dict):
+        return jsonify(body[0]), body[1]
     path = body.get("path")
     if not isinstance(path, str) or not path:
         return json_error("path is required", 400, "MISSING_PARAM")

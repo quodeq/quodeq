@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from quodeq.core.types.severity import Severity
+from quodeq.core.types.severity import Severity, parse_severity
 from quodeq.shared.serialization import coerce_line
 
 
@@ -20,6 +20,9 @@ class ReviewOptions:
     baseline_available: bool = True
     artifact_url: str | None = None
 
+
+# The legacy spelling of major severity (see ci/sarif.py's rank table).
+_LEGACY_MAJOR = "high"
 
 # Markdown and HTML control characters that untrusted finding text may carry.
 _MD_SPECIAL = re.compile(r"([\\`*_#\[\]<>|~])")
@@ -212,11 +215,23 @@ def build_review_summary(
     return "\n".join(lines)
 
 
+_BLOCKING = frozenset({Severity.CRITICAL, Severity.MAJOR})
+
+
+def _verdict_severity(raw: object) -> Severity:
+    text = str(raw or "").strip().lower()
+    return Severity.MAJOR if text == _LEGACY_MAJOR else parse_severity(text)
+
+
 def determine_verdict(new_violations: list[dict]) -> str:
     """Determine the review verdict based on NEW violation severities.
 
     Existing (pre-existing baseline) violations do not influence the verdict —
     this PR is only responsible for what it introduces.
+
+    Blocks (REQUEST_CHANGES) when any new violation is critical or major
+    severity (the legacy "high" spelling counts as major). Everything else
+    only comments.
 
     Returns: 'COMMENT' or 'REQUEST_CHANGES'.
 
@@ -229,7 +244,6 @@ def determine_verdict(new_violations: list[dict]) -> str:
     if not new_violations:
         return "COMMENT"
 
-    severities = {v.get("severity", Severity.MINOR) for v in new_violations}
-    if severities & {"critical", "high"}:
+    if any(_verdict_severity(v.get("severity")) in _BLOCKING for v in new_violations):
         return "REQUEST_CHANGES"
     return "COMMENT"

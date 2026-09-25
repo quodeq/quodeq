@@ -6,6 +6,9 @@ handler to return as-is, or None when the input is acceptable.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from flask import Response, jsonify, request
 
 from quodeq.api._constants import CODE_INVALID_PARAM
@@ -23,6 +26,19 @@ def json_body() -> dict | None:
     """
     data = request.get_json(silent=True)
     return data if isinstance(data, dict) else None
+
+
+def string_fields_error(data: Mapping[str, Any], names: tuple[str, ...]) -> tuple[Response, int] | None:
+    """A 400 for the first of *names* present in *data* with a non-string value.
+
+    An explicit JSON ``null`` is treated as absent, not as a type error,
+    matching ``routes_project_create``'s ``x is not None and not isinstance(...)``
+    pattern for optional fields.
+    """
+    for name in names:
+        if name in data and data[name] is not None and not isinstance(data[name], str):
+            return jsonify({"error": f"{name} must be a string", "code": "INVALID_PARAM"}), 400
+    return None
 
 
 def invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:

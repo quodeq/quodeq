@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import ssl as _ssl
 import threading
 import time
@@ -11,6 +12,7 @@ import urllib.request
 from urllib.parse import urlparse
 
 from quodeq.shared.constants import ENV_TRUTHY, SCHEME_HTTP, SCHEME_HTTPS
+from quodeq.shared.env import env_float, env_int
 from quodeq.shared.ssrf import is_private_address as _is_private_hostname
 
 _logger = logging.getLogger(__name__)
@@ -51,10 +53,10 @@ class FetchClient:
         self._timeout = timeout_s
         self._env = env
         _e = self._env if self._env is not None else os.environ
-        self._CIRCUIT_THRESHOLD = int(_e.get("QUODEQ_CIRCUIT_THRESHOLD", "5"))
-        self._MAX_RETRIES = int(_e.get("QUODEQ_MAX_RETRIES", "2"))
-        self._RETRY_BACKOFF_S = float(_e.get("QUODEQ_RETRY_BACKOFF_S", "0.5"))
-        self._MAX_BODY_BYTES = int(_e.get("QUODEQ_MAX_RESPONSE_BYTES", str(_DEFAULT_MAX_BODY_BYTES)))
+        self._CIRCUIT_THRESHOLD = env_int("QUODEQ_CIRCUIT_THRESHOLD", 5, minimum=1, env=_e)
+        self._MAX_RETRIES = env_int("QUODEQ_MAX_RETRIES", 2, minimum=0, env=_e)
+        self._RETRY_BACKOFF_S = env_float("QUODEQ_RETRY_BACKOFF_S", 0.5, minimum=0.0, env=_e)
+        self._MAX_BODY_BYTES = env_int("QUODEQ_MAX_RESPONSE_BYTES", _DEFAULT_MAX_BODY_BYTES, minimum=1, env=_e)
         if allow_private is not None:
             self._allow_private: bool = allow_private
         else:
@@ -105,7 +107,7 @@ class FetchClient:
                 last_exc = exc
                 if retry < self._MAX_RETRIES - 1:
                     _logger.debug("Fetch retry %d/%d after: %s", retry + 1, self._MAX_RETRIES, exc)
-                    time.sleep(self._RETRY_BACKOFF_S * (retry + 1))
+                    time.sleep(self._RETRY_BACKOFF_S * (2 ** retry) + random.uniform(0, self._RETRY_BACKOFF_S))
 
         if last_exc is not None:
             self._record_failure(last_exc)

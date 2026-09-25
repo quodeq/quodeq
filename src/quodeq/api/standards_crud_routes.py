@@ -4,10 +4,10 @@ from __future__ import annotations
 import logging
 from http import HTTPStatus
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify
 
 from quodeq.api._constants import ERROR_CODE_BAD_REQUEST, ERROR_CODE_FORBIDDEN, ERROR_CODE_NOT_FOUND
-from quodeq.api.helpers import json_object_or_error, error_response
+from quodeq.api.helpers import error_response, json_object_or_error
 from quodeq.shared.serialization import to_camel_dict
 
 logger = logging.getLogger(__name__)
@@ -59,14 +59,16 @@ def _store_error_response(exc: Exception, standard_id: str, operation: str) -> R
 def _handle_update(get_service, app: Flask, standard_id: str) -> Response:
     """Handle PUT /api/standards/<id> -- update a standard."""
     svc = get_service(app)
-    payload = request.get_json(force=True)
+    payload = json_object_or_error(ERROR_CODE_BAD_REQUEST)
     if not isinstance(payload, dict):
-        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+        return payload
     logger.info("standards.update id=%s", standard_id)
     try:
         detail = svc.update_standard(standard_id, payload)
     except (FileNotFoundError, PermissionError) as exc:
         return _store_error_response(exc, standard_id, "update")
+    except ValueError:
+        return error_response(f"Invalid standard id: {standard_id!r}", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     return jsonify(to_camel_dict(detail))
 
 
@@ -78,18 +80,20 @@ def _handle_delete(get_service, app: Flask, standard_id: str) -> tuple[str, int]
         svc.delete_standard(standard_id)
     except (FileNotFoundError, PermissionError) as exc:
         return _store_error_response(exc, standard_id, "delete")
+    except ValueError:
+        return error_response(f"Invalid standard id: {standard_id!r}", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     return "", HTTPStatus.NO_CONTENT
 
 
 def _handle_duplicate(get_service, app: Flask, standard_id: str) -> tuple[Response, int]:
     """Handle POST /api/standards/<id>/duplicate -- duplicate a standard."""
     svc = get_service(app)
-    payload = request.get_json(force=True)
+    payload = json_object_or_error(ERROR_CODE_BAD_REQUEST)
     if not isinstance(payload, dict):
-        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+        return payload
     new_id = payload.get("newId") or payload.get("new_id")
-    if not new_id:
-        return error_response("newId is required", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
+    if not isinstance(new_id, str) or not new_id:
+        return error_response("newId must be a non-empty string", HTTPStatus.BAD_REQUEST, ERROR_CODE_BAD_REQUEST)
     logger.info("standards.duplicate id=%s new_id=%s", standard_id, new_id)
     try:
         detail = svc.duplicate_standard(standard_id, new_id)

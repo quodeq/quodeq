@@ -62,10 +62,11 @@ def _patch_entries(entries: list[dict], cwe_names: dict[int, str]) -> int:
     return patched
 
 
-def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[int, int]:
+def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[int, int] | None:
     """Patch a single evaluation JSON file, filling empty titles from CWE names.
 
-    Returns (violations_patched, compliance_patched).
+    Returns (violations_patched, compliance_patched), or None if the file
+    needed a write and the write failed.
 
     Note: this one-shot migration script intentionally mixes file I/O with
     transformation logic — strict layering is not warranted for tooling
@@ -87,6 +88,7 @@ def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[in
             path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=_TEXT_ENCODING)
         except OSError as exc:
             print(f"  ERROR writing {path}: {exc}")
+            return None
 
     return v_count, c_count
 
@@ -116,11 +118,16 @@ def main() -> None:
         print("No evaluation/*.json files found.")
         sys.exit(0)
 
-    total_v = total_c = files_changed = 0
+    total_v = total_c = files_changed = failures = 0
 
     for path in eval_files:
-        v, c = migrate_file(path, cwe_names, args.apply)
+        result = migrate_file(path, cwe_names, args.apply)
         rel = path.relative_to(root)
+        if result is None:
+            failures += 1
+            print(f"  FAILED   {rel}")
+            continue
+        v, c = result
         if v or c:
             files_changed += 1
             total_v += v
@@ -133,6 +140,9 @@ def main() -> None:
     print(f"\n{mode}: {files_changed} files, {total_v} violations, {total_c} compliance entries")
     if not args.apply and (total_v or total_c):
         print("Run with --apply to write changes.")
+    if failures:
+        print(f"{failures} file(s) failed to write.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

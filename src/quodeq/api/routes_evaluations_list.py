@@ -19,7 +19,13 @@ from quodeq.api._evaluation_helpers import (
 )
 from quodeq.api._evaluation_options import build_evaluation_options
 from quodeq.api._constants import CODE_INVALID_INPUT
-from quodeq.api.helpers import json_error, page_params, scan_target_error, validate_evaluation_payload
+from quodeq.api.helpers import (
+    json_error,
+    optional_json_object_or_error,
+    page_params,
+    scan_target_error,
+    validate_evaluation_payload,
+)
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.shared.validation import relative_scope_error
 from quodeq.assistant import get_provider_configs
@@ -182,7 +188,9 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         rate_error = check_eval_rate_limit(eval_rate_store)
         if rate_error is not None:
             return rate_error
-        payload = request.get_json(silent=True) or {}
+        payload = optional_json_object_or_error("INVALID_INPUT")
+        if not isinstance(payload, dict):
+            return jsonify(payload[0]), payload[1]
         start_request, error = _validated_start_request(payload)
         if error is not None:
             return error

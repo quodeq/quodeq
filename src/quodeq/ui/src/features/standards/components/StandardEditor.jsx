@@ -33,6 +33,14 @@ function useResizable(defaultWidth) {
   const startX = useRef(0);
   const startWidth = useRef(0);
 
+  const resetBodyDragStyles = useCallback(() => {
+    dragging.current = false;
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+  }, []);
+
   const onMouseDown = useCallback((e) => {
     e.preventDefault();
     dragging.current = true;
@@ -52,19 +60,16 @@ function useResizable(defaultWidth) {
       setWidth(newWidth);
     };
     const onMouseUp = () => {
-      dragging.current = false;
-      if (typeof document !== 'undefined') {
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
+      resetBodyDragStyles();
     };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
     return () => {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      if (dragging.current) resetBodyDragStyles();
     };
-  }, []);
+  }, [resetBodyDragStyles]);
 
   return { width, onMouseDown, setWidth };
 }

@@ -8,7 +8,13 @@ from typing import Any
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, QUERY_FLAG_TRUE
-from quodeq.api.helpers import path_from_body, error_response, json_error, page_params
+from quodeq.api.helpers import (
+    error_response,
+    json_error,
+    optional_json_object_or_error,
+    page_params,
+    path_from_body,
+)
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
 from quodeq.api.routes_common import reports_dir
@@ -91,7 +97,9 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     not registered, so NOT_FOUND is reserved for that case.
     """
     project = request.view_args["project"]
-    data = request.get_json(silent=True) or {}
+    data = optional_json_object_or_error("INVALID_INPUT")
+    if not isinstance(data, dict):
+        return jsonify(data[0]), data[1]
     raw_path = path_from_body(data)
     if isinstance(raw_path, tuple):
         body, status = raw_path

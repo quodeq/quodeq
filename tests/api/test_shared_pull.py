@@ -200,6 +200,18 @@ def test_pull_non_string_action_returns_400(client, uuid_named_shared_clone_fixt
     assert resp.get_json()["code"] == "INVALID_ACTION"
 
 
+def test_pull_non_object_body_returns_400(client, uuid_named_shared_clone_fixture, local_eval_dir):  # 2755
+    _, project_uuid = uuid_named_shared_clone_fixture
+    resp = client.post(
+        f"/api/shared/projects/{project_uuid}/pull",
+        json=[1],
+        headers=_ORIGIN,
+    )
+    assert resp.status_code == 400
+    assert resp.is_json
+    assert resp.get_json()["code"] == "INVALID_ACTION"
+
+
 # --- not-found / validation ------------------------------------------------
 
 def test_pull_project_not_found_in_shared_repo_returns_404(client, uuid_named_shared_clone_fixture, local_eval_dir):

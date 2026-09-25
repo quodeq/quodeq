@@ -14,9 +14,14 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import Response, jsonify, request
+from flask import Response, jsonify
 
-from quodeq.api.helpers import json_error, scan_target_error as _scan_target_error
+from quodeq.api._constants import CODE_INVALID_CLONE_DEST, CODE_INVALID_REPO
+from quodeq.api.helpers import (
+    json_error,
+    optional_json_object_or_error,
+    scan_target_error as _scan_target_error,
+)
 from quodeq.services.base import ActionProvider, CreateProjectStatus, NewProjectSpec
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import contained_path, relative_scope_error
@@ -43,7 +48,10 @@ def _parse_create_project_request(
 ) -> tuple[_CreateProjectRequest | None, tuple[Response, int] | None]:
     """Parse and validate the create_project request body. Returns
     (parsed, error): parsed is None on failure, error is None on success."""
-    repo = (data.get("repo") or "").strip()
+    raw_repo = data.get("repo")
+    if raw_repo is not None and not isinstance(raw_repo, str):
+        return None, json_error("repo must be a string", HTTPStatus.BAD_REQUEST, CODE_INVALID_REPO)
+    repo = (raw_repo or "").strip()
     if not repo:
         return None, json_error("repo is required", HTTPStatus.BAD_REQUEST, "MISSING_REPO")
 
@@ -52,8 +60,14 @@ def _parse_create_project_request(
         err = relative_scope_error(str(scope_path))
         if err is not None:
             return None, json_error(err, HTTPStatus.BAD_REQUEST, "INVALID_SCOPE")
-    discipline = data.get("discipline") or None
-    clone_dest = data.get("cloneDest") or None
+    discipline = data.get("discipline")
+    if discipline is not None and not isinstance(discipline, str):
+        return None, json_error("discipline must be a string", HTTPStatus.BAD_REQUEST, "INVALID_DISCIPLINE")
+    discipline = discipline or None
+    clone_dest = data.get("cloneDest")
+    if clone_dest is not None and not isinstance(clone_dest, str):
+        return None, json_error("cloneDest must be a string", HTTPStatus.BAD_REQUEST, CODE_INVALID_CLONE_DEST)
+    clone_dest = clone_dest or None
     ephemeral = bool(data.get("ephemeral", False))
     reports_root = _reports_dir()
 
@@ -92,13 +106,13 @@ def _resolve_create_project_clone_dest(
             return None, json_error(
                 "Invalid cloneDest path",
                 HTTPStatus.BAD_REQUEST,
-                "INVALID_CLONE_DEST",
+                CODE_INVALID_CLONE_DEST,
             )
         except ValueError:
             return None, json_error(
                 "cloneDest must be an existing directory under your home folder",
                 HTTPStatus.BAD_REQUEST,
-                "INVALID_CLONE_DEST",
+                CODE_INVALID_CLONE_DEST,
             )
         # Hand the *contained* path to the cloner. The previous code
         # resolved into a local and then passed the raw request string
@@ -124,7 +138,7 @@ def _validate_local_create_project_repo(repo: str, reports_root: str) -> tuple[R
         return json_error(
             f"Local repo path {detail}",
             HTTPStatus.BAD_REQUEST,
-            "INVALID_REPO",
+            CODE_INVALID_REPO,
         )
     # Same allowlist as /api/scan: registering a project scans it and
     # persists the file tree, so an unvalidated path here would leak
@@ -149,7 +163,7 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
             HTTPStatus.CONFLICT,
         )
     if result.status == CreateProjectStatus.INVALID_REPO:
-        return json_error(result.message, HTTPStatus.BAD_REQUEST, "INVALID_REPO")
+        return json_error(result.message, HTTPStatus.BAD_REQUEST, CODE_INVALID_REPO)
     if result.status == CreateProjectStatus.CLONE_FAILED:
         code_map = {
             "auth": ("AUTH_REQUIRED", HTTPStatus.BAD_REQUEST),
@@ -196,7 +210,10 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
     or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
     ``ephemeral`` are ignored.
     """
-    parsed, error = _parse_create_project_request(request.get_json(silent=True) or {})
+    body = optional_json_object_or_error("INVALID_INPUT")
+    if not isinstance(body, dict):
+        return jsonify(body[0]), body[1]
+    parsed, error = _parse_create_project_request(body)
     if error is not None:
         return error
 

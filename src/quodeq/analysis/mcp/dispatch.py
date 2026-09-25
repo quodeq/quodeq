@@ -49,15 +49,18 @@ def dispatch(
     """Route a single JSON-RPC message."""
     method = msg.get("method", "")
     req_id = msg.get("id")
+    params = msg.get("params")
+    if not isinstance(params, dict):
+        params = {}
 
     if method in _IGNORED_NOTIFICATIONS:
         return
     if method == McpMethod.INITIALIZE:
-        _send(handle_initialize(req_id, msg))
+        _send(handle_initialize(req_id, {**msg, "params": params}))
     elif method == McpMethod.TOOLS_LIST:
         _send(handle_tools_list(req_id, has_queue=queue is not None))
     elif method == McpMethod.TOOLS_CALL:
-        _send(handle_tools_call(req_id, msg.get("params", {}), router, queue, agent_id))
+        _send(handle_tools_call(req_id, params, router, queue, agent_id))
     elif method == McpMethod.PING:
         _send(_ok(req_id, {}))
     else:

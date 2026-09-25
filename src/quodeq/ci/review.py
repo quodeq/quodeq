@@ -21,6 +21,7 @@ class ReviewError(RuntimeError):
 _GH_MISSING = "gh CLI not found. Install with 'brew install gh' and run 'gh auth login'."
 _GH_VIEW = "view"  # gh <resource> view
 _GH_JSON_FLAG = "--json"
+_GH_TIMEOUT_S = 60
 
 
 def _run_gh(args: list[str]) -> str:
@@ -28,14 +29,18 @@ def _run_gh(args: list[str]) -> str:
 
     A missing gh binary becomes the one ReviewError every caller shares; a
     non-zero exit propagates as ``subprocess.CalledProcessError`` so each
-    caller words its own failure.
+    caller words its own failure. A hung ``gh`` call (bad auth, dead network)
+    is bounded to ``_GH_TIMEOUT_S`` rather than blocking the review forever.
     """
     try:
         result = subprocess.run(
             ["gh", *args], capture_output=True, text=True, encoding="utf-8", check=True,
+            timeout=_GH_TIMEOUT_S,
         )
     except FileNotFoundError:
         raise ReviewError(_GH_MISSING)
+    except subprocess.TimeoutExpired:
+        raise ReviewError(f"gh command timed out after {_GH_TIMEOUT_S}s: gh {' '.join(args)}")
     return result.stdout
 
 

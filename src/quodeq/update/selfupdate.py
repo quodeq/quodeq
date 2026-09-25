@@ -22,7 +22,7 @@ import threading
 from pathlib import Path
 from urllib.parse import urlparse
 
-import httpx
+from quodeq.update.download import download_file as _download_file
 
 from quodeq.shared.constants import PLATFORM_DARWIN
 
@@ -154,21 +154,6 @@ def _check(argv: list[str], message: str) -> None:
         raise UpdateError(message)
 
 
-def _download_file(url: str, target: Path, progress) -> None:
-    with httpx.stream(
-        "GET", url, follow_redirects=True, timeout=httpx.Timeout(10.0, read=60.0)
-    ) as response:
-        response.raise_for_status()
-        total = int(response.headers.get("Content-Length") or 0)
-        done = 0
-        with open(target, "wb") as out:
-            for chunk in response.iter_bytes():
-                out.write(chunk)
-                done += len(chunk)
-                if total:
-                    progress(min(99, done * 100 // total))
-
-
 def _request_app_exit() -> None:
     callback = _shutdown_callback
     if callback is not None:
@@ -210,7 +195,10 @@ def _run_update(download_url: str, target_version: str, install_app: Path, team:
     mounted = False
     try:
         dmg = tmp / (Path(urlparse(download_url).path).name or "update.dmg")
-        _download_file(download_url, dmg, lambda pct: _set(percent=pct))
+        _download_file(
+            download_url, dmg,
+            lambda done, total: _set(percent=min(99, done * 100 // total) if total else 0),
+        )
 
         _set(phase="verifying", percent=100)
         _check(

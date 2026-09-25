@@ -6,6 +6,7 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
+from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.logging import log_info
 
@@ -16,12 +17,12 @@ _UI_DIRNAME = "ui"  # bundled UI source directory name, both inside the package 
 
 def _npm_install_timeout_s(env: Mapping[str, str] | None = None) -> int:
     """Seconds allowed for ``npm ci``; ``QUODEQ_NPM_INSTALL_TIMEOUT_S`` overrides."""
-    return int(resolve_env(env).get("QUODEQ_NPM_INSTALL_TIMEOUT_S", "300"))
+    return env_int("QUODEQ_NPM_INSTALL_TIMEOUT_S", 300, minimum=1, env=resolve_env(env))
 
 
 def _npm_build_timeout_s(env: Mapping[str, str] | None = None) -> int:
     """Seconds allowed for ``npm run build``; ``QUODEQ_NPM_BUILD_TIMEOUT_S`` overrides."""
-    return int(resolve_env(env).get("QUODEQ_NPM_BUILD_TIMEOUT_S", "600"))
+    return env_int("QUODEQ_NPM_BUILD_TIMEOUT_S", 600, minimum=1, env=resolve_env(env))
 
 
 def quodeq_dir(env: Mapping[str, str] | None = None) -> Path:

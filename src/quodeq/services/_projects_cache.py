@@ -55,16 +55,16 @@ class ProjectsCache:
         return self._list_all(reports_dir)
 
     def _list_all(self, reports_dir: str) -> dict[str, Any]:
-        if self._is_fresh():
-            return self._payload  # type: ignore[return-value]
+        if (payload := self._fresh_payload()) is not None:
+            return payload
         # Single-flight: requests racing a cold cache wait for the one build
         # in progress instead of each starting their own. The client retries
         # a slow startup request, and the build can take minutes right after
         # an upgrade invalidates the score caches — without this lock those
         # retries multiplied the whole recompute.
         with self._lock:
-            if self._is_fresh():
-                return self._payload  # type: ignore[return-value]
+            if (payload := self._fresh_payload()) is not None:
+                return payload
             projects = fs_projects.build_project_list(Path(reports_dir))
             # Entities, not wire dicts: the route owns serialization per request.
             # The cached part is the expensive disk walk; camelCase mapping is
@@ -86,11 +86,11 @@ class ProjectsCache:
         return {"projects": self._hydrate(reports_dir, window)}
 
     def _get_index(self, reports_dir: str) -> list[ProjectEntry]:
-        if self._index_fresh():
-            return self._index  # type: ignore[return-value]
+        if (index := self._fresh_index()) is not None:
+            return index
         with self._index_lock:
-            if self._index_fresh():
-                return self._index  # type: ignore[return-value]
+            if (index := self._fresh_index()) is not None:
+                return index
             self._index = _fs_project_index.build_project_index(Path(reports_dir))
             self._index_stamp = time.monotonic()
             # A regenerated index may have dropped or renamed ids -- a stale
@@ -152,11 +152,26 @@ class ProjectsCache:
             self._hydrated = {}
             self._hydrated_stamp = 0.0
 
-    def _is_fresh(self) -> bool:
-        return self._payload is not None and (time.monotonic() - self._stamp) < self._ttl_s
+    def _fresh_payload(self) -> dict[str, Any] | None:
+        """Return the cached payload if still fresh, else None.
 
-    def _index_fresh(self) -> bool:
-        return self._index is not None and (time.monotonic() - self._index_stamp) < self._ttl_s
+        Snapshots ``_payload``/``_stamp`` into locals *before* calling
+        ``time.monotonic()`` -- a concurrent ``invalidate()`` landing inside
+        that call can zero the instance's own ``_stamp``/``_payload``, but
+        the snapshot already taken is immune, so the freshness check and the
+        returned value always agree with each other.
+        """
+        payload, stamp = self._payload, self._stamp
+        if payload is not None and time.monotonic() - stamp < self._ttl_s:
+            return payload
+        return None
+
+    def _fresh_index(self) -> list[ProjectEntry] | None:
+        """Same snapshot-before-check shape as ``_fresh_payload``, for the index tier."""
+        index, stamp = self._index, self._index_stamp
+        if index is not None and time.monotonic() - stamp < self._ttl_s:
+            return index
+        return None
 
     def _hydrated_fresh(self) -> bool:
         return (time.monotonic() - self._hydrated_stamp) < self._ttl_s

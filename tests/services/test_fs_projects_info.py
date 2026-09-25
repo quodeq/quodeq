@@ -10,6 +10,7 @@ from unittest.mock import patch
 from quodeq.services.fs_projects import (
     build_project_list,
     get_project_info,
+    online_path_missing,
 )
 
 
@@ -68,6 +69,22 @@ class TestGetProjectInfo:
     def test_traversal_rejected(self, tmp_path: Path):
         result = get_project_info(str(tmp_path), "../escape")
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# online_path_missing
+# ---------------------------------------------------------------------------
+
+
+class TestOnlinePathMissing:
+    def test_none_path_does_not_raise(self):
+        assert online_path_missing({"location": "online", "path": None}) is True
+
+    def test_missing_path_key_does_not_raise(self):
+        assert online_path_missing({"location": "online"}) is True
+
+    def test_remote_url_is_not_missing(self):
+        assert online_path_missing({"location": "online", "path": "https://x"}) is False
 
 
 # ---------------------------------------------------------------------------

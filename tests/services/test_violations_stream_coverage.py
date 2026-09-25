@@ -99,6 +99,18 @@ class TestParseStreamLine:
         acc = _StreamAccumulator(dimension="sec")
         _parse_stream_line(json.dumps({"type": "unknown_event"}), acc)
         assert acc.violations == []
+        # A list-shaped line and a dict with a non-string `type` must be
+        # skipped the same way, without raising and without blocking a
+        # later, well-formed line on the same accumulator.
+        _parse_stream_line(json.dumps([1]), acc)
+        _parse_stream_line(json.dumps({"type": []}), acc)
+        valid_text = json.dumps({"p": "P1", "t": "violation", "file": "a.py", "line": 1})
+        valid_event = json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "text", "text": valid_text},
+        ]}})
+        _parse_stream_line(valid_event, acc)
+        assert len(acc.violations) == 1
+        assert acc.violations[0].practice_id == "P1"
 
 
 class TestParseViolationsFromStream:

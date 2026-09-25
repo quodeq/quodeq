@@ -225,9 +225,8 @@ def check_eval_rate_limit(eval_rate_store: "RateLimitStore | None") -> tuple[Res
         return None
     ip = request.remote_addr or "unknown"
     now = _time.monotonic()
-    if eval_rate_store.check(ip, now):
+    if eval_rate_store.check_and_record(ip, now):
         return json_error(
             "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
         )
-    eval_rate_store.record(ip, now)
     return None
