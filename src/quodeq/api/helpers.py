@@ -102,19 +102,6 @@ def validate_segment(*segments: str, message: str = "Invalid parameter") -> tupl
     return None
 
 
-def dimension_eval_response(payload: dict[str, Any] | None) -> Response | tuple[Response, int]:
-    """The response for one dimension's evaluation, local or shared.
-
-    404 when there is no evaluation file, 202 while the dimension is still
-    being written (``waiting``) so the UI keeps polling, else the payload.
-    """
-    if payload is None:
-        return json_error("Eval file not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-    if payload.get("waiting"):
-        return jsonify(payload), HTTPStatus.ACCEPTED
-    return jsonify(payload)
-
-
 def path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
     """Return the request body's stripped ``path``, or a 400 error tuple.
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
+from quodeq.core.types import EvalPending
 from quodeq.services.fs_reports import _enrich_with_coverage, get_dimension_eval
 
 
@@ -70,12 +71,14 @@ class TestGetDimensionEval:
         assert result is None
 
     def test_run_dir_exists_no_result(self, tmp_path):
+        """No evaluation file yet, but the run dir exists: EvalPending, not
+        None. The waiting-body shape (``{"waiting": True, ...}``) is the
+        route's job now — see tests/api/test_dimension_eval_wire.py."""
         run_dir = tmp_path / "proj" / "run1"
         run_dir.mkdir(parents=True)
         with patch("quodeq.services.fs_reports.resolve_dimension_eval", return_value=None):
             result = get_dimension_eval(str(tmp_path), "proj", "run1", "dim")
-            assert result is not None
-            assert result.get("waiting") is True
+            assert result == EvalPending(project="proj", run_id="run1", dimension="dim")
 
     def test_run_dir_not_exists(self, tmp_path):
         with patch("quodeq.services.fs_reports.resolve_dimension_eval", return_value=None):

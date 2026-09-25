@@ -8,12 +8,13 @@ from http import HTTPStatus
 import pytest
 from flask import Flask
 
+from quodeq.api.dimension_eval_wire import dimension_eval_response
 from quodeq.api.helpers import (
-    dimension_eval_response,
     jsonify_error,
     optional_json_object_or_response,
     validate_segment,
 )
+from quodeq.core.types import EvalPending
 
 
 @pytest.fixture
@@ -83,3 +84,10 @@ def test_dimension_eval_response_is_200_with_a_payload(app: Flask) -> None:
         response = dimension_eval_response({"score": 7})
         assert response.status_code == HTTPStatus.OK
         assert response.get_json() == {"score": 7}
+
+
+def test_dimension_eval_response_is_202_for_an_eval_pending(app: Flask) -> None:
+    with app.test_request_context():
+        response, status = dimension_eval_response(EvalPending(project="p", run_id="r", dimension="d"))
+        assert status == HTTPStatus.ACCEPTED
+        assert response.get_json() == {"waiting": True, "project": "p", "runId": "r", "dimension": "d"}

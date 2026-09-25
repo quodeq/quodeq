@@ -14,13 +14,14 @@ from .plugin import PluginDimension, PluginInfo
 from .project import ProjectEntry, ProjectMetadata
 from .report import ParsedReport, PrincipleGrade, PrincipleGradeWithOverall
 from .scoring import ConfidenceLevel, Deductions, OverallScore, PrincipleScore, ScaleInfo, ScoringResult
-from .violation import ProgressInfo, ViolationFileEntry, ViolationResponse, ViolationSummary
+from .violation import EvalPending, ProgressInfo, ViolationFileEntry, ViolationResponse, ViolationSummary
 
 __all__ = [
     "ConfidenceLevel",
     "Deductions",
     "DimensionResult",
     "DimensionSummary",
+    "EvalPending",
     "EvidenceFileMeta",
     "Finding",
     "GradeBreakdown",

@@ -21,7 +21,7 @@ src/quodeq/api/_run_event_watcher.py:97:broad-except
 src/quodeq/api/_scores_routes.py:32:broad-except
 src/quodeq/api/_scores_routes.py:63:broad-except
 src/quodeq/api/routes_runs.py:28:broad-except
-src/quodeq/api/routes_shared_mirrors.py:68:broad-except
+src/quodeq/api/routes_shared_mirrors.py:69:broad-except
 src/quodeq/api/security.py:269:broad-except
 src/quodeq/assistant/adapters/api.py:128:broad-except
 src/quodeq/assistant/cancel.py:55:broad-except
