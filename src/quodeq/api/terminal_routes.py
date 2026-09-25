@@ -6,10 +6,8 @@ from __future__ import annotations
 
 import atexit
 import json
-import logging
 import os
 import struct
-import subprocess
 import threading
 
 from flask import Flask, jsonify, request
@@ -24,15 +22,13 @@ from quodeq.api._terminal_ws_helpers import (
 )
 from quodeq.api.helpers import json_error
 from quodeq.terminal.links import (
-    build_open_argv,
     detect_editor,
+    open_in_editor,
     resolve_bases,
     resolve_path,
     safe_editor_path,
 )
 from quodeq.terminal.sessions import TerminalSessionRegistry, shell_name
-
-_logger = logging.getLogger(__name__)
 
 
 # App-specific WS close codes (4000-4999 range). The client's auto-reconnect
@@ -149,17 +145,8 @@ def _launch_editor(editor, safe: str, body: dict):
     """Spawn *editor* on *safe* at the body's optional line/col; fail-soft."""
     line = _coerce_int(body.get("line"))
     col = _coerce_int(body.get("col"))
-    try:
-        argv = build_open_argv(editor, safe, line, col)
-        if argv is None:  # Windows startfile sentinel
-            os.startfile(safe)  # type: ignore[attr-defined]
-        else:
-            # Detached: the editor outlives this request; we don't wait on it.
-            subprocess.Popen(argv, start_new_session=True)
-        return jsonify({"opened": True, "editor": editor.name})
-    except (OSError, ValueError):
-        _logger.warning("failed to open %s in %s", safe, editor.name, exc_info=True)
-        return jsonify({"opened": False, "editor": editor.name})
+    opened = open_in_editor(editor, safe, line, col)
+    return jsonify({"opened": opened, "editor": editor.name})
 
 
 def _terminal_open(registry: TerminalSessionRegistry):

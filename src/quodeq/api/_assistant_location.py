@@ -15,9 +15,8 @@ from pathlib import Path
 from flask import Flask
 
 from quodeq.assistant import AssistantRepository, AssistantStore
-from quodeq.core.types.project_source import ProjectLocation
 from quodeq.core.utils.io import resolve_child_dir
-from quodeq.services.fs_projects import get_project_info
+from quodeq.services.fs_projects import get_project_info, repo_attach_reason
 from quodeq.services.shared_repo import shared_evaluations_root
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared.env import get_evaluations_dir
@@ -79,20 +78,16 @@ def repo_attach_info(project_id: str | None) -> tuple[str | None, str]:
     """(repo_root, reason) for the UI's attachment chip and write gate.
 
     Reasons: ok, no_project, unknown_project, no_recorded_path,
-    online_project, path_missing."""
+    online_project, path_missing. The project_id-level reasons are handled
+    here; repo_attach_reason (shared with services.local_repo_root) covers
+    the rest once a project's info is resolved."""
     if not project_id:
         return None, "no_project"
     info = get_project_info(get_evaluations_dir(), project_id)
     if info is None:
         return None, "unknown_project"
-    path = info.get("path")
-    if not path or not isinstance(path, str):
-        return None, "no_recorded_path"
-    if str(info.get("location", "")).lower() == ProjectLocation.ONLINE or "://" in path:
-        return None, "online_project"
-    if not Path(path).is_dir():
-        return None, "path_missing"
-    return path, "ok"
+    path, reason = repo_attach_reason(info)
+    return path, reason
 
 
 def resolve_repo_root(project_id: str) -> str | None:

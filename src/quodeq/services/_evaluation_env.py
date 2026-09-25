@@ -17,17 +17,13 @@ def _apply_provider_credentials(built_env: dict[str, str], options: EvaluationOp
     """Export user-entered API credentials into *built_env* in place.
 
     Under the env names the scan subprocess resolves them from (provider's
-    api_key_env). Without this, a key typed in Settings for e.g. OpenRouter
+    ``api_key_env`` or ``credential_env``, e.g. omlx's OMLX_API_KEY/
+    OMLX_BASE_URL). Without this, a key typed in Settings for e.g. OpenRouter
     never reached the run and it failed with a missing-key error.
     """
     built_env.update(provider_env_exports(
         options.ai_cmd, options.provider_api_key, options.provider_api_base,
     ))
-    if options.ai_cmd == "omlx":
-        if options.provider_api_key:
-            built_env["OMLX_API_KEY"] = options.provider_api_key
-        if options.provider_api_base:
-            built_env["OMLX_BASE_URL"] = options.provider_api_base
 
 
 def build_eval_env(

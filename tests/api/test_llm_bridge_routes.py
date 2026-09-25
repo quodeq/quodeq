@@ -112,6 +112,36 @@ class TestProviderTest:
         data = resp.get_json()
         assert data["success"] is True
 
+    def test_missing_api_key_reports_env_var(self, client, monkeypatch):
+        # No api_key in the body and the provider's env var unset: the wire
+        # body is a frozen contract the UI keys off (success/code/error).
+        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+        resp = client.post("/api/provider/test", json={
+            "provider": "openrouter",
+            "model": "test",
+        }, headers={"Origin": "http://localhost"})
+
+        assert resp.status_code == 200
+        assert resp.get_json() == {
+            "success": False,
+            "code": "MISSING_API_KEY",
+            "error": "OPENROUTER_API_KEY is not set in the dashboard's environment. "
+                     "Export it in your shell (e.g. ~/.zshrc) and relaunch the dashboard from that terminal.",
+        }
+
+
+class TestProviderEnvCheck:
+    def test_omlx_stays_absent_no_api_key_env_entry(self, client):
+        # omlx has no `api_key_env` (it takes base_url/api_key per-request,
+        # not from a settings env var), so it must never appear in the
+        # env-check payload — only providers with a configured env var do.
+        resp = client.get("/api/provider/env-check")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "omlx" not in data
+        assert "openrouter" in data
+        assert "custom" in data
+
 
 class TestKnownModels:
     def test_returns_models(self, client):

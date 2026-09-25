@@ -47,6 +47,24 @@ def read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
     return read_repository_info(reports_root / entry_name) or {}
 
 
+def repo_attach_reason(info: dict[str, Any]) -> tuple[str | None, str | None]:
+    """``(path, reason)`` for a project's repository_info.json payload *info*.
+
+    Reasons: ok, no_recorded_path, online_project, path_missing. Shared by
+    the API's ``repo_attach_info`` (which handles the project_id-level
+    reasons -- no_project, unknown_project -- before calling this) and
+    ``local_repo_root`` below.
+    """
+    path = info.get("path")
+    if not path or not isinstance(path, str):
+        return None, "no_recorded_path"
+    if str(info.get("location", "")).lower() == ProjectLocation.ONLINE or "://" in path:
+        return None, "online_project"
+    if not Path(path).is_dir():
+        return None, "path_missing"
+    return path, "ok"
+
+
 def local_repo_root(reports_root: Path, entry_name: str) -> Path | None:
     """The analyzed repo's local working copy, or None when there isn't one.
 
@@ -55,11 +73,5 @@ def local_repo_root(reports_root: Path, entry_name: str) -> Path | None:
     working copies resolve to None, which downstream visibility lookups treat
     as "use the default selection".
     """
-    info = read_repo_info(reports_root, entry_name)
-    path = info.get("path")
-    if not path or not isinstance(path, str):
-        return None
-    if str(info.get("location", "")).lower() == ProjectLocation.ONLINE or "://" in path:
-        return None
-    root = Path(path)
-    return root if root.is_dir() else None
+    path, _ = repo_attach_reason(read_repo_info(reports_root, entry_name))
+    return Path(path) if path else None

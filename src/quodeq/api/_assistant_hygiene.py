@@ -1,62 +1,36 @@
-"""One-shot-per-process assistant cleanup: reap leaked worktrees, prune old
-sessions; and the shared-source-gone error type build_tool_context raises.
+"""One-shot-per-process gate for assistant cleanup, and the shared-source-gone
+error type build_tool_context raises.
 
 Split out of _assistant_helpers.py. ``get_repository`` is imported directly
 from ``_assistant_location`` (its real owner), not looked up on the
 ``_assistant_helpers`` facade, so this module never imports back the facade
-that re-exports it.
+that re-exports it. The cleanup logic itself (worktree GC + session prune)
+lives in ``quodeq.assistant.hygiene``, re-exported here so this stays the
+one place both are patched from.
 """
 from __future__ import annotations
-
-import logging
-from collections.abc import Mapping
 
 from flask import Flask
 
 from quodeq.api._assistant_location import get_repository
-from quodeq.shared.env_resolve import resolve_env
-
-_logger = logging.getLogger(__name__)
+from quodeq.assistant.hygiene import (  # noqa: F401 — re-export/patch target
+    DEFAULT_SESSION_TTL_DAYS as _DEFAULT_SESSION_TTL_DAYS,
+    run_hygiene,
+    session_ttl_days,
+)
 
 
 class SharedSourceUnavailable(RuntimeError):
     """A shared-source session's clone is gone (repo disconnected)."""
 
 
-# ~/.quodeq/assistant.db is never pruned otherwise; a session older than this
-# is effectively dead (its worktree, if any, was reaped long before). 0
-# disables. Whole-session delete cascades to its messages/events/actions.
-_DEFAULT_SESSION_TTL_DAYS = 90
-
-
-def session_ttl_days(env: Mapping[str, str] | None = None) -> int:
-    raw = resolve_env(env).get("QUODEQ_ASSISTANT_SESSION_TTL_DAYS")
-    if raw is None:
-        return _DEFAULT_SESSION_TTL_DAYS
-    try:
-        return max(0, int(raw))
-    except ValueError:
-        return _DEFAULT_SESSION_TTL_DAYS
-
-
 def run_assistant_hygiene(app: Flask, *, ttl_days: int | None = None) -> None:
-    """One-shot-per-process cleanup: reap leaked worktrees, prune old sessions.
+    """Run assistant hygiene once per process, on the first assistant request.
 
-    Runs on the first assistant request. Worktrees are GC'd BEFORE the session
-    prune so a pruned session's on-disk worktree/branch is already gone.
-    Never raises — hygiene must not break the request that triggered it.
+    The one-shot flag is set before running, so a hygiene failure still
+    won't re-run (or break) the next request either.
     """
     if getattr(app, "_assistant_hygiene_done", False):
         return
     app._assistant_hygiene_done = True
-    from quodeq.assistant.worktree import gc_worktrees  # noqa: PLC0415
-    repo = get_repository(app)
-    try:
-        gc_worktrees(repo)
-        removed = repo.prune_sessions_older_than(
-            ttl_days if ttl_days is not None else session_ttl_days()
-        )
-        if removed:
-            _logger.info("Pruned %d old assistant session(s)", removed)
-    except Exception:  # noqa: BLE001 — hygiene is best-effort
-        _logger.warning("assistant hygiene failed", exc_info=True)
+    run_hygiene(get_repository(app), ttl_days)
