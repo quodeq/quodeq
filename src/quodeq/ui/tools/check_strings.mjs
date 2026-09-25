@@ -17,7 +17,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import {
-  UI_ROOT, collectCounts, diffCounts, loadBaseline, total, writeBaseline, parseGateArgs,
+  UI_ROOT, collectCounts, diffCounts, exitWith, loadBaseline, okSummary, writeBaseline, parseGateArgs,
 } from './_ratchet_common.mjs';
 import { catalogKeyRefs } from './i18n_rules.mjs';
 
@@ -109,16 +109,10 @@ async function main() {
   }
 
   if (grew.length === 0 && shrank.length === 0 && catalogOk) {
-    console.log(`OK: no new hardcoded strings (${total(counts)} grandfathered across ${Object.keys(counts).length} files).`);
+    console.log(okSummary('hardcoded strings', counts));
     return 0;
   }
   return 1;
 }
 
-main().then(
-  (code) => process.exit(code),
-  (err) => {
-    console.error(err.message || err);
-    process.exit(2);
-  },
-);
+exitWith(main());

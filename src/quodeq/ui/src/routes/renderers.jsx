@@ -55,6 +55,20 @@ const NO_PROJECT_TABS = [
 const SELF_HANDLED_EMPTY = new Set([NAV_TAB.OVERVIEW, NAV_TAB.MAP, NAV_TAB.VIOLATIONS, NAV_TAB.HISTORY]);
 
 /**
+ * The dashboard page for a route. Every dashboard route navigates and
+ * retries; `callbacks` adds the route's own.
+ */
+function dashboardElement(props, runMode, callbacks = {}) {
+  return (
+    <DashboardPage
+      data={props.dashboardData}
+      callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry, ...callbacks }}
+      runMode={runMode}
+    />
+  );
+}
+
+/**
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
  * @returns {JSX.Element}
  */
@@ -64,24 +78,16 @@ const SELF_HANDLED_EMPTY = new Set([NAV_TAB.OVERVIEW, NAV_TAB.MAP, NAV_TAB.VIOLA
 // ROUTE_RENDERERS.file(params, props) just builds the React element tree; it
 // doesn't render, so the returned element's props can be asserted on directly.
 export const ROUTE_RENDERERS = {
-  overview: (params, props) => (
-    <DashboardPage
-      data={props.dashboardData}
-      callbacks={{
-        onNavigate: props.navigation.handleNavigate,
-        onRunSelect: props.navigation.handleRunSelect,
-        onProjectsReload: props.navigation.loadProjects,
-        onRetry: props.dashboardData.onRetry,
-        onProjectsRetry: props.dashboardData.onProjectsRetry,
-      }}
-      runMode={false}
-    />
-  ),
+  overview: (params, props) => dashboardElement(props, false, {
+    onRunSelect: props.navigation.handleRunSelect,
+    onProjectsReload: props.navigation.loadProjects,
+    onProjectsRetry: props.dashboardData.onProjectsRetry,
+  }),
   violations: (params, props) => <ViolationsRoute params={params} props={props} />,
   map: mapRoute,
-  run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry, onProjectsRetry: props.dashboardData.onProjectsRetry }} runMode={true} />,
+  run: (params, props) => dashboardElement(props, true, { onProjectsRetry: props.dashboardData.onProjectsRetry }),
   history: historyRoute,
-  [NAV_TAB.HISTORY_RUN]: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry }} runMode={true} />,
+  [NAV_TAB.HISTORY_RUN]: (params, props) => dashboardElement(props, true),
   explorer: (params, props) => (
     <ExplorerPage
       project={params.fromProject || props.navigation.selectedProject}

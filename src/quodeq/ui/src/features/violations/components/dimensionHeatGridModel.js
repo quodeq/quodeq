@@ -7,6 +7,7 @@ import { SEVERITY } from '../../../vocab/severity.js';
 import { SORT_DIR } from '../../../vocab/sortDirection.js';
 import { COL_NAME, COL_VIOLATIONS, COL_HEALTH } from '../../../components/heatGridColumns.js';
 import { ROW_TYPE } from '../violationsVocab.js';
+import { emptySeverityCounts } from '../../../utils/severity.js';
 
 export const DEFAULT_SEVERITY = SEVERITY.MINOR;
 const UNKNOWN_PRINCIPLE = '(unknown)'; // findings that name no principle share one synthetic row
@@ -35,15 +36,8 @@ export function comparator(col, dir) {
   };
 }
 
-// A fresh per-severity tally. Built rather than shared so each counter is
-// independent, and named so the dimension total and a principle's own counts
-// can never disagree on which severities exist.
-function newSeverityCounts() {
-  return { critical: 0, major: 0, minor: 0 };
-}
-
 export function newPrincipleEntry() {
-  return { violations: 0, compliance: 0, severity: newSeverityCounts(), violationItems: [], complianceItems: [] };
+  return { violations: 0, compliance: 0, severity: emptySeverityCounts(), violationItems: [], complianceItems: [] };
 }
 
 // The principle's entry in `principleMap`, created on first sight.
@@ -80,7 +74,7 @@ export function buildDimensionGroup(dim) {
   const compliance = dim.compliance || [];
   if (violations.length === 0 && compliance.length === 0) return null;
 
-  const dimSev = newSeverityCounts();
+  const dimSev = emptySeverityCounts();
   const principleMap = new Map();
 
   for (const v of violations) {

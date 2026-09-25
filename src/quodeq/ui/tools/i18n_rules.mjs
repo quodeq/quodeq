@@ -101,12 +101,27 @@ const STRUCTURAL_STYLE_KEYS = new Set([
   'gridTemplateAreas', 'gridArea', 'boxShadow', 'cursor', 'content',
 ]);
 
+/**
+ * Yields `[parent, child, depth]` for each step up from `node`, at most
+ * `maxDepth` steps, stopping at the root. The rules below climb this way from
+ * a literal through the expressions that shape its value.
+ *
+ * @param {{parent?: object}} node
+ * @param {number} maxDepth
+ */
+export function* parentChain(node, maxDepth) {
+  let cur = node;
+  for (let depth = 0; cur && depth < maxDepth; depth++) {
+    const parent = cur.parent;
+    if (!parent) return;
+    yield [parent, cur, depth];
+    cur = parent;
+  }
+}
+
 /** Name of the enclosing JSX attribute, climbing through value wrappers. */
 function enclosingAttribute(node) {
-  let cur = node;
-  for (let depth = 0; cur && depth < 6; depth++) {
-    const parent = cur.parent;
-    if (!parent) return null;
+  for (const [parent] of parentChain(node, 6)) {
     if (parent.type === 'JSXAttribute') {
       return parent.name?.type === 'JSXNamespacedName'
         ? `${parent.name.namespace.name}:${parent.name.name.name}`
@@ -116,24 +131,19 @@ function enclosingAttribute(node) {
     // unrelated call does not inherit an attribute's exemption.
     if (!['JSXExpressionContainer', 'TemplateLiteral', 'ConditionalExpression',
       'LogicalExpression', 'BinaryExpression'].includes(parent.type)) return null;
-    cur = parent;
   }
   return null;
 }
 
 /** True when the literal is a value in a style-ish object under a CSS key. */
 function inStructuralStyleValue(node) {
-  let cur = node;
-  for (let depth = 0; cur && depth < 4; depth++) {
-    const parent = cur.parent;
-    if (!parent) return false;
+  for (const [parent, cur] of parentChain(node, 4)) {
     if (parent.type === 'Property' && parent.value === cur) {
       const key = parent.key?.name ?? parent.key?.value;
       return typeof key === 'string' && STRUCTURAL_STYLE_KEYS.has(key);
     }
     if (!['TemplateLiteral', 'ConditionalExpression', 'LogicalExpression',
       'BinaryExpression'].includes(parent.type)) return false;
-    cur = parent;
   }
   return false;
 }
@@ -175,10 +185,7 @@ function isProse(s) {
 
 /** Developer-facing sinks: console.*, thrown Errors, and Error construction. */
 function inDevChannel(node) {
-  let cur = node;
-  for (let depth = 0; cur && depth < 4; depth++) {
-    const parent = cur.parent;
-    if (!parent) return false;
+  for (const [parent, , depth] of parentChain(node, 4)) {
     if (parent.type === 'CallExpression' || parent.type === 'NewExpression') {
       const callee = parent.callee;
       if (callee?.type === 'MemberExpression' && callee.object?.name === 'console') return true;
@@ -189,7 +196,6 @@ function inDevChannel(node) {
     // unrelated expression does not inherit a console call's exemption.
     if (!['BinaryExpression', 'TemplateLiteral', 'ConditionalExpression', 'LogicalExpression'].includes(parent.type)
       && depth > 0) return false;
-    cur = parent;
   }
   return false;
 }

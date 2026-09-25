@@ -1,4 +1,7 @@
 import EmptyState from '../../../components/EmptyState.jsx';
+import {
+  LoadProjectFailedEmptyState, NoEvalsEmptyState, NoProjectsEmptyState,
+} from '../../../components/ProjectEmptyStates.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import ViolationsSkeleton from './ViolationsSkeleton.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
@@ -16,9 +19,7 @@ function ViolationsSkeletonState() {
 }
 
 // The "no evaluations yet" branch (loading / error / shared-no-evals /
-// generic-no-evals) of the empty-state chain below, split out purely to fit
-// the size ratchet's per-function line cap -- same logic, same order, same
-// conditions.
+// generic-no-evals) of the empty-state chain below.
 function renderNoDimensionDataState({
   loading, error, isFetching, isRefreshing, selectedSource, projectName, selectedProject, onRetry, onNavigate,
 }) {
@@ -33,12 +34,7 @@ function renderNoDimensionDataState({
     return (
       <div className="violations-page violations-page--terminal">
         <TermHeader name={t('violations.termName')} sub={t('violations.subError')} />
-        <EmptyState
-          title={t('overview.loadProjectFailedTitle')}
-          description={error}
-          actionLabel={t('overview.retry')}
-          onAction={() => onRetry?.()}
-        />
+        <LoadProjectFailedEmptyState error={error} onRetry={onRetry} />
       </div>
     );
   }
@@ -60,20 +56,15 @@ function renderNoDimensionDataState({
   return (
     <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
       <TermHeader name={t('violations.termName')} sub={t('violations.subNoEvals')} />
-      <EmptyState
-        title={t('overview.noEvalsTitle')}
-        description={t('overview.noEvalsDesc', { name: projectName || selectedProject })}
-        actionLabel={t('overview.startEvaluation')}
-        onAction={() => onNavigate?.(NAV_TAB.EVALUATE)}
-      />
+      <NoEvalsEmptyState projectName={projectName || selectedProject} onNavigate={onNavigate} />
     </div>
   );
 }
 
 /**
- * ViolationsPage.jsx's empty-state dispatch chain (projects loading, no
- * local projects, no project selected, no dimension data). Extracted
- * verbatim.
+ * ViolationsPage's empty-state dispatch chain (projects loading, no local
+ * projects, no project selected, no dimension data); null when the page has
+ * dimension data to show.
  */
 export function renderViolationsEmptyState({
   projectsLoaded, projects, selectedSource, selectedProject, onNavigate,
@@ -88,12 +79,7 @@ export function renderViolationsEmptyState({
     return (
       <div className="violations-page violations-page--terminal">
         <TermHeader name={t('violations.termName')} sub={t('violations.subNoProjects')} />
-        <EmptyState
-          title={t('overview.noProjectsTitle')}
-          description={t('overview.noProjectsDesc')}
-          actionLabel={t('overview.addProject')}
-          onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
-        />
+        <NoProjectsEmptyState onNavigate={onNavigate} />
       </div>
     );
   }

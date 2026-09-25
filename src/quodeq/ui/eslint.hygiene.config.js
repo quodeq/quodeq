@@ -9,6 +9,7 @@
 // only shrink.
 import react from 'eslint-plugin-react';
 import jsdoc from 'eslint-plugin-jsdoc';
+import { JSX_MODULE_LANGUAGE_OPTIONS, REACT_SETTINGS } from './tools/eslint_shared_config.mjs';
 
 export default [
   {
@@ -29,11 +30,7 @@ export default [
     ],
     ignores: ['**/*.test.js', '**/*.test.jsx'],
     plugins: { jsdoc },
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
+    languageOptions: JSX_MODULE_LANGUAGE_OPTIONS,
     rules: {
       'jsdoc/require-jsdoc': ['error', {
         publicOnly: true,
@@ -51,12 +48,8 @@ export default [
   {
     files: ['src/**/*.js', 'src/**/*.jsx'],
     plugins: { react },
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
-    settings: { react: { version: 'detect' } },
+    languageOptions: JSX_MODULE_LANGUAGE_OPTIONS,
+    settings: REACT_SETTINGS,
     rules: {
       // Marks components referenced only in JSX as used, so no-unused-vars
       // does not flag their imports.
@@ -93,11 +86,7 @@ export default [
     // vi.stubGlobal is undone after each test by `unstubGlobals: true` in
     // vitest.config.js; Object.defineProperty and `globalThis.x = ...` are not.
     files: ['src/**/*.test.jsx'],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
+    languageOptions: JSX_MODULE_LANGUAGE_OPTIONS,
     rules: {
       'no-restricted-syntax': [
         'error',

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeSeverity, summaryBucket, countBySeverity, emptySeverityCounts, sumSeverityTallies,
+  countKnownSeverities, emptySeverityLists, severityListCounts,
 } from './severity.js';
 
 test('normalizeSeverity maps missing/invalid to unknown, known pass through', () => {
@@ -49,4 +50,27 @@ test('sumSeverityTallies adds every item severity and treats gaps as zero', () =
     ]),
     { critical: 1, major: 3, minor: 3 },
   );
+});
+
+test('countKnownSeverities counts a missing severity as minor and skips unlisted ones', () => {
+  const vs = [{ severity: 'critical' }, {}, { severity: 'unknown' }, { severity: 'Major' }, { severity: 'major' }];
+  assert.deepEqual(countKnownSeverities(vs), { critical: 1, major: 1, minor: 1 });
+});
+
+test('countKnownSeverities with ignoreCase lower-cases each severity first', () => {
+  assert.deepEqual(countKnownSeverities([{ severity: 'Major' }, { severity: 'CRITICAL' }], { ignoreCase: true }), { critical: 1, major: 1, minor: 0 });
+});
+
+test('countKnownSeverities treats a missing list as empty', () => {
+  assert.deepEqual(countKnownSeverities(undefined), { critical: 0, major: 0, minor: 0 });
+});
+
+test('emptySeverityLists gives a fresh empty list per display bucket, unknown included', () => {
+  const a = emptySeverityLists();
+  a.critical.push(1);
+  assert.deepEqual([Object.keys(a), emptySeverityLists().critical], [['critical', 'major', 'minor', 'unknown'], []]);
+});
+
+test('severityListCounts gives each display bucket its list length', () => {
+  assert.deepEqual(severityListCounts({ critical: [1, 2], major: [], minor: [3], unknown: [4] }), { critical: 2, major: 0, minor: 1, unknown: 1 });
 });

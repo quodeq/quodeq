@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { projectId, projectIdOrSelf } from './projectIdentity.js';
+import { findProject, projectId, projectIdOrSelf } from './projectIdentity.js';
 
 test('projectId prefers the id and falls back to the name', () => {
   assert.equal(projectId({ id: 'abc', name: 'repo' }), 'abc');
@@ -13,4 +13,13 @@ test('projectIdOrSelf also accepts a bare project name', () => {
   assert.equal(projectIdOrSelf({ id: 'abc', name: 'repo' }), 'abc');
   assert.equal(projectIdOrSelf({ id: null, name: 'repo' }), 'repo');
   assert.equal(projectIdOrSelf('bare-name'), 'bare-name');
+});
+
+test('findProject returns the project whose key matches', () => {
+  const projects = [{ id: 'a', name: 'one' }, { id: null, name: 'two' }];
+  assert.deepEqual([findProject(projects, 'a'), findProject(projects, 'two')], projects);
+});
+
+test('findProject returns null for no match or no list', () => {
+  assert.deepEqual([findProject([{ id: 'a' }], 'zzz'), findProject(undefined, 'a'), findProject(null, 'a')], [null, null, null]);
 });

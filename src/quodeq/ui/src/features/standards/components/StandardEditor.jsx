@@ -8,6 +8,7 @@ import { STANDARD_TYPES } from '../hooks/useStandards.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
 import { KEY } from '../../../vocab/keyboard.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 const TYPE_LABELS = { [STANDARD_TYPES.BUILTIN]: t('standards.baseIso'), [STANDARD_TYPES.QUODEQ]: t('standards.baseQuodeq'), [STANDARD_TYPES.COMMUNITY]: t('standards.baseCommunity'), [STANDARD_TYPES.CUSTOM]: t('standards.baseCustom') };
 
@@ -79,8 +80,8 @@ function buildSubLine({ standard, dirty }) {
   const requirements = (standard?.principles || []).reduce((sum, p) => sum + (p.requirements?.length || 0), 0);
   const type = TYPE_LABELS[standard?.type] || t('standards.baseCustom');
   const dirtyMark = dirty ? ` · ${t('standards.unsaved')}` : '';
-  const principlesPart = principles === 1 ? t('standards.principlesCountOne', { count: principles }) : t('standards.principlesCountMany', { count: principles });
-  const requirementsPart = requirements === 1 ? t('standards.requirementsCountOne', { count: requirements }) : t('standards.requirementsCountMany', { count: requirements });
+  const principlesPart = t(pluralKey(principles, 'standards.principlesCountOne', 'standards.principlesCountMany'), { count: principles });
+  const requirementsPart = t(pluralKey(requirements, 'standards.requirementsCountOne', 'standards.requirementsCountMany'), { count: requirements });
   return `${principlesPart} · ${requirementsPart} · ${type}${dirtyMark}`;
 }
 

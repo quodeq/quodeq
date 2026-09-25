@@ -18,6 +18,7 @@ import { useProjectActions } from './useProjectActions.js';
 import { useVisibleRuns } from './useVisibleRuns.js';
 import { LATEST_RUN_ID } from '../constants.js';
 import { NAV_TAB } from '../vocab/navTab.js';
+import { projectIdOrSelf } from '../utils/projectIdentity.js';
 
 // Kept for the existing test/hook imports below (useAppState.reconcile.test.jsx,
 // useNativeNavBridge.js) -- the values themselves live in vocab/navTab.js,
@@ -74,7 +75,7 @@ function resolveSelectedProjectNames(selectedProject, projects) {
   if (!selectedProject || !projects.length) {
     return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };
   }
-  const projectById = new Map(projects.map((p) => [(p.id || p.name || p), p]));
+  const projectById = new Map(projects.map((p) => [projectIdOrSelf(p), p]));
   const data = projectById.get(selectedProject);
   const parentRef = data?.parent || null;
   const parentData = parentRef ? projectById.get(parentRef) : null;

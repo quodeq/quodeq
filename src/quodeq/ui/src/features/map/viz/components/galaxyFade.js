@@ -19,6 +19,19 @@ const CLUSTER_DIM_START_ZOOM = 1;
 const SELECTED_DECOR_FADE_SPAN = 2;
 
 /**
+ * Alpha that is 1 at zoom `level` and drops by 1 every `span` of zoom past
+ * it, never below 0.
+ *
+ * @param {number} camZ - the camera zoom.
+ * @param {number} level - the zoom the fade starts at.
+ * @param {number} span - the zoom distance of a full fade.
+ * @returns {number}
+ */
+export function fadeOutFrom(camZ, level, span) {
+  return Math.max(0, 1 - (camZ - level) / span);
+}
+
+/**
  * Dimming applied to stars outside the focused cluster, so the focused one
  * reads as the subject. Stars in the focused cluster (or every star when no
  * cluster is focused) stay at full alpha.
@@ -31,7 +44,18 @@ const SELECTED_DECOR_FADE_SPAN = 2;
 export function clusterDimming(s, cam, nav) {
   const inFocusedCluster = nav.clusterCx == null || (s._clusterCx === nav.clusterCx && s._clusterCy === nav.clusterCy);
   if (inFocusedCluster) return 1;
-  return Math.max(UNFOCUSED_CLUSTER_MIN_ALPHA, 1 - (cam.z - CLUSTER_DIM_START_ZOOM) / CLUSTER_DIM_SPAN);
+  return unfocusedClusterAlpha(cam.z);
+}
+
+/**
+ * Alpha of anything drawn for a cluster other than the focused one: it fades
+ * as the camera zooms in, down to UNFOCUSED_CLUSTER_MIN_ALPHA.
+ *
+ * @param {number} camZ - the camera zoom.
+ * @returns {number}
+ */
+export function unfocusedClusterAlpha(camZ) {
+  return Math.max(UNFOCUSED_CLUSTER_MIN_ALPHA, fadeOutFrom(camZ, CLUSTER_DIM_START_ZOOM, CLUSTER_DIM_SPAN));
 }
 
 /**
@@ -42,7 +66,7 @@ export function clusterDimming(s, cam, nav) {
  * @returns {number} alpha in [0, 1].
  */
 export function selectedZoomFade(camZ) {
-  return Math.max(0, 1 - (camZ - ZOOM_DIMENSION_LEVEL) / SELECTED_DECOR_FADE_SPAN);
+  return fadeOutFrom(camZ, ZOOM_DIMENSION_LEVEL, SELECTED_DECOR_FADE_SPAN);
 }
 
 /**
@@ -55,7 +79,7 @@ export function selectedZoomFade(camZ) {
  * @returns {number} alpha in [0, 1].
  */
 export function principleParticleFade(camZ, isSelected) {
-  return isSelected ? Math.max(0, 1 - (camZ - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN) : 1;
+  return isSelected ? fadeOutFrom(camZ, ZOOM_PRINCIPLE_LEVEL, PRINCIPLE_FADE_SPAN) : 1;
 }
 
 /**
@@ -69,7 +93,7 @@ export function principleParticleFade(camZ, isSelected) {
  * @returns {number} alpha in [0, 1].
  */
 export function principleLabelAlpha(camZ, isSelected, anySelected) {
-  if (isSelected) return Math.max(0, 1 - (camZ - ZOOM_PRINCIPLE_LEVEL) / PRINCIPLE_FADE_SPAN);
+  if (isSelected) return principleParticleFade(camZ, true);
   if (!anySelected) return 1;
-  return Math.max(0, 1 - (camZ - ZOOM_PRINCIPLE_LEVEL) / SIBLING_LABEL_FADE_SPAN);
+  return fadeOutFrom(camZ, ZOOM_PRINCIPLE_LEVEL, SIBLING_LABEL_FADE_SPAN);
 }

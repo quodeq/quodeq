@@ -22,3 +22,14 @@ export function projectId(project) {
 export function projectIdOrSelf(entry) {
   return entry.id || entry.name || entry;
 }
+
+/**
+ * The project in `projects` whose projectId is `key`, or null when there is
+ * none or no list.
+ * @param {Array<{id?: string|null, name?: string}>|null|undefined} projects
+ * @param {string} key
+ * @returns {object|null}
+ */
+export function findProject(projects, key) {
+  return projects?.find((p) => projectId(p) === key) || null;
+}

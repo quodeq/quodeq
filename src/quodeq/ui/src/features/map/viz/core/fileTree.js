@@ -1,11 +1,12 @@
 import { SEVERITY, SEVERITY_FILTER_ALL } from '../../../../vocab/severity.js';
 import { FINDING_TYPE } from '../../../../vocab/findingType.js';
+import { emptySeverityCounts } from '../../../../utils/severity.js';
 
 function createNode(name, path, isFile) {
   return {
     name, path, isFile,
     violations: 0, compliance: 0,
-    severity: { critical: 0, major: 0, minor: 0 },
+    severity: emptySeverityCounts(),
     dimensions: {},
     complianceRate: 0,
     children: [],
@@ -88,6 +89,17 @@ function collapseSingleChildren(node, _depth = 0) {
       collapseSingleChildren(child, _depth + 1);
     }
   }
+}
+
+/**
+ * Whether a tree node is a folder the views can drill into: not a file, and
+ * holding at least one child.
+ *
+ * @param {{isFile?: boolean, children?: Array}} node
+ * @returns {boolean}
+ */
+export function isDrillableFolder(node) {
+  return !node.isFile && node.children?.length > 0;
 }
 
 /** Convert a tree node into a file object, optionally filtered by severity.

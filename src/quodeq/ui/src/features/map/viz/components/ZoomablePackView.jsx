@@ -8,6 +8,8 @@ import { t } from '../../../../strings/index.js';
 import { LABEL_GAP_PX } from './viewLabels.js';
 import { KEY } from '../../../../vocab/keyboard.js';
 import { PERCENT } from '../../../../constants.js';
+import { isDrillableFolder } from '../core/fileTree.js';
+import MapTooltipSeverityRows from './MapTooltipSeverityRows.jsx';
 
 const BASE_SIZE = 600;
 const PAD = 20;
@@ -112,7 +114,7 @@ function useFocusHandlers({ focusNode, setFocus, onFileClick, onDrillDown, prevP
   const handleClick = useCallback((e, c) => {
     e.stopPropagation();
     const nav = { setFocus, onDrillDown, prevPathRef };
-    const isFolder = !c.data.isFile && c.data.children?.length > 0;
+    const isFolder = isDrillableFolder(c.data);
     if (c.data.isFile) {
       onFileClick?.(c.data);
     } else if (isFolder && c !== focusNode) {
@@ -135,7 +137,7 @@ function useCircleIndices(circles) {
     const fi = [], fli = [];
     circles.forEach((c, i) => {
       const d = c.data;
-      const isFolder = !d.isFile && d.children?.length > 0;
+      const isFolder = isDrillableFolder(d);
       if (isFolder || c.depth === 0) fi.push(i);
       else fli.push(i);
     });
@@ -170,7 +172,7 @@ function useFocusManager({ root, circles, resetKey, currentPath, onDrillDown, on
 function PackLabels({ circles, screenCoords, focusNode, skipTransition }) {
   return circles.map((c, i) => {
     const d = c.data;
-    const isFolder = !d.isFile && d.children?.length > 0;
+    const isFolder = isDrillableFolder(d);
     const sc = screenCoords[i];
     if (!(sc.r > LABEL_RADIUS_THRESHOLD && c.parent === focusNode)) return null;
     return (
@@ -209,14 +211,7 @@ function tooltipStyle(mousePos, containerRef) {
 /** Per-severity rows, shown only for a node that actually has violations. */
 function TooltipSeverityRows({ hd }) {
   if (!(hd.violations > 0)) return null;
-  const sev = hd.severity || {};
-  return (
-    <>
-      {sev.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>{t('map.critical')}</span><span>{sev.critical}</span></div>}
-      {sev.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>{t('map.major')}</span><span>{sev.major}</span></div>}
-      {sev.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>{t('map.minor')}</span><span>{sev.minor}</span></div>}
-    </>
-  );
+  return <MapTooltipSeverityRows severity={hd.severity} />;
 }
 
 function PackTooltip({ circles, hover, mousePos, containerRef }) {

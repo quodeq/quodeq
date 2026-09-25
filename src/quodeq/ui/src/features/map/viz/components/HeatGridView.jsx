@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import HeatGridCells, { HEAT_GRID_VARIANT, makeColumnSortHandler } from '../../../../components/HeatGridCells.jsx';
 import { COL_NAME, COL_VIOLATIONS, COL_HEALTH, COL_ALIGN_LEFT } from '../../../../components/heatGridColumns.js';
 import { ICON_FOLDER } from '../../../../constants/navigation.jsx';
-import { activateOnKey } from '../../../../utils/a11y.js';
+import { activationHandlers } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
 import { SORT_DIR } from '../../../../vocab/sortDirection.js';
+import { isDrillableFolder } from '../core/fileTree.js';
 
 // This module's own severity column ids (the rest of its columns are
 // covered by HeatGridCells.jsx's shared COL_NAME/COL_VIOLATIONS/COL_HEALTH).
@@ -61,8 +62,7 @@ function HeatGridHeaderRow({ sortCol, sortDir, onSort }) {
         <th
           key={col.id}
           className={`heat-grid-th-sort viz-focusable${col.align === COL_ALIGN_LEFT ? ' left' : ''}`}
-          onClick={() => onSort(col.id)}
-          onKeyDown={activateOnKey(() => onSort(col.id))}
+          {...activationHandlers(() => onSort(col.id))}
           tabIndex={0}
           aria-sort={sortCol === col.id ? (sortDir === SORT_DIR.ASC ? 'ascending' : 'descending') : 'none'}
         >
@@ -74,7 +74,7 @@ function HeatGridHeaderRow({ sortCol, sortDir, onSort }) {
 }
 
 function HeatGridRow({ row, onDrillDown, onFileClick, onCellClick, variant }) {
-  const canDrill = !row.isFile && row.children?.length > 0;
+  const canDrill = isDrillableFolder(row);
   return (
     <tr>
       <td>
@@ -82,8 +82,7 @@ function HeatGridRow({ row, onDrillDown, onFileClick, onCellClick, variant }) {
           className={`heat-grid-file${canDrill || row.isFile ? ' clickable viz-focusable' : ''}`}
           role={canDrill || row.isFile ? 'button' : undefined}
           tabIndex={canDrill || row.isFile ? 0 : undefined}
-          onClick={() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row)}
-          onKeyDown={activateOnKey(() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row))}
+          {...activationHandlers(() => canDrill ? onDrillDown(row.path) : row.isFile && onFileClick?.(row))}
           title={row.path}
         >
           {row.isFile ? null : <span className="heat-grid-folder-icon" aria-hidden="true">{ICON_FOLDER}</span>}

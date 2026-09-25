@@ -1,5 +1,5 @@
 import { t } from '../../../../strings/index.js';
-import { SEVERITY } from '../../../../vocab/severity.js';
+import { countKnownSeverities } from '../../../../utils/severity.js';
 import { NAV_TAB } from '../../../../vocab/navTab.js';
 
 // The overlay's fixed styling, hoisted out of the JSX: one object per element
@@ -86,19 +86,15 @@ function computeSystemLevelInfo(scene, nav, projectName) {
   const clusterCon = nav.clusterCx != null
     ? (scene.constellations || []).find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy)
     : null;
-  // One pass over the cluster for every figure (score, violations,
-  // compliance, per-severity counts) rather than a reduce per figure.
+  // One pass over the cluster for the score, violation and compliance
+  // totals rather than a reduce per figure.
   let totalV = 0, totalC = 0, totalScore = 0;
-  const sevCounts = { critical: 0, major: 0, minor: 0 };
   for (const s of clusterStars) {
     totalV += s.violations;
     totalC += s.compliance;
     totalScore += s.score;
-    for (const v of s._raw?.violations || []) {
-      const sev = v.severity || SEVERITY.MINOR;
-      if (sevCounts[sev] != null) sevCounts[sev]++;
-    }
   }
+  const sevCounts = countKnownSeverities(clusterStars.flatMap((s) => s._raw?.violations || []));
   const avgScore = clusterStars.length > 0 ? totalScore / clusterStars.length : 0;
   const lines = [
     { label: t('map.score'), value: avgScore.toFixed(1) },
@@ -119,11 +115,7 @@ function computeDimensionLevelInfo(scene, nav, navRef, onNavigate) {
   if (!dim) return null;
   const prins = scene.principles[nav.dim] || [];
   const rawDim = dim._raw;
-  const dimSev = { critical: 0, major: 0, minor: 0 };
-  (rawDim?.violations || []).forEach(v => {
-    const sev = v.severity || SEVERITY.MINOR;
-    if (dimSev[sev] != null) dimSev[sev]++;
-  });
+  const dimSev = countKnownSeverities(rawDim?.violations);
   const dimLines = [
     { label: t('map.score'), value: dim.score.toFixed(1) },
     { label: t('map.principles'), value: prins.length },

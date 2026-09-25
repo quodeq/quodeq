@@ -3,6 +3,7 @@ import { resolveRequirementText } from '../resolveRequirementText.js';
 import { t } from '../../../strings/index.js';
 import { KEY } from '../../../vocab/keyboard.js';
 import { NODE_TYPE } from '../standardTreeModel.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 function TreeExpandIcon({ showExpand, expanded }) {
   if (!showExpand) return <span className="tree-expand-btn tree-expand-btn--invisible" />;
@@ -132,9 +133,7 @@ function PrincipleNode({ principle, pi, selectedNode, actions, confirmFn = windo
   const handleRemovePrinciple = () => {
     if (reqCount > 0) {
       const name = principle.name || t('standards.untitled');
-      const message = reqCount === 1
-        ? t('standards.deletePrincipleConfirmOne', { name, count: reqCount })
-        : t('standards.deletePrincipleConfirmMany', { name, count: reqCount });
+      const message = t(pluralKey(reqCount, 'standards.deletePrincipleConfirmOne', 'standards.deletePrincipleConfirmMany'), { name, count: reqCount });
       if (!confirmFn(message)) return;
     }
     onRemovePrinciple(pi);

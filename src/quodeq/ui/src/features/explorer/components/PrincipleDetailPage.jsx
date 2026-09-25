@@ -2,7 +2,7 @@ import { memo, useMemo, useEffect } from 'react';
 import { gradeLetter } from '../../../utils/formatters.js';
 import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
-import { headerRowKey, ROW_KIND } from './findingListRows.js';
+import { ROW_KIND } from './findingListRows.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
@@ -44,28 +44,13 @@ function buildListItems({ displayedBySeverity, compliance, activeSevFilter }) {
   return arr;
 }
 
-// Estimated row heights for the virtualizer: a finding/compliance card vs a
-// section header row.
-const ROW_HEIGHT_CARD = 160;
-const ROW_HEIGHT_HEADER = 36;
+// Estimated row heights for the virtualizer: a finding/compliance card
+// (also the estimate for a row not materialised yet) vs a section header row.
+const ROW_HEIGHT_PX = Object.freeze({ missing: 160, header: 36, row: 160 });
 
-function estimateItemSize(items) {
-  return (i) => {
-    const item = items[i];
-    if (!item) return ROW_HEIGHT_CARD;
-    return item.kind === ROW_KIND.SEV_HEADER || item.kind === ROW_KIND.COMPLIANCE_HEADER ? ROW_HEIGHT_HEADER : ROW_HEIGHT_CARD;
-  };
-}
-
-function itemKey(items) {
-  return (i) => {
-    const item = items[i];
-    if (!item) return i;
-    const header = headerRowKey(item);
-    if (header) return header;
-    if (item.kind === FINDING_TYPE.VIOLATION) return `v-${item.v.file || ''}:${item.v.line ?? ''}:${item.idx}`;
-    return `c-${item.c.file || ''}:${item.c.line ?? ''}:${item.idx}`;
-  };
+function principleFindingKey(item) {
+  if (item.kind === FINDING_TYPE.VIOLATION) return `v-${item.v.file || ''}:${item.v.line ?? ''}:${item.idx}`;
+  return `c-${item.c.file || ''}:${item.c.line ?? ''}:${item.idx}`;
 }
 
 function SevBadgeRow({ sevCounts }) {
@@ -162,8 +147,8 @@ function PrincipleDetailBody({
         resetKey={virtualKey}
         items={items}
         scrollElement={scrollElement}
-        estimateSize={estimateItemSize(items)}
-        getItemKey={itemKey(items)}
+        rowHeights={ROW_HEIGHT_PX}
+        findingKey={principleFindingKey}
         renderItem={(item) => renderPrincipleItem(item, { principle, cardDismiss })}
       />
     </>

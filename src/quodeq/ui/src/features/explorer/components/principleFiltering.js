@@ -3,6 +3,7 @@ import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { usePrincipleData } from './explorerDataHooks.js';
 import { useHydratedCompliance } from '../hooks/useHydratedCompliance.js';
 import { SEVERITY, SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
+import { countKnownSeverities } from '../../../utils/severity.js';
 
 /** Split an evalPrincipal's violations into per-severity buckets and totals. */
 export function computeEvalPrincipleData(evalPrincipal) {
@@ -11,13 +12,12 @@ export function computeEvalPrincipleData(evalPrincipal) {
   // A deferred /scores item has no reason/snippet yet but is still a real check.
   const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet || c.detailDeferred);
   const violationsBySeverity = {};
-  const sevCounts = { critical: 0, major: 0, minor: 0 };
   for (const sev of KNOWN_SEVERITIES) violationsBySeverity[sev] = [];
   for (const v of violations) {
     const sev = (v.severity || SEVERITY.MINOR).toLowerCase();
     if (violationsBySeverity[sev]) violationsBySeverity[sev].push(v);
-    if (sevCounts[sev] !== undefined) sevCounts[sev]++;
   }
+  const sevCounts = countKnownSeverities(violations, { ignoreCase: true });
   return { violations, compliance, violationsBySeverity, sevCounts };
 }
 
@@ -55,9 +55,7 @@ export function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) 
       );
     }
     const allFiltered = Object.values(bySev).flat();
-    const counts = { critical: 0, major: 0, minor: 0 };
-    allFiltered.forEach((v) => { const s = (v.severity || SEVERITY.MINOR).toLowerCase(); if (counts[s] !== undefined) counts[s]++; });
-    return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: counts };
+    return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: countKnownSeverities(allFiltered, { ignoreCase: true }) };
   }, [violationsBySeverity, dismissedSet]);
 
   const displayedBySeverity = useMemo(

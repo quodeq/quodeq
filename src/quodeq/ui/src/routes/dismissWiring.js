@@ -21,16 +21,7 @@ export function isSharedSource(selectedSource) {
   return selectedSource === PROJECT_SOURCE.SHARED;
 }
 
-/**
- * Find a project in `projects` by the id-or-name key the app routes on.
- *
- * @param {Array|undefined} projects
- * @param {string|undefined} key
- * @returns {Object|null}
- */
-export function findProject(projects, key) {
-  return projects?.find((p) => (p.id || p.name) === key) || null;
-}
+export { findProject } from '../utils/projectIdentity.js';
 
 /**
  * The onDismiss handler a detail route passes down, or undefined for a

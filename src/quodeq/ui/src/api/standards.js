@@ -4,6 +4,7 @@
 
 import { request, BASE } from './request.js';
 import { HTTP_STATUS } from '../constants.js';
+import { projectPath } from './paths.js';
 
 // Matches request.js's default request timeout; importStandard uses a raw
 // fetch (not the request() wrapper) so a stream-driven import failure can be
@@ -122,7 +123,7 @@ export async function exportStandard(standardId) {
  * @returns {Promise<{ overrides: Object, counts: Object }>}
  */
 export async function getStandardsOverrides(projectId) {
-  return request(`/projects/${encodeURIComponent(projectId)}/standards-overrides`);
+  return request(`${projectPath(projectId)}/standards-overrides`);
 }
 
 /**
@@ -134,7 +135,7 @@ export async function getStandardsOverrides(projectId) {
  */
 export async function putStandardsOverrides(projectId, overrides, { dryRun = false } = {}) {
   const suffix = dryRun ? '?dryRun=true' : '';
-  return request(`/projects/${encodeURIComponent(projectId)}/standards-overrides${suffix}`, {
+  return request(`${projectPath(projectId)}/standards-overrides${suffix}`, {
     method: 'PUT',
     body: JSON.stringify({ overrides }),
   });
@@ -146,7 +147,7 @@ export async function putStandardsOverrides(projectId, overrides, { dryRun = fal
  * @returns {Promise<{ visibleStandardIds: string[], isDefault: boolean, knownStandardIds: string[], defaultStandardIds: string[] }>}
  */
 export async function getStandardsVisibility(projectId) {
-  return request(`/projects/${encodeURIComponent(projectId)}/standards-visibility`);
+  return request(`${projectPath(projectId)}/standards-visibility`);
 }
 
 /**
@@ -156,7 +157,7 @@ export async function getStandardsVisibility(projectId) {
  * @returns {Promise<{ visibleStandardIds: string[], isDefault: boolean, knownStandardIds: string[], defaultStandardIds: string[] }>}
  */
 export async function putStandardsVisibility(projectId, visibleStandardIds) {
-  return request(`/projects/${encodeURIComponent(projectId)}/standards-visibility`, {
+  return request(`${projectPath(projectId)}/standards-visibility`, {
     method: 'PUT',
     body: JSON.stringify({ visibleStandardIds }),
   });

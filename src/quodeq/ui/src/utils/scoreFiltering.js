@@ -7,7 +7,7 @@
 
 import { bucketKey, isBucketEligible } from './dailyGrouping.js';
 import { scoreToGradeLabel } from './gradeThresholds.js';
-import { countBySeverity } from './severity.js';
+import { countBySeverity, emptySeverityCounts } from './severity.js';
 import { roundOneDecimal } from './rounding.js';
 
 // Mean of the scores that are present, rounded to one decimal. null when
@@ -187,7 +187,7 @@ export function filterAccumulatedByVisibleStandards(accumulated, visibleSet, fil
 export function computeSummaryFromFilteredDimensions(dimensions) {
   let totalViolations = 0;
   let totalCompliance = 0;
-  const severity = { critical: 0, major: 0, minor: 0 };
+  const severity = emptySeverityCounts();
   for (const d of dimensions) {
     // Support both totals-based (from unified endpoint) and violations-array-based
     const totals = d.totals;

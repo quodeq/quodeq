@@ -3,6 +3,7 @@ import {
   drawGlow, drawParticles,
 } from '../core/galaxyCore.js';
 import { HIT_TARGET_TYPE } from '../core/galaxyHitTypes.js';
+import { withinRadius } from '../core/hitTest.js';
 import { newCueBatch, collectSeverityCue, drawCueBatch } from './galaxyFolderCues.js';
 import { CANVAS_FONT_FAMILY } from '../core/galaxyTunables.js';
 import { fillBackgroundGradient } from './galaxyStarfield.js';
@@ -210,11 +211,9 @@ function hitTestStar({ s, i, sc, sr }, params) {
   const fly = flyRef.current;
   const mx = mouseRef.current.x, my = mouseRef.current.y;
   if (animRef.current || fly || mx < 0) return null;
-  const dx = mx - sc.x, dy = my - sc.y;
-  const d2 = dx * dx + dy * dy;
   const clusterR = s.isFolder && s.clusterHitR > 0 ? s.clusterHitR : 0;
   const starHitR = Math.max(sr * 2, FOLDER_STAR.hitRadiusMinPx);
-  if (d2 < starHitR * starHitR || (clusterR > 0 && d2 < clusterR * clusterR)) {
+  if (withinRadius(mx, my, sc.x, sc.y, starHitR) || (clusterR > 0 && withinRadius(mx, my, sc.x, sc.y, clusterR))) {
     return { type: s.isFolder ? HIT_TARGET_TYPE.FOLDER : HIT_TARGET_TYPE.FILE, starIdx: i, data: s };
   }
   return null;

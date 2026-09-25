@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { invalidateThemeColors } from '../core/galaxyCore.js';
 import VizBreadcrumb from './VizBreadcrumb.jsx';
 import MapLegend, { VizTooltipAnchor } from './MapLegend.jsx';
@@ -7,6 +7,7 @@ import { createEventHandlers } from './galaxyFolderEvents.js';
 import { useGalaxyFolderNav } from './useGalaxyFolderNav.js';
 import { useGalaxyFolderCamera } from './useGalaxyFolderCamera.js';
 import { LevelInfoPanel } from './galaxyViewInfo.jsx';
+import GalaxyCanvas, { useFadeIn } from './GalaxyCanvas.jsx';
 import ChartKeyboardControls from '../../../../components/ChartKeyboardControls.jsx';
 import { t } from '../../../../strings/index.js';
 import { riskBubbleKey } from './riskBubbleName.js';
@@ -90,28 +91,12 @@ export default function GalaxyFolderView({ node, currentPath = '', onPathChange,
     node, currentPath, onPathChange, onFileClick, showLabels, resetKey, projectName,
   });
 
-  // Fade in
-  const [visible, setVisible] = useState(false);
-  useEffect(() => { if (scene) setVisible(true); }, [scene]);
+  const visible = useFadeIn(scene);
 
   if (!scene) return null;
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', opacity: visible ? 1 : 0, transition: 'opacity 0.4s ease' }}>
-      <canvas
-        className="viz-focusable"
-        ref={refs.canvasRef}
-        width={size.w}
-        height={size.h}
-        style={{ width: '100%', height: '100%', display: 'block' }}
-        tabIndex={0}
-        role="application"
-        aria-label={t('map.galaxyFolderAria')}
-        onMouseMove={handlers.handleMouseMove}
-        onMouseLeave={handlers.handleMouseLeave}
-        onClick={handlers.handleClick}
-        onKeyDown={handlers.handleKeyDown}
-      />
+    <GalaxyCanvas visible={visible} canvasRef={refs.canvasRef} size={size} label={t('map.galaxyFolderAria')} handlers={handlers}>
       <ChartKeyboardControls label={t('map.galaxyKbdLabel')} items={starItems(scene, handlers.activateStar)} />
       <VizBreadcrumb items={breadcrumb.map((bc, i) => ({
         label: bc.label,
@@ -119,6 +104,6 @@ export default function GalaxyFolderView({ node, currentPath = '', onPathChange,
       }))} />
       <GalaxyFolderOverlays tooltipRef={refs.tooltipRef} />
       <LevelInfoPanel levelInfo={levelInfo} />
-    </div>
+    </GalaxyCanvas>
   );
 }

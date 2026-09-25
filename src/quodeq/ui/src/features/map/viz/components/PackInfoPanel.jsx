@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { LevelInfoPanel } from './galaxyViewInfo.jsx';
 import { PERCENT } from '../../../../constants.js';
+import { isDrillableFolder } from '../core/fileTree.js';
 
 /** Compliance rate as a whole percentage, or a dash when nothing was checked. */
 function complianceRate(d) {
@@ -12,7 +13,7 @@ function complianceRate(d) {
 function childCounts(children) {
   const kids = children || [];
   return {
-    folders: kids.filter(c => !c.isFile && c.children?.length > 0).length,
+    folders: kids.filter(isDrillableFolder).length,
     files: kids.filter(c => c.isFile || !c.children || c.children.length === 0).length,
   };
 }

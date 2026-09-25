@@ -6,13 +6,14 @@ import { useGradeFormulaState } from './hooks/useGradeFormulaState.js';
 import { useGradePreview } from './hooks/useGradePreview.js';
 import { useRescoreProgress } from './hooks/useRescoreProgress.js';
 import { t } from '../../strings/index.js';
+import { pluralKey } from '../../utils/plural.js';
 
 // Singular and plural are separate whole sentences, not a stem plus an "s":
 // the verb agreement moves too ("shows" vs "show"), and plenty of languages
 // inflect more of the sentence than English does.
 function noticeFor(rescore) {
   return rescore.failed > 0
-    ? t(rescore.failed === 1 ? 'gradeFormula.partialRescoreOne' : 'gradeFormula.partialRescoreMany', { count: rescore.failed })
+    ? t(pluralKey(rescore.failed, 'gradeFormula.partialRescoreOne', 'gradeFormula.partialRescoreMany'), { count: rescore.failed })
     : null;
 }
 
