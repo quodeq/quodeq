@@ -25,10 +25,10 @@ _ALLOWLIST: set[str] = {
     # kill_tree POSIX branch, in the else of `if sys.platform == "win32"`
     # (win32 uses taskkill /F /T). Hoisted from analysis/_process.py so
     # services/ and analysis/ can share one implementation.
-    "shared/process_kill.py:34",
+    "shared/process_kill.py:38",
     # kill_proc_tree POSIX branch, in the else of `if sys.platform == "win32"`
     # (win32 uses taskkill /F /T). Hoisted from assistant to shared.
-    "shared/process_kill.py:71",
+    "shared/process_kill.py:74",
     # pgrep / ps are wrapped in `except (OSError, ...)` -> returns _UNKNOWN, so
     # on Windows (FileNotFoundError) resource sampling degrades gracefully.
     "shared/resource_sampler.py:60",

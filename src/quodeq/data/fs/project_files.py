@@ -16,6 +16,7 @@ import shutil
 from pathlib import Path
 
 from quodeq.core.types.scan import ScanData
+from quodeq.data.fs.run_artifacts import read_json_object
 
 REPOSITORY_INFO_FILENAME = "repository_info.json"
 SCAN_FILENAME = "scan.json"
@@ -40,21 +41,10 @@ def scan_json_exists(project_dir: Path) -> bool:
     return (project_dir / SCAN_FILENAME).exists()
 
 
-def _read_json_object(path: Path) -> dict | None:
-    """Parsed JSON object at *path*, or None when absent, corrupt, or not an object."""
-    if not path.exists():
-        return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
-    return data if isinstance(data, dict) else None
-
-
 def read_repository_info(project_dir: Path) -> dict | None:
     """Parsed ``repository_info.json``, or None when absent, corrupt, or
     not a JSON object."""
-    return _read_json_object(project_dir / REPOSITORY_INFO_FILENAME)
+    return read_json_object(project_dir / REPOSITORY_INFO_FILENAME, raise_non_utf8=True)
 
 
 def write_repository_info(project_dir: Path, data: dict) -> bool:
@@ -69,11 +59,8 @@ def write_repository_info(project_dir: Path, data: dict) -> bool:
 
 def read_scan_total_files(project_dir: Path) -> int:
     """``total_files`` from ``scan.json``; 0 when absent, corrupt, or non-int."""
-    try:
-        data = json.loads((project_dir / SCAN_FILENAME).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return 0
-    raw = data.get("total_files") if isinstance(data, dict) else None
+    data = read_json_object(project_dir / SCAN_FILENAME)
+    raw = data.get("total_files") if data is not None else None
     return int(raw) if isinstance(raw, int) else 0
 
 
@@ -87,7 +74,7 @@ def write_scan_json(scan: ScanData, output_dir: Path) -> None:
 def read_scan_json(project_dir: Path) -> dict | None:
     """Parsed ``scan.json``, or None when absent, corrupt, or not a JSON
     object. Mirrors :func:`read_repository_info`'s contract."""
-    return _read_json_object(project_dir / SCAN_FILENAME)
+    return read_json_object(project_dir / SCAN_FILENAME, raise_non_utf8=True)
 
 
 def remove_project_dir(project_dir: Path) -> bool:

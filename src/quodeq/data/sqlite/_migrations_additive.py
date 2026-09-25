@@ -6,8 +6,11 @@ from __future__ import annotations
 
 import sqlite3
 
+FINDINGS_TABLE = "findings"  # the table most upgrades extend
 
-def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
+
+def table_exists(conn: sqlite3.Connection, name: str) -> bool:
+    """True when the database has a table called *name*."""
     return conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
     ).fetchone() is not None
@@ -31,11 +34,19 @@ def _add_findings_column(conn: sqlite3.Connection, column: str, decl: str) -> No
     OperationalError the scoring/dashboard read seams don't catch, permanently
     bricking the run. Skip if the column already exists.
     """
-    if not _table_exists(conn, "findings"):
-        return
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
+    if table_exists(conn, FINDINGS_TABLE):
+        add_missing_column(conn, FINDINGS_TABLE, column, decl)
+
+
+def add_missing_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+    """``ALTER TABLE <table> ADD COLUMN <column> <decl>`` unless *table* already has *column*.
+
+    The caller checks that *table* exists where it may not. *table*, *column*
+    and *decl* are migration literals, never input.
+    """
+    columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
     if column not in columns:
-        conn.execute(f"ALTER TABLE findings ADD COLUMN {column} {decl}")
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
 
 def upgrade_v5_to_v6(conn: sqlite3.Connection) -> None:
@@ -73,7 +84,7 @@ def upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
     re-run safe if a crash landed the CREATE INDEX but not the later
     user_version bump (same idempotency shape as the other upgrades here).
     """
-    if not _table_exists(conn, "findings"):
+    if not table_exists(conn, FINDINGS_TABLE):
         return
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_findings_req_file_line "

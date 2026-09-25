@@ -30,7 +30,7 @@ def test_write_and_read_round_trip(tmp_path: Path) -> None:
 def test_run_status_from_status_dict_round_trips_to_same_json(tmp_path: Path, monkeypatch) -> None:
     """RunStatus.from_status_dict(read_status(run_dir)) must reproduce identical JSON."""
     import quodeq.data.fs.run_status_store as run_status_store
-    monkeypatch.setattr(run_status_store, "_now_iso", lambda: "2026-04-20T00:00:00+00:00")
+    monkeypatch.setattr(run_status_store, "utc_now_iso", lambda **_: "2026-04-20T00:00:00+00:00")
 
     original = RunStatus(
         state=RunState.DONE, job_id="ext-rt", started_at="2026-04-20T00:00:00+00:00",

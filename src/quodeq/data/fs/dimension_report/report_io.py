@@ -1,7 +1,6 @@
 """I/O adapters -- persist pre-built report dicts to disk."""
 from __future__ import annotations
 
-import json
 import logging
 import os
 import tempfile
@@ -9,6 +8,7 @@ from pathlib import Path
 
 from quodeq.core.types import ScoringResult
 from quodeq.core.evidence.model import Evidence
+from quodeq.shared.json_state import dump_json_and_replace
 from quodeq.shared.validation import validate_path_segment
 
 from quodeq.data.fs.dimension_report.report_assembly import build_full_report, build_dashboard_report
@@ -28,9 +28,7 @@ def persist_json(data: dict, path: Path) -> None:
         dir=str(path.parent), suffix=".tmp", prefix=f".{path.name}.",
     )
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp_path, str(path))
+        dump_json_and_replace(fd, tmp_path, path, data, indent=2)
         tmp_path = None
     except OSError as exc:
         raise OSError(f"Failed to write report to {path}: {exc}") from exc

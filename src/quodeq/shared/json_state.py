@@ -15,6 +15,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, TypeVar
 
+from quodeq.shared.env_paths import home_state_dir
 from quodeq.shared.env_resolve import resolve_env
 
 _StateT = TypeVar("_StateT")
@@ -33,7 +34,7 @@ def state_file_path(
     explicit = environ.get(explicit_var)
     if explicit:
         return explicit
-    base = environ.get("QUODEQ_DIR") or str(Path.home() / ".quodeq")
+    base = environ.get("QUODEQ_DIR") or str(home_state_dir())
     return str(Path(base) / filename)
 
 
@@ -54,6 +55,21 @@ def read_json_state(path: Path, cls: type[_StateT]) -> _StateT:
     return cls(**{k: v for k, v in raw.items() if k in known})
 
 
+def dump_json_and_replace(
+    fd: int, tmp_path: str, path: Path, data: object, *, indent: int | None = None,
+) -> None:
+    """Write *data* as JSON into the open temp file *fd*, then move *tmp_path* onto *path*.
+
+    The publish step of an atomic JSON write: the caller makes the temp file
+    (``tempfile.mkstemp`` next to *path*) and owns cleanup and error policy.
+    ``os.replace`` is atomic and overwrites on every platform, so a reader
+    never sees a half-written file. *fd* is closed on return or on error.
+    """
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=indent)
+    os.replace(tmp_path, str(path))
+
+
 def write_json_state(
     state: Any, path: Path, label: str, logger: logging.Logger,
 ) -> None:
@@ -67,9 +83,7 @@ def write_json_state(
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp_fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-        with os.fdopen(tmp_fd, "w", encoding="utf-8") as fh:
-            fh.write(json.dumps(asdict(state), indent=2))
-        os.replace(tmp_name, path)
+        dump_json_and_replace(tmp_fd, tmp_name, path, asdict(state), indent=2)
     except OSError as exc:
         # fail-silent: this write is never worth crashing over
         logger.debug("%s state write failed (fail-soft): %s", label, exc)

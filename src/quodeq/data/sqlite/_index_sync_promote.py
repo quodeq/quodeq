@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import dataclasses
 import sqlite3
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import NamedTuple
 
@@ -25,6 +24,7 @@ from quodeq.data.fs.run_status_store import (
     read_status,
     write_status,
 )
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 
 
 class _StaleRunRow(NamedTuple):
@@ -80,7 +80,7 @@ def _promote_via_status_write(
 
 def _promote_index_only(db: sqlite3.Connection, job_id: str) -> None:
     """Update the index row directly (no run_dir on disk / full orphan)."""
-    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    now_iso = utc_now_iso(timespec=ISO_SECONDS)
     db.execute(
         "UPDATE runs SET state = ?, exit_reason = ?, finalized_at = ?, "
         "updated_at = ? WHERE job_id = ?",

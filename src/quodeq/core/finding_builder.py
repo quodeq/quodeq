@@ -19,6 +19,9 @@ class ViolationContext:
 class FindingSpec:
     """Input fields for building a normalized finding dict."""
     practice_id: str | None
+    # The input carrier declares the Finding fields it fills, with the same
+    # names and types, so this block repeats core/types/finding.py by design.
+    # jscpd:ignore-start
     file: str | None = None
     line: int | str | None = None
     end_line: int | str | None = None
@@ -27,6 +30,7 @@ class FindingSpec:
     snippet: str | None = None
     severity: str | None = None
     cwe: int | str | None = None
+    # jscpd:ignore-end
     req: str | None = None
     req_refs: list[dict] | None = None
     context: str | None = None

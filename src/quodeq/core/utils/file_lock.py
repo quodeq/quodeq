@@ -12,21 +12,40 @@ from __future__ import annotations
 import logging
 import sys
 import time
+from collections.abc import Callable
 
 from quodeq.core.constants import PLATFORM_WIN32
 
 _logger = logging.getLogger(__name__)
 
-# Windows blocking lock budget. msvcrt.LK_LOCK only retries 10x at 1s,
-# which is too short under the subagent pool's heavy contention. We use
-# the non-blocking variant in our own retry loop instead.
-_WIN_LOCK_TIMEOUT_S = 60.0
-_WIN_LOCK_RETRY_INTERVAL_S = 0.05
+# Lock budget for both platforms. Windows' blocking msvcrt.LK_LOCK only
+# retries 10x at 1s, which is too short under the subagent pool's heavy
+# contention, and Unix flock has no built-in timeout, so both poll the
+# non-blocking primitive in _poll_lock with this budget and cadence.
+_LOCK_TIMEOUT_S = 60.0
+_LOCK_RETRY_INTERVAL_S = 0.05
 
-# Unix flock has no built-in timeout; poll with a short non-blocking retry
-# loop instead, mirroring the Windows branch's budget and cadence.
-_UNIX_LOCK_TIMEOUT_S = 60.0
-_UNIX_LOCK_RETRY_INTERVAL_S = 0.05
+
+def _budget(timeout_s: float | None) -> float:
+    """*timeout_s*, or ``_LOCK_TIMEOUT_S`` when it is None.
+
+    Read at call time rather than as a default arg: tests monkeypatch the
+    module constant to keep the contention case fast.
+    """
+    return _LOCK_TIMEOUT_S if timeout_s is None else timeout_s
+
+
+def _poll_lock(try_lock: Callable[[], None], budget: float) -> None:
+    """Call *try_lock* until it stops raising OSError; after *budget* seconds the last one propagates."""
+    deadline = time.monotonic() + budget
+    while True:
+        try:
+            try_lock()
+            return
+        except OSError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(_LOCK_RETRY_INTERVAL_S)
 
 
 def _make_lock_ops() -> tuple:
@@ -35,19 +54,7 @@ def _make_lock_ops() -> tuple:
         import msvcrt
 
         def _lock(fd: int, timeout_s: float | None = None) -> None:
-            # Read at call time, not as a default arg: tests monkeypatch the
-            # module constant to keep the contention case fast.
-            if timeout_s is None:
-                timeout_s = _WIN_LOCK_TIMEOUT_S
-            deadline = time.monotonic() + timeout_s
-            while True:
-                try:
-                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-                    return
-                except OSError:
-                    if time.monotonic() >= deadline:
-                        raise
-                    time.sleep(_WIN_LOCK_RETRY_INTERVAL_S)
+            _poll_lock(lambda: msvcrt.locking(fd, msvcrt.LK_NBLCK, 1), _budget(timeout_s))
 
         def _unlock(fd: int) -> None:
             msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
@@ -55,27 +62,19 @@ def _make_lock_ops() -> tuple:
         import fcntl
 
         def _lock(fd: int, timeout_s: float | None = None) -> None:
-            # Read at call time, not as a default arg: tests monkeypatch the
-            # module constant to keep the contention case fast.
-            if timeout_s is None:
-                timeout_s = _UNIX_LOCK_TIMEOUT_S
+            budget = _budget(timeout_s)
             _logger.debug(
-                "Waiting for file lock (timeout %.0fs)", timeout_s,
+                "Waiting for file lock (timeout %.0fs)", budget,
             )
-            deadline = time.monotonic() + timeout_s
-            while True:
-                try:
-                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    return
-                except OSError:
-                    if time.monotonic() >= deadline:
-                        _logger.warning(
-                            "Timed out after %.0fs waiting for file lock", timeout_s,
-                        )
-                        raise TimeoutError(
-                            f"Timed out waiting for file lock after {timeout_s}s",
-                        ) from None
-                    time.sleep(_UNIX_LOCK_RETRY_INTERVAL_S)
+            try:
+                _poll_lock(lambda: fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB), budget)
+            except OSError:
+                _logger.warning(
+                    "Timed out after %.0fs waiting for file lock", budget,
+                )
+                raise TimeoutError(
+                    f"Timed out waiting for file lock after {budget}s",
+                ) from None
 
         def _unlock(fd: int) -> None:
             fcntl.flock(fd, fcntl.LOCK_UN)

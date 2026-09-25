@@ -32,6 +32,14 @@ _logger = logging.getLogger(__name__)
 _WORKTREE_TIMEOUT_S = 30
 
 
+def _git(repo_dir: Path, *args: str, timeout: float, check: bool = False) -> subprocess.CompletedProcess[str]:
+    """Run ``git -C <repo_dir> <args>`` with captured UTF-8 text output."""
+    return subprocess.run(
+        [GIT_BIN, GIT_FLAG_C, str(repo_dir), *args],
+        capture_output=True, text=True, encoding="utf-8", check=check, timeout=timeout,
+    )
+
+
 def _fetch_branch(repo_dir: Path, branch: str) -> bool:
     """Fetch *branch* from origin into a local branch of the same name.
 
@@ -42,10 +50,7 @@ def _fetch_branch(repo_dir: Path, branch: str) -> bool:
     """
     from quodeq import _cli_resolution as _facade
     try:
-        result = subprocess.run(
-            [GIT_BIN, GIT_FLAG_C, str(repo_dir), "fetch", "origin", f"{branch}:{branch}"],
-            capture_output=True, text=True, encoding="utf-8", timeout=_facade.FETCH_TIMEOUT_S,
-        )
+        result = _git(repo_dir, "fetch", "origin", f"{branch}:{branch}", timeout=_facade.FETCH_TIMEOUT_S)
         return result.returncode == 0
     except (subprocess.SubprocessError, OSError):
         return False
@@ -63,9 +68,9 @@ def create_worktree(repo_dir: Path, branch: str) -> Path | None:
     from quodeq import _cli_resolution as _facade
     for retried in (False, True):
         try:
-            subprocess.run(
-                [GIT_BIN, GIT_FLAG_C, str(repo_dir), "worktree", "add", str(worktree_dir), "--", branch],
-                capture_output=True, text=True, encoding="utf-8", check=True, timeout=_WORKTREE_TIMEOUT_S,
+            _git(
+                repo_dir, "worktree", "add", str(worktree_dir), "--", branch,
+                timeout=_WORKTREE_TIMEOUT_S, check=True,
             )
             return worktree_dir
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
@@ -81,10 +86,7 @@ def create_worktree(repo_dir: Path, branch: str) -> Path | None:
 def cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
     """Remove a temporary git worktree."""
     try:
-        result = subprocess.run(
-            [GIT_BIN, GIT_FLAG_C, str(repo_dir), "worktree", "remove", str(worktree_dir), "--force"],
-            capture_output=True, text=True, encoding="utf-8", timeout=_WORKTREE_TIMEOUT_S,
-        )
+        result = _git(repo_dir, "worktree", "remove", str(worktree_dir), "--force", timeout=_WORKTREE_TIMEOUT_S)
         if result.returncode != 0:
             _logger.warning(
                 "git worktree remove %s exited %d: %s",

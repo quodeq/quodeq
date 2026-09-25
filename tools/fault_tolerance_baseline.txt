@@ -96,10 +96,10 @@ src/quodeq/dashboard/runner.py:162:broad-except
 src/quodeq/dashboard/runner.py:180:broad-except
 src/quodeq/dashboard/runner.py:191:broad-except
 src/quodeq/data/cache_store/_migrate_params.py:42:broad-except
-src/quodeq/data/cache_store/entry.py:37:broad-except
+src/quodeq/data/cache_store/entry.py:34:broad-except
 src/quodeq/data/fs/compiled_standards.py:36:broad-except
 src/quodeq/data/fs/report_parser/run_dates.py:43:broad-except
-src/quodeq/data/fs/run_artifacts.py:75:suppress
+src/quodeq/data/fs/run_artifacts.py:79:suppress
 src/quodeq/data/fs/standards_prefs.py:116:broad-except
 src/quodeq/data/fs/standards_prefs.py:41:broad-except
 src/quodeq/data/fs/standards_prefs.py:86:broad-except
@@ -107,10 +107,10 @@ src/quodeq/data/fs/suppression_rules.py:42:broad-except
 src/quodeq/data/migrations/dismissed_json_to_actions_log.py:65:broad-except
 src/quodeq/data/sqlite/findings_queries.py:215:broad-except
 src/quodeq/data/sqlite/findings_queries.py:263:broad-except
-src/quodeq/data/sqlite/run_index.py:113:broad-except
-src/quodeq/data/sqlite/run_index.py:181:broad-except
-src/quodeq/data/sqlite/run_index.py:90:broad-except
-src/quodeq/data/sqlite/run_index.py:96:broad-except
+src/quodeq/data/sqlite/run_index.py:103:broad-except
+src/quodeq/data/sqlite/run_index.py:109:broad-except
+src/quodeq/data/sqlite/run_index.py:126:broad-except
+src/quodeq/data/sqlite/run_index.py:191:broad-except
 src/quodeq/llm_bridge/_cloud.py:67:broad-except
 src/quodeq/menubar/app.py:137:broad-except
 src/quodeq/menubar/app.py:156:broad-except

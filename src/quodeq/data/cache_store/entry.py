@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field, fields
-from datetime import datetime, timezone
+
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 
 # Bumped whenever the entry format itself changes shape. Independent of
 # CacheKey.schema_version, which gates input-side invalidation.
@@ -20,10 +21,6 @@ from datetime import datetime, timezone
 # recoverable from the entry alone (derivable only via the compiled
 # standards), which the schema-3 -> 4 migration had to work around.
 ENTRY_FORMAT_VERSION = 3
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def quodeq_version() -> str:
@@ -86,7 +83,7 @@ class CacheEntry:
     # default config). Format v3; older entries load as "" and the migration
     # derives the real value from ``provenance.effective_params``.
     params_hash: str = ""
-    created_at: str = field(default_factory=_utc_now)
+    created_at: str = field(default_factory=lambda: utc_now_iso(timespec=ISO_SECONDS))
     cache_format_version: int = ENTRY_FORMAT_VERSION
     # Whether a COMPLETED run has consolidated these findings into its
     # report. Written False at creation and flipped to True by

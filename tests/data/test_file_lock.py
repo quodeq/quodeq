@@ -17,10 +17,8 @@ def test_unix_lock_times_out_on_contention(tmp_path, monkeypatch, caplog) -> Non
     from quodeq.core.utils import file_lock as _file_lock_impl
     from quodeq.data import file_lock
 
-    monkeypatch.setattr(_file_lock_impl, "_WIN_LOCK_TIMEOUT_S", 0.2, raising=False)
-    # The Unix path reads its own timeout constant; patch the module-level
-    # constant the implementation will use (see Step 3) directly:
-    monkeypatch.setattr(_file_lock_impl, "_UNIX_LOCK_TIMEOUT_S", 0.2, raising=False)
+    # Both platforms read the one module-level budget at call time.
+    monkeypatch.setattr(_file_lock_impl, "_LOCK_TIMEOUT_S", 0.2)
 
     path = tmp_path / "lock"
     path.write_text("")

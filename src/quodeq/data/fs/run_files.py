@@ -17,6 +17,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from quodeq.core.run.state import RunState, parse_run_state
+from quodeq.data.fs.run_artifacts import read_json_object
 from quodeq.shared.constants import EVIDENCE_DIRNAME, JSON_SUFFIX, MANIFEST_FILENAME
 
 _logger = logging.getLogger(__name__)
@@ -79,12 +80,7 @@ def read_run_manifest(run_dir: Path) -> dict | None:
     None when absent, corrupt, or not a JSON object -- mirrors
     ``project_files.read_repository_info``'s contract.
     """
-    manifest_path = run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME
-    try:
-        data = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return None
-    return data if isinstance(data, dict) else None
+    return read_json_object(run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME)
 
 
 def has_fingerprint_files(evidence_dir: Path) -> bool:
@@ -110,11 +106,7 @@ def list_dimension_evidence(run_dir: Path) -> list[tuple[str, Path, int]] | None
         return None
     out: list[tuple[str, Path, int]] = []
     for path in evidence_dir.glob(f"*{_EVIDENCE_SUFFIX}"):
-        try:
-            size = path.stat().st_size
-        except OSError:
-            size = 0
-        out.append((path.name[: -len(_EVIDENCE_SUFFIX)], path, size))
+        out.append((path.name[: -len(_EVIDENCE_SUFFIX)], path, evidence_file_size(path)))
     return out
 
 
@@ -184,10 +176,7 @@ def read_queue_files_count(queue_path: Path) -> int:
     0 when the file is absent, corrupt, or not batch-shaped — this feeds
     coverage counters, never correctness.
     """
-    try:
-        data = json.loads(queue_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return 0
+    data = read_queue_state(queue_path)
     taken = data.get("taken") if isinstance(data, dict) else None
     if not isinstance(taken, list):
         return 0

@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from quodeq.data.fs._index_cache import IndexCache, index_cache
+from quodeq.shared.json_state import dump_json_and_replace
 
 _INDEX_FILE = "project_index.json"
 MAX_LEGACY_SCAN = 500
@@ -54,9 +55,19 @@ def save_index(reports_dir: Path, index: dict[str, str], *, cache: IndexCache | 
     tmp = ""
     try:
         fd, tmp = tempfile.mkstemp(dir=reports_dir, suffix=".tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(index, f, indent=2)
-        os.replace(tmp, index_path)
+        dump_json_and_replace(fd, tmp, index_path, index, indent=2)
     except OSError as exc:
         logging.getLogger(__name__).warning("Could not save project index: %s", exc)
         _cleanup_tmp(tmp)
+
+
+class FilesystemProjectRepository:
+    """The default ``ProjectRepository``: the reports dir's ``project_index.json``."""
+
+    def load_index(self, reports_dir: Path) -> dict[str, str]:
+        """Load the index through the module-wide cache (see ``load_index``)."""
+        return load_index(reports_dir)
+
+    def save_index(self, reports_dir: Path, index: dict[str, str]) -> None:
+        """Write the index atomically (see ``save_index``)."""
+        save_index(reports_dir, index)

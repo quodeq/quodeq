@@ -780,7 +780,7 @@ tests/data/sqlite/test_migrations.py:4:private-name:quodeq.data.sqlite._migratio
 tests/data/sqlite/test_migrations.py:9:private-module:quodeq.data.sqlite._schema.EVALUATION_DDL
 tests/data/sqlite/test_migrations.py:9:private-module:quodeq.data.sqlite._schema.SCHEMA_VERSION
 tests/data/sqlite/test_migrations_columns.py:241:private-module:quodeq.data.sqlite._migrations_additive
-tests/data/sqlite/test_migrations_columns.py:254:private-name:quodeq.data.sqlite._migrations_additive._table_exists
+tests/data/sqlite/test_migrations_columns.py:254:private-module:quodeq.data.sqlite._migrations_additive.table_exists
 tests/data/sqlite/test_migrations_columns.py:3:private-module:quodeq.data.sqlite._migrations.apply_evaluation_schema
 tests/data/sqlite/test_migrations_columns.py:4:private-module:quodeq.data.sqlite._schema.EVALUATION_DDL
 tests/data/sqlite/test_migrations_columns.py:4:private-module:quodeq.data.sqlite._schema.SCHEMA_VERSION

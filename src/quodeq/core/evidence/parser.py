@@ -66,6 +66,22 @@ def _build_evidence(
     )
 
 
+def _group(judgments: list[Judgment], dimension: str, options: EvidenceParseOptions) -> GroupedJudgments:
+    """Group *judgments* for *dimension* with the standards sources *options* names."""
+    return group_judgments(
+        judgments, dimension=dimension, evaluators_dir=options.evaluators_dir,
+        compiled_dir=options.compiled_dir, req_map_reader=options.req_map_reader,
+    )
+
+
+def _grouped_evidence(context: EvidenceContext, grouped: GroupedJudgments, dimension: str) -> Evidence:
+    """The Evidence for one dimension's *grouped* judgments."""
+    return _build_evidence(
+        context, _build_principles(grouped, dimension, context.source_file_count),
+        grouped.quarantined,
+    )
+
+
 def _read_by_dimension(
     jsonl_file: Path, options: EvidenceParseOptions,
 ) -> dict[str, list[Judgment]]:
@@ -100,14 +116,9 @@ def parse_jsonl_to_evidence_by_dimension(
     result: dict[str, Evidence] = {}
     all_quarantined = []
     for dim, dj in by_dim.items():
-        grouped = group_judgments(dj, dimension=dim, evaluators_dir=options.evaluators_dir,
-                                   compiled_dir=options.compiled_dir,
-                                   req_map_reader=options.req_map_reader)
+        grouped = _group(dj, dim, options)
         all_quarantined.extend(grouped.quarantined_findings)
-        result[dim] = _build_evidence(
-            context, _build_principles(grouped, dim, context.source_file_count),
-            grouped.quarantined,
-        )
+        result[dim] = _grouped_evidence(context, grouped, dim)
     if options.on_quarantine is not None and all_quarantined:
         options.on_quarantine(all_quarantined)
     return result
@@ -124,12 +135,7 @@ def parse_jsonl_to_evidence(
     # parse_jsonl_to_evidence_by_dimension which groups incrementally.
     judgments = read_judgments(jsonl_file, options)
     dim = judgments[0].dimension if judgments else ""
-    grouped = group_judgments(judgments, dimension=dim, evaluators_dir=options.evaluators_dir,
-                               compiled_dir=options.compiled_dir,
-                               req_map_reader=options.req_map_reader)
+    grouped = _group(judgments, dim, options)
     if options.on_quarantine is not None and grouped.quarantined_findings:
         options.on_quarantine(grouped.quarantined_findings)
-    return _build_evidence(
-        context, _build_principles(grouped, dim, context.source_file_count),
-        grouped.quarantined,
-    )
+    return _grouped_evidence(context, grouped, dim)

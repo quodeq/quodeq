@@ -217,5 +217,4 @@ def test_lock_file_default_timeout_is_unchanged():
     change to the shared primitive other workloads depend on."""
     from quodeq.core.utils import file_lock
 
-    assert file_lock._UNIX_LOCK_TIMEOUT_S == 60.0
-    assert file_lock._WIN_LOCK_TIMEOUT_S == 60.0
+    assert file_lock._LOCK_TIMEOUT_S == 60.0

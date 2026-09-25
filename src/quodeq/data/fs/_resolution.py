@@ -4,13 +4,12 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
 from quodeq.core.types.project_source import ProjectLocation
 from quodeq.data.fs._index_io import MAX_LEGACY_SCAN
-from quodeq.data.fs._models import ProjectIdentity
+from quodeq.data.fs._models import ProjectIdentity, ProjectRepository
 
 _REPO_INFO_FILENAME = "repository_info.json"
 _URL_PREFIXES = ("https://", "git@")
@@ -37,11 +36,11 @@ def _scan_legacy_projects(
     identity: ProjectIdentity,
     key: str,
     index: dict[str, str],
-    save_fn: Callable[[Path, dict[str, str]], None],
+    repository: ProjectRepository,
 ) -> str | None:
     """Directory scan fallback for projects created before the index existed.
 
-    Updates *index* (and persists via *save_fn*) on a match so the next
+    Updates *index* (and persists via *repository*) on a match so the next
     lookup hits the index directly.
     """
     scanned = 0
@@ -60,33 +59,27 @@ def _scan_legacy_projects(
             continue
         if info.get("name") != identity.project_name:
             continue
-        # Prefer remote_url match when both sides have one
-        if identity.remote_url and info.get("remote_url") == identity.remote_url:
+        # A remote_url match when both sides have one, else a path match
+        remote_match = identity.remote_url and info.get("remote_url") == identity.remote_url
+        if remote_match or info.get("path") == identity.repo_path:
             index[key] = entry.name
-            save_fn(reports_dir, index)
-            return entry.name
-        if info.get("path") == identity.repo_path:
-            index[key] = entry.name
-            save_fn(reports_dir, index)
+            repository.save_index(reports_dir, index)
             return entry.name
     return None
 
 
 def find_existing_project(
-    reports_dir: Path,
-    identity: ProjectIdentity,
-    load_fn: Callable[[Path], dict[str, str]],
-    save_fn: Callable[[Path, dict[str, str]], None],
+    reports_dir: Path, identity: ProjectIdentity, repository: ProjectRepository,
 ) -> str | None:
     """Look up project by identity in the index; fall back to directory scan for
     projects created before the index existed, updating the index on success."""
     key = index_key(identity)
-    index = load_fn(reports_dir)
+    index = repository.load_index(reports_dir)
     if key in index:
         if (reports_dir / index[key]).is_dir():
             return index[key]
         del index[key]
-        save_fn(reports_dir, index)
+        repository.save_index(reports_dir, index)
 
     # Legacy path-based key migration: when a remote_url is set, also try the
     # path-based key that would have been used before remote-URL identity.
@@ -96,17 +89,16 @@ def find_existing_project(
         if legacy_key in index and (reports_dir / index[legacy_key]).is_dir():
             uuid_value = index[legacy_key]
             index[key] = uuid_value
-            save_fn(reports_dir, index)
+            repository.save_index(reports_dir, index)
             return uuid_value
 
-    return _scan_legacy_projects(reports_dir, identity, key, index, save_fn)
+    return _scan_legacy_projects(reports_dir, identity, key, index, repository)
 
 
 def create_project(
     reports_dir: Path,
     identity: ProjectIdentity,
-    load_fn: Callable[[Path], dict[str, str]],
-    save_fn: Callable[[Path, dict[str, str]], None],
+    repository: ProjectRepository,
     *,
     parent_uuid: str | None = None,
 ) -> str:
@@ -144,7 +136,7 @@ def create_project(
             project_dir, exc,
         )
         raise
-    index = load_fn(reports_dir)
+    index = repository.load_index(reports_dir)
     index[index_key(identity)] = project_uuid
-    save_fn(reports_dir, index)
+    repository.save_index(reports_dir, index)
     return project_uuid

@@ -105,12 +105,17 @@ class Job:
     ended_at: str | None
     exit_code: int | None
     logs: deque[str] = field(default_factory=lambda: deque(maxlen=MAX_LOG_LINES))
+    # The live record declares the fields its frozen JobSnapshot
+    # (core/types/job.py) carries; a frozen and a mutable dataclass cannot
+    # share them by inheritance, so this block repeats that one by design.
+    # jscpd:ignore-start
     output_project: str | None = None
     output_run_id: str | None = None
     phase: str | None = None
     deadline_at: str | None = None
     current_dimension: str | None = None
     dimensions: list[str] | None = None
+    # jscpd:ignore-end
     ai_provider: str | None = None
     ai_model: str | None = None
     time_limit_s: int | None = None  # 0 = unlimited, None = unknown

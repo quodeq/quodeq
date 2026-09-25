@@ -13,12 +13,12 @@ cycle back through this module -- see that module's docstring.
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Callable
 from typing import TypeVar
 
 from quodeq.shared._config import get_config
 from quodeq.shared._env_sanitize import sanitized_env_path  # noqa: F401 — re-export
+from quodeq.shared.env_resolve import resolve_env
 
 
 def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
@@ -40,7 +40,7 @@ def _env_number(
 
     When *minimum* is given, parsed values below it also fall back to *default*.
     """
-    raw = (os.environ if env is None else env).get(var)
+    raw = resolve_env(env).get(var)
     if raw is not None:
         log = logging.getLogger(__name__)
         try:
@@ -96,7 +96,7 @@ def get_action_api_port(env: dict[str, str] | None = None) -> int:
 
 def get_action_api_host(env: dict[str, str] | None = None) -> str:
     """Return the action API host from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_ACTION_API_HOST", get_config()["default_host"])
+    return resolve_env(env).get("QUODEQ_ACTION_API_HOST", get_config()["default_host"])
 
 
 def get_dashboard_port(env: dict[str, str] | None = None) -> int:
@@ -106,22 +106,22 @@ def get_dashboard_port(env: dict[str, str] | None = None) -> int:
 
 def get_anthropic_api_key(env: dict[str, str] | None = None) -> str | None:
     """Return the Anthropic API key from environment, or None."""
-    return (os.environ if env is None else env).get("ANTHROPIC_API_KEY") or None
+    return resolve_env(env).get("ANTHROPIC_API_KEY") or None
 
 
 def get_asvs_url(env: dict[str, str] | None = None) -> str:
     """Return the OWASP ASVS JSON URL from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_ASVS_URL", get_config()["asvs_url"])
+    return resolve_env(env).get("QUODEQ_ASVS_URL", get_config()["asvs_url"])
 
 
 def get_github_search_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub repository search URL from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_GITHUB_SEARCH_URL", get_config()["github_search_url"])
+    return resolve_env(env).get("QUODEQ_GITHUB_SEARCH_URL", get_config()["github_search_url"])
 
 
 def get_github_raw_base_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub raw content base URL from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_GITHUB_RAW_BASE_URL", get_config()["github_raw_base_url"])
+    return resolve_env(env).get("QUODEQ_GITHUB_RAW_BASE_URL", get_config()["github_raw_base_url"])
 
 
 # ---------------------------------------------------------------------------

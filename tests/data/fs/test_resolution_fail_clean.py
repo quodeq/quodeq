@@ -9,6 +9,14 @@ from quodeq.data.fs._models import ProjectIdentity
 from quodeq.data.fs._resolution import _REPO_INFO_FILENAME, create_project
 
 
+class _Repo:
+    """A ProjectRepository over two plain functions."""
+
+    def __init__(self, load_fn, save_fn) -> None:
+        self.load_index = load_fn
+        self.save_index = save_fn
+
+
 def _identity() -> ProjectIdentity:
     return ProjectIdentity(project_name="proj", repo_path="/tmp/proj")
 
@@ -32,7 +40,7 @@ def test_metadata_write_failure_propagates_and_skips_index(tmp_path, monkeypatch
     monkeypatch.setattr(Path, "write_text", failing_write_text)
 
     with pytest.raises(OSError):
-        create_project(tmp_path, _identity(), load_fn, save_fn)
+        create_project(tmp_path, _identity(), _Repo(load_fn, save_fn))
 
     # The identity-to-project index must not record the broken project.
     assert saved == []
@@ -47,7 +55,7 @@ def test_successful_create_writes_metadata_and_indexes(tmp_path):
     def save_fn(reports_dir: Path, index: dict) -> None:
         saved.append(dict(index))
 
-    project_uuid = create_project(tmp_path, _identity(), load_fn, save_fn)
+    project_uuid = create_project(tmp_path, _identity(), _Repo(load_fn, save_fn))
 
     assert (tmp_path / project_uuid / _REPO_INFO_FILENAME).is_file()
     assert saved and list(saved[-1].values()) == [project_uuid]

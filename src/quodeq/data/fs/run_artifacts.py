@@ -15,6 +15,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from quodeq.shared.json_state import dump_json_and_replace
+
 
 def ensure_dir(path: Path) -> None:
     """Create *path* (and parents) if absent."""
@@ -42,17 +44,21 @@ def copy_matching_files(src_dir: Path, dest_dir: Path, pattern: str) -> None:
         shutil.copy2(src, dest_dir / src.name)
 
 
-def read_json_object(path: Path) -> dict | None:
+def read_json_object(path: Path, *, raise_non_utf8: bool = False) -> dict | None:
     """Parsed JSON object at *path*.
 
     None when the file is absent, not valid JSON, not a JSON object, or not
-    UTF-8 text. A generic counterpart to ``project_files``'s per-artifact
-    readers, for JSON stores outside the per-project ``repository_info.json``
-    / ``scan.json`` pair.
+    UTF-8 text. ``raise_non_utf8=True`` lets the UnicodeDecodeError of a
+    non-UTF-8 file propagate instead: ``project_files``' record readers
+    (``repository_info.json`` / ``scan.json``) have always done so.
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+    except UnicodeDecodeError:
+        if raise_non_utf8:
+            raise
+        return None
+    except (OSError, json.JSONDecodeError):
         return None
     return data if isinstance(data, dict) else None
 
@@ -66,9 +72,7 @@ def replace_json_file(path: Path, data: dict) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
     cleanup_tmp: str | None = tmp_path
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(json.dumps(data))
-        os.replace(tmp_path, str(path))
+        dump_json_and_replace(fd, tmp_path, path, data)
         cleanup_tmp = None  # ownership transferred to final path
     finally:
         if cleanup_tmp is not None:

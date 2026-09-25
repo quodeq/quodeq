@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from dataclasses import dataclass
 
 from quodeq.core.types import DimensionResult
 from quodeq.data.sqlite.score_cache_db import open_score_cache
@@ -57,13 +58,30 @@ def write_cached_rows(
         _logger.warning("score cache write failed for %s/%s", project, run_id, exc_info=True)
 
 
-def read_cached_accumulated(
-    conn: sqlite3.Connection, project: str, version: str,
-) -> dict | None:
-    """Return the cached accumulated payload for (project, version), or None."""
+@dataclass(frozen=True)
+class _PayloadSlot:
+    """One single-slot-per-project JSON payload table and the warnings it logs."""
+
+    table: str  # a module constant below, never caller input (it is formatted into the SQL)
+    write_failed_log: str  # %s is the project
+    unserializable_log: str | None  # None: skip an unserializable payload silently
+
+
+_ACCUMULATED = _PayloadSlot(
+    "accumulated_cache",
+    "accumulated cache write failed for %s",
+    "accumulated payload for %s not serializable; skipping cache",
+)
+_PROJECT_SUMMARY = _PayloadSlot(
+    "project_summary_cache", "project summary cache write failed for %s", None,
+)
+
+
+def _read_payload(conn: sqlite3.Connection, slot: _PayloadSlot, project: str, version: str) -> dict | None:
+    """The payload stored in *slot* for (project, version); None on miss, error or bad JSON."""
     try:
         row = conn.execute(
-            "SELECT payload FROM accumulated_cache WHERE project=? AND version=?",
+            f"SELECT payload FROM {slot.table} WHERE project=? AND version=?",
             (project, version),
         ).fetchone()
     except sqlite3.Error:
@@ -74,6 +92,34 @@ def read_cached_accumulated(
         return json.loads(row[0])
     except (ValueError, TypeError):
         return None
+
+
+def _write_payload(
+    conn: sqlite3.Connection, slot: _PayloadSlot, project: str, version: str, payload: dict,
+) -> None:
+    """Replace *project*'s payload in *slot* with *payload* at *version* (best-effort)."""
+    try:
+        blob = json.dumps(payload)
+    except (TypeError, ValueError):
+        if slot.unserializable_log is not None:
+            _logger.warning(slot.unserializable_log, project)
+        return
+    try:
+        conn.execute(f"DELETE FROM {slot.table} WHERE project=?", (project,))
+        conn.execute(
+            f"INSERT OR REPLACE INTO {slot.table} (project, version, payload) VALUES (?, ?, ?)",
+            (project, version, blob),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        _logger.warning(slot.write_failed_log, project, exc_info=True)
+
+
+def read_cached_accumulated(
+    conn: sqlite3.Connection, project: str, version: str,
+) -> dict | None:
+    """Return the cached accumulated payload for (project, version), or None."""
+    return _read_payload(conn, _ACCUMULATED, project, version)
 
 
 def write_cached_accumulated(
@@ -88,58 +134,24 @@ def write_cached_accumulated(
 
     Best-effort: logs and returns on any SQLite/serialization error.
     """
-    try:
-        blob = json.dumps(payload)
-    except (TypeError, ValueError):
-        _logger.warning("accumulated payload for %s not serializable; skipping cache", project)
-        return
-    try:
-        conn.execute("DELETE FROM accumulated_cache WHERE project=?", (project,))
-        conn.execute(
-            "INSERT OR REPLACE INTO accumulated_cache (project, version, payload) VALUES (?, ?, ?)",
-            (project, version, blob),
-        )
-        conn.commit()
-    except sqlite3.Error:
-        _logger.warning("accumulated cache write failed for %s", project, exc_info=True)
+    _write_payload(conn, _ACCUMULATED, project, version, payload)
 
 
 def read_cached_project_summary(
     conn: sqlite3.Connection, project: str, version: str,
 ) -> dict | None:
     """Return the cached project-card summary for (project, version), or None."""
-    try:
-        row = conn.execute(
-            "SELECT payload FROM project_summary_cache WHERE project=? AND version=?",
-            (project, version),
-        ).fetchone()
-    except sqlite3.Error:
-        return None
-    if row is None:
-        return None
-    try:
-        return json.loads(row[0])
-    except (ValueError, TypeError):
-        return None
+    return _read_payload(conn, _PROJECT_SUMMARY, project, version)
 
 
 def write_cached_project_summary(
     conn: sqlite3.Connection, project: str, version: str, payload: dict,
 ) -> None:
-    """Single-slot-per-project write for the project-card summary."""
-    try:
-        blob = json.dumps(payload)
-    except (TypeError, ValueError):
-        return
-    try:
-        conn.execute("DELETE FROM project_summary_cache WHERE project=?", (project,))
-        conn.execute(
-            "INSERT OR REPLACE INTO project_summary_cache (project, version, payload) VALUES (?, ?, ?)",
-            (project, version, blob),
-        )
-        conn.commit()
-    except sqlite3.Error:
-        _logger.warning("project summary cache write failed for %s", project, exc_info=True)
+    """Single-slot-per-project write for the project-card summary.
+
+    Best-effort: logs a SQLite error; an unserializable payload is skipped silently.
+    """
+    _write_payload(conn, _PROJECT_SUMMARY, project, version, payload)
 
 
 def store_run_keys(

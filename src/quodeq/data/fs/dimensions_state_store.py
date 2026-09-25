@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -19,14 +18,11 @@ from quodeq.core.run.dimensions import (  # noqa: F401 — re-exported API
     IllegalDimTransitionError,
     validate_dim_transition,
 )
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 
 _logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def read_dimensions(run_dir: Path) -> dict[str, Any]:
@@ -54,13 +50,13 @@ def _apply_state_transition(
     """
     entry["state"] = state.value
     if state == DimState.RUNNING:
-        entry["started_at"] = _now_iso()
+        entry["started_at"] = utc_now_iso(timespec=ISO_SECONDS)
     elif state == DimState.DONE:
-        entry["completed_at"] = _now_iso()
+        entry["completed_at"] = utc_now_iso(timespec=ISO_SECONDS)
         if exit_reason is not None:
             entry["exit_reason"] = exit_reason
     elif state == DimState.INCOMPLETE:
-        entry["interrupted_at"] = _now_iso()
+        entry["interrupted_at"] = utc_now_iso(timespec=ISO_SECONDS)
         if reason:
             entry["reason"] = reason
     return entry
