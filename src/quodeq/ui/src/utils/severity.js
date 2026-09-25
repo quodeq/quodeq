@@ -12,6 +12,8 @@
  */
 import { KNOWN_SEVERITIES } from './constants.js';
 
+const UNKNOWN_SEVERITY = 'unknown'; // fallback bucket for a severity value KNOWN_SEVERITIES doesn't recognise
+
 /**
  * Coerces any severity value to one of the four known ones, mapping anything
  * unrecognised (including null) to 'unknown'.
@@ -19,8 +21,8 @@ import { KNOWN_SEVERITIES } from './constants.js';
  * @returns {'critical'|'major'|'minor'|'unknown'}
  */
 export function normalizeSeverity(value) {
-  const normalized = String(value || 'unknown').toLowerCase();
-  return KNOWN_SEVERITIES.includes(normalized) ? normalized : 'unknown';
+  const normalized = String(value || UNKNOWN_SEVERITY).toLowerCase();
+  return KNOWN_SEVERITIES.includes(normalized) ? normalized : UNKNOWN_SEVERITY;
 }
 
 /**
@@ -31,7 +33,7 @@ export function normalizeSeverity(value) {
  */
 export function summaryBucket(value) {
   const normalized = normalizeSeverity(value);
-  return normalized === 'unknown' ? 'minor' : normalized;
+  return normalized === UNKNOWN_SEVERITY ? 'minor' : normalized;
 }
 
 /**

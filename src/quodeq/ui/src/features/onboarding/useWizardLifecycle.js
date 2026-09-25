@@ -6,8 +6,9 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { readString } from '../../adapters/storage.js';
-import { STEP_WELCOME, SKIPPED_KEY } from './wizardSteps.js';
+import { STEP_WELCOME, SKIPPED_KEY, SKIPPED_VALUE } from './wizardSteps.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
+import { NAV_TAB } from '../../vocab/navTab.js';
 
 /**
  * Whether the first-paint onboarding-wizard auto-open effect should fire.
@@ -64,7 +65,7 @@ export function buildWizardHandlers({ state, setWizardEntry, navTab }) {
       // != null keeps an explicit 0 ("Unlimited") — 0 is falsy but meaningful.
       if (totalTimeLimitS != null) payload.timeLimit = totalTimeLimitS;
       state.evalLifecycle.handleStartEvaluation(payload);
-      navTab('evaluate');
+      navTab(NAV_TAB.EVALUATE);
     },
   };
 }
@@ -118,7 +119,7 @@ export function useWizardLifecycle({ state, navTab, isEvaluating, sharedSignal }
       return;
     }
     autoOpenedRef.current = true;
-    if (readString(SKIPPED_KEY, null) !== 'true') {
+    if (readString(SKIPPED_KEY, null) !== SKIPPED_VALUE) {
       setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: true });
     }
   }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]); // eslint-disable-line react-hooks/exhaustive-deps

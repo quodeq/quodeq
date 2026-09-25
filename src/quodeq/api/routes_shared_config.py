@@ -11,7 +11,7 @@ from typing import Callable
 from flask import Flask, Response, jsonify
 
 from quodeq.services.shared_connect import ConnectStatus, connect_shared_repo
-from quodeq.services.shared_publish import get_publish_status
+from quodeq.services.shared_publish import PublishStartResult, get_publish_status
 from quodeq.services.shared_repo import RepoFormat, disconnect_shared_repo, last_synced_at, read_state
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared.log_sink import SHARED_LOG
@@ -130,9 +130,9 @@ def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tu
             "no shared repository configured", 400, "NO_SHARED_REPO"
         )
     outcome = start_publish(project, settings.url, evaluations_root=Path(reports_dir()))
-    if outcome == "already_running":
+    if outcome == PublishStartResult.ALREADY_RUNNING:
         return json_error("a publish is already running", 409, "PUBLISH_IN_PROGRESS")
-    if outcome != "started":
+    if outcome != PublishStartResult.STARTED:
         return json_error(
             "could not start the publish job, see server logs", 500, "PUBLISH_START_FAILED"
         )

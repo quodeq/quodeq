@@ -15,6 +15,7 @@ import subprocess
 import threading
 
 from quodeq.shared.frozen import dashboard_cmd as _dashboard_cmd
+from quodeq.menubar._constants import STATUS_STOPPED
 from quodeq.menubar._process import (
     DashboardCallbacks as _DashboardCallbacks,
     DashboardState as _DashboardState,
@@ -68,7 +69,7 @@ class DashboardLifecycleMixin:
             self._do_start_inner()
         except (OSError, subprocess.SubprocessError, ValueError) as e:
             self._set_error(f"Error: {e}")
-            self._status_item.title = "Stopped"
+            self._status_item.title = STATUS_STOPPED
             self._cleanup_stderr_log()
         finally:
             with self._state_lock:
@@ -90,7 +91,7 @@ class DashboardLifecycleMixin:
         except OSError as e:
             stderr_log.close()
             self._set_error(f"Failed: {e}")
-            self._status_item.title = "Stopped"
+            self._status_item.title = STATUS_STOPPED
             self._cleanup_stderr_log()
             return False
 
@@ -121,7 +122,7 @@ class DashboardLifecycleMixin:
         self._set_error(
             f"Dashboard stopped unexpectedly (exit code {self._process.returncode}). Try restarting."
         )
-        self._status_item.title = "Stopped"
+        self._status_item.title = STATUS_STOPPED
         self._cleanup_stderr_log()
 
     def _wait_for_dashboard(self, stderr_log):
@@ -134,7 +135,7 @@ class DashboardLifecycleMixin:
 
         def on_timeout():
             self._set_error("Timeout: dashboard did not respond")
-            self._status_item.title = "Stopped"
+            self._status_item.title = STATUS_STOPPED
             self._cleanup_stderr_log()
 
         _wait_for_dashboard(
@@ -175,6 +176,6 @@ class DashboardLifecycleMixin:
         self._sweep_stragglers()
         with self._state_lock:
             self._port = None
-        self._status_item.title = "Stopped"
+        self._status_item.title = STATUS_STOPPED
         self._set_ui_state(running=False)
         self._cleanup_stderr_log()

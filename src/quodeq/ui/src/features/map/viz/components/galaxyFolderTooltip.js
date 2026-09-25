@@ -1,4 +1,5 @@
 import { rgb } from '../core/galaxyCore.js';
+import { HIT_TARGET_TYPE } from '../core/galaxyHitTypes.js';
 import { pushSeverityRows, showTooltip } from './galaxyTooltipDom.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { countDescendants } from './galaxyFolderScene.js';
@@ -30,7 +31,7 @@ export function createTooltipUpdater(refs) {
     const row = (label, value, color) => `<div style="display:flex;justify-content:space-between;gap:12px;color:${color || 'var(--color-text-muted)'}"><span>${label}</span><span style="color:${color || 'var(--color-text)'};font-weight:500">${value}</span></div>`;
     const rows = [];
     const sev = d.severity || {};
-    if (h.type === 'folder') {
+    if (h.type === HIT_TARGET_TYPE.FOLDER) {
       rows.push(row(t('map.compliance'), (d.complianceRate * 100).toFixed(0) + '%'));
       rows.push(row(t('map.violations'), d.violations));
       rows.push(row(t('map.contents'), _cachedDescendantCount(d._node)));
@@ -44,10 +45,10 @@ export function createTooltipUpdater(refs) {
     const nameCol = rgb(d.col);
     const name = d.name;
     const ff = refs.focusedFolderRef.current;
-    const isFocused = h.type === 'folder' && ff && ff.starIdx === h.starIdx;
+    const isFocused = h.type === HIT_TARGET_TYPE.FOLDER && ff && ff.starIdx === h.starIdx;
     // Whole-sentence keys, not "Click to " + a verb phrase: the fragment is
     // unassemblable in languages that order the clause differently.
-    const hint = h.type === 'file' ? t('map.clickToZoomIn')
+    const hint = h.type === HIT_TARGET_TYPE.FILE ? t('map.clickToZoomIn')
       : isFocused ? t('map.clickToEnterFolder') : t('map.clickToFocus');
     showTooltip(
       el,

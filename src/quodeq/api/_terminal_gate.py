@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from flask import current_app, request
 
+from quodeq.api._constants import CODE_FORBIDDEN
 from quodeq.api.helpers import json_error
 from quodeq.terminal.gate import terminal_env_reason, terminal_gate_reason
 
@@ -35,4 +36,4 @@ def gate_reason() -> str | None:
 
 
 def forbidden():
-    return json_error("forbidden", 403, "FORBIDDEN")  # code + message once, for six routes
+    return json_error("forbidden", 403, CODE_FORBIDDEN)  # code + message once, for six routes

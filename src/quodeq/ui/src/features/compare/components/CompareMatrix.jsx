@@ -23,6 +23,7 @@ import { OVERALL, computeMatrixExtremes, sortMatrixRows } from './compareMatrixM
 import { useMatrixColumnChunks } from './useMatrixColumnChunks.js';
 import CompareMatrixTable from './CompareMatrixTable.jsx';
 import { score1, prefixOf, stemOf } from '../compareFormatters.js';
+import { SORT_DIR } from '../../../vocab/sortDirection.js';
 
 
 // Column headers hold 3-character numbers; full dimension or principle
@@ -143,13 +144,13 @@ function makeScoreCell(hoverClass, extremes, setHoverKey) {
 function buildMatrixCellHelpers(sort, setSort, hoverKey, setHoverKey, extremes) {
   // desc -> asc -> back to the caller's order.
   const toggleSort = (key) => setSort((cur) => {
-    if (cur?.key !== key) return { key, dir: 'desc' };
-    if (cur.dir === 'desc') return { key, dir: 'asc' };
+    if (cur?.key !== key) return { key, dir: SORT_DIR.DESC };
+    if (cur.dir === SORT_DIR.DESC) return { key, dir: SORT_DIR.ASC };
     return null;
   });
   const sortMark = (key) => {
     if (sort?.key !== key) return '';
-    return sort.dir === 'desc' ? ' ↓' : ' ↑';
+    return sort.dir === SORT_DIR.DESC ? ' ↓' : ' ↑';
   };
   const hoverClass = (key) => (hoverKey === key ? ' compare-matrix__hovercol' : '');
   const headerCell = makeHeaderCell(hoverClass, sort, toggleSort, sortMark);

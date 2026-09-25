@@ -4,6 +4,10 @@ import { t } from '../../../../strings/index.js';
 import { SECONDS_PER_HOUR } from '../../../../utils/time.js';
 
 
+// This step's own <input> type: a single-standard first project picks one
+// via radio, an existing project's "add more" picks any number via checkbox.
+const INPUT_TYPE = Object.freeze({ RADIO: 'radio', CHECKBOX: 'checkbox' });
+
 function formatTimeLimit(seconds) {
   if (!seconds || seconds <= 0) return 'No limit';
   if (seconds < SECONDS_PER_HOUR) return `${Math.round(seconds / 60)} min`;
@@ -16,7 +20,7 @@ function StandardListItem({ s, inputType, state, actions }) {
       <label className={state.standardIds.has(s.id) ? 'onboarding-standard-card onboarding-standard-card--selected' : 'onboarding-standard-card'}>
         <input
           type={inputType}
-          name={inputType === 'radio' ? 'standard' : `standard-${s.id}`}
+          name={inputType === INPUT_TYPE.RADIO ? 'standard' : `standard-${s.id}`}
           checked={state.standardIds.has(s.id)}
           onChange={() => actions.toggleStandard(s.id)}
           aria-label={s.name}
@@ -54,7 +58,7 @@ function StandardLaunchActions({ selectedIds, onLaunch, onBack }) {
 }
 
 export default function StandardLaunchStep({ state, actions, standards, onLaunch, onBack, stepIndex = 0, stepTotal = 0 }) {
-  const inputType = state.isFirstProject ? 'radio' : 'checkbox';
+  const inputType = state.isFirstProject ? INPUT_TYPE.RADIO : INPUT_TYPE.CHECKBOX;
   const selectedIds = Array.from(state.standardIds);
   const selectedNames = standards
     .filter((s) => state.standardIds.has(s.id))

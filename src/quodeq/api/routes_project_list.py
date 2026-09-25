@@ -7,6 +7,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, QUERY_FLAG_TRUE
 from quodeq.api.helpers import (
     error_response,
     json_error,
@@ -32,12 +33,12 @@ _logger = logging.getLogger(__name__)
 def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle DELETE /api/projects/<project>."""
     project = request.view_args["project"]
-    if request.args.get("confirm") != "true":
+    if request.args.get("confirm") != QUERY_FLAG_TRUE:
         return json_error("Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED")
     _logger.info("delete_project: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.delete_project(reports_dir(), project)
     if not ok:
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify({"deleted": project})
 
 
@@ -58,7 +59,7 @@ def _validated_target_path(new_path: str) -> str | tuple[dict[str, Any], int]:
         # http://, always with the same reason -- never echo exception text.
         return error_response(
             "path must use https:// or git@; cleartext http:// repository URLs are rejected",
-            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
         )
     if looks_like_url:
         if not is_valid_repo_url(new_path):
@@ -75,12 +76,12 @@ def _validated_target_path(new_path: str) -> str | tuple[dict[str, Any], int]:
         # Fixed message, not str(exc): never echo exception text.
         return error_response(
             f"path must be an absolute, traversal-free directory, got {new_path!r}",
-            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
         )
     if not resolved.is_dir():
         return error_response(
             f"path must be an existing directory, got {new_path!r}",
-            HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
         )
     return str(resolved)
 
@@ -104,7 +105,7 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
         body, status = raw_path
         return jsonify(body), status
     if not raw_path:
-        return json_error("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return json_error("Path is required", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     new_path = _validated_target_path(raw_path)
     if isinstance(new_path, tuple):
         body, status = new_path
@@ -113,7 +114,7 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.update_project_path(reports_dir(), project, new_path)
     if not ok:
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify({"updated": project, "path": new_path})
 
 
@@ -122,7 +123,7 @@ def _invalid_project_name(project: str) -> tuple[Response, int] | None:
     try:
         validate_path_segment(project)
     except ValueError:
-        body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
         return jsonify(body), status
     return None
 
@@ -167,7 +168,7 @@ def _project_info(provider: ActionProvider, project: str) -> Response | tuple[Re
         return invalid
     info = provider.get_project_info(reports_dir(), project)
     if not info:
-        body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
         return jsonify(body), status
     return jsonify(info)
 

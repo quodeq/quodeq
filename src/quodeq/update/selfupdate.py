@@ -24,6 +24,8 @@ from urllib.parse import urlparse
 
 from quodeq.update.download import download_file as _download_file
 
+from quodeq.shared.constants import PLATFORM_DARWIN
+
 _logger = logging.getLogger(__name__)
 
 # Apple Developer Team ID that release DMGs are signed with. Filled in once
@@ -34,6 +36,7 @@ EXPECTED_TEAM_ID: str = ""
 # The only asset the dashboard app may replace itself with.
 _ASSET_PREFIX = "Quodeq-"
 _ASSET_SUFFIX = "-macOS.dmg"
+_HDIUTIL = "hdiutil"  # macOS disk-image CLI to mount/unmount the downloaded update
 
 _ACTIVE_PHASES = frozenset({"downloading", "verifying", "installing", "relaunching"})
 
@@ -105,7 +108,7 @@ def describe(
     bundle = bundle_path(executable)
     if not is_frozen:
         reason = "not_frozen"
-    elif plat != "darwin":
+    elif plat != PLATFORM_DARWIN:
         reason = "not_macos"
     elif not team:
         reason = "no_team_id"
@@ -203,7 +206,7 @@ def _run_update(download_url: str, target_version: str, install_app: Path, team:
             "The downloaded update is not notarized by Apple",
         )
         _check(
-            ["hdiutil", "attach", "-nobrowse", "-readonly", "-mountpoint", str(mnt), str(dmg)],
+            [_HDIUTIL, "attach", "-nobrowse", "-readonly", "-mountpoint", str(mnt), str(dmg)],
             "Could not open the downloaded update",
         )
         mounted = True
@@ -213,7 +216,7 @@ def _run_update(download_url: str, target_version: str, install_app: Path, team:
         staging = install_app.parent / f".{install_app.name}.new"
         shutil.rmtree(staging, ignore_errors=True)
         _check(["ditto", str(app_src), str(staging)], "Could not copy the update into place")
-        subprocess.run(["hdiutil", "detach", str(mnt)], capture_output=True, text=True, encoding="utf-8")
+        subprocess.run([_HDIUTIL, "detach", str(mnt)], capture_output=True, text=True, encoding="utf-8")
         mounted = False
 
         _swap_bundle(staging, install_app)
@@ -228,7 +231,7 @@ def _run_update(download_url: str, target_version: str, install_app: Path, team:
         _set(phase="error", error="Automatic update failed")
     finally:
         if mounted:
-            subprocess.run(["hdiutil", "detach", str(mnt)], capture_output=True, text=True, encoding="utf-8")
+            subprocess.run([_HDIUTIL, "detach", str(mnt)], capture_output=True, text=True, encoding="utf-8")
         shutil.rmtree(tmp, ignore_errors=True)
 
 

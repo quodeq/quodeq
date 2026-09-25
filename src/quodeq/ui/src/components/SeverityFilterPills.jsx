@@ -1,5 +1,5 @@
 import FlagPill from './terminal/FlagPill.jsx';
-import { SEVERITY_ORDER } from '../vocab/severity.js';
+import { SEVERITY_ORDER, SEVERITY_FILTER_ALL } from '../vocab/severity.js';
 import { FINDING_TYPE } from '../vocab/findingType.js';
 
 /**
@@ -16,7 +16,7 @@ import { FINDING_TYPE } from '../vocab/findingType.js';
  * }} props
  */
 export default function SeverityFilterPills({ counts, complianceCount = 0, activeFilter, onFilterChange }) {
-  const isAllActive = !activeFilter || activeFilter === 'all';
+  const isAllActive = !activeFilter || activeFilter === SEVERITY_FILTER_ALL;
   const toggle = (key) => onFilterChange(activeFilter === key ? null : key);
   return (
     <div className="term-flag-row">

@@ -2,7 +2,7 @@ import { memo, useMemo, useEffect } from 'react';
 import { gradeLetter } from '../../../utils/formatters.js';
 import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
-import { headerRowKey } from './findingListRows.js';
+import { headerRowKey, ROW_KIND } from './findingListRows.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 import { useStandardDescriptions } from '../hooks/useStandardDescriptions.js';
@@ -14,6 +14,7 @@ import DeferredViolationList from './DeferredViolationList.jsx';
 import { t } from '../../../strings/index.js';
 import { GRADE } from '../../../vocab/grade.js';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 
 // Rows are virtualized (same VirtualList as FileDetailPage): a principle can
 // carry hundreds of findings, and each card runs pretext measurement layout
@@ -23,7 +24,7 @@ import { FINDING_TYPE } from '../../../vocab/findingType.js';
 // The compliance section shows unless the user has narrowed to one severity:
 // no filter, the explicit "all", and the compliance-only view all keep it.
 function showsComplianceSection(activeSevFilter) {
-  return !activeSevFilter || activeSevFilter === 'all' || activeSevFilter === FINDING_TYPE.COMPLIANCE;
+  return !activeSevFilter || activeSevFilter === SEVERITY_FILTER_ALL || activeSevFilter === FINDING_TYPE.COMPLIANCE;
 }
 
 function buildListItems({ displayedBySeverity, compliance, activeSevFilter }) {
@@ -32,12 +33,12 @@ function buildListItems({ displayedBySeverity, compliance, activeSevFilter }) {
     for (const sev of KNOWN_SEVERITIES) {
       const vs = displayedBySeverity[sev];
       if (!vs || vs.length === 0) continue;
-      arr.push({ kind: 'sev-header', sev, count: vs.length });
+      arr.push({ kind: ROW_KIND.SEV_HEADER, sev, count: vs.length });
       vs.forEach((v, idx) => arr.push({ kind: FINDING_TYPE.VIOLATION, v, idx }));
     }
   }
   if (showsComplianceSection(activeSevFilter) && compliance.length > 0) {
-    arr.push({ kind: 'compliance-header', count: compliance.length });
+    arr.push({ kind: ROW_KIND.COMPLIANCE_HEADER, count: compliance.length });
     compliance.forEach((c, idx) => arr.push({ kind: FINDING_TYPE.COMPLIANCE, c, idx }));
   }
   return arr;
@@ -52,7 +53,7 @@ function estimateItemSize(items) {
   return (i) => {
     const item = items[i];
     if (!item) return ROW_HEIGHT_CARD;
-    return item.kind === 'sev-header' || item.kind === 'compliance-header' ? ROW_HEIGHT_HEADER : ROW_HEIGHT_CARD;
+    return item.kind === ROW_KIND.SEV_HEADER || item.kind === ROW_KIND.COMPLIANCE_HEADER ? ROW_HEIGHT_HEADER : ROW_HEIGHT_CARD;
   };
 }
 
@@ -123,9 +124,9 @@ function PrincipleContext({ principleData }) {
 
 function renderPrincipleItem(item, { principle, cardDismiss }) {
   switch (item.kind) {
-    case 'sev-header':
+    case ROW_KIND.SEV_HEADER:
       return <SectionLabel>{item.sev.toUpperCase()} · {item.count}</SectionLabel>;
-    case 'compliance-header':
+    case ROW_KIND.COMPLIANCE_HEADER:
       return <SectionLabel>{t('overview.statCompliance')} · {item.count}</SectionLabel>;
     case FINDING_TYPE.VIOLATION:
       return <EvalViolationCard v={item.v} principle={principle} index={item.idx} onDismiss={cardDismiss} />;

@@ -12,7 +12,14 @@
  *     the root and the last two segments collapses.
  */
 
-const RUN_DATE_PAGES = new Set(['run', 'history-run']);
+import { NAV_TAB } from '../../../vocab/navTab.js';
+
+// openKey sentinel for the "…" (collapsed-ancestors) chip's own menu, as
+// opposed to a numbered `seg-<index>` sibling-menu key. Shared by
+// NavBreadcrumb.jsx and NavBreadcrumbEllipsisMenu.jsx, which open/close it.
+export const ELLIPSIS_OPEN_KEY = 'ellipsis';
+
+const RUN_DATE_PAGES = new Set([NAV_TAB.RUN, NAV_TAB.HISTORY_RUN]);
 
 export function isRunDateEntry(entry) {
   return RUN_DATE_PAGES.has(entry?.page);

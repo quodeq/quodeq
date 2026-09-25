@@ -9,6 +9,7 @@ import urllib.request
 import urllib.error
 
 from quodeq.config.llm_bridge_env import ollama_base_url
+from quodeq.shared.constants import SYSTEM_DARWIN, SYSTEM_LINUX
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
@@ -144,11 +145,11 @@ def detect_memory() -> float:
     """
     system = platform.system()
     try:
-        if system == "Darwin":
+        if system == SYSTEM_DARWIN:
             # macOS: unified memory — total system RAM is the GPU budget
             out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], timeout=_SYSCTL_TIMEOUT_S)
             return float(out.strip())
-        if system == "Linux":
+        if system == SYSTEM_LINUX:
             # Try nvidia-smi for discrete GPU
             out = subprocess.check_output(
                 ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],

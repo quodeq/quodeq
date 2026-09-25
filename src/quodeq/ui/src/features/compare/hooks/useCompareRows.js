@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import {
   buildRow, buildFleet, buildDimensionsBoard, buildAttention,
-  buildDimensionView, buildDuelView, sortRows,
+  buildDimensionView, buildDuelView, sortRows, COMPARE_VIEW_FLEET,
 } from '../compareModel.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 
@@ -63,7 +63,7 @@ export function useCompareRows({
   const attention = useMemo(() => buildAttention(scopeRows), [scopeRows]);
   const orderedRows = useMemo(() => sortRows(scopeRows, sortDir), [scopeRows, sortDir]);
   const dimensionView = useMemo(
-    () => (view === 'fleet' ? null : buildDimensionView(view, scopeRows, now, summariesById)),
+    () => (view === COMPARE_VIEW_FLEET ? null : buildDimensionView(view, scopeRows, now, summariesById)),
     [view, scopeRows, now, summariesById],
   );
   // Duel rows come from `rows`, not `scopeRows` — see the module doc above.

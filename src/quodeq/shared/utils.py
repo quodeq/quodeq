@@ -41,12 +41,13 @@ from quodeq.shared._security import SENSITIVE_PATTERNS, sanitize_sensitive
 # ---------------------------------------------------------------------------
 
 from quodeq.shared._config import ACTION_API_MODULE, Config, get_config
+from quodeq.shared.constants import PLATFORM_WIN32
 
 # ---------------------------------------------------------------------------
 # Platform detection
 # ---------------------------------------------------------------------------
 
-IS_WIN32: bool = sys.platform == "win32"
+IS_WIN32: bool = sys.platform == PLATFORM_WIN32
 """True when the current platform is Windows (win32)."""
 
 # ---------------------------------------------------------------------------

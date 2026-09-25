@@ -1,6 +1,6 @@
 // src/quodeq/ui/src/utils/reportBuilder/shared.js
 import { KNOWN_SEVERITIES } from '../constants.js';
-import { SEVERITY } from '../../vocab/severity.js';
+import { SEVERITY, SEVERITY_FILTER_ALL } from '../../vocab/severity.js';
 import { FINDING_TYPE } from '../../vocab/findingType.js';
 
 const SNIPPET_MAX_LINES = 5;
@@ -153,7 +153,7 @@ export function runSuffix(runId) {
  * @returns {boolean}
  */
 export function severityMatches(severityFilter, severity) {
-  return !severityFilter || severityFilter === 'all' || severityFilter === severity;
+  return !severityFilter || severityFilter === SEVERITY_FILTER_ALL || severityFilter === severity;
 }
 
 /**

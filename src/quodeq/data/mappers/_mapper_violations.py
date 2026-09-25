@@ -33,9 +33,9 @@ def _parse_progress_info(raw: dict[str, object]) -> ProgressInfo:
 
 def parse_violation_response(raw: dict[str, object]) -> ViolationResponse:
     """Parse a raw dict into a ViolationResponse dataclass."""
-    dim = require_str(raw, "dimension", "ViolationResponse")
-    run_id = require_str(raw, "runId", "ViolationResponse")
-    project = require_str(raw, "project", "ViolationResponse")
+    dim = require_str(raw, "dimension", ViolationResponse.__name__)
+    run_id = require_str(raw, "runId", ViolationResponse.__name__)
+    project = require_str(raw, "project", ViolationResponse.__name__)
 
     violations_raw = raw.get("violations")
     violations: list[Finding] = []

@@ -5,6 +5,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import CODE_FORBIDDEN, QUERY_FLAG_TRUTHY
 from quodeq.api._evaluation_helpers import ai_cmd_path_error
 from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.shared.serialization import to_camel_dict
@@ -16,7 +17,7 @@ from quodeq.services.plugin_discovery import discover_plugins
 # stay exact regardless of the provider's internal wording. .get() defaults
 # to the same 404 triple browse_repo returns for an unrecognized code.
 _BROWSE_ERROR_MAP = {
-    "PATH_OUTSIDE_BOUNDARY": (HTTPStatus.FORBIDDEN, "FORBIDDEN", "Path must be within the user's home directory"),
+    "PATH_OUTSIDE_BOUNDARY": (HTTPStatus.FORBIDDEN, CODE_FORBIDDEN, "Path must be within the user's home directory"),
     "PATH_NOT_DIRECTORY": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT", "Path is not a directory"),
     "PATH_NOT_FOUND": (HTTPStatus.NOT_FOUND, "INVALID_INPUT", "Path not found or not accessible"),
 }
@@ -26,7 +27,7 @@ _BROWSE_ERROR_DEFAULT = (HTTPStatus.NOT_FOUND, "INVALID_INPUT", "Path not found 
 def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle GET /api/browse."""
     path = request.args.get("path")
-    include_files = request.args.get("files", "").lower() in ("1", "true")
+    include_files = request.args.get("files", "").lower() in QUERY_FLAG_TRUTHY
     payload = provider.browse_repo(path, include_files=include_files)
     if "error" in payload:
         http_status, code, safe_msg = _BROWSE_ERROR_MAP.get(
@@ -42,7 +43,7 @@ def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
 _MKDIR_ERROR_MAP = {
     "MISSING_FIELDS": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT"),
     "INVALID_NAME": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT"),
-    "PATH_OUTSIDE_BOUNDARY": (HTTPStatus.FORBIDDEN, "FORBIDDEN"),
+    "PATH_OUTSIDE_BOUNDARY": (HTTPStatus.FORBIDDEN, CODE_FORBIDDEN),
     "PARENT_NOT_FOUND": (HTTPStatus.NOT_FOUND, "NOT_FOUND"),
     "ALREADY_EXISTS": (HTTPStatus.CONFLICT, "CONFLICT"),
     "MKDIR_FAILED": (HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR"),

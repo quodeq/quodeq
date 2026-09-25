@@ -21,6 +21,7 @@ from quodeq.api._run_event_serializers import (
     payload_as_sse_finding,
 )
 from quodeq.core.run.state import RunState
+from quodeq.shared.constants import JSON_SUFFIX
 from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
@@ -32,8 +33,6 @@ Bounds the initial-snapshot burst so a run with tens of thousands of findings
 cannot OOM the API process. Subsequent ticks resume from the last event
 timestamp via the SSE Last-Event-ID mechanism.
 """
-
-DIM_FILENAME_SUFFIX = ".json"
 
 EventTuple = tuple[str, str, str | None]
 """(event_type, payload, optional_event_id) — event_id is ISO timestamp for findings, None for others."""
@@ -99,9 +98,9 @@ def scan_completed_dimensions(run_dir: Path) -> set[str]:
     eval_dir = run_dir / "evaluation"
     try:
         return {
-            entry.name[: -len(DIM_FILENAME_SUFFIX)]
+            entry.name[: -len(JSON_SUFFIX)]
             for entry in eval_dir.iterdir()
-            if entry.is_file() and entry.name.endswith(DIM_FILENAME_SUFFIX)
+            if entry.is_file() and entry.name.endswith(JSON_SUFFIX)
         }
     except OSError:
         return set()
@@ -114,7 +113,7 @@ def read_dim_eval(run_dir: Path, dimension: str) -> dict[str, Any] | None:
     written by the scoring engine. Callers should treat that value as
     authoritative — it always matches the filename stem for well-formed files.
     """
-    path = run_dir / "evaluation" / f"{dimension}{DIM_FILENAME_SUFFIX}"
+    path = run_dir / "evaluation" / f"{dimension}{JSON_SUFFIX}"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else None

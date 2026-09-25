@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { applyAssistantAction, rejectAssistantAction } from '../../api/assistant.js';
 import { notifyAssistantActionApplied } from '../../constants.js';
 import { t } from '../../strings/index.js';
-
-// Server-side action kinds this card knows how to summarise. Anything else
-// falls through to the generic standard-edit summary.
-const ACTION_TYPE = Object.freeze({ DISMISS_FINDING: 'dismiss_finding', VERIFY_FINDING: 'verify_finding' });
+import { ACTION_TYPE } from '../../vocab/actionType.js';
 
 // Local lifecycle of one card: idle until the user picks, pending while the
 // request is in flight, then the terminal outcome. Drives both the banner and

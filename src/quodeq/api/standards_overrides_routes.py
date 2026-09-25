@@ -10,6 +10,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import QUERY_FLAG_TRUTHY
 from quodeq.api.helpers import json_object_or_error
 from quodeq.api.standards_project import invalid_body, invalid_payload, project_root_or_error
 from quodeq.core.standards.overrides import validate_overrides
@@ -70,7 +71,7 @@ def _put_standards_overrides(app: Flask, project_id: str) -> Response:
         return invalid_payload("Invalid overrides", "invalid_overrides", errors)
     compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
     changed = changed_dimensions(compiled_dir, load_project_overrides(root), clean)
-    dry_run = request.args.get("dryRun", "").lower() in ("1", "true")
+    dry_run = request.args.get("dryRun", "").lower() in QUERY_FLAG_TRUTHY
     if not dry_run:
         _persist_overrides(root, project_id, clean)
     return jsonify({"overrides": clean, "changedDimensions": changed})

@@ -12,9 +12,11 @@ import sys
 from collections.abc import MutableMapping
 from os.path import expanduser
 
+from quodeq.shared.constants import MACHINE_ARM64, PLATFORM_WIN32
 from quodeq.shared.env_resolve import resolve_env_mut
 
 _logger = logging.getLogger(__name__)
+
 
 _MODULE_MAP = {
     "api": "quodeq.api.app",
@@ -72,7 +74,7 @@ def source_user_path(env: MutableMapping[str, str] | None = None) -> None:
     *env* is the mapping ``SHELL`` is read from and ``PATH`` is written
     back into; ``None`` means this process's own environment.
     """
-    if not is_frozen() or sys.platform == "win32":
+    if not is_frozen() or sys.platform == PLATFORM_WIN32:
         return
     environ = resolve_env_mut(env)
     try:
@@ -93,6 +95,6 @@ def source_user_path(env: MutableMapping[str, str] | None = None) -> None:
     except (subprocess.TimeoutExpired, OSError) as exc:
         _logger.debug("login-shell PATH discovery failed, using fallback locations: %s", exc)
     # Fallback: add common locations
-    brew = "/opt/homebrew/bin" if platform.machine() == "arm64" else "/usr/local/bin"
+    brew = "/opt/homebrew/bin" if platform.machine() == MACHINE_ARM64 else "/usr/local/bin"
     extra = f"{expanduser('~/.local/bin')}:{brew}"
     environ["PATH"] = f"{environ.get('PATH', '')}:{extra}"

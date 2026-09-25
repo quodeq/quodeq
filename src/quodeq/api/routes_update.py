@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from flask import Flask, Response, jsonify
 
+from quodeq.api._constants import CODE_MISSING_PARAM
 from quodeq.api.helpers import optional_json_object_or_error
 from quodeq.update.checker import (
     begin_self_update,
@@ -40,12 +41,12 @@ def register_update_routes(app: Flask) -> None:
 
     @app.post("/api/update/dismiss")
     def update_dismiss() -> Response | tuple[Response, int]:
-        body = optional_json_object_or_error("MISSING_PARAM")
+        body = optional_json_object_or_error(CODE_MISSING_PARAM)
         if not isinstance(body, dict):
             return jsonify(body[0]), body[1]
         version = body.get("version")
         if not version:
-            return jsonify({"error": "version is required", "code": "MISSING_PARAM"}), 400
+            return jsonify({"error": "version is required", "code": CODE_MISSING_PARAM}), 400
         dismiss(version)
         return jsonify({"ok": True, "status": get_status()})
 
@@ -55,7 +56,7 @@ def register_update_routes(app: Flask) -> None:
 
     @app.post("/api/update/settings")
     def update_settings() -> Response | tuple[Response, int]:
-        body = optional_json_object_or_error("MISSING_PARAM")
+        body = optional_json_object_or_error(CODE_MISSING_PARAM)
         if not isinstance(body, dict):
             return jsonify(body[0]), body[1]
         set_settings(

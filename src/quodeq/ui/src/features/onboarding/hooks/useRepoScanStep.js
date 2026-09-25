@@ -4,6 +4,10 @@ import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { writeString } from '../../../adapters/storage.js';
 import { LAST_CLONE_ROOT_STORAGE_KEY, HTTP_STATUS } from '../../../constants.js';
 
+// RepoScanStep's own sub-step: the repo-url input form, or the clone-target
+// picker (once a remote URL needs a local destination).
+export const REPO_SCAN_SUB_STEP = Object.freeze({ INPUT: 'input', CLONE_TARGET: 'cloneTarget' });
+
 const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
 // Lifts the adapter's 30s default so a resume scan (which reads a project
 // that may not have finished its first scan yet) isn't cut short.
@@ -62,7 +66,7 @@ export function makeHandleSubmit({ state, actions, createProject, setSubStep, se
     if (URL_RE.test(repo)) {
       // URL input branches into the clone-target sub-step. Local-path inputs
       // continue to call createProject directly.
-      setSubStep('cloneTarget');
+      setSubStep(REPO_SCAN_SUB_STEP.CLONE_TARGET);
       setCloneError(null);
       return;
     }
@@ -101,10 +105,10 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
         if (!ok) console.warn('[useRepoScanStep] could not persist clone destination'); // private mode
       }
       actions.succeedScan(projectId, scanData);
-      setSubStep('input');
+      setSubStep(REPO_SCAN_SUB_STEP.INPUT);
     } catch (err) {
       if (await resumedExisting(err, tryResumeExisting)) {
-        setSubStep('input');
+        setSubStep(REPO_SCAN_SUB_STEP.INPUT);
         return;
       }
       const message = friendlyCloneError(err);
@@ -124,7 +128,7 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
  */
 export function useRepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan = apiGetProjectScan }) {
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
-  const [subStep, setSubStep] = useState('input'); // 'input' | 'cloneTarget'
+  const [subStep, setSubStep] = useState(REPO_SCAN_SUB_STEP.INPUT);
   const [cloneSubmitting, setCloneSubmitting] = useState(false);
   const [cloneError, setCloneError] = useState(null);
 

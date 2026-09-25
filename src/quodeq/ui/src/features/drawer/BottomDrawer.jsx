@@ -3,6 +3,8 @@ import { useAssistantDrawer } from '../assistant/AssistantDrawerProvider.jsx';
 import { AssistantPane } from '../assistant/AssistantDrawer.jsx';
 import AssistantHeader from '../assistant/AssistantHeader.jsx';
 import { t } from '../../strings/index.js';
+import { DRAWER_PANEL } from '../assistant/drawerPanelsModel.js';
+import { POINTER_EVENT } from '../../vocab/pointerEvent.js';
 
 const TerminalPane = lazy(() => import('../terminal/TerminalPane.jsx'));
 
@@ -38,14 +40,14 @@ function useDrawerDrag({ height, setHeight, maximized, setMaximized }) {
   }, [setHeight]);
   const handleDragEnd = useCallback(() => {
     dragRef.current = null;
-    window.removeEventListener('pointermove', handleDragMove);
-    window.removeEventListener('pointerup', handleDragEnd);
+    window.removeEventListener(POINTER_EVENT.MOVE, handleDragMove);
+    window.removeEventListener(POINTER_EVENT.UP, handleDragEnd);
   }, [handleDragMove]);
   const handleDragStart = useCallback((event) => {
     const startHeight = resizeStartHeight(event.currentTarget, { height, maximized, setMaximized });
     dragRef.current = { startY: event.clientY, startHeight };
-    window.addEventListener('pointermove', handleDragMove);
-    window.addEventListener('pointerup', handleDragEnd);
+    window.addEventListener(POINTER_EVENT.MOVE, handleDragMove);
+    window.addEventListener(POINTER_EVENT.UP, handleDragEnd);
   }, [height, maximized, setMaximized, handleDragMove, handleDragEnd]);
   // The keyboard path is the same resize, one step at a time.
   const handleResizeKey = useCallback((event) => {
@@ -60,8 +62,8 @@ function useDrawerDrag({ height, setHeight, maximized, setMaximized }) {
   // Unmounting mid-drag would leave the window listeners registered and the
   // stale handlers calling setHeight until the next pointerup; drop them.
   useEffect(() => () => {
-    window.removeEventListener('pointermove', handleDragMove);
-    window.removeEventListener('pointerup', handleDragEnd);
+    window.removeEventListener(POINTER_EVENT.MOVE, handleDragMove);
+    window.removeEventListener(POINTER_EVENT.UP, handleDragEnd);
   }, [handleDragMove, handleDragEnd]);
 
   return { handleDragStart, handleResizeKey };
@@ -83,16 +85,16 @@ export function BottomDrawer({ uiState, projectName, onOpenSettings }) {
         role="separator" tabIndex={0} aria-orientation="horizontal"
         aria-label={t('common.resizeDrawer')} aria-valuenow={height}
         onKeyDown={handleResizeKey} />
-      {openPanels.includes('assistant') && (
-        <div className="drawer-panel" style={{ display: active === 'assistant' ? 'flex' : 'none' }}>
+      {openPanels.includes(DRAWER_PANEL.ASSISTANT) && (
+        <div className="drawer-panel" style={{ display: active === DRAWER_PANEL.ASSISTANT ? 'flex' : 'none' }}>
           <AssistantHeader selectedProject={projectName ?? uiState?.selectedProject} onOpenSettings={onOpenSettings} />
-          <AssistantPane uiState={uiState} active={active === 'assistant'} />
+          <AssistantPane uiState={uiState} active={active === DRAWER_PANEL.ASSISTANT} />
         </div>
       )}
-      {openPanels.includes('terminal') && (
-        <div className="drawer-panel" style={{ display: active === 'terminal' ? 'flex' : 'none' }}>
+      {openPanels.includes(DRAWER_PANEL.TERMINAL) && (
+        <div className="drawer-panel" style={{ display: active === DRAWER_PANEL.TERMINAL ? 'flex' : 'none' }}>
           <Suspense fallback={<div className="tty-disabled">{t('drawer.loadingTerminal')}</div>}>
-            <TerminalPane active={active === 'terminal'} />
+            <TerminalPane active={active === DRAWER_PANEL.TERMINAL} />
           </Suspense>
         </div>
       )}

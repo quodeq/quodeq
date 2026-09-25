@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { assistantEventsUrl } from '../../api/assistant.js';
 import { t } from '../../strings/index.js';
 import { FRAME_TYPE } from '../../vocab/frameType.js';
+import { MESSAGE_ROLE } from './messageRole.js';
 
 const INACTIVITY_MS = 60000;
 // Max characters revealed per flush tick. Delta-streaming providers (ollama,
@@ -38,10 +39,10 @@ export function applyFrame(frame, handlers) {
 function withRevealedChunk(prev, chunk, startNewBubble) {
   const next = prev.slice();
   const last = next[next.length - 1];
-  if (!startNewBubble && last && last.role === 'assistant') {
+  if (!startNewBubble && last && last.role === MESSAGE_ROLE.ASSISTANT) {
     next[next.length - 1] = { ...last, text: last.text + chunk };
   } else {
-    next.push({ role: 'assistant', text: chunk });
+    next.push({ role: MESSAGE_ROLE.ASSISTANT, text: chunk });
   }
   return next;
 }
@@ -120,12 +121,12 @@ function makeFrameHandlers({ revealer, append, beginContent, setError, endPendin
       if (endPending.current) drain(true);
       beginContent(); revealText(f.text || '');
     },
-    onToolCall: (f) => { beginContent(); flushTokens(); append({ role: 'tool', name: f.name, argsSummary: f.argsSummary }); },
+    onToolCall: (f) => { beginContent(); flushTokens(); append({ role: MESSAGE_ROLE.TOOL, name: f.name, argsSummary: f.argsSummary }); },
     onActionDraft: (f) => { beginContent(); flushTokens();
-      append({ role: 'action', actionId: f.actionId, actionType: f.actionType, summary: f.summary }); },
-    onWarning: (f) => { beginContent(); flushTokens(); append({ role: 'warning', message: f.message }); },
+      append({ role: MESSAGE_ROLE.ACTION, actionId: f.actionId, actionType: f.actionType, summary: f.summary }); },
+    onWarning: (f) => { beginContent(); flushTokens(); append({ role: MESSAGE_ROLE.WARNING, message: f.message }); },
     onError: (f) => { flushTokens(); setError(f.message || 'error'); endTurn(); },
-    onStopped: () => { flushTokens(); append({ role: 'warning', message: t('assistant.turnStopped') }); endTurn(); },
+    onStopped: () => { flushTokens(); append({ role: MESSAGE_ROLE.WARNING, message: t('assistant.turnStopped') }); endTurn(); },
     onDone: () => { endTurn(); },
   };
 }

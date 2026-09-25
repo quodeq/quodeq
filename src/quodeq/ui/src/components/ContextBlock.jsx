@@ -16,6 +16,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { measureWidth, cssFontFromElement } from '../utils/pretext.js';
 import { isHighlightedLine, stripHighlightMarker } from '../utils/codeMarker.js';
 import { t } from '../strings/index.js';
+import { KEY } from '../vocab/keyboard.js';
 
 const CONTEXT_PADDING = 5;
 const CODE_LINE_HEIGHT = 18; // must match terminal.css .ctx-line line-height
@@ -96,7 +97,7 @@ function ScopeBar({ label, lineCount, expanded, onToggle, children }) {
         role={hasCode ? 'button' : undefined}
         tabIndex={hasCode ? 0 : undefined}
         onClick={hasCode ? onToggle : undefined}
-        onKeyDown={hasCode ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } } : undefined}
+        onKeyDown={hasCode ? (e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onToggle(); } } : undefined}
       >
         <span className={`scope-bar-chevron${expanded ? ' scope-bar-chevron--open' : ''}`}>{'\u25b8'}</span>
         <span className="scope-bar-label">{label}{hasCode ? ` \u00b7 ${lineCount} lines` : ''}</span>

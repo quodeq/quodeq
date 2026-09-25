@@ -11,6 +11,7 @@ from quodeq.shared.utils import read_json
 _logger = logging.getLogger(__name__)
 
 _NO_STANDARDS_FOR_DIM = "_No compiled standards for this dimension._"
+_FIELD_ID = "id"  # the compiled-standards field name _require_field looks up
 
 
 def _require_field(entry: dict, field: str, kind: str) -> object:
@@ -74,7 +75,7 @@ def render_compiled_standards(
         if principle.get("description"):
             lines.append(principle["description"])
         for req in reqs:
-            req_id = _require_field(req, "id", "requirement")
+            req_id = _require_field(req, _FIELD_ID, "requirement")
             text = resolve_requirement_text(req, (overrides or {}).get(req_id))
             req_line = f"- **{req_id}**: {text}"
             if req.get("description"):
@@ -105,7 +106,7 @@ def render_compact_standards(
             continue
         requirements = []
         for r in reqs:
-            req_id = _require_field(r, "id", "requirement")
+            req_id = _require_field(r, _FIELD_ID, "requirement")
             requirements.append({
                 "id": req_id,
                 "rule": resolve_requirement_text(r, (overrides or {}).get(req_id)),
@@ -122,7 +123,7 @@ def render_dimensions(dimensions_data: dict, dimension: str) -> str:
     applies = dimensions_data.get("applies", [])
     dim_entry = None
     for d in applies:
-        d_id = _require_field(d, "id", "dimension")
+        d_id = _require_field(d, _FIELD_ID, "dimension")
         if d_id == dimension:
             dim_entry = d
             break

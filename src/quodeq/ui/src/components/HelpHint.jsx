@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { KEY } from '../vocab/keyboard.js';
 
 export default function HelpHint({ children, label = 'More info' }) {
   const [open, setOpen] = useState(false);
@@ -9,7 +10,7 @@ export default function HelpHint({ children, label = 'More info' }) {
     const onDocClick = (e) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
     };
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    const onKey = (e) => { if (e.key === KEY.ESCAPE) setOpen(false); };
     document.addEventListener('mousedown', onDocClick);
     document.addEventListener('keydown', onKey);
     return () => {

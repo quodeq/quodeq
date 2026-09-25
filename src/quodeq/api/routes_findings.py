@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import CODE_INVALID_PARAM, CODE_MISSING_PARAM, CODE_NOT_FOUND, QUERY_FLAG_TRUE
 from quodeq.api.helpers import json_error, optional_json_object_or_error, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed_listing import load_dismissed
@@ -110,10 +111,10 @@ def _finding_target_or_error(
     file = body.get("file", "")
     line = body.get("line")
     if not project or not req or not file or line is None:
-        return None, (jsonify({"error": "project, req, file, and line are required", "code": "MISSING_PARAM"}), 400)
+        return None, (jsonify({"error": "project, req, file, and line are required", "code": CODE_MISSING_PARAM}), 400)
     type_err = _invalid_body_fields(body, ("project", "req", "file", "fingerprint"), ("line",))
     if type_err:
-        return None, (jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400)
+        return None, (jsonify({"error": type_err, "code": CODE_INVALID_PARAM}), 400)
     return {"project": project, "req": req, "file": file, "line": line}, None
 
 
@@ -157,7 +158,7 @@ def _mutate_finding(
     delta_for: Callable[..., Any],
 ) -> tuple[Response, int]:
     """Apply *mutate* to the finding named in the request body, then rescore."""
-    body = optional_json_object_or_error("INVALID_PARAM")
+    body = optional_json_object_or_error(CODE_INVALID_PARAM)
     if not isinstance(body, dict):
         return jsonify(body[0]), body[1]
     target, err = _finding_target_or_error(body)
@@ -180,13 +181,13 @@ def _mutate_project(
     count_key: str,
 ) -> tuple[Response, int]:
     """Apply *mutate* to every entry of the request body's project, then rescore."""
-    body = optional_json_object_or_error("INVALID_PARAM")
+    body = optional_json_object_or_error(CODE_INVALID_PARAM)
     if not isinstance(body, dict):
         return jsonify(body[0]), body[1]
     project = body.get("project", "")
     run_id = _run_id(body)
     if not project:
-        return jsonify({"error": "project is required", "code": "MISSING_PARAM"}), 400
+        return jsonify({"error": "project is required", "code": CODE_MISSING_PARAM}), 400
     count = mutate(_project_dir(_eval_dir(app), project))
     scores = _scores_with_fallback(app, project, run_id)
     delta = delta_for(_eval_dir(app), project, run_id)
@@ -210,7 +211,7 @@ def _restore_all(app: Flask) -> tuple[Response, int]:
 
 
 def _delete(app: Flask) -> tuple[Response, int]:
-    body = optional_json_object_or_error("INVALID_PARAM")
+    body = optional_json_object_or_error(CODE_INVALID_PARAM)
     if not isinstance(body, dict):
         return jsonify(body[0]), body[1]
     project = body.get("project", "")
@@ -219,10 +220,10 @@ def _delete(app: Flask) -> tuple[Response, int]:
     file = body.get("file", "")
     run_id = _run_id(body)
     if not project or not dimension or not principle or not file:
-        return jsonify({"error": "project, dimension, principle, and file are required", "code": "MISSING_PARAM"}), 400
+        return jsonify({"error": "project, dimension, principle, and file are required", "code": CODE_MISSING_PARAM}), 400
     type_err = _invalid_body_fields(body, ("project", "dimension", "principle", "file"))
     if type_err:
-        return jsonify({"error": type_err, "code": "INVALID_PARAM"}), 400
+        return jsonify({"error": type_err, "code": CODE_INVALID_PARAM}), 400
     swept = delete_finding(_project_dir(_eval_dir(app), project), body)
     scores = _scores_with_fallback(app, project, run_id)
     delta = delete_delta(
@@ -233,7 +234,7 @@ def _delete(app: Flask) -> tuple[Response, int]:
 
 
 def _delete_all(app: Flask) -> tuple[Response, int]:
-    if request.args.get("confirm") != "true":
+    if request.args.get("confirm") != QUERY_FLAG_TRUE:
         return json_error(
             "Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
         )
@@ -241,7 +242,7 @@ def _delete_all(app: Flask) -> tuple[Response, int]:
 
 
 def _unverify(app: Flask) -> tuple[Response, int]:
-    body = optional_json_object_or_error("INVALID_PARAM")
+    body = optional_json_object_or_error(CODE_INVALID_PARAM)
     if not isinstance(body, dict):
         return jsonify(body[0]), body[1]
     target, err = _finding_target_or_error(body)
@@ -259,7 +260,7 @@ def register_findings_routes(app: Flask) -> None:
         # Same {"error", "code"} shape every other error branch in this
         # file returns, instead of Flask's default 404 HTML page that the
         # bare abort() _project_dir used to call would give.
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
 
     @app.get("/api/findings/dismissed")
     def list_dismissed() -> Response | tuple[dict[str, Any], int]:

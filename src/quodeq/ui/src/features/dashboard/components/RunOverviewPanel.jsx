@@ -11,6 +11,9 @@ import buildRunSummary from '../buildRunSummary.js';
 import { t } from '../../../strings/index.js';
 import { RunHeroSection } from './RunHeroSection.jsx';
 import { useRunReportSpecs } from './runReportSpecs.jsx';
+import { HERO_CARD_KIND } from '../dashboardVocab.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 export { RunHeroSection };
 
@@ -76,8 +79,8 @@ function useCardNavigate({ dashboard, selectedRunId, projectName, runDateLabel, 
     return (kind) => {
       const label = `${projectName || 'project'} · ${runDateLabel || 'run'}`;
       const projectFile = buildProjectRootFile(dashboard?.dimensions || [], label);
-      const severityFilter = kind === 'violations' ? 'all' : kind;
-      onNavigate('file', { file: projectFile, severityFilter, runId: selectedRunId, dateLabel: runDateLabel });
+      const severityFilter = kind === HERO_CARD_KIND.VIOLATIONS ? SEVERITY_FILTER_ALL : kind;
+      onNavigate(NAV_TAB.FILE, { file: projectFile, severityFilter, runId: selectedRunId, dateLabel: runDateLabel });
     };
   }, [onNavigate, dashboard, projectName, runDateLabel, selectedRunId]);
 }

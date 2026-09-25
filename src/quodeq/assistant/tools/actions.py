@@ -60,11 +60,11 @@ def _summarize_create_standard(canonical: dict) -> dict:
 
 
 def _apply_create_standard(payload: dict, ctx: ActionContext) -> dict:
-    from quodeq.services.standards import StandardsService  # noqa: PLC0415
+    from quodeq.services.standards import IMPORT_STATUS_CONFLICT, StandardsService  # noqa: PLC0415
 
     service = StandardsService(ctx.evaluators_dir, ctx.compiled_dir, ctx.dimensions_file)
     result = service.import_from_file(payload, force=False)
-    if result.get("status") == "conflict":
+    if result.get("status") == IMPORT_STATUS_CONFLICT:
         raise ActionConflict("standard id already exists")
     return result
 

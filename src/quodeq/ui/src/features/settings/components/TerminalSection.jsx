@@ -4,6 +4,8 @@ import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { SettingsPillTabs } from './settingsRowParts.jsx';
+import { TERMINAL_RESTART_EVENT } from '../../../constants.js';
+import { DIALOG_VARIANT } from '../../../vocab/dialogVariant.js';
 
 export default function TerminalSection() {
   const { enabled, setEnabled } = useTerminalSettings();
@@ -17,11 +19,11 @@ export default function TerminalSection() {
     const ok = await confirmDialog({
       title: t('settings.restartTerminalConfirmTitle'),
       message: t('settings.restartTerminalConfirmMessage'),
-      variant: 'danger',
+      variant: DIALOG_VARIANT.DANGER,
     });
     if (!ok) return;
     killTerminal()
-      .then(() => window.dispatchEvent(new Event('quodeq:terminal-restart')))
+      .then(() => window.dispatchEvent(new Event(TERMINAL_RESTART_EVENT)))
       .catch((err) => { console.warn('Terminal restart: kill failed, not reconnecting', err); });
   };
   return (

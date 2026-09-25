@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { isLowConfidence } from '../../violations/components/LowConfidenceGroup.jsx';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
+import { ROW_KIND } from './findingListRows.js';
 import { useHydratedCompliance } from '../hooks/useHydratedCompliance.js';
 
 const dismissKey = (v) => `${v.file}:${v.line}`;
@@ -32,8 +34,8 @@ function pushSeverityRows(arr, { highConfidenceBySeverity, activeFilter }) {
   for (const sev of KNOWN_SEVERITIES) {
     const bucket = highConfidenceBySeverity[sev] || [];
     if (bucket.length === 0) continue;
-    if (activeFilter && activeFilter !== 'all' && activeFilter !== sev) continue;
-    arr.push({ kind: 'sev-header', sev, count: bucket.length });
+    if (activeFilter && activeFilter !== SEVERITY_FILTER_ALL && activeFilter !== sev) continue;
+    arr.push({ kind: ROW_KIND.SEV_HEADER, sev, count: bucket.length });
     for (const v of bucket) arr.push({ kind: FINDING_TYPE.VIOLATION, v });
   }
 }
@@ -41,11 +43,11 @@ function pushSeverityRows(arr, { highConfidenceBySeverity, activeFilter }) {
 // The low-confidence toggle, plus its rows when expanded. Suppressed while a
 // severity filter is on: the low-confidence split cuts across severities.
 function pushLowConfidenceRows(arr, { activeFilter, lowConfidenceViolations, lowConfExpanded }) {
-  if (activeFilter && activeFilter !== 'all') return;
+  if (activeFilter && activeFilter !== SEVERITY_FILTER_ALL) return;
   if (lowConfidenceViolations.length === 0) return;
-  arr.push({ kind: 'low-conf-toggle', count: lowConfidenceViolations.length, expanded: lowConfExpanded });
+  arr.push({ kind: ROW_KIND.LOW_CONF_TOGGLE, count: lowConfidenceViolations.length, expanded: lowConfExpanded });
   if (!lowConfExpanded) return;
-  for (const v of lowConfidenceViolations) arr.push({ kind: 'low-conf-row', v });
+  for (const v of lowConfidenceViolations) arr.push({ kind: ROW_KIND.LOW_CONF_ROW, v });
 }
 
 // Flatten everything into a single virtualizable items array. Mixing
@@ -62,7 +64,7 @@ function buildFileDetailItems({
     pushLowConfidenceRows(arr, { activeFilter, lowConfidenceViolations, lowConfExpanded });
   }
   if (showCompliance && totalCompliance > 0) {
-    arr.push({ kind: 'compliance-header', count: totalCompliance });
+    arr.push({ kind: ROW_KIND.COMPLIANCE_HEADER, count: totalCompliance });
     for (const c of compliance) arr.push({ kind: FINDING_TYPE.COMPLIANCE, c });
   }
   return arr;
@@ -90,7 +92,7 @@ export function useFileDetailFiltering({ file, onDismiss, activeFilter, lowConfE
   const totalCompliance = file.compliance?.length || 0;
   const distinctSeverities = KNOWN_SEVERITIES.filter((s) => liveSevCounts[s] > 0).length;
   const showFilters = distinctSeverities > 1 || (distinctSeverities >= 1 && totalCompliance > 0);
-  const showCompliance = !activeFilter || activeFilter === 'all' || activeFilter === FINDING_TYPE.COMPLIANCE;
+  const showCompliance = !activeFilter || activeFilter === SEVERITY_FILTER_ALL || activeFilter === FINDING_TYPE.COMPLIANCE;
   const showViolations = activeFilter !== FINDING_TYPE.COMPLIANCE;
 
   const items = useMemo(

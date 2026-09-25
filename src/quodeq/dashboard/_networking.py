@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import socket
 
+from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 
@@ -51,4 +52,4 @@ def allow_plaintext_http(
     """
     if override is not None:
         return override
-    return resolve_env(env).get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"
+    return resolve_env(env).get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == ENV_TRUTHY

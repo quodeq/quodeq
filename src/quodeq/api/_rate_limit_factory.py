@@ -12,6 +12,9 @@ _logger = logging.getLogger(__name__)
 
 _DEFAULT_RATE_LIMIT_FILE = str(default_rate_limit_path())
 
+_BACKEND_MEMORY = "memory"  # process-local, no external dependencies
+_BACKEND_FILE = "file"  # QUODEQ_RATE_LIMIT_FILE-backed, for single-machine multi-worker setups
+
 
 def _validated_rate_limit_path(raw: str) -> str:
     """Reject obviously-unsafe rate-limit file paths from the env.
@@ -58,15 +61,15 @@ def create_rate_limit_store(env: dict[str, str] | None = None) -> RateLimitStore
     ``create_app(rate_limit_store=...)``.
     """
     environ = resolve_env(env)
-    backend = environ.get("QUODEQ_RATE_LIMIT_BACKEND", "memory")
+    backend = environ.get("QUODEQ_RATE_LIMIT_BACKEND", _BACKEND_MEMORY)
 
-    if backend == "file":
+    if backend == _BACKEND_FILE:
         from quodeq.api._rate_limit_file_store import FileRateLimitStore
         path = _validated_rate_limit_path(environ.get("QUODEQ_RATE_LIMIT_FILE", ""))
         _logger.info("Using file-based rate-limit store at %s", path)
         return FileRateLimitStore(path)
 
-    if backend != "memory":
+    if backend != _BACKEND_MEMORY:
         _logger.warning(
             "Unknown rate-limit backend %r — falling back to in-memory. "
             "Pass a custom RateLimitStore to create_app() for shared backends.",

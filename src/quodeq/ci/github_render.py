@@ -21,6 +21,9 @@ class ReviewOptions:
     artifact_url: str | None = None
 
 
+# The legacy spelling of major severity (see ci/sarif.py's rank table).
+_LEGACY_MAJOR = "high"
+
 # Markdown and HTML control characters that untrusted finding text may carry.
 _MD_SPECIAL = re.compile(r"([\\`*_#\[\]<>|~])")
 # A list item ("- ", "+ ", "1. ", "2) ") or a thematic break ("---") only
@@ -32,6 +35,9 @@ _LEADING_BLOCK_MARKER = re.compile(r"^(\d+)([.)])|^([-+])")
 # trigger breaks the scan while leaving the text readable.
 _AUTOLINK_TRIGGER = re.compile(r"(https?://|www\.|@)", re.IGNORECASE)
 _ZWSP = "\u200b"
+
+_STATUS_NEW = "new"  # violation_to_comment status: introduced by this PR
+_UNSCORED = "N/A"  # sentinel for report fields diff-mode runs never score
 
 
 def _escape_leading_marker(match: re.Match) -> str:
@@ -58,7 +64,7 @@ def _md_escape(text: object) -> str:
     return _AUTOLINK_TRIGGER.sub(lambda m: m.group(1) + _ZWSP, escaped)
 
 
-def violation_to_comment(violation: dict, status: str = "new") -> dict:
+def violation_to_comment(violation: dict, status: str = _STATUS_NEW) -> dict:
     """Convert a violation to a GitHub PR review comment dict.
 
     status: "new" (introduced by this PR) or "existing" (pre-existing baseline issue).
@@ -69,7 +75,7 @@ def violation_to_comment(violation: dict, status: str = "new") -> dict:
     req = _md_escape(violation.get("req", ""))
 
     severity_label = severity.upper()
-    status_prefix = "🆕 NEW" if status == "new" else "⚠️ Pre-existing"
+    status_prefix = "🆕 NEW" if status == _STATUS_NEW else "⚠️ Pre-existing"
 
     body_parts = [f"{status_prefix} · **{severity_label}** — {title}"]
     if reason:
@@ -103,8 +109,8 @@ def _score_summary_lines(reports: list[dict], is_diff_mode: bool, baseline_avail
     if not is_diff_mode:
         for report in reports:
             dimension = report.get("dimension", "unknown")
-            score = report.get("overallScore", "N/A")
-            grade = report.get("overallGrade", "N/A")
+            score = report.get("overallScore", _UNSCORED)
+            grade = report.get("overallGrade", _UNSCORED)
             lines.append(f"**{dimension.title()}**: {score} ({grade})")
         lines.append("")
     return lines
@@ -189,7 +195,7 @@ def build_review_summary(
     # "no baseline" note (which frames absence-of-baseline as a scoring
     # concern) don't apply. Detect from the data the caller already passes.
     is_diff_mode = bool(reports) and all(
-        r.get("overallScore") == "N/A" for r in reports
+        r.get("overallScore") == _UNSCORED for r in reports
     )
 
     lines = ["## Quodeq Evaluation", ""]
@@ -213,9 +219,8 @@ _BLOCKING = frozenset({Severity.CRITICAL, Severity.MAJOR})
 
 
 def _verdict_severity(raw: object) -> Severity:
-    # "high" is the legacy spelling of major (see ci/sarif.py's rank table).
     text = str(raw or "").strip().lower()
-    return Severity.MAJOR if text == "high" else parse_severity(text)
+    return Severity.MAJOR if text == _LEGACY_MAJOR else parse_severity(text)
 
 
 def determine_verdict(new_violations: list[dict]) -> str:

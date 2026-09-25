@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { DEFAULT_TIME_LIMIT_S } from '../../../constants.js';
+import { DEFAULT_TIME_LIMIT_S, PROVIDER_SETTING_KEY } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { t } from '../../../strings/index.js';
+import { STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
+import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
 
 const SECONDS_PER_MINUTE = 60;
 const MIN_MINUTES = 1;
@@ -39,7 +41,7 @@ const VERIFY_HINT = (
 );
 
 export function TimeLimitSetting({ state, update, providerType }) {
-  const timeLimit = parseInt(state['time-limit'] || '0', 10);
+  const timeLimit = parseInt(state[PROVIDER_SETTING_KEY.TIME_LIMIT] || '0', 10);
   const unlimited = timeLimit === 0;
   const persistedMinutes = unlimited ? '' : String(Math.round(timeLimit / SECONDS_PER_MINUTE));
   const [draft, setDraft] = useState(persistedMinutes);
@@ -53,7 +55,7 @@ export function TimeLimitSetting({ state, update, providerType }) {
     }
     const n = parseInt(raw, 10);
     const safe = Number.isNaN(n) ? DEFAULT_TIME_LIMIT_MINUTES : Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, n));
-    update('time-limit', String(safe * SECONDS_PER_MINUTE));
+    update(PROVIDER_SETTING_KEY.TIME_LIMIT, String(safe * SECONDS_PER_MINUTE));
   };
 
   return (
@@ -63,15 +65,15 @@ export function TimeLimitSetting({ state, update, providerType }) {
           <span className="settings-label">{t('settings.timeLimitLabel')}</span>
           <HelpHint label={t('settings.timeLimitHelpAria')}>
             <p>{t('settings.timeLimitHintBase')}</p>
-            {providerType === 'cloud-api' && <p>{t('settings.timeLimitHintCloud')}</p>}
+            {providerType === PROVIDER_CLASSIFICATION.CLOUD_API && <p>{t('settings.timeLimitHintCloud')}</p>}
           </HelpHint>
         </span>
         <span className="settings-description">{t('settings.timeLimitDesc')}</span>
       </div>
       <div className="settings-budget-control">
         <div className="settings-pill-group">
-          <button type="button" className={`settings-pill${unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('time-limit', '0')} aria-pressed={unlimited}>{t('settings.unlimited')}</button>
-          <button type="button" className={`settings-pill${!unlimited ? ' settings-pill--active' : ''}`} onClick={() => update('time-limit', String(DEFAULT_TIME_LIMIT_S))} aria-pressed={!unlimited}>{t('settings.limited')}</button>
+          <button type="button" className={`settings-pill${unlimited ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.TIME_LIMIT, '0')} aria-pressed={unlimited}>{t('settings.unlimited')}</button>
+          <button type="button" className={`settings-pill${!unlimited ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.TIME_LIMIT, String(DEFAULT_TIME_LIMIT_S))} aria-pressed={!unlimited}>{t('settings.limited')}</button>
         </div>
         <input
           type="number"
@@ -90,8 +92,8 @@ export function TimeLimitSetting({ state, update, providerType }) {
 }
 
 export function AdvancedAnalysisSettings({ state, update }) {
-  const perDimension = state['per-dimension'] !== 'false';
-  const verify = state['verify'] !== 'false';
+  const perDimension = state[PROVIDER_SETTING_KEY.PER_DIMENSION] !== STORED_FALSE;
+  const verify = state[PROVIDER_SETTING_KEY.VERIFY] !== STORED_FALSE;
 
   return (
     <>
@@ -104,8 +106,8 @@ export function AdvancedAnalysisSettings({ state, update }) {
           <span className="settings-description">{t('settings.analysisModeDesc')}</span>
         </div>
         <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.violationGroupingAria')}>
-          <button type="button" role="radio" aria-checked={perDimension} className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'true')}>{t('settings.perDimension')}</button>
-          <button type="button" role="radio" aria-checked={!perDimension} className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update('per-dimension', 'false')}>{t('settings.grouped')}</button>
+          <button type="button" role="radio" aria-checked={perDimension} className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.PER_DIMENSION, STORED_TRUE)}>{t('settings.perDimension')}</button>
+          <button type="button" role="radio" aria-checked={!perDimension} className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.PER_DIMENSION, STORED_FALSE)}>{t('settings.grouped')}</button>
         </div>
       </div>
 
@@ -118,8 +120,8 @@ export function AdvancedAnalysisSettings({ state, update }) {
           <span className="settings-description">{t('settings.verifyFindingsDesc')}</span>
         </div>
         <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.verifyFindingsAria')}>
-          <button type="button" role="radio" aria-checked={verify} className={`settings-pill${verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'true')}>{t('settings.on')}</button>
-          <button type="button" role="radio" aria-checked={!verify} className={`settings-pill${!verify ? ' settings-pill--active' : ''}`} onClick={() => update('verify', 'false')}>{t('settings.off')}</button>
+          <button type="button" role="radio" aria-checked={verify} className={`settings-pill${verify ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.VERIFY, STORED_TRUE)}>{t('settings.on')}</button>
+          <button type="button" role="radio" aria-checked={!verify} className={`settings-pill${!verify ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.VERIFY, STORED_FALSE)}>{t('settings.off')}</button>
         </div>
       </div>
     </>

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from packaging.version import InvalidVersion, Version
 
+_VERSION_PREFIX_CHARS = ("v", "V")  # leading char a release tag may drop
+
 
 def normalize(version: str) -> str:
     """Strip a leading ``v`` and surrounding whitespace off a release tag."""
     v = version.strip()
-    if v[:1] in ("v", "V"):
+    if v[:1] in _VERSION_PREFIX_CHARS:
         v = v[1:]
     return v
 

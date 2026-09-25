@@ -16,6 +16,8 @@ from functools import lru_cache
 # from here, so the constant cannot come from it): parse each manifest text
 # once, not once per discipline rule that probes it.
 _PARSE_CACHE_MAX = 64
+_XML_TAG_GROUP_ID = "groupId"
+_XML_TAG_ARTIFACT_ID = "artifactId"
 
 
 def _json_dep_names(
@@ -180,7 +182,7 @@ def _pom_coords(content: str) -> frozenset[str]:
     for elem in root.iter():
         # Strip default Maven namespace if present (``{http://maven.apache.org/POM/4.0.0}groupId``).
         tag = elem.tag.rsplit("}", 1)[-1]
-        if tag in ("groupId", "artifactId") and elem.text:
+        if tag in (_XML_TAG_GROUP_ID, _XML_TAG_ARTIFACT_ID) and elem.text:
             coords.add(elem.text.strip())
     return frozenset(coords)
 

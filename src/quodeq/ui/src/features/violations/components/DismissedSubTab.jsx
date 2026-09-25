@@ -3,6 +3,7 @@ import { RefLinks } from '../../../components/findingDetail.jsx';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
+import { DIALOG_VARIANT } from '../../../vocab/dialogVariant.js';
 
 function dismissedLabel(d) {
   return d.principle || d.dimension || (d.req ?? '?');
@@ -68,7 +69,7 @@ export default function DismissedSubTab({ dismissed, onRestore, onRestoreAll, on
                   const ok = await confirmDialog({
                     title: t('violations.deleteAllConfirmTitle'),
                     message: t('violations.deleteAllConfirmMessage'),
-                    variant: 'danger',
+                    variant: DIALOG_VARIANT.DANGER,
                   });
                   if (!ok) return;
                   onDeleteAll();

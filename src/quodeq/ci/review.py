@@ -19,6 +19,8 @@ class ReviewError(RuntimeError):
 
 
 _GH_MISSING = "gh CLI not found. Install with 'brew install gh' and run 'gh auth login'."
+_GH_VIEW = "view"  # gh <resource> view
+_GH_JSON_FLAG = "--json"
 _GH_TIMEOUT_S = 60
 
 
@@ -50,14 +52,14 @@ def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
     if pr_override is not None:
         # Still need baseRefName, so ask gh about this PR.
         try:
-            out = _run_gh(["pr", "view", str(pr_override), "--json", "number,baseRefName"])
+            out = _run_gh(["pr", _GH_VIEW, str(pr_override), _GH_JSON_FLAG, "number,baseRefName"])
         except subprocess.CalledProcessError as exc:
             raise ReviewError(f"Could not find PR #{pr_override}: {exc.stderr.strip()}")
         data = json.loads(out)
         return data["number"], data["baseRefName"]
 
     try:
-        out = _run_gh(["pr", "view", "--json", "number,baseRefName"])
+        out = _run_gh(["pr", _GH_VIEW, _GH_JSON_FLAG, "number,baseRefName"])
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()
         if "no pull requests found" in stderr.lower():
@@ -84,7 +86,7 @@ def get_github_token() -> str:
 def get_repo_info() -> tuple[str, str]:
     """Get (owner, repo) from the current git repository via gh."""
     try:
-        out = _run_gh(["repo", "view", "--json", "owner,name"])
+        out = _run_gh(["repo", _GH_VIEW, _GH_JSON_FLAG, "owner,name"])
     except subprocess.CalledProcessError:
         raise ReviewError(
             "Could not determine GitHub repo. "

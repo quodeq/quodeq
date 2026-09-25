@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { terminalSocketUrl } from '../../api/terminal.js';
+import { TERMINAL_STATUS } from './terminalSetup.js';
 
 // App-specific WS close codes sent by the server (api/terminal_routes.py).
 // They mean a reconnect cannot succeed right now, so the hook reports the
@@ -27,25 +28,25 @@ function cancelRetry(retryTimerRef) {
 function connectSocket({ sessionId, wsRef, retryTimerRef, attemptsRef, onOpenRef, onDataRef, setStatus, setGen }) {
   const ws = new WebSocket(terminalSocketUrl(window.location, sessionId));
   wsRef.current = ws;
-  setStatus(attemptsRef.current > 0 ? 'reconnecting' : 'connecting');
+  setStatus(attemptsRef.current > 0 ? TERMINAL_STATUS.RECONNECTING : TERMINAL_STATUS.CONNECTING);
   ws.onopen = () => {
     attemptsRef.current = 0;
     // Runs before onmessage (WS delivers open before any frame), so the
     // reset lands ahead of the scrollback replay.
     onOpenRef.current?.();
-    setStatus('open');
+    setStatus(TERMINAL_STATUS.OPEN);
   };
   ws.onclose = (e) => {
     if (wsRef.current === ws) wsRef.current = null;
-    if (e?.code === CLOSE_BUSY) { setStatus('busy'); return; }
-    if (e?.code === CLOSE_REFUSED) { setStatus('refused'); return; }
+    if (e?.code === CLOSE_BUSY) { setStatus(TERMINAL_STATUS.BUSY); return; }
+    if (e?.code === CLOSE_REFUSED) { setStatus(TERMINAL_STATUS.REFUSED); return; }
     // Session no longer exists server-side. Retrying this URL can never
     // succeed; the owner reconciles against /terminal/sessions instead.
-    if (e?.code === CLOSE_GONE) { setStatus('gone'); return; }
+    if (e?.code === CLOSE_GONE) { setStatus(TERMINAL_STATUS.GONE); return; }
     // Unexpected drop (server restart/crash/sleep). A dead socket swallows
     // keystrokes silently, so surface it and retry with capped exponential
     // backoff — the local server can come back at any moment.
-    setStatus('reconnecting');
+    setStatus(TERMINAL_STATUS.RECONNECTING);
     const delay = Math.min(RETRY_BASE_MS * 2 ** attemptsRef.current, RETRY_MAX_MS);
     attemptsRef.current += 1;
     retryTimerRef.current = setTimeout(() => {
@@ -69,9 +70,8 @@ function connectSocket({ sessionId, wsRef, retryTimerRef, attemptsRef, onOpenRef
   };
 }
 
-// status: 'idle' | 'connecting' | 'open' | 'reconnecting' | 'busy' | 'refused' | 'gone'
 export function useTerminalSocket({ active, onData, onOpen, restartKey = 0, sessionId = null }) {
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState(TERMINAL_STATUS.IDLE);
   // Bumped internally to open a fresh socket after an unexpected close.
   const [gen, setGen] = useState(0);
   const wsRef = useRef(null);

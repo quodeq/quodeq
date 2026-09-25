@@ -9,6 +9,7 @@ from quodeq.data.git_cli import stream_log_names
 
 _GIT_LOG_TIMEOUT_S = 10
 _GIT_HASH_LENGTH = 40
+_HEX_DIGITS = "0123456789abcdef"
 _GIT_DATE_PREFIX_LEN = 10  # YYYY-MM-DD
 _DEFAULT_CHURN_DIVISOR = 4
 _DEFAULT_CHURN_MAX = 5
@@ -65,7 +66,7 @@ def _accumulate_churn(
         if not line:
             continue
         # 40-char hex = commit hash, skip
-        if len(line) == _GIT_HASH_LENGTH and all(c in "0123456789abcdef" for c in line):
+        if len(line) == _GIT_HASH_LENGTH and all(c in _HEX_DIGITS for c in line):
             continue
         # Date lines: "YYYY-MM-DD HH:MM:SS +ZZZZ"
         if _is_date_line(line):

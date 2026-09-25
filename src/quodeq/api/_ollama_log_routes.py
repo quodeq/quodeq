@@ -9,6 +9,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._sse_log_helpers import sse_tail_generator
+from quodeq.shared.constants import PLATFORM_WIN32
 from quodeq.shared.env_resolve import resolve_env
 
 
@@ -26,7 +27,7 @@ def _ollama_log_path(env: Mapping[str, str] | None = None) -> Path | None:
     override = environ.get("QUODEQ_OLLAMA_LOG")
     if override:
         return Path(override)
-    if sys.platform == "win32":
+    if sys.platform == PLATFORM_WIN32:
         local_app = environ.get("LOCALAPPDATA")
         if not local_app:
             return None

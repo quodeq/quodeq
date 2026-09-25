@@ -16,6 +16,8 @@ import { FRAME_TYPE } from './frameType.js';
 import { SCOPE_GATE_RULE } from './scopeGateRule.js';
 import { RESCORE_STATE } from './rescoreState.js';
 import { LOG_STREAM_STATUS } from './logStreamStatus.js';
+import { KEY } from './keyboard.js';
+import { NAV_TAB } from './navTab.js';
 
 test('vocab modules spell the wire values', () => {
   assert.deepEqual(RUN_STATE, {
@@ -64,4 +66,23 @@ test('provider sets derive from PROVIDER', () => {
   assert.deepEqual([...LOCAL_API_PROVIDERS].sort(), ['llamacpp', 'ollama', 'omlx']);
   assert.deepEqual([...WEB_TOOL_PROVIDERS].sort(), ['claude', 'llamacpp', 'ollama', 'omlx']);
   assert.equal(Object.isFrozen(PROVIDER), true);
+});
+
+test('KEY mirrors the DOM KeyboardEvent.key spellings', () => {
+  assert.deepEqual(KEY, {
+    ENTER: 'Enter', ESCAPE: 'Escape', TAB: 'Tab',
+    ARROW_UP: 'ArrowUp', ARROW_DOWN: 'ArrowDown', ARROW_LEFT: 'ArrowLeft', ARROW_RIGHT: 'ArrowRight',
+  });
+  assert.equal(Object.isFrozen(KEY), true);
+});
+
+test('NAV_TAB spells the nav-stack page ids', () => {
+  assert.deepEqual(NAV_TAB, {
+    OVERVIEW: 'overview', VIOLATIONS: 'violations', MAP: 'map', HISTORY: 'history',
+    PROJECTS: 'projects', EVALUATE: 'evaluate', STANDARDS: 'standards', HELP: 'help',
+    SETTINGS: 'settings', COMPARE: 'compare', HISTORY_RUN: 'history-run', RUN: 'run',
+    EXPLORER: 'explorer', EVAL_PRINCIPLE: 'evalprinciple', FILE: 'file', GRADE_FORMULA: 'grade-formula',
+    EVAL_PRINCIPLE_DETAIL: 'eval-principle-detail',
+  });
+  assert.equal(Object.isFrozen(NAV_TAB), true);
 });

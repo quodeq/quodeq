@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   openTabPanels, togglePanel, openPanelsIfClosed, togglePanels,
   closeActiveTabPanels, closeSpecificPanel, dropDisabledPanels, fallbackActiveTab,
+  DRAWER_PANEL,
 } from './drawerPanelsModel.js';
 
 // Activate a panel, opening it if it isn't already (in-drawer tab click /
@@ -67,8 +68,8 @@ function makeClosePanel(setOpenPanels, setActiveTab, activeTabRef) {
 
 export function useDrawerPanels({ assistantEnabled, terminalEnabled }) {
   const [openPanels, setOpenPanels] = useState([]);
-  const [activeTab, setActiveTab] = useState('assistant');
-  const activeTabRef = useRef('assistant');
+  const [activeTab, setActiveTab] = useState(DRAWER_PANEL.ASSISTANT);
+  const activeTabRef = useRef(DRAWER_PANEL.ASSISTANT);
   activeTabRef.current = activeTab;
   const isOpen = openPanels.length > 0;
 

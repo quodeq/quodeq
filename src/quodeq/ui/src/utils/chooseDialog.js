@@ -14,12 +14,13 @@
  *   if (choice === null) return; // user cancelled
  */
 import { t } from '../strings/index.js';
-import { buildDialogShell } from './domDialogBuilder.js';
-const _ALLOWED_VARIANTS = new Set(['default', 'primary', 'danger']);
+import { buildDialogShell, BUTTON_TYPE } from './domDialogBuilder.js';
+import { DIALOG_VARIANT } from '../vocab/dialogVariant.js';
+const _ALLOWED_VARIANTS = new Set([DIALOG_VARIANT.DEFAULT, DIALOG_VARIANT.PRIMARY, DIALOG_VARIANT.DANGER]);
 
 function createCancelButton(actionsEl, cancelLabel) {
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
+  const cancelBtn = document.createElement(BUTTON_TYPE);
+  cancelBtn.type = BUTTON_TYPE;
   cancelBtn.className = 'qd-confirm-btn qd-confirm-btn--cancel';
   cancelBtn.textContent = cancelLabel;
   actionsEl.appendChild(cancelBtn);
@@ -28,14 +29,14 @@ function createCancelButton(actionsEl, cancelLabel) {
 
 function createActionButtons(actionsEl, actions) {
   return actions.map((a) => {
-    const variant = _ALLOWED_VARIANTS.has(a.variant) ? a.variant : 'default';
-    const btn = document.createElement('button');
-    btn.type = 'button';
+    const variant = _ALLOWED_VARIANTS.has(a.variant) ? a.variant : DIALOG_VARIANT.DEFAULT;
+    const btn = document.createElement(BUTTON_TYPE);
+    btn.type = BUTTON_TYPE;
     // 'default' is a neutral outline button (no --confirm). 'primary' is
     // the accent-filled affirmative action. 'danger' is the destructive
     // emphasized action. This keeps destructive vs safe visually distinct
     // even on themes where --color-accent and --color-danger are similar.
-    const cls = variant === 'default'
+    const cls = variant === DIALOG_VARIANT.DEFAULT
       ? 'qd-confirm-btn'
       : `qd-confirm-btn qd-confirm-btn--confirm qd-confirm-btn--${variant}`;
     btn.className = cls;
@@ -49,7 +50,7 @@ function createActionButtons(actionsEl, actions) {
 // cannot accidentally fire the destructive button. Otherwise focus the
 // last (rightmost / primary) action.
 function focusDefaultButton(cancelBtn, buttons, actions) {
-  const hasDanger = actions.some((a) => a.variant === 'danger');
+  const hasDanger = actions.some((a) => a.variant === DIALOG_VARIANT.DANGER);
   if (hasDanger || buttons.length === 0) cancelBtn.focus();
   else buttons[buttons.length - 1].btn.focus();
 }

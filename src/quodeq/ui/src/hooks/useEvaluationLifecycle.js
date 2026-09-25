@@ -6,6 +6,7 @@ import { safeGetItem, readAnalysisPower, writeAnalysisPower, resolveSubagentMode
 import { useJobCompletionEffect } from './useJobCompletionEffect.js';
 import { t } from '../strings/index.js';
 import { JOB_STATUS } from '../vocab/jobStatus.js';
+import { EVAL_DISMISS_ACTION } from '../features/evaluation/evaluationVocab.js';
 
 /**
  * Manages the full evaluation lifecycle: start, poll, dismiss, cancel.
@@ -46,7 +47,7 @@ function makeStartEvaluationHandler({ job, setBlockedStartError, storage, analys
 
 function makeEvalDismissHandler({ job, startedProject, selectedProject, selectProjectAndRun, navReset, setBlockedStartError, clearJob }) {
   return function handleEvalDismiss(action) {
-    if (action === 'view') {
+    if (action === EVAL_DISMISS_ACTION.VIEW) {
       // The completion effect deliberately leaves the selection alone when
       // the user browsed to another project mid-run; this button is the
       // explicit jump to the evaluated project's results. Prefer the job's

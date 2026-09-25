@@ -4,6 +4,8 @@ from __future__ import annotations
 import sys
 from typing import IO, Protocol
 
+from quodeq.shared.constants import PLATFORM_WIN32
+
 
 class FileLock(Protocol):
     """Exclusive whole-file lock held for the lifetime of a critical section."""
@@ -17,7 +19,7 @@ class FileLock(Protocol):
         ...
 
 
-if sys.platform == "win32":
+if sys.platform == PLATFORM_WIN32:
     import msvcrt
 
     class _WindowsFileLock:

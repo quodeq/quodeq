@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
+from quodeq.shared.constants import SCHEME_HTTP, SCHEME_HTTPS
 from quodeq.shared.ssrf import is_loopback_address, is_private_address
 
 
@@ -20,7 +21,7 @@ def url_safety_error(
 
     parsed = urlparse(url)
 
-    if parsed.scheme not in ("http", "https"):
+    if parsed.scheme not in (SCHEME_HTTP, SCHEME_HTTPS):
         return f"URL scheme {parsed.scheme!r} is not allowed; use http or https"
 
     hostname = parsed.hostname

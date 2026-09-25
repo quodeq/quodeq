@@ -6,7 +6,8 @@ import { useStandardTypes } from './useStandardTypes.js';
 import { useMapDisplayPrefs } from './useMapDisplayPrefs.js';
 import { useMapDimensionFilter } from './useMapDimensionFilter.js';
 import { useMapTreeState } from './useMapTreeState.js';
-import { MAP_VIEW_MODE } from '../mapVocab.js';
+import { MAP_VIEW_MODE, VIZ_STYLE, GALAXY_MODE } from '../mapVocab.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 // Re-exported so existing importers of the tree helpers keep one seam; the
 // implementations live in mapTree.js (pure, unit-testable without the hook).
@@ -23,9 +24,9 @@ export { findSubtree, buildBreadcrumbPath } from './mapTree.js';
 function useMapNavParams(nav) {
   const {
     path: currentPath = '',
-    vizStyle = 'zoompack',
+    vizStyle = VIZ_STYLE.ZOOMPACK,
     viewMode = MAP_VIEW_MODE.HEALTH,
-    galaxyMode = 'filesystem',
+    galaxyMode = GALAXY_MODE.FILESYSTEM,
     onPathChange, onVizStyleChange, onViewModeChange, onGalaxyModeChange,
   } = nav || {};
   return {
@@ -69,7 +70,7 @@ function buildMapPageResult({
       onDrillDown: handleDrillDown,
       onFileClick: (treeNode) => {
         if (!callbacks?.onNavigate) return;
-        callbacks.onNavigate('file', { file: treeNodeToFileObj(treeNode), sourceTab: 'map' });
+        callbacks.onNavigate(NAV_TAB.FILE, { file: treeNodeToFileObj(treeNode), sourceTab: NAV_TAB.MAP });
       },
       onNavigate: callbacks?.onNavigate,
       onBreadcrumbNav: handleBreadcrumbNav,

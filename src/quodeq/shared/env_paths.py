@@ -6,6 +6,8 @@ from pathlib import Path
 
 from quodeq.shared._env_sanitize import sanitized_env_path
 
+_QUODEQ_HOME_DIRNAME = ".quodeq"  # base state dir under the user's home
+
 
 def get_static_dist(env: dict[str, str] | None = None) -> str | None:
     """Return the static dist path from environment, or the user-level cache."""
@@ -13,7 +15,7 @@ def get_static_dist(env: dict[str, str] | None = None) -> str | None:
     if from_env:
         return from_env
     # Check user-level cache (built on demand by `quodeq dashboard`)
-    cached = Path.home() / ".quodeq" / "static"
+    cached = Path.home() / _QUODEQ_HOME_DIRNAME / "static"
     if cached.is_dir() and (cached / "index.html").exists():
         return str(cached)
     return None
@@ -31,7 +33,7 @@ def get_evaluations_dir(default: str | None = None, env: dict[str, str] | None =
         return sanitized_env_path(from_env)
     if default is not None:
         return default
-    return str(Path.home() / ".quodeq" / "evaluations")
+    return str(Path.home() / _QUODEQ_HOME_DIRNAME / "evaluations")
 
 
 def get_findings_file(env: dict[str, str] | None = None) -> str | None:
@@ -48,7 +50,7 @@ def get_quodeq_dir(env: dict[str, str] | None = None) -> Path:
     from_env = (os.environ if env is None else env).get("QUODEQ_DIR")
     if from_env:
         return Path(sanitized_env_path(from_env))
-    return Path.home() / ".quodeq"
+    return Path.home() / _QUODEQ_HOME_DIRNAME
 
 
 def get_clones_dir(env: dict[str, str] | None = None) -> Path:
@@ -61,7 +63,7 @@ def get_clones_dir(env: dict[str, str] | None = None) -> Path:
     from_env = (os.environ if env is None else env).get("QUODEQ_CLONES_DIR")
     if from_env:
         return Path(sanitized_env_path(from_env))
-    return Path.home() / ".quodeq" / "clones"
+    return Path.home() / _QUODEQ_HOME_DIRNAME / "clones"
 
 
 def get_grade_formula_path(env: dict[str, str] | None = None) -> str:
@@ -76,7 +78,7 @@ def get_grade_formula_path(env: dict[str, str] | None = None) -> str:
     environ = env if env is not None else os.environ
     if "QUODEQ_GRADE_FORMULA_PATH" in environ:
         return sanitized_env_path(environ["QUODEQ_GRADE_FORMULA_PATH"])
-    return str(Path.home() / ".quodeq" / "grade_formula.json")
+    return str(Path.home() / _QUODEQ_HOME_DIRNAME / "grade_formula.json")
 
 
 def get_run_dir(env: dict[str, str] | None = None) -> Path:
@@ -89,6 +91,6 @@ def get_run_dir(env: dict[str, str] | None = None) -> Path:
     raw = (os.environ if env is None else env).get("QUODEQ_RUN_DIR")
     if raw and not Path(raw).is_absolute():
         raise ValueError(f"QUODEQ_RUN_DIR must be an absolute path, got: {raw!r}")
-    run_dir = Path(raw) if raw else Path.home() / ".quodeq" / "run"
+    run_dir = Path(raw) if raw else Path.home() / _QUODEQ_HOME_DIRNAME / "run"
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir

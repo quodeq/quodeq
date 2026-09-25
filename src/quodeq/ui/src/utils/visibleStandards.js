@@ -3,8 +3,8 @@ import {
   STANDARDS_CHANGED_REASON, notifyStandardsChanged,
 } from '../constants.js';
 import { getStandardsVisibility, putStandardsVisibility } from '../api/standards.js';
-import { readJSON, writeString } from '../adapters/storage.js';
-import { decideHydration } from './visibleStandardsModel.js';
+import { readJSON, STORAGE_FLAG_ON, writeString } from '../adapters/storage.js';
+import { decideHydration, HYDRATION_KIND } from './visibleStandardsModel.js';
 
 // Marks that the (per-browser, not per-project) cache has been reconciled
 // with SOME project's own real file -- either because that project already
@@ -113,11 +113,11 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
       alreadyMigrated: !!storage.getItem(VISIBLE_STANDARDS_MIGRATED_KEY),
       fallbackDefaults: DEFAULT_VISIBLE_STANDARDS,
     });
-    if (decision.kind === 'migrate') {
+    if (decision.kind === HYDRATION_KIND.MIGRATE) {
       const saved = await putStandardsVisibility(projectId, decision.ids);
       if (supersededByNewerWrite()) return readVisibleStandardIds(storage);
       const ids = saved?.visibleStandardIds ?? decision.ids;
-      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, '1', storage);
+      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, STORAGE_FLAG_ON, storage);
       writeVisibleStandardIds(ids, storage);
       return ids;
     }
@@ -126,7 +126,7 @@ export async function hydrateVisibleStandardIds(projectId, { storage = localStor
       // to belong to a specific project's synced selection, so it must
       // never again be read as an unclaimed legacy value up for grabs by
       // the next project that happens to have no file yet.
-      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, '1', storage);
+      writeString(VISIBLE_STANDARDS_MIGRATED_KEY, STORAGE_FLAG_ON, storage);
     }
     writeVisibleStandardIds(decision.ids, storage);
     return decision.ids;

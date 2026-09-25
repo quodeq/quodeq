@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getHealth } from '../api/index.js';
 import { SERVER_BASE_URL, DASHBOARD_BASE_PORT } from '../config.js';
 import { systemKeys } from '../api/queryKeys.js';
+import { SETTLED_FULFILLED } from '../constants.js';
 
 // Where the server can have moved to. The dashboard walks *upward* from its
 // configured base port when one is taken (see dashboard/_networking.py), so a
@@ -57,7 +58,7 @@ export function altPortCandidates(currentPort) {
 
 async function tryFindPort(candidates, baseUrl) {
   const results = await Promise.allSettled(candidates.map((p) => probeAltPort(p, baseUrl)));
-  const found = results.find((r) => r.status === 'fulfilled' && r.value !== null);
+  const found = results.find((r) => r.status === SETTLED_FULFILLED && r.value !== null);
   return found ? found.value : null;
 }
 

@@ -12,6 +12,7 @@ import { severityLabel } from '../../../strings/labels.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { DIM_STATE } from '../../../vocab/dimState.js';
 import { SEVERITY_ORDER } from '../../../vocab/severity.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
@@ -40,7 +41,7 @@ function ViolationLiveRow({ violation, index }) {
         aria-expanded={open}
         aria-label={t('evaluate.findingAria', { severity: severityLabel(v.severity), title: v.title || v.file || t('evaluate.detailsFallback') })}
         onClick={() => setOpen(o => !o)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
+        onKeyDown={(e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
       >
         <span className="vlive-rail" aria-hidden="true" />
         {REAL_SEVERITY_SET.has(v.severity)

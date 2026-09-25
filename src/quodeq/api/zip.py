@@ -14,12 +14,12 @@ from pathlib import Path
 from flask import Response, after_this_request, send_file
 
 from quodeq.api.helpers import ClientMessageError, json_error
+from quodeq.shared.constants import MANIFEST_FILENAME
 from quodeq.shared.env import env_int
 
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_ZIP_SIZE_MB = 500
-MANIFEST_FILENAME = "manifest.json"
 MANIFEST_KIND = "quodeq-project-export"
 MANIFEST_SCHEMA = 1
 # Import allows the extracted (uncompressed) archive to reach the MB cap times

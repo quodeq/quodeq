@@ -23,6 +23,7 @@ from quodeq.api._assistant_helpers import (
     get_repository,
     local_provider_busy,
 )
+from quodeq.api._constants import CODE_INVALID_PARAM, CODE_UNKNOWN_SESSION, MESSAGE_UNKNOWN_SESSION
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.api.assistant_turn_state import AssistantTurnState, turn_state
 from quodeq.api.helpers import json_error, optional_json_object_or_error
@@ -133,8 +134,8 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
     repo = get_repository(app)
     session = repo.get_session(sid)
     if session is None:
-        return json_error("unknown session", 404, "UNKNOWN_SESSION")
-    body = optional_json_object_or_error("INVALID_PARAM")
+        return json_error(MESSAGE_UNKNOWN_SESSION, 404, CODE_UNKNOWN_SESSION)
+    body = optional_json_object_or_error(CODE_INVALID_PARAM)
     if not isinstance(body, dict):
         return jsonify(body[0]), body[1]
     text = str(body.get("text", "")).strip()
@@ -173,7 +174,7 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
 
 def _stop_assistant_turn(app: Flask, sid: str):
     if get_repository(app).get_session(sid) is None:
-        return json_error("unknown session", 404, "UNKNOWN_SESSION")
+        return json_error(MESSAGE_UNKNOWN_SESSION, 404, CODE_UNKNOWN_SESSION)
     token = turn_state(app).cancel_token(sid)
     if token is None:
         return json_error("no turn running", 409, "NO_TURN_RUNNING")
@@ -188,7 +189,7 @@ def _stop_assistant_turn(app: Flask, sid: str):
 def _assistant_events(app: Flask, sid: str):
     repo = get_repository(app)
     if repo.get_session(sid) is None:
-        return json_error("unknown session", 404, "UNKNOWN_SESSION")
+        return json_error(MESSAGE_UNKNOWN_SESSION, 404, CODE_UNKNOWN_SESSION)
     raw = request.headers.get("Last-Event-ID") or request.args.get("after", "0")
     try:
         after = int(raw)

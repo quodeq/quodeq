@@ -24,12 +24,12 @@ from quodeq.dashboard._webview_token import (
     warn_reused_api_token_mismatch,
     spawn_window_with_token,
 )
+from quodeq.shared.constants import SCHEME_HTTP
 from quodeq.shared.env_resolve import resolve_env_mut
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
 _logger = logging.getLogger(__name__)
-_HTTP_SCHEME = "http"
 
 
 def _guard_plaintext_http(
@@ -70,7 +70,7 @@ def ensure_action_api(
     cfg = api_config or ApiConfig()
     _guard_plaintext_http(host, cfg.allow_plaintext, probes=probes)
     for port in range(start_port, start_port + max_tries):
-        base_url = f"{_HTTP_SCHEME}://{host}:{port}"
+        base_url = f"{SCHEME_HTTP}://{host}:{port}"
         if probes.is_port_open(host, port):
             if probes.api_healthy(base_url):
                 warn_reused_api_token_mismatch(base_url)

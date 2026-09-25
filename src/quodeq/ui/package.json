@@ -21,6 +21,8 @@
     "lint:hygiene:update": "node tools/check_hygiene.mjs --update",
     "lint:magic": "node tools/check_magic.mjs",
     "lint:magic:update": "node tools/check_magic.mjs --update",
+    "lint:magic-strings": "node tools/check_magic_strings.mjs",
+    "lint:magic-strings:update": "node tools/check_magic_strings.mjs --update",
     "lint:vocab": "node tools/check_vocab.mjs",
     "lint:vocab:update": "node tools/check_vocab.mjs --update",
     "lint:naming": "node tools/check_naming.mjs",

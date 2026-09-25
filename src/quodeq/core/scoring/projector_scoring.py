@@ -30,6 +30,7 @@ from quodeq.core.scoring.internals import (
     principle_score_and_grade,
     score_to_grade_label,
 )
+from quodeq.core.types.scoring import ConfidenceLevel
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
     ScoringParams,
@@ -104,7 +105,7 @@ def compute_principle_grade(
         scale_multiplier=scale.scale_multiplier,
         source_file_count=scale.source_file_count,
     )
-    if confidence_level == "low":
+    if confidence_level == ConfidenceLevel.LOW:
         return _insufficient_grade(principle_id, len(findings), dismissed_count)
 
     v_dicts = [finding_to_scoring_dict(v) for v in findings]

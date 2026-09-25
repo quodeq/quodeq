@@ -12,6 +12,8 @@
 // mode too); tests/tools/test_vocab_gate_word_lists_match.py holds the two
 // lists together. A word can sit in several lists; the same-vocabulary array
 // rule matches per list.
+import { SRC_JS_JSX_BASE } from './tools/eslint_shared_config.mjs';
+
 const VOCABULARIES = {
   runState: [
     'pending', 'running', 'finalizing', 'done', 'failed', 'cancelled',
@@ -28,6 +30,8 @@ const VOCABULARIES = {
   findingType: ['violation', 'compliance'],
 };
 const WORDS = [...new Set(Object.values(VOCABULARIES).flat())];
+// Read by tools/magic_string_rules.mjs so a vocabulary word has one gate.
+export const VOCAB_WORDS = new Set(WORDS);
 const literal = (words) => `Literal[value=/^(${words.join('|')})$/]`;
 const KEYS = ['status', 'state', 'severity', 'grade', 'exitReason', 'runState'];
 const VALUE = literal(WORDS);
@@ -36,20 +40,7 @@ const MESSAGE = 'Bare vocabulary literal; use the constant from src/vocab/*.js.'
 
 export default [
   {
-    files: ['src/**/*.js', 'src/**/*.jsx'],
-    ignores: [
-      'src/vocab/**',
-      'src/strings/**',
-      'src/**/*.test.js',
-      'src/**/*.test.jsx',
-      'src/**/*.fixtures.js',
-      'src/**/*.fixtures.jsx',
-    ],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
+    ...SRC_JS_JSX_BASE,
     rules: {
       'no-restricted-syntax': [
         'error',

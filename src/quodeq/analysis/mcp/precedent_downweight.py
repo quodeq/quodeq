@@ -22,6 +22,11 @@ from quodeq.core.observability import NULL_LOG, LogSink
 
 _PRECEDENT_DOWNWEIGHT = 25
 
+# apply_precedent_downweight()'s matched-tier return value for a fingerprint
+# hit; enricher.py compares against it to decide whether to notify. Its
+# sibling "semantic" is never compared elsewhere, so it stays bare.
+PRECEDENT_TIER_EXACT = "exact"
+
 
 class _UnsetScore:
     """Type of :data:`UNSET_SCORE`; it exists only so the sentinel has one."""
@@ -92,7 +97,7 @@ def apply_precedent_downweight(
     field (see ``FindingEnricher._after_precedent``).
     """
     matched, text = _precedent_probe(finding, fingerprints)
-    tier: str | None = "exact" if matched else None
+    tier: str | None = PRECEDENT_TIER_EXACT if matched else None
 
     if not matched and corpus is not None and text is not None:
         similarity = corpus.match(text) if isinstance(score, _UnsetScore) else score

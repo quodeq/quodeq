@@ -8,7 +8,7 @@ from quodeq.analysis.errors import (
     REASON_AGENT_FAILURE_STREAK, REASON_PROVIDER_FATAL,
     EvaluationError, FatalProviderError,
 )
-from quodeq.analysis.mcp.schemas import FileDoneStatus
+from quodeq.analysis.mcp.schemas import JSONL_MARKER_FILE_DONE, FileDoneStatus
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
@@ -138,7 +138,7 @@ def _tally_markers(jsonl_path: Path) -> tuple[int, int]:
                     entry = json.loads(raw)
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     continue
-                if entry.get("_marker") != "file_done":
+                if entry.get("_marker") != JSONL_MARKER_FILE_DONE:
                     continue
                 file = entry.get("file")
                 status = entry.get("status")

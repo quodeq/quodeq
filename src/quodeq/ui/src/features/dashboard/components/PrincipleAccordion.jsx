@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { gradeColorClass } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 function ViolationRow({ v, principle, onViolationClick, handleViolationKeyDown }) {
   return (
@@ -102,7 +103,7 @@ export default function PrincipleAccordion({ principle, onViolationClick }) {
 
   function handleViolationKeyDown(v) {
     return (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onViolationClick(v, principle); }
+      if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onViolationClick(v, principle); }
     };
   }
 

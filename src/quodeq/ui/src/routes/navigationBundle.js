@@ -1,5 +1,6 @@
 import { t } from '../strings/index.js';
 import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER } from '../features/onboarding/wizardSteps.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 // Every navigation action is blocked while an evaluation runs: the guard
 // toasts the action's own "busy" message and swallows the click. Written once
@@ -84,7 +85,7 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
     onResumeSetup: makeOnResumeSetup({ isEvaluating, showToast, setWizardEntry }),
     // null when the shared repo has no content — consumers use the nullness
     // to hide their "browse remote repositories" affordance.
-    onBrowseRemote: sharedHasContent ? () => navTab('projects') : null,
+    onBrowseRemote: sharedHasContent ? () => navTab(NAV_TAB.PROJECTS) : null,
     isEvaluating,
   };
 }
