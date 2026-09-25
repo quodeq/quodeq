@@ -16,10 +16,12 @@ export const ISO_25010_URL = 'https://www.iso.org/';
 // so they all agree on where "full score" is.
 export const SCORE_SCALE_MAX = 10;
 
-// Fraction-to-percent multiplier, and the percent scale's own ceiling
-// (a fully-covered/fully-confident value). Shared by every `* 100` percent
-// conversion and percent-scale default across the app so they all agree on
-// what "100%" means.
+// Fraction-to-percent multiplier, and the ceiling of any value already on
+// the percent axis (a progress bar's aria-valuemax, a percent field's full
+// value). Shared by every `* 100` percent conversion and percent-scale
+// ceiling across the app so they all agree on what "100%" means. Not a
+// general-purpose "100" default — a value on a different 0-100 domain scale
+// (e.g. confidence) gets its own name next to that scale's other constants.
 export const PERCENT = 100;
 
 // Idle timeout for an SSE stream (the assistant chat and the eval job log):
