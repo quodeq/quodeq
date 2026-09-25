@@ -11,9 +11,7 @@ from quodeq.analysis._dim_order import DimEstimates, order_by_backlog
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loop_state import DimTransition, run_dir_for, safe_write_dim_state
 from quodeq.analysis._loop_steps import default_loop_deps
-from quodeq.analysis._pipeline_setup import (
-    set_run_deadline, warn_if_local_api_oversubscribed,
-)
+from quodeq.analysis._pipeline_setup import set_run_deadline, warn_if_local_api_oversubscribed
 from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.cache.gc import ensure_cache_ready
@@ -24,10 +22,10 @@ from quodeq.analysis.subagents.runner import process_consolidated_dimensions
 from quodeq.analysis.subprocess import get_provider_type
 from quodeq.config.provider import ProviderType
 from quodeq.core.evidence.model import Evidence
-from quodeq.data.fs.dimensions_state_store import DimState
+from quodeq.core.run.dimensions import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis.runner_markers import emit_marker
-from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_SCORING, CC_PHASE_SETUP
+from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_SCORING, CC_PHASE_SETUP
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG
 
@@ -271,7 +269,8 @@ def _run_dimensions(
     warn_if_local_api_oversubscribed(config, log=SHARED_LOG)
 
     dimensions, ctx, runner, dim_counts = _prepare_run_context(config)
-    set_run_deadline(config)
+    if (deadline_iso := set_run_deadline(config)) is not None:
+        emit_marker(CC_PHASE_ANALYZING_START, deadline_at=deadline_iso, budget_s=config.options.time_limit)
 
     fixed_mode_result = _dispatch_fixed_mode(
         config, dimensions, ctx, runner, on_dimension_done, dim_counts=dim_counts,

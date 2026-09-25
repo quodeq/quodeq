@@ -100,6 +100,10 @@ class JobManager(JobMonitorMixin, JobCapacityMixin):
         # Injection seam for the hard job-duration cap; None means "fall back
         # to the QUODEQ_JOB_TIMEOUT_S env var" (see _job_timeout_cap_s below).
         self._job_timeout_cap_s_override = seams.job_timeout_cap_s
+        # Injection seam for the concurrency cap; None means "fall back to
+        # the QUODEQ_MAX_CONCURRENT_JOBS env var" (see _max_concurrent_jobs
+        # in _job_capacity_mixin.py).
+        self._max_concurrent_jobs_override = seams.max_concurrent_jobs
         # _run_log_writers and _pre_marker_buffer are owned exclusively by the
         # per-job _consume_stream thread started in start_job(). No other code
         # path may read or mutate these dicts — doing so reintroduces the
@@ -190,8 +194,17 @@ class JobManager(JobMonitorMixin, JobCapacityMixin):
             job.ended_at = datetime.now(timezone.utc).isoformat()
             self._store.put(job)
         if process:
-            terminate_process(process)
+            self._terminate(process)
         return True
+
+    def _terminate(self, process: subprocess.Popen) -> None:
+        """Escalating SIGTERM -> SIGKILL kill, shared by cancel and the
+        watchdog (``JobMonitorMixin._monitor_process``). A plain method on
+        the module that owns ``terminate_process`` -- not a facade lookup --
+        so ``JobMonitorMixin`` (mixed into this class) can call ``self.
+        _terminate`` without importing this module back.
+        """
+        terminate_process(process)
 
     def _cancel_external(self, job_id: str, reports_root: Path, run_dir: Path | None = None) -> bool:
         """Send SIGTERM to an external run's process; *run_dir* skips the scan when valid."""

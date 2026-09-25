@@ -85,7 +85,10 @@ def finalize_run_evaluate(args: argparse.Namespace, evaluation_dir: Path, result
     # findings still read as new in the live feed).
     if not no_scored_reports:
         from quodeq.analysis.cache.consolidation import mark_run_consolidated
-        mark_run_consolidated(evaluation_dir.parent)
+        from quodeq.analysis.cache.local import LocalFileBackend
+        # Composition root: wire the concrete cache backend here rather than
+        # leaving mark_run_consolidated to build it internally.
+        mark_run_consolidated(evaluation_dir.parent, cache=LocalFileBackend())
     # Only export SARIF on success and only when scored reports exist.
     if result == 0 and getattr(args, "sarif", None) and not no_scored_reports:
         write_sarif_if_requested(args, evaluation_dir)

@@ -1,6 +1,7 @@
 """Consolidated multi-dimension analysis — extracted from subagents/runner.py."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
 from quodeq.analysis.prompts.builder import build_consolidated_prompt, prompt_context
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+from quodeq.analysis.subagents._config_kwargs import shared_analysis_config_kwargs
 from quodeq.analysis.subagents._pool_launcher import default_subagent_model, compute_files_per_agent
 from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.analysis.runner_markers import cleanup_stream
@@ -47,10 +49,8 @@ def _build_consolidated_config(
     subagent_model = config.options.subagent_model or default_subagent_model() or config.options.ai_model
     time_limit_val = config.options.time_limit
     return AnalysisConfig(
-        analysis_budget=config.options.analysis_budget,
+        **shared_analysis_config_kwargs(config),
         compiled_dir=compiled_dir,
-        max_turns=config.options.max_turns,
-        max_duration=config.options.max_duration,
         ai_model=subagent_model,
         dimension=",".join(dimensions),
         max_files_per_agent=files_per_agent,
@@ -113,8 +113,16 @@ def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: AnalysisConte
 def process_consolidated_dimensions(
     config: "RunConfig", dimensions: list[str], ctx: AnalysisContext,
     *, log: LogSink = NULL_LOG,
+    pool_factory: Callable[..., Any] | None = None,
+    queue_factory: Callable[..., Any] | None = None,
 ) -> dict[str, Evidence]:
-    """Run all dimensions in a single pass -- files read once, not per dimension."""
+    """Run all dimensions in a single pass -- files read once, not per dimension.
+
+    *pool_factory* defaults to ``SubagentPool``, *queue_factory* to
+    ``FileQueue`` (tests pass fakes).
+    """
+    pool_cls = pool_factory if pool_factory is not None else SubagentPool
+    queue_cls = queue_factory if queue_factory is not None else FileQueue
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     evidence_dir = config.work_dir or config.src
 
@@ -128,17 +136,18 @@ def process_consolidated_dimensions(
     prompt = _build_prompt(config, dimensions, ctx)
     files_per_agent = compute_files_per_agent(len(files))
     queue_path = evidence_dir / "consolidated_queue.json"
-    FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
+    queue_cls(queue_path, files, max_files_per_agent=files_per_agent)
     log.info(f"Consolidated analysis: {len(files)} files, {len(dimensions)} dimensions, max {config.options.max_subagents} agents")
 
     # 3. Build config and launch pool
     base_ac = _build_consolidated_config(config, dimensions, files_per_agent, compiled_dir=compiled_dir)
-    pool = SubagentPool(
+    pool = pool_cls(
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
         options=PoolOptions(
             n_agents=config.options.max_subagents,
             prompt=prompt,
             dimension=dimensions,
+            agent_failure_streak_limit=config.options.agent_failure_streak_limit,
         ),
         config=base_ac,
     )

@@ -20,6 +20,7 @@ import logging
 import tempfile
 from contextlib import ExitStack
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 
 from quodeq.analysis._api_batch import (
@@ -46,6 +47,7 @@ from quodeq.analysis._command import (
 )
 from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, SpawnPaths
 from quodeq.analysis._process import AnalysisError, check_process_result, spawn_and_monitor
+from quodeq.analysis.cache.local import default_cache_root
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
@@ -54,7 +56,7 @@ from quodeq.config.provider import Provider, ProviderType
 from quodeq.core.constants import MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_FILE
 from quodeq.core.stream.events import copilot_error, parse_stream_event
 from quodeq.shared.utils import sanitize_sensitive
-from quodeq.shared.utils import get_ai_cmd
+from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path, get_ai_model
 
 
 _log = logging.getLogger(__name__)
@@ -86,7 +88,7 @@ def _run_cli_analysis(
     work_dir: Path, prompt: str, stream_file: Path, cfg: AnalysisConfig,
 ) -> None:
     """Run analysis via CLI subprocess."""
-    ai_cmd = cfg.ai_cmd or get_ai_cmd()
+    ai_cmd = cfg.ai_cmd
     # ai_cmd comes from the AI_CMD/AI_PROVIDER env var and is gated to known
     # providers in register_cli_mcp before any subprocess call; it runs via a
     # subprocess list (no shell injection). Skipping shutil.which for CI/PATH.
@@ -150,7 +152,7 @@ def _resolve_provider_config(
 
     Raises AnalysisError if model or api_base are missing.
     """
-    ai_cmd = cfg.ai_cmd or get_ai_cmd()
+    ai_cmd = cfg.ai_cmd
     configs = get_provider_configs()
     provider_cfg = configs.get(ai_cmd, {})
 
@@ -200,7 +202,7 @@ def _run_api_analysis_bridge(
     if ctx is None:
         return
 
-    api_config = build_batch_api_config(cfg, model, api_base, api_key)
+    api_config = build_batch_api_config(cfg, model, api_base, api_key, env)
     dispatch_api_batches(ctx, cfg, api_config, env)
 
     write_stream_done_marker(stream_file)
@@ -214,14 +216,32 @@ def run_analysis(
 ) -> None:
     """Run AI analysis, dispatching to CLI or API runner based on provider type.
 
-    *env* supplies provider credentials; the default is resolved here, at the
-    public boundary, so the resolution logic below stays injectable.
+    *env* supplies provider credentials and every setting the caller left
+    unset; the default is resolved here, at the public boundary, so the
+    resolution logic below stays injectable and never reads the environment.
     """
-    cfg = config or AnalysisConfig()
-    ai_cmd = cfg.ai_cmd or get_ai_cmd()
-    provider_type = get_provider_type(ai_cmd)
+    environ = process_environment(env)
+    cfg = _fill_env_defaults(config or AnalysisConfig(), environ)
+    provider_type = get_provider_type(cfg.ai_cmd)
 
     if provider_type == ProviderType.API:
-        _run_api_analysis_bridge(work_dir, stream_file, cfg, process_environment(env))
+        _run_api_analysis_bridge(work_dir, stream_file, cfg, environ)
     else:
-        _run_cli_analysis(work_dir, prompt, stream_file, cfg)
+        # The API path falls back to the provider's configured model instead.
+        cli_cfg = replace(cfg, ai_model=cfg.ai_model or get_ai_model(environ))
+        _run_cli_analysis(work_dir, prompt, stream_file, cli_cfg)
+
+
+def _fill_env_defaults(cfg: AnalysisConfig, env: Mapping[str, str]) -> AnalysisConfig:
+    """Fill the provider id, binary override and cache root the caller left unset.
+
+    The run's composition root (the CLI, via the dimension and pool config
+    builders) sets all three; this keeps direct callers on the values the
+    command builders used to read from the process environment themselves.
+    """
+    return replace(
+        cfg,
+        ai_cmd=cfg.ai_cmd or get_ai_cmd(env),
+        ai_cmd_path=cfg.ai_cmd_path or get_ai_cmd_path(env),
+        cache_root=cfg.cache_root or default_cache_root(env),
+    )

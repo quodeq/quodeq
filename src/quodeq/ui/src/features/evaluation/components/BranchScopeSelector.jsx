@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
+import { toRepoRelativeScope } from '../../../utils/repoScope.js';
 import { t } from '../../../strings/index.js';
 
 /**
@@ -57,7 +58,7 @@ export default function BranchScopeSelector({
       {scopeBrowserOpen && (
         <FolderBrowser
           onSelect={(path) => {
-            const rel = projectPath ? path.replace(projectPath, '').replace(/^\//, '') : path;
+            const rel = toRepoRelativeScope(path, projectPath);
             onScopeChange(rel || null);
             setScopeBrowserOpen(false);
           }}

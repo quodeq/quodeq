@@ -1,6 +1,6 @@
 import { Component, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import HistoryChartPanelPlaceholder from './HistoryChartPanelPlaceholder.jsx';
-import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
+import RunNavigator from '../../../components/RunNavigator.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';

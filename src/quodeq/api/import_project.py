@@ -7,10 +7,12 @@ zip-bomb compression ratios before a single byte is extracted (see
 _import_validation.py and _import_extract.py for the checks themselves).
 
 Split into four collaborator modules plus this orchestrator:
-  - _import_validation.py: archive/member/manifest/repo-info validation.
-  - _import_identity.py: identity-collision detection and index updates.
+  - services/project_import_identity.py: identity-collision detection and
+    index updates (moved out of api/; api/_import_identity.py re-exports it
+    for tests/api/test_import_identity.py's existing import path).
   - _import_extract.py: ``safe_extract``, the hardened extraction step.
   - _import_upload.py: ``open_upload``, the bounded view of the uploaded archive.
+  - _import_validation.py: archive/member/manifest/repo-info validation.
 This module re-exports every moved name so existing imports and patches
 (tests/api/test_project_import.py) keep working unchanged.
 """
@@ -35,15 +37,17 @@ from quodeq.api.zip import (
     max_zip_size_bytes,
 )
 from quodeq.services.project_index import ProjectIdentity
+from quodeq.shared.log_sink import LoggerSink
 
-from ._import_extract import StrandedBackupError, safe_extract, swap_into_place  # safe_extract re-exported
-from ._import_identity import (
+from quodeq.services.project_import_identity import (
     REPO_INFO_FILENAME,
     find_identity_collision,
     identity_from_info,
     rewrite_repository_info,  # re-export
     update_index,
 )
+
+from ._import_extract import StrandedBackupError, safe_extract, swap_into_place  # safe_extract re-exported
 from ._import_validation import (
     ImportOutcome,  # re-export
     ImportValidationError,
@@ -63,6 +67,10 @@ _ACTION_REPLACE = "replace"
 _ACTION_COPY = "copy"
 _ALLOWED_ACTIONS = frozenset({_ACTION_REPLACE, _ACTION_COPY})
 _IO_ERROR_MESSAGE = "Failed to write imported project. Check disk space and permissions."
+# Bridges the identity/index helpers' injected LogSink to this module's own
+# logger, so their best-effort save/rewrite failures keep surfacing through
+# the same "quodeq.api._import_validation" logger they always have.
+_LOG = LoggerSink(logger)
 
 
 def _error_outcome(message: str, status: int, code: str) -> ImportOutcome:
@@ -110,7 +118,7 @@ def _resolve_import_conflict(
     """
     same_uuid_path = reports_root / top_dir
     same_uuid_collision = same_uuid_path.is_dir()
-    same_identity_uuid = find_identity_collision(reports_root, identity, ignore_uuid=top_dir)
+    same_identity_uuid = find_identity_collision(reports_root, identity, ignore_uuid=top_dir, log=_LOG)
 
     # Without an explicit action, surface the collision so the client can
     # prompt the user.
@@ -191,9 +199,9 @@ def _stage_and_commit(
             shutil.rmtree(staging, ignore_errors=True)
 
     if target.target_uuid != target.top_dir:
-        rewrite_repository_info(final_path, target.target_uuid)
+        rewrite_repository_info(final_path, target.target_uuid, log=_LOG)
 
-    update_index(target.reports_root, target.identity, target.target_uuid)
+    update_index(target.reports_root, target.identity, target.target_uuid, log=_LOG)
 
 
 def _read_and_validate_member_payloads(

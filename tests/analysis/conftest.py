@@ -41,8 +41,8 @@ def api_provider(monkeypatch) -> DispatchPolicy:
     """A literal API-type DispatchPolicy.
 
     ``default_dispatch_policy()`` (the factory every un-injected caller —
-    the module-level wrapper functions, ``RunConfig._policy()`` — resolves
-    through) reads ``get_provider_configs()`` from inside
+    ``RunConfig.dispatch_policy()``, the queue worker without a RunConfig —
+    resolves through) reads ``get_provider_configs()`` from inside
     ``dispatch_policy.py``'s own body. Patching it there, rather than
     patching ``default_dispatch_policy`` itself, reaches every caller
     regardless of which module imported the factory by name.

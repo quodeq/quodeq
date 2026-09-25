@@ -7,9 +7,10 @@ from collections.abc import Mapping
 from quodeq.analysis._dim_order import apply_dim_deadline
 from quodeq.analysis._drop_stats import DropStatsCounter, report_run_drop_stats
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
+from quodeq.analysis.runner_markers import emit_marker
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import LogSink
-from quodeq.data.fs.dimensions_state_store import DimState
+from quodeq.core.run.dimensions import DimState
 from quodeq.analysis._loop_state import (
     DimTransition,
     run_dir_for,
@@ -38,9 +39,17 @@ def _run_post_loop_guards(
     """Drop-stats report + the fatal-cancel/zero-findings/reachability guards.
 
     Drop stats run before any guard raises: a high drop ratio and a
-    worthless run often co-occur, so the summary must land either way.
+    worthless run often co-occur, so the summary must land either way. The
+    ``drop_stats`` dashboard marker is emitted here (not inside
+    ``report_run_drop_stats``) -- this loop is the composition root for
+    that seam, mirroring the "reads == 0" no-op rule the report itself uses.
     """
-    report_run_drop_stats(drop_counter)
+    stats = report_run_drop_stats(drop_counter, log=log)
+    if stats.parsed:
+        emit_marker(
+            "drop_stats",
+            dropped=stats.dropped, kept=stats.kept, ratio=round(stats.ratio, 4),
+        )
     raise_on_fatal_cancel(run_dir_for(config), log=log)
     check_zero_findings(
         result, config.source_file_count, skipped_count,

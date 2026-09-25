@@ -28,7 +28,7 @@ def test_baseline_has_no_stale_entries():
 
 # Revise DOWNWARD as sites are fixed; NEVER raise without a justification
 # reviewed in the PR that raises it.
-BASELINE_CEILING = 3  # at introduction: two per-item event emits and one status poll
+BASELINE_CEILING = 2  # two per-item event emits; the status poll moved behind a helper
 
 
 def test_baseline_only_shrinks():

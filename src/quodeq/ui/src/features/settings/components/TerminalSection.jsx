@@ -1,31 +1,12 @@
 import useTerminalSettings from '../hooks/useTerminalSettings.js';
-import { killTerminal } from '../../../api/terminal.js';
+import { useTerminalRestart } from '../hooks/useTerminalRestart.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
-import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { SettingsPillTabs } from './settingsRowParts.jsx';
-import { TERMINAL_RESTART_EVENT } from '../../../constants.js';
-import { DIALOG_VARIANT } from '../../../vocab/dialogVariant.js';
 
 export default function TerminalSection() {
   const { enabled, setEnabled } = useTerminalSettings();
-  // Restart = kill the server shell, then signal the open terminal pane to
-  // clear its screen and reconnect (the reconnect spawns a fresh PTY). Killing
-  // first also handles the case where the terminal panel isn't currently open.
-  // Only dispatch on kill SUCCESS: on failure the server keeps the live PTY and
-  // a reconnect would reattach to the same shell — a fake restart — so we skip
-  // the clear+reconnect and surface the failure instead.
-  const restart = async () => {
-    const ok = await confirmDialog({
-      title: t('settings.restartTerminalConfirmTitle'),
-      message: t('settings.restartTerminalConfirmMessage'),
-      variant: DIALOG_VARIANT.DANGER,
-    });
-    if (!ok) return;
-    killTerminal()
-      .then(() => window.dispatchEvent(new Event(TERMINAL_RESTART_EVENT)))
-      .catch((err) => { console.warn('Terminal restart: kill failed, not reconnecting', err); });
-  };
+  const restart = useTerminalRestart();
   return (
     <section className="panel settings-section">
       <div className="panel-header"><SectionLabel marker="▶">{t('settings.terminalLabel')}</SectionLabel></div>

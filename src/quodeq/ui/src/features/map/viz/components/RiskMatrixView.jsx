@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { nodeColor, nodeBorderColor } from '../core/mapColors.js';
+import { riskPoint } from '../core/riskScore.js';
 import FileShape from './FileShape.jsx';
 import { activateOnKey } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
@@ -10,10 +11,6 @@ import { PERCENT } from '../../../../constants.js';
 const W = 600, H = 420, PAD = { l: 55, r: 25, t: 35, b: 55 };
 const PW = W - PAD.l - PAD.r, PH = H - PAD.t - PAD.b;
 
-const COMPLIANCE_DAMPEN = 0.45;
-const SEV_WEIGHT_CRITICAL = 100;
-const SEV_WEIGHT_MAJOR = 10;
-const SEV_WEIGHT_MINOR = 1;
 const BUBBLE_RADIUS_MIN = 3;
 const BUBBLE_RADIUS_RANGE = 8;
 const LABEL_FONT_MAX = 11;
@@ -56,19 +53,13 @@ function useBubbleLayout(node) {
   const items = useMemo(() => (node.children?.length > 0 ? node.children : [node]), [node]);
 
   const { points, maxX, maxY, maxB } = useMemo(() => {
-    const pts = items.map((c) => {
-      const total = (c.violations || 0) + (c.compliance || 0);
-      const dampen = total > 0 ? 1 - (c.compliance / total) * COMPLIANCE_DAMPEN : 1;
-      return {
-        child: c,
-        x: (c.violations || 0) * dampen,
-        y: ((c.severity?.critical || 0) * SEV_WEIGHT_CRITICAL + (c.severity?.major || 0) * SEV_WEIGHT_MAJOR + (c.severity?.minor || 0) * SEV_WEIGHT_MINOR) * dampen,
-        b: total,
-        color: nodeColor(c, 'violations'),
-        border: nodeBorderColor(c, 'violations'),
-        hasCritical: (c.severity?.critical || 0) > 0,
-      };
-    });
+    const pts = items.map((c) => ({
+      child: c,
+      ...riskPoint(c),
+      color: nodeColor(c, 'violations'),
+      border: nodeBorderColor(c, 'violations'),
+      hasCritical: (c.severity?.critical || 0) > 0,
+    }));
     return {
       points: pts,
       maxX: Math.max(1, ...pts.map((p) => p.x)) * AXIS_SCALE_MARGIN,

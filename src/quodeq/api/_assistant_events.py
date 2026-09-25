@@ -1,10 +1,9 @@
 """SSE event-frame generator for the assistant turn stream.
 
-Split out of _assistant_helpers.py. ``POLL_SECONDS``/``IDLE_LIMIT``
-are looked up on the ``_assistant_helpers`` facade at call time (rather than
-read as this module's own globals) so tests patching
-"quodeq.api._assistant_helpers.POLL_SECONDS"/"IDLE_LIMIT" keep working
-after the split.
+Split out of _assistant_helpers.py. ``POLL_SECONDS``/``IDLE_LIMIT`` are read
+as this module's own globals (not looked up on the ``_assistant_helpers``
+facade) so this module never imports back the facade that re-exports it.
+Tests patch "quodeq.api._assistant_events.POLL_SECONDS"/"IDLE_LIMIT".
 """
 from __future__ import annotations
 
@@ -43,14 +42,13 @@ def event_frames(repository: AssistantStore, session_id: str, after_seq: int):
     traversal stays ordered by seq with ``last`` advancing so no frame is
     missed or duplicated.
     """
-    from quodeq.api import _assistant_helpers as _helpers  # noqa: PLC0415 — deferred: see module docstring
     last, idle = after_seq, 0
-    while idle < _helpers.IDLE_LIMIT:
+    while idle < IDLE_LIMIT:
         rows = repository.events_after(session_id, last)
         if not rows:
             idle += 1
             yield None
-            time.sleep(_helpers.POLL_SECONDS)
+            time.sleep(POLL_SECONDS)
             continue
         idle = 0
         for seq, frame in rows:

@@ -2,17 +2,25 @@
 
 The online-repo clone cache reads three things from the environment: where
 the cache lives, whether it is switched off, and the git child-process
-environment used for its clones. ``quodeq.context`` never reads them
-itself; they are resolved here, lazily per call, and passed in.
+environment used for its clones. The semantic precedent tier reads its flag,
+embedding model, server URL and match threshold. ``quodeq.context`` never
+reads them itself; they are resolved here, lazily per call, and passed in.
 """
 from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.config.process_env import process_environment_copy
 from quodeq.shared.constants import ENV_TRUTHY
+from quodeq.shared.env import (
+    get_embedding_base_url,
+    get_embedding_model,
+    get_precedent_similarity_threshold,
+    semantic_precedents_enabled,
+)
 
 CACHE_ROOT_ENV = "QUODEQ_CACHE_ROOT"  # override the cache root for tests / sandboxing
 DISABLE_ONLINE_CACHE_ENV = "QUODEQ_DISABLE_ONLINE_CACHE"
@@ -42,3 +50,26 @@ def git_child_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
     child = process_environment_copy(env)
     child["GIT_LFS_SKIP_SMUDGE"] = ENV_TRUTHY
     return child
+
+
+@dataclass(frozen=True)
+class PrecedentSettings:
+    """What one semantic precedent corpus build reads from the environment."""
+
+    enabled: bool
+    model: str
+    base_url: str
+    similarity_threshold: float
+
+
+def precedent_settings(env: Mapping[str, str] | None = None) -> PrecedentSettings:
+    """QUODEQ_SEMANTIC_PRECEDENTS (default off), QUODEQ_EMBEDDING_MODEL, the
+    embeddings base URL and QUODEQ_PRECEDENT_SIMILARITY (default 0.85; out of
+    range or invalid -> default), each with its existing parse rule."""
+    src = os.environ if env is None else env
+    return PrecedentSettings(
+        enabled=semantic_precedents_enabled(src),
+        model=get_embedding_model(src),
+        base_url=get_embedding_base_url(src),
+        similarity_threshold=get_precedent_similarity_threshold(src),
+    )

@@ -11,7 +11,7 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.core.run.dimensions import DimState
@@ -33,11 +33,10 @@ from quodeq.shared.lru import LRUDict
 
 _AGENT_ACTIVE_WINDOW_S = 30
 
-# Bounded process-wide memo of IncrementalTally objects, one per (evidence
-# file, suppression state) so a live-progress poll resumes where the last
-# poll stopped instead of re-parsing the file from byte 0 (findings
-# 5531/5532). The dashboard polls from several threads, hence the lock --
-# which covers the memo only, never a tally's own file read.
+# Bounded process-wide memo of IncrementalTally objects, one per (evidence file,
+# suppression state) so a live-progress poll resumes where the last poll stopped
+# instead of re-parsing the file from byte 0 (findings
+# 5531/5532). The dashboard polls from several threads, hence the lock -- it covers the memo, not a read.
 _LIVE_TALLIES: LRUDict = LRUDict(256)
 _LIVE_TALLIES_LOCK = threading.Lock()
 
@@ -98,21 +97,26 @@ def _standards_stamp(directory: Path | None) -> tuple[str, int]:
         return (str(directory), 0)
 
 
-def live_tally(path: Path, *, suppressed, make_resolver, memo_key: tuple | None) -> FindingTally:
+def live_tally(
+    path: Path, *, suppressed, make_resolver, memo_key: tuple | None,
+    tally_factory: Callable[..., "IncrementalTally"] | None = None,
+) -> FindingTally:
     """The file's tally, resumed from the last poll when *memo_key* is unchanged.
 
     *make_resolver* (zero-arg, or None) is called only when a new tally is
     built. ``memo_key=None`` means this state cannot be keyed (see
     ``_suppression_stamp``): the file is tallied from scratch, nothing stored.
+    ``tally_factory`` defaults to ``IncrementalTally`` (tests pass a fake).
     """
+    build = tally_factory if tally_factory is not None else IncrementalTally
     if memo_key is None:
-        return IncrementalTally(path, suppressed=suppressed, resolver=make_resolver and make_resolver()).advance()
+        return build(path, suppressed=suppressed, resolver=make_resolver and make_resolver()).advance()
     key = (str(path), memo_key)
     with _LIVE_TALLIES_LOCK:
         guarded = _LIVE_TALLIES.get(key)
         if guarded is None:
             guarded = _GuardedTally(
-                IncrementalTally(path, suppressed=suppressed, resolver=make_resolver and make_resolver()))
+                build(path, suppressed=suppressed, resolver=make_resolver and make_resolver()))
             _LIVE_TALLIES.put(key, guarded)
     return guarded.advance()
 
@@ -177,10 +181,9 @@ def _dim_state(
 def _queue_file_counts(queue: dict) -> dict[str, int]:
     """``{"taken": n, "total": n + pending}`` for a file-queue state dict.
 
-    ``taken`` is a list of batch entries ``[{"files": [...], "agent": ...,
-    "ts": ...}, ...]``. Match FileQueue.stats(): flatten the file counts
-    across batches so the number matches the heartbeat log. Entries that are
-    not dicts, and file lists that are not lists, count as nothing.
+    ``taken`` is a list of batch entries ``[{"files": [...], "agent": ..., "ts": ...}, ...]``.
+    Match FileQueue.stats(): flatten the file counts across batches so the number matches the
+    heartbeat log. Entries that are not dicts, and file lists that are not lists, count as nothing.
     """
     taken = 0
     for entry in queue.get("taken") or []:
@@ -194,13 +197,12 @@ def _queue_file_counts(queue: dict) -> dict[str, int]:
 def consolidated_dim_progress(run_dir: Path) -> DimProgress:
     """Progress row for a live consolidated (grouped) pass.
 
-    Evidence counters are the raw cross-dimension tally: suppression
-    netting is per-dimension and cannot be applied to the combined stream,
-    so the live numbers may slightly over-read what the finished reports
-    will show.
+    Evidence counters are the raw cross-dimension tally: suppression netting is per-dimension
+    and cannot be applied to the combined stream, so the live numbers may slightly over-read
+    what the finished reports will show.
     """
     evidence_dir = run_dir / EVIDENCE_DIRNAME
-    queue = read_queue_state(evidence_dir / "consolidated_queue.json") or {}
+    queue = read_queue_state(dimension_queue_file(run_dir, CONSOLIDATED_DIMENSION_KEY)) or {}
     tally = live_tally(evidence_dir / "consolidated_evidence.jsonl",
                        suppressed=None, make_resolver=None, memo_key=(CONSOLIDATED_DIMENSION_KEY,))
     return DimProgress(
@@ -219,27 +221,25 @@ def _dim_files_summary(queue: dict | None, d_state: DimState, dim_estimates: dic
     if queue is not None:
         return _queue_file_counts(queue)
     if d_state == DimState.PENDING:
-        # Pending dims report 0 until the precomputed estimate lands.
-        # The UI uses "any pending dim with total=0" as the signal to
-        # keep the header in "preparing…" — better to show nothing
-        # than the project-wide ceiling, which is misleading once
-        # incremental filters are applied.
+        # Pending dims report 0 until the precomputed estimate lands. The UI uses
+        # "any pending dim with total=0" as the signal to keep the header in
+        # "preparing…" -- better to show nothing than the project-wide ceiling,
+        # which is misleading once incremental filters are applied.
         estimate = dim_estimates.get(dim_id)
         return {"taken": 0, "total": estimate["count"] if estimate else 0}
     return {"taken": 0, "total": 0}
 
 
 def _dim_exit_reason(record: dict | None) -> str | None:
-    """DONE dims carry `exit_reason`; INCOMPLETE dims carry `reason` (e.g.
-    "provider_fatal", "cancelled_signal"). Fall back so an interrupted dim
-    still tells the UI why it stopped."""
+    """DONE dims carry `exit_reason`; INCOMPLETE dims carry `reason` (e.g. "provider_fatal",
+    "cancelled_signal"). Fall back so an interrupted dim still tells the UI why it stopped."""
     if isinstance(record, dict):
         return record.get("exit_reason") or record.get("reason")
     return None
 
 
 def _dim_evidence_tally(dim_id: str, ctx: ProgressContext, dismissed, deleted):
-    matcher = build_matcher(dim_id, dismissed, deleted)
+    matcher = build_matcher(dim_id, dismissed, deleted, evaluators_dir=ctx.evaluators_dir)
     stamp = _suppression_stamp(dismissed, deleted)
     memo_key = None if stamp is None else (
         dim_id, stamp,

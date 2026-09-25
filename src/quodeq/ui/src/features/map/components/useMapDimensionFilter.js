@@ -1,6 +1,25 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { writeCachedState } from '../../../utils/pageStateCache.js';
+
+/**
+ * Mirrors the selection to the page-state cache so it survives unmount
+ * (Map/Violations drop their subtree on drill-in). Runs as an effect, not
+ * inside the state updater, so it stays a pure function of state and never
+ * fires on the initial mount — only on a selection actually made this
+ * session.
+ */
+function useCacheSelectedDimensions(selectedProject, selectedDimensions) {
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    writeCachedState('map', selectedProject, { selectedDimensionsArr: Array.from(selectedDimensions) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDimensions]);
+}
 
 /**
  * Dimension visibility + the map's own selection filter on top of it.
@@ -25,14 +44,9 @@ export function useMapDimensionFilter({ allDimensions, selectedProject, cachedSe
     [visibleDimensions]
   );
 
-  const [selectedDimensions, _setSelectedDimensions] = useState(() => new Set(cachedSelectedArr));
-  const setSelectedDimensions = (updater) => {
-    _setSelectedDimensions((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      writeCachedState('map', selectedProject, { selectedDimensionsArr: Array.from(next) });
-      return next;
-    });
-  };
+  const [selectedDimensions, setSelectedDimensions] = useState(() => new Set(cachedSelectedArr));
+  useCacheSelectedDimensions(selectedProject, selectedDimensions);
+
   const effectiveSelected = useMemo(
     () => selectedDimensions.size === 0 ? new Set(dimensionNames) : selectedDimensions,
     [selectedDimensions, dimensionNames]

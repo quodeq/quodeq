@@ -110,9 +110,11 @@ def test_build_router_wires_load_precedent_corpus_with_project_and_run_dir(
 
     sentinel = object()
     calls = []
+    # The server process resolves the precedent settings from its own env.
+    monkeypatch.setenv("QUODEQ_PRECEDENT_SIMILARITY", "0.9")
 
-    def fake_load_precedent_corpus(project_dir, run_dir):
-        calls.append((project_dir, run_dir))
+    def fake_load_precedent_corpus(project_dir, run_dir, *, settings):
+        calls.append((project_dir, run_dir, settings.similarity_threshold))
         return sentinel
 
     monkeypatch.setattr(
@@ -126,7 +128,7 @@ def test_build_router_wires_load_precedent_corpus_with_project_and_run_dir(
 
     _build_router(io.StringIO(), findings_path, ctx, ServerArgs())
 
-    assert calls == [(project_dir, project_dir / "run-1")]
+    assert calls == [(project_dir, project_dir / "run-1", 0.9)]
     assert ctx.precedent_corpus is sentinel
 
 

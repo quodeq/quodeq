@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quodeq.services._run_index_fs import remove_run_directory
+from quodeq.data.fs.run_dirs import remove_run_directory
 
 
 def test_remove_run_directory_rejects_path_traversal_in_run_uuid(tmp_path: Path):

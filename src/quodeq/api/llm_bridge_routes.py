@@ -21,6 +21,7 @@ from quodeq.llm_bridge import (
     get_provider_configs,
     check_cloud_connection,
     resolve_api_key,
+    resolve_test_endpoint,
 )
 from quodeq.shared.url_validation import url_safety_error
 
@@ -171,17 +172,11 @@ def provider_test() -> Response:
         return jsonify(BODY_NOT_OBJECT), HTTPStatus.BAD_REQUEST
     if (err := string_fields_error(data, ("provider", "api_base", "api_key", "model"))):
         return err
-    configs = get_provider_configs()
     provider_id = data.get("provider", "")
-    provider_cfg = configs.get(provider_id, {}) if provider_id else {}
-
-    api_base = data.get("api_base") or provider_cfg.get("api_base", "")
-    api_key = data.get("api_key", "")
-    api_key_env = ""
-    if not api_key:
-        # Resolve env var via provider id when given, else by api_base
-        # match so old clients (without `provider`) still work.
-        api_key, api_key_env = resolve_api_key(provider_id, api_base)
+    # Resolves the env var via provider id when given, else by api_base
+    # match so old clients (without `provider`) still work.
+    api_base, api_key, api_key_env = resolve_test_endpoint(
+        provider_id, data.get("api_base") or "", data.get("api_key", ""))
 
     if api_base:
         err = url_safety_error(api_base, allow_private=True)

@@ -224,3 +224,71 @@ class TestCacheStatsMarker:
         cache_stats = next(kw for p, kw in captured if p == "cache_stats")
         roundtripped = json.loads(json.dumps(cache_stats))
         assert roundtripped == cache_stats
+
+
+class TestJsonlEvidenceProducedGate:
+    """_try_parse_stream_evidence's mcp_produced check (private, inside
+    _dimension_steps.parse_dimension_evidence) moved from
+    ``jsonl_file.exists() and jsonl_file.stat().st_size > 0`` to
+    ``evidence_file_size(jsonl_file) > 0`` (the run_files helper). Pin the
+    branch choice for the three shapes that mattered under the old check:
+    missing, present-but-empty, and present-with-content.
+
+    Reaches ``parse_dimension_evidence`` via ``_make_callbacks()`` (already
+    imported at module scope above) rather than a fresh import, so this adds
+    no new private-module import for tools/private_imports_tests_baseline.txt
+    to track.
+    """
+
+    def _parse_evidence_recording_branch(self, monkeypatch):
+        parse_evidence = _make_callbacks().parse_evidence
+        calls: list[str] = []
+        monkeypatch.setitem(
+            parse_evidence.__globals__, "count_files_from_stream",
+            lambda *_a, **_k: calls.append("count") or 3,
+        )
+        monkeypatch.setitem(
+            parse_evidence.__globals__, "extract_evidence_from_stream",
+            lambda *_a, **_k: calls.append("extract") or 5,
+        )
+        return parse_evidence, calls
+
+    def _valid_stream_file(self, tmp_path: Path) -> Path:
+        stream_file = tmp_path / "d_live.stream"
+        stream_file.write_text('{"type": "assistant"}\n')
+        return stream_file
+
+    def test_missing_jsonl_falls_back_to_stream_extraction(
+        self, tmp_path: Path, monkeypatch,
+    ) -> None:
+        parse_evidence, calls = self._parse_evidence_recording_branch(monkeypatch)
+        config = _setup(tmp_path, {})
+        jsonl_file = tmp_path / "d_evidence.jsonl"  # never created
+
+        parse_evidence(config, "d", self._valid_stream_file(tmp_path), jsonl_file, _make_ctx())
+
+        assert calls == ["extract"]
+
+    def test_empty_jsonl_falls_back_to_stream_extraction(
+        self, tmp_path: Path, monkeypatch,
+    ) -> None:
+        parse_evidence, calls = self._parse_evidence_recording_branch(monkeypatch)
+        config = _setup(tmp_path, {})
+        jsonl_file = tmp_path / "d_evidence.jsonl"
+        jsonl_file.write_text("")
+
+        parse_evidence(config, "d", self._valid_stream_file(tmp_path), jsonl_file, _make_ctx())
+
+        assert calls == ["extract"]
+
+    def test_nonempty_jsonl_uses_stream_file_count(
+        self, tmp_path: Path, monkeypatch,
+    ) -> None:
+        parse_evidence, calls = self._parse_evidence_recording_branch(monkeypatch)
+        config = _setup(tmp_path, {})
+        jsonl_file = tmp_path / "d_evidence.jsonl"
+        jsonl_file.write_text('{"file": "a.py"}\n')
+
+        parse_evidence(config, "d", self._valid_stream_file(tmp_path), jsonl_file, _make_ctx())
+
+        assert calls == ["count"]

@@ -10,6 +10,9 @@ import FolderBrowser from './FolderBrowser.jsx';
 import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';
 import { detectedLanguages, BUDGET_CHOICES_S, formatBudgetLabel } from './scanSummary.js';
 import { CLEAN_PERSIST } from './scanModes.js';
+import { toRepoRelativeScope } from '../../../utils/repoScope.js';
+import { queuedFileAnalyses } from '../scanEstimateRules.js';
+import { createScanSummary } from '../../../models/index.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { KEY } from '../../../vocab/keyboard.js';
 
@@ -52,11 +55,12 @@ export function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, 
 }
 
 export function DetectedLine({ scanData }) {
-  if (!scanData || !(scanData.code_files > 0)) return null;
-  const langs = detectedLanguages(scanData.languages);
+  const s = createScanSummary(scanData);
+  if (!s || !(s.codeFiles > 0)) return null;
+  const langs = detectedLanguages(s.languages);
   return (
     <div className="eval-detected-line">
-      {t('evaluate.detectedSourceFiles', { count: formatCount(scanData.code_files) })}
+      {t('evaluate.detectedSourceFiles', { count: formatCount(s.codeFiles) })}
       {langs.map(({ name, count }) => (
         <span key={name}> · {name} {formatCount(count)}</span>
       ))}
@@ -118,13 +122,7 @@ export function RunBar({ disabled, canStart, handleScan, selectedDims, estimates
   const picked = selectedDims.size;
   const isClean = cleanScan !== CLEAN_PERSIST.OFF;
   const scanFiles = estimates ? (isClean ? estimates.projectFiles : estimates.changedFiles) : null;
-  const pickedSum = estimates?.dimensions
-    ? [...selectedDims].reduce((sum, id) => {
-        const est = estimates.dimensions[id];
-        if (!est) return sum;
-        return (sum ?? 0) + (isClean ? (est.total ?? 0) : (est.count ?? 0));
-      }, null)
-    : null;
+  const pickedSum = queuedFileAnalyses(selectedDims, estimates, isClean);
 
   const budgetPart = timeLimitS > 0 ? t('evaluate.totalBudget', { label: formatBudgetLabel(timeLimitS) }) : t('evaluate.noTimeLimit');
   const line1 = runBarLine1({ picked, scanFiles, isClean, budgetPart });
@@ -198,7 +196,7 @@ export function ScopeBrowserOverlay({ open, info, scope, onClose }) {
   return (
     <FolderBrowser
       onSelect={(path) => {
-        const rel = info.path ? path.replace(info.path, '').replace(/^\//, '') : path;
+        const rel = toRepoRelativeScope(path, info.path);
         scope.setScopePath(rel || null);
         onClose();
       }}

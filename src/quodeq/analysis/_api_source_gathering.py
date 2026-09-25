@@ -44,17 +44,23 @@ CREDENTIAL_LOADERS: dict[str, Callable[[Mapping[str, str] | None], str | None]] 
 
 def gather_api_source_files(
     work_dir: Path, cfg: AnalysisConfig, jsonl_file: Path, stream_file: Path,
+    *, queue_factory: Callable[[Path], FileQueue] | None = None,
 ) -> list[Path] | None:
     """Gather source files from queue or by scanning.
 
     Returns None (and writes empty output) when the queue is exhausted.
+    *queue_factory* defaults to ``FileQueue`` (tests pass a fake).
     """
+    factory = queue_factory if queue_factory is not None else FileQueue
     if cfg.queue_path and cfg.queue_path.exists():
-        queue = FileQueue(cfg.queue_path)
+        queue = factory(cfg.queue_path)
         taken = queue.take(count=min(cfg.max_files_per_agent or 10, 3), agent_id=cfg.agent_id)
-        # Enumeration applies the same predicate, so dropped files here mean
-        # the file changed (or vanished) between queue build and dispatch.
-        dispatchable, dropped = dispatch_policy.split_api_dispatchable(work_dir, taken)
+        # Enumeration applies the same predicate (the run's own policy when a
+        # RunConfig is carried), so dropped files here mean the file changed
+        # (or vanished) between queue build and dispatch.
+        policy = (cfg.run_config.dispatch_policy() if cfg.run_config is not None
+                  else dispatch_policy.default_dispatch_policy())
+        dispatchable, dropped = policy.split_api_dispatchable(work_dir, taken)
         if dropped:
             # Lazy import keeps the baseline-pinned llm_bridge line above
             # from shifting; the marker helper is router-owned wire format.
@@ -63,7 +69,7 @@ def gather_api_source_files(
                 jsonl_file, dropped,
                 reason=(
                     f"skipped: missing or over the API file-size cap "
-                    f"({dispatch_policy.api_file_size_cap()} bytes)"
+                    f"({policy.file_size_cap} bytes)"
                 ),
             )
         source_files = [work_dir / f for f in dispatchable]

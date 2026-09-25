@@ -90,7 +90,7 @@ def project_all_runs(
     if not project_dir.is_dir():
         return
     if repo_factory is None:
-        from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+        from quodeq.services.wiring import SqliteFindingsRepository  # noqa: PLC0415
         repo_factory = SqliteFindingsRepository
 
     for run_dir in sorted(p for p in project_dir.iterdir() if p.is_dir()):

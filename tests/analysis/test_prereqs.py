@@ -209,3 +209,29 @@ class TestInstallHints:
 
         assert "@google/gemini-cli" in _CLI_INSTALL_HINTS["gemini"]
         assert "@anthropic-ai/gemini-cli" not in _CLI_INSTALL_HINTS["gemini"]
+
+
+class TestEvaluatePrereqsEnvThreading:
+    def test_evaluate_threads_the_injected_env_to_every_lookup(self, monkeypatch):
+        """Provider, binary override and key checks all read the given env."""
+        monkeypatch.setenv("AI_CMD", "codex")  # the process value must lose
+        monkeypatch.setattr(
+            "quodeq.analysis.prereqs.get_provider_configs",
+            lambda: {"claude": {"type": "cli"}, "codex": {"type": "api"}},
+        )
+        with patch("quodeq.analysis.prereqs.shutil.which", return_value=None) as which:
+            with pytest.raises(RuntimeError, match="command override"):
+                check_evaluate_prereqs(env={"AI_CMD": "claude", "AI_CMD_PATH": "/opt/bin/claude-api"})
+        which.assert_called_once_with("/opt/bin/claude-api")
+
+    def test_cli_entry_passes_the_process_env(self, monkeypatch):
+        """``quodeq evaluate`` checks prerequisites against the process env."""
+        import argparse
+
+        from quodeq import cli_evaluation
+
+        monkeypatch.setenv("AI_CMD_PATH", "/opt/bin/claude-api")
+        seen: list[object] = []
+        monkeypatch.setattr(cli_evaluation, "check_evaluate_prereqs", lambda env=None: seen.append(env))
+        cli_evaluation._check_evaluate_args(argparse.Namespace())
+        assert seen[0]["AI_CMD_PATH"] == "/opt/bin/claude-api"

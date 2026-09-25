@@ -148,3 +148,34 @@ def test_non_dict_json_returns_none() -> None:
     r.json.return_value = ["not", "a", "dict"]  # bypass the `payload or {}` default
     with patch("quodeq.update.source.httpx.get", return_value=r):
         assert fetch_latest("frozen") is None
+
+
+def test_injected_http_get_is_used_for_both_github_and_pypi() -> None:
+    """The seam: an injected *http_get* fakes BOTH requests (GitHub then the
+    wheel-channel PyPI correction), proving httpx.get is never called."""
+    requested_urls: list[str] = []
+
+    def fake_http_get(url, *a, **k):
+        requested_urls.append(url)
+        if "pypi.org" in url:
+            return _resp(payload={"info": {"version": "2.0.0"}})
+        return _resp(payload=_GH_RELEASE)
+
+    with patch("quodeq.update.source.httpx.get", side_effect=AssertionError("must not call httpx.get")):
+        info = fetch_latest("wheel", http_get=fake_http_get)
+
+    assert info is not None
+    assert info.version == "2.0.0"
+    assert requested_urls == [
+        "https://api.github.com/repos/quodeq/quodeq/releases/latest",
+        "https://pypi.org/pypi/quodeq/json",
+    ]
+
+
+def test_default_http_get_still_resolves_to_the_patched_httpx_get() -> None:
+    """Existing patch target keeps biting: no http_get injected -> falls back
+    to this module's httpx.get, resolved at call time."""
+    with patch("quodeq.update.source.httpx.get", return_value=_resp(payload=_GH_RELEASE)) as mock_get:
+        info = fetch_latest("frozen", platform="darwin")
+    assert info is not None
+    mock_get.assert_called_once()

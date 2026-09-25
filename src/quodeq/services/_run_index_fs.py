@@ -1,25 +1,27 @@
-"""Run-index housekeeping: directory removal, fallback scan, liveness, merge.
+"""Run-index housekeeping: liveness and merge, plus the fallback-scan sync.
 
 Split out of ``_evaluations_index.py``. Nothing patches
 these directly (verified: no test reaches ``EvaluationsIndex`` internals by
 name) so they move as plain free functions — no re-export required, callers
 are ``EvaluationsIndex`` methods only. ``_evaluations_index.py`` is a
 DECLARED_LOGGING_SITES entry; this sibling does not add a new logging
-import, so ``remove_run_directory`` takes an injected ``LogSink`` (the
-caller already holds the facade's own declared logger and threads it
-through).
+import.
+
+``remove_run_directory`` and ``scan_reports_root_for_run`` themselves live in
+``data/fs/run_dirs.py`` (plain filesystem operations, no run-index business
+logic); re-exported here via ``services/wiring.py`` so this module's own
+callers (``_evaluations_index.py``, ``_external_jobs.py``) don't need to
+change their import path.
 """
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
-from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types.job import JobSnapshot
+from quodeq.services.wiring import remove_run_directory, scan_reports_root_for_run  # noqa: F401
 from quodeq.services.wiring import run_index as _run_index
 from quodeq.services._run_status_readers import status_json_terminal
-from quodeq.core.utils.io import is_within
 
 
 def merge_internal_jobs(
@@ -57,55 +59,6 @@ def merge_internal_jobs(
         s for s in snapshots
         if (s.output_project, s.output_run_id) not in covered
     ] + visible_internal
-
-
-def remove_run_directory(
-    reports_dir: Path, output_project: str | None, run_uuid: str,
-    *, log: LogSink = NULL_LOG,
-) -> bool:
-    """Remove a run's on-disk directory. Returns True if removed.
-
-    Tries the known project dir first (fast path when the snapshot carries
-    ``output_project``); falls back to scanning every project dir under
-    ``reports_dir`` for a ``run_uuid`` match.
-    """
-    removed_dir = False
-    if output_project and reports_dir.is_dir():
-        candidate = reports_dir / output_project / run_uuid
-        if not is_within(candidate, reports_dir):
-            candidate = None
-        if candidate and candidate.is_dir():
-            shutil.rmtree(candidate, ignore_errors=True)
-            removed_dir = not candidate.exists()
-            if not removed_dir:
-                log.warning(f"Could not remove run directory {candidate}")
-    if not removed_dir and reports_dir.is_dir():
-        for project_dir in reports_dir.iterdir():
-            candidate = project_dir / run_uuid
-            if not is_within(candidate, reports_dir):
-                continue
-            if candidate.is_dir():
-                shutil.rmtree(candidate, ignore_errors=True)
-                removed_dir = not candidate.exists()
-                if not removed_dir:
-                    log.warning(f"Could not remove run directory {candidate}")
-                break
-    return removed_dir
-
-
-def scan_reports_root_for_run(reports_root: Path | None, run_id: str) -> Path | None:
-    """Scan *reports_root* for ``<project>/<run_id>/``, jailed to *reports_root*."""
-    if reports_root is None or not reports_root.is_dir():
-        return None
-    for project_dir in reports_root.iterdir():
-        if not project_dir.is_dir():
-            continue
-        candidate = project_dir / run_id
-        if not is_within(candidate, reports_root):
-            continue
-        if candidate.is_dir():
-            return candidate
-    return None
 
 
 def sync_external_run_by_scan(db, reports_dir: Path, run_id: str) -> None:

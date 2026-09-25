@@ -46,6 +46,9 @@ class OutcomeKind(StrEnum):
     DISCARDED = "discarded"
 
 
+ManagerFactory = Callable[[dict], WorktreeManager]
+
+
 def _manager(row: dict) -> WorktreeManager:
     return WorktreeManager(repo_root=Path(row["repo_root"]),
                            path=Path(row["path"]), branch=row["branch"])
@@ -120,14 +123,18 @@ class ApplyOutcome:
 def apply_workspace(
     repo: AssistantStore, sid: str,
     *, claim_turn: ClaimTurn, release_turn: ReleaseTurn,
+    manager_factory: ManagerFactory | None = None,
 ) -> ApplyOutcome:
     """Apply the worktree diff onto the user's repo and advance the row to
     "applied". Claims the turn slot first so a concurrent /messages turn (or
-    another apply/pr) sees "turn_busy" instead of racing the same worktree."""
+    another apply/pr) sees "turn_busy" instead of racing the same worktree.
+    *manager_factory* defaults to the module's ``_manager`` builder (tests
+    pass a fake)."""
+    build_manager = manager_factory if manager_factory is not None else _manager
     with _claimed_row(repo, sid, claim_turn, release_turn, _ACTIVE_ONLY) as claim:
         if claim.refusal is not None:
             return ApplyOutcome(*_active_refusal(claim))
-        manager = _manager(claim.row)
+        manager = build_manager(claim.row)
         try:
             stats = manager.apply_to_repo()
         except WorktreeError as exc:
@@ -163,14 +170,17 @@ class PrOutcome:
 def create_workspace_pr(
     repo: AssistantStore, sid: str, draft: PrDraft,
     *, claim_turn: ClaimTurn, release_turn: ReleaseTurn,
+    manager_factory: ManagerFactory | None = None,
 ) -> PrOutcome:
     """Commit, push, and open a PR from the worktree; advance the row to
     "pr_created" only once a PR URL actually comes back (fail-soft cases
-    leave the row "active" so the user can retry)."""
+    leave the row "active" so the user can retry). *manager_factory* defaults
+    to the module's ``_manager`` builder (tests pass a fake)."""
+    build_manager = manager_factory if manager_factory is not None else _manager
     with _claimed_row(repo, sid, claim_turn, release_turn, _ACTIVE_ONLY) as claim:
         if claim.refusal is not None:
             return PrOutcome(*_active_refusal(claim))
-        manager = _manager(claim.row)
+        manager = build_manager(claim.row)
         try:
             result = manager.create_pr(draft.title, draft.body)
         except WorktreeError as exc:
@@ -195,19 +205,22 @@ class DiscardOutcome:
 def discard_workspace(
     repo: AssistantStore, sid: str,
     *, claim_turn: ClaimTurn, release_turn: ReleaseTurn,
+    manager_factory: ManagerFactory | None = None,
 ) -> DiscardOutcome:
     """Remove the worktree/branch and advance the row to "discarded". Claims
     the turn slot like apply/pr: without this, discard raced an in-flight
     apply (overwriting "applied" with "discarded" while the changes sat in
     the user's real tree) and pulled the worktree out from under a running
-    write turn."""
+    write turn. *manager_factory* defaults to the module's ``_manager``
+    builder (tests pass a fake)."""
+    build_manager = manager_factory if manager_factory is not None else _manager
     with _claimed_row(
         repo, sid, claim_turn, release_turn, (WorktreeStatus.ACTIVE, WorktreeStatus.STALE),
     ) as claim:
         if claim.refusal is not None:
             return DiscardOutcome(claim.refusal, detail=claim.detail)
         try:
-            _manager(claim.row).remove()
+            build_manager(claim.row).remove()
         except WorktreeError as exc:
             return DiscardOutcome(OutcomeKind.FAILED, detail=str(exc))
         repo.set_worktree_status(sid, WorktreeStatus.DISCARDED)

@@ -14,6 +14,7 @@ from quodeq.data.fs.run_artifacts import (
     copy_file_if_exists,
     copy_matching_files,
     ensure_dir,
+    read_json_object,
     replace_json_file,
 )
 
@@ -60,6 +61,31 @@ class TestCopyMatchingFiles:
         assert sorted(p.name for p in dest_dir.iterdir()) == [
             "a_evidence.jsonl", "b_evidence.jsonl",
         ]
+
+
+class TestReadJsonObject:
+    def test_none_when_missing(self, tmp_path):
+        assert read_json_object(tmp_path / "missing.json") is None
+
+    def test_none_when_corrupt_json(self, tmp_path):
+        path = tmp_path / "bad.json"
+        path.write_text("{not valid json")
+        assert read_json_object(path) is None
+
+    def test_none_when_not_an_object(self, tmp_path):
+        path = tmp_path / "list.json"
+        path.write_text("[1, 2, 3]")
+        assert read_json_object(path) is None
+
+    def test_none_when_not_utf8(self, tmp_path):
+        path = tmp_path / "binary.json"
+        path.write_bytes(b"\xff\xfe\x00\x01")
+        assert read_json_object(path) is None
+
+    def test_returns_parsed_object(self, tmp_path):
+        path = tmp_path / "ok.json"
+        path.write_text('{"a": 1}')
+        assert read_json_object(path) == {"a": 1}
 
 
 class TestReplaceJsonFile:

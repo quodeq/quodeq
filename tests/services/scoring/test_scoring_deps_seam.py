@@ -86,6 +86,38 @@ def test_rescore_accumulated_uses_injected_rescorer(tmp_path):
     assert out["dimensions"][0]["overallScore"] == "8.0/10"
 
 
+def test_scored_run_dimensions_uses_injected_load_suppression_rules(tmp_path):
+    """A rule injected through deps must trigger the rescore path even with
+    no dismissals/deletions, proving the fake (not the real loader) was used."""
+    from quodeq.services.scoring import ScoringDeps, scored_run_dimensions
+    from quodeq.services.suppression_keys import SuppressionKeys
+
+    raw = _dim()
+    rescored = replace(raw, overall_score="9.9/10")
+    calls = {}
+
+    def fake_load_rules(project_dir):
+        calls["project_dir"] = project_dir
+        return ("rule-1",)
+
+    def fake_rescore(d, keys: SuppressionKeys, *, params, run_dir):
+        calls["rules"] = keys.rules
+        return rescored
+
+    deps = ScoringDeps(
+        read_run_data=lambda root, p, r: [raw],
+        dismissed_keys=lambda pd: set(),
+        deleted_keys=lambda pd: set(),
+        load_suppression_rules=fake_load_rules,
+        rescore_dimension=fake_rescore,
+    )
+    out = scored_run_dimensions(tmp_path, "proj", "run-1", deps=deps)
+
+    assert out == [rescored]
+    assert calls["project_dir"] == tmp_path / "proj"
+    assert calls["rules"] == ("rule-1",)
+
+
 def test_none_deps_defaults_to_production_behavior(tmp_path):
     """deps=None resolves every field to the module's production callable,
     so existing callers and (transitionally) namespace patches see no change."""

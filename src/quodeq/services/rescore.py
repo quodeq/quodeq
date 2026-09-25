@@ -20,7 +20,9 @@ from quodeq.core.scoring.report_grades import summarize_dimensions
 from quodeq.services import grade_formula
 from quodeq.services._rescore_legacy import group_by_principle, score_all_principles
 from quodeq.services.dismissed import recount_totals
-from quodeq.services.evidence_rescore import EvidenceScoreRequest, score_dimension_from_evidence
+from quodeq.services.evidence_rescore import (
+    EvidenceScoreRequest, score_dimension_from_evidence, standard_dirs,
+)
 from quodeq.services.suppression import FindingRef, is_deleted, is_dismissed
 from quodeq.services.suppression_keys import SuppressionKeys
 
@@ -54,6 +56,7 @@ def _rescore_from_evidence(
             dismissed=keys.dismissed, deleted=keys.deleted,
             source_file_count=dim.source_file_count or 0,
             files_read=dim.files_read or 0, params=params,
+            standard_dirs_fn=standard_dirs,
         ),
     )
     if scores is None:

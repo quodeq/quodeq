@@ -1,6 +1,7 @@
 import { TermHeader, Stat } from '../../../components/terminal/index.js';
 import { HeroPanel, ComplianceAndRatioStats, heroCardHandlers } from './heroSectionParts.jsx';
 import { formatRunId, gradeLetter, complianceRatio } from '../../../utils/formatters.js';
+import { formatScoreDisplay } from '../../../utils/gradeFormatting.js';
 import SeverityBadgeRow from './SeverityBadgeRow.jsx';
 import { t } from '../../../strings/index.js';
 
@@ -39,8 +40,7 @@ function RunStatStrip({ scoreDisplay, grade, violations, compliance, suppressed,
 
 export function RunHeroSection({ dashboard, selectedRunId, runSummary, onCardNavigate }) {
   const dateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId);
-  const scoreNum = parseFloat(runSummary.numericAverage);
-  const scoreDisplay = isNaN(scoreNum) ? '—' : scoreNum.toFixed(1);
+  const scoreDisplay = formatScoreDisplay(runSummary.numericAverage);
   const grade = runSummary.overallGrade;
   const violations = runSummary.totalViolations || 0;
   const compliance = runSummary.totalCompliance || 0;

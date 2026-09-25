@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +12,7 @@ from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import build_dashboard
 from quodeq.services.violations import ResolveOptions, aggregate_violations, resolve_dimension_eval
+from quodeq.services.wiring import read_scan_json, scan_json_exists
 
 _SCAN_FILENAME = "scan.json"
 
@@ -21,23 +21,23 @@ def _enrich_with_coverage(
     reports_dir: str, project: str, payload: dict[str, Any], *, log: LogSink = NULL_LOG,
 ) -> dict[str, Any]:
     """Add coverage fields from scan.json if available."""
-    scan_path = Path(reports_dir) / project / _SCAN_FILENAME
-    if not scan_path.exists():
+    project_dir = Path(reports_dir) / project
+    if not scan_json_exists(project_dir):
         return payload
-    try:
-        scan = json.loads(scan_path.read_text(encoding="utf-8"))
-        total = scan.get("total_files", 0)
-        payload["totalFiles"] = total
-        # Compute analyzed_files from the files_count already tracked in run data.
-        # The existing read_accumulated_summary returns files_count from manifests.
-        # Use it as the analyzed count (it counts unique source files seen across runs).
-        files_count = payload.get("filesCount") or payload.get("files_count")
-        if files_count and total:
-            payload["analyzedFiles"] = min(files_count, total)
-        else:
-            payload["analyzedFiles"] = None
-    except (json.JSONDecodeError, OSError) as exc:
-        log.debug(f"coverage enrichment skipped for {project}: {exc}")
+    scan = read_scan_json(project_dir)
+    if scan is None:
+        log.debug(f"coverage enrichment skipped for {project}: invalid scan.json")
+        return payload
+    total = scan.get("total_files", 0)
+    payload["totalFiles"] = total
+    # Compute analyzed_files from the files_count already tracked in run data.
+    # The existing read_accumulated_summary returns files_count from manifests.
+    # Use it as the analyzed count (it counts unique source files seen across runs).
+    files_count = payload.get("filesCount") or payload.get("files_count")
+    if files_count and total:
+        payload["analyzedFiles"] = min(files_count, total)
+    else:
+        payload["analyzedFiles"] = None
     return payload
 
 
@@ -59,13 +59,14 @@ def get_dimension_eval(
     dimension: str,
     *,
     compiled_dir: Path | None = None,
+    evaluators_dir: Path | None = None,
 ) -> dict[str, Any] | None:
     """Return parsed evaluation data for a single dimension in a run."""
     base = (Path(reports_dir) / project / run_id).resolve()
     if not base.is_relative_to(Path(reports_dir).resolve()):
         return None
     effective_compiled = compiled_dir or default_paths().standards_dir / "compiled"
-    effective_evaluators = default_paths().evaluators_dir
+    effective_evaluators = evaluators_dir if evaluators_dir is not None else default_paths().evaluators_dir
     result = resolve_dimension_eval(
         base, project, run_id, dimension,
         options=ResolveOptions(

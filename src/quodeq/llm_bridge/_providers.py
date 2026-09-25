@@ -99,3 +99,23 @@ def resolve_api_key(
     """
     env_name = resolve_api_key_env(provider_id, api_base)
     return _api_key(env_name, env), env_name
+
+
+def resolve_test_endpoint(
+    provider_id: str, api_base: str, api_key: str,
+) -> tuple[str, str, str]:
+    """Resolve the effective ``(api_base, api_key, api_key_env)`` for a
+    ``/api/provider/test`` call.
+
+    *api_base*/*api_key* are the request body's values (possibly empty). An
+    empty *api_base* falls back to the provider config's default; an empty
+    *api_key* is resolved from the environment. *api_key_env* is returned
+    either way, so the caller can report which variable is missing.
+    """
+    configs = get_provider_configs()
+    provider_cfg = configs.get(provider_id, {}) if provider_id else {}
+    resolved_base = api_base or provider_cfg.get("api_base", "")
+    api_key_env = ""
+    if not api_key:
+        api_key, api_key_env = resolve_api_key(provider_id, resolved_base)
+    return resolved_base, api_key, api_key_env

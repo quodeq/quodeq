@@ -202,3 +202,44 @@ class TestMakeLruDimensionFetcher:
         assert results[1] is not None
         # Only one disk read should have occurred
         assert call_count["n"] == 1
+
+
+# ---------------------------------------------------------------------------
+# _run_is_in_progress (through make_lru_dimension_fetcher's public path)
+# ---------------------------------------------------------------------------
+
+
+class TestRunIsInProgress:
+    """Pin the cache guard's "stay cautious" default across every status.json
+    shape. The guard must keep behaving exactly as it did before read_run_state
+    started normalizing/rejecting state strings: an unrecognized state string
+    is treated as in-progress (not cached), same as before that change made
+    read_run_state return None for it instead of the raw string.
+    """
+
+    @patch("quodeq.services.cache.read_run_data")
+    def test_unknown_state_string_is_in_progress_not_cached(self, mock_read, tmp_path):
+        mock_read.return_value = [_make_dim()]
+        run_dir = tmp_path / "proj" / "run1"
+        run_dir.mkdir(parents=True)
+        (run_dir / "status.json").write_text('{"state": "bogus"}')
+        ctx = _make_ctx()
+        fetcher = make_lru_dimension_fetcher(tmp_path, "proj", ctx)
+
+        result = fetcher("run1")
+
+        assert len(result) == 1
+        assert ctx.cache == {}, "an unrecognized state must stay in-progress and not be persisted"
+
+    @patch("quodeq.services.cache.read_run_data")
+    def test_missing_status_json_is_not_in_progress_and_is_cached(self, mock_read, tmp_path):
+        mock_read.return_value = [_make_dim()]
+        run_dir = tmp_path / "proj" / "run1"
+        run_dir.mkdir(parents=True)
+        ctx = _make_ctx()
+        fetcher = make_lru_dimension_fetcher(tmp_path, "proj", ctx)
+
+        result = fetcher("run1")
+
+        assert len(result) == 1
+        assert len(ctx.cache) == 1, "a missing status.json counts as terminal and its read is cached"

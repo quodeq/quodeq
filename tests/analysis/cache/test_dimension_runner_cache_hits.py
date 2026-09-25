@@ -10,7 +10,6 @@ in tests/analysis/cache/conftest.py.
 from __future__ import annotations
 
 import json
-import logging
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
@@ -19,9 +18,9 @@ from quodeq.analysis.cache import CacheEntry, build_cache_key_for_file
 from quodeq.analysis.cache._key_provenance import build_cache_key_struct
 from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
 from quodeq.analysis.cache.key import compute_key
+from tests.conftest import RecordingLog
 from tests.analysis.cache.conftest import (
     FakeDispatcher,
-    _ListHandler,
     _make_callbacks,
     _make_ctx,
     _setup,
@@ -79,20 +78,15 @@ class TestProvenanceSurfacing:
                 },
             ))
 
-        handler = _ListHandler()
-        logger = logging.getLogger("quodeq.analysis.cache._dimension_context")
-        logger.addHandler(handler)
+        log = RecordingLog()
         dispatcher = FakeDispatcher(src)
-        try:
-            process_dimension_with_cache(
-                config, "security", idx=1, ctx=_make_ctx(),
-                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
-            )
-        finally:
-            logger.removeHandler(handler)
+        process_dimension_with_cache(
+            config, "security", idx=1, ctx=_make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(log=log), cache=cache, dispatcher=dispatcher),
+        )
 
         assert dispatcher.calls == []
-        text = "\n".join(handler.messages)
+        text = "\n".join(log.info_messages)
         assert "model" in text.lower()
         assert "old-model" in text  # the model the reused findings predate
 
@@ -121,16 +115,11 @@ class TestModelSwitchReuse:
             options=replace(config_a.options, subagent_model="other-model"),
         )
         d2 = FakeDispatcher(src)
-        handler = _ListHandler()
-        logger = logging.getLogger("quodeq.analysis.cache._dimension_context")
-        logger.addHandler(handler)
-        try:
-            ev = process_dimension_with_cache(
-                config_b, "security", idx=1, ctx=_make_ctx(),
-                opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=d2),
-            )
-        finally:
-            logger.removeHandler(handler)
+        log = RecordingLog()
+        ev = process_dimension_with_cache(
+            config_b, "security", idx=1, ctx=_make_ctx(),
+            opts=CacheRunOptions(callbacks=_make_callbacks(log=log), cache=cache, dispatcher=d2),
+        )
 
         # All hits despite the model change: no re-dispatch.
         assert d2.calls == []
@@ -148,7 +137,7 @@ class TestModelSwitchReuse:
         # by run 2's classify and surfaced on the log, naming the model the
         # reused findings predate. This pins the persist -> classify ->
         # format_provenance_drift seam that the unit tests stub.
-        text = "\n".join(handler.messages)
+        text = "\n".join(log.info_messages)
         assert "model" in text.lower()
         assert "test-model" in text
 
@@ -273,21 +262,16 @@ class TestAdoptedReporting:
             files_read=1, file_path="old/a.py", dimension="security", model_id="test-model",
             file_content_hash=struct.file_content_hash,
         ))
-        handler = _ListHandler()
-        logger = logging.getLogger("quodeq.analysis.cache._dimension_context")
-        logger.addHandler(handler)
+        log = RecordingLog()
         dispatcher = FakeDispatcher(src)
-        try:
-            with patch("quodeq.analysis.cache._dimension_context.emit_marker") as marker:
-                process_dimension_with_cache(
-                    config, "security", idx=1, ctx=_make_ctx(),
-                    opts=CacheRunOptions(callbacks=_make_callbacks(), cache=cache, dispatcher=dispatcher),
-                )
-        finally:
-            logger.removeHandler(handler)
+        with patch("quodeq.analysis.cache._dimension_context.emit_marker") as marker:
+            process_dimension_with_cache(
+                config, "security", idx=1, ctx=_make_ctx(),
+                opts=CacheRunOptions(callbacks=_make_callbacks(log=log), cache=cache, dispatcher=dispatcher),
+            )
 
         assert dispatcher.calls == []  # adopted, nothing dispatched
-        line = next(m for m in handler.messages if "cache:" in m and "hits" in m)
+        line = next(m for m in log.info_messages if "cache:" in m and "hits" in m)
         assert "1 hits / 0 misses (1 total)" in line
         assert "1 adopted from moved files" in line
         stats_call = next(

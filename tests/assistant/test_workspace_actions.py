@@ -110,3 +110,55 @@ def test_release_runs_when_the_store_raises():
     with pytest.raises(RuntimeError):
         _call(wa.apply_workspace, _Broken(None), turns)
     assert turns.released == ["s1"]
+
+
+class TestManagerFactorySeam:
+    """manager_factory injection: apply/create_pr/discard must use an
+    injected factory, proving the module's WorktreeManager was never built."""
+
+    def test_apply_uses_the_injected_manager_factory(self):
+        fake = _Manager()
+        seen_rows = []
+
+        def factory(row):
+            seen_rows.append(row)
+            return fake
+
+        store, turns = _Store(_row("active")), _Turns()
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(
+                "quodeq.assistant.workspace_actions.WorktreeManager",
+                lambda **_kw: (_ for _ in ()).throw(AssertionError("must not build WorktreeManager")),
+            )
+            out = wa.apply_workspace(
+                store, "s1", claim_turn=turns.claim, release_turn=turns.release,
+                manager_factory=factory,
+            )
+
+        assert out.kind == "applied"
+        assert seen_rows == [_row("active")]
+
+    def test_discard_uses_the_injected_manager_factory(self):
+        fake = _Manager()
+        store, turns = _Store(_row("stale")), _Turns()
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(
+                "quodeq.assistant.workspace_actions.WorktreeManager",
+                lambda **_kw: (_ for _ in ()).throw(AssertionError("must not build WorktreeManager")),
+            )
+            out = wa.discard_workspace(
+                store, "s1", claim_turn=turns.claim, release_turn=turns.release,
+                manager_factory=lambda row: fake,
+            )
+
+        assert out.kind == "discarded"
+        assert fake.removed == 1
+
+    def test_default_manager_factory_still_resolves_to_the_patched_worktreemanager(self, manager):
+        """No manager_factory injected -> falls back to _manager(), which
+        still resolves the module's patched WorktreeManager at call time
+        (this is what the `manager` fixture patches)."""
+        store, turns = _Store(_row("active")), _Turns()
+        out = wa.apply_workspace(store, "s1", claim_turn=turns.claim, release_turn=turns.release)
+        assert out.kind == "applied"
+        assert manager.removed == 1

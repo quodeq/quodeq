@@ -27,6 +27,8 @@ class _MockOptions:
     time_limit: int | None = None
     max_subagents: int = 3
     deadline_at: float | None = None
+    ai_cmd_path: str | None = None
+    cache_root: Path | None = None
 
 
 @dataclass
@@ -44,6 +46,7 @@ class _MockRunConfig:
     manifest: object = None
     target: _MockTarget | None = None
     source_file_count: int = 100
+    ai_cmd: str = "claude"
     options: _MockOptions = field(default_factory=_MockOptions)
 
 

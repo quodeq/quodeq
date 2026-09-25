@@ -1,7 +1,6 @@
 """Source file listing and filtering for subagent queues."""
 from __future__ import annotations
 
-from quodeq.analysis import dispatch_policy
 from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
 
@@ -53,8 +52,9 @@ def list_source_files(
     files, extensions = resolved
 
     excluded: list[str] = []
-    if dispatch_policy.provider_is_api():
-        files, excluded = dispatch_policy.split_api_dispatchable(config.src, files)
+    policy = config.dispatch_policy()
+    if policy.provider_is_api():
+        files, excluded = policy.split_api_dispatchable(config.src, files)
         if not files:
             return [], extensions, excluded
 

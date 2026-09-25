@@ -5,7 +5,7 @@ each ``repository_info.json``; this index makes the duplicate check a
 lookup.
 
 Mirrors the import-identity index
-(``api/_import_identity.py`` + ``data/fs/project_index.py``): index-first
+(``services/project_import_identity.py`` + ``data/fs/project_index.py``): index-first
 lookup, directory-walk fallback for entries the index doesn't have yet (a
 project created before this index existed, or an index write that failed),
 and self-heal -- a fallback hit is written back into the index so the next
@@ -22,13 +22,17 @@ three-field key rather than reusing a key scheme that doesn't match it.
 """
 from __future__ import annotations
 
-import json
-import os
-import tempfile
+import os  # noqa: F401 -- monkeypatched (module-attribute -> the shared os
+# module) by tests/services/test_cluster32_empty_except_logging.py's
+# save_repo_index cleanup-failure test; the actual os.replace/os.unlink
+# calls now live in data.fs.repo_index_store.write_repo_index, but patching
+# THIS name still works since `import os` everywhere binds the same module.
 from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.services.wiring import read_repo_index as _read_repo_index_file
+from quodeq.services.wiring import write_repo_index as _write_repo_index_file
 
 _INDEX_FILENAME = ".repo_index.json"
 
@@ -57,11 +61,7 @@ class RepoIdentity:
 
 def load_repo_index(reports_root: Path) -> dict[str, str]:
     """Load the repo-identity index, returning {} on a missing/corrupt file."""
-    try:
-        data = json.loads((reports_root / _INDEX_FILENAME).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    return _read_repo_index_file(reports_root / _INDEX_FILENAME)
 
 
 def save_repo_index(reports_root: Path, index: dict[str, str], *, log: LogSink = NULL_LOG) -> None:
@@ -71,19 +71,10 @@ def save_repo_index(reports_root: Path, index: dict[str, str], *, log: LogSink =
     ``find_existing_project``'s directory-walk fallback as the (slower,
     still-correct) path until a later successful write repairs the index.
     """
-    tmp = ""
     try:
-        fd, tmp = tempfile.mkstemp(dir=reports_root, suffix=".tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(index, f, indent=2)
-        os.replace(tmp, reports_root / _INDEX_FILENAME)
+        _write_repo_index_file(reports_root / _INDEX_FILENAME, index, log=log)
     except OSError as exc:
         log.warning(f"Could not save repo-identity index: {exc}")
-        if tmp and os.path.exists(tmp):
-            try:
-                os.unlink(tmp)
-            except OSError as inner_exc:
-                log.debug(f"temp repo index file not removed after a failed save: {inner_exc}")
 
 
 def add_repo_index_entry(

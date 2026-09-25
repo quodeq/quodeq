@@ -2,15 +2,11 @@
 from __future__ import annotations
 
 import json
-from collections import deque
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from quodeq.services.jobs import JobManager
-from quodeq.services._job_log_tee import TeeContext, drain_pre_marker_buffer
 from tests.services._jobs_run_log_fixtures import _make_job
 
 
@@ -219,39 +215,3 @@ def test_consume_stream_cleans_up_on_unexpected_exception(tmp_path: Path) -> Non
     # Writer and buffer must be cleaned up regardless.
     assert "job-exc" not in jm._run_log_writers
     assert "job-exc" not in jm._pre_marker_buffer
-
-
-# ---------------------------------------------------------------------------
-# drain_pre_marker_buffer's writer.write() calls must not raise
-# ---------------------------------------------------------------------------
-
-def test_drain_pre_marker_buffer_survives_broken_pipe(tmp_path: Path) -> None:
-    """A BrokenPipeError out of writer.write() during the final drain must be
-    logged and swallowed, not raised -- mirrors the (IOError, BrokenPipeError)
-    handling in _read_and_tee_loop two functions up in this module."""
-    job_id = "job-drain"
-    run_dir = tmp_path / "proj-drain" / "run-drain"
-    run_dir.mkdir(parents=True)
-
-    store = MagicMock()
-    store.get.return_value = SimpleNamespace(output_project="proj-drain", output_run_id="run-drain")
-    log = MagicMock()
-    ctx = TeeContext(
-        store=store,
-        reports_root=tmp_path,
-        run_log_writers={},
-        pre_marker_buffer={job_id: deque(["buffered-1", "buffered-2"])},
-        log=log,
-        flush_batch=MagicMock(),
-    )
-
-    with patch("quodeq.services._job_log_tee.RunLogWriter") as MockWriter:
-        writer = MockWriter.return_value
-        writer.write.side_effect = BrokenPipeError("pipe closed")
-
-        drain_pre_marker_buffer(job_id, ctx)  # must not raise
-
-    log.warning.assert_called_once()
-    assert job_id in log.warning.call_args[0][0]
-    # Buffer is still cleared even though the write failed.
-    assert ctx.pre_marker_buffer[job_id] == deque()

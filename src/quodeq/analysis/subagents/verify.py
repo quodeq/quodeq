@@ -22,7 +22,7 @@ from quodeq.analysis.subagents._verify_io import (  # noqa: F401 — re-exports
     resolve_evidence_paths,
 )
 from quodeq.analysis.subagents._verify_io import load_previous_findings
-from quodeq.shared.logging import log_info
+from quodeq.core.observability import NULL_LOG, LogSink
 
 
 def load_previous_findings_for_dimension(
@@ -32,6 +32,7 @@ def load_previous_findings_for_dimension(
     *,
     quiet: bool = False,
     cache: dict[tuple[str, str], tuple[list[dict], int, int]] | None = None,
+    log: LogSink = NULL_LOG,
 ) -> list[dict]:
     """Load and pre-filter previous findings for a dimension.
 
@@ -50,13 +51,13 @@ def load_previous_findings_for_dimension(
         if cached is not None:
             surviving, total, gone = cached
             if not quiet and total > 0:
-                log_info(f"  [{dim_id}] {total} previous findings: {gone} files gone, {len(surviving)} surviving")
+                log.info(f"  [{dim_id}] {total} previous findings: {gone} files gone, {len(surviving)} surviving")
             return surviving
 
     prev_jsonl, _ = resolve_previous_evidence(evidence_dir, dim_id, cache, cache_key)
     if prev_jsonl is None:
         if not quiet:
-            log_info(f"  [{dim_id}] No previous evaluation — skipping verification")
+            log.info(f"  [{dim_id}] No previous evaluation — skipping verification")
         return []
 
     prev_findings = load_previous_findings(prev_jsonl)
@@ -67,7 +68,7 @@ def load_previous_findings_for_dimension(
 
     surviving, gone = pre_filter_gone(prev_findings, config.src)
     if not quiet:
-        log_info(f"  [{dim_id}] {len(prev_findings)} previous findings: {gone} files gone, {len(surviving)} surviving")
+        log.info(f"  [{dim_id}] {len(prev_findings)} previous findings: {gone} files gone, {len(surviving)} surviving")
     if cache is not None:
         cache[cache_key] = (surviving, len(prev_findings), gone)
     return surviving

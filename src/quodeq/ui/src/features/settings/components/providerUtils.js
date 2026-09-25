@@ -7,7 +7,7 @@ export { providerSupportsWebTools, WEB_TOOL_PROVIDERS } from '../../../models/pr
 
 // classifyProvider's result: how a provider is reached. Every Settings tab
 // that branches on "which kind of provider is this" (ProviderTabs,
-// ModelSection, CliProviderTab, ProviderSettings, useAssistantProvider's
+// CliProviderTab, ProviderSettings, useAssistantProvider's
 // picker) reads this back.
 export const PROVIDER_CLASSIFICATION = Object.freeze({
   CLI: 'cli', LOCAL_API: 'local-api', CLOUD_API: 'cloud-api',

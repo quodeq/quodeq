@@ -112,9 +112,11 @@ class TestBuildRouterContextCorpus:
 
         sentinel = object()
         calls = []
+        # The caller resolves the precedent settings from the process env.
+        monkeypatch.setenv("QUODEQ_PRECEDENT_SIMILARITY", "0.9")
 
-        def fake_load_precedent_corpus(project_dir, run_dir):
-            calls.append((project_dir, run_dir))
+        def fake_load_precedent_corpus(project_dir, run_dir, *, settings):
+            calls.append((project_dir, run_dir, settings.similarity_threshold))
             return sentinel
 
         monkeypatch.setattr(
@@ -124,7 +126,7 @@ class TestBuildRouterContextCorpus:
         run_dir = tmp_path / "run-1"
         ctx = _build_router_context(tmp_path, "security", None, tmp_path, run_dir)
 
-        assert calls == [(tmp_path, run_dir)]
+        assert calls == [(tmp_path, run_dir, 0.9)]
         assert ctx.precedent_corpus is sentinel
 
 

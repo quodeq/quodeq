@@ -4,7 +4,6 @@ dismiss/verify drafts.
 """
 from __future__ import annotations
 
-import json
 import logging
 import threading
 import time
@@ -14,10 +13,12 @@ from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._read_tools_common import default_findings_repo_factory, requirement_of
 from quodeq.assistant.tools.registry import ToolError
 from quodeq.data.ports.findings import FindingsRepository
+from quodeq.data.sqlite.connection import EVALUATION_DB_FILENAME
 from quodeq.services import fs_reports
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.scoring import rescore_accumulated, scored_run_dimensions
+from quodeq.services.wiring import iter_eval_reports
 from quodeq.shared.lru import LRUDict
 from quodeq.shared.serialization import coerce_line, to_camel_dict
 
@@ -107,19 +108,18 @@ def _eval_json_finding_keys(ctx: ToolContext, add) -> bool:
     eval_dir = ctx.run_dir / "evaluation"
     if not eval_dir.is_dir():
         return True
-    complete = True
-    # Parse each dimension file INDEPENDENTLY: one corrupt/truncated file
-    # (a known failure mode of deadline-cut runs) must drop only its own
-    # findings, not discard every healthy dimension's keys.
-    for p in sorted(eval_dir.glob("*.json")):
-        try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            complete = False
-            continue
+    # skip_corrupt=True: parse each dimension file INDEPENDENTLY, so one
+    # corrupt/truncated file (a known failure mode of deadline-cut runs)
+    # drops only its own findings, not every healthy dimension's keys. The
+    # helper skips silently, so a report count short of the file count is
+    # how a skipped file shows up here.
+    expected = len(list(eval_dir.glob("*.json")))
+    parsed = 0
+    for _dimension, data in iter_eval_reports(eval_dir, skip_corrupt=True):
+        parsed += 1
         for v in (data.get("violations") or []):
             add(v)
-    return complete
+    return parsed == expected
 
 
 def _sql_finding_keys(ctx: ToolContext, keys: set[tuple]) -> bool:
@@ -127,7 +127,7 @@ def _sql_finding_keys(ctx: ToolContext, keys: set[tuple]) -> bool:
     only an EXISTING db so a read-only draft never creates evaluation.db or
     kicks a projection on a run that has none -- when there is no db there
     are no SQL findings to miss anyway. False when the db was unreadable."""
-    if not (ctx.run_dir / "evaluation.db").is_file():
+    if not (ctx.run_dir / EVALUATION_DB_FILENAME).is_file():
         return True
     try:
         for req, file, line in findings_repo(ctx, ctx.run_dir).list_keys():

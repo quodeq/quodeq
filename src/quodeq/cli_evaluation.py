@@ -195,7 +195,7 @@ def _check_evaluate_args(args: argparse.Namespace) -> int | None:
 
     if not getattr(args, "dry_run", False):
         try:
-            check_evaluate_prereqs()
+            check_evaluate_prereqs(env=cli_environ())
         except RuntimeError as exc:
             log_error(f"Error: {exc}")
             return 1

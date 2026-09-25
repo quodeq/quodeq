@@ -23,6 +23,7 @@ from quodeq.analysis.subagents._pool_scaling import (
     should_respawn,
 )
 from quodeq.analysis.subagents.file_queue import WorkQueue
+from quodeq.config.analysis_env import AGENT_FAILURE_STREAK_DEFAULT
 from quodeq.shared import cancellation
 
 _SCOUT_BUDGET_FRACTION = 0.5
@@ -46,6 +47,8 @@ class LoopContext:
     submit_fn: Callable[[], None]
     deadline_at: float | None = None
     run_deadline_at: float | None = None
+    # The run's consecutive-dead-agent backstop (see check_agent_failure_streak).
+    agent_failure_streak_limit: int = AGENT_FAILURE_STREAK_DEFAULT
     # Injectable cancellation check; the default binds the process-wide
     # signal here (the composition seam) so the loops never touch the
     # singleton themselves and tests can pass an isolated callable.
@@ -82,7 +85,7 @@ def scout_loop(ctx: LoopContext) -> None:
     while ctx.futures:
         done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
         if done:
-            check_agent_failure_streak(ctx.results)
+            check_agent_failure_streak(ctx.results, ctx.agent_failure_streak_limit)
         scale_ctx = ScaleUpContext(
             ctx.queue, ctx.queue_path, ctx.submit_fn,
             deadline_at=ctx.deadline_at, run_deadline_at=ctx.run_deadline_at,
@@ -116,7 +119,7 @@ def immediate_loop(ctx: LoopContext) -> None:
         # the per-agent max_duration clamp set in build_agent_config().
         done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
         if done:
-            check_agent_failure_streak(ctx.results)
+            check_agent_failure_streak(ctx.results, ctx.agent_failure_streak_limit)
         if not done:
             time.sleep(FUTURE_POLL_INTERVAL_S)
             continue
