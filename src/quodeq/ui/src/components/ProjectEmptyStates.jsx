@@ -3,7 +3,7 @@ import { t } from '../strings/index.js';
 import { NAV_TAB } from '../vocab/navTab.js';
 
 /**
- * Project-level empty states the overview and history pages both show.
+ * Project-level empty states the overview, history and violations pages show.
  * Each page keeps its own branch order and frame; only the content is shared.
  */
 
@@ -25,6 +25,19 @@ export function LoadProjectFailedEmptyState({ error, onRetry }) {
       description={error}
       actionLabel={t('overview.retry')}
       onAction={() => onRetry?.()}
+    />
+  );
+}
+
+/**
+ * A shared project with no completed evaluation. Shared projects are read-only
+ * in the app (evaluations only run locally), so there is no call to action.
+ */
+export function SharedNoCompletedEvalEmptyState() {
+  return (
+    <EmptyState
+      title={t('overview.noCompletedEvalTitle')}
+      description={t('overview.noCompletedEvalSharedDesc')}
     />
   );
 }

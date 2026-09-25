@@ -63,10 +63,10 @@ function DuelTrendLine({ series, variant, x, y }) {
 
 /* The 30-day delta window, shaded so the numbers in the versus header
    visibly correspond to this slice of the chart. */
-function DuelTrendWindow({ t0, t1, span }) {
+function DuelTrendWindow({ t0, t1, span, xAt }) {
   if (span <= 0) return null;
   const windowStart = Math.max(t0, t1 - DELTA_WINDOW_DAYS * MS_PER_DAY);
-  const xw = PAD.left + ((windowStart - t0) / span) * (W - PAD.left - PAD.right);
+  const xw = xAt(windowStart);
   return (
     <rect
       className="compare-duel-trend__window"
@@ -126,9 +126,11 @@ export default function CompareDuelTrend({ a, b, aName, bName }) {
   // loosely equal to null.
   if (!Number.isFinite(t0) || !Number.isFinite(t1)) return null;
   const span = t1 - t0;
-  const x = (iso) => (span
-    ? PAD.left + ((new Date(iso).getTime() - t0) / span) * (W - PAD.left - PAD.right)
+  // Time (ms) to x; a single-instant domain centres its points.
+  const xAt = (ms) => (span
+    ? PAD.left + ((ms - t0) / span) * (W - PAD.left - PAD.right)
     : W / 2);
+  const x = (iso) => xAt(new Date(iso).getTime());
   const y = (v) => PAD.top + (1 - (v - v0) / (v1 - v0)) * (H - PAD.top - PAD.bottom);
 
   const ticks = [];
@@ -146,7 +148,7 @@ export default function CompareDuelTrend({ a, b, aName, bName }) {
           aria-label={t('compare.trendChartAria', { a: aName, b: bName })}
           className="compare-duel-trend__svg"
         >
-          <DuelTrendWindow t0={t0} t1={t1} span={span} />
+          <DuelTrendWindow t0={t0} t1={t1} span={span} xAt={xAt} />
           <DuelTrendGrid ticks={ticks} y={y} />
           <DuelTrendLine key="b" series={b} variant="b" x={x} y={y} />
           <DuelTrendLine key="a" series={a} variant="a" x={x} y={y} />

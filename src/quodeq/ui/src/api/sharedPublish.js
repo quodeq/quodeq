@@ -5,6 +5,7 @@
 
 import { request, BASE } from './request.js';
 import { FETCH_ERROR_NAME } from '../constants.js';
+import { projectPath, sharedProjectPath } from './paths.js';
 
 // Generous: a pull imports a zip stream from the shared repository, but a
 // stalled connection must not leave the pull pending forever.
@@ -16,7 +17,7 @@ const PULL_TIMEOUT_MS = 600000; // 10 min
  * @returns {Promise<{started: boolean}>}
  */
 export function publishProject(projectId) {
-  return request(`/projects/${encodeURIComponent(projectId)}/publish`, {
+  return request(`${projectPath(projectId)}/publish`, {
     method: 'POST',
   });
 }
@@ -40,7 +41,7 @@ export async function pullSharedProject(projectId, action) {
   const body = action ? { action } : {};
   let res;
   try {
-    res = await fetch(`${BASE}/shared/projects/${encodeURIComponent(projectId)}/pull`, {
+    res = await fetch(`${BASE}${sharedProjectPath(projectId)}/pull`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

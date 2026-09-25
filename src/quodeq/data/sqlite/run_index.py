@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 import time as _time
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -57,17 +57,32 @@ class RunRow:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+def _visible_subdirs(directory: Path) -> Iterator[Path]:
+    """Yield the subdirectories of *directory* whose names do not start with a dot."""
+    for child in directory.iterdir():
+        if child.is_dir() and not child.name.startswith("."):
+            yield child
+
+
 def _walk_run_dirs(evaluations_root: Path):
     """Yield (project_uuid, run_id, run_dir) for every run on disk."""
     if not evaluations_root.is_dir():
         return
-    for project_dir in evaluations_root.iterdir():
-        if not project_dir.is_dir() or project_dir.name.startswith("."):
-            continue
-        for run_dir in project_dir.iterdir():
-            if not run_dir.is_dir() or run_dir.name.startswith("."):
-                continue
+    for project_dir in _visible_subdirs(evaluations_root):
+        for run_dir in _visible_subdirs(project_dir):
             yield project_dir.name, run_dir.name, run_dir
+
+
+def _upsert_if_changed(
+    db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
+    cached_mtime: int | None,
+) -> None:
+    """Upsert the run's row from ``status.json`` unless *cached_mtime* still matches it.
+
+    Raises whatever ``upsert_from_status`` raises; each caller owns its policy.
+    """
+    if cached_mtime is None or cached_mtime != status_mtime_ns(run_dir):
+        upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
 
 
 def _sync_status_backed_run(
@@ -75,7 +90,6 @@ def _sync_status_backed_run(
     cached_mtimes: dict[str, int | None] | None = None,
 ) -> None:
     """Sync a run that has a ``status.json`` (the common, non-legacy case)."""
-    disk_mtime = status_mtime_ns(run_dir)
     job_id = external_job_id(run_id)
     if cached_mtimes is not None:
         cached_value = cached_mtimes.get(job_id)
@@ -84,12 +98,11 @@ def _sync_status_backed_run(
             "SELECT status_mtime FROM runs WHERE job_id = ?", (job_id,),
         ).fetchone()
         cached_value = row[0] if row is not None else None
-    if cached_value is None or cached_value != disk_mtime:
-        try:
-            upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
-        except Exception as exc:  # noqa: BLE001 - one malformed status.json must not stop syncing the rest
-            _logger.warning("skipping run %s: %s", run_dir, exc, exc_info=True)
-            return
+    try:
+        _upsert_if_changed(db, run_dir, project_uuid=project_uuid, run_id=run_id, cached_mtime=cached_value)
+    except Exception as exc:  # noqa: BLE001 - one malformed status.json must not stop syncing the rest
+        _logger.warning("skipping run %s: %s", run_dir, exc, exc_info=True)
+        return
     # Always check staleness, even on mtime-unchanged runs.
     try:
         check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
@@ -167,19 +180,16 @@ def sync_project_dates(db: sqlite3.Connection, project_dir: Path, project_uuid: 
                 (project_uuid,),
             )
         }
-        for run_dir in project_dir.iterdir():
-            if not run_dir.is_dir() or run_dir.name.startswith("."):
-                continue
+        for run_dir in _visible_subdirs(project_dir):
             if not (run_dir / "status.json").exists():
                 continue
-            disk_mtime = status_mtime_ns(run_dir)
-            cached = cached_mtimes.get(run_dir.name)
-            if cached is None or cached != disk_mtime:
-                try:
-                    upsert_from_status(
-                        db, run_dir, project_uuid=project_uuid, run_id=run_dir.name)
-                except Exception:  # noqa: BLE001 - one run's date-sync failure must not stop syncing the rest
-                    _logger.warning("date-sync upsert failed for %s", run_dir, exc_info=True)
+            try:
+                _upsert_if_changed(
+                    db, run_dir, project_uuid=project_uuid, run_id=run_dir.name,
+                    cached_mtime=cached_mtimes.get(run_dir.name),
+                )
+            except Exception:  # noqa: BLE001 - one run's date-sync failure must not stop syncing the rest
+                _logger.warning("date-sync upsert failed for %s", run_dir, exc_info=True)
 
 
 # ---------------------------------------------------------------------------

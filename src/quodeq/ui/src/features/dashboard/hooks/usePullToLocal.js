@@ -12,15 +12,20 @@ export function usePullToLocal({ shared, onProjectsReload }) {
   const [pullConflictId, setPullConflictId] = useState(null);
   const [pulledIds, setPulledIds] = useState(() => new Set());
 
+  // Record the pull and reload the local list. Without the reload, a project
+  // pulled here never appears in the merged list until some unrelated action
+  // happens to reload the project list -- the user has no way to tell the
+  // pull actually landed a local copy.
+  async function markPulled(id) {
+    setPulledIds((prev) => new Set(prev).add(id));
+    await onProjectsReload?.();
+  }
+
   async function handlePull(id) {
     try {
       await shared.pull(id);
       setPullConflictId(null);
-      setPulledIds((prev) => new Set(prev).add(id));
-      // Without this, a project pulled here never appears in the merged list
-      // until some unrelated action happens to reload the project list --
-      // the user has no way to tell the pull actually landed a local copy.
-      await onProjectsReload?.();
+      await markPulled(id);
     } catch (err) {
       if (err?.status === HTTP_STATUS.CONFLICT) {
         setPullConflictId(id);
@@ -33,8 +38,7 @@ export function usePullToLocal({ shared, onProjectsReload }) {
   async function handleConfirmCopy(id) {
     try {
       await shared.pull(id, 'copy');
-      setPulledIds((prev) => new Set(prev).add(id));
-      await onProjectsReload?.();
+      await markPulled(id);
     } catch (err) {
       showToast(apiErrorMessage(err, 'projects.pullFailed'));
     } finally {

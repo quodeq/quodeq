@@ -17,6 +17,7 @@ import httpx
 
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.shared.url_validation import validate_url_safe
+from quodeq.core.utils.numbers import clamp
 
 _SEARCH_URL = "https://html.duckduckgo.com/html/"
 _USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -97,7 +98,7 @@ def _search_web(query: str, max_results: int = _DEFAULT_SEARCH_RESULTS) -> dict:
         max_results = int(max_results)
     except (TypeError, ValueError) as exc:
         raise ToolError("max_results must be a number") from exc
-    max_results = max(1, min(max_results, _MAX_RESULTS))
+    max_results = clamp(max_results, 1, _MAX_RESULTS)
     try:
         resp = httpx.get(_SEARCH_URL, params={"q": query},
                          headers={"User-Agent": _USER_AGENT}, timeout=_TIMEOUT)

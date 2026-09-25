@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+from flask import Flask
 
 from quodeq.shared.utils import get_evaluations_dir
 
@@ -24,3 +27,8 @@ def reports_dir() -> str:
     identifier, never by a caller-supplied path.
     """
     return os.path.realpath(get_evaluations_dir())
+
+
+def standards_compiled_dir(app: Flask) -> Path:
+    """The compiled-standards directory ``create_app`` configured on *app*."""
+    return Path(app.config["STANDARDS_COMPILED_DIR"])

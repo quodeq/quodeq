@@ -10,13 +10,8 @@ export {
   buildGroupPlanText,
   buildSingleViolationPlanText,
 } from './planBuilder.js';
-import { KNOWN_SEVERITIES } from './constants.js';
 import { FULL_CONFIDENCE } from '../models/runRules.js';
-
-function normalizeSeverity(value) {
-  const normalized = String(value || 'unknown').toLowerCase();
-  return KNOWN_SEVERITIES.includes(normalized) ? normalized : 'unknown';
-}
+import { emptySeverityLists, normalizeSeverity, severityListCounts } from './severity.js';
 
 /**
  * Whether an entry survives the principle and file-substring filters. An
@@ -67,17 +62,12 @@ function aggregateViolationEntry(bucket, dimension, entry) {
   const current = bucket.get(file) || {
     file,
     total: 0,
-    critical: 0,
-    major: 0,
-    minor: 0,
-    unknown: 0,
     dimensions: new Set(),
     principles: new Set(),
-    violationsBySeverity: { critical: [], major: [], minor: [], unknown: [] },
+    violationsBySeverity: emptySeverityLists(),
   };
 
   current.total += 1;
-  current[severity] += 1;
   current.violationsBySeverity[severity].push({
     dimension: dimension.dimension || '',
     principle: entry.principle || '',
@@ -122,10 +112,7 @@ export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = DE
     .map((item) => ({
       file: item.file,
       total: item.total,
-      critical: item.critical,
-      major: item.major,
-      minor: item.minor,
-      unknown: item.unknown,
+      ...severityListCounts(item.violationsBySeverity),
       dimensions: Array.from(item.dimensions).sort((a, b) => a.localeCompare(b)),
       dimensionsCount: item.dimensions.size,
       principlesCount: item.principles.size,
@@ -171,7 +158,7 @@ function collectRootCompliance(dim, acc) {
  */
 export function buildProjectRootFile(dimensions = [], projectName = 'project') {
   const acc = {
-    violationsBySeverity: { critical: [], major: [], minor: [], unknown: [] },
+    violationsBySeverity: emptySeverityLists(),
     compliance: [],
     dims: new Set(),
     principles: new Set(),
@@ -187,10 +174,7 @@ export function buildProjectRootFile(dimensions = [], projectName = 'project') {
   return {
     file: projectName || 'project',
     total: acc.total,
-    critical: violationsBySeverity.critical.length,
-    major: violationsBySeverity.major.length,
-    minor: violationsBySeverity.minor.length,
-    unknown: violationsBySeverity.unknown.length,
+    ...severityListCounts(violationsBySeverity),
     dimensions: Array.from(dims).sort((a, b) => a.localeCompare(b)),
     dimensionsCount: dims.size,
     principlesCount: principles.size,

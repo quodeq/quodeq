@@ -6,15 +6,14 @@ traversal, absolute paths, symlinks, special files, oversize entries, and
 zip-bomb compression ratios before a single byte is extracted (see
 _import_validation.py and _import_extract.py for the checks themselves).
 
-Split into four collaborator modules plus this orchestrator:
+This orchestrator works with four collaborator modules:
   - services/project_import_identity.py: identity-collision detection and
-    index updates (moved out of api/; api/_import_identity.py re-exports it
-    for tests/api/test_import_identity.py's existing import path).
+    index updates.
   - _import_extract.py: ``safe_extract``, the hardened extraction step.
   - _import_upload.py: ``open_upload``, the bounded view of the uploaded archive.
   - _import_validation.py: archive/member/manifest/repo-info validation.
-This module re-exports every moved name so existing imports and patches
-(tests/api/test_project_import.py) keep working unchanged.
+This module re-exports their names for the imports and patches in
+tests/api/test_project_import.py.
 """
 from __future__ import annotations
 
@@ -29,8 +28,8 @@ from typing import Any
 
 from flask import Response, jsonify, request
 
-from quodeq.api._constants import CODE_INVALID_ACTION
-from quodeq.api.helpers import error_response
+from quodeq.api._constants import CODE_INVALID_ACTION, CODE_PROJECT_EXISTS
+from quodeq.api.helpers import error_response, json_error
 from quodeq.api.zip import (
     EXTRACT_HEADROOM,
     MANIFEST_FILENAME,
@@ -73,9 +72,20 @@ _IO_ERROR_MESSAGE = "Failed to write imported project. Check disk space and perm
 _LOG = LoggerSink(logger)
 
 
+_KIND_SAME_UUID = "same_uuid"  # the archive's project UUID is already on disk
+_KIND_SAME_IDENTITY = "same_identity"  # another project has the same repo identity
+
+
 def _error_outcome(message: str, status: int, code: str) -> ImportOutcome:
     body, http_status = error_response(message, status, code)
     return ImportOutcome(http_status, body)
+
+
+def _project_exists(message: str, kind: str, existing_id: str, identity: ProjectIdentity) -> ImportOutcome:
+    """The 409 that asks the client to choose copy or replace for a collision."""
+    outcome = _error_outcome(message, HTTPStatus.CONFLICT, CODE_PROJECT_EXISTS)
+    outcome.body.update(kind=kind, existingProjectId=existing_id, projectName=identity.project_name)
+    return outcome
 
 
 def import_project(reports_dir: str) -> Response | tuple[Response, int]:
@@ -94,8 +104,7 @@ def import_project(reports_dir: str) -> Response | tuple[Response, int]:
     """
     upload = request.files.get("file")
     if upload is None or not upload.filename:
-        body, status = error_response("file is required", HTTPStatus.BAD_REQUEST, "MISSING_FILE")
-        return jsonify(body), status
+        return json_error("file is required", HTTPStatus.BAD_REQUEST, "MISSING_FILE")
 
     action = (request.form.get("action") or "").strip().lower() or None
     try:
@@ -127,13 +136,7 @@ def _resolve_import_conflict(
             return top_dir, True
         if action == _ACTION_COPY:
             return str(_uuid.uuid4()), False
-        return ImportOutcome(HTTPStatus.CONFLICT, {
-            "error": "Project already exists",
-            "code": "PROJECT_EXISTS",
-            "kind": "same_uuid",
-            "existingProjectId": top_dir,
-            "projectName": identity.project_name,
-        })
+        return _project_exists("Project already exists", _KIND_SAME_UUID, top_dir, identity)
     if same_identity_uuid is not None:
         if action == _ACTION_COPY:
             # No UUID collision, so the incoming UUID is fine — both
@@ -147,13 +150,9 @@ def _resolve_import_conflict(
                 "Use 'copy' to import as a separate project.",
                 HTTPStatus.CONFLICT, "AMBIGUOUS_REPLACE",
             )
-        return ImportOutcome(HTTPStatus.CONFLICT, {
-            "error": "A project for this repository already exists",
-            "code": "PROJECT_EXISTS",
-            "kind": "same_identity",
-            "existingProjectId": same_identity_uuid,
-            "projectName": identity.project_name,
-        })
+        return _project_exists(
+            "A project for this repository already exists", _KIND_SAME_IDENTITY, same_identity_uuid, identity,
+        )
     return top_dir, False
 
 

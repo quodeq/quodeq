@@ -5,10 +5,8 @@ import { t } from '../../../strings/index.js';
 import { NAV_TAB } from '../../../vocab/navTab.js';
 
 /**
- * HistoryPage.jsx's empty-state content pieces, extracted verbatim. The
- * conditional dispatch (which branch applies, in what order) stays in
- * HistoryPage.jsx itself -- only the per-branch content moved, matching the
- * DashboardPageEmptyStates.jsx precedent.
+ * HistoryPage.jsx's empty-state content pieces. The conditional dispatch
+ * (which branch applies, in what order) lives in HistoryPage.jsx.
  */
 export function HistoryEmptyShell({ sub, children, refreshing }) {
   return (
@@ -32,13 +30,4 @@ export function NoProjectSelectedEmptyContent({ onNavigate }) {
 
 export function LoadingEmptyContent() {
   return <HistorySkeleton />;
-}
-
-export function SharedNoEvalsEmptyContent() {
-  return (
-    <EmptyState
-      title={t('overview.noCompletedEvalTitle')}
-      description={t('overview.noCompletedEvalSharedDesc')}
-    />
-  );
 }

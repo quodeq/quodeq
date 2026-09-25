@@ -7,13 +7,15 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, QUERY_FLAG_TRUE
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, MESSAGE_INVALID_PROJECT_NAME, QUERY_FLAG_TRUE
 from quodeq.api.helpers import (
     error_response,
     json_error,
-    optional_json_object_or_error,
+    jsonify_error,
+    optional_json_object_or_response,
     page_params,
     path_from_body,
+    validate_segment,
 )
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.api.import_project import import_project as _import_project
@@ -25,7 +27,7 @@ from quodeq.services.warmup import WarmupEngine, engine as warmup_engine
 from quodeq.services.wiring import is_valid_repo_url
 from quodeq.services.base import ActionProvider
 from quodeq.shared.utils import is_repo_url
-from quodeq.shared.validation import validate_canonical_absolute, validate_path_segment
+from quodeq.shared.validation import validate_canonical_absolute
 
 _logger = logging.getLogger(__name__)
 
@@ -97,19 +99,17 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     not registered, so NOT_FOUND is reserved for that case.
     """
     project = request.view_args["project"]
-    data = optional_json_object_or_error(CODE_INVALID_INPUT)
+    data = optional_json_object_or_response(CODE_INVALID_INPUT)
     if not isinstance(data, dict):
-        return jsonify(data[0]), data[1]
+        return data
     raw_path = path_from_body(data)
     if isinstance(raw_path, tuple):
-        body, status = raw_path
-        return jsonify(body), status
+        return jsonify_error(raw_path)
     if not raw_path:
         return json_error("Path is required", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     new_path = _validated_target_path(raw_path)
     if isinstance(new_path, tuple):
-        body, status = new_path
-        return jsonify(body), status
+        return jsonify_error(new_path)
 
     _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.update_project_path(reports_dir(), project, new_path)
@@ -120,12 +120,7 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
 
 def _invalid_project_name(project: str) -> tuple[Response, int] | None:
     """The 400 every per-project route returns for a malformed name, else None."""
-    try:
-        validate_path_segment(project)
-    except ValueError:
-        body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
-        return jsonify(body), status
-    return None
+    return validate_segment(project, message=MESSAGE_INVALID_PROJECT_NAME)
 
 
 def _list_projects(
@@ -166,8 +161,7 @@ def _project_info(provider: ActionProvider, project: str) -> Response | tuple[Re
         return invalid
     info = provider.get_project_info(reports_dir(), project)
     if not info:
-        body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-        return jsonify(body), status
+        return json_error("Project info not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify(info)
 
 

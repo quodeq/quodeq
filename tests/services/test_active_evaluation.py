@@ -1,8 +1,6 @@
 """Unit tests for services.active_evaluation.find_active_evaluation.
 
-The staleness rule moved here verbatim from
-dashboard/_webview_window.WindowApi._get_running_evaluation, so these tests
-pin exactly the behavior that function used to implement: a "running" job
+These tests pin the staleness rule: a "running" job
 whose outputProject is missing from the project list is stale and skipped,
 jobs without an outputProject stay valid, and a failing project lookup falls
 back to the first running job.
@@ -99,7 +97,7 @@ def test_projects_failure_logs_before_falling_back(recording_log):
 
 def test_dict_jobs_and_dict_projects_are_supported():
     # Remote/stub providers hand back wire dicts; the rule reads the same
-    # keys the webview used to read ("project" as the legacy fallback).
+    # keys the webview reads ("project" as the legacy fallback).
     provider = StubProvider(
         [{"jobId": "j1", "status": "running", "project": "proj-1"}],
         projects=[{"id": "proj-1", "name": "Proj"}],
@@ -111,4 +109,20 @@ def test_dict_jobs_and_dict_projects_are_supported():
 @pytest.mark.parametrize("items", [None, {}, "nonsense"])
 def test_non_list_evaluations_payload_yields_none(items):
     provider = StubProvider(items)
+    assert find_active_evaluation(provider, _REPORTS) is None
+
+
+def test_dict_output_project_wins_over_the_legacy_project_key():
+    provider = StubProvider(
+        [{"jobId": "j1", "status": "running", "outputProject": "gone", "project": "proj-1"}],
+        projects=[{"id": "proj-1", "name": "Proj"}],
+    )
+    assert find_active_evaluation(provider, _REPORTS) is None
+
+
+def test_dict_job_with_an_empty_output_project_falls_back_to_project():
+    provider = StubProvider(
+        [{"jobId": "j1", "status": "running", "outputProject": "", "project": "gone"}],
+        projects=[{"id": "proj-1", "name": "Proj"}],
+    )
     assert find_active_evaluation(provider, _REPORTS) is None

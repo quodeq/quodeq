@@ -1,10 +1,9 @@
 """Environment-based configuration accessors -- semantic precedent embeddings."""
 from __future__ import annotations
 
-import os
-
 from quodeq.shared._env_db import SQLITE_DISABLE_TRUTHY
 from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL
+from quodeq.shared.env_resolve import resolve_env
 
 _DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
 _DEFAULT_EMBEDDING_BASE_URL = OLLAMA_DEFAULT_BASE_URL
@@ -17,7 +16,7 @@ def get_embedding_model(env: dict[str, str] | None = None) -> str:
     Independent of the chat provider: CLI providers have no HTTP endpoint and
     llama.cpp serves one model per process, so embeddings get their own model.
     """
-    return (env if env is not None else os.environ).get(
+    return resolve_env(env).get(
         "QUODEQ_EMBEDDING_MODEL", _DEFAULT_EMBEDDING_MODEL
     )
 
@@ -27,7 +26,7 @@ def get_embedding_base_url(env: dict[str, str] | None = None) -> str:
 
     Resolution: QUODEQ_EMBEDDING_BASE_URL, then OLLAMA_BASE_URL, then localhost.
     """
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     return (
         environ.get("QUODEQ_EMBEDDING_BASE_URL")
         or environ.get("OLLAMA_BASE_URL")
@@ -37,7 +36,7 @@ def get_embedding_base_url(env: dict[str, str] | None = None) -> str:
 
 def semantic_precedents_enabled(env: dict[str, str] | None = None) -> bool:
     """True when QUODEQ_SEMANTIC_PRECEDENTS is truthy. Default OFF in v1."""
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     raw = environ.get("QUODEQ_SEMANTIC_PRECEDENTS", "")
     return raw.strip().lower() in SQLITE_DISABLE_TRUTHY
 
@@ -48,7 +47,7 @@ def get_precedent_similarity_threshold(env: dict[str, str] | None = None) -> flo
     Default 0.85 is a placeholder until Phase B golden-set calibration.
     Out-of-range or unparsable values fall back to the default.
     """
-    raw = (env if env is not None else os.environ).get("QUODEQ_PRECEDENT_SIMILARITY", "")
+    raw = resolve_env(env).get("QUODEQ_PRECEDENT_SIMILARITY", "")
     try:
         val = float(raw)
     except ValueError:

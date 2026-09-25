@@ -10,7 +10,7 @@ import {
   periodOrDateLabel,
   tooltipScore,
 } from '../../../components/scoreChartPanel.jsx';
-import { PANEL_CHART_HEIGHT_PX } from '../../../components/scoreChartHelpers.js';
+import { PANEL_CHART_HEIGHT_PX, runChartInteraction } from '../../../components/scoreChartHelpers.js';
 
 const MAX_CHART_RUNS = 20;
 const MAX_BAR_SIZE = 28;
@@ -112,12 +112,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBa
         <ScoreChartWithKeyboard
           data={data}
           chart={CHART_PRESENTATION}
-          interaction={{
-            hoveredIndex,
-            setHoveredIndex,
-            selectedRunId,
-            onActivate: onBarClick ? (point) => onBarClick(point.runId) : undefined,
-          }}
+          interaction={runChartInteraction({ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick })}
           kbdLabel={t('dashboard.runHistoryKbdLabel')}
           kbdItems={buildRunKbdItems(data, onBarClick)}
         />

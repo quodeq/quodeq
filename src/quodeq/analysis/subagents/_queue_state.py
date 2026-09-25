@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from quodeq.analysis.subagents._file_lock import lock_file, unlock_file
+from quodeq.shared.json_state import dump_json_to_fd
 
 
 QUEUE_VERSION = 1
@@ -75,10 +76,7 @@ def write_state(state: dict, path: Path) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=str(parent), suffix=".tmp", prefix=".queue_")
     cleanup_tmp: str | None = tmp_path
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(state, f)
-            f.flush()
-            os.fsync(f.fileno())
+        dump_json_to_fd(fd, state, fsync=True)
         # os.replace is atomic and overwrites on all platforms;
         # os.rename raises FileExistsError on Windows when the destination exists.
         os.replace(tmp_path, str(path))

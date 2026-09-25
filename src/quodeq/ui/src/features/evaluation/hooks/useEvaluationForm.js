@@ -1,16 +1,12 @@
 /**
  * useEvaluationForm — form state + submit for the large (non-terminal)
  * EvaluationForm.
- *
- * Split out of EvaluationForm.jsx verbatim.
  */
 import { useState, useEffect } from 'react';
 import { usePluginDimensions } from './usePluginDimensions.js';
-import { t } from '../../../strings/index.js';
+import { useDimensionSet } from './useDimensionSet.js';
 import { buildEvaluationPayload } from '../components/evaluationFormHelpers.js';
 import { CLEAN_PERSIST } from '../components/scanModes.js';
-
-const NO_STANDARDS_MESSAGE = t('evaluate.noStandardsMessage');
 
 function buildAndSubmit(onStart, formState) {
   const { repo, selectedDims, branch, scopePath, cleanScan, setRepo, setSelectedDims, setBranch, setScopePath, setCleanScan } = formState;
@@ -40,7 +36,7 @@ function buildAndSubmit(onStart, formState) {
 export function useEvaluationForm(onStart, onValidationFail) {
   const [repo, setRepo] = useState('');
   const { allDimensions, dimLoadError } = usePluginDimensions();
-  const [selectedDims, setSelectedDims] = useState(new Set());
+  const { selectedDims, setSelectedDims, toggleDim, selectAll, clearAll, refuseEmptySelection } = useDimensionSet(allDimensions);
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
   const [branch, setBranch] = useState(null);
   const [scopePath, setScopePath] = useState(null);
@@ -48,19 +44,9 @@ export function useEvaluationForm(onStart, onValidationFail) {
 
   useEffect(() => { setScopePath(null); setBranch(null); }, [repo]);
 
-  const toggleDim = (id) => setSelectedDims((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const selectAll = () => setSelectedDims(new Set(allDimensions.map((d) => d.id)));
-  const clearAll = () => setSelectedDims(new Set());
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (allDimensions.length > 0 && selectedDims.size === 0) {
-      onValidationFail?.(NO_STANDARDS_MESSAGE);
-      return;
-    }
+    if (refuseEmptySelection(onValidationFail)) return;
     buildAndSubmit(onStart, { repo, selectedDims, branch, scopePath, cleanScan, setRepo, setSelectedDims, setBranch, setScopePath, setCleanScan });
   };
   const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };

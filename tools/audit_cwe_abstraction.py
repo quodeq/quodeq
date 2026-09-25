@@ -83,42 +83,41 @@ def _fetch_cwe_endpoint(
         return None
 
 
+def _cwe_record(
+    cwe_id: int, entity: dict, abstraction: str, mapping_usage: str, mapping_rationale: str,
+) -> dict:
+    """The audit's record for one CWE entity (weakness, category or view)."""
+    return {
+        "id": cwe_id,
+        "name": entity.get("Name", ""),
+        "abstraction": abstraction,
+        "status": entity.get("Status", ""),
+        "mapping_usage": mapping_usage,
+        "mapping_rationale": mapping_rationale,
+    }
+
+
 def fetch_cwe_info(cwe_id: int, api_base: str | None = None) -> dict | None:
     """Fetch abstraction and mapping info from CWE API."""
     api_base = api_base or _default_api_base()
     w = _fetch_cwe_endpoint("weakness", "Weaknesses", cwe_id, api_base)
     if w is not None:
         mapping_notes = w.get("MappingNotes", {})
-        return {
-            "id": cwe_id,
-            "name": w.get("Name", ""),
-            "abstraction": w.get("Abstraction", "Unknown"),
-            "status": w.get("Status", ""),
-            "mapping_usage": mapping_notes.get("Usage", "Unknown"),
-            "mapping_rationale": mapping_notes.get("Rationale", ""),
-        }
+        return _cwe_record(
+            cwe_id, w, w.get("Abstraction", "Unknown"),
+            mapping_notes.get("Usage", "Unknown"), mapping_notes.get("Rationale", ""),
+        )
     # 404 from weakness — try category then view
     cat = _fetch_cwe_endpoint("category", "Categories", cwe_id, api_base)
     if cat is not None:
         mapping_notes = cat.get("MappingNotes", {})
-        return {
-            "id": cwe_id,
-            "name": cat.get("Name", ""),
-            "abstraction": "Category",
-            "status": cat.get("Status", ""),
-            "mapping_usage": mapping_notes.get("Usage", "Prohibited"),
-            "mapping_rationale": "Categories are not weaknesses",
-        }
+        return _cwe_record(
+            cwe_id, cat, "Category",
+            mapping_notes.get("Usage", "Prohibited"), "Categories are not weaknesses",
+        )
     view = _fetch_cwe_endpoint("view", "Views", cwe_id, api_base)
     if view is not None:
-        return {
-            "id": cwe_id,
-            "name": view.get("Name", ""),
-            "abstraction": "View",
-            "status": view.get("Status", ""),
-            "mapping_usage": "Prohibited",
-            "mapping_rationale": "Views are not weaknesses",
-        }
+        return _cwe_record(cwe_id, view, "View", "Prohibited", "Views are not weaknesses")
     return None
 
 

@@ -10,6 +10,7 @@ import { t } from '../../../strings/index.js';
 import { walkTree } from '../../../utils/treeWalk.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { VIOLATIONS_SUB_TAB } from '../violationsVocab.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 function findSubtree(root, path) {
   if (!path) return root;
@@ -101,9 +102,7 @@ function ViolationsHeader({ summary, visibleDimensions, topFilesCount, uniquePri
   const total = summary.totalViolations || 0;
   const subParts = [
     t('violations.subTotal', { count: total }),
-    visibleDimensions.length === 1
-      ? t('violations.subDim', { count: visibleDimensions.length })
-      : t('violations.subDims', { count: visibleDimensions.length }),
+    t(pluralKey(visibleDimensions.length, 'violations.subDim', 'violations.subDims'), { count: visibleDimensions.length }),
     t('violations.subPrinciples', { count: uniquePrinciples }),
     t('violations.subFiles', { count: topFilesCount }),
   ];
@@ -148,17 +147,11 @@ export function ViolationsSubTabContent(props) {
     // the list stays visible read-only. useDismissedFindings' own handlers
     // also no-op as defense in depth (see that hook), but the button must not
     // even render here.
-    const isShared = selectedSource === PROJECT_SOURCE.SHARED;
+    const actions = selectedSource === PROJECT_SOURCE.SHARED
+      ? {}
+      : { onRestore: handleRestore, onRestoreAll: handleRestoreAll, onDelete: handleDelete, onDeleteAll: handleDeleteAll };
     return dismissed.length > 0
-      ? (
-        <DismissedSubTab
-          dismissed={dismissed}
-          onRestore={isShared ? undefined : handleRestore}
-          onRestoreAll={isShared ? undefined : handleRestoreAll}
-          onDelete={isShared ? undefined : handleDelete}
-          onDeleteAll={isShared ? undefined : handleDeleteAll}
-        />
-      )
+      ? <DismissedSubTab dismissed={dismissed} {...actions} />
       : <p className="empty-state">{t('violations.noDismissedViolations')}</p>;
   }
   return null;

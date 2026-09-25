@@ -14,9 +14,8 @@ from here at module load time.
 from __future__ import annotations
 
 import logging
-import sys
 
-from quodeq.shared.constants import PLATFORM_DARWIN
+from quodeq.dashboard._webview_window_chrome import macos_native_window
 
 _logger = logging.getLogger(__name__)
 _macos_fullscreen_observer: object | None = None  # keep the ObjC observer alive
@@ -98,15 +97,10 @@ def install_macos_fullscreen_observer(window: object) -> None:
     macOS or before the native handle exists. Call from the ``loaded`` event.
     """
     global _macos_fullscreen_handler_class
-    if sys.platform != PLATFORM_DARWIN:
+    native = macos_native_window(window)
+    if native is None:
         return
-    try:
-        from PyObjCTools import AppHelper  # noqa: PLC0415
-    except ImportError:
-        return
-    nswindow = getattr(window, "native", None) if window is not None else None
-    if nswindow is None:
-        return
+    nswindow, AppHelper = native
 
     # Define the ObjC handler class at most once: redefining an NSObject
     # subclass in the same process raises objc.error (the same trap the About

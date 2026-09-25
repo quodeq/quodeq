@@ -22,7 +22,8 @@ from enum import StrEnum
 from pathlib import Path
 
 from quodeq.assistant._worktree_git import (
-    WorktreeError, WorktreeStatus, run_git, run_git_bytes, diff_stats, diff_text, worktrees_base,
+    WorktreeError, WorktreeStatus, run_git, run_git_bytes, diff_stats, diff_text,
+    mark_intent_to_add, worktrees_base,
 )
 from quodeq.shared.constants import GIT_BIN, GIT_DIR_NAME, GIT_FLAG_C
 
@@ -142,7 +143,7 @@ class WorktreeManager:
         deletions, binary and non-UTF-8 changes survive the roundtrip. The
         patch file lives OUTSIDE the worktree so a failed cleanup can never
         leak it into a later diff or apply."""
-        self._git_worktree(_GIT_VERB_ADD, "-N", ".")
+        mark_intent_to_add(self.path)
         patch = run_git_bytes([GIT_BIN, GIT_FLAG_C, str(self.path), "diff", "HEAD",
                             "--binary"])
         if not patch.strip():
@@ -213,7 +214,7 @@ def ensure_session_worktree(repository, *, repo_root: Path, project_id: str | No
                                           session_id, base=base)
     if manager.path.exists():  # crash leftover or terminal reuse: start clean
         shutil.rmtree(manager.path, ignore_errors=True)
-        run_git([GIT_BIN, GIT_FLAG_C, str(repo_root), _GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_PRUNE])
+        manager._git_repo(_GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_PRUNE)
     manager.create()
     repository.upsert_worktree(session_id=session_id, project_id=project_id,
                                repo_root=str(repo_root), path=str(manager.path),

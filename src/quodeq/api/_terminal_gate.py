@@ -1,11 +1,12 @@
 """Request-context gating shared by every terminal route.
 
-Split out of ``terminal_routes.py`` to keep that module under the size limit.
 The two reasons differ only in whether Origin is checked; see
 ``quodeq.terminal.gate`` for the policy itself.
 """
 from __future__ import annotations
 
+import functools
+from collections.abc import Callable
 from http import HTTPStatus
 
 from flask import current_app, request
@@ -38,4 +39,20 @@ def gate_reason() -> str | None:
 
 
 def forbidden():
-    return json_error("forbidden", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN)  # code + message once, for six routes
+    return json_error("forbidden", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN)
+
+
+def gated(reason: Callable[[], str | None] = gate_reason):
+    """Decorate a terminal HTTP handler so it answers 403 when *reason* refuses.
+
+    *reason* defaults to the full gate (Origin included); the listing route
+    passes ``env_reason``. The handler runs only when *reason* returns None.
+    """
+    def decorate(handler):
+        @functools.wraps(handler)
+        def guarded(*args, **kwargs):
+            if reason() is not None:
+                return forbidden()
+            return handler(*args, **kwargs)
+        return guarded
+    return decorate

@@ -6,8 +6,9 @@
  * renderers.jsx rather than in it so the route table stays a table.
  */
 import { lazy } from 'react';
-import { findProject, makeDismissHandler } from './dismissWiring.js';
+import { makeDismissHandler } from './dismissWiring.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { findProject, projectIdOrSelf } from '../utils/projectIdentity.js';
 
 const EvaluateScreen = lazy(() => import('../features/evaluation/components/EvaluateScreen.jsx'));
 const SettingsPage = lazy(() => import('../features/settings/components/SettingsPage.jsx'));
@@ -77,7 +78,7 @@ export function SettingsCase({ settings, onOpenGradeFormula, onSharedDisconnecte
 export function resolveSelectionAfterSharedDisconnect({ selectedSource, projects }) {
   if (selectedSource !== PROJECT_SOURCE.SHARED) return null;
   const first = (projects || [])[0];
-  const id = first ? (first.id || first.name || first) : '';
+  const id = first ? projectIdOrSelf(first) : '';
   return { id, source: PROJECT_SOURCE.LOCAL };
 }
 

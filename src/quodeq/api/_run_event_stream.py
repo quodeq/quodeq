@@ -25,6 +25,7 @@ from quodeq.api._run_event_serializers import (  # noqa: F401 — re-export
     serialize_finding_event,
     serialize_status_event,
     payload_as_sse_finding,
+    sse_json,
 )
 from quodeq.api._run_event_watcher import (  # noqa: F401 — re-export
     DEFAULT_FINDINGS_BATCH,
@@ -40,8 +41,7 @@ from quodeq.api._run_event_watcher import (  # noqa: F401 — re-export
 )
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.core.run.state import TERMINAL_STATES
-from quodeq.shared.env import env_float
-from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.env import env_float, env_int
 
 _EVENT_TYPE_STATUS = "status"  # compute_tick's event tuple tag for a status.json change
 _DEFAULT_TICK_MS = 250  # QUODEQ_SSE_TICK_MS fallback: observer poll cadence
@@ -50,13 +50,12 @@ _MIN_HEARTBEAT_S = 0.1  # floor: keeps a bogus tiny/negative override from turni
 
 
 def _tick_ms(env: Mapping[str, str] | None = None) -> int:
-    """Read tick interval at call time so tests can set QUODEQ_SSE_TICK_MS=0
-    to force a single-tick drain. Reading at module import time made the env
-    var a no-op for tests that set it inside the test body."""
-    try:
-        return int(resolve_env(env).get("QUODEQ_SSE_TICK_MS", str(_DEFAULT_TICK_MS)))
-    except ValueError:
-        return _DEFAULT_TICK_MS
+    """The observer poll cadence in ms; ``QUODEQ_SSE_TICK_MS`` overrides.
+
+    Read on every call, so a test can set ``QUODEQ_SSE_TICK_MS=0`` inside its
+    body to force a single-tick drain.
+    """
+    return env_int("QUODEQ_SSE_TICK_MS", _DEFAULT_TICK_MS, env=env, warn=False)
 
 
 def _heartbeat_s(env: Mapping[str, str] | None = None) -> float:
@@ -102,7 +101,7 @@ def _format_tick_frames(
 
 def _done_frame(terminal_state: str) -> str:
     """SSE `event: done` frame closing the stream on a terminal status."""
-    return sse_line(json.dumps({"state": terminal_state}, separators=(",", ":")), event="done")
+    return sse_line(sse_json({"state": terminal_state}), event="done")
 
 
 def run_events_generator(

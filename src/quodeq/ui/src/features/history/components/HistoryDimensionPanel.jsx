@@ -48,9 +48,8 @@ function trendColorClass(angle) {
   return 'trend-same';
 }
 
-// Shortcodes mirror src/quodeq/config/dimensions.py.
-// Ideally these would come from a /api/dimensions config endpoint;
-// hardcoded for now to avoid an extra network round-trip.
+// Short codes the dimension panel shows on its axis in place of a dimension's
+// name; unlisted dimensions fall back to their first letters (dimCode).
 const DIM_CODE = {
   affordability:  'aff',
   availability:   'avl',

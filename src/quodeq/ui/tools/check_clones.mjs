@@ -7,16 +7,15 @@
 // module), never a third copy.
 //
 // Detection is jscpd, configured once in `.jscpd.json` at the repo root
-// (5 lines / 50 tokens, formats python+javascript+jsx, tests, snapshots,
+// (5 lines / 40 tokens, formats python+javascript+jsx, tests, snapshots,
 // fixtures, node_modules and dist excluded). jscpd is a devDependency of
 // this package, so it runs via `npx --no-install`; if it is missing the
 // gate says how to install it instead of passing silently.
 //
-// This is a node port of the former tools/check_clones.py: that Python
-// ratchet lived in the `test` CI job's tests/tools suite, which runs on
-// three OSes with only `uv sync` (no node_modules), so `npx --no-install
-// jscpd` always failed there. jscpd is a UI devDependency, so the gate
-// belongs in the node-only `ui` CI job instead.
+// This runs under node rather than Python because jscpd is a UI
+// devDependency: the `test` CI job's tests/tools suite runs on three OSes
+// with only `uv sync` (no node_modules), so `npx --no-install jscpd` would
+// fail there. The gate belongs in the node-only `ui` CI job instead.
 //
 // Existing clones are grandfathered in tools/clones_baseline.json (a JSON
 // array of span keys) so the gate runs green today while blocking NEW ones.

@@ -8,16 +8,15 @@ the facade for that reason; nothing here is patch-tested via
 from __future__ import annotations
 
 import sys
-import threading
 
 from quodeq.dashboard._webview_diag import diag_stream
 from quodeq.dashboard._webview_window_about import MENU_POLL_INTERVAL_S, MENU_POLL_MAX_ATTEMPTS
-from quodeq.dashboard._webview_window_chrome import logger
+from quodeq.dashboard._webview_window_chrome import evaluate_js_in_background
 from quodeq.shared.constants import PLATFORM_DARWIN
-from quodeq.shared.fault_isolation import run_isolated
 
 _help_target: object | None = None  # keep the Help-menu handler alive (menu item holds a weak ref)
 _help_menu_installed = False  # the _HelpHandler ObjC class may only be defined once
+_HELP_NAV_LABEL = "help-menu navigation"  # names the logged failure when the help tab cannot be opened
 _HELP_MENU_TITLE = "Help"  # top-level menu title, shared by the macOS Apple menu and the non-macOS menu bar
 
 # Payload both native shells dispatch to open the help tab; routed by the
@@ -26,23 +25,13 @@ NAVIGATE_HELP_JS = "window.dispatchEvent(new CustomEvent('quodeq:navigate', { de
 
 
 def _build_help_handler(window: object) -> object:
-    """Build the ObjC handler whose openHelp_ dispatches the navigate event.
-
-    Split out of install_macos_help_menu so neither half exceeds the
-    function-size cap.
-    """
+    """Build the ObjC handler whose openHelp_ dispatches the navigate event."""
     from AppKit import NSObject  # noqa: PLC0415
 
     class _HelpHandler(NSObject):
         def openHelp_(self, sender):  # noqa: ARG002 — ObjC selector signature
-            # Menu actions fire on the AppKit main thread, where evaluate_js
-            # deadlocks (it blocks on the JS engine) — hop to a worker thread.
-            def _run() -> None:
-                run_isolated(
-                    lambda: window.evaluate_js(NAVIGATE_HELP_JS),  # type: ignore[union-attr]
-                    label="help-menu navigation", log=logger,
-                )
-            threading.Thread(target=_run, daemon=True).start()
+            # Menu actions fire on the AppKit main thread.
+            evaluate_js_in_background(window, NAVIGATE_HELP_JS, _HELP_NAV_LABEL)
 
     return _HelpHandler.alloc().init()
 
@@ -161,13 +150,7 @@ def non_macos_menu(window: object) -> "list[object] | None":
         return None
 
     def _open_help() -> None:
-        # Menu callbacks fire on the backend's GUI thread, where evaluate_js
-        # can deadlock — hop to a worker thread (same discipline as macOS).
-        def _run() -> None:
-            run_isolated(
-                lambda: window.evaluate_js(NAVIGATE_HELP_JS),  # type: ignore[union-attr]
-                label="help-menu navigation", log=logger,
-            )
-        threading.Thread(target=_run, daemon=True).start()
+        # Menu callbacks fire on the backend's GUI thread.
+        evaluate_js_in_background(window, NAVIGATE_HELP_JS, _HELP_NAV_LABEL)
 
     return [wm.Menu(_HELP_MENU_TITLE, [wm.MenuAction("quodeq Help", _open_help)])]

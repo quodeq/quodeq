@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 
 from quodeq.shared.utils import get_findings_file
+from quodeq.shared.csv_values import split_csv
 
 
 class ServerArgs:
@@ -24,7 +25,7 @@ class ServerArgs:
         """Return dimensions as a list (splits comma-separated values)."""
         if not self.dimension:
             return []
-        return [d.strip() for d in self.dimension.split(",") if d.strip()]
+        return split_csv(self.dimension)
 
 
 _FLAG_MAP = {

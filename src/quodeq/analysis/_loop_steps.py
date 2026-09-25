@@ -1,13 +1,12 @@
 """Per-dimension steps shared by the dimension loops.
 
-Split out of ``_loops.py`` (M-MOD-6). This module imports only
-downward (``_loop_state``, ``runner_markers``, ``run_types``, ``dimension_runner``,
+This module imports only downward (``_loop_state``, ``runner_markers``, ``run_types``, ``dimension_runner``,
 core/data/shared) and never imports back from ``_loops`` -- ``_loops.py``
 imports it at the top instead. ``loop_should_stop`` and ``finalize_dim_result``
-moved here too because ``run_incremental_loop``'s per-iteration step
-(``run_one_incremental_dim``) needs them and a same-layer import back into
-``_loops`` would have recreated the cycle this split exists to avoid;
-``_loops.py``'s ``run_per_dimension_loop`` imports them back from here instead.
+live here because ``run_incremental_loop``'s per-iteration step
+(``run_one_incremental_dim``) needs them and an import back into ``_loops``
+would create a cycle; ``_loops.py``'s ``run_per_dimension_loop`` imports them
+from here.
 """
 from __future__ import annotations
 
@@ -143,6 +142,12 @@ def finalize_dim_result(
         run.result.setdefault(dimension, ev)
 
 
+def _stdout_gone(exc: BrokenPipeError) -> tuple[None, BrokenPipeError]:
+    """Silence the closed stdout and report the dimension as not run because of *exc*."""
+    silence_broken_stdout()
+    return None, exc
+
+
 def _attempt_incremental_dim(
     config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
 ) -> tuple[Evidence | None, BaseException | None]:
@@ -157,8 +162,7 @@ def _attempt_incremental_dim(
     try:
         return runner.run(config, dimension, idx, ctx, emit_log=False), None
     except BrokenPipeError as exc:
-        silence_broken_stdout()
-        return None, exc
+        return _stdout_gone(exc)
     except (OSError, KeyError, ValueError, RuntimeError) as exc:
         if cancellation.is_cancelled():
             # The run is being torn down (signal, breaker, fatal provider
@@ -176,8 +180,7 @@ def _attempt_incremental_dim(
         try:
             return runner.run(fallback_config, dimension, idx, ctx, emit_log=True), None
         except BrokenPipeError as inner_exc:
-            silence_broken_stdout()
-            return None, inner_exc
+            return _stdout_gone(inner_exc)
         except (OSError, KeyError, ValueError, RuntimeError) as inner_exc:
             return None, inner_exc
 

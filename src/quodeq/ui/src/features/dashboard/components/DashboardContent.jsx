@@ -2,6 +2,7 @@ import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
+import { SharedNoCompletedEvalEmptyState } from '../../../components/ProjectEmptyStates.jsx';
 import { t } from '../../../strings/index.js';
 import { RUN_STATE } from '../../../vocab/runState.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
@@ -28,12 +29,7 @@ function NoCompletedEvalPanel({ availableRuns = [], onNavigate, selectedSource }
   // the same empty shell without the button and with copy that doesn't imply
   // there's an action to take here.
   if (selectedSource === PROJECT_SOURCE.SHARED) {
-    return (
-      <EmptyState
-        title={t('overview.noCompletedEvalTitle')}
-        description={t('overview.noCompletedEvalSharedDesc')}
-      />
-    );
+    return <SharedNoCompletedEvalEmptyState />;
   }
   return (
     <EmptyState
@@ -80,8 +76,7 @@ function AccumulatedContent({ data, callbacks }) {
 // ---------------------------------------------------------------------------
 // DashboardContent — the ready-state body of DashboardPage (run panel,
 // accumulated overview, single-dimension focus, or the no-completed-eval
-// empty state). Split out of DashboardPage.jsx to keep that file's
-// early-return ladder under the file-size cap; behavior is unchanged.
+// empty state).
 // ---------------------------------------------------------------------------
 export default function DashboardContent({ runMode, data, focus, callbacks }) {
   const { accumulatedDimensions, availableRuns, selectedProject, projectInfo, selectedSource } = data;

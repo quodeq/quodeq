@@ -6,6 +6,7 @@
 import { createProject } from '../models/project.js';
 import { request, BASE } from './request.js';
 import { FETCH_ERROR_NAME } from '../constants.js';
+import { projectPath } from './paths.js';
 
 // ── Health ──────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ export async function listProjects() {
 
 /** @returns {Promise<import('../models/project.js').Project>} */
 export async function getProjectInfo(projectId) {
-  const data = await request(`/projects/${encodeURIComponent(projectId)}/info`);
+  const data = await request(`${projectPath(projectId)}/info`);
   return createProject(data);
 }
 
@@ -55,7 +56,7 @@ export async function getProjectInfo(projectId) {
  * @returns {Promise<Object>} raw scan payload
  */
 export function getProjectScan(projectId, { signal, timeout } = {}) {
-  return request(`/projects/${encodeURIComponent(projectId)}/scan`, { signal, timeout });
+  return request(`${projectPath(projectId)}/scan`, { signal, timeout });
 }
 
 /**
@@ -63,7 +64,7 @@ export function getProjectScan(projectId, { signal, timeout } = {}) {
  * @returns {Promise<Object>}
  */
 export function deleteProject(projectId) {
-  return request(`/projects/${encodeURIComponent(projectId)}?confirm=true`, { method: 'DELETE' });
+  return request(`${projectPath(projectId)}?confirm=true`, { method: 'DELETE' });
 }
 
 /**
@@ -71,7 +72,7 @@ export function deleteProject(projectId) {
  * @returns {string} Download URL for the project export
  */
 export function getProjectExportUrl(projectId) {
-  return `${BASE}/projects/${encodeURIComponent(projectId)}/export`;
+  return `${BASE}${projectPath(projectId)}/export`;
 }
 
 /**
@@ -80,7 +81,7 @@ export function getProjectExportUrl(projectId) {
  * @returns {Promise<Object>}
  */
 export function relocateProject(projectId, newPath) {
-  return request(`/projects/${encodeURIComponent(projectId)}/path`, {
+  return request(`${projectPath(projectId)}/path`, {
     method: 'PATCH',
     body: JSON.stringify({ path: newPath }),
   });

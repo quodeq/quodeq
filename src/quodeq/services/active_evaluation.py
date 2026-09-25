@@ -1,12 +1,11 @@
 """Single owner of the "is an evaluation actually running" rule.
 
 The native window shell (dashboard/_webview_window) and the React
-useRunningRunsRefresh hook each used to cross-reference /api/evaluations
-against /api/projects to decide whether a "running" job is stale. That rule
-now lives here, served by ``GET /api/evaluations/active``, so it cannot
-diverge between presentation layers.
+useRunningRunsRefresh hook both need to know whether a "running" job is
+stale. The rule lives here, served by ``GET /api/evaluations/active``, so it
+cannot diverge between presentation layers.
 
-The rule (moved verbatim from ``WindowApi._get_running_evaluation``):
+The rule:
 a "running" job whose ``outputProject`` no longer exists in the project
 list (project deleted, or the API restarted mid-scan) is stale and ignored.
 Jobs without an ``outputProject`` are very-early-phase evals that haven't
@@ -25,26 +24,31 @@ from quodeq.services.base import ActionProvider
 
 # Providers hand back JobSnapshot entities, but remote/stub providers may
 # return already-serialized wire dicts (the /api/evaluations route accepts
-# both) — the accessors below read the same fields the webview shell used to
-# read off the wire, including the legacy "project" key fallback.
+# both) — the accessors below read the same wire fields the webview shell reads,
+# including the legacy "project" key fallback.
+
+
+def _read_field(item: Any, attr: str, *wire_keys: str) -> str | None:
+    """*item*'s *attr* when it is an entity; for a wire dict, the first truthy
+    of *wire_keys* (the last one's value, falsy or not, when none is)."""
+    if not isinstance(item, dict):
+        return getattr(item, attr, None)
+    value = item.get(wire_keys[0])
+    for key in wire_keys[1:]:
+        value = value or item.get(key)
+    return value
 
 
 def _job_status(job: Any) -> str | None:
-    if isinstance(job, dict):
-        return job.get("status")
-    return getattr(job, "status", None)
+    return _read_field(job, "status", "status")
 
 
 def _job_project(job: Any) -> str | None:
-    if isinstance(job, dict):
-        return job.get("outputProject") or job.get("project")
-    return getattr(job, "output_project", None)
+    return _read_field(job, "output_project", "outputProject", "project")
 
 
 def _project_id(entry: Any) -> str | None:
-    if isinstance(entry, dict):
-        return entry.get("id")
-    return getattr(entry, "id", None)
+    return _read_field(entry, "id", "id")
 
 
 def find_active_evaluation(

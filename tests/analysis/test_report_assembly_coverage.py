@@ -18,6 +18,20 @@ from quodeq.analysis._report_constants import REPORT_SCHEMA_VERSION
 # assemble_report_dict
 # ---------------------------------------------------------------------------
 
+def _empty_report_data(*, dimension: str = "security", evidence: dict) -> ReportData:
+    """A ReportData with no scores, principles, or findings — just the evidence dict under test."""
+    return ReportData(
+        dimension=dimension,
+        evidence=evidence,
+        top_score=None,
+        top_grade=None,
+        principle_rows=[],
+        flat_violations=[],
+        flat_compliance=[],
+        sev_tally={},
+    )
+
+
 class TestAssembleReportDict:
     def test_basic_assembly(self):
         data = ReportData(
@@ -62,59 +76,23 @@ class TestAssembleReportDict:
         assert report["totals"]["severity"] == {"critical": 0, "major": 1, "minor": 0}
 
     def test_includes_module_when_present(self):
-        data = ReportData(
-            dimension="security",
-            evidence={"module": "auth-service", "meta": {}},
-            top_score=None,
-            top_grade=None,
-            principle_rows=[],
-            flat_violations=[],
-            flat_compliance=[],
-            sev_tally={},
-        )
+        data = _empty_report_data(evidence={"module": "auth-service", "meta": {}})
         report = assemble_report_dict(data)
         assert report["module"] == "auth-service"
 
     def test_no_module_key_when_absent(self):
-        data = ReportData(
-            dimension="security",
-            evidence={"meta": {}},
-            top_score=None,
-            top_grade=None,
-            principle_rows=[],
-            flat_violations=[],
-            flat_compliance=[],
-            sev_tally={},
-        )
+        data = _empty_report_data(evidence={"meta": {}})
         report = assemble_report_dict(data)
         assert "module" not in report
 
     def test_handles_empty_meta(self):
-        data = ReportData(
-            dimension="reliability",
-            evidence={"meta": {}},
-            top_score=None,
-            top_grade=None,
-            principle_rows=[],
-            flat_violations=[],
-            flat_compliance=[],
-            sev_tally={},
-        )
+        data = _empty_report_data(dimension="reliability", evidence={"meta": {}})
         report = assemble_report_dict(data)
         assert report["meta"]["analysis_prompt_version"] is None
         assert report["meta"]["scoring_prompt_version"] is None
 
     def test_null_scores(self):
-        data = ReportData(
-            dimension="security",
-            evidence={"meta": {}},
-            top_score=None,
-            top_grade=None,
-            principle_rows=[],
-            flat_violations=[],
-            flat_compliance=[],
-            sev_tally={},
-        )
+        data = _empty_report_data(evidence={"meta": {}})
         report = assemble_report_dict(data)
         assert report["overallScore"] is None
         assert report["overallGrade"] is None

@@ -3,6 +3,7 @@ import { LocalApiTabLayout, LocalApiModelSelectRow, ModelPickerSelect } from './
 import { useOllamaModels } from '../hooks/useOllamaModels.js';
 import { useLocalApiTabTest } from '../hooks/useLocalApiTabTest.js';
 import { useOllamaLog } from '../ollama-log/OllamaLogContext.js';
+import { warnAndRethrow, toggleLogWindow } from '../settingsHelpers.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
 
@@ -30,10 +31,7 @@ export default function OllamaTab({ state, update }) {
   const { ollamaStatus, models, modelsError } = useOllamaModels();
 
   const concurrency = useLocalApiTabTest({
-    probe: () => testOllamaConcurrency(state.model).catch((err) => {
-      console.warn('Ollama concurrency test failed', err);
-      throw err;
-    }),
+    probe: warnAndRethrow(() => testOllamaConcurrency(state.model), 'Ollama'),
     errorKey: 'settings.concurrencyTestFailedOllama',
     update,
     enabled: !!state.model,
@@ -43,7 +41,7 @@ export default function OllamaTab({ state, update }) {
     <LocalApiTabLayout
       serverStatus={ollamaStatus}
       offlineMessage={<span>{tRich('settings.ollamaOffline')}</span>}
-      onToggleConsole={() => (ollamaLog.open ? ollamaLog.closeLog() : ollamaLog.openLog())}
+      onToggleConsole={() => toggleLogWindow(ollamaLog)}
       consoleOpen={ollamaLog.open}
       modelsError={modelsError}
       modelRow={<LocalApiModelSelectRow hint={OLLAMA_MODEL_HINT} Control={ModelSelector} state={state} update={update} models={models} />}

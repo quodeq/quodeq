@@ -17,6 +17,7 @@ from quodeq.config.provider import Provider, ProviderType
 from quodeq.services._browse_mixin import FsBrowseMixin
 from quodeq.services.wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
 from quodeq.shared.constants import MACHINE_ARM64, PLATFORM_DARWIN
+from quodeq.shared.csv_values import split_csv
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
 from quodeq.shared.log_sink import SHARED_LOG
@@ -121,7 +122,7 @@ class FsToolingMixin(FsBrowseMixin):
 
         # CLI tools: only include if installed
         if "QUODEQ_AI_CLIENTS" in environ:
-            ids = [c.strip() for c in environ["QUODEQ_AI_CLIENTS"].split(",") if c.strip()]
+            ids = split_csv(environ["QUODEQ_AI_CLIENTS"])
             candidates = [{"id": c, "label": c.capitalize()} for c in ids]
         else:
             candidates = self._CLI_CANDIDATES

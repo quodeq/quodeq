@@ -13,6 +13,7 @@ import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { DIM_STATE } from '../../../vocab/dimState.js';
 import { SEVERITY_ORDER } from '../../../vocab/severity.js';
 import { KEY } from '../../../vocab/keyboard.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
@@ -115,9 +116,10 @@ function LiveViolationsHead({ totalCount, orderedDimsCount, hiddenCarriedCount, 
         <SectionLabel>{t('evaluate.liveViolationsLabel')}</SectionLabel>
         <span className="vlive-counter">
           {totalCount > 0
-            ? (orderedDimsCount === 1
-                ? t('evaluate.acrossDimsOne', { count: totalCount, dims: orderedDimsCount })
-                : t('evaluate.acrossDimsMany', { count: totalCount, dims: orderedDimsCount }))
+            ? t(
+              pluralKey(orderedDimsCount, 'evaluate.acrossDimsOne', 'evaluate.acrossDimsMany'),
+              { count: totalCount, dims: orderedDimsCount },
+            )
             : t('evaluate.noNewFindings')}
           {hiddenCarriedCount > 0 && (
             <span className="vlive-counter-hidden"> · {t('evaluate.carriedForwardHidden', { count: hiddenCarriedCount })}</span>

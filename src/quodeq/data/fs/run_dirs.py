@@ -1,9 +1,9 @@
 """Run-directory removal and reports-root scanning.
 
-Split out of ``services/_run_index_fs.py``: these two are plain filesystem
-operations (rmtree, directory scan) with no run-index business logic of
-their own, so they belong in the data layer. ``services/_run_index_fs.py``
-re-exports both (via ``services/wiring.py``) for its existing callers.
+These two are plain filesystem operations (rmtree, directory scan) with no
+run-index business logic of their own, so they belong in the data layer.
+``services/_run_index_fs.py`` re-exports both (via ``services/wiring.py``)
+for its callers.
 """
 from __future__ import annotations
 
@@ -27,25 +27,22 @@ def remove_run_directory(
     removed_dir = False
     if output_project and reports_dir.is_dir():
         candidate = reports_dir / output_project / run_uuid
-        if not is_within(candidate, reports_dir):
-            candidate = None
-        if candidate and candidate.is_dir():
-            shutil.rmtree(candidate, ignore_errors=True)
-            removed_dir = not candidate.exists()
-            if not removed_dir:
-                log.warning(f"Could not remove run directory {candidate}")
-    if not removed_dir and reports_dir.is_dir():
-        for project_dir in reports_dir.iterdir():
-            candidate = project_dir / run_uuid
-            if not is_within(candidate, reports_dir):
-                continue
-            if candidate.is_dir():
-                shutil.rmtree(candidate, ignore_errors=True)
-                removed_dir = not candidate.exists()
-                if not removed_dir:
-                    log.warning(f"Could not remove run directory {candidate}")
-                break
+        if is_within(candidate, reports_dir) and candidate.is_dir():
+            removed_dir = _remove_and_verify(candidate, log)
+    if not removed_dir:
+        found = scan_reports_root_for_run(reports_dir, run_uuid)
+        if found is not None:
+            removed_dir = _remove_and_verify(found, log)
     return removed_dir
+
+
+def _remove_and_verify(run_dir: Path, log: LogSink) -> bool:
+    """rmtree *run_dir*; True when it is gone, else warn and return False."""
+    shutil.rmtree(run_dir, ignore_errors=True)
+    if run_dir.exists():
+        log.warning(f"Could not remove run directory {run_dir}")
+        return False
+    return True
 
 
 def scan_reports_root_for_run(reports_root: Path | None, run_id: str) -> Path | None:

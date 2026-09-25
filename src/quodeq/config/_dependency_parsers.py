@@ -15,18 +15,17 @@ existing substring behaviour — see ``_discipline_detection.py``.
 Python (pyproject.toml, requirements.txt) matchers live in
 ``_dependency_parsers_python.py``; package.json/Cargo.toml/go.mod/
 composer.json/pom.xml/Gradle matchers live in
-``_dependency_parsers_compiled.py`` — both split out to keep this module
-under the size ratchet's 300-line cap. All ``has_*`` names stay re-exported
+``_dependency_parsers_compiled.py``. All ``has_*`` names are re-exported
 from here.
 """
 from __future__ import annotations
 
 import re
-import tomllib
 from functools import lru_cache
 from typing import Callable
 
 from quodeq.config._constants import PARSE_CACHE_MAX
+from quodeq.config.manifest_tables import lowered_keys, toml_table
 from quodeq.config._dependency_parsers_python import (  # re-export
     has_pyproject_dependency,
     has_requirements_txt_dependency,
@@ -146,16 +145,10 @@ def has_pubspec_dependency(content: str, needle: str) -> bool:
 
 @lru_cache(maxsize=PARSE_CACHE_MAX)
 def _julia_deps(content: str) -> frozenset[str]:
-    try:
-        data = tomllib.loads(content)
-    except tomllib.TOMLDecodeError:
+    data = toml_table(content)
+    if data is None:
         return frozenset()
-    names: set[str] = set()
-    for key in ("deps", "weakdeps", "extras"):
-        v = data.get(key)
-        if isinstance(v, dict):
-            names.update(k.lower() for k in v if isinstance(k, str))
-    return frozenset(names)
+    return frozenset(lowered_keys(data, ("deps", "weakdeps", "extras")))
 
 
 def has_julia_dependency(content: str, needle: str) -> bool:

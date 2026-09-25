@@ -34,6 +34,13 @@ class _RowClass(StrEnum):
     SUPPRESSED = "suppressed"
 
 
+# The row classes a tally counts, one counter each.
+_COUNTED_KINDS = (
+    FindingType.VIOLATION, FindingType.COMPLIANCE,
+    _RowClass.DUPLICATE, _RowClass.SUPPRESSED, _RowClass.QUARANTINED,
+)
+
+
 @dataclass(frozen=True)
 class FindingTally:
     """Unique violation/compliance counts plus the duplicates folded out.
@@ -135,28 +142,31 @@ def tally_unique_findings(
     if not jsonl_path.is_file():
         return FindingTally()
     seen: set[tuple] = set()
-    violations = compliance = duplicates = hidden = quarantined = 0
+    counts = _zero_counts()
     try:
         with open_text(jsonl_path) as f:
             for raw in f:
                 kind = _classify_finding_row(
                     raw, seen, suppressed=suppressed, resolver=resolver,
                 )
-                if kind == _RowClass.DUPLICATE:
-                    duplicates += 1
-                elif kind == _RowClass.QUARANTINED:
-                    quarantined += 1
-                elif kind == _RowClass.SUPPRESSED:
-                    hidden += 1
-                elif kind == FindingType.VIOLATION:
-                    violations += 1
-                elif kind == FindingType.COMPLIANCE:
-                    compliance += 1
+                if kind in counts:
+                    counts[kind] += 1
     except OSError as exc:
         _logger.debug("evidence file unreadable during tally: %s", exc)
+    return _tally_of(counts)
+
+
+def _zero_counts() -> dict[str, int]:
+    """A zero counter per counted row class (SKIP is not counted)."""
+    return dict.fromkeys(_COUNTED_KINDS, 0)
+
+
+def _tally_of(counts: dict[str, int]) -> FindingTally:
+    """The FindingTally for *counts* (see ``_zero_counts``)."""
     return FindingTally(
-        violations=violations, compliance=compliance,
-        duplicates=duplicates, suppressed=hidden, quarantined=quarantined,
+        violations=counts[FindingType.VIOLATION], compliance=counts[FindingType.COMPLIANCE],
+        duplicates=counts[_RowClass.DUPLICATE], suppressed=counts[_RowClass.SUPPRESSED],
+        quarantined=counts[_RowClass.QUARANTINED],
     )
 
 
@@ -189,7 +199,7 @@ class IncrementalTally:
         self.offset = 0
         self._tail = b""
         self._seen: set[tuple] = set()
-        self._counts = {"violation": 0, "compliance": 0, "duplicate": 0, "suppressed": 0, "quarantined": 0}
+        self._counts = _zero_counts()
 
     def _tail_matches(self, f) -> bool:
         if not self._tail:
@@ -229,6 +239,4 @@ class IncrementalTally:
         return self._tally()
 
     def _tally(self) -> FindingTally:
-        c = self._counts
-        return FindingTally(violations=c["violation"], compliance=c["compliance"],
-                            duplicates=c["duplicate"], suppressed=c["suppressed"], quarantined=c["quarantined"])
+        return _tally_of(self._counts)

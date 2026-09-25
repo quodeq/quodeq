@@ -90,8 +90,7 @@ def read_through(
     if not enabled:
         return compute()
     try:
-        with open_score_cache() as conn:
-            cached = table.read(conn, project, version)
+        cached = _read_row(table, project, version)
         if cached is not None:
             return cached
     except sqlite3.Error as exc:
@@ -101,8 +100,7 @@ def read_through(
     with flight.hold((table.kind, project, version)):
         # Re-check: a caller we waited on may have computed and cached it.
         try:
-            with open_score_cache() as conn:
-                cached = table.read(conn, project, version)
+            cached = _read_row(table, project, version)
             if cached is not None:
                 return cached
         except sqlite3.Error as exc:
@@ -118,11 +116,16 @@ def read_through(
         return result
 
 
+def _read_row(table: CacheTable, project: str, version: str) -> dict | None:
+    """The exact-version cached payload, or None on a miss. SQLite errors propagate."""
+    with open_score_cache() as conn:
+        return table.read(conn, project, version)
+
+
 def _peek(table: CacheTable, project: str, version: str) -> dict | None:
     """The exact-version cached payload, or None on a miss or SQLite error."""
     try:
-        with open_score_cache() as conn:
-            return table.read(conn, project, version)
+        return _read_row(table, project, version)
     except sqlite3.Error:
         return None
 

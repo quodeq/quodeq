@@ -5,10 +5,12 @@ import os
 from pathlib import Path
 
 from quodeq.shared._env_sanitize import sanitized_env_path
+from quodeq.shared.env_paths import home_state_dir
+from quodeq.shared.env_resolve import resolve_env
 
 SQLITE_DISABLE_TRUTHY = {"1", "true", "yes", "on"}
 
-_DEFAULT_INDEX_DB_PATH = Path.home() / ".quodeq" / "index.db"
+_DEFAULT_INDEX_DB_PATH = home_state_dir() / "index.db"
 
 
 def get_index_db_path(default: str | None = None, env: dict[str, str] | None = None) -> str:
@@ -17,13 +19,13 @@ def get_index_db_path(default: str | None = None, env: dict[str, str] | None = N
     Resolution order: QUODEQ_INDEX_DB_PATH env var, then *default*, then
     ~/.quodeq/index.db. Always returns a str for downstream Path/sqlite3 use.
     """
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     if "QUODEQ_INDEX_DB_PATH" in environ:
         return sanitized_env_path(environ["QUODEQ_INDEX_DB_PATH"])
     return default or str(_DEFAULT_INDEX_DB_PATH)
 
 
-_DEFAULT_SCORE_CACHE_PATH = Path.home() / ".quodeq" / "score_cache.db"
+_DEFAULT_SCORE_CACHE_PATH = home_state_dir() / "score_cache.db"
 
 
 def get_score_cache_path(env: dict[str, str] | None = None) -> str:
@@ -33,7 +35,7 @@ def get_score_cache_path(env: dict[str, str] | None = None) -> str:
     (so the test suite's QUODEQ_INDEX_DB_PATH override auto-isolates it), else
     ~/.quodeq/score_cache.db. This cache is disposable -- deleting it is safe.
     """
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     if "QUODEQ_SCORE_CACHE_PATH" in environ:
         return sanitized_env_path(environ["QUODEQ_SCORE_CACHE_PATH"])
     index_parent = Path(get_index_db_path(env=environ)).parent
@@ -44,7 +46,7 @@ def get_score_cache_path(env: dict[str, str] | None = None) -> str:
 
 def score_cache_disabled(env: dict[str, str] | None = None) -> bool:
     """Return True when QUODEQ_DISABLE_SCORE_CACHE is truthy (operator kill switch)."""
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     return environ.get("QUODEQ_DISABLE_SCORE_CACHE", "").strip().lower() in SQLITE_DISABLE_TRUTHY
 
 

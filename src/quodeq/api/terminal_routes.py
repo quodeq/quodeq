@@ -14,7 +14,7 @@ from http import HTTPStatus
 from flask import Flask, jsonify, request
 from flask_sock import Sock
 
-from quodeq.api._terminal_gate import env_reason, forbidden, gate_reason
+from quodeq.api._terminal_gate import env_reason, gate_reason, gated
 from quodeq.api._terminal_ws_helpers import (
     pump_terminal_out,
     resolve_ws_session,
@@ -22,7 +22,8 @@ from quodeq.api._terminal_ws_helpers import (
     terminal_read_loop,
 )
 from quodeq.api._constants import CODE_INVALID_INPUT, CODE_MISSING_PARAM, CODE_UNKNOWN_SESSION
-from quodeq.api.helpers import json_error, optional_json_object_or_error
+from quodeq.api.helpers import json_error, optional_json_object_or_response
+from quodeq.core.utils.numbers import clamp
 from quodeq.terminal.links import (
     detect_editor,
     open_in_editor,
@@ -51,9 +52,12 @@ def _coerce_int(value) -> int | None:
     return n if n > 0 else None
 
 
+_WINSIZE_MAX = 65535  # struct.pack('HH') upper bound for a terminal dimension
+
+
 def _clamp_winsize(value: int) -> int:
     """Keep a terminal dimension within struct.pack('HH') range (1..65535)."""
-    return max(1, min(int(value), 65535))
+    return clamp(int(value), 1, _WINSIZE_MAX)
 
 
 def _apply_control(manager, payload: str) -> None:
@@ -103,52 +107,47 @@ def _session_wire(view: TerminalSessionView) -> dict:
     }
 
 
+# env_reason, not the full gate: same-origin GETs carry no Origin
+# header (same reasoning as /status).
+@gated(env_reason)
 def _terminal_sessions(registry: TerminalSessionRegistry):
-    # env_reason, not the full gate: same-origin GETs carry no Origin
-    # header (same reasoning as /status).
-    if env_reason() is not None:
-        return forbidden()
     sessions = [_session_wire(view) for view in registry.list()]
     return jsonify({"sessions": sessions, "max": registry.MAX_SESSIONS})
 
 
+@gated()
 def _terminal_session_create(registry: TerminalSessionRegistry):
-    if gate_reason() is not None:
-        return forbidden()
     session = registry.create()
     if session is None:
         return json_error("session limit reached", HTTPStatus.CONFLICT, "SESSION_LIMIT")
     return jsonify({"id": session.id, "name": session.name}), HTTPStatus.CREATED
 
 
+@gated()
 def _terminal_session_kill(registry: TerminalSessionRegistry, sid):
-    if gate_reason() is not None:
-        return forbidden()
     if not registry.kill(sid):
         return json_error("unknown session", HTTPStatus.NOT_FOUND, CODE_UNKNOWN_SESSION)
     return jsonify({"ok": True})
 
 
+@gated()
 def _terminal_kill(registry: TerminalSessionRegistry):
     # Kills EVERY session — this backs Settings' "Restart terminal", which
     # is a full reset; the client reconciles its tabs via /sessions after.
-    if gate_reason() is not None:
-        return forbidden()
     registry.kill_all()
     return jsonify({"ok": True})
 
 
+@gated()
 def _terminal_resolve(registry: TerminalSessionRegistry):
     """Resolve candidate path tokens the client detected in a terminal line
     to absolute paths, reporting which exist. The client makes only the
     existing ones clickable, so path-shaped text never becomes a dead link.
     Gated exactly like the other terminal routes (same threat model: a
     single-user localhost app whose terminal already grants a full shell)."""
-    if gate_reason() is not None:
-        return forbidden()
-    body = optional_json_object_or_error(CODE_INVALID_INPUT)
+    body = optional_json_object_or_response(CODE_INVALID_INPUT)
     if not isinstance(body, dict):
-        return jsonify(body[0]), body[1]
+        return body
     paths = body.get("paths")
     if not isinstance(paths, list):
         return json_error("paths must be a list", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
@@ -170,15 +169,14 @@ def _launch_editor(editor, safe: str, body: dict):
     return jsonify({"opened": opened, "editor": editor.name})
 
 
+@gated()
 def _terminal_open(registry: TerminalSessionRegistry):
     """Open an already-resolved absolute path in the user's editor at an
     optional line/col. Fail-soft: any error returns opened=false rather than
     raising, so a missing editor never surfaces as a 500."""
-    if gate_reason() is not None:
-        return forbidden()
-    body = optional_json_object_or_error(CODE_INVALID_INPUT)
+    body = optional_json_object_or_response(CODE_INVALID_INPUT)
     if not isinstance(body, dict):
-        return jsonify(body[0]), body[1]
+        return body
     path = body.get("path")
     if not isinstance(path, str) or not path:
         return json_error("path is required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)

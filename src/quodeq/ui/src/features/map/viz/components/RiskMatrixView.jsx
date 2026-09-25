@@ -2,11 +2,13 @@ import { useMemo, useState, useEffect } from 'react';
 import { nodeColor, nodeBorderColor } from '../core/mapColors.js';
 import { riskPoint } from '../core/riskScore.js';
 import FileShape from './FileShape.jsx';
-import { activateOnKey } from '../../../../utils/a11y.js';
+import { activationHandlers } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
 import { riskBubbleKey } from './riskBubbleName.js';
 import { LABEL_GAP_PX } from './viewLabels.js';
 import { PERCENT } from '../../../../constants.js';
+import { isDrillableFolder } from '../core/fileTree.js';
+import MapTooltipSeverityRows from './MapTooltipSeverityRows.jsx';
 
 const W = 600, H = 420, PAD = { l: 55, r: 25, t: 35, b: 55 };
 const PW = W - PAD.l - PAD.r, PH = H - PAD.t - PAD.b;
@@ -81,7 +83,12 @@ function useBubbleLayout(node) {
 function BubbleNode({ point, px, py, br, entered, tip, setTip, onDrillDown, onFileClick }) {
   const { child, x, y, b, color, border, hasCritical } = point;
   const cx = px(x), cy = py(y), r = br(b);
-  const canDrill = !child.isFile && child.children?.length > 0;
+  const canDrill = isDrillableFolder(child);
+  const hover = {
+    onMouseEnter: (e) => setTip({ x: e.clientX, y: e.clientY, child }),
+    onMouseMove: (e) => setTip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null),
+    onMouseLeave: () => setTip(null),
+  };
   return (
     <g style={{ opacity: entered ? 1 : 0, transition: 'opacity 0.2s ease' }}>
       {hasCritical && <circle cx={cx} cy={cy} r={r + CRITICAL_RING_PAD_PX} fill="none" stroke={color} strokeWidth={1} opacity={0.3}>
@@ -96,19 +103,14 @@ function BubbleNode({ point, px, py, br, entered, tip, setTip, onDrillDown, onFi
           tabIndex={0}
           role="button"
           aria-label={child.name || child.path}
-          onMouseEnter={(e) => setTip({ x: e.clientX, y: e.clientY, child })}
-          onMouseMove={(e) => setTip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null)}
-          onMouseLeave={() => setTip(null)}
-          onClick={() => onDrillDown?.(child.path)}
-          onKeyDown={activateOnKey(() => onDrillDown?.(child.path))} />
+          {...hover}
+          {...activationHandlers(() => onDrillDown?.(child.path))} />
       ) : (
         <FileShape cx={cx} cy={cy} r={r} color={color} borderColor={border}
           glow={tip?.name === child.name}
           ariaLabel={t(riskBubbleKey(child.violations), { file: child.name || child.path, count: child.violations || 0 })}
           handlers={{
-            onMouseEnter: (e) => setTip({ x: e.clientX, y: e.clientY, child }),
-            onMouseMove: (e) => setTip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null),
-            onMouseLeave: () => setTip(null),
+            ...hover,
             onClick: () => onFileClick?.(child),
             style: { cursor: onFileClick ? 'pointer' : 'default' },
           }} />
@@ -126,7 +128,7 @@ function BubbleLabels({ points, px, py, br, entered }) {
     .sort((a, b) => b.b - a.b);
   return sorted.map(({ child, x, y, b }) => {
     const cx = px(x), cy = py(y), r = br(b);
-    const canDrill = !child.isFile && child.children?.length > 0;
+    const canDrill = isDrillableFolder(child);
     const labelY = canDrill ? cy - r - LABEL_GAP_PX : cy - r * FILE_LABEL_RADIUS_FRACTION - LABEL_GAP_PX;
     const fs = Math.min(LABEL_FONT_MAX, Math.max(LABEL_FONT_MIN, r / LABEL_FONT_DIVISOR));
     const estW = (child.name || '').length * fs * LABEL_CHAR_WIDTH_FACTOR;
@@ -185,21 +187,22 @@ function MatrixTooltip({ tip }) {
   const c = tip.child;
   const total = c.violations + c.compliance;
   const rate = total > 0 ? Math.round(c.compliance / total * PERCENT) : 0;
+  // Near the right or bottom edge the tooltip anchors on its far side instead.
+  const flipX = tip.x > window.innerWidth * TOOLTIP_FLIP_X_THRESHOLD;
+  const flipY = tip.y > window.innerHeight * TOOLTIP_FLIP_Y_THRESHOLD;
   return (
     <div className="map-tooltip" style={{
       position: 'fixed',
-      left: tip.x > window.innerWidth * TOOLTIP_FLIP_X_THRESHOLD ? undefined : tip.x + TOOLTIP_OFFSET_PX,
-      right: tip.x > window.innerWidth * TOOLTIP_FLIP_X_THRESHOLD ? window.innerWidth - tip.x + TOOLTIP_OFFSET_PX : undefined,
-      top: tip.y > window.innerHeight * TOOLTIP_FLIP_Y_THRESHOLD ? undefined : tip.y - TOOLTIP_OFFSET_PX,
-      bottom: tip.y > window.innerHeight * TOOLTIP_FLIP_Y_THRESHOLD ? window.innerHeight - tip.y + TOOLTIP_OFFSET_PX : undefined,
+      left: flipX ? undefined : tip.x + TOOLTIP_OFFSET_PX,
+      right: flipX ? window.innerWidth - tip.x + TOOLTIP_OFFSET_PX : undefined,
+      top: flipY ? undefined : tip.y - TOOLTIP_OFFSET_PX,
+      bottom: flipY ? window.innerHeight - tip.y + TOOLTIP_OFFSET_PX : undefined,
     }}>
       <div className="map-tooltip-title">{c.path || c.name}</div>
       <div className="map-tooltip-row"><span>{t('map.violations')}</span><span>{c.violations}</span></div>
       <div className="map-tooltip-row"><span>{t('map.compliance')}</span><span>{c.compliance}</span></div>
       <div className="map-tooltip-row"><span>{t('map.health')}</span><span>{rate}%</span></div>
-      {c.severity?.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>{t('map.critical')}</span><span>{c.severity.critical}</span></div>}
-      {c.severity?.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>{t('map.major')}</span><span>{c.severity.major}</span></div>}
-      {c.severity?.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>{t('map.minor')}</span><span>{c.severity.minor}</span></div>}
+      <MapTooltipSeverityRows severity={c.severity} />
     </div>
   );
 }

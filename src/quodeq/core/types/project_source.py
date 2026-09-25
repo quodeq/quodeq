@@ -6,7 +6,9 @@ registered project's code lives (``repository_info.json``'s ``location``).
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from enum import StrEnum
+from typing import Any
 
 
 class ProjectSource(StrEnum):
@@ -26,3 +28,8 @@ class ProjectLocation(StrEnum):
 
     LOCAL = "local"
     ONLINE = "online"
+
+
+def session_source(session: Mapping[str, Any]) -> str:
+    """Where *session*'s project data lives; a row with no ``source`` is local."""
+    return session.get("source") or ProjectSource.LOCAL

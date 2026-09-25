@@ -13,7 +13,6 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +26,7 @@ from quodeq.core.run.state import (  # noqa: F401 — re-exported API
     UnsupportedSchemaError,
     validate_transition,
 )
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 
 _logger = logging.getLogger(__name__)
 
@@ -39,23 +39,19 @@ _logger = logging.getLogger(__name__)
 _write_lock = threading.RLock()
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
 def _build_status_payload(status: RunStatus) -> dict[str, Any]:
     pid = status.pid
     if pid is None:
         pid = os.getpid()
     finalized_at = status.finalized_at
     if finalized_at is None and status.state in TERMINAL_STATES:
-        finalized_at = _now_iso()
+        finalized_at = utc_now_iso(timespec=ISO_SECONDS)
     payload: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "job_id": status.job_id,
         "state": status.state.value,
         "started_at": status.started_at,
-        "updated_at": _now_iso(),
+        "updated_at": utc_now_iso(timespec=ISO_SECONDS),
         "finalized_at": finalized_at,
         "phase": status.phase,
         "current_dimension": status.current_dimension,

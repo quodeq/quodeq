@@ -35,8 +35,8 @@ from quodeq.shared.validation import validate_path_segment
 from quodeq.services.scoring._summary import recompute_summary  # noqa: F401 — facade re-export
 
 # ---------------------------------------------------------------------------
-# Decomposed submodules. Every moved name is re-exported here so external
-# callers and test patch targets keep working against the package facade.
+# Submodules. Their names are re-exported here so external callers and test
+# patch targets use the package facade.
 # ---------------------------------------------------------------------------
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.scoring._fetchers import make_scoring_trend_fetcher, max_history_runs  # noqa: F401
@@ -45,8 +45,6 @@ from quodeq.services.scoring._response_builders import (  # noqa: F401
     build_response_from_eval_files,
     build_response_from_grade_tables,
     build_summary_from_dim_dicts,
-    build_totals_from_findings,
-    severity_bucket,
 )
 from quodeq.services.scoring._rescoring import (  # noqa: F401
     dims_expecting_rescore,

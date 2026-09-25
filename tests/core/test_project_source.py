@@ -16,3 +16,12 @@ def test_project_location_values():
 def test_the_axes_do_not_accept_each_others_words():
     assert "online" not in ProjectSource
     assert "shared" not in ProjectLocation
+
+
+def test_session_source_defaults_to_local():
+    from quodeq.core.types.project_source import session_source
+
+    assert session_source({}) == ProjectSource.LOCAL
+    assert session_source({"source": None}) == ProjectSource.LOCAL
+    assert session_source({"source": ""}) == ProjectSource.LOCAL
+    assert session_source({"source": "shared"}) == ProjectSource.SHARED

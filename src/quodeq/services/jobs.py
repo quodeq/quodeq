@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
 from pathlib import Path
 import threading
 import uuid
@@ -11,6 +10,7 @@ from typing import Any, Callable
 
 import subprocess
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.run.exit_reason import DEADLINE_EXIT_REASONS
 from quodeq.core.run.job_status import JobStatus, is_external_job_id, strip_external_prefix
@@ -197,7 +197,7 @@ class JobManager(JobMonitorMixin, JobCapacityMixin):
             if not job or job.status != JobStatus.RUNNING:
                 return False
             job.status = JobStatus.CANCELLED
-            job.ended_at = datetime.now(timezone.utc).isoformat()
+            job.ended_at = utc_now_iso()
             self._store.put(job)
         if process:
             self._terminate(process)

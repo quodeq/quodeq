@@ -5,6 +5,8 @@ import {
 } from '../core/galaxyCore.js';
 import { SEVERITY } from '../../../../vocab/severity.js';
 import { SCORE_SCALE_MAX } from '../../../../constants.js';
+import { emptySeverityCounts } from '../../../../utils/severity.js';
+import { isDrillableFolder } from '../core/fileTree.js';
 
 /* ── Position consistency engine ── */
 
@@ -31,7 +33,7 @@ export function unwrapLeaf(node) {
 export function layoutChildren(node) {
   const ch = node.children || [];
   const resolved = ch.map(c => unwrapLeaf(c));
-  const folders = resolved.filter(c => !c.isFile && c.children && c.children.length > 0);
+  const folders = resolved.filter(isDrillableFolder);
   const files = resolved.filter(c => c.isFile || !c.children || c.children.length === 0);
   const folderSet = new Set(folders);
   const all = [...folders, ...files];
@@ -154,7 +156,7 @@ function placeRootStars(positioned, W, H) {
       ? FOLDER_RADIUS_BASE_PX + Math.sqrt(Math.max(desc, 1)) * RADIUS_MULTIPLIER
       : FILE_RADIUS_BASE_PX + Math.sqrt(c.violations || 1) * RADIUS_MULTIPLIER;
     const rate = c.complianceRate || 0;
-    const sev = c.severity || { critical: 0, major: 0, minor: 0 };
+    const sev = c.severity || emptySeverityCounts();
     const col = scoreRGB(rate * SCORE_SCALE_MAX);
 
     const distFactor = ip.isFolder ? (FOLDER_DIST_MIN + ip.dist * FOLDER_DIST_MAX) : (FILE_DIST_MIN + ip.dist * FILE_DIST_MAX);
@@ -286,7 +288,7 @@ export function buildNavPath(root, targetPath) {
   return path;
 }
 
-// Level-info panel builder split out to galaxyFolderLevelInfo.js (self-
-// contained; shares nothing with the layout math above) — re-exported so
-// GalaxyFolderView.jsx keeps one import path.
+// The level-info panel builder lives in galaxyFolderLevelInfo.js (it shares
+// nothing with the layout math above); re-exported so GalaxyFolderView.jsx
+// has one import path.
 export { buildLevelInfo } from './galaxyFolderLevelInfo.js';

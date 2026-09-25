@@ -1,17 +1,18 @@
-"""SSE payload serializers for /api/evaluations/<jobId>/events.
-
-Split out of _run_event_stream.py purely for file size; nothing here is
-patch-tested by name (tests import these directly).
-"""
+"""SSE payload serializers for /api/evaluations/<jobId>/events."""
 from __future__ import annotations
 
 import json
 from typing import Any
 
 
+def sse_json(payload: Any) -> str:
+    """Compact JSON (no spaces after separators) for one SSE ``data:`` line."""
+    return json.dumps(payload, separators=(",", ":"))
+
+
 def serialize_status_event(status: dict[str, Any]) -> str:
     """Return the SSE data: payload for an `event: status` frame."""
-    return json.dumps(status, separators=(",", ":"))
+    return sse_json(status)
 
 
 def serialize_dimension_event(*, dimension: str, eval_data: dict[str, Any] | None) -> str:
@@ -21,8 +22,8 @@ def serialize_dimension_event(*, dimension: str, eval_data: dict[str, Any] | Non
     On read failure or missing file, only the dimension name is emitted.
     """
     if eval_data is None:
-        return json.dumps({"dimension": dimension}, separators=(",", ":"))
-    return json.dumps(eval_data, separators=(",", ":"))
+        return sse_json({"dimension": dimension})
+    return sse_json(eval_data)
 
 
 def serialize_finding_event(judgment_dict: dict[str, Any]) -> str:
@@ -31,7 +32,7 @@ def serialize_finding_event(judgment_dict: dict[str, Any]) -> str:
     judgment_dict is the row dict returned by SqliteFindingsRepository.list_*
     converted via _judgment_as_dict.
     """
-    return json.dumps(judgment_dict, separators=(",", ":"))
+    return sse_json(judgment_dict)
 
 
 def payload_as_sse_finding(payload: Any, finding_id: int) -> dict[str, Any]:

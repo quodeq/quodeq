@@ -4,7 +4,7 @@
 // VirtualList mounted (and the spinner overlaid the page from the top of
 // main.dashboard, not the list slot). These bars stand in the list's slot
 // with a card-like footprint instead: one 36px section-header row plus
-// 160px card rows, matching the pages' estimateItemSize. House skeleton
+// 160px card rows, matching the pages' ROW_HEIGHT_PX (see rowSizeEstimator). House skeleton
 // idiom: static dimmed blocks, no shimmer, no spinner.
 
 const DEFAULT_ROW_COUNT = 4;

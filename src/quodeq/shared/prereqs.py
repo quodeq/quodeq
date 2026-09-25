@@ -29,6 +29,18 @@ _VERSION_FLAG = "--version"
 _NPM = "npm"
 
 
+class _Tool(NamedTuple):
+    """A prerequisite: its ``--version`` command, display name and minimum major version."""
+
+    cmd: tuple[str, ...]
+    name: str
+    min_major: int
+
+
+_NODE_TOOL = _Tool(("node", _VERSION_FLAG), "Node.js", _MIN_NODE_MAJOR)
+_NPM_TOOL = _Tool((_NPM, _VERSION_FLAG), _NPM, _MIN_NPM_MAJOR)
+
+
 def run_version_cmd(cmd: list[str]) -> str:
     """Run a version command and return its stdout, or raise.
 
@@ -109,12 +121,12 @@ def _check_tool_version(cmd: list[str], tool_name: str, min_major: int, install_
 
 def check_node(min_major: int = _MIN_NODE_MAJOR) -> None:
     """Raise RuntimeError if Node.js is missing or below minimum version."""
-    _check_tool_version(["node", _VERSION_FLAG], "Node.js", min_major, _INSTALL_HINT_NODE)
+    _check_tool_version(list(_NODE_TOOL.cmd), _NODE_TOOL.name, min_major, _INSTALL_HINT_NODE)
 
 
 def check_npm(min_major: int = _MIN_NPM_MAJOR) -> None:
     """Raise RuntimeError if npm is missing or below minimum version."""
-    _check_tool_version([_NPM, _VERSION_FLAG], _NPM, min_major, _INSTALL_HINT_NODE)
+    _check_tool_version(list(_NPM_TOOL.cmd), _NPM_TOOL.name, min_major, _INSTALL_HINT_NODE)
 
 
 def _collect_tool_issue(cmd: list[str], tool_name: str, min_major: int) -> str | None:
@@ -144,13 +156,10 @@ def check_dashboard_dev_prereqs() -> None:
     npm (common on fresh Debian/Ubuntu systems where they ship as separate
     packages) gets the full story in one message with one install command.
     """
-    issues: list[str] = []
-    node_issue = _collect_tool_issue(["node", _VERSION_FLAG], "Node.js", _MIN_NODE_MAJOR)
-    if node_issue is not None:
-        issues.append(node_issue)
-    npm_issue = _collect_tool_issue([_NPM, _VERSION_FLAG], _NPM, _MIN_NPM_MAJOR)
-    if npm_issue is not None:
-        issues.append(npm_issue)
+    issues = [
+        issue for tool in (_NODE_TOOL, _NPM_TOOL)
+        if (issue := _collect_tool_issue(list(tool.cmd), tool.name, tool.min_major)) is not None
+    ]
     if not issues:
         return
     bullets = "\n".join(f"  - {issue}" for issue in issues)

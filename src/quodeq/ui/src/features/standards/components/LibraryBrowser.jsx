@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLibrary } from '../hooks/useLibrary.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 function LibraryCard({ standard, onImport, importing }) {
   const principleCount = standard.principles?.length ?? 0;
@@ -20,9 +21,9 @@ function LibraryCard({ standard, onImport, importing }) {
         <p className="library-card-description">{standard.description}</p>
       )}
       <div className="library-card-counts">
-        <span>{principleCount === 1 ? t('standards.principlesCountOne', { count: principleCount }) : t('standards.principlesCountMany', { count: principleCount })}</span>
+        <span>{t(pluralKey(principleCount, 'standards.principlesCountOne', 'standards.principlesCountMany'), { count: principleCount })}</span>
         <span className="library-card-counts-sep">·</span>
-        <span>{requirementCount === 1 ? t('standards.requirementsCountOne', { count: requirementCount }) : t('standards.requirementsCountMany', { count: requirementCount })}</span>
+        <span>{t(pluralKey(requirementCount, 'standards.requirementsCountOne', 'standards.requirementsCountMany'), { count: requirementCount })}</span>
       </div>
       <div className="library-card-footer">
         <button

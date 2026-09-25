@@ -1,7 +1,6 @@
 /**
- * Encapsulates project-level actions (delete, export, relocate, import) that
- * were previously inlined inside App, keeping the root component focused
- * on composition rather than API plumbing.
+ * Encapsulates project-level actions (delete, export, relocate, import), so
+ * App stays focused on composition rather than API plumbing.
  *
  * Failure handlers return `{ ok: false, messageKey, vars }` (the raw i18n
  * key + interpolation vars, not a rendered string) so a caller can inspect
@@ -19,6 +18,8 @@ import { t } from '../strings/index.js';
 import { apiErrorMessage } from '../strings/apiErrors.js';
 import { HTTP_STATUS } from '../constants.js';
 import { DIALOG_VARIANT } from '../vocab/dialogVariant.js';
+import { findProject, projectIdOrSelf } from '../utils/projectIdentity.js';
+import { projectPath } from '../api/paths.js';
 
 // Strip filesystem-unfriendly characters so a project name like
 // "foo/bar" or "..\\evil" can't influence the download path.
@@ -51,7 +52,7 @@ export function makeHandleDeleteProject({ deleteProject, projects, selectedProje
     } catch (err) {
       return fail('projects.deleteProjectFailed', { error: apiErrorMessage(err, 'projects.deleteProjectFailed') });
     }
-    if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
+    if (selectedProject === projectId) handleProjectChange(projects.find((p) => projectIdOrSelf(p) !== projectId)?.id ?? '');
     loadProjects();
     return { ok: true };
   };
@@ -59,11 +60,11 @@ export function makeHandleDeleteProject({ deleteProject, projects, selectedProje
 
 function makeHandleExportProject({ projects, getProjectExportUrl }) {
   return function handleExportProject(projectId) {
-    const proj = projects.find((p) => (p.id || p.name) === projectId);
+    const proj = findProject(projects, projectId);
     const filename = `${sanitizeFilename(proj?.name || projectId)}.zip`;
     // PyWebView: native Save dialog, fetches server-side
     if (window.pywebview?.api?.download_url) {
-      window.pywebview.api.download_url(`/api/projects/${encodeURIComponent(projectId)}/export`, filename);
+      window.pywebview.api.download_url(`/api${projectPath(projectId)}/export`, filename);
       return;
     }
     // Regular browser: <a download> works

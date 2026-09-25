@@ -7,12 +7,11 @@
  *
  * Standards visibility: every summary is filtered by the SAME source the
  * Overview reads — readVisibleStandardIds(), the browser-local visible set
- * behind the Standards screen's enable/disable stars. Compare used to fetch
- * each project's server-side visibility file instead, which made it deaf to
- * the toggles (the write goes to the SELECTED project only, and 404s
- * silently when that project is a shared one), so flipping a standard never
- * refreshed this screen. One source of truth, and the tab remount re-reads
- * it on every visit.
+ * behind the Standards screen's enable/disable stars. Each project's
+ * server-side visibility file would miss the toggles (the write goes to the
+ * SELECTED project only, and 404s silently when that project is a shared
+ * one), so flipping a standard would never refresh this screen. One source
+ * of truth, and the tab remount re-reads it on every visit.
  */
 import { useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
@@ -22,6 +21,7 @@ import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { projectKeys, sharedKeys } from '../../../api/queryKeys.js';
 import { applyVisibleStandards } from '../compareModel.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { projectId } from '../../../utils/projectIdentity.js';
 
 // A cold project's first summary can take as long as its Overview takes to
 // compute (the accumulated walk). Match the projects-list ceiling rather
@@ -46,10 +46,10 @@ const QUERY_DEFAULTS = {
  */
 export function useCompareData(projects) {
   const { getCompareSummary, sharedGetCompareSummary } = useApi();
-  const list = (projects || []).filter((p) => p && (p.id || p.name));
+  const list = (projects || []).filter((p) => p && projectId(p));
   const summaryResults = useQueries({
     queries: list.map((p) => {
-      const id = p.id || p.name;
+      const id = projectId(p);
       // Remote (shared-repo) rows fetch from the shared mirror route with
       // the RAW project id; `id` stays the fleet-unique row key. The key's
       // source segment keeps a same-named local project's cache separate.
@@ -72,7 +72,7 @@ export function useCompareData(projects) {
     const errorsById = {};
     let loadedCount = 0;
     list.forEach((p, i) => {
-      const id = p.id || p.name;
+      const id = projectId(p);
       const summary = summaryResults[i];
       if (summary?.data !== undefined) {
         summariesById[id] = applyVisibleStandards(summary.data, visibleIds);
@@ -112,7 +112,7 @@ export function useSharedCompareProjects() {
     refetchOnWindowFocus: false,
   });
   return useMemo(
-    () => (data || []).filter((p) => p && (p.id || p.name)),
+    () => (data || []).filter((p) => p && projectId(p)),
     [data],
   );
 }

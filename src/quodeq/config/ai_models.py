@@ -1,8 +1,8 @@
 """Model tier resolution -- maps tier names to concrete model IDs."""
 from __future__ import annotations
 
-import os
 from enum import StrEnum
+from quodeq.shared.env_resolve import resolve_env
 
 
 class ModelTier(StrEnum):
@@ -32,7 +32,7 @@ def get_model_for_tier(
 
     Priority: QUODEQ_MODEL_<TIER> > AI_MODEL > provider_default > None
     """
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     tier_var = _TIER_ENV_VARS[tier]
     tier_value = environ.get(tier_var, "").strip()
     if tier_value:

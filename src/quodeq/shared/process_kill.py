@@ -1,8 +1,8 @@
 """Cross-platform 'kill the whole process tree' helper (shared, cross-cutting).
 
-Hoisted out of assistant/adapters/cli.py so the terminal layer can reuse it
-without a cross-layer import. See tests/test_no_unguarded_posix.py: the POSIX
-os.killpg call is allowlisted for this path.
+Used by services/, terminal/, and assistant/ so each layer can terminate
+process trees without a cross-layer import. See tests/test_no_unguarded_posix.py:
+the POSIX os.killpg call is allowlisted for this path.
 """
 from __future__ import annotations
 
@@ -21,14 +21,18 @@ _TERMINATE_TIMEOUT_S = 10
 _KILL_WAIT_TIMEOUT_S = 5
 
 
+def _run_taskkill(pid: int) -> subprocess.CompletedProcess[bytes]:
+    """Windows: force-kill the tree rooted at *pid* (``taskkill /T``). Raises what ``subprocess.run`` raises."""
+    return subprocess.run(
+        ["taskkill", "/F", "/T", "/PID", str(pid)],
+        capture_output=True, timeout=_TERMINATE_TIMEOUT_S,
+    )
+
+
 def kill_tree(pid: int, sig: int = signal.SIGTERM) -> None:
     """Kill a process and all its children, cross-platform."""
     if sys.platform == PLATFORM_WIN32:
-        # taskkill /T kills the entire process tree
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(pid)],
-            capture_output=True, timeout=_TERMINATE_TIMEOUT_S,
-        )
+        _run_taskkill(pid)
     else:
         try:
             os.killpg(os.getpgid(pid), sig)
@@ -55,8 +59,7 @@ def terminate_process(process: subprocess.Popen) -> None:
 def _taskkill_tree(pid: int) -> bool:
     """Windows: kill the tree rooted at *pid* via taskkill. True when it succeeded."""
     try:
-        result = subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
-                                capture_output=True, timeout=_TERMINATE_TIMEOUT_S)
+        result = _run_taskkill(pid)
     except (OSError, subprocess.SubprocessError, TypeError) as exc:
         _logger.debug("taskkill failed for pid %s, falling back to proc.kill(): %s", pid, exc)
         return False

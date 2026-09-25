@@ -1,4 +1,4 @@
-"""Dashboard and accumulated-view logic, split from action_provider_fs.
+"""Dashboard and accumulated-view logic.
 
 This module owns the *selected run*: resolving which run the request means,
 rescoring its dimensions against project-wide suppressions, and driving the
@@ -195,19 +195,23 @@ def _resolve_selected_dims(
     # permanent suppression), so measure it against the dismissed-only filter.
     pre_filter_counts = {d.dimension: len(d.violations) for d in raw_dims}
     dismissed_only = filter_dismissed_from_dimensions(raw_dims, project_dir)
-    dismissed_counts = {
-        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
-        for d in dismissed_only
-    }
+    dismissed_counts = _hidden_counts(pre_filter_counts, dismissed_only)
     selected_dims = _rescore_run_dimensions(
         raw_dims, reports_root, project, selected_run.run_id, params)
     # Measured against the SAME dimensions the response ships, so the number
     # the UI shows always reconciles: shown + suppressed == what the scan found.
-    suppressed_counts = {
-        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
-        for d in selected_dims
-    }
+    suppressed_counts = _hidden_counts(pre_filter_counts, selected_dims)
     return selected_dims, dismissed_counts, suppressed_counts
+
+
+def _hidden_counts(
+    pre_filter_counts: dict[str | None, int], shown: list[DimensionResult],
+) -> dict[str, int]:
+    """Per dimension, how many of the scan's violations *shown* no longer carries."""
+    return {
+        (d.dimension or ""): pre_filter_counts.get(d.dimension, 0) - len(d.violations)
+        for d in shown
+    }
 
 
 def _resolve_params(params: ScoringParams | None) -> ScoringParams:

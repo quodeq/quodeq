@@ -7,7 +7,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, current_app, jsonify
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error
 
 _logger = logging.getLogger(__name__)
 
@@ -19,11 +19,10 @@ def register_index_routes(app: Flask) -> None:
     def rebuild_index_endpoint() -> Response | tuple[Response, int]:
         provider = current_app.config.get("_provider")
         if provider is None or not hasattr(provider, "rebuild_index"):
-            return jsonify({"error": "provider not available", "code": "PROVIDER_UNAVAILABLE"}), HTTPStatus.SERVICE_UNAVAILABLE
+            return json_error("provider not available", HTTPStatus.SERVICE_UNAVAILABLE, "PROVIDER_UNAVAILABLE")
         try:
             count, elapsed_ms = provider.rebuild_index()
         except (sqlite3.Error, OSError):
             _logger.exception("Unexpected error rebuilding index")
-            body, status = error_response("Failed to rebuild index", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-            return jsonify(body), status
+            return json_error("Failed to rebuild index", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
         return jsonify({"count": count, "elapsed_ms": elapsed_ms})

@@ -1,13 +1,12 @@
 """Regression: the SQL grade overlay closes the no-dismissals accumulated seam.
 
-Before the overlay moved into the run-read layer, ``get_project_scores`` for a
-project with no dismissed/deleted findings served the *eval-time* JSON grades
-forever — even after the user applied a custom grade formula (which rewrites the
-SQL grade tables via ``apply_to_all_runs``). The dashboard RUN view used the SQL
-grades, but the OVERVIEW (accumulated), TREND, and PROJECT CARD did not, so they
-disagreed.
+Without the overlay, ``get_project_scores`` for a project with no
+dismissed/deleted findings would serve the *eval-time* JSON grades even after
+the user applied a custom grade formula (which rewrites the SQL grade tables
+via ``apply_to_all_runs``), so the OVERVIEW (accumulated), TREND and PROJECT
+CARD would disagree with the RUN view, which reads the SQL grades.
 
-These tests pin the fix: ``read_run_data`` overlays the SQL grade tables for
+These tests pin the overlay: ``read_run_data`` overlays the SQL grade tables for
 event-log runs, so accumulated / trend / project-card reads all reflect the
 applied formula by construction.
 """
@@ -19,14 +18,14 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.core.events.models import Judgment
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.fs.report_parser.runs import read_run_data
-from quodeq.data.projection.grade_projector import recompute_grades
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 from quodeq.services import grade_formula
 from quodeq.services.dashboard import clear_shared_dimension_cache
 from quodeq.services.scoring import get_project_scores
+
+from tests.services.conftest import seed_security_findings
 
 # A formula whose severity weights differ sharply from the default so the
 # baked-with-custom-params grade is provably different from the default one.
@@ -68,24 +67,7 @@ def _build_event_log_run(
     (run_dir / "events.jsonl").write_text("")  # event-log marker
 
     store = SQLiteStateStore(run_dir)
-    for i in range(6):
-        store.record_finding(Judgment(
-            practice_id="p1", dimension="security", req=f"req{i}",
-            verdict="violation", severity="major", file=f"f{i}.py", line=1,
-            title=f"t{i}", reason=f"r{i}",
-        ))
-    for i in range(8):
-        store.record_finding(Judgment(
-            practice_id="p1", dimension="security", req=f"c{i}",
-            verdict="compliance", severity="minor", file=f"g{i}.py", line=1,
-            title=f"ct{i}", reason=f"cr{i}",
-        ))
-    # Mark the (empty) event log as fully projected so ensure_projected is a
-    # no-op and won't wipe the grades we bake below.
-    store.save_projected_size((run_dir / "events.jsonl").stat().st_size)
-
-    # Bake default-params grades — this is the "eval-time" baseline.
-    recompute_grades(run_dir, params=DEFAULT_PARAMS)
+    seed_security_findings(store, run_dir)
 
     # An eval JSON per dimension, carrying the default-params (stale) grade so
     # read_run_data has a dimension to overlay onto.

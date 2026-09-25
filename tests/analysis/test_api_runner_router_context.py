@@ -145,7 +145,7 @@ class TestBuildRouterContextCorpus:
         with (project_dir, run_dir) and stores its return value -- the
         None-when-flag-off test above passes trivially against the
         CompiledContext field default, so this closes that gap."""
-        import quodeq.analysis._api_runner as api_runner_module
+        import quodeq.analysis.mcp.precedent_signals as precedent_signals_module
 
         sentinel = object()
         calls = []
@@ -157,7 +157,7 @@ class TestBuildRouterContextCorpus:
             return sentinel
 
         monkeypatch.setattr(
-            api_runner_module, "load_precedent_corpus", fake_load_precedent_corpus,
+            precedent_signals_module, "load_precedent_corpus", fake_load_precedent_corpus,
         )
 
         run_dir = tmp_path / "run-1"
@@ -173,7 +173,7 @@ class TestBuildRouterContextPrecedentReader:
         per-run memo would remember as "no dismissals" until that DB's stat
         changes. The strict reader lets load_precedent_fingerprints see the
         failure, log it and skip the run without memoizing."""
-        import quodeq.analysis._api_runner as api_runner_module
+        import quodeq.analysis.mcp.precedent_signals as precedent_signals_module
         from quodeq.data.sqlite.findings_queries import (
             dismissed_source_stamp, read_dismissed_snippets_strict,
         )
@@ -185,7 +185,7 @@ class TestBuildRouterContextPrecedentReader:
             return {"fp"}
 
         monkeypatch.setattr(
-            api_runner_module, "load_precedent_fingerprints",
+            precedent_signals_module, "load_precedent_fingerprints",
             fake_load_precedent_fingerprints,
         )
 

@@ -68,7 +68,7 @@ def test_llamacpp_base_url_is_read_at_call_time(monkeypatch):
     assert _llamacpp._default_base_url(env={"LLAMACPP_BASE_URL": "http://x:1"}) == "http://x:1"
     monkeypatch.setenv("LLAMACPP_BASE_URL", "http://late:2")
     seen: list[str] = []
-    monkeypatch.setattr(_llamacpp, "_normalize_base", lambda url: seen.append(url) or "http://late:2")
+    monkeypatch.setattr(_llamacpp, "normalize_base", lambda url: seen.append(url) or "http://late:2")
     monkeypatch.setattr(_llamacpp.urllib.request, "urlopen",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
     _llamacpp.get_llamacpp_status()

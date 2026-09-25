@@ -6,6 +6,8 @@ import Icon from '../../../components/Icon.jsx';
 import { DownloadGlyph, TrashGlyph } from '../../../components/glyphs.jsx';
 import { t } from '../../../strings/index.js';
 import { KEY } from '../../../vocab/keyboard.js';
+import { pluralKey } from '../../../utils/plural.js';
+import StandardsModal from './StandardsModal.jsx';
 
 // The row-action glyph box, a step down from the sidebar rail's icons.
 const ROW_ICON_SIZE = 14;
@@ -24,43 +26,37 @@ function ConfirmDeleteModal({ standardName, principleCount, requirementCount, on
   const canDelete = !hasContent || typed.toLowerCase().trim() === confirmText;
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal-title">{t('standards.deleteStandardTitle')}</h3>
-        {hasContent ? (
-          <>
-            <p className="modal-body modal-body--warning">
-              <strong>{standardName}</strong> {t('standards.contains')} <strong>{principleCount === 1 ? t('standards.principlesCountOne', { count: principleCount }) : t('standards.principlesCountMany', { count: principleCount })}</strong> {t('standards.and')} <strong>{requirementCount === 1 ? t('standards.requirementsCountOne', { count: requirementCount }) : t('standards.requirementsCountMany', { count: requirementCount })}</strong>. {t('standards.cannotBeUndone')}
-            </p>
-            <p className="modal-body">{t('standards.typePrefix')} <strong>{standardName}</strong> {t('standards.toConfirmSuffix')}</p>
-            <input className="modal-input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={standardName} autoFocus />
-          </>
-        ) : (
-          <p className="modal-body">{t('standards.deleteConfirmPrefix')} <strong>{standardName}</strong>?</p>
-        )}
-        <div className="modal-actions">
-          <button type="button" className="btn-secondary" onClick={onCancel}>{t('common.cancel')}</button>
-          <button type="button" className="btn-danger" onClick={onConfirm} disabled={!canDelete}>{t('violations.delete')}</button>
-        </div>
-      </div>
-    </div>
+    <StandardsModal
+      title={t('standards.deleteStandardTitle')}
+      onCancel={onCancel}
+      actions={<button type="button" className="btn-danger" onClick={onConfirm} disabled={!canDelete}>{t('violations.delete')}</button>}
+    >
+      {hasContent ? (
+        <>
+          <p className="modal-body modal-body--warning">
+            <strong>{standardName}</strong> {t('standards.contains')} <strong>{t(pluralKey(principleCount, 'standards.principlesCountOne', 'standards.principlesCountMany'), { count: principleCount })}</strong> {t('standards.and')} <strong>{t(pluralKey(requirementCount, 'standards.requirementsCountOne', 'standards.requirementsCountMany'), { count: requirementCount })}</strong>. {t('standards.cannotBeUndone')}
+          </p>
+          <p className="modal-body">{t('standards.typePrefix')} <strong>{standardName}</strong> {t('standards.toConfirmSuffix')}</p>
+          <input className="modal-input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={standardName} autoFocus />
+        </>
+      ) : (
+        <p className="modal-body">{t('standards.deleteConfirmPrefix')} <strong>{standardName}</strong>?</p>
+      )}
+    </StandardsModal>
   );
 }
 
 function DuplicateModal({ standardId, onConfirm, onCancel }) {
   const [newId, setNewId] = useState(`${standardId}-copy`);
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal-title">{t('standards.duplicateStandardTitle')}</h3>
-        <p className="modal-body">{t('standards.enterNewId')}</p>
-        <input className="modal-input" value={newId} onChange={(e) => setNewId(e.target.value)} autoFocus />
-        <div className="modal-actions">
-          <button type="button" className="btn-secondary" onClick={onCancel}>{t('common.cancel')}</button>
-          <button type="button" className="btn-primary" onClick={() => onConfirm(newId)} disabled={!newId.trim()}>{t('standards.duplicate')}</button>
-        </div>
-      </div>
-    </div>
+    <StandardsModal
+      title={t('standards.duplicateStandardTitle')}
+      onCancel={onCancel}
+      actions={<button type="button" className="btn-primary" onClick={() => onConfirm(newId)} disabled={!newId.trim()}>{t('standards.duplicate')}</button>}
+    >
+      <p className="modal-body">{t('standards.enterNewId')}</p>
+      <input className="modal-input" value={newId} onChange={(e) => setNewId(e.target.value)} autoFocus />
+    </StandardsModal>
   );
 }
 

@@ -1,9 +1,9 @@
 """Source-file gathering and compiled-standards text for the API prompt.
 
-Split out of subprocess.py: repository scanning that selects which source
-files get inlined into a direct-API prompt, and rendering compiled standards
-JSON into the compact grouped-JSON text sent to API models. None of these
-functions are mock.patch targets.
+Repository scanning that selects which source files get inlined into a
+direct-API prompt, and rendering compiled standards JSON into the compact
+grouped-JSON text sent to API models. None of these functions are
+mock.patch targets.
 """
 from __future__ import annotations
 
@@ -125,6 +125,16 @@ def standards_char_budget(env: dict[str, str] | None = None) -> int:
     return max_standards_chars(env)
 
 
+_TRUNCATION_MARKER = "\n\n[... standards truncated for context limits ...]"  # tells the model the list is partial
+
+
+def _truncate(text: str, limit: int) -> str:
+    """Cut *text* to *limit* characters and append the truncation marker when it is longer."""
+    if len(text) > limit:
+        return text[:limit] + _TRUNCATION_MARKER
+    return text
+
+
 def load_standards_text(
     compiled_dir: Path | None,
     dimension: str | None,
@@ -158,8 +168,7 @@ def load_standards_text(
                 if len(text) > limit:
                     _log.info("Truncating %s standards from %d to %d chars for API prompt",
                               dimension, len(text), limit)
-                    text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
-                return text
+                return _truncate(text, limit)
         except (OSError, _json.JSONDecodeError) as exc:
             _log.warning(
                 "compiled standards file skipped for dimension %s (%s): %s",
@@ -168,10 +177,7 @@ def load_standards_text(
     md_path = compiled_dir / f"{dimension}.md"
     if md_path.exists():
         try:
-            text = md_path.read_text(encoding="utf-8")
-            if len(text) > limit:
-                text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
-            return text
+            return _truncate(md_path.read_text(encoding="utf-8"), limit)
         except OSError as exc:
             _log.debug("standards text file unreadable: %s", exc)
     return ""

@@ -162,11 +162,17 @@ def build_project_list(
     return auto_detect_parents(projects)
 
 
+def _contained_project_dir(reports_root: Path, project: str) -> Path | None:
+    """``reports_root / project`` resolved, or None when it escapes *reports_root*."""
+    project_dir = (reports_root / project).resolve()
+    return project_dir if is_within(project_dir, reports_root) else None
+
+
 def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
     """Update the path stored in a project's metadata."""
     reports_root = Path(reports_dir).resolve()
-    project_dir = (reports_root / project).resolve()
-    if not is_within(project_dir, reports_root):
+    project_dir = _contained_project_dir(reports_root, project)
+    if project_dir is None:
         return False
     if not repository_info_exists(project_dir):
         return False
@@ -219,8 +225,8 @@ def delete_project(reports_dir: str, project: str) -> bool:
     If the project is a parent, cascade-deletes all children.
     """
     reports_root = Path(reports_dir).resolve()
-    project_path = (reports_root / project).resolve()
-    if not is_within(project_path, reports_root):
+    project_path = _contained_project_dir(reports_root, project)
+    if project_path is None:
         return False
     if not project_path.exists() or not project_path.is_dir():
         return False
@@ -262,8 +268,8 @@ def get_project_info(
     defaulting to the production collaborators of the same name
     (``list_available_dimensions_for_discipline``, ``project_has_fingerprints``).
     """
-    project_dir = (Path(reports_dir) / project).resolve()
-    if not is_within(project_dir, reports_dir):
+    project_dir = _contained_project_dir(Path(reports_dir), project)
+    if project_dir is None:
         return None
     info = read_repository_info(project_dir)
     if info is None:

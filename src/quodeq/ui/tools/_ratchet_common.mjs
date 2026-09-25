@@ -87,6 +87,35 @@ export function total(counts) {
 }
 
 /**
+ * The line a ratchet gate prints when it passes.
+ *
+ * @param {string} noun    what the gate counts, e.g. `magic numbers`
+ * @param {Record<string, number>} counts
+ * @returns {string}
+ */
+export function okSummary(noun, counts) {
+  return `OK: no new ${noun} (${total(counts)} grandfathered across ${Object.keys(counts).length} files).`;
+}
+
+/**
+ * Exit with the code a gate run resolves to; on a crash, print the error and
+ * exit 2.
+ *
+ * @param {Promise<number>} run
+ * @param {(code: number) => void} [exit]
+ * @returns {Promise<void>}
+ */
+export function exitWith(run, exit = (code) => process.exit(code)) {
+  return run.then(
+    (code) => exit(code),
+    (err) => {
+      console.error(err.message || err);
+      exit(2);
+    },
+  );
+}
+
+/**
  * Compare today's *counts* against *baseline*.
  *
  * `grew` is the gate failure (a file has more violations than it is allowed);

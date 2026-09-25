@@ -5,6 +5,8 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
+import { runExclusive } from '../settingsHelpers.js';
 
 // Groups the section's own useState/useRef declarations so the outer
 // component's body stays under the function-length cap; still called
@@ -35,23 +37,13 @@ function useInitNewUrl({ currentUrl, setNewUrl, initializedRef }) {
 
 function buildConnectMutationConfig({ connectShared, setError, setNewUrl, refetchStatus, savingRef, queryClient }) {
   return {
-    mutationFn: async (url) => {
-      if (savingRef.current) return;
-      savingRef.current = true;
-      try {
-        setError(null);
-        const result = await connectShared(url);
-        setNewUrl(result?.url || url);
-        await refetchStatus();
-        return result;
-      } catch (err) {
-        const errorMsg = apiErrorMessage(err, 'settings.connectFailed');
-        setError(errorMsg);
-        throw err;
-      } finally {
-        savingRef.current = false;
-      }
-    },
+    mutationFn: (url) => runExclusive(savingRef, async () => {
+      setError(null);
+      const result = await connectShared(url);
+      setNewUrl(result?.url || url);
+      await refetchStatus();
+      return result;
+    }, (err) => setError(apiErrorMessage(err, 'settings.connectFailed'))),
     onSuccess: () => {
       // Everything "shared"-prefixed, not just status: ProjectsPage's
       // useSharedProjects and usePublish read the SAME cache entries (audit
@@ -65,28 +57,18 @@ function buildConnectMutationConfig({ connectShared, setError, setNewUrl, refetc
 
 function buildDisconnectMutationConfig({ disconnectShared, setError, setNewUrl, setConfirming, refetchStatus, disconnectingRef, queryClient, onDisconnected }) {
   return {
-    mutationFn: async () => {
-      if (disconnectingRef.current) return;
-      disconnectingRef.current = true;
-      try {
-        setError(null);
-        await disconnectShared();
-        setNewUrl('');
-        setConfirming(false);
-        await refetchStatus();
-        // A currently-'shared' project selection has nowhere left to
-        // resolve once the repo is disconnected -- let the app reset it
-        // (back to a local project, or no selection) rather than stranding
-        // the user on a broken view.
-        onDisconnected?.();
-      } catch (err) {
-        const errorMsg = apiErrorMessage(err, 'settings.disconnectFailed');
-        setError(errorMsg);
-        throw err;
-      } finally {
-        disconnectingRef.current = false;
-      }
-    },
+    mutationFn: () => runExclusive(disconnectingRef, async () => {
+      setError(null);
+      await disconnectShared();
+      setNewUrl('');
+      setConfirming(false);
+      await refetchStatus();
+      // A currently-'shared' project selection has nowhere left to
+      // resolve once the repo is disconnected -- let the app reset it
+      // (back to a local project, or no selection) rather than stranding
+      // the user on a broken view.
+      onDisconnected?.();
+    }, (err) => setError(apiErrorMessage(err, 'settings.disconnectFailed'))),
     onSuccess: () => {
       // Remove the list's cached data BEFORE invalidating: sharedKeys.status()
       // hasn't refetched/flipped `configured` to false anywhere yet at this
@@ -129,18 +111,17 @@ function ErrorRow({ error }) {
 function UrlStatusRow({ isLoading, status, configured, currentUrl }) {
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label">{t('settings.repositoryUrl')}</span>
-        <span className="settings-description">
-          {isLoading && !status ? (
-            t('settings.checkingEllipsis')
-          ) : configured ? (
-            <>{t('settings.configuredPrefix')} <code>{currentUrl}</code></>
-          ) : (
-            t('settings.notConfigured')
-          )}
-        </span>
-      </div>
+      <SettingsRowLabel
+        hintSlot={false}
+        label={t('settings.repositoryUrl')}
+        description={isLoading && !status ? (
+          t('settings.checkingEllipsis')
+        ) : configured ? (
+          <>{t('settings.configuredPrefix')} <code>{currentUrl}</code></>
+        ) : (
+          t('settings.notConfigured')
+        )}
+      />
     </div>
   );
 }

@@ -7,7 +7,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify
 
 from quodeq.api._constants import CODE_MISSING_PARAM
-from quodeq.api.helpers import optional_json_object_or_error
+from quodeq.api.helpers import json_error, optional_json_object_or_response
 from quodeq.menubar import control
 from quodeq.menubar.state import is_enabled, set_enabled
 
@@ -29,12 +29,12 @@ def register_menubar_routes(app: Flask) -> None:
 
     @app.put("/api/menubar")
     def menubar_set() -> Response | tuple[Response, int]:
-        body = optional_json_object_or_error(CODE_MISSING_PARAM)
+        body = optional_json_object_or_response(CODE_MISSING_PARAM)
         if not isinstance(body, dict):
-            return jsonify(body[0]), body[1]
+            return body
         enabled = body.get("enabled")
         if not isinstance(enabled, bool):
-            return jsonify({"error": "enabled must be a boolean", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST
+            return json_error("enabled must be a boolean", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
         set_enabled(enabled)
         if enabled:
             control.spawn()

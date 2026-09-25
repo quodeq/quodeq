@@ -18,6 +18,8 @@
 // production UI code names a home rather than being grandfathered here.
 // Tests and fixtures are excluded: there the literal is the expected value,
 // which is the contract under test.
+import { JSX_MODULE_LANGUAGE_OPTIONS } from './tools/eslint_shared_config.mjs';
+
 export default [
   {
     files: ['src/**/*.js', 'src/**/*.jsx'],
@@ -27,11 +29,7 @@ export default [
       'src/**/*.fixtures.js',
       'src/**/*.fixtures.jsx',
     ],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
+    languageOptions: JSX_MODULE_LANGUAGE_OPTIONS,
     rules: {
       'no-magic-numbers': [
         'error',

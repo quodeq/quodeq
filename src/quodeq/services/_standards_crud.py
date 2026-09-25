@@ -48,25 +48,39 @@ def _validate_id(standard_id: str) -> None:
         raise ValueError(f"Invalid standard ID: {standard_id}")
 
 
-def create(data: dict, evaluators_dir: Path, store: StandardsStore) -> StandardDetail:
-    """Create a new custom standard and persist it to disk."""
-    standard_id = data["id"]
+def _locate(store: StandardsStore, evaluators_dir: Path, standard_id: str) -> tuple[Path, bool]:
+    """Validate *standard_id*, then return its path and whether it exists."""
     _validate_id(standard_id)
-    path = store.path(evaluators_dir, standard_id)
-    if store.exists(evaluators_dir, standard_id):
+    return store.path(evaluators_dir, standard_id), store.exists(evaluators_dir, standard_id)
+
+
+def _claim_new_id(store: StandardsStore, evaluators_dir: Path, standard_id: str) -> Path:
+    """The path for a new standard under an unused *standard_id*, its directory ensured."""
+    path, exists = _locate(store, evaluators_dir, standard_id)
+    if exists:
         raise ValueError(f"Standard '{standard_id}' already exists")
     store.ensure_dir(evaluators_dir)
+    return path
+
+
+def _reject_managed(payload: dict, standard_id: str, action: str) -> None:
+    """Refuse to *action* (edit, delete, overwrite) a standard whose *payload* is managed."""
+    if payload.get("managed", False):
+        raise StandardProtectedError(f"Cannot {action} managed standard '{standard_id}'")
+
+
+def create(data: dict, evaluators_dir: Path, store: StandardsStore) -> StandardDetail:
+    """Create a new custom standard and persist it to disk."""
+    path = _claim_new_id(store, evaluators_dir, data["id"])
     return _write_and_load_detail(store, path, {**data, **_CUSTOM_DEFAULTS})
 
 
 def update(standard_id: str, data: dict, evaluators_dir: Path, store: StandardsStore) -> StandardDetail:
     """Update an existing custom standard with new *data*."""
-    _validate_id(standard_id)
-    path = store.path(evaluators_dir, standard_id)
-    if not store.exists(evaluators_dir, standard_id):
+    path, exists = _locate(store, evaluators_dir, standard_id)
+    if not exists:
         raise StandardNotFoundError(f"Standard not found: {standard_id}")
-    if store.read(path).get("managed", False):
-        raise StandardProtectedError(f"Cannot edit managed standard '{standard_id}'")
+    _reject_managed(store.read(path), standard_id, "edit")
     payload = {**data, "id": standard_id, "type": TYPE_CUSTOM, "managed": False}
     store.write(path, payload)
     return build_detail(payload)
@@ -75,25 +89,19 @@ def update(standard_id: str, data: dict, evaluators_dir: Path, store: StandardsS
 def delete(standard_id: str, evaluators_dir: Path, compiled_dir: Path,
            store: StandardsStore, is_builtin: Callable[[str], bool]) -> None:
     """Delete a custom standard. Raises for built-in or managed standards."""
-    _validate_id(standard_id)
-    path = store.path(evaluators_dir, standard_id)
-    if not store.exists(evaluators_dir, standard_id):
+    path, exists = _locate(store, evaluators_dir, standard_id)
+    if not exists:
         if store.compiled_exists(compiled_dir, standard_id) or is_builtin(standard_id):
             raise StandardProtectedError(f"Cannot delete built-in standard '{standard_id}'")
         raise StandardNotFoundError(f"Standard not found: {standard_id}")
-    if store.read(path).get("managed", False):
-        raise StandardProtectedError(f"Cannot delete managed standard '{standard_id}'")
+    _reject_managed(store.read(path), standard_id, "delete")
     store.remove(evaluators_dir, standard_id)
 
 
 def duplicate(new_id: str, source_detail: StandardDetail,
               evaluators_dir: Path, store: StandardsStore) -> StandardDetail:
     """Duplicate an existing standard under *new_id* as a custom copy."""
-    _validate_id(new_id)
-    new_path = store.path(evaluators_dir, new_id)
-    if store.exists(evaluators_dir, new_id):
-        raise ValueError(f"Standard '{new_id}' already exists")
-    store.ensure_dir(evaluators_dir)
+    new_path = _claim_new_id(store, evaluators_dir, new_id)
     s = source_detail
     payload = {"id": new_id, "name": s.name, "description": s.description,
                "weight": s.weight, "source": s.source, "principles": s.principles,
@@ -118,8 +126,8 @@ def import_from_file(data: dict, force: bool, evaluators_dir: Path, store: Stand
         p, r = count_principles_and_requirements(existing)
         return {"status": IMPORT_STATUS_CONFLICT, "detail": None,
                 "existing": build_custom_meta(existing, p, r), "warnings": warnings}
-    if existing is not None and existing.get("managed", False):
-        raise StandardProtectedError(f"Cannot overwrite managed standard '{standard_id}'")
+    if existing is not None:
+        _reject_managed(existing, standard_id, "overwrite")
     store.ensure_dir(evaluators_dir)
     detail = _write_and_load_detail(store, path, {**cleaned, **_CUSTOM_DEFAULTS})
     return {"status": "imported", "detail": detail,

@@ -12,6 +12,7 @@ import { t, LOCALE } from '../../../strings/index.js';
 import { computeCoverageInfo, buildPartialTooltip } from './dimensionGaugeMath.js';
 import { activateOnKey } from '../../../utils/a11y.js';
 import { SCORE_SCALE_MAX } from '../../../constants.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 /**
  * Findings the scan produced but scoring never saw, because the principle they
@@ -24,7 +25,7 @@ import { SCORE_SCALE_MAX } from '../../../constants.js';
  */
 function UnmappedSegment({ count }) {
   if (!count) return null;
-  const tooltipKey = count === 1 ? 'overview.unmappedTooltipOne' : 'overview.unmappedTooltipMany';
+  const tooltipKey = pluralKey(count, 'overview.unmappedTooltipOne', 'overview.unmappedTooltipMany');
   return (
     <> · <span
       className="dim-gauge-card__unmapped"

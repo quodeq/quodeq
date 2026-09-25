@@ -1,6 +1,6 @@
 """Persistent UUID-based project identity resolution for the reports directory.
 
-Split into focused modules:
+Built from focused modules:
 - _models: ProjectIdentity, ProjectRepository
 - _index_cache: thread-safe mtime cache
 - _index_io: load/save index file
@@ -8,10 +8,11 @@ Split into focused modules:
 """
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from quodeq.data.fs._index_cache import clear_index_cache
-from quodeq.data.fs._index_io import load_index, save_index
+from quodeq.data.fs._index_io import FilesystemProjectRepository
 from quodeq.data.fs._models import ProjectIdentity, ProjectRepository
 from quodeq.data.fs._resolution import create_project, find_existing_project
 from quodeq.data.fs.children import find_children
@@ -26,57 +27,49 @@ __all__ = [
 ]
 
 
-def _resolve_scoped(
-    reports_dir: Path, identity: ProjectIdentity, resolved_path: str,
-    load_fn, save_fn,
+def _find_or_create(
+    reports_dir: Path, identity: ProjectIdentity, repository: ProjectRepository,
+    parent_uuid: str | None = None,
 ) -> str:
-    """Resolve a scoped project: ensure parent exists, then resolve child."""
-    parent_identity = ProjectIdentity(
-        identity.project_name, resolved_path, identity.discipline, identity.location,
-        remote_url=identity.remote_url,
-    )
-    parent_uuid = find_existing_project(reports_dir, parent_identity, load_fn, save_fn)
-    if not parent_uuid:
-        parent_uuid = create_project(reports_dir, parent_identity, load_fn, save_fn)
-
-    child_name = f"{identity.project_name}/{identity.scope_path}"
-    child_identity = ProjectIdentity(
-        child_name, resolved_path, identity.discipline, identity.location,
-        scope_path=identity.scope_path, remote_url=identity.remote_url,
-    )
-    existing = find_existing_project(reports_dir, child_identity, load_fn, save_fn)
+    """The project already indexed for *identity*, else a new one under *parent_uuid*."""
+    existing = find_existing_project(reports_dir, identity, repository)
     if existing:
         return existing
-    return create_project(
-        reports_dir, child_identity, load_fn, save_fn, parent_uuid=parent_uuid,
+    return create_project(reports_dir, identity, repository, parent_uuid=parent_uuid)
+
+
+def _at_path(identity: ProjectIdentity, resolved_path: str, **changes: str | None) -> ProjectIdentity:
+    """*identity* at *resolved_path*, unscoped unless *changes* set ``scope_path``."""
+    fields: dict[str, str | None] = {"scope_path": None, **changes}
+    return replace(identity, repo_path=resolved_path, **fields)
+
+
+def _resolve_scoped(
+    reports_dir: Path, identity: ProjectIdentity, resolved_path: str, repository: ProjectRepository,
+) -> str:
+    """Resolve a scoped project: ensure parent exists, then resolve child."""
+    parent_uuid = _find_or_create(reports_dir, _at_path(identity, resolved_path), repository)
+    child_identity = _at_path(
+        identity, resolved_path,
+        project_name=f"{identity.project_name}/{identity.scope_path}", scope_path=identity.scope_path,
     )
+    return _find_or_create(reports_dir, child_identity, repository, parent_uuid)
 
 
 def _resolve_unscoped(
-    reports_dir: Path, identity: ProjectIdentity, resolved_path: str,
-    load_fn, save_fn,
+    reports_dir: Path, identity: ProjectIdentity, resolved_path: str, repository: ProjectRepository,
 ) -> str:
     """Resolve an unscoped project, creating a dot-child if children exist."""
-    resolved = ProjectIdentity(
-        identity.project_name, resolved_path, identity.discipline, identity.location,
-        remote_url=identity.remote_url,
-    )
-    existing = find_existing_project(reports_dir, resolved, load_fn, save_fn)
-    if existing:
-        if find_children(reports_dir, existing):
-            dot_identity = ProjectIdentity(
-                f"{identity.project_name}/.", resolved_path,
-                identity.discipline, identity.location, scope_path=".",
-                remote_url=identity.remote_url,
-            )
-            dot_existing = find_existing_project(reports_dir, dot_identity, load_fn, save_fn)
-            if dot_existing:
-                return dot_existing
-            return create_project(
-                reports_dir, dot_identity, load_fn, save_fn, parent_uuid=existing,
-            )
+    resolved = _at_path(identity, resolved_path)
+    existing = find_existing_project(reports_dir, resolved, repository)
+    if not existing:
+        return create_project(reports_dir, resolved, repository)
+    if not find_children(reports_dir, existing):
         return existing
-    return create_project(reports_dir, resolved, load_fn, save_fn)
+    dot_identity = _at_path(
+        identity, resolved_path, project_name=f"{identity.project_name}/.", scope_path=".",
+    )
+    return _find_or_create(reports_dir, dot_identity, repository, existing)
 
 
 def resolve_project_uuid(
@@ -104,9 +97,8 @@ def resolve_project_uuid(
     if not reports_dir.exists():
         reports_dir.mkdir(parents=True, exist_ok=True)
 
-    load_fn = repository.load_index if repository is not None else load_index
-    save_fn = repository.save_index if repository is not None else save_index
-
+    if repository is None:
+        repository = FilesystemProjectRepository()
     if identity.scope_path:
-        return _resolve_scoped(reports_dir, identity, resolved_path, load_fn, save_fn)
-    return _resolve_unscoped(reports_dir, identity, resolved_path, load_fn, save_fn)
+        return _resolve_scoped(reports_dir, identity, resolved_path, repository)
+    return _resolve_unscoped(reports_dir, identity, resolved_path, repository)

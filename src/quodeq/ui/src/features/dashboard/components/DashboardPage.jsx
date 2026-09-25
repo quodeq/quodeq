@@ -7,6 +7,7 @@ import { renderDashboardGate } from './dashboardGate.jsx';
 import { renderDashboardBody } from './dashboardBody.jsx';
 import { ProjectsLoadFailedState } from './DashboardPageEmptyStates.jsx';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { projectId } from '../../../utils/projectIdentity.js';
 
 // ---------------------------------------------------------------------------
 // DashboardPage — body only, header is rendered by App.jsx
@@ -26,11 +27,11 @@ import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 // pull) -- looking it up in `projects` would silently bleed the local twin's
 // languageStats/publishedBy/etc. into a shared Overview. `sharedProjectInfo`
 // is fetched separately (useDashboard, keyed by source) and is exactly this
-// shared project's own info. Local behavior is unchanged: same lookup, same
-// null fallback. Exported so the source-gating contract is unit-testable
+// shared project's own info. A local selection is looked up in `projects`,
+// null when absent. Exported so the source-gating contract is unit-testable
 // without mounting the whole page (which needs a SidePaneProvider and more).
 export function selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo }) {
-  const localProjectInfo = (projects || []).find((p) => (p.id || p.name) === selectedProject) || null;
+  const localProjectInfo = (projects || []).find((p) => projectId(p) === selectedProject) || null;
   return selectedSource === PROJECT_SOURCE.SHARED ? (sharedProjectInfo || null) : localProjectInfo;
 }
 
@@ -64,10 +65,10 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // These hooks MUST stay above the early returns below — calling them after a
   // conditional return changes the hook count between renders (React error
   // #310, a blank-crash on load). The grace/appear/sticky-latch state machine
-  // is extracted into useDashboardPageState (hooks/useDashboardPageState.js);
-  // its sub-hooks run in the exact order they did when inline here, so the
-  // render-phase state adjustments (grace reset, sticky-latch write) and the
-  // StrictMode double-invocation semantics they depend on are unchanged.
+  // lives in useDashboardPageState (hooks/useDashboardPageState.js); its
+  // sub-hooks run in a fixed order, which the render-phase state adjustments
+  // (grace reset, sticky-latch write) and the StrictMode double-invocation
+  // semantics depend on.
   const pageState = useDashboardPageState({
     runMode, dashboard, accumulated, loading, error, selectedProject, selectedSource, selectedRunId,
   });

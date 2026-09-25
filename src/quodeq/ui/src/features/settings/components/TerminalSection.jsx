@@ -2,7 +2,7 @@ import useTerminalSettings from '../hooks/useTerminalSettings.js';
 import { useTerminalRestart } from '../hooks/useTerminalRestart.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
-import { SettingsPillTabs } from './settingsRowParts.jsx';
+import { SettingsEnableRow } from './settingsRowParts.jsx';
 
 export default function TerminalSection() {
   const { enabled, setEnabled } = useTerminalSettings();
@@ -10,19 +10,12 @@ export default function TerminalSection() {
   return (
     <section className="panel settings-section">
       <div className="panel-header"><SectionLabel marker="▶">{t('settings.terminalLabel')}</SectionLabel></div>
-      <div className={`settings-row${enabled ? '' : ' settings-row--last'}`}>
-        <div className="settings-row-label">
-          <span className="settings-label">{t('settings.terminalEnable')}</span>
-          <span className="settings-description">
-            {t('settings.terminalEnableDesc')}
-          </span>
-        </div>
-        <SettingsPillTabs
-          options={[{ v: true, l: t('settings.on') }, { v: false, l: t('settings.off') }]}
-          value={enabled}
-          onChange={setEnabled}
-        />
-      </div>
+      <SettingsEnableRow
+        enabled={enabled}
+        setEnabled={setEnabled}
+        label={t('settings.terminalEnable')}
+        description={t('settings.terminalEnableDesc')}
+      />
       {enabled && (
         <div className="settings-row settings-row--last">
           <span className="settings-description">

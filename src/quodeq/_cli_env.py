@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 from collections.abc import Mapping
 
 from quodeq.shared.constants import ENV_TRUTHY
+from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
@@ -82,10 +82,10 @@ def cli_environ(env: Mapping[str, str] | None = None) -> Mapping[str, str]:
     ``build_run_config`` and the update notice resolve the run's
     environment here, once, and pass the mapping on; the modules they call
     never name ``os.environ`` themselves. The readers in this module go
-    through it too, so the module names ``os.environ`` exactly once. An
-    injected ``{}`` means "no variables set" and is returned as-is.
+    through it too. An injected ``{}`` means "no variables set" and is
+    returned as-is.
     """
-    return os.environ if env is None else env
+    return resolve_env(env)
 
 
 def no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:

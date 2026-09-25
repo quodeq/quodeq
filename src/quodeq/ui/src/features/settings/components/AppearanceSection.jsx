@@ -1,5 +1,6 @@
 import { t } from '../../../strings/index.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
 
 const MODE_OPTIONS = [
   { value: 'system',   label: t('settings.themeModeSystem') },
@@ -24,10 +25,7 @@ export default function AppearanceSection({ themeMode, themeFamily, onApplyMode,
         <SectionLabel marker="▶">{t('settings.appearanceLabel')}</SectionLabel>
       </div>
       <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">{t('settings.modeLabel')}</span>
-          <span className="settings-description">{t('settings.modeDesc')}</span>
-        </div>
+        <SettingsRowLabel hintSlot={false} label={t('settings.modeLabel')} description={t('settings.modeDesc')} />
         <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.appearanceGroupAria')}>
           {MODE_OPTIONS.map(({ value, label }) => (
             <button
@@ -44,10 +42,7 @@ export default function AppearanceSection({ themeMode, themeFamily, onApplyMode,
         </div>
       </div>
       <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">{t('settings.themeLabel')}</span>
-          <span className="settings-description">{t('settings.themeDesc')}</span>
-        </div>
+        <SettingsRowLabel hintSlot={false} label={t('settings.themeLabel')} description={t('settings.themeDesc')} />
         <div className="settings-pill-group">
           {FAMILY_OPTIONS.map(({ value, label }) => (
             <button

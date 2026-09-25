@@ -8,13 +8,15 @@ import { EvaluationsTable } from './EvaluationsTable.jsx';
 import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { roundOneDecimal } from '../../../utils/rounding.js';
+import { pluralKey } from '../../../utils/plural.js';
+import { NOT_READY_MESSAGE } from '../historyHelpers.js';
 
 // Deferred so the History page's first paint doesn't carry the chart library.
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
-// The lazy-loaded chart panel had no error boundary around its Suspense: a
-// chunk-load failure (offline, deploy skew) or a render throw inside the
-// chart used to crash the whole History page instead of just the chart.
+// Error boundary around the lazy-loaded chart's Suspense: a chunk-load
+// failure (offline, deploy skew) or a render throw inside the chart takes
+// down only the chart, not the whole History page.
 class ChartErrorBoundary extends Component {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
@@ -26,7 +28,6 @@ class ChartErrorBoundary extends Component {
 }
 
 const TOAST_DISMISS_MS = 2600;
-const NOT_READY_MESSAGE = t('history.notReadyMessage');
 
 // Exported for HistoryContent.deltas.test.jsx.
 export function computeDeltas(rows) {
@@ -60,14 +61,14 @@ function NotReadyToast({ message, onDismiss }) {
 }
 
 // Header block: the terminal header + (when there's more than zero runs) the
-// run navigator. Extracted verbatim from HistoryContent's JSX.
+// run navigator.
 function HistoryTopHeader({ trend, languageSub, selectedSource, availableRuns, runNav, onRunClick }) {
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
   return (
     <div className="history-page__top">
       <TermHeader
         name={t('history.termName')}
-        sub={`${trend.length === 1 ? t('history.evalsCountOne', { count: trend.length }) : t('history.evalsCountMany', { count: trend.length })}${languageSub ? ` · ${languageSub}` : ''}`}
+        sub={`${t(pluralKey(trend.length, 'history.evalsCountOne', 'history.evalsCountMany'), { count: trend.length })}${languageSub ? ` · ${languageSub}` : ''}`}
         badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
       />
       {availableRuns && availableRuns.length > 0 && (

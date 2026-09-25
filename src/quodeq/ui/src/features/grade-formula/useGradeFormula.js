@@ -6,13 +6,14 @@ import { useGradeFormulaState } from './hooks/useGradeFormulaState.js';
 import { useGradePreview } from './hooks/useGradePreview.js';
 import { useRescoreProgress } from './hooks/useRescoreProgress.js';
 import { t } from '../../strings/index.js';
+import { pluralKey } from '../../utils/plural.js';
 
 // Singular and plural are separate whole sentences, not a stem plus an "s":
 // the verb agreement moves too ("shows" vs "show"), and plenty of languages
 // inflect more of the sentence than English does.
 function noticeFor(rescore) {
   return rescore.failed > 0
-    ? t(rescore.failed === 1 ? 'gradeFormula.partialRescoreOne' : 'gradeFormula.partialRescoreMany', { count: rescore.failed })
+    ? t(pluralKey(rescore.failed, 'gradeFormula.partialRescoreOne', 'gradeFormula.partialRescoreMany'), { count: rescore.failed })
     : null;
 }
 
@@ -35,11 +36,11 @@ function settleRescore(payload, { failWith, notePartialRescore, requestPreview }
  * boundaries into; defaults to the app-wide store, injectable so tests
  * don't leak grading state into the rest of the process.
  *
- * Split into hooks/useGradeFormulaState.js (server/draft/preview/busy/error
+ * Composes hooks/useGradeFormulaState.js (server/draft/preview/busy/error
  * state + the initial load), hooks/useGradePreview.js (the debounced preview
  * request + update()) and hooks/useRescoreProgress.js (the page's view of
  * the app-level rescore tracker in rescore/, which polls after an
- * apply/reset: the server answers with 202 and finishes in the background). This file composes them and owns apply/resetToDefaults.
+ * apply/reset: the server answers with 202 and finishes in the background), and owns apply/resetToDefaults.
  */
 export default function useGradeFormula(projectId, thresholdsStore = defaultGradeThresholdsStore) {
   const {

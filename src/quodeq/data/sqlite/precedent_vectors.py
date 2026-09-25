@@ -19,11 +19,11 @@ import sqlite3
 import struct
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
 from quodeq.data.sqlite.constants import SQLITE_BUSY_TIMEOUT_MS
+from quodeq.shared.clock import utc_now_iso
 
 _logger = logging.getLogger(__name__)
 
@@ -163,7 +163,7 @@ def insert_vectors(
     if not items:
         return True
     dims = len(items[0][1])
-    now = datetime.now(timezone.utc).isoformat()
+    now = utc_now_iso()
     try:
         conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(

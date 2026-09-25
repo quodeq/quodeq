@@ -1,9 +1,7 @@
 /**
- * Fleet-wide row and aggregate builders for the Compare tab.
- *
- * Split out of compareModel.js (which keeps the shared primitives and
- * re-exports everything here) — see compareModel.js for the module-level
- * docs on inputs.
+ * Fleet-wide row and aggregate builders for the Compare tab. compareModel.js
+ * keeps the shared primitives, re-exports these builders and documents the
+ * inputs.
  */
 import {
   STALE_AFTER_DAYS, nameKey, parseScore10, daysBetween, trendDelta, mean,
@@ -12,6 +10,8 @@ import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 import { SORT_DIR } from '../../vocab/sortDirection.js';
 import { roundOneDecimal } from '../../utils/rounding.js';
 import { SCORE_SCALE_MAX, PERCENT } from '../../constants.js';
+import { projectId } from '../../utils/projectIdentity.js';
+import { emptySeverityCounts, sumSeverityTallies } from '../../utils/severity.js';
 
 // consequenceLevel's return values, in ascending severity. CompareFleetView
 // and useCompareScopeActions both compare against CLEAR to decide whether a
@@ -67,7 +67,7 @@ function _buildRowDims(summary) {
       grade: d.overallGrade ?? null,
       violations: d.totals?.violationCount ?? 0,
       compliance: d.totals?.complianceCount ?? 0,
-      severity: d.totals?.severity || { critical: 0, major: 0, minor: 0 },
+      severity: d.totals?.severity || emptySeverityCounts(),
       principles: (d.principles || []).map((p) => ({
         key: nameKey(p.principle || p.name),
         label: String(p.principle || p.name || '').toLowerCase(),
@@ -115,7 +115,7 @@ function _rowScores(score, s, trend) {
     delta: trend.delta,
     lastDelta: trend.lastDelta,
     spark: trend.spark,
-    severity: s?.severity || { critical: 0, major: 0, minor: 0 },
+    severity: s?.severity || emptySeverityCounts(),
     totalViolations: s?.totalViolations ?? 0,
     totalCompliance: s?.totalCompliance ?? 0,
   };
@@ -144,7 +144,7 @@ function _rowStatus(project, summary, score) {
  * `summary` may be undefined while the per-project query is in flight.
  */
 export function buildRow(project, summary, now) {
-  const id = project.id || project.name;
+  const id = projectId(project);
   const s = summary?.summary || null;
   const score = s?.numericAverage ?? null;
   return {
@@ -192,14 +192,7 @@ export function buildFleet(rows) {
   const delta = weightSum
     ? roundOneDecimal(weighted.reduce((a, r) => a + r.delta * r.totalFiles, 0) / weightSum)
     : null;
-  const severity = scored.reduce(
-    (acc, r) => ({
-      critical: acc.critical + (r.severity.critical || 0),
-      major: acc.major + (r.severity.major || 0),
-      minor: acc.minor + (r.severity.minor || 0),
-    }),
-    { critical: 0, major: 0, minor: 0 },
-  );
+  const severity = sumSeverityTallies(scored);
   const totalViolations = scored.reduce((a, r) => a + r.totalViolations, 0);
   const totalCompliance = scored.reduce((a, r) => a + r.totalCompliance, 0);
   const checks = totalViolations + totalCompliance;

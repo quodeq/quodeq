@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import random
 import ssl as _ssl
 import threading
@@ -13,6 +12,7 @@ from urllib.parse import urlparse
 
 from quodeq.shared.constants import ENV_TRUTHY, SCHEME_HTTP, SCHEME_HTTPS
 from quodeq.shared.env import env_float, env_int
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.ssrf import is_private_address as _is_private_hostname
 
 _logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ class FetchClient:
         self._failures = 0
         self._timeout = timeout_s
         self._env = env
-        _e = self._env if self._env is not None else os.environ
+        _e = resolve_env(self._env)
         self._CIRCUIT_THRESHOLD = env_int("QUODEQ_CIRCUIT_THRESHOLD", _DEFAULT_CIRCUIT_THRESHOLD, minimum=1, env=_e)
         self._MAX_RETRIES = env_int("QUODEQ_MAX_RETRIES", 2, minimum=0, env=_e)
         self._RETRY_BACKOFF_S = env_float("QUODEQ_RETRY_BACKOFF_S", _DEFAULT_RETRY_BACKOFF_S, minimum=0.0, env=_e)

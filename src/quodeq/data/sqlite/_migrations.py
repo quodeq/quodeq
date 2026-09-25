@@ -4,6 +4,9 @@ from __future__ import annotations
 import sqlite3
 
 from quodeq.data.sqlite._migrations_additive import (
+    FINDINGS_TABLE,
+    add_missing_column,
+    table_exists,
     upgrade_v5_to_v6,
     upgrade_v6_to_v7,
     upgrade_v7_to_v8,
@@ -38,9 +41,7 @@ def _upgrade_v1_to_v2(conn: sqlite3.Connection) -> None:
     name: confidence" and bricks the run (see _upgrade_v4_to_v5 for the same
     guard on exit_reason).
     """
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(findings)")}
-    if "confidence" not in columns:
-        conn.execute("ALTER TABLE findings ADD COLUMN confidence INTEGER NOT NULL DEFAULT 100")
+    add_missing_column(conn, FINDINGS_TABLE, "confidence", "INTEGER NOT NULL DEFAULT 100")
 
 
 def _upgrade_v2_to_v3(conn: sqlite3.Connection) -> None:
@@ -122,10 +123,7 @@ def _invalidate_projection_checkpoint(conn: sqlite3.Connection) -> None:
     does. Skip gracefully in that case; without a checkpoint, ensure_projected
     rebuilds from scratch anyway.
     """
-    has_run_meta = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_meta'"
-    ).fetchone() is not None
-    if has_run_meta:
+    if table_exists(conn, "run_meta"):
         conn.execute(
             "DELETE FROM run_meta WHERE key IN "
             "('projection_checkpoint', 'projection_event_log_size', 'actions_log_projected_size')"
@@ -166,19 +164,14 @@ def _upgrade_v4_to_v5(conn: sqlite3.Connection) -> None:
     scripts never did. Skip the ALTER in that case; if a future caller
     needs the table they will get the fresh DDL on a new DB.
     """
-    has_dim_scores = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='dimension_scores'"
-    ).fetchone() is not None
-    if has_dim_scores:
+    if table_exists(conn, "dimension_scores"):
         # Idempotency: the ALTER and the PRAGMA user_version bump in
         # apply_evaluation_schema commit separately (autocommit), so a crash
         # in between leaves the column added but the version still 4. Re-running
         # the bare ALTER would then raise "duplicate column name: exit_reason"
         # -- a plain OperationalError the scoring/dashboard read seams don't
         # catch, permanently bricking the run. Skip if the column already exists.
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(dimension_scores)")}
-        if "exit_reason" not in columns:
-            conn.execute("ALTER TABLE dimension_scores ADD COLUMN exit_reason TEXT")
+        add_missing_column(conn, "dimension_scores", "exit_reason", "TEXT")
 
 
 _UPGRADES = {

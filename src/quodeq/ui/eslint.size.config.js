@@ -12,6 +12,7 @@
 // waived with an inline comment -- grandfathering only happens through the
 // reviewed list below, which is the point of a ratchet.
 import { SIZE_GRANDFATHER } from './tools/size_grandfather.mjs';
+import { JSX_MODULE_LANGUAGE_OPTIONS } from './tools/eslint_shared_config.mjs';
 
 const SIZE_RULES = {
   'max-lines': ['error', { max: 300, skipBlankLines: false }],
@@ -21,11 +22,7 @@ const SIZE_RULES = {
 export default [
   {
     files: ['src/**/*.js', 'src/**/*.jsx'],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
+    languageOptions: JSX_MODULE_LANGUAGE_OPTIONS,
     rules: SIZE_RULES,
   },
   // Test files group related cases under one describe(...), and ESLint

@@ -13,7 +13,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, QUERY_FLAG_TRUE
-from quodeq.api.helpers import json_error, optional_json_object_or_error
+from quodeq.api.helpers import json_error, optional_json_object_or_error, validate_segment
 from quodeq.api.routes_common import reports_dir
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
@@ -24,7 +24,6 @@ from quodeq.core.scoring.params import (
 )
 from quodeq.services import grade_formula
 from quodeq.services.grade_formula_job import GradeFormulaRescorer, RescoreSnapshot
-from quodeq.shared.validation import validate_path_segment
 
 
 def _invalid_input(message: str) -> tuple[Response, int]:
@@ -66,12 +65,9 @@ def _preview_response() -> Response | tuple[Response, int]:
     if not isinstance(payload, dict):
         return payload
     project = payload.get("project") or ""
-    try:
-        validate_path_segment(project)
-    except ValueError:
-        return json_error(
-            "Invalid project", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
-        )
+    err = validate_segment(project, message="Invalid project")
+    if err is not None:
+        return err
     params, err = _parse_params(payload.get("params") or {})
     if err:
         return err

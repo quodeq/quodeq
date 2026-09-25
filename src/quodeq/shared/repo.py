@@ -51,14 +51,14 @@ def looks_like_authority(candidate: str) -> bool:
     return "." in host or host.startswith("[") or host == LOCALHOST
 
 
-def _strip_userinfo(url: str) -> str:
-    """Drop any embedded userinfo (``user:token@host``, ``git@host``) from ``url``.
+def _userinfo_end(text: str) -> int | None:
+    """Index just past the userinfo "@" of *text*, or None when it embeds no userinfo.
 
-    ``url`` has already had its scheme stripped, so the authority starts at
-    position 0. RFC 3986 ends userinfo at the LAST "@" of the authority, so
-    the search runs from the right: a password containing "@"
+    *text* has had its scheme stripped, so the authority starts at position
+    0. RFC 3986 ends userinfo at the LAST "@" of the authority, so the
+    search runs from the right: a password containing "@"
     ("user:p@ss@host") would otherwise leave the tail of the credential in
-    the normalized value.
+    the result.
 
     A "/" before that "@" usually means the authority already ended and the
     "@" belongs to a path segment ("host/~user@host/repo") -- but only when
@@ -67,13 +67,22 @@ def _strip_userinfo(url: str) -> str:
     bounding the search by the first "/" then hides the real "@" and lets
     the whole credential through unstripped.
     """
-    at_pos = url.rfind("@")
+    at_pos = text.rfind("@")
     if at_pos == -1:
-        return url
-    slash_pos = url.find("/")
-    if -1 < slash_pos < at_pos and looks_like_authority(url[:slash_pos]):
-        return url
-    return url[at_pos + 1 :]
+        return None
+    slash_pos = text.find("/")
+    if -1 < slash_pos < at_pos and looks_like_authority(text[:slash_pos]):
+        return None
+    return at_pos + 1
+
+
+def _strip_userinfo(url: str) -> str:
+    """Drop any embedded userinfo (``user:token@host``, ``git@host``) from scheme-less *url*.
+
+    ``_userinfo_end`` documents how the credential boundary is found.
+    """
+    end = _userinfo_end(url)
+    return url if end is None else url[end:]
 
 
 def split_userinfo(url: str) -> tuple[str, str] | None:
@@ -82,13 +91,7 @@ def split_userinfo(url: str) -> tuple[str, str] | None:
     None when *url* carries no scheme (scp-style ``git@host:path`` remotes,
     where the leading ``git@`` is a username convention, not a credential),
     when the authority has no "@", or when the "@" belongs to a path segment.
-
-    Userinfo ends at the LAST "@" of the authority (RFC 3986), so the search
-    runs from the right. A "/" before that "@" usually means the authority
-    already ended -- but only when the text before that "/" is itself a
-    plausible host. Real credentials (base64-derived tokens, JWTs, CI PATs)
-    often contain a literal "/", and bounding the search by the first "/"
-    would then hide the real "@" and let the whole credential through.
+    ``_userinfo_end`` documents how the credential boundary is found.
 
     The two callers differ only in what they put back: the registration path
     drops the userinfo, the API error path masks it as ``***@``.
@@ -98,13 +101,8 @@ def split_userinfo(url: str) -> tuple[str, str] | None:
         return None
     scheme = match.group(1)
     rest = url[len(scheme):]
-    at_pos = rest.rfind("@")
-    if at_pos == -1:
-        return None
-    slash_pos = rest.find("/")
-    if -1 < slash_pos < at_pos and looks_like_authority(rest[:slash_pos]):
-        return None
-    return scheme, rest[at_pos + 1:]
+    end = _userinfo_end(rest)
+    return None if end is None else (scheme, rest[end:])
 
 
 def normalize_remote_url(url: str) -> str | None:

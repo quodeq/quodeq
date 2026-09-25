@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 
 from quodeq.core.standards.overrides import resolve_requirement_text
@@ -27,6 +28,23 @@ def _require_field(entry: dict, field: str, kind: str) -> object:
             f"Malformed standards file: a {kind} is missing required {field!r}: {entry!r}"
         )
     return value
+
+
+def _principles_with_requirements(data: dict) -> Iterator[tuple[dict, list[dict]]]:
+    """Yield each principle that has requirements, with its requirement list."""
+    for principle in data.get("principles", []):
+        reqs = principle.get("requirements", [])
+        if reqs:
+            yield principle, reqs
+
+
+def _resolved_requirements(
+    reqs: list[dict], overrides: dict[str, dict] | None,
+) -> Iterator[tuple[dict, object, str]]:
+    """Yield ``(req, id, text)`` per requirement, with the project's threshold overrides applied."""
+    for req in reqs:
+        req_id = _require_field(req, _FIELD_ID, "requirement")
+        yield req, req_id, resolve_requirement_text(req, (overrides or {}).get(req_id))
 
 
 def load_dimension_data(
@@ -66,17 +84,12 @@ def render_compiled_standards(
     if data is None:
         return _NO_STANDARDS_FOR_DIM
     lines = []
-    for principle in data.get("principles", []):
-        reqs = principle.get("requirements", [])
-        if not reqs:
-            continue
+    for principle, reqs in _principles_with_requirements(data):
         name = _require_field(principle, "name", "principle")
         lines.append(f"### {name}")
         if principle.get("description"):
             lines.append(principle["description"])
-        for req in reqs:
-            req_id = _require_field(req, _FIELD_ID, "requirement")
-            text = resolve_requirement_text(req, (overrides or {}).get(req_id))
+        for req, req_id, text in _resolved_requirements(reqs, overrides):
             req_line = f"- **{req_id}**: {text}"
             if req.get("description"):
                 req_line += f" — {req['description']}"
@@ -100,17 +113,11 @@ def render_compact_standards(
     if data is None:
         return _NO_STANDARDS_FOR_DIM
     checklist = []
-    for principle in data.get("principles", []):
-        reqs = principle.get("requirements", [])
-        if not reqs:
-            continue
-        requirements = []
-        for r in reqs:
-            req_id = _require_field(r, _FIELD_ID, "requirement")
-            requirements.append({
-                "id": req_id,
-                "rule": resolve_requirement_text(r, (overrides or {}).get(req_id)),
-            })
+    for principle, reqs in _principles_with_requirements(data):
+        requirements = [
+            {"id": req_id, "rule": text}
+            for _req, req_id, text in _resolved_requirements(reqs, overrides)
+        ]
         checklist.append({
             "principle": principle.get("name", "Unknown"),
             "requirements": requirements,

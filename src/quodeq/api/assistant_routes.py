@@ -1,6 +1,6 @@
 """HTTP surface for the embedded assistant (sessions, turns, SSE, actions).
 
-Split into four route modules plus this thin orchestrator:
+A thin orchestrator over four route modules:
   - assistant_turn_state.py: ``AssistantTurnState`` and the request-context
     turn-claim shims the workspace routes use.
   - assistant_session_routes.py: create session + skills/actions catalog.
@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
-from flask import Flask, Response, jsonify
+from flask import Flask, Response
 
 from quodeq.api.assistant_action_routes import register_assistant_action_routes
 from quodeq.api.assistant_session_routes import SessionGates, register_assistant_session_routes
@@ -34,7 +34,8 @@ from quodeq.api.assistant_turn_state import (  # noqa: F401 — re-export/patch 
 )
 from quodeq.api._assistant_helpers import build_tool_context
 from quodeq.api.assistant_workspace_routes import register_assistant_workspace_routes
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import json_error
+from quodeq.api.routes_shared_common import no_shared_repo_error
 from quodeq.assistant import LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant.orchestrator import TurnRequest, run_turn
@@ -65,13 +66,11 @@ def _shared_source_error() -> tuple[Response, int] | None:
     repository is configured or its local clone state is unusable, else None."""
     settings = read_settings()
     if not settings.url:
-        body, status = error_response("no shared repository configured", HTTPStatus.CONFLICT, "NO_SHARED_REPO")
-        return jsonify(body), status
+        return no_shared_repo_error(HTTPStatus.CONFLICT)
     state = read_state(settings.url)
     if state not in (RepoFormat.OK, RepoFormat.EMPTY):
-        body, status = error_response(
+        return json_error(
             f"shared repository unavailable: {state}", HTTPStatus.CONFLICT, "SHARED_REPO_UNAVAILABLE")
-        return jsonify(body), status
     return None
 
 
