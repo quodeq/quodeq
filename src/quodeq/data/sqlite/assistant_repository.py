@@ -15,7 +15,7 @@ from quodeq.data.sqlite._assistant_schema import (
     ASSISTANT_MIGRATIONS,
     ASSISTANT_SCHEMA_VERSION,
 )
-from quodeq.data.sqlite._constants import SQLITE_BUSY_TIMEOUT_MS
+from quodeq.data.sqlite.constants import SQLITE_BUSY_TIMEOUT_MS
 
 
 def _dict_row(cursor: sqlite3.Cursor, row: tuple) -> dict:

@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-from quodeq.data.sqlite._constants import SQLITE_BUSY_TIMEOUT_MS
+from quodeq.data.sqlite.constants import SQLITE_BUSY_TIMEOUT_MS
 
 _logger = logging.getLogger(__name__)
 

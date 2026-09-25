@@ -34,7 +34,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.data.sqlite import SQLITE_BUSY_TIMEOUT_MS
+from quodeq.data.sqlite.constants import SQLITE_BUSY_TIMEOUT_MS
 
 _logger = logging.getLogger(__name__)
 

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Iterator
 
 from quodeq.data.sqlite._migrations import apply_evaluation_schema
-from quodeq.data.sqlite._constants import SQLITE_BUSY_TIMEOUT_MS
+from quodeq.data.sqlite.constants import SQLITE_BUSY_TIMEOUT_MS
 
 EVALUATION_DB_FILENAME = "evaluation.db"
 

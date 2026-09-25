@@ -7,6 +7,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from quodeq.analysis.mcp.schemas import DEFAULT_FILE_BATCH_SIZE
 from quodeq.analysis.subagents._queue_state import (
     FileQueueError,  # re-export
     QUEUE_VERSION,
@@ -14,7 +15,7 @@ from quodeq.analysis.subagents._queue_state import (
     read_state,
     write_state,
 )
-from quodeq.analysis.subagents.types import DEFAULT_FILE_BATCH_SIZE, WorkQueue  # noqa: F401 — re-export
+from quodeq.analysis.subagents.types import WorkQueue  # noqa: F401 — re-export
 
 _KEY_FILES = "files"
 _KEY_AGENT = "agent"

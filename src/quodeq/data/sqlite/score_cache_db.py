@@ -13,7 +13,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Iterator
 
-from quodeq.data.sqlite._constants import SQLITE_BUSY_TIMEOUT_MS
+from quodeq.data.sqlite.constants import SQLITE_BUSY_TIMEOUT_MS
 from quodeq.data.sqlite._score_cache_epoch import CACHE_WRITER_EPOCH
 from quodeq.shared.env import get_score_cache_path
 
