@@ -3,7 +3,7 @@
 // Hover handlers (onPrevHover, etc.) are optional — when wired they prefetch the
 // adjacent run's dashboard so the click feels instant.
 
-import { t } from '../../../strings/index.js';
+import { t } from '../strings/index.js';
 
 function RunNavPager({ currentRun, isLatest, isOldest, onPrev, onNext, onPrevHover, onNextHover }) {
   return (

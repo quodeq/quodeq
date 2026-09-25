@@ -13,7 +13,8 @@ import logging
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.context.online_cache import (
@@ -75,6 +76,17 @@ class GitCloneClient:
 _default_git_client = GitCloneClient()
 
 
+@dataclass(frozen=True)
+class OnlineCacheOps:
+    """Online-cache collaborators ``prepare_repository`` drives. None =
+    production default (``context.online_cache.cache_disabled``/
+    ``ensure_clone``). The cache's own clone/fetch internals are not
+    threaded here -- only the two calls this module makes directly."""
+
+    cache_disabled: Callable[[], bool] | None = None
+    ensure_clone: Callable[[str], Path | None] | None = None
+
+
 def clone_repo(url: str, dest: Path, extra_args: list[str], *, timeout_s: int) -> None:
     """Compat wrapper around :meth:`GitCloneClient.clone_progress` on the
     module default instance. See that method for the argv-shape rationale.
@@ -105,24 +117,31 @@ def _legacy_tempdir_clone(repo_input: str, *, client: GitCloneClient | None = No
     return str(dest.resolve())
 
 
-def prepare_repository(repo_input: str, *, client: GitCloneClient | None = None) -> str:
+def prepare_repository(
+    repo_input: str, *, client: GitCloneClient | None = None,
+    cache_ops: OnlineCacheOps | None = None,
+) -> str:
     """Return a local working copy of *repo_input*, cloning if necessary.
 
     Routes through :func:`quodeq.context.online_cache.ensure_clone` so the
     second-and-onward evaluations of the same URL reuse a shallow cached
     clone (fetched + reset to ``origin/HEAD``). The legacy mkdtemp clone
     path is kept as a fallback and behind ``QUODEQ_DISABLE_ONLINE_CACHE``.
-    *client* is an injection seam for the legacy path only — the online
-    cache's own clone/fetch calls (``context/online_cache.py``) are a
-    separate collaborator, not threaded here.
+    *client* is an injection seam for the legacy path only. *cache_ops* is
+    an :class:`OnlineCacheOps` bundle for the two online-cache calls this
+    function makes directly — the online cache's own clone/fetch internals
+    are a separate collaborator, not threaded here.
 
     Raises ValueError if the URL does not match the expected git
     repository format.
     """
+    ops = cache_ops or OnlineCacheOps()
+    is_cache_disabled = ops.cache_disabled if ops.cache_disabled is not None else cache_disabled
+    do_ensure_clone = ops.ensure_clone if ops.ensure_clone is not None else ensure_clone
     _validate_remote_url(repo_input)
-    if cache_disabled():
+    if is_cache_disabled():
         return _legacy_tempdir_clone(repo_input, client=client)
-    cached = ensure_clone(repo_input)
+    cached = do_ensure_clone(repo_input)
     if cached is not None:
         return str(cached.resolve())
     # Cache-miss + clone failure: try the old path so a corrupt cache

@@ -101,7 +101,7 @@ class TestValidateAiCmdPath:
         resp, status = validate_ai_cmd_path("claude", str(path))
         assert status == HTTPStatus.BAD_REQUEST
 
-    @patch("quodeq.api._evaluation_helpers._get_ai_cmd", return_value="claude")
+    @patch("quodeq.shared.cmd_path_policy._get_ai_cmd", return_value="claude")
     def test_provider_falls_back_to_configured_cmd(self, _mock, app_ctx, bin_dir):
         binary = _make_executable(bin_dir, "claude-api")
         assert validate_ai_cmd_path(None, binary) is None

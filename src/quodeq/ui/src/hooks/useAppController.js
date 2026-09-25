@@ -3,6 +3,7 @@ import { applyMutationDelta } from '../api/applyMutationDelta.js';
 import {
   computeIsEvaluating, useAppBootExtras, useAppWizardBounce, useAppDerived, useAppEvalProgress,
   useSidebarProviderSelection, useAppStartupGate, useAppNavigationEffects, useSelectedProjectSyncEffects,
+  useVisibleStandardsFiltered,
 } from './useAppShellHooks.js';
 import { useAssistantActionAppliedEffect } from './useAppEffects.js';
 
@@ -40,7 +41,8 @@ export function useAppChrome({ state, sharedSignal }) {
   const startup = useAppStartupGate({ state, activeTab });
   useAppNavigationEffects({ state, activeTab, navTab, sharedSignal });
   useSelectedProjectSyncEffects(state.selectedProject);
-  const derived = useAppDerived({ state, navTab, navSwapAt, activePage });
+  const { filteredTrend, filteredAccumulated } = useVisibleStandardsFiltered(state);
+  const derived = useAppDerived({ state, navTab, navSwapAt, activePage, filteredTrend, filteredAccumulated });
   const topbarRunProgress = useAppEvalProgress({ state, isEvaluating });
   return { selectedProjectInfo, isEvaluating, ...wizard, ...sidebar, ...startup, ...derived, topbarRunProgress };
 }

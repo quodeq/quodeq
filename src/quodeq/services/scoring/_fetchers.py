@@ -7,24 +7,25 @@ instead of reaching back into the still-loading facade.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 from typing import Callable
 
+from quodeq.config.services_env import max_history_runs as _resolve_max_history_runs
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.dimension import DimensionResult
 from quodeq.services.trend_fetcher import make_trend_fetcher
-from quodeq.services.dashboard import DEFAULT_MAX_HISTORY_RUNS, make_run_dimension_fetcher
+from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.wiring import read_run_scalars
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
-from quodeq.shared.env import env_int
 
 
-def max_history_runs() -> int:
+def max_history_runs(env: Mapping[str, str] | None = None) -> int:
     """Read max history runs from env at call time for lazy configuration."""
-    return env_int("QUODEQ_MAX_HISTORY_RUNS", DEFAULT_MAX_HISTORY_RUNS, minimum=1)
+    return _resolve_max_history_runs(env=env)
 
 
 def make_scoring_trend_fetcher(

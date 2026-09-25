@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { dismissUpdate, markUpdateDisclosed } from '../../api/index.js';
 import { t } from '../../strings/index.js';
 import { useUpdateStatus } from './useUpdateStatus.js';
 import { useSelfUpdate } from './useSelfUpdate.js';
+import { useUpdateBannerActions } from './useUpdateBannerActions.js';
 import { openExternal } from './openExternal.js';
 
 const PHASE_STRINGS = {
@@ -60,6 +60,7 @@ function UpdateAction({ status, selfUpdate }) {
 export default function UpdateBanner() {
   const { status, adopt } = useUpdateStatus();
   const selfUpdate = useSelfUpdate(status, adopt);
+  const { markUpdateDisclosed, dismissUpdate } = useUpdateBannerActions();
   const [dismissed, setDismissed] = useState(false);
 
   // First-run disclosure: record that the user has been informed.
@@ -67,7 +68,7 @@ export default function UpdateBanner() {
     if (status && status.disclosed === false) {
       markUpdateDisclosed().catch(warnPersistFailed);
     }
-  }, [status]);
+  }, [status, markUpdateDisclosed]);
 
   if (!status || !status.update_available || dismissed) return null;
   if (selfUpdate.active) return <ProgressBanner selfUpdate={selfUpdate} />;

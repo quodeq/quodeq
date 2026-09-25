@@ -87,12 +87,14 @@ class JobProcessSeams:
     """Injection points for how ``JobManager`` spawns, probes and caps subprocesses.
 
     Every field defaults to the production collaborator: ``subprocess.Popen``,
-    the signal-based ``ProcessControl``, and the ``QUODEQ_JOB_TIMEOUT_S``
-    env var for the hard duration cap.
+    the signal-based ``ProcessControl``, the ``QUODEQ_JOB_TIMEOUT_S`` env var
+    for the hard duration cap, and the ``QUODEQ_MAX_CONCURRENT_JOBS`` env var
+    for the concurrency cap.
     """
     spawn_impl: Callable[..., subprocess.Popen] | None = None
     process_control: ProcessControl | None = None
     job_timeout_cap_s: float | None = None
+    max_concurrent_jobs: int | None = None
 
 
 @dataclass

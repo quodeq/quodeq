@@ -6,7 +6,6 @@ get_violations' scope routing.
 from __future__ import annotations
 
 import heapq
-import json
 
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools._read_tools_common import raw_run_dims, requirement_of, validate_dimension
@@ -23,6 +22,7 @@ from quodeq.core.standards.visibility import (
     partition_visible,
 )
 from quodeq.core.types.severity import Severity
+from quodeq.services.wiring import read_eval_report
 
 # Trimmed violation shape shared by get_report and get_violations. We keep only
 # the fields that let the model locate and explain an issue and DROP the large
@@ -135,8 +135,12 @@ def _violations_from_run(ctx: ToolContext, dimension: str | None):
             entry = next((d for d in scored if d.get("dimension") == dimension), None)
             if entry is not None:
                 return entry.get("violations") or [], dimension, []
-        viols = json.loads(path.read_text(encoding="utf-8")).get("violations") or []
-        return viols, dimension, []
+        # Fall back to the raw report only when the dismiss/delete rescore
+        # has no answer -- read_eval_report re-checks existence itself, but
+        # the is_file() above still gates the not-found error message so a
+        # missing dim never falls through to scored_run_dims for nothing.
+        report = read_eval_report(eval_dir, dimension) or {}
+        return report.get("violations") or [], dimension, []
     if not eval_dir.is_dir():
         raise ToolError(
             "no evaluation reports in this run. Try get_overview for "

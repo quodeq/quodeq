@@ -9,6 +9,7 @@ from quodeq.llm_bridge._providers import (
     classify_provider,
     resolve_api_key,
     resolve_api_key_env,
+    resolve_test_endpoint,
     LOCAL_PROVIDERS,
 )
 from quodeq.llm_bridge._ollama import (
@@ -43,6 +44,7 @@ __all__ = [
     "classify_provider",
     "resolve_api_key",
     "resolve_api_key_env",
+    "resolve_test_endpoint",
     "get_ollama_status",
     "list_ollama_models",
     "estimate_max_agents",

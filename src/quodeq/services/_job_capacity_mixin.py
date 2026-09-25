@@ -10,20 +10,24 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timezone
 
+from quodeq.config.services_env import max_concurrent_jobs as _resolve_max_concurrent_jobs
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
 from quodeq.services._job_model import Job
-from quodeq.shared.env import env_int
 
-_DEFAULT_MAX_CONCURRENT_JOBS = 8
 _EXIT_CODE_TOO_MANY_JOBS = -2
 
 
 class JobCapacityMixin:
-    @staticmethod
-    def _max_concurrent_jobs() -> int:
-        """Return QUODEQ_MAX_CONCURRENT_JOBS, or 8 when unset/invalid."""
-        return env_int("QUODEQ_MAX_CONCURRENT_JOBS", _DEFAULT_MAX_CONCURRENT_JOBS, minimum=1)
+    # Declared, not assigned: JobManager.__init__ owns it (mirrors
+    # _job_timeout_cap_s_override in _job_monitor_mixin.py).
+    _max_concurrent_jobs_override: int | None
+
+    def _max_concurrent_jobs(self) -> int:
+        """Return the injected override, else QUODEQ_MAX_CONCURRENT_JOBS (default 8)."""
+        if self._max_concurrent_jobs_override is not None:
+            return self._max_concurrent_jobs_override
+        return _resolve_max_concurrent_jobs()
 
     def _reserve_slot_or_refuse(self, job: Job) -> JobSnapshot | None:
         """Reserve a slot for *job*, or fail it as a capacity refusal.

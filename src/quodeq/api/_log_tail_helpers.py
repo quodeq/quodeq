@@ -6,13 +6,13 @@ the split already used by ``_sse_log_helpers.py`` for the SSE tail generator.
 """
 from __future__ import annotations
 
-import json
 import logging
 from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
 
 from quodeq.core.run.job_status import JOB_FINISHED, JobStatus
+from quodeq.services.run_events import read_run_status_json
 from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
@@ -102,13 +102,13 @@ def stream_terminal_state(provider, job_id: str) -> str:
     path = resolve_stream_log_path(provider, job_id)
     if path is None:
         return JobStatus.DONE
-    status_path = path.parent / "status.json"
-    if status_path.exists():
-        try:
-            data = json.loads(status_path.read_text(encoding="utf-8"))
-            state = data.get("state")
-            if isinstance(state, str):
-                return state
-        except (OSError, ValueError) as exc:
-            _logger.debug("status.json unreadable for job %s, reporting done: %s", job_id, exc)
+    run_dir = path.parent
+    status_path = run_dir / "status.json"
+    if not status_path.exists():
+        return JobStatus.DONE
+    data = read_run_status_json(run_dir)
+    state = data.get("state") if isinstance(data, dict) else None
+    if isinstance(state, str):
+        return state
+    _logger.debug("status.json unreadable for job %s, reporting done", job_id)
     return JobStatus.DONE

@@ -18,9 +18,9 @@ from pathlib import Path
 # this module stays inside the SEP-06 logging boundary that _job_model.py
 # already carries a declared exemption for (see
 # tests/tools/test_logging_boundary.py's DECLARED_LOGGING_SITES).
+from quodeq.config.services_env import job_persist_dir as _resolve_job_persist_dir
 from quodeq.core.run.job_status import JobStatus, parse_job_status
 from quodeq.services._job_model import InMemoryJobStore, Job, JobStore, MAX_LOG_LINES, logger
-from quodeq.shared.env_resolve import resolve_env
 
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
 
@@ -29,18 +29,9 @@ def _default_persist_dir(env: Mapping[str, str] | None = None) -> Path:
     """Read persist dir from env at call time for lazy configuration.
 
     *env* overrides ``os.environ`` for the ``QUODEQ_JOB_PERSIST_DIR`` read.
-
-    Resolution: QUODEQ_JOB_PERSIST_DIR, else ``run/jobs`` next to the index
-    DB (mirroring get_score_cache_path, so the test suite's
-    QUODEQ_INDEX_DB_PATH override auto-isolates this store too), which
-    itself defaults to ``~/.quodeq``. Hardcoding the home fallback here let
-    pytest runs write fake jobs into the developer's real dashboard.
+    See ``config.services_env.job_persist_dir`` for the resolution order.
     """
-    explicit = resolve_env(env).get("QUODEQ_JOB_PERSIST_DIR")
-    if explicit:
-        return Path(explicit)
-    from quodeq.shared.env import get_index_db_path
-    return Path(get_index_db_path()).parent / "run" / "jobs"
+    return _resolve_job_persist_dir(env=env)
 
 
 def _job_to_json(job: Job) -> dict:

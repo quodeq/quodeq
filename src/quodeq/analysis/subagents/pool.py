@@ -58,6 +58,7 @@ class SubagentPool:
         )
         self._scout_first, self._jsonl_lock = options.scout_first, threading.Lock()
         self._phase = options.phase
+        self._agent_failure_streak_limit = options.agent_failure_streak_limit
         self._futures: dict[Future[SubagentResult], int] = {}
         self._finished: dict[str, bool] = {}
         self._next_idx = 0
@@ -80,6 +81,15 @@ class SubagentPool:
         self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
         self._next_idx += 1
 
+    def _run_config_evaluators_dir(self) -> Path | None:
+        """The run's evaluators dir, read off ``base_config.run_config`` the
+        same way the heartbeat's principle resolver reads it -- so the
+        suppression matcher and the resolver never disagree on which
+        custom-evaluator files exist. None (not the global default) when the
+        run has no evaluators dir configured."""
+        run_config = getattr(self._base_config, "run_config", None)
+        return getattr(run_config, "evaluators_dir", None)
+
     def _suppression_predicate(self):
         """Predicate the heartbeat uses to net dismissed/deleted findings out.
 
@@ -98,7 +108,10 @@ class SubagentPool:
         try:
             from quodeq.services.suppression import matcher_for  # noqa: PLC0415
             project_dir = self._evidence_dir.parent.parent
-            matcher = matcher_for(project_dir, self._dimension_key)
+            matcher = matcher_for(
+                project_dir, self._dimension_key,
+                evaluators_dir=self._run_config_evaluators_dir(),
+            )
         except (ImportError, OSError, ValueError) as exc:
             log_warning(f"Suppression state unavailable, counts stay raw: {exc}")
             return None
@@ -106,7 +119,6 @@ class SubagentPool:
 
     def _start_heartbeat(self) -> tuple[threading.Event, threading.Thread]:
         stop = threading.Event()
-        run_config = getattr(self._base_config, "run_config", None)
         ctx = HeartbeatContext(
             queue_path=self._queue_path, dimension_key=self._dimension_key,
             jsonl_path=self._shared_jsonl_path(), lock=self._jsonl_lock,
@@ -115,7 +127,7 @@ class SubagentPool:
             # heartbeat counts what the report will keep.
             resolver=build_principle_resolver(
                 self._dimension_key,
-                getattr(run_config, "evaluators_dir", None),
+                self._run_config_evaluators_dir(),
                 self._base_config.compiled_dir,
                 req_map_reader=read_req_to_principle_map,
             ),
@@ -150,6 +162,7 @@ class SubagentPool:
                 submit_fn=lambda: self._submit_agent(pool),
                 deadline_at=self._base_config.deadline_at,
                 run_deadline_at=self._base_config.run_deadline_at,
+                agent_failure_streak_limit=self._agent_failure_streak_limit,
             )
             if self._scout_first:
                 scout_loop(ctx)

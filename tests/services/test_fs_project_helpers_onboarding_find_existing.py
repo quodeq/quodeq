@@ -61,6 +61,26 @@ def test_find_existing_project_uses_index_then_self_heals_via_walk_fallback(tmp_
     assert set(load_repo_index(reports).values()) == set(uuids)
 
 
+def test_find_existing_project_walk_visits_directories_in_sorted_order(tmp_path, monkeypatch):
+    """The directory-walk fallback must visit candidates in a deterministic
+    (sorted) order, not whatever order the filesystem happens to return."""
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    for name in ("zeta", "alpha", "mu"):
+        (reports / name).mkdir()
+
+    visited: list[str] = []
+    real = helpers._repo_identity_matches
+
+    def spy(project_dir, expected_name, repo_resolved, scope_path):
+        visited.append(project_dir.name)
+        return real(project_dir, expected_name, repo_resolved, scope_path)
+
+    monkeypatch.setattr(helpers, "_repo_identity_matches", spy)
+    assert find_existing_project(str(reports), "nomatch-repo", None) is None
+    assert visited == ["alpha", "mu", "zeta"]
+
+
 def test_find_existing_project_ignores_index_entry_left_by_a_path_move(tmp_path):
     """A project that moved must stop claiming the path it left behind.
 

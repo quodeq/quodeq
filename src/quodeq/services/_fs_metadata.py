@@ -20,10 +20,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from quodeq.data.fs.standards_prefs import load_visible_standard_ids
 from quodeq.services._accumulated_data import has_valid_score
 from quodeq.core.scoring.report_grades import summarize_dimensions
-from quodeq.services.wiring import RunInfo, read_run_data
+from quodeq.services.wiring import RunInfo, load_visible_standard_ids, read_run_data
 from quodeq.services._fs_project_primitives import local_repo_root
 from quodeq.services._fs_project_primitives import (  # noqa: F401 — re-export
     check_path_exists,
@@ -232,7 +231,8 @@ def _read_settled_or_pending_summary(
 
 def read_accumulated_summary(
     reports_root: Path, entry_name: str, runs: list[RunInfo],
-    params: "ScoringParams | None" = None, *, compute_on_miss: bool = False,
+    params: "ScoringParams | None" = None, *,
+    compute_on_miss: bool = False, cache_enabled: bool = True,
 ) -> tuple[str | None, float | None, int | None, bool]:
     """Compute accumulated grade and score across all runs. Returns (grade, score, files, pending).
 
@@ -250,6 +250,10 @@ def read_accumulated_summary(
     selection is folded into the cache version so toggling a standard
     invalidates the cached card.
 
+    *cache_enabled* is the resolved QUODEQ_DISABLE_SCORE_CACHE kill switch
+    (default True): the provider composition resolves it once via
+    ``score_cache_disabled()`` and passes it in.
+
     See ``_compute_on_miss_summary`` and ``_read_settled_or_pending_summary``
     for the two branches' cache-hit/miss rationale.
     """
@@ -257,9 +261,8 @@ def read_accumulated_summary(
         from quodeq.services import grade_formula  # noqa: PLC0415
         params = grade_formula.load_params()
 
-    from quodeq.shared.env import score_cache_disabled  # noqa: PLC0415
     scope = _summary_version(reports_root, entry_name, runs, params)
-    if compute_on_miss or score_cache_disabled():
+    if compute_on_miss or not cache_enabled:
         return _compute_on_miss_summary(reports_root, entry_name, runs, params, scope)
     return _read_settled_or_pending_summary(entry_name, runs, scope.version)
 
@@ -274,7 +277,7 @@ def warm_project_summary(reports_root: Path, entry_name: str) -> None:
     status-stamped (``_summary_version`` -> ``per_run_versions``), so an
     in-progress run's cached row self-invalidates once it completes.
     """
-    from quodeq.data.fs.report_parser.runs import list_runs  # noqa: PLC0415
+    from quodeq.services.wiring import list_runs  # noqa: PLC0415
     from quodeq.services import grade_formula  # noqa: PLC0415
     from quodeq.services.score_cache import cached_project_summary  # noqa: PLC0415
 

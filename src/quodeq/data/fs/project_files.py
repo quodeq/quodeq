@@ -32,6 +32,14 @@ def repository_info_exists(project_dir: Path) -> bool:
     return (project_dir / REPOSITORY_INFO_FILENAME).exists()
 
 
+def scan_json_exists(project_dir: Path) -> bool:
+    """True when ``scan.json`` exists.
+
+    Pure presence probe, mirrors :func:`repository_info_exists`.
+    """
+    return (project_dir / SCAN_FILENAME).exists()
+
+
 def _read_json_object(path: Path) -> dict | None:
     """Parsed JSON object at *path*, or None when absent, corrupt, or not an object."""
     if not path.exists():

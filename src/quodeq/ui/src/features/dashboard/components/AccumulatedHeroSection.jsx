@@ -1,5 +1,6 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { gradeLetter, complianceRatio, extDisplayName } from '../../../utils/formatters.js';
+import { formatScoreDisplay } from '../../../utils/gradeFormatting.js';
 import { TermHeader, Stat } from '../../../components/terminal/index.js';
 import { HeroPanel, ComplianceAndRatioStats, heroCardHandlers } from './heroSectionParts.jsx';
 import LastFetchedLine from '../../../components/LastFetchedLine.jsx';
@@ -55,11 +56,10 @@ function AccumulatedStatStrip({ scoreDisplay, scoreDelta, grade, customFormula, 
 
 /** Numbers the stat strip shows, read off the accumulated summary. */
 function accumulatedStats(summary) {
-  const scoreNum = parseFloat(summary?.numericAverage);
   const violations = summary?.totalViolations || 0;
   const compliance = summary?.totalCompliance || 0;
   return {
-    scoreDisplay: isNaN(scoreNum) ? '—' : scoreNum.toFixed(1),
+    scoreDisplay: formatScoreDisplay(summary?.numericAverage),
     grade: summary?.overallGrade,
     violations,
     compliance,

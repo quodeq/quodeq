@@ -12,7 +12,7 @@ from quodeq.core.events.models import (
     FindingUndismissed,
     FindingUndismissedEvent,
 )
-from quodeq.data.actions_log import ActionLogWriter, read_action_events
+from quodeq.data.actions_log import ActionLogWriter, merge_action_log_files, read_action_events
 
 
 def test_writer_appends_event(tmp_path: Path) -> None:
@@ -145,3 +145,36 @@ def test_a_failed_append_is_logged_with_the_log_path(tmp_path: Path, caplog) -> 
         writer.emit_many([*_undismiss("R1"), object()])  # type: ignore[list-item]
     assert "Failed to emit" in caplog.text
     assert str(tmp_path / "actions.jsonl") in caplog.text
+
+
+def test_merge_action_log_files_unions_dedups_and_sorts(tmp_path: Path) -> None:
+    a = tmp_path / "a.jsonl"
+    b = tmp_path / "b.jsonl"
+    dest = tmp_path / "merged.jsonl"
+    line1 = '{"event_id":"1","timestamp":"2026-07-01T10:00:00Z"}'
+    line2 = '{"event_id":"2","timestamp":"2026-07-02T10:00:00Z"}'
+    a.write_text(line2 + "\n" + line1 + "\n")
+    b.write_text(line1 + "\n")  # duplicate of line1
+
+    merge_action_log_files(dest, (a, b))
+
+    assert dest.read_text().splitlines() == [line1, line2]
+
+
+def test_merge_action_log_files_skips_missing_sources(tmp_path: Path) -> None:
+    dest = tmp_path / "merged.jsonl"
+
+    merge_action_log_files(dest, (tmp_path / "none1", tmp_path / "none2"))
+
+    assert not dest.exists()
+
+
+def test_merge_action_log_files_non_utf8_source_raises_value_error(tmp_path: Path) -> None:
+    a = tmp_path / "a.jsonl"
+    b = tmp_path / "b.jsonl"
+    dest = tmp_path / "merged.jsonl"
+    a.write_text('{"event_id":"1","timestamp":"1"}\n', encoding="utf-8")
+    b.write_bytes(b"\xff\xfe not valid utf-8\n")
+
+    with pytest.raises(ValueError):
+        merge_action_log_files(dest, (a, b))

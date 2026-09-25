@@ -1,16 +1,22 @@
 """Defensive env parsing: malformed values fall back instead of raising.
 
 Covers these env sites: QUODEQ_JOB_TIMEOUT_S,
-QUODEQ_CANCEL_GRACE_S, QUODEQ_GIT_CLONE_TIMEOUT_S (config.clone_env, read
-lazily per call by services._fs_clone and by the _cli_resolution import-time
-constant), and QUODEQ_MAX_HISTORY_RUNS. Import-time constants are exercised
-via importlib.reload with the env var set, then restored.
+QUODEQ_CANCEL_GRACE_S (config.services_env, read lazily per call by
+services._external_jobs.cancel_external_run -- no longer an import-time
+module constant; see
+tests/services/test_external_jobs.py::TestCancelGraceReadPerCall, which is
+already grandfathered for the private ``_external_jobs`` import this needs),
+QUODEQ_GIT_CLONE_TIMEOUT_S (config.clone_env, read lazily per call by
+services._fs_clone and by the _cli_resolution import-time constant), and
+QUODEQ_MAX_HISTORY_RUNS. Import-time constants are exercised via
+importlib.reload with the env var set, then restored.
 """
 from __future__ import annotations
 
 import importlib
 
 from quodeq.config.clone_env import git_clone_timeout_s
+from quodeq.services.dashboard import run_dim_cache_max
 from quodeq.services.jobs import JobManager
 from quodeq.services.scoring import max_history_runs
 
@@ -55,14 +61,24 @@ class TestMaxHistoryRuns:
         assert max_history_runs() == 7
 
 
-class TestImportTimeConstants:
-    def test_cancel_grace_invalid_falls_back(self, monkeypatch):
-        value = _reload_attr(
-            monkeypatch, "quodeq.services._external_jobs",
-            "QUODEQ_CANCEL_GRACE_S", "abc", "_DEFAULT_GRACE_PERIOD_S",
-        )
-        assert value == 30.0
+class TestRunDimCacheMax:
+    """No ``env=`` injected -- the real process env, through the public
+    ``run_dim_cache_max()`` entry point make_run_dimension_fetcher calls."""
 
+    def test_valid_value_is_used(self, monkeypatch):
+        monkeypatch.setenv("QUODEQ_RUN_DIM_CACHE_MAX", "3")
+        assert run_dim_cache_max() == 3
+
+    def test_zero_is_a_real_value(self, monkeypatch):
+        monkeypatch.setenv("QUODEQ_RUN_DIM_CACHE_MAX", "0")
+        assert run_dim_cache_max() == 0
+
+    def test_invalid_value_falls_back(self, monkeypatch):
+        monkeypatch.setenv("QUODEQ_RUN_DIM_CACHE_MAX", "lots")
+        assert run_dim_cache_max() == 256
+
+
+class TestImportTimeConstants:
     def test_clone_timeout_invalid_falls_back(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_GIT_CLONE_TIMEOUT_S", "fast")
         assert git_clone_timeout_s() == 300

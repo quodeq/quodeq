@@ -22,8 +22,8 @@ def test_post_message_spawns_turn_and_streams(client, app, monkeypatch):
     # The stream now stays open past a turn's `done` (so 2nd+ turns still
     # reach the browser), so bound the idle backstop to keep this consuming
     # test from blocking the full 600s window once the turn's frames drain.
-    monkeypatch.setattr("quodeq.api._assistant_helpers.POLL_SECONDS", 0.001)
-    monkeypatch.setattr("quodeq.api._assistant_helpers.IDLE_LIMIT", 30)
+    monkeypatch.setattr("quodeq.api._assistant_events.POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_events.IDLE_LIMIT", 30)
 
     def fake_run_turn(request, *, repository, tool_ctx, **kw):
         repository.add_message(request.session_id, "user", request.text)
@@ -47,8 +47,8 @@ def test_event_frames_keeps_yielding_past_a_done_frame(app, monkeypatch):
     # `done` frame. A turn's done is a marker, not the end of the stream — an
     # event appended AFTER a done (i.e. the next turn) must still be yielded so
     # one SSE connection serves the whole session.
-    monkeypatch.setattr("quodeq.api._assistant_helpers.POLL_SECONDS", 0.001)
-    monkeypatch.setattr("quodeq.api._assistant_helpers.IDLE_LIMIT", 40)
+    monkeypatch.setattr("quodeq.api._assistant_events.POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_events.IDLE_LIMIT", 40)
     from quodeq.api._assistant_helpers import event_frames
 
     repo = _repo(app)
@@ -89,8 +89,8 @@ def test_events_stream_heartbeats_while_idle(client, monkeypatch):
     # IDLE_LIMIT the stream must emit repeated ":keepalive" comments (not
     # just the one at open) instead of hanging until the idle limit, proving
     # event_frames yields a heartbeat sentinel on each idle tick.
-    monkeypatch.setattr("quodeq.api._assistant_helpers.POLL_SECONDS", 0.001)
-    monkeypatch.setattr("quodeq.api._assistant_helpers.IDLE_LIMIT", 5)
+    monkeypatch.setattr("quodeq.api._assistant_events.POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_events.IDLE_LIMIT", 5)
     sid = client.post("/api/assistant/sessions",
                       json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
     stream = client.get(f"/api/assistant/sessions/{sid}/events?after=0")
@@ -105,8 +105,8 @@ def test_events_stream_emits_heartbeat_data_frame_on_sustained_idle(client, monk
     # {"type": "heartbeat"} DATA frame on a throttled cadence (every 20th
     # idle tick == ~5s at the real POLL_SECONDS) so the client sees liveness,
     # while a final "done" frame still terminates the stream normally.
-    monkeypatch.setattr("quodeq.api._assistant_helpers.POLL_SECONDS", 0.001)
-    monkeypatch.setattr("quodeq.api._assistant_helpers.IDLE_LIMIT", 100)
+    monkeypatch.setattr("quodeq.api._assistant_events.POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_events.IDLE_LIMIT", 100)
     sid = client.post("/api/assistant/sessions",
                       json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
     stream = client.get(f"/api/assistant/sessions/{sid}/events?after=0")

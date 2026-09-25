@@ -107,7 +107,8 @@ def _resolve_standards_checklist(context: ctx.PromptContext) -> str:
         return ctx.NO_STANDARDS
     compiled_dir = context.standards_dir / "compiled"
     eval_dir = context.evaluators_dir
-    overrides = load_project_overrides(context.project_root)
+    load_overrides = context.overrides_loader if context.overrides_loader is not None else load_project_overrides
+    overrides = load_overrides(context.project_root)
     if not (compiled_dir.exists() or (eval_dir and eval_dir.is_dir())):
         return ctx.NO_STANDARDS
     if not context.work_dir:
@@ -201,9 +202,10 @@ def build_consolidated_prompt(
     if template is None:
         template = load_template(template_name="cli_consolidated_prompt.md")
 
+    load_overrides = context.overrides_loader if context.overrides_loader is not None else load_project_overrides
     standards_text = render_all_standards(
         context.standards_dir, dimensions, evaluators_dir=context.evaluators_dir,
-        overrides=load_project_overrides(context.project_root),
+        overrides=load_overrides(context.project_root),
     ) if context.standards_dir else ctx.NO_STANDARDS
 
     manifest_context = ctx.render_manifest_context(context)

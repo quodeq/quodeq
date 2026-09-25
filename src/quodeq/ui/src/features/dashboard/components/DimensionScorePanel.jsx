@@ -1,19 +1,14 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionSparkline from '../../../components/DimensionSparkline.jsx';
 import { fallbackDelta } from '../../../utils/dimensionUtils.js';
+import { dimensionViolationCount } from '../../../models/index.js';
 import { t } from '../../../strings/index.js';
 import { KEY } from '../../../vocab/keyboard.js';
-
-function violationCount(dim) {
-  if (typeof dim.totalViolations === 'number') return dim.totalViolations;
-  if (Array.isArray(dim.violations)) return dim.violations.length;
-  return 0;
-}
 
 function DimensionRow({ dim, onBarClick, delta, scores }) {
   const curr = parseFloat(dim.overallScore);
   const score = Number.isNaN(curr) ? 0 : curr;
-  const violations = violationCount(dim);
+  const violations = dimensionViolationCount(dim);
 
   return (
     <div

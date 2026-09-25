@@ -15,15 +15,26 @@ from quodeq.core.finding_identity import coerce_line, finding_dismiss_keys
 from quodeq.shared.constants import JSON_SUFFIX
 
 
-def iter_eval_reports(eval_dir: Path) -> Iterator[tuple[str, dict]]:
+def iter_eval_reports(eval_dir: Path, *, skip_corrupt: bool = False) -> Iterator[tuple[str, dict]]:
     """Yield ``(dimension, data)`` for every ``<dim>.json`` file in
     *eval_dir*, in filename order. ``dimension`` is the filename stem.
 
-    Malformed JSON propagates -- a corrupt evaluation report is a bug in the
-    run, not something callers should silently skip over.
+    Malformed JSON propagates by default -- a corrupt evaluation report is a
+    bug in the run, not something callers should silently skip over.
+    ``skip_corrupt=True`` instead skips just that one file and continues
+    with the rest, for callers (e.g. the assistant's finding-identity index)
+    that must keep serving every healthy dimension even when one report is
+    truncated or corrupt -- a known failure mode of deadline-cut runs.
     """
     for path in sorted(eval_dir.glob("*.json")):
-        yield path.stem, json.loads(path.read_text(encoding="utf-8"))
+        if skip_corrupt:
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            yield path.stem, data
+        else:
+            yield path.stem, json.loads(path.read_text(encoding="utf-8"))
 
 
 def read_eval_report(eval_dir: Path, dimension: str) -> dict | None:

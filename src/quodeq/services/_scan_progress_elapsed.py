@@ -10,7 +10,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.run.dimensions import DimState
-from quodeq.services.wiring import file_mtime, latest_dim_activity_mtime, read_queue_state
+from quodeq.services.wiring import (
+    dimension_queue_file,
+    file_mtime,
+    latest_dim_activity_mtime,
+    read_queue_state,
+)
 
 
 def _parse_iso_utc(raw: object) -> datetime | None:
@@ -89,7 +94,7 @@ def dim_elapsed_s(dim_id: str, run_dir: Path, state: DimState, record: dict | No
     stamped = _stamped_elapsed_s(record, state)
     if stamped is not None:
         return stamped
-    queue = run_dir / "evidence" / f"{dim_id}_queue.json"
+    queue = dimension_queue_file(run_dir, dim_id)
     qstate = read_queue_state(queue)
     if qstate is None:
         return None

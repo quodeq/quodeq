@@ -8,7 +8,6 @@ import tempfile
 from pathlib import Path
 
 from quodeq.analysis._config import AgentParams
-from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
 from quodeq.shared.mcp import codex_mcp_override
 
 _SERVER_NAME = "findings"
@@ -33,11 +32,13 @@ def _findings_server_args(
         args.extend(["--work-dir", str(ap.work_dir.resolve())])
     # Cache fingerprint inputs (cache_root + model_id +
     # language) MUST be emitted on every spawn so the subprocess writes cache
-    # entries with the same keys as classify_files_via_cache. Defaults match
+    # entries with the same keys as classify_files_via_cache; run_analysis
+    # always resolves cache_root before a spawn. Defaults match
     # cache.dimension_helpers.model_id_from ('unknown') and the
     # language-unset contract ('').
+    if ap.cache_root is not None:
+        args.extend(["--cache-root", str(ap.cache_root)])
     args.extend([
-        "--cache-root", str(_default_cache_root()),
         "--model-id", ap.model_id or "unknown",
         "--language", ap.language or "",
     ])

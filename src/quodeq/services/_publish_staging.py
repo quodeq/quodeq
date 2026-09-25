@@ -15,7 +15,6 @@ _publish_git.py, whose push/commit run_git calls tests DO monkeypatch via
 """
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 
@@ -29,6 +28,7 @@ from quodeq.services.wiring import (
     copy_file_if_exists,
     copy_matching_files,
     ensure_dir,
+    merge_action_log_files,
     read_status,
     replace_json_file,
     run_git,
@@ -75,32 +75,14 @@ def copy_run(run_dir: Path, dest_run_dir: Path) -> None:
         copy_matching_files(evaluation, dest_run_dir / _EVALUATION_DIR, "*.json")
 
 
-def _timestamp_key(line: str) -> tuple[int, str]:
-    try:
-        ts = json.loads(line).get("timestamp")
-    except (json.JSONDecodeError, AttributeError, TypeError):
-        return (1, "")
-    if not ts:
-        return (1, "")
-    return (0, str(ts))
-
-
 def merge_actions_log(ours: Path, theirs: Path, dest: Path) -> None:
-    seen: set[str] = set()
-    lines: list[str] = []
-    for source in (ours, theirs):
-        if not source.exists():
-            continue
-        for raw in source.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if line and line not in seen:
-                seen.add(line)
-                lines.append(line)
-    if not lines:
-        return
-    lines.sort(key=_timestamp_key)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    """Union-merge *ours* and *theirs* into *dest*, deduped and timestamp-sorted.
+
+    Thin delegate to ``data.actions_log.merge_action_log_files``: a non-UTF8
+    source raises ``ValueError`` here too, which ``stage_project``'s caller
+    (``publish_project``) already catches and turns into ``PublishError``.
+    """
+    merge_action_log_files(dest, (ours, theirs))
 
 
 def _publish_attribution(clone_root: Path) -> str:

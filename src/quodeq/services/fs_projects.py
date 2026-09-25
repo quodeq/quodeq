@@ -14,6 +14,7 @@ from quodeq.core.utils.io import is_within
 from quodeq.services._filesystem_helpers import list_available_dimensions_for_discipline
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.services._fs_metadata import project_has_fingerprints, infer_discipline
+from quodeq.services._fs_project_primitives import repo_attach_reason  # noqa: F401 — re-export
 from quodeq.services._fs_working_copy import annotate_working_copy, online_path_missing
 from quodeq.services.fs_project_helpers import (
     KnownProjectIds,

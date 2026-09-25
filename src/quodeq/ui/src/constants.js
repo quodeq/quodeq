@@ -42,6 +42,11 @@ export const TIME_LIMIT_STORAGE_KEY = 'cc-time-limit';
 export const AI_CMD_STORAGE_KEY = 'cc-ai-cmd';
 export const PER_DIMENSION_STORAGE_KEY = 'cc-per-dimension';
 
+// The analysis-power tier (fast/balanced/thorough): canonical home for
+// powerLevels.js's STORAGE_KEY, so hook-layer code (evaluationLifecycleHelpers.js)
+// doesn't have to import a UI components module for a storage key.
+export const ANALYSIS_POWER_STORAGE_KEY = 'quodeq-analysis-power';
+
 export const ACTIVE_PROVIDER_KEY = 'cc-active-provider';
 
 export function providerKey(providerId, setting) {

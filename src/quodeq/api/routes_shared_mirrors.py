@@ -9,6 +9,13 @@ therefore identical to the local route's; only the data source differs.
 
 Read-only invariant: no finding-mutation routes exist in this module or
 anywhere under /api/shared/*, per routes_shared.py's module docstring.
+
+``refresh_shared_clone`` and ``sync_shared_index`` are imported directly
+from their real owner (rather than looked up on the ``routes_shared``
+facade, which no longer re-exports them), so this module never imports back
+a sibling that imports it. Tests patch
+"quodeq.api.routes_shared_mirrors.refresh_shared_clone" /
+"...sync_shared_index".
 """
 from __future__ import annotations
 
@@ -16,21 +23,21 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Callable
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, current_app, jsonify, request
 
 from quodeq.api._constants import CODE_NOT_FOUND, QUERY_FLAG_TRUE_NUMERIC
 from quodeq.api.helpers import json_error
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
-from quodeq.core.types.project_source import ProjectSource
 from quodeq.services import fs_reports, fs_projects
 from quodeq.services.compare import build_compare_summary
 from quodeq.services.run_constants import LATEST_RUN
 from quodeq.services.runs_unit import build_runs_unit
 from quodeq.services.scoring import get_project_scores, get_scores_slim
+from quodeq.services.shared_listing import enrich_shared_info, list_shared_projects
 from quodeq.services.shared_repo import (
-    published_meta,
-    last_synced_at,
+    refresh_shared_clone,
     shared_index_db_path,
+    sync_shared_index,
 )
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.serialization import to_camel_dict
@@ -44,41 +51,12 @@ def _shared_projects(
     eval_root: Path, url: str,
     refresh_clone: Callable[[str], tuple[bool, object]], sync_index: Callable[[str], object],
 ):
-    stale = None
-    if request.args.get("refresh") == QUERY_FLAG_TRUE_NUMERIC:
-        # Refresh-on-read: the UI calls this on tab entry to force the
-        # clone up to date before listing, rather than showing whatever
-        # was last fetched. A failed refresh (host unreachable) is not
-        # fatal -- fall through and serve the existing (now-stale)
-        # clone contents, just flag it. The index is only re-synced
-        # after a successful refresh; there is nothing new to index
-        # when the fetch itself failed.
-        ok, _ = refresh_clone(url)
-        if ok:
-            sync_index(url)
-            stale = False
-        else:
-            stale = True
-    # backfill=False: the shared clone is a git worktree, not a local
-    # evaluations dir -- writing onboardingCompletedAt into
-    # repository_info.json here would dirty it, and a dirty worktree can
-    # make publish's `pull --rebase` refuse (confusing wedge) the next
-    # time someone publishes into this clone.
-    # inline_summaries=True: this route has no warm-up engine to fill a
-    # missing project-card summary later, so a cache miss must compute
-    # it inline here instead of reporting it pending forever.
-    projects = fs_projects.build_project_list(
-        eval_root, backfill=False, inline_summaries=True,
+    listing = list_shared_projects(
+        eval_root, url,
+        refresh=request.args.get("refresh") == QUERY_FLAG_TRUE_NUMERIC,
+        refresh_clone=refresh_clone, sync_index=sync_index,
+        serialize=to_camel_dict,
     )
-    listing = {"projects": [to_camel_dict(p) for p in projects]}
-    meta = published_meta(url)
-    for project in listing["projects"]:
-        key = project.get("id") or project.get("name")
-        project.update(meta.get(key, {}))
-        project["source"] = ProjectSource.SHARED
-    listing["lastSynced"] = last_synced_at(url)
-    if stale is not None:
-        listing["stale"] = stale
     return jsonify(listing)
 
 
@@ -116,9 +94,7 @@ def shared_project_info(project: str, eval_root: Path, url: str):
     # badge has no "published by <name>" to show. `project` here is the
     # directory name under the clone root, the exact key published_meta
     # indexes by.
-    meta = published_meta(url)
-    info.update(meta.get(project, {}))
-    info["source"] = ProjectSource.SHARED
+    enrich_shared_info(info, project, url)
     return jsonify(info)
 
 
@@ -224,7 +200,11 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
     err = validate_segment(project, dim, run_id)
     if err:
         return err
-    payload = fs_reports.get_dimension_eval(str(eval_root), project, run_id, dim)
+    evaluators_dir = current_app.config.get("STANDARDS_EVALUATORS_DIR")
+    payload = fs_reports.get_dimension_eval(
+        str(eval_root), project, run_id, dim,
+        evaluators_dir=Path(evaluators_dir) if evaluators_dir else None,
+    )
     if payload is None:
         return json_error("Eval file not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     if payload.get("waiting"):
@@ -252,18 +232,11 @@ def register_shared_mirror_routes(app: Flask) -> None:
     Called from routes_shared.py, which owns the read-only invariant for the
     whole /api/shared/* namespace.
     """
-    # refresh_shared_clone and sync_shared_index are looked up on the
-    # quodeq.api.routes_shared facade at call time (rather than imported
-    # directly here) so that tests patching
-    # "quodeq.api.routes_shared.refresh_shared_clone" /
-    # "...sync_shared_index" keep working after the split.
-    from quodeq.api import routes_shared as _routes_shared
-
     @app.get("/api/shared/projects")
     @with_shared_root
     def shared_projects(eval_root: Path, url: str):
         return _shared_projects(
-            eval_root, url, _routes_shared.refresh_shared_clone, _routes_shared.sync_shared_index,
+            eval_root, url, refresh_shared_clone, sync_shared_index,
         )
 
     app.get("/api/shared/projects/<project>/info")(shared_project_info)

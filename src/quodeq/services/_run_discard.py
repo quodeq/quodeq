@@ -8,14 +8,13 @@ keeps working after the move (tests patch both).
 """
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 from typing import Protocol
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.run.state import TERMINAL_STATES
-from quodeq.services.wiring import read_dispatched_cache_keys, remove_matching_files
+from quodeq.services.wiring import read_dispatched_cache_keys, read_run_state, remove_matching_files
 
 _CANCEL_WAIT_TIMEOUT_S = 2.0
 _CANCEL_WAIT_POLL_S = 0.05
@@ -53,17 +52,15 @@ def wait_for_terminal_status(
     follow-up "Start" surfaces two ``running`` rows in the UI.
     """
     deadline = time.monotonic() + timeout_s
-    status_path = run_dir / "status.json"
     logged = False
     while True:
-        try:
-            data = json.loads(status_path.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and data.get("state") in TERMINAL_STATES:
+        state = read_run_state(run_dir)
+        if state is not None:
+            if state in TERMINAL_STATES:
                 return True
-        except (OSError, ValueError) as exc:
-            if not logged:
-                log.debug(f"status.json not yet readable while waiting for a terminal state: {exc}")
-                logged = True
+        elif not logged:
+            log.debug("status.json not yet readable while waiting for a terminal state")
+            logged = True
         if time.monotonic() >= deadline:
             return False
         time.sleep(poll_interval_s)

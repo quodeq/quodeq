@@ -17,9 +17,7 @@ from tests.api._run_event_stream_helpers import (
 )
 
 
-# ---------------------------------------------------------------------------
-# compute_tick tests
-# ---------------------------------------------------------------------------
+# --- compute_tick tests ---
 
 def test_compute_tick_initial_emits_status_when_status_json_present(tmp_path: Path):
     _write_status(tmp_path, "running")
@@ -114,6 +112,29 @@ def test_compute_tick_handles_missing_events_jsonl(tmp_path: Path):
     assert finding_events == []
 
 
+def test_compute_tick_never_crashes_on_a_read_or_shaping_failure(tmp_path: Path, monkeypatch, caplog):
+    """Read and shaping failures both degrade to "no findings this tick"
+    instead of crashing compute_tick -- one guard covers both."""
+    _write_status(tmp_path)
+    _write_finding_event(tmp_path, "P1", line=1)
+
+    def _boom(*a, **k):
+        raise AttributeError("'NoneType' object has no attribute 'practice_id'")
+    targets = ("quodeq.api._run_event_watcher.payload_as_sse_finding",
+               "quodeq.api._run_event_watcher.read_new_findings_from_events")
+    for target in targets:
+        with monkeypatch.context() as m:
+            m.setattr(target, _boom)
+            state = WatcherState(); caplog.clear()
+            with caplog.at_level("WARNING"):
+                events, new_state = compute_tick(tmp_path, state)
+        assert [e for e in events if e[0] == "finding"] == []
+        assert new_state.last_event_counter == state.last_event_counter
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1, [(r.name, r.message) for r in warnings]
+        assert warnings[0].message.startswith(f"events.jsonl read failed for {tmp_path}: ")
+
+
 def test_compute_tick_handles_malformed_status_json(tmp_path: Path):
     (tmp_path / "status.json").write_text("not valid json {")
     state = WatcherState()
@@ -122,9 +143,45 @@ def test_compute_tick_handles_malformed_status_json(tmp_path: Path):
     assert len(status_events) == 1
 
 
-# ---------------------------------------------------------------------------
-# run_events_generator tests
-# ---------------------------------------------------------------------------
+def test_compute_tick_logs_exactly_once_on_corrupt_status_json(tmp_path: Path, caplog):
+    """Log parity with the pre-move inline reader: a corrupt status.json
+    produces exactly one WARNING total (across every logger, not just
+    api._run_event_watcher's own), with the "status.json read failed
+    at ...: ..." message -- not the two records a naive delegation to
+    wiring.read_status/read_run_status_json would produce (one logged
+    inside run_status_store, one logged again by this caller). Nothing
+    else in this minimal fixture (no evaluation dir, no events.jsonl) can
+    log, so any record beyond the one this reader emits is the regression
+    a fix-round review caught."""
+    (tmp_path / "status.json").write_text("not valid json {")
+    state = WatcherState()
+    with caplog.at_level("WARNING"):
+        compute_tick(tmp_path, state)
+    assert len(caplog.records) == 1, [(r.name, r.message) for r in caplog.records]
+    record = caplog.records[0]
+    assert record.name == "quodeq.api._run_event_watcher"
+    assert record.levelname == "WARNING"
+    assert record.message.startswith("status.json read failed at ")
+    assert "status.json" in record.message
+
+
+def test_compute_tick_logs_nothing_on_non_dict_status_json(tmp_path: Path, caplog):
+    """Valid JSON that isn't a dict (e.g. a bare list) is not an error --
+    it silently becomes the pending status, exactly like the pre-move
+    inline reader, with no WARNING at all (not even from a lower-level
+    reader that would treat it as corrupt)."""
+    (tmp_path / "status.json").write_text("[1, 2, 3]")
+    state = WatcherState()
+    with caplog.at_level("WARNING"):
+        events, _ = compute_tick(tmp_path, state)
+    assert caplog.records == [], [(r.name, r.message) for r in caplog.records]
+    status_events = [e for e in events if e[0] == "status"]
+    assert len(status_events) == 1
+    payload = json.loads(status_events[0][1])
+    assert payload["state"] == "pending"
+
+
+# --- run_events_generator tests ---
 
 def _drain_generator(gen, max_frames: int) -> list[str]:
     out = []
@@ -138,7 +195,6 @@ def _drain_generator(gen, max_frames: int) -> list[str]:
 
 
 def test_run_events_generator_emits_status_then_done_for_terminal_run(tmp_path: Path):
-
     _write_status(tmp_path, state="done")
     frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
     non_keepalive = [f for f in frames if not f.startswith(":")]
@@ -147,7 +203,6 @@ def test_run_events_generator_emits_status_then_done_for_terminal_run(tmp_path: 
 
 
 def test_run_events_generator_emits_finding_with_event_id(tmp_path: Path):
-
     _write_status(tmp_path, state="running")
     _write_finding_event(tmp_path)
     gen = run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0)
@@ -162,7 +217,6 @@ def test_run_events_generator_emits_finding_with_event_id(tmp_path: Path):
 
 
 def test_run_events_generator_respects_initial_last_event_ts(tmp_path: Path):
-
     _write_status(tmp_path, state="running")
     _write_finding_event(tmp_path, p="P1", line=1)
     _write_finding_event(tmp_path, p="P2", line=2)
@@ -186,7 +240,6 @@ def test_run_events_generator_respects_initial_last_event_ts(tmp_path: Path):
 
 
 def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
-
     _write_status(tmp_path, state="failed")
     _write_finding_event(tmp_path)
     frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
@@ -196,14 +249,52 @@ def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
     assert any("event: done" in f for f in non_keepalive)
 
 
-# ---------------------------------------------------------------------------
-# Grade updates intentionally do NOT flow through SSE anymore — the dismiss /
-# restore / delete HTTP endpoints return the rescored payload in their
-# response body. The whole ``scores.updated`` machinery (fingerprint state
-# machine, principle_grades polling, terminal-status workaround) was deleted.
-#
-# The contract is now: ``compute_tick`` only emits lifecycle events
-# (``status``, ``dimension-completed``, ``finding``, ``done``) for in-progress
-# evals. See ``routes_findings.py`` and the API-level tests for the new
-# mutation-returns-scores contract.
-# ---------------------------------------------------------------------------
+# Grade updates intentionally do NOT flow through SSE anymore -- see
+# WatcherState's docstring in _run_event_watcher.py. compute_tick only
+# emits lifecycle events (status, dimension-completed, finding, done) for
+# in-progress evals; routes_findings.py returns the rescored payload
+# synchronously on mutation instead.
+
+# Wire-characterization: exact SSE frame sequence, byte for byte -- pins
+# the frame text so moving readers between api/_run_event_watcher.py and
+# services/run_event_readers.py can't change what goes over the wire.
+
+def test_finished_run_sse_sequence_is_byte_identical(tmp_path: Path):
+    """A run with one dimension, one finding, and a terminal status emits
+    exactly: status, dimension-completed, finding, done -- in that order,
+    with the exact SSE frame text (not just "some frame of this type")."""
+    _write_status(tmp_path, state="done")
+    _write_dim_eval(tmp_path, "timeliness", score=90)
+    _write_finding_event(tmp_path, p="P1", line=1)
+
+    frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
+    non_keepalive = [f for f in frames if not f.startswith(":")]
+
+    assert len(non_keepalive) == 4, non_keepalive
+    status_frame, dim_frame, finding_frame, done_frame = non_keepalive
+
+    assert status_frame == (
+        'event: status\ndata: {"state":"done"}\n\n'
+    )
+    assert dim_frame == (
+        'event: dimension-completed\n'
+        'data: {"dimension":"timeliness","score":90}\n\n'
+    )
+    assert finding_frame.startswith('id: ')
+    assert '\nevent: finding\n' in finding_frame
+    assert finding_frame.endswith(
+        'data: {"id":1,"practice_id":"P1","dimension":"dim","requirement":null,'
+        '"verdict":"violation","severity":"medium","file":"x.py","line":1,'
+        '"end_line":null,"title":"t","reason":"r","snippet":"s","confidence":100,'
+        '"provenance_downgrade":false,"scope_downgrade":null,"carried_forward":false}\n\n'
+    )
+    assert done_frame == 'event: done\ndata: {"state":"done"}\n\n'
+
+
+def test_pending_run_emits_only_status_pending_when_status_json_absent(tmp_path: Path):
+    """No status.json yet: exactly one status frame reporting `pending`,
+    nothing else -- the watcher's read-failure/absence defaults stay
+    byte-identical across the reader move."""
+    frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
+    non_keepalive = [f for f in frames if not f.startswith(":")]
+    assert non_keepalive == ['event: status\ndata: {"state":"pending"}\n\n']

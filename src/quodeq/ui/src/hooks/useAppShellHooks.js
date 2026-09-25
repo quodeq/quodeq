@@ -147,20 +147,10 @@ export function useSelectedProjectSyncEffects(selectedProject) {
 }
 
 /**
- * Day-label memo, dark/light theme sync, visible-standards-filtered
- * trend/accumulated data, and the breadcrumb jump-bar's sibling lookup.
+ * Sidebar counts should respect the user's currently-visible standards so
+ * they match the numbers shown on the Violations and History pages.
  */
-export function useAppDerived({ state, navTab, navSwapAt, activePage }) {
-  const currentDayLabel = useMemo(
-    () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
-    [state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex]
-  );
-  // Resolve whether the UI is currently rendering dark and keep the native
-  // titlebar in sync; the toggle is used by the topbar's moon/sun button so
-  // the icon reflects what's on-screen, not just the saved mode preference.
-  const { effectiveDark, toggleTheme } = useStartupTheme(state.settings);
-  // Sidebar counts should respect the user's currently-visible standards so
-  // they match the numbers shown on the Violations and History pages.
+export function useVisibleStandardsFiltered(state) {
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const filteredTrend = useMemo(
     () => filterTrendByVisibleStandards(state.dashboard?.trend || [], visibleSet),
@@ -170,6 +160,24 @@ export function useAppDerived({ state, navTab, navSwapAt, activePage }) {
     () => filterAccumulatedByVisibleStandards(state.accumulated, visibleSet, filteredTrend, null),
     [state.accumulated, visibleSet, filteredTrend]
   );
+  return { filteredTrend, filteredAccumulated };
+}
+
+/**
+ * Day-label memo, dark/light theme sync, and the breadcrumb jump-bar's
+ * sibling lookup. `filteredTrend`/`filteredAccumulated` come from
+ * useVisibleStandardsFiltered (called by the caller, unconditionally, ahead
+ * of this hook) and are passed through unchanged.
+ */
+export function useAppDerived({ state, navTab, navSwapAt, activePage, filteredTrend, filteredAccumulated }) {
+  const currentDayLabel = useMemo(
+    () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
+    [state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex]
+  );
+  // Resolve whether the UI is currently rendering dark and keep the native
+  // titlebar in sync; the toggle is used by the topbar's moon/sun button so
+  // the icon reflects what's on-screen, not just the saved mode preference.
+  const { effectiveDark, toggleTheme } = useStartupTheme(state.settings);
   const breadcrumbSiblingsFor = useCallback(
     buildBreadcrumbSiblingsFor({
       selectedProject: state.selectedProject, navTab, navSwapAt, activePage, filteredAccumulated,

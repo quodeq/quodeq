@@ -34,7 +34,6 @@ from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.orchestrator import TurnRequest
 from quodeq.assistant.tools import ToolContext
 from quodeq.core.types.project_source import ProjectSource
-from quodeq.services.score_cache import score_cache_path_override
 
 
 @dataclass(frozen=True)
@@ -56,11 +55,7 @@ def _start_turn_worker(state: AssistantTurnState, turn: TurnRequest,
     context, so it cannot resolve current_app."""
     def _worker():
         try:
-            if tool_ctx.score_cache_path is not None:
-                with score_cache_path_override(tool_ctx.score_cache_path):
-                    run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
-            else:
-                run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
+            run_turn(turn, repository=repo, tool_ctx=tool_ctx, cancel=cancel)
         finally:
             state.release_turn(turn.session_id)
 

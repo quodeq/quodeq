@@ -247,3 +247,41 @@ def test_loader_embed_failure_partial_corpus(tmp_path: Path, monkeypatch) -> Non
     )
     assert corpus2 is not None
     assert second_calls == [1]
+
+
+def test_loader_uses_the_injected_settings_over_the_process_env(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Callers resolve the settings; an explicit value beats the process env."""
+    from quodeq.config.context_env import PrecedentSettings
+
+    monkeypatch.setenv("QUODEQ_SEMANTIC_PRECEDENTS", "1")
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    run_dir = seed_dismissed(
+        project_dir, "r1",
+        req="S-CON-1", snippet="password = 'secret'", file="auth.py", line=42,
+    )
+
+    def embed(texts, **kw):
+        return [[1.0, 0.0] for _ in texts]
+
+    off = PrecedentSettings(enabled=False, model="m", base_url="http://x", similarity_threshold=0.85)
+    assert load_precedent_corpus(
+        project_dir, run_dir, settings=off, embed_fn=embed, availability_fn=lambda m, b: True,
+    ) is None
+
+    seen: list[tuple[str, str]] = []
+
+    def availability(model, base_url):
+        seen.append((model, base_url))
+        return True
+
+    on = PrecedentSettings(enabled=True, model="mxbai", base_url="http://embed:1", similarity_threshold=0.5)
+    corpus = load_precedent_corpus(
+        project_dir, run_dir, settings=on,
+        embed_fn=embed, availability_fn=availability,
+    )
+    assert seen == [("mxbai", "http://embed:1")]
+    assert corpus is not None
+    assert corpus.threshold == 0.5

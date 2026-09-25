@@ -20,7 +20,6 @@ from quodeq.analysis.subagents._pool_launcher import (
     default_subagent_model,
     _non_scout_providers,
 )
-from quodeq.analysis.subagents._pool_scaling import _agent_failure_streak_limit
 
 
 def test_api_file_size_cap_honours_injected_env(monkeypatch):
@@ -64,12 +63,6 @@ def test_default_subagent_model_honours_injected_env(monkeypatch):
     monkeypatch.setenv("SUBAGENT_MODEL", "from-process")
     assert default_subagent_model(env={"QUODEQ_SUBAGENT_MODEL": "m"}) == "m"
     assert default_subagent_model(env={}) is None
-
-
-def test_agent_failure_streak_limit_honours_injected_env(monkeypatch):
-    monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "11")
-    assert _agent_failure_streak_limit(env={"QUODEQ_AGENT_FAILURE_STREAK": "2"}) == 2
-    assert _agent_failure_streak_limit(env={}) == 5
 
 
 def test_provider_explicitly_configured_honours_injected_env(monkeypatch):

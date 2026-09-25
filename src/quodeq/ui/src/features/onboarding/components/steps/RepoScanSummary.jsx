@@ -1,4 +1,5 @@
 import { StatStrip, Stat } from '../../../../components/terminal/index.js';
+import { createScanSummary } from '../../../../models/index.js';
 import { t } from '../../../../strings/index.js';
 
 const TOP_LANGUAGES_LIMIT = 8; // the chip row stays one glance; the rest is noise for a summary
@@ -8,17 +9,18 @@ const TOP_LANGUAGES_LIMIT = 8; // the chip row stays one glance; the rest is noi
  * top languages). Extracted verbatim.
  */
 export function RepoScanSummary({ scan }) {
-  const totalFiles = scan?.total_files ?? 0;
-  const codeFiles = scan?.code_files ?? 0;
-  const untrackedFiles = scan?.untracked_files ?? 0;
+  const s = createScanSummary(scan);
+  const totalFiles = s?.totalFiles ?? 0;
+  const codeFiles = s?.codeFiles ?? 0;
+  const untrackedFiles = s?.untrackedFiles ?? 0;
   // The FILES tile counts what the run will score (git-tracked only, #1209);
   // when git left files out, say how many so the smaller total has a reason.
   const filesHint = untrackedFiles > 0
     ? t('onboarding.untrackedFilesHint', { count: untrackedFiles })
     : t('onboarding.allFilesHint');
-  const langs = scan?.languages || {};
+  const langs = s?.languages || {};
   const langCount = Object.keys(langs).length;
-  const branchCount = scan?.branches?.length ?? 0;
+  const branchCount = s?.branches?.length ?? 0;
   const topLangs = Object.entries(langs).sort((a, b) => b[1] - a[1]).slice(0, TOP_LANGUAGES_LIMIT);
   return (
     <div className="onboarding-scan-summary">

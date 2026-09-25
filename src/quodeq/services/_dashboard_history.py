@@ -17,6 +17,8 @@ from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.scoring.report_grades import calculate_trend
 from quodeq.core.types import DimensionResult, DimensionSummary
 
+from quodeq.config.services_env import MAX_HISTORY_RUNS_DEFAULT
+from quodeq.config.services_env import max_history_runs as _resolve_max_history_runs
 from quodeq.services._dashboard_cache import DashboardCacheConfig, make_run_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services.dashboard_trend import build_accumulated_trend, build_partial_run_entries
@@ -24,7 +26,6 @@ from quodeq.services.scoring_deps import ScoringDeps
 from quodeq.services.trend_fetcher import make_trend_fetcher
 from quodeq.services.wiring import RunInfo, read_run_status_json
 from quodeq.services.scoring_view import select_trend_runs
-from quodeq.shared.env_resolve import resolve_env
 
 SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 
@@ -45,19 +46,12 @@ def read_run_exit_reason(reports_root: Path, project: str, run_id: str) -> str |
 # Maximum number of historical runs scanned for trend, previous scores, and
 # stale dimensions. The full run list is still returned in availableRuns (metadata
 # only, no disk reads) so users can navigate to older runs directly.
-DEFAULT_MAX_HISTORY_RUNS = 100
+DEFAULT_MAX_HISTORY_RUNS = MAX_HISTORY_RUNS_DEFAULT
 
 
 def max_history_runs(env: dict[str, str] | None = None) -> int:
     """Return the history-scan ceiling, honouring QUODEQ_MAX_HISTORY_RUNS."""
-    raw = resolve_env(env).get("QUODEQ_MAX_HISTORY_RUNS")
-    if not raw:
-        return DEFAULT_MAX_HISTORY_RUNS
-    try:
-        value = int(raw)
-    except ValueError:
-        return DEFAULT_MAX_HISTORY_RUNS
-    return value if value > 0 else DEFAULT_MAX_HISTORY_RUNS
+    return _resolve_max_history_runs(env=env)
 
 
 def collect_previous_scores(

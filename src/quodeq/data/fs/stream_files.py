@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from quodeq.core.stream.events import extract_files_from_event, parse_stream_event
@@ -100,6 +100,41 @@ def append_jsonl_rows(path: Path, rows: Iterable[dict]) -> None:
                 out.write(json.dumps(row) + "\n")
     except OSError:
         _logger.warning("could not append to %s", path, exc_info=True)
+
+
+def append_jsonl_strict(path: Path, rows: Iterable[dict], *, append: bool = True) -> None:
+    """Write *rows* as JSONL lines to *path*. Raises on any OSError.
+
+    Unlike ``append_jsonl_rows``, a write failure here is never swallowed:
+    the caller (cache replay) needs to know when a finding it believes is
+    now on disk is not. ``append=False`` truncates and rewrites the file
+    instead of appending to it.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    mode = "a" if append else "w"
+    with path.open(mode, encoding="utf-8") as out:
+        for row in rows:
+            out.write(json.dumps(row) + "\n")
+
+
+def iter_stream_lines(path: Path, *, missing_ok: bool = True) -> Iterator[str]:
+    """Yield stripped, non-empty lines from *path*.
+
+    ``missing_ok=True`` (the default): yields nothing when *path* does not
+    exist. ``missing_ok=False``: a missing *path* raises ``FileNotFoundError``
+    (an ``OSError``) when the file is opened instead -- for a caller that
+    needs to tell "missing" apart from "empty" (e.g. to log a warning only
+    once, from one ``except OSError``, instead of a separate existence
+    pre-check that would race a concurrent delete). Any other read failure
+    (permissions, a mid-read I/O error) always raises ``OSError``.
+    """
+    if missing_ok and not path.exists():
+        return
+    with open_text(path) as f:
+        for raw_line in f:
+            stripped = raw_line.strip()
+            if stripped:
+                yield stripped
 
 
 def count_jsonl_lines(jsonl_file: Path) -> int:

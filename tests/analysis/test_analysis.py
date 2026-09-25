@@ -196,19 +196,23 @@ class TestIsStreamValid:
 # ---------------------------------------------------------------------------
 
 class TestBuildAiCmd:
-    """Guard against regressions that silently break evaluations (0 findings)."""
+    """Guard against regressions that silently break evaluations (0 findings).
+
+    ``ai_cmd`` is set explicitly: run_analysis resolves it before building the
+    command, so build_ai_cmd itself no longer falls back to the environment.
+    """
 
     def test_bash_not_in_default_tools(self):
         """Bash must NOT be in the default tools — it enables arbitrary command
         execution which could be exploited via prompt injection to exfiltrate data."""
-        args, _ = build_ai_cmd("test prompt", AnalysisConfig())
+        args, _ = build_ai_cmd("test prompt", AnalysisConfig(ai_cmd="claude"))
         tools_idx = args.index("--tools")
         tools_value = args[tools_idx + 1]
         assert "Bash" not in tools_value.split(",")
 
     def test_read_glob_grep_in_allowed_tools(self):
         """File exploration tools must be available."""
-        args, _ = build_ai_cmd("test prompt", AnalysisConfig())
+        args, _ = build_ai_cmd("test prompt", AnalysisConfig(ai_cmd="claude"))
         tools_idx = args.index("--tools")
         tools_value = args[tools_idx + 1]
         for tool in ("Read", "Glob", "Grep"):
@@ -219,7 +223,7 @@ class TestBuildAiCmd:
         in --print mode and the evaluation silently produces 0 findings."""
         jsonl = tmp_path / "findings.jsonl"
         args, mcp_path = build_ai_cmd(
-            "test prompt", AnalysisConfig(jsonl_file=jsonl),
+            "test prompt", AnalysisConfig(ai_cmd="claude", jsonl_file=jsonl),
         )
         assert "--permission-mode" in args, (
             "--permission-mode flag is missing; without bypassPermissions "
@@ -232,7 +236,7 @@ class TestBuildAiCmd:
         """When jsonl_file is set, MCP config must be generated."""
         jsonl = tmp_path / "findings.jsonl"
         args, mcp_path = build_ai_cmd(
-            "test prompt", AnalysisConfig(jsonl_file=jsonl),
+            "test prompt", AnalysisConfig(ai_cmd="claude", jsonl_file=jsonl),
         )
         assert mcp_path is not None
         assert "--mcp-config" in args
@@ -242,7 +246,7 @@ class TestBuildAiCmd:
 
     def test_print_mode_always_set(self):
         """Analysis must run in --print (non-interactive) mode."""
-        args, _ = build_ai_cmd("test prompt", AnalysisConfig())
+        args, _ = build_ai_cmd("test prompt", AnalysisConfig(ai_cmd="claude"))
         assert "--print" in args
         assert "--output-format" in args
         fmt_idx = args.index("--output-format")

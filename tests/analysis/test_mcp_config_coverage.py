@@ -108,7 +108,7 @@ class TestCreateMcpConfig:
         --cache-root, --model-id, and --language so the subprocess can build
         a cache writer whose fingerprint matches classify_files_via_cache.
         """
-        params = AgentParams(model_id="sonnet", language="kotlin")
+        params = AgentParams(model_id="sonnet", language="kotlin", cache_root=Path("cache") / "results")
         config_path = make_mcp_config(agent_params=params)
         data = json.loads(config_path.read_text())
         args = data["mcpServers"]["findings"]["args"]
@@ -119,18 +119,18 @@ class TestCreateMcpConfig:
         assert args[model_idx + 1] == "sonnet"
         lang_idx = args.index("--language")
         assert args[lang_idx + 1] == "kotlin"
-        # Cache root ends with /cache/results regardless of whether the
-        # default (~/.quodeq/cache) or QUODEQ_CACHE_ROOT override is used.
+        # The agent's resolved cache root travels verbatim (run_analysis
+        # resolves it from QUODEQ_CACHE_ROOT or the default).
         # Compare via Path so the tail check holds on every OS.
         cr_idx = args.index("--cache-root")
         expected_tail = str(Path("cache") / "results")
         assert args[cr_idx + 1].endswith(expected_tail)
 
-    def test_cache_root_honours_quodeq_cache_root_env(self, tmp_path, monkeypatch, make_mcp_config):
-        """Fix A (#2419): QUODEQ_CACHE_ROOT overrides the default cache root in
-        the generated MCP config so the subprocess uses the same sandbox path."""
-        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path))
-        config_path = make_mcp_config()
+    def test_cache_root_comes_from_agent_params(self, tmp_path, monkeypatch, make_mcp_config):
+        """Fix A (#2419): the run's resolved cache root reaches the generated MCP
+        config; an exported QUODEQ_CACHE_ROOT is not re-read here."""
+        monkeypatch.setenv("QUODEQ_CACHE_ROOT", str(tmp_path / "from-process"))
+        config_path = make_mcp_config(agent_params=AgentParams(cache_root=tmp_path / "results"))
         data = json.loads(config_path.read_text())
         args = data["mcpServers"]["findings"]["args"]
         cr_idx = args.index("--cache-root")
@@ -163,11 +163,11 @@ class TestCreateMcpConfig:
         assert "--standards-dir" not in args
 
     def test_cache_flag_fallbacks(self, make_mcp_config):
-        """No AgentParams overrides => model_id='unknown', language=''."""
+        """No AgentParams overrides => model_id='unknown', language='', no cache root."""
         config_path = make_mcp_config(agent_params=None)
         data = json.loads(config_path.read_text())
         args = data["mcpServers"]["findings"]["args"]
-        assert "--cache-root" in args
+        assert "--cache-root" not in args
         model_idx = args.index("--model-id")
         assert args[model_idx + 1] == "unknown"
         lang_idx = args.index("--language")
@@ -201,13 +201,13 @@ class TestFindingsServerArgsAreShared:
         work.mkdir()
         ap = AgentParams(
             queue_path=queue, agent_id="agent-7", work_dir=work,
-            model_id="sonnet", language="python", standards_dir=standards,
+            model_id="sonnet", language="python", standards_dir=standards, cache_root=tmp_path / "cache",
         )
         return jsonl, compiled, ap
 
     def test_both_emitters_agree(self, tmp_path, findings_jsonl, make_mcp_config):
         from quodeq.analysis._mcp_config import codex_mcp_config_arg
-        from quodeq.analysis.cache.local import default_cache_root
+        expected_cache_root = str(tmp_path / "cache")
 
         jsonl, compiled, ap = self._fixture(tmp_path, findings_jsonl)
 
@@ -227,7 +227,7 @@ class TestFindingsServerArgsAreShared:
             "--queue": str((tmp_path / "queue.jsonl").resolve()),
             "--agent-id": "agent-7",
             "--work-dir": str((tmp_path / "work").resolve()),
-            "--cache-root": str(default_cache_root()),
+            "--cache-root": expected_cache_root,
             "--model-id": "sonnet",
             "--language": "python",
         }

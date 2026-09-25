@@ -124,6 +124,22 @@ class TestMaxViolationFiles:
     def test_env_override(self):
         assert _max_violation_files(env={"QUODEQ_MAX_VIOLATION_FILES": "10"}) == 10
 
+    def test_env_override_reaches_aggregate_violations(self, monkeypatch):
+        """No ``env=`` injected -- the real process env, through the public
+        aggregate_violations() entry point, must cap the top-files list."""
+        monkeypatch.setenv("QUODEQ_MAX_VIOLATION_FILES", "1")
+        dashboard = {
+            "dimensions": [{
+                "totals": {"violationCount": 2, "severity": {"major": 2}},
+                "violations": [
+                    {"file": "a.py", "severity": "major"},
+                    {"file": "b.py", "severity": "major"},
+                ],
+            }],
+        }
+        result = aggregate_violations(dashboard)
+        assert len(result.files) == 1
+
 
 class TestAggregateViolationsExtended:
     def test_none_dimensions(self):

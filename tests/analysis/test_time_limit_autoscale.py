@@ -215,3 +215,47 @@ class TestLaunchPoolExtendsDeadline:
 
         assert config.options.deadline_at == original
         assert "deadline_extended" not in [c.args[0] for c in marker.call_args_list]
+
+
+class TestLaunchPoolInjectedFactory:
+    def test_uses_injected_pool_factory_instead_of_the_concrete_subagent_pool(self, tmp_path):
+        """pool_factory is a call-time seam: when set, launch_pool must build
+        the pool through it instead of the concrete SubagentPool, and the
+        existing patch.object(_pool_launcher, "SubagentPool") tests must keep
+        biting on the default (unset) path -- see TestLaunchPoolExtendsDeadline.
+        Imports through the public runner re-export and string patch targets
+        rather than the private _pool_launcher module, per the private-import
+        ratchet."""
+        from quodeq.analysis.subagents.runner import LaunchPoolParams, launch_pool
+
+        config = RunConfig(
+            src=tmp_path, language="python",
+            options=AnalysisOptions(deadline_at=None, time_limit=600),
+        )
+        params = LaunchPoolParams(
+            evidence_dir=tmp_path, queue_path=tmp_path / "queue.json", prompt="p",
+        )
+        built_with: list = []
+
+        class _FakePool:
+            def __init__(self, *, paths, options, config):
+                built_with.append((paths, options, config))
+
+            def run(self):
+                return ["fake-result"]
+
+        # SubagentPool itself must not be touched: patch it to explode so a
+        # regression that falls back to the concrete class fails loudly.
+        with patch(
+            "quodeq.analysis.subagents._pool_launcher.SubagentPool",
+            side_effect=AssertionError("the concrete SubagentPool must not be built"),
+        ), patch(
+            "quodeq.analysis.subagents._pool_launcher.get_ai_cmd", return_value="ollama",
+        ):
+            pool, results = launch_pool(
+                config, "dim-x", params, pool_factory=_FakePool,
+            )
+
+        assert len(built_with) == 1
+        assert isinstance(pool, _FakePool)
+        assert results == ["fake-result"]

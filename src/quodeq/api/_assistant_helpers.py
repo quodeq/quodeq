@@ -5,13 +5,16 @@ Split into three modules plus this thin facade:
     ``SharedSourceUnavailable``.
   - _assistant_location.py: ``resolve_run_location``,
     ``resolve_shared_run_location``, ``repo_attach_info``,
-    ``resolve_repo_root``.
+    ``resolve_repo_root``, ``get_repository``.
   - _assistant_events.py: ``event_frames``, ``POLL_SECONDS``, ``IDLE_LIMIT``.
 
 The moved names stay imported here (re-exported) so callers across the
 codebase and tests can keep patching/importing "quodeq.api._assistant_helpers.
-<name>" — the split modules look several of them up on this module at call
-time rather than binding their own copies, so a patch here still lands.
+<name>". None of the split modules import back through this facade any
+more (each imports its own dependencies directly), so a patch on one of the
+split names here only reaches code that -- like this module -- reads it via
+the facade at call time; see each split module's docstring for its own
+patch target.
 """
 from __future__ import annotations
 
@@ -20,7 +23,6 @@ from typing import Callable
 
 from flask import Flask, current_app
 
-from quodeq.assistant import AssistantRepository, AssistantStore
 from quodeq.assistant.tools import ActionContext, ToolContext, default_findings_repo_factory
 from quodeq.assistant import LOCAL_PROVIDERS as _LOCAL_PROVIDERS
 from quodeq.services.standards_prefs import load_visible_standard_ids
@@ -40,6 +42,7 @@ from quodeq.api._assistant_hygiene import (  # noqa: F401 — re-export/patch ta
     run_assistant_hygiene,
 )
 from quodeq.api._assistant_location import (  # noqa: F401 — re-export/patch target
+    get_repository,
     repo_attach_info,
     resolve_repo_root,
     resolve_run_location,
@@ -50,14 +53,6 @@ from quodeq.api._assistant_events import (  # noqa: F401 — re-export/patch tar
     POLL_SECONDS,
     event_frames,
 )
-
-
-def get_repository(app: Flask) -> AssistantStore:
-    if not hasattr(app, "_assistant_repository"):
-        app._assistant_repository = AssistantRepository(
-            Path(app.config["ASSISTANT_DB_PATH"])
-        )
-    return app._assistant_repository
 
 
 def build_action_context(app: Flask) -> ActionContext:
@@ -134,6 +129,7 @@ def build_tool_context(
         evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
         compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
+        repo_is_git=repo_root is not None and (repo_root / ".git").exists(),
         project_id=session.get("project_id"),
         reports_dir=reports_dir,
         read_only=(source == ProjectSource.SHARED),

@@ -38,3 +38,10 @@ def test_read_settings_empty_url_coerced_to_none(tmp_path):
     env = {"QUODEQ_DIR": str(tmp_path)}
     (tmp_path / "shared.json").write_text(json.dumps({"url": ""}), encoding="utf-8")
     assert read_settings(env=env).url is None
+
+
+def test_quodeq_dir_env_reaches_shared_settings_path_with_no_injection(monkeypatch, tmp_path):
+    """No ``env=`` injected -- the real process env, through the public
+    shared_settings_path() entry point."""
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    assert shared_settings_path() == tmp_path / "shared.json"

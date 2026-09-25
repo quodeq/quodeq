@@ -15,7 +15,7 @@ intercept the prompt patch ``quodeq.analysis._api_batch.assemble_api_prompt``
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -31,6 +31,10 @@ from quodeq.analysis._api_standards_text import (
 )
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.api_prompt_assembly import ProjectBrief, assemble_api_prompt
+from quodeq.config.analysis_env import (
+    api_read_timeout_override, context_size_override, finding_repair_disabled,
+    max_output_tokens_override,
+)
 from quodeq.context.trust_model import TrustModel, resolve_trust_model
 from quodeq.shared import cancellation
 
@@ -55,12 +59,21 @@ class _BatchContext:
 
 def _resolve_standards_text(
     work_dir: Path, cfg: AnalysisConfig, env: Mapping[str, str],
+    *, overrides_loader: Callable[[Path], Mapping[str, dict]] | None = None,
 ) -> str:
     """Load the compiled standards text for the API prompt, with the
-    project's own requirement overrides applied."""
-    from quodeq.data.fs.standards_prefs import load_project_overrides  # noqa: PLC0415
+    project's own requirement overrides applied.
 
-    overrides = load_project_overrides(work_dir)
+    *overrides_loader* defaults to the data-layer ``load_project_overrides``
+    (tests pass a fake).
+    """
+    if overrides_loader is None:
+        # Lazy default resolution: the concrete data-layer loader is only
+        # imported when no loader was injected.
+        from quodeq.data.fs.standards_prefs import load_project_overrides  # noqa: PLC0415
+        overrides_loader = load_project_overrides
+
+    overrides = overrides_loader(work_dir)
     # env is the resolved process environment (run_analysis defaults it to
     # os.environ), passed explicitly so these lookups skip os.environ itself.
     return load_standards_text(
@@ -71,6 +84,7 @@ def _resolve_standards_text(
 
 def build_api_batch_context(
     work_dir: Path, cfg: AnalysisConfig, env: Mapping[str, str], stream_file: Path,
+    *, overrides_loader: Callable[[Path], Mapping[str, dict]] | None = None,
 ) -> _BatchContext | None:
     """Resolve the per-dimension batch inputs, or None when the queue is
     exhausted (``gather_api_source_files`` has already written the stream's
@@ -83,7 +97,7 @@ def build_api_batch_context(
     if source_files is None:
         return None
 
-    standards_text = _resolve_standards_text(work_dir, cfg, env)
+    standards_text = _resolve_standards_text(work_dir, cfg, env, overrides_loader=overrides_loader)
     # Resolved once per dimension: the same declared-then-detected trust
     # model the finding sink applies, briefed here to cut out-of-scope findings.
     trust_model = resolve_trust_model(work_dir)
@@ -130,14 +144,25 @@ def _dispatch_one_batch(
 
 def build_batch_api_config(
     cfg: AnalysisConfig, model: str, api_base: str, api_key: str,
+    env: Mapping[str, str],
 ) -> ApiRunnerConfig:
-    """Build the one ApiRunnerConfig shared by every batch in a dimension."""
+    """Build the one ApiRunnerConfig shared by every batch in a dimension.
+
+    The operator overrides are resolved here, once per dimension, from *env*
+    (``run_analysis``'s resolved environment), so the per-call code in
+    ``_api_call`` never reads the environment. QUODEQ_CONTEXT_SIZE only
+    applies when the run did not configure a context size.
+    """
     from quodeq.analysis._api_runner import ApiRunnerConfig  # noqa: PLC0415
 
     max_subagents = getattr(getattr(cfg.run_config, "options", None), "max_subagents", 1)
+    context_size = cfg.context_size if cfg.context_size > 0 else (context_size_override(env) or 0)
     return ApiRunnerConfig(
         model=model, api_base=api_base, api_key=api_key,
-        context_size=cfg.context_size, n_subagents=max(1, max_subagents),
+        context_size=context_size, n_subagents=max(1, max_subagents),
+        max_tokens_override=max_output_tokens_override(env),
+        read_timeout_s=api_read_timeout_override(env),
+        repair_enabled=not finding_repair_disabled(env),
     )
 
 

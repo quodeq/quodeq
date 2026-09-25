@@ -1,5 +1,44 @@
+import json
+from pathlib import Path
+from unittest.mock import patch
+
 from quodeq.analysis.prompts._context import PromptContext
-from quodeq.analysis.prompts.builder import render_previous_findings_section
+from quodeq.analysis.prompts.builder import (
+    build_analysis_prompt,
+    build_consolidated_prompt,
+    load_template,
+    render_all_standards,
+    render_compiled_standards,
+    render_previous_findings_section,
+)
+
+
+def _sample_dimensions():
+    return {
+        "applies": [
+            {"id": "security", "weight": 1.2, "iso_25010": "Security", "source": "OWASP"},
+        ],
+        "excludes": [],
+    }
+
+
+def _write_security_compiled(compiled_dir: Path) -> None:
+    """Write a minimal compiled security standard to *compiled_dir*."""
+    compiled_dir.mkdir(parents=True, exist_ok=True)
+    compiled = {
+        "id": "security",
+        "principles": [
+            {
+                "name": "Confidentiality",
+                "source": "iso25010",
+                "requirements": [
+                    {"id": "S-CON-1", "source": "iso25010",
+                     "text": "Secrets MUST NOT be hardcoded in source", "refs": []},
+                ],
+            },
+        ],
+    }
+    (compiled_dir / "security.json").write_text(json.dumps(compiled))
 
 
 def test_prompt_context_default_previous_findings():
@@ -72,3 +111,75 @@ def test_build_subagent_prompt_passes_inline_findings():
     result = build_subagent_prompt(config, "security", ctx, inline_findings=findings)
     assert "Previous findings" in result
     assert "a.py" in result
+
+
+def test_build_analysis_prompt_uses_injected_overrides_loader(tmp_path):
+    """PromptContext.overrides_loader is a call-time seam: when set,
+    the standards checklist must be rendered with the loader's overrides
+    instead of calling the concrete load_project_overrides."""
+    _write_security_compiled(tmp_path / "standards" / "compiled")
+    loader_calls: list = []
+    sentinel_overrides = {"S-CON-1": {"floorMajor": 9.0}}
+
+    def _fake_loader(project_root):
+        loader_calls.append(project_root)
+        return sentinel_overrides
+
+    with patch(
+        "quodeq.analysis.prompts.builder.load_project_overrides",
+        side_effect=AssertionError("the concrete loader must not be called"),
+    ), patch(
+        "quodeq.analysis.prompts.builder.render_compiled_standards",
+        wraps=render_compiled_standards,
+    ) as spy_render:
+        build_analysis_prompt(
+            load_template(),
+            PromptContext(
+                language="typescript", repo_name="my-app", date_str="2026-03-06",
+                dimension="security", source_file_count=42,
+                dimensions_data=_sample_dimensions(),
+                standards_dir=tmp_path / "standards",
+                project_root=tmp_path,
+                overrides_loader=_fake_loader,
+            ),
+        )
+    assert loader_calls == [tmp_path]
+    assert spy_render.call_args.kwargs["overrides"] is sentinel_overrides
+
+
+def test_build_consolidated_prompt_uses_injected_overrides_loader(tmp_path):
+    """Same seam, consolidated-prompt path."""
+    compiled = tmp_path / "compiled"
+    compiled.mkdir()
+    data = {"id": "security", "principles": [{"name": "Test", "source": "iso25010",
+            "requirements": [{"id": "S-CON-1", "source": "iso25010",
+            "text": "Test req", "refs": []}]}]}
+    (compiled / "security.json").write_text(json.dumps(data))
+
+    loader_calls: list = []
+    sentinel_overrides = {"S-CON-1": {"floorMajor": 9.0}}
+
+    def _fake_loader(project_root):
+        loader_calls.append(project_root)
+        return sentinel_overrides
+
+    with patch(
+        "quodeq.analysis.prompts.builder.load_project_overrides",
+        side_effect=AssertionError("the concrete loader must not be called"),
+    ), patch(
+        "quodeq.analysis.prompts.builder.render_all_standards",
+        wraps=render_all_standards,
+    ) as spy_render:
+        build_consolidated_prompt(
+            dimensions=["security"],
+            context=PromptContext(
+                language="python", repo_name="test", date_str="2026-03-22",
+                dimension="consolidated", source_file_count=20,
+                dimensions_data=_sample_dimensions(),
+                standards_dir=tmp_path,
+                project_root=tmp_path,
+                overrides_loader=_fake_loader,
+            ),
+        )
+    assert loader_calls == [tmp_path]
+    assert spy_render.call_args.kwargs["overrides"] is sentinel_overrides

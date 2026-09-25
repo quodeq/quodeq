@@ -7,11 +7,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from quodeq.config.services_env import max_violation_files as _resolve_max_violation_files
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.core.types.severity import Severity
-from quodeq.shared.utils import env_int, read_text
+from quodeq.shared.utils import read_text
 from quodeq.services.wiring import (
     OVERALL_PRINCIPLE,
+    dimension_evidence_file,
     is_known_dimension,
     parse_eval_from_json,
     parse_eval_markdown,
@@ -34,14 +36,10 @@ from quodeq.shared.constants import EVIDENCE_DIRNAME
 
 _logger = logging.getLogger(__name__)
 
-_DEFAULT_MAX_VIOLATION_FILES = 20
-
 
 def _max_violation_files(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the max number of violation files to include. *override* bypasses env for testing."""
-    if override is not None:
-        return override
-    return env_int("QUODEQ_MAX_VIOLATION_FILES", _DEFAULT_MAX_VIOLATION_FILES, env=env)
+    return override if override is not None else _resolve_max_violation_files(env=env)
 
 
 @dataclass(frozen=True)
@@ -64,7 +62,7 @@ def _try_evidence_formats(
             keys.deleted, dimension,
         )
 
-    jsonl_path = base / EVIDENCE_DIRNAME / f"{dimension}_evidence.jsonl"
+    jsonl_path = dimension_evidence_file(base, dimension)
     stream_path = base / EVIDENCE_DIRNAME / f"{dimension}_live.stream"
     if opts.exists_fn(jsonl_path) and opts.stat_fn(jsonl_path).st_size > 0:
         return parse_violations_from_jsonl(

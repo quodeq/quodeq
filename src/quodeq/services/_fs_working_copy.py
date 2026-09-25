@@ -7,23 +7,17 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.types.project_source import ProjectLocation
+from quodeq.services.wiring import last_fetched_mtime
 
 
 def _derive_last_fetched_at(repo_path: str | None) -> str | None:
     """Return ISO-8601 mtime of .git/FETCH_HEAD (or .git/HEAD as fallback), or None."""
     if not repo_path:
         return None
-    p = Path(repo_path)
-    fetch_head = p / ".git" / "FETCH_HEAD"
-    head = p / ".git" / "HEAD"
-    candidate = fetch_head if fetch_head.exists() else head if head.exists() else None
-    if candidate is None:
+    mtime = last_fetched_mtime(Path(repo_path))
+    if mtime is None:
         return None
-    try:
-        ts = candidate.stat().st_mtime
-    except OSError:
-        return None
-    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
 
 
 def _is_evaluable(repo_path: str | None) -> bool:

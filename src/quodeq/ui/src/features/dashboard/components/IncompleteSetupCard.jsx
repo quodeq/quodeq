@@ -1,10 +1,6 @@
-import { useState } from 'react';
 import CloneTargetStep from '../../onboarding/components/steps/CloneTargetStep.jsx';
-import { registerProject } from '../../../api/index.js';
+import { useCompleteSetup } from '../hooks/useCompleteSetup.js';
 import { t } from '../../../strings/index.js';
-import { apiErrorMessage } from '../../../strings/apiErrors.js';
-import { writeString } from '../../../adapters/storage.js';
-import { LAST_CLONE_ROOT_STORAGE_KEY } from '../../../constants.js';
 import { PROJECT_LOCATION } from '../../../models/project.js';
 
 /**
@@ -15,28 +11,12 @@ import { PROJECT_LOCATION } from '../../../models/project.js';
  * and turns the project into a normal local project.
  */
 export default function IncompleteSetupCard({ projectInfo, onComplete }) {
-  const [open, setOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const repoUrl = projectInfo?.path || projectInfo?.repo || '';
+  // useCompleteSetup runs unconditionally, before the early return below, so
+  // hook order stays stable across the legacy-online / not-applicable branches.
+  const { open, setOpen, submitting, error, handleSubmit } = useCompleteSetup({ repoUrl, onComplete });
 
   if (!projectInfo || projectInfo.location !== PROJECT_LOCATION.ONLINE) return null;
-  const repoUrl = projectInfo.path || projectInfo.repo || '';
-
-  async function handleSubmit({ cloneDest, ephemeral }) {
-    setSubmitting(true);
-    setError(null);
-    try {
-      const result = await registerProject({ repo: repoUrl, cloneDest, ephemeral });
-      if (cloneDest) {
-        writeString(LAST_CLONE_ROOT_STORAGE_KEY, cloneDest);
-      }
-      onComplete?.(result);
-    } catch (err) {
-      setError(apiErrorMessage(err, 'overview.cloneFailed'));
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   if (!open) {
     return (

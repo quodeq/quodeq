@@ -15,7 +15,7 @@ from quodeq.analysis.subagents._pool_models import (
 )
 from quodeq.analysis.errors import REASON_AGENT_FAILURE_STREAK
 from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
-from quodeq.config.analysis_env import agent_failure_streak_limit
+from quodeq.config.analysis_env import AGENT_FAILURE_STREAK_DEFAULT
 from quodeq.shared import cancellation
 from quodeq.shared.logging import log_warning
 
@@ -130,16 +130,9 @@ def should_respawn(
     return remaining
 
 
-def _agent_failure_streak_limit(env: dict[str, str] | None = None) -> int:
-    """Consecutive whole-agent failures tolerated before the run is cancelled.
-
-    Env override QUODEQ_AGENT_FAILURE_STREAK (resolved by the config layer);
-    0 disables the backstop.
-    """
-    return agent_failure_streak_limit(env)
-
-
-def check_agent_failure_streak(results: list[SubagentResult]) -> None:
+def check_agent_failure_streak(
+    results: list[SubagentResult], limit: int = AGENT_FAILURE_STREAK_DEFAULT,
+) -> None:
     """Cancel the run when every recent agent died without a single success.
 
     Provider-agnostic backstop for failure modes the fatal-error
@@ -147,8 +140,10 @@ def check_agent_failure_streak(results: list[SubagentResult]) -> None:
     provider cannot serve this run, and respawning only burns wall-clock and
     spams the console. Cancellation is enforced by the spawn gate
     (``should_respawn``) and the dimension loops.
+
+    *limit* is the run's QUODEQ_AGENT_FAILURE_STREAK (resolved once by the
+    CLI and carried on the pool's options); 0 disables the backstop.
     """
-    limit = _agent_failure_streak_limit()
     if limit <= 0 or cancellation.is_cancelled():
         return
     streak = 0

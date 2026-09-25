@@ -168,6 +168,38 @@ class TestGatherApiSourceFiles:
         assert {m["file"] for m in markers} == {"missing1.py", "missing2.py", "missing3.py"}
         assert all(m["_marker"] == "file_done" and m["status"] == "skipped" for m in markers)
 
+    def test_uses_injected_queue_factory_instead_of_the_concrete_file_queue(self, tmp_path):
+        """queue_factory is a call-time seam: when set, gather_api_source_files
+        must build the queue through it instead of the concrete FileQueue."""
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        jsonl_file = evidence_dir / "security_evidence.jsonl"
+        stream_file = evidence_dir / "agent.stream"
+        real_file = tmp_path / "real.py"
+        real_file.write_text("print(1)\n")
+
+        queue_path = evidence_dir / "queue.json"
+        # A real queue file must exist for the queue_path branch to trigger,
+        # but its content is never read -- the fake below stands in for it.
+        FileQueue(queue_path, files=["ignored.py"])
+        cfg = AnalysisConfig(queue_path=queue_path, agent_id="agent-1")
+
+        built_from: list = []
+
+        class _FakeQueue:
+            def __init__(self, path):
+                built_from.append(path)
+
+            def take(self, *, count, agent_id):
+                return ["real.py"]
+
+        result = gather_api_source_files(
+            tmp_path, cfg, jsonl_file, stream_file, queue_factory=_FakeQueue,
+        )
+
+        assert built_from == [queue_path]
+        assert result == [real_file]
+
 
 class TestLoadSkipDirs:
     def test_returns_frozenset(self):

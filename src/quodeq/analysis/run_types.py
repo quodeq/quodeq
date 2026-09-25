@@ -16,6 +16,10 @@ from quodeq.analysis._dimensions import DimensionsConfig
 from quodeq.analysis.dispatch_policy import DispatchPolicy, default_dispatch_policy
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis._config import HeartbeatCallback
+from quodeq.config.analysis_env import (
+    AGENT_FAILURE_STREAK_DEFAULT, DEFAULT_MAX_DURATION_DEFAULT, DEFAULT_MAX_TURNS_DEFAULT,
+    FAILURE_STREAK_THRESHOLD_DEFAULT,
+)
 from quodeq.config.paths import default_paths
 
 if TYPE_CHECKING:
@@ -60,10 +64,23 @@ class AnalysisOptions:
     # persistence and scoring are suppressed — PR runs are evidence-only.
     diff_from: str | None = None
     skip_scoring: bool = False
+    # Resolved once per run by the CLI (AI_CMD_PATH / QUODEQ_CACHE_ROOT) and
+    # copied onto every AnalysisConfig; None leaves ``run_analysis`` to fill
+    # them from its own environment.
+    ai_cmd_path: str | None = None
+    cache_root: Path | None = None
     # Consecutive `file_done: error` markers that trip the dim-runner's
-    # circuit breaker. 0 disables. The QUODEQ_FAILURE_STREAK env var,
-    # when set, overrides this default at runtime.
-    failure_streak_threshold: int = 5
+    # circuit breaker. 0 disables. The CLI resolves the QUODEQ_FAILURE_STREAK
+    # override into this field once per run.
+    failure_streak_threshold: int = FAILURE_STREAK_THRESHOLD_DEFAULT
+    # Consecutive whole-agent failures before the pool cancels the run
+    # (QUODEQ_AGENT_FAILURE_STREAK, resolved by the CLI). 0 disables.
+    agent_failure_streak_limit: int = AGENT_FAILURE_STREAK_DEFAULT
+    # Single-agent dimension ceilings when ``max_turns``/``max_duration`` are
+    # unset (QUODEQ_DEFAULT_MAX_TURNS/DURATION, resolved by the CLI). Pool
+    # agents never read them.
+    default_max_turns: int = DEFAULT_MAX_TURNS_DEFAULT
+    default_max_duration: int = DEFAULT_MAX_DURATION_DEFAULT
 
 
 @dataclass
@@ -108,7 +125,7 @@ class RunConfig:
     # classifications, and a file edited in between must hash fresh.
     content_hash_memo: dict[str, str] | None = None
     # Explicit DispatchPolicy for this run. ``None`` means "resolve a fresh
-    # live snapshot on demand" via :meth:`_policy` — see there for why that
+    # live snapshot on demand" via :meth:`dispatch_policy` — see there for why that
     # resolution is deliberately NOT cached onto this field.
     dispatch: DispatchPolicy | None = None
 
@@ -118,7 +135,7 @@ class RunConfig:
             return None
         return self.classify_stash.get(dim_id)
 
-    def _policy(self) -> DispatchPolicy:
+    def dispatch_policy(self) -> DispatchPolicy:
         """The DispatchPolicy for this run: the explicit override, or a
         fresh live snapshot.
 
@@ -135,7 +152,7 @@ class RunConfig:
     @property
     def ai_cmd(self) -> str:
         """The active AI provider id for this run (resolved dispatch policy)."""
-        return self._policy().ai_cmd
+        return self.dispatch_policy().ai_cmd
 
     @property
     def source_file_count(self) -> int:
@@ -154,7 +171,7 @@ class RunConfig:
             files, total = self.manifest.source_files, self.manifest.total_files
         else:
             return 0
-        policy = self._policy()
+        policy = self.dispatch_policy()
         if not files or not policy.provider_is_api():
             return total
         dispatchable, _excluded = policy.split_api_dispatchable(self.src, files)

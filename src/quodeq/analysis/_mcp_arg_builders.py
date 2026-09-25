@@ -27,7 +27,6 @@ from quodeq.core.constants import (
     PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )
 from quodeq.shared.models import normalize_model_id
-from quodeq.shared.utils import get_ai_cmd_path
 
 
 def get_ai_tools(env: Mapping[str, str] | None = None) -> str:
@@ -40,21 +39,23 @@ def get_base_ai_args(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
     return tuple(base_ai_args(env).split())
 
 
-def cmd_binary(cmd: str) -> str:
+def cmd_binary(cmd: str, ai_cmd_path: str | None = None) -> str:
     """Return the binary to spawn for provider *cmd*.
 
-    AI_CMD_PATH (validated at the API boundary, see
-    api._evaluation_helpers.validate_ai_cmd_path) redirects the spawn to an
-    alternate install or wrapper while *cmd* keeps keying the provider config.
+    *ai_cmd_path* (AI_CMD_PATH, resolved by the caller and validated at the
+    API boundary, see api._evaluation_helpers.validate_ai_cmd_path) redirects
+    the spawn to an alternate install or wrapper while *cmd* keeps keying the
+    provider config.
     """
-    return get_ai_cmd_path() or cmd
+    return ai_cmd_path or cmd
 
 
 def build_base_args(
     cmd: str, provider_cfg: dict, env: Mapping[str, str] | None = None,
+    *, ai_cmd_path: str | None = None,
 ) -> list[str]:
     """Build the initial args list: binary, subcommand, base args, and tools."""
-    args: list[str] = [cmd_binary(cmd)]
+    args: list[str] = [cmd_binary(cmd, ai_cmd_path)]
     subcommand = provider_cfg.get("cmd_subcommand", "")
     if subcommand:
         args.append(subcommand)
@@ -84,6 +85,7 @@ def _build_agent_params(config: AnalysisConfig, work_dir: Path | None) -> AgentP
         # The standards ROOT, not compiled_dir -- see resolve_standards_dir
         # and AgentParams.standards_dir.
         standards_dir=resolve_standards_dir(config),
+        cache_root=config.cache_root,
     )
 
 
