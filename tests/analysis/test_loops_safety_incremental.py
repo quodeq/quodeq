@@ -8,9 +8,11 @@ tests/analysis/_loops_safety_fixtures.py.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.analysis._loops import LoopDeps, run_incremental_loop
+from quodeq.analysis.run_types import RunConfig
 
 from tests.analysis._loops_safety_fixtures import _FakeEvidence, _config, _ctx, _runner_from
 
@@ -67,6 +69,58 @@ class TestIncrementalLoopSafety:
             )
         assert seen == ["security", "reliability", "maintainability"]
         assert set(result) == {"security", "maintainability"}
+
+    def test_unexpected_exception_is_isolated_and_the_traceback_is_logged(self, recording_log):
+        cfg = _config()
+        seen: list[str] = []
+
+        def fake_runner(_c, dim, _i, _ctx):
+            seen.append(dim)
+            if dim == "reliability":
+                raise AttributeError("boom")
+            return _FakeEvidence()
+
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
+            result = run_incremental_loop(
+                cfg, ["security", "reliability", "maintainability"], _ctx(3),
+                LoopDeps(runner=_runner_from(fake_runner), log=recording_log),
+            )
+        assert seen == ["security", "reliability", "maintainability"]
+        assert set(result) == {"security", "maintainability"}
+        matching = [m for m in recording_log.warning_messages if "failed" in m]
+        assert matching, recording_log.warning_messages
+        assert "Traceback (most recent call last)" in matching[0]
+        assert "AttributeError: boom" in matching[0]
+
+    def test_fallback_exception_outside_the_narrowed_types_still_reaches_the_boundary(self, recording_log):
+        """The fallback's own except narrows to (OSError, KeyError, ValueError,
+        RuntimeError); anything else must escape to the loop-iteration boundary.
+
+        Needs a real RunConfig (not the MagicMock fixture): the fallback path
+        calls ``dataclasses.replace(config, ...)``, which requires a genuine
+        dataclass instance.
+        """
+        cfg = RunConfig(src=Path("."), language="python")
+        cfg.options.skip_scoring = True
+        attempts = {"n": 0}
+
+        def fake_runner(_c, dim, _i, _ctx):
+            if dim != "reliability":
+                return _FakeEvidence()
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                raise RuntimeError("triggers the full-scan fallback")
+            raise AttributeError("not a narrowed type")
+
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
+            result = run_incremental_loop(
+                cfg, ["security", "reliability", "maintainability"], _ctx(3),
+                LoopDeps(runner=_runner_from(fake_runner), log=recording_log),
+            )
+        assert set(result) == {"security", "maintainability"}
+        matching = [m for m in recording_log.warning_messages if "failed" in m]
+        assert matching, recording_log.warning_messages
+        assert "AttributeError: not a narrowed type" in matching[-1]
 
     def test_diagnostic_log_lines_are_emitted(self, recording_log):
         cfg = _config()

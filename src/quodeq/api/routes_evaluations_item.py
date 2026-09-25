@@ -18,6 +18,7 @@ from quodeq.services.background import BackgroundRunner, ThreadBackgroundRunner
 from quodeq.services.base import ActionProvider
 from quodeq.services.scan_progress import build_scan_progress
 from quodeq.services.run_events import read_run_dim_states
+from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
 
@@ -39,6 +40,17 @@ def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
     if not project or not run_id:
         return {}
     return read_run_dim_states(reports_dir(), project, run_id)
+
+
+def _run_score_completed_evidence(reports_dir: Path, score_args: dict) -> None:
+    """Score completed dimensions via the patch-tested facade.
+
+    Deferred import so a patch on
+    ``quodeq.api._evaluation_routes.score_completed_evidence`` (the public
+    patch target) is honored regardless of this module.
+    """
+    from quodeq.api import _evaluation_routes as _facade  # noqa: PLC0415
+    _facade.score_completed_evidence(reports_dir, score_args)
 
 
 def _score_completed_dims_in_bg(app: Flask, job_id: str, job: Any) -> None:
@@ -64,16 +76,10 @@ def _score_completed_dims_in_bg(app: Flask, job_id: str, job: Any) -> None:
     }
 
     def _score_in_bg() -> None:
-        # Deferred so a patch on quodeq.api._evaluation_routes.score_completed_evidence
-        # (the public patch target) is honored regardless of this module.
-        from quodeq.api import _evaluation_routes as _facade
-        try:
-            _facade.score_completed_evidence(_reports, _score_args)
-        except Exception as exc:  # noqa: BLE001 - fire-and-forget background task, any error must not propagate
-            _logger.debug(
-                "Could not score cancelled dimension for %s: %s",
-                _score_args.get("outputRunId"), exc,
-            )
+        run_isolated(
+            lambda: _run_score_completed_evidence(_reports, _score_args),
+            label=f"score cancelled dimension for {_score_args.get('outputRunId')}", log=_logger,
+        )
 
     if not _background(app).submit(_score_in_bg, name=f"score-{job_id}"):
         # Dropped (queue full): give the claim back so the next GET retries.

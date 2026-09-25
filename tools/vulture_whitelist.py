@@ -200,7 +200,6 @@ _.record_principle_grade  # data/sqlite/state_store.py: Referenced only from tes
 _.reset_for_tests  # services/warmup.py: Referenced only from tests/, which this scan does not cover (3 refs).
 _.reset_hash_caches  # analysis/fingerprint.py: Referenced only from tests/, which this scan does not cover (2 refs).
 _.reset_provider_config_cache  # analysis/provider_cache.py: Referenced only from tests/, which this scan does not cover (3 refs).
-_.run_isolated  # shared/fault_isolation.py: Referenced only from tests/, which this scan does not cover (14 refs).
 _.store_api_key_secure  # config/ai_provider.py: Referenced only from tests/, which this scan does not cover (21 refs).
 _.tb  # shared/run_log.py: Referenced only from tests/, which this scan does not cover (2 refs).
 _.tool_uses  # assistant/adapters/_stream.py: Referenced only from tests/, which this scan does not cover (6 refs).

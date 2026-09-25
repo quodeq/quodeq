@@ -6,6 +6,7 @@ I/O to complete.
 """
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from unittest.mock import patch
@@ -148,6 +149,25 @@ def test_get_evaluation_scores_only_once_for_same_job(client):
         f"Expected scoring to run exactly once (dedup via _scored_jobs), "
         f"got {call_count} calls."
     )
+
+
+def test_score_completed_dims_failure_is_isolated_and_logged(client, caplog):
+    """A raising score_completed_evidence must not crash the background task,
+    and must be logged with the traceback (fault-isolation boundary)."""
+    with patch(
+        "quodeq.api._evaluation_routes.score_completed_evidence",
+        side_effect=RuntimeError("boom"),
+    ), caplog.at_level(logging.WARNING, logger="quodeq.api.routes_evaluations_item"):
+        resp = client.get("/api/evaluations/j1")
+
+        deadline = time.monotonic() + budget(5)
+        while time.monotonic() < deadline and not caplog.records:
+            time.sleep(0.02)
+
+    assert resp.status_code == 200
+    matching = [r for r in caplog.records if "failed" in r.getMessage()]
+    assert matching, [r.getMessage() for r in caplog.records]
+    assert any(r.exc_info for r in matching)
 
 
 class _DeadlineCancelledProvider(_FailedJobProvider):

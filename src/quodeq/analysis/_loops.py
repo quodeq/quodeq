@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from pathlib import Path
 
 from quodeq.analysis._dim_order import apply_dim_deadline
 from quodeq.analysis._drop_stats import DropStatsCounter, report_run_drop_stats
@@ -29,6 +30,7 @@ from quodeq.analysis._loop_steps import (
     loop_should_stop,
     run_one_incremental_dim,
 )
+from quodeq.shared.fault_isolation import run_isolated
 
 
 def _run_post_loop_guards(
@@ -96,52 +98,69 @@ def run_incremental_loop(
     return result
 
 
+def _skip_dim(
+    run_dir: Path | None, dimension: str, step: str, log: LogSink,
+    reason: str, exc: BaseException | None = None,
+) -> None:
+    """Mark the dim INCOMPLETE and log the iteration (*step*, e.g. "1/3") as
+    skipped for *reason*."""
+    safe_write_dim_state(
+        run_dir, dimension,
+        DimTransition(DimState.INCOMPLETE, reason=interruption_reason(exc)), log=log,
+    )
+    log.info(f"[loop] completed iteration {step} for {dimension} (skipped: {reason})")
+
+
+def _attempt_per_dim(
+    config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
+) -> Evidence | None:
+    """Run the dimension (full scan); a known-bad exception is skipped here.
+
+    An exception this function doesn't recognize propagates --
+    ``_dispatch_per_dim`` isolates it at the loop-iteration boundary.
+    """
+    log = deps.log
+    run_dir = run_dir_for(config)
+    step = f"{idx}/{ctx.total}"
+    try:
+        ev = deps.runner.run(config, dimension, idx, ctx, emit_log=True)
+    except BrokenPipeError as exc:
+        silence_broken_stdout()
+        _skip_dim(run_dir, dimension, step, log, "broken pipe", exc)
+        return None
+    except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
+        log.warning(f"[{step}] {dimension} - failed: {exc}")
+        _skip_dim(run_dir, dimension, step, log, type(exc).__name__, exc)
+        return None
+    if ev is None:
+        _skip_dim(run_dir, dimension, step, log, "ev=None")
+        return None
+    return ev
+
+
 def _dispatch_per_dim(
     config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
 ) -> Evidence | None:
     """Run one dimension (full scan). Returns the Evidence, or None if skipped.
 
-    On any caught exception, or a clean ``None`` return from the runner, this
-    writes the dim's ``INCOMPLETE`` state (with the reason keyed off the real
-    exception -- ``interruption_reason`` special-cases ``FatalProviderError``
-    and ``CircuitBreakerError``, both of which surface here) and logs the
-    "completed iteration" line itself, so the exception never needs to leave
-    this function.
+    A known-bad exception (or a clean ``None`` return) is handled inside
+    ``_attempt_per_dim``, which writes the dim's ``INCOMPLETE`` state (the
+    reason keyed off the real exception -- ``interruption_reason``
+    special-cases ``FatalProviderError`` and ``CircuitBreakerError``, both of
+    which surface here) and logs the "completed iteration" line itself. An
+    exception class neither the runner call nor ``_attempt_per_dim``
+    recognizes is caught here (the loop-iteration boundary), logged with its
+    traceback, and skipped the same way, so the exception never needs to
+    leave this function.
     """
-    log = deps.log
-    run_dir = run_dir_for(config)
-
-    def _skip(reason: str, exc: BaseException | None = None) -> None:
-        """Mark the dim INCOMPLETE and log the iteration as skipped for *reason*."""
-        safe_write_dim_state(
-            run_dir, dimension,
-            DimTransition(DimState.INCOMPLETE, reason=interruption_reason(exc)), log=log,
-        )
-        log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (skipped: {reason})")
-
-    try:
-        ev = deps.runner.run(config, dimension, idx, ctx, emit_log=True)
-    except BrokenPipeError as exc:
-        silence_broken_stdout()
-        _skip("broken pipe", exc)
-        return None
-    except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
-        log.warning(f"[{idx}/{ctx.total}] {dimension} - failed: {exc}")
-        _skip(type(exc).__name__, exc)
-        return None
-    except Exception as exc:  # noqa: BLE001
-        # Don't let an exotic exception class drop the rest of the loop
-        # silently. Log + count as skipped + continue so we get the trail.
-        log.warning(
-            f"[loop] {dimension} - unexpected exception "
-            f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
-        )
-        _skip("unexpected", exc)
-        return None
-    if ev is None:
-        _skip("ev=None")
-        return None
-    return ev
+    return run_isolated(
+        lambda: _attempt_per_dim(config, dimension, idx, ctx, deps),
+        label=f"[{idx}/{ctx.total}] {dimension} dispatch",
+        log=deps.log,
+        on_error=lambda exc: _skip_dim(
+            run_dir_for(config), dimension, f"{idx}/{ctx.total}", deps.log, "unexpected", exc,
+        ),
+    )
 
 
 def _run_one_dimension(

@@ -33,6 +33,7 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.shared import cancellation
+from quodeq.shared.fault_isolation import run_isolated
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,15 +145,14 @@ def finalize_dim_result(
         run.result.setdefault(dimension, ev)
 
 
-def _dispatch_incremental_dim(
+def _attempt_incremental_dim(
     config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
 ) -> tuple[Evidence | None, BaseException | None]:
-    """Run one dimension incrementally, falling back to a full scan on failure.
+    """Try the incremental run, falling back to a full scan on a known-bad exception.
 
-    Returns ``(ev, last_exc)``: ``ev`` is the resulting Evidence (or None if
-    both the incremental attempt and any fallback failed), ``last_exc`` is
-    the most recent exception encountered (or None on success), used to
-    pick the dim-state ``INCOMPLETE`` reason.
+    A failure of a type this function doesn't recognize (from either the
+    incremental attempt or the fallback) is left to propagate --
+    ``_dispatch_incremental_dim`` isolates it at the loop-iteration boundary.
     """
     runner, log = deps.runner, deps.log
     try:
@@ -179,19 +179,29 @@ def _dispatch_incremental_dim(
         except BrokenPipeError as inner_exc:
             silence_broken_stdout()
             return None, inner_exc
-        except Exception as inner_exc:  # noqa: BLE001
+        except (OSError, KeyError, ValueError, RuntimeError) as inner_exc:
             return None, inner_exc
-    except Exception as exc:  # noqa: BLE001
-        # Loop-level diagnostic: an unanticipated exception class would
-        # otherwise propagate up silently and the lifecycle would treat it
-        # as failed without saying which dim. Log + swallow + continue so
-        # subsequent dims still run; the surfaced log line gives us the
-        # trail we need next time this happens.
-        log.warning(
-            f"[loop] {dimension} - unexpected exception "
-            f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
-        )
-        return None, exc
+
+
+def _dispatch_incremental_dim(
+    config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
+) -> tuple[Evidence | None, BaseException | None]:
+    """Run one dimension incrementally, falling back to a full scan on failure.
+
+    Returns ``(ev, last_exc)``: ``ev`` is the resulting Evidence (or None if
+    both the incremental attempt and any fallback failed), ``last_exc`` is
+    the most recent exception encountered (or None on success), used to
+    pick the dim-state ``INCOMPLETE`` reason. An exception class neither the
+    incremental attempt nor the fallback recognizes is caught here (the
+    loop-iteration boundary) and logged with its traceback, instead of
+    propagating up silently -- subsequent dims still run.
+    """
+    return run_isolated(
+        lambda: _attempt_incremental_dim(config, dimension, idx, ctx, deps),
+        label=f"[{idx}/{ctx.total}] {dimension} incremental dispatch",
+        log=deps.log,
+        on_error=lambda exc: (None, exc),
+    )
 
 
 def run_one_incremental_dim(

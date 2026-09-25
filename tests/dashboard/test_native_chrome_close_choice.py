@@ -1,4 +1,5 @@
 """Close-confirm dialog choice: platform dispatch, NSAlert mapping and _cancel_evaluation."""
+import logging
 from unittest.mock import MagicMock, patch
 
 from quodeq.dashboard import _webview_window as ww
@@ -150,3 +151,11 @@ class TestMacConfirmClose:
         # or the worker would hang (the deadlock class this file already hit).
         choice, _, _ = self._run(run_modal_error=RuntimeError("boom"))
         assert choice == "keep"
+
+    def test_runmodal_error_logs_the_traceback(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_close"):
+            choice, _, _ = self._run(run_modal_error=RuntimeError("boom"))
+        assert choice == "keep"
+        matching = [r for r in caplog.records if "failed" in r.getMessage()]
+        assert matching, [r.getMessage() for r in caplog.records]
+        assert any(r.exc_info for r in matching)

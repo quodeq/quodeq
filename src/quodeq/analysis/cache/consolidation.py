@@ -18,6 +18,7 @@ from pathlib import Path
 
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.core.run.state import RunState
+from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
 
@@ -64,6 +65,16 @@ def _collect_keys(evidence_dir: Path) -> set[str]:
     return keys
 
 
+def _consolidate_one(cache: CacheBackend, key: str) -> bool:
+    """Flip *key*'s cache entry to consolidated. Returns whether it was flipped."""
+    entry = cache.get(key)
+    if entry is None or entry.consolidated:
+        return False
+    entry.consolidated = True
+    cache.put(key, entry)
+    return True
+
+
 def mark_run_consolidated(
     run_dir: Path, cache: CacheBackend | None = None,
 ) -> None:
@@ -93,15 +104,12 @@ def mark_run_consolidated(
             cache = LocalFileBackend()
         flipped = 0
         for key in sorted(keys):
-            try:
-                entry = cache.get(key)
-                if entry is None or entry.consolidated:
-                    continue
-                entry.consolidated = True
-                cache.put(key, entry)
+            did_flip = run_isolated(
+                lambda key=key: _consolidate_one(cache, key),
+                label=f"consolidate cache entry {key}", log=_logger,
+            )
+            if did_flip:
                 flipped += 1
-            except Exception as exc:  # noqa: BLE001 — one bad entry must not stop the rest
-                _logger.warning("Could not consolidate cache entry %s: %s", key, exc)
         _logger.info(
             "cache: consolidated %d entries for run %s", flipped, run_dir.name,
         )

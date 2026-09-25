@@ -86,6 +86,28 @@ class TestPerDimLoopSafety:
         assert "security" not in result
         assert "reliability" in result
 
+    def test_unexpected_exception_is_isolated_and_the_traceback_is_logged(self, recording_log):
+        cfg = _config()
+        seen: list[str] = []
+
+        def process_fn(_c, dim, _i, _ctx):
+            seen.append(dim)
+            if dim == "security":
+                raise AttributeError("boom")
+            return _FakeEvidence()
+
+        result = run_per_dimension_loop(
+            cfg, ["security", "reliability"], _ctx(2),
+            LoopDeps(runner=_runner_from(process_fn), log=recording_log),
+        )
+        assert seen == ["security", "reliability"]
+        assert "security" not in result
+        assert "reliability" in result
+        matching = [m for m in recording_log.warning_messages if "failed" in m]
+        assert matching, recording_log.warning_messages
+        assert "Traceback (most recent call last)" in matching[0]
+        assert "AttributeError: boom" in matching[0]
+
     def test_diagnostic_log_lines_are_emitted(self, recording_log):
         cfg = _config()
         run_per_dimension_loop(

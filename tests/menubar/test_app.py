@@ -172,6 +172,18 @@ def test_on_check_updates_logs_when_check_fails(monkeypatch, caplog) -> None:
     )
 
 
+def test_on_check_updates_logs_the_traceback_at_warning(monkeypatch, caplog) -> None:
+    _module, _, app = _make_app()
+    monkeypatch.setattr("quodeq.update.checker.run_check", _raising("boom"))
+    with caplog.at_level(logging.WARNING, logger="quodeq.menubar.app"):
+        app._on_check_updates(None)
+    matching = [r for r in caplog.records if "failed" in r.getMessage()]
+    assert matching, [r.getMessage() for r in caplog.records]
+    assert any(r.exc_info for r in matching)
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "RuntimeError: boom" in caplog.text
+
+
 def test_poll_logs_when_update_status_check_fails(monkeypatch, caplog) -> None:
     _module, _, app = _make_app()
     _assert_logs(

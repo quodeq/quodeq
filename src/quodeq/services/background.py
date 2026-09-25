@@ -29,6 +29,7 @@ import threading
 from typing import Callable, Protocol
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.shared.fault_isolation import run_isolated
 
 WORKER_THREAD_PREFIX = "background-worker-"
 # Concurrency cap: enough to overlap a salvage score with a projection sweep
@@ -55,10 +56,10 @@ class BackgroundRunner(Protocol):
 class ThreadBackgroundRunner:
     """Default runner: a bounded pool of on-demand daemon workers.
 
-    Exceptions raised by *fn* are swallowed and logged at debug level: by
-    the time the work runs, the caller has already returned its response (or,
-    for the service-layer caller, already returned its own result), so there
-    is no request left to report the failure to.
+    Exceptions raised by *fn* are isolated and logged at warning level with
+    the traceback: by the time the work runs, the caller has already returned
+    its response (or, for the service-layer caller, already returned its own
+    result), so there is no request left to report the failure to.
     """
 
     def __init__(
@@ -133,10 +134,4 @@ class ThreadBackgroundRunner:
                 except queue.Empty:
                     self._active -= 1
                     return
-            self._run(fn, name)
-
-    def _run(self, fn: Callable[[], None], name: str) -> None:
-        try:
-            fn()
-        except Exception as exc:  # noqa: BLE001 -- background work must never crash the thread silently
-            self._log.debug(f"Background task {name or fn} failed: {exc}")
+            run_isolated(fn, label=f"background task {name or fn}", log=self._log)

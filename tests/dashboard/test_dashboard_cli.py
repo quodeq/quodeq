@@ -38,6 +38,16 @@ def test_main_catches_unexpected_exception(monkeypatch, capsys):
     assert "Error: no access" in capsys.readouterr().err
 
 
+def test_main_logs_the_traceback_on_unexpected_exception(monkeypatch, capsys):
+    monkeypatch.setattr("quodeq.dashboard.cli.run_dashboard", lambda cfg: (_ for _ in ()).throw(PermissionError("no access")))
+    monkeypatch.setattr(sys, "argv", ["quodeq-dashboard"])
+    exit_code = main([])
+    assert exit_code == 1
+    err = capsys.readouterr().err
+    assert "Traceback (most recent call last)" in err
+    assert "PermissionError: no access" in err
+
+
 @pytest.mark.parametrize("argv", [
     lambda p: ["--evaluations", str(p)],
     lambda p: [f"--evaluations={p}"],
