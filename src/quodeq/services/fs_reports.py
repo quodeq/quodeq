@@ -26,18 +26,22 @@ def _enrich_with_coverage(
         return payload
     try:
         scan = json.loads(scan_path.read_text(encoding="utf-8"))
-        total = scan.get("total_files", 0)
-        payload["totalFiles"] = total
-        # Compute analyzed_files from the files_count already tracked in run data.
-        # The existing read_accumulated_summary returns files_count from manifests.
-        # Use it as the analyzed count (it counts unique source files seen across runs).
-        files_count = payload.get("filesCount") or payload.get("files_count")
-        if files_count and total:
-            payload["analyzedFiles"] = min(files_count, total)
-        else:
-            payload["analyzedFiles"] = None
-    except (json.JSONDecodeError, OSError) as exc:
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
         log.debug(f"coverage enrichment skipped for {project}: {exc}")
+        return payload
+    if not isinstance(scan, dict):
+        log.debug(f"coverage enrichment skipped for {project}: scan.json is not an object")
+        return payload
+    total = scan.get("total_files", 0)
+    payload["totalFiles"] = total
+    # Compute analyzed_files from the files_count already tracked in run data.
+    # The existing read_accumulated_summary returns files_count from manifests.
+    # Use it as the analyzed count (it counts unique source files seen across runs).
+    files_count = payload.get("filesCount") or payload.get("files_count")
+    if files_count and total:
+        payload["analyzedFiles"] = min(files_count, total)
+    else:
+        payload["analyzedFiles"] = None
     return payload
 
 

@@ -8,6 +8,8 @@ import dataclasses
 import shutil
 from pathlib import Path
 
+import pytest
+
 from quodeq.core.events.models import Judgment
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.projection.grade_projector import compute_run_grades, recompute_grades
@@ -112,6 +114,30 @@ def test_apply_to_all_runs_reports_failed_runs_and_continues(tmp_path, formula_p
     assert result.failed == ["run-bad"]
     assert "run-good" in seen
     assert cleared["n"] == 1  # cache cleared despite the partial failure
+
+
+def test_apply_to_all_runs_lets_an_out_of_scope_recompute_error_propagate(
+    tmp_path, formula_path, monkeypatch,
+):
+    """recompute_grades' real surface is (sqlite3.Error, OSError, ValueError,
+    RuntimeError) -- open_evaluation_db's own raises plus a locked/corrupt
+    db. A bug outside that surface is a genuine defect in the recompute path
+    and must surface, not be retried into a false 'failed' report."""
+    project = tmp_path / "proj"
+    d = project / "run-bad"
+    d.mkdir(parents=True)
+    (d / "events.jsonl").write_text("")
+
+    def boom(run_dir, params=None):
+        raise AttributeError("unexpected bug")
+
+    monkeypatch.setattr("quodeq.services.grade_formula.recompute_grades", boom)
+    monkeypatch.setattr(
+        "quodeq.services.dashboard.clear_shared_dimension_cache", lambda: None,
+    )
+
+    with pytest.raises(AttributeError, match="unexpected bug"):
+        grade_formula.apply_to_all_runs(tmp_path)
 
 
 def test_apply_to_all_runs_clears_cache_when_root_missing(formula_path, monkeypatch, tmp_path):

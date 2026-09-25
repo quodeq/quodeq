@@ -96,7 +96,7 @@ class WarmupEngine:
             self._reports_dir = reports_dir
             try:
                 listing = sorted(self._list_fn(reports_dir), key=lambda t: t[1], reverse=True)
-            except Exception:  # noqa: BLE001 - never block server start
+            except (OSError, ValueError):
                 _logger.warning("warm-up enumeration failed", exc_info=True)
                 listing = []
             for project_id, _date in listing:
@@ -165,7 +165,7 @@ class WarmupEngine:
             # Fetch display name outside the lock (file I/O shouldn't block others)
             try:
                 current_name = _project_display_name(reports_dir, project_id)
-            except Exception:  # noqa: BLE001 - bad metadata shouldn't crash worker
+            except (OSError, ValueError):
                 current_name = project_id
             with self._cond:
                 self._current_name = current_name

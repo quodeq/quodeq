@@ -191,6 +191,53 @@ def test_default_warm_project_runs_against_a_real_project_dir(tmp_path, monkeypa
     _warm_project(str(tmp_path), "proj")  # must not raise
 
 
+def test_start_survives_a_project_listing_failure(tmp_path, make_engine):
+    """A real enumeration failure (e.g. a bad run directory tripping
+    validate_path_segment, or a filesystem stat error) must not stop the
+    engine from starting -- it just starts with an empty queue."""
+    def boom(_rd):
+        raise OSError("listing failed")
+
+    eng = make_engine(warm_fn=lambda *_: None, list_fn=boom)
+    eng.start(str(tmp_path))
+    assert _wait_until(lambda: eng.snapshot() is not None)
+    assert eng.snapshot()["projectsTotal"] == 0
+
+
+def test_start_lets_an_out_of_scope_listing_error_propagate(tmp_path, make_engine):
+    """A bug in the listing seam outside (OSError, ValueError) is a genuine
+    defect and must surface at startup, not be silently absorbed."""
+    def boom(_rd):
+        raise RuntimeError("unexpected bug")
+
+    eng = make_engine(warm_fn=lambda *_: None, list_fn=boom)
+    with pytest.raises(RuntimeError, match="unexpected bug"):
+        eng.start(str(tmp_path))
+
+
+def test_display_name_failure_falls_back_to_the_project_id(tmp_path, make_engine, monkeypatch):
+    """A bad/unreadable repository_info.json (or any (OSError, ValueError)
+    from _project_display_name) must not crash the worker -- the progress
+    display just falls back to the raw project id."""
+    entered = threading.Event()
+    release = threading.Event()
+
+    def boom(_reports_dir, _project_id):
+        raise ValueError("bad metadata")
+
+    monkeypatch.setattr("quodeq.services.warmup._project_display_name", boom)
+
+    def warm(reports_dir, pid):
+        entered.set()
+        release.wait(5)
+
+    eng = make_engine(warm_fn=warm, list_fn=lambda _rd: [("p1", "2026-08-01")])
+    eng.start(str(tmp_path))
+    assert entered.wait(5)
+    assert eng.snapshot()["currentProjectName"] == "p1"
+    release.set()
+
+
 def test_bad_repository_info_json_does_not_kill_worker(tmp_path, make_engine):
     """Verify that invalid repository_info.json doesn't crash the worker."""
     import json

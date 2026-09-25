@@ -7,6 +7,7 @@ not to data.
 from __future__ import annotations
 
 import logging
+import sqlite3
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -118,7 +119,7 @@ def _recompute_with_retries(run_dir: Path, params: ScoringParams) -> bool:
         try:
             recompute_grades(run_dir, params=params)
             return True
-        except Exception:  # noqa: BLE001 — one bad run must not block the rest
+        except (sqlite3.Error, OSError, ValueError, RuntimeError):
             if attempt < _APPLY_RETRIES:
                 time.sleep(_APPLY_RETRY_SLEEP_S)
                 continue

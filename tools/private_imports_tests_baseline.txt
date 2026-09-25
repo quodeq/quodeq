@@ -1039,7 +1039,6 @@ tests/services/test_jobs_deadline_marker.py:78:private-name:quodeq.analysis._api
 tests/services/test_jobs_run_log.py:13:private-module:quodeq.services._job_log_tee.TeeContext
 tests/services/test_jobs_run_log.py:13:private-module:quodeq.services._job_log_tee.drain_pre_marker_buffer
 tests/services/test_jobs_run_log_batching.py:9:private-name:quodeq.services._job_log_tee._iter_line_batches
-tests/services/test_mutation_scoring_logging.py:7:private-module:quodeq.services._mutation_scoring.resolve_default_run_id
 tests/services/test_per_run_versions_memo.py:15:private-name:quodeq.services.trend_fetcher._make_version_for
 tests/services/test_plugin_discovery.py:6:private-name:quodeq.services.plugin_discovery._discover_from_detection
 tests/services/test_post_run_hook.py:14:private-module:quodeq.services._post_run_hook.PostRunHook

@@ -21,7 +21,7 @@ from quodeq.data.cache_store.migrate import ensure_cache_ready
 def _default_standards_dir() -> Path | None:
     try:
         std = default_paths().standards_dir
-    except Exception:  # noqa: BLE001 - maintenance must never break serving
+    except OSError:
         return None
     return std if std is not None and std.exists() else None
 

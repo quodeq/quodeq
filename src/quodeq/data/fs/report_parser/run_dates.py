@@ -18,6 +18,7 @@ back to ``parse_run_date``.
 from __future__ import annotations
 
 import logging
+import sqlite3
 from pathlib import Path
 
 from quodeq.data.fs.report_parser._date_utils import normalize_date
@@ -40,8 +41,8 @@ def project_run_dates(reports_root: Path, project: str) -> dict[str, tuple[str, 
             rows = list_runs_for_project(db, project, limit=None)
         finally:
             db.close()
-    except Exception:
-        _logger.debug("project_run_dates: index unavailable for %s", project, exc_info=True)
+    except (sqlite3.Error, OSError):
+        _logger.warning("project_run_dates: index unavailable for %s", project, exc_info=True)
         return {}
 
     out: dict[str, tuple[str, str]] = {}

@@ -212,7 +212,7 @@ def read_dismissed_snippets(run_dir: Path) -> list[tuple[str | None, str | None]
     let precedent matching break a scan."""
     try:
         return read_dismissed_snippets_strict(run_dir)
-    except Exception as exc:  # noqa: BLE001 — precedent must never break a scan
+    except (sqlite3.Error, OSError, RuntimeError) as exc:
         _logger.warning("Could not read dismissed snippets from %s: %s", run_dir, exc)
         return []
 
@@ -260,7 +260,7 @@ def read_semantic_eligible_dismissals(run_dir: Path) -> list[tuple[str | None, s
     try:
         with open_evaluation_db(run_dir) as conn:
             return [(req, snippet) for req, snippet in conn.execute(_SEMANTIC_ELIGIBLE_SQL)]
-    except Exception as exc:  # noqa: BLE001 — precedent must never break a scan
+    except (sqlite3.Error, OSError, RuntimeError) as exc:
         _logger.warning("Could not read dismissed texts from %s: %s", run_dir, exc)
         return []
 
