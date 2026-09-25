@@ -134,7 +134,9 @@ class TestParseViolationsFromStream:
             result = parse_violations_from_stream(missing, ctx)
         assert result is None
         assert "Failed to read stream file" in caplog.text
-        assert str(missing) in caplog.text
+        # str(missing) is wrong on Windows: OSError's str() renders the
+        # filename via repr(), which doubles backslashes there.
+        assert repr(str(missing)) in caplog.text
 
     def test_valid_stream_file(self, tmp_path):
         from quodeq.services.violation_context import ViolationContext

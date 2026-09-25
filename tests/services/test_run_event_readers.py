@@ -9,7 +9,9 @@ exercised directly here instead.
 """
 from __future__ import annotations
 
+import errno
 import logging
+import os
 
 from quodeq.services.run_event_readers import read_dim_eval
 from quodeq.shared.log_sink import LoggerSink
@@ -30,7 +32,5 @@ def test_read_dim_eval_missing_file_logs_the_old_oserror_text(tmp_path, caplog):
     record = caplog.records[0]
     assert record.levelname == "WARNING"
     path = tmp_path / "evaluation" / "security.json"
-    assert record.message == (
-        f"dimension eval read failed at {path}: "
-        f"[Errno 2] No such file or directory: '{path}'"
-    )
+    oserror_text = str(FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(path)))
+    assert record.message == f"dimension eval read failed at {path}: {oserror_text}"
