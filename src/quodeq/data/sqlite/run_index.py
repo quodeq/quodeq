@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 import time as _time
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -57,7 +57,7 @@ class RunRow:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _visible_subdirs(directory: Path):
+def _visible_subdirs(directory: Path) -> Iterator[Path]:
     """Yield the subdirectories of *directory* whose names do not start with a dot."""
     for child in directory.iterdir():
         if child.is_dir() and not child.name.startswith("."):

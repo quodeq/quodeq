@@ -4,8 +4,8 @@ Every timestamp the services layer stamps (job start/end, onboarding
 completion, deletion time, scan time) is ``datetime.now(timezone.utc)
 .isoformat()``: microsecond precision with a ``+00:00`` offset. The run
 state files, the run index and the result cache stamp at second precision
-instead (``timespec=ISO_SECONDS``). One home so neither format can drift
-between writers.
+instead (``timespec=ISO_SECONDS``). Writers stamp through these functions
+so neither format drifts.
 """
 from __future__ import annotations
 

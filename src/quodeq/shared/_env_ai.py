@@ -1,7 +1,6 @@
 """Environment-based configuration accessors -- AI provider/CLI selection."""
 from __future__ import annotations
 
-
 from quodeq.shared._config import get_config
 from quodeq.shared.env_resolve import resolve_env
 

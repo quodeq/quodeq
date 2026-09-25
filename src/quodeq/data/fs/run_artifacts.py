@@ -49,8 +49,8 @@ def read_json_object(path: Path, *, raise_non_utf8: bool = False) -> dict | None
 
     None when the file is absent, not valid JSON, not a JSON object, or not
     UTF-8 text. ``raise_non_utf8=True`` lets the UnicodeDecodeError of a
-    non-UTF-8 file propagate instead: ``project_files``' record readers
-    (``repository_info.json`` / ``scan.json``) have always done so.
+    non-UTF-8 file propagate instead, for callers that treat a non-UTF-8
+    record as an error rather than a missing one.
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
