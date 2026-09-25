@@ -43,10 +43,10 @@ src/quodeq/api/_index_routes.py:24:broad-except
 src/quodeq/api/_run_event_watcher.py:153:broad-except
 src/quodeq/api/_scores_routes.py:42:broad-except
 src/quodeq/api/_scores_routes.py:76:broad-except
-src/quodeq/api/_sse_log_helpers.py:83:broad-except
-src/quodeq/api/_terminal_ws_helpers.py:103:broad-except
-src/quodeq/api/_terminal_ws_helpers.py:57:broad-except
-src/quodeq/api/_terminal_ws_helpers.py:74:broad-except
+src/quodeq/api/_sse_log_helpers.py:87:broad-except
+src/quodeq/api/_terminal_ws_helpers.py:106:broad-except
+src/quodeq/api/_terminal_ws_helpers.py:58:broad-except
+src/quodeq/api/_terminal_ws_helpers.py:77:broad-except
 src/quodeq/api/app.py:138:broad-except
 src/quodeq/api/app.py:273:broad-except
 src/quodeq/api/routes_compare.py:37:broad-except
@@ -138,7 +138,7 @@ src/quodeq/services/warmup.py:168:broad-except
 src/quodeq/services/warmup.py:174:broad-except
 src/quodeq/services/warmup.py:99:broad-except
 src/quodeq/shared/resource_sampler.py:146:broad-except
-src/quodeq/terminal/_pty_windows.py:75:broad-except
+src/quodeq/terminal/_pty_windows.py:76:broad-except
 src/quodeq/update/checker.py:84:broad-except
 src/quodeq/update/checker.py:87:broad-except
 src/quodeq/update/checker.py:95:broad-except

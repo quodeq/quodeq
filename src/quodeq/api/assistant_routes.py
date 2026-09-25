@@ -19,6 +19,8 @@ this facade.
 """
 from __future__ import annotations
 
+from http import HTTPStatus
+
 from flask import Flask, Response, jsonify
 
 from quodeq.api.assistant_action_routes import register_assistant_action_routes
@@ -63,11 +65,12 @@ def _shared_source_error() -> tuple[Response, int] | None:
     repository is configured or its local clone state is unusable, else None."""
     settings = read_settings()
     if not settings.url:
-        body, status = error_response("no shared repository configured", 409, "NO_SHARED_REPO")
+        body, status = error_response("no shared repository configured", HTTPStatus.CONFLICT, "NO_SHARED_REPO")
         return jsonify(body), status
     state = read_state(settings.url)
     if state not in (RepoFormat.OK, RepoFormat.EMPTY):
-        body, status = error_response(f"shared repository unavailable: {state}", 409, "SHARED_REPO_UNAVAILABLE")
+        body, status = error_response(
+            f"shared repository unavailable: {state}", HTTPStatus.CONFLICT, "SHARED_REPO_UNAVAILABLE")
         return jsonify(body), status
     return None
 

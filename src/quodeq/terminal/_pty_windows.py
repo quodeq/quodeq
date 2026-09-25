@@ -8,6 +8,7 @@ import time
 from winpty import PtyProcess  # type: ignore[import-untyped]
 
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.terminal.constants import PTY_READ_MAX_BYTES
 
 _logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class WindowsPty:
             env.pop(k, None)
         self._proc = PtyProcess.spawn(self._cmd, cwd=cwd, env=env, dimensions=(rows, cols))
 
-    def read(self, max_bytes: int = 65536) -> bytes:
+    def read(self, max_bytes: int = PTY_READ_MAX_BYTES) -> bytes:
         if self._proc is None or not self._proc.isalive():
             return b""
         try:
