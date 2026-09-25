@@ -146,7 +146,10 @@ def load_standards_text(
                     text = text[:limit] + "\n\n[... standards truncated for context limits ...]"
                 return text
         except (OSError, _json.JSONDecodeError) as exc:
-            _log.debug("compiled standards file skipped: %s", exc)
+            _log.warning(
+                "compiled standards file skipped for dimension %s (%s): %s",
+                dimension, json_path, exc,
+            )
     md_path = compiled_dir / f"{dimension}.md"
     if md_path.exists():
         try:

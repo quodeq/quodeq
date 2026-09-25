@@ -102,6 +102,13 @@ class WalkCounts:
     """
 
     skipped_untracked: int = 0
+    unreadable_dirs: int = 0
+    """Directories ``os.walk`` could not list (permission denied, vanished
+    mid-walk). Previously silent: os.walk without ``onerror`` just skips
+    the directory and moves on, so a partially-scanned repo looked
+    identical to a fully-scanned one. Tallied, not logged -- this module
+    reports the number and never logs it (inner-layer files take no
+    logging framework)."""
 
 
 def iter_source_files(
@@ -127,7 +134,11 @@ def iter_source_files(
     ignore_patterns = walk.ignore_patterns or []
     tracked = walk.tracked_files
     src_abs = src.resolve()
-    for dirpath, dirnames, filenames in os.walk(walk_root):
+
+    def _on_walk_error(_exc: OSError) -> None:
+        counts.unreadable_dirs += 1
+
+    for dirpath, dirnames, filenames in os.walk(walk_root, onerror=_on_walk_error):
         dirnames[:] = [d for d in dirnames if d not in walk.skip_dirs and not d.startswith(".")]
         if ignore_patterns:
             _prune_ignored_dirs(src, dirpath, dirnames, ignore_patterns)

@@ -19,44 +19,54 @@ class TestApplyMarker:
     def _make_job(self):
         return Job("j1", "running", [], "now", None, None)
 
+    def _manager(self):
+        return JobManager(job_store=InMemoryJobStore())
+
     def test_setup_marker(self):
         job = self._make_job()
         line = json.dumps({"_cc": "setup", "dimensions": ["sec", "perf"]})
-        JobManager._apply_marker(job, line)
+        self._manager()._apply_marker(job, line)
         assert job.phase == "setup"
         assert job.dimensions == ["sec", "perf"]
 
     def test_analyzing_marker(self):
         job = self._make_job()
         line = json.dumps({"_cc": "analyzing", "dimension": "security"})
-        JobManager._apply_marker(job, line)
+        self._manager()._apply_marker(job, line)
         assert job.phase == "analyzing"
         assert job.current_dimension == "security"
 
     def test_scoring_marker(self):
         job = self._make_job()
         line = json.dumps({"_cc": "scoring", "dimension": "perf"})
-        JobManager._apply_marker(job, line)
+        self._manager()._apply_marker(job, line)
         assert job.phase == "scoring"
         assert job.current_dimension == "perf"
 
     def test_report_path_marker(self):
         job = self._make_job()
         line = json.dumps({"_cc": "report_path", "project": "myproj", "runId": "r1"})
-        JobManager._apply_marker(job, line)
+        self._manager()._apply_marker(job, line)
         assert job.output_project == "myproj"
         assert job.output_run_id == "r1"
 
     def test_report_path_marker_missing_fields(self):
         job = self._make_job()
         line = json.dumps({"_cc": "report_path"})
-        JobManager._apply_marker(job, line)
+        self._manager()._apply_marker(job, line)
         assert job.output_project is None
 
     def test_invalid_json_ignored(self):
         job = self._make_job()
-        JobManager._apply_marker(job, "not json")
+        self._manager()._apply_marker(job, "not json")
         assert job.phase is None
+
+    def test_invalid_json_logs_a_warning(self, recording_log):
+        job = self._make_job()
+        manager = JobManager(job_store=InMemoryJobStore(), log=recording_log)
+        manager._apply_marker(job, "not json")
+        assert recording_log.warning_messages
+        assert "malformed structured marker" in recording_log.warning_messages[0]
 
 
 # ---------------------------------------------------------------------------

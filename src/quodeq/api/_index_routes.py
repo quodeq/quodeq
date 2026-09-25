@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 from http import HTTPStatus
 
 from flask import Flask, Response, current_app, jsonify
@@ -21,7 +22,7 @@ def register_index_routes(app: Flask) -> None:
             return jsonify({"error": "provider not available", "code": "PROVIDER_UNAVAILABLE"}), HTTPStatus.SERVICE_UNAVAILABLE
         try:
             count, elapsed_ms = provider.rebuild_index()
-        except Exception:
+        except (sqlite3.Error, OSError):
             _logger.exception("Unexpected error rebuilding index")
             body, status = error_response("Failed to rebuild index", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
             return jsonify(body), status

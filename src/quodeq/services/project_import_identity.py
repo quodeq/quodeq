@@ -113,6 +113,7 @@ def rewrite_repository_info(project_dir: Path, new_uuid: str, *, log: LogSink = 
     """Update the imported project's repository_info.json with its new UUID."""
     data = read_repository_info(project_dir)
     if data is None:
+        log.warning(f"import: could not read repository_info.json for {project_dir}")
         return
     data["uuid"] = new_uuid
     if not write_repository_info(project_dir, data):

@@ -11,6 +11,8 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from quodeq.analysis._loops import LoopDeps, run_incremental_loop
+from quodeq.analysis.run_types import RunConfig
+from quodeq.data.fs.dimensions_state_store import read_dimensions
 
 from tests.analysis._loops_safety_fixtures import _FakeEvidence, _config, _ctx, _runner_from
 
@@ -50,6 +52,62 @@ class TestIncrementalLoopSafety:
         # usability now DOES appear in callback_calls (the persistence retry).
         assert callback_calls == ["security", "usability", "flexibility"]
 
+    def test_callback_exception_outside_the_narrowed_types_is_isolated_per_dimension(
+        self, tmp_path, recording_log,
+    ):
+        """Mirrors the per-dimension loop's version
+        (test_loops_safety_per_dim.py): run_incremental_loop isolates the
+        whole one-dimension step (dispatch, fallback and finalize) as one
+        loop-iteration boundary, so an on_dimension_done bug (AttributeError
+        -- not one of finalize_dim_result's narrowed types) marks the
+        dimension skipped instead of aborting the rest of the run.
+
+        Same terminal-state note as the per-dimension test:
+        finalize_dim_result writes the dim's DONE state before invoking the
+        callback, and DONE has no outgoing transition in the dim state
+        machine, so the on_error path's INCOMPLETE write is rejected and
+        dimensions.json still reads "done" for security.
+        """
+        cfg = _config()
+        cfg.work_dir = tmp_path
+        cfg.src = tmp_path
+        seen: list[str] = []
+
+        def fake_runner(_c, dim, _i, _ctx):
+            seen.append(dim)
+            return _FakeEvidence()
+
+        def on_done(dim, _ev):
+            if dim == "security":
+                raise AttributeError("not a narrowed type")
+
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
+            result = run_incremental_loop(
+                cfg, ["security", "reliability"], _ctx(2),
+                LoopDeps(
+                    runner=_runner_from(fake_runner), on_dimension_done=on_done, log=recording_log,
+                ),
+            )
+
+        # Both dimensions attempted -- the run completed instead of aborting.
+        assert seen == ["security", "reliability"]
+        assert "reliability" in result
+
+        entry = read_dimensions(tmp_path)["dimensions"]["security"]
+        assert entry["state"] == "done"  # DONE is terminal; see docstring above.
+
+        traceback_warnings = [
+            m for m in recording_log.warning_messages if "Traceback (most recent call last)" in m
+        ]
+        assert traceback_warnings, recording_log.warning_messages
+        assert "AttributeError: not a narrowed type" in traceback_warnings[0]
+
+        rejected_transition_warnings = [
+            m for m in recording_log.warning_messages if "dim-state transition rejected" in m
+        ]
+        assert rejected_transition_warnings, recording_log.warning_messages
+        assert "done -> incomplete not permitted" in rejected_transition_warnings[0]
+
     def test_unexpected_exception_in_runner_logs_and_continues(self):
         cfg = _config()
         seen: list[str] = []
@@ -67,6 +125,64 @@ class TestIncrementalLoopSafety:
             )
         assert seen == ["security", "reliability", "maintainability"]
         assert set(result) == {"security", "maintainability"}
+
+    def test_unexpected_exception_is_isolated_and_the_traceback_is_logged(self, recording_log):
+        cfg = _config()
+        seen: list[str] = []
+
+        def fake_runner(_c, dim, _i, _ctx):
+            seen.append(dim)
+            if dim == "reliability":
+                raise AttributeError("boom")
+            return _FakeEvidence()
+
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
+            result = run_incremental_loop(
+                cfg, ["security", "reliability", "maintainability"], _ctx(3),
+                LoopDeps(runner=_runner_from(fake_runner), log=recording_log),
+            )
+        assert seen == ["security", "reliability", "maintainability"]
+        assert set(result) == {"security", "maintainability"}
+        matching = [m for m in recording_log.warning_messages if "failed" in m]
+        assert matching, recording_log.warning_messages
+        assert "Traceback (most recent call last)" in matching[0]
+        assert "AttributeError: boom" in matching[0]
+
+    def test_fallback_exception_outside_the_narrowed_types_still_reaches_the_boundary(
+        self, recording_log, tmp_path,
+    ):
+        """The fallback's own except narrows to (OSError, KeyError, ValueError,
+        RuntimeError); anything else must escape to the loop-iteration boundary.
+
+        Needs a real RunConfig (not the MagicMock fixture): the fallback path
+        calls ``dataclasses.replace(config, ...)``, which requires a genuine
+        dataclass instance.
+
+        ``run_dir`` is pinned to ``tmp_path`` so the loop's dim-state write
+        (``dimensions.json``) lands in the test's own directory instead of
+        falling back to ``src`` and writing into the process cwd.
+        """
+        cfg = RunConfig(src=tmp_path, language="python", run_dir=tmp_path)
+        cfg.options.skip_scoring = True
+        attempts = {"n": 0}
+
+        def fake_runner(_c, dim, _i, _ctx):
+            if dim != "reliability":
+                return _FakeEvidence()
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                raise RuntimeError("triggers the full-scan fallback")
+            raise AttributeError("not a narrowed type")
+
+        with patch("quodeq.analysis._loop_steps.log_dimension_result"):
+            result = run_incremental_loop(
+                cfg, ["security", "reliability", "maintainability"], _ctx(3),
+                LoopDeps(runner=_runner_from(fake_runner), log=recording_log),
+            )
+        assert set(result) == {"security", "maintainability"}
+        matching = [m for m in recording_log.warning_messages if "failed" in m]
+        assert matching, recording_log.warning_messages
+        assert "AttributeError: not a narrowed type" in matching[-1]
 
     def test_diagnostic_log_lines_are_emitted(self, recording_log):
         cfg = _config()

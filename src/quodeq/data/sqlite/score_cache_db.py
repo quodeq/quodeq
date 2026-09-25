@@ -155,6 +155,11 @@ def _open_locked(path: Path) -> sqlite3.Connection:
             _INITIALIZED.discard(ident)
     try:
         conn = _init(path)
+    except sqlite3.OperationalError:
+        # Lock contention, not corruption -- another connection is mid-write.
+        # Propagate so the caller can retry; deleting the file here would
+        # destroy a live, healthy database out from under its writer.
+        raise
     except sqlite3.DatabaseError:
         _logger.warning("score cache at %s unreadable; rebuilding", path)
         path.unlink(missing_ok=True)

@@ -57,12 +57,12 @@ class JobMonitorMixin:
     _on_job_complete: Callable[[str, Job], None] | None
     _job_timeout_cap_s_override: float | None
 
-    @staticmethod
-    def _apply_marker(job: Job, line: str) -> None:
+    def _apply_marker(self, job: Job, line: str) -> None:
         """Parse a structured JSON marker and update job state."""
         try:
             marker = json.loads(line)
         except json.JSONDecodeError:
+            self._log.warning(f"malformed structured marker: {line!r}")
             return
         phase = marker.get("_cc")
         if phase == CC_PHASE_SETUP:

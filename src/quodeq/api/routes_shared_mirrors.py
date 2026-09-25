@@ -134,7 +134,7 @@ def shared_accumulated(project: str, eval_root: Path):
     if err:
         return err
     as_of = request.args.get("asOf")
-    payload = fs_reports.get_accumulated(str(eval_root), project, as_of)
+    payload = fs_reports.get_accumulated(str(eval_root), project, as_of, log=SHARED_LOG)
     if payload is None:
         return json_error(_PROJECT_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify(payload)

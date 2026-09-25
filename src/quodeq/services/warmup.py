@@ -15,6 +15,8 @@ from collections import deque
 from pathlib import Path
 from typing import Callable
 
+from quodeq.shared.fault_isolation import run_isolated
+
 _logger = logging.getLogger(__name__)
 
 _FAILURE_BACKOFF_S = 60.0
@@ -98,7 +100,7 @@ class WarmupEngine:
             self._reports_dir = reports_dir
             try:
                 listing = sorted(self._list_fn(reports_dir), key=lambda t: t[1], reverse=True)
-            except Exception:  # noqa: BLE001 - never block server start
+            except (OSError, ValueError):
                 _logger.warning("warm-up enumeration failed", exc_info=True)
                 listing = []
             for project_id, _date in listing:
@@ -165,6 +167,37 @@ class WarmupEngine:
             self._current_name = None
             self._done = 0
 
+    def _process_queued_item(self, project_id: str, reports_dir: str) -> None:
+        """Resolve one queued project's display name and warm its caches.
+
+        This is the sole statement ``run_isolated`` wraps in ``_worker``'s
+        loop body: anything beyond the narrowed display-name fallback below
+        (a bug in ``_project_display_name`` or a ``_warm_fn`` failure) must
+        not kill the daemon thread, so it propagates for ``run_isolated`` to
+        log with a traceback and absorb. Every path through here -- success,
+        the narrowed fallback, or a re-raised failure -- still releases the
+        item's queue/progress state in ``finally``.
+        """
+        try:
+            # Fetch display name outside the lock (file I/O shouldn't block others)
+            try:
+                current_name = _project_display_name(reports_dir, project_id)
+            except (OSError, ValueError):
+                current_name = project_id
+            with self._cond:
+                self._current_name = current_name
+            self._warm_fn(reports_dir, project_id)
+        except Exception:
+            with self._cond:
+                self._failed_at[project_id] = time.monotonic()
+            raise
+        finally:
+            with self._cond:
+                self._queued.discard(project_id)
+                self._current = None
+                self._current_name = None
+                self._done += 1
+
     def _worker(self) -> None:
         while True:
             with self._cond:
@@ -175,25 +208,11 @@ class WarmupEngine:
                 project_id = self._pending.popleft()
                 self._current = project_id
                 reports_dir = self._reports_dir or ""
-            # Fetch display name outside the lock (file I/O shouldn't block others)
-            try:
-                current_name = _project_display_name(reports_dir, project_id)
-            except Exception:  # noqa: BLE001 - bad metadata shouldn't crash worker
-                current_name = project_id
-            with self._cond:
-                self._current_name = current_name
-            try:
-                self._warm_fn(reports_dir, project_id)
-            except Exception:  # noqa: BLE001 - log and continue with the queue
-                _logger.warning("warm-up failed for project %s", project_id, exc_info=True)
-                with self._cond:
-                    self._failed_at[project_id] = time.monotonic()
-            finally:
-                with self._cond:
-                    self._queued.discard(project_id)
-                    self._current = None
-                    self._current_name = None
-                    self._done += 1
+            run_isolated(
+                lambda: self._process_queued_item(project_id, reports_dir),
+                label=f"score warmup for project {project_id!r}",
+                log=_logger,
+            )
 
 
 engine = WarmupEngine()

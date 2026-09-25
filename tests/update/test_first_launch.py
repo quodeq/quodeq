@@ -131,14 +131,39 @@ def test_relaunch_failure_returns_false(tmp_path: Path) -> None:
     assert tools == ["osascript", "ditto", "open"]
 
 
-def test_any_exception_is_swallowed(tmp_path: Path) -> None:
+def test_runner_os_error_is_swallowed(tmp_path: Path) -> None:
+    """A tool (osascript/ditto/open) that can't launch raises OSError."""
     def exploding_runner(argv, **kwargs):
-        raise RuntimeError("boom")
+        raise OSError("boom")
 
     moved = first_launch.offer_move_to_applications(
         Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=tmp_path, runner=exploding_runner
     )
     assert moved is False
+
+
+def test_runner_unicode_decode_error_is_swallowed(tmp_path: Path) -> None:
+    """A tool whose output isn't valid UTF-8 raises UnicodeDecodeError
+    (text=True, encoding="utf-8" on subprocess.run)."""
+    def exploding_runner(argv, **kwargs):
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    moved = first_launch.offer_move_to_applications(
+        Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=tmp_path, runner=exploding_runner
+    )
+    assert moved is False
+
+
+def test_runner_out_of_scope_error_propagates(tmp_path: Path) -> None:
+    """R-FT-7 — an error outside (OSError, UnicodeDecodeError) (e.g. a
+    programming bug) must now propagate instead of being swallowed."""
+    def exploding_runner(argv, **kwargs):
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        first_launch.offer_move_to_applications(
+            Path("/Volumes/Quodeq/Quodeq.app"), applications_dir=tmp_path, runner=exploding_runner
+        )
 
 
 def test_previous_bundle_removal_failure_aborts_the_move(tmp_path: Path, monkeypatch) -> None:

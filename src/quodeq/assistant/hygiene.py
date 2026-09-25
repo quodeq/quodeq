@@ -7,6 +7,8 @@ wraps ``run_hygiene`` for the route layer.
 from __future__ import annotations
 
 import logging
+import sqlite3
+import subprocess
 from collections.abc import Mapping
 
 from quodeq.assistant.worktree import gc_worktrees
@@ -47,5 +49,5 @@ def run_hygiene(repo: AssistantStore, ttl_days: int | None = None) -> None:
         )
         if removed:
             _logger.info("Pruned %d old assistant session(s)", removed)
-    except Exception:  # noqa: BLE001 — hygiene is best-effort
+    except (sqlite3.Error, OSError, subprocess.SubprocessError, ValueError):
         _logger.warning("assistant hygiene failed", exc_info=True)

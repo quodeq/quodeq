@@ -8,6 +8,8 @@ the whole fleet view.
 from __future__ import annotations
 
 import logging
+import sqlite3
+import subprocess
 from http import HTTPStatus
 from pathlib import Path
 
@@ -34,7 +36,7 @@ def register_compare_routes(app: Flask) -> None:
             return jsonify(body), status
         try:
             result = build_compare_summary(Path(reports_dir()), project)
-        except Exception:
+        except (OSError, ValueError, sqlite3.Error, subprocess.SubprocessError):
             _logger.exception("Unexpected error building compare summary for project %s", project)
             body, status = error_response("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
             return jsonify(body), status

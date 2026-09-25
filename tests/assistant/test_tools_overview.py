@@ -51,7 +51,7 @@ def _ctx(tmp_path, *, project_id="selectives", reports_dir=None,
 def test_get_overview_trims_accumulated_payload(tmp_path, monkeypatch):
     seen = {}
 
-    def fake_get_accumulated(reports_dir, project, as_of):
+    def fake_get_accumulated(reports_dir, project, as_of, **_kwargs):
         seen["args"] = (reports_dir, project, as_of)
         return _ACCUMULATED
 
@@ -74,7 +74,7 @@ def test_get_overview_trims_accumulated_payload(tmp_path, monkeypatch):
 def test_get_overview_passes_as_of(tmp_path, monkeypatch):
     seen = {}
 
-    def fake(rd, p, ao):
+    def fake(rd, p, ao, **_kwargs):
         seen["as_of"] = ao
         return _ACCUMULATED
 
@@ -91,7 +91,7 @@ def test_get_overview_requires_project_and_reports_dir(tmp_path):
 
 def test_get_overview_tool_error_when_no_data(tmp_path, monkeypatch):
     monkeypatch.setattr("quodeq.assistant.tools._overview.get_accumulated",
-                        lambda *a: None)
+                        lambda *a, **kw: None)
     with pytest.raises(ToolError):
         _get_overview(_ctx(tmp_path))
 
@@ -103,7 +103,7 @@ def test_get_overview_registered(tmp_path):
 
 def test_overview_excludes_hidden_dimensions(tmp_path, monkeypatch):
     monkeypatch.setattr("quodeq.assistant.tools._overview.get_accumulated",
-                        lambda *a: _ACCUMULATED)
+                        lambda *a, **kw: _ACCUMULATED)
     out = _get_overview(_ctx(tmp_path, visible_standard_ids=("security",)))
     assert [d["dimension"] for d in out["dimensions"]] == ["security"]
     assert out["hiddenStandardIds"] == ["clean-architecture"]
@@ -113,7 +113,7 @@ def test_overview_omits_aggregate_grade_when_filtering(tmp_path, monkeypatch):
     """The dashboard derives these from trend data in JS; recomputing them here
     would put the assistant back out of step with the screen."""
     monkeypatch.setattr("quodeq.assistant.tools._overview.get_accumulated",
-                        lambda *a: _ACCUMULATED)
+                        lambda *a, **kw: _ACCUMULATED)
     out = _get_overview(_ctx(tmp_path, visible_standard_ids=("security",)))
     assert "overallGrade" not in out["summary"]
     assert "numericAverage" not in out["summary"]
@@ -122,7 +122,7 @@ def test_overview_omits_aggregate_grade_when_filtering(tmp_path, monkeypatch):
 
 def test_overview_recomputes_countable_aggregates(tmp_path, monkeypatch):
     monkeypatch.setattr("quodeq.assistant.tools._overview.get_accumulated",
-                        lambda *a: _ACCUMULATED)
+                        lambda *a, **kw: _ACCUMULATED)
     out = _get_overview(_ctx(tmp_path, visible_standard_ids=("security",)))
     # Only the "security" dimension survives the filter (2 violations: one
     # critical, one major); "clean-architecture" (1 minor violation) is hidden.
@@ -133,7 +133,7 @@ def test_overview_recomputes_countable_aggregates(tmp_path, monkeypatch):
 
 def test_overview_keeps_full_summary_when_nothing_hidden(tmp_path, monkeypatch):
     monkeypatch.setattr("quodeq.assistant.tools._overview.get_accumulated",
-                        lambda *a: _ACCUMULATED)
+                        lambda *a, **kw: _ACCUMULATED)
     out = _get_overview(_ctx(tmp_path, visible_standard_ids=None))
     assert out["summary"]["overallGrade"]
     assert out["summary"]["numericAverage"] is not None

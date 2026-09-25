@@ -19,6 +19,7 @@ from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.scoring import rescore_accumulated, scored_run_dimensions
 from quodeq.services.wiring import iter_eval_reports
+from quodeq.shared.log_sink import LoggerSink
 from quodeq.shared.lru import LRUDict
 from quodeq.shared.serialization import coerce_line, to_camel_dict
 
@@ -64,7 +65,9 @@ def accumulated_dims(ctx: ToolContext, *, rescored: bool = True) -> list[dict] |
     """
     if ctx.reports_dir is None or ctx.project_id is None:
         return None
-    payload = fs_reports.get_accumulated(str(ctx.reports_dir), ctx.project_id, None)
+    payload = fs_reports.get_accumulated(
+        str(ctx.reports_dir), ctx.project_id, None, log=LoggerSink(_logger),
+    )
     if payload is None:
         return None
     if rescored:
@@ -89,7 +92,13 @@ def scored_run_dims(ctx: ToolContext) -> list[dict] | None:
         if not dismissed_keys(project_dir) and not deleted_keys(project_dir):
             return None
         dims = scored_run_dimensions(project_dir.parent, project_dir.name, ctx.run_dir.name)
-    except Exception:  # noqa: BLE001 - unresolvable layout: serve raw, not a ToolError
+    except (OSError, ValueError, KeyError) as exc:
+        # Matches read_run_data's own failure surface (validate_path_segment
+        # raises ValueError, a missing run resolves to FileNotFoundError, a
+        # malformed evaluation file raises ValueError/KeyError) -- fail open
+        # to the raw eval-JSON read rather than erroring the chat turn.
+        _logger.warning(
+            "scored_run_dims failed for run %s: %s", ctx.run_dir, exc, exc_info=True)
         return None
     return [to_camel_dict(d) for d in dims]
 

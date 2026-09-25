@@ -1,10 +1,36 @@
 """Assistant workspace routes: status/diff, apply, discard, PR and their error codes."""
+from unittest.mock import patch
+
 from tests.api._assistant_workspace_fixtures import (  # noqa: F401 -- app/client/repo are pytest fixtures
     _session_with_worktree,
     app,
     client,
     repo,
 )
+
+
+def test_worktree_summary_logs_and_reports_no_stats_on_diff_stats_failure(tmp_path):
+    from quodeq.assistant.worktree import WorktreeError
+    from quodeq.api import assistant_workspace_routes as routes
+
+    wt_path = tmp_path / "wt"
+    wt_path.mkdir()
+    row = {
+        "status": routes.WorktreeStatus.ACTIVE, "path": str(wt_path),
+        "branch": "quodeq/fix-1", "created_at": "2026-01-01T00:00:00Z",
+    }
+
+    def _raise(_path):
+        raise WorktreeError("git diff failed")
+
+    with patch.object(routes, "diff_stats", _raise), \
+            patch.object(routes._logger, "warning") as warning:
+        summary = routes._worktree_summary(row)
+
+    assert summary["stats"] == []
+    assert summary["filesChanged"] == 0
+    assert warning.called
+    assert "diff_stats failed" in warning.call_args.args[0]
 
 
 def test_workspace_status_and_diff(app, client, repo):

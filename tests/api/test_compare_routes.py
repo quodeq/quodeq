@@ -44,8 +44,11 @@ def test_invalid_segment_400(client):
 
 
 def test_internal_error_500(client, monkeypatch):
+    # OSError, not an arbitrary Exception: the route's except was narrowed to
+    # (OSError, ValueError, sqlite3.Error, subprocess.SubprocessError) (R-FT-7),
+    # the realistic surface of build_compare_summary's cache/sqlite/git reads.
     def boom(root, project):
-        raise RuntimeError("kaput")
+        raise OSError("kaput")
 
     monkeypatch.setattr(routes_compare, "build_compare_summary", boom)
     res = client.get("/api/projects/proj-a/compare-summary")

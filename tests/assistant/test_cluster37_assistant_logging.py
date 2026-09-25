@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.assistant.mcp import mcp_config
+from quodeq.assistant.tools import _read_tools_scope
 from quodeq.llm_bridge import _ollama
 
 
@@ -69,8 +70,6 @@ def test_worktree_remove_logs_when_branch_delete_fails(monkeypatch, tmp_path) ->
 
 
 def test_accumulated_finding_keys_logs_and_never_calls_add(monkeypatch) -> None:
-    from quodeq.assistant.tools import _read_tools_scope
-
     def _raise(*_args, **_kwargs):
         raise OSError(5, "boom")
 
@@ -81,6 +80,32 @@ def test_accumulated_finding_keys_logs_and_never_calls_add(monkeypatch) -> None:
     assert added == []
     assert debug.called
     assert "accumulated findings unavailable" in debug.call_args.args[0]
+
+
+def test_scored_run_dims_logs_and_returns_none_on_failure(monkeypatch, tmp_path) -> None:
+    from quodeq.assistant.tools import ToolContext
+
+    run_dir = tmp_path / "reports" / "proj" / "run-1"
+    run_dir.mkdir(parents=True)
+    ctx = ToolContext(
+        repository=None, session_id="s1", run_dir=run_dir, repo_root=None,
+        evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
+        dimensions_file=tmp_path / "d.json",
+    )
+    monkeypatch.setattr(_read_tools_scope, "dismissed_keys", lambda _p: {("r", "f", 1)})
+    monkeypatch.setattr(_read_tools_scope, "deleted_keys", lambda _p: set())
+
+    def _raise(*_args, **_kwargs):
+        raise ValueError("bad run id")
+
+    monkeypatch.setattr(_read_tools_scope, "scored_run_dimensions", _raise)
+
+    with patch.object(_read_tools_scope._logger, "warning") as warning:
+        result = _read_tools_scope.scored_run_dims(ctx)
+
+    assert result is None
+    assert warning.called
+    assert "scored_run_dims failed" in warning.call_args.args[0]
 
 
 def test_cli_hook_logs_and_swallows_when_dup2_fails(monkeypatch) -> None:

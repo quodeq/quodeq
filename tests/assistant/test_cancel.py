@@ -25,6 +25,20 @@ def test_register_after_cancel_runs_hook_immediately():
     assert hits == ["late"]
 
 
+def test_register_after_cancel_swallows_a_realistic_kill_hook_failure():
+    """register_kill's immediate-call except was narrowed from bare
+    `Exception` to (OSError, httpx.HTTPError) (R-FT-7): the realistic surface
+    of its two production hooks (an httpx client's close(), a subprocess
+    kill that already never raises past OSError)."""
+    token = CancelToken()
+    token.cancel()
+
+    def boom():
+        raise OSError("client close failed")
+
+    token.register_kill(boom)  # must not raise past this point
+
+
 def test_hook_exception_does_not_block_other_hooks():
     token = CancelToken()
     hits = []

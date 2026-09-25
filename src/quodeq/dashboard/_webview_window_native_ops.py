@@ -78,7 +78,7 @@ def send_cancel_evaluation(base_url: str, job_id: str | None) -> None:
         # for the eval-check poll is too tight here.
         with urllib.request.urlopen(req, timeout=_CANCEL_TIMEOUT_S):
             pass
-    except Exception:
+    except (OSError, http.client.HTTPException):
         _logger.warning("cancel-on-quit for job %s failed", job_id, exc_info=True)
 
 

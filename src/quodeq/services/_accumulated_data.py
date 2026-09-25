@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.services.wiring import RunInfo, read_run_data, run_fingerprint
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import DimensionResult
 
 
@@ -71,6 +72,7 @@ def _strip_findings(dimensions: list[DimensionResult]) -> list[DimensionResult]:
 def make_slim_run_fetcher(
     reports_root: Path, project: str,
     cache: OrderedDict, lock: threading.Lock, max_size: int,
+    *, log: LogSink = NULL_LOG,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a fetcher of findings-free per-run dimensions, LRU-cached.
 
@@ -83,7 +85,7 @@ def make_slim_run_fetcher(
     """
     def get_slim(run_id: str) -> list[DimensionResult]:
         if max_size <= 0:
-            return _strip_findings(_read_run_data_safely(reports_root, project, run_id))
+            return _strip_findings(_read_run_data_safely(reports_root, project, run_id, log=log))
         key = (str(reports_root), project, run_id,
                run_fingerprint(reports_root / project / run_id))
         with lock:
@@ -91,7 +93,7 @@ def make_slim_run_fetcher(
             if hit is not None:
                 cache.move_to_end(key)
                 return hit
-        slim = _strip_findings(_read_run_data_safely(reports_root, project, run_id))
+        slim = _strip_findings(_read_run_data_safely(reports_root, project, run_id, log=log))
         with lock:
             cache[key] = slim
             cache.move_to_end(key)
@@ -103,12 +105,13 @@ def make_slim_run_fetcher(
 
 
 def _read_run_data_safely(
-    reports_root: Path, project: str, run_id: str,
+    reports_root: Path, project: str, run_id: str, *, log: LogSink = NULL_LOG,
 ) -> list[DimensionResult]:
     """``read_run_data`` with the same error tolerance the LRU fetcher applies."""
     try:
         return read_run_data(reports_root, project, run_id)
-    except (OSError, ValueError, KeyError):
+    except (OSError, ValueError, KeyError) as exc:
+        log.warning(f"read_run_data failed for {run_id}: {exc}")
         return []
 
 

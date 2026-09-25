@@ -74,12 +74,12 @@ def _compute_dimension_params(compiled: Path, project_root: Path | None) -> tupl
     """(params_hash, effective_params) for one compiled dimension file."""
     try:
         data = json.loads(compiled.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001 - keying must never abort analysis
-        # Deliberately wider than OSError/ValueError/UnicodeDecodeError:
-        # deeply nested JSON overflows the C decoder's call stack and raises
-        # RecursionError, a RuntimeError subclass that would otherwise escape.
-        # This sits on the per-dimension cache-keying path, so any escape here
-        # fails the run rather than degrading to an unkeyed hash.
+    except (OSError, ValueError, UnicodeDecodeError, RecursionError):
+        # RecursionError is included deliberately: deeply nested JSON
+        # overflows the C decoder's call stack and raises it (a RuntimeError
+        # subclass) instead of json.JSONDecodeError. This sits on the
+        # per-dimension cache-keying path, so any escape here fails the run
+        # rather than degrading to an unkeyed hash.
         return "", {}
     overrides = load_project_overrides(project_root) if project_root else {}
     try:

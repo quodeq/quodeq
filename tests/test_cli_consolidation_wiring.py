@@ -11,6 +11,7 @@ so no real pipeline, AI provider, or repo is involved.
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 
 import pytest
@@ -63,10 +64,10 @@ def wired(tmp_path: Path, monkeypatch):
     )
 
     calls: list[Path] = []
-    # run_evaluate imports this locally, so it resolves at call time and
-    # patching the source module is enough.
+    # _cli_evaluate_finalize imports this at module level, so mock.patch
+    # resolves where the name is used, not where it's defined.
     monkeypatch.setattr(
-        "quodeq.analysis.cache.consolidation.mark_run_consolidated",
+        "quodeq._cli_evaluate_finalize.mark_run_consolidated",
         lambda run_dir, cache=None: calls.append(run_dir),
     )
     return calls, evaluation_dir.parent
@@ -96,6 +97,53 @@ def test_run_evaluate_skips_consolidation_for_diff_from(tmp_path: Path, wired, m
     assert calls == []
 
 
+def test_consolidation_failure_does_not_flip_a_finished_runs_exit_code(
+    tmp_path: Path, monkeypatch, caplog,
+):
+    """_consolidate_run_cache wraps mark_run_consolidated in run_isolated: an
+    exception outside that function's own narrowed (OSError, ValueError) --
+    e.g. a bug surfacing as AttributeError -- must still never turn a
+    finished run's zero exit code into a nonzero one. A warning (with
+    traceback) is recorded instead."""
+    src = tmp_path / "src"
+    src.mkdir()
+    evaluation_dir = tmp_path / "reports" / "proj" / "run1" / "evaluation"
+    evaluation_dir.mkdir(parents=True)
+    evidence_dir = evaluation_dir.parent / "evidence"
+    evidence_dir.mkdir()
+    paths = (tmp_path / "reports", evidence_dir, evaluation_dir)
+
+    monkeypatch.setattr(
+        cli_evaluation, "resolve_evaluation_inputs",
+        lambda a: ResolvedInputs(
+            src=src, language="python",
+            manifest=SourceManifest(), dims_data={"applies": []},
+        ),
+    )
+    monkeypatch.setattr(cli_evaluation, "setup_run_dirs", lambda a, s: paths)
+    monkeypatch.setattr(cli_evaluation, "run_pipeline_with_cleanup", lambda a, i, p: 0)
+
+    def boom(_run_dir, cache=None):
+        raise AttributeError("consolidation bug")
+
+    monkeypatch.setattr("quodeq._cli_evaluate_finalize.mark_run_consolidated", boom)
+    args = _args(tmp_path)
+
+    quodeq_logger = logging.getLogger("quodeq")
+    orig_propagate = quodeq_logger.propagate
+    quodeq_logger.propagate = True
+    try:
+        with caplog.at_level(logging.WARNING, logger="quodeq"):
+            result = cli_evaluation.run_evaluate(args)
+    finally:
+        quodeq_logger.propagate = orig_propagate
+
+    assert result == 0
+    matching = [r for r in caplog.records if "post-run cache consolidation" in r.getMessage()]
+    assert matching, caplog.records
+    assert "AttributeError" in matching[0].getMessage()
+
+
 def test_run_evaluate_passes_a_local_file_backend_cache(tmp_path: Path, monkeypatch):
     """finalize_run_evaluate is the composition root: it must build the
     concrete LocalFileBackend itself and hand it to mark_run_consolidated,
@@ -120,7 +168,7 @@ def test_run_evaluate_passes_a_local_file_backend_cache(tmp_path: Path, monkeypa
 
     received: list = []
     monkeypatch.setattr(
-        "quodeq.analysis.cache.consolidation.mark_run_consolidated",
+        "quodeq._cli_evaluate_finalize.mark_run_consolidated",
         lambda run_dir, cache=None: received.append(cache),
     )
 

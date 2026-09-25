@@ -158,13 +158,21 @@ class FindingsRouter:
         self.counter += 1
 
     def _emit_event(self, finding: dict) -> None:
-        """Emit a JudgmentCreatedEvent to the event log. Never raises."""
+        """Emit a JudgmentCreatedEvent to the event log.
+
+        Absorbs the event log's own I/O and decode/malformed-payload
+        failures ((OSError, ValueError, KeyError, TypeError)) so the JSONL
+        write (the durable side effect) still succeeds. Anything else is a
+        real bug and propagates -- ``findings_server.py``'s per-message
+        ``run_isolated`` is the fault-isolation boundary that catches it
+        without losing the process.
+        """
         try:
             from quodeq.core.events.models import JudgmentCreatedEvent  # noqa: PLC0415
             from quodeq.core.finding_mappings import wire_dict_to_judgment  # noqa: PLC0415
             payload = wire_dict_to_judgment(finding)
             self._event_log.emit(JudgmentCreatedEvent(payload=payload))
-        except Exception:  # noqa: BLE001 — event log must never break JSONL durability
+        except (OSError, ValueError, KeyError, TypeError):  # event log must never break JSONL durability
             _logger.warning("FindingsRouter: event log emit failed (JSONL succeeded)", exc_info=True)
 
     def mark_file_done(self, *, file: str, status: str, reason: str | None = None) -> None:
@@ -202,7 +210,7 @@ class FindingsRouter:
             if status == FileDoneStatus.OK:
                 try:
                     self._on_file_done(file, accumulated)
-                except Exception:  # noqa: BLE001 — callback failure must never lose the ok marker
+                except (OSError, ValueError, TypeError):  # callback failure must never lose the ok marker
                     _logger.warning(
                         "FindingsRouter: on_file_done callback raised for %s", file,
                         exc_info=True,
