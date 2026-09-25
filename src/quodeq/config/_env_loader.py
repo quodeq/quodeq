@@ -6,6 +6,7 @@ import logging
 import os
 
 from quodeq.config._config_paths import ConfigPaths
+from quodeq.shared.env_resolve import resolve_env_mut
 
 _logger = logging.getLogger(__name__)
 
@@ -19,8 +20,7 @@ def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> N
     Pass an explicit *target* dict in tests to avoid mutating the real
     environment.
     """
-    if target is None:
-        target = os.environ
+    target = resolve_env_mut(target)
     if not paths.env_file.exists():
         return
     try:

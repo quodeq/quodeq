@@ -73,7 +73,7 @@ def test_ollama_reason_depends_on_what_is_missing():
         assert run_concurrency_test("m", "http://localhost:1")["reason"] == "Could not determine model size"
 
 
-def test_local_servers_report_their_address_without_the_scheme():
+def test_an_unreachable_llamacpp_server_reports_connection_failed():
     with patch(f"{_LLAMACPP}.urllib.request.urlopen", side_effect=OSError("down")):
         assert get_llamacpp_status("http://127.0.0.1:8080/v1/") == {
             "running": False, "error": "Connection failed",
