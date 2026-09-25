@@ -141,12 +141,10 @@ def _running_job(api: "WindowApi") -> dict | None:
 
 
 def _run_macos_close_alert(result: dict, done: threading.Semaphore) -> None:
-    """The AppHelper.callAfter target: run the alert and store the choice in
-    *result*. See macos_confirm_close.
+    """The AppHelper.callAfter target: run the alert and store the choice in *result*.
 
-    Isolated: any AppKit/PyObjC failure (activation, alert construction,
-    runModal) falls back to 'keep' (result's initial value, since a failure
-    before the assignment leaves it untouched) rather than trapping the user.
+    Isolated: any AppKit/PyObjC failure falls back to 'keep' (result's initial
+    value, left untouched by a failure) rather than trapping the user.
     """
     run_isolated(lambda: _build_macos_alert(result, done), label="macOS close alert", log=_logger)
 
