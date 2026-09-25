@@ -17,6 +17,7 @@ from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
 from quodeq.analysis.prompts.builder import build_consolidated_prompt, prompt_context
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+from quodeq.analysis.subagents._config_kwargs import shared_analysis_config_kwargs
 from quodeq.analysis.subagents._pool_launcher import default_subagent_model, compute_files_per_agent
 from quodeq.analysis.subagents.source_files import list_source_files
 from quodeq.analysis.runner_markers import cleanup_stream
@@ -48,13 +49,8 @@ def _build_consolidated_config(
     subagent_model = config.options.subagent_model or default_subagent_model() or config.options.ai_model
     time_limit_val = config.options.time_limit
     return AnalysisConfig(
-        analysis_budget=config.options.analysis_budget,
+        **shared_analysis_config_kwargs(config),
         compiled_dir=compiled_dir,
-        max_turns=config.options.max_turns,
-        max_duration=config.options.max_duration,
-        ai_cmd=config.ai_cmd,
-        ai_cmd_path=config.options.ai_cmd_path,
-        cache_root=config.options.cache_root,
         ai_model=subagent_model,
         dimension=",".join(dimensions),
         max_files_per_agent=files_per_agent,

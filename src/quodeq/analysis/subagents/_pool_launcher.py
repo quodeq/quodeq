@@ -11,6 +11,7 @@ from typing import Any
 from quodeq.analysis.runner_markers import emit_marker
 from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
+from quodeq.analysis.subagents._config_kwargs import shared_analysis_config_kwargs
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.config.analysis_env import non_scout_providers, subagent_model_override
 from quodeq.shared.constants import CC_PHASE_DEADLINE_EXTENDED, DEFAULT_TIME_LIMIT
@@ -146,13 +147,8 @@ def _build_pool_config(
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     subagent_model = config.options.subagent_model or default_subagent_model(env) or config.options.ai_model
     return AnalysisConfig(
-        analysis_budget=config.options.analysis_budget,
+        **shared_analysis_config_kwargs(config),
         compiled_dir=compiled_dir,
-        max_turns=config.options.max_turns,
-        max_duration=config.options.max_duration,
-        ai_cmd=config.ai_cmd,
-        ai_cmd_path=config.options.ai_cmd_path,
-        cache_root=config.options.cache_root,
         ai_model=subagent_model,
         max_files_per_agent=params.max_files_per_agent,
         time_limit=time_limit,

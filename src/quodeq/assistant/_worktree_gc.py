@@ -1,10 +1,10 @@
 """Reap leaked assistant worktrees and their ``quodeq/fix-*`` branches.
 
-Split from ``worktree.py`` to keep that file under the size ratchet's
-300-line cap. ``WorktreeError``/``WorktreeStatus``/``worktree_ttl_hours`` are
-imported from ``_worktree_git.py``, their real owner (not from
-``worktree.py``, which just re-exports them), so this module never imports
-back the module that imports it.
+Sweeps the worktree table for two failure modes: an ``active`` row whose
+session was abandoned (dir already gone, or past the TTL), and a terminal
+row (applied/pr_created/discarded/stale) whose worktree dir survived a
+previous failed removal. Both cases go through ``WorktreeManager.remove()``
+via ``_default_manager`` (or an injected ``manager_factory`` in tests).
 """
 from __future__ import annotations
 
