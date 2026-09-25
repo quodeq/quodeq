@@ -15,6 +15,7 @@ import { queuedFileAnalyses } from '../scanEstimateRules.js';
 import { createScanSummary } from '../../../models/index.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { KEY } from '../../../vocab/keyboard.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 const BUTTON_ROW_GAP = '8px';
 const REPO_URL_PLACEHOLDER = 'https://github.com/org/repo';
@@ -108,7 +109,7 @@ export function BudgetChips({ valueS, onChange, disabled }) {
 function runBarLine1({ picked, scanFiles, isClean, budgetPart }) {
   if (picked === 0) return t('evaluate.noDimsSelected');
   return [
-    picked === 1 ? t('evaluate.dimSingular', { count: picked }) : t('evaluate.dimPlural', { count: picked }),
+    t(pluralKey(picked, 'evaluate.dimSingular', 'evaluate.dimPlural'), { count: picked }),
     scanFiles != null
       ? (isClean
           ? t('evaluate.filesFullRescan', { count: formatCount(scanFiles) })

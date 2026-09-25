@@ -4,10 +4,14 @@ import { t } from '../../../strings/index.js';
 import { sortClientsByProviderOrder } from './providerClientOrder.js';
 
 /**
- * AssistantProviderTabs.jsx's AI-client list fetch (sorted by
- * providerConfigs order), extracted verbatim.
+ * The AI-client list both provider pickers show, fetched once on mount and
+ * sorted by the providers' configured order.
+ * @param {Object} providerConfigs ai_providers.json contents, keyed by provider id.
+ * @param {(clients: Array) => void} [onLoaded] Called with the sorted list
+ *   after a successful fetch, before the load error is cleared.
+ * @returns {{clients: Array, clientsError: string|null}}
  */
-export function useAssistantClientList(providerConfigs) {
+export function useAiClientList(providerConfigs, onLoaded) {
   const { getAiClients } = useApi();
   const [clients, setClients] = useState([]);
   const [clientsError, setClientsError] = useState(null);
@@ -17,6 +21,7 @@ export function useAssistantClientList(providerConfigs) {
       const raw = data.clients || [];
       const list = sortClientsByProviderOrder(raw, providerConfigs);
       setClients(list);
+      onLoaded?.(list);
       setClientsError(null);
     }).catch(() => { setClients([]); setClientsError(t('settings.providersLoadFailed')); });
   }, []);

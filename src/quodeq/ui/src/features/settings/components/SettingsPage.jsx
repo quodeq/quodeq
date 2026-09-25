@@ -13,6 +13,7 @@ import SharedRepoSection from './SharedRepoSection.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
 
 const _SETTINGS_PHRASE_KEYS = [
   'settingsPhrase.cuore',
@@ -52,12 +53,7 @@ export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDiscon
             <SectionLabel marker="▶">{t('settings.gradeFormula')}</SectionLabel>
           </div>
           <div className="settings-row">
-            <div className="settings-row-label">
-              <span className="settings-label">{t('settings.gradeFormula')}</span>
-              <span className="settings-description">
-                {t('settings.gradeFormulaDesc')}
-              </span>
-            </div>
+            <SettingsRowLabel hintSlot={false} label={t('settings.gradeFormula')} description={t('settings.gradeFormulaDesc')} />
             <button type="button" className="settings-pill" onClick={onOpenGradeFormula}>
               {t('settings.openEditor')}
             </button>

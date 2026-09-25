@@ -7,7 +7,8 @@ import LlamaCppTab from './LlamaCppTab.jsx';
 import OmlxTab from './OmlxTab.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
 import CloudProviderTab from './CloudProviderTab.jsx';
-import HelpHint from '../../../components/HelpHint.jsx';
+import { ProviderPillGroup } from './ProviderPillGroup.jsx';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
@@ -30,32 +31,13 @@ const INSTALL_INSTRUCTIONS = {
 function ProviderPillRow({ clients, activeTab, selectTab }) {
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label-row">
-          <span className="settings-label">{t('settings.aiProvider')}</span>
-          <HelpHint label={t('settings.aiProviderHelpAria')}>{PROVIDER_HINT}</HelpHint>
-        </span>
-        <span className="settings-description">{t('settings.providerRunsDesc')}</span>
-      </div>
-      <div className="settings-pill-group" role="tablist">
-        {clients.map((c) => {
-          const installed = c.installed !== false;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              role="tab"
-              aria-selected={c.id === activeTab}
-              aria-disabled={!installed}
-              title={installed ? undefined : t('settings.providerNotInstalledTitle', { name: c.label })}
-              className={`settings-pill${c.id === activeTab ? ' settings-pill--active' : ''}${installed ? '' : ' settings-pill--disabled'}`}
-              onClick={() => selectTab(c.id)}
-            >
-              {c.label}
-            </button>
-          );
-        })}
-      </div>
+      <SettingsRowLabel
+        label={t('settings.aiProvider')}
+        hint={PROVIDER_HINT}
+        hintAria={t('settings.aiProviderHelpAria')}
+        description={t('settings.providerRunsDesc')}
+      />
+      <ProviderPillGroup clients={clients} activeId={activeTab} onSelect={selectTab} selectUninstalled />
     </div>
   );
 }

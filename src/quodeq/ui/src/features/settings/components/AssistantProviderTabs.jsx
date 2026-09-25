@@ -1,6 +1,8 @@
 import useAssistantProvider from '../hooks/useAssistantProvider.js';
-import { useAssistantClientList } from '../hooks/useAssistantClientList.js';
+import { useAiClientList } from '../hooks/useAiClientList.js';
 import { AssistantModeRows } from './AssistantModeRows.jsx';
+import { ProviderPillGroup } from './ProviderPillGroup.jsx';
+import { SettingsRowLabel, SettingsEnableRow } from './settingsRowParts.jsx';
 import AssistantModelPicker from './AssistantModelPicker.jsx';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
@@ -8,68 +10,17 @@ import { CopilotModelStatus } from './CopilotModelSelect.jsx';
 import { PROVIDER } from '../../../vocab/provider.js';
 import { ASSISTANT_MODE } from '../settingsVocab.js';
 
-function AssistantEnableRow({ enabled, setEnabled }) {
-  return (
-    <div className={`settings-row${enabled ? '' : ' settings-row--last'}`}>
-      <div className="settings-row-label">
-        <span className="settings-label">{t('settings.assistantEnable')}</span>
-        <span className="settings-description">
-          {t('settings.assistantEnableDesc')}
-        </span>
-      </div>
-      <div className="settings-pill-group" role="tablist">
-        {[{ value: true, label: t('settings.on') }, { value: false, label: t('settings.off') }].map(({ value, label }) => (
-          <button
-            key={label}
-            type="button"
-            role="tab"
-            aria-selected={enabled === value}
-            className={`settings-pill${enabled === value ? ' settings-pill--active' : ''}`}
-            onClick={() => setEnabled(value)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function AssistantCustomProviderSection({ clients, activeProvider, setActiveProvider, active, providerConfigs, model, setModel }) {
   return (
     <>
       <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">{t('settings.aiProvider')}</span>
-          <span className="settings-description">{t('settings.assistantProviderDesc')}</span>
-        </div>
-        <div className="settings-pill-group" role="tablist">
-          {clients.map((c) => {
-            const installed = c.installed !== false;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                role="tab"
-                aria-selected={c.id === activeProvider}
-                aria-disabled={!installed}
-                title={installed ? undefined : t('settings.providerNotInstalledTitle', { name: c.label })}
-                className={`settings-pill${c.id === activeProvider ? ' settings-pill--active' : ''}${installed ? '' : ' settings-pill--disabled'}`}
-                onClick={() => { if (!installed) return; setActiveProvider(c.id); }}
-              >
-                {c.label}
-              </button>
-            );
-          })}
-        </div>
+        <SettingsRowLabel hintSlot={false} label={t('settings.aiProvider')} description={t('settings.assistantProviderDesc')} />
+        <ProviderPillGroup clients={clients} activeId={activeProvider} onSelect={setActiveProvider} />
       </div>
       {active?.id === PROVIDER.COPILOT && <CopilotModelStatus />}
       {active && (
         <div className="settings-row settings-row--last">
-          <div className="settings-row-label">
-            <span className="settings-label">{t('settings.modelLabel')}</span>
-            <span className="settings-description">{t('settings.assistantModelDesc')}</span>
-          </div>
+          <SettingsRowLabel hintSlot={false} label={t('settings.modelLabel')} description={t('settings.assistantModelDesc')} />
           <AssistantModelPicker
             provider={active}
             providerConfig={providerConfigs?.[active.id] || {}}
@@ -83,7 +34,7 @@ function AssistantCustomProviderSection({ clients, activeProvider, setActiveProv
 }
 
 export default function AssistantProviderTabs({ providerConfigs }) {
-  const { clients, clientsError } = useAssistantClientList(providerConfigs);
+  const { clients, clientsError } = useAiClientList(providerConfigs);
   const { enabled, setEnabled, mode, setMode, activeProvider, setActiveProvider, model, setModel } = useAssistantProvider();
 
   const active = clients.find((c) => c.id === activeProvider);
@@ -95,7 +46,12 @@ export default function AssistantProviderTabs({ providerConfigs }) {
       </div>
       {clientsError && <div className="settings-row"><span className="settings-error" role="alert">{clientsError}</span></div>}
 
-      <AssistantEnableRow enabled={enabled} setEnabled={setEnabled} />
+      <SettingsEnableRow
+        enabled={enabled}
+        setEnabled={setEnabled}
+        label={t('settings.assistantEnable')}
+        description={t('settings.assistantEnableDesc')}
+      />
 
       <AssistantModeRows enabled={enabled} mode={mode} setMode={setMode} active={active} activeProvider={activeProvider} model={model} />
 

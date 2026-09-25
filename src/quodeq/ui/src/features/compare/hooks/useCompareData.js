@@ -22,6 +22,7 @@ import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { projectKeys, sharedKeys } from '../../../api/queryKeys.js';
 import { applyVisibleStandards } from '../compareModel.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { projectId } from '../../../utils/projectIdentity.js';
 
 // A cold project's first summary can take as long as its Overview takes to
 // compute (the accumulated walk). Match the projects-list ceiling rather
@@ -46,10 +47,10 @@ const QUERY_DEFAULTS = {
  */
 export function useCompareData(projects) {
   const { getCompareSummary, sharedGetCompareSummary } = useApi();
-  const list = (projects || []).filter((p) => p && (p.id || p.name));
+  const list = (projects || []).filter((p) => p && projectId(p));
   const summaryResults = useQueries({
     queries: list.map((p) => {
-      const id = p.id || p.name;
+      const id = projectId(p);
       // Remote (shared-repo) rows fetch from the shared mirror route with
       // the RAW project id; `id` stays the fleet-unique row key. The key's
       // source segment keeps a same-named local project's cache separate.
@@ -72,7 +73,7 @@ export function useCompareData(projects) {
     const errorsById = {};
     let loadedCount = 0;
     list.forEach((p, i) => {
-      const id = p.id || p.name;
+      const id = projectId(p);
       const summary = summaryResults[i];
       if (summary?.data !== undefined) {
         summariesById[id] = applyVisibleStandards(summary.data, visibleIds);
@@ -112,7 +113,7 @@ export function useSharedCompareProjects() {
     refetchOnWindowFocus: false,
   });
   return useMemo(
-    () => (data || []).filter((p) => p && (p.id || p.name)),
+    () => (data || []).filter((p) => p && projectId(p)),
     [data],
   );
 }

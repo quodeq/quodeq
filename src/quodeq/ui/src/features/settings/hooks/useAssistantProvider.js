@@ -43,53 +43,44 @@ function loadState(storage) {
   return { enabled, mode, activeProvider, model, followsAnalysis: false };
 }
 
-function makeSetEnabled(storage, setState, broadcast) {
+// A setter that writes one storage key, then re-reads the whole state and
+// broadcasts it. A refused write (quota, private mode) goes to `onRefused` and
+// the re-read still runs. `keyFor` runs before the write is attempted.
+function makePersistingSetter({ storage, setState, broadcast }, { keyFor, stored = (value) => value, onRefused }) {
   return (value) => {
+    const key = keyFor();
     try {
-      storage.setItem(ASSISTANT_ENABLED_KEY, value ? STORED_TRUE : STORED_FALSE);
+      storage.setItem(key, stored(value));
     } catch (err) {
-      console.warn('[useAssistantProvider] Could not persist assistant enabled:', err);
+      onRefused(err);
     }
     setState(loadState(storage));
     broadcast();
   };
 }
 
-function makeSetMode(storage, setState, broadcast) {
-  return (mode) => {
-    try {
-      storage.setItem(ASSISTANT_MODE_KEY, mode === ASSISTANT_MODE.CUSTOM ? ASSISTANT_MODE.CUSTOM : ASSISTANT_MODE.DEFAULT);
-    } catch (err) {
-      console.warn('[useAssistantProvider] Could not persist assistant mode:', err);
-    }
-    setState(loadState(storage));
-    broadcast();
-  };
-}
+const SETTERS = {
+  setEnabled: {
+    onRefused: (err) => console.warn('[useAssistantProvider] Could not persist assistant enabled:', err),
+    keyFor: () => ASSISTANT_ENABLED_KEY,
+    stored: (value) => (value ? STORED_TRUE : STORED_FALSE),
+  },
+  setMode: {
+    onRefused: (err) => console.warn('[useAssistantProvider] Could not persist assistant mode:', err),
+    keyFor: () => ASSISTANT_MODE_KEY,
+    stored: (mode) => (mode === ASSISTANT_MODE.CUSTOM ? ASSISTANT_MODE.CUSTOM : ASSISTANT_MODE.DEFAULT),
+  },
+  setActiveProvider: {
+    onRefused: (err) => console.warn('[useAssistantProvider] Could not persist active provider:', err),
+    keyFor: () => ASSISTANT_ACTIVE_PROVIDER_KEY,
+  },
+};
 
-function makeSetActiveProvider(storage, setState, broadcast) {
-  return (id) => {
-    try {
-      storage.setItem(ASSISTANT_ACTIVE_PROVIDER_KEY, id);
-    } catch (err) {
-      console.warn('[useAssistantProvider] Could not persist active provider:', err);
-    }
-    setState(loadState(storage));
-    broadcast();
-  };
-}
-
-function makeSetModel(storage, setState, broadcast) {
-  return (value) => {
-    const { activeProvider } = loadState(storage);
-    try {
-      storage.setItem(providerKey(activeProvider, 'model-assistant'), value);
-    } catch (err) {
-      console.warn('[useAssistantProvider] Could not persist assistant model:', err);
-    }
-    setState(loadState(storage));
-    broadcast();
-  };
+function makeSetModel(ctx) {
+  return makePersistingSetter(ctx, {
+    onRefused: (err) => console.warn('[useAssistantProvider] Could not persist assistant model:', err),
+    keyFor: () => providerKey(loadState(ctx.storage).activeProvider, 'model-assistant'),
+  });
 }
 
 // Analysis-gate changes (provider/model) fire PROVIDER_SETTINGS_CHANGED_EVENT
@@ -129,10 +120,15 @@ export function useAssistantProvider({ storage = localStorage } = {}) {
   // useMemo, not useCallback: the factories must run only when their inputs
   // change, where useCallback(factory(...), deps) rebuilds the closure every
   // render and then throws it away.
-  const setEnabled = useMemo(() => makeSetEnabled(storage, setState, broadcast), [storage, broadcast]);
-  const setMode = useMemo(() => makeSetMode(storage, setState, broadcast), [storage, broadcast]);
-  const setActiveProvider = useMemo(() => makeSetActiveProvider(storage, setState, broadcast), [storage, broadcast]);
-  const setModel = useMemo(() => makeSetModel(storage, setState, broadcast), [storage, broadcast]);
+  const { setEnabled, setMode, setActiveProvider, setModel } = useMemo(() => {
+    const ctx = { storage, setState, broadcast };
+    return {
+      setEnabled: makePersistingSetter(ctx, SETTERS.setEnabled),
+      setMode: makePersistingSetter(ctx, SETTERS.setMode),
+      setActiveProvider: makePersistingSetter(ctx, SETTERS.setActiveProvider),
+      setModel: makeSetModel(ctx),
+    };
+  }, [storage, broadcast]);
 
   useSettingsChangeSync(SYNC_EVENTS, { load: loadState, setState, storage });
 

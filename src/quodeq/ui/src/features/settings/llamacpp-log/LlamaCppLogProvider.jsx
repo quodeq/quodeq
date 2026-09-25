@@ -1,34 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
-import ConsoleLogViewer from '../../evaluation/components/ConsoleLogViewer.jsx';
+import { useEffect, useMemo, useState } from 'react';
 import { LlamaCppLogContext } from './LlamaCppLogContext.js';
 import { useLlamaCppLogStream } from './useLlamaCppLogStream.js';
+import { useLogWindow } from '../_shared/useLogWindow.js';
+import { makeProviderLogSpec } from '../_shared/providerLogSpec.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
-import { LOG_STREAM_STATUS } from '../../../vocab/logStreamStatus.js';
 
 const WINDOW_ID = 'llamacpp-log';
 
-const STATUS_LABEL = {
-  [LOG_STREAM_STATUS.IDLE]: '',
-  [LOG_STREAM_STATUS.STREAMING]: ' · running',
-  [LOG_STREAM_STATUS.DONE]: ' · stopped',
-  [LOG_STREAM_STATUS.ERROR]: t('settings.logUnavailable'),
-};
-
-function buildSpec(logs, status, firstSeq) {
-  return {
-    id: WINDOW_ID,
-    type: WINDOW_ID,
-    title: `${t('settings.llamaCppLogTitle')}${STATUS_LABEL[status] || ''}`,
-    render: () => <ConsoleLogViewer logs={logs} firstSeq={firstSeq} />,
-  };
-}
+const buildSpec = makeProviderLogSpec({
+  windowId: WINDOW_ID,
+  title: () => t('settings.llamaCppLogTitle'),
+  emptyOnOpen: true,
+});
 
 // The console toggle is hidden unless the server reports a configured
 // LLAMACPP_LOG_FILE. Probe once on mount; the result is stable for the
 // session since the env var is set at server-launch time.
-function useLlamaCppAvailabilityProbe(getLlamacppLogAvailable, setAvailable) {
+function useLlamaCppAvailabilityProbe(getLlamacppLogAvailable) {
+  const [available, setAvailable] = useState(false);
   useEffect(() => {
     let cancelled = false;
     getLlamacppLogAvailable()
@@ -40,44 +30,15 @@ function useLlamaCppAvailabilityProbe(getLlamacppLogAvailable, setAvailable) {
       });
     return () => { cancelled = true; };
   }, [getLlamacppLogAvailable]);
+  return available;
 }
 
 export function LlamaCppLogProvider({ children }) {
   const { getLlamacppLogAvailable } = useApi();
-  const [open, setOpen] = useState(false);
-  const [available, setAvailable] = useState(false);
-  const { logs, firstSeq, status } = useLlamaCppLogStream(open);
-  const { addWindow, removeWindow, replaceWindow, hasWindow } = useSidePane();
+  const logWindow = useLogWindow({ windowId: WINDOW_ID, useLogSource: useLlamaCppLogStream, buildSpec });
+  const available = useLlamaCppAvailabilityProbe(getLlamacppLogAvailable);
 
-  useLlamaCppAvailabilityProbe(getLlamacppLogAvailable, setAvailable);
-
-  const spec = useMemo(() => (open ? buildSpec(logs, status, firstSeq) : null), [open, logs, status, firstSeq]);
-
-  useEffect(() => {
-    if (spec) replaceWindow(spec);
-  }, [spec, replaceWindow]);
-
-  const openLog = useCallback(() => {
-    setOpen(true);
-    const fresh = buildSpec([], LOG_STREAM_STATUS.STREAMING, 0);
-    addWindow(fresh);
-    replaceWindow(fresh);
-  }, [addWindow, replaceWindow]);
-
-  const closeLog = useCallback(() => {
-    setOpen(false);
-    removeWindow(WINDOW_ID);
-  }, [removeWindow]);
-
-  // Sync open state if user closes the window via the X.
-  useEffect(() => {
-    if (open && !hasWindow(WINDOW_ID)) setOpen(false);
-  }, [open, hasWindow]);
-
-  const value = useMemo(
-    () => ({ open, available, openLog, closeLog }),
-    [open, available, openLog, closeLog],
-  );
+  const value = useMemo(() => ({ ...logWindow, available }), [logWindow, available]);
 
   return <LlamaCppLogContext.Provider value={value}>{children}</LlamaCppLogContext.Provider>;
 }

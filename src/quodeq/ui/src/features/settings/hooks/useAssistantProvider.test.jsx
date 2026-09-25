@@ -1,4 +1,4 @@
-import { it, expect, beforeEach, afterEach } from 'vitest';
+import { it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAssistantProvider } from './useAssistantProvider.js';
 
@@ -136,4 +136,37 @@ it('syncs model changes across independent hook instances', () => {
   act(() => a.result.current.setModel('opus'));
 
   expect(b.result.current.model).toBe('opus');
+});
+
+it('each setter warns with its own message when storage refuses the write, then re-reads', () => {
+  const values = { 'cc-active-provider': 'claude', 'cc-assistant-mode': 'custom' };
+  const writes = [];
+  const storage = {
+    getItem: (k) => (k in values ? values[k] : null),
+    setItem: (k, v) => { writes.push([k, v]); throw new Error('quota'); },
+  };
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const { result } = renderHook(() => useAssistantProvider({ storage }));
+    act(() => result.current.setEnabled(false));
+    act(() => result.current.setMode('bogus'));
+    act(() => result.current.setActiveProvider('gemini'));
+    act(() => result.current.setModel('opus'));
+    expect(writes).toEqual([
+      ['cc-assistant-enabled', 'false'],
+      ['cc-assistant-mode', 'default'],
+      ['cc-assistant-active-provider', 'gemini'],
+      ['cc-claude-model-assistant', 'opus'],
+    ]);
+    expect(warn.mock.calls.map((c) => c[0])).toEqual([
+      '[useAssistantProvider] Could not persist assistant enabled:',
+      '[useAssistantProvider] Could not persist assistant mode:',
+      '[useAssistantProvider] Could not persist active provider:',
+      '[useAssistantProvider] Could not persist assistant model:',
+    ]);
+    expect(result.current.enabled).toBe(true);
+    expect(result.current.activeProvider).toBe('claude');
+  } finally {
+    warn.mockRestore();
+  }
 });

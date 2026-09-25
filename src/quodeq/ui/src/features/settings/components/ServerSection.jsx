@@ -8,6 +8,7 @@ import { getHealth } from '../../../api/index.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
 import { SERVER_STATUS } from '../settingsVocab.js';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
 
 const LOCAL_SERVER_HINT = t('settings.localServerHint');
 
@@ -32,12 +33,7 @@ function ServerDetails({ health }) {
 function OfflineRestartHint() {
   return (
     <div className="settings-row settings-row--last">
-      <div className="settings-row-label">
-        <span className="settings-label">{t('settings.restart')}</span>
-        <span className="settings-description">
-          {tRich('settings.restartDesc')}
-        </span>
-      </div>
+      <SettingsRowLabel hintSlot={false} label={t('settings.restart')} description={tRich('settings.restartDesc')} />
     </div>
   );
 }

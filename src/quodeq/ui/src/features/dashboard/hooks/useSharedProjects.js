@@ -44,12 +44,13 @@
  * because a disabled list query never fetches on its own.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
 import { useCoalescedRefresh } from './useCoalescedRefresh.js';
 import { useSharedActions } from './useSharedActions.js';
+import { useSharedStatusAndList } from './useSharedStatusAndList.js';
 
 // react-query's own query-state status ('pending'|'error'|'success'), not
 // the run/job/dim vocabulary -- kept local rather than forced into vocab/*.js.
@@ -157,18 +158,7 @@ export function useSharedProjects() {
   const { getSharedStatus, sharedListProjects, connectShared, refreshShared, pullSharedProject } = useApi();
   const queryClient = useQueryClient();
 
-  const statusQuery = useQuery({
-    queryKey: sharedKeys.status(),
-    queryFn: getSharedStatus,
-  });
-
-  const configured = !!statusQuery.data?.configured;
-
-  const listQuery = useQuery({
-    queryKey: sharedKeys.list(),
-    queryFn: () => sharedListProjects({ refresh: false }),
-    enabled: configured,
-  });
+  const { statusQuery, configured, listQuery } = useSharedStatusAndList({ getSharedStatus, sharedListProjects });
 
   // Overridden to true by a failed refresh() round (either the POST or the
   // re-list that follows it); reset on the next round's outcome. Combined
@@ -176,8 +166,8 @@ export function useSharedProjects() {
   // toolbar show "· stale".
   const [staleOverride, setStaleOverride] = useState(false);
 
-  // connect()/pull(): lifted verbatim into useSharedActions (see that
-  // file's doc comment) -- same in-flight-ref idiom as usePublishTrigger.
+  // connect()/pull(): see useSharedActions -- same in-flight-ref idiom as
+  // usePublishTrigger.
   const { connecting, connectError, connect, pull } = useSharedActions({ connectShared, pullSharedProject, queryClient });
 
   const refreshCore = useCallback(
@@ -185,8 +175,8 @@ export function useSharedProjects() {
     [refreshShared, queryClient],
   );
 
-  // refresh(): coalescing wrapper around one POST + re-list round -- lifted
-  // verbatim into useCoalescedRefresh (see that file's doc comment).
+  // refresh(): coalescing wrapper around one POST + re-list round (see
+  // useCoalescedRefresh).
   const { refreshing, refresh } = useCoalescedRefresh(refreshCore);
 
   useBackgroundRevalidate(listQuery.isSuccess, refresh);
@@ -203,6 +193,13 @@ export function useSharedProjects() {
     pull,
   };
 }
+
+// This signal feeds a one-time startup decision (wizard auto-open, initial
+// landing). Focus revalidation belongs to the pages that render the list, not
+// here -- refetching on focus would let hasContent flip mid-session for users
+// who never open those pages. This is a per-observer option and does not
+// affect useSharedProjects' own observers on the same query keys.
+const SIGNAL_OBSERVER_OPTIONS = { refetchOnWindowFocus: false };
 
 /**
  * useSharedContentSignal — passive "does the shared repo have anything to
@@ -222,25 +219,8 @@ export function useSharedProjects() {
 export function useSharedContentSignal() {
   const { getSharedStatus, sharedListProjects } = useApi();
 
-  // This signal feeds a one-time startup decision (wizard auto-open,
-  // initial landing). Focus revalidation belongs to the pages that render
-  // the list, not here -- refetching on focus would let hasContent flip
-  // mid-session for users who never open those pages. This is a
-  // per-observer option and does not affect useSharedProjects' own
-  // observers on the same query keys.
-  const statusQuery = useQuery({
-    queryKey: sharedKeys.status(),
-    queryFn: getSharedStatus,
-    refetchOnWindowFocus: false,
-  });
-  const configured = !!statusQuery.data?.configured;
-
-  // See comment above: same rationale applies to the list query.
-  const listQuery = useQuery({
-    queryKey: sharedKeys.list(),
-    queryFn: () => sharedListProjects({ refresh: false }),
-    enabled: configured,
-    refetchOnWindowFocus: false,
+  const { statusQuery, configured, listQuery } = useSharedStatusAndList({
+    getSharedStatus, sharedListProjects, observerOptions: SIGNAL_OBSERVER_OPTIONS,
   });
 
   const statusSettled = statusQuery.isSuccess || statusQuery.isError;

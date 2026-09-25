@@ -1,4 +1,5 @@
 import { mostFrequentGrade } from '../../utils/formatters.js';
+import { emptySeverityCounts } from '../../utils/severity.js';
 
 /** The shape buildRunSummary returns for a run with no dimension data. */
 function emptySummary() {
@@ -8,7 +9,7 @@ function emptySummary() {
     totalViolations: 0,
     totalCompliance: 0,
     dimensionCount: 0,
-    severity: { critical: 0, major: 0, minor: 0 },
+    severity: emptySeverityCounts(),
     dismissed: 0,
     suppressed: 0,
   };

@@ -7,6 +7,7 @@ import { renderDashboardGate } from './dashboardGate.jsx';
 import { renderDashboardBody } from './dashboardBody.jsx';
 import { ProjectsLoadFailedState } from './DashboardPageEmptyStates.jsx';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { projectId } from '../../../utils/projectIdentity.js';
 
 // ---------------------------------------------------------------------------
 // DashboardPage — body only, header is rendered by App.jsx
@@ -30,7 +31,7 @@ import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 // null fallback. Exported so the source-gating contract is unit-testable
 // without mounting the whole page (which needs a SidePaneProvider and more).
 export function selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo }) {
-  const localProjectInfo = (projects || []).find((p) => (p.id || p.name) === selectedProject) || null;
+  const localProjectInfo = (projects || []).find((p) => projectId(p) === selectedProject) || null;
   return selectedSource === PROJECT_SOURCE.SHARED ? (sharedProjectInfo || null) : localProjectInfo;
 }
 

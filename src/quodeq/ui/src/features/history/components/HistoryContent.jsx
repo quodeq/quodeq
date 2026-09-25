@@ -8,6 +8,8 @@ import { EvaluationsTable } from './EvaluationsTable.jsx';
 import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { roundOneDecimal } from '../../../utils/rounding.js';
+import { pluralKey } from '../../../utils/plural.js';
+import { NOT_READY_MESSAGE } from '../historyHelpers.js';
 
 // Deferred so the History page's first paint doesn't carry the chart library.
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
@@ -26,7 +28,6 @@ class ChartErrorBoundary extends Component {
 }
 
 const TOAST_DISMISS_MS = 2600;
-const NOT_READY_MESSAGE = t('history.notReadyMessage');
 
 // Exported for HistoryContent.deltas.test.jsx.
 export function computeDeltas(rows) {
@@ -67,7 +68,7 @@ function HistoryTopHeader({ trend, languageSub, selectedSource, availableRuns, r
     <div className="history-page__top">
       <TermHeader
         name={t('history.termName')}
-        sub={`${trend.length === 1 ? t('history.evalsCountOne', { count: trend.length }) : t('history.evalsCountMany', { count: trend.length })}${languageSub ? ` · ${languageSub}` : ''}`}
+        sub={`${t(pluralKey(trend.length, 'history.evalsCountOne', 'history.evalsCountMany'), { count: trend.length })}${languageSub ? ` · ${languageSub}` : ''}`}
         badge={selectedSource === PROJECT_SOURCE.SHARED ? <SharedReadOnlyBadge /> : null}
       />
       {availableRuns && availableRuns.length > 0 && (

@@ -6,6 +6,7 @@ import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
 import { roundOneDecimal } from '../../utils/rounding.js';
 import { CONSEQUENCE_LEVEL } from './compareFleet.js';
 import { SCORE_SCALE_MAX } from '../../constants.js';
+import { sumSeverityTallies } from '../../utils/severity.js';
 
 // Outlier detection: a principle counts as an outlier when the worst project
 // sits at least this many points under the next-worst score, or below the
@@ -102,17 +103,6 @@ function _buildStandings(holders, dimensionKey, now, summariesById) {
     .sort((a, b) => b.score - a.score);
 }
 
-function _summarizeSeverity(standings) {
-  return standings.reduce(
-    (acc, s) => ({
-      critical: acc.critical + (s.severity?.critical || 0),
-      major: acc.major + (s.severity?.major || 0),
-      minor: acc.minor + (s.severity?.minor || 0),
-    }),
-    { critical: 0, major: 0, minor: 0 },
-  );
-}
-
 function _buildPrincipleBoard(standings) {
   const principleKeys = new Map();
   // Walking the standings in order leaves each principle's perProject in
@@ -173,7 +163,7 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
   const standings = _buildStandings(holders, dimensionKey, now, summariesById);
   const lead = standings[0];
   const trail = standings[standings.length - 1];
-  const severity = _summarizeSeverity(standings);
+  const severity = sumSeverityTallies(standings);
   const principles = _buildPrincipleBoard(standings);
   const weakest = principles.reduce(
     (acc, p) => (acc == null || (p.avg ?? AVG_SENTINEL_ABOVE_MAX) < (acc.avg ?? AVG_SENTINEL_ABOVE_MAX) ? p : acc),

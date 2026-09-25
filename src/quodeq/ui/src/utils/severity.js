@@ -43,9 +43,37 @@ export function summaryBucket(value) {
  * @returns {{critical: number, major: number, minor: number}}
  */
 export function countBySeverity(violations) {
-  const counts = { critical: 0, major: 0, minor: 0 };
+  const counts = emptySeverityCounts();
   for (const v of violations || []) {
     counts[summaryBucket(v?.severity)]++;
   }
   return counts;
+}
+
+/**
+ * A zeroed three-bucket tally. Each call returns a new object, so callers
+ * may mutate it.
+ *
+ * @returns {{critical: number, major: number, minor: number}}
+ */
+export function emptySeverityCounts() {
+  return { critical: 0, major: 0, minor: 0 };
+}
+
+/**
+ * Adds up the `severity` tallies of a list of items (rows, standings), a
+ * missing tally or bucket counting as zero.
+ *
+ * @param {Array<{severity?: {critical?: number, major?: number, minor?: number}|null}>} items
+ * @returns {{critical: number, major: number, minor: number}}
+ */
+export function sumSeverityTallies(items) {
+  return items.reduce(
+    (acc, item) => ({
+      critical: acc.critical + (item.severity?.critical || 0),
+      major: acc.major + (item.severity?.major || 0),
+      minor: acc.minor + (item.severity?.minor || 0),
+    }),
+    emptySeverityCounts(),
+  );
 }

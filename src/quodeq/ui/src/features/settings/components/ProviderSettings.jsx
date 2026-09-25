@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { DEFAULT_TIME_LIMIT_S, PROVIDER_SETTING_KEY } from '../../../constants.js';
-import HelpHint from '../../../components/HelpHint.jsx';
 import { t } from '../../../strings/index.js';
 import { STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
 import { SECONDS_PER_MINUTE } from '../../../utils/time.js';
 import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
+import { SettingsRowLabel } from './settingsRowParts.jsx';
 
 const MIN_MINUTES = 1;
 const MAX_MINUTES = 60;
@@ -46,16 +46,15 @@ export function TimeLimitSetting({ state, update, providerType }) {
 
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label-row">
-          <span className="settings-label">{t('settings.timeLimitLabel')}</span>
-          <HelpHint label={t('settings.timeLimitHelpAria')}>
-            <p>{t('settings.timeLimitHintBase')}</p>
-            {providerType === PROVIDER_CLASSIFICATION.CLOUD_API && <p>{t('settings.timeLimitHintCloud')}</p>}
-          </HelpHint>
-        </span>
-        <span className="settings-description">{t('settings.timeLimitDesc')}</span>
-      </div>
+      <SettingsRowLabel
+        label={t('settings.timeLimitLabel')}
+        hint={<>
+          <p>{t('settings.timeLimitHintBase')}</p>
+          {providerType === PROVIDER_CLASSIFICATION.CLOUD_API && <p>{t('settings.timeLimitHintCloud')}</p>}
+        </>}
+        hintAria={t('settings.timeLimitHelpAria')}
+        description={t('settings.timeLimitDesc')}
+      />
       <div className="settings-budget-control">
         <div className="settings-pill-group">
           <button type="button" className={`settings-pill${unlimited ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.TIME_LIMIT, '0')} aria-pressed={unlimited}>{t('settings.unlimited')}</button>
@@ -84,13 +83,12 @@ export function AdvancedAnalysisSettings({ state, update }) {
   return (
     <>
       <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label-row">
-            <span className="settings-label">{t('settings.analysisMode')}</span>
-            <HelpHint label={t('settings.analysisModeHelpAria')}>{ANALYSIS_MODE_HINT}</HelpHint>
-          </span>
-          <span className="settings-description">{t('settings.analysisModeDesc')}</span>
-        </div>
+        <SettingsRowLabel
+          label={t('settings.analysisMode')}
+          hint={ANALYSIS_MODE_HINT}
+          hintAria={t('settings.analysisModeHelpAria')}
+          description={t('settings.analysisModeDesc')}
+        />
         <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.violationGroupingAria')}>
           <button type="button" role="radio" aria-checked={perDimension} className={`settings-pill${perDimension ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.PER_DIMENSION, STORED_TRUE)}>{t('settings.perDimension')}</button>
           <button type="button" role="radio" aria-checked={!perDimension} className={`settings-pill${!perDimension ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.PER_DIMENSION, STORED_FALSE)}>{t('settings.grouped')}</button>
@@ -98,13 +96,12 @@ export function AdvancedAnalysisSettings({ state, update }) {
       </div>
 
       <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label-row">
-            <span className="settings-label">{t('settings.verifyFindings')}</span>
-            <HelpHint label={t('settings.verifyHelpAria')}>{VERIFY_HINT}</HelpHint>
-          </span>
-          <span className="settings-description">{t('settings.verifyFindingsDesc')}</span>
-        </div>
+        <SettingsRowLabel
+          label={t('settings.verifyFindings')}
+          hint={VERIFY_HINT}
+          hintAria={t('settings.verifyHelpAria')}
+          description={t('settings.verifyFindingsDesc')}
+        />
         <div className="settings-pill-group" role="radiogroup" aria-label={t('settings.verifyFindingsAria')}>
           <button type="button" role="radio" aria-checked={verify} className={`settings-pill${verify ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.VERIFY, STORED_TRUE)}>{t('settings.on')}</button>
           <button type="button" role="radio" aria-checked={!verify} className={`settings-pill${!verify ? ' settings-pill--active' : ''}`} onClick={() => update(PROVIDER_SETTING_KEY.VERIFY, STORED_FALSE)}>{t('settings.off')}</button>

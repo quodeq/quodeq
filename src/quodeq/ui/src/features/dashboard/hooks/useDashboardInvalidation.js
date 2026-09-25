@@ -5,6 +5,19 @@ import { projectKeys } from '../../../api/queryKeys.js';
 // one per action (see useScheduleDashboardReconcile below).
 const RECONCILE_DEBOUNCE_MS = 1200;
 
+// Invalidation option that marks the project's queries stale without
+// refetching the mounted observers now (see refreshDashboard below).
+const MARK_STALE_ONLY = { refetchType: 'none' };
+
+// Invalidate the selected project's query subtree. With no options the
+// active observers refetch now; MARK_STALE_ONLY defers that to the next mount.
+function invalidateProject(queryClient, selectedProject, selectedSource, options) {
+  queryClient.invalidateQueries({
+    queryKey: projectKeys.project(selectedProject, selectedSource),
+    ...options,
+  });
+}
+
 // refreshDashboard: mark project queries stale but DON'T trigger an
 // immediate refetch. The dashboard payload is 10-20 MB on large projects
 // (one run's full violation + compliance arrays × multiple dimensions);
@@ -29,17 +42,12 @@ const RECONCILE_DEBOUNCE_MS = 1200;
 function useRefreshDashboard({ queryClient, selectedProject, selectedSource }) {
   const refreshDashboard = useCallback(() => {
     if (!selectedProject) return;
-    queryClient.invalidateQueries({
-      queryKey: projectKeys.project(selectedProject, selectedSource),
-      refetchType: 'none',
-    });
+    invalidateProject(queryClient, selectedProject, selectedSource, MARK_STALE_ONLY);
   }, [queryClient, selectedProject, selectedSource]);
 
   const refreshDashboardActive = useCallback(() => {
     if (!selectedProject) return;
-    queryClient.invalidateQueries({
-      queryKey: projectKeys.project(selectedProject, selectedSource),
-    });
+    invalidateProject(queryClient, selectedProject, selectedSource);
   }, [queryClient, selectedProject, selectedSource]);
 
   return { refreshDashboard, refreshDashboardActive };
@@ -70,16 +78,11 @@ function useScheduleDashboardReconcile({ queryClient, selectedProject, selectedS
     // happened, so the mutation degrades to refreshDashboard's
     // mark-stale-only semantics and a remount or Overview-return still
     // self-heals.
-    queryClient.invalidateQueries({
-      queryKey: projectKeys.project(selectedProject, selectedSource),
-      refetchType: 'none',
-    });
+    invalidateProject(queryClient, selectedProject, selectedSource, MARK_STALE_ONLY);
     if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
     reconcileTimer.current = setTimeout(() => {
       reconcileTimer.current = null;
-      queryClient.invalidateQueries({
-        queryKey: projectKeys.project(selectedProject, selectedSource),
-      });
+      invalidateProject(queryClient, selectedProject, selectedSource);
     }, RECONCILE_DEBOUNCE_MS);
   }, [queryClient, selectedProject, selectedSource]);
   useEffect(() => () => clearTimeout(reconcileTimer.current), []);
@@ -89,8 +92,7 @@ function useScheduleDashboardReconcile({ queryClient, selectedProject, selectedS
 
 /**
  * The three ways useDashboard invalidates the project query subtree, plus
- * the debounce ref the third one owns. Extracted verbatim from
- * useDashboard.js.
+ * the debounce ref the third one owns.
  */
 export function useDashboardInvalidation({ queryClient, selectedProject, selectedSource }) {
   const { refreshDashboard, refreshDashboardActive } = useRefreshDashboard({ queryClient, selectedProject, selectedSource });

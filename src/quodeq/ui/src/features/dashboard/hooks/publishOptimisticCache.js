@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { projectId } from '../../../utils/projectIdentity.js';
 
 /**
  * Indexes a shared project list by id to its publish timestamp, for the
@@ -11,7 +12,7 @@ import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 export function buildPublishedAtMap(list) {
   const map = {};
   for (const p of list || []) {
-    const id = p.id || p.name;
+    const id = projectId(p);
     if (id && p.publishedAt) map[id] = p.publishedAt;
   }
   return map;
@@ -38,7 +39,7 @@ function carryOver(local, existing, field, fallback) {
  * field `local` doesn't know, so a merge never regresses already-good data.
  */
 export function upsertPublishedProject(projects, id, local) {
-  const idx = projects.findIndex((p) => (p.id || p.name) === id);
+  const idx = projects.findIndex((p) => projectId(p) === id);
   const existing = idx === -1 ? null : projects[idx];
   const merged = {
     ...existing,

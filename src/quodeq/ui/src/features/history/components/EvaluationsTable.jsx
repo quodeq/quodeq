@@ -8,6 +8,7 @@ import { activateOnKey, isActivationKey } from '../../../utils/a11y.js';
 import { PARTIAL_STATUSES } from './historyRowAssembly.js';
 import { deltaDirection } from '../utils/deltaDirection.js';
 import { RUN_STATE } from '../../../vocab/runState.js';
+import { NOT_READY_MESSAGE } from '../historyHelpers.js';
 
 const DELTA_SIGN = { up: '+', down: '-', flat: '' };
 const DELTA_CLASS = {
@@ -16,7 +17,6 @@ const DELTA_CLASS = {
   flat: 'history-delta',
 };
 
-const NOT_READY_MESSAGE = t('history.notReadyMessage');
 
 // Splits an ISO timestamp into the row's two-line date/time cell. A
 // malformed timestamp degrades to the caller's fallback label rather than

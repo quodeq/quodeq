@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { t } from '../../../strings/index.js';
 import { ScoreChartWithKeyboard, makeScoreTooltip } from '../../../components/scoreChartPanel.jsx';
-import { HISTORY_CHART_HEIGHT } from '../../../components/scoreChartHelpers.js';
+import { HISTORY_CHART_HEIGHT, runChartInteraction } from '../../../components/scoreChartHelpers.js';
 import { computeHistoryChartStats, buildHistoryKbdItems } from './historyChartStats.js';
 import { DATA_THEME_ATTR } from '../../../constants.js';
 
@@ -79,12 +79,7 @@ export default function HistoryChartPanel({ trend = [], selectedRunId = null, on
       <ScoreChartWithKeyboard
         data={data}
         chart={CHART_PRESENTATION}
-        interaction={{
-          hoveredIndex,
-          setHoveredIndex,
-          selectedRunId,
-          onActivate: onBarClick ? (point) => onBarClick(point.runId) : undefined,
-        }}
+        interaction={runChartInteraction({ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick })}
         kbdLabel={t('history.kbdRunsLabel')}
         kbdItems={kbdItems}
       />

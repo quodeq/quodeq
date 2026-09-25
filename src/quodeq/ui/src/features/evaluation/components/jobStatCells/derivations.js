@@ -9,6 +9,7 @@ import { SCAN_MODE } from '../scanModes.js';
 import { MS_PER_SECOND, SECONDS_PER_MINUTE, MINUTES_PER_HOUR, SECONDS_PER_HOUR } from '../../../../utils/time.js';
 import { DIM_STATE } from '../../../../vocab/dimState.js';
 import { SEVERITY_ORDER } from '../../../../vocab/severity.js';
+import { emptySeverityCounts } from '../../../../utils/severity.js';
 
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
@@ -170,7 +171,7 @@ export function buildDimensionCycle(progress) {
 
 /** Severity buckets across the live feed's `{dim: Violation[]}` map. */
 export function sumSeverities(liveViolations) {
-  const counts = { critical: 0, major: 0, minor: 0 };
+  const counts = emptySeverityCounts();
   for (const vs of Object.values(liveViolations || {})) {
     for (const v of vs || []) {
       const sev = String(v?.severity || '').toLowerCase();

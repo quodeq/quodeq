@@ -10,6 +10,8 @@ import { OnlineCardFooter } from './projectCards/OnlineCardFooter.jsx';
 import { ProjectsToolbar } from './ProjectsToolbar.jsx';
 import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { projectIdOrSelf } from '../../../utils/projectIdentity.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 const EVAL_BLOCKED_TITLE = t('projects.evalBlockedTitle');
 
@@ -51,9 +53,7 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
 // "loading" rather than "0 repositories evaluated".
 function headerSub(projectsLoaded, count) {
   if (!projectsLoaded) return t('overview.loading');
-  return count === 1
-    ? t('projects.reposEvaluatedOne', { count })
-    : t('projects.reposEvaluatedMany', { count });
+  return t(pluralKey(count, 'projects.reposEvaluatedOne', 'projects.reposEvaluatedMany'), { count });
 }
 
 function ProjectsPageHeader({ projectsLoaded, projects, isEmpty, onImportProject, onAddProject, isEvaluating }) {
@@ -138,7 +138,7 @@ function LocalProjectEntry({ entry, project, selection, actions }) {
 
 function SharedProjectEntry({ entry, ctx }) {
   const { onSelect, pullConflictId, handlePull, handleConfirmCopy, cancelConflict, pulledIds } = ctx;
-  const sharedId = entry.shared.id || entry.shared.name || entry.shared;
+  const sharedId = projectIdOrSelf(entry.shared);
   return (
     <ProjectCard
       key={entry.key}

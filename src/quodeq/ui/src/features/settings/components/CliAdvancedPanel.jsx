@@ -1,8 +1,7 @@
-import HelpHint from '../../../components/HelpHint.jsx';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 import { t } from '../../../strings/index.js';
-import { SettingsRowLabel } from './settingsRowParts.jsx';
+import { SettingsRowLabel, SettingsAdvanced } from './settingsRowParts.jsx';
 import CopilotModelSelect from './CopilotModelSelect.jsx';
 import { PROVIDER_SETTING_KEY } from '../../../constants.js';
 
@@ -74,10 +73,7 @@ function AnalysisModelsRow({ providerId, state, update, analysisHint }) {
 function AnalysisPowerRow({ power, setPower, persistPower }) {
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label">{t('settings.analysisPower')}</span>
-        <span className="settings-description">{t('settings.analysisPowerDesc')}</span>
-      </div>
+      <SettingsRowLabel hintSlot={false} label={t('settings.analysisPower')} description={t('settings.analysisPowerDesc')} />
       <PowerSelector value={power} onChange={setPower} onPersist={persistPower} />
     </div>
   );
@@ -86,15 +82,12 @@ function AnalysisPowerRow({ power, setPower, persistPower }) {
 function CmdOverrideRow({ providerId, state, update, cmdPathError, validateCmdPath }) {
   return (
     <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label-row">
-          <span className="settings-label">{t('settings.cmdOverride')}</span>
-          <HelpHint label={t('settings.cmdOverrideHelpAria')}>
-            {t('settings.cmdOverrideHint', { provider: providerId })}
-          </HelpHint>
-        </span>
-        <span className="settings-description">{t('settings.cmdOverrideDesc', { provider: providerId })}</span>
-      </div>
+      <SettingsRowLabel
+        label={t('settings.cmdOverride')}
+        hint={t('settings.cmdOverrideHint', { provider: providerId })}
+        hintAria={t('settings.cmdOverrideHelpAria')}
+        description={t('settings.cmdOverrideDesc', { provider: providerId })}
+      />
       <div className="settings-model-field">
         <input
           type="text"
@@ -120,21 +113,18 @@ function CmdOverrideRow({ providerId, state, update, cmdPathError, validateCmdPa
 }
 
 /**
- * CliProviderTab.jsx's `<details>` advanced-settings panel (analysis model
- * overrides, analysis power, cmd-path override). Extracted verbatim.
+ * A CLI provider tab's advanced settings: analysis model overrides, analysis
+ * power, the launch-command override and the shared analysis options.
  */
 export function CliAdvancedPanel({
   providerId, state, update, analysisHint, power, setPower, persistPower, cmdPathError, validateCmdPath,
 }) {
   return (
-    <details className="settings-advanced">
-      <summary className="settings-advanced-toggle">{t('settings.advanced')}</summary>
-      <div className="settings-advanced-content">
-        <AnalysisModelsRow providerId={providerId} state={state} update={update} analysisHint={analysisHint} />
-        <AnalysisPowerRow power={power} setPower={setPower} persistPower={persistPower} />
-        <CmdOverrideRow providerId={providerId} state={state} update={update} cmdPathError={cmdPathError} validateCmdPath={validateCmdPath} />
-        <AdvancedAnalysisSettings state={state} update={update} />
-      </div>
-    </details>
+    <SettingsAdvanced>
+      <AnalysisModelsRow providerId={providerId} state={state} update={update} analysisHint={analysisHint} />
+      <AnalysisPowerRow power={power} setPower={setPower} persistPower={persistPower} />
+      <CmdOverrideRow providerId={providerId} state={state} update={update} cmdPathError={cmdPathError} validateCmdPath={validateCmdPath} />
+      <AdvancedAnalysisSettings state={state} update={update} />
+    </SettingsAdvanced>
   );
 }
