@@ -1,7 +1,6 @@
 """JSONL-specific parsing for extracting violations from MCP findings files."""
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Iterable
@@ -9,7 +8,7 @@ from typing import Iterable
 from quodeq.core.types import Finding, ViolationResponse
 from quodeq.core.evidence.req_mapping import PrincipleResolver, build_principle_resolver
 from quodeq.data.fs.standards_loader import build_req_refs_lookup, read_req_to_principle_map
-from quodeq.data.fs.stream_files import count_files_in_stream
+from quodeq.data.fs.stream_files import count_files_in_stream, decode_jsonl_objects
 from quodeq.services.violation_context import ViolationContext
 from quodeq.services.suppression import SuppressionMatcher, load_req_to_principle
 from quodeq.services.suppression_keys import SuppressionKeys
@@ -87,17 +86,11 @@ def _parse_jsonl_findings(
         # scored report can never map a req ID to different principles.
         req_to_principle=resolver.req_to_principle if resolver else {},
     )
-    for raw_line in lines:
-        raw = raw_line.strip()
-        if not raw:
-            continue
-        try:
-            obj = json.loads(raw)
-        except json.JSONDecodeError:
-            _logger.warning("Skipping malformed JSONL line in findings file: %s", raw[:200])
-            continue
-        if not isinstance(obj, dict):
-            continue
+
+    def _warn_malformed(raw: str) -> None:
+        _logger.warning("Skipping malformed JSONL line in findings file: %s", raw[:200])
+
+    for obj in decode_jsonl_objects(lines, on_malformed_line=_warn_malformed):
         resolved_obj = _resolve_and_dedupe(obj, matcher, resolver, seen)
         if resolved_obj is None:
             continue

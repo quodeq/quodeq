@@ -1,16 +1,15 @@
 """Post-loop and mid-loop health guards: dead-provider, zero-findings, unreachable-model."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from quodeq.analysis.errors import (
     REASON_AGENT_FAILURE_STREAK, REASON_PROVIDER_FATAL,
     EvaluationError, FatalProviderError,
 )
-from quodeq.analysis.mcp.schemas import JSONL_MARKER_FILE_DONE, FileDoneStatus
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.data.fs.evidence_markers import tally_evidence_markers
 from quodeq.shared import cancellation
 
 
@@ -29,7 +28,7 @@ def _tally_evidence_dir(run_dir: Path | None) -> tuple[int, int]:
     ok_total = 0
     err_total = 0
     for jsonl in evidence_dir.glob("*_evidence.jsonl"):
-        ok, err = _tally_markers(jsonl)
+        ok, err = tally_evidence_markers(jsonl)
         ok_total += ok
         err_total += err
     return ok_total, err_total
@@ -115,42 +114,6 @@ def _count_findings(result: dict[str, Evidence]) -> int:
         sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
         for ev in result.values()
     )
-
-
-def _tally_markers(jsonl_path: Path) -> tuple[int, int]:
-    """Return ``(ok_count, error_count)`` from a dim's evidence JSONL.
-
-    Counts each file once by its *latest* ``file_done`` marker status, matching
-    the cache's ok_files semantics (a file that errored then re-succeeded counts
-    as ok). Unreadable/missing files contribute nothing.
-    """
-    last_status: dict[str, str] = {}
-    try:
-        # errors="replace" so a corrupt (non-UTF8) evidence file degrades to
-        # unparseable lines (dropped by the json.loads guard) instead of
-        # raising UnicodeDecodeError out of an otherwise-successful run.
-        with jsonl_path.open("r", encoding="utf-8", errors="replace") as fh:
-            for raw in fh:
-                raw = raw.strip()
-                if not raw:
-                    continue
-                try:
-                    entry = json.loads(raw)
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    continue
-                if entry.get("_marker") != JSONL_MARKER_FILE_DONE:
-                    continue
-                file = entry.get("file")
-                status = entry.get("status")
-                if isinstance(file, str) and status in (
-                    FileDoneStatus.OK, FileDoneStatus.ERROR,
-                ):
-                    last_status[file] = status
-    except OSError:
-        return 0, 0
-    ok = sum(1 for s in last_status.values() if s == FileDoneStatus.OK)
-    err = sum(1 for s in last_status.values() if s == FileDoneStatus.ERROR)
-    return ok, err
 
 
 def check_model_reachable(run_dir: Path | None, result: dict) -> None:

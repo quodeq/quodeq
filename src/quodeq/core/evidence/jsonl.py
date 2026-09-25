@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from dataclasses import replace
 from pathlib import Path
 
 from quodeq.core.constants import FULL_CONFIDENCE
 from quodeq.core.evidence._options import EvidenceParseOptions, MalformedLineSink
-from quodeq.core.evidence.refs import enrich_judgment
+from quodeq.core.evidence.refs import enrich_judgment, resolve_llm_refs
+from quodeq.core.finding_builder import FindingSpec, build_finding_base
 from quodeq.core.finding_coercions import coerce_confidence, coerce_scope_downgrade
 from quodeq.core.events.models import DEFAULT_SEVERITY, Judgment
+from quodeq.core.types.finding import Finding
 from quodeq.core.types.finding_type import FINDING_TYPES
 from quodeq.core.types.req_ref import ReqRef
 from quodeq.core.utils.io import open_text
@@ -61,6 +64,41 @@ def parse_jsonl_line(
         carried_forward=bool(obj.get("carried_forward")),
     )
     return j, obj.get("refs")
+
+
+def build_finding_entry(
+    obj: dict, dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None,
+) -> Finding:
+    """Build a normalized finding from a raw JSON object."""
+    req = obj.get("req")
+    # Prefer MCP-enriched req_refs (already filtered to best-match);
+    # fall back to compiled-standards lookup + LLM ref selection.
+    pre_resolved = obj.get("req_refs")
+    if isinstance(pre_resolved, list) and pre_resolved:
+        req_refs = pre_resolved
+    else:
+        all_req_refs = req_refs_lookup.get(req) if req and req_refs_lookup else None
+        req_refs = resolve_llm_refs(obj.get("refs"), all_req_refs)
+    entry = build_finding_base(FindingSpec(
+        practice_id=obj["p"],
+        file=obj.get("file"),
+        line=obj.get("line"),
+        end_line=obj.get("end_line"),
+        title=obj.get("w"),
+        reason=obj.get("reason"),
+        snippet=obj.get("snippet"),
+        severity=obj.get("severity"),
+        cwe=obj.get("cwe"),
+        req=req,
+        req_refs=req_refs,
+        context=obj.get("context"),
+        scope=obj.get("scope"),
+        confidence=coerce_confidence(obj.get("confidence")),
+        provenance_downgrade=bool(obj.get("provenance_downgrade")),
+        scope_downgrade=coerce_scope_downgrade(obj.get("scope_downgrade")),
+        carried_forward=bool(obj.get("carried_forward")),
+    ))
+    return replace(entry, dimension=obj.get("d", dimension), violation_type=obj.get("vt"))
 
 
 def judgment_to_dict(j: Judgment) -> dict:
