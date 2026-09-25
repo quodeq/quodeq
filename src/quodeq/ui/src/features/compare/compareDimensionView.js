@@ -3,7 +3,7 @@
  * compareModel.js — see compareModel.js for the module-level docs.
  */
 import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
-import { roundScore1 } from './compareFormatters.js';
+import { roundOneDecimal } from '../../utils/rounding.js';
 import { CONSEQUENCE_LEVEL } from './compareFleet.js';
 import { SCORE_SCALE_MAX } from '../../constants.js';
 
@@ -49,7 +49,7 @@ export function buildDimensionAttention(view) {
       .sort((a, b) => a.score - b.score);
     if (by.length < 2) continue;
     const worst = by[0];
-    const gap = roundScore1(by[1].score - worst.score);
+    const gap = roundOneDecimal(by[1].score - worst.score);
     if (gap < OUTLIER_GAP_THRESHOLD && worst.score >= OUTLIER_FLOOR_SCORE) continue;
     items.push({
       kind: ATTENTION_KIND.OUTLIER,
@@ -186,10 +186,10 @@ export function buildDimensionView(dimensionKey, rows, now, summariesById) {
     avg: mean(standings.map((s) => s.score)),
     delta: (() => {
       const ds = standings.map((s) => s.delta).filter((d) => d != null);
-      return ds.length ? roundScore1(mean(ds)) : null;
+      return ds.length ? roundOneDecimal(mean(ds)) : null;
     })(),
     spread: lead && trail && lead !== trail
-      ? roundScore1(lead.score - trail.score)
+      ? roundOneDecimal(lead.score - trail.score)
       : null,
     lead,
     trail,

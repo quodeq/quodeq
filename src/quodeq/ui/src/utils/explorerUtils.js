@@ -11,7 +11,7 @@ export {
   buildSingleViolationPlanText,
 } from './planBuilder.js';
 import { KNOWN_SEVERITIES } from './constants.js';
-import { FULL_CONFIDENCE } from '../models/index.js';
+import { FULL_CONFIDENCE } from '../models/runRules.js';
 
 function normalizeSeverity(value) {
   const normalized = String(value || 'unknown').toLowerCase();

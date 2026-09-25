@@ -2,10 +2,11 @@
  * Head-to-head duel view builder for the Compare tab. Split out of
  * compareModel.js — see compareModel.js for the module-level docs.
  */
-import { sortedByDate, round1 } from './compareModel.js';
+import { sortedByDate } from './compareModel.js';
+import { roundOneDecimal } from '../../utils/rounding.js';
 import { ISO_DATE_LENGTH } from '../../utils/dailyGrouping.js';
 
-const gapOf = (x, y) => (x != null && y != null ? round1(x - y) : null);
+const gapOf = (x, y) => (x != null && y != null ? roundOneDecimal(x - y) : null);
 
 /**
  * Dimension union: a dimension only one side has still renders (gapless);

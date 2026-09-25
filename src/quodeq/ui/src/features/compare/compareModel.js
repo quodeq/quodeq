@@ -124,8 +124,6 @@ export function mean(values) {
   return xs.reduce((a, b) => a + b, 0) / xs.length;
 }
 
-export const round1 = roundOneDecimal;
-
 export {
   buildRow, consequenceOf, consequenceLevel, sortRows, buildFleet,
 } from './compareFleet.js';

@@ -2,6 +2,7 @@ import ParamSlider from './ParamSlider.jsx';
 import CurvePlot from './CurvePlot.jsx';
 import GradeBoundaryBar from './GradeBoundaryBar.jsx';
 import { t } from '../../strings/index.js';
+import { SCORE_SCALE_MAX } from '../../constants.js';
 
 // Bounds shared by the three severity-weight sliders below.
 const SEVERITY_WEIGHT_MIN = 0.05;
@@ -70,10 +71,10 @@ export function BoundariesTab({ draft, update }) {
       />
       <div style={{ marginTop: 14 }}>
         <span className="settings-label">{t('gradeFormula.severityFloors')}</span>
-        <ParamSlider label={t('gradeFormula.minorOnly')} value={draft.floorMinor} min={0} max={10} step={0.5}
+        <ParamSlider label={t('gradeFormula.minorOnly')} value={draft.floorMinor} min={0} max={SCORE_SCALE_MAX} step={0.5}
           hint={t('gradeFormula.hintFloorMinor')}
           onChange={(v) => update({ floorMinor: v })} />
-        <ParamSlider label={t('gradeFormula.floorMajor')} value={draft.floorMajor} min={0} max={10} step={0.5}
+        <ParamSlider label={t('gradeFormula.floorMajor')} value={draft.floorMajor} min={0} max={SCORE_SCALE_MAX} step={0.5}
           hint={t('gradeFormula.hintFloorMajor')}
           onChange={(v) => update({ floorMajor: v })} />
         <span className="settings-description">{t('gradeFormula.criticalNoFloor')}</span>

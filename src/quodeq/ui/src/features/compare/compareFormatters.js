@@ -11,15 +11,10 @@ export const MIN_BAR_HEIGHT_PCT = 15;
 
 // 0-10 score to bar height/width in percent (a full 10 score fills the bar).
 // Shared by every principle/standing/duel bar so they all scale the same way.
-export const SCORE_TO_PCT = PERCENT / SCORE_SCALE_MAX; // score (0-SCORE_SCALE_MAX) to percent
-
-// Scores are compared and shown at one decimal throughout the tab; rounding
-// in one place keeps a computed gap agreeing with the numbers it was derived
-// from.
-export const roundScore1 = roundOneDecimal;
+export const SCORE_TO_PCT = PERCENT / SCORE_SCALE_MAX;
 
 export const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
-export const score1 = (s) => (s == null ? '—' : roundScore1(s).toFixed(1));
+export const score1 = (s) => (s == null ? '—' : roundOneDecimal(s).toFixed(1));
 export const signed1 = (g) => (g == null ? '—' : (g > 0 ? `+${g.toFixed(1)}` : g.toFixed(1)));
 
 // Short labels: the dimension tab bar and the matrix column headers speak
