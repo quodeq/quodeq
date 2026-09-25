@@ -7,6 +7,7 @@ finished run's grades.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from pathlib import Path
 from typing import Callable
@@ -17,6 +18,7 @@ from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetc
 from quodeq.shared.validation import validate_path_segment
 
 _Fetcher = Callable[[str], list[DimensionResult]]
+_logger = logging.getLogger(__name__)
 
 
 def make_scalar_trend_fetcher(
@@ -29,10 +31,14 @@ def make_scalar_trend_fetcher(
     one request reads an in-progress run once and the next request re-reads it.
     """
     def read_scalars_only(rr: Path, proj: str, run_id: str) -> list[DimensionResult]:
-        return [
-            replace(d, violations=[], compliance=[])
-            for d in read_scalars(rr, proj, run_id)
-        ]
+        # Same tolerance as the cached path's disk read: a run that cannot be
+        # read is skipped, never a failed request.
+        try:
+            dims = read_scalars(rr, proj, run_id)
+        except (OSError, ValueError, KeyError) as exc:
+            _logger.warning("Failed to read run scalars for %s/%s: %s", proj, run_id, exc)
+            return []
+        return [replace(d, violations=[], compliance=[]) for d in dims]
 
     cache = shared_trend_scalar_cache()
     ctx = DimensionCacheContext(

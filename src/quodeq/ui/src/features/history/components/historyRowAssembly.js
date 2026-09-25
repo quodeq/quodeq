@@ -8,10 +8,8 @@
 
 import { RUN_STATE } from '../../../vocab/runState.js';
 
-// Only outright failures are hidden. Cancelled runs may still have written
-// per-dim evaluation files (the dashboard's overview reads them and shows
-// scores), so hiding them here would create a confusing mismatch where the
-// overview shows scores from a run that history claims doesn't exist.
+// Only outright failures are hidden. A cancelled run that scored something
+// is listed from `partialRuns` with its own values (see assembleHistoryRows).
 export const HIDDEN_STATUSES = new Set([RUN_STATE.FAILED]);
 export const PARTIAL_STATUSES = new Set([RUN_STATE.CANCELLED]);
 
@@ -24,32 +22,20 @@ function buildInProgressStubs(availableRuns, trendIds) {
     .map((r) => ({ runId: r.runId, dateLabel: r.dateLabel, dateISO: null, status: RUN_STATE.RUNNING, hasScoredDims: false }));
 }
 
-function buildCancelledStubs(availableRuns, trendIds) {
-  // Cancelled runs are stripped from `trend` server-side (they're not chart
-  // points), but their kept-findings scores still drive the Overview when no
-  // complete run exists. Surface them as partial, dated rows so History and
-  // the Overview agree instead of showing scores over an empty table.
-  return (availableRuns || [])
-    .filter((r) => r.status === RUN_STATE.CANCELLED && !trendIds.has(r.runId))
-    .map((r) => ({
-      runId: r.runId, dateLabel: r.dateLabel, dateISO: r.dateISO ?? null,
-      status: RUN_STATE.CANCELLED, hasScoredDims: true,
-    }));
-}
-
 /**
  * Ordered rows for the History table: in-progress runs on top (running now),
- * then cancelled partial rows interleaved with the (already newest-first)
- * trend by date. Cancelled runs are absent from `trend`, so without this a
- * project whose only runs are cancelled shows an empty History while the
- * Overview shows their scores.
+ * then the trend and the partial runs interleaved by date, newest first.
+ *
+ * `partialRuns` are the cancelled runs that scored at least one dimension,
+ * with the run's own grade and score (the server keeps them out of `trend`,
+ * so they are never chart points and never move an accumulated number). A
+ * cancelled run with nothing scored has no row: there is nothing to open.
  */
-export function assembleHistoryRows(availableRuns, trend) {
-  // Both stub builders skip runs the trend already lists; build the id set once.
+export function assembleHistoryRows(availableRuns, trend, partialRuns = []) {
   const trendIds = new Set((trend || []).map((e) => e.runId));
   const inProgress = buildInProgressStubs(availableRuns, trendIds);
-  const cancelled = buildCancelledStubs(availableRuns, trendIds);
-  const dated = [...cancelled, ...(trend || [])].sort(
+  const partial = (partialRuns || []).filter((e) => !trendIds.has(e.runId));
+  const dated = [...partial, ...(trend || [])].sort(
     (a, b) => (b.dateISO || '').localeCompare(a.dateISO || ''),
   );
   return [...inProgress, ...dated];
@@ -58,12 +44,13 @@ export function assembleHistoryRows(availableRuns, trend) {
 /**
  * Assembled rows minus hidden (failed) runs — the rows the table actually
  * shows. The "no evaluations yet" guard checks this (not just `trend`), so
- * a project whose only runs are cancelled still populates History instead
- * of short-circuiting to empty while the Overview shows their scores.
+ * a project whose only runs are cancelled still populates History from its
+ * partial runs instead of short-circuiting to empty while the Overview
+ * shows their scores.
  */
-export function visibleHistoryRows(availableRuns, trend) {
+export function visibleHistoryRows(availableRuns, trend, partialRuns = []) {
   const statusById = new Map((availableRuns || []).map((r) => [r.runId, r.status]));
-  return assembleHistoryRows(availableRuns, trend).filter(
+  return assembleHistoryRows(availableRuns, trend, partialRuns).filter(
     (r) => !HIDDEN_STATUSES.has(statusById.get(r.runId) ?? r.status),
   );
 }

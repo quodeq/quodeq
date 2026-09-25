@@ -2,34 +2,43 @@ import { describe, it, expect } from 'vitest';
 import { assembleHistoryRows, visibleHistoryRows } from './HistoryPage.jsx';
 
 // Cancelled runs are stripped from `trend` server-side (they're not chart
-// points), but the Overview still shows their kept-findings scores when no
-// complete run exists. History must therefore surface them too, or an
-// all-cancelled project shows Overview scores over an empty History table.
+// points). The ones that scored a dimension arrive as `partialRuns`, with the
+// run's own grade and score, and History lists them between the trend rows.
+// A cancelled run with nothing scored has no row.
 describe('assembleHistoryRows', () => {
-  it('surfaces a cancelled run (absent from trend) as a partial, dated row', () => {
-    const availableRuns = [
-      { runId: 'r-cancelled', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z', dateLabel: '2 May 2026' },
-    ];
-    const rows = assembleHistoryRows(availableRuns, []);
+  const partial = { runId: 'r-cancelled', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z', dateLabel: '2 May 2026', runNumericAverage: 6.5, runOverallGrade: 'Adequate', dimensionsCount: 1, numericAverage: null };
+
+  it('lists a partial run with its own values', () => {
+    const availableRuns = [{ runId: 'r-cancelled', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z' }];
+    const rows = assembleHistoryRows(availableRuns, [], [partial]);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      runId: 'r-cancelled', status: 'cancelled', hasScoredDims: true,
-      dateISO: '2026-05-02T10:00:00Z',
-    });
+    expect(rows[0]).toMatchObject({ runId: 'r-cancelled', status: 'cancelled', runNumericAverage: 6.5, numericAverage: null });
   });
 
-  it('interleaves cancelled runs with trend rows by date, newest first', () => {
+  it('gives a cancelled run with nothing scored no row', () => {
+    const availableRuns = [{ runId: 'r-nothing', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z' }];
+    expect(assembleHistoryRows(availableRuns, [], [])).toEqual([]);
+  });
+
+  it('interleaves partial runs with trend rows by date, newest first', () => {
     const trend = [
       { runId: 't-new', status: 'done', dateISO: '2026-05-03T10:00:00Z', numericAverage: 9 },
       { runId: 't-old', status: 'done', dateISO: '2026-05-01T10:00:00Z', numericAverage: 7 },
     ];
     const availableRuns = [
       { runId: 't-new', status: 'done', dateISO: '2026-05-03T10:00:00Z' },
-      { runId: 'r-cancelled', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z', dateLabel: '2 May' },
+      { runId: 'r-cancelled', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z' },
       { runId: 't-old', status: 'done', dateISO: '2026-05-01T10:00:00Z' },
     ];
-    const rows = assembleHistoryRows(availableRuns, trend);
+    const rows = assembleHistoryRows(availableRuns, trend, [partial]);
     expect(rows.map((r) => r.runId)).toEqual(['t-new', 'r-cancelled', 't-old']);
+  });
+
+  it('does not list a partial run the trend already carries', () => {
+    const trend = [{ runId: 'r-cancelled', status: 'done', dateISO: '2026-05-02T10:00:00Z', numericAverage: 8 }];
+    const rows = assembleHistoryRows([], trend, [partial]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].numericAverage).toBe(8);
   });
 
   it('keeps in-progress runs on top and does not duplicate trend runs', () => {
@@ -45,14 +54,18 @@ describe('assembleHistoryRows', () => {
 });
 
 describe('visibleHistoryRows', () => {
-  it('surfaces cancelled runs even when trend is empty (all-cancelled project)', () => {
-    // The empty-trend "no evaluations yet" guard must not hide cancelled
-    // runs whose scores the Overview shows.
+  it('lists an all-cancelled project from its partial runs', () => {
+    // The empty-trend "no evaluations yet" guard must not hide runs whose
+    // scores the Overview shows.
     const availableRuns = [
-      { runId: 'c1', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z', dateLabel: '2 May' },
-      { runId: 'c2', status: 'cancelled', dateISO: '2026-05-01T10:00:00Z', dateLabel: '1 May' },
+      { runId: 'c1', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z' },
+      { runId: 'c2', status: 'cancelled', dateISO: '2026-05-01T10:00:00Z' },
     ];
-    const rows = visibleHistoryRows(availableRuns, []);
+    const partialRuns = [
+      { runId: 'c1', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z', runNumericAverage: 6 },
+      { runId: 'c2', status: 'cancelled', dateISO: '2026-05-01T10:00:00Z', runNumericAverage: 5 },
+    ];
+    const rows = visibleHistoryRows(availableRuns, [], partialRuns);
     expect(rows.map((r) => r.runId)).toEqual(['c1', 'c2']);
   });
 
