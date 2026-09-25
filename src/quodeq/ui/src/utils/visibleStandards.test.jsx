@@ -251,3 +251,33 @@ it('does not fire the migration PUT for a project the user has left', async () =
 
   expect(putStandardsVisibility).not.toHaveBeenCalled();
 });
+
+it('two injected storages keep separate write generations -- a write to one never supersedes an in-flight hydrate for the other', async () => {
+  // The write generation used to be one module-global counter shared by every
+  // caller. A write to storage A would bump it and wrongly make an unrelated,
+  // still in-flight hydrate for storage B look "superseded", discarding B's
+  // legitimate GET response even though nothing about B changed. Production
+  // has one localStorage, so this never showed up there -- it only bites when
+  // tests (or anything else) inject more than one storage.
+  const storageA = fakeStorage();
+  const storageB = fakeStorage();
+
+  let resolveGetB;
+  const getBPromise = new Promise((resolve) => { resolveGetB = resolve; });
+  getStandardsVisibility.mockImplementation((projectId) => (
+    projectId === 'B' ? getBPromise : Promise.resolve({ visibleStandardIds: ['x'], isDefault: false })
+  ));
+
+  // Start B's hydrate; it's slow (GET still pending).
+  const hydrateB = hydrateVisibleStandardIds('B', { storage: storageB, isStale: () => false });
+
+  // An unrelated write lands on storage A while B is still in flight.
+  writeVisibleStandardIds(['unrelated'], storageA);
+
+  // B's GET now resolves.
+  resolveGetB({ visibleStandardIds: ['reliability'], isDefault: false });
+  const idsForB = await hydrateB;
+
+  expect(idsForB).toEqual(['reliability']);
+  expect(JSON.parse(storageB._map[VISIBLE_STANDARDS_STORAGE_KEY])).toEqual(['reliability']);
+});

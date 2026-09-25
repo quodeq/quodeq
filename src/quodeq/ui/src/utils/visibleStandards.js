@@ -40,23 +40,30 @@ export function readVisibleStandardIds(storage = localStorage) {
 // already landed a newer value, and this response is discarded instead of
 // clobbering it.
 //
-// The counter is module state: each call compares against its own sample
-// rather than an absolute value, and every caller awaits its in-flight
-// hydrate before the next one starts. A promise left dangling across a test
-// boundary would otherwise trip a later call's check, so `resetWriteGeneration`
-// below exists as the structural escape hatch that note used to only ask for.
-let writeGeneration = 0;
+// Keyed per Storage (WeakMap<Storage, number>) rather than one module-global
+// number: production has exactly one localStorage, so this is identical
+// there, but a write to one injected test storage must never supersede an
+// in-flight hydrate for a different storage. Every caller awaits its
+// in-flight hydrate before the next one starts. A promise left dangling
+// across a test boundary would otherwise trip a later call's check, so
+// `resetWriteGeneration` below exists as the structural escape hatch that
+// note used to only ask for.
+let writeGenerations = new WeakMap();
 
-/** Reset the write generation. Test-isolation hook; returns the new value. */
+function generationFor(storage) {
+  return writeGenerations.get(storage) || 0;
+}
+
+/** Reset every storage's write generation. Test-isolation hook; returns the new value. */
 export function resetWriteGeneration() {
-  writeGeneration = 0;
-  return writeGeneration;
+  writeGenerations = new WeakMap();
+  return 0;
 }
 
 /** Write the selection to the local cache. The server is the source of truth. */
 export function writeVisibleStandardIds(ids, storage = localStorage) {
   storage.setItem(VISIBLE_STANDARDS_STORAGE_KEY, JSON.stringify(ids));
-  writeGeneration += 1;
+  writeGenerations.set(storage, generationFor(storage) + 1);
   // Same-tab consumers (the Evaluate picker) read this cache synchronously
   // and only on mount; tell them it moved.
   notifyStandardsChanged(STANDARDS_CHANGED_REASON.VISIBILITY);
@@ -97,8 +104,8 @@ export function writeVisibleStandardIds(ids, storage = localStorage) {
  */
 export async function hydrateVisibleStandardIds(projectId, { storage = localStorage, isStale } = {}) {
   if (!projectId) return readVisibleStandardIds(storage);
-  const generationAtStart = writeGeneration;
-  const supersededByNewerWrite = () => isStale?.() || writeGeneration !== generationAtStart;
+  const generationAtStart = generationFor(storage);
+  const supersededByNewerWrite = () => isStale?.() || generationFor(storage) !== generationAtStart;
   try {
     const { visibleStandardIds, isDefault, defaultStandardIds } = await getStandardsVisibility(projectId);
     if (supersededByNewerWrite()) return readVisibleStandardIds(storage);

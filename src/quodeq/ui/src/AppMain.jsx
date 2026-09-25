@@ -95,6 +95,7 @@ function AppTopBar({ shell }) {
       {...buildTopBarProps({
         resolvedDisplayName,
         serverConnected: state.serverConnected,
+        serverUrl: typeof window !== 'undefined' ? window.location.origin : null,
         sidebarProvider,
         sidebarModel,
         selectedSource: state.selectedSource,
