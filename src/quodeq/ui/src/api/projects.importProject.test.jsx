@@ -72,9 +72,31 @@ describe('importProject', () => {
     expect(caught.projectName).toBe('demo');
   });
 
-  it('synthesises a message when the envelope carries none', async () => {
+  it('falls back to "importProject failed (status)" — the pre-request() text — when the envelope carries no error field', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })));
     const { importProject } = await import('./projects.js');
-    await expect(importProject(new Blob(['x']))).rejects.toThrow();
+    let caught;
+    try {
+      await importProject(new Blob(['x']));
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.message).toBe('importProject failed (500)');
+    expect(caught.status).toBe(500);
+  });
+
+  it('keeps the backend error text (not the per-route fallback) when the envelope carries one', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'not a zip file', code: 'BAD_ZIP' }),
+    })));
+    const { importProject } = await import('./projects.js');
+    await expect(importProject(new Blob(['x']))).rejects.toMatchObject({
+      message: 'not a zip file',
+      status: 400,
+      code: 'BAD_ZIP',
+    });
   });
 });

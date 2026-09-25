@@ -92,6 +92,32 @@ describe('registerProject', () => {
     global.fetch.mockRejectedValue(timeoutErr);
     await expect(registerProject({ repo: '/tmp/repo' })).rejects.toThrow(/timed out/i);
   });
+
+  it('falls back to "registerProject failed (status)" — the pre-request() text — when the envelope carries no error field', async () => {
+    global.fetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+    let caught;
+    try {
+      await registerProject({ repo: '/tmp/repo' });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.message).toBe('registerProject failed (500)');
+    expect(caught.status).toBe(500);
+  });
+
+  it('keeps the backend error text (not the per-route fallback) when the envelope carries one', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'cloneDest is required', code: 'MISSING_CLONE_DEST' }),
+    });
+    await expect(registerProject({ repo: 'https://x/y.git' })).rejects.toMatchObject({
+      message: 'cloneDest is required',
+      status: 400,
+      code: 'MISSING_CLONE_DEST',
+    });
+  });
 });
 
 describe('getLlamacppLogAvailable', () => {

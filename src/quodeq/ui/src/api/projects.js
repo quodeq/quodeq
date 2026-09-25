@@ -125,6 +125,19 @@ export function scanPath(dirPath) {
 // Standards and findings APIs live in their own modules (see api/index.js).
 
 /**
+ * request()'s generic `Request failed: ${status}` fallback replaces each
+ * route's own wording when the envelope carries no `error` field. Restore
+ * the exact pre-request() text for that one case, in place, so callers that
+ * read err.message (e.g. via apiErrorMessage's fallback) see the same
+ * string as before the move onto request().
+ */
+function restoreFallbackMessage(err, label) {
+  if (err?.status !== undefined && !err?.body?.error) {
+    err.message = `${label} failed (${err.status})`;
+  }
+}
+
+/**
  * Import a previously-exported project zip.
  *
  * Sends multipart/form-data (request() skips the JSON Content-Type for a
@@ -148,6 +161,7 @@ export async function importProject(file, opts = {}) {
     if (e?.body?.kind) e.kind = e.body.kind;
     if (e?.body?.existingProjectId) e.existingProjectId = e.body.existingProjectId;
     if (e?.body?.projectName) e.projectName = e.body.projectName;
+    restoreFallbackMessage(e, 'importProject');
     throw e;
   }
 }
@@ -172,6 +186,7 @@ export async function registerProject(payload) {
       throw new Error('Project registration timed out. The server may be unresponsive or the clone is taking too long; try again.');
     }
     if (e?.body?.existingProjectId) e.existingProjectId = e.body.existingProjectId;
+    restoreFallbackMessage(e, 'registerProject');
     throw e;
   }
 }
