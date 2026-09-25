@@ -11,9 +11,7 @@ from quodeq.analysis._dim_order import DimEstimates, order_by_backlog
 from quodeq.analysis._analysis_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loop_state import DimTransition, run_dir_for, safe_write_dim_state
 from quodeq.analysis._loop_steps import default_loop_deps
-from quodeq.analysis._pipeline_setup import (
-    set_run_deadline, warn_if_local_api_oversubscribed,
-)
+from quodeq.analysis._pipeline_setup import set_run_deadline, warn_if_local_api_oversubscribed
 from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.cache.gc import ensure_cache_ready

@@ -17,8 +17,7 @@ from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.frame_type import FrameType
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.config.provider import ProviderType
-from quodeq.assistant.guard import (
-    MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
+from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS
 from quodeq.assistant.message_role import MessageRole
 from quodeq.assistant.skills import cached_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
