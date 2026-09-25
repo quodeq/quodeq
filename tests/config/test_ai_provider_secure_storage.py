@@ -32,11 +32,7 @@ class TestStoreApiKeySecure:
         assert calls["args"] == ("quodeq", "claude", "sk-secret")
         assert not paths.env_file.exists()
 
-    def test_keyring_error_falls_back_to_cleartext(self, paths, monkeypatch):
-        def raise_keyring_error(service, provider, key):
-            raise keyring.errors.KeyringError("no backend available")
-
-        monkeypatch.setattr(ai_provider.keyring, "set_password", raise_keyring_error)
+    def test_keyring_error_falls_back_to_cleartext(self, paths, no_keyring):
         result = store_api_key_secure("claude", "sk-fallback")
 
         assert result is True
@@ -54,20 +50,16 @@ class TestStoreApiKeySecure:
         assert result is True
         assert "export OPENROUTER_API_KEY=sk-fallback2" in paths.env_file.read_text()
 
-    def test_both_paths_failing_returns_false(self, paths, monkeypatch):
-        def raise_keyring_error(service, provider, key):
-            raise keyring.errors.KeyringError("no backend")
-
+    def test_both_paths_failing_returns_false(self, paths, no_keyring, monkeypatch):
         def raise_write_error(*args, **kwargs):
             raise OSError("disk full")
 
-        monkeypatch.setattr(ai_provider.keyring, "set_password", raise_keyring_error)
         monkeypatch.setattr(ai_provider, "_write_env", raise_write_error)
         result = store_api_key_secure("claude", "sk-doomed")
 
         assert result is False
 
-    def test_out_of_scope_error_propagates(self, paths, monkeypatch):
+    def test_out_of_scope_error_propagates(self, paths, no_keyring, monkeypatch):
         """The cleartext-fallback except was narrowed
         from bare `Exception` to `(OSError, ValueError)` (R-FT-7) — the realistic
         surface of `_write_env`/`_ensure_gitignore`'s file I/O plus
@@ -75,23 +67,15 @@ class TestStoreApiKeySecure:
         `test_provider_without_an_api_key_var_is_rejected_cleanly` below).
         Anything else (e.g. a programming bug raising TypeError) must now
         propagate instead of being silently swallowed."""
-        def raise_keyring_error(service, provider, key):
-            raise keyring.errors.KeyringError("no backend")
-
         def raise_type_error(*args, **kwargs):
             raise TypeError("not an I/O or validation failure")
 
-        monkeypatch.setattr(ai_provider.keyring, "set_password", raise_keyring_error)
         monkeypatch.setattr(ai_provider, "_write_env", raise_type_error)
 
         with pytest.raises(TypeError):
             store_api_key_secure("claude", "sk-doomed")
 
-    def test_unknown_provider_derives_env_var_name(self, paths, monkeypatch):
-        def raise_keyring_error(service, provider, key):
-            raise keyring.errors.KeyringError("no backend")
-
-        monkeypatch.setattr(ai_provider.keyring, "set_password", raise_keyring_error)
+    def test_unknown_provider_derives_env_var_name(self, paths, no_keyring):
         result = store_api_key_secure("mystery-provider", "sk-mystery")
 
         assert result is True
@@ -221,11 +205,7 @@ class TestGetApiKeySecure:
         monkeypatch.setattr(ai_provider.keyring, "get_password", lambda service, provider: "sk-from-keyring")
         assert get_api_key_secure("claude") == "sk-from-keyring"
 
-    def test_keyring_error_falls_back_to_cleartext_file(self, paths, monkeypatch):
-        def raise_keyring_error(service, provider):
-            raise keyring.errors.KeyringError("no backend")
-
-        monkeypatch.setattr(ai_provider.keyring, "get_password", raise_keyring_error)
+    def test_keyring_error_falls_back_to_cleartext_file(self, paths, no_keyring):
         ai_provider._write_env(paths, "claude", "ANTHROPIC_API_KEY", "sk-cleartext")
 
         assert get_api_key_secure("claude") == "sk-cleartext"
@@ -247,17 +227,8 @@ class TestGetApiKeySecure:
 
 
 class TestRoundTrip:
-    def test_store_then_get_via_cleartext_fallback(self, paths, monkeypatch):
+    def test_store_then_get_via_cleartext_fallback(self, paths, no_keyring):
         """The keyring-failure fallback path, exercised end-to-end."""
-        def raise_keyring_error_set(service, provider, key):
-            raise keyring.errors.KeyringError("no backend")
-
-        def raise_keyring_error_get(service, provider):
-            raise keyring.errors.KeyringError("no backend")
-
-        monkeypatch.setattr(ai_provider.keyring, "set_password", raise_keyring_error_set)
-        monkeypatch.setattr(ai_provider.keyring, "get_password", raise_keyring_error_get)
-
         assert store_api_key_secure("gemini", "sk-roundtrip") is True
         assert get_api_key_secure("gemini") == "sk-roundtrip"
 

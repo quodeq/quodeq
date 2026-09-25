@@ -13,23 +13,24 @@ the prior entries the user wanted refreshed were still hits, producing the
 surprising "instant complete" behaviour.
 
 Shared scaffolding (including the _setup_cache_with_hits/_callbacks
-helpers that keep these tests short) lives in
+helpers and the fake-dispatcher builders _build_evidence/_write_dispatch_result
+that keep these tests short) lives in
 tests/analysis/cache/_clean_scan_honor_fixtures.py.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from quodeq.analysis.cache import CacheEntry, LocalFileBackend, build_cache_key_for_file
 from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
-from quodeq.core.evidence.model import Evidence
 
 from tests.analysis.cache._clean_scan_honor_fixtures import (  # noqa: F401 -- cache is a pytest fixture
+    _build_evidence,
     _callbacks,
     _make_ctx,
     _setup,
     _setup_cache_with_hits,
+    _write_dispatch_result,
     cache,
 )
 
@@ -47,20 +48,9 @@ class TestDispatchBypassesCacheOnCleanScan:
         def fake_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
             files = sorted(cfg.options.incremental_file_filter or set())
             dispatched_files.extend(files)
-            jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
-            jsonl.parent.mkdir(parents=True, exist_ok=True)
-            with jsonl.open("a") as out:
-                for f in files:
-                    out.write(json.dumps({
-                        "file": f, "line": 1, "t": "violation", "w": f"fresh-{f}",
-                    }) + "\n")
-                    out.write(json.dumps({
-                        "_marker": "file_done", "file": f, "status": "ok",
-                    }) + "\n")
-            return Evidence(
-                repository="", language="python", date="2026-01-01",
-                source_file_count=len(files), files_read=len(files),
-                coverage_pct=100.0, principles={},
+            _write_dispatch_result(cfg, dim_id, [(f, f"fresh-{f}") for f in files])
+            return _build_evidence(
+                source_file_count=len(files), files_read=len(files), coverage_pct=100.0,
             )
 
         process_dimension_with_cache(
@@ -86,20 +76,8 @@ class TestDispatchBypassesCacheOnCleanScan:
         ))
 
         def fake_dispatcher(cfg, dim_id, idx, ctx, callbacks, **_):
-            jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
-            jsonl.parent.mkdir(parents=True, exist_ok=True)
-            with jsonl.open("a") as out:
-                out.write(json.dumps({
-                    "file": "a.py", "line": 1, "t": "violation", "w": "fresh",
-                }) + "\n")
-                out.write(json.dumps({
-                    "_marker": "file_done", "file": "a.py", "status": "ok",
-                }) + "\n")
-            return Evidence(
-                repository="", language="python", date="2026-01-01",
-                source_file_count=1, files_read=1, coverage_pct=100.0,
-                principles={},
-            )
+            _write_dispatch_result(cfg, dim_id, [("a.py", "fresh")])
+            return _build_evidence(source_file_count=1, files_read=1, coverage_pct=100.0)
 
         process_dimension_with_cache(
             config, "security", 1, _make_ctx(),
@@ -128,17 +106,10 @@ class TestCleanScanInvalidates:
             assert cache.get(build_cache_key_for_file(config, f, "security")) is not None
 
         def fake_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
-            jsonl = (cfg.work_dir or cfg.src) / f"{dim_id}_evidence.jsonl"
-            jsonl.parent.mkdir(parents=True, exist_ok=True)
             # Worker emits a marker for a.py only -- b.py is "abandoned"
             # mid-flight (simulating a cancel after a finished).
-            with jsonl.open("w") as out:
-                out.write(json.dumps({"file": "a.py", "line": 1, "t": "violation", "w": "fresh-a"}) + "\n")
-                out.write(json.dumps({"_marker": "file_done", "file": "a.py", "status": "ok"}) + "\n")
-            return Evidence(
-                repository="", language="python", date="2026-01-01",
-                source_file_count=2, files_read=1, coverage_pct=50.0, principles={},
-            )
+            _write_dispatch_result(cfg, dim_id, [("a.py", "fresh-a")], mode="w")
+            return _build_evidence(source_file_count=2, files_read=1, coverage_pct=50.0)
 
         process_dimension_with_cache(
             config, "security", 1, _make_ctx(),
@@ -174,10 +145,7 @@ class TestCleanScanInvalidates:
         assert entry_before is not None
 
         def noop_dispatch(cfg, dim_id, idx, ctx, callbacks, **_):
-            return Evidence(
-                repository="", language="python", date="2026-01-01",
-                source_file_count=1, files_read=1, coverage_pct=100.0, principles={},
-            )
+            return _build_evidence(source_file_count=1, files_read=1, coverage_pct=100.0)
 
         process_dimension_with_cache(
             config, "security", 1, _make_ctx(),

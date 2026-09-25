@@ -36,9 +36,8 @@ def api_config():
     )
 
 
-@pytest.fixture
-def api_provider(monkeypatch) -> DispatchPolicy:
-    """A literal API-type DispatchPolicy.
+def _dispatch_policy(monkeypatch, provider_type: str) -> DispatchPolicy:
+    """Build a literal-provider DispatchPolicy for the given provider type.
 
     ``default_dispatch_policy()`` (the factory every un-injected caller —
     ``RunConfig.dispatch_policy()``, the queue worker without a RunConfig —
@@ -47,7 +46,7 @@ def api_provider(monkeypatch) -> DispatchPolicy:
     patching ``default_dispatch_policy`` itself, reaches every caller
     regardless of which module imported the factory by name.
     """
-    configs = {_TEST_PROVIDER: {"type": "api"}}
+    configs = {_TEST_PROVIDER: {"type": provider_type}}
     monkeypatch.setenv("QUODEQ_MAX_API_FILE_SIZE", str(CAP))
     monkeypatch.setenv("AI_CMD", _TEST_PROVIDER)
     monkeypatch.setattr("quodeq.analysis.dispatch_policy.get_provider_configs", lambda: configs)
@@ -55,10 +54,12 @@ def api_provider(monkeypatch) -> DispatchPolicy:
 
 
 @pytest.fixture
+def api_provider(monkeypatch) -> DispatchPolicy:
+    """A literal API-type DispatchPolicy."""
+    return _dispatch_policy(monkeypatch, "api")
+
+
+@pytest.fixture
 def cli_provider(monkeypatch) -> DispatchPolicy:
     """A literal CLI-type DispatchPolicy. See :func:`api_provider`."""
-    configs = {_TEST_PROVIDER: {"type": "cli"}}
-    monkeypatch.setenv("QUODEQ_MAX_API_FILE_SIZE", str(CAP))
-    monkeypatch.setenv("AI_CMD", _TEST_PROVIDER)
-    monkeypatch.setattr("quodeq.analysis.dispatch_policy.get_provider_configs", lambda: configs)
-    return DispatchPolicy(provider_configs=configs, ai_cmd=_TEST_PROVIDER, file_size_cap=CAP)
+    return _dispatch_policy(monkeypatch, "cli")

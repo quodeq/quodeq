@@ -19,14 +19,14 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.core.events.models import Judgment
 from quodeq.core.scoring.params import DEFAULT_PARAMS
 from quodeq.data.fs.report_parser.runs import read_run_data
-from quodeq.data.projection.grade_projector import recompute_grades
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 from quodeq.services import grade_formula
 from quodeq.services.dashboard import clear_shared_dimension_cache
 from quodeq.services.scoring import get_project_scores
+
+from tests.services.conftest import _seed_security_findings
 
 # A formula whose severity weights differ sharply from the default so the
 # baked-with-custom-params grade is provably different from the default one.
@@ -68,24 +68,7 @@ def _build_event_log_run(
     (run_dir / "events.jsonl").write_text("")  # event-log marker
 
     store = SQLiteStateStore(run_dir)
-    for i in range(6):
-        store.record_finding(Judgment(
-            practice_id="p1", dimension="security", req=f"req{i}",
-            verdict="violation", severity="major", file=f"f{i}.py", line=1,
-            title=f"t{i}", reason=f"r{i}",
-        ))
-    for i in range(8):
-        store.record_finding(Judgment(
-            practice_id="p1", dimension="security", req=f"c{i}",
-            verdict="compliance", severity="minor", file=f"g{i}.py", line=1,
-            title=f"ct{i}", reason=f"cr{i}",
-        ))
-    # Mark the (empty) event log as fully projected so ensure_projected is a
-    # no-op and won't wipe the grades we bake below.
-    store.save_projected_size((run_dir / "events.jsonl").stat().st_size)
-
-    # Bake default-params grades — this is the "eval-time" baseline.
-    recompute_grades(run_dir, params=DEFAULT_PARAMS)
+    _seed_security_findings(store, run_dir)
 
     # An eval JSON per dimension, carrying the default-params (stale) grade so
     # read_run_data has a dimension to overlay onto.
