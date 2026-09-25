@@ -30,19 +30,47 @@ pulls in a much larger dependency tree -- jsonschema included -- that does
 its own legitimate file reads at import, which a blanket Path.read_text
 patch can't tell apart from the one this task cares about); subprocess.py's
 shim is instead pinned by value equality below.
+
+test_diag_old_name_matches_diag_stream calls diag_stream() for real (the
+only test here that gets past a patched mkdir/open), so it really appends
+to the webview diag log -- a child process inherits the real HOME by
+default, and conftest's _isolate_quodeq_home fixture only covers QUODEQ_*
+env vars, not HOME/USERPROFILE (diag deliberately keeps the hardcoded
+Path.home() / ".quodeq" / "run" path, not the QUODEQ_RUN_DIR-aware one).
+_run_fresh_interpreter takes an env override; that one test passes
+_home_isolated_env(tmp_path) so it appends to a log under tmp_path instead
+of the developer's or CI runner's real ~/.quodeq/run/webview_debug.log.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+from pathlib import Path
 
 
-def _run_fresh_interpreter(script: str) -> subprocess.CompletedProcess:
+def _run_fresh_interpreter(script: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     """Run *script* in a brand-new interpreter -- a genuinely fresh import,
-    unlike importlib.reload (see module docstring)."""
+    unlike importlib.reload (see module docstring).
+
+    *env* defaults to the real process environment (subprocess.run's own
+    default). Pass an isolated one for any script that can reach
+    Path.home() for real, so it never touches the developer's or CI
+    runner's actual home directory."""
     return subprocess.run(
-        [sys.executable, "-c", script], capture_output=True, text=True, check=False,
+        [sys.executable, "-c", script], capture_output=True, text=True, check=False, env=env,
     )
+
+
+def _home_isolated_env(home: Path) -> dict[str, str]:
+    """A copy of the real environment with *home* substituted for the home
+    directory on every platform Path.home() reads it from.
+
+    USERPROFILE takes precedence over HOMEDRIVE+HOMEPATH in Python's own
+    expanduser() on Windows, so setting it is sufficient there; HOME covers
+    POSIX. Matches the repo's existing convention (for example
+    tests/services/test_tooling_mixin_browse.py's browse_tree fixture)."""
+    return {**os.environ, "HOME": str(home), "USERPROFILE": str(home)}
 
 
 class TestSkipDirsLazyImport:
@@ -94,12 +122,17 @@ class TestDiagStreamLazyImport:
         assert result.returncode == 0, result.stdout + result.stderr
         assert "OK" in result.stdout
 
-    def test_diag_old_name_matches_diag_stream(self):
+    def test_diag_old_name_matches_diag_stream(self, tmp_path):
+        """Calls diag_stream() for real (unlike the test above, which never
+        gets past the patched mkdir/open), so it really appends to
+        ~/.quodeq/run/webview_debug.log -- isolate HOME/USERPROFILE at
+        tmp_path first so it never touches the real one."""
         script = (
             "import quodeq.dashboard._webview_diag as mod\n"
             "assert mod.diag is mod.diag_stream(), (mod.diag, mod.diag_stream())\n"
             "print('OK')\n"
         )
-        result = _run_fresh_interpreter(script)
+        result = _run_fresh_interpreter(script, env=_home_isolated_env(tmp_path))
         assert result.returncode == 0, result.stdout + result.stderr
         assert "OK" in result.stdout
+        assert (tmp_path / ".quodeq" / "run" / "webview_debug.log").exists()
