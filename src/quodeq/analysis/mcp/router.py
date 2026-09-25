@@ -158,7 +158,15 @@ class FindingsRouter:
         self.counter += 1
 
     def _emit_event(self, finding: dict) -> None:
-        """Emit a JudgmentCreatedEvent to the event log. Never raises."""
+        """Emit a JudgmentCreatedEvent to the event log.
+
+        Absorbs the event log's own I/O and decode/malformed-payload
+        failures ((OSError, ValueError, KeyError, TypeError)) so the JSONL
+        write (the durable side effect) still succeeds. Anything else is a
+        real bug and propagates -- ``findings_server.py``'s per-message
+        ``run_isolated`` is the fault-isolation boundary that catches it
+        without losing the process.
+        """
         try:
             from quodeq.core.events.models import JudgmentCreatedEvent  # noqa: PLC0415
             from quodeq.core.finding_mappings import wire_dict_to_judgment  # noqa: PLC0415

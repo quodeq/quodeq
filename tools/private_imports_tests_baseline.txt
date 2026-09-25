@@ -220,8 +220,8 @@ tests/analysis/test_loops_drop_stats.py:19:private-module:quodeq.analysis._loops
 tests/analysis/test_loops_reachability.py:23:private-module:quodeq.analysis._loops.check_model_reachable
 tests/analysis/test_loops_safety_incremental.py:14:private-module:quodeq.analysis._loops.LoopDeps
 tests/analysis/test_loops_safety_incremental.py:14:private-module:quodeq.analysis._loops.run_incremental_loop
-tests/analysis/test_loops_safety_per_dim.py:12:private-module:quodeq.analysis._loops.LoopDeps
-tests/analysis/test_loops_safety_per_dim.py:12:private-module:quodeq.analysis._loops.run_per_dimension_loop
+tests/analysis/test_loops_safety_per_dim.py:10:private-module:quodeq.analysis._loops.LoopDeps
+tests/analysis/test_loops_safety_per_dim.py:10:private-module:quodeq.analysis._loops.run_per_dimension_loop
 tests/analysis/test_loops_safety_retry.py:11:private-module:quodeq.analysis._loops.LoopDeps
 tests/analysis/test_loops_safety_retry.py:11:private-module:quodeq.analysis._loops.run_incremental_loop
 tests/analysis/test_loops_safety_retry.py:11:private-module:quodeq.analysis._loops.run_per_dimension_loop
@@ -1153,7 +1153,7 @@ tests/terminal/test_pty_unix.py:91:private-module:quodeq.terminal._pty_unix.Unix
 tests/terminal/test_pty_windows.py:62:private-module:quodeq.terminal._pty_windows.mod
 tests/terminal/test_pty_windows_smoke.py:12:private-module:quodeq.terminal._pty_windows.WindowsPty
 tests/terminal/test_pty_windows_smoke.py:12:private-module:quodeq.terminal._pty_windows.resolve_shell
-tests/test_cli_consolidation_wiring.py:19:private-module:quodeq._cli_resolution.ResolvedInputs
+tests/test_cli_consolidation_wiring.py:20:private-module:quodeq._cli_resolution.ResolvedInputs
 tests/test_cli_diff_from_wiring.py:10:private-module:quodeq._cli_resolution.ResolvedInputs
 tests/test_cli_env_injection.py:114:private-name:quodeq.cli_evaluation._resolve_run_config_locals
 tests/test_cli_env_injection.py:115:private-module:quodeq._cli_resolution.ResolvedInputs

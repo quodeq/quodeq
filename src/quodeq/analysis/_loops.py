@@ -116,8 +116,9 @@ def _attempt_per_dim(
 ) -> Evidence | None:
     """Run the dimension (full scan); a known-bad exception is skipped here.
 
-    An exception this function doesn't recognize propagates --
-    ``_dispatch_per_dim`` isolates it at the loop-iteration boundary.
+    An exception this function doesn't recognize propagates -- the whole
+    one-dimension step (``_run_one_dimension``, dispatch + finalize) is
+    isolated at the loop-iteration boundary in ``run_per_dimension_loop``.
     """
     log = deps.log
     run_dir = run_dir_for(config)
@@ -138,42 +139,29 @@ def _attempt_per_dim(
     return ev
 
 
-def _dispatch_per_dim(
-    config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
-) -> Evidence | None:
-    """Run one dimension (full scan). Returns the Evidence, or None if skipped.
-
-    A known-bad exception (or a clean ``None`` return) is handled inside
-    ``_attempt_per_dim``, which writes the dim's ``INCOMPLETE`` state (the
-    reason keyed off the real exception -- ``interruption_reason``
-    special-cases ``FatalProviderError`` and ``CircuitBreakerError``, both of
-    which surface here) and logs the "completed iteration" line itself. An
-    exception class neither the runner call nor ``_attempt_per_dim``
-    recognizes is caught here (the loop-iteration boundary), logged with its
-    traceback, and skipped the same way, so the exception never needs to
-    leave this function.
-    """
-    return run_isolated(
-        lambda: _attempt_per_dim(config, dimension, idx, ctx, deps),
-        label=f"[{idx}/{ctx.total}] {dimension} dispatch",
-        log=deps.log,
-        on_error=lambda exc: _skip_dim(
-            run_dir_for(config), dimension, f"{idx}/{ctx.total}", deps.log, "unexpected", exc,
-        ),
-    )
-
-
 def _run_one_dimension(
     config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, run: LoopRun,
 ) -> Evidence | None:
     """Take one dimension through RUNNING -> analysis -> finalized.
 
-    Returns None when the dimension was skipped; ``_dispatch_per_dim`` has
-    already written its INCOMPLETE state and logged the reason.
+    A known-bad exception (or a clean ``None`` return) from the runner call
+    is handled inside ``_attempt_per_dim``, which writes the dim's
+    ``INCOMPLETE`` state (the reason keyed off the real exception --
+    ``interruption_reason`` special-cases ``FatalProviderError`` and
+    ``CircuitBreakerError``, both of which surface here) and logs the
+    "completed iteration" line itself.
+
+    Anything else -- from the runner call, or from ``finalize_dim_result``'s
+    ``on_dimension_done`` callback -- propagates out of this function
+    uncaught: ``run_per_dimension_loop`` isolates the whole step (dispatch
+    *and* finalize) at the loop-iteration boundary, so one dimension's bug
+    cannot abort the rest of the run.
+
+    Returns None when the dimension was skipped.
     """
     run_dir = run_dir_for(config)
     safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=run.deps.log)
-    ev = _dispatch_per_dim(config, dimension, idx, ctx, run.deps)
+    ev = _attempt_per_dim(config, dimension, idx, ctx, run.deps)
     if ev is None:
         return None
     finalize_dim_result(run_dir, dimension, ev, run)
@@ -197,7 +185,18 @@ def run_per_dimension_loop(
         log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
         if loop_should_stop(config, dimension, log):
             break
-        if _run_one_dimension(config, dimension, idx, ctx, run) is None:
+        step = f"{idx}/{ctx.total}"
+        ev = run_isolated(
+            lambda config=config, dimension=dimension, idx=idx: _run_one_dimension(
+                config, dimension, idx, ctx, run,
+            ),
+            label=f"[{step}] {dimension} dispatch",
+            log=log,
+            on_error=lambda exc, dimension=dimension, step=step: _skip_dim(
+                run_dir_for(config), dimension, step, log, "unexpected", exc,
+            ),
+        )
+        if ev is None:
             skipped_count += 1
             continue
         log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev=set)")

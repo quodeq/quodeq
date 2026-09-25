@@ -8,7 +8,7 @@
 # the baseline (update the shifted line number) over blind --update-baseline
 # regeneration, which can silently absorb a genuinely new violation
 # introduced in the same change.
-src/quodeq/_cli_evaluate_finalize.py:71:broad-except
+src/quodeq/_cli_evaluate_finalize.py:74:broad-except
 src/quodeq/_cli_scoring.py:127:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:214:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:243:broad-except

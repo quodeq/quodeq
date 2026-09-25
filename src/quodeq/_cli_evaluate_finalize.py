@@ -12,7 +12,10 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from quodeq._cli_resolution import ResolvedInputs
+from quodeq.analysis.cache.consolidation import mark_run_consolidated
 from quodeq.analysis.diff_resolver import DiffResolveError
+from quodeq.shared.fault_isolation import run_isolated
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.logging import log_error, log_info, log_warning
 
 
@@ -72,6 +75,24 @@ def write_sarif_if_requested(args: argparse.Namespace, evaluation_dir: Path) -> 
         log_warning(f"SARIF export failed (evaluation results are safe): {exc}")
 
 
+def _consolidate_run_cache(evaluation_dir: Path) -> None:
+    """Post-run cache consolidation, isolated from the run's own result.
+
+    ``mark_run_consolidated`` is already fail-soft internally (its own
+    whole-body catch degrades on (OSError, ValueError) rather than raising),
+    but this call sits after the run lifecycle has closed and
+    finalize_run_evaluate's return value becomes the process exit code -- so
+    an exception type that guard doesn't recognize must still never turn a
+    finished run's zero exit code into a nonzero one. ``run_isolated`` is
+    that backstop. Tests patch ``quodeq._cli_evaluate_finalize.mark_run_consolidated``
+    -- mock.patch resolves where a name is used, not where it's defined.
+    """
+    run_isolated(
+        lambda: mark_run_consolidated(evaluation_dir.parent),
+        label="post-run cache consolidation", log=SHARED_LOG,
+    )
+
+
 def finalize_run_evaluate(args: argparse.Namespace, evaluation_dir: Path, result: int) -> int:
     """Fail-soft consolidation + SARIF export, run OUTSIDE the run lifecycle
     (already closed) so a failure here can never flip the run state."""
@@ -84,8 +105,7 @@ def finalize_run_evaluate(args: argparse.Namespace, evaluation_dir: Path, result
     # (a cancelled/failed/killed run leaves entries unconsolidated, so their
     # findings still read as new in the live feed).
     if not no_scored_reports:
-        from quodeq.analysis.cache.consolidation import mark_run_consolidated
-        mark_run_consolidated(evaluation_dir.parent)
+        _consolidate_run_cache(evaluation_dir)
     # Only export SARIF on success and only when scored reports exist.
     if result == 0 and getattr(args, "sarif", None) and not no_scored_reports:
         write_sarif_if_requested(args, evaluation_dir)
