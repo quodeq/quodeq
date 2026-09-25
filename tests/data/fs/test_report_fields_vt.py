@@ -1,8 +1,7 @@
 """The report JSON keeps the ``vt`` tag the scorer groups by.
 
 ``evaluation/<dim>.json`` is a strict field whitelist. Without ``vt`` in it,
-a reader of the report could not see what the scorer saw, which is how a
-scoring change was once validated on the wrong artifact (issue #1274).
+a reader of the report cannot see every input the scorer saw (issue #1274).
 """
 from __future__ import annotations
 
