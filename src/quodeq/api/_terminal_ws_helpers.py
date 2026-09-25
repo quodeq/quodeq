@@ -46,17 +46,26 @@ def resolve_ws_session(registry: TerminalSessionRegistry, sid: str | None):
 
 
 def pump_terminal_out(manager, ws, stop: threading.Event) -> None:
-    while not stop.is_set():
-        data = manager.read(65536)
-        if not data:
-            if not manager.alive:
+    # try/finally, not a bare loop: this runs on its own daemon thread (see
+    # terminal_routes.py's `_terminal_ws`), so nothing else guards it. If
+    # ws.send ever raised something outside (ConnectionClosed, OSError) the
+    # old bare `except Exception` still caught, the thread would die without
+    # signalling `stop` -- the read-loop thread would then wait on a peer
+    # that is never coming back. finally closes that gap regardless of which
+    # exception type ends the loop.
+    try:
+        while not stop.is_set():
+            data = manager.read(65536)
+            if not data:
+                if not manager.alive:
+                    break
+                continue
+            try:
+                ws.send(_WS_TAG_DATA + data)
+            except (ConnectionClosed, OSError):
                 break
-            continue
-        try:
-            ws.send(_WS_TAG_DATA + data)
-        except Exception:
-            break
-    stop.set()
+    finally:
+        stop.set()
 
 
 def setup_terminal_session(manager, ws) -> bool:
@@ -71,7 +80,7 @@ def setup_terminal_session(manager, ws) -> bool:
         if sb:
             ws.send(_WS_TAG_DATA + sb)
         return True
-    except Exception:
+    except (ConnectionClosed, OSError):
         # Spawn failure or early disconnect must not propagate past
         # flask-sock (would surface as a 500), but leave a trace for
         # operators.
@@ -100,7 +109,7 @@ def terminal_read_loop(ws, manager, stop: threading.Event, apply_control) -> Non
                 manager.write(payload.encode("utf-8"))
             elif tag == _WS_TAG_CONTROL:
                 apply_control(manager, payload)
-    except Exception:
+    except (ConnectionClosed, OSError, ValueError):
         # A write to a dead/killed process (or any other failure in this
         # loop) must not silently end the session: log it for operators,
         # and signal the write-side pump to stop rather than leaving it

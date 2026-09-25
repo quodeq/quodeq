@@ -18,6 +18,23 @@ from quodeq.data.sqlite import precedent_vectors as _sqlite_vectors
 
 _logger = logging.getLogger(__name__)
 
+
+def openai_errors() -> tuple[type[BaseException], ...]:
+    """openai's SDK error base, or () when the optional package is absent.
+
+    Lazy on purpose: quodeq.context/__init__.py imports this module eagerly,
+    and tests/tools/test_no_framework_transitivity.py guards tests/core
+    against pulling httpx/openai into sys.modules just by importing
+    quodeq.context -- only a call that actually embeds pays that cost.
+    precedent_corpus.py calls this rather than duplicating it.
+    """
+    try:
+        import openai  # noqa: PLC0415
+    except ImportError:
+        return ()
+    return (openai.OpenAIError,)
+
+
 BACKFILL_BUDGET_S = 60.0
 BACKFILL_CHUNK = 32
 
@@ -79,6 +96,8 @@ def _backfill_missing(
     N+1 scan, and rescanning ``texts`` per chunk made the loop quadratic in
     the corpus size. Returns how many were newly embedded.
     """
+    import httpx  # noqa: PLC0415 -- lazy: see openai_errors()'s docstring
+
     embedded_new = 0
     deadline = time.monotonic() + BACKFILL_BUDGET_S
     stored = store.stored_fingerprints(conn)
@@ -90,7 +109,7 @@ def _backfill_missing(
         chunk = missing[start:start + chunk_size]
         try:
             vecs = embedder.embed_fn([texts[fp] for fp in chunk], timeout=embedder.batch_timeout)
-        except Exception as exc:  # noqa: BLE001 -- partial corpus is fine
+        except (*openai_errors(), httpx.HTTPError, RuntimeError) as exc:
             _logger.warning("Precedent backfill stopped: %s", exc)
             break
         if not store.insert_vectors(conn, embedder.model, list(zip(chunk, vecs))):

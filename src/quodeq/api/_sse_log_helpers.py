@@ -80,7 +80,7 @@ def _emit_done_frame(terminal_state, offset: int) -> str:
     if terminal_state is not None:
         try:
             state = terminal_state() or ""
-        except Exception:  # noqa: BLE001 — never block the done frame on a bad reader
+        except (OSError, ValueError, AttributeError):
             state = ""
     return sse_line(state, event="done", event_id=offset or None)
 

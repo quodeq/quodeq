@@ -6,6 +6,8 @@ Split out of _assistant_helpers.py.
 from __future__ import annotations
 
 import logging
+import sqlite3
+import subprocess
 from collections.abc import Mapping
 
 from flask import Flask
@@ -58,5 +60,5 @@ def run_assistant_hygiene(app: Flask, *, ttl_days: int | None = None) -> None:
         )
         if removed:
             _logger.info("Pruned %d old assistant session(s)", removed)
-    except Exception:  # noqa: BLE001 — hygiene is best-effort
+    except (sqlite3.Error, OSError, subprocess.SubprocessError, ValueError):
         _logger.warning("assistant hygiene failed", exc_info=True)

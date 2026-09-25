@@ -54,7 +54,7 @@ def _ollama_supports_tools(
             return known
     try:
         info = (probe or _default_probe)(f"{base}/api/show", {"model": model})
-    except Exception as exc:  # noqa: BLE001 - any probe failure → fallback path
+    except (httpx.HTTPError, ValueError) as exc:
         _logger.info("ollama capability probe failed: %s", exc)
         return False
     answer = "tools" in info.get("capabilities", [])

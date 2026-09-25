@@ -474,8 +474,8 @@ tests/api/test_sse_log_helpers.py:14:private-name:quodeq.api._sse_log_helpers._E
 tests/api/test_sse_log_helpers.py:14:private-name:quodeq.api._sse_log_helpers._tail_max_bytes
 tests/api/test_sse_log_helpers.py:14:private-name:quodeq.api._sse_log_helpers._tail_new_lines
 tests/api/test_terminal_routes.py:5:private-name:quodeq.api.terminal_routes._apply_control
-tests/api/test_terminal_ws_helpers.py:14:private-module:quodeq.api._terminal_ws_helpers
-tests/api/test_terminal_ws_helpers.py:15:private-module:quodeq.api._terminal_ws_helpers.setup_terminal_session
+tests/api/test_terminal_ws_helpers.py:16:private-module:quodeq.api._terminal_ws_helpers
+tests/api/test_terminal_ws_helpers.py:17:private-module:quodeq.api._terminal_ws_helpers.setup_terminal_session
 tests/api/test_zip_coverage.py:171:private-name:quodeq.api.zip._ZipSizeLimitError
 tests/api/test_zip_coverage.py:58:private-name:quodeq.api.zip._ZipSizeLimitError
 tests/assistant/test_api_adapter.py:153:private-name:quodeq.assistant.adapters.api._extra_body
@@ -607,7 +607,7 @@ tests/config/test_standards_fetcher_extended.py:8:private-name:quodeq.config.sta
 tests/config/test_standards_fetcher_extended.py:8:private-name:quodeq.config.standards_fetcher._DEFAULT_ASVS_VERSION
 tests/config/test_standards_fetcher_extended.py:8:private-name:quodeq.config.standards_fetcher._asvs_version
 tests/conftest.py:12:private-module:quodeq.data.fs._index_cache.clear_index_cache
-tests/context/test_precedent_corpus.py:26:private-name:quodeq.context.precedent_store._backfill_missing
+tests/context/test_precedent_corpus.py:52:private-name:quodeq.context.precedent_store._backfill_missing
 tests/core/test_confidence_not_scored.py:17:private-module:quodeq.analysis._report_constants.COMPLIANCE_FIELDS
 tests/core/test_confidence_not_scored.py:17:private-module:quodeq.analysis._report_constants.VIOLATION_FIELDS
 tests/core/test_enrich_judgment_refs_reader.py:11:private-module:quodeq.core.evidence._options.EvidenceParseOptions
@@ -813,9 +813,9 @@ tests/integration/_cancel_resume_fixtures.py:66:private-module:quodeq.analysis._
 tests/integration/test_copilot_cli_local.py:15:private-module:quodeq.analysis._config.AnalysisConfig
 tests/integration/test_sqlite_dual_write_e2e.py:15:private-module:quodeq.data.fs.report_parser._evidence.load_evidence_map
 tests/integration/test_sse_run_events_e2e.py:11:private-module:quodeq.api._run_events_routes.register_run_events_routes
-tests/integration/test_terminal_pty_reliability_e2e.py:35:private-module:quodeq.api._terminal_ws_helpers.pump_terminal_out
-tests/integration/test_terminal_pty_reliability_e2e.py:35:private-module:quodeq.api._terminal_ws_helpers.terminal_read_loop
-tests/llm_bridge/test_cloud.py:7:private-module:quodeq.llm_bridge._cloud.check_cloud_connection
+tests/integration/test_terminal_pty_reliability_e2e.py:36:private-module:quodeq.api._terminal_ws_helpers.pump_terminal_out
+tests/integration/test_terminal_pty_reliability_e2e.py:36:private-module:quodeq.api._terminal_ws_helpers.terminal_read_loop
+tests/llm_bridge/test_cloud.py:9:private-module:quodeq.llm_bridge._cloud.check_cloud_connection
 tests/llm_bridge/test_embeddings.py:6:private-name:quodeq.llm_bridge.embeddings._client_kwargs
 tests/llm_bridge/test_embeddings.py:6:private-name:quodeq.llm_bridge.embeddings._v1_base
 tests/llm_bridge/test_env_injection_sites.py:9:private-module:quodeq.llm_bridge._llamacpp

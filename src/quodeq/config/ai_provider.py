@@ -243,7 +243,11 @@ def store_api_key(provider: str, api_key: str,
     try:
         keyring.set_password(_KEYRING_SERVICE, provider, api_key)
         return True, True
-    except Exception as exc:  # keyring.errors.KeyringError, or an unconfigured backend raising something else
+    # keyring.errors.KeyringError is the documented failure; RuntimeError is
+    # widened in (not narrowed to just KeyringError/OSError) because an
+    # unconfigured backend (e.g. SecretService with no dbus running) is known
+    # to raise it directly -- see test_generic_exception_falls_back_to_cleartext.
+    except (keyring.errors.KeyringError, OSError, RuntimeError) as exc:
         log_debug(f"keyring unavailable for '{provider}', falling back to cleartext: {exc}")
 
     paths = paths if paths is not None else default_paths()
@@ -278,7 +282,8 @@ def get_api_key_secure(provider: str, paths: ConfigPaths | None = None) -> str |
         value = keyring.get_password(_KEYRING_SERVICE, provider)
         if value:
             return value
-    except Exception as exc:  # keyring.errors.KeyringError, or an unconfigured backend raising something else
+    # Same widen as store_api_key's keyring except: see the comment there.
+    except (keyring.errors.KeyringError, OSError, RuntimeError) as exc:
         log_debug(f"keyring lookup failed for '{provider}': {exc}")
 
     paths = paths if paths is not None else default_paths()

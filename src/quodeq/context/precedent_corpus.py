@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import math
+import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +23,7 @@ from quodeq.context.precedent_store import (
     Embedder,
     VectorStoreFns,
     load_or_backfill_vectors,
+    openai_errors,
     resolve_vector_store,
 )
 
@@ -73,14 +75,14 @@ class PrecedentCorpus:
 
     def match_many(self, texts: list[str]) -> list[float | None]:
         """Best cosine similarity of each text against the corpus, one embedding call."""
+        import httpx  # noqa: PLC0415 -- lazy: see precedent_store.openai_errors()'s docstring
         if self._disabled or not self._vectors or not texts:
             return [None] * len(texts)
         try:
             start = time.monotonic()
             queries = self._embed(list(texts))
             if len(queries) != len(texts):
-                raise RuntimeError(f"embedding returned {len(queries)} vectors "
-                                   f"for {len(texts)} texts")
+                raise RuntimeError(f"embedding returned {len(queries)} vectors for {len(texts)} texts")
             self._elapsed += time.monotonic() - start
             scores: list[float | None] = []
             for query in queries:
@@ -89,7 +91,7 @@ class PrecedentCorpus:
             if self._elapsed > EMBED_BUDGET_S:
                 self._trip("cumulative embedding time budget exceeded")
             return scores
-        except Exception as exc:  # noqa: BLE001 -- contractually total
+        except (*openai_errors(), httpx.HTTPError, RuntimeError, TypeError, ValueError) as exc:
             self._trip(f"embedding failed: {exc}")
             return [None] * len(texts)
 
@@ -265,6 +267,7 @@ def load_precedent_corpus(
     failure disables the tier for sibling agents, respawns, and per-call API
     context rebuilds.
     """
+    import httpx  # noqa: PLC0415 -- lazy: see precedent_store.openai_errors()'s docstring
     from quodeq.shared.env import (  # noqa: PLC0415 -- cross-cutting layer
         get_precedent_similarity_threshold,
         semantic_precedents_enabled,
@@ -292,6 +295,6 @@ def load_precedent_corpus(
 
         policy = CorpusBuildPolicy(marker=marker, threshold=get_precedent_similarity_threshold())
         return _embed_and_build_corpus(store, project_dir, texts, embedder, policy)
-    except Exception as exc:  # noqa: BLE001 -- never break a scan
+    except (*openai_errors(), httpx.HTTPError, RuntimeError, sqlite3.Error, OSError, ValueError) as exc:
         _logger.warning("Semantic precedent corpus unavailable: %s", exc)
         return None

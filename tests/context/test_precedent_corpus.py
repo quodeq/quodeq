@@ -1,5 +1,7 @@
 """PrecedentCorpus: matching, circuit breaker, and the backfill pass."""
+import importlib
 import math
+import sys
 from pathlib import Path
 
 import pytest
@@ -10,6 +12,30 @@ from quodeq.context.precedent import (
     VectorStoreFns,
     precedent_text,
 )
+
+
+@pytest.mark.parametrize("module_name", [
+    "quodeq.context.precedent_corpus", "quodeq.context.precedent_store",
+])
+def test_module_still_imports_without_openai_installed(module_name, monkeypatch):
+    """precedent_store now names openai.OpenAIError in an except tuple
+    (R-FT-7), guarded the same way llm_bridge/_cloud.py and
+    llm_bridge/embeddings.py already do (`try: import openai / except
+    ImportError: openai = None`); precedent_corpus imports that guard's
+    result (`OPENAI_ERRORS`) rather than duplicating it. Re-importing
+    either with openai blocked must still succeed."""
+    module = sys.modules[module_name]
+    monkeypatch.setitem(sys.modules, "openai", None)
+    try:
+        importlib.reload(module)  # must not raise
+    finally:
+        # sys.modules["openai"] is only restored at test teardown; undo now
+        # so this reload puts the module back to its normal, openai-present
+        # state instead of leaking the blocked one into later tests.
+        monkeypatch.undo()
+        importlib.reload(module)
+        if module_name == "quodeq.context.precedent_store":
+            importlib.reload(sys.modules["quodeq.context.precedent_corpus"])
 
 
 def _unit(vec: list[float]) -> list[float]:
