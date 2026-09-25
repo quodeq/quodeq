@@ -160,9 +160,7 @@ class PrOutcome:
     the raw WorktreeError text for "failed" (server-side logging only).
     ``result`` is ``WorktreeManager.create_pr``'s typed, fail-soft
     ``PrResult`` on success (a missing/None ``pr_url`` there means push or
-    ``gh`` failed, not that this call raised). Distinct from
-    ``_worktree_manager.PrOutcome`` (the create_pr reason StrEnum) even
-    though the two names coincide.
+    ``gh`` failed, not that this call raised).
     """
     kind: OutcomeKind
     detail: str = ""

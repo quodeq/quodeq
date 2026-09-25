@@ -30,7 +30,7 @@ from quodeq.assistant._worktree_git import (  # noqa: F401 — re-export/patch t
     worktrees_base,
 )
 from quodeq.assistant._worktree_manager import (  # noqa: F401 — re-export
-    PrOutcome, PrResult, WorktreeManager, ensure_session_worktree,
+    PrResult, PrResultReason, WorktreeManager, ensure_session_worktree,
 )
 from quodeq.assistant._worktree_gc import (  # noqa: F401 — re-export
     gc_stale_worktrees, gc_worktrees,

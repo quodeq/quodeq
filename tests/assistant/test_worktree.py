@@ -1,7 +1,7 @@
 import pytest
 
 from quodeq.assistant.worktree import (
-    PrOutcome, WorktreeError, WorktreeManager, run_git, diff_stats, diff_text)
+    PrResultReason, WorktreeError, WorktreeManager, run_git, diff_stats, diff_text)
 from quodeq.assistant.worktree import ensure_session_worktree, gc_stale_worktrees
 from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
@@ -169,7 +169,7 @@ def test_create_pr_fail_soft_without_gh(manager, monkeypatch):
     result = manager.create_pr("t", "b")
     assert result.pr_url is None
     assert result.branch == manager.branch
-    assert result.reason is PrOutcome.PUSH_FAILED
+    assert result.reason is PrResultReason.PUSH_FAILED
 
 
 def test_create_pr_push_failure_restores_worktree_changes(manager, repo):

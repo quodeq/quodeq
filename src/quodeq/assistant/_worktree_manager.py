@@ -36,7 +36,7 @@ _GIT_VERB_ADD = "add"
 _GIT_VERB_PRUNE = "prune"
 
 
-class PrOutcome(StrEnum):
+class PrResultReason(StrEnum):
     """Why ``WorktreeManager.create_pr`` ended the way it did; the route
     builds the user-facing message from this plus ``PrResult.detail``.
 
@@ -63,7 +63,7 @@ class PrResult:
     pr_url: str | None
     branch: str
     pushed: bool
-    reason: PrOutcome
+    reason: PrResultReason
     detail: str = ""
 
 
@@ -184,9 +184,9 @@ class WorktreeManager:
         except WorktreeError as exc:
             if committed:
                 self._git_worktree("reset", "--soft", "HEAD~1")
-            return PrResult(None, self.branch, False, PrOutcome.PUSH_FAILED, str(exc))
+            return PrResult(None, self.branch, False, PrResultReason.PUSH_FAILED, str(exc))
         if shutil.which("gh") is None:
-            return PrResult(None, self.branch, True, PrOutcome.NO_GH)
+            return PrResult(None, self.branch, True, PrResultReason.NO_GH)
         # gh runs with the parent process env on purpose (it needs the user's
         # own auth). It is NOT routed through the scrubbed-env CLI spawner
         # used for AI provider CLIs; that scrubber exists to keep secrets
@@ -197,9 +197,9 @@ class WorktreeManager:
                         "--body", body or "", "--head", self.branch],
                        cwd=self.path)
         except WorktreeError as exc:
-            return PrResult(None, self.branch, True, PrOutcome.GH_FAILED, str(exc))
+            return PrResult(None, self.branch, True, PrResultReason.GH_FAILED, str(exc))
         url = out.strip().splitlines()[-1] if out.strip() else None
-        return PrResult(url, self.branch, True, PrOutcome.CREATED)
+        return PrResult(url, self.branch, True, PrResultReason.CREATED)
 
 
 def ensure_session_worktree(repository, *, repo_root: Path, project_id: str | None,

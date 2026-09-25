@@ -1,11 +1,9 @@
-"""Assistant workspace PR route: exact-equality wire body per PrOutcome.
+"""Assistant workspace PR route: exact-equality wire body per PrResultReason.
 
 Characterizes ``_workspace_pr``'s whole JSON response (all 4
 ``WorktreeManager.create_pr`` outcomes), so the message text stays
-byte-identical across the PrResult/PrOutcome route-shaping refactor.
+byte-identical across the PrResult/PrResultReason route-shaping refactor.
 """
-import sys
-
 from tests.api._assistant_workspace_fixtures import (  # noqa: F401 -- app/client/repo are pytest fixtures
     _session_with_worktree,
     app,
@@ -64,7 +62,7 @@ def test_pr_gh_fail_exact_body(app, client, repo, monkeypatch):
     sid, store, manager = _session_with_worktree(app, client, repo)
     _patch_push(monkeypatch)
     monkeypatch.setattr("quodeq.assistant.worktree.shutil.which", lambda _: "/usr/bin/gh")
-    orig_run_git = sys.modules["quodeq.assistant._worktree_manager"].run_git
+    from quodeq.assistant.worktree import run_git as orig_run_git
 
     def fake_run_git(argv, **kwargs):
         if argv[0] == "gh":
@@ -85,7 +83,7 @@ def test_pr_success_exact_body(app, client, repo, monkeypatch):
     sid, store, manager = _session_with_worktree(app, client, repo)
     _patch_push(monkeypatch)
     monkeypatch.setattr("quodeq.assistant.worktree.shutil.which", lambda _: "/usr/bin/gh")
-    orig_run_git = sys.modules["quodeq.assistant._worktree_manager"].run_git
+    from quodeq.assistant.worktree import run_git as orig_run_git
 
     def fake_run_git(argv, **kwargs):
         if argv[0] == "gh":

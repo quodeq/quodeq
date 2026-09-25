@@ -19,7 +19,7 @@ from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.assistant.workspace_actions import (
     OutcomeKind, PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
 from quodeq.assistant.worktree import (
-    PrOutcome, PrResult, WorktreeError, WorktreeStatus, diff_stats, diff_text)
+    PrResult, PrResultReason, WorktreeError, WorktreeStatus, diff_stats, diff_text)
 
 _logger = logging.getLogger(__name__)
 
@@ -34,12 +34,12 @@ def _pr_message(result: PrResult) -> str:
     ``result.detail`` exactly as ``WorktreeManager.create_pr`` used to write
     it before this shaping moved here. All 4 strings are wire-visible (the
     UI shows them as-is), so they must stay byte-identical."""
-    if result.reason == PrOutcome.PUSH_FAILED:
+    if result.reason == PrResultReason.PUSH_FAILED:
         return (f"Push failed: {result.detail}. The changes are back in the "
                 "worktree; apply them or open a PR manually.")
-    if result.reason == PrOutcome.GH_FAILED:
+    if result.reason == PrResultReason.GH_FAILED:
         return f"gh pr create failed: {result.detail}"
-    if result.reason == PrOutcome.NO_GH:
+    if result.reason == PrResultReason.NO_GH:
         return _PR_MESSAGE_NO_GH
     return _PR_MESSAGE_CREATED
 
