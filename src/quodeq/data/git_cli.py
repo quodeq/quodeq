@@ -20,7 +20,11 @@ from quodeq.shared.repo import normalize_remote_url
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT_S = 10
-_DEFAULT_LOOKBACK_MONTHS = 3  # stream_log_names' churn-history window
+
+# stream_log_names' churn-history window. Public: also the fallback default
+# for analysis/subagents/_git_scoring.py's git_lookback_months config knob,
+# which forwards it into stream_log_names(months=...).
+DEFAULT_GIT_LOOKBACK_MONTHS = 3
 
 
 def run_git(
@@ -151,7 +155,7 @@ def git_remote_url(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> st
 
 
 def stream_log_names(
-    repo_dir: Path, *, months: int = _DEFAULT_LOOKBACK_MONTHS, timeout: float = _DEFAULT_TIMEOUT_S,
+    repo_dir: Path, *, months: int = DEFAULT_GIT_LOOKBACK_MONTHS, timeout: float = _DEFAULT_TIMEOUT_S,
 ) -> Iterator[str]:
     """Yield ``git log --name-only`` lines one at a time (streaming Popen).
 

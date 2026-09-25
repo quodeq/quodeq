@@ -34,7 +34,7 @@ __all__ = [
     # these from here.
     "WEBVIEW_TOKEN_UA_PREFIX", "WEBVIEW_UA_MARKER", "diag",
     "quodeq_version", "webview_user_agent",
-    "MENU_POLL_INTERVAL_S",  # re-exported for _webview_window_help_menu's poller
+    "MENU_POLL_INTERVAL_S",  # defined here, exported for _webview_window_help_menu's poller
 ]
 
 _APP_DISPLAY_NAME = "quodeq"

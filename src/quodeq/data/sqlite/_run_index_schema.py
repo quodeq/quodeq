@@ -16,8 +16,9 @@ _logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 1
 
-_RUN_INDEX_BUSY_TIMEOUT_MS = 3000  # shorter than SQLITE_BUSY_TIMEOUT_MS:
-# bounded wait for the one lock SQLite will not route through busy_timeout --
+_RUN_INDEX_BUSY_TIMEOUT_MS = 3000  # kept at its historical value; the other sqlite stores use 5000 (SQLITE_BUSY_TIMEOUT_MS)
+
+# Bounded wait for the one lock SQLite will not route through busy_timeout --
 # see _connect_retrying. The writer being waited on is a schema DDL that takes
 # milliseconds, so this ceiling is never approached in practice; it is kept
 # short so a wedged peer degrades the caller rather than stalling it.

@@ -25,7 +25,7 @@ _MAX_START_RETRIES = 20
 _HEALTH_POLL_INTERVAL_S = 0.5
 STDERR_READ_MAX = 500
 ERROR_DISPLAY_MAX = 200
-_LSOF_TIMEOUT_S = 5
+_LSOF_TIMEOUT_S = 5  # ceiling for the lsof subprocess that finds pids on a port
 
 
 class DashboardCallbacks(NamedTuple):

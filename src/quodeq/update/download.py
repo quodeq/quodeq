@@ -17,7 +17,7 @@ from quodeq.shared.constants import RETRY_BASE_DELAY_S, RETRY_JITTER_S
 
 _TIMEOUT = httpx.Timeout(10.0, read=60.0)
 _SERVER_ERROR_STATUS = 500
-_DEFAULT_DOWNLOAD_ATTEMPTS = 3
+_DEFAULT_DOWNLOAD_ATTEMPTS = 3  # download_file's retry budget for a flaky release-asset fetch
 
 
 def download_file(

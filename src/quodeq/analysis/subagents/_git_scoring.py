@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from quodeq.data.git_cli import stream_log_names
+from quodeq.data.git_cli import DEFAULT_GIT_LOOKBACK_MONTHS, stream_log_names
 
 _GIT_LOG_TIMEOUT_S = 10
 _GIT_HASH_LENGTH = 40
@@ -15,7 +15,6 @@ _DEFAULT_CHURN_DIVISOR = 4
 _DEFAULT_CHURN_MAX = 5
 _DEFAULT_RECENCY_DAYS = 14
 _DEFAULT_RECENCY_MULTIPLIER = 1.5
-_DEFAULT_LOOKBACK_MONTHS = 3  # how far back to scan git log for churn/recency signals
 
 
 def _is_date_line(line: str) -> bool:
@@ -35,7 +34,7 @@ def _has_git(src: Path) -> bool:
     return False
 
 
-def _iter_git_log(src: Path, months: int = _DEFAULT_LOOKBACK_MONTHS):
+def _iter_git_log(src: Path, months: int = DEFAULT_GIT_LOOKBACK_MONTHS):
     """Yield git log lines one at a time (streaming, no full materialization).
 
     Process execution lives in ``data/git_cli.stream_log_names``; this
@@ -116,7 +115,7 @@ def compute_git_scores(
     cfg = config or {}
     file_set = set(files)
     accumulated = _accumulate_churn(
-        file_set, src, cfg.get("git_lookback_months", _DEFAULT_LOOKBACK_MONTHS), log_source,
+        file_set, src, cfg.get("git_lookback_months", DEFAULT_GIT_LOOKBACK_MONTHS), log_source,
     )
     if accumulated is None:
         return {}
