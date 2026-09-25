@@ -25,6 +25,7 @@ _MAX_START_RETRIES = 20
 _HEALTH_POLL_INTERVAL_S = 0.5
 STDERR_READ_MAX = 500
 ERROR_DISPLAY_MAX = 200
+_LSOF_TIMEOUT_S = 5
 
 
 class DashboardCallbacks(NamedTuple):
@@ -82,7 +83,7 @@ def find_pids_on_port(port: int) -> list[int]:
         # plain integer ever reaches the lsof argument.
         result = subprocess.run(
             ["lsof", f"-ti:{int(port)}"], capture_output=True, text=True, encoding="utf-8",
-            timeout=5,
+            timeout=_LSOF_TIMEOUT_S,
         )
         return [int(pid.strip()) for pid in result.stdout.strip().split("\n") if pid.strip()]
     except (subprocess.TimeoutExpired, OSError, ValueError):

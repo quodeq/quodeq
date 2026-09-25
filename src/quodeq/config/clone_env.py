@@ -14,6 +14,8 @@ from quodeq.shared.env import env_int
 # 3) so the boundary commit is never cut off.
 _DEFAULT_SHALLOW_MONTHS = 4
 
+_GIT_CLONE_TIMEOUT_DEFAULT_S = 300  # QUODEQ_GIT_CLONE_TIMEOUT_S fallback
+
 
 def git_clone_timeout_s(env: dict[str, str] | None = None) -> int:
     """Return the git clone subprocess timeout in seconds.
@@ -21,7 +23,7 @@ def git_clone_timeout_s(env: dict[str, str] | None = None) -> int:
     Honors QUODEQ_GIT_CLONE_TIMEOUT_S; malformed or sub-1 values fall back
     to the default (300).
     """
-    return env_int("QUODEQ_GIT_CLONE_TIMEOUT_S", 300, minimum=1, env=env)
+    return env_int("QUODEQ_GIT_CLONE_TIMEOUT_S", _GIT_CLONE_TIMEOUT_DEFAULT_S, minimum=1, env=env)
 
 
 def clone_shallow_months(env: dict[str, str] | None = None) -> int:

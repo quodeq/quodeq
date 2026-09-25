@@ -13,11 +13,11 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Iterator
 
+from quodeq.data.sqlite._constants import SQLITE_BUSY_TIMEOUT_MS
 from quodeq.data.sqlite._score_cache_epoch import CACHE_WRITER_EPOCH
 from quodeq.shared.env import get_score_cache_path
 
 _logger = logging.getLogger(__name__)
-_BUSY_TIMEOUT_MS = 5000
 
 # Shared-root isolation seam: when serving read endpoints from a
 # second (shared) clone, the score cache must not mix rows with the local
@@ -92,7 +92,7 @@ def _init(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     try:
         conn.execute("PRAGMA journal_mode = WAL")
-        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+        conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
         conn.executescript(_SCHEMA)
         conn.commit()
         _purge_run_keys_on_epoch_change(conn)
@@ -132,7 +132,7 @@ def _connect_initialized(path: Path) -> sqlite3.Connection:
     (an inode can be reused by a brand-new file)."""
     conn = sqlite3.connect(path)
     try:
-        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+        conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
         row = conn.execute(
             "SELECT value FROM cache_meta WHERE key='writer_epoch'"
         ).fetchone()

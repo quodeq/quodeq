@@ -17,7 +17,13 @@ from typing import Any, Callable
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import CODE_INVALID_PARAM, CODE_MISSING_PARAM, CODE_NOT_FOUND, QUERY_FLAG_TRUE
+from quodeq.api._constants import (
+    CODE_INVALID_PARAM,
+    CODE_MISSING_PARAM,
+    CODE_NOT_FOUND,
+    MAX_FINDINGS_LIST_LIMIT,
+    QUERY_FLAG_TRUE,
+)
 from quodeq.api.helpers import json_error, optional_json_object_or_error, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed_listing import load_dismissed
@@ -35,7 +41,6 @@ from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import resolve_child_dir, validate_path_segment
 
 _logger = logging.getLogger(__name__)
-_MAX_FINDINGS_LIST_LIMIT = 5000
 
 
 def _invalid_body_fields(
@@ -141,11 +146,11 @@ def _list_project_entries(
     # No limit param → return everything (capped at the hard maximum).
     # A malformed or out-of-range limit/offset answers 400; an explicit
     # limit above the hard maximum stays clamped (the UI asks for 5000).
-    paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+    paging = page_params(request.args, default_limit=MAX_FINDINGS_LIST_LIMIT)
     if isinstance(paging[0], dict):
         return paging
     limit, offset = paging
-    limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
+    limit = min(limit, MAX_FINDINGS_LIST_LIMIT)
     project_dir = _project_dir_or_none(_eval_dir(app), project)
     if project_dir is None:
         return jsonify([])

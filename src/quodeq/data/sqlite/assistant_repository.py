@@ -9,14 +9,13 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from quodeq.core.types.project_source import ProjectSource
-from quodeq.data.ports.assistant import SessionScope
+from quodeq.data.ports.assistant import DEFAULT_EVENTS_LIMIT, SessionScope
 from quodeq.data.sqlite._assistant_schema import (
     ASSISTANT_DDL,
     ASSISTANT_MIGRATIONS,
     ASSISTANT_SCHEMA_VERSION,
 )
-
-_BUSY_TIMEOUT_MS = 5000
+from quodeq.data.sqlite._constants import SQLITE_BUSY_TIMEOUT_MS
 
 
 def _dict_row(cursor: sqlite3.Cursor, row: tuple) -> dict:
@@ -53,7 +52,7 @@ class AssistantRepository:
             # delta, so a FULL fsync per commit would pace the reader thread.
             conn.execute("PRAGMA synchronous = NORMAL")
             conn.execute("PRAGMA foreign_keys = ON")
-            conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+            conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
             version = conn.execute("PRAGMA user_version").fetchone()[0]
             if version == 0:
                 conn.executescript(ASSISTANT_DDL)
@@ -209,7 +208,7 @@ class AssistantRepository:
             return int(cur.lastrowid)
 
     def events_after(self, session_id: str, after_seq: int,
-                     limit: int = 500) -> list[tuple[int, dict]]:
+                     limit: int = DEFAULT_EVENTS_LIMIT) -> list[tuple[int, dict]]:
         """Read up to *limit* frames with ``seq > after_seq``, in sequence order.
 
         The poller resumes from the last seq it saw; a caller behind by more

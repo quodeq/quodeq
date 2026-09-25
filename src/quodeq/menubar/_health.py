@@ -24,6 +24,7 @@ _DEFAULT_COMMANDS = ("python3", "node", "claude")
 # cross-cutting shared/config (tools/check_imports.py); JobStatus lives in
 # core/, so this compares against the value directly instead.
 _JOB_STATUS_RUNNING = "running"
+_COMMAND_CACHE_MAXSIZE = 4  # distinct (names,) tuples find_commands is called with
 
 
 def _icons_dir() -> Path:
@@ -58,7 +59,7 @@ def find_commands(
     return _find_commands_uncached(names, env)
 
 
-@functools.lru_cache(maxsize=4)
+@functools.lru_cache(maxsize=_COMMAND_CACHE_MAXSIZE)
 def _find_commands_cached(names: tuple[str, ...]) -> dict[str, str | None]:
     return _find_commands_uncached(names, env=None)
 

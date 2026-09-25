@@ -19,9 +19,10 @@ _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
 
 DEFAULT_FETCH_TIMEOUT_S = 30
 _MAX_FETCH_BYTES = 50 * 1024 * 1024  # ASVS standard docs are well under this; guards against a compromised/misconfigured allowlisted host
+_DEFAULT_MAX_RETRIES = 3  # attempts before fetch_with_retry gives up
 
 
-def fetch_with_retry(url: str, timeout: int = DEFAULT_FETCH_TIMEOUT_S, max_retries: int = 3) -> bytes:
+def fetch_with_retry(url: str, timeout: int = DEFAULT_FETCH_TIMEOUT_S, max_retries: int = _DEFAULT_MAX_RETRIES) -> bytes:
     """Fetch URL content with exponential-backoff retries.
 
     Retries on network errors up to *max_retries* times, raising

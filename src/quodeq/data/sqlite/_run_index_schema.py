@@ -16,14 +16,14 @@ _logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 1
 
-_BUSY_TIMEOUT_MS = 3000
-# Bounded wait for the one lock SQLite will not route through busy_timeout --
+_RUN_INDEX_BUSY_TIMEOUT_MS = 3000  # shorter than SQLITE_BUSY_TIMEOUT_MS:
+# bounded wait for the one lock SQLite will not route through busy_timeout --
 # see _connect_retrying. The writer being waited on is a schema DDL that takes
 # milliseconds, so this ceiling is never approached in practice; it is kept
 # short so a wedged peer degrades the caller rather than stalling it.
 # It bounds when the *next* retry starts, not total wall time: a peer holding
 # a SHARED lock sends the attempt through busy_timeout instead of failing
-# fast, so the worst case is this deadline plus one full _BUSY_TIMEOUT_MS
+# fast, so the worst case is this deadline plus one full _RUN_INDEX_BUSY_TIMEOUT_MS
 # (~5.3s) before the raise.
 _WAL_SWITCH_DEADLINE_S = 2.0
 _WAL_SWITCH_SLEEP_S = 0.02
@@ -84,7 +84,7 @@ def _connect_with_pragmas(db_path: Path) -> sqlite3.Connection:
     # _connect_retrying for the case it cannot absorb.
     db = sqlite3.connect(str(db_path))
     try:
-        db.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
+        db.execute(f"PRAGMA busy_timeout={_RUN_INDEX_BUSY_TIMEOUT_MS}")
         db.execute("PRAGMA journal_mode=WAL")
     except sqlite3.DatabaseError:
         _close_quietly(db)

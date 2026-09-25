@@ -76,7 +76,7 @@ src/quodeq/context/precedent_store.py:93:broad-except
 src/quodeq/context/project_shape.py:59:broad-except
 src/quodeq/context/trust_model.py:125:broad-except
 src/quodeq/context/trust_model.py:192:broad-except
-src/quodeq/dashboard/_webview_token.py:86:suppress
+src/quodeq/dashboard/_webview_token.py:88:suppress
 src/quodeq/dashboard/_webview_user_agent.py:17:broad-except
 src/quodeq/dashboard/_webview_window_chrome.py:145:broad-except
 src/quodeq/dashboard/_webview_window_close.py:121:broad-except
@@ -143,6 +143,6 @@ src/quodeq/update/checker.py:84:broad-except
 src/quodeq/update/checker.py:87:broad-except
 src/quodeq/update/checker.py:95:broad-except
 src/quodeq/update/first_launch.py:72:broad-except
-src/quodeq/update/selfupdate.py:163:broad-except
-src/quodeq/update/selfupdate.py:229:broad-except
-src/quodeq/update/selfupdate.py:273:broad-except
+src/quodeq/update/selfupdate.py:166:broad-except
+src/quodeq/update/selfupdate.py:232:broad-except
+src/quodeq/update/selfupdate.py:276:broad-except

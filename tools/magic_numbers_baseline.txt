@@ -3,30 +3,3 @@
 # against). The fix is a named constant that carries meaning and unit.
 # Burn to zero; never add.
 # Regenerate intentionally: python tools/check_magic_numbers.py --update-baseline
-quodeq/config/_asvs_network.py:A:3
-quodeq/config/_fetch_client.py:A:15
-quodeq/config/_fetch_client_class.py:A:0.5
-quodeq/config/_fetch_client_class.py:A:15
-quodeq/config/_fetch_client_class.py:A:5
-quodeq/config/clone_env.py:A:300
-quodeq/dashboard/_build_npm.py:A:300
-quodeq/dashboard/_build_npm.py:A:600
-quodeq/dashboard/_instance.py:A:0.5
-quodeq/dashboard/_webview_token.py:A:24
-quodeq/dashboard/_webview_window_about.py:A:0.2
-quodeq/dashboard/_webview_window_about.py:A:128
-quodeq/dashboard/_webview_window_help_menu.py:A:0.2
-quodeq/data/cache_store/index.py:A:50
-quodeq/data/git_cli.py:A:3
-quodeq/data/ports/assistant.py:A:500
-quodeq/data/ports/findings.py:A:100
-quodeq/data/sqlite/assistant_repository.py:A:500
-quodeq/data/sqlite/findings_repository.py:A:100
-quodeq/data/sqlite/index_sync.py:A:30
-quodeq/menubar/_health.py:A:4
-quodeq/menubar/_process.py:A:5
-quodeq/shared/run_heartbeat.py:A:5.0
-quodeq/update/download.py:A:3
-quodeq/update/selfupdate.py:A:0.5
-quodeq/update/selfupdate.py:A:100
-quodeq/update/selfupdate.py:A:5

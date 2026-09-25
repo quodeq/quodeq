@@ -17,6 +17,7 @@ from quodeq.shared.constants import RETRY_BASE_DELAY_S, RETRY_JITTER_S
 
 _TIMEOUT = httpx.Timeout(10.0, read=60.0)
 _SERVER_ERROR_STATUS = 500
+_DEFAULT_DOWNLOAD_ATTEMPTS = 3
 
 
 def download_file(
@@ -24,7 +25,7 @@ def download_file(
     dest: Path,
     on_progress: Callable[[int, int], None],
     *,
-    attempts: int = 3,
+    attempts: int = _DEFAULT_DOWNLOAD_ATTEMPTS,
     sleep: Callable[[float], None] = time.sleep,
 ) -> None:
     """Download *url* to *dest*, retrying transient failures.

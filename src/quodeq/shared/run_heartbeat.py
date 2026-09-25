@@ -16,12 +16,13 @@ from pathlib import Path
 _logger = logging.getLogger(__name__)
 
 HEARTBEAT_FILENAME = ".heartbeat"
+_DEFAULT_INTERVAL_S = 5.0  # how often the thread touches the heartbeat file
 
 
 class HeartbeatThread:
     """Background thread that periodically updates run_dir/.heartbeat mtime."""
 
-    def __init__(self, run_dir: Path, *, interval: float = 5.0) -> None:
+    def __init__(self, run_dir: Path, *, interval: float = _DEFAULT_INTERVAL_S) -> None:
         self._path = run_dir / HEARTBEAT_FILENAME
         self._interval = interval
         self._stop = threading.Event()

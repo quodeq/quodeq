@@ -38,3 +38,7 @@ CODE_NO_ACTIVE_WORKTREE = "NO_ACTIVE_WORKTREE"
 # routes_shared_pull's optional "action" field (copy|replace) on a pull collision.
 CODE_INVALID_ACTION = "INVALID_ACTION"
 MESSAGE_UNKNOWN_SESSION = "unknown session"
+
+# Hard cap on a findings-listing page, local and shared-clone mirrors alike
+# (routes_findings.py, routes_shared_findings_mirrors.py).
+MAX_FINDINGS_LIST_LIMIT = 5000

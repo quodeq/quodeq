@@ -34,6 +34,7 @@ from quodeq.data.sqlite._index_sync_promote import (
 logger = logging.getLogger(__name__)
 
 _KNOWN_STATE_VALUES = {s.value for s in RunState}
+_DEFAULT_STALE_SECONDS = 30  # check_stale_and_promote's heartbeat-staleness threshold
 
 _UPSERT_SQL = """
 INSERT INTO runs (
@@ -184,7 +185,7 @@ def delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
 
 def check_stale_and_promote(
     db: sqlite3.Connection, run_dir: Path, *,
-    project_uuid: str, run_id: str, stale_seconds: int = 30,
+    project_uuid: str, run_id: str, stale_seconds: int = _DEFAULT_STALE_SECONDS,
 ) -> bool:
     """Promote non-terminal runs with dead heartbeat + dead PID to cancelled.
 

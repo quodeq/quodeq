@@ -12,15 +12,15 @@ from pathlib import Path
 from typing import Iterator
 
 from quodeq.data.sqlite._migrations import apply_evaluation_schema
+from quodeq.data.sqlite._constants import SQLITE_BUSY_TIMEOUT_MS
 
 EVALUATION_DB_FILENAME = "evaluation.db"
-_BUSY_TIMEOUT_MS = 5000
 
 
 def _configure(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+    conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
 
 
 @contextmanager
