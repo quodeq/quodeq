@@ -4,6 +4,7 @@ import { exitReasonHint, exitReasonLabel } from '../../../models/exitReason.js';
 import { t } from '../../../strings/index.js';
 import { EXIT_REASON } from '../../../vocab/exitReason.js';
 import { DIM_STATE } from '../../../vocab/dimState.js';
+import { PERCENT } from '../../../constants.js';
 
 // Reasons surfaced as a badge so an unusually large estimate isn't a mystery.
 export const ESTIMATE_REASON_LABEL = {
@@ -89,7 +90,7 @@ export default function DimRow({ dim }) {
   // green dimension look red.
   const isDone = dim.state === DIM_STATE.DONE;
   const isRunning = dim.state === DIM_STATE.RUNNING;
-  const p = isDone ? 100 : pct(taken, total);
+  const p = isDone ? PERCENT : pct(taken, total);
   const dotClass = isDone ? ' scan-progress__dim-dot--done' : isRunning ? ' scan-progress__dim-dot--running' : '';
   const fillClass = isDone ? 'scan-progress__bar-fill--done' : '';
 

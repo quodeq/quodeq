@@ -1,5 +1,6 @@
 import { t } from '../../../../strings/index.js';
 import { MAP_VIEW_MODE } from '../../mapVocab.js';
+import { PERCENT } from '../../../../constants.js';
 
 const RATE_HIGH = 0.9;
 const RATE_MEDIUM = 0.7;
@@ -103,7 +104,7 @@ export function nodeColor(node, viewMode) {
  */
 export function nodeStateText(node, viewMode) {
   if (viewMode === MAP_VIEW_MODE.COMPLIANCE || viewMode === MAP_VIEW_MODE.HEALTH) {
-    return t('map.stateCompliance', { pct: Math.round((node.complianceRate || 0) * 100) });
+    return t('map.stateCompliance', { pct: Math.round((node.complianceRate || 0) * PERCENT) });
   }
   const worst = worstSeverity(node.severity || {});
   return worst ? t(SEVERITY_STATE_KEYS[worst]) : t('map.stateClean');

@@ -11,7 +11,7 @@ import {
   VIOLATION_ORBS, LABEL_ALPHA, FOLDER_NEBULA, FOLDER_NEBULA_DASH,
   FOLDER_STAR, FOLDER_LABEL,
 } from './galaxyTuning.js';
-import { SCORE_SCALE_MAX } from '../../../../constants.js';
+import { SCORE_SCALE_MAX, PERCENT } from '../../../../constants.js';
 
 export { starShapeFor } from './galaxyFolderCues.js';
 // Re-exported so the folder canvas's draw surface stays in one module.
@@ -280,7 +280,7 @@ export function drawLabels(ctx, pendingLabels, tc) {
     } else if (lb.s.isFolder) {
       ctx.font = `${subSize}px ${CANVAS_FONT_FAMILY}`;
       ctx.fillStyle = rgba(tc.textMuted, FOLDER_LABEL.rateAlpha);
-      ctx.fillText((lb.s.complianceRate * 100).toFixed(0) + '%', lb.sc.x, lb.sc.y + lb.sr + subDrop);
+      ctx.fillText((lb.s.complianceRate * PERCENT).toFixed(0) + '%', lb.sc.x, lb.sc.y + lb.sr + subDrop);
     }
   });
 }

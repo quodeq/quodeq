@@ -15,6 +15,12 @@ export const ISO_25010_URL = 'https://www.iso.org/';
 // so they all agree on where "full score" is.
 export const SCORE_SCALE_MAX = 10;
 
+// Fraction-to-percent multiplier, and the percent scale's own ceiling
+// (a fully-covered/fully-confident value). Shared by every `* 100` percent
+// conversion and percent-scale default across the app so they all agree on
+// what "100%" means.
+export const PERCENT = 100;
+
 // Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).
 // These client-side defaults can be overridden by server config (ai_providers.json).
 export const DEFAULT_MAX_SUBAGENTS = 5;

@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { LevelInfoPanel } from './galaxyViewInfo.jsx';
+import { PERCENT } from '../../../../constants.js';
 
 /** Compliance rate as a whole percentage, or a dash when nothing was checked. */
 function complianceRate(d) {
   const total = d.violations + d.compliance;
-  return total > 0 ? Math.round((d.compliance / total) * 100) + '%' : '—';
+  return total > 0 ? Math.round((d.compliance / total) * PERCENT) + '%' : '—';
 }
 
 /** How many direct children are folders and how many are files. */

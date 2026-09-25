@@ -17,10 +17,11 @@
  * coverage fields are null and the UI falls back to the run-only display.
  */
 import { DIM_STATE } from '../../../vocab/dimState.js';
+import { PERCENT } from '../../../constants.js';
 
 export function pct(taken, total) {
   if (!total || total <= 0) return 0;
-  return Math.min(100, Math.round((taken / total) * 100));
+  return Math.min(PERCENT, Math.round((taken / total) * PERCENT));
 }
 
 /**

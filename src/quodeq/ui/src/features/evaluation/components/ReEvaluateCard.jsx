@@ -9,6 +9,7 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { t, LOCALE } from '../../../strings/index.js';
+import { PERCENT } from '../../../constants.js';
 
 export { buildScanPayload } from '../hooks/useDimensionSelection.js';
 
@@ -34,7 +35,7 @@ function buildDimMetas(estimates, isClean) {
     const count = isClean ? total : (est.count ?? 0);
     const cached = isClean ? 0 : (est.cached ?? 0);
     if (count === 0) return [id, [t('evaluate.upToDate')]];
-    const pct = Math.round((cached / total) * 100);
+    const pct = Math.round((cached / total) * PERCENT);
     const lines = [t('evaluate.filesToAnalyze', { count: count.toLocaleString(LOCALE) })];
     if (pct > 0) lines.push(t('evaluate.pctAnalyzed', { pct }));
     return [id, lines];

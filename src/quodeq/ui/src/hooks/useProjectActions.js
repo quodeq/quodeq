@@ -22,11 +22,13 @@ import { DIALOG_VARIANT } from '../vocab/dialogVariant.js';
 
 // Strip filesystem-unfriendly characters so a project name like
 // "foo/bar" or "..\\evil" can't influence the download path.
+const MAX_EXPORT_FILENAME_LENGTH = 100; // keeps the downloaded .zip's name reasonable
+
 function sanitizeFilename(name) {
   return String(name || '')
     .replace(/[/\\:*?"<>|\x00-\x1f]+/g, '_')
     .replace(/^\.+/, '_')
-    .slice(0, 100) || 'project';
+    .slice(0, MAX_EXPORT_FILENAME_LENGTH) || 'project';
 }
 
 function makeFail(onError) {

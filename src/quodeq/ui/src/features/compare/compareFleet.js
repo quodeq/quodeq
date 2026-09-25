@@ -11,7 +11,7 @@ import {
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 import { SORT_DIR } from '../../vocab/sortDirection.js';
 import { roundOneDecimal } from '../../utils/rounding.js';
-import { SCORE_SCALE_MAX } from '../../constants.js';
+import { SCORE_SCALE_MAX, PERCENT } from '../../constants.js';
 
 // consequenceLevel's return values, in ascending severity. CompareFleetView
 // and useCompareScopeActions both compare against CLEAR to decide whether a
@@ -102,7 +102,7 @@ function _rowCoverage(project) {
     totalFiles,
     analyzedFiles,
     coveragePct: totalFiles && analyzedFiles != null
-      ? Math.round((analyzedFiles / totalFiles) * 100)
+      ? Math.round((analyzedFiles / totalFiles) * PERCENT)
       : null,
   };
 }
@@ -225,8 +225,8 @@ export function buildFleet(rows) {
     totalViolations,
     totalCompliance,
     checks,
-    passPct: checks ? Math.round((totalCompliance / checks) * 100) : null,
-    coveragePct: coverageBase ? Math.round((analyzed / coverageBase) * 100) : null,
+    passPct: checks ? Math.round((totalCompliance / checks) * PERCENT) : null,
+    coveragePct: coverageBase ? Math.round((analyzed / coverageBase) * PERCENT) : null,
     staleCount: rows.filter((r) => r.stale).length,
   };
 }
