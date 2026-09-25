@@ -12,6 +12,7 @@ from unittest.mock import DEFAULT, MagicMock, patch
 
 import pytest
 
+from quodeq.analysis._pipeline import _run_dimensions
 from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.shared.constants import CC_PHASE_ANALYZING_START
 
@@ -55,7 +56,6 @@ def test_default_run_uses_incremental_loop(patched_pipeline):
         m.run_per_dimension_loop.return_value = {}
         m.process_consolidated_dimensions.return_value = {}
 
-        from quodeq.analysis._pipeline import _run_dimensions
         _run_dimensions(_make_config(incremental=True))
 
         assert m.run_incremental_loop.called, "Default run did not reach run_incremental_loop"
@@ -73,7 +73,6 @@ def test_clean_scan_skips_incremental_loop(patched_pipeline):
         m.process_consolidated_dimensions.return_value = {}
         m.get_provider_type.return_value = "api"
 
-        from quodeq.analysis._pipeline import _run_dimensions
         _run_dimensions(_make_config(incremental=False))
 
         assert not m.run_incremental_loop.called, "Clean scan unexpectedly used run_incremental_loop"
@@ -93,7 +92,6 @@ def test_diff_from_uses_per_dim_loop(patched_pipeline):
         m.run_incremental_loop.return_value = {}
         m.run_per_dimension_loop.return_value = {}
 
-        from quodeq.analysis._pipeline import _run_dimensions
         _run_dimensions(_make_config(incremental=True, diff_from="origin/main"))
 
         assert m.run_per_dimension_loop.called, "diff_from did not route to run_per_dimension_loop"
@@ -117,7 +115,6 @@ def test_deadline_marker_emitted_once_at_the_root_when_set(patched_pipeline):
         m.run_incremental_loop.return_value = {}
         m.set_run_deadline.return_value = "2026-05-02T10:00:00+00:00"
 
-        from quodeq.analysis._pipeline import _run_dimensions
         config = _make_config(incremental=True)
         config.options.time_limit = 600
         _run_dimensions(config)
@@ -137,7 +134,6 @@ def test_no_deadline_marker_when_set_run_deadline_skips(patched_pipeline):
         m.run_incremental_loop.return_value = {}
         m.set_run_deadline.return_value = None
 
-        from quodeq.analysis._pipeline import _run_dimensions
         _run_dimensions(_make_config(incremental=True))
 
         assert _deadline_calls(m.emit_marker) == []

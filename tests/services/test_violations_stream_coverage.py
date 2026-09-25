@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 
+from quodeq.services._violations_stream import parse_violations_from_stream
+
 
 class TestTryParseTextLine:
     def test_non_json_line(self):
@@ -115,7 +117,6 @@ class TestParseStreamLine:
 
 class TestParseViolationsFromStream:
     def test_missing_file(self, tmp_path):
-        from quodeq.services._violations_stream import parse_violations_from_stream
         from quodeq.services.violation_context import ViolationContext
         ctx = ViolationContext(dimension="sec", run_id="r1", project="p1")
         result = parse_violations_from_stream(tmp_path / "missing.stream", ctx)
@@ -126,7 +127,6 @@ class TestParseViolationsFromStream:
         exactly as it did before ``iter_stream_lines`` existed -- a plain
         early return (with no log call) would silently drop this signal."""
         import logging
-        from quodeq.services._violations_stream import parse_violations_from_stream
         from quodeq.services.violation_context import ViolationContext
         ctx = ViolationContext(dimension="sec", run_id="r1", project="p1")
         missing = tmp_path / "missing.stream"
@@ -137,7 +137,6 @@ class TestParseViolationsFromStream:
         assert str(missing) in caplog.text
 
     def test_valid_stream_file(self, tmp_path):
-        from quodeq.services._violations_stream import parse_violations_from_stream
         from quodeq.services.violation_context import ViolationContext
         stream = tmp_path / "stream.jsonl"
         # Write a minimal stream event (no findings in it)

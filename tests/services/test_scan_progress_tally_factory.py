@@ -12,13 +12,13 @@ from pathlib import Path
 from tests._timeouts import budget
 
 from quodeq.data.fs.evidence_tally import FindingTally
-from quodeq.services._scan_progress_dims import _LIVE_TALLIES, live_tally
+import quodeq.services._scan_progress_dims as dims
 
 
 def test_one_run_s_advance_does_not_block_another_run_s_poll(tmp_path):
     """Finding 8: the process-wide lock guards the memo, not the file read, so
     a slow advance() on one run cannot serialise every other run's poll."""
-    _LIVE_TALLIES.clear()
+    dims._LIVE_TALLIES.clear()
     gate = threading.Event()
 
     class _BlockingTally:
@@ -31,18 +31,16 @@ def test_one_run_s_advance_does_not_block_another_run_s_poll(tmp_path):
                 assert gate.wait(timeout=budget(5)), "advance() was never released"
             return FindingTally()
 
-    import quodeq.services._scan_progress_dims as dims
-
     original = dims.IncrementalTally
     dims.IncrementalTally = _BlockingTally
     try:
-        slow = threading.Thread(target=lambda: live_tally(
+        slow = threading.Thread(target=lambda: dims.live_tally(
             tmp_path / "blocked.jsonl", suppressed=None, make_resolver=None, memo_key=("a",)))
         slow.start()
         done = threading.Event()
 
         def _other_poll():
-            live_tally(tmp_path / "other.jsonl", suppressed=None, make_resolver=None, memo_key=("b",))
+            dims.live_tally(tmp_path / "other.jsonl", suppressed=None, make_resolver=None, memo_key=("b",))
             done.set()
 
         other = threading.Thread(target=_other_poll)
@@ -59,7 +57,7 @@ def test_one_run_s_advance_does_not_block_another_run_s_poll(tmp_path):
 def test_injected_tally_factory_is_used_instead_of_incremental_tally(tmp_path):
     """live_tally's tally_factory seam: a fake factory must back the tally,
     proving the real IncrementalTally class was never constructed."""
-    _LIVE_TALLIES.clear()
+    dims._LIVE_TALLIES.clear()
     path = tmp_path / "e.jsonl"
     path.write_text('{"p": "P1", "file": "a.py", "line": 1, "t": "violation"}\n')
     built_paths: list[Path] = []
@@ -71,7 +69,7 @@ def test_injected_tally_factory_is_used_instead_of_incremental_tally(tmp_path):
         def advance(self):
             return FindingTally(violations=99)
 
-    result = live_tally(
+    result = dims.live_tally(
         path, suppressed=None, make_resolver=None, memo_key=("fake-factory",),
         tally_factory=_FakeTally,
     )
@@ -83,7 +81,7 @@ def test_injected_tally_factory_is_used_instead_of_incremental_tally(tmp_path):
 def test_default_tally_factory_still_resolves_to_the_patched_incremental_tally(tmp_path, monkeypatch):
     """Existing patch target keeps biting: no tally_factory injected -> falls
     back to this module's IncrementalTally, resolved at call time."""
-    _LIVE_TALLIES.clear()
+    dims._LIVE_TALLIES.clear()
     path = tmp_path / "e.jsonl"
     path.write_text('{"p": "P1", "file": "a.py", "line": 1, "t": "violation"}\n')
     calls: list[Path] = []
@@ -96,6 +94,6 @@ def test_default_tally_factory_still_resolves_to_the_patched_incremental_tally(t
             return FindingTally()
 
     monkeypatch.setattr("quodeq.services._scan_progress_dims.IncrementalTally", _SpyTally)
-    live_tally(path, suppressed=None, make_resolver=None, memo_key=("spy",))
+    dims.live_tally(path, suppressed=None, make_resolver=None, memo_key=("spy",))
 
     assert calls == [path]
