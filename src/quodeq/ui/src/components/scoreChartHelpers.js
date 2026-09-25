@@ -128,3 +128,10 @@ export const REF_LINE_OPACITY_ODD = 0.2;
 /** Fixed chart height for the History tab's score chart (HistoryChartPanel),
  * shared with its Suspense placeholder so the two never drift apart. */
 export const HISTORY_CHART_HEIGHT = 220;
+
+// Fixed pixel height for the compact panel bar charts: the dashboard's
+// run-history panel, the explorer's dimension-score-history panel, and
+// history's per-dimension-scores-for-one-run panel. Not HISTORY_CHART_HEIGHT
+// above (220px, the History tab's own score line chart) — a different,
+// shorter chart shape, deliberately a different height.
+export const PANEL_CHART_HEIGHT_PX = 160;

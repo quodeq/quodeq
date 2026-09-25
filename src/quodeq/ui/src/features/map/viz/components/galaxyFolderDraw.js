@@ -17,8 +17,8 @@ export { starShapeFor } from './galaxyFolderCues.js';
 // Re-exported so the folder canvas's draw surface stays in one module.
 export { drawStarfield } from './galaxyStarfield.js';
 
-// Added to a folder star's label-collision importance so a folder always
-// outranks a file (whose importance is only violations + radius, orders of
+// Added to a folder star's label-collision importance so a folder outranks
+// any ordinary file (whose importance is only violations + radius, orders of
 // magnitude smaller) when two labels compete for the same space.
 const FOLDER_IMPORTANCE_BOOST = 1000;
 

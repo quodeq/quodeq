@@ -12,13 +12,12 @@
 // events, queries and breakpoints: src/constants.js. Unit conversions:
 // src/utils/time.js. See CONTRIBUTING.md, Code Style.
 //
-// Ignored values are self-describing: -1/0/1/2 (sentinels, unit steps).
-// The score scale, percent and time unit factors (10, 24, 60, 100, 1000)
-// are named constants, not ignored. Tests and fixtures are excluded: there
-// the literal is the expected value, which is the contract under test.
-//
-// -1/0/1/2 is the floor: every other literal in production UI code names
-// a home (CONTRIBUTING.md, Code Style) rather than being grandfathered here.
+// Ignored values are self-describing: -1/0/1/2 (sentinels, unit steps) —
+// the floor. The score scale, percent and time unit factors (10, 24, 60,
+// 100, 1000) are named constants, not ignored: every other literal in
+// production UI code names a home rather than being grandfathered here.
+// Tests and fixtures are excluded: there the literal is the expected value,
+// which is the contract under test.
 export default [
   {
     files: ['src/**/*.js', 'src/**/*.jsx'],

@@ -30,13 +30,6 @@ export const PERCENT = 100;
 // identically instead of drifting apart if one is tuned and not the other.
 export const STREAM_INACTIVITY_MS = SECONDS_PER_MINUTE * MS_PER_SECOND;
 
-// Fixed pixel height for the score-history bar charts on the dashboard's
-// run-history panel, the explorer's dimension panel, and history's
-// dimension panel. Not the same chart as HISTORY_CHART_HEIGHT in
-// scoreChartHelpers.js (220px, the history line-chart panel) — different
-// charts, deliberately different heights.
-export const HISTORY_CHART_HEIGHT_PX = 160;
-
 // Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).
 // These client-side defaults can be overridden by server config (ai_providers.json).
 export const DEFAULT_MAX_SUBAGENTS = 5;

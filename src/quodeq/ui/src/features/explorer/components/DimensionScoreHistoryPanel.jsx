@@ -10,7 +10,7 @@ import {
   periodOrDateLabel,
   tooltipScore,
 } from '../../../components/scoreChartPanel.jsx';
-import { HISTORY_CHART_HEIGHT_PX } from '../../../constants.js';
+import { PANEL_CHART_HEIGHT_PX } from '../../../components/scoreChartHelpers.js';
 
 const MAX = 16;
 const MAX_BAR_SIZE = 28;
@@ -42,7 +42,7 @@ const DimensionTooltip = makeScoreTooltip({
 });
 
 const CHART_PRESENTATION = {
-  height: HISTORY_CHART_HEIGHT_PX,
+  height: PANEL_CHART_HEIGHT_PX,
   fillHeight: true,
   maxBarSize: MAX_BAR_SIZE,
   gradientId: 'dimScoreAreaGrad',

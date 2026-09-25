@@ -11,11 +11,11 @@ import {
 } from 'recharts';
 import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/formatters.js';
 import ChartKeyboardControls from '../../../components/ChartKeyboardControls.jsx';
-import { cssVar } from '../../../components/scoreChartHelpers.js';
+import { cssVar, PANEL_CHART_HEIGHT_PX } from '../../../components/scoreChartHelpers.js';
 import { fallbackDelta } from '../../../utils/dimensionUtils.js';
 import { t } from '../../../strings/index.js';
 import { scoreBarColorVar } from './scoreBarColor.js';
-import { SCORE_SCALE_MAX, HISTORY_CHART_HEIGHT_PX } from '../../../constants.js';
+import { SCORE_SCALE_MAX } from '../../../constants.js';
 
 const CHART_LEFT_MARGIN = -16;
 const CHART_MAX_BAR_SIZE = 40;
@@ -134,7 +134,7 @@ function renderTrendLabel(data, { x, y, width, index }) {
 
 function DimensionBarChart({ data, onBarClick }) {
   return (
-    <ResponsiveContainer width="100%" height={HISTORY_CHART_HEIGHT_PX}>
+    <ResponsiveContainer width="100%" height={PANEL_CHART_HEIGHT_PX}>
       <BarChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: CHART_LEFT_MARGIN }}>
         <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
         <XAxis
