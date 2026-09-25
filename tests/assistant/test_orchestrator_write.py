@@ -29,7 +29,11 @@ def _fixture(tmp_path, repo_root, monkeypatch):
     ctx = ToolContext(
         repository=store, session_id="s1", run_dir=None, repo_root=repo_root,
         evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
-        dimensions_file=tmp_path / "d.json", project_id="proj")
+        dimensions_file=tmp_path / "d.json", project_id="proj",
+        # Mirrors the composition-root computation (api/_assistant_helpers.
+        # build_tool_context) so this fixture exercises both the with-git
+        # and without-git (test_grant_without_git_repo_stays_read_only) cases.
+        repo_is_git=repo_root is not None and (repo_root / ".git").exists())
     return store, ctx
 
 

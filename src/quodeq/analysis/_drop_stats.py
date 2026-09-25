@@ -9,22 +9,22 @@ This module accumulates the per-call (dropped, kept) counts in a
 :class:`DropStatsCounter` — the whole run (all dimensions, all pool worker
 threads) executes in one process, so the module-default instance is the
 aggregation seam. The dimension loops call :func:`report_run_drop_stats`
-once at end of run to log the aggregate, elevate a single warning when the
-drop ratio crosses :data:`DROP_RATIO_WARN_THRESHOLD`, and emit a structured
-``drop_stats`` marker for the dashboard stream (mirroring the per-dim
-``cache_stats`` marker).
+once at end of run to log the aggregate through the injected sink and
+elevate a single warning when the drop ratio crosses
+:data:`DROP_RATIO_WARN_THRESHOLD`. The dashboard ``drop_stats`` marker
+(mirroring the per-dim ``cache_stats`` marker) is emitted by the caller
+(``_loops.py``), the run's composition root for this seam, not here.
 
 Deliberately stdlib-only: ``_loops`` imports this module, and must not pull
 in ``_api_runner`` (which requires the ``quodeq[api]`` extra).
 """
 from __future__ import annotations
 
-import logging
 import threading
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-_logger = logging.getLogger(__name__)
+from quodeq.core.observability import NULL_LOG, LogSink
 
 # Elevate one run-level warning when MORE than this fraction of parsed
 # findings was dropped. Strict inequality: 'crosses', not 'reaches'.
@@ -130,35 +130,32 @@ def consume() -> DropStats:
     return _default_counter.consume()
 
 
-def report_run_drop_stats(counter: DropStatsCounter | None = None) -> DropStats:
-    """Log the run's aggregate drop ratio and emit the ``drop_stats`` marker.
+def report_run_drop_stats(
+    counter: DropStatsCounter | None = None, *, log: LogSink = NULL_LOG,
+) -> DropStats:
+    """Log the run's aggregate drop ratio through the injected sink.
 
     Reads (and resets) *counter*, defaulting to the run-wide module counter.
     Silent no-op when no API calls were recorded (CLI-provider runs, or a
     run where the model emitted no finding-shaped objects at all) — there
-    is no ratio to report and the marker would be noise.
+    is no ratio to report. The caller (``_loops.py``) emits the
+    ``drop_stats`` dashboard marker off the returned :class:`DropStats`
+    when ``parsed`` is non-zero, mirroring this same no-op-when-empty rule.
     """
     stats = (counter or _default_counter).consume()
     if stats.parsed == 0:
         return stats
-    _logger.info(
-        "API runner parse summary: kept %d, dropped %d of %d parsed finding(s) "
-        "(%.1f%% drop ratio)%s",
-        stats.kept, stats.dropped, stats.parsed, stats.ratio * 100,
-        f"; top reasons: {stats.top_reasons()}" if stats.reasons else "",
+    log.info(
+        f"API runner parse summary: kept {stats.kept}, dropped {stats.dropped} "
+        f"of {stats.parsed} parsed finding(s) ({stats.ratio * 100:.1f}% drop ratio)"
+        + (f"; top reasons: {stats.top_reasons()}" if stats.reasons else "")
     )
     if stats.ratio > DROP_RATIO_WARN_THRESHOLD:
-        _logger.warning(
-            "API runner dropped %.1f%% of parsed findings this run (%d of %d) -- "
-            "above the %.0f%% threshold. This points at a systemic output-shape "
-            "problem (prompt or model change?). Rejecting constraints, commonest "
-            "first: %s.",
-            stats.ratio * 100, stats.dropped, stats.parsed,
-            DROP_RATIO_WARN_THRESHOLD * 100, stats.top_reasons(),
+        log.warning(
+            f"API runner dropped {stats.ratio * 100:.1f}% of parsed findings "
+            f"this run ({stats.dropped} of {stats.parsed}) -- above the "
+            f"{DROP_RATIO_WARN_THRESHOLD * 100:.0f}% threshold. This points at a "
+            "systemic output-shape problem (prompt or model change?). Rejecting "
+            f"constraints, commonest first: {stats.top_reasons()}."
         )
-    from quodeq.analysis.runner_markers import emit_marker  # noqa: PLC0415
-    emit_marker(
-        "drop_stats",
-        dropped=stats.dropped, kept=stats.kept, ratio=round(stats.ratio, 4),
-    )
     return stats

@@ -11,10 +11,8 @@ from datetime import datetime, timedelta, timezone
 
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.run_types import RunConfig
-from quodeq.analysis.runner_markers import emit_marker
 from quodeq.analysis.subprocess import get_provider_type
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.shared.constants import CC_PHASE_ANALYZING_START
 
 _LOCAL_API_HOSTS = ("localhost", "127.0.0.1", "::1")
 
@@ -49,16 +47,17 @@ def warn_if_local_api_oversubscribed(
     )
 
 
-def set_run_deadline(config: RunConfig) -> None:
+def set_run_deadline(config: RunConfig) -> str | None:
     """Set the run-level deadline once, just before the dim loop starts.
 
     Skipped for dry runs (caller returns earlier), unlimited budget, or when
-    an outer caller (tests) has pre-set deadline_at.
+    an outer caller (tests) has pre-set deadline_at -- ``None`` is returned
+    in every skipped case. Otherwise returns the deadline's ISO timestamp so
+    the caller (``_pipeline.py``, the composition root for this seam) can
+    emit the ``analyzing_start`` dashboard marker itself.
     """
     budget_s = config.options.time_limit
     if config.options.deadline_at is None and budget_s is not None and budget_s > 0:
         config.options.deadline_at = time.monotonic() + budget_s
-        deadline_iso = (
-            datetime.now(timezone.utc) + timedelta(seconds=budget_s)
-        ).isoformat()
-        emit_marker(CC_PHASE_ANALYZING_START, deadline_at=deadline_iso, budget_s=budget_s)
+        return (datetime.now(timezone.utc) + timedelta(seconds=budget_s)).isoformat()
+    return None

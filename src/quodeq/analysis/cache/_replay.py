@@ -31,6 +31,22 @@ def dim_jsonl_path(config: RunConfig, dim_id: str) -> Path:
     return evidence_dir(config) / f"{dim_id}_evidence.jsonl"
 
 
+def write_dispatch_keys_sidecar(
+    config: RunConfig, dim_id: str, keys: dict[str, str],
+) -> None:
+    """Record the cache keys this dim is about to dispatch (miss path).
+
+    ``consolidation.mark_run_consolidated`` reads this sidecar alongside
+    ``<dim>_replayed_unconsolidated_keys.json`` to know which entries a
+    completed run consolidates. Unlike that sidecar, this one is always
+    written when the miss path runs at all -- the caller only reaches this
+    point once there is at least one miss to dispatch.
+    """
+    sidecar = evidence_dir(config) / f"{dim_id}_dispatch_keys.json"
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(json.dumps(keys, indent=2), encoding="utf-8")
+
+
 def write_replayed_keys_sidecar(
     config: RunConfig, dim_id: str, keys: dict[str, str],
 ) -> None:

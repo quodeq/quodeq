@@ -92,6 +92,7 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
         evaluators_dir=Path(ns.evaluators_dir),
         compiled_dir=Path(ns.compiled_dir),
         dimensions_file=Path(ns.dimensions_file),
+        repo_is_git=repo_root is not None and (repo_root / ".git").exists(),
         project_id=ns.project_id or None,
         reports_dir=reports_dir,
         worktree_dir=Path(ns.worktree_dir) if getattr(ns, "worktree_dir", "") else None,

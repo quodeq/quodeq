@@ -26,7 +26,7 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.run.dimensions import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis.runner_markers import emit_marker
-from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_SCORING, CC_PHASE_SETUP
+from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_SCORING, CC_PHASE_SETUP
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG
 
@@ -270,7 +270,8 @@ def _run_dimensions(
     warn_if_local_api_oversubscribed(config, log=SHARED_LOG)
 
     dimensions, ctx, runner, dim_counts = _prepare_run_context(config)
-    set_run_deadline(config)
+    if (deadline_iso := set_run_deadline(config)) is not None:
+        emit_marker(CC_PHASE_ANALYZING_START, deadline_at=deadline_iso, budget_s=config.options.time_limit)
 
     fixed_mode_result = _dispatch_fixed_mode(
         config, dimensions, ctx, runner, on_dimension_done, dim_counts=dim_counts,

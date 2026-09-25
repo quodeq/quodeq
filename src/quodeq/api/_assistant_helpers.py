@@ -134,6 +134,7 @@ def build_tool_context(
         evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
         compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
+        repo_is_git=repo_root is not None and (repo_root / ".git").exists(),
         project_id=session.get("project_id"),
         reports_dir=reports_dir,
         read_only=(source == ProjectSource.SHARED),

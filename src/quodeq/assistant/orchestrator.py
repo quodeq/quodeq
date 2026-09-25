@@ -128,8 +128,8 @@ def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
 
 
 def _attached_git_repo(tool_ctx: ToolContext) -> bool:
-    """True when the session has a local git checkout the assistant may write to."""
-    return tool_ctx.repo_root is not None and (tool_ctx.repo_root / ".git").exists()
+    """True when the session has a local git checkout, resolved by the composition root."""
+    return tool_ctx.repo_is_git
 
 
 def _write_is_grantable(request: TurnRequest, tool_ctx: ToolContext) -> bool:

@@ -24,7 +24,6 @@ since ``mock.patch`` resolves where a name is used.
 """
 from __future__ import annotations
 
-import json
 import logging
 import threading
 from collections.abc import Callable
@@ -51,7 +50,7 @@ from quodeq.analysis.cache._persist_watcher import (
 from quodeq.analysis.cache._replay import (
     compute_files_read,
     emit_cached_findings,  # noqa: F401 -- re-export
-    evidence_dir,
+    write_dispatch_keys_sidecar,
     write_findings,
 )
 from quodeq.analysis.cache.backend import CacheBackend
@@ -118,9 +117,7 @@ def _prepare_miss_dispatch(config: RunConfig, dim_id: str, cctx: CacheContext) -
     miss_config = replace(config, options=miss_options)
     if classify.cached_findings or classify.unconsolidated_findings:
         write_findings(cctx.jsonl, classify, append=True, trust_model=cctx.trust_model)
-    sidecar = evidence_dir(config) / f"{dim_id}_dispatch_keys.json"
-    sidecar.parent.mkdir(parents=True, exist_ok=True)
-    sidecar.write_text(json.dumps(classify.miss_keys, indent=2), encoding="utf-8")
+    write_dispatch_keys_sidecar(config, dim_id, classify.miss_keys)
     return miss_config
 
 
@@ -227,7 +224,7 @@ def process_dimension_with_cache(
     """V2 entry point — content-addressed cache replaces V1 change
     detection. Falls through to ``opts.dispatcher`` when there's no
     source-file list to classify (matches V1's no-files fallback)."""
-    cctx = prepare_cache_context(config, dim_id, opts.cache)
+    cctx = prepare_cache_context(config, dim_id, opts.cache, log=opts.callbacks.log)
     if cctx is None:
         return opts.dispatcher(config, dim_id, idx, ctx, opts.callbacks)
 
