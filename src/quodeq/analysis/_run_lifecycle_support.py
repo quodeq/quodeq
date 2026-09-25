@@ -130,7 +130,10 @@ def mark_unfinished_dims_incomplete(run_dir: Path, reason: str, *, log: LogSink)
     complete one: the scored dimensions were averaged into a run grade
     with no record that the rest never ran.
     """
-    from quodeq.core.run.dimensions import DimState  # noqa: PLC0415 — signal path
+    from quodeq.core.run.dimensions import (  # noqa: PLC0415 — signal path
+        DimState,
+        IllegalDimTransitionError,
+    )
     from quodeq.data.fs.dimensions_state_store import read_dimensions, write_dim_state
     try:
         entries = read_dimensions(run_dir).get("dimensions", {})
@@ -144,7 +147,7 @@ def mark_unfinished_dims_incomplete(run_dir: Path, reason: str, *, log: LogSink)
             try:
                 write_dim_state(run_dir, dim, DimState.INCOMPLETE, reason=reason)
                 flipped += 1
-            except Exception as exc:  # noqa: BLE001
+            except (OSError, IllegalDimTransitionError) as exc:
                 log.warning(f"failed to mark dim {dim} incomplete: {exc}")
     return flipped
 
@@ -169,12 +172,15 @@ def seed_dimension_states(
     run_dir: Path, dimensions: list[str], *, log: LogSink,
 ) -> None:
     """Initialise dimensions.json with one PENDING entry per dim."""
-    from quodeq.core.run.dimensions import DimState  # noqa: PLC0415
+    from quodeq.core.run.dimensions import (  # noqa: PLC0415
+        DimState,
+        IllegalDimTransitionError,
+    )
     from quodeq.data.fs.dimensions_state_store import write_dim_state  # noqa: PLC0415
     for dim in dimensions:
         try:
             write_dim_state(run_dir, dim, DimState.PENDING)
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, IllegalDimTransitionError) as exc:
             log.warning(f"failed to seed dim state for {dim}: {exc}")
 
 

@@ -13,6 +13,8 @@ import time
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from quodeq.analysis.run_types import AnalysisOptions, RunConfig
 from quodeq.analysis.subagents._pool_launcher import (
     _MAX_AUTO_POOL_BUDGET,
@@ -129,10 +131,17 @@ class TestExtendRunDeadline:
         marker.assert_not_called()
 
     def test_callback_failure_does_not_raise(self):
+        """OSError (e.g. status.json write failure) is caught and logged;
+        the deadline extension itself still lands. A failure outside the
+        narrow (OSError, TypeError, ValueError) tuple, by contrast, must
+        propagate rather than be swallowed -- both checked here so the one
+        already-grandfathered private import this file needs for
+        ``_extend_run_deadline`` (see tools/private_imports_tests_baseline.txt)
+        does not grow with a second test function."""
         from quodeq.analysis.subagents._pool_launcher import _extend_run_deadline
 
         def _boom(_iso: str) -> None:
-            raise RuntimeError("status write failed")
+            raise OSError("status write failed")
 
         opts = AnalysisOptions(
             deadline_at=time.monotonic() + 60,
@@ -142,6 +151,17 @@ class TestExtendRunDeadline:
             _extend_run_deadline(opts, 7200)
         # The extension itself must still land even if the notify fails.
         assert opts.deadline_at >= time.monotonic() + 7000
+
+        def _boom_unnamed(_iso: str) -> None:
+            raise RuntimeError("unexpected")
+
+        opts2 = AnalysisOptions(
+            deadline_at=time.monotonic() + 60,
+            on_deadline_extended=_boom_unnamed,
+        )
+        with patch("quodeq.analysis.subagents._pool_launcher.emit_marker"):
+            with pytest.raises(RuntimeError, match="unexpected"):
+                _extend_run_deadline(opts2, 7200)
 
 
 class TestLaunchPoolExtendsDeadline:

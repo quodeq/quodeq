@@ -52,6 +52,20 @@ class TestPathologicalManifestsDegrade:
         _write(tmp_path / "pyproject.toml", '[project]\nname = "x"\ndependencies = 5\n')
         assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
 
+    def test_non_utf8_package_json_degrades(self, tmp_path: Path) -> None:
+        """read_text (called through read_json) narrows to
+        (OSError, UnicodeDecodeError): invalid UTF-8 bytes must degrade the
+        signal, not crash the scan."""
+        (tmp_path / "package.json").write_bytes(b'{"name": "\xff\xfe bad utf8"}')
+        assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
+
+    def test_non_utf8_pyproject_toml_degrades(self, tmp_path: Path) -> None:
+        """read_toml narrows to (OSError, ValueError, RecursionError):
+        tomllib.load raises UnicodeDecodeError (a ValueError subclass) on
+        non-UTF-8 bytes, which must degrade the signal, not crash the scan."""
+        (tmp_path / "pyproject.toml").write_bytes(b'[project]\nname = "\xff\xfe"\n')
+        assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
+
     def test_a_readable_manifest_still_detects_after_a_broken_sibling(
         self, tmp_path: Path, deeply_nested_json: str,
     ) -> None:

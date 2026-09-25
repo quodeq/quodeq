@@ -11,15 +11,16 @@ web service" assumptions on what is in fact a desktop / CLI / library.
 
 Every manifest here is *analyzed*, untrusted input from the repository under
 evaluation, and detection is advisory with a well-defined UNKNOWN fallback.
-So nothing in this module may raise: a manifest that cannot be read or whose
-shape is nonsense degrades that one signal and leaves the rest intact. That
-has to hold against every failure mode, not the well-behaved ones -- deeply
-nested JSON or TOML overflows the parser's call stack and raises
-``RecursionError``, a ``RuntimeError`` subclass, and a scalar where a list
-belongs raises ``TypeError`` with every parser succeeding. ``detect_shape``
-has four callers that guard nothing (``_api_runner``, ``api_prompt_assembly``,
-``mcp/findings_server``, and the ``context`` re-export), so an escape here
-fails the whole run.
+A manifest that cannot be read or whose shape is nonsense degrades that one
+signal and leaves the rest intact: a per-manifest read failure (``OSError``,
+a decode error) is absorbed in ``_project_shape_io.py``, deeply nested JSON
+or TOML overflows the parser's call stack and is absorbed there too
+(``RecursionError``), and a scalar where a list belongs raises ``TypeError``
+with every parser succeeding, caught by ``detect_shape``'s own boundary.
+``detect_shape``'s four callers (``_api_runner``, ``api_prompt_assembly``,
+``mcp/findings_server``, and the ``context`` re-export) do not add their own
+guard, so those are the failure modes this module absorbs; anything else
+propagates to the caller's own fault-isolation boundary.
 
 ``Deployment`` / ``ProjectShape`` live in ``_project_shape_types.py``;
 manifest-reading helpers live in ``_project_shape_io.py``; per-ecosystem
@@ -56,7 +57,7 @@ def detect_shape(repo_path: Path) -> ProjectShape:
         js_dep, js_web, _, ui_lang = node_signals(repo)
         rust_dep = rust_signals(repo)
         go_dep = go_signals(repo)
-    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
+    except (OSError, TypeError) as exc:
         _logger.warning(
             "Manifest signal detection failed for %s, degrading to UNKNOWN: %s", repo, exc,
         )

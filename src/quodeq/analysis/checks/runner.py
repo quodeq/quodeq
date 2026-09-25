@@ -1,9 +1,8 @@
 """Run a dimension's deterministic checkers and fold the results into its evidence.
 
-Every step here is fail-soft. A checker that raises, a standard that will not
-load, a JSONL that will not open -- each costs the deterministic findings and
-nothing else. The LLM's findings, the score and the run itself carry on. A
-check that can take a run down is worse than a check that does not exist.
+Every step here is fail-soft: a checker that raises, a standard that will not
+load, a JSONL that will not open each costs the deterministic findings and
+nothing else. A check that can take a run down is worse than no check at all.
 """
 from __future__ import annotations
 
@@ -27,8 +26,11 @@ from quodeq.data.fs.stream_files import append_jsonl_rows
 from quodeq.data.fs.symbol_uses import build_symbol_uses
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.data.fs.standards_loader import load_requirement_checks
+from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
+
+_SKIP = object()  # run_isolated's on_error sentinel: a failed checker vs. an empty one
 
 
 def deterministic_judgments(
@@ -72,10 +74,11 @@ def deterministic_judgments(
             # ship as data and outlive binaries; skip it and keep the rest.
             _logger.info("checks: %r is not a checker this build knows", name)
             continue
-        try:
-            produced = checker(context)
-        except Exception:  # one bad checker must not lose the others
-            _logger.warning("checks: %r failed on %s", name, root, exc_info=True)
+        produced = run_isolated(
+            lambda c=checker: list(c(context)),
+            label=f"checks: {name!r} on {root}", log=_logger, on_error=lambda _exc: _SKIP,
+        )
+        if produced is _SKIP:
             continue
         wanted = declared[name]
         out.extend(j for j in produced if j.practice_id in wanted)
@@ -102,8 +105,7 @@ def _to_wire(j: Judgment) -> dict:
     return row
 
 
-def _merge_into_evidence(evidence: Evidence, judgments: list[Judgment],
-                         resolver) -> int:
+def _merge_into_evidence(evidence: Evidence, judgments: list[Judgment], resolver) -> int:
     """Add *judgments* to their principles, recomputing metrics. Returns the count.
 
     A checker reports both verdicts: a violation when it found something and a
@@ -183,7 +185,7 @@ def _persist(jsonl_path: Path, judgments: list[Judgment], rows: list[dict]) -> N
         writer = EventLogWriter(jsonl_path.parent.parent / "events.jsonl")
         writer.emit_many(
             JudgmentCreatedEvent(payload=j) for j in judgments)
-    except Exception:  # the findings are already in the evidence
+    except (OSError, TypeError, ValueError):  # the findings are already in the evidence
         _logger.warning("checks: could not mirror findings to the event log", exc_info=True)
 
 
@@ -238,8 +240,7 @@ def apply_deterministic_checks(
         gated.append(judgment)
         rows.append(row)
 
-    resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir,
-                                        req_map_reader=read_req_to_principle_map)
+    resolver = build_principle_resolver(dimension, evaluators_dir, compiled_dir, req_map_reader=read_req_to_principle_map)
     added = _merge_into_evidence(evidence, gated, resolver)
     if added and jsonl_path is not None:
         (persist_fn or _persist)(jsonl_path, gated, rows)
@@ -276,12 +277,10 @@ def apply_checks_for_run(config, dimension: str, evidence: Evidence) -> int:
             return 0
         standards_dir = config.standards_dir
         evidence_dir = config.work_dir or config.src
-        # Resolved once per dimension and threaded down, the same way
-        # process_dimension_with_cache does it: resolution reads the project
-        # profile and walks the manifests, which is per-project work, not
-        # per-finding work. Guarding on ``config.src`` rather than assuming it
-        # keeps apply_scope_gate's no-op explicit -- resolve_trust_model would
-        # degrade to CONSERVATIVE on None, which is a different statement.
+        # Resolved once per dimension (per-project work, not per-finding work).
+        # Guarding on config.src rather than assuming it keeps the no-op
+        # explicit -- resolve_trust_model would degrade to CONSERVATIVE on
+        # None, which is a different statement.
         trust_model = resolve_trust_model(config.src) if config.src is not None else None
         scope = CheckScope(
             root=Path(config.src),
@@ -295,6 +294,6 @@ def apply_checks_for_run(config, dimension: str, evidence: Evidence) -> int:
             jsonl_path=Path(evidence_dir) / f"{dimension}_evidence.jsonl",
             trust_model=trust_model,
         )
-    except Exception:  # a check must never fail a dimension that already succeeded
+    except (OSError, TypeError, ValueError):  # a check must never fail a dimension that already succeeded
         _logger.warning("checks: skipped for %s", dimension, exc_info=True)
         return 0

@@ -28,10 +28,42 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from quodeq.analysis.cache import LocalFileBackend, build_cache_key_for_file
-from quodeq.analysis.cache.dimension_runner import CacheRunOptions, process_dimension_with_cache
+from quodeq.analysis.cache.dimension_runner import (
+    CacheRunOptions,
+    periodic_persist,
+    process_dimension_with_cache,
+)
 from tests.analysis.cache.conftest import _make_callbacks, _make_ctx
 
 from ._periodic_persist_helpers import _setup
+
+
+# ============================================================
+# periodic_persist: fault isolation
+# ============================================================
+
+
+class TestPeriodicPersistFaultIsolation:
+    def test_a_failing_tick_logs_and_the_watcher_keeps_ticking(self, recording_log) -> None:
+        """A tick that raises must not kill the watcher thread: the next
+        tick (and eventually the final persist) still runs."""
+        stop_event = threading.Event()
+        calls: list[int] = []
+
+        def persist_fn() -> None:
+            calls.append(1)
+            if len(calls) == 1:
+                raise RuntimeError("tick failed")
+            if len(calls) == 2:
+                stop_event.set()
+
+        periodic_persist(stop_event, persist_fn, 0.0, recording_log)
+
+        # tick 1 (raises), tick 2 (sets stop_event), final persist (tick 3).
+        assert len(calls) == 3
+        assert recording_log.warning_messages
+        assert "cache persist failed" in recording_log.warning_messages[0]
+        assert "tick failed" in recording_log.warning_messages[0]
 
 
 # ============================================================

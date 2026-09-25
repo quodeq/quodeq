@@ -8,15 +8,6 @@
 # the baseline (update the shifted line number) over blind --update-baseline
 # regeneration, which can silently absorb a genuinely new violation
 # introduced in the same change.
-src/quodeq/analysis/_run_lifecycle_support.py:147:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:177:broad-except
-src/quodeq/analysis/cache/_persist_watcher.py:147:broad-except
-src/quodeq/analysis/cache/_persist_watcher.py:152:broad-except
-src/quodeq/analysis/cache/_replay.py:146:broad-except
-src/quodeq/analysis/checks/runner.py:186:broad-except
-src/quodeq/analysis/checks/runner.py:298:broad-except
-src/quodeq/analysis/checks/runner.py:77:broad-except
-src/quodeq/analysis/subagents/_pool_launcher.py:88:broad-except
 src/quodeq/api/_run_event_watcher.py:97:broad-except
 src/quodeq/api/_scores_routes.py:32:broad-except
 src/quodeq/api/_scores_routes.py:63:broad-except
@@ -28,12 +19,6 @@ src/quodeq/assistant/cancel.py:55:broad-except
 src/quodeq/assistant/orchestrator.py:298:broad-except
 src/quodeq/assistant/tools/_read_tools_scope.py:144:broad-except
 src/quodeq/assistant/tools/registry.py:66:broad-except
-src/quodeq/context/_project_shape_io.py:60:broad-except
-src/quodeq/context/_project_shape_io.py:74:broad-except
-src/quodeq/context/_project_shape_io.py:91:broad-except
-src/quodeq/context/project_shape.py:59:broad-except
-src/quodeq/context/trust_model.py:125:broad-except
-src/quodeq/context/trust_model.py:192:broad-except
 src/quodeq/dashboard/_webview_token.py:88:suppress
 src/quodeq/dashboard/_webview_window_close.py:207:broad-except
 src/quodeq/dashboard/_webview_window_close.py:237:broad-except
