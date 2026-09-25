@@ -1,7 +1,10 @@
 """One-shot-per-process assistant cleanup: reap leaked worktrees, prune old
 sessions; and the shared-source-gone error type build_tool_context raises.
 
-Split out of _assistant_helpers.py.
+Split out of _assistant_helpers.py. ``get_repository`` is imported directly
+from ``_assistant_location`` (its real owner), not looked up on the
+``_assistant_helpers`` facade, so this module never imports back the facade
+that re-exports it.
 """
 from __future__ import annotations
 
@@ -10,6 +13,7 @@ from collections.abc import Mapping
 
 from flask import Flask
 
+from quodeq.api._assistant_location import get_repository
 from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
@@ -46,11 +50,7 @@ def run_assistant_hygiene(app: Flask, *, ttl_days: int | None = None) -> None:
         return
     app._assistant_hygiene_done = True
     from quodeq.assistant.worktree import gc_worktrees  # noqa: PLC0415
-    # Deferred: _assistant_helpers re-exports this module's names, so a
-    # module-level import here would cycle back into a partially-initialized
-    # _assistant_helpers.
-    from quodeq.api import _assistant_helpers as _helpers  # noqa: PLC0415
-    repo = _helpers.get_repository(app)
+    repo = get_repository(app)
     try:
         gc_worktrees(repo)
         removed = repo.prune_sessions_older_than(

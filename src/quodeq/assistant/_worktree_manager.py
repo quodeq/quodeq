@@ -2,10 +2,11 @@
 worktree.
 
 Split from ``worktree.py`` to keep that file under the size ratchet's
-300-line cap. Moved verbatim; the low-level git helpers (``run_git``,
-``run_git_bytes``, ``WorktreeError``, ``diff_text``, ``diff_stats``,
-``worktrees_base``) stay imported from ``worktree.py`` rather than
-duplicated.
+300-line cap. The low-level git helpers (``run_git``, ``run_git_bytes``,
+``WorktreeError``, ``diff_text``, ``diff_stats``, ``worktrees_base``) are
+imported from ``_worktree_git.py``, their real owner (not from
+``worktree.py``, which just re-exports them), so this module never imports
+back the module that imports it.
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.assistant.worktree import (
+from quodeq.assistant._worktree_git import (
     WorktreeError, WorktreeStatus, run_git, run_git_bytes, diff_stats, diff_text, worktrees_base,
 )
 

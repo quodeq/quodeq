@@ -63,7 +63,13 @@ def app(tmp_path, provider):
     flask_app.config["TESTING"] = True
     flask_app.config["EVALUATIONS_DIR"] = str(tmp_path)
 
-    with patch("quodeq.api.routes_project_list.reports_dir", return_value=str(tmp_path)):
+    # routes_project_list.reports_dir covers the list/delete/update/export
+    # routes (which read the name via their own module-level import);
+    # routes_common.reports_dir covers create/scan/estimate (which look it
+    # up dynamically through their real owner, routes_common, not through
+    # this facade -- see routes_project_create.py / routes_project_scan.py).
+    with patch("quodeq.api.routes_project_list.reports_dir", return_value=str(tmp_path)), \
+         patch("quodeq.api.routes_common.reports_dir", return_value=str(tmp_path)):
         register_project_list_routes(flask_app, provider)
         yield flask_app
 

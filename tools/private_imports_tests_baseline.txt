@@ -510,7 +510,7 @@ tests/assistant/test_context.py:1:private-module:quodeq.assistant._context.build
 tests/assistant/test_context.py:1:private-module:quodeq.assistant._context.build_turn_message
 tests/assistant/test_copilot_events.py:3:private-module:quodeq.assistant.adapters._stream
 tests/assistant/test_env_seams_t5.py:11:private-module:quodeq.assistant.adapters._cli_spawn.build_chat_env
-tests/assistant/test_env_seams_t5.py:13:private-name:quodeq.assistant.worktree._DEFAULT_WORKTREE_TTL_H
+tests/assistant/test_env_seams_t5.py:13:private-name:quodeq.assistant._worktree_git._DEFAULT_WORKTREE_TTL_H
 tests/assistant/test_fallback.py:1:private-module:quodeq.assistant.adapters._fallback.extract_prompted_tool_call
 tests/assistant/test_findings_repo_factory.py:14:private-module:quodeq.assistant.tools._read_tools.finding_keys_in_scope
 tests/assistant/test_findings_repo_factory.py:14:private-name:quodeq.assistant.tools._read_tools._search_findings

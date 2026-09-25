@@ -1,7 +1,10 @@
 """Reap leaked assistant worktrees and their ``quodeq/fix-*`` branches.
 
 Split from ``worktree.py`` to keep that file under the size ratchet's
-300-line cap. Moved verbatim.
+300-line cap. ``WorktreeError``/``WorktreeStatus``/``worktree_ttl_hours`` are
+imported from ``_worktree_git.py``, their real owner (not from
+``worktree.py``, which just re-exports them), so this module never imports
+back the module that imports it.
 """
 from __future__ import annotations
 
@@ -9,8 +12,8 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.assistant._worktree_git import WorktreeError, WorktreeStatus, worktree_ttl_hours
 from quodeq.assistant._worktree_manager import WorktreeManager
-from quodeq.assistant.worktree import WorktreeError, WorktreeStatus, worktree_ttl_hours
 
 _logger = logging.getLogger(__name__)
 

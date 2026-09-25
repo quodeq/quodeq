@@ -9,6 +9,13 @@ therefore identical to the local route's; only the data source differs.
 
 Read-only invariant: no finding-mutation routes exist in this module or
 anywhere under /api/shared/*, per routes_shared.py's module docstring.
+
+``refresh_shared_clone`` and ``sync_shared_index`` are imported directly
+from their real owner (rather than looked up on the ``routes_shared``
+facade, which no longer re-exports them), so this module never imports back
+a sibling that imports it. Tests patch
+"quodeq.api.routes_shared_mirrors.refresh_shared_clone" /
+"...sync_shared_index".
 """
 from __future__ import annotations
 
@@ -28,7 +35,9 @@ from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.services.shared_repo import (
     published_meta,
     last_synced_at,
+    refresh_shared_clone,
     shared_index_db_path,
+    sync_shared_index,
 )
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.serialization import to_camel_dict
@@ -252,18 +261,11 @@ def register_shared_mirror_routes(app: Flask) -> None:
     Called from routes_shared.py, which owns the read-only invariant for the
     whole /api/shared/* namespace.
     """
-    # refresh_shared_clone and sync_shared_index are looked up on the
-    # quodeq.api.routes_shared facade at call time (rather than imported
-    # directly here) so that tests patching
-    # "quodeq.api.routes_shared.refresh_shared_clone" /
-    # "...sync_shared_index" keep working after the split.
-    from quodeq.api import routes_shared as _routes_shared
-
     @app.get("/api/shared/projects")
     @with_shared_root
     def shared_projects(eval_root: Path, url: str):
         return _shared_projects(
-            eval_root, url, _routes_shared.refresh_shared_clone, _routes_shared.sync_shared_index,
+            eval_root, url, refresh_shared_clone, sync_shared_index,
         )
 
     app.get("/api/shared/projects/<project>/info")(shared_project_info)

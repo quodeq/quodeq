@@ -194,8 +194,17 @@ class JobManager(JobMonitorMixin, JobCapacityMixin):
             job.ended_at = datetime.now(timezone.utc).isoformat()
             self._store.put(job)
         if process:
-            terminate_process(process)
+            self._terminate(process)
         return True
+
+    def _terminate(self, process: subprocess.Popen) -> None:
+        """Escalating SIGTERM -> SIGKILL kill, shared by cancel and the
+        watchdog (``JobMonitorMixin._monitor_process``). A plain method on
+        the module that owns ``terminate_process`` -- not a facade lookup --
+        so ``JobMonitorMixin`` (mixed into this class) can call ``self.
+        _terminate`` without importing this module back.
+        """
+        terminate_process(process)
 
     def _cancel_external(self, job_id: str, reports_root: Path, run_dir: Path | None = None) -> bool:
         """Send SIGTERM to an external run's process; *run_dir* skips the scan when valid."""

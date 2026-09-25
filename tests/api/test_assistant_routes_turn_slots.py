@@ -120,8 +120,8 @@ def test_events_stream_returns_429_above_cap(app, client):
 
 
 def test_events_stream_releases_slot_when_stream_ends(app, client, monkeypatch):
-    monkeypatch.setattr("quodeq.api._assistant_helpers.POLL_SECONDS", 0.001)
-    monkeypatch.setattr("quodeq.api._assistant_helpers.IDLE_LIMIT", 5)
+    monkeypatch.setattr("quodeq.api._assistant_events.POLL_SECONDS", 0.001)
+    monkeypatch.setattr("quodeq.api._assistant_events.IDLE_LIMIT", 5)
     sid = client.post("/api/assistant/sessions",
                       json={"provider": "ollama", "model": "m"}).get_json()["sessionId"]
     stream = client.get(f"/api/assistant/sessions/{sid}/events?after=0")

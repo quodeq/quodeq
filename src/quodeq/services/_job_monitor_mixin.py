@@ -207,14 +207,11 @@ class JobMonitorMixin:
                     # start_new_session=True, so a bare process.kill() would
                     # orphan the subagent pool + AI-CLI children (leaking tokens
                     # and CPU, and letting them write into the abandoned run
-                    # dir). terminate_process matches the cancel/shutdown paths
-                    # and waits internally.
-                    # Deferred facade lookup: tests patch
-                    # quodeq.services.jobs.terminate_process, so this must
-                    # resolve dynamically through that module rather than a
-                    # module-level import here.
-                    from quodeq.services import jobs as _jobs_facade
-                    _jobs_facade.terminate_process(process)
+                    # dir). ``self._terminate`` (JobManager, jobs.py) matches
+                    # the cancel/shutdown paths and waits internally; tests
+                    # patch quodeq.services.jobs.terminate_process, which
+                    # _terminate's own module-global lookup still picks up.
+                    self._terminate(process)
                     exit_code = EXIT_CODE_TIMEOUT
                     watchdog_killed = True
                     break

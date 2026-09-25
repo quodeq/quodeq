@@ -1,11 +1,10 @@
 """POST /api/projects — register a new project (clone + scan).
 
 Split from ``routes_project_list.py`` to keep that file under the size
-ratchet's 300-line cap. ``reports_dir`` is looked up dynamically through the
-routes_project_list facade (rather than imported directly) so that
-``patch("quodeq.api.routes_project_list.reports_dir", ...)`` in existing
-tests still takes effect, since ``handle_create_project`` is invoked from a
-closure registered by ``register_project_list_routes``.
+ratchet's 300-line cap. ``reports_dir`` is looked up dynamically through its
+real owner, ``routes_common`` (rather than through the ``routes_project_list``
+facade that just re-exports it), so this module never imports back a sibling
+that imports it. Tests patch "quodeq.api.routes_common.reports_dir".
 """
 from __future__ import annotations
 
@@ -23,8 +22,8 @@ from quodeq.shared.validation import contained_path, relative_scope_error
 
 
 def _reports_dir() -> str:
-    from quodeq.api import routes_project_list as _facade
-    return _facade.reports_dir()
+    from quodeq.api.routes_common import reports_dir as _owner_reports_dir
+    return _owner_reports_dir()
 
 
 @dataclass
