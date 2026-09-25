@@ -123,16 +123,11 @@ def make_persist_fn(
     return _persist_now
 
 
-def resolve_failure_streak_threshold(
-    opts: AnalysisOptions, *, override: int | None = None,
-) -> int:
-    """Return the effective breaker threshold.
+def resolve_failure_streak_threshold(opts: AnalysisOptions) -> int:
+    """Return the effective breaker threshold from the options field.
 
-    Priority: *override* (when given) > options field. 0 disables; negative
-    values clamp to 0.
+    0 disables; negative values clamp to 0.
     """
-    if override is not None:
-        return max(0, override)
     return max(0, opts.failure_streak_threshold)
 
 

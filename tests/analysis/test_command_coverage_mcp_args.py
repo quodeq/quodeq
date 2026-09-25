@@ -92,9 +92,11 @@ class TestBuildMcpServerArgs:
         assert args[cr_idx + 1] == str(tmp_path / "cache" / "results")
 
     def test_cache_flags_fall_back_when_no_run_config(self, tmp_path):
-        """Without a RunConfig carrier, --cache-root is still emitted, model_id
-        comes from AnalysisConfig.ai_model, and language is empty — matching
-        The contract that language="" means "unset" rather than missing.
+        """Without a RunConfig carrier, --cache-root is emitted because this
+        config sets cache_root directly (it's omitted when cache_root is
+        None), model_id comes from AnalysisConfig.ai_model, and language is
+        empty — matching the contract that language="" means "unset" rather
+        than missing.
         """
         jsonl = tmp_path / "findings.jsonl"
         config = AnalysisConfig(jsonl_file=jsonl, ai_model="haiku", cache_root=tmp_path / "c")

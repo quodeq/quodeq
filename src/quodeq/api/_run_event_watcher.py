@@ -88,11 +88,19 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
     )
     new_last_ts = state.last_event_ts
     new_counter = state.last_event_counter
-    for event_ts, counter, payload in new_findings:
-        finding_dict = payload_as_sse_finding(payload, counter)
-        events.append(("finding", serialize_finding_event(finding_dict), event_ts.isoformat()))
-        new_last_ts = event_ts
-        new_counter = counter
+    try:
+        finding_events: list[EventTuple] = []
+        for event_ts, counter, payload in new_findings:
+            finding_dict = payload_as_sse_finding(payload, counter)
+            finding_events.append(("finding", serialize_finding_event(finding_dict), event_ts.isoformat()))
+            new_last_ts = event_ts
+            new_counter = counter
+    except Exception as exc:  # noqa: BLE001 — never crash the stream on read errors
+        _LOG.warning(f"events.jsonl read failed for {run_dir}: {exc}")
+        finding_events = []
+        new_last_ts = state.last_event_ts
+        new_counter = state.last_event_counter
+    events.extend(finding_events)
 
     # NOTE: scores.updated used to be emitted here on every tick by reading
     # dimension_scores / principle_grades and fingerprinting them. That whole

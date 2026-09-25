@@ -17,9 +17,7 @@ from tests.api._run_event_stream_helpers import (
 )
 
 
-# ---------------------------------------------------------------------------
-# compute_tick tests
-# ---------------------------------------------------------------------------
+# --- compute_tick tests ---
 
 def test_compute_tick_initial_emits_status_when_status_json_present(tmp_path: Path):
     _write_status(tmp_path, "running")
@@ -114,6 +112,29 @@ def test_compute_tick_handles_missing_events_jsonl(tmp_path: Path):
     assert finding_events == []
 
 
+def test_compute_tick_never_crashes_on_a_malformed_finding_payload(tmp_path: Path, monkeypatch, caplog):
+    """A bad payload degrades to "no findings this tick" instead of crashing
+    compute_tick -- parity with the pre-move inline reader (simulated via a
+    monkeypatched payload_as_sse_finding, since EventLogReader only ever
+    yields typed Judgment payloads in practice)."""
+    _write_status(tmp_path)
+    _write_finding_event(tmp_path, "P1", line=1)
+
+    def _boom(payload, finding_id):
+        raise AttributeError("'NoneType' object has no attribute 'practice_id'")
+
+    monkeypatch.setattr("quodeq.api._run_event_watcher.payload_as_sse_finding", _boom)
+    state = WatcherState()
+    with caplog.at_level("WARNING"):
+        events, new_state = compute_tick(tmp_path, state)
+
+    assert [e for e in events if e[0] == "finding"] == []
+    assert new_state.last_event_counter == state.last_event_counter
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1, [(r.name, r.message) for r in warnings]
+    assert warnings[0].message.startswith(f"events.jsonl read failed for {tmp_path}: ")
+
+
 def test_compute_tick_handles_malformed_status_json(tmp_path: Path):
     (tmp_path / "status.json").write_text("not valid json {")
     state = WatcherState()
@@ -160,9 +181,7 @@ def test_compute_tick_logs_nothing_on_non_dict_status_json(tmp_path: Path, caplo
     assert payload["state"] == "pending"
 
 
-# ---------------------------------------------------------------------------
-# run_events_generator tests
-# ---------------------------------------------------------------------------
+# --- run_events_generator tests ---
 
 def _drain_generator(gen, max_frames: int) -> list[str]:
     out = []
@@ -176,7 +195,6 @@ def _drain_generator(gen, max_frames: int) -> list[str]:
 
 
 def test_run_events_generator_emits_status_then_done_for_terminal_run(tmp_path: Path):
-
     _write_status(tmp_path, state="done")
     frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
     non_keepalive = [f for f in frames if not f.startswith(":")]
@@ -185,7 +203,6 @@ def test_run_events_generator_emits_status_then_done_for_terminal_run(tmp_path: 
 
 
 def test_run_events_generator_emits_finding_with_event_id(tmp_path: Path):
-
     _write_status(tmp_path, state="running")
     _write_finding_event(tmp_path)
     gen = run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0)
@@ -200,7 +217,6 @@ def test_run_events_generator_emits_finding_with_event_id(tmp_path: Path):
 
 
 def test_run_events_generator_respects_initial_last_event_ts(tmp_path: Path):
-
     _write_status(tmp_path, state="running")
     _write_finding_event(tmp_path, p="P1", line=1)
     _write_finding_event(tmp_path, p="P2", line=2)
@@ -224,7 +240,6 @@ def test_run_events_generator_respects_initial_last_event_ts(tmp_path: Path):
 
 
 def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
-
     _write_status(tmp_path, state="failed")
     _write_finding_event(tmp_path)
     frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
@@ -234,28 +249,15 @@ def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
     assert any("event: done" in f for f in non_keepalive)
 
 
-# ---------------------------------------------------------------------------
-# Grade updates intentionally do NOT flow through SSE anymore — the dismiss /
-# restore / delete HTTP endpoints return the rescored payload in their
-# response body. The whole ``scores.updated`` machinery (fingerprint state
-# machine, principle_grades polling, terminal-status workaround) was deleted.
-#
-# The contract is now: ``compute_tick`` only emits lifecycle events
-# (``status``, ``dimension-completed``, ``finding``, ``done``) for in-progress
-# evals. See ``routes_findings.py`` and the API-level tests for the new
-# mutation-returns-scores contract.
-# ---------------------------------------------------------------------------
+# Grade updates intentionally do NOT flow through SSE anymore -- see
+# WatcherState's docstring in _run_event_watcher.py. compute_tick only
+# emits lifecycle events (status, dimension-completed, finding, done) for
+# in-progress evals; routes_findings.py returns the rescored payload
+# synchronously on mutation instead.
 
-
-# ---------------------------------------------------------------------------
-# Wire-characterization: exact SSE frame sequence, byte for byte.
-#
-# The SSE watcher's artifact readers (status.json / evaluation/<dim>.json /
-# events.jsonl) live in services/run_event_readers.py; api/_run_event_watcher.py
-# only orchestrates them. These two tests pin the exact SSE frame text a
-# finished/pending run produces so moving the readers between layers cannot
-# change what goes over the wire.
-# ---------------------------------------------------------------------------
+# Wire-characterization: exact SSE frame sequence, byte for byte -- pins
+# the frame text so moving readers between api/_run_event_watcher.py and
+# services/run_event_readers.py can't change what goes over the wire.
 
 def test_finished_run_sse_sequence_is_byte_identical(tmp_path: Path):
     """A run with one dimension, one finding, and a terminal status emits

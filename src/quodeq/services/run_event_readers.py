@@ -8,18 +8,21 @@ service uses.
 
 ``read_status`` is the one exception: it reads status.json inline rather
 than through ``wiring.read_status`` (``data/fs/run_status_store.read_status``)
-or ``wiring.read_run_status_json``. Both of those already log a warning
-internally on a read/parse failure, and letting this caller log again on
-top would double the WARNING records a corrupt status.json produces, and
-add a WARNING (there was none) for non-dict JSON -- a caller-side log
+or ``wiring.read_run_status_json``. ``read_status`` (the former) already
+logs a warning internally on a read/parse failure, so letting this caller
+log again on top would double the WARNING records a corrupt status.json
+produces; ``read_run_status_json`` (the latter) is silent, swallowing the
+exception text this caller needs. Delegating to either one would also add
+a WARNING (there was none) for non-dict JSON -- a caller-side log
 regression a fix-round review caught. The old inline reader is the only
 way to keep the exact record count, logger, and message this caller had
-before the SSE-reader move, since the exception text those other readers
-would need to reproduce it is swallowed inside them.
+before the SSE-reader move.
 """
 from __future__ import annotations
 
+import errno
 import json
+import os
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
@@ -121,7 +124,13 @@ def read_dim_eval(
         log.warning(f"dimension eval read failed at {path}: {exc}")
         return None
     if data is None:
-        log.warning(f"dimension eval read failed at {path}: file not found")
+        # wiring.read_eval_report returns None (no exception) for a missing
+        # file, but the pre-move inline reader read the file directly and
+        # logged the OSError text it got from that -- reproduce that exact
+        # text here so the message stays byte-identical across the move.
+        missing = FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT))
+        missing.filename = str(path)
+        log.warning(f"dimension eval read failed at {path}: {missing}")
         return None
     return data if isinstance(data, dict) else None
 

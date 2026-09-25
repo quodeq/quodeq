@@ -20,8 +20,8 @@ src/quodeq/analysis/_loops.py:141:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:167:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:175:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:205:broad-except
+src/quodeq/analysis/cache/_persist_watcher.py:147:broad-except
 src/quodeq/analysis/cache/_persist_watcher.py:152:broad-except
-src/quodeq/analysis/cache/_persist_watcher.py:157:broad-except
 src/quodeq/analysis/cache/_replay.py:146:broad-except
 src/quodeq/analysis/cache/consolidation.py:103:broad-except
 src/quodeq/analysis/cache/consolidation.py:108:broad-except
@@ -39,6 +39,7 @@ src/quodeq/analysis/mcp/router.py:165:broad-except
 src/quodeq/analysis/mcp/router.py:203:broad-except
 src/quodeq/analysis/subagents/_pool_launcher.py:87:broad-except
 src/quodeq/api/_index_routes.py:24:broad-except
+src/quodeq/api/_run_event_watcher.py:98:broad-except
 src/quodeq/api/_scores_routes.py:41:broad-except
 src/quodeq/api/_scores_routes.py:75:broad-except
 src/quodeq/api/_sse_log_helpers.py:83:broad-except
@@ -130,7 +131,7 @@ src/quodeq/services/grade_formula.py:121:broad-except
 src/quodeq/services/grade_formula_job.py:197:broad-except
 src/quodeq/services/mutation_rescore.py:188:broad-except
 src/quodeq/services/project_registration.py:166:broad-except
-src/quodeq/services/run_event_readers.py:162:broad-except
+src/quodeq/services/run_event_readers.py:171:broad-except
 src/quodeq/services/score_run.py:232:broad-except
 src/quodeq/services/shared_publish.py:195:broad-except
 src/quodeq/services/shared_publish.py:221:broad-except
