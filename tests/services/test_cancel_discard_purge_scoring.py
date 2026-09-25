@@ -113,7 +113,7 @@ class TestRouteDiscardBlocksScoringResurrection:
         )
         scored = threading.Event()
         with patch(
-            "quodeq.api._evaluation_routes.score_completed_evidence",
+            "quodeq.services.score_run.score_completed_evidence",
             side_effect=lambda *a, **k: scored.set(),
         ):
             get_resp = client.get("/api/evaluations/j-disc")

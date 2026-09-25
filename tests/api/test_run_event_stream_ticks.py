@@ -122,6 +122,44 @@ def test_compute_tick_handles_malformed_status_json(tmp_path: Path):
     assert len(status_events) == 1
 
 
+def test_compute_tick_logs_exactly_once_on_corrupt_status_json(tmp_path: Path, caplog):
+    """Log parity with the pre-move inline reader: a corrupt status.json
+    produces exactly one WARNING total (across every logger, not just
+    api._run_event_watcher's own), with the "status.json read failed
+    at ...: ..." message -- not the two records a naive delegation to
+    wiring.read_status/read_run_status_json would produce (one logged
+    inside run_status_store, one logged again by this caller). Nothing
+    else in this minimal fixture (no evaluation dir, no events.jsonl) can
+    log, so any record beyond the one this reader emits is the regression
+    a fix-round review caught."""
+    (tmp_path / "status.json").write_text("not valid json {")
+    state = WatcherState()
+    with caplog.at_level("WARNING"):
+        compute_tick(tmp_path, state)
+    assert len(caplog.records) == 1, [(r.name, r.message) for r in caplog.records]
+    record = caplog.records[0]
+    assert record.name == "quodeq.api._run_event_watcher"
+    assert record.levelname == "WARNING"
+    assert record.message.startswith("status.json read failed at ")
+    assert "status.json" in record.message
+
+
+def test_compute_tick_logs_nothing_on_non_dict_status_json(tmp_path: Path, caplog):
+    """Valid JSON that isn't a dict (e.g. a bare list) is not an error --
+    it silently becomes the pending status, exactly like the pre-move
+    inline reader, with no WARNING at all (not even from a lower-level
+    reader that would treat it as corrupt)."""
+    (tmp_path / "status.json").write_text("[1, 2, 3]")
+    state = WatcherState()
+    with caplog.at_level("WARNING"):
+        events, _ = compute_tick(tmp_path, state)
+    assert caplog.records == [], [(r.name, r.message) for r in caplog.records]
+    status_events = [e for e in events if e[0] == "status"]
+    assert len(status_events) == 1
+    payload = json.loads(status_events[0][1])
+    assert payload["state"] == "pending"
+
+
 # ---------------------------------------------------------------------------
 # run_events_generator tests
 # ---------------------------------------------------------------------------

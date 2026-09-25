@@ -3,11 +3,23 @@
 Reads status.json, evaluation/<dim>.json, and events.jsonl for
 ``api/_run_event_watcher.py``'s ``compute_tick``. Split out so the API layer
 stops touching those files directly and instead goes through the same
-readers (``wiring.read_status``, ``wiring.EventLogReader``) every other
+readers (``wiring.read_eval_report``, ``wiring.EventLogReader``) every other
 service uses.
+
+``read_status`` is the one exception: it reads status.json inline rather
+than through ``wiring.read_status`` (``data/fs/run_status_store.read_status``)
+or ``wiring.read_run_status_json``. Both of those already log a warning
+internally on a read/parse failure, and letting this caller log again on
+top would double the WARNING records a corrupt status.json produces, and
+add a WARNING (there was none) for non-dict JSON -- a caller-side log
+regression a fix-round review caught. The old inline reader is the only
+way to keep the exact record count, logger, and message this caller had
+before the SSE-reader move, since the exception text those other readers
+would need to reproduce it is swallowed inside them.
 """
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
@@ -51,11 +63,17 @@ def findings_batch_size(env: Mapping[str, str] | None = None) -> int:
 
 
 def read_status(run_dir: Path, *, log: LogSink = NULL_LOG) -> tuple[dict[str, Any], float]:
-    """Read status.json via ``wiring.read_status``. Returns ``({state:
-    pending}, 0.0)`` when the file is absent.
+    """Read status.json. Returns ``({state: pending}, 0.0)`` when the file
+    is absent.
 
-    Tracks its own mtime (wiring.read_status doesn't) so the watcher can
-    tell "unchanged" from "just wrote a new status" without re-parsing.
+    Reads and parses inline (see the module docstring for why this one
+    reader doesn't delegate to ``wiring``): no log on a missing file (not
+    started yet, not an error), exactly one WARNING -- logged here, with
+    the real exception text -- on a read/parse failure, no log at all when
+    the JSON parses but isn't a dict (also not an error, just not a status
+    payload). Schema version is not validated, matching the pre-move
+    reader; a newer schema than this code understands is served as-is
+    rather than downgraded to pending.
     """
     path = run_dir / wiring.STATUS_FILENAME
     try:
@@ -63,14 +81,13 @@ def read_status(run_dir: Path, *, log: LogSink = NULL_LOG) -> tuple[dict[str, An
     except OSError:
         return {"state": RunState.PENDING}, STATUS_MTIME_MISSING
     try:
-        data = wiring.read_status(run_dir)
-    except wiring.UnsupportedSchemaError as exc:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return {"state": RunState.PENDING}, mtime
+        return data, mtime
+    except (OSError, ValueError) as exc:
         log.warning(f"status.json read failed at {path}: {exc}")
         return {"state": RunState.PENDING}, mtime
-    if data is None:
-        log.warning(f"status.json read failed at {path}")
-        return {"state": RunState.PENDING}, mtime
-    return data, mtime
 
 
 def scan_completed_dimensions(run_dir: Path) -> set[str]:
