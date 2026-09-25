@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from quodeq.analysis.subagents._pool_models import (
     SubagentResult,
@@ -24,6 +26,9 @@ class WorkerContext:
     dimension_key: str
     evidence_dir: Path
     queue_path: Path
+    # None = production default (``run_analysis``, looked up at call time
+    # so ``patch("...run_analysis")`` in existing tests keeps working).
+    run_fn: Callable[..., Any] | None = None
 
 
 def build_agent_config(
@@ -84,8 +89,9 @@ def run_single_agent(
     """Run a single subagent. Returns SubagentResult."""
     agent_id = f"{AGENT_ID_PREFIX}-{idx}"
     ac, jsonl_file, stream_file = build_agent_config(idx, base_config, wctx)
+    run_fn = wctx.run_fn if wctx.run_fn is not None else run_analysis
     try:
-        run_analysis(
+        run_fn(
             work_dir=work_dir,
             prompt=prompt,
             stream_file=stream_file,

@@ -85,6 +85,26 @@ class TestRunSingleAgentFatal:
         assert cancellation.is_cancelled()
         assert (cancellation.cancel_reason() or "").startswith(f"{REASON_PROVIDER_FATAL}:quota")
 
+    def test_uses_injected_run_fn_instead_of_the_module_default(self, tmp_path):
+        """WorkerContext.run_fn is a call-time seam: when set, run_single_agent
+        must call it instead of the concrete run_analysis, and never touch the
+        module-level default at all."""
+        calls: list[dict] = []
+        wctx = WorkerContext(
+            dimension="security", dimension_key="security",
+            evidence_dir=tmp_path, queue_path=tmp_path / "q.json",
+            run_fn=lambda **kwargs: calls.append(kwargs),
+        )
+        with patch(
+            "quodeq.analysis.subagents._pool_worker.run_analysis",
+            side_effect=AssertionError("the concrete run_analysis must not be called"),
+        ):
+            result = run_single_agent(0, tmp_path, "prompt", AnalysisConfig(), wctx)
+        assert len(calls) == 1
+        assert calls[0]["work_dir"] == tmp_path
+        assert calls[0]["prompt"] == "prompt"
+        assert result.success is True
+
 
 class TestLoopFatalMapping:
     """interruption_reason (consumer, quodeq.analysis._loop_state) must read back

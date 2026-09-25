@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -180,11 +181,16 @@ def _pool_paths(config: RunConfig, params: LaunchPoolParams) -> PoolPaths:
 def launch_pool(
     config: RunConfig, dim_id: str, params: LaunchPoolParams,
     *, env: dict[str, str] | None = None,
+    pool_factory: Callable[..., Any] | None = None,
 ) -> tuple[Any, list[Any]]:
-    """Create and run a SubagentPool, returning its results."""
+    """Create and run a SubagentPool, returning its results.
+
+    *pool_factory* defaults to ``SubagentPool`` (tests pass a fake).
+    """
+    factory = pool_factory if pool_factory is not None else SubagentPool
     time_limit = _resolve_pool_budget(config, dim_id, params)
     base_ac = _build_pool_config(config, dim_id, params, time_limit, env)
-    pool = SubagentPool(
+    pool = factory(
         paths=_pool_paths(config, params),
         options=PoolOptions(
             n_agents=config.options.max_subagents,

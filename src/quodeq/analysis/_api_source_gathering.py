@@ -44,13 +44,16 @@ CREDENTIAL_LOADERS: dict[str, Callable[[Mapping[str, str] | None], str | None]] 
 
 def gather_api_source_files(
     work_dir: Path, cfg: AnalysisConfig, jsonl_file: Path, stream_file: Path,
+    *, queue_factory: Callable[[Path], FileQueue] | None = None,
 ) -> list[Path] | None:
     """Gather source files from queue or by scanning.
 
     Returns None (and writes empty output) when the queue is exhausted.
+    *queue_factory* defaults to ``FileQueue`` (tests pass a fake).
     """
+    factory = queue_factory if queue_factory is not None else FileQueue
     if cfg.queue_path and cfg.queue_path.exists():
-        queue = FileQueue(cfg.queue_path)
+        queue = factory(cfg.queue_path)
         taken = queue.take(count=min(cfg.max_files_per_agent or 10, 3), agent_id=cfg.agent_id)
         # Enumeration applies the same predicate (the run's own policy when a
         # RunConfig is carried), so dropped files here mean the file changed

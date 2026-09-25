@@ -1,6 +1,7 @@
 """Consolidated multi-dimension analysis — extracted from subagents/runner.py."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -116,8 +117,16 @@ def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: AnalysisConte
 def process_consolidated_dimensions(
     config: "RunConfig", dimensions: list[str], ctx: AnalysisContext,
     *, log: LogSink = NULL_LOG,
+    pool_factory: Callable[..., Any] | None = None,
+    queue_factory: Callable[..., Any] | None = None,
 ) -> dict[str, Evidence]:
-    """Run all dimensions in a single pass -- files read once, not per dimension."""
+    """Run all dimensions in a single pass -- files read once, not per dimension.
+
+    *pool_factory* defaults to ``SubagentPool``, *queue_factory* to
+    ``FileQueue`` (tests pass fakes).
+    """
+    pool_cls = pool_factory if pool_factory is not None else SubagentPool
+    queue_cls = queue_factory if queue_factory is not None else FileQueue
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     evidence_dir = config.work_dir or config.src
 
@@ -131,12 +140,12 @@ def process_consolidated_dimensions(
     prompt = _build_prompt(config, dimensions, ctx)
     files_per_agent = compute_files_per_agent(len(files))
     queue_path = evidence_dir / "consolidated_queue.json"
-    FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
+    queue_cls(queue_path, files, max_files_per_agent=files_per_agent)
     log.info(f"Consolidated analysis: {len(files)} files, {len(dimensions)} dimensions, max {config.options.max_subagents} agents")
 
     # 3. Build config and launch pool
     base_ac = _build_consolidated_config(config, dimensions, files_per_agent, compiled_dir=compiled_dir)
-    pool = SubagentPool(
+    pool = pool_cls(
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
         options=PoolOptions(
             n_agents=config.options.max_subagents,
