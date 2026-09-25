@@ -1,6 +1,5 @@
 """Additive evaluation.db upgrades after the v3->v4 rebuild: each adds a
-column or an index, guarded to be idempotent. Split out of _migrations.py to
-keep both files under the size ratchet; the version walk itself stays in
+column or an index, guarded to be idempotent. The version walk itself is in
 _migrations.py."""
 from __future__ import annotations
 

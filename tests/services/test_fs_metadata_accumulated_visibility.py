@@ -1,12 +1,9 @@
 """Tests for _fs_metadata.py — read_accumulated_summary and standards
 visibility selection.
 
-Split from test_fs_metadata.py (further split out of
-test_fs_metadata_accumulated.py to stay under the file-size cap): dims
-absent from the latest run's config, hidden-standards exclusion, the
+Dims absent from the latest run's config, hidden-standards exclusion, the
 default ISO selection, cache invalidation on visibility change, and the
-SQL-grade/loaded-params overlay all part of the same TestReadAccumulatedSummary
-suite in the original file.
+SQL-grade/loaded-params overlay.
 """
 from __future__ import annotations
 

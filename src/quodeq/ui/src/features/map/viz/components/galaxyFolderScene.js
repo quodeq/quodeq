@@ -288,7 +288,7 @@ export function buildNavPath(root, targetPath) {
   return path;
 }
 
-// Level-info panel builder split out to galaxyFolderLevelInfo.js (self-
-// contained; shares nothing with the layout math above) — re-exported so
-// GalaxyFolderView.jsx keeps one import path.
+// The level-info panel builder lives in galaxyFolderLevelInfo.js (it shares
+// nothing with the layout math above); re-exported so GalaxyFolderView.jsx
+// has one import path.
 export { buildLevelInfo } from './galaxyFolderLevelInfo.js';

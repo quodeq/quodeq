@@ -65,10 +65,10 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   // These hooks MUST stay above the early returns below — calling them after a
   // conditional return changes the hook count between renders (React error
   // #310, a blank-crash on load). The grace/appear/sticky-latch state machine
-  // is extracted into useDashboardPageState (hooks/useDashboardPageState.js);
-  // its sub-hooks run in the exact order they did when inline here, so the
-  // render-phase state adjustments (grace reset, sticky-latch write) and the
-  // StrictMode double-invocation semantics they depend on are unchanged.
+  // lives in useDashboardPageState (hooks/useDashboardPageState.js); its
+  // sub-hooks run in a fixed order, which the render-phase state adjustments
+  // (grace reset, sticky-latch write) and the StrictMode double-invocation
+  // semantics depend on.
   const pageState = useDashboardPageState({
     runMode, dashboard, accumulated, loading, error, selectedProject, selectedSource, selectedRunId,
   });

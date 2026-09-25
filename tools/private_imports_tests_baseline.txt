@@ -3,10 +3,10 @@
 # package" as the src it exercises, so this list is expected to stay
 # large -- it is a ratchet (must not grow), not a to-zero gate.
 # Regenerate intentionally: python tools/check_private_imports.py --update-baseline
-tests/analysis/cache/_clean_scan_honor_fixtures.py:45:private-module:quodeq.analysis._dimensions.DimensionsConfig
-tests/analysis/cache/_clean_scan_honor_fixtures.py:84:private-module:quodeq.analysis._dimension_steps.build_dimension_prompt
-tests/analysis/cache/_clean_scan_honor_fixtures.py:84:private-module:quodeq.analysis._dimension_steps.parse_dimension_evidence
-tests/analysis/cache/_clean_scan_honor_fixtures.py:84:private-module:quodeq.analysis._dimension_steps.run_dimension_analysis
+tests/analysis/cache/_clean_scan_honor_fixtures.py:42:private-module:quodeq.analysis._dimensions.DimensionsConfig
+tests/analysis/cache/_clean_scan_honor_fixtures.py:81:private-module:quodeq.analysis._dimension_steps.build_dimension_prompt
+tests/analysis/cache/_clean_scan_honor_fixtures.py:81:private-module:quodeq.analysis._dimension_steps.parse_dimension_evidence
+tests/analysis/cache/_clean_scan_honor_fixtures.py:81:private-module:quodeq.analysis._dimension_steps.run_dimension_analysis
 tests/analysis/cache/_dimension_helpers_helpers.py:46:private-module:quodeq.analysis.cache._key_provenance.hash_prompts_combined
 tests/analysis/cache/_dimension_helpers_helpers.py:7:private-module:quodeq.analysis.cache._persist_watcher.CachePersistProvenance
 tests/analysis/cache/conftest.py:74:private-module:quodeq.analysis._dimensions.DimensionsConfig
@@ -430,13 +430,13 @@ tests/api/test_project_import_limits.py:106:private-module:quodeq.data.fs._model
 tests/api/test_project_import_limits.py:107:private-module:quodeq.data.fs._resolution.index_key
 tests/api/test_project_import_limits.py:137:private-module:quodeq.data.fs._models.ProjectIdentity
 tests/api/test_project_import_limits.py:138:private-module:quodeq.data.fs._resolution.index_key
-tests/api/test_rate_limit_cross_process_lock.py:146:private-module:quodeq.api._rate_limit_file_store.store_mod
-tests/api/test_rate_limit_cross_process_lock.py:15:private-module:quodeq.api._rate_limit_file_store.FileRateLimitStore
-tests/api/test_rate_limit_cross_process_lock.py:162:private-module:quodeq.api._rate_limit_file_store.store_mod
-tests/api/test_rate_limit_cross_process_lock.py:176:private-module:quodeq.api._rate_limit_file_store.store_mod
-tests/api/test_rate_limit_cross_process_lock.py:196:private-module:quodeq.api._rate_limit_file_store.store_mod
-tests/api/test_rate_limit_cross_process_lock.py:210:private-module:quodeq.api._rate_limit_file_store.store_mod
-tests/api/test_rate_limit_cross_process_lock.py:83:private-module:quodeq.api._rate_limit_file_store.store_mod
+tests/api/test_rate_limit_cross_process_lock.py:145:private-module:quodeq.api._rate_limit_file_store.store_mod
+tests/api/test_rate_limit_cross_process_lock.py:14:private-module:quodeq.api._rate_limit_file_store.FileRateLimitStore
+tests/api/test_rate_limit_cross_process_lock.py:161:private-module:quodeq.api._rate_limit_file_store.store_mod
+tests/api/test_rate_limit_cross_process_lock.py:175:private-module:quodeq.api._rate_limit_file_store.store_mod
+tests/api/test_rate_limit_cross_process_lock.py:195:private-module:quodeq.api._rate_limit_file_store.store_mod
+tests/api/test_rate_limit_cross_process_lock.py:209:private-module:quodeq.api._rate_limit_file_store.store_mod
+tests/api/test_rate_limit_cross_process_lock.py:82:private-module:quodeq.api._rate_limit_file_store.store_mod
 tests/api/test_rate_limit_hardening.py:15:private-module:quodeq.api._evaluation_helpers.check_eval_rate_limit
 tests/api/test_rate_limit_hardening.py:16:private-module:quodeq.api._rate_limit_file_store.FileRateLimitStore
 tests/api/test_rate_limit_hardening.py:17:private-module:quodeq.api._rate_limit_store.InMemoryRateLimitStore
@@ -956,7 +956,7 @@ tests/services/test_fs_metadata_accumulated.py:16:private-module:quodeq.services
 tests/services/test_fs_metadata_accumulated.py:86:private-name:quodeq.services._fs_metadata._compute_summary
 tests/services/test_fs_metadata_accumulated_card.py:14:private-module:quodeq.services._fs_metadata.read_accumulated_summary
 tests/services/test_fs_metadata_accumulated_rescore.py:16:private-module:quodeq.services._fs_metadata.read_accumulated_summary
-tests/services/test_fs_metadata_accumulated_visibility.py:16:private-module:quodeq.services._fs_metadata.read_accumulated_summary
+tests/services/test_fs_metadata_accumulated_visibility.py:13:private-module:quodeq.services._fs_metadata.read_accumulated_summary
 tests/services/test_fs_metadata_readonly.py:15:private-module:quodeq.data.fs.report_parser._run_info.RunInfo
 tests/services/test_fs_metadata_readonly.py:16:private-module:quodeq.services._fs_metadata.read_accumulated_summary
 tests/services/test_fs_metadata_readonly.py:16:private-module:quodeq.services._fs_metadata.warm_project_summary

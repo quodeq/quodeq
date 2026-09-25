@@ -1,13 +1,12 @@
 """Per-dimension steps shared by the dimension loops.
 
-Split out of ``_loops.py`` (M-MOD-6). This module imports only
-downward (``_loop_state``, ``runner_markers``, ``run_types``, ``dimension_runner``,
+This module imports only downward (``_loop_state``, ``runner_markers``, ``run_types``, ``dimension_runner``,
 core/data/shared) and never imports back from ``_loops`` -- ``_loops.py``
 imports it at the top instead. ``loop_should_stop`` and ``finalize_dim_result``
-moved here too because ``run_incremental_loop``'s per-iteration step
-(``run_one_incremental_dim``) needs them and a same-layer import back into
-``_loops`` would have recreated the cycle this split exists to avoid;
-``_loops.py``'s ``run_per_dimension_loop`` imports them back from here instead.
+live here because ``run_incremental_loop``'s per-iteration step
+(``run_one_incremental_dim``) needs them and an import back into ``_loops``
+would create a cycle; ``_loops.py``'s ``run_per_dimension_loop`` imports them
+from here.
 """
 from __future__ import annotations
 

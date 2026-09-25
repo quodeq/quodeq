@@ -13,10 +13,10 @@ import { LATEST_RUN_ID } from '../../../constants.js';
 import { useHistoryDeleteRun } from '../hooks/useHistoryDeleteRun.js';
 import { HistoryContent } from './HistoryContent.jsx';
 import {
-  HistoryEmptyShell, NoProjectSelectedEmptyContent, LoadingEmptyContent, SharedNoEvalsEmptyContent,
+  HistoryEmptyShell, NoProjectSelectedEmptyContent, LoadingEmptyContent,
 } from './HistoryEmptyStates.jsx';
 import {
-  LoadProjectFailedEmptyState, NoEvalsEmptyState, NoProjectsEmptyState,
+  LoadProjectFailedEmptyState, NoEvalsEmptyState, NoProjectsEmptyState, SharedNoCompletedEvalEmptyState,
 } from '../../../components/ProjectEmptyStates.jsx';
 import { assembleHistoryRows, visibleHistoryRows } from './historyRowAssembly.js';
 
@@ -44,9 +44,7 @@ function useHistoryLanguageSub(projectInfo) {
 }
 
 // The "no rows to show" branch of the empty-state dispatch (loading / error /
-// shared-no-evals / generic-no-evals), split out of renderHistoryEmptyState
-// purely to fit the size ratchet's per-function line cap -- same logic,
-// same order, same conditions.
+// shared-no-evals / generic-no-evals).
 function renderNoRowsEmptyState({
   selectedSource, loading, error, isFetching, isRefreshing, projectInfo, selectedProject, onNavigate, onRetry,
 }) {
@@ -72,7 +70,7 @@ function renderNoRowsEmptyState({
   if (selectedSource === PROJECT_SOURCE.SHARED) {
     return (
       <HistoryEmptyShell sub={t('violations.subNoEvals')} refreshing={isRefreshing}>
-        <SharedNoEvalsEmptyContent />
+        <SharedNoCompletedEvalEmptyState />
       </HistoryEmptyShell>
     );
   }
@@ -84,9 +82,8 @@ function renderNoRowsEmptyState({
   );
 }
 
-// Empty-state dispatch: which branch applies, and in what order. Mirrors
-// the original inline conditional chain 1:1 -- only the per-branch content
-// moved, into HistoryEmptyStates.jsx (see that file's header comment).
+// Empty-state dispatch: which branch applies, and in what order. The
+// per-branch content lives in HistoryEmptyStates.jsx.
 function renderHistoryEmptyState({
   projectsLoaded, projects, selectedSource, selectedProject, onNavigate,
   availableRuns, trend, partialRuns, loading, error, isFetching, isRefreshing, projectInfo, onRetry,

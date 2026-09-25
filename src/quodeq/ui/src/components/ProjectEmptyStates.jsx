@@ -29,6 +29,19 @@ export function LoadProjectFailedEmptyState({ error, onRetry }) {
   );
 }
 
+/**
+ * A shared project with no completed evaluation. Shared projects are read-only
+ * in the app (evaluations only run locally), so there is no call to action.
+ */
+export function SharedNoCompletedEvalEmptyState() {
+  return (
+    <EmptyState
+      title={t('overview.noCompletedEvalTitle')}
+      description={t('overview.noCompletedEvalSharedDesc')}
+    />
+  );
+}
+
 export function NoEvalsEmptyState({ projectName, onNavigate }) {
   return (
     <EmptyState

@@ -2,9 +2,8 @@
 
 Builds the camelCase ``{dimensions, summary}`` payloads from either the
 SQL grade tables (modern, event-log-projected runs) or the eval JSON
-files (legacy runs). Moved out of the package ``__init__`` in the
-ScoringReader decomposition; the facade re-exports every name, so
-callers and patch targets are unchanged.
+files (legacy runs). The package ``__init__`` re-exports every name, so
+callers and patch targets use the package path.
 """
 from __future__ import annotations
 

@@ -12,7 +12,7 @@ def test_unix_lock_times_out_on_contention(tmp_path, monkeypatch, caplog) -> Non
     import fcntl
 
     # quodeq.data.file_lock is a re-export shim; the implementation (and
-    # its timeout constants) now live in quodeq.core.utils.file_lock, so
+    # its timeout constants) are in quodeq.core.utils.file_lock, so
     # that's what must be patched for the patch to actually take effect.
     from quodeq.core.utils import file_lock as _file_lock_impl
     from quodeq.data import file_lock

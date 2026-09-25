@@ -106,11 +106,10 @@ export function buildDimensionGroup(dim) {
 }
 
 /**
- * Flatten dimension groups into sorted rows. Non-mutating: sorts a COPY of
- * `groups` ([...groups].sort) rather than the array the caller passed in
- * (the original sorted `groups` — and each group's `principles` array — in
- * place; changed here for `groups` only, kept for `principles` since each
- * group object is freshly built per call and not retained by any caller).
+ * Flatten dimension groups into sorted rows. Sorts a COPY of `groups`
+ * ([...groups].sort), never the caller's array. Each group's `principles`
+ * array is sorted in place: group objects are built fresh per call and no
+ * caller retains them.
  */
 export function flattenAndSort(groups, sortCol, sortDir) {
   const cmp = comparator(sortCol, sortDir);

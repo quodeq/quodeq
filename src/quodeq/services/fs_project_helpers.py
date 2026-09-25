@@ -35,7 +35,9 @@ from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
     max_projects_listed,
 )
 from quodeq.services._registration_url import strip_credentials
-from quodeq.services._repo_index import load_repo_index, repo_index_key, save_repo_index
+from quodeq.services._repo_index import (
+    RepoIdentity, load_repo_index, repo_index_key, save_repo_index,
+)
 from quodeq.shared.env import score_cache_disabled
 
 _logger = logging.getLogger(__name__)
@@ -217,11 +219,7 @@ def _repo_identity_matches(
     data = read_repository_info(project_dir)
     if data is None:
         return False
-    return (
-        data.get("name") == expected_name
-        and data.get("path") == repo_resolved
-        and (data.get("scopePath") or None) == (scope_path or None)
-    )
+    return RepoIdentity(expected_name, repo_resolved, scope_path).matches_record(data)
 
 
 def find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:

@@ -100,8 +100,7 @@ function DrawerControls({ session, toggles, actions }) {
 /**
  * The assistant panel's own header: panel switcher, animated compass
  * identity, the live model chip (click opens Settings), the session-state
- * chips, and the window controls that used to live in the shared drawer
- * header.
+ * chips, and the window controls.
  */
 export default function AssistantHeader({ selectedProject, onOpenSettings }) {
   const { closeActiveTab, maximized, toggleMaximized, provider, model,

@@ -203,8 +203,7 @@ function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
   const relocateActions = useRelocateDialog(onRelocate);
 
   // The merge/filter memo chain (shared sync, publish state, local/shared
-  // merge, subproject nesting, query filter) is extracted verbatim into
-  // useProjectsPageData -- same hooks, same deps, same order.
+  // merge, subproject nesting, query filter) lives in useProjectsPageData.
   const { shared, children, localEntryById, publishActions, isEmpty, visibleEntries } = useProjectsPageData({ projects, filters });
 
   const { pullConflictId, pulledIds, handlePull, handleConfirmCopy, cancelConflict } = usePullToLocal({ shared, onProjectsReload });

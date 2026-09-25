@@ -1,7 +1,7 @@
 """Dashboard start/stop/open lifecycle for the menu bar app.
 
-Mixin methods for QuodeqApp (quodeq/menubar/app.py), split out for file size.
-The host class provides the menu items (_status_item, _error_item, ...), the
+Mixin methods for QuodeqApp (quodeq/menubar/app.py). The host class provides
+the menu items (_status_item, _error_item, ...), the
 _state_lock/_starting/_port/_process fields, _set_error/_clear_error,
 _find_running_port, and _set_ui_state. Nothing here touches rumps directly,
 so this module stays importable without the rumps stub tests use for app.py.

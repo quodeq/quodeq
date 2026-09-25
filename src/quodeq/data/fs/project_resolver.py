@@ -1,6 +1,6 @@
 """Persistent UUID-based project identity resolution for the reports directory.
 
-Split into focused modules:
+Built from focused modules:
 - _models: ProjectIdentity, ProjectRepository
 - _index_cache: thread-safe mtime cache
 - _index_io: load/save index file

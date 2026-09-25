@@ -1,9 +1,7 @@
 """Use case: register a project (resolve identity, clone if needed, scan).
 
-Extracted from ``evaluation_mixin`` so the API layer has a public entry
-point instead of importing private helpers.
-
-Split into two sibling modules plus this orchestrator:
+The API layer's public entry point for registration. This orchestrator
+works with two sibling modules:
   - _registration_url.py: credential-stripping and origin-remote reads.
   - _registration_scan.py: the zero-run scan fallback and parent-project scan.
 """

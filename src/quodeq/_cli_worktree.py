@@ -1,9 +1,8 @@
 """Git worktree management for branch-scoped evaluation.
 
-Split from ``_cli_resolution.py`` to keep each module under 300 lines.
 Re-exported by ``_cli_resolution.py`` (which is in turn re-exported by
-``cli_evaluation.py``), so existing ``quodeq._cli_resolution.<name>`` and
-``quodeq.cli_evaluation.<name>`` patch targets keep working unchanged.
+``cli_evaluation.py``), so ``quodeq._cli_resolution.<name>`` and
+``quodeq.cli_evaluation.<name>`` are valid patch targets.
 
 ``create_worktree``'s failure path calls ``cleanup_worktree`` through a
 deferred lookup on ``quodeq._cli_resolution`` (rather than a bare name)

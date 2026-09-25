@@ -1,4 +1,4 @@
-"""Apply-drafted-action use case, extracted from the HTTP route.
+"""Apply-drafted-action use case behind the HTTP route.
 
 The workflow (ownership check, atomic drafted->applied claim, release on
 failure, spec dispatch) is framework-free; the route maps each outcome to

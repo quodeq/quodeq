@@ -1,7 +1,6 @@
 """Live rescore service -- recalculates grades after dismissals change.
 
-Split into this dispatcher/public-API module plus
-_rescore_legacy.py, which holds the in-place scoring fallback used when a
+This is the dispatcher/public-API module; _rescore_legacy.py holds the in-place scoring fallback used when a
 run has no evidence basis to rescore from.
 """
 from __future__ import annotations

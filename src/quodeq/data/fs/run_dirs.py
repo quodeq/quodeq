@@ -1,9 +1,9 @@
 """Run-directory removal and reports-root scanning.
 
-Split out of ``services/_run_index_fs.py``: these two are plain filesystem
-operations (rmtree, directory scan) with no run-index business logic of
-their own, so they belong in the data layer. ``services/_run_index_fs.py``
-re-exports both (via ``services/wiring.py``) for its existing callers.
+These two are plain filesystem operations (rmtree, directory scan) with no
+run-index business logic of their own, so they belong in the data layer.
+``services/_run_index_fs.py`` re-exports both (via ``services/wiring.py``)
+for its callers.
 """
 from __future__ import annotations
 

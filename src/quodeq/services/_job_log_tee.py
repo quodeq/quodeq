@@ -1,5 +1,4 @@
-"""Stream-consumption and run.log tee logic for JobManager, split out of
-jobs.py as free functions.
+"""Stream-consumption and run.log tee logic for JobManager, as free functions.
 
 ``JobManager._consume_stream``/``_tee_run_log``/``_drain_pre_marker_buffer``
 become thin delegates that pass in the per-job state they exclusively own

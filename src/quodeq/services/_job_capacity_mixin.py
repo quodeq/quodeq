@@ -1,7 +1,6 @@
 """JobManager's start_job concurrency cap.
 
-Split from ``jobs.py`` to keep that file under the file-length ratchet.
-Mixed into ``JobManager`` there; expects ``self._lock``, ``self._processes``,
+Mixed into ``JobManager`` (``jobs.py``); expects ``self._lock``, ``self._processes``,
 ``self._reserved``, ``self._store``, and ``self._log`` to already be set by
 ``JobManager.__init__``.
 """

@@ -1,6 +1,5 @@
 /**
- * The History tab's route renderer, moved out of routes/renderers.jsx
- * verbatim (move-only refactor).
+ * The History tab's route renderer.
  */
 import { lazy } from 'react';
 import { LATEST_RUN_ID } from '../constants.js';

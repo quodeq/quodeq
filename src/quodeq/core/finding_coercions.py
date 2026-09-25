@@ -7,6 +7,7 @@ wire_dict_to_judgment and parse_jsonl_line).
 from __future__ import annotations
 
 from quodeq.core.constants import FULL_CONFIDENCE
+from quodeq.core.utils.numbers import clamp
 
 
 def coerce_confidence(value: object, default: int = FULL_CONFIDENCE) -> int:
@@ -17,7 +18,7 @@ def coerce_confidence(value: object, default: int = FULL_CONFIDENCE) -> int:
         coerced = int(value)  # type: ignore[call-overload]
     except (TypeError, ValueError):
         return default
-    return max(0, min(FULL_CONFIDENCE, coerced))
+    return clamp(coerced, 0, FULL_CONFIDENCE)
 
 
 def coerce_scope_downgrade(raw: object) -> dict[str, str] | None:

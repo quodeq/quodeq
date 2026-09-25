@@ -1,7 +1,4 @@
-"""Shared fixtures for tests/analysis/cache/test_clean_scan_honor_*.py siblings.
-
-Split out of test_clean_scan_honor.py.
-"""
+"""Shared fixtures for tests/analysis/cache/test_clean_scan_honor_*.py siblings."""
 from __future__ import annotations
 
 import json

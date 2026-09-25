@@ -1,7 +1,6 @@
 """Pull-a-shared-project-locally route.
 
-Split out of routes_shared.py. This is a deliberate, spec-approved
-exception to the read-only invariant documented in routes_shared.py's module
+This is a deliberate, spec-approved exception to the read-only invariant documented in routes_shared.py's module
 docstring: it mutates LOCAL state (the local reports directory, via
 import_zip_stream), not the shared repository clone itself. The clone is
 only read from to build the in-memory zip. It is therefore intentionally

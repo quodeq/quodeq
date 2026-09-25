@@ -1,8 +1,7 @@
 /**
  * Route renderers: the per-route view composition App.jsx's MainContent
  * dispatches to, plus the prop-bundle builders the renderers consume.
- * Moved out of App.jsx verbatim (move-only refactor); App state arrives via
- * the explicit `props` bundles — no context. Everything here is exported so
+ * App state arrives via the explicit `props` bundles — no context. Everything here is exported so
  * the route contracts stay unit-testable without mounting the whole App
  * (which needs ~8 providers).
  */
@@ -35,15 +34,15 @@ const HelpPage = lazy(() => import('../features/help/components/HelpPage.jsx'));
 // The source gate, the project lookup, buildEvalPrincipal,
 // buildDashboardDataBundle and buildNavigationBundle are re-exported below
 // (their consumers -- App.jsx, this file's own route renderers, and the tests
-// that pin producer/consumer contracts -- all import them from here) even
-// though they now live in sibling modules; see dismissWiring.js,
+// that pin producer/consumer contracts -- all import them from here); they
+// are defined in sibling modules: dismissWiring.js,
 // violationsRoute.jsx, dashboardDataBundle.js and navigationBundle.js.
 export { isSharedSource, findProject, makeDismissHandler };
 export { buildEvalPrincipal };
 export { buildDashboardDataBundle };
 export { buildNavigationBundle };
-// resolveSelectionAfterSharedDisconnect moved to routeCases.jsx with the
-// Settings route it serves; App.jsx and its tests still import it from here.
+// resolveSelectionAfterSharedDisconnect is defined in routeCases.jsx with the
+// Settings route it serves; App.jsx and its tests import it from here.
 export { resolveSelectionAfterSharedDisconnect };
 
 // Tabs that are reachable with zero projects. `projects` is in here so a

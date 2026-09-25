@@ -1,6 +1,6 @@
 """Clean-scan honoring — process_dimension_with_cache dispatch + invalidation.
 
-Split from test_clean_scan_honor.py: process_dimension_with_cache bypasses
+process_dimension_with_cache bypasses
 cache reads when incremental=False, dispatches all files, and writes fresh
 results back to the cache. Also covers the "I want fresh" invalidation
 guarantee: a clean scan deletes the (file, dim) cache entries up front, so

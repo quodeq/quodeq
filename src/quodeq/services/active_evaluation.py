@@ -1,12 +1,11 @@
 """Single owner of the "is an evaluation actually running" rule.
 
 The native window shell (dashboard/_webview_window) and the React
-useRunningRunsRefresh hook each used to cross-reference /api/evaluations
-against /api/projects to decide whether a "running" job is stale. That rule
-now lives here, served by ``GET /api/evaluations/active``, so it cannot
-diverge between presentation layers.
+useRunningRunsRefresh hook both need to know whether a "running" job is
+stale. The rule lives here, served by ``GET /api/evaluations/active``, so it
+cannot diverge between presentation layers.
 
-The rule (moved verbatim from ``WindowApi._get_running_evaluation``):
+The rule:
 a "running" job whose ``outputProject`` no longer exists in the project
 list (project deleted, or the API restarted mid-scan) is stale and ignored.
 Jobs without an ``outputProject`` are very-early-phase evals that haven't

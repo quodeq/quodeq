@@ -1,4 +1,4 @@
-"""Dashboard and accumulated-view logic, split from action_provider_fs.
+"""Dashboard and accumulated-view logic.
 
 This module owns the *selected run*: resolving which run the request means,
 rescoring its dimensions against project-wide suppressions, and driving the

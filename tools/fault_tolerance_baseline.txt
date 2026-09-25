@@ -12,10 +12,10 @@ src/quodeq/_cli_evaluate_finalize.py:71:broad-except
 src/quodeq/_cli_scoring.py:127:broad-except
 src/quodeq/analysis/_api_call.py:268:broad-except
 src/quodeq/analysis/_api_runner.py:73:broad-except
-src/quodeq/analysis/_loop_steps.py:108:broad-except
-src/quodeq/analysis/_loop_steps.py:139:broad-except
-src/quodeq/analysis/_loop_steps.py:186:broad-except
-src/quodeq/analysis/_loop_steps.py:188:broad-except
+src/quodeq/analysis/_loop_steps.py:107:broad-except
+src/quodeq/analysis/_loop_steps.py:138:broad-except
+src/quodeq/analysis/_loop_steps.py:185:broad-except
+src/quodeq/analysis/_loop_steps.py:187:broad-except
 src/quodeq/analysis/_loops.py:141:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:137:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:145:broad-except
@@ -50,7 +50,7 @@ src/quodeq/api/app.py:138:broad-except
 src/quodeq/api/app.py:273:broad-except
 src/quodeq/api/routes_compare.py:34:broad-except
 src/quodeq/api/routes_runs.py:28:broad-except
-src/quodeq/api/routes_shared_mirrors.py:69:broad-except
+src/quodeq/api/routes_shared_mirrors.py:68:broad-except
 src/quodeq/api/security.py:278:broad-except
 src/quodeq/assistant/adapters/api.py:128:broad-except
 src/quodeq/assistant/adapters/capabilities.py:58:broad-except
@@ -119,7 +119,7 @@ src/quodeq/services/_mutation_scoring.py:86:broad-except
 src/quodeq/services/_post_run_hook.py:37:broad-except
 src/quodeq/services/_post_run_hook.py:45:broad-except
 src/quodeq/services/_run_discard.py:135:broad-except
-src/quodeq/services/active_evaluation.py:74:broad-except
+src/quodeq/services/active_evaluation.py:73:broad-except
 src/quodeq/services/background.py:141:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except
 src/quodeq/services/cache_maintenance.py:40:broad-except
@@ -127,7 +127,7 @@ src/quodeq/services/evidence_rescore.py:196:broad-except
 src/quodeq/services/grade_formula.py:121:broad-except
 src/quodeq/services/grade_formula_job.py:197:broad-except
 src/quodeq/services/mutation_rescore.py:186:broad-except
-src/quodeq/services/project_registration.py:166:broad-except
+src/quodeq/services/project_registration.py:164:broad-except
 src/quodeq/services/score_run.py:232:broad-except
 src/quodeq/services/shared_publish.py:195:broad-except
 src/quodeq/services/shared_publish.py:229:broad-except

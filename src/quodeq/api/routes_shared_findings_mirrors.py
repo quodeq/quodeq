@@ -1,7 +1,7 @@
 """Read-only mirrors of the dismissed/verified findings listings, scoped to the shared clone.
 
-Split out of routes_shared_mirrors.py to keep that module under the size
-limit. Same read-only invariant: nothing here mutates a finding.
+Same read-only invariant as routes_shared_mirrors.py: nothing here mutates a
+finding.
 """
 from __future__ import annotations
 

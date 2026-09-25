@@ -2,9 +2,8 @@
 
 Applies the project-wide dismiss/delete rescore to accumulated payloads,
 tracking coverage so a partial rescore is served but never persisted
-(the 2026-07-29 cache-poison incident). Moved out of the package
-``__init__`` in the ScoringReader decomposition; the facade re-exports
-every name, so callers and patch targets are unchanged.
+(the 2026-07-29 cache-poison incident). The package ``__init__`` re-exports
+every name, so callers and patch targets use the package path.
 """
 from __future__ import annotations
 

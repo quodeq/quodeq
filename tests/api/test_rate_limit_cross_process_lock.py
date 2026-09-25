@@ -1,8 +1,7 @@
 """Cross-process locking for FileRateLimitStore.check_and_record().
 
-Split out of test_rate_limit_hardening.py when that file crossed the
-300-line cap; that file keeps the path/permission hardening, the env-config
-parsing and the in-memory store's own regressions.
+test_rate_limit_hardening.py covers the path/permission hardening, the
+env-config parsing and the in-memory store's own regressions.
 """
 from __future__ import annotations
 

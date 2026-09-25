@@ -1,8 +1,8 @@
 """On-disk index backing ``find_existing_project``'s duplicate pre-flight check.
 
-Why: ``find_existing_project`` used to scan every project directory and read
-each ``repository_info.json``; this index makes the duplicate check a
-lookup.
+Why: without it ``find_existing_project`` would scan every project directory
+and read each ``repository_info.json``; this index makes the duplicate check
+a lookup.
 
 Mirrors the import-identity index
 (``services/project_import_identity.py`` + ``data/fs/project_index.py``): index-first
@@ -25,7 +25,7 @@ from __future__ import annotations
 import os  # noqa: F401 -- monkeypatched (module-attribute -> the shared os
 # module) by tests/services/test_cluster32_empty_except_logging.py's
 # save_repo_index cleanup-failure test; the actual os.replace/os.unlink
-# calls now live in data.fs.repo_index_store.write_repo_index, but patching
+# calls are in data.fs.repo_index_store.write_repo_index, but patching
 # THIS name still works since `import os` everywhere binds the same module.
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,6 +57,17 @@ class RepoIdentity:
     def key(self) -> str:
         """The index key for this identity (see ``repo_index_key``)."""
         return repo_index_key(self.name, self.path, self.scope_path)
+
+    def matches_record(self, data: dict) -> bool:
+        """True when a ``repository_info.json`` payload carries this identity.
+
+        An empty or missing ``scopePath`` and a ``None`` scope compare equal.
+        """
+        return (
+            data.get("name") == self.name
+            and data.get("path") == self.path
+            and (data.get("scopePath") or None) == (self.scope_path or None)
+        )
 
 
 def load_repo_index(reports_root: Path) -> dict[str, str]:

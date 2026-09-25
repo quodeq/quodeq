@@ -1,8 +1,6 @@
 """JSON serialization and disk-backed job store.
 
-Split from ``_job_model.py`` to keep that file under the size ratchet's
-300-line cap. ``FileJobStore``/``create_job_store`` stay re-exported from
-there. Moved verbatim.
+``FileJobStore``/``create_job_store`` are re-exported from ``_job_model.py``.
 """
 from __future__ import annotations
 

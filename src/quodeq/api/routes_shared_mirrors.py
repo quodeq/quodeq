@@ -1,7 +1,6 @@
 """Read-only mirrors of the project read endpoints, scoped to the shared clone.
 
-Split out of routes_shared.py. Each route below delegates to the
-SAME service function its local counterpart uses (see
+Each route below delegates to the SAME service function its local counterpart uses (see
 api/routes_project_list.py, routes_project_data.py, _scores_routes.py,
 routes_runs.py, routes_findings.py), with the shared clone's evaluations
 root standing in for the local reports directory. The response shape is

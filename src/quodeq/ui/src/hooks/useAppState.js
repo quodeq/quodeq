@@ -20,9 +20,9 @@ import { LATEST_RUN_ID } from '../constants.js';
 import { NAV_TAB } from '../vocab/navTab.js';
 import { projectIdOrSelf } from '../utils/projectIdentity.js';
 
-// Kept for the existing test/hook imports below (useAppState.reconcile.test.jsx,
-// useNativeNavBridge.js) -- the values themselves live in vocab/navTab.js,
-// this file's own comparisons read NAV_TAB directly.
+// Tab aliases imported by useAppState.reconcile.test.jsx and
+// useNativeNavBridge.js. The values live in vocab/navTab.js; this file's own
+// comparisons read NAV_TAB directly.
 export const TAB_OVERVIEW = NAV_TAB.OVERVIEW;
 // 'compare' is appended AFTER the first four on purpose: PROJECT_TABS is a
 // positional slice of the head of this list.

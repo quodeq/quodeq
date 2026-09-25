@@ -1,7 +1,7 @@
 """Config/status/lifecycle routes for the shared results repository.
 
-Split out of routes_shared.py: status, config PUT/DELETE, refresh,
-and the local project-publish route. ``refresh_shared_clone`` and
+Status, config PUT/DELETE, refresh, and the local project-publish route.
+``refresh_shared_clone`` and
 ``start_publish`` are imported directly from their real owners (rather than
 looked up on the ``routes_shared`` facade, which no longer re-exports them),
 so this module never imports back a sibling that imports it. Tests patch

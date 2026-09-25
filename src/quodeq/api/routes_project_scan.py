@@ -1,7 +1,6 @@
 """Project scan and estimate routes.
 
-Split from routes_project_list.py to keep that file under the size ratchet's
-300-line cap. ``reports_dir`` is looked up dynamically through its real
+``reports_dir`` is looked up dynamically through its real
 owner, ``routes_common`` (rather than through the routes_project_list
 facade that just re-exports it), so this module never imports back a
 sibling that imports it. Tests patch
@@ -42,6 +41,7 @@ from quodeq.services.fs_project_helpers import (
 )
 from quodeq.services.fs_scan import scan_project
 from quodeq.core.types.project_source import ProjectLocation
+from quodeq.shared.csv_values import split_csv
 
 _logger = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ def project_estimates(project: str) -> Response | tuple[Response, int]:
     from quodeq.analysis.estimates import project_estimates_payload
 
     raw_dims = request.args.get("dimensions", "")
-    requested = [d.strip() for d in raw_dims.split(",") if d.strip()] or None
+    requested = split_csv(raw_dims) or None
     clean_scan = request.args.get("cleanScan", "false").strip().lower() == QUERY_FLAG_TRUE
     return jsonify(project_estimates_payload(project_dir, requested, clean_scan))
 

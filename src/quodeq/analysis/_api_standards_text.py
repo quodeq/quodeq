@@ -1,7 +1,6 @@
 """Source-file gathering and compiled-standards text for the API prompt.
 
-Split out of subprocess.py: repository scanning that selects which source
-files get inlined into a direct-API prompt, and rendering compiled standards
+Repository scanning that selects which source files get inlined into a direct-API prompt, and rendering compiled standards
 JSON into the compact grouped-JSON text sent to API models. None of these
 functions are mock.patch targets.
 """

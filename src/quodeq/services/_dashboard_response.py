@@ -1,6 +1,6 @@
 """Serialization of the dashboard response.
 
-Split out of ``dashboard``: this is the wire boundary — everything here turns
+This is the wire boundary — everything here turns
 already-computed domain objects into the camelCase dict the UI consumes, and
 nothing here reads history or resolves runs. Declared in
 ``tests/tools/test_serialization_boundary.py``.

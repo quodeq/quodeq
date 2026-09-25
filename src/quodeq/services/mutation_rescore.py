@@ -1,14 +1,14 @@
 """Rescore-after-mutation helpers, shared by API routes and assistant actions.
 
-Moved out of ``api/routes_findings.py`` so the assistant's dismiss action can
-reuse ``rescore_with_fallback`` without an assistant -> api layer import.
-Behavior is unchanged: rescore the referenced run when possible, otherwise
-kick a background projection so the mutation still lands in SQL. Distinct
+They live in services so the assistant's dismiss action can use
+``rescore_with_fallback`` without an assistant -> api layer import. Rescore
+the referenced run when possible, otherwise kick a background projection so
+the mutation still lands in SQL. Distinct
 from ``services/rescore.py``, which is the in-memory grade recompute engine.
 
-Split: per-project locks + the project-wide projection sweep moved
-to ``_mutation_projection.py``; the slim rescore payload + default-run
-resolution moved to ``_mutation_scoring.py``. Both are re-exported here —
+Per-project locks + the project-wide projection sweep are in
+``_mutation_projection.py``; the slim rescore payload + default-run
+resolution are in ``_mutation_scoring.py``. Both are re-exported here —
 ``ProjectLockRegistry``/``DEFAULT_PROJECT_LOCKS`` and ``project_all_runs``
 are imported directly by tests, which patch/inspect them at this module's
 path.

@@ -36,11 +36,11 @@ function settleRescore(payload, { failWith, notePartialRescore, requestPreview }
  * boundaries into; defaults to the app-wide store, injectable so tests
  * don't leak grading state into the rest of the process.
  *
- * Split into hooks/useGradeFormulaState.js (server/draft/preview/busy/error
+ * Composes hooks/useGradeFormulaState.js (server/draft/preview/busy/error
  * state + the initial load), hooks/useGradePreview.js (the debounced preview
  * request + update()) and hooks/useRescoreProgress.js (the page's view of
  * the app-level rescore tracker in rescore/, which polls after an
- * apply/reset: the server answers with 202 and finishes in the background). This file composes them and owns apply/resetToDefaults.
+ * apply/reset: the server answers with 202 and finishes in the background), and owns apply/resetToDefaults.
  */
 export default function useGradeFormula(projectId, thresholdsStore = defaultGradeThresholdsStore) {
   const {

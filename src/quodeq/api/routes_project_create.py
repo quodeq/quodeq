@@ -1,7 +1,6 @@
 """POST /api/projects — register a new project (clone + scan).
 
-Split from ``routes_project_list.py`` to keep that file under the size
-ratchet's 300-line cap. ``reports_dir`` is looked up dynamically through its
+``reports_dir`` is looked up dynamically through its
 real owner, ``routes_common`` (rather than through the ``routes_project_list``
 facade that just re-exports it), so this module never imports back a sibling
 that imports it. Tests patch "quodeq.api.routes_common.reports_dir".

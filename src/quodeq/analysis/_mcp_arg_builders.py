@@ -1,6 +1,6 @@
 """MCP/tool/model command-line argument construction for the AI CLI runner.
 
-Split out of _command.py: env-driven tool/base-arg defaults, the base-args
+Env-driven tool/base-arg defaults, the base-args
 and MCP-config args builders (config-file / config-arg / cli-register
 dispatch), the model/budget/turns/prompt args builder, and the RunConfig
 cache-fingerprint resolvers those builders (and _command.py's own

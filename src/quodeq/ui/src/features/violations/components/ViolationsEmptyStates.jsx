@@ -1,6 +1,6 @@
 import EmptyState from '../../../components/EmptyState.jsx';
 import {
-  LoadProjectFailedEmptyState, NoEvalsEmptyState, NoProjectsEmptyState,
+  LoadProjectFailedEmptyState, NoEvalsEmptyState, NoProjectsEmptyState, SharedNoCompletedEvalEmptyState,
 } from '../../../components/ProjectEmptyStates.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import ViolationsSkeleton from './ViolationsSkeleton.jsx';
@@ -46,10 +46,7 @@ function renderNoDimensionDataState({
     return (
       <div className={`violations-page violations-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
         <TermHeader name={t('violations.termName')} sub={t('violations.subNoEvals')} />
-        <EmptyState
-          title={t('overview.noCompletedEvalTitle')}
-          description={t('overview.noCompletedEvalSharedDesc')}
-        />
+        <SharedNoCompletedEvalEmptyState />
       </div>
     );
   }

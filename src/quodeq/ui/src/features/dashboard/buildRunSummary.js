@@ -1,5 +1,5 @@
 import { mostFrequentGrade } from '../../utils/formatters.js';
-import { emptySeverityCounts } from '../../utils/severity.js';
+import { emptySeverityCounts, sumSeverityTallies } from '../../utils/severity.js';
 
 /** The shape buildRunSummary returns for a run with no dimension data. */
 function emptySummary() {
@@ -21,30 +21,15 @@ function averageScore(scores) {
   return (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
 }
 
-/** One dimension's severity counts, zero-filled. */
-function severityOf(dimension) {
-  const sev = dimension.totals?.severity;
-  return {
-    critical: sev?.critical || 0,
-    major: sev?.major || 0,
-    minor: sev?.minor || 0,
-  };
-}
-
-/** Running totals across every dimension: counts, severity split and triage. */
+/** Running totals across every dimension: counts and triage. */
 function sumDimensionTotals(dimensions) {
   const sums = {
     totalViolations: 0, totalCompliance: 0,
-    critical: 0, major: 0, minor: 0,
     dismissed: 0, suppressed: 0,
   };
   for (const d of dimensions) {
     sums.totalViolations += d.totals?.violationCount || 0;
     sums.totalCompliance += d.totals?.complianceCount || 0;
-    const sev = severityOf(d);
-    sums.critical += sev.critical;
-    sums.major += sev.major;
-    sums.minor += sev.minor;
     sums.dismissed += typeof d.dismissedCount === 'number' ? d.dismissedCount : 0;
     // Dismissed AND deleted. On a project with a triage history this dwarfs
     // `dismissed` -- deletions suppress a whole principle across a file and
@@ -69,8 +54,7 @@ export default function buildRunSummary(dimensions, apiSummary) {
 
   const grades = dimensions.map((d) => d.overallGrade).filter(Boolean);
   const scores = dimensions.map((d) => parseFloat(d.overallScore)).filter((s) => !isNaN(s));
-  const { totalViolations, totalCompliance, critical, major, minor, dismissed, suppressed } =
-    sumDimensionTotals(dimensions);
+  const { totalViolations, totalCompliance, dismissed, suppressed } = sumDimensionTotals(dimensions);
 
   return {
     overallGrade: mostFrequentGrade(grades) || '-',
@@ -78,7 +62,7 @@ export default function buildRunSummary(dimensions, apiSummary) {
     totalViolations,
     totalCompliance,
     dimensionCount: dimensions.length,
-    severity: { critical, major, minor },
+    severity: sumSeverityTallies(dimensions.map((d) => d.totals || {})),
     dismissed,
     suppressed,
   };

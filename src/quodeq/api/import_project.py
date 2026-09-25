@@ -6,15 +6,14 @@ traversal, absolute paths, symlinks, special files, oversize entries, and
 zip-bomb compression ratios before a single byte is extracted (see
 _import_validation.py and _import_extract.py for the checks themselves).
 
-Split into four collaborator modules plus this orchestrator:
+This orchestrator works with four collaborator modules:
   - services/project_import_identity.py: identity-collision detection and
-    index updates (moved out of api/; api/_import_identity.py re-exports it
-    for tests/api/test_import_identity.py's existing import path).
+    index updates.
   - _import_extract.py: ``safe_extract``, the hardened extraction step.
   - _import_upload.py: ``open_upload``, the bounded view of the uploaded archive.
   - _import_validation.py: archive/member/manifest/repo-info validation.
-This module re-exports every moved name so existing imports and patches
-(tests/api/test_project_import.py) keep working unchanged.
+This module re-exports their names for the imports and patches in
+tests/api/test_project_import.py.
 """
 from __future__ import annotations
 

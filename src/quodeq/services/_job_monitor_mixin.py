@@ -1,9 +1,8 @@
 """JobManager's log/marker parsing and background process-monitoring behavior.
 
-Split from ``jobs.py`` to keep that file under the size ratchet's 300-line
-cap. ``JobMonitorMixin`` is mixed into ``JobManager`` there; the state it
+``JobMonitorMixin`` is mixed into ``JobManager`` (``jobs.py``); the state it
 reads is declared on the class below and owned by ``JobManager.__init__``,
-which assigns every one of those attributes. Only the methods moved.
+which assigns every one of those attributes.
 
 The constants both modules need live in ``_job_model``, which imports
 neither, so nothing here imports ``jobs``.

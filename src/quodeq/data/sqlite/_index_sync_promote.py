@@ -1,7 +1,5 @@
 """Force-promote-to-cancelled helpers for the SQLite run index.
 
-Split out of ``index_sync.py`` purely to keep that module under the size
-cap (an intra-file extraction there would have pushed it over 300 lines).
 ``force_promote_to_cancelled_stale`` is re-exported from ``index_sync`` --
 that is the stable entry point callers use. The few names shared with
 ``index_sync`` (``logger``, ``upsert_from_status``) are looked up via a

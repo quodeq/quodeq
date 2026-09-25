@@ -1,10 +1,6 @@
 /**
- * ReEvaluateCard's smaller subcomponents.
- *
- * Split out of ReEvaluateCard.jsx verbatim (UrlRestoreSection, DetectedLine,
- * BudgetChips, RunBar). IdentityHeader is an additional
- * extraction of ReEvaluateCardView's identity strip, needed to bring that
- * component's function under the max-lines-per-function gate.
+ * ReEvaluateCard's smaller subcomponents: UrlRestoreSection, DetectedLine,
+ * BudgetChips, RunBar, and IdentityHeader (ReEvaluateCardView's identity strip).
  */
 import FolderBrowser from './FolderBrowser.jsx';
 import { IdentityStrip, IdentityCell } from './IdentityStrip.jsx';

@@ -159,8 +159,7 @@ function useEntryLists(projectsWithPublished, shared, filters) {
 /**
  * The full merge/filter pipeline that backs ProjectsPage's render: shared
  * project sync, publish state, the local/shared merge (unfiltered and
- * location-filtered), subproject nesting, and the query filter. Extracted
- * verbatim (same hooks, same deps, same order) from ProjectsPage's body.
+ * location-filtered), subproject nesting, and the query filter.
  */
 export function useProjectsPageData({ projects, filters }) {
   const { shared, sharedConfigured, publishedAtByProject, publishState, publishingProject, publishError, publishErrorProject, publish } = useSharedAndPublish(projects);
