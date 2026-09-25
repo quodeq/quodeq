@@ -1,4 +1,6 @@
 """CancelToken / TurnCancelled: the stop-turn signalling primitives."""
+import pytest
+
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 
 
@@ -40,6 +42,28 @@ def test_register_after_cancel_swallows_a_realistic_kill_hook_failure():
 
 
 def test_hook_exception_does_not_block_other_hooks():
+    """cancel()'s per-hook except was narrowed from bare `Exception` to
+    (OSError, httpx.HTTPError) (R-FT-7), the same realistic surface as
+    register_kill's own narrowed except: a failing hook of that shape must
+    not stop later hooks from running."""
+    token = CancelToken()
+    hits = []
+
+    def boom():
+        raise OSError("kill failed")
+
+    token.register_kill(boom)
+    token.register_kill(lambda: hits.append("second"))
+    token.cancel()
+    assert token.cancelled is True
+    assert hits == ["second"]
+
+
+def test_hook_exception_outside_the_narrowed_tuple_propagates():
+    """A RuntimeError from a kill hook is not OSError/httpx.HTTPError, so it
+    is a real bug in the hook, not a best-effort kill failure: cancel() now
+    lets it escape instead of swallowing it, at the cost of any later hooks
+    in the same cancel() call not running."""
     token = CancelToken()
     hits = []
 
@@ -48,9 +72,10 @@ def test_hook_exception_does_not_block_other_hooks():
 
     token.register_kill(boom)
     token.register_kill(lambda: hits.append("second"))
-    token.cancel()
-    assert token.cancelled is True
-    assert hits == ["second"]
+    with pytest.raises(RuntimeError):
+        token.cancel()
+    assert token.cancelled is True  # the flag is set before hooks run
+    assert hits == []  # the hook after the failing one never ran
 
 
 def test_cancel_is_idempotent_and_hooks_run_once():

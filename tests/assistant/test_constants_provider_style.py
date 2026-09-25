@@ -89,6 +89,6 @@ def test_assistant_cli_cleanup_uses_the_shared_mcp_style_constant():
 
 
 def test_assistant_orchestrator_isolated_styles_match_the_shared_constants():
-    from quodeq.assistant.orchestrator import _ISOLATED_MCP_STYLES
+    from quodeq.assistant.orchestrator import ISOLATED_MCP_STYLES
 
-    assert _ISOLATED_MCP_STYLES == {MCP_STYLE_CONFIG_FILE, MCP_STYLE_CONFIG_ARG}
+    assert ISOLATED_MCP_STYLES == {MCP_STYLE_CONFIG_FILE, MCP_STYLE_CONFIG_ARG}

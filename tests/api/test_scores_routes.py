@@ -35,6 +35,18 @@ def test_project_run_scores_wraps_unexpected_error(client, monkeypatch):
     assert body["code"] == "SCORES_READ_FAILED"
 
 
+def test_project_run_scores_propagates_an_error_outside_the_narrowed_tuple(client, monkeypatch):
+    """A RuntimeError (not OSError/sqlite3.Error/ValueError) is a real bug in
+    get_scores_slim, not a read failure, so it now escapes the route instead
+    of being wrapped into a SCORES_READ_FAILED 500."""
+    monkeypatch.setattr(
+        "quodeq.api._scores_routes.get_scores_slim",
+        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("unexpected bug")),
+    )
+    with pytest.raises(RuntimeError):
+        client.get("/api/projects/demo/scores/run123")
+
+
 def test_get_scores_raw_reads_from_sql_after_projection(tmp_path: Path) -> None:
     """After ensure_projected runs, get_scores_raw returns SQL-backed grades.
 

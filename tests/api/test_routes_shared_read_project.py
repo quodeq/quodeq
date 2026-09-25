@@ -1,6 +1,8 @@
 """Per-project /api/shared mirrors: info, runs, dashboard, accumulated, scores and compare-summary."""
 from __future__ import annotations
 
+import pytest
+
 from tests.api._routes_shared_read_fixtures import app, client  # noqa: F401 -- pytest fixtures
 
 
@@ -26,23 +28,21 @@ def test_shared_project_info_invalid_segment(client, shared_clone_fixture):
     assert resp.status_code == 400
 
 
-def test_shared_project_info_returns_sanitized_500_on_unexpected_error(
+def test_shared_project_info_returns_sanitized_500_on_a_read_failure(
     client, shared_clone_fixture, monkeypatch,
 ):
     """shared_project_info is reached via a publicly shared URL,
-    unlike most of this app's local-only UI. Before this fix it had no
-    try/except at all -- an unexpected exception from get_project_info would
-    propagate straight into Flask's raw error handling instead of the
-    sanitized {"error", "code"} contract its three siblings (shared_runs,
-    shared_scores, shared_compare_summary) already return. This locks the
-    same contract in for shared_project_info and confirms the raised
-    exception's own text never reaches the response body."""
+    unlike most of this app's local-only UI. An OSError/sqlite3.Error/
+    ValueError from get_project_info (a read failure the route expects) must
+    still degrade to the sanitized {"error", "code"} contract its siblings
+    (shared_runs, shared_scores, shared_compare_summary) return, with the
+    raised exception's own text never reaching the response body."""
     import quodeq.services.fs_projects as fs_projects_mod
 
     secret_detail = "SECRET_DB_PATH=/private/leak/db.sqlite exploded"
 
     def _boom(*_args, **_kwargs):
-        raise RuntimeError(secret_detail)
+        raise OSError(secret_detail)
 
     monkeypatch.setattr(fs_projects_mod, "get_project_info", _boom)
 
@@ -55,8 +55,25 @@ def test_shared_project_info_returns_sanitized_500_on_unexpected_error(
 
     raw = resp.get_data(as_text=True)
     assert secret_detail not in raw
-    assert "RuntimeError" not in raw
+    assert "OSError" not in raw
     assert "Traceback" not in raw
+
+
+def test_shared_project_info_propagates_an_error_outside_the_narrowed_tuple(
+    client, shared_clone_fixture, monkeypatch,
+):
+    """A RuntimeError (not OSError/sqlite3.Error/ValueError) is a real bug in
+    get_project_info, not a read failure, so it now escapes the route
+    instead of being swallowed into a sanitized JSON 500."""
+    import quodeq.services.fs_projects as fs_projects_mod
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("unexpected bug")
+
+    monkeypatch.setattr(fs_projects_mod, "get_project_info", _boom)
+
+    with pytest.raises(RuntimeError):
+        client.get("/api/shared/projects/proj-a/info")
 
 
 # --- GET /api/shared/projects/<project>/runs ----------------------------------

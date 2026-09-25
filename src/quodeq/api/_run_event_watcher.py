@@ -94,7 +94,7 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
             finding_events.append(("finding", serialize_finding_event(finding_dict), event_ts.isoformat()))
             new_last_ts = event_ts
             new_counter = counter
-    except Exception as exc:  # noqa: BLE001 — never crash the stream on read errors
+    except (OSError, ValueError, TypeError) as exc:
         _LOG.warning(f"events.jsonl read failed for {run_dir}: {exc}")
         finding_events = []
         new_last_ts = state.last_event_ts

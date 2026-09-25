@@ -4,16 +4,22 @@
 ``after_request``. Before this fix, a failure inside
 ``_same_origin_ws_sources`` was swallowed by a bare ``except Exception:
 self_ws = ""`` with no trace at all -- a security control (the same-origin
-websocket connect-src entry) could silently degrade repo-wide. These tests
-force that failure and assert it is now observable, that the response still
-completes with the safe fallback, and that repeated failures within the
-cooldown window don't turn the failure itself into a new source of log spam.
+websocket connect-src entry) could silently degrade repo-wide. The only
+expected failure mode is a bad/attacker-controlled Host header, which
+``request.host`` surfaces as ``werkzeug.exceptions.SecurityError``; these
+tests force that failure and assert it is now observable, that the response
+still completes with the safe fallback, and that repeated failures within
+the cooldown window don't turn the failure itself into a new source of log
+spam. A failure of any other type is a real bug in the ws-source
+computation, not a bad Host header, so it now escapes instead of being
+swallowed (covered separately below).
 """
 from __future__ import annotations
 
 import logging
 
 import pytest
+from werkzeug.exceptions import SecurityError
 
 from quodeq.api import security as security_module
 from quodeq.api.app import create_app
@@ -22,7 +28,7 @@ _FAILURE_MARKER = "CSP same-origin ws"
 
 
 def _boom(_host: str) -> str:
-    raise RuntimeError("host parse exploded")
+    raise SecurityError("host parse exploded")
 
 
 def _reset_throttle(monkeypatch) -> None:
@@ -79,7 +85,7 @@ def test_csp_header_logs_and_falls_back_on_same_origin_ws_failure(monkeypatch, s
     assert matching[0].levelno == logging.WARNING
     # No raw request data (host/headers) in the message -- only the
     # exception's type name, so nothing attacker-controlled reaches the log.
-    assert "RuntimeError" in matching[0].getMessage()
+    assert "SecurityError" in matching[0].getMessage()
 
 
 def test_csp_header_failure_log_is_rate_limited_across_responses(monkeypatch, security_caplog):
@@ -157,3 +163,22 @@ def test_csp_header_logging_cannot_break_response_even_if_a_handler_raises(monke
 
     assert resp.status_code == 200
     assert "wss://" not in resp.headers["Content-Security-Policy"]
+
+
+def test_csp_header_propagates_a_failure_outside_the_narrowed_tuple(monkeypatch):
+    """A RuntimeError (not a werkzeug SecurityError) from
+    _same_origin_ws_sources is a real bug in the computation, not a bad Host
+    header, so it now escapes the after_request hook. Flask's own exception
+    handling turns that into a plain 500 for the client -- it does not crash
+    the process or leave the response half-built."""
+    def _real_bug(_host: str) -> str:
+        raise RuntimeError("host parse exploded")
+
+    monkeypatch.setattr(security_module, "_same_origin_ws_sources", _real_bug)
+    _reset_throttle(monkeypatch)
+
+    app = create_app()
+    with app.test_client() as client:
+        resp = client.get("/api/health")
+
+    assert resp.status_code == 500

@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
+from werkzeug.exceptions import SecurityError
 
 from quodeq.api._constants import CODE_FORBIDDEN
 from quodeq.api._rate_limit import RateLimitStore
@@ -275,7 +276,7 @@ def configure_security(
         # The primary bind port isn't known here; add same-origin ws explicitly.
         try:
             self_ws = _same_origin_ws_sources(request.host)
-        except Exception as exc:
+        except SecurityError as exc:
             self_ws = ""
             _log_csp_ws_failure(exc)
         is_webview = _is_trusted_webview(request.headers.get("User-Agent", ""), env)

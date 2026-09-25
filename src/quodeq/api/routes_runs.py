@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 from http import HTTPStatus
 from pathlib import Path
 
@@ -25,7 +26,7 @@ def register_runs_routes(app: Flask) -> None:
             return err
         try:
             runs = build_runs_unit(Path(reports_dir()), Path(get_index_db_path()), project)
-        except Exception:
+        except (OSError, sqlite3.Error, ValueError):
             _logger.exception("Failed to build runs unit for %s", project)
             return json_error("Failed to load runs", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
         return conditional_json({"runs": runs}, max_age=0)

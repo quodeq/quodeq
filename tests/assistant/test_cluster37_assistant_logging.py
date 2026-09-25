@@ -108,6 +108,57 @@ def test_scored_run_dims_logs_and_returns_none_on_failure(monkeypatch, tmp_path)
     assert "scored_run_dims failed" in warning.call_args.args[0]
 
 
+def _sql_keys_ctx(tmp_path, list_keys_fn):
+    from quodeq.assistant.tools import ToolContext
+
+    run_dir = tmp_path / "reports" / "proj" / "run-1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "evaluation.db").write_bytes(b"x")
+
+    class _Repo:
+        def list_keys(self):
+            return list_keys_fn()
+
+    return ToolContext(
+        repository=None, session_id="s1", run_dir=run_dir, repo_root=None,
+        evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
+        dimensions_file=tmp_path / "d.json",
+        findings_repo_factory=lambda _run_dir: _Repo(),
+    )
+
+
+def test_sql_finding_keys_logs_and_returns_false_on_a_db_read_failure(monkeypatch, tmp_path) -> None:
+    import sqlite3
+
+    def _raise():
+        raise sqlite3.OperationalError("database disk image is malformed")
+
+    ctx = _sql_keys_ctx(tmp_path, _raise)
+    keys: set = set()
+
+    with patch.object(_read_tools_scope._logger, "warning") as warning:
+        complete = _read_tools_scope._sql_finding_keys(ctx, keys)
+
+    assert complete is False
+    assert keys == set()
+    assert warning.called
+    assert "evaluation.db unreadable" in warning.call_args.args[0]
+
+
+def test_sql_finding_keys_propagates_an_error_outside_the_narrowed_tuple(tmp_path) -> None:
+    """A RuntimeError from list_keys is not sqlite3.Error/OSError/ValueError,
+    so it is a real bug, not a corrupt-db read failure, and now escapes
+    instead of being swallowed as a warning."""
+    def _raise():
+        raise RuntimeError("unexpected bug")
+
+    ctx = _sql_keys_ctx(tmp_path, _raise)
+    keys: set = set()
+
+    with pytest.raises(RuntimeError):
+        _read_tools_scope._sql_finding_keys(ctx, keys)
+
+
 def test_cli_hook_logs_and_swallows_when_dup2_fails(monkeypatch) -> None:
     from quodeq import cli
 

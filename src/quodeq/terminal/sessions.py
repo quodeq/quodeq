@@ -9,6 +9,7 @@ reconciles against ``list()`` rather than persisting its own session list.
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import threading
@@ -16,8 +17,11 @@ import time
 import uuid
 
 from quodeq.shared.constants import PLATFORM_WIN32
+from quodeq.shared.fault_isolation import run_isolated
 from quodeq.terminal.links import child_cwd
 from quodeq.terminal.manager import TerminalManager
+
+_logger = logging.getLogger(__name__)
 
 
 def shell_name() -> str:
@@ -134,12 +138,14 @@ class TerminalSessionRegistry:
 
     def kill_all(self) -> None:
         """Empty the registry and kill every PTY. Called on server shutdown
-        so no shell outlives the process."""
+        so no shell outlives the process. Each kill runs inside its own
+        fault-isolation boundary, so one PTY's failed teardown never stops
+        the rest from being killed."""
         with self._lock:
             sessions = list(self._sessions.values())
             self._sessions.clear()
         for session in sessions:
-            session.manager.kill()
+            run_isolated(session.manager.kill, label=f"terminal session {session.id} kill", log=_logger)
 
     def pid_for(self, sid: str | None) -> int | None:
         """PID of session ``sid``'s shell, falling back to the first live

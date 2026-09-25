@@ -109,6 +109,29 @@ def test_kill_all_empties_registry():
     assert reg.any_alive is False
 
 
+def test_kill_all_isolates_one_failing_session_so_the_rest_still_die(caplog):
+    """Each session's kill runs inside its own fault-isolation boundary, so a
+    bug in one PTY's teardown must not stop the others from being killed."""
+    import logging
+
+    reg = _registry()
+    a, b, c = (reg.create() for _ in range(3))
+
+    def _boom():
+        raise RuntimeError("teardown exploded")
+
+    a.manager.kill = _boom
+
+    with caplog.at_level(logging.WARNING, logger="quodeq.terminal.sessions"):
+        reg.kill_all()
+
+    assert reg.list() == []
+    assert b.manager.killed and c.manager.killed
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert warnings[0].exc_info is not None
+
+
 def test_sessions_have_independent_managers_and_locks():
     reg = _registry()
     a = reg.create()

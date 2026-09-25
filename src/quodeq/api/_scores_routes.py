@@ -10,6 +10,7 @@ directly when using these endpoints.
 from __future__ import annotations
 
 import logging
+import sqlite3
 from http import HTTPStatus
 from pathlib import Path
 
@@ -29,7 +30,7 @@ def _load_scores(project: str) -> tuple[dict | None, tuple[Response, int] | None
     eval_dir = reports_dir()
     try:
         result = get_project_scores(Path(eval_dir), project, as_of)
-    except Exception:
+    except (OSError, sqlite3.Error, ValueError):
         _logger.exception("Unexpected error fetching scores for project %s", project)
         return None, json_error("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
     if result is None:
@@ -60,7 +61,7 @@ def register_scores_routes(app: Flask) -> None:
             result = get_scores_slim(Path(eval_dir), project, run_id)
         except FileNotFoundError:
             return json_error("Run not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-        except Exception:
+        except (OSError, sqlite3.Error, ValueError):
             _logger.exception("Unexpected error fetching run scores for project %s run %s", project, run_id)
             return json_error(
                 "could not read run scores", HTTPStatus.INTERNAL_SERVER_ERROR, "SCORES_READ_FAILED"

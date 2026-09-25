@@ -18,6 +18,7 @@ module never imports back a sibling that imports it. Tests patch
 """
 from __future__ import annotations
 
+import sqlite3
 from http import HTTPStatus
 from pathlib import Path
 from typing import Callable
@@ -65,7 +66,7 @@ def _load_or_500(
     """``(result, None)`` from *load*, or ``(None, 500 response)`` when it raises."""
     try:
         return load(), None
-    except Exception:
+    except (OSError, sqlite3.Error, ValueError):
         logger.exception(log_msg, project)
         return None, json_error(error_msg, HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
 

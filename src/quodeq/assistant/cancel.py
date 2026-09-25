@@ -52,7 +52,7 @@ class CancelToken:
         for hook in hooks:
             try:
                 hook()
-            except Exception:  # noqa: BLE001 - kill hooks are best-effort
+            except (OSError, httpx.HTTPError):
                 _logger.warning("kill hook failed", exc_info=True)
 
     def register_kill(self, hook: Callable[[], None]) -> None:
