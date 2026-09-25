@@ -29,6 +29,8 @@ from quodeq.services._run_version_memo import (  # facade re-export
     remember_run_version,
     suppression_state_fingerprint as _state_fingerprint,
 )
+from quodeq.core.scoring import projector_scoring
+from quodeq.services._score_cache_params import params_fingerprint
 from quodeq.services.wiring import load_suppression_rules
 
 # ---------------------------------------------------------------------------
@@ -69,21 +71,6 @@ if TYPE_CHECKING:
 _ACCUMULATED_CACHE_ALGO_VERSION = 6
 
 
-def _params_fingerprint(params: ScoringParams) -> str:
-    """Deterministic serialization of the grade-formula params (sorted maps)."""
-    return json.dumps({
-        "severity_weight": dict(sorted(params.severity_weight.items())),
-        "base_k": params.base_k,
-        "lift_compress": params.lift_compress,
-        "ceil_scale": params.ceil_scale,
-        "floor_minor": params.floor_minor,
-        "floor_major": params.floor_major,
-        "grade_thresholds": [list(t) for t in params.grade_thresholds],
-        "dimension_weights_enabled": params.dimension_weights_enabled,
-        "dimension_weights": dict(sorted(params.dimension_weights.items())),
-    }, sort_keys=True)
-
-
 def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
     """Content-hash of the project's suppression state + grade params.
 
@@ -94,12 +81,15 @@ def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
     """
     payload = json.dumps({
         "epoch": _CACHE_WRITER_EPOCH,
+        # Read at call time so every grade-formula bump invalidates cached
+        # rows the same way it re-derives the SQL grade tables.
+        "algo": projector_scoring.GRADE_ALGO_VERSION,
         "dismissed": as_dismissed_keys(dismissed_keys(project_dir)).version_payload(),
         "deleted": sorted(str(k) for k in deleted_keys(project_dir)),
         "rules": [
             [r.req, r.file, r.reason] for r in load_suppression_rules(project_dir)
         ],
-        "params": _params_fingerprint(params),
+        "params": params_fingerprint(params),
     }, sort_keys=True)
     return hashlib.sha256(payload.encode(TEXT_ENCODING)).hexdigest()
 
@@ -122,9 +112,10 @@ def run_scoped_version(
     touching = as_dismissed_keys(dismissed_all).touching(run_dismiss_keys)
     payload = json.dumps({
         "epoch": _CACHE_WRITER_EPOCH,
+        "algo": projector_scoring.GRADE_ALGO_VERSION,
         "dismissed": touching.version_payload(),
         "deleted": sorted(str(k) for k in (deleted_all & run_class_keys)),
-        "params": _params_fingerprint(params),
+        "params": params_fingerprint(params),
     }, sort_keys=True)
     return hashlib.sha256(payload.encode(TEXT_ENCODING)).hexdigest()
 
@@ -167,7 +158,8 @@ def accumulated_cache_version(
         # this bump it is served forever (tests/services/
         # test_accumulated_version_heals_poison.py pins the keyspace exit).
         "algo": _ACCUMULATED_CACHE_ALGO_VERSION,
-        "params": _params_fingerprint(params),
+        "grade_algo": projector_scoring.GRADE_ALGO_VERSION,
+        "params": params_fingerprint(params),
         "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",
         **({} if visible_dims is None else {"visible": sorted(visible_dims)}),
@@ -296,4 +288,4 @@ def suppression_state_fingerprint(
 
     See ``services._run_version_memo``; this facade folds in the params hash.
     """
-    return _state_fingerprint(_params_fingerprint(params), dismissed_all, deleted_all)
+    return _state_fingerprint(params_fingerprint(params), dismissed_all, deleted_all)
