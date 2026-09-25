@@ -18,6 +18,7 @@ import re
 import shutil
 import tempfile
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from quodeq.assistant._worktree_git import (
@@ -33,6 +34,37 @@ _DEFAULT_PROJECT_NAME = "project"  # fallback path segment when no project id is
 _GIT_SUBCOMMAND_WORKTREE = "worktree"
 _GIT_VERB_ADD = "add"
 _GIT_VERB_PRUNE = "prune"
+
+
+class PrOutcome(StrEnum):
+    """Why ``WorktreeManager.create_pr`` ended the way it did; the route
+    builds the user-facing message from this plus ``PrResult.detail``.
+
+    A local vocabulary, distinct from ``workspace_actions.OutcomeKind`` even
+    where a word ("created") coincides.
+    """
+
+    PUSH_FAILED = "push_failed"
+    NO_GH = "no_gh"
+    GH_FAILED = "gh_failed"
+    CREATED = "created"
+
+
+@dataclass(frozen=True)
+class PrResult:
+    """``create_pr``'s typed, fail-soft result: the route shapes this into
+    the wire body (``prUrl``/``branch``/``pushed``/``message``).
+
+    ``detail`` carries the dynamic part of the route's message (the push or
+    ``gh`` error text); empty for ``NO_GH`` and ``CREATED``, whose message is
+    fixed text.
+    """
+
+    pr_url: str | None
+    branch: str
+    pushed: bool
+    reason: PrOutcome
+    detail: str = ""
 
 
 def _safe_segment(value: str) -> str:
@@ -140,7 +172,7 @@ class WorktreeManager:
         )
         return True
 
-    def create_pr(self, title: str, body: str) -> dict:
+    def create_pr(self, title: str, body: str) -> PrResult:
         """Commit, push, gh pr create. Fail-soft: the branch is always kept.
 
         On push failure the just-made commit is rolled back (soft) so the
@@ -152,13 +184,9 @@ class WorktreeManager:
         except WorktreeError as exc:
             if committed:
                 self._git_worktree("reset", "--soft", "HEAD~1")
-            return {"prUrl": None, "branch": self.branch, "pushed": False,
-                    "message": (f"Push failed: {exc}. The changes are back in the"
-                                " worktree; apply them or open a PR manually.")}
+            return PrResult(None, self.branch, False, PrOutcome.PUSH_FAILED, str(exc))
         if shutil.which("gh") is None:
-            return {"prUrl": None, "branch": self.branch, "pushed": True,
-                    "message": ("Branch pushed. Install and authenticate the gh"
-                                " CLI, or open the PR from your git host.")}
+            return PrResult(None, self.branch, True, PrOutcome.NO_GH)
         # gh runs with the parent process env on purpose (it needs the user's
         # own auth). It is NOT routed through the scrubbed-env CLI spawner
         # used for AI provider CLIs; that scrubber exists to keep secrets
@@ -169,11 +197,9 @@ class WorktreeManager:
                         "--body", body or "", "--head", self.branch],
                        cwd=self.path)
         except WorktreeError as exc:
-            return {"prUrl": None, "branch": self.branch, "pushed": True,
-                    "message": f"gh pr create failed: {exc}"}
+            return PrResult(None, self.branch, True, PrOutcome.GH_FAILED, str(exc))
         url = out.strip().splitlines()[-1] if out.strip() else None
-        return {"prUrl": url, "branch": self.branch, "pushed": True,
-                "message": "PR created"}
+        return PrResult(url, self.branch, True, PrOutcome.CREATED)
 
 
 def ensure_session_worktree(repository, *, repo_root: Path, project_id: str | None,
