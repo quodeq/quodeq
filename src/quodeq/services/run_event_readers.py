@@ -139,8 +139,6 @@ def read_new_findings_from_events(
     run_dir: Path,
     last_event_ts: datetime | None,
     counter_start: int,
-    *,
-    log: LogSink = NULL_LOG,
 ) -> list[tuple[datetime, int, Any]]:
     """Return (event_ts, counter, payload) triples for new JUDGMENT_CREATED events.
 
@@ -152,22 +150,23 @@ def read_new_findings_from_events(
     into the SSE finding dict is the caller's job (``payload_as_sse_finding``
     in ``api/_run_event_serializers.py``), so this reader stays free of
     delivery-format concerns.
+
+    Propagates any read failure (e.g. a malformed events.jsonl) to the
+    caller. ``compute_tick`` wraps this call together with the
+    finding-shaping step in one try/except, so the two failure modes share a
+    single WARNING and an all-or-nothing outcome.
     """
     events_log = run_dir / "events.jsonl"
     if not events_log.is_file():
         return []
-    try:
-        results: list[tuple[datetime, int, Any]] = []
-        counter = counter_start
-        batch_limit = findings_batch_size()
-        for event in wiring.EventLogReader(events_log).stream(since_timestamp=last_event_ts):
-            if event.event_type != EventType.JUDGMENT_CREATED:
-                continue
-            counter += 1
-            results.append((event.timestamp, counter, event.payload))
-            if len(results) >= batch_limit:
-                break
-        return results
-    except Exception as exc:  # noqa: BLE001 — never crash the stream on read errors
-        log.warning(f"events.jsonl read failed for {run_dir}: {exc}")
-        return []
+    results: list[tuple[datetime, int, Any]] = []
+    counter = counter_start
+    batch_limit = findings_batch_size()
+    for event in wiring.EventLogReader(events_log).stream(since_timestamp=last_event_ts):
+        if event.event_type != EventType.JUDGMENT_CREATED:
+            continue
+        counter += 1
+        results.append((event.timestamp, counter, event.payload))
+        if len(results) >= batch_limit:
+            break
+    return results

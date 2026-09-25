@@ -112,27 +112,27 @@ def test_compute_tick_handles_missing_events_jsonl(tmp_path: Path):
     assert finding_events == []
 
 
-def test_compute_tick_never_crashes_on_a_malformed_finding_payload(tmp_path: Path, monkeypatch, caplog):
-    """A bad payload degrades to "no findings this tick" instead of crashing
-    compute_tick -- parity with the pre-move inline reader (simulated via a
-    monkeypatched payload_as_sse_finding, since EventLogReader only ever
-    yields typed Judgment payloads in practice)."""
+def test_compute_tick_never_crashes_on_a_read_or_shaping_failure(tmp_path: Path, monkeypatch, caplog):
+    """Read and shaping failures both degrade to "no findings this tick"
+    instead of crashing compute_tick -- one guard covers both."""
     _write_status(tmp_path)
     _write_finding_event(tmp_path, "P1", line=1)
 
-    def _boom(payload, finding_id):
+    def _boom(*a, **k):
         raise AttributeError("'NoneType' object has no attribute 'practice_id'")
-
-    monkeypatch.setattr("quodeq.api._run_event_watcher.payload_as_sse_finding", _boom)
-    state = WatcherState()
-    with caplog.at_level("WARNING"):
-        events, new_state = compute_tick(tmp_path, state)
-
-    assert [e for e in events if e[0] == "finding"] == []
-    assert new_state.last_event_counter == state.last_event_counter
-    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
-    assert len(warnings) == 1, [(r.name, r.message) for r in warnings]
-    assert warnings[0].message.startswith(f"events.jsonl read failed for {tmp_path}: ")
+    targets = ("quodeq.api._run_event_watcher.payload_as_sse_finding",
+               "quodeq.api._run_event_watcher.read_new_findings_from_events")
+    for target in targets:
+        with monkeypatch.context() as m:
+            m.setattr(target, _boom)
+            state = WatcherState(); caplog.clear()
+            with caplog.at_level("WARNING"):
+                events, new_state = compute_tick(tmp_path, state)
+        assert [e for e in events if e[0] == "finding"] == []
+        assert new_state.last_event_counter == state.last_event_counter
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1, [(r.name, r.message) for r in warnings]
+        assert warnings[0].message.startswith(f"events.jsonl read failed for {tmp_path}: ")
 
 
 def test_compute_tick_handles_malformed_status_json(tmp_path: Path):

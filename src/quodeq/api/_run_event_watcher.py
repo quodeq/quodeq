@@ -83,12 +83,12 @@ def compute_tick(run_dir: Path, state: WatcherState) -> tuple[list[EventTuple], 
         ), None))
 
     # --- Findings ---
-    new_findings = read_new_findings_from_events(
-        run_dir, state.last_event_ts, state.last_event_counter, log=_LOG,
-    )
     new_last_ts = state.last_event_ts
     new_counter = state.last_event_counter
     try:
+        new_findings = read_new_findings_from_events(
+            run_dir, state.last_event_ts, state.last_event_counter,
+        )
         finding_events: list[EventTuple] = []
         for event_ts, counter, payload in new_findings:
             finding_dict = payload_as_sse_finding(payload, counter)

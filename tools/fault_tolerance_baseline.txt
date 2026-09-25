@@ -131,7 +131,6 @@ src/quodeq/services/grade_formula.py:121:broad-except
 src/quodeq/services/grade_formula_job.py:197:broad-except
 src/quodeq/services/mutation_rescore.py:188:broad-except
 src/quodeq/services/project_registration.py:166:broad-except
-src/quodeq/services/run_event_readers.py:171:broad-except
 src/quodeq/services/score_run.py:232:broad-except
 src/quodeq/services/shared_publish.py:195:broad-except
 src/quodeq/services/shared_publish.py:221:broad-except
