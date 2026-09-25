@@ -147,8 +147,7 @@ def test_get_evaluation_scores_only_once_for_same_job(client):
 
 
 def test_score_completed_dims_failure_is_isolated_and_logged(client, caplog):
-    """A raising score_completed_evidence must not crash the background task,
-    and must be logged with the traceback (fault-isolation boundary)."""
+    """A raising scorer is isolated and logged with its traceback."""
     with patch(
         "quodeq.services.score_run.score_completed_evidence",
         side_effect=RuntimeError("boom"),
@@ -207,11 +206,7 @@ def test_deadline_cancelled_job_still_triggers_salvage_scoring(reports_root):
     )
 
 
-# ---------------------------------------------------------------------------
-# Unit tests for ScoringClaims.claim (race-closure + bounded-registry
-# guarantees). Each test builds its own fresh instance, so there is no
-# shared registry to reset between tests.
-# ---------------------------------------------------------------------------
+# ScoringClaims unit tests: each builds its own instance, so nothing to reset.
 
 def test_claim_scoring_exactly_once_under_concurrency():
     """claim() returns True exactly once when N threads race on the same job_id.
@@ -248,11 +243,7 @@ def test_claim_scoring_exactly_once_under_concurrency():
 
 
 def test_claim_scoring_registry_bounded():
-    """Registry never exceeds SCORED_JOBS_MAX entries.
-
-    Claims more than SCORED_JOBS_MAX distinct job_ids and verifies that
-    the registry size stays at or below the cap (oldest entries are evicted).
-    """
+    """Registry never exceeds SCORED_JOBS_MAX entries (oldest are evicted)."""
     claims = ScoringClaims()
     overflow = SCORED_JOBS_MAX + 50
     for i in range(overflow):
