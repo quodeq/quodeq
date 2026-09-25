@@ -1,4 +1,5 @@
 import { GRANULARITY } from './utils/granularity.js';
+import { SECONDS_PER_MINUTE, MS_PER_SECOND } from './utils/time.js';
 
 const UNDEFINED_TYPEOF = 'undefined'; // typeof sentinel for the event-dispatch helpers' "are we in a browser" guard
 
@@ -20,6 +21,19 @@ export const SCORE_SCALE_MAX = 10;
 // conversion and percent-scale default across the app so they all agree on
 // what "100%" means.
 export const PERCENT = 100;
+
+// Idle timeout for an SSE stream (the assistant chat and the eval job log):
+// no frame for this long and the stream is treated as stalled and torn
+// down. Shared by useAssistantStream and useJobLogStream so both time out
+// identically instead of drifting apart if one is tuned and not the other.
+export const STREAM_INACTIVITY_MS = SECONDS_PER_MINUTE * MS_PER_SECOND;
+
+// Fixed pixel height for the score-history bar charts on the dashboard's
+// run-history panel, the explorer's dimension panel, and history's
+// dimension panel. Not the same chart as HISTORY_CHART_HEIGHT in
+// scoreChartHelpers.js (220px, the history line-chart panel) — different
+// charts, deliberately different heights.
+export const HISTORY_CHART_HEIGHT_PX = 160;
 
 // Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).
 // These client-side defaults can be overridden by server config (ai_providers.json).

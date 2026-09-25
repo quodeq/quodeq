@@ -1,10 +1,11 @@
 import { readJSON, readString, removeKey, writeJSON, writeString } from '../../../adapters/storage.js';
 import { SKIPPED_KEY, SKIPPED_VALUE } from '../wizardSteps.js';
+import { MS_PER_DAY } from '../../../utils/time.js';
 
 // Re-exported for useWizardDraft.test.jsx; production code imports the leaf.
 export { SKIPPED_KEY };
 export const DRAFT_KEY = 'quodeq_onboarding_draft';
-const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+const DRAFT_TTL_MS = MS_PER_DAY;
 
 /**
  * Save wizard state snapshot to localStorage with a savedAt timestamp.

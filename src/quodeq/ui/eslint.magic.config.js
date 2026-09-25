@@ -16,6 +16,9 @@
 // The score scale, percent and time unit factors (10, 24, 60, 100, 1000)
 // are named constants, not ignored. Tests and fixtures are excluded: there
 // the literal is the expected value, which is the contract under test.
+//
+// -1/0/1/2 is the floor: every other literal in production UI code names
+// a home (CONTRIBUTING.md, Code Style) rather than being grandfathered here.
 export default [
   {
     files: ['src/**/*.js', 'src/**/*.jsx'],
@@ -34,7 +37,7 @@ export default [
       'no-magic-numbers': [
         'error',
         {
-          ignore: [-1, 0, 1, 2, 24, 60, 1000],
+          ignore: [-1, 0, 1, 2],
           ignoreArrayIndexes: true,
           ignoreDefaultValues: true,
           ignoreClassFieldInitialValues: true,

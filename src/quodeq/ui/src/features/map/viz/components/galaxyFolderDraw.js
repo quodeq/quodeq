@@ -17,6 +17,11 @@ export { starShapeFor } from './galaxyFolderCues.js';
 // Re-exported so the folder canvas's draw surface stays in one module.
 export { drawStarfield } from './galaxyStarfield.js';
 
+// Added to a folder star's label-collision importance so a folder always
+// outranks a file (whose importance is only violations + radius, orders of
+// magnitude smaller) when two labels compete for the same space.
+const FOLDER_IMPORTANCE_BOOST = 1000;
+
 /**
  * Paint the canvas background gradient and return the theme colours every
  * other draw helper in this module reads. The scene itself is not consulted:
@@ -192,7 +197,7 @@ function collectStarLabel(s, sc, sr, cam, showLabels) {
   const lh = fontSize + FOLDER_LABEL.heightPadPx;
   const lx = sc.x;
   const ly = sc.y - sr - FOLDER_LABEL.offsetPx * fs;
-  const importance = (s.isFolder ? 1000 : 0) + (s.violations || 0) + (s.radius || 0);
+  const importance = (s.isFolder ? FOLDER_IMPORTANCE_BOOST : 0) + (s.violations || 0) + (s.radius || 0);
   return { s, sc, sr, fs, label, fontSize, lx, ly, lw, lh, importance, col: s.col };
 }
 

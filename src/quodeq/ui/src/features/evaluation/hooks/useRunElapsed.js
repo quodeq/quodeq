@@ -1,6 +1,7 @@
 import { useEffect, useReducer } from 'react';
 import { deriveRunElapsedS, msUntilNextSecond } from '../components/buildJobStatCells.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
+import { MS_PER_SECOND } from '../../../utils/time.js';
 
 /**
  * The evaluate screen's elapsed clock, in seconds. Server-anchored (see
@@ -39,7 +40,7 @@ export function useRunElapsed(job, progress, dataUpdatedAt) {
     // Virtual start of the run on the client's clock: the display flips when
     // floor((now - anchor) / 1000) changes, matching deriveRunElapsedS.
     const anchorMs = Number.isFinite(serverElapsedS) && Number.isFinite(dataUpdatedAt)
-      ? dataUpdatedAt - serverElapsedS * 1000
+      ? dataUpdatedAt - serverElapsedS * MS_PER_SECOND
       : Date.parse(startedAt);
     if (Number.isNaN(anchorMs)) return undefined;
     let id;
