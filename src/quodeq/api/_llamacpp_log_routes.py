@@ -19,6 +19,8 @@ hides the console button. Recommended launch:
 """
 from __future__ import annotations
 
+from quodeq.api._constants import CODE_NOT_FOUND
+
 import logging
 import sys
 from collections.abc import Mapping
@@ -127,7 +129,7 @@ def register_llamacpp_log_routes(app: Flask, env: Mapping[str, str] | None = Non
             return (
                 jsonify({
                     "error": "llamacpp log unavailable",
-                    "code": "NOT_FOUND",
+                    "code": CODE_NOT_FOUND,
                     "help": (
                         "Could not locate a llama-server log file. Either redirect "
                         "llama-server's output to a standard path (e.g. on macOS: "

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from flask import Response, request
 
+from quodeq.api._constants import CODE_INVALID_INPUT
 from quodeq.api.helpers import ClientMessageError, json_error
 from quodeq.core.types.provider import ProviderType
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
@@ -122,7 +123,7 @@ def validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tu
         return json_error(
             f"Invalid AI command. Allowed: {allowed_list}",
             HTTPStatus.BAD_REQUEST,
-            "INVALID_INPUT",
+            CODE_INVALID_INPUT,
         )
     return None
 
@@ -215,7 +216,7 @@ def validate_ai_cmd_path(
     return json_error(
         f"Invalid AI command override: {reason}",
         HTTPStatus.BAD_REQUEST,
-        "INVALID_INPUT",
+        CODE_INVALID_INPUT,
     )
 
 

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import CODE_NOT_FOUND
 from quodeq.api._sse_log_helpers import sse_tail_generator
 from quodeq.shared.constants import PLATFORM_WIN32
 from quodeq.shared.env_resolve import resolve_env
@@ -64,7 +65,7 @@ def register_ollama_log_routes(app: Flask, env: Mapping[str, str] | None = None)
             return (
                 jsonify({
                     "error": "ollama log unavailable",
-                    "code": "NOT_FOUND",
+                    "code": CODE_NOT_FOUND,
                     "help": "Could not locate the Ollama server log. Start the Ollama app or run `ollama serve`.",
                 }),
                 HTTPStatus.NOT_FOUND,

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import CODE_INVALID_ACTION, CODE_NOT_FOUND
 from quodeq.api.helpers import error_response, optional_json_object_or_error
 from quodeq.api.import_project import import_zip_stream
 from quodeq.api.zip import build_project_zip
@@ -79,16 +80,16 @@ def shared_pull(project: str, eval_root: Path) -> Response | tuple[Response, int
     project_path = shared_project_dir(eval_root, project)
     if project_path is None:
         body, status = error_response(
-            "Project not found in the shared repository", HTTPStatus.NOT_FOUND, "NOT_FOUND",
+            "Project not found in the shared repository", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND,
         )
         return jsonify(body), status
 
-    payload = optional_json_object_or_error("INVALID_ACTION")
+    payload = optional_json_object_or_error(CODE_INVALID_ACTION)
     if not isinstance(payload, dict):
         return jsonify(payload[0]), payload[1]
     action = payload.get("action")
     if action is not None and not isinstance(action, str):
-        body, status = error_response("action must be a string", HTTPStatus.BAD_REQUEST, "INVALID_ACTION")
+        body, status = error_response("action must be a string", HTTPStatus.BAD_REQUEST, CODE_INVALID_ACTION)
         return jsonify(body), status
 
     zip_path, build_err = _build_pull_zip(project, project_path)

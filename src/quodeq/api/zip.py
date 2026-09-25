@@ -13,6 +13,7 @@ from pathlib import Path
 
 from flask import Response, after_this_request, send_file
 
+from quodeq.api._constants import CODE_NOT_FOUND
 from quodeq.api.helpers import ClientMessageError, json_error
 from quodeq.shared.constants import MANIFEST_FILENAME
 from quodeq.shared.env import env_int
@@ -183,7 +184,7 @@ def _resolve_project_path(project: str, reports_dir: str) -> tuple[Path | None, 
             HTTPStatus.BAD_REQUEST, "BAD_REQUEST",
         )
     if not project_path.exists() or not project_path.is_dir():
-        return None, json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return None, json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return project_path, None
 
 
