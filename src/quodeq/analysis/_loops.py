@@ -61,7 +61,7 @@ def run_incremental_loop(
     ``deps.runner.run(config, dim, idx, ctx, emit_log=False)`` is used for
     the incremental path (the loop emits its own ``analyzing`` marker with
     an "(incremental)" suffix and logs the result itself); the full-scan
-    fallback (see ``_dispatch_incremental_dim``) uses ``emit_log=True`` so
+    fallback (see ``_attempt_incremental_dim``) uses ``emit_log=True`` so
     the runner emits its own analyzing marker and success log.
 
     Each dimension gets its own slice of the remaining budget, sized by its
@@ -72,11 +72,13 @@ def run_incremental_loop(
     post-loop guards see the run budget, not the last dimension's slice.
 
     ``run_one_incremental_dim`` (dispatch, fallback *and* finalize) is
-    isolated as one loop-iteration boundary: a bug outside
-    ``_dispatch_incremental_dim``'s own narrowed dispatch/fallback boundary
-    or ``finalize_dim_result``'s narrowed callback boundary -- most notably
-    an unrecognized exception from the ``on_dimension_done`` callback --
-    marks the dimension skipped instead of aborting the rest of the run.
+    isolated as exactly one loop-iteration boundary via
+    ``_run_incremental_dim_isolated``: a bug outside
+    ``_attempt_incremental_dim``'s own recognized exception types (the
+    incremental attempt and its full-scan fallback), or outside
+    ``finalize_dim_result``'s narrowed callback boundary -- most notably an
+    unrecognized exception from the ``on_dimension_done`` callback -- marks
+    the dimension skipped instead of aborting the rest of the run.
     """
     log = deps.log
     result: dict[str, Evidence] = {}

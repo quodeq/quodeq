@@ -33,7 +33,6 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.fs.dimensions_state_store import DimState
 from quodeq.shared import cancellation
-from quodeq.shared.fault_isolation import run_isolated
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,7 +151,8 @@ def _attempt_incremental_dim(
 
     A failure of a type this function doesn't recognize (from either the
     incremental attempt or the fallback) is left to propagate --
-    ``_dispatch_incremental_dim`` isolates it at the loop-iteration boundary.
+    ``run_incremental_loop`` isolates it, along with the rest of the step
+    (finalize included), at the loop-iteration boundary.
     """
     runner, log = deps.runner, deps.log
     try:
@@ -183,30 +183,6 @@ def _attempt_incremental_dim(
             return None, inner_exc
 
 
-def _dispatch_incremental_dim(
-    config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
-) -> tuple[Evidence | None, BaseException | None]:
-    """Run one dimension incrementally, falling back to a full scan on failure.
-
-    Returns ``(ev, last_exc)``: ``ev`` is the resulting Evidence (or None if
-    both the incremental attempt and any fallback failed), ``last_exc`` is
-    the most recent exception encountered (or None on success), used to
-    pick the dim-state ``INCOMPLETE`` reason. An exception class neither the
-    incremental attempt nor the fallback recognizes is caught here and
-    logged with its traceback, degrading to ``(None, exc)`` instead of
-    propagating -- this is a boundary around the dispatch/fallback pair
-    specifically, nested inside the whole-step loop-iteration boundary
-    ``run_incremental_loop`` wraps around ``run_one_incremental_dim``
-    (dispatch, fallback *and* finalize).
-    """
-    return run_isolated(
-        lambda: _attempt_incremental_dim(config, dimension, idx, ctx, deps),
-        label=f"[{idx}/{ctx.total}] {dimension} incremental dispatch",
-        log=deps.log,
-        on_error=lambda exc: (None, exc),
-    )
-
-
 def run_one_incremental_dim(
     config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, run: LoopRun,
 ) -> None:
@@ -214,14 +190,18 @@ def run_one_incremental_dim(
     finalize-or-incomplete.
 
     A known-bad exception from the incremental attempt or its full-scan
-    fallback is handled inside ``_dispatch_incremental_dim`` (its own
-    narrowed loop-iteration-shaped boundary, unchanged): both attempts
-    failing is a clean ``(None, exc)``, not a raise. Anything else --
-    escaping that pair, or from ``finalize_dim_result``'s
+    fallback is handled inside ``_attempt_incremental_dim`` itself: both
+    attempts failing on a recognized exception type is a clean
+    ``(None, exc)``, not a raise. Anything else -- an exception type neither
+    attempt recognizes, or one from ``finalize_dim_result``'s
     ``on_dimension_done`` callback -- propagates out of this function
-    uncaught: ``run_incremental_loop`` isolates the whole step (dispatch,
-    fallback *and* finalize) at the loop-iteration boundary, so one
-    dimension's bug cannot abort the rest of the run.
+    uncaught. Exactly one boundary per iteration: ``run_incremental_loop``
+    isolates the whole step (dispatch, fallback *and* finalize) at the
+    loop-iteration boundary, so one dimension's bug cannot abort the rest of
+    the run. (There used to be a second, nested ``run_isolated`` here around
+    the dispatch/fallback pair alone; removed -- one boundary per iteration
+    is the contract, and the outer one's ``on_error`` records the identical
+    INCOMPLETE reason via the same ``interruption_reason`` call.)
 
     The caller (``run_incremental_loop``) has already logged the "entering
     iteration" line and checked ``loop_should_stop`` before calling this.
@@ -231,7 +211,7 @@ def run_one_incremental_dim(
     safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=log)
     emit_marker(CC_PHASE_ANALYZING, dimension=dimension)
     log.info(f"-> [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
-    ev, last_exc = _dispatch_incremental_dim(config, dimension, idx, ctx, run.deps)
+    ev, last_exc = _attempt_incremental_dim(config, dimension, idx, ctx, run.deps)
     if ev:
         finalize_dim_result(
             run_dir, dimension, ev, run,
