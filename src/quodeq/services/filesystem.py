@@ -228,7 +228,7 @@ class FilesystemActionProvider(ActionProvider):
         self, reports_dir: str, project: str, as_of: str | None,
     ) -> dict[str, Any] | None:
         """Return dimension data accumulated across every run up to *as_of*, or None."""
-        return fs_reports.get_accumulated(reports_dir, project, as_of)
+        return fs_reports.get_accumulated(reports_dir, project, as_of, log=SHARED_LOG)
 
     def get_dimension_eval(
         self, reports_dir: str, project: str, run_id: str, dimension: str,

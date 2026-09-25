@@ -53,7 +53,7 @@ src/quodeq/assistant/adapters/capabilities.py:57:broad-except
 src/quodeq/assistant/cancel.py:53:broad-except
 src/quodeq/assistant/cancel.py:66:broad-except
 src/quodeq/assistant/orchestrator.py:294:broad-except
-src/quodeq/assistant/tools/_read_tools_scope.py:134:broad-except
+src/quodeq/assistant/tools/_read_tools_scope.py:137:broad-except
 src/quodeq/assistant/tools/registry.py:66:broad-except
 src/quodeq/ci/cli.py:103:broad-except
 src/quodeq/cli.py:101:broad-except

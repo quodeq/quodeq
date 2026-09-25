@@ -8,12 +8,17 @@ and trimming the payload to what a chat needs.
 """
 from __future__ import annotations
 
+import logging
+
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_entries_visible
 from quodeq.core.types.severity import SEVERITY_ORDER
 from quodeq.services import get_accumulated
 from quodeq.services.scoring import rescore_accumulated
+from quodeq.shared.log_sink import LoggerSink
+
+_logger = logging.getLogger(__name__)
 
 # Severity buckets recomputed for the filtered summary. Unknown/missing
 # severities are ignored rather than added as a fourth bucket.
@@ -68,7 +73,9 @@ def _get_overview(ctx: ToolContext, as_of: str | None = None) -> dict:
             "Call get_context to confirm scope, then ask the user to open a "
             "project overview."
         )
-    payload = get_accumulated(str(ctx.reports_dir), ctx.project_id, as_of)
+    payload = get_accumulated(
+        str(ctx.reports_dir), ctx.project_id, as_of, log=LoggerSink(_logger),
+    )
     if payload is None:
         raise ToolError(f"no accumulated data for project: {ctx.project_id}")
     # Project-wide dismiss/delete rescore: the raw accumulated payload keeps

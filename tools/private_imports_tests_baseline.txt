@@ -1043,8 +1043,6 @@ tests/services/test_mutation_scoring_logging.py:7:private-module:quodeq.services
 tests/services/test_per_run_versions_memo.py:15:private-name:quodeq.services.trend_fetcher._make_version_for
 tests/services/test_plugin_discovery.py:6:private-name:quodeq.services.plugin_discovery._discover_from_detection
 tests/services/test_post_run_hook.py:14:private-module:quodeq.services._post_run_hook.PostRunHook
-tests/services/test_project_scores_log_wiring.py:16:private-module:quodeq.services.scoring._project_scores
-tests/services/test_project_scores_log_wiring.py:17:private-name:quodeq.services.scoring._project_scores._ScoresRequest
 tests/services/test_project_summary_cache.py:5:private-module:quodeq.services._fs_metadata
 tests/services/test_projects_cache_entities.py:13:private-module:quodeq.services._projects_cache.mod
 tests/services/test_projects_cache_entities.py:15:private-module:quodeq.services._projects_cache.ProjectsCache
@@ -1157,13 +1155,12 @@ tests/terminal/test_pty_windows_smoke.py:12:private-module:quodeq.terminal._pty_
 tests/terminal/test_pty_windows_smoke.py:12:private-module:quodeq.terminal._pty_windows.resolve_shell
 tests/test_cli_consolidation_wiring.py:19:private-module:quodeq._cli_resolution.ResolvedInputs
 tests/test_cli_diff_from_wiring.py:10:private-module:quodeq._cli_resolution.ResolvedInputs
-tests/test_cli_env_injection.py:113:private-name:quodeq.cli_evaluation._resolve_run_config_locals
-tests/test_cli_env_injection.py:114:private-module:quodeq._cli_resolution.ResolvedInputs
-tests/test_cli_env_injection.py:130:private-name:quodeq.cli_evaluation._resolve_run_config_locals
-tests/test_cli_env_injection.py:131:private-module:quodeq._cli_resolution.ResolvedInputs
-tests/test_cli_env_injection.py:14:private-module:quodeq._cli_env.cli_env_int
+tests/test_cli_env_injection.py:114:private-name:quodeq.cli_evaluation._resolve_run_config_locals
+tests/test_cli_env_injection.py:115:private-module:quodeq._cli_resolution.ResolvedInputs
+tests/test_cli_env_injection.py:131:private-name:quodeq.cli_evaluation._resolve_run_config_locals
+tests/test_cli_env_injection.py:132:private-module:quodeq._cli_resolution.ResolvedInputs
 tests/test_cli_env_injection.py:14:private-module:quodeq._cli_env.cli_environ
-tests/test_cli_env_injection.py:75:private-module:quodeq._cli_run_config.resolve_limits
+tests/test_cli_env_injection.py:76:private-module:quodeq._cli_run_config.resolve_limits
 tests/test_cli_evaluation_print.py:16:private-name:quodeq._cli_scoring._format_score_line
 tests/test_cli_evaluation_print.py:17:private-module:quodeq.analysis._report_io.write_dimension_report
 tests/test_cli_evaluation_print_evidence_parse.py:18:private-module:quodeq.analysis._report_io.write_dimension_report

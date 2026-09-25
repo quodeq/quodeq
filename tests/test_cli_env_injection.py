@@ -11,7 +11,8 @@ import io
 import os
 from unittest.mock import patch
 
-from quodeq._cli_env import cli_env_int, cli_environ
+from quodeq._cli_env import cli_environ
+from quodeq.cli_evaluation import cli_env_int  # re-export
 
 
 def test_cli_env_int_logs_and_falls_back_on_malformed_value():

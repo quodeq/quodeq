@@ -16,6 +16,7 @@ from quodeq.services import fs_reports
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.scoring import rescore_accumulated, scored_run_dimensions
+from quodeq.shared.log_sink import LoggerSink
 from quodeq.shared.serialization import coerce_line, to_camel_dict
 
 _logger = logging.getLogger(__name__)
@@ -60,7 +61,9 @@ def accumulated_dims(ctx: ToolContext, *, rescored: bool = True) -> list[dict] |
     """
     if ctx.reports_dir is None or ctx.project_id is None:
         return None
-    payload = fs_reports.get_accumulated(str(ctx.reports_dir), ctx.project_id, None)
+    payload = fs_reports.get_accumulated(
+        str(ctx.reports_dir), ctx.project_id, None, log=LoggerSink(_logger),
+    )
     if payload is None:
         return None
     if rescored:

@@ -90,10 +90,10 @@ def _build_registry(tmp_path, repo_root, monkeypatch):
     """
     monkeypatch.setattr(
         "quodeq.assistant.tools._overview.get_accumulated",
-        lambda *a: _ACCUMULATED)
+        lambda *a, **kw: _ACCUMULATED)
     monkeypatch.setattr(
         "quodeq.services.fs_reports.get_accumulated",
-        lambda *a: _ACCUMULATED)
+        lambda *a, **kw: _ACCUMULATED)
     repo = AssistantRepository(tmp_path / "assistant.db")
     repo.create_session(session_id="s1", provider="ollama")
     ctx = ToolContext(

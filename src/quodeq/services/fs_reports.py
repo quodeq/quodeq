@@ -47,9 +47,11 @@ def get_dashboard(reports_dir: str, project: str, run: str, *, log: LogSink = NU
     return _enrich_with_coverage(reports_dir, project, payload, log=log)
 
 
-def get_accumulated(reports_dir: str, project: str, as_of: str | None) -> dict[str, Any] | None:
+def get_accumulated(
+    reports_dir: str, project: str, as_of: str | None, *, log: LogSink = NULL_LOG,
+) -> dict[str, Any] | None:
     """Return accumulated dimension data across all runs up to as_of."""
-    return compute_accumulated(reports_dir, project, as_of)
+    return compute_accumulated(reports_dir, project, as_of, log=log)
 
 
 def get_dimension_eval(
