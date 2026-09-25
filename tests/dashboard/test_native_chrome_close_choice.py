@@ -2,6 +2,8 @@
 import logging
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from quodeq.dashboard import _webview_window as ww
 from quodeq.dashboard import _webview_window_close as wwc
 from tests.dashboard._native_chrome_helpers import _MACOS_ONLY
@@ -36,6 +38,25 @@ class TestOnClosingChoice:
         window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
         with patch.object(ww.sys, "platform", "linux"):
             assert ww.ask_close_choice(window) == "keep"
+
+    def test_ask_close_choice_non_macos_dialog_error_logs_the_traceback(self, caplog):
+        window = MagicMock()
+        window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
+        with patch.object(ww.sys, "platform", "linux"), \
+             caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_close"):
+            assert ww.ask_close_choice(window) == "keep"
+        matching = [r for r in caplog.records if "close dialog failed" in r.getMessage()]
+        assert matching, [r.getMessage() for r in caplog.records]
+        assert any(r.exc_info for r in matching)
+
+    def test_ask_close_choice_non_macos_out_of_scope_error_propagates(self):
+        """R-FT-7 — an error outside (WebViewException, OSError, RuntimeError)
+        must now propagate instead of being swallowed as 'keep'."""
+        window = MagicMock()
+        window.create_confirmation_dialog.side_effect = ValueError("bad args")
+        with patch.object(ww.sys, "platform", "linux"):
+            with pytest.raises(ValueError, match="bad args"):
+                ww.ask_close_choice(window)
 
     # --- NSAlert return -> choice mapping (pure) ----------------------------
 
@@ -92,6 +113,15 @@ class TestOnClosingChoice:
         api._base_url = "http://127.0.0.1:7863"
         with patch("urllib.request.urlopen",
                     side_effect=urllib.error.URLError("boom")):
+            api._cancel_evaluation("job-42")  # must not raise
+
+    def test_cancel_evaluation_swallows_truncated_response(self):
+        # http.client.HTTPException (e.g. IncompleteRead) is not an OSError.
+        import http.client
+        api = ww.WindowApi()
+        api._base_url = "http://127.0.0.1:7863"
+        with patch("urllib.request.urlopen",
+                    side_effect=http.client.IncompleteRead(b"partial")):
             api._cancel_evaluation("job-42")  # must not raise
 
 

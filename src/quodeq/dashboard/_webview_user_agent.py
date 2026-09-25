@@ -12,9 +12,9 @@ from __future__ import annotations
 def quodeq_version() -> str:
     """The installed quodeq version, or "dev" when the metadata is missing."""
     try:
-        from importlib.metadata import version  # noqa: PLC0415
+        from importlib.metadata import PackageNotFoundError, version  # noqa: PLC0415
         return version("quodeq")
-    except Exception:  # noqa: BLE001 — metadata may be missing in dev
+    except PackageNotFoundError:  # metadata may be missing in dev
         return "dev"
 
 

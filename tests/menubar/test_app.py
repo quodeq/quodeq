@@ -141,16 +141,19 @@ def test_start_uses_own_binary(monkeypatch) -> None:
     assert cmd == [sys.executable, "-m", "quodeq.dashboard", "--no-open", "--port", "7863"]
 
 
-def _raising(message: str):
+def _raising(message: str, exc_type: type[BaseException] = RuntimeError):
     """A stand-in that always raises, so the caller's fail-soft path runs."""
     def boom(*_args, **_kwargs):
-        raise RuntimeError(message)
+        raise exc_type(message)
     return boom
 
 
-def _assert_logs(monkeypatch, caplog, target: str, message: str, action, expected: str) -> None:
+def _assert_logs(
+    monkeypatch, caplog, target: str, message: str, action, expected: str,
+    exc_type: type[BaseException] = RuntimeError,
+) -> None:
     """Patch *target* to raise, run *action*, and assert the debug line landed."""
-    monkeypatch.setattr(target, _raising(message))
+    monkeypatch.setattr(target, _raising(message, exc_type))
     with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
         action()
     assert expected in caplog.text
@@ -158,9 +161,12 @@ def _assert_logs(monkeypatch, caplog, target: str, message: str, action, expecte
 
 def test_on_quit_logs_when_preference_set_fails(monkeypatch, caplog) -> None:
     _module, _, app = _make_app()
+    # _on_quit's except is narrowed to (OSError, ValueError): state.set_enabled
+    # goes through json_state's on-disk read/write.
     _assert_logs(
         monkeypatch, caplog, "quodeq.menubar.state.set_enabled", "state write failed",
         lambda: app._on_quit(None), "could not disable menubar preference on quit",
+        exc_type=OSError,
     )
 
 
@@ -186,10 +192,23 @@ def test_on_check_updates_logs_the_traceback_at_warning(monkeypatch, caplog) -> 
 
 def test_poll_logs_when_update_status_check_fails(monkeypatch, caplog) -> None:
     _module, _, app = _make_app()
+    # _poll's update-check except is narrowed to (OSError, ValueError), the
+    # same on-disk state-file domain as get_status's callees.
     _assert_logs(
         monkeypatch, caplog, "quodeq.update.checker.get_status", "status check failed",
         lambda: app._poll(None), "update availability check failed",
+        exc_type=OSError,
     )
+
+
+def test_set_accessory_policy_logs_when_appkit_missing(monkeypatch, caplog) -> None:
+    """_set_accessory_policy's except is narrowed to (ImportError,): AppKit
+    is unavailable off macOS (or in a stripped-down test env)."""
+    module, _, _ = _make_app()
+    monkeypatch.setitem(sys.modules, "AppKit", None)
+    with caplog.at_level(logging.DEBUG, logger="quodeq.menubar.app"):
+        module._set_accessory_policy()  # must not raise
+    assert "could not set accessory policy" in caplog.text
 
 
 def test_set_ui_state_running_enables_open_and_stop_only() -> None:

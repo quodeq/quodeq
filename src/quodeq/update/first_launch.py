@@ -69,6 +69,9 @@ def offer_move_to_applications(
             _logger.warning("relaunch from Applications failed: %s", relaunched.stderr)
             return False
         return True
-    except Exception:
+    except (OSError, UnicodeDecodeError):
+        # subprocess.run(..., text=True, encoding="utf-8"): OSError when a
+        # tool (osascript/ditto/open) can't launch, UnicodeDecodeError when
+        # its output isn't valid UTF-8.
         _logger.debug("move-to-Applications offer failed", exc_info=True)
         return False

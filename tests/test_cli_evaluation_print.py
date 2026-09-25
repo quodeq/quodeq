@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from quodeq.cli_evaluation import print_scores
 from quodeq._cli_scoring import _format_score_line
 from quodeq.analysis._report_io import write_dimension_report
@@ -128,12 +130,17 @@ def test_dimension_without_evidence_falls_back_to_original_line(tmp_path, capsys
 
 
 def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeypatch):
-    """A scoring-engine exception during the suppression-aware rescore must
-    never propagate. The rescore is a console embellishment layered on top
-    of reports already written to disk -- nothing upstream of
+    """A ValueError during the suppression-aware rescore must never
+    propagate. The rescore is a console embellishment layered on top of
+    reports already written to disk -- nothing upstream of
     `execute_pipeline` catches a generic exception (only AnalysisError /
     EvaluationError), so a bug here would otherwise crash an
     otherwise-successful scan's exit path with a raw traceback.
+
+    ValueError is what the real call chain can raise: rescore_dimension_
+    from_evidence's only unguarded path is validate_path_segment(dim_id)
+    rejecting a path-traversal/separator character (everything else it
+    calls is already fail-soft internally).
     """
     project_dir = tmp_path / "proj"
     run_dir = project_dir / "run1"
@@ -150,7 +157,7 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
     assert dismissed_keys(project_dir), "dismiss did not register"
 
     def _boom(*args, **kwargs):
-        raise RuntimeError("scoring engine exploded")
+        raise ValueError("dim_id contains a path separator")
 
     monkeypatch.setattr("quodeq.cli_evaluation.rescore_dimension_from_evidence", _boom)
 
@@ -158,6 +165,29 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
 
     out = capsys.readouterr().out
     assert out == f"  {DIM}: {original_score}  (2 violations, 1 major, 40.0 per 100 files)\n"
+
+
+def test_rescore_out_of_scope_error_propagates(tmp_path, monkeypatch):
+    """R-FT-7 — an error outside (ValueError,) (e.g. a programming bug) must
+    now propagate instead of being swallowed."""
+    project_dir = tmp_path / "proj"
+    run_dir = project_dir / "run1"
+    lines = [
+        _ev_line("R-1", "a.kt", 10, sev="major", vt="VT-COUPLING"),
+        _ev_line("R-2", "a.kt", 20, sev="critical", vt="VT-GODCLASS"),
+        _ev_line("C-1", "a.kt", 1, t="compliance"),
+    ]
+    original_score = _build_run(run_dir, DIM, lines)
+    dismiss_finding(project_dir, {"req": "R-2", "file": "a.kt", "line": 20})
+    assert dismissed_keys(project_dir), "dismiss did not register"
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("scoring engine exploded")
+
+    monkeypatch.setattr("quodeq.cli_evaluation.rescore_dimension_from_evidence", _boom)
+
+    with pytest.raises(RuntimeError, match="scoring engine exploded"):
+        print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
 
 def test_excluded_count_ignores_quarantined_findings(tmp_path, monkeypatch):

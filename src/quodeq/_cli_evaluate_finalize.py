@@ -71,7 +71,10 @@ def write_sarif_if_requested(args: argparse.Namespace, evaluation_dir: Path) -> 
         out.write_text(json.dumps(doc, indent=2), encoding="utf-8")
         count = sum(len(r["results"]) for r in doc["runs"])
         log_info(f"Wrote {count} finding(s) to SARIF: {out}")
-    except Exception as exc:  # noqa: BLE001 — fail-soft: SARIF must never sink a scan
+    except (OSError, ValueError) as exc:
+        # OSError: reading a report file or writing the SARIF output.
+        # ValueError: json.JSONDecodeError/UnicodeDecodeError from a
+        # malformed report on disk (both are ValueError subclasses).
         log_warning(f"SARIF export failed (evaluation results are safe): {exc}")
 
 

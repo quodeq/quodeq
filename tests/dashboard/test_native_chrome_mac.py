@@ -1,9 +1,14 @@
 """macOS native chrome: traffic lights, app identity, fullscreen chrome/observer and exception logging."""
+import logging
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from quodeq.dashboard import _webview_window as ww
 from quodeq.dashboard import _webview_window_chrome as chrome
 from tests.dashboard._native_chrome_helpers import _MACOS_ONLY
+
+_LIFECYCLE = "quodeq.dashboard._webview_window_lifecycle"
 
 
 @_MACOS_ONLY
@@ -40,6 +45,48 @@ class TestMacAppIdentityIdempotent:
         # macOS, where AppKit isn't importable.)
         ww.set_macos_app_identity()
         ww.set_macos_app_identity()  # must not raise
+
+
+class TestMacLoadedHooksExceptNarrowing:
+    """_run_macos_loaded_hooks's two best-effort steps are narrowed to
+    (AttributeError, TypeError, ValueError) -- the PyObjC bridge failure
+    modes this module's own AppKit call sites already guard against
+    (see set_macos_app_identity / install_about_panel_override)."""
+
+    def _run(self, **overrides):
+        window = MagicMock()
+        patches = {
+            "show_macos_traffic_lights": lambda w: None,
+            "set_macos_unified_toolbar": lambda w: None,
+            "set_macos_titlebar_appearance": lambda w, v: None,
+            "install_macos_fullscreen_observer": lambda w: None,
+            "set_macos_app_identity": lambda: None,
+            "install_macos_help_menu": lambda w: None,
+        }
+        patches.update(overrides)
+        with patch.multiple(_LIFECYCLE, **patches):
+            ww.make_on_loaded(window)()  # -> _on_loaded -> _run_macos_loaded_hooks
+
+    def test_app_identity_failure_does_not_block_help_menu(self, caplog):
+        help_called = []
+        with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
+            self._run(
+                set_macos_app_identity=MagicMock(side_effect=AttributeError("boom")),
+                install_macos_help_menu=lambda w: help_called.append(1),
+            )
+        assert help_called == [1]
+        assert "macOS app-identity setup failed" in caplog.text
+
+    def test_help_menu_failure_is_swallowed(self, caplog):
+        with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
+            self._run(install_macos_help_menu=MagicMock(side_effect=TypeError("boom")))
+        assert "macOS Help menu setup failed" in caplog.text
+
+    def test_app_identity_out_of_scope_error_propagates(self):
+        """R-FT-7 — an error outside (AttributeError, TypeError, ValueError)
+        must now propagate instead of being swallowed."""
+        with pytest.raises(RuntimeError, match="boom"):
+            self._run(set_macos_app_identity=MagicMock(side_effect=RuntimeError("boom")))
 
 
 class _SyncThread:

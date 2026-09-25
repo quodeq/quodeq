@@ -98,7 +98,10 @@ def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> Non
                 f"{tag}: {status['current']} → {status['latest']}. Run: {action}",
                 file=out,
             )
-    except Exception:  # pragma: no cover - defensive
+    except OSError:  # pragma: no cover - defensive
+        # check_async/get_status/set_settings already fail-soft internally
+        # (json_state.py swallows OSError/ValueError); the realistic source
+        # here is print(..., file=out) racing a closed/broken stdout pipe.
         _logger.debug("update notice failed", exc_info=True)
 
 

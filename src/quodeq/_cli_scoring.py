@@ -124,9 +124,13 @@ def _adjusted_score(
             # (see the return below), so don't pay for a scoring pass.
             score_when_nothing_excluded=False,
         )
-    except Exception as exc:  # noqa: BLE001 — console embellishment on top of
-        # reports already on disk; nothing upstream catches a generic exception
-        # (see run_pipeline_with_cleanup), so fall back instead of crashing.
+    except ValueError as exc:
+        # The only unguarded raise in this call chain: _resolve_evidence_jsonl's
+        # validate_path_segment(dim_id) rejects a path-traversal/separator
+        # character. Everything else rescore_dimension_from_evidence calls is
+        # already fail-soft internally (evidence_rescore._parse_evidence_jsonl
+        # catches (OSError, ValueError, KeyError) and returns None;
+        # score_evidence has its own local except Exception).
         _logger.debug("Suppression-aware rescore failed for dim %s: %s", dim, exc)
         return None, 0
     if rescored.excluded == 0 or rescored.result is None:

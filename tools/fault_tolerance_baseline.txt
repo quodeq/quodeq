@@ -8,8 +8,6 @@
 # the baseline (update the shifted line number) over blind --update-baseline
 # regeneration, which can silently absorb a genuinely new violation
 # introduced in the same change.
-src/quodeq/_cli_evaluate_finalize.py:74:broad-except
-src/quodeq/_cli_scoring.py:127:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:214:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:243:broad-except
 src/quodeq/analysis/cache/_persist_watcher.py:152:broad-except
@@ -30,7 +28,6 @@ src/quodeq/assistant/cancel.py:55:broad-except
 src/quodeq/assistant/orchestrator.py:294:broad-except
 src/quodeq/assistant/tools/_read_tools_scope.py:137:broad-except
 src/quodeq/assistant/tools/registry.py:66:broad-except
-src/quodeq/cli.py:101:broad-except
 src/quodeq/context/_project_shape_io.py:60:broad-except
 src/quodeq/context/_project_shape_io.py:74:broad-except
 src/quodeq/context/_project_shape_io.py:91:broad-except
@@ -38,21 +35,11 @@ src/quodeq/context/project_shape.py:59:broad-except
 src/quodeq/context/trust_model.py:125:broad-except
 src/quodeq/context/trust_model.py:192:broad-except
 src/quodeq/dashboard/_webview_token.py:86:suppress
-src/quodeq/dashboard/_webview_user_agent.py:17:broad-except
 src/quodeq/dashboard/_webview_window_chrome.py:145:broad-except
-src/quodeq/dashboard/_webview_window_close.py:164:broad-except
-src/quodeq/dashboard/_webview_window_close.py:180:broad-except
-src/quodeq/dashboard/_webview_window_close.py:195:broad-except
-src/quodeq/dashboard/_webview_window_close.py:222:broad-except
-src/quodeq/dashboard/_webview_window_close.py:230:broad-except
-src/quodeq/dashboard/_webview_window_close.py:257:broad-except
-src/quodeq/dashboard/_webview_window_lifecycle.py:45:broad-except
-src/quodeq/dashboard/_webview_window_lifecycle.py:51:broad-except
+src/quodeq/dashboard/_webview_window_close.py:182:broad-except
+src/quodeq/dashboard/_webview_window_close.py:197:broad-except
+src/quodeq/dashboard/_webview_window_close.py:232:broad-except
 src/quodeq/dashboard/_webview_window_native_ops.py:190:broad-except
-src/quodeq/dashboard/_webview_window_native_ops.py:81:broad-except
-src/quodeq/dashboard/runner.py:162:broad-except
-src/quodeq/dashboard/runner.py:180:broad-except
-src/quodeq/dashboard/runner.py:191:broad-except
 src/quodeq/data/fs/compiled_standards.py:36:broad-except
 src/quodeq/data/fs/report_parser/run_dates.py:43:broad-except
 src/quodeq/data/fs/run_artifacts.py:60:suppress
@@ -67,9 +54,6 @@ src/quodeq/data/sqlite/run_index.py:113:broad-except
 src/quodeq/data/sqlite/run_index.py:181:broad-except
 src/quodeq/data/sqlite/run_index.py:90:broad-except
 src/quodeq/data/sqlite/run_index.py:96:broad-except
-src/quodeq/menubar/app.py:153:broad-except
-src/quodeq/menubar/app.py:210:broad-except
-src/quodeq/menubar/app.py:226:broad-except
 src/quodeq/services/_mutation_scoring.py:108:broad-except
 src/quodeq/services/_mutation_scoring.py:86:broad-except
 src/quodeq/services/_post_run_hook.py:37:broad-except
@@ -92,7 +76,6 @@ src/quodeq/terminal/_pty_windows.py:75:broad-except
 src/quodeq/update/checker.py:84:broad-except
 src/quodeq/update/checker.py:87:broad-except
 src/quodeq/update/checker.py:95:broad-except
-src/quodeq/update/first_launch.py:72:broad-except
 src/quodeq/update/selfupdate.py:163:broad-except
 src/quodeq/update/selfupdate.py:229:broad-except
 src/quodeq/update/selfupdate.py:273:broad-except

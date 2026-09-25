@@ -1,4 +1,5 @@
 """Native-chrome close handler: off-thread prompt on macOS/GTK/Qt, inline dialog on Windows."""
+import http.client
 from unittest.mock import MagicMock, patch
 
 from quodeq.dashboard import _webview_window as ww
@@ -40,6 +41,17 @@ class TestOnClosing:
 
     def test_no_job_closes_without_prompt(self):
         on_closing, window, api = self._wire(job=None)
+        with patch.object(wwc, "ask_close_choice") as choose:
+            assert on_closing() is True
+        choose.assert_not_called()
+
+    def test_truncated_running_evaluation_response_closes_without_prompt(self):
+        # fetch_running_evaluation already catches (OSError, ValueError); a
+        # truncated/malformed response body (http.client.HTTPException) is
+        # not an OSError and still needs a guard here — treated the same as
+        # "no job running".
+        on_closing, window, api = self._wire(job=None)
+        api._get_running_evaluation.side_effect = http.client.IncompleteRead(b"partial")
         with patch.object(wwc, "ask_close_choice") as choose:
             assert on_closing() is True
         choose.assert_not_called()
@@ -194,6 +206,12 @@ class TestOnClosing:
 
     def test_windows_no_job_closes_without_dialog(self):
         on_closing, window, api = self._wire(job=None, platform="win32")
+        assert on_closing() is True
+        window.create_confirmation_dialog.assert_not_called()
+
+    def test_windows_truncated_running_evaluation_response_closes_without_dialog(self):
+        on_closing, window, api = self._wire(job=None, platform="win32")
+        api._get_running_evaluation.side_effect = http.client.IncompleteRead(b"partial")
         assert on_closing() is True
         window.create_confirmation_dialog.assert_not_called()
 

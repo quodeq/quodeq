@@ -150,7 +150,7 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
         """
         try:
             _state.set_enabled(False)
-        except Exception:
+        except (OSError, ValueError):
             _logging.getLogger(__name__).debug("could not disable menubar preference on quit", exc_info=True)
         _control.remove_pidfile()
         rumps.quit_application()
@@ -207,7 +207,7 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
                 self._update_item.title = "Update Available. Click to view"
             else:
                 self._update_item.title = "Check for Updates…"
-        except Exception:
+        except (OSError, ValueError):
             _logging.getLogger(__name__).debug("update availability check failed", exc_info=True)
 
 
@@ -223,7 +223,7 @@ def _set_accessory_policy() -> None:
         NSApplication.sharedApplication().setActivationPolicy_(
             NSApplicationActivationPolicyAccessory,
         )
-    except Exception:
+    except ImportError:
         _logging.getLogger(__name__).debug("could not set accessory policy", exc_info=True)
 
 

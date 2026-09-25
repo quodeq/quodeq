@@ -1,5 +1,4 @@
-"""Close-confirmation dialog orchestration, backend dispatch, and the
-close-choice seam itself.
+"""Close-confirmation dialog orchestration, backend dispatch, and the close-choice seam itself.
 
 ask_close_choice and prompt_close_choice_and_finish live here rather than
 in the facade (_webview_window.py): ask_close_choice is patch-tested
@@ -13,12 +12,15 @@ module — tests patch this module directly.
 """
 from __future__ import annotations
 
+import http.client
 import logging
 import sys
 import threading
 from collections.abc import Callable
 from enum import StrEnum
 from typing import TYPE_CHECKING
+
+import webview
 
 from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
 from quodeq.shared.fault_isolation import run_isolated
@@ -144,16 +146,15 @@ def _run_macos_close_alert(result: dict, done: threading.Semaphore) -> None:
 def ask_close_choice(window: object) -> str:
     """Ask the user how to close while a scan runs; return 'keep', 'cancel', or 'stay'.
 
-    macOS gets a 3-button native alert (keep scanning / cancel scan / stay);
-    other backends get pywebview's 2-button dialog (OK = keep scanning, Cancel =
-    stay). If the dialog can't render, return 'keep' so the user is never
-    trapped in an un-closeable window.
+    macOS gets a 3-button native alert (keep scanning / cancel scan / stay); other
+    backends get pywebview's 2-button dialog (OK = keep scanning, Cancel = stay).
+    If the dialog can't render, return 'keep' so the user is never trapped in an
+    un-closeable window.
 
-    Patch-tested against this module's own namespace
-    (``patch.object(wwc, "ask_close_choice")`` in
-    tests/dashboard/test_native_chrome.py) and bare-calls macos_confirm_close,
-    which is patch-tested the same way — both live here so a patch on either
-    is visible to the other.
+    Patch-tested against this module's own namespace (``patch.object(wwc,
+    "ask_close_choice")`` in tests/dashboard/test_native_chrome.py) and
+    bare-calls macos_confirm_close, which is patch-tested the same way — both
+    live here so a patch on either is visible to the other.
     """
     if sys.platform == PLATFORM_DARWIN:
         return macos_confirm_close(window)
@@ -161,7 +162,8 @@ def ask_close_choice(window: object) -> str:
         ok = bool(window.create_confirmation_dialog(
             CLOSE_CONFIRM_TITLE, CLOSE_CONFIRM_BODY,
         ))
-    except Exception:
+    except (webview.errors.WebViewException, OSError, RuntimeError) as exc:  # backend-specific dialog failure
+        _logger.warning("close dialog failed: %s", exc, exc_info=True)
         return CloseChoice.KEEP
     return CloseChoice.KEEP if ok else CloseChoice.STAY
 
@@ -219,7 +221,7 @@ def _make_on_closing_inline(api: "WindowApi", window: object) -> "Callable[[], b
     def _on_closing() -> bool:
         try:
             job = api._get_running_evaluation()
-        except Exception:
+        except http.client.HTTPException:  # a truncated response fetch_running_evaluation doesn't catch
             job = None
         if not job:
             return True
@@ -254,7 +256,7 @@ def _make_on_closing_async(api: "WindowApi", window: object) -> "Callable[[], bo
             return True  # user already confirmed; let the re-issued close through
         try:
             job = api._get_running_evaluation()
-        except Exception:
+        except http.client.HTTPException:  # see _make_on_closing_inline
             job = None
         if not job:
             return True
