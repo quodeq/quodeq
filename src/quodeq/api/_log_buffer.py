@@ -5,8 +5,9 @@ import logging
 import re
 import threading
 from collections import deque
-from datetime import datetime, timezone
 from http import HTTPStatus
+
+from quodeq.shared.clock import utc_now_iso
 
 _DEFAULT_MAX_LINES = 500
 
@@ -62,7 +63,7 @@ class LogBuffer:
         with self._lock:
             self._entries.append({
                 "index": self._index,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": utc_now_iso(),
                 "line": line,
                 "level": level,
             })

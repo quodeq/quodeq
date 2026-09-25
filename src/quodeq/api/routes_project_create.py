@@ -16,13 +16,16 @@ from pathlib import Path
 from flask import Response, jsonify
 
 from quodeq.api._constants import (
-    CODE_INVALID_CLONE_DEST, CODE_INVALID_DISCIPLINE, CODE_INVALID_INPUT, CODE_INVALID_REPO)
+    CODE_INVALID_CLONE_DEST, CODE_INVALID_DISCIPLINE, CODE_INVALID_INPUT, CODE_INVALID_REPO,
+    CODE_PROJECT_EXISTS)
 from quodeq.api.helpers import (
     json_error,
-    optional_json_object_or_error,
+    jsonify_error,
+    optional_json_object_or_response,
     scan_target_error as _scan_target_error,
 )
 from quodeq.services.base import ActionProvider, CreateProjectStatus, NewProjectSpec
+from quodeq.shared.paths import not_a_directory_reason
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import contained_path, relative_scope_error
 
@@ -126,17 +129,9 @@ def _validate_local_create_project_repo(repo: str, reports_root: str) -> tuple[R
     # a project for a missing directory would leave an orphan UUID dir
     # behind that the caller has no way to recover from.
     local_candidate = Path(repo)
-    if not local_candidate.exists() or not local_candidate.is_dir():
-        # Say WHICH mistake it was: a path at a file is a different
-        # user error from a missing path (a real registration once
-        # slipped through as .../lib/player.js).
-        detail = (
-            "points at a file, not a directory"
-            if local_candidate.exists()
-            else "does not exist"
-        )
+    if not local_candidate.is_dir():
         return json_error(
-            f"Local repo path {detail}",
+            f"Local repo path {not_a_directory_reason(local_candidate)}",
             HTTPStatus.BAD_REQUEST,
             CODE_INVALID_REPO,
         )
@@ -145,8 +140,7 @@ def _validate_local_create_project_repo(repo: str, reports_root: str) -> tuple[R
     # arbitrary readable directories through project endpoints.
     err = _scan_target_error(local_candidate.resolve(), reports_root)
     if err is not None:
-        body, status = err
-        return jsonify(body), status
+        return jsonify_error(err)
     return None
 
 
@@ -157,7 +151,7 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
         return (
             jsonify({
                 "error": "Project already exists",
-                "code": "PROJECT_EXISTS",
+                "code": CODE_PROJECT_EXISTS,
                 "existingProjectId": result.existing_project_id,
             }),
             HTTPStatus.CONFLICT,
@@ -210,9 +204,9 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
     or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
     ``ephemeral`` are ignored.
     """
-    body = optional_json_object_or_error(CODE_INVALID_INPUT)
+    body = optional_json_object_or_response(CODE_INVALID_INPUT)
     if not isinstance(body, dict):
-        return jsonify(body[0]), body[1]
+        return body
     parsed, error = _parse_create_project_request(body)
     if error is not None:
         return error

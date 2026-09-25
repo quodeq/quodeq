@@ -21,7 +21,8 @@ from quodeq.api._evaluation_options import build_evaluation_options
 from quodeq.api._constants import CODE_INVALID_INPUT
 from quodeq.api.helpers import (
     json_error,
-    optional_json_object_or_error,
+    jsonify_error,
+    optional_json_object_or_response,
     page_params,
     scan_target_error,
     validate_evaluation_payload,
@@ -126,8 +127,7 @@ def _repo_target_error(repo: Any) -> tuple[Response, int] | None:
     err = scan_target_error(str(repo), reports_dir())
     if err is None:
         return None
-    body, status = err
-    return jsonify(body), status
+    return jsonify_error(err)
 
 
 def _validated_start_request(
@@ -188,9 +188,9 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         rate_error = check_eval_rate_limit(eval_rate_store)
         if rate_error is not None:
             return rate_error
-        payload = optional_json_object_or_error(CODE_INVALID_INPUT)
+        payload = optional_json_object_or_response(CODE_INVALID_INPUT)
         if not isinstance(payload, dict):
-            return jsonify(payload[0]), payload[1]
+            return payload
         start_request, error = _validated_start_request(payload)
         if error is not None:
             return error

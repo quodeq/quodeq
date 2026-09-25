@@ -10,6 +10,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 
 from quodeq.api._constants import CODE_FORBIDDEN, CODE_INVALID_INPUT, CODE_NOT_FOUND, ERROR_CODE_BAD_REQUEST
 from quodeq.shared.errors import ClientMessageError  # noqa: F401 -- re-export for api modules
+from quodeq.shared.validation import validate_path_segment
 
 
 def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
@@ -17,15 +18,19 @@ def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any]
     return {"error": message, "code": code}, status
 
 
-def json_error(message: str, status: int, code: str) -> tuple[Response, int]:
-    """``error_response`` already jsonified, as a ``(Response, status)`` tuple.
+def jsonify_error(error: tuple[dict[str, Any], int]) -> tuple[Response, int]:
+    """Turn an ``error_response``-style ``(body, status)`` pair into ``(Response, status)``.
 
-    For the handlers annotated to return a ``Response``: one call replaces
-    the ``body, status = error_response(...)`` plus
-    ``return jsonify(body), status`` pair that stood at a hundred-odd sites.
+    For handlers annotated to return a ``Response`` that receive an error
+    pair from a validator such as ``path_from_body`` or ``scan_target_error``.
     """
-    body, status_code = error_response(message, status, code)
-    return jsonify(body), status_code
+    body, status = error
+    return jsonify(body), status
+
+
+def json_error(message: str, status: int, code: str) -> tuple[Response, int]:
+    """``error_response`` already jsonified, as a ``(Response, status)`` tuple."""
+    return jsonify_error(error_response(message, status, code))
 
 
 def json_object_or_error(
@@ -68,6 +73,46 @@ def optional_json_object_or_error(
     if not isinstance(payload, dict):
         return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, code)
     return payload
+
+
+def optional_json_object_or_response(
+    code: str = ERROR_CODE_BAD_REQUEST, *, force: bool = False,
+) -> dict[str, Any] | tuple[Response, int]:
+    """``optional_json_object_or_error`` with the error already jsonified.
+
+    Returns the body dict (``{}`` when there is none), or the ``(Response,
+    status)`` pair a handler returns as-is.
+    """
+    payload = optional_json_object_or_error(code, force=force)
+    if isinstance(payload, dict):
+        return payload
+    return jsonify_error(payload)
+
+
+def validate_segment(*segments: str, message: str = "Invalid parameter") -> tuple[Response, int] | None:
+    """A coded 400 when any of *segments* is not a plain path segment, else None.
+
+    Guards every route parameter that is joined onto a filesystem path;
+    *message* lets a route name what it expected (e.g. "Invalid project name").
+    """
+    try:
+        validate_path_segment(*segments)
+    except ValueError:
+        return json_error(message, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
+    return None
+
+
+def dimension_eval_response(payload: dict[str, Any] | None) -> Response | tuple[Response, int]:
+    """The response for one dimension's evaluation, local or shared.
+
+    404 when there is no evaluation file, 202 while the dimension is still
+    being written (``waiting``) so the UI keeps polling, else the payload.
+    """
+    if payload is None:
+        return json_error("Eval file not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
+    if payload.get("waiting"):
+        return jsonify(payload), HTTPStatus.ACCEPTED
+    return jsonify(payload)
 
 
 def path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
@@ -241,9 +286,9 @@ def register_static_routes(app: Flask, static_dist: str | None) -> None:
         """Serve a static file or fall back to the SPA index."""
         resolved = (dist / path).resolve()
         if not resolved.is_relative_to(dist):
-            return jsonify({"error": "Forbidden", "code": CODE_FORBIDDEN}), HTTPStatus.FORBIDDEN
+            return json_error("Forbidden", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN)
         if resolved.is_file():
             return send_from_directory(str(dist), path)
         if path.startswith('api/'):
-            return jsonify({"error": "Not found", "code": CODE_NOT_FOUND}), HTTPStatus.NOT_FOUND
+            return json_error("Not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
         return send_from_directory(str(dist), 'index.html')

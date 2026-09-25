@@ -26,14 +26,14 @@ from quodeq.api._assistant_helpers import (
 )
 from quodeq.api._constants import (
     CODE_INVALID_PARAM, CODE_MISSING_PARAM, CODE_UNKNOWN_SESSION, MESSAGE_UNKNOWN_SESSION)
-from quodeq.api._sse_log_helpers import sse_line
+from quodeq.api._sse_log_helpers import event_stream_response, sse_line
 from quodeq.api.assistant_turn_state import AssistantTurnState, turn_state
-from quodeq.api.helpers import json_error, optional_json_object_or_error
+from quodeq.api.helpers import json_error, optional_json_object_or_response
 from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.orchestrator import TurnRequest
 from quodeq.assistant.tools import ToolContext
-from quodeq.core.types.project_source import ProjectSource
+from quodeq.core.types.project_source import ProjectSource, session_source
 
 
 @dataclass(frozen=True)
@@ -123,7 +123,7 @@ def _build_turn_request(sid: str, session: dict, body: dict, text: str,
         model=body.get("model") or session.get("model") or provider_cfg.get("model", ""),
         web_enabled=bool(body.get("webEnabled", False)),
         write_enabled=(bool(body.get("writeEnabled", False))
-                       and (session.get("source") or ProjectSource.LOCAL) == ProjectSource.LOCAL),
+                       and session_source(session) == ProjectSource.LOCAL),
     )
 
 
@@ -132,15 +132,15 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
     session = repo.get_session(sid)
     if session is None:
         return json_error(MESSAGE_UNKNOWN_SESSION, HTTPStatus.NOT_FOUND, CODE_UNKNOWN_SESSION)
-    body = optional_json_object_or_error(CODE_INVALID_PARAM)
+    body = optional_json_object_or_response(CODE_INVALID_PARAM)
     if not isinstance(body, dict):
-        return jsonify(body[0]), body[1]
+        return body
     text = str(body.get("text", "")).strip()
     if not text:
         return json_error("text required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     if local_provider_busy(session["provider"]):
         return json_error("model busy with analysis", HTTPStatus.CONFLICT, "PROVIDER_BUSY")
-    if (session.get("source") or ProjectSource.LOCAL) == ProjectSource.SHARED:
+    if session_source(session) == ProjectSource.SHARED:
         shared_error = gates.shared_source_error()
         if shared_error is not None:
             return shared_error
@@ -206,10 +206,8 @@ def _assistant_events(app: Flask, sid: str):
         finally:
             release()
 
-    resp = Response(_generate(), mimetype="text/event-stream")
+    resp = event_stream_response(_generate())
     resp.call_on_close(release)
-    resp.headers["Cache-Control"] = "no-cache"
-    resp.headers["X-Accel-Buffering"] = "no"
     return resp
 
 

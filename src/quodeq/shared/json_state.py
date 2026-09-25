@@ -56,7 +56,8 @@ def read_json_state(path: Path, cls: type[_StateT]) -> _StateT:
 
 
 def dump_json_and_replace(
-    fd: int, tmp_path: str, path: Path, data: object, *, indent: int | None = None,
+    fd: int, tmp_path: str, path: Path, data: object, *,
+    indent: int | None = None, mode: int | None = None,
 ) -> None:
     """Write *data* as JSON into the open temp file *fd*, then move *tmp_path* onto *path*.
 
@@ -64,9 +65,13 @@ def dump_json_and_replace(
     (``tempfile.mkstemp`` next to *path*) and owns cleanup and error policy.
     ``os.replace`` is atomic and overwrites on every platform, so a reader
     never sees a half-written file. *fd* is closed on return or on error.
+    *mode*, when given, is set on the temp file before the replace, so the
+    file is never visible at *path* with looser permissions.
     """
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=indent)
+    if mode is not None:
+        os.chmod(tmp_path, mode)
     os.replace(tmp_path, str(path))
 
 

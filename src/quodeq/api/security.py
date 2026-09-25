@@ -13,6 +13,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_FORBIDDEN
 from quodeq.api._rate_limit import RateLimitStore
+from quodeq.api.helpers import json_error
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.constants import SECRET_SUFFIX_CHARS
 from quodeq.shared.dashboard_ports import alt_port_origins
@@ -150,7 +151,7 @@ def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
     if api_key:
         auth = request.headers.get("Authorization", "")
         if not hmac.compare_digest(auth, f"{_BEARER_PREFIX}{api_key}"):
-            return jsonify({"error": "Unauthorized", "code": "UNAUTHORIZED"}), HTTPStatus.UNAUTHORIZED
+            return json_error("Unauthorized", HTTPStatus.UNAUTHORIZED, "UNAUTHORIZED")
     else:
         remote = request.remote_addr or ""
         if remote not in _LOCALHOST_ADDRS:
@@ -167,10 +168,10 @@ def _check_csrf() -> Response | tuple[Response, int] | None:
         return None
     origin = request.headers.get("Origin")
     if not origin:
-        return jsonify({"error": "Origin header required", "code": CODE_FORBIDDEN}), HTTPStatus.FORBIDDEN
+        return json_error("Origin header required", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN)
     allowed = {f"http://{request.host}", f"https://{request.host}"}
     if origin not in allowed:
-        return jsonify({"error": "Origin not allowed", "code": CODE_FORBIDDEN}), HTTPStatus.FORBIDDEN
+        return json_error("Origin not allowed", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN)
     return None
 
 
@@ -191,7 +192,7 @@ def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] 
         if not limited:
             store.record(ip, now)
     if limited:
-        return jsonify({"error": "Too many requests", "code": "RATE_LIMITED"}), HTTPStatus.TOO_MANY_REQUESTS
+        return json_error("Too many requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED")
     return None
 
 

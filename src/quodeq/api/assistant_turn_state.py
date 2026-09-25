@@ -1,8 +1,8 @@
 """Per-app assistant turn/SSE-stream registry.
 
-Split out of assistant_routes.py: the ``AssistantTurnState`` class
-and the request-context shims the workspace routes use to claim/release the
-same per-session turn slot as a /messages turn.
+The ``AssistantTurnState`` class, and the request-context shims the
+workspace routes use to claim/release the same per-session turn slot as a
+/messages turn.
 """
 from __future__ import annotations
 
@@ -40,23 +40,26 @@ class AssistantTurnState:
         self._open_sse_streams = 0
         self._sse_lock = threading.Lock()
 
+    def _claim_locked(self, sid: str) -> bool:
+        """Take *sid*'s turn slot if it is free. Caller holds ``_running_lock``."""
+        if sid in self._running_turns:
+            return False
+        self._running_turns.add(sid)
+        return True
+
     def try_claim_turn(self, sid: str) -> bool:
         """Atomically claim the per-session turn slot for a workspace action
         so a concurrent /messages turn (or another apply/pr) 409s instead of
         racing the same worktree. Returns False if already claimed."""
         with self._running_lock:
-            if sid in self._running_turns:
-                return False
-            self._running_turns.add(sid)
-            return True
+            return self._claim_locked(sid)
 
     def claim_turn(self, sid: str) -> CancelToken | None:
         """Claim the turn slot for a /messages turn and mint its cancel token
         in one atomic step. Returns None when the slot is already claimed."""
         with self._running_lock:
-            if sid in self._running_turns:
+            if not self._claim_locked(sid):
                 return None
-            self._running_turns.add(sid)
             token = self._cancel_tokens[sid] = CancelToken()
             return token
 

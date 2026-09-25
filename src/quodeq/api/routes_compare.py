@@ -13,11 +13,10 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify
 
-from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND
-from quodeq.api.helpers import error_response
+from quodeq.api._constants import CODE_NOT_FOUND
+from quodeq.api.helpers import json_error, validate_segment
 from quodeq.api.routes_common import reports_dir
 from quodeq.services.compare import build_compare_summary
-from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
@@ -27,18 +26,14 @@ def register_compare_routes(app: Flask) -> None:
 
     @app.get("/api/projects/<project>/compare-summary")
     def project_compare_summary(project: str) -> Response | tuple[Response, int]:
-        try:
-            validate_path_segment(project)
-        except ValueError:
-            body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
-            return jsonify(body), status
+        err = validate_segment(project)
+        if err is not None:
+            return err
         try:
             result = build_compare_summary(Path(reports_dir()), project)
         except Exception:
             _logger.exception("Unexpected error building compare summary for project %s", project)
-            body, status = error_response("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-            return jsonify(body), status
+            return json_error("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
         if result is None:
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-            return jsonify(body), status
+            return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
         return jsonify(result)

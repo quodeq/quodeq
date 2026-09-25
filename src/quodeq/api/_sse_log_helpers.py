@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Callable
+
+from flask import Response
 
 from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
@@ -29,10 +31,11 @@ def _max_wait_s(env: Mapping[str, str] | None = None) -> int:
 # when the runner spends a long time in the "preparing" phase.
 _KEEPALIVE_MS = 2000
 
-# Per-tick byte cap on the SSE tail read. Caps a runaway log file from blowing
-# out RAM in a single read; remaining bytes are served on the next tick.
-_DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
-_ENV_TAIL_MAX_BYTES = "QUODEQ_LOG_TAIL_MAX_BYTES"
+# Per-read byte cap on a log tail (SSE tick or plain poll). Caps a runaway log
+# file from blowing out RAM in a single read; remaining bytes are served on
+# the next read.
+DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
+ENV_TAIL_MAX_BYTES = "QUODEQ_LOG_TAIL_MAX_BYTES"
 
 # _wait_for_log_file/_tail_new_lines tick statuses -- a local closed
 # vocabulary distinct from RunState/JobStatus/FileDoneStatus even though two
@@ -44,15 +47,31 @@ _TICK_DONE = "done"
 _TICK_ERROR = "error"
 
 
-def _tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
-    raw = resolve_env(env).get(_ENV_TAIL_MAX_BYTES)
-    if not raw:
-        return _DEFAULT_TAIL_MAX_BYTES
+def tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
+    """Bytes one log-tail read may pull; ``QUODEQ_LOG_TAIL_MAX_BYTES`` overrides.
+
+    Read on every tick, so an unusable value falls back without a warning.
+    """
+    return env_int(ENV_TAIL_MAX_BYTES, DEFAULT_TAIL_MAX_BYTES, minimum=1, env=env, warn=False)
+
+
+def initial_offset(last_event_id: str) -> int:
+    """Parse the SSE ``Last-Event-ID`` header (a byte offset); 0 when absent or malformed."""
     try:
-        value = int(raw)
+        return int(last_event_id) if last_event_id else 0
     except ValueError:
-        return _DEFAULT_TAIL_MAX_BYTES
-    return value if value > 0 else _DEFAULT_TAIL_MAX_BYTES
+        return 0
+
+
+def event_stream_response(frames: Iterable[str]) -> Response:
+    """Wrap *frames* in an uncached ``text/event-stream`` response.
+
+    ``X-Accel-Buffering: no`` stops a reverse proxy from holding frames back.
+    """
+    resp = Response(frames, mimetype="text/event-stream")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
 
 
 def sse_line(data: str, event: str | None = None, event_id: int | None = None) -> str:
@@ -136,7 +155,7 @@ def _tail_new_lines(path: Path, offset: int, line_filter):
     try:
         with open(path, "rb") as fh:
             fh.seek(offset)
-            raw = fh.read(_tail_max_bytes())
+            raw = fh.read(tail_max_bytes())
     except OSError:  # includes FileNotFoundError
         yield sse_line("log file unavailable", event="error")
         return offset, _TICK_ERROR

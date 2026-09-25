@@ -1,12 +1,11 @@
 """Session-scope resolution: run/repo-root lookups for the create-session and
 tool-context routes, all jailed to the evaluations root or the shared clone.
 
-Split out of _assistant_helpers.py. ``get_evaluations_dir`` is imported
-directly from its real owner (``quodeq.shared.env``), not looked up on the
-``_assistant_helpers`` facade, so this module never imports back the facade
-that re-exports it. This module also owns ``get_repository`` -- moved here
-(rather than left on ``_assistant_helpers``) so ``_assistant_hygiene.py`` can
-import it directly too, without cycling back through the facade.
+``get_evaluations_dir`` is imported from its real owner
+(``quodeq.shared.env``), never from the ``_assistant_helpers`` facade, so this
+module never imports back the facade that re-exports it. ``get_repository``
+lives here so ``_assistant_hygiene.py`` can import it without cycling back
+through the facade.
 """
 from __future__ import annotations
 
@@ -20,6 +19,17 @@ from quodeq.services.fs_projects import get_project_info, repo_attach_reason
 from quodeq.services.shared_repo import shared_evaluations_root
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared.env import get_evaluations_dir
+
+
+def _run_dir_under(root: str | Path, project_id: str, run_id: str) -> str | None:
+    """``<root>/<project_id>/<run_id>`` when both directories exist, else None.
+
+    Both segments are matched against the directory listing rather than
+    joined and then jailed, so a crafted id ("../..") matches no entry and
+    there is nothing to contain afterwards.
+    """
+    project_dir = resolve_child_dir(root, project_id)
+    return resolve_child_dir(project_dir, run_id) if project_dir else None
 
 
 def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str | None]:
@@ -42,14 +52,7 @@ def resolve_run_location(project_id: str, run_id: str) -> tuple[str | None, str 
     which picks each dimension's latest run independently rather than binding
     one whole run.
     """
-    evaluations_root = Path(get_evaluations_dir())
-    # Resolve both segments against the directory listing rather than joining
-    # and then jailing the result. A crafted project_id/run_id ("../..")
-    # matches no entry, so there is nothing to contain afterwards. This
-    # replaces the old resolve() + relative_to() + is_dir() sequence: those
-    # three steps existed to undo a join we no longer perform.
-    project_dir = resolve_child_dir(evaluations_root, project_id)
-    run_dir = resolve_child_dir(project_dir, run_id) if project_dir else None
+    run_dir = _run_dir_under(Path(get_evaluations_dir()), project_id, run_id)
     if run_dir is None:
         return None, None
     return run_dir, resolve_repo_root(project_id)
@@ -66,9 +69,7 @@ def resolve_shared_run_location(project_id: str, run_id: str) -> str | None:
     settings = read_settings()
     if not settings.url:
         return None
-    root = shared_evaluations_root(settings.url).resolve()
-    project_dir = resolve_child_dir(root, project_id)
-    run_dir = resolve_child_dir(project_dir, run_id) if project_dir else None
+    run_dir = _run_dir_under(shared_evaluations_root(settings.url).resolve(), project_id, run_id)
     if run_dir is None:
         return None
     return str(run_dir)

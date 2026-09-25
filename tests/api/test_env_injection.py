@@ -68,14 +68,6 @@ def test_default_log_paths_honours_the_injected_env(monkeypatch, tmp_path: Path)
 # Tail / stream tuning
 # --------------------------------------------------------------------------
 
-def test_log_tail_max_bytes_honours_the_injected_env(monkeypatch):
-    from quodeq.api._log_tail_helpers import _DEFAULT_TAIL_MAX_BYTES, _tail_max_bytes
-
-    monkeypatch.setenv("QUODEQ_LOG_TAIL_MAX_BYTES", "77")
-    assert _tail_max_bytes({"QUODEQ_LOG_TAIL_MAX_BYTES": "4096"}) == 4096
-    assert _tail_max_bytes({}) == _DEFAULT_TAIL_MAX_BYTES
-
-
 def test_read_tail_honours_the_injected_byte_cap(tmp_path: Path):
     from quodeq.api._log_tail_helpers import read_tail
 
@@ -90,11 +82,11 @@ def test_read_tail_honours_the_injected_byte_cap(tmp_path: Path):
 
 
 def test_sse_tail_max_bytes_honours_the_injected_env(monkeypatch):
-    from quodeq.api._sse_log_helpers import _DEFAULT_TAIL_MAX_BYTES, _tail_max_bytes
+    from quodeq.api._sse_log_helpers import DEFAULT_TAIL_MAX_BYTES, tail_max_bytes
 
     monkeypatch.setenv("QUODEQ_LOG_TAIL_MAX_BYTES", "77")
-    assert _tail_max_bytes(env={"QUODEQ_LOG_TAIL_MAX_BYTES": "2048"}) == 2048
-    assert _tail_max_bytes(env={}) == _DEFAULT_TAIL_MAX_BYTES
+    assert tail_max_bytes(env={"QUODEQ_LOG_TAIL_MAX_BYTES": "2048"}) == 2048
+    assert tail_max_bytes(env={}) == DEFAULT_TAIL_MAX_BYTES
 
 
 def test_tick_ms_honours_the_injected_env(monkeypatch):

@@ -8,23 +8,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from http import HTTPStatus
-from pathlib import Path
 
-from flask import Flask, Response, current_app, jsonify, request
+from flask import Flask, Response, current_app, request
 
-from quodeq.api._constants import CODE_NOT_FOUND
+from quodeq.api._constants import CODE_GONE, CODE_NOT_FOUND
+from quodeq.api._log_tail_helpers import resolve_run_dir
 from quodeq.api._run_event_stream import run_events_generator
-
-
-def _resolve_run_dir(job_id: str) -> tuple[Path | None, int]:
-    """Return (run_dir, status_hint). status_hint is 0 on success, HTTP code on error."""
-    provider = current_app.config.get("_provider")
-    if provider is None or not hasattr(provider, "get_log_run_dir"):
-        return None, HTTPStatus.NOT_FOUND
-    run_dir = provider.get_log_run_dir(job_id)
-    if run_dir is None or not run_dir.is_dir():
-        return None, HTTPStatus.GONE
-    return run_dir, 0
+from quodeq.api._sse_log_helpers import event_stream_response
+from quodeq.api.helpers import json_error
 
 
 def register_run_events_routes(app: Flask) -> None:
@@ -35,10 +26,10 @@ def register_run_events_routes(app: Flask) -> None:
 
     @app.get("/api/evaluations/<job_id>/events")
     def stream_run_events(job_id: str) -> Response | tuple[Response, int]:
-        run_dir, err = _resolve_run_dir(job_id)
+        run_dir, err = resolve_run_dir(current_app.config.get("_provider"), job_id)
         if run_dir is None:
-            code = "GONE" if err == HTTPStatus.GONE else CODE_NOT_FOUND
-            return jsonify({"error": "run unavailable", "code": code}), err
+            code = CODE_GONE if err == HTTPStatus.GONE else CODE_NOT_FOUND
+            return json_error("run unavailable", err, code)
 
         last_event_id_raw = request.headers.get("Last-Event-ID", "")
         last_event_ts: datetime | None = None
@@ -48,10 +39,4 @@ def register_run_events_routes(app: Flask) -> None:
             except ValueError:
                 last_event_ts = None
 
-        resp = Response(
-            run_events_generator(run_dir, last_event_ts=last_event_ts),
-            mimetype="text/event-stream",
-        )
-        resp.headers["Cache-Control"] = "no-cache"
-        resp.headers["X-Accel-Buffering"] = "no"
-        return resp
+        return event_stream_response(run_events_generator(run_dir, last_event_ts=last_event_ts))

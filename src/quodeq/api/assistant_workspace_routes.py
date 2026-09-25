@@ -15,7 +15,7 @@ from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
 from quodeq.api._constants import (
     CODE_INVALID_PARAM, CODE_NO_ACTIVE_WORKTREE, CODE_UNKNOWN_SESSION, MESSAGE_UNKNOWN_SESSION)
 from quodeq.api.assistant_routes import release_app_turn, claim_app_turn
-from quodeq.api.helpers import json_error, optional_json_object_or_error
+from quodeq.api.helpers import json_error, optional_json_object_or_response
 from quodeq.assistant.workspace_actions import (
     OutcomeKind, PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
 from quodeq.assistant.worktree import WorktreeError, WorktreeStatus, diff_stats, diff_text
@@ -124,9 +124,9 @@ def _workspace_pr(app: Flask, sid: str):
     repo, _row, err = _workspace_target(app, sid)
     if err:
         return err
-    req_body = optional_json_object_or_error(CODE_INVALID_PARAM)
+    req_body = optional_json_object_or_response(CODE_INVALID_PARAM)
     if not isinstance(req_body, dict):
-        return jsonify(req_body[0]), req_body[1]
+        return req_body
     draft = PrDraft(title=str(req_body.get("title", "")), body=str(req_body.get("body", "")))
     outcome = create_workspace_pr(
         repo, sid, draft, claim_turn=claim_app_turn, release_turn=release_app_turn)

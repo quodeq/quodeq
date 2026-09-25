@@ -30,6 +30,7 @@ from quodeq.services.wiring import (
     write_repository_info,
 )
 from quodeq.core.types.project_source import ProjectLocation
+from quodeq.shared.paths import not_a_directory_reason
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
 
@@ -67,11 +68,7 @@ def _resolve_target_path(request: MaterializeRequest) -> Path:
 
     target_path = Path(request.repo_resolved)
     if not target_path.is_dir():
-        # A path pointing at a FILE is a distinct user mistake from a
-        # missing path (a real registration once slipped through as
-        # .../lib/player.js) — say which one it was.
-        detail = "points at a file, not a directory" if target_path.exists() else "does not exist"
-        raise FileNotFoundError(f"Repo path {detail}: {target_path}")
+        raise FileNotFoundError(f"Repo path {not_a_directory_reason(target_path)}: {target_path}")
     return target_path
 
 

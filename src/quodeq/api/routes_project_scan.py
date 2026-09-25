@@ -25,12 +25,14 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, QUERY_FLAG_TRUE
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, MESSAGE_INVALID_PROJECT_NAME, QUERY_FLAG_TRUE
 from quodeq.api.helpers import (
     json_error,
-    optional_json_object_or_error,
+    jsonify_error,
+    optional_json_object_or_response,
     path_from_body,
     scan_target_error as _scan_target_error,
+    validate_segment,
 )
 from quodeq.services.fs_project_helpers import (
     project_record_exists,
@@ -39,7 +41,6 @@ from quodeq.services.fs_project_helpers import (
     scan_json_exists,
 )
 from quodeq.services.fs_scan import scan_project
-from quodeq.shared.validation import validate_path_segment
 from quodeq.core.types.project_source import ProjectLocation
 
 _logger = logging.getLogger(__name__)
@@ -70,10 +71,9 @@ def _contained_project_dir(project: str) -> Path | None:
 
 def _scan_inputs(project: str) -> tuple[Path | None, tuple[Response, int] | None]:
     """Resolve *project* to its directory under the reports root, or an error."""
-    try:
-        validate_path_segment(project)
-    except ValueError:
-        return None, json_error("Invalid project name", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
+    err = validate_segment(project, message=MESSAGE_INVALID_PROJECT_NAME)
+    if err is not None:
+        return None, err
     project_dir = _contained_project_dir(project)
     if project_dir is None:
         return None, json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
@@ -156,13 +156,12 @@ def project_estimates(project: str) -> Response | tuple[Response, int]:
 
 def scan_path() -> Response | tuple[Response, int]:
     """Scan a local directory path directly (no registered project required)."""
-    data = optional_json_object_or_error(CODE_INVALID_INPUT)
+    data = optional_json_object_or_response(CODE_INVALID_INPUT)
     if not isinstance(data, dict):
-        return jsonify(data[0]), data[1]
+        return data
     target = path_from_body(data)
     if isinstance(target, tuple):
-        body, status = target
-        return jsonify(body), status
+        return jsonify_error(target)
     if not target:
         return json_error("path is required", HTTPStatus.BAD_REQUEST, "MISSING_PATH")
 
@@ -170,8 +169,7 @@ def scan_path() -> Response | tuple[Response, int]:
     # Allowlist: only permit paths under user home or the evaluations directory
     err = _scan_target_error(target_path, _reports_dir())
     if err is not None:
-        body, status = err
-        return jsonify(body), status
+        return jsonify_error(err)
     if not target_path.is_dir():
         return json_error("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
 

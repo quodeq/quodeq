@@ -3,12 +3,11 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Mapping
-from http import HTTPStatus
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask
 
-from quodeq.api._constants import CODE_NOT_FOUND
+from quodeq.api.provider_log_routes import ProviderLog, register_provider_log_routes
 from quodeq.api._sse_log_helpers import sse_tail_generator
 from quodeq.shared.constants import PLATFORM_WIN32
 from quodeq.shared.env_resolve import resolve_env
@@ -52,34 +51,21 @@ def _is_gin_line(line: str) -> bool:
     return True
 
 
+def _tail_gin_lines(log_path: Path, offset: int):
+    return sse_tail_generator(log_path, offset, line_filter=_is_gin_line)
+
+
+_OLLAMA_LOG = ProviderLog(
+    name="ollama",
+    log_path=_ollama_log_path,
+    help="Could not locate the Ollama server log. Start the Ollama app or run `ollama serve`.",
+    tail=_tail_gin_lines,
+)
+
+
 def register_ollama_log_routes(app: Flask, env: Mapping[str, str] | None = None) -> None:
     """Register the /api/ollama/logs/stream SSE endpoint.
 
     Auth and *env* capture work as in ``configure_security``.
     """
-
-    @app.get("/api/ollama/logs/stream")
-    def stream_ollama_logs() -> Response | tuple[Response, int]:
-        log_path = _ollama_log_path(env)
-        if log_path is None or not log_path.exists():
-            return (
-                jsonify({
-                    "error": "ollama log unavailable",
-                    "code": CODE_NOT_FOUND,
-                    "help": "Could not locate the Ollama server log. Start the Ollama app or run `ollama serve`.",
-                }),
-                HTTPStatus.NOT_FOUND,
-            )
-        last_event_id = request.headers.get("Last-Event-ID", "")
-        try:
-            initial_offset = int(last_event_id) if last_event_id else 0
-        except ValueError:
-            initial_offset = 0
-
-        resp = Response(
-            sse_tail_generator(log_path, initial_offset, line_filter=_is_gin_line),
-            mimetype="text/event-stream",
-        )
-        resp.headers["Cache-Control"] = "no-cache"
-        resp.headers["X-Accel-Buffering"] = "no"
-        return resp
+    register_provider_log_routes(app, _OLLAMA_LOG, env)

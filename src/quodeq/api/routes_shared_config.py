@@ -30,8 +30,9 @@ from quodeq.services.shared_settings import read_settings
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import path_segment_error
 
-from .helpers import json_error, optional_json_object_or_error
+from .helpers import json_error, optional_json_object_or_response
 from .routes_common import reports_dir
+from .routes_shared_common import no_shared_repo_error
 
 
 def shared_status() -> Response:
@@ -73,9 +74,9 @@ def shared_config_put() -> Response | tuple[Response, int]:
     Clones it and verifies it is a quodeq results repo before accepting, so a
     typo or a foreign repository fails here rather than on the first publish.
     """
-    body = optional_json_object_or_error(CODE_INVALID_INPUT)
+    body = optional_json_object_or_response(CODE_INVALID_INPUT)
     if not isinstance(body, dict):
-        return jsonify(body[0]), body[1]
+        return body
     url = str(body.get("url") or "").strip()
     if not url:
         return json_error("url is required", HTTPStatus.BAD_REQUEST, "URL_REQUIRED")
@@ -114,9 +115,7 @@ def shared_config_delete() -> Response:
 def _shared_refresh(refresh_clone: Callable[[str], tuple[bool, str | None]]) -> Response | tuple[Response, int]:
     settings = read_settings()
     if not settings.url:
-        return json_error(
-            "no shared repository configured", HTTPStatus.BAD_REQUEST, "NO_SHARED_REPO"
-        )
+        return no_shared_repo_error(HTTPStatus.BAD_REQUEST)
     ok, reason = refresh_clone(settings.url)
     if not ok:
         return (
@@ -139,9 +138,7 @@ def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tu
         return json_error(err, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     settings = read_settings()
     if not settings.url:
-        return json_error(
-            "no shared repository configured", HTTPStatus.BAD_REQUEST, "NO_SHARED_REPO"
-        )
+        return no_shared_repo_error(HTTPStatus.BAD_REQUEST)
     outcome = start_publish(project, settings.url, evaluations_root=Path(reports_dir()))
     if outcome == PublishStartResult.ALREADY_RUNNING:
         return json_error("a publish is already running", HTTPStatus.CONFLICT, "PUBLISH_IN_PROGRESS")

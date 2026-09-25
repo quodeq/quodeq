@@ -11,9 +11,9 @@ from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
 
+from quodeq.api._sse_log_helpers import tail_max_bytes
 from quodeq.core.run.job_status import JOB_FINISHED, JobStatus
 from quodeq.services.run_events import read_run_status_json
-from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
@@ -22,35 +22,33 @@ _logger = logging.getLogger(__name__)
 # (rss / fds / threads / ollama RSS) and clutter the operator-facing view.
 _CONSOLE_HIDDEN_MARKERS: tuple[str, ...] = ("[resources]",)
 
-# Per-poll byte cap: a single tail read will not pull more than this many bytes
-# into memory in one shot. The remaining bytes will be served on the next poll.
-# Caps a runaway log file from blowing out RAM on read.
-_DEFAULT_TAIL_MAX_BYTES = 1 * 1024 * 1024  # 1 MiB
-
-
-def _tail_max_bytes(env: Mapping[str, str] | None = None) -> int:
-    raw = resolve_env(env).get("QUODEQ_LOG_TAIL_MAX_BYTES")
-    if not raw:
-        return _DEFAULT_TAIL_MAX_BYTES
-    try:
-        value = int(raw)
-    except ValueError:
-        return _DEFAULT_TAIL_MAX_BYTES
-    return value if value > 0 else _DEFAULT_TAIL_MAX_BYTES
+_RUN_LOG = "run.log"  # the run directory's log file the console tails
 
 
 def is_visible_log_line(line: str) -> bool:
     return not any(marker in line for marker in _CONSOLE_HIDDEN_MARKERS)
 
 
-def resolve_run_log(provider, job_id: str) -> tuple[Path | None, int]:
-    """Return (log_path, status_hint). status_hint is 0 on success, HTTP code on error."""
+def resolve_run_dir(provider, job_id: str) -> tuple[Path | None, int]:
+    """Return (run_dir, status_hint). status_hint is 0 on success, HTTP code on error.
+
+    404 when *provider* cannot map jobs to run directories, 410 when the
+    job's run directory is unknown or gone.
+    """
     if provider is None or not hasattr(provider, "get_log_run_dir"):
         return None, HTTPStatus.NOT_FOUND
     run_dir = provider.get_log_run_dir(job_id)
     if run_dir is None or not run_dir.is_dir():
         return None, HTTPStatus.GONE
-    log_path = run_dir / "run.log"
+    return run_dir, 0
+
+
+def resolve_run_log(provider, job_id: str) -> tuple[Path | None, int]:
+    """Return (log_path, status_hint). status_hint is 0 on success, HTTP code on error."""
+    run_dir, status = resolve_run_dir(provider, job_id)
+    if run_dir is None:
+        return None, status
+    log_path = run_dir / _RUN_LOG
     if not log_path.exists():
         return None, HTTPStatus.NOT_FOUND
     return log_path, 0
@@ -66,7 +64,7 @@ def read_tail(
     """
     with open(log_path, "rb") as fh:
         fh.seek(since)
-        raw = fh.read(_tail_max_bytes(env))
+        raw = fh.read(tail_max_bytes(env))
     text = raw.decode("utf-8", errors="replace")
     if not text.endswith("\n"):
         last_nl = text.rfind("\n")
@@ -83,12 +81,10 @@ def resolve_stream_log_path(provider, job_id: str) -> Path | None:
     output_project yet) eventually emits the report_path marker; from then on
     get_log_run_dir returns the real run dir and run.log appears.
     """
-    if not hasattr(provider, "get_log_run_dir"):
+    run_dir, _ = resolve_run_dir(provider, job_id)
+    if run_dir is None:
         return None
-    run_dir = provider.get_log_run_dir(job_id)
-    if run_dir is None or not run_dir.is_dir():
-        return None
-    return run_dir / "run.log"
+    return run_dir / _RUN_LOG
 
 
 def stream_terminal_state(provider, job_id: str) -> str:

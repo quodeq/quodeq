@@ -11,11 +11,11 @@ from typing import Callable
 from flask import Flask, jsonify, request
 
 from quodeq.api._constants import MAX_FINDINGS_LIST_LIMIT
-from quodeq.api.helpers import page_params
+from quodeq.api.helpers import page_params, validate_segment
 from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services.verified import verified_entries
 
-from .routes_shared_common import shared_project_dir, validate_segment, with_shared_root
+from .routes_shared_common import shared_project_dir, with_shared_root
 
 
 def _shared_findings_page(project: str, eval_root: Path, lister: Callable[..., list]):

@@ -1,9 +1,11 @@
 """Shared helpers for the ``/api/shared/*`` route modules.
 
-``with_shared_root`` and ``validate_segment`` are used by the config, pull,
-and read-only mirror route registrars alike; ``shared_project_dir`` by the
-pull route and two of the mirrors. Split out of routes_shared.py so
-those registrars can share one implementation instead of three copies.
+``with_shared_root`` is used by the config, pull and read-only mirror route
+registrars alike; ``shared_project_dir`` by the pull route and two of the
+mirrors. Every shared route validates its path segments with
+``helpers.validate_segment``, even where the local route it mirrors relies
+on the service layer's own traversal check: defense in depth for a surface
+that serves a second, independently-controlled clone.
 """
 from __future__ import annotations
 
@@ -15,7 +17,7 @@ from pathlib import Path
 
 from flask import Response
 
-from quodeq.api._constants import CODE_INVALID_INPUT
+from quodeq.api._constants import CODE_NO_SHARED_REPO, MESSAGE_NO_SHARED_REPO
 from quodeq.api.helpers import json_error
 from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.shared_repo import (
@@ -25,9 +27,18 @@ from quodeq.services.shared_repo import (
     shared_score_cache_path,
 )
 from quodeq.services.shared_settings import read_settings
-from quodeq.shared.validation import resolve_child_dir, validate_path_segment
+from quodeq.shared.validation import resolve_child_dir
 
 logger = logging.getLogger(__name__)
+
+
+def no_shared_repo_error(status: int) -> tuple[Response, int]:
+    """The answer for a shared-repository route when none is configured.
+
+    The read mirrors and assistant sessions answer 409; config actions that
+    need a repository to act on answer 400.
+    """
+    return json_error(MESSAGE_NO_SHARED_REPO, status, CODE_NO_SHARED_REPO)
 
 
 def with_shared_root(fn):
@@ -54,9 +65,7 @@ def with_shared_root(fn):
     def wrapper(*args, **kwargs):
         settings = read_settings()
         if not settings.url:
-            return json_error(
-                "no shared repository configured", HTTPStatus.CONFLICT, "NO_SHARED_REPO"
-            )
+            return no_shared_repo_error(HTTPStatus.CONFLICT)
         state = read_state(settings.url)
         if state == RepoFormat.UNSUPPORTED_VERSION:
             return json_error(
@@ -85,21 +94,6 @@ def with_shared_root(fn):
             return fn(*args, **injected, **kwargs)
 
     return wrapper
-
-
-def validate_segment(*segments: str) -> tuple[Response, int] | None:
-    """Shared-route path-segment guard.
-
-    Every shared mirror that takes a project/run/dimension segment validates
-    it here, even where the local route it mirrors relies solely on the
-    service layer's own traversal check — defense in depth for a surface
-    that serves a second, independently-controlled clone.
-    """
-    try:
-        validate_path_segment(*segments)
-    except ValueError:
-        return json_error("Invalid parameter", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
-    return None
 
 
 def shared_project_dir(eval_root: Path, project: str) -> Path | None:

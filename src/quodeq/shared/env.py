@@ -13,7 +13,7 @@ cycle back through this module -- see that module's docstring.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import TypeVar
 
 from quodeq.shared._config import get_config
@@ -34,31 +34,34 @@ def _env_number(
     default: _NumberT,
     kind: Callable[[str], _NumberT],
     minimum: _NumberT | None,
-    env: dict[str, str] | None,
+    env: Mapping[str, str] | None,
+    warn: bool = True,
 ) -> _NumberT:
     """Read an env var through *kind*; warn and return *default* on failure.
 
     When *minimum* is given, parsed values below it also fall back to *default*.
+    ``warn=False`` falls back without logging.
     """
     raw = resolve_env(env).get(var)
-    if raw is not None:
-        log = logging.getLogger(__name__)
-        try:
-            value = kind(raw)
-        except ValueError:
-            log.warning(
+    if raw is None:
+        return default
+    try:
+        value = kind(raw)
+    except ValueError:
+        if warn:
+            logging.getLogger(__name__).warning(
                 "Invalid %s=%r (expected %s), using default %r",
                 var, raw, "integer" if kind is int else "number", default,
             )
-        else:
-            if minimum is not None and value < minimum:
-                log.warning(
-                    "Out-of-range %s=%r (minimum %r), using default %r",
-                    var, raw, minimum, default,
-                )
-            else:
-                return value
-    return default
+        return default
+    if minimum is not None and value < minimum:
+        if warn:
+            logging.getLogger(__name__).warning(
+                "Out-of-range %s=%r (minimum %r), using default %r",
+                var, raw, minimum, default,
+            )
+        return default
+    return value
 
 
 def env_int(
@@ -66,13 +69,16 @@ def env_int(
     default: int,
     *,
     minimum: int | None = None,
-    env: dict[str, str] | None = None,
+    env: Mapping[str, str] | None = None,
+    warn: bool = True,
 ) -> int:
     """Read an env var as an int; warn and return *default* on parse failure.
 
     When *minimum* is given, parsed values below it also fall back to *default*.
+    ``warn=False`` is for values read on every poll, where a bad setting
+    would repeat the same warning each tick.
     """
-    return _env_number(var, default, int, minimum, env)
+    return _env_number(var, default, int, minimum, env, warn)
 
 
 def env_float(
