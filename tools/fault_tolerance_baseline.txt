@@ -51,7 +51,7 @@ src/quodeq/api/app.py:273:broad-except
 src/quodeq/api/routes_compare.py:34:broad-except
 src/quodeq/api/routes_runs.py:28:broad-except
 src/quodeq/api/routes_shared_mirrors.py:68:broad-except
-src/quodeq/api/security.py:278:broad-except
+src/quodeq/api/security.py:277:broad-except
 src/quodeq/assistant/adapters/api.py:128:broad-except
 src/quodeq/assistant/adapters/capabilities.py:58:broad-except
 src/quodeq/assistant/cancel.py:53:broad-except
@@ -96,7 +96,7 @@ src/quodeq/data/cache_store/_migrate_params.py:42:broad-except
 src/quodeq/data/cache_store/entry.py:34:broad-except
 src/quodeq/data/fs/compiled_standards.py:36:broad-except
 src/quodeq/data/fs/report_parser/run_dates.py:43:broad-except
-src/quodeq/data/fs/run_artifacts.py:79:suppress
+src/quodeq/data/fs/run_artifacts.py:78:suppress
 src/quodeq/data/fs/standards_prefs.py:116:broad-except
 src/quodeq/data/fs/standards_prefs.py:41:broad-except
 src/quodeq/data/fs/standards_prefs.py:86:broad-except

@@ -140,11 +140,10 @@ def _prepare_run_context(
     Cache is constructed here (composition root) rather than left for
     process_dimension_with_cache to default lazily, so every dimension in
     this run shares one LocalFileBackend. The cache maintenance (schema
-    migration, content-index build, legacy GC) that used to ride along with
-    the lazy default is called explicitly here instead -- it's still
-    once-per-(root, schema)-per-process (see ensure_cache_ready's own memo),
-    just triggered at runner construction instead of on the first
-    cache-is-None dimension call.
+    migration, content-index build, legacy GC) is called explicitly here,
+    once per (root, schema) per process (see ensure_cache_ready's own memo),
+    at runner construction rather than on the first cache-is-None dimension
+    call.
     """
     dimensions, ctx = load_analysis_context(config)
     if config.classify_stash is None:

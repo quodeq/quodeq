@@ -1,8 +1,7 @@
 """Job data model, store protocol, and in-memory store implementation.
 
 JSON serialization (``_job_to_json``/``_job_from_json``) and the disk-backed
-``FileJobStore``/``create_job_store`` live in ``_job_file_store.py`` -- split
-out to keep this module under the size ratchet's 300-line cap, and
+``FileJobStore``/``create_job_store`` live in ``_job_file_store.py`` and are
 re-exported from here.
 """
 

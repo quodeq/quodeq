@@ -1,7 +1,7 @@
 """Project-building helpers for the filesystem action provider.
 
-Split: parent-detection and the max-projects-listed limit moved to
-_fs_project_parents.py, re-exported here for fs_projects.py's import.
+Parent-detection and the max-projects-listed limit are defined in
+_fs_project_parents.py and re-exported here for fs_projects.py's import.
 """
 
 from __future__ import annotations

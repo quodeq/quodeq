@@ -11,7 +11,7 @@
  * and Settings' SharedRepoSection read, and on their own mutations invalidate,
  * these SAME cache entries, so a connect, disconnect, publish or refresh
  * anywhere is reflected everywhere through one cache rather than three
- * independently fetched copies that used to drift apart.
+ * independently fetched copies that could drift apart.
  *
  * Cached-first mount: the list query's `queryFn` always passes
  * `refresh: false`, so the UI renders instantly from whatever the server has

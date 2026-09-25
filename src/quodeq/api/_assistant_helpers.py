@@ -8,13 +8,12 @@ A thin facade over three modules:
     ``resolve_repo_root``, ``get_repository``.
   - _assistant_events.py: ``event_frames``, ``POLL_SECONDS``, ``IDLE_LIMIT``.
 
-The moved names stay imported here (re-exported) so callers across the
-codebase and tests can keep patching/importing "quodeq.api._assistant_helpers.
-<name>". None of the split modules import back through this facade any
-more (each imports its own dependencies directly), so a patch on one of the
-split names here only reaches code that -- like this module -- reads it via
-the facade at call time; see each split module's docstring for its own
-patch target.
+Their names are re-exported here, so callers and tests can import or patch
+"quodeq.api._assistant_helpers.<name>". None of the three modules imports
+through this facade (each imports its own dependencies directly), so a
+patch on one of those names here only reaches code that, like this module,
+reads it via the facade at call time; see each module's docstring for its
+own patch target.
 """
 from __future__ import annotations
 

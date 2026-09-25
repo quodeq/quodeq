@@ -1,7 +1,6 @@
 /**
- * Encapsulates project-level actions (delete, export, relocate, import) that
- * were previously inlined inside App, keeping the root component focused
- * on composition rather than API plumbing.
+ * Encapsulates project-level actions (delete, export, relocate, import), so
+ * App stays focused on composition rather than API plumbing.
  *
  * Failure handlers return `{ ok: false, messageKey, vars }` (the raw i18n
  * key + interpolation vars, not a rendered string) so a caller can inspect

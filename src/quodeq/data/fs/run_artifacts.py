@@ -1,8 +1,7 @@
 """Copy/replace mechanics for staging run artifacts (shared-repo publish).
 
 services/shared_publish decides WHAT gets published (the source-of-truth
-allowlist, the glob patterns) and used to perform the shutil/os mechanics
-inline too; the mechanics live here. Errors propagate: the publish flow
+allowlist, the glob patterns); the shutil/os mechanics live here. Errors propagate: the publish flow
 converts OSError into a user-facing PublishError at its own boundary, so
 nothing here may swallow one.
 """

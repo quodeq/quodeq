@@ -6,8 +6,8 @@ edits feel stale. The cache holds ``ProjectEntry`` entities — serialization
 to the camelCase wire shape happens at the route.
 
 Two independent tiers:
-  * The full/unpaginated payload (``list()`` with no offset/limit) keeps its
-    original single-flight, whole-list caching, unchanged, and used by every
+  * The full/unpaginated payload (``list()`` with no offset/limit) uses
+    single-flight, whole-list caching, used by every
     non-paginated caller (``active_evaluation``, the shared-repo route,
     direct provider callers).
   * A paginated request (offset and/or limit given) instead caches a cheap

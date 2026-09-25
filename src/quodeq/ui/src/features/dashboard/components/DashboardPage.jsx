@@ -27,8 +27,8 @@ import { projectId } from '../../../utils/projectIdentity.js';
 // pull) -- looking it up in `projects` would silently bleed the local twin's
 // languageStats/publishedBy/etc. into a shared Overview. `sharedProjectInfo`
 // is fetched separately (useDashboard, keyed by source) and is exactly this
-// shared project's own info. Local behavior is unchanged: same lookup, same
-// null fallback. Exported so the source-gating contract is unit-testable
+// shared project's own info. A local selection is looked up in `projects`,
+// null when absent. Exported so the source-gating contract is unit-testable
 // without mounting the whole page (which needs a SidePaneProvider and more).
 export function selectDashboardProjectInfo({ selectedSource, projects, selectedProject, sharedProjectInfo }) {
   const localProjectInfo = (projects || []).find((p) => projectId(p) === selectedProject) || null;

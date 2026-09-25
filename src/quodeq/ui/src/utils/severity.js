@@ -6,9 +6,8 @@
  *   normalizeSeverity.
  * - Summary counters (the chips next to a total) use three buckets, with
  *   unknown folded into minor so critical+major+minor always equals the
- *   violation total: summaryBucket / countBySeverity. Before this module
- *   seven independent implementations disagreed on the fold and chip sums
- *   drifted from totals whenever a finding lacked a severity.
+ *   violation total: summaryBucket / countBySeverity. One implementation
+ *   keeps chip sums equal to totals when a finding lacks a severity.
  */
 import { KNOWN_SEVERITIES } from './constants.js';
 import { SEVERITY } from '../vocab/severity.js';

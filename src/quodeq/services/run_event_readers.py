@@ -2,8 +2,9 @@
 
 Reads status.json, evaluation/<dim>.json, and events.jsonl for
 ``api/_run_event_watcher.py``'s ``compute_tick``, so the API layer never
-touches those files directly and goes through the same readers (``wiring.read_eval_report``, ``wiring.EventLogReader``) every other
-service uses.
+touches those files directly and goes through the same readers
+(``wiring.read_eval_report``, ``wiring.EventLogReader``) every other service
+uses.
 
 ``read_status`` is the one exception: it reads status.json inline rather
 than through ``wiring.read_status`` (``data/fs/run_status_store.read_status``)

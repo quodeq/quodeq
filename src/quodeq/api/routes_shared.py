@@ -19,9 +19,9 @@ A thin orchestrator over four modules:
     Owns the ``refresh_shared_clone`` / ``sync_shared_index`` imports used
     by its own routes.
 
-This module holds no patch-holder re-exports: each split registrar imports
+This module holds no patch-holder re-exports: each registrar module imports
 its own dependencies directly from their real owners, so tests patch the
-module that actually calls the name (see each split module's docstring).
+module that actually calls the name (see each module's docstring).
 """
 from __future__ import annotations
 

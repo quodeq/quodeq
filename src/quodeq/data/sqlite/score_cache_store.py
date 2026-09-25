@@ -211,11 +211,9 @@ def load_run_keys_or_empty(
     itself (an unopenable/twice-corrupt db raises past its one rebuild
     attempt), not just from the query — matching every other read in this
     module's empty-on-error contract. Named for the call site in
-    ``services.score_cache.per_run_versions``, which used to open the
-    connection itself and only wrap the query, letting an open/rebuild
-    failure propagate to callers (``scoring.get_project_scores``,
-    ``services._fs_metadata`` summaries) that expect this disposable cache
-    to degrade to recompute, never raise.
+    ``services.score_cache.per_run_versions``, whose callers
+    (``scoring.get_project_scores``, ``services._fs_metadata`` summaries)
+    expect this disposable cache to degrade to recompute, never raise.
     """
     try:
         with open_score_cache() as conn:

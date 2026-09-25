@@ -1,6 +1,6 @@
 """Run-config assembly phases for ``cli_evaluation.build_run_config``.
 
-The orchestrator stays a short list of phase calls; this module owns the
+Keeps the orchestrator a short list of phase calls: this module owns the
 dimension filter, the flag/env-derived caps (``_RunLimits``) and the
 ``AnalysisOptions`` mapping. ``build_run_config`` itself stays in
 ``cli_evaluation`` because tests patch ``default_paths`` at that module's path.

@@ -39,7 +39,7 @@ def _shared_findings_page(project: str, eval_root: Path, lister: Callable[..., l
 # namespace shared by mutation routes too. Every other shared mirror
 # nests ``project`` as a URL path segment, so these two follow that
 # convention instead of the local route's exact URL shape -- the response
-# bodies (bare JSON array, same item shape) are unchanged.
+# bodies (bare JSON array, same item shape) match the local routes.
 @with_shared_root
 def shared_dismissed_findings(project: str, eval_root: Path):
     """List the findings dismissed in the shared clone, as a bare JSON array."""

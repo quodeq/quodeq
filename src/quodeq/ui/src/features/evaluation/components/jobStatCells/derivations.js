@@ -115,8 +115,8 @@ export function msUntilNextSecond(elapsedMs) {
  * time since that payload landed. Anchoring to the server (instead of
  * Date.parse(job.startedAt) vs client Date.now()) makes the clock immune to
  * client/server clock skew and keeps every clock on the screen in lock-step
- * — the stat strip and the footer previously mixed client wall-clock with
- * 2s-stale poll data and visibly disagreed.
+ * — mixing client wall-clock with 2s-stale poll data would make the stat
+ * strip and the footer visibly disagree.
  *
  * Fallback order when the server hasn't reported an elapsed yet (first
  * render before any poll, legacy runs): job wall-clock timestamps, else null.

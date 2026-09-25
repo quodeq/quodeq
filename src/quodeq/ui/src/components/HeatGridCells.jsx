@@ -19,11 +19,9 @@ const violationsAriaKey = (count) => pluralKey(count, 'heatGrid.violationsCellAr
  *  - DimensionHeatGridView (Violations tab by-dimension/by-file tables) —
  *    pass `variant="flat"` for the leaner text-only treatment.
  *
- * This used to be two copies (one here, one under features/map/viz/components)
- * that drifted apart: the violations copy gained keyboard activation + aria
- * labels while the map copy gained the `viz-focusable` keyboard focus ring.
- * They were merged into this file so every clickable cell in both grids gets
- * the same treatment — keep it that way rather than re-forking.
+ * Both grids share these cells so every clickable cell gets the same keyboard
+ * activation, aria labels and `viz-focusable` focus ring; keep one copy
+ * rather than forking it per grid.
  */
 function SeverityCell({ row, sev, flat, onCellClick }) {
   const count = row.severity[sev];

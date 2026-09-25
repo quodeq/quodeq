@@ -14,9 +14,9 @@ import { NOT_READY_MESSAGE } from '../historyHelpers.js';
 // Deferred so the History page's first paint doesn't carry the chart library.
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
-// The lazy-loaded chart panel had no error boundary around its Suspense: a
-// chunk-load failure (offline, deploy skew) or a render throw inside the
-// chart used to crash the whole History page instead of just the chart.
+// Error boundary around the lazy-loaded chart's Suspense: a chunk-load
+// failure (offline, deploy skew) or a render throw inside the chart takes
+// down only the chart, not the whole History page.
 class ChartErrorBoundary extends Component {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }

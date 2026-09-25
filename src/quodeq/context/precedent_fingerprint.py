@@ -35,8 +35,8 @@ __all__ = [
 _logger = logging.getLogger(__name__)
 
 # Per-run memo: run_dir -> (source stamp, fingerprints read under that stamp).
-# Every scan used to open and query every run's DB again; keying the read on
-# a cheap stamp makes a settled history cost one stat per run, not one query.
+# Without it every scan would open and query every run's DB again; keying the
+# read on a cheap stamp makes a settled history cost one stat per run, not one query.
 # Bounded LRU so a long-lived server never grows without limit across projects.
 PrecedentMemo = LRUDict[Path, tuple[object, frozenset[str]]]
 _MEMO_MAX_RUNS = 4096

@@ -7,11 +7,10 @@
  *
  * Standards visibility: every summary is filtered by the SAME source the
  * Overview reads — readVisibleStandardIds(), the browser-local visible set
- * behind the Standards screen's enable/disable stars. Compare used to fetch
- * each project's server-side visibility file instead, which made it deaf to
- * the toggles (the write goes to the SELECTED project only, and 404s
- * silently when that project is a shared one), so flipping a standard never
- * refreshed this screen. One source of truth, and the tab remount re-reads
+ * behind the Standards screen's enable/disable stars. Each project's
+ * server-side visibility file would miss the toggles (the write goes to the
+ * SELECTED project only, and 404s silently when that project is a shared
+ * one), so flipping a standard would never refresh this screen. One source of truth, and the tab remount re-reads
  * it on every visit.
  */
 import { useMemo } from 'react';

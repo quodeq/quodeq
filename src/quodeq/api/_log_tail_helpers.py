@@ -1,8 +1,8 @@
 """Log-tailing and log-path-resolution helpers for the log-stream routes.
 
 Raw file I/O and the log-parsing business rules used by
-``_log_stream_routes.py`` live here rather than in the routes module, mirroring
-the split already used by ``_sse_log_helpers.py`` for the SSE tail generator.
+``_log_stream_routes.py`` live here rather than in the routes module, the same
+layout ``_sse_log_helpers.py`` uses for the SSE tail generator.
 """
 from __future__ import annotations
 

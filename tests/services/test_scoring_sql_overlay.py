@@ -1,13 +1,12 @@
 """Regression: the SQL grade overlay closes the no-dismissals accumulated seam.
 
-Before the overlay moved into the run-read layer, ``get_project_scores`` for a
-project with no dismissed/deleted findings served the *eval-time* JSON grades
-forever — even after the user applied a custom grade formula (which rewrites the
-SQL grade tables via ``apply_to_all_runs``). The dashboard RUN view used the SQL
-grades, but the OVERVIEW (accumulated), TREND, and PROJECT CARD did not, so they
-disagreed.
+Without the overlay, ``get_project_scores`` for a project with no
+dismissed/deleted findings would serve the *eval-time* JSON grades even after
+the user applied a custom grade formula (which rewrites the SQL grade tables
+via ``apply_to_all_runs``), so the OVERVIEW (accumulated), TREND and PROJECT
+CARD would disagree with the RUN view, which reads the SQL grades.
 
-These tests pin the fix: ``read_run_data`` overlays the SQL grade tables for
+These tests pin the overlay: ``read_run_data`` overlays the SQL grade tables for
 event-log runs, so accumulated / trend / project-card reads all reflect the
 applied formula by construction.
 """

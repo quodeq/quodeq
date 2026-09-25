@@ -2,9 +2,8 @@
 
 ``quodeq.services`` inner modules never read the environment directly;
 overrides are resolved here, lazily per call, and passed in (or read once by
-a composition point and threaded through). Each resolver mirrors the exact
-default/parse rule the service module it replaces used to apply -- see each
-docstring for the one-line contract.
+a composition point and threaded through). Each resolver's docstring
+states its default/parse rule in one line.
 """
 from __future__ import annotations
 

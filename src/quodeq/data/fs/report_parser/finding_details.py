@@ -3,7 +3,6 @@
 The SQL twin is ``quodeq.data.sqlite.findings_queries.read_finding_details``
 (the ``findings`` table); this reader serves runs that pre-date the
 event-log scoring engine and so never produced that table.
-services/dismissed.py used to walk and parse these files inline.
 """
 from __future__ import annotations
 

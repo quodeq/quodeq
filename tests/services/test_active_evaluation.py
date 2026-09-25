@@ -86,7 +86,7 @@ def test_projects_failure_falls_back_to_first_running_job():
 
 def test_dict_jobs_and_dict_projects_are_supported():
     # Remote/stub providers hand back wire dicts; the rule reads the same
-    # keys the webview used to read ("project" as the legacy fallback).
+    # keys the webview reads ("project" as the legacy fallback).
     provider = StubProvider(
         [{"jobId": "j1", "status": "running", "project": "proj-1"}],
         projects=[{"id": "proj-1", "name": "Proj"}],

@@ -1,8 +1,7 @@
 """Per-project JSON artifacts: ``repository_info.json`` and ``scan.json``.
 
-Services used to read/modify/write these files directly (json.loads +
-read_text/write_text inline), scattering the on-disk format across the
-service layer. The mechanics live here; services keep the decision logic
+The on-disk format and the read/modify/write mechanics live here, not in the
+service layer; services keep the decision logic
 and delegate the I/O. Reads are best-effort (None on absent/corrupt/
 non-dict payloads — the recurring non-dict-JSON crash class), writes are
 best-effort too (False on failure) so callers keep their long-standing

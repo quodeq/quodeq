@@ -76,9 +76,8 @@ def upgrade_v6_to_v7(conn: sqlite3.Connection) -> None:
 def upgrade_v7_to_v8(conn: sqlite3.Connection) -> None:
     """Add the (requirement, file, line) composite index to findings.
 
-    read_finding_details() (findings_queries.py) used to scan every row and
-    filter matching keys in Python; the index lets its SQL WHERE seek
-    instead. Skip if findings doesn't exist yet (mirrors the
+    read_finding_details() (findings_queries.py) filters on those keys in its
+    SQL WHERE; the index lets that seek instead of scanning every row. Skip if findings doesn't exist yet (mirrors the
     provenance_downgrade guard in upgrade_v5_to_v6). IF NOT EXISTS makes a
     re-run safe if a crash landed the CREATE INDEX but not the later
     user_version bump (same idempotency shape as the other upgrades here).

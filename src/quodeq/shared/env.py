@@ -2,9 +2,8 @@
 
 Numeric helpers and the ports/keys/urls accessors stay here; AI-provider,
 filesystem-path, sqlite-DB, and embedding accessors live in the four
-siblings below and are re-exported so every existing import path
-(``from quodeq.shared.env import <name>``, including this project-wide
-fan-in's many call sites) keeps working unchanged.
+siblings below and are re-exported, so ``from quodeq.shared.env import <name>`` works for every
+accessor (this module is a project-wide fan-in with many call sites).
 
 ``sanitized_env_path`` lives in the leaf module ``_env_sanitize.py`` (not
 defined here) so ``env_paths.py``/``_env_db.py`` can import it without a

@@ -23,8 +23,8 @@ from quodeq.services.base import ActionProvider
 
 # Providers hand back JobSnapshot entities, but remote/stub providers may
 # return already-serialized wire dicts (the /api/evaluations route accepts
-# both) — the accessors below read the same fields the webview shell used to
-# read off the wire, including the legacy "project" key fallback.
+# both) — the accessors below read the same wire fields the webview shell reads,
+# including the legacy "project" key fallback.
 
 
 def _read_field(item: Any, attr: str, *wire_keys: str) -> str | None:
