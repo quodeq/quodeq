@@ -4,20 +4,13 @@ Dispatch workers append one ``file_done`` marker per file as they finish it;
 cache replays write findings without markers, so counting these markers
 measures fresh progress a run made itself, never carried-forward data (see
 ``quodeq.analysis._loop_guards``, the sole caller).
-
-The marker vocabulary mirrors ``quodeq.analysis.mcp.schemas.FileDoneStatus``
-and ``JSONL_MARKER_FILE_DONE`` by value: data/fs may only import core (see
-``tools/check_imports.py``'s layer rules), so the wire strings are duplicated
-here as module-level constants rather than importing the analysis-owned enum.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-_MARKER_FILE_DONE = "file_done"
-_STATUS_OK = "ok"
-_STATUS_ERROR = "error"
+from quodeq.core.evidence.markers import JSONL_MARKER_FILE_DONE, FileDoneStatus
 
 
 def tally_evidence_markers(jsonl_path: Path) -> tuple[int, int]:
@@ -41,14 +34,16 @@ def tally_evidence_markers(jsonl_path: Path) -> tuple[int, int]:
                     entry = json.loads(raw)
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     continue
-                if entry.get("_marker") != _MARKER_FILE_DONE:
+                if entry.get("_marker") != JSONL_MARKER_FILE_DONE:
                     continue
                 file = entry.get("file")
                 status = entry.get("status")
-                if isinstance(file, str) and status in (_STATUS_OK, _STATUS_ERROR):
+                if isinstance(file, str) and status in (
+                    FileDoneStatus.OK, FileDoneStatus.ERROR,
+                ):
                     last_status[file] = status
     except OSError:
         return 0, 0
-    ok = sum(1 for s in last_status.values() if s == _STATUS_OK)
-    err = sum(1 for s in last_status.values() if s == _STATUS_ERROR)
+    ok = sum(1 for s in last_status.values() if s == FileDoneStatus.OK)
+    err = sum(1 for s in last_status.values() if s == FileDoneStatus.ERROR)
     return ok, err

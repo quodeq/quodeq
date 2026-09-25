@@ -5,31 +5,14 @@ for ``report_finding``, ``get_next_files``, and ``mark_file_done``.
 """
 from __future__ import annotations
 
-from enum import StrEnum
-
+# Moved to core.evidence.markers so data/fs can read the vocabulary directly
+# (data may only import core); re-exported here for existing importers.
+from quodeq.core.evidence.markers import (  # noqa: F401 -- re-exported
+    FileDoneStatus,
+    JSONL_MARKER_FILE_DONE,
+)
 from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.severity import Severity
-
-
-class FileDoneStatus(StrEnum):
-    """mark_file_done's "status" vocabulary.
-
-    router.py writes these into the JSONL file_done markers; _loop_guards.py
-    reads them back to count analysed vs abandoned files, so both sides
-    import this rather than retyping the values.
-    """
-
-    OK = "ok"
-    ERROR = "error"
-    # Accepted by the router but deliberately absent from the tool schema's
-    # enum: written by the server for files the worker could never dispatch,
-    # not something a worker is told to report.
-    SKIPPED = "skipped"
-
-
-# router.py's file_done JSONL entries' "_marker" value; _loop_guards.py,
-# cache/_jsonl_state.py and cache/failure_streak.py all read it back.
-JSONL_MARKER_FILE_DONE = "file_done"
 
 
 REPORT_FINDING_NAME = "report_finding"
