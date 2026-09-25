@@ -3,6 +3,7 @@
 // counts and short labels the same way.
 import { LOCALE } from '../../strings/index.js';
 import { roundOneDecimal } from '../../utils/rounding.js';
+import { SCORE_SCALE_MAX } from '../../constants.js';
 
 // Per-project principle bar height, as a percent of the bar track: a near-
 // zero score still renders a visible sliver instead of disappearing.
@@ -10,7 +11,7 @@ export const MIN_BAR_HEIGHT_PCT = 15;
 
 // 0-10 score to bar height/width in percent (a full 10 score fills the bar).
 // Shared by every principle/standing/duel bar so they all scale the same way.
-export const SCORE_TO_PCT = 10;
+export const SCORE_TO_PCT = 100 / SCORE_SCALE_MAX; // score (0-SCORE_SCALE_MAX) to percent
 
 // Scores are compared and shown at one decimal throughout the tab; rounding
 // in one place keeps a computed gap agreeing with the numbers it was derived

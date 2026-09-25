@@ -6,7 +6,7 @@ import { buildFolderScene } from './galaxyFolderScene.js';
 // so the target is weighted toward the star rather than the raw cursor.
 const CURSOR_WEIGHT = 0.3;
 const NEAREST_STAR_WEIGHT = 0.7;
-// Each such click multiplies the zoom by this, capped at ten fit zooms.
+// Each such click multiplies the zoom by this, capped at MAX_ZOOM_FIT_MULTIPLES.
 const ZOOM_STEP_MULTIPLIER = 2.5;
 // Zoom-toward-cursor cap, in multiples of the scene's fit zoom.
 const MAX_ZOOM_FIT_MULTIPLES = 10;

@@ -28,9 +28,9 @@ const SEVERE_AT = 18;
 const ELEVATED_AT = 11;
 const WATCH_AT = 6;
 const STALE_FACTOR = 1.35;
-// Added to the file count before log10 so a 0-file (or tiny) project still
-// produces a finite, small size weight instead of -Infinity/a sharp cliff
-// near log10(0..1).
+// Added to the file count before log10 so log10(files + offset) is always
+// >= 1: a 0-file (or tiny) project's size weight never drops below 1, so its
+// consequence score never shrinks under the raw (score-scale - score) gap.
 const FILE_COUNT_LOG_OFFSET = 10;
 
 function topLanguage(languageStats) {
