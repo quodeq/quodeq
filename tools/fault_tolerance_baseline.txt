@@ -14,9 +14,8 @@ src/quodeq/analysis/_api_call.py:259:broad-except
 src/quodeq/analysis/_api_runner.py:105:broad-except
 src/quodeq/analysis/_loop_steps.py:109:broad-except
 src/quodeq/analysis/_loop_steps.py:140:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:205:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:213:broad-except
-src/quodeq/analysis/_run_lifecycle_support.py:242:broad-except
+src/quodeq/analysis/_run_lifecycle_support.py:214:broad-except
+src/quodeq/analysis/_run_lifecycle_support.py:243:broad-except
 src/quodeq/analysis/cache/_persist_watcher.py:152:broad-except
 src/quodeq/analysis/cache/_persist_watcher.py:157:broad-except
 src/quodeq/analysis/cache/_replay.py:129:broad-except
@@ -54,8 +53,7 @@ src/quodeq/assistant/adapters/capabilities.py:57:broad-except
 src/quodeq/assistant/cancel.py:53:broad-except
 src/quodeq/assistant/cancel.py:66:broad-except
 src/quodeq/assistant/orchestrator.py:294:broad-except
-src/quodeq/assistant/tools/_read_tools_scope.py:128:broad-except
-src/quodeq/assistant/tools/_read_tools_scope.py:88:broad-except
+src/quodeq/assistant/tools/_read_tools_scope.py:134:broad-except
 src/quodeq/assistant/tools/registry.py:66:broad-except
 src/quodeq/ci/cli.py:103:broad-except
 src/quodeq/cli.py:101:broad-except
@@ -109,7 +107,7 @@ src/quodeq/services/_mutation_scoring.py:86:broad-except
 src/quodeq/services/_post_run_hook.py:37:broad-except
 src/quodeq/services/_post_run_hook.py:45:broad-except
 src/quodeq/services/_run_discard.py:138:broad-except
-src/quodeq/services/active_evaluation.py:69:broad-except
+src/quodeq/services/active_evaluation.py:70:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except
 src/quodeq/services/cache_maintenance.py:40:broad-except
 src/quodeq/services/evidence_rescore.py:196:broad-except

@@ -42,7 +42,8 @@ def _worktree_summary(row) -> dict | None:
     if active:
         try:
             stats = diff_stats(Path(row["path"]))
-        except WorktreeError:
+        except WorktreeError as exc:
+            _logger.warning("diff_stats failed for %s: %s", row["path"], exc, exc_info=True)
             stats = []
     return {"branch": row["branch"], "status": row["status"],
             "filesChanged": len(stats), "stats": stats,

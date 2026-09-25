@@ -7,11 +7,14 @@ in turn), and ``_cli_lifecycle`` imports ``resolve_time_limit`` directly.
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 from collections.abc import Mapping
 
 from quodeq.shared.constants import ENV_TRUTHY
+
+_logger = logging.getLogger(__name__)
 
 ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
@@ -62,6 +65,9 @@ def cli_env_int(var: str, default: int | None, env: dict[str, str] | None = None
     try:
         return int(raw)
     except ValueError:
+        _logger.warning(
+            "Invalid %s=%r (expected integer), using default %r", var, raw, default,
+        )
         return default
 
 

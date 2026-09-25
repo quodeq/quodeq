@@ -59,6 +59,37 @@ class _FakeLog:
         pass
 
 
+def test_cached_accumulated_logs_on_first_read_failure(monkeypatch, tmp_path):
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    monkeypatch.setattr(_score_cache_fetch, "read_cached_accumulated", _boom)
+
+    log = _FakeLog()
+    computed = {"score": 3.0}
+    result = _score_cache_fetch.cached_accumulated("proj", "v1", lambda: computed, log=log)
+
+    assert result is computed
+    assert any("score-cache read failed" in msg for msg in log.warnings)
+
+
+def test_make_cache_backed_fetcher_logs_on_bulk_read_failure(monkeypatch, tmp_path):
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    monkeypatch.setattr(_score_cache_fetch, "read_all_cached_rows", _boom)
+
+    scalars = [DimensionResult(dimension="security", overall_score="8.0/10", overall_grade="Good")]
+
+    def base_fetcher(_run_id):
+        return scalars
+
+    log = _FakeLog()
+    fetch = _score_cache_fetch.make_cache_backed_fetcher(
+        "proj", lambda _rid: "v1", base_fetcher, log=log,
+    )
+    out = fetch("r1")
+
+    assert [d.overall_score for d in out] == ["8.0/10"]
+    assert any("score-cache bulk read failed" in msg for msg in log.warnings)
+
+
 def test_cached_accumulated_logs_on_write_failure(monkeypatch, tmp_path):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     monkeypatch.setattr(_score_cache_fetch, "write_cached_accumulated", _boom)

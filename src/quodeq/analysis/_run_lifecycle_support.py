@@ -202,7 +202,8 @@ def mark_unfinished_dims_incomplete(run_dir: Path, reason: str, *, log: LogSink)
     )
     try:
         entries = read_dimensions(run_dir).get("dimensions", {})
-    except Exception:  # noqa: BLE001 — a failing flip must not mask the exit
+    except TypeError as exc:  # a run_dir that isn't a real Path
+        log.warning(f"failed to read dimensions for flip: {exc}")
         return 0
     flipped = 0
     for dim, entry in entries.items():

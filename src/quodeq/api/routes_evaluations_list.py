@@ -32,6 +32,7 @@ from quodeq.assistant import get_provider_configs
 from quodeq.api.routes_common import reports_dir
 from quodeq.services.active_evaluation import find_active_evaluation
 from quodeq.services.base import ActionProvider
+from quodeq.shared.log_sink import LoggerSink
 from quodeq.shared.utils import is_repo_url
 
 _logger = logging.getLogger(__name__)
@@ -180,7 +181,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         the staleness rule lives in services.active_evaluation, so shells
         (native window, frontend) consume it instead of re-deriving it.
         """
-        job = find_active_evaluation(provider, reports_dir())
+        job = find_active_evaluation(provider, reports_dir(), log=LoggerSink(_logger))
         return jsonify(to_camel_dict(job) if job is not None else None)
 
     @app.post("/api/evaluations")

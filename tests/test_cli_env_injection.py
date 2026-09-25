@@ -9,8 +9,19 @@ from __future__ import annotations
 import argparse
 import io
 import os
+from unittest.mock import patch
 
-from quodeq._cli_env import cli_environ
+from quodeq._cli_env import cli_env_int, cli_environ
+
+
+def test_cli_env_int_logs_and_falls_back_on_malformed_value():
+    with patch("quodeq._cli_env._logger.warning") as warning:
+        result = cli_env_int("QUODEQ_MAX_TURNS", 5, env={"QUODEQ_MAX_TURNS": "not-a-number"})
+    assert result == 5
+    assert warning.called
+    message = warning.call_args.args[0] % warning.call_args.args[1:]
+    assert "QUODEQ_MAX_TURNS" in message
+    assert "not-a-number" in message
 
 
 def test_environ_returns_the_injected_mapping(monkeypatch):

@@ -132,7 +132,10 @@ def _violations_from_run(ctx: ToolContext, dimension: str | None):
             entry = next((d for d in scored if d.get("dimension") == dimension), None)
             if entry is not None:
                 return entry.get("violations") or [], dimension, []
-        viols = json.loads(path.read_text(encoding="utf-8")).get("violations") or []
+        try:
+            viols = json.loads(path.read_text(encoding="utf-8")).get("violations") or []
+        except (OSError, ValueError) as exc:
+            raise ToolError(f"could not read report for dimension: {dimension}") from exc
         return viols, dimension, []
     if not eval_dir.is_dir():
         raise ToolError(

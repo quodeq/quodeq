@@ -31,6 +31,7 @@ from quodeq.config.process_env import process_environment_copy
 from quodeq.config.provider import Provider, ProviderType
 from quodeq.shared.utils import get_ai_cmd, get_ai_model
 from quodeq.shared.copilot import build_copilot_env
+from quodeq.shared.log_sink import LoggerSink
 
 _log = logging.getLogger(__name__)
 
@@ -53,7 +54,9 @@ def build_ai_cmd(
     provider_cfg = _get_provider_configs().get(cmd, {})
 
     args = build_base_args(cmd, provider_cfg)
-    mcp_args, mcp_config_path = build_mcp_args(config, provider_cfg, work_dir)
+    mcp_args, mcp_config_path = build_mcp_args(
+        config, provider_cfg, work_dir, log=LoggerSink(_log),
+    )
     args.extend(mcp_args)
     if cmd == Provider.COPILOT and work_dir is not None:
         root = str(work_dir.resolve())

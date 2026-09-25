@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from quodeq.api._import_identity import find_identity_collision
+from quodeq.api.import_project import rewrite_repository_info  # re-export
 from quodeq.services.project_index import ProjectIdentity, index_key, load_index, save_index
 
 
@@ -14,6 +16,18 @@ def _identity(**kw) -> ProjectIdentity:
     )
     defaults.update(kw)
     return ProjectIdentity(**defaults)
+
+
+def test_rewrite_repository_info_logs_and_returns_on_corrupt_json(tmp_path: Path):
+    project_dir = tmp_path / "proj-uuid"
+    project_dir.mkdir()
+    (project_dir / "repository_info.json").write_text("{not json", encoding="utf-8")
+
+    with patch("quodeq.api._import_identity.logger.warning") as warning:
+        rewrite_repository_info(project_dir, "new-uuid")
+
+    assert warning.called
+    assert "could not read repository_info.json" in warning.call_args.args[0]
 
 
 def test_finds_collision_via_index_without_reading_repository_info(tmp_path: Path):

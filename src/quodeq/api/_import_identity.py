@@ -110,7 +110,8 @@ def rewrite_repository_info(project_dir: Path, new_uuid: str) -> None:
     info_path = project_dir / REPO_INFO_FILENAME
     try:
         data = json.loads(info_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("import: could not read repository_info.json: %s", exc)
         return
     data["uuid"] = new_uuid
     try:

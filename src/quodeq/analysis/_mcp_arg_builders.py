@@ -26,6 +26,7 @@ from quodeq.core.constants import (
     MCP_CONFIG_ARG_FLAG, MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE,
     PROMPT_FLAG_DEFAULT, PROMPT_STYLE_FLAG, PROMPT_STYLE_POSITIONAL,
 )
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared.models import normalize_model_id
 from quodeq.shared.utils import get_ai_cmd_path
 
@@ -126,6 +127,7 @@ def _build_config_file_mcp_args(
 
 def build_mcp_args(
     config: AnalysisConfig, provider_cfg: dict, work_dir: Path | None,
+    *, log: LogSink = NULL_LOG,
 ) -> tuple[list[str], Path | None]:
     """Build MCP-related args and return the config path (if any)."""
     if config.jsonl_file is None:
@@ -138,6 +140,10 @@ def build_mcp_args(
         # --allowed-mcp-server-names) or the registered server stays blocked.
         return list(provider_cfg.get("mcp_permission_args", [])), None
     if mcp_style not in {MCP_STYLE_CONFIG_FILE, MCP_STYLE_CONFIG_ARG}:
+        log.warning(
+            f"unknown mcp_style {mcp_style!r} for provider {config.ai_cmd or 'unknown'}; "
+            "no MCP args emitted"
+        )
         return [], None
 
     agent_params = _build_agent_params(config, work_dir)

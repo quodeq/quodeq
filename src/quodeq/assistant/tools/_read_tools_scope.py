@@ -85,7 +85,13 @@ def scored_run_dims(ctx: ToolContext) -> list[dict] | None:
         if not dismissed_keys(project_dir) and not deleted_keys(project_dir):
             return None
         dims = scored_run_dimensions(project_dir.parent, project_dir.name, ctx.run_dir.name)
-    except Exception:  # noqa: BLE001 - unresolvable layout: serve raw, not a ToolError
+    except (OSError, ValueError, KeyError) as exc:
+        # Matches read_run_data's own failure surface (validate_path_segment
+        # raises ValueError, a missing run resolves to FileNotFoundError, a
+        # malformed evaluation file raises ValueError/KeyError) -- fail open
+        # to the raw eval-JSON read rather than erroring the chat turn.
+        _logger.warning(
+            "scored_run_dims failed for run %s: %s", ctx.run_dir, exc, exc_info=True)
         return None
     return [to_camel_dict(d) for d in dims]
 
