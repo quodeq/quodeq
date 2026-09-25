@@ -20,3 +20,9 @@ test('the clone ceiling stays at zero', () => {
   const source = readFileSync(join(here, 'check_clones.mjs'), 'utf8');
   assert.match(source, /const TOTAL_CEILING = 0;/);
 });
+
+test('the clone threshold stays at 40 tokens over 5 lines', () => {
+  const config = JSON.parse(readFileSync(join(here, '..', '..', '..', '..', '.jscpd.json'), 'utf8'));
+  assert.equal(config.minTokens, 40);
+  assert.equal(config.minLines, 5);
+});

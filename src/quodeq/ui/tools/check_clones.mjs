@@ -7,7 +7,7 @@
 // module), never a third copy.
 //
 // Detection is jscpd, configured once in `.jscpd.json` at the repo root
-// (5 lines / 50 tokens, formats python+javascript+jsx, tests, snapshots,
+// (5 lines / 40 tokens, formats python+javascript+jsx, tests, snapshots,
 // fixtures, node_modules and dist excluded). jscpd is a devDependency of
 // this package, so it runs via `npx --no-install`; if it is missing the
 // gate says how to install it instead of passing silently.
