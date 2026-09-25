@@ -47,6 +47,29 @@ def json_object_or_error(
     return payload
 
 
+def optional_json_object_or_error(
+    code: str = ERROR_CODE_BAD_REQUEST, *, force: bool = False,
+) -> dict[str, Any] | tuple[dict[str, Any], int]:
+    """Return the JSON object body, ``{}`` when there is none, or a 400 tuple.
+
+    For handlers where every field is optional: no body (or an unparseable
+    one) means ``{}``, as the old ``get_json(silent=True) or {}`` did. A body
+    that parses to a list or scalar answers a coded 400 instead of reaching
+    ``.get`` and answering an HTML 500.
+
+    ``cache=False``: Flask's ``get_json`` caches its parsed result keyed only
+    by ``silent``, not by ``force`` -- a bare ``or {}`` call after a
+    ``force=True`` one in the same request would otherwise see the earlier
+    call's cached body instead of re-checking the content type.
+    """
+    payload = request.get_json(force=force, silent=True, cache=False)
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        return error_response("Request body must be a JSON object", HTTPStatus.BAD_REQUEST, code)
+    return payload
+
+
 def path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
     """Return the request body's stripped ``path``, or a 400 error tuple.
 

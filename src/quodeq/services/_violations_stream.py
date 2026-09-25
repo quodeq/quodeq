@@ -77,7 +77,12 @@ def _parse_stream_line(stripped: str, acc: _StreamAccumulator) -> None:
         event = json.loads(stripped)
     except json.JSONDecodeError:
         return
-    extractor = TEXT_EXTRACTORS.get(event.get("type"))
+    if not isinstance(event, dict):
+        return
+    etype = event.get("type")
+    if not isinstance(etype, str):
+        return
+    extractor = TEXT_EXTRACTORS.get(etype)
     texts = extractor(event) if extractor else []
     new_v, new_c = _parse_entries_from_texts(texts, acc.dimension, acc.seen)
     acc.violations.extend(new_v)

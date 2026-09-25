@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify
 
 from quodeq.services.shared_connect import ConnectStatus, connect_shared_repo
 from quodeq.services.shared_publish import get_publish_status, start_publish
@@ -28,7 +28,7 @@ from quodeq.services.shared_settings import read_settings
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import path_segment_error
 
-from .helpers import json_error
+from .helpers import json_error, optional_json_object_or_error
 from .routes_common import reports_dir
 
 
@@ -71,7 +71,9 @@ def shared_config_put() -> Response | tuple[Response, int]:
     Clones it and verifies it is a quodeq results repo before accepting, so a
     typo or a foreign repository fails here rather than on the first publish.
     """
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_error("INVALID_INPUT")
+    if not isinstance(body, dict):
+        return jsonify(body[0]), body[1]
     url = str(body.get("url") or "").strip()
     if not url:
         return json_error("url is required", 400, "URL_REQUIRED")

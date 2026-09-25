@@ -201,3 +201,38 @@ class TestEstimateAgentsValidation:
         )
         assert resp.status_code == 400
         assert resp.get_json()["code"] == "INVALID_PARAM"
+
+
+class TestProviderTestFieldTypes:
+    """A non-string provider/api_base/api_key/model must 400, not 500."""
+
+    @pytest.mark.parametrize("body", [
+        {"provider": ["x"]},
+        {"api_base": 5},
+        {"api_key": 1},
+        {"model": {}},
+    ])
+    def test_non_string_field_returns_400(self, client, body):
+        resp = client.post(
+            "/api/provider/test", json=body, headers={"Origin": "http://localhost"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_PARAM"
+
+    def test_null_api_key_is_treated_as_absent(self, client):
+        """An explicit JSON null for api_key is not a type error (it's the
+        same as omitting the field): the route falls through to env-var
+        resolution instead of 400ing."""
+        with patch("quodeq.api.llm_bridge_routes.check_cloud_connection") as mock_check, \
+                patch("quodeq.api.llm_bridge_routes.resolve_api_key") as mock_resolve:
+            mock_check.return_value = {"success": True, "model": "test", "latency_ms": 200}
+            mock_resolve.return_value = (_TEST_API_KEY, "OPENROUTER_API_KEY")
+            resp = client.post("/api/provider/test", json={
+                "provider": "openrouter",
+                "model": "test",
+                "api_base": "https://example.com/v1",
+                "api_key": None,
+            }, headers={"Origin": "http://localhost"})
+
+        assert resp.status_code == 200
+        mock_check.assert_called_once()

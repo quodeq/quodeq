@@ -39,5 +39,5 @@ def online_path_missing(info: dict[str, Any]) -> bool:
     """True for an online project whose stored path is not a remote URL."""
     return (
         info.get("location") == ProjectLocation.ONLINE
-        and not (info.get("path", "").startswith(("https://", "git@")))
+        and not (info.get("path") or "").startswith(("https://", "git@"))
     )

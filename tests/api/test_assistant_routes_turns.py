@@ -225,3 +225,11 @@ def test_message_passes_write_enabled(client, app, monkeypatch):
                 json={"text": "hi", "writeEnabled": True})
     assert done.wait(timeout=budget(2))  # run_turn runs on a daemon thread
     assert seen.get("write_enabled") is True
+
+
+def test_post_message_non_object_body_has_code(client):  # 2532
+    sid = client.post("/api/assistant/sessions", json={"provider": "claude"}).get_json()["sessionId"]
+    resp = client.post(f"/api/assistant/sessions/{sid}/messages", json=[1])
+    assert resp.status_code == 400
+    assert resp.is_json
+    assert resp.get_json()["code"] == "INVALID_PARAM"

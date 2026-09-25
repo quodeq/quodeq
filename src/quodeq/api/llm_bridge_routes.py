@@ -28,6 +28,7 @@ from quodeq.api._llm_bridge_validation import (
     invalid_base_url,
     json_body,
     require_model_name,
+    string_fields_error,
 )
 
 
@@ -166,6 +167,8 @@ def provider_test() -> Response:
     data = json_body()
     if data is None:
         return jsonify(BODY_NOT_OBJECT), 400
+    if (err := string_fields_error(data, ("provider", "api_base", "api_key", "model"))):
+        return err
     provider_id = data.get("provider", "")
     # Resolves the env var via provider id when given, else by api_base
     # match so old clients (without `provider`) still work.

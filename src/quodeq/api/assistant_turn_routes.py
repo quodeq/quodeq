@@ -25,7 +25,7 @@ from quodeq.api._assistant_helpers import (
 )
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.api.assistant_turn_state import AssistantTurnState, turn_state
-from quodeq.api.helpers import json_error
+from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.orchestrator import TurnRequest
@@ -129,7 +129,9 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
     session = repo.get_session(sid)
     if session is None:
         return json_error("unknown session", 404, "UNKNOWN_SESSION")
-    body = request.get_json(silent=True) or {}
+    body = optional_json_object_or_error("INVALID_PARAM")
+    if not isinstance(body, dict):
+        return jsonify(body[0]), body[1]
     text = str(body.get("text", "")).strip()
     if not text:
         return json_error("text required", 400, "MISSING_PARAM")

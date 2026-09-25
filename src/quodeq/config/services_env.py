@@ -23,12 +23,8 @@ MAX_VIOLATION_FILES_DEFAULT = 20
 
 
 def run_dim_cache_max(env: Mapping[str, str] | None = None) -> int:
-    """QUODEQ_RUN_DIM_CACHE_MAX, default 256; invalid -> default (0 is a valid size)."""
-    src = os.environ if env is None else env
-    try:
-        return int(src.get("QUODEQ_RUN_DIM_CACHE_MAX", str(RUN_DIM_CACHE_MAX_DEFAULT)))
-    except (ValueError, TypeError):
-        return RUN_DIM_CACHE_MAX_DEFAULT
+    """QUODEQ_RUN_DIM_CACHE_MAX, default 256; negative or invalid -> default (0 disables the cache)."""
+    return env_int("QUODEQ_RUN_DIM_CACHE_MAX", RUN_DIM_CACHE_MAX_DEFAULT, minimum=0, env=env)
 
 
 def max_history_runs(env: Mapping[str, str] | None = None) -> int:

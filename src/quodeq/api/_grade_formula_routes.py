@@ -12,7 +12,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import json_error
+from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.api.routes_common import reports_dir
 from quodeq.core.scoring.params import (
     DEFAULT_PARAMS,
@@ -59,6 +59,30 @@ def _state_payload(rescore: RescoreSnapshot) -> dict:
     }
 
 
+def _preview_response() -> Response | tuple[Response, int]:
+    """Handle POST /api/grade-formula/preview for one project."""
+    payload = optional_json_object_or_error("INVALID_INPUT")
+    if not isinstance(payload, dict):
+        return payload
+    project = payload.get("project") or ""
+    try:
+        validate_path_segment(project)
+    except ValueError:
+        return json_error(
+            "Invalid project", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+        )
+    params, err = _parse_params(payload.get("params") or {})
+    if err:
+        return err
+    result = grade_formula.preview_scores(Path(reports_dir()), project, params)
+    if result is None:
+        return json_error(
+            "No evaluation with an event log found for this project",
+            HTTPStatus.NOT_FOUND, "NOT_FOUND",
+        )
+    return jsonify(result)
+
+
 def register_grade_formula_routes(
     app: Flask, rescorer: GradeFormulaRescorer | None = None,
 ) -> None:
@@ -79,7 +103,10 @@ def register_grade_formula_routes(
 
     @app.put("/api/grade-formula")
     def put_grade_formula() -> tuple[Response, int]:
-        params, err = _parse_params(request.get_json(silent=True))
+        body = optional_json_object_or_error("INVALID_INPUT")
+        if not isinstance(body, dict):
+            return body
+        params, err = _parse_params(body)
         if err:
             return err
         # Save first: a pass that starts after the generation bump loads these.
@@ -100,21 +127,4 @@ def register_grade_formula_routes(
 
     @app.post("/api/grade-formula/preview")
     def preview_grade_formula() -> Response | tuple[Response, int]:
-        payload = request.get_json(silent=True) or {}
-        project = payload.get("project") or ""
-        try:
-            validate_path_segment(project)
-        except ValueError:
-            return json_error(
-                "Invalid project", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
-            )
-        params, err = _parse_params(payload.get("params") or {})
-        if err:
-            return err
-        result = grade_formula.preview_scores(Path(reports_dir()), project, params)
-        if result is None:
-            return json_error(
-                "No evaluation with an event log found for this project",
-                HTTPStatus.NOT_FOUND, "NOT_FOUND",
-            )
-        return jsonify(result)
+        return _preview_response()

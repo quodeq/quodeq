@@ -168,3 +168,46 @@ class TestLoadStandardsText:
 
     def test_returns_empty_when_files_missing(self, tmp_path):
         assert load_standards_text(tmp_path, "nonexistent") == ""
+
+
+# ---------------------------------------------------------------------------
+# render_standards_grouped: malformed compiled-JSON shapes
+# ---------------------------------------------------------------------------
+
+class TestRenderStandardsGroupedMalformedShapes:
+    def test_list_data_returns_str_without_raising(self):
+        result = render_standards_grouped([])
+        assert isinstance(result, str)
+        assert result == ""
+
+    def test_non_dict_principle_and_non_dict_id_are_skipped(self):
+        data = {"principles": [1, {"requirements": [{"text": "x"}]}]}
+        result = render_standards_grouped(data)
+        assert isinstance(result, str)
+
+    def test_non_list_principles_returns_str_without_raising(self):
+        result = render_standards_grouped({"principles": "x"})
+        assert isinstance(result, str)
+        assert result == ""
+
+    def test_compiled_json_list_falls_back_to_md(self, tmp_path):
+        """A compiled .json file whose top level is a list renders empty,
+        so load_standards_text falls back to the .md text."""
+        (tmp_path / "security.json").write_text(json.dumps([]))
+        (tmp_path / "security.md").write_text("# Security Standards\n- Validate inputs")
+        result = load_standards_text(tmp_path, "security")
+        assert "Security Standards" in result
+
+    def test_none_requirements_treated_as_empty(self):
+        data = {"principles": [{"name": "P", "requirements": None}]}
+        result = render_standards_grouped(data)
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert parsed[0]["requirements"] == []
+
+    def test_non_list_scalar_requirements_treated_as_empty(self):
+        data = {"principles": [{"name": "P", "requirements": "not-a-list"}]}
+        result = render_standards_grouped(data)
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert parsed[0]["requirements"] == []

@@ -37,6 +37,14 @@ class TestViolationLocation:
         v = {"req": "R", "file": "f.py", "line": 0}
         assert violation_location(v) == ("f.py", 0)
 
+    def test_none_file_value_does_not_raise(self):
+        v = {"req": "R", "file": None, "line": 5}
+        assert violation_location(v) == ("", 5)
+
+    def test_none_file_value_no_line_does_not_raise(self):
+        v = {"req": "R", "file": None}
+        assert violation_location(v) == ("", 0)
+
 
 class TestDeletedKeyForViolation:
     def test_camel_case_practice_id(self):
@@ -57,6 +65,10 @@ class TestDeletedKeyForViolation:
 
     def test_empty_dict(self):
         assert deleted_key_for_violation({}, "") == ("", "", "")
+
+    def test_none_file_value_does_not_raise(self):
+        v = {"practiceId": "Modularity", "file": None}
+        assert deleted_key_for_violation(v, "maintainability") == ("maintainability", "Modularity", "")
 
 
 class TestFilterDismissedFromResult:
