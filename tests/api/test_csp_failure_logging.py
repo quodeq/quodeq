@@ -25,12 +25,6 @@ def _boom(_host: str) -> str:
     raise RuntimeError("host parse exploded")
 
 
-def _reset_throttle(monkeypatch) -> None:
-    # Each test gets a fresh cooldown window regardless of module import
-    # order / earlier tests in the same process.
-    monkeypatch.setattr(security_module, "_last_csp_ws_failure_log_at", None)
-
-
 @pytest.fixture
 def security_caplog(caplog):
     """caplog, wired to actually see quodeq.api.security records.
@@ -60,7 +54,6 @@ def test_csp_header_logs_and_falls_back_on_same_origin_ws_failure(monkeypatch, s
     """
     caplog = security_caplog
     monkeypatch.setattr(security_module, "_same_origin_ws_sources", _boom)
-    _reset_throttle(monkeypatch)
 
     app = create_app()
     with app.test_client() as client:
@@ -89,7 +82,6 @@ def test_csp_header_failure_log_is_rate_limited_across_responses(monkeypatch, se
     """
     caplog = security_caplog
     monkeypatch.setattr(security_module, "_same_origin_ws_sources", _boom)
-    _reset_throttle(monkeypatch)
 
     app = create_app()
     with app.test_client() as client:
@@ -116,7 +108,6 @@ def test_csp_header_first_failure_logs_on_freshly_booted_machine(monkeypatch, se
 
     caplog = security_caplog
     monkeypatch.setattr(security_module, "_same_origin_ws_sources", _boom)
-    monkeypatch.setattr(security_module, "_last_csp_ws_failure_log_at", None)
     # Clock says the machine has been up for 5 s.
     monkeypatch.setattr(security_module, "time", types.SimpleNamespace(monotonic=lambda: 5.0))
 
@@ -136,7 +127,6 @@ def test_csp_header_logging_cannot_break_response_even_if_a_handler_raises(monke
     """A misbehaving handler must be contained by the handler contract
     (handleError), so the response still completes with the safe fallback."""
     monkeypatch.setattr(security_module, "_same_origin_ws_sources", _boom)
-    _reset_throttle(monkeypatch)
 
     class _ExplodingHandler(logging.Handler):
         def emit(self, record):

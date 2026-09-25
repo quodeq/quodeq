@@ -373,11 +373,7 @@ tests/api/test_cluster36_empty_except_logging.py:9:private-module:quodeq.api._ra
 tests/api/test_cluster38_narrowed_handlers.py:7:private-module:quodeq.api._log_buffer
 tests/api/test_cluster4_scores_error.py:24:private-module:quodeq.api._scores_routes.scores_mod
 tests/api/test_cluster6_rate_limit_dead_keys.py:21:private-module:quodeq.api._rate_limit_file_store.FileRateLimitStore
-tests/api/test_cluster6_score_offthread.py:16:private-module:quodeq.api._evaluation_routes.SCORED_JOBS_MAX
-tests/api/test_cluster6_score_offthread.py:16:private-module:quodeq.api._evaluation_routes.claim_scoring
-tests/api/test_cluster6_score_offthread.py:16:private-module:quodeq.api._evaluation_routes.scored_jobs
-tests/api/test_cluster6_score_offthread.py:16:private-module:quodeq.api._evaluation_routes.scored_jobs_lock
-tests/api/test_cluster6_score_offthread.py:23:private-module:quodeq.services._job_model.JobSnapshot
+tests/api/test_cluster6_score_offthread.py:18:private-module:quodeq.services._job_model.JobSnapshot
 tests/api/test_codeql_triage_guards.py:126:private-name:quodeq.analysis.manifest_build._walk_and_group
 tests/api/test_codeql_triage_guards.py:145:private-name:quodeq.analysis.manifest_build._walk_and_group
 tests/api/test_codeql_triage_guards.py:164:private-name:quodeq.analysis.manifest_build._walk_and_group
@@ -866,8 +862,6 @@ tests/services/test_cache.py:10:private-name:quodeq.services.cache._cache_store
 tests/services/test_cache.py:10:private-name:quodeq.services.cache._fetch_and_store
 tests/services/test_cache.py:10:private-name:quodeq.services.cache._fetch_dimensions_from_disk
 tests/services/test_cache.py:10:private-name:quodeq.services.cache._wait_for_inflight
-tests/services/test_cancel_discard_purge_scoring.py:89:private-module:quodeq.api._evaluation_routes.scored_jobs
-tests/services/test_cancel_discard_purge_scoring.py:89:private-module:quodeq.api._evaluation_routes.scored_jobs_lock
 tests/services/test_cancel_discard_purge_state.py:18:private-module:quodeq.services._external_jobs.ProcessControl
 tests/services/test_cancel_evaluation_orphan.py:18:private-module:quodeq.services._external_jobs.ProcessControl
 tests/services/test_carried_forward_read_paths.py:10:private-module:quodeq.data.fs.report_parser._report_parsing.build_finding
