@@ -192,9 +192,12 @@ def _dispatch_incremental_dim(
     both the incremental attempt and any fallback failed), ``last_exc`` is
     the most recent exception encountered (or None on success), used to
     pick the dim-state ``INCOMPLETE`` reason. An exception class neither the
-    incremental attempt nor the fallback recognizes is caught here (the
-    loop-iteration boundary) and logged with its traceback, instead of
-    propagating up silently -- subsequent dims still run.
+    incremental attempt nor the fallback recognizes is caught here and
+    logged with its traceback, degrading to ``(None, exc)`` instead of
+    propagating -- this is a boundary around the dispatch/fallback pair
+    specifically, nested inside the whole-step loop-iteration boundary
+    ``run_incremental_loop`` wraps around ``run_one_incremental_dim``
+    (dispatch, fallback *and* finalize).
     """
     return run_isolated(
         lambda: _attempt_incremental_dim(config, dimension, idx, ctx, deps),
@@ -206,17 +209,24 @@ def _dispatch_incremental_dim(
 
 def run_one_incremental_dim(
     config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, run: LoopRun,
-) -> bool:
-    """Run one incremental-loop iteration for *dimension*.
+) -> None:
+    """Run one incremental dimension: RUNNING -> dispatch (+ fallback) ->
+    finalize-or-incomplete.
 
-    Returns True if the loop should stop before this dimension ran (deadline
-    or cancellation reached), in which case the caller must break the loop
-    without counting the iteration as completed.
+    A known-bad exception from the incremental attempt or its full-scan
+    fallback is handled inside ``_dispatch_incremental_dim`` (its own
+    narrowed loop-iteration-shaped boundary, unchanged): both attempts
+    failing is a clean ``(None, exc)``, not a raise. Anything else --
+    escaping that pair, or from ``finalize_dim_result``'s
+    ``on_dimension_done`` callback -- propagates out of this function
+    uncaught: ``run_incremental_loop`` isolates the whole step (dispatch,
+    fallback *and* finalize) at the loop-iteration boundary, so one
+    dimension's bug cannot abort the rest of the run.
+
+    The caller (``run_incremental_loop``) has already logged the "entering
+    iteration" line and checked ``loop_should_stop`` before calling this.
     """
     log = run.deps.log
-    log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
-    if loop_should_stop(config, dimension, log):
-        return True
     run_dir = run_dir_for(config)
     safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=log)
     emit_marker(CC_PHASE_ANALYZING, dimension=dimension)
@@ -233,4 +243,3 @@ def run_one_incremental_dim(
             DimTransition(DimState.INCOMPLETE, reason=interruption_reason(last_exc)), log=log,
         )
     log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev={'set' if ev else 'None'})")
-    return False

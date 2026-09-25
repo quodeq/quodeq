@@ -70,6 +70,13 @@ def run_incremental_loop(
     scoring (``on_dimension_done``) runs inside the loop and so sees its
     dimension's slice; the run-level deadline is restored afterwards so the
     post-loop guards see the run budget, not the last dimension's slice.
+
+    ``run_one_incremental_dim`` (dispatch, fallback *and* finalize) is
+    isolated as one loop-iteration boundary: a bug outside
+    ``_dispatch_incremental_dim``'s own narrowed dispatch/fallback boundary
+    or ``finalize_dim_result``'s narrowed callback boundary -- most notably
+    an unrecognized exception from the ``on_dimension_done`` callback --
+    marks the dimension skipped instead of aborting the rest of the run.
     """
     log = deps.log
     result: dict[str, Evidence] = {}
@@ -80,8 +87,10 @@ def run_incremental_loop(
     try:
         for idx, dimension in enumerate(dimensions, 1):
             apply_dim_deadline(config, dimensions[idx - 1:], run_deadline, dim_counts)
-            if run_one_incremental_dim(config, dimension, idx, ctx, run):
+            log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
+            if loop_should_stop(config, dimension, log):
                 break
+            _run_incremental_dim_isolated(config, dimension, idx, ctx, run, log)
     # This restore would also discard a ratchet from
     # ``_pool_launcher._extend_run_deadline``, which only fires when
     # time_limit is None -- mutually exclusive with slicing, since a None
@@ -109,6 +118,23 @@ def _skip_dim(
         DimTransition(DimState.INCOMPLETE, reason=interruption_reason(exc)), log=log,
     )
     log.info(f"[loop] completed iteration {step} for {dimension} (skipped: {reason})")
+
+
+def _run_incremental_dim_isolated(
+    config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, run: LoopRun, log: LogSink,
+) -> None:
+    """Isolate one incremental dimension's whole step (dispatch, fallback
+    *and* finalize) at the loop-iteration boundary: a bug in
+    ``on_dimension_done`` marks the dimension skipped instead of aborting
+    the rest of the run."""
+    run_isolated(
+        lambda: run_one_incremental_dim(config, dimension, idx, ctx, run),
+        label=f"[{idx}/{ctx.total}] {dimension} incremental step",
+        log=log,
+        on_error=lambda exc: _skip_dim(
+            run_dir_for(config), dimension, f"{idx}/{ctx.total}", log, "unexpected", exc,
+        ),
+    )
 
 
 def _attempt_per_dim(
