@@ -114,3 +114,34 @@ def test_a_database_error_inside_the_block_forces_a_full_init_next_time(db_path,
             conn.execute("SELECT * FROM no_such_table")
     _touch()
     assert len(init_calls) == 2
+
+
+def test_a_locked_score_cache_is_not_deleted(db_path, monkeypatch) -> None:
+    """Lock contention on the very first schema init must raise, not be
+    treated as corruption.
+
+    The db is pre-set to WAL journal mode before the lock is taken, so the
+    busy-timeout PRAGMA (set right after journal_mode inside _init) is
+    already active by the time the CREATE TABLE write blocks -- otherwise
+    the journal_mode statement itself would block first and ride
+    sqlite3.connect's default 5s busy handler instead of the monkeypatched
+    one, making the test slow. _purge_run_keys_on_epoch_change swallows
+    sqlite3.Error internally (a separate, out-of-scope broad catch), so a
+    lock hit there would never reach this test; blocking on the schema's
+    own CREATE TABLE avoids that path entirely.
+    """
+    monkeypatch.setattr(score_cache_db, "_BUSY_TIMEOUT_MS", 50)
+    pre = sqlite3.connect(db_path)
+    pre.execute("PRAGMA journal_mode = WAL")
+    pre.close()
+    score_cache_db._forget(db_path)
+    holder = sqlite3.connect(db_path, isolation_level=None)
+    holder.execute("BEGIN EXCLUSIVE")
+    try:
+        with pytest.raises(sqlite3.OperationalError):
+            with open_score_cache():
+                pass
+        assert db_path.exists()
+    finally:
+        holder.execute("ROLLBACK")
+        holder.close()

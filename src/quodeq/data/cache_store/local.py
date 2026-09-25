@@ -114,8 +114,14 @@ class LocalFileBackend:
             text = path.read_text(encoding="utf-8")
         except FileNotFoundError:
             return None
-        except OSError as exc:
+        except (OSError, UnicodeDecodeError) as exc:
+            # Unreadable or non-UTF-8 -- treat as miss and remove so the next put can heal.
             _logger.warning("cache read failed for %s: %s", key, exc)
+            try:
+                path.unlink(missing_ok=True)
+                self._mark_mutated()
+            except OSError as exc:
+                _logger.debug("unreadable local cache entry not removed: %s", exc)
             return None
         try:
             return CacheEntry.from_json(text)
