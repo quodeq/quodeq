@@ -1,8 +1,8 @@
 """Session lifecycle routes for the embedded assistant: create + catalog.
 
-The provider lookup and the shared-clone gate are injected by the registrar (``SessionGates``): they live
-in ``assistant_routes`` so tests patching
-"quodeq.api.assistant_routes.get_provider_configs"/"read_settings"/
+The provider lookup and the shared-clone gate are injected by the
+registrar (``SessionGates``): they live in ``assistant_routes`` so tests
+patching "quodeq.api.assistant_routes.get_provider_configs"/"read_settings"/
 "read_state" keep working, and this module never imports that facade.
 """
 from __future__ import annotations

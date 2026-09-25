@@ -1,10 +1,11 @@
 """Pull-a-shared-project-locally route.
 
-This is a deliberate, spec-approved exception to the read-only invariant documented in routes_shared.py's module
-docstring: it mutates LOCAL state (the local reports directory, via
-import_zip_stream), not the shared repository clone itself. The clone is
-only read from to build the in-memory zip. It is therefore intentionally
-included in the allowed-mutations set of the read-only sweep test
+This is a deliberate, spec-approved exception to the read-only invariant
+documented in routes_shared.py's module docstring: it mutates LOCAL state
+(the local reports directory, via import_zip_stream), not the shared
+repository clone itself. The clone is only read from to build the
+in-memory zip. It is therefore intentionally included in the
+allowed-mutations set of the read-only sweep test
 (tests/api/test_routes_shared_read.py::test_no_mutating_routes_under_shared).
 """
 from __future__ import annotations

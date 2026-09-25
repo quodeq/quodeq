@@ -49,8 +49,8 @@ def _rescored(
     """*dim* carrying the filtered violations, the new principle grades, the
     overall score and grade from *overall*, and recounted totals.
 
-    Shared by the evidence path and the legacy fallback: the two differ only
-    in how they arrive at *principle_grades* and *overall*.
+    Takes *principle_grades* and *overall* as already-computed inputs, so
+    any caller can rescore *dim* regardless of how those were derived.
     """
     return replace(
         dim,

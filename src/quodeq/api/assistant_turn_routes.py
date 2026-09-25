@@ -1,11 +1,12 @@
 """Turn lifecycle routes for the embedded assistant: post message, stop, SSE
 event stream.
 
-The provider lookup, the endpoint resolver, the shared-clone gate and the turn/tool-context entry points are
-injected by the registrar (``TurnGates``): they live in ``assistant_routes``
-so tests patching "quodeq.api.assistant_routes.get_provider_configs" /
-"...run_turn" / "...build_tool_context" keep working, and this module never
-imports that facade.
+The provider lookup, the endpoint resolver, the shared-clone gate and the
+turn/tool-context entry points are injected by the registrar
+(``TurnGates``): they live in ``assistant_routes`` so tests patching
+"quodeq.api.assistant_routes.get_provider_configs" / "...run_turn" /
+"...build_tool_context" keep working, and this module never imports that
+facade.
 """
 from __future__ import annotations
 

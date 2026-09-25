@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from quodeq import __version__
 from quodeq.shared.clock import utc_now_iso
+from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.update import channel as _channel
 from quodeq.update import selfupdate as _selfupdate
@@ -20,10 +21,7 @@ _DEFAULT_INTERVAL = 86400
 
 
 def _interval(env: dict[str, str]) -> int:
-    try:
-        return int(env.get("QUODEQ_UPDATE_CHECK_INTERVAL", _DEFAULT_INTERVAL))
-    except ValueError:
-        return _DEFAULT_INTERVAL
+    return env_int("QUODEQ_UPDATE_CHECK_INTERVAL", _DEFAULT_INTERVAL, env=env, warn=False)
 
 
 def should_check(state: UpdateState, env: dict[str, str] | None = None) -> bool:

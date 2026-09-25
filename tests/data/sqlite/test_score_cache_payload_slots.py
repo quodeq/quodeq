@@ -1,4 +1,6 @@
-"""The two single-slot payload caches: shared read/write, each with its own logging."""
+"""The accumulated and project-summary caches each keep one version per
+project and never share rows; only the accumulated slot logs a warning on
+an unserializable payload."""
 from __future__ import annotations
 
 import logging

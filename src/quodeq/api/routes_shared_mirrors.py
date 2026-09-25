@@ -1,18 +1,18 @@
 """Read-only mirrors of the project read endpoints, scoped to the shared clone.
 
-Each route below delegates to the SAME service function its local counterpart uses (see
-api/routes_project_list.py, routes_project_data.py, _scores_routes.py,
-routes_runs.py, routes_findings.py), with the shared clone's evaluations
-root standing in for the local reports directory. The response shape is
-therefore identical to the local route's; only the data source differs.
+Each route below delegates to the SAME service function its local
+counterpart uses (see api/routes_project_list.py, routes_project_data.py,
+_scores_routes.py, routes_runs.py, routes_findings.py), with the shared
+clone's evaluations root standing in for the local reports directory. The
+response shape is therefore identical to the local route's; only the data
+source differs.
 
 Read-only invariant: no finding-mutation routes exist in this module or
 anywhere under /api/shared/*, per routes_shared.py's module docstring.
 
 ``refresh_shared_clone`` and ``sync_shared_index`` are imported directly
-from their real owner (rather than looked up on the ``routes_shared``
-facade, which no longer re-exports them), so this module never imports back
-a sibling that imports it. Tests patch
+from their real owner, never through the ``routes_shared`` facade, so this
+module never imports back a sibling that imports it. Tests patch
 "quodeq.api.routes_shared_mirrors.refresh_shared_clone" /
 "...sync_shared_index".
 """

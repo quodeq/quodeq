@@ -124,11 +124,12 @@ _ALT_PORT_ORIGINS = alt_port_origins()
 # Cooldown between consecutive "CSP same-origin ws computation failed" log
 # lines. This except block sits in after_request, so it runs on every
 # response; if the computation starts failing under some sustained condition
-# we still want the FIRST occurrence surfaced immediately, but must not turn a per-request code path into a per-request log
-# line -- that would make the failure itself a new source of log-volume
-# noise. Module-level, best-effort (no lock): a rare double-log right at the
-# window boundary under concurrent requests is harmless: it's a diagnostic
-# throttle, not a correctness guarantee.
+# we still want the FIRST occurrence surfaced immediately, but must not turn a
+# per-request code path into a per-request log line -- that would make the
+# failure itself a new source of log-volume noise. Module-level, best-effort
+# (no lock): a rare double-log right at the window boundary under concurrent
+# requests is harmless: it's a diagnostic throttle, not a correctness
+# guarantee.
 _CSP_WS_FAILURE_LOG_INTERVAL_S = 60.0
 # None, not 0.0: time.monotonic() is seconds-since-boot, so a 0.0 sentinel
 # would silently drop the first failure on any machine up for less than the

@@ -2,8 +2,8 @@
 
 Each provider only differs in where its server log lives, what help text the
 404 carries, how its log is tailed (which lines the console shows), and
-whether the UI asks up front if a log exists. ``ProviderLog`` carries those differences; the routes are
-the same for every provider:
+whether the UI asks up front if a log exists. ``ProviderLog`` carries
+those differences; the routes are the same for every provider:
 
 - ``GET /api/<name>/logs/stream``: SSE tail of the log, resumable through
   ``Last-Event-ID`` (a byte offset), or 404 when there is no log file.

@@ -1,8 +1,6 @@
-"""The shared standards guards keep each call site's own wording.
-
-Update, delete and forced import all refuse a managed standard through one
-guard that names the refused action; create and duplicate both refuse a
-taken id through one guard.
+"""Update, delete and forced import each refuse to touch a managed
+standard, with an error naming the refused action; create and duplicate
+each refuse a standard id that is already taken.
 """
 from __future__ import annotations
 

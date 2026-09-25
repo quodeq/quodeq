@@ -68,9 +68,8 @@ def read_status(run_dir: Path, *, log: LogSink = NULL_LOG) -> tuple[dict[str, An
     started yet, not an error), exactly one WARNING -- logged here, with
     the real exception text -- on a read/parse failure, no log at all when
     the JSON parses but isn't a dict (also not an error, just not a status
-    payload). Schema version is not validated, matching the pre-move
-    reader; a newer schema than this code understands is served as-is
-    rather than downgraded to pending.
+    payload). Schema version is not validated; a newer schema than this
+    code understands is served as-is rather than downgraded to pending.
     """
     path = run_dir / wiring.STATUS_FILENAME
     try:
@@ -119,9 +118,8 @@ def read_dim_eval(
         return None
     if data is None:
         # wiring.read_eval_report returns None (no exception) for a missing
-        # file, but the pre-move inline reader read the file directly and
-        # logged the OSError text it got from that -- reproduce that exact
-        # text here so the message stays byte-identical across the move.
+        # file. Build the OSError a direct read would raise, so the warning
+        # below logs the same text a direct read would.
         missing = FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT))
         missing.filename = str(path)
         log.warning(f"dimension eval read failed at {path}: {missing}")

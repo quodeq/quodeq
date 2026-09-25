@@ -10,7 +10,7 @@ from quodeq.data.projection.grade_projector import recompute_grades
 from quodeq.data.sqlite.state_store import SQLiteStateStore
 
 
-def _seed_security_findings(store: SQLiteStateStore, run_dir: Path) -> None:
+def seed_security_findings(store: SQLiteStateStore, run_dir: Path) -> None:
     """Record 6 security violations and 8 compliance findings under practice p1,
     then bake default-params grades.
 

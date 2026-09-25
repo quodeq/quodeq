@@ -25,7 +25,7 @@ from quodeq.services import grade_formula
 from quodeq.services.dashboard import clear_shared_dimension_cache
 from quodeq.services.scoring import get_project_scores
 
-from tests.services.conftest import _seed_security_findings
+from tests.services.conftest import seed_security_findings
 
 # A formula whose severity weights differ sharply from the default so the
 # baked-with-custom-params grade is provably different from the default one.
@@ -67,7 +67,7 @@ def _build_event_log_run(
     (run_dir / "events.jsonl").write_text("")  # event-log marker
 
     store = SQLiteStateStore(run_dir)
-    _seed_security_findings(store, run_dir)
+    seed_security_findings(store, run_dir)
 
     # An eval JSON per dimension, carrying the default-params (stale) grade so
     # read_run_data has a dimension to overlay onto.

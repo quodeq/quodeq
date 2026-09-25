@@ -1,8 +1,8 @@
 """Cross-platform 'kill the whole process tree' helper (shared, cross-cutting).
 
-Hoisted out of assistant/adapters/cli.py so the terminal layer can reuse it
-without a cross-layer import. See tests/test_no_unguarded_posix.py: the POSIX
-os.killpg call is allowlisted for this path.
+Used by services/, terminal/, and assistant/ so each layer can terminate
+process trees without a cross-layer import. See tests/test_no_unguarded_posix.py:
+the POSIX os.killpg call is allowlisted for this path.
 """
 from __future__ import annotations
 

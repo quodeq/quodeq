@@ -24,9 +24,8 @@ class AssistantTurnState:
 
     One instance per Flask app (``app.extensions["assistant_turns"]``,
     created in ``create_app``) so two apps in one process — or two tests —
-    never share turn slots. Lock granularity matches the former module
-    globals: one lock guards the turn/token registry, another the SSE
-    stream counter.
+    never share turn slots. Two locks at separate granularities: one
+    guards the turn/token registry, another the SSE stream counter.
     """
 
     def __init__(self, max_sse_streams: int = _MAX_SSE_STREAMS) -> None:

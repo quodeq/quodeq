@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from quodeq.services._fs_metadata import read_accumulated_summary
 
-from tests.services.conftest import _seed_security_findings
+from tests.services.conftest import seed_security_findings
 
 
 class TestReadAccumulatedSummary:
@@ -190,7 +190,7 @@ class TestReadAccumulatedSummary:
         (run_dir / "events.jsonl").write_text("")
 
         store = SQLiteStateStore(run_dir)
-        _seed_security_findings(store, run_dir)
+        seed_security_findings(store, run_dir)
 
         baked = {r["dimension"]: r for r in store.read_dimension_scores()}["security"]
         eval_dir = run_dir / "evaluation"

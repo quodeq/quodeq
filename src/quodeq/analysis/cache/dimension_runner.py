@@ -16,7 +16,7 @@ cached, when migrating a long-lived V1 install to V2; this is cleaned up by
 removing V1's carry-forward once the V1 path is deleted.
 
 Cache-replay lives in ``_replay.py``; the persist-watcher body, its persist
-callable and the hoisted provenance-hash computation live in
+callable and the provenance-hash computation live in
 ``_persist_watcher.py``; the pre-dispatch setup (cache backend, trust model,
 file listing, classification) lives in ``_dimension_context.py``.
 ``threading.Thread``/``threading.Event()`` stay in helpers defined here,

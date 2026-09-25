@@ -1,8 +1,9 @@
 """Source-file gathering and compiled-standards text for the API prompt.
 
-Repository scanning that selects which source files get inlined into a direct-API prompt, and rendering compiled standards
-JSON into the compact grouped-JSON text sent to API models. None of these
-functions are mock.patch targets.
+Repository scanning that selects which source files get inlined into a
+direct-API prompt, and rendering compiled standards JSON into the compact
+grouped-JSON text sent to API models. None of these functions are
+mock.patch targets.
 """
 from __future__ import annotations
 

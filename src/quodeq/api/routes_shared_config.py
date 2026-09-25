@@ -1,10 +1,9 @@
 """Config/status/lifecycle routes for the shared results repository.
 
 Status, config PUT/DELETE, refresh, and the local project-publish route.
-``refresh_shared_clone`` and
-``start_publish`` are imported directly from their real owners (rather than
-looked up on the ``routes_shared`` facade, which no longer re-exports them),
-so this module never imports back a sibling that imports it. Tests patch
+``refresh_shared_clone`` and ``start_publish`` are imported directly from
+their real owner, never through the ``routes_shared`` facade, so this
+module never imports back a sibling that imports it. Tests patch
 "quodeq.api.routes_shared_config.refresh_shared_clone" /
 "...start_publish".
 """
