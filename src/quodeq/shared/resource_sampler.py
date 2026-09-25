@@ -21,6 +21,8 @@ import os
 import subprocess
 import threading
 import time
+from dataclasses import dataclass
+from typing import Callable
 
 from quodeq.shared.logging import log_info
 
@@ -32,15 +34,29 @@ _KB_PER_MB = 1024
 _UNKNOWN = -1
 
 
-def _self_rss_mb() -> int:
+@dataclass(frozen=True)
+class ResourceProbes:
+    """Process probes ResourceSampler drives. None = production default.
+
+    ``run`` backs the ``ps``/``pgrep`` subprocess calls; ``read_proc`` backs
+    the ``/proc``-or-``/dev/fd`` directory listing ``_fd_count`` uses to
+    count open file descriptors.
+    """
+
+    run: Callable[..., subprocess.CompletedProcess] | None = None
+    read_proc: Callable[[str], list[str]] | None = None
+
+
+def _self_rss_mb(probes: ResourceProbes) -> int:
     """Resident set size of the current process in MB. Returns -1 on failure."""
-    return _ps_rss_mb(os.getpid())
+    return _ps_rss_mb(os.getpid(), probes)
 
 
-def _ollama_rss_mb() -> int:
+def _ollama_rss_mb(probes: ResourceProbes) -> int:
     """RSS of the first ``ollama`` process (if any) in MB. 0 if not running."""
+    run = probes.run if probes.run is not None else subprocess.run
     try:
-        out = subprocess.run(
+        out = run(
             ["pgrep", "-x", "ollama"], capture_output=True, text=True, encoding="utf-8",
             timeout=_PS_TIMEOUT_S, check=False,
         )
@@ -51,12 +67,13 @@ def _ollama_rss_mb() -> int:
     pids = [p for p in out.stdout.split() if p.isdigit()]
     if not pids:
         return 0
-    return _ps_rss_mb(int(pids[0]))
+    return _ps_rss_mb(int(pids[0]), probes)
 
 
-def _ps_rss_mb(pid: int) -> int:
+def _ps_rss_mb(pid: int, probes: ResourceProbes) -> int:
+    run = probes.run if probes.run is not None else subprocess.run
     try:
-        out = subprocess.run(
+        out = run(
             ["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True, encoding="utf-8",
             timeout=_PS_TIMEOUT_S, check=False,
         )
@@ -68,11 +85,12 @@ def _ps_rss_mb(pid: int) -> int:
     return int(raw) // _KB_PER_MB
 
 
-def _fd_count() -> int:
+def _fd_count(probes: ResourceProbes) -> int:
     """Open file descriptor count for this process. Returns -1 on failure."""
+    read_proc = probes.read_proc if probes.read_proc is not None else os.listdir
     for path in (f"/proc/{os.getpid()}/fd", "/dev/fd"):
         try:
-            return len(os.listdir(path))
+            return len(read_proc(path))
         except OSError:
             continue
     return _UNKNOWN
@@ -94,8 +112,11 @@ class ResourceSampler:
     raised, and the next tick tries again.
     """
 
-    def __init__(self, *, interval_s: float = _DEFAULT_INTERVAL_S) -> None:
+    def __init__(
+        self, *, interval_s: float = _DEFAULT_INTERVAL_S, probes: ResourceProbes | None = None,
+    ) -> None:
         self._interval = interval_s
+        self._probes = probes if probes is not None else ResourceProbes()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._started_at: float | None = None
@@ -133,10 +154,10 @@ class ResourceSampler:
         elapsed = time.monotonic() - (self._started_at or time.monotonic())
         return _format(
             elapsed,
-            _self_rss_mb(),
+            _self_rss_mb(self._probes),
             threading.active_count(),
-            _fd_count(),
-            _ollama_rss_mb(),
+            _fd_count(self._probes),
+            _ollama_rss_mb(self._probes),
         )
 
     def _loop(self) -> None:

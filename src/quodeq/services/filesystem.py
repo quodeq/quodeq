@@ -31,6 +31,7 @@ from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._post_run_hook import PostRunHook
 from quodeq.services._projects_cache import ProjectsCache
 from quodeq.services.base import ActionProvider, CreateProjectResult, EvaluationOptions, NewProjectSpec
+from quodeq.services._evaluation_dispatch import SubprocessDispatcher
 from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.jobs import JobManager
 from quodeq.services.project_registration import register_project_with_rollback
@@ -110,6 +111,7 @@ class FilesystemActionProvider(ActionProvider):
             jobs=self._jobs,
             get_status_fn=lambda job_id, reports_dir=None:
                 self._evaluations.get_status(job_id, reports_dir=reports_dir),
+            dispatcher=SubprocessDispatcher(self._jobs),
         )
         self._tooling = _default_tooling()
 

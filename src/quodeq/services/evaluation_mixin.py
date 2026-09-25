@@ -59,10 +59,11 @@ class FsEvaluationMixin:
         self,
         jobs: "JobManager | None" = None,
         get_status_fn: Callable | None = None,
+        dispatcher: EvaluationDispatcher | None = None,
     ) -> None:
         if jobs is not None:
             self._jobs = jobs
-        self._dispatcher = None
+        self._dispatcher = dispatcher
         self._get_status_fn = get_status_fn
 
     @property

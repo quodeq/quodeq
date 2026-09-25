@@ -138,7 +138,7 @@ src/quodeq/services/shared_publish.py:221:broad-except
 src/quodeq/services/warmup.py:168:broad-except
 src/quodeq/services/warmup.py:174:broad-except
 src/quodeq/services/warmup.py:99:broad-except
-src/quodeq/shared/resource_sampler.py:146:broad-except
+src/quodeq/shared/resource_sampler.py:167:broad-except
 src/quodeq/terminal/_pty_windows.py:75:broad-except
 src/quodeq/update/checker.py:84:broad-except
 src/quodeq/update/checker.py:87:broad-except
