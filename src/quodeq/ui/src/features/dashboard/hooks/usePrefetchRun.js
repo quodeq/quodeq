@@ -20,6 +20,7 @@ import { useApi } from "../../../api/ApiContext.jsx";
 import { projectKeys } from "../../../api/queryKeys.js";
 import { STALE_TIME_MS } from "../../../hooks/queryDefaults.js";
 import { PROJECT_SOURCE } from "../../../vocab/projectSource.js";
+import { LATEST_RUN_ID } from "../../../constants.js";
 
 export const PREFETCH_DWELL_MS = 150;
 
@@ -55,7 +56,7 @@ export function usePrefetchRun(selectedProject, selectedSource = PROJECT_SOURCE.
         // Historical runs are immutable (see useDashboard), so a cached entry
         // is good until a mutation invalidates it — and prefetchQuery refetches
         // invalidated entries regardless of staleTime.
-        const staleTime = runId !== "latest" ? Infinity : STALE_TIME_MS;
+        const staleTime = runId !== LATEST_RUN_ID ? Infinity : STALE_TIME_MS;
         // Dashboard payload (the main render).
         queryClient.prefetchQuery({
           queryKey: projectKeys.dashboard(selectedProject, runId, selectedSource),
@@ -63,7 +64,7 @@ export function usePrefetchRun(selectedProject, selectedSource = PROJECT_SOURCE.
           staleTime,
         });
         // Scores payload (drives accumulated + trend).
-        const asOf = runId !== "latest" ? runId : null;
+        const asOf = runId !== LATEST_RUN_ID ? runId : null;
         queryClient.prefetchQuery({
           queryKey: projectKeys.scores(selectedProject, asOf, selectedSource),
           queryFn: () => fetchScores(selectedProject, asOf),

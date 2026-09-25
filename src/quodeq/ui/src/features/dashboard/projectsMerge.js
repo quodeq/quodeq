@@ -5,6 +5,7 @@
  * separate on purpose (forks, same-named repos).
  */
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
+import { PROJECT_ACTION } from './dashboardVocab.js';
 
 const GIT_SUFFIX_LENGTH = 4; // ".git"
 
@@ -131,7 +132,7 @@ function compareDoneRuns(local, shared) {
   if (sharedId == null) return undefined;
   // No done local run to publish -- nothing new to offer, already in sync.
   if (localId == null) return null;
-  return localId !== sharedId ? 'update' : null;
+  return localId !== sharedId ? PROJECT_ACTION.UPDATE : null;
 }
 
 /** Action for an entry present on both sides. */
@@ -143,13 +144,13 @@ function bothSidesAction(local, shared) {
   // strictly "zero runs" -- a run can exist on disk and still not count.
   const lastEval = toMs(local?.latestDate);
   const publishedAt = toMs(shared?.publishedAt);
-  if (lastEval != null && (publishedAt == null || lastEval > publishedAt)) return 'update';
+  if (lastEval != null && (publishedAt == null || lastEval > publishedAt)) return PROJECT_ACTION.UPDATE;
   return null;
 }
 
 export function deriveAction(entry, { configured }) {
   const { local, shared } = entry;
-  if (local && !shared) return configured ? 'publish' : null;
-  if (!local && shared) return 'pull';
+  if (local && !shared) return configured ? PROJECT_ACTION.PUBLISH : null;
+  if (!local && shared) return PROJECT_ACTION.PULL;
   return bothSidesAction(local, shared);
 }

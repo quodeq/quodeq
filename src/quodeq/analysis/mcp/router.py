@@ -11,7 +11,9 @@ import sys
 from pathlib import Path
 from typing import Callable, Protocol, runtime_checkable
 
-if sys.platform != "win32":
+from quodeq.shared.constants import PLATFORM_WIN32
+
+if sys.platform != PLATFORM_WIN32:
     import fcntl
 
 from quodeq.analysis.mcp.enricher import (
@@ -19,7 +21,7 @@ from quodeq.analysis.mcp.enricher import (
     FileReader,
     FindingEnricher,
 )
-from quodeq.analysis.mcp.schemas import FileDoneStatus
+from quodeq.analysis.mcp.schemas import JSONL_MARKER_FILE_DONE, FileDoneStatus
 from quodeq.shared.log_sink import SHARED_LOG
 from typing import TYPE_CHECKING, TextIO
 
@@ -52,7 +54,7 @@ def _locked_write(fh: TextIO, line: str) -> None:
     write when the file handle doesn't support ``fileno()`` (e.g. StringIO
     in tests) or on Windows.
     """
-    use_lock = sys.platform != "win32"
+    use_lock = sys.platform != PLATFORM_WIN32
     if use_lock:
         try:
             fcntl.flock(fh, fcntl.LOCK_EX)
@@ -190,7 +192,7 @@ class FindingsRouter:
             raise ValueError(
                 f"mark_file_done: status must be one of {names}, got {status!r}"
             )
-        payload: dict = {"_marker": "file_done", "file": file, "status": status}
+        payload: dict = {"_marker": JSONL_MARKER_FILE_DONE, "file": file, "status": status}
         if reason is not None:
             payload["reason"] = reason
         line = json.dumps(payload) + "\n"

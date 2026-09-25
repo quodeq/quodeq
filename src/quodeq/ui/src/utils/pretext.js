@@ -201,6 +201,10 @@ export function fitMiddleTruncate(text, font, maxWidth, ellipsis = '\u2026') {
 
 const DEFAULT_FONT_SIZE = '13px';
 const DEFAULT_FONT_FAMILY = '"JetBrains Mono", ui-monospace, monospace';
+// CSS computed-style defaults: skip a weight/style segment when it's already
+// the browser's default, instead of always emitting "400 normal".
+const DEFAULT_FONT_WEIGHT = '400';
+const DEFAULT_FONT_STYLE = 'normal';
 
 /**
  * Build a CSS-font-shorthand string that matches what the browser will use.
@@ -216,7 +220,7 @@ export function cssFontFromElement(el) {
   const cs = window.getComputedStyle(el);
   const size = cs.fontSize || DEFAULT_FONT_SIZE;
   const family = cs.fontFamily || DEFAULT_FONT_FAMILY;
-  const weight = cs.fontWeight && cs.fontWeight !== '400' ? `${cs.fontWeight} ` : '';
-  const style = cs.fontStyle && cs.fontStyle !== 'normal' ? `${cs.fontStyle} ` : '';
+  const weight = cs.fontWeight && cs.fontWeight !== DEFAULT_FONT_WEIGHT ? `${cs.fontWeight} ` : '';
+  const style = cs.fontStyle && cs.fontStyle !== DEFAULT_FONT_STYLE ? `${cs.fontStyle} ` : '';
   return `${style}${weight}${size} ${family}`.trim();
 }

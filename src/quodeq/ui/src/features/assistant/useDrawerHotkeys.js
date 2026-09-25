@@ -5,6 +5,8 @@
  * source.
  */
 import { useEffect } from 'react';
+import { KEY_CODE } from '../../vocab/keyboard.js';
+import { DRAWER_PANEL } from './drawerPanelsModel.js';
 
 /**
  * Pure decision: which panel (if any) a keydown event should toggle. Does
@@ -14,12 +16,12 @@ import { useEffect } from 'react';
  * the hook below, right where the combo is recognised.
  */
 export function resolveHotkeyTarget(event, { assistantEnabled, terminalEnabled }) {
-  if (event.code !== 'Backquote' || !(event.ctrlKey || event.metaKey)) return null;
+  if (event.code !== KEY_CODE.BACKQUOTE || !(event.ctrlKey || event.metaKey)) return null;
   if (event.shiftKey) {
-    return terminalEnabled ? 'terminal' : null;
+    return terminalEnabled ? DRAWER_PANEL.TERMINAL : null;
   }
-  if (assistantEnabled) return 'assistant';
-  if (terminalEnabled) return 'terminal';
+  if (assistantEnabled) return DRAWER_PANEL.ASSISTANT;
+  if (terminalEnabled) return DRAWER_PANEL.TERMINAL;
   return null;
 }
 
@@ -27,7 +29,7 @@ export function useDrawerHotkeys({ assistantEnabled, terminalEnabled, toggleTopb
   useEffect(() => {
     if (!assistantEnabled && !terminalEnabled) return undefined;
     const handleKeyDown = (e) => {
-      if (e.code !== 'Backquote' || !(e.ctrlKey || e.metaKey)) return;
+      if (e.code !== KEY_CODE.BACKQUOTE || !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       const target = resolveHotkeyTarget(e, { assistantEnabled, terminalEnabled });
       if (target) toggleTopbar(target);

@@ -159,8 +159,14 @@ def load_standards_text(
     return ""
 
 
-def render_standards_grouped(data: dict, overrides: dict | None = None) -> str:
+def render_standards_grouped(data: object, overrides: dict | None = None) -> str:
     """Render standards as a compact JSON array grouped by principle.
+
+    *data* is the parsed compiled-standards JSON, which comes from a file on
+    disk and is not guaranteed to have the expected shape; anything other
+    than a dict with a list ``principles`` renders as an empty string, and
+    malformed principles or requirements within it are skipped rather than
+    raising.
 
     The explicit structure helps local models give attention to ALL principle
     groups instead of fixating on the first ones in a flat list.
@@ -172,16 +178,28 @@ def render_standards_grouped(data: dict, overrides: dict | None = None) -> str:
     """
     from quodeq.core.standards.overrides import resolve_requirement_text  # noqa: PLC0415
 
-    principles = data.get("principles", [])
-    if not principles:
+    if not isinstance(data, dict):
+        return ""
+    principles = data.get("principles")
+    if not isinstance(principles, list) or not principles:
         return ""
     checklist = []
     for p in principles:
+        if not isinstance(p, dict):
+            continue
+        requirements = []
+        raw_requirements = p.get("requirements")
+        if not isinstance(raw_requirements, list):
+            raw_requirements = []
+        for r in raw_requirements:
+            if not isinstance(r, dict) or not isinstance(r.get("id"), str):
+                continue
+            requirements.append({
+                "id": r["id"],
+                "rule": resolve_requirement_text(r, (overrides or {}).get(r["id"])),
+            })
         checklist.append({
             "principle": p.get("name", "Unknown"),
-            "requirements": [
-                {"id": r["id"], "rule": resolve_requirement_text(r, (overrides or {}).get(r["id"]))}
-                for r in p.get("requirements", [])
-            ],
+            "requirements": requirements,
         })
     return _json.dumps(checklist, separators=(",", ":"))

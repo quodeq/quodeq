@@ -12,6 +12,10 @@ from quodeq.analysis.subagents.verify import load_previous_findings_for_dimensio
 from quodeq.core.types.finding_type import FindingType
 
 _SIZE_SCORE_CAP = 5
+_DIM_MAINTAINABILITY = "maintainability"  # the one dimension with a size-based boost, not keyword-based
+# Fallbacks for file_priority.json's own keys, used when the config omits them.
+_DEFAULT_MAINTAINABILITY_SIZE_DIVISOR = 2000
+_DEFAULT_DIMENSION_KEYWORD_BOOST = 5
 
 # Re-export compute_fan_in so existing imports from this module still work
 __all__ = [
@@ -65,14 +69,14 @@ def compute_dimension_boost(
     best = 0
     for dim in dims:
         keywords = config.get("dimension_keywords", {}).get(dim, [])
-        if not keywords and dim == "maintainability":
-            divisor = config.get("maintainability_size_divisor", 2000)
+        if not keywords and dim == _DIM_MAINTAINABILITY:
+            divisor = config.get("maintainability_size_divisor", _DEFAULT_MAINTAINABILITY_SIZE_DIVISOR)
             score = min(_SIZE_SCORE_CAP, int(file_size / divisor))
         else:
             score = 0
             for kw in keywords:
                 if kw in filepath_lower:
-                    score = config.get("dimension_keyword_boost", 5)
+                    score = config.get("dimension_keyword_boost", _DEFAULT_DIMENSION_KEYWORD_BOOST)
                     break
         best = max(best, score)
     return best

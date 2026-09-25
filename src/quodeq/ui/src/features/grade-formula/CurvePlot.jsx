@@ -1,5 +1,6 @@
 import { t } from '../../strings/index.js';
 import { baseCurve, ceilingCurve } from './curveMath.js';
+import { SCORE_SCALE_MAX } from '../../constants.js';
 const W = 220;
 const H = 130;
 const PAD_L = 26;
@@ -11,16 +12,18 @@ const PLOT_H = H - PAD_T - PAD_B;
 const MAX_WV = 40;
 // Nudges the threshold tick label down so it sits centered on its gridline.
 const TICK_LABEL_Y_OFFSET = 3;
+// SVG path "lineto" command, joining points into a polyline.
+const SVG_LINETO = ' L ';
 
 const x = (wv) => PAD_L + (wv / MAX_WV) * PLOT_W;
-const y = (score) => PAD_T + ((10 - score) / 10) * PLOT_H;
+const y = (score) => PAD_T + ((SCORE_SCALE_MAX - score) / SCORE_SCALE_MAX) * PLOT_H;
 
 function pathFor(fn) {
   const pts = [];
   for (let wv = 0; wv <= MAX_WV; wv += 1) {
     pts.push(`${x(wv).toFixed(1)},${y(Math.max(0, fn(wv))).toFixed(1)}`);
   }
-  return `M ${pts.join(' L ')}`;
+  return `M ${pts.join(SVG_LINETO)}`;
 }
 
 /** Base + ceiling curves with the compliance-lift zone shaded between them. */
@@ -29,7 +32,7 @@ export default function CurvePlot({ baseK, ceilScale, thresholds }) {
   const ceiling = (wv) => ceilingCurve(wv, ceilScale);
   const basePath = pathFor(base);
   const ceilPath = pathFor(ceiling);
-  const zone = `${ceilPath} L ${basePath.slice(2).split(' L ').reverse().join(' L ')} Z`;
+  const zone = `${ceilPath}${SVG_LINETO}${basePath.slice(2).split(SVG_LINETO).reverse().join(SVG_LINETO)} Z`;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width={W} role="img" aria-label={t('gradeFormula.scoreCurves')}>
       {thresholds.map(([score]) => (

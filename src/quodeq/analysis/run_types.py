@@ -102,6 +102,11 @@ class RunConfig:
     # tests and one-shot callers that construct a fresh RunConfig get the
     # original behaviour without any wiring.
     classify_stash: "dict[str, ClassifyStash] | None" = None
+    # Per-request memo of file content hashes (path -> sha256) for one-shot
+    # read-only callers that classify every dim in one go, like the /estimates
+    # endpoint. ``None`` for pipeline runs: minutes pass between their
+    # classifications, and a file edited in between must hash fresh.
+    content_hash_memo: dict[str, str] | None = None
     # Explicit DispatchPolicy for this run. ``None`` means "resolve a fresh
     # live snapshot on demand" via :meth:`_policy` — see there for why that
     # resolution is deliberately NOT cached onto this field.

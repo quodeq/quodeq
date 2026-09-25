@@ -5,10 +5,13 @@ import json
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.core.stream.events import copilot_error, copilot_event_data
+from quodeq.core.stream.events import EVENT_TYPE_RESULT, copilot_error, copilot_event_data
 from quodeq.shared.utils import open_text
 
 _MCP_SERVER_NAME = "findings"
+_EVENT_TYPE_SESSION_MCP_SERVERS_LOADED = "session.mcp_servers_loaded"  # Copilot's init-event dialect
+
+MCP_STATUS_CONNECTED = "connected"  # get_mcp_status()'s healthy value; consumed by _dimension_steps.py
 
 
 def _has_content(stream_file: Path) -> bool:
@@ -22,7 +25,7 @@ def _has_content(stream_file: Path) -> bool:
 
 def _event_servers(event: dict) -> list | None:
     """The MCP server list an init event advertises, in either provider dialect."""
-    if event.get("type") == "session.mcp_servers_loaded":
+    if event.get("type") == _EVENT_TYPE_SESSION_MCP_SERVERS_LOADED:
         return copilot_event_data(event).get("servers", [])
     return event.get("mcp_servers", [])
 
@@ -50,16 +53,21 @@ def get_mcp_status(stream_file: Path, *, log: LogSink = NULL_LOG) -> str | None:
     try:
         with open_text(stream_file) as f:
             for line in f:
-                d = json.loads(line)
-                servers = _event_servers(d) if isinstance(d, dict) else None
+                try:
+                    d = json.loads(line)
+                except json.JSONDecodeError:
+                    log.debug(f"Skipping malformed stream line in {stream_file}")
+                    continue
+                if not isinstance(d, dict):
+                    continue
+                servers = _event_servers(d)
                 if not isinstance(servers, list):
-                    if isinstance(d, dict):
-                        log.debug(f"Invalid MCP server list in {stream_file}")
+                    log.debug(f"Invalid MCP server list in {stream_file}")
                     continue
                 status = _findings_server_status(servers, stream_file, log)
                 if status is not None:
                     return status
-    except (json.JSONDecodeError, OSError) as exc:
+    except OSError as exc:
         log.debug(f"Failed to read MCP status from {stream_file}: {exc}")
     return None
 
@@ -75,7 +83,7 @@ def _is_error_event(
         return None
     if not isinstance(d, dict):
         return False  # a valid-JSON non-object line is not an error event
-    if d.get("type") == "result" and d.get("is_error"):
+    if d.get("type") == EVENT_TYPE_RESULT and d.get("is_error"):
         return True
     return copilot_error(d) is not None
 

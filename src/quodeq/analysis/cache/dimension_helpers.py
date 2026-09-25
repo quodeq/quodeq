@@ -42,6 +42,7 @@ from quodeq.analysis.cache._classify import (
     classify_one_file,  # noqa: F401 -- re-export
     partition_files_by_cache,  # noqa: F401 -- re-export
     classify_files_via_cache,  # noqa: F401 -- re-export
+    count_cache_misses,  # noqa: F401 -- re-export
 )
 from quodeq.analysis.cache._jsonl_state import DispatchJsonlState
 from quodeq.analysis.cache._key_provenance import (

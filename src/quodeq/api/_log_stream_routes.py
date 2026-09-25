@@ -7,6 +7,7 @@ from http import HTTPStatus
 from flask import Flask, Response, current_app, jsonify, request
 
 from quodeq.core.run.job_status import JOB_FINISHED
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND
 from quodeq.api._log_tail_helpers import (
     is_visible_log_line,
     read_tail,
@@ -86,7 +87,7 @@ def _sse_log_response(provider, job_id: str, initial_offset: int) -> Response:
 
 def _invalid_job_id() -> tuple[Response, int]:
     """The 400 both log routes answer a malformed job id with."""
-    return jsonify({"error": "invalid job id", "code": "INVALID_INPUT"}), HTTPStatus.BAD_REQUEST
+    return jsonify({"error": "invalid job id", "code": CODE_INVALID_INPUT}), HTTPStatus.BAD_REQUEST
 
 
 def _job_log_inputs(job_id: str):
@@ -118,7 +119,7 @@ def register_log_stream_routes(app: Flask) -> None:
             return _invalid_job_id()
         provider, log_path, err = resolved
         if log_path is None:
-            return jsonify({"error": "log unavailable", "code": "NOT_FOUND"}), err
+            return jsonify({"error": "log unavailable", "code": CODE_NOT_FOUND}), err
         since = max(0, request.args.get("since", 0, type=int))
         lines, next_offset = read_tail(log_path, since)
         done = _job_done_checker(provider, job_id)()
@@ -137,6 +138,6 @@ def register_log_stream_routes(app: Flask) -> None:
         # recognise as live — otherwise the dashboard pane would show
         # "stream disconnected" until the user reopens the console.
         if log_path is None and not _is_preparing_job(provider, job_id):
-            return jsonify({"error": "log unavailable", "code": "NOT_FOUND"}), err
+            return jsonify({"error": "log unavailable", "code": CODE_NOT_FOUND}), err
         initial_offset = _initial_offset(request.headers.get("Last-Event-ID", ""))
         return _sse_log_response(provider, job_id, initial_offset)

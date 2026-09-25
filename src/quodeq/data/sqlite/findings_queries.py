@@ -124,7 +124,7 @@ def read_finding_details(run_dir: Path, keys: set[DismissKey]) -> dict[DismissKe
     matched in Python; the file list is chunked to stay under SQLite's
     per-statement bind-parameter limit.
     """
-    db_path = run_dir / "evaluation.db"
+    db_path = run_dir / EVALUATION_DB_FILENAME
     if not db_path.is_file() or not keys:
         return {}
     out: dict[DismissKey, dict] = {}
@@ -255,7 +255,7 @@ def read_semantic_eligible_dismissals(run_dir: Path) -> list[tuple[str | None, s
     without the filter a single empty-snippet dismissal would cosine-match
     every future finding under that requirement.
     """
-    if not (run_dir / "evaluation.db").is_file():
+    if not (run_dir / EVALUATION_DB_FILENAME).is_file():
         return []
     try:
         with open_evaluation_db(run_dir) as conn:
@@ -272,7 +272,7 @@ def find_dismissed_matching(
     DISMISSED finding in *run_dir* matching the ``(dimension, practice_id,
     file)`` deletion key. The caller derives the dismiss identities from the
     row (``finding_dismiss_keys``) to find the entries to undismiss."""
-    db_path = run_dir / "evaluation.db"
+    db_path = run_dir / EVALUATION_DB_FILENAME
     if not db_path.is_file():
         return []
     try:

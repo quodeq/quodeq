@@ -1,6 +1,7 @@
 import {
   TAU, getThemeColors, drawGlow, drawParticles, rgba,
 } from '../core/galaxyCore.js';
+import { GALAXY_VIEW_HOVER_TYPE } from '../core/galaxyHitTypes.js';
 import { ZOOM_DIMENSION_LEVEL, ZOOM_PRINCIPLE_LEVEL, CANVAS_FONT_FAMILY } from '../core/galaxyTunables.js';
 import { drawStarfield, fillBackgroundGradient } from './galaxyStarfield.js';
 import {
@@ -13,9 +14,18 @@ import {
   DIM_PARTICLE, DIM_LABEL, PRINCIPLE,
 } from './galaxyTuning.js';
 
+// CanvasRenderingContext2D.textAlign value every label draw in this module uses.
+const TEXT_ALIGN_CENTER = 'center';
+
 // Dimension labels grow with the zoom up to this cap. Deliberately equal
 // to ZOOM_DIMENSION_LEVEL: once principles appear the label stops growing.
 const LABEL_SCALE_CAP = ZOOM_DIMENSION_LEVEL;
+
+// World-unit padding beyond a cluster's spread for its dashed ring, before
+// the zoom scale is applied.
+const CONSTELLATION_RING_PADDING_WORLD = 10;
+// Screen-pixel gap between the dashed ring and its label above it.
+const CONSTELLATION_LABEL_GAP_PX = 10;
 
 /**
  * Render one animation frame on the galaxy canvas.
@@ -68,7 +78,7 @@ function drawConstellations(ctx, scene, view, opts, tc) {
     const conClusterDim = isFocused ? 1 : Math.max(UNFOCUSED_CLUSTER_MIN_ALPHA, 1 - (cam.z - 1) / 2);
     // Dashed circle around cluster
     const csc = w2s(W / 2 + con.cx, H / 2 + con.cy);
-    const circleR = (con.spread + 10) * cam.z;
+    const circleR = (con.spread + CONSTELLATION_RING_PADDING_WORLD) * cam.z;
     ctx.beginPath(); ctx.arc(csc.x, csc.y, circleR, 0, TAU);
     ctx.strokeStyle = `rgba(${mr},${mg},${mb},${CONSTELLATION.ringAlpha * conAlpha * conClusterDim})`;
     ctx.lineWidth = 1;
@@ -86,9 +96,9 @@ function drawConstellations(ctx, scene, view, opts, tc) {
     // Constellation label — above the dashed circle
     if (showLabels && con.label) {
       const lx = csc.x;
-      const ly = csc.y - circleR - 10;
+      const ly = csc.y - circleR - CONSTELLATION_LABEL_GAP_PX;
       ctx.font = `600 ${CONSTELLATION.labelFontPx}px ${CANVAS_FONT_FAMILY}`;
-      ctx.textAlign = 'center';
+      ctx.textAlign = TEXT_ALIGN_CENTER;
       ctx.fillStyle = `rgba(${mr},${mg},${mb},${CONSTELLATION.labelAlpha * conAlpha * conClusterDim})`;
       ctx.fillText(con.label, lx, ly);
       con._lx = lx; con._ly = ly;
@@ -145,7 +155,7 @@ function drawOneDimStar(ctx, target, view, opts, tc) {
   if (showLabels && decorAlpha > MIN_VISIBLE_ALPHA) {
     const fs = Math.min(cam.z, LABEL_SCALE_CAP);
     ctx.font = `600 ${Math.max(DIM_LABEL.fontMinPx, DIM_LABEL.fontPx * fs)}px ${CANVAS_FONT_FAMILY}`;
-    ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, LABEL_ALPHA * decorAlpha);
+    ctx.textAlign = TEXT_ALIGN_CENTER; ctx.fillStyle = rgba(tc.text, LABEL_ALPHA * decorAlpha);
     ctx.fillText(s.name, sc.x, sc.y - sr - DIM_LABEL.offsetPx * fs);
     ctx.font = `${Math.max(DIM_LABEL.scoreFontMinPx, DIM_LABEL.scoreFontPx * fs)}px ${CANVAS_FONT_FAMILY}`;
     ctx.fillStyle = rgba(tc.textMuted, DIM_LABEL.scoreAlpha * decorAlpha);
@@ -159,7 +169,7 @@ function drawOneDimStar(ctx, target, view, opts, tc) {
   if (!animating && nav.depth === 0 && mx >= 0) {
     const dx = mx - sc.x, dy = my - sc.y;
     const hitR = Math.max(sr * 2, DIM_LABEL.hitRadiusMinPx);
-    if (dx * dx + dy * dy < hitR * hitR) return { type: 'dim', idx: i, data: s };
+    if (dx * dx + dy * dy < hitR * hitR) return { type: GALAXY_VIEW_HOVER_TYPE.DIM, idx: i, data: s };
   }
   return null;
 }
@@ -205,7 +215,7 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
     const sr = p.radius * pScale;
     // orbit ring
     ctx.beginPath(); ctx.arc(dsc.x, dsc.y, Math.hypot(sc.x - dsc.x, sc.y - dsc.y), 0, TAU);
-    ctx.strokeStyle = `rgba(50,55,80,${PRINCIPLE.orbitRingAlpha * pAlpha})`; ctx.lineWidth = 0.5; ctx.stroke();
+    ctx.strokeStyle = rgba(PRINCIPLE.orbitRingColor, PRINCIPLE.orbitRingAlpha * pAlpha); ctx.lineWidth = PRINCIPLE.orbitRingWidthPx; ctx.stroke();
     // connection line
     ctx.beginPath(); ctx.moveTo(dsc.x, dsc.y); ctx.lineTo(sc.x, sc.y);
     ctx.strokeStyle = rgba(dim.col, PRINCIPLE.linkAlpha * pAlpha); ctx.lineWidth = PRINCIPLE.linkWidthPx; ctx.stroke();
@@ -223,7 +233,7 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
     if (showLabels && prinLabelAlpha > MIN_VISIBLE_ALPHA) {
       const la = pAlpha * prinLabelAlpha;
       ctx.font = `600 ${PRINCIPLE.labelFontPx}px ${CANVAS_FONT_FAMILY}`;
-      ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, LABEL_ALPHA * la);
+      ctx.textAlign = TEXT_ALIGN_CENTER; ctx.fillStyle = rgba(tc.text, LABEL_ALPHA * la);
       ctx.fillText(p.name, sc.x, sc.y - sr - PRINCIPLE.labelOffsetPx);
       ctx.font = `${PRINCIPLE.scoreFontPx}px ${CANVAS_FONT_FAMILY}`;
       ctx.fillStyle = rgba(tc.textMuted, PRINCIPLE.scoreAlpha * la);
@@ -235,7 +245,7 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
     if (!animating && nav.depth === 1 && pAlpha > PRINCIPLE.hitMinAlpha && mx >= 0) {
       const dx = mx - sc.x, dy = my - sc.y;
       const hitR = sr + PRINCIPLE.hitPadPx;
-      if (dx * dx + dy * dy < hitR * hitR) newHovered = { type: 'prin', idx: pi, data: p };
+      if (dx * dx + dy * dy < hitR * hitR) newHovered = { type: GALAXY_VIEW_HOVER_TYPE.PRIN, idx: pi, data: p };
     }
   });
   return newHovered;
@@ -260,7 +270,7 @@ function drawZoomedPrinciple(ctx, scene, cam, opts) {
       const sevName = p.sev.charAt(0).toUpperCase() + p.sev.slice(1);
       const fontPx = Math.max(VIOLATION_ORBS.labelFontMinPx, Math.min(VIOLATION_ORBS.labelFontMaxPx, sr * VIOLATION_ORBS.labelFontRadiusFraction));
       ctx.font = `500 ${fontPx}px ${CANVAS_FONT_FAMILY}`;
-      ctx.textAlign = 'center'; ctx.fillStyle = rgba(p.col, VIOLATION_ORBS.labelAlpha * vAlpha);
+      ctx.textAlign = TEXT_ALIGN_CENTER; ctx.fillStyle = rgba(p.col, VIOLATION_ORBS.labelAlpha * vAlpha);
       ctx.fillText(sevName, px, py - sr - VIOLATION_ORBS.labelOffsetPx);
     }
   });

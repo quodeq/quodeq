@@ -7,6 +7,7 @@ import { t } from '../../../strings/index.js';
 import { EvaluationsTable } from './EvaluationsTable.jsx';
 import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { roundOneDecimal } from '../../../utils/rounding.js';
 
 // Deferred so the History page's first paint doesn't carry the chart library.
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
@@ -40,7 +41,7 @@ export function computeDeltas(rows) {
   for (let i = rows.length - 1; i >= 0; i--) {
     const curr = parseFloat(rows[i].numericAverage);
     if (Number.isNaN(curr)) continue;
-    if (!Number.isNaN(nextScored)) deltas[i] = Math.round((curr - nextScored) * 10) / 10;
+    if (!Number.isNaN(nextScored)) deltas[i] = roundOneDecimal(curr - nextScored);
     nextScored = curr;
   }
   return deltas;
@@ -90,8 +91,11 @@ function HistoryTopHeader({ trend, languageSub, selectedSource, availableRuns, r
 
 // The visible (non-hidden) rows plus their run-over-run deltas. Rows whose
 // run is in a hidden status (queued, cancelled) never reach the table.
-function useHistoryVisibleRows({ availableRuns, trend }) {
-  const historyRows = useMemo(() => assembleHistoryRows(availableRuns, trend), [availableRuns, trend]);
+function useHistoryVisibleRows({ availableRuns, trend, partialRuns }) {
+  const historyRows = useMemo(
+    () => assembleHistoryRows(availableRuns, trend, partialRuns),
+    [availableRuns, trend, partialRuns],
+  );
   const statusByRunId = useMemo(() => {
     const map = new Map();
     (availableRuns || []).forEach((r) => { if (r.runId) map.set(r.runId, r.status); });
@@ -111,7 +115,7 @@ function useHistoryVisibleRows({ availableRuns, trend }) {
  * The History page's main (non-empty) content: chart, run navigator and the
  * evaluations table.
  * @param {object} props
- * @param {{trend: Array, selectedRunId: string, availableRuns: Array}} props.data
+ * @param {{trend: Array, partialRuns: Array, selectedRunId: string, availableRuns: Array}} props.data
  * @param {object} props.callbacks - row click/hover, run change and delete handlers.
  * @param {object} props.runNav - the run navigator's prev/next/latest state.
  * @param {string} props.languageSub - the header's language subtitle.
@@ -119,7 +123,7 @@ function useHistoryVisibleRows({ availableRuns, trend }) {
  * @param {boolean} props.isRefreshing - dims the page while a refetch is in flight.
  */
 export function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource, isRefreshing }) {
-  const { trend, selectedRunId, availableRuns } = data;
+  const { trend, partialRuns, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunHover, onRunHoverEnd, onRunChange, onDeleteRun } = callbacks;
   // Toast state for clicks on running runs that have no scored dimensions yet.
   // toastKey forces remount so consecutive clicks restart the auto-dismiss timer.
@@ -129,7 +133,7 @@ export function HistoryContent({ data, callbacks, runNav, languageSub, selectedS
     setToastVisible(true);
     setToastKey((k) => k + 1);
   };
-  const { statusByRunId, visible, deltas } = useHistoryVisibleRows({ availableRuns, trend });
+  const { statusByRunId, visible, deltas } = useHistoryVisibleRows({ availableRuns, trend, partialRuns });
 
   return (
     <div className={`history-page history-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>

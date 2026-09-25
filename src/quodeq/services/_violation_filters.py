@@ -23,7 +23,7 @@ def violation_location(v: dict, *, log: LogSink = NULL_LOG) -> tuple[str, int]:
     - Separated: file="path/to/file.py", line=42
     - Combined: file="path/to/file.py:42", line=None
     """
-    raw_file = v.get("file", "")
+    raw_file = v.get("file") or ""
     line = v.get("line")
     if line is not None:
         return (raw_file, coerce_line(line))
@@ -56,7 +56,7 @@ def deleted_key_for_violation(v: dict, dimension: str, principle: str | None = N
     kept as a fallback for pre-camelCase dicts. Principle-group entries carry
     no principle field at all, so callers pass the group name as *principle*.
     """
-    raw_file = v.get("file", "")
+    raw_file = v.get("file") or ""
     if v.get("line") is None and ":" in raw_file:
         raw_file = raw_file.rsplit(":", 1)[0]
     if principle is None:

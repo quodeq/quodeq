@@ -13,6 +13,7 @@ import { exitReasonLabel, isTimeLimitExit } from '../../../models/exitReason.js'
 import { t } from '../../../strings/index.js';
 import { jobStatusLabel } from '../../../strings/labels.js';
 import { JOB_STATUS, JOB_TERMINAL } from '../../../vocab/jobStatus.js';
+import { EVAL_DISMISS_ACTION } from '../evaluationVocab.js';
 
 // A cancelled/failed job whose run hit its time budget is not an error:
 // the header must agree with the coverage banner below it, which already
@@ -59,12 +60,12 @@ function JobHeader({ job, onDismiss, onCancel }) {
           <button type="button" className="term-btn term-btn--ghost term-btn--sm" onClick={onCancel}>{t('evaluate.cancelBtn')}</button>
         )}
         {!isRunning && isDone && (
-          <button type="button" className="term-btn term-btn--primary term-btn--sm" onClick={() => onDismiss('view')}>
+          <button type="button" className="term-btn term-btn--primary term-btn--sm" onClick={() => onDismiss(EVAL_DISMISS_ACTION.VIEW)}>
             <span aria-hidden="true">▸</span> {t('evaluate.viewResults')}
           </button>
         )}
         {!isRunning && (
-          <button type="button" className="term-btn term-btn--secondary term-btn--sm" onClick={() => onDismiss('close')}>{t('evaluate.closeBtn')}</button>
+          <button type="button" className="term-btn term-btn--secondary term-btn--sm" onClick={() => onDismiss(EVAL_DISMISS_ACTION.CLOSE)}>{t('evaluate.closeBtn')}</button>
         )}
       </div>
     </div>

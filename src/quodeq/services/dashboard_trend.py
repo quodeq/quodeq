@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Callable, TypedDict
 
+from quodeq.core.run.state import RunState
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.scoring.report_grades import most_frequent_grade, parse_numeric_score
@@ -140,3 +141,30 @@ def build_accumulated_trend(
         trend.append(_build_trend_entry(item, run_dims, acc_by_dim, prev_by_dim, params))
     trend.reverse()
     return trend
+
+
+def build_partial_run_entries(
+    runs: list[RunInfo],
+    get_run_dimensions: Callable[[str], list[DimensionResult]],
+    params: ScoringParams | None = None,
+) -> list[TrendEntry]:
+    """Own-score rows for the cancelled runs in *runs* that scored a dimension.
+
+    Kept apart from the trend on purpose: a cancelled run is not a history
+    point, so its accumulated fields and deltas are None and nothing that
+    reads ``trend`` sees it. It is still an evaluation the user kept, and
+    this is what lets History list it with its own grade. Same order as
+    *runs*; cancelled runs with nothing scored are left out.
+    """
+    if params is None:
+        from quodeq.services import grade_formula  # noqa: PLC0415
+        params = grade_formula.load_params()
+    entries: list[TrendEntry] = []
+    for item in runs:
+        if item.status is not RunState.CANCELLED:
+            continue
+        run_dims = get_run_dimensions(item.run_id)
+        if not run_dims:
+            continue
+        entries.append(_build_trend_entry(item, run_dims, {}, {}, params))
+    return entries

@@ -14,6 +14,8 @@ import logging
 import sys
 import threading
 
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
+
 logger = logging.getLogger(__name__)
 
 _macos_toolbar_installed = False  # the unified toolbar (taller titlebar) is added once
@@ -24,7 +26,7 @@ _S_OK = 0  # HRESULT success
 
 def set_macos_titlebar_appearance(window: object, dark: bool) -> None:
     """Set the macOS native titlebar to dark or light aqua (on the UI thread)."""
-    if sys.platform != "darwin":
+    if sys.platform != PLATFORM_DARWIN:
         return
     try:
         from AppKit import (  # noqa: PLC0415
@@ -58,7 +60,7 @@ def show_macos_traffic_lights(window: object) -> None:
     to re-apply on resize. Runs on the UI thread; no-op before the native
     handle exists.
     """
-    if sys.platform != "darwin":
+    if sys.platform != PLATFORM_DARWIN:
         return
     try:
         from AppKit import (  # noqa: PLC0415
@@ -107,7 +109,7 @@ def set_macos_unified_toolbar(window: object) -> None:
     native handle exists.
     """
     global _macos_toolbar_installed
-    if _macos_toolbar_installed or sys.platform != "darwin":
+    if _macos_toolbar_installed or sys.platform != PLATFORM_DARWIN:
         return
     try:
         from PyObjCTools import AppHelper  # noqa: PLC0415
@@ -148,7 +150,7 @@ def set_macos_fullscreen_class(window: object, is_full: bool) -> None:
 
 def set_windows_titlebar(dark: bool, window_title: str = "quodeq") -> None:
     """Set the native Windows titlebar dark/light via DWM (attr 20, fallback 19)."""
-    if sys.platform != "win32":
+    if sys.platform != PLATFORM_WIN32:
         return
     try:
         import ctypes  # noqa: PLC0415

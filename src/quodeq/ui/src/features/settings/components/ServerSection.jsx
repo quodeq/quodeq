@@ -11,6 +11,10 @@ import { SERVER_STATUS } from '../settingsVocab.js';
 
 const LOCAL_SERVER_HINT = t('settings.localServerHint');
 
+// This component's own third status, layered on top of settingsVocab.js's
+// SERVER_STATUS (online/offline): the health query hasn't resolved yet.
+const SERVER_STATUS_CHECKING = 'checking';
+
 const HEALTH_POLL_MS = 10000;
 
 function ServerDetails({ health }) {
@@ -48,7 +52,7 @@ export default function ServerSection() {
     refetchOnWindowFocus: false,
   });
 
-  const status = isLoading && !health ? 'checking' : (health ? SERVER_STATUS.ONLINE : SERVER_STATUS.OFFLINE);
+  const status = isLoading && !health ? SERVER_STATUS_CHECKING : (health ? SERVER_STATUS.ONLINE : SERVER_STATUS.OFFLINE);
 
   return (
     <section className="panel settings-section">
@@ -63,7 +67,7 @@ export default function ServerSection() {
         status={status === SERVER_STATUS.ONLINE ? SERVER_STATUS.ONLINE : SERVER_STATUS.OFFLINE}
         address={health?.address}
         offlineMessage={
-          status === 'checking'
+          status === SERVER_STATUS_CHECKING
             ? <span>{t('settings.checkingEllipsis')}</span>
             : <span>{t('settings.connectionLost')}</span>
         }

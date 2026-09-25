@@ -15,6 +15,7 @@ from pathlib import Path
 
 from quodeq.core.run.exit_reason import ExitReason
 from quodeq.core.run.job_status import external_job_id
+from quodeq.shared.constants import EVIDENCE_DIRNAME, MANIFEST_FILENAME
 from quodeq.shared.process import is_pid_alive as _is_pid_alive
 from quodeq.shared.run_heartbeat import HEARTBEAT_FILENAME
 from quodeq.data.fs.run_status_store import (
@@ -33,6 +34,7 @@ from quodeq.data.sqlite._index_sync_promote import (
 logger = logging.getLogger(__name__)
 
 _KNOWN_STATE_VALUES = {s.value for s in RunState}
+_DEFAULT_STALE_SECONDS = 30  # check_stale_and_promote's heartbeat-staleness threshold
 
 _UPSERT_SQL = """
 INSERT INTO runs (
@@ -118,7 +120,7 @@ def sync_legacy_run(
     """Synthesize a row from filesystem signals for a run with no status.json."""
     scan_path = run_dir / "scan.json"
     pid_path = run_dir / ".pid"
-    manifest_path = run_dir / "evidence" / "manifest.json"
+    manifest_path = run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME
     if not manifest_path.exists():
         return  # not a real run
 
@@ -183,7 +185,7 @@ def delete_orphan_non_terminal_rows(db: sqlite3.Connection) -> int:
 
 def check_stale_and_promote(
     db: sqlite3.Connection, run_dir: Path, *,
-    project_uuid: str, run_id: str, stale_seconds: int = 30,
+    project_uuid: str, run_id: str, stale_seconds: int = _DEFAULT_STALE_SECONDS,
 ) -> bool:
     """Promote non-terminal runs with dead heartbeat + dead PID to cancelled.
 

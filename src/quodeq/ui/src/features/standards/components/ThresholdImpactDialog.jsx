@@ -7,6 +7,7 @@
 import { useEffect, useRef } from 'react';
 import { t } from '../../../strings/index.js';
 import { focusables, trapTab, restoreFocus } from '../../../utils/a11y.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 export default function ThresholdImpactDialog({ changedDimensions, onCancel, onSave, onSaveAndRescan }) {
   const many = changedDimensions.length > 1;
@@ -22,7 +23,7 @@ export default function ThresholdImpactDialog({ changedDimensions, onCancel, onS
     const first = focusables(rootRef.current)[0];
     if (first) first.focus();
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') { cancelRef.current(); return; }
+      if (e.key === KEY.ESCAPE) { cancelRef.current(); return; }
       trapTab(rootRef.current, e);
     };
     document.addEventListener('keydown', onKeyDown);

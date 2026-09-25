@@ -12,7 +12,9 @@ from typing import TYPE_CHECKING
 
 from flask import Response, request
 
+from quodeq.api._constants import CODE_INVALID_INPUT
 from quodeq.api.helpers import ClientMessageError, json_error
+from quodeq.core.types.provider import ProviderType
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.repo import split_userinfo
@@ -121,7 +123,7 @@ def validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tu
         return json_error(
             f"Invalid AI command. Allowed: {allowed_list}",
             HTTPStatus.BAD_REQUEST,
-            "INVALID_INPUT",
+            CODE_INVALID_INPUT,
         )
     return None
 
@@ -130,7 +132,7 @@ def validate_ai_model(
     ai_cmd: str | None, ai_model: str | None, provider_configs: Mapping[str, dict],
 ) -> tuple[Response, int] | None:
     """API-type providers require an explicit model."""
-    if ai_cmd and provider_configs.get(ai_cmd, {}).get("type") == "api" and not ai_model:
+    if ai_cmd and provider_configs.get(ai_cmd, {}).get("type") == ProviderType.API and not ai_model:
         return json_error(
             "No model selected. Go to Settings and select one.",
             HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",
@@ -214,7 +216,7 @@ def validate_ai_cmd_path(
     return json_error(
         f"Invalid AI command override: {reason}",
         HTTPStatus.BAD_REQUEST,
-        "INVALID_INPUT",
+        CODE_INVALID_INPUT,
     )
 
 
@@ -224,9 +226,8 @@ def check_eval_rate_limit(eval_rate_store: "RateLimitStore | None") -> tuple[Res
         return None
     ip = request.remote_addr or "unknown"
     now = _time.monotonic()
-    if eval_rate_store.check(ip, now):
+    if eval_rate_store.check_and_record(ip, now):
         return json_error(
             "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
         )
-    eval_rate_store.record(ip, now)
     return None

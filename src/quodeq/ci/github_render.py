@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 
 from quodeq.analysis.dimension_aliases import DIMENSION_ALIASES
-from quodeq.core.types.severity import Severity
+from quodeq.core.types.severity import Severity, parse_severity
 from quodeq.shared.serialization import coerce_line
 
 
@@ -22,6 +22,9 @@ class ReviewOptions:
     artifact_url: str | None = None
 
 
+# The legacy spelling of major severity (see ci/sarif.py's rank table).
+_LEGACY_MAJOR = "high"
+
 # Markdown and HTML control characters that untrusted finding text may carry.
 _MD_SPECIAL = re.compile(r"([\\`*_#\[\]<>|~])")
 # A list item ("- ", "+ ", "1. ", "2) ") or a thematic break ("---") only
@@ -33,6 +36,9 @@ _LEADING_BLOCK_MARKER = re.compile(r"^(\d+)([.)])|^([-+])")
 # trigger breaks the scan while leaving the text readable.
 _AUTOLINK_TRIGGER = re.compile(r"(https?://|www\.|@)", re.IGNORECASE)
 _ZWSP = "\u200b"
+
+_STATUS_NEW = "new"  # violation_to_comment status: introduced by this PR
+_UNSCORED = "N/A"  # sentinel for report fields diff-mode runs never score
 
 
 def _escape_leading_marker(match: re.Match) -> str:
@@ -59,7 +65,7 @@ def _md_escape(text: object) -> str:
     return _AUTOLINK_TRIGGER.sub(lambda m: m.group(1) + _ZWSP, escaped)
 
 
-def violation_to_comment(violation: dict, status: str = "new") -> dict:
+def violation_to_comment(violation: dict, status: str = _STATUS_NEW) -> dict:
     """Convert a violation to a GitHub PR review comment dict.
 
     status: "new" (introduced by this PR) or "existing" (pre-existing baseline issue).
@@ -70,7 +76,7 @@ def violation_to_comment(violation: dict, status: str = "new") -> dict:
     req = _md_escape(violation.get("req", ""))
 
     severity_label = severity.upper()
-    status_prefix = "🆕 NEW" if status == "new" else "⚠️ Pre-existing"
+    status_prefix = "🆕 NEW" if status == _STATUS_NEW else "⚠️ Pre-existing"
 
     body_parts = [f"{status_prefix} · **{severity_label}** — {title}"]
     if reason:
@@ -104,8 +110,8 @@ def _score_summary_lines(reports: list[dict], is_diff_mode: bool, baseline_avail
     if not is_diff_mode:
         for report in reports:
             dimension = report.get("dimension", "unknown")
-            score = report.get("overallScore", "N/A")
-            grade = report.get("overallGrade", "N/A")
+            score = report.get("overallScore", _UNSCORED)
+            grade = report.get("overallGrade", _UNSCORED)
             lines.append(f"**{dimension.title()}**: {score} ({grade})")
         lines.append("")
     return lines
@@ -195,7 +201,7 @@ def build_review_summary(
     # "no baseline" note (which frames absence-of-baseline as a scoring
     # concern) don't apply. Detect from the data the caller already passes.
     is_diff_mode = bool(reports) and all(
-        r.get("overallScore") == "N/A" for r in reports
+        r.get("overallScore") == _UNSCORED for r in reports
     )
 
     lines = ["## Quodeq Evaluation", ""]
@@ -215,9 +221,17 @@ def build_review_summary(
     return "\n".join(lines)
 
 
+_BLOCKING = frozenset({Severity.CRITICAL, Severity.MAJOR})
+
+
+def _verdict_severity(raw: object) -> Severity:
+    text = str(raw or "").strip().lower()
+    return Severity.MAJOR if text == _LEGACY_MAJOR else parse_severity(text)
+
+
 # Findings in these dimensions are posted as review comments but never turn
 # the verdict into REQUEST_CHANGES: the bot runs them on a local model to flag
-# regressions early, and one noisy critical must not block a merge.
+# regressions early, and one noisy critical or major must not block a merge.
 _COMMENT_ONLY_DIMENSIONS = frozenset({"performance"})
 
 
@@ -243,6 +257,10 @@ def determine_verdict(new_violations: list[dict]) -> str:
     after lowercasing and alias-expanding the finding's dimension; a
     violation without a dimension counts.
 
+    Blocks (REQUEST_CHANGES) when any new violation is critical or major
+    severity (the legacy "high" spelling counts as major). Everything else
+    only comments.
+
     Returns: 'COMMENT' or 'REQUEST_CHANGES'.
 
     Note: GitHub Actions' default token is **not permitted to approve pull
@@ -257,7 +275,6 @@ def determine_verdict(new_violations: list[dict]) -> str:
     if not blocking:
         return "COMMENT"
 
-    severities = {v.get("severity", Severity.MINOR) for v in blocking}
-    if severities & {"critical", "high"}:
+    if any(_verdict_severity(v.get("severity")) in _BLOCKING for v in blocking):
         return "REQUEST_CHANGES"
     return "COMMENT"

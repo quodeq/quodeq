@@ -4,7 +4,10 @@ import { t } from '../../../strings/index.js';
 
 const DEFAULT_POWER_LEVEL = 2;
 
-export default function PowerSelector({ value, onChange, onPersist, labelPosition = 'right' }) {
+// This component's own label-placement prop values.
+const LABEL_POSITION = Object.freeze({ LEFT: 'left', RIGHT: 'right' });
+
+export default function PowerSelector({ value, onChange, onPersist, labelPosition = LABEL_POSITION.RIGHT }) {
   const [hover, setHover] = useState(null);
 
   const active = value ?? DEFAULT_POWER_LEVEL;
@@ -34,7 +37,7 @@ export default function PowerSelector({ value, onChange, onPersist, labelPositio
 
   return (
     <div className="power-selector" title={t('evaluate.analysisPower', { level: currentLevel?.label })}>
-      {labelPosition === 'left' ? <>{label}{bars}</> : <>{bars}{label}</>}
+      {labelPosition === LABEL_POSITION.LEFT ? <>{label}{bars}</> : <>{bars}{label}</>}
     </div>
   );
 }

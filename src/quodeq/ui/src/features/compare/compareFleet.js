@@ -9,6 +9,16 @@ import {
   STALE_AFTER_DAYS, nameKey, parseScore10, daysBetween, trendDelta, mean,
 } from './compareModel.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
+import { SORT_DIR } from '../../vocab/sortDirection.js';
+import { roundOneDecimal } from '../../utils/rounding.js';
+import { SCORE_SCALE_MAX, PERCENT } from '../../constants.js';
+
+// consequenceLevel's return values, in ascending severity. CompareFleetView
+// and useCompareScopeActions both compare against CLEAR to decide whether a
+// row is worth surfacing in the attention strip / "select flagged" action.
+export const CONSEQUENCE_LEVEL = Object.freeze({
+  SEVERE: 'severe', ELEVATED: 'elevated', WATCH: 'watch', CLEAR: 'clear',
+});
 
 // Consequence thresholds. The score scales as
 // (10 - score) * log10(files + 10) * staleness, i.e. roughly 0..45 across
@@ -18,6 +28,10 @@ const SEVERE_AT = 18;
 const ELEVATED_AT = 11;
 const WATCH_AT = 6;
 const STALE_FACTOR = 1.35;
+// Added to the file count before log10 so log10(files + offset) is always
+// >= 1: a 0-file (or tiny) project's size weight never drops below 1, so its
+// consequence score never shrinks under the raw (score-scale - score) gap.
+const FILE_COUNT_LOG_OFFSET = 10;
 
 function topLanguage(languageStats) {
   if (!languageStats || typeof languageStats !== 'object') return null;
@@ -88,7 +102,7 @@ function _rowCoverage(project) {
     totalFiles,
     analyzedFiles,
     coveragePct: totalFiles && analyzedFiles != null
-      ? Math.round((analyzedFiles / totalFiles) * 100)
+      ? Math.round((analyzedFiles / totalFiles) * PERCENT)
       : null,
   };
 }
@@ -145,16 +159,16 @@ export function buildRow(project, summary, now) {
 /** Higher = more deserving of attention. 0 for rows without a score. */
 export function consequenceOf(row) {
   if (row.score == null) return 0;
-  const sizeWeight = Math.log10((row.totalFiles ?? 0) + 10);
+  const sizeWeight = Math.log10((row.totalFiles ?? 0) + FILE_COUNT_LOG_OFFSET);
   const staleness = row.stale ? STALE_FACTOR : 1;
-  return (10 - row.score) * sizeWeight * staleness;
+  return (SCORE_SCALE_MAX - row.score) * sizeWeight * staleness;
 }
 
 export function consequenceLevel(value) {
-  if (value >= SEVERE_AT) return 'severe';
-  if (value >= ELEVATED_AT) return 'elevated';
-  if (value >= WATCH_AT) return 'watch';
-  return 'clear';
+  if (value >= SEVERE_AT) return CONSEQUENCE_LEVEL.SEVERE;
+  if (value >= ELEVATED_AT) return CONSEQUENCE_LEVEL.ELEVATED;
+  if (value >= WATCH_AT) return CONSEQUENCE_LEVEL.WATCH;
+  return CONSEQUENCE_LEVEL.CLEAR;
 }
 
 /**
@@ -162,9 +176,9 @@ export function consequenceLevel(value) {
  * to the bottom, whichever direction is active — an unevaluated project is
  * not "the worst project".
  */
-export function sortRows(rows, direction = 'desc') {
+export function sortRows(rows, direction = SORT_DIR.DESC) {
   const scored = rows.filter((r) => r.score != null)
-    .sort((a, b) => (direction === 'asc' ? a.score - b.score : b.score - a.score));
+    .sort((a, b) => (direction === SORT_DIR.ASC ? a.score - b.score : b.score - a.score));
   const unscored = rows.filter((r) => r.score == null);
   return scored.concat(unscored);
 }
@@ -176,7 +190,7 @@ export function buildFleet(rows) {
   const weighted = scored.filter((r) => r.delta != null && r.totalFiles);
   const weightSum = weighted.reduce((a, r) => a + r.totalFiles, 0);
   const delta = weightSum
-    ? Math.round((weighted.reduce((a, r) => a + r.delta * r.totalFiles, 0) / weightSum) * 10) / 10
+    ? roundOneDecimal(weighted.reduce((a, r) => a + r.delta * r.totalFiles, 0) / weightSum)
     : null;
   const severity = scored.reduce(
     (acc, r) => ({
@@ -200,7 +214,7 @@ export function buildFleet(rows) {
     lead,
     trail,
     spread: lead && trail
-      ? Math.round((lead.score - trail.score) * 10) / 10
+      ? roundOneDecimal(lead.score - trail.score)
       : null,
     count: rows.length,
     scoredCount: scored.length,
@@ -211,8 +225,8 @@ export function buildFleet(rows) {
     totalViolations,
     totalCompliance,
     checks,
-    passPct: checks ? Math.round((totalCompliance / checks) * 100) : null,
-    coveragePct: coverageBase ? Math.round((analyzed / coverageBase) * 100) : null,
+    passPct: checks ? Math.round((totalCompliance / checks) * PERCENT) : null,
+    coveragePct: coverageBase ? Math.round((analyzed / coverageBase) * PERCENT) : null,
     staleCount: rows.filter((r) => r.stale).length,
   };
 }

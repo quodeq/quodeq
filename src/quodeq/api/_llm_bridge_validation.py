@@ -6,11 +6,16 @@ handler to return as-is, or None when the input is acceptable.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
+from http import HTTPStatus
+from typing import Any
+
 from flask import Response, jsonify, request
 
+from quodeq.api._constants import CODE_INVALID_PARAM, CODE_MISSING_PARAM
 from quodeq.shared.url_validation import url_safety_error
 
-BODY_NOT_OBJECT = {"error": "request body must be a JSON object", "code": "INVALID_PARAM"}
+BODY_NOT_OBJECT = {"error": "request body must be a JSON object", "code": CODE_INVALID_PARAM}
 
 
 def json_body() -> dict | None:
@@ -24,6 +29,19 @@ def json_body() -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def string_fields_error(data: Mapping[str, Any], names: tuple[str, ...]) -> tuple[Response, int] | None:
+    """A 400 for the first of *names* present in *data* with a non-string value.
+
+    An explicit JSON ``null`` is treated as absent, not as a type error,
+    matching ``routes_project_create``'s ``x is not None and not isinstance(...)``
+    pattern for optional fields.
+    """
+    for name in names:
+        if name in data and data[name] is not None and not isinstance(data[name], str):
+            return jsonify({"error": f"{name} must be a string", "code": CODE_INVALID_PARAM}), HTTPStatus.BAD_REQUEST
+    return None
+
+
 def invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:
     """Return a 400 response when *base_url* fails SSRF validation, else None.
 
@@ -34,7 +52,7 @@ def invalid_base_url(base_url: str | None) -> tuple[Response, int] | None:
         return None
     err = url_safety_error(base_url, allow_private=True)
     if err is not None:
-        return jsonify({"error": err, "code": "INVALID_URL"}), 400
+        return jsonify({"error": err, "code": "INVALID_URL"}), HTTPStatus.BAD_REQUEST
     return None
 
 
@@ -44,7 +62,7 @@ def _invalid_model_name(model: str) -> tuple[Response, int] | None:
     Prevents path traversal and null-byte injection.
     """
     if "\\" in model or ".." in model or "\0" in model:
-        return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
+        return jsonify({"error": "Invalid model name", "code": CODE_INVALID_PARAM}), HTTPStatus.BAD_REQUEST
     return None
 
 
@@ -60,9 +78,9 @@ def require_model_name(
     model = data.get("model", "")
     if require_nonempty:
         if not model or not isinstance(model, str):
-            return None, (jsonify({"error": "model is required", "code": "MISSING_PARAM"}), 400)
+            return None, (jsonify({"error": "model is required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST)
     elif not isinstance(model, str):
-        return None, (jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400)
+        return None, (jsonify({"error": "model must be a string", "code": CODE_INVALID_PARAM}), HTTPStatus.BAD_REQUEST)
     err = _invalid_model_name(model)
     if err is not None:
         return None, err

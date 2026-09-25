@@ -13,6 +13,7 @@ import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { DIALOG_VARIANT } from '../../../vocab/dialogVariant.js';
 
 /**
  * @param {object} options
@@ -126,7 +127,7 @@ function makeHandleDeleteAll({ selectedProject, isShared, dismissedCount, applyD
       message: t('violations.deleteDismissedBody', { count: dismissedCount }),
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
-      variant: 'danger',
+      variant: DIALOG_VARIANT.DANGER,
     });
     if (!ok) return;
     try {

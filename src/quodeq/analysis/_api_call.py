@@ -17,7 +17,9 @@ import openai
 
 from quodeq.analysis._api_response import finish_call, repair_snippetless
 from quodeq.analysis._api_schema import SYSTEM_PROMPT
-from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
+from quodeq.analysis.errors import (
+    REASON_PAYMENT, REASON_QUOTA, FatalProviderError, classify_fatal_provider_message,
+)
 from quodeq.config.analysis_env import (
     api_read_timeout_override, context_size_override, max_output_tokens_override,
 )
@@ -41,6 +43,10 @@ _CLOUD_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=30.0, pool=10.0)
 # lossy path (error marker, re-dispatch next run), so nothing is silently lost.
 _DEFAULT_LOCAL_MAX_TOKENS = 8192
 
+# Distinct base URLs the one-warning-per-base cache below remembers; a run
+# configures a handful of providers at most.
+_WARN_CACHE_MAX_BASES = 8
+
 
 @dataclass(frozen=True)
 class ApiRunnerConfig:
@@ -56,7 +62,7 @@ class ApiRunnerConfig:
     """Pool size this call competes with; scales the local read timeout."""
 
 
-@functools.lru_cache(maxsize=8)
+@functools.lru_cache(maxsize=_WARN_CACHE_MAX_BASES)
 def _warn_ollama_ctx_noop(api_base: str) -> None:
     """One warning per base URL: Ollama's /v1 endpoint ignores num_ctx
     (top-level and nested options alike, verified on 0.33.1), so a configured
@@ -128,10 +134,10 @@ def _classify_fatal_api_error(exc: Exception) -> tuple[str, str] | None:
         return "auth", "permission denied (403)"
     if isinstance(exc, openai.APIStatusError):
         if exc.status_code == HTTPStatus.PAYMENT_REQUIRED:
-            return "payment", "out of credits (402 payment required)"
+            return REASON_PAYMENT, "out of credits (402 payment required)"
         if exc.status_code == HTTPStatus.TOO_MANY_REQUESTS:
             reason = classify_fatal_provider_message(str(exc))
-            if reason in ("quota", "payment"):
+            if reason in (REASON_QUOTA, REASON_PAYMENT):
                 return reason, "quota/credits exhausted (429)"
     return None
 

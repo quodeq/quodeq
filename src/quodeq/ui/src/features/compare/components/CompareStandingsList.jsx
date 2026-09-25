@@ -3,7 +3,7 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t } from '../../../strings/index.js';
-import { nf, score1, MIN_BAR_HEIGHT_PCT } from '../compareFormatters.js';
+import { nf, score1, MIN_BAR_HEIGHT_PCT, SCORE_TO_PCT } from '../compareFormatters.js';
 
 
 function standingTag(index, total, score, avg) {
@@ -20,7 +20,7 @@ function StandingPBars({ s }) {
           key={p.key}
           className="compare-standings__pbar"
           style={{
-            height: `${Math.max(MIN_BAR_HEIGHT_PCT, Math.round(p.score * 10))}%`,
+            height: `${Math.max(MIN_BAR_HEIGHT_PCT, Math.round(p.score * SCORE_TO_PCT))}%`,
             background: scoreGradeColorVar(p.score),
           }}
           title={`${p.label} · ${score1(p.score)}`}

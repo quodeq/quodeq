@@ -130,7 +130,10 @@ def project_estimates_payload(
         # load_analysis_context filters unknown requested dimensions the
         # same way run start does; ValueError means none were valid.
         dimensions, _ctx = load_analysis_context(config)
-        estimates = compute_dim_estimates(config, dimensions)
+        # Only counts are returned: skip prioritizing (it only reorders),
+        # check cache hits by existence, and hash each file once across dims.
+        config.content_hash_memo = {}
+        estimates = compute_dim_estimates(config, dimensions, count_only=True)
     except (OSError, ValueError, KeyError, RuntimeError):
         return dict(EMPTY_ESTIMATES_PAYLOAD)
 

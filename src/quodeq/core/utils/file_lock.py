@@ -13,6 +13,8 @@ import logging
 import sys
 import time
 
+from quodeq.core.constants import PLATFORM_WIN32
+
 _logger = logging.getLogger(__name__)
 
 # Windows blocking lock budget. msvcrt.LK_LOCK only retries 10x at 1s,
@@ -29,7 +31,7 @@ _UNIX_LOCK_RETRY_INTERVAL_S = 0.05
 
 def _make_lock_ops() -> tuple:
     """Return (lock_fn, unlock_fn) for the current platform."""
-    if sys.platform == "win32":
+    if sys.platform == PLATFORM_WIN32:
         import msvcrt
 
         def _lock(fd: int, timeout_s: float | None = None) -> None:

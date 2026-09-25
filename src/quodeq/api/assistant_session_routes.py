@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from http import HTTPStatus
 from pathlib import Path
 from typing import Callable
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify
 
 from quodeq.api import _assistant_helpers
-from quodeq.api.helpers import error_response
+from quodeq.api._constants import CODE_INVALID_PARAM
+from quodeq.api.helpers import error_response, optional_json_object_or_error
 from quodeq.assistant import SessionScope
 from quodeq.assistant.orchestrator import write_safe_provider
 from quodeq.assistant.skills import RESERVED_COMMANDS, cached_skills
@@ -42,11 +44,11 @@ def _validate_session_request(
     provider_cfg = gates.known_provider(str(body.get("provider", "")))
     if provider_cfg is None:
         body_, status = error_response(
-            "unknown or unsupported provider", 400, "INVALID_PROVIDER")
+            "unknown or unsupported provider", HTTPStatus.BAD_REQUEST, "INVALID_PROVIDER")
         return (jsonify(body_), status), ""
     source = str(body.get("source") or ProjectSource.LOCAL)
     if source not in ProjectSource:
-        body_, status = error_response("invalid source", 400, "INVALID_SOURCE")
+        body_, status = error_response("invalid source", HTTPStatus.BAD_REQUEST, "INVALID_SOURCE")
         return (jsonify(body_), status), source
     if source == ProjectSource.SHARED:
         shared_error = gates.shared_source_error()
@@ -109,7 +111,9 @@ def register_assistant_session_routes(app: Flask, gates: SessionGates) -> None:
         # First assistant request of the process: reap leaked worktrees +
         # prune stale sessions before minting a new one (one-shot, best-effort).
         _assistant_helpers.run_assistant_hygiene(app)
-        body = request.get_json(silent=True) or {}
+        body = optional_json_object_or_error(CODE_INVALID_PARAM)
+        if not isinstance(body, dict):
+            return jsonify(body[0]), body[1]
         error, source = _validate_session_request(body, gates)
         if error is not None:
             return error
@@ -126,7 +130,7 @@ def register_assistant_session_routes(app: Flask, gates: SessionGates) -> None:
                         "repoAttached": repo_root is not None,
                         "repoReason": repo_reason,
                         "readOnly": source == ProjectSource.SHARED,
-                        "writeAvailable": write_available}), 201
+                        "writeAvailable": write_available}), HTTPStatus.CREATED
 
     @app.get("/api/assistant/skills")
     def get_assistant_catalog():

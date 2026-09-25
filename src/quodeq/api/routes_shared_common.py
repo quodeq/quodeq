@@ -15,6 +15,7 @@ from pathlib import Path
 
 from flask import Response
 
+from quodeq.api._constants import CODE_INVALID_INPUT
 from quodeq.api.helpers import json_error
 from quodeq.services.score_cache import score_cache_path_override
 from quodeq.services.shared_repo import (
@@ -97,7 +98,7 @@ def validate_segment(*segments: str) -> tuple[Response, int] | None:
     try:
         validate_path_segment(*segments)
     except ValueError:
-        return json_error("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return json_error("Invalid parameter", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     return None
 
 

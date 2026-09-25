@@ -5,6 +5,7 @@ import { activateOnKey } from '../../../../utils/a11y.js';
 import { t } from '../../../../strings/index.js';
 import { riskBubbleKey } from './riskBubbleName.js';
 import { LABEL_GAP_PX } from './viewLabels.js';
+import { PERCENT } from '../../../../constants.js';
 
 const W = 600, H = 420, PAD = { l: 55, r: 25, t: 35, b: 55 };
 const PW = W - PAD.l - PAD.r, PH = H - PAD.t - PAD.b;
@@ -192,7 +193,7 @@ function MatrixTooltip({ tip }) {
   if (!tip) return null;
   const c = tip.child;
   const total = c.violations + c.compliance;
-  const rate = total > 0 ? Math.round(c.compliance / total * 100) : 0;
+  const rate = total > 0 ? Math.round(c.compliance / total * PERCENT) : 0;
   return (
     <div className="map-tooltip" style={{
       position: 'fixed',

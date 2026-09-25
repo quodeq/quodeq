@@ -9,12 +9,18 @@
  * no framework imports.
  */
 import { RUN_STATE } from '../vocab/runState.js';
+import { LATEST_RUN_ID } from '../constants.js';
 
 /**
  * Confidence below which a finding is grouped away as low-signal.
  * Matches the backend's own reporting threshold.
  */
 export const LOW_CONFIDENCE_THRESHOLD = 50;
+
+// Confidence is an absolute 0-100 domain scale (compared directly against
+// LOW_CONFIDENCE_THRESHOLD, never rendered as a percent). A finding whose
+// wire payload omits the field is treated as fully confident.
+export const FULL_CONFIDENCE = 100;
 
 /** Score tiers, mirroring the backend grading bands (see core scoring params). */
 export const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
@@ -31,7 +37,7 @@ export const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
  *    frozen avoids a spurious refetch on mount.
  */
 export function isFrozenRun(selectedRun, availableRuns) {
-  if (!selectedRun || selectedRun === 'latest') return false;
+  if (!selectedRun || selectedRun === LATEST_RUN_ID) return false;
   const status = (availableRuns || []).find((r) => r.runId === selectedRun)?.status;
   return status !== RUN_STATE.RUNNING;
 }

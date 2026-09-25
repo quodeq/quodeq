@@ -24,6 +24,7 @@ from quodeq.dashboard._webview_user_agent import (
     WEBVIEW_TOKEN_UA_PREFIX, WEBVIEW_UA_MARKER, quodeq_version,
     webview_user_agent,
 )
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
 from quodeq.shared.logging import log_debug
 
 __all__ = [
@@ -33,9 +34,17 @@ __all__ = [
     # these from here.
     "WEBVIEW_TOKEN_UA_PREFIX", "WEBVIEW_UA_MARKER", "diag",
     "quodeq_version", "webview_user_agent",
+    "MENU_POLL_INTERVAL_S", "MENU_POLL_MAX_ATTEMPTS",  # defined here, exported for _webview_window_help_menu's poller
 ]
 
 _APP_DISPLAY_NAME = "quodeq"
+
+# NSTimer poll cadence for the About/Help native-menu install pollers, and how many
+# attempts (~5s) before one gives up. Public: shared with _webview_window_help_menu.
+MENU_POLL_INTERVAL_S = 0.2
+MENU_POLL_MAX_ATTEMPTS = 25
+
+_WM_SETICON = 0x0080  # Win32 WM_SETICON: set a window's icon via SendMessage
 
 
 @dataclass
@@ -52,6 +61,9 @@ _STATE = _MacAppState()
 _QUODEQ_WEBSITE = "https://quodeq.com"
 _QUODEQ_REPO = "https://github.com/quodeq/quodeq"
 
+_ICON_EXT_ICNS = ".icns"  # macOS dock/About-panel icon format
+_ICON_EXT_ICO = ".ico"  # Windows taskbar icon format
+
 
 def icon_path(ext: str) -> str | None:
     """Resolve the quodeq icon path for the given extension (.icns or .ico).
@@ -64,9 +76,9 @@ def icon_path(ext: str) -> str | None:
         base = Path(sys._MEIPASS) / "quodeq" / "data" / "icons"  # type: ignore[attr-defined]
     else:
         base = Path(__file__).resolve().parent.parent / "data" / "icons"
-    if ext == ".icns":
+    if ext == _ICON_EXT_ICNS:
         p = base / "icon.icns"
-    elif ext == ".ico":
+    elif ext == _ICON_EXT_ICO:
         p = base / "icon.ico"
     else:
         return None
@@ -157,7 +169,7 @@ def _schedule_about_install_poller(target: object) -> None:
     from Foundation import NSTimer  # noqa: PLC0415
 
     state = {"attempts": 0, "timer": None}
-    max_attempts = 25  # ~5 seconds at 200ms
+    max_attempts = MENU_POLL_MAX_ATTEMPTS
 
     class _InstallPoller(NSObject):
         def tryInstall_(self, timer):  # noqa: ARG002
@@ -188,7 +200,7 @@ def _schedule_about_install_poller(target: object) -> None:
     state["poller"] = poller
     try:
         timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-            0.2, poller, "tryInstall:", None, True,
+            MENU_POLL_INTERVAL_S, poller, "tryInstall:", None, True,
         )
         state["timer"] = timer
     except (AttributeError, ValueError) as exc:
@@ -246,7 +258,7 @@ def set_macos_app_identity() -> None:
             info["CFBundleDisplayName"] = _APP_DISPLAY_NAME
     except (AttributeError, TypeError) as exc:
         log_debug(f"bundle name patch skipped: {exc}")
-    path = icon_path(".icns")
+    path = icon_path(_ICON_EXT_ICNS)
     if not path:
         return
     try:
@@ -269,12 +281,12 @@ def set_macos_app_identity() -> None:
 
 def set_app_icon() -> None:
     """Set the application icon (dock on macOS, taskbar on Windows)."""
-    if sys.platform == "darwin":
+    if sys.platform == PLATFORM_DARWIN:
         set_macos_app_identity()
-    elif sys.platform == "win32":
+    elif sys.platform == PLATFORM_WIN32:
         try:
             import ctypes  # noqa: PLC0415
-            path = icon_path(".ico")
+            path = icon_path(_ICON_EXT_ICO)
             if path:
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("quodeq.dashboard")
                 # Load icon and set for the process
@@ -282,7 +294,7 @@ def set_app_icon() -> None:
                 hicon = ctypes.windll.user32.LoadImageW(0, path, 1, 0, 0, icon_flags)
                 if hicon:
                     ctypes.windll.user32.SendMessageW(
-                        ctypes.windll.kernel32.GetConsoleWindow(), 0x0080, 0, hicon,
+                        ctypes.windll.kernel32.GetConsoleWindow(), _WM_SETICON, 0, hicon,
                     )
         except (AttributeError, OSError) as exc:
             log_debug(f"windows taskbar icon not set: {exc}")

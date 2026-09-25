@@ -1,7 +1,9 @@
 import { getThemeColors } from '../core/galaxyCore.js';
+import { HIT_TARGET_TYPE } from '../core/galaxyHitTypes.js';
 import { buildFolderScene } from './galaxyFolderScene.js';
 import { createTooltipUpdater } from './galaxyFolderTooltip.js';
 import { handleNodeClick, handleEmptySpaceClick } from './galaxyFolderClickHandlers.js';
+import { KEY } from '../../../../vocab/keyboard.js';
 
 function makeMouseMoveHandler(refs, updateTooltip) {
   return function handleMouseMove(e) {
@@ -51,7 +53,7 @@ function makeActivateStarHandler(refs, params) {
     const starIdx = stars.findIndex((s) => (s.path || s.name) === starPath);
     if (starIdx < 0) return;
     const s = stars[starIdx];
-    handleNodeClick(refs, { type: s.isFolder ? 'folder' : 'file', starIdx, data: s }, { startTransition, saveNav });
+    handleNodeClick(refs, { type: s.isFolder ? HIT_TARGET_TYPE.FOLDER : HIT_TARGET_TYPE.FILE, starIdx, data: s }, { startTransition, saveNav });
   };
 }
 
@@ -81,23 +83,23 @@ function makeKeyDownHandler(refs, handleClick) {
     const z = cam.z || 1;
     const step = PAN_STEP / z;
     switch (e.key) {
-      case 'ArrowLeft':
+      case KEY.ARROW_LEFT:
         e.preventDefault();
         cam.x -= step;
         break;
-      case 'ArrowRight':
+      case KEY.ARROW_RIGHT:
         e.preventDefault();
         cam.x += step;
         break;
-      case 'ArrowUp':
+      case KEY.ARROW_UP:
         e.preventDefault();
         cam.y -= step;
         break;
-      case 'ArrowDown':
+      case KEY.ARROW_DOWN:
         e.preventDefault();
         cam.y += step;
         break;
-      case 'Enter':
+      case KEY.ENTER:
       case ' ':
         e.preventDefault();
         handleClick();

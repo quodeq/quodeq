@@ -10,6 +10,7 @@ from quodeq.data.fs.report_parser.grades import (
     summarize_dimensions,
 )
 from quodeq.data.fs.report_parser.json_parser import (
+    OVERALL_PRINCIPLE,
     empty_severity_buckets,
     parse_eval_from_json,
     parse_evidence_file,
@@ -32,6 +33,7 @@ from quodeq.data.fs.report_parser.runs import (
 
 __all__ = [
     "NUMERIC_GRADE_ORDER",
+    "OVERALL_PRINCIPLE",
     "SEVERITIES",
     "TEXT_GRADE_ORDER",
     "RunInfo",

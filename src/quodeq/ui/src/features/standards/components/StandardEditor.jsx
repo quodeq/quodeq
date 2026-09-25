@@ -7,6 +7,7 @@ import ThresholdImpactDialog from './ThresholdImpactDialog.jsx';
 import { STANDARD_TYPES } from '../hooks/useStandards.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 const TYPE_LABELS = { [STANDARD_TYPES.BUILTIN]: t('standards.baseIso'), [STANDARD_TYPES.QUODEQ]: t('standards.baseQuodeq'), [STANDARD_TYPES.COMMUNITY]: t('standards.baseCommunity'), [STANDARD_TYPES.CUSTOM]: t('standards.baseCustom') };
 
@@ -19,9 +20,9 @@ const RESIZE_STEP_PX = 16; // one keyboard step
 /** ArrowLeft/ArrowRight resize the tree panel by one RESIZE_STEP_PX, clamped. */
 function makeDividerKeyDown(setWidth) {
   return (e) => {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    if (e.key !== KEY.ARROW_LEFT && e.key !== KEY.ARROW_RIGHT) return;
     e.preventDefault();
-    const delta = e.key === 'ArrowRight' ? RESIZE_STEP_PX : -RESIZE_STEP_PX;
+    const delta = e.key === KEY.ARROW_RIGHT ? RESIZE_STEP_PX : -RESIZE_STEP_PX;
     setWidth((w) => Math.min(MAX_TREE_WIDTH, Math.max(MIN_TREE_WIDTH, w + delta)));
   };
 }
@@ -31,6 +32,14 @@ function useResizable(defaultWidth) {
   const dragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
+
+  const resetBodyDragStyles = useCallback(() => {
+    dragging.current = false;
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+  }, []);
 
   const onMouseDown = useCallback((e) => {
     e.preventDefault();
@@ -51,19 +60,16 @@ function useResizable(defaultWidth) {
       setWidth(newWidth);
     };
     const onMouseUp = () => {
-      dragging.current = false;
-      if (typeof document !== 'undefined') {
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
+      resetBodyDragStyles();
     };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
     return () => {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      if (dragging.current) resetBodyDragStyles();
     };
-  }, []);
+  }, [resetBodyDragStyles]);
 
   return { width, onMouseDown, setWidth };
 }

@@ -3,6 +3,7 @@ import {
   resolveProjectDisplayName, selectSidebarCounts,
 } from './appGating.js';
 import { buildDashboardDataBundle, buildNavigationBundle } from './routes/renderers.jsx';
+import { NAV_TAB } from './vocab/navTab.js';
 
 // Pure prop-builders for App.jsx's Sidebar/TopBar wiring, extracted
 // verbatim from the inline JSX props so App.jsx itself stays a thin
@@ -46,9 +47,9 @@ export function buildTopBarProps({
     onEvaluate: shouldShowEvaluateButton(projectsCount, selectedSource) ? onEvaluateClick : null,
     evaluating,
     runProgress: topbarRunProgress,
-    onProviderClick: () => navTab('settings'),
+    onProviderClick: () => navTab(NAV_TAB.SETTINGS),
     onMenuToggle: () => setSidebarPinned((v) => !v),
-    onSelectProject: () => navTab('projects'),
+    onSelectProject: () => navTab(NAV_TAB.PROJECTS),
     breadcrumb,
     mobileTitle,
     canGoBack: navStackLength > 1,

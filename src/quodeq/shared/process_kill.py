@@ -13,6 +13,8 @@ import subprocess
 import sys
 from typing import Any
 
+from quodeq.shared.constants import PLATFORM_WIN32
+
 _logger = logging.getLogger(__name__)
 
 _TERMINATE_TIMEOUT_S = 10
@@ -21,7 +23,7 @@ _KILL_WAIT_TIMEOUT_S = 5
 
 def kill_tree(pid: int, sig: int = signal.SIGTERM) -> None:
     """Kill a process and all its children, cross-platform."""
-    if sys.platform == "win32":
+    if sys.platform == PLATFORM_WIN32:
         # taskkill /T kills the entire process tree
         subprocess.run(
             ["taskkill", "/F", "/T", "/PID", str(pid)],
@@ -82,7 +84,7 @@ def kill_proc_tree(proc: Any) -> None:
     # through to proc.kill(): on Windows `taskkill /PID None` RUNS (exits
     # non-zero without raising) and would otherwise return before the fallback.
     if pid is not None:
-        killed = _taskkill_tree(pid) if sys.platform == "win32" else _killpg_tree(pid)
+        killed = _taskkill_tree(pid) if sys.platform == PLATFORM_WIN32 else _killpg_tree(pid)
         if killed:
             return
     try:

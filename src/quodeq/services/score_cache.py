@@ -58,9 +58,15 @@ from quodeq.services._score_cache_fetch import (  # noqa: F401 — facade re-exp
     make_cache_backed_fetcher,
 )
 from quodeq.shared.env import get_score_cache_path  # noqa: F401 — facade re-export
+from quodeq.shared.utils import TEXT_ENCODING
 
 if TYPE_CHECKING:
     from quodeq.core.dismissals import DismissedKeys
+
+# Bumped whenever the accumulated/project-card cache-key computation changes
+# (see the version history in the payload below); an old value recomputes
+# instead of serving a stale entry.
+_ACCUMULATED_CACHE_ALGO_VERSION = 6
 
 
 def _params_fingerprint(params: ScoringParams) -> str:
@@ -95,7 +101,7 @@ def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
         ],
         "params": _params_fingerprint(params),
     }, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(TEXT_ENCODING)).hexdigest()
 
 
 def run_scoped_version(
@@ -120,7 +126,7 @@ def run_scoped_version(
         "deleted": sorted(str(k) for k in (deleted_all & run_class_keys)),
         "params": _params_fingerprint(params),
     }, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(TEXT_ENCODING)).hexdigest()
 
 
 def accumulated_cache_version(
@@ -160,13 +166,13 @@ def accumulated_cache_version(
         # under algo 5 hashes identically to a correct recompute, so without
         # this bump it is served forever (tests/services/
         # test_accumulated_version_heals_poison.py pins the keyspace exit).
-        "algo": 6,
+        "algo": _ACCUMULATED_CACHE_ALGO_VERSION,
         "params": _params_fingerprint(params),
         "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",
         **({} if visible_dims is None else {"visible": sorted(visible_dims)}),
     }, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(TEXT_ENCODING)).hexdigest()
 
 
 _IN_FLIGHT = frozenset({RunState.PENDING, RunState.RUNNING, RunState.FINALIZING})
@@ -187,7 +193,7 @@ def accumulated_stale_scope(
               for rid, status, version in run_versions]
     payload = json.dumps({"acc": accumulated_cache_version(params, masked, as_of),
                           "suppression": suppression_fp}, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(TEXT_ENCODING)).hexdigest()
 
 
 def per_run_versions(

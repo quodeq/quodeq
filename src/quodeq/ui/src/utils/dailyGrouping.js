@@ -3,12 +3,15 @@ import { RUN_STATE } from '../vocab/runState.js';
 import { GRANULARITY } from './granularity.js';
 
 const DAYS_PER_WEEK = 7;
+const PAD_CHAR = '0'; // padStart fill for two-digit month/day/week segments
 // ISO weeks are anchored on Thursday: shifting any date in the week to its
 // Thursday and reading that Thursday's year/week gives the correct ISO week
 // even when the week spans a year boundary.
 const ISO_WEEK_ANCHOR_DAY = 4;
 // "YYYY-MM".length
 export const YEAR_MONTH_KEY_LENGTH = 7;
+// "YYYY-MM-DD".length: slices a UTC instant string down to its date part.
+export const ISO_DATE_LENGTH = 10;
 
 /**
  * Local calendar-day key (YYYY-MM-DD) for a trend entry's dateISO.
@@ -25,13 +28,13 @@ export const YEAR_MONTH_KEY_LENGTH = 7;
  */
 export function localDayKey(dateISO) {
   const s = dateISO || '';
-  if (s.length <= 10) return s.slice(0, 10);
+  if (s.length <= ISO_DATE_LENGTH) return s.slice(0, ISO_DATE_LENGTH);
   const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return s.slice(0, 10);
+  if (Number.isNaN(d.getTime())) return s.slice(0, ISO_DATE_LENGTH);
   return [
     d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
+    String(d.getMonth() + 1).padStart(2, PAD_CHAR),
+    String(d.getDate()).padStart(2, PAD_CHAR),
   ].join('-');
 }
 
@@ -56,7 +59,7 @@ export function isoWeekKey(dateISO) {
   const isoYear = date.getUTCFullYear();
   const yearStart = new Date(Date.UTC(isoYear, 0, 1));
   const weekNo = Math.ceil(((date - yearStart) / MS_PER_DAY + 1) / DAYS_PER_WEEK);
-  return `${isoYear}-W${String(weekNo).padStart(2, '0')}`;
+  return `${isoYear}-W${String(weekNo).padStart(2, PAD_CHAR)}`;
 }
 
 /**

@@ -1,31 +1,39 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { providerKey, notifyProviderSettingsChanged, PROVIDER_CONFIGURED_MARKER } from '../../../constants.js';
+import {
+  providerKey, notifyProviderSettingsChanged, PROVIDER_CONFIGURED_MARKER, PROVIDER_SETTING_KEY,
+} from '../../../constants.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { saveProviderKey } from '../../../api/providers.js';
 import { t } from '../../../strings/index.js';
+import { STORED_FALSE, STORED_TRUE } from '../../../adapters/storage.js';
 
 export { PROVIDER_CONFIGURED_MARKER };
 
-const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'time-limit', 'per-dimension', 'verify', 'api-key', 'api-base', 'cmd-path'];
+const SETTINGS = [
+  PROVIDER_SETTING_KEY.MODEL, PROVIDER_SETTING_KEY.MODEL_ANALYSIS, PROVIDER_SETTING_KEY.MODEL_FAST,
+  PROVIDER_SETTING_KEY.MODEL_BALANCED, PROVIDER_SETTING_KEY.MODEL_THOROUGH, PROVIDER_SETTING_KEY.SUBAGENTS,
+  PROVIDER_SETTING_KEY.TIME_LIMIT, PROVIDER_SETTING_KEY.PER_DIMENSION, PROVIDER_SETTING_KEY.VERIFY,
+  PROVIDER_SETTING_KEY.API_KEY, PROVIDER_SETTING_KEY.API_BASE, PROVIDER_SETTING_KEY.CMD_PATH,
+];
 const DEFAULTS = {
-  'model': '',
-  'model-analysis': '',
-  'model-fast': '',
-  'model-balanced': '',
-  'model-thorough': '',
-  'subagents': '1',
-  'time-limit': '0',
+  [PROVIDER_SETTING_KEY.MODEL]: '',
+  [PROVIDER_SETTING_KEY.MODEL_ANALYSIS]: '',
+  [PROVIDER_SETTING_KEY.MODEL_FAST]: '',
+  [PROVIDER_SETTING_KEY.MODEL_BALANCED]: '',
+  [PROVIDER_SETTING_KEY.MODEL_THOROUGH]: '',
+  [PROVIDER_SETTING_KEY.SUBAGENTS]: '1',
+  [PROVIDER_SETTING_KEY.TIME_LIMIT]: '0',
   // Grouped is the engine's actual default; the pill must not claim
   // per-dimension for an untouched toggle.
-  'per-dimension': 'false',
-  'verify': 'true',
-  'api-key': '',
-  'api-base': '',
-  'cmd-path': '',
+  [PROVIDER_SETTING_KEY.PER_DIMENSION]: STORED_FALSE,
+  [PROVIDER_SETTING_KEY.VERIFY]: STORED_TRUE,
+  [PROVIDER_SETTING_KEY.API_KEY]: '',
+  [PROVIDER_SETTING_KEY.API_BASE]: '',
+  [PROVIDER_SETTING_KEY.CMD_PATH]: '',
 };
 
 // Legacy storage key fallback, only consulted when the new key has no value.
-const LEGACY_KEY_MAP = { 'time-limit': 'pool-budget' };
+const LEGACY_KEY_MAP = { [PROVIDER_SETTING_KEY.TIME_LIMIT]: PROVIDER_SETTING_KEY.POOL_BUDGET };
 
 /**
  * Reads one provider's settings, falling back to `overrides` and then the
@@ -41,7 +49,7 @@ export function loadProviderState(providerId, overrides, storage = localStorage,
   const state = {};
   for (const key of SETTINGS) {
     let value = storage.getItem(providerKey(providerId, key));
-    if (key === 'api-key' && value === PROVIDER_CONFIGURED_MARKER) {
+    if (key === PROVIDER_SETTING_KEY.API_KEY && value === PROVIDER_CONFIGURED_MARKER) {
       // The sentinel means "the backend holds a key", not "here is a key".
       // Consumers of state['api-key'] (OmlxTab hands it straight to
       // getOmlxModels / testOmlxConcurrency as a real credential) would
@@ -94,7 +102,7 @@ export async function saveProviderApiKey(providerId, apiKey, storage = localStor
   try {
     const { stored } = await saveProviderKey(providerId, apiKey);
     if (!stored) throw new Error('Provider key was not stored');
-    storage.setItem(providerKey(providerId, 'api-key'), PROVIDER_CONFIGURED_MARKER);
+    storage.setItem(providerKey(providerId, PROVIDER_SETTING_KEY.API_KEY), PROVIDER_CONFIGURED_MARKER);
     return true;
   } catch (err) {
     console.warn('[useProviderSettings] Could not save provider API key:', err);
@@ -134,7 +142,7 @@ export default function useProviderSettings(providerId, defaults, { storage = lo
   const update = useCallback((key, value) => {
     setState(prev => ({ ...prev, [key]: String(value) }));
     const onPersistError = () => showToast(t('settings.persistError'));
-    if (key === 'api-key') {
+    if (key === PROVIDER_SETTING_KEY.API_KEY) {
       // Fire and forget: saveProviderApiKey catches its own failures, reports
       // them through onPersistError and resolves false, so there is nothing
       // left here to reject.

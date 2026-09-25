@@ -11,6 +11,8 @@
  */
 import { lazy } from 'react';
 import { buildProjectRootFile } from '../utils/explorerUtils.js';
+import { NAV_TAB } from '../vocab/navTab.js';
+import { ROW_TYPE, VIOLATIONS_SUB_TAB } from '../features/violations/violationsVocab.js';
 
 const ViolationsPage = lazy(() => import('../features/violations/components/ViolationsPage.jsx'));
 
@@ -47,10 +49,10 @@ function makeNavigateToPrinciple({ dimMap, principleMap, nav }) {
     // backend can rescore and project the action into SQL — without this the
     // PrincipleDetail score never moves on dismiss and the entry never lands
     // on the Dismissed tab.
-    nav('evalprinciple', {
+    nav(NAV_TAB.EVAL_PRINCIPLE, {
       evalPrincipal: buildEvalPrincipal(principleObj, pg, dim?.fromRunId),
       severity,
-      sourceTab: 'violations',
+      sourceTab: NAV_TAB.VIOLATIONS,
     });
   };
 }
@@ -65,12 +67,12 @@ function makeNavigateToDimension({ dimMap, nav }) {
     // aggregated from the dimension, with the chosen severity preselected.
     const dimFile = buildProjectRootFile([dim], dim.dimension);
     const severityFilter = severity || 'all';
-    nav('file', {
+    nav(NAV_TAB.FILE, {
       file: dimFile,
       severityFilter,
       runId: dim.fromRunId,
       dateLabel: dim.fromDateLabel,
-      sourceTab: 'violations',
+      sourceTab: NAV_TAB.VIOLATIONS,
     });
   };
 }
@@ -104,10 +106,10 @@ function buildViolationsData({ props, acc, dims }) {
 // in useDashboard.js.
 function buildViolationsCallbacks({ props, nav, navigateToPrinciple, navigateToDimension }) {
   return {
-    onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
-    onFileClick: (fileObj, opts) => nav('file', { file: fileObj, sourceTab: 'violations', severityFilter: opts?.severity || null }),
+    onDimensionClick: (dim) => nav(NAV_TAB.EXPLORER, { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: NAV_TAB.VIOLATIONS }),
+    onFileClick: (fileObj, opts) => nav(NAV_TAB.FILE, { file: fileObj, sourceTab: NAV_TAB.VIOLATIONS, severityFilter: opts?.severity || null }),
     onCellClick: ({ row, severity }) => {
-      if (row.type === 'principle' && row.principleObj) {
+      if (row.type === ROW_TYPE.PRINCIPLE && row.principleObj) {
         navigateToPrinciple(row.principleObj, severity);
       } else {
         navigateToDimension(row, severity);
@@ -130,8 +132,8 @@ function buildViolationsPageProps({ params, props, acc, dims, nav, navigateToPri
     // screen: it lives in the route entry so back/forward and the crumb see
     // it, but flipping replaces (never pushes) so history doesn't grow.
     // Params are spread forward so _tabKey survives the flip.
-    subTab: params.subTab || 'dimension',
-    onSubTabChange: (v) => props.navigation.handleNavigateReplace('violations', { ...params, subTab: v }),
+    subTab: params.subTab || VIOLATIONS_SUB_TAB.DIMENSION,
+    onSubTabChange: (v) => props.navigation.handleNavigateReplace(NAV_TAB.VIOLATIONS, { ...params, subTab: v }),
   };
 }
 

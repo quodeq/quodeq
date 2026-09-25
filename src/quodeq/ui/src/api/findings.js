@@ -3,6 +3,7 @@
  */
 
 import { request } from './request.js';
+import { LATEST_RUN_ID } from '../constants.js';
 
 // The dismissed list is per-project user data: a single response with all
 // entries is fine for any realistic project (a few thousand at most). Ask
@@ -66,9 +67,9 @@ export async function restoreAllFindings(projectId) {
  * @param {string} [run='latest'] - Run ID (optional, defaults to latest)
  * @returns {Promise<{dimensions: Array, summary: object}>} Rescored data
  */
-export async function getRescore(projectId, run = 'latest') {
+export async function getRescore(projectId, run = LATEST_RUN_ID) {
   const params = new URLSearchParams({ project: projectId });
-  if (run && run !== 'latest') params.set('run', run);
+  if (run && run !== LATEST_RUN_ID) params.set('run', run);
   return request(`/rescore?${params}`);
 }
 

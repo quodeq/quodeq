@@ -3,7 +3,7 @@ import ScanProgress from '../../../evaluation/components/ScanProgress.jsx';
 import FolderBrowser from '../../../evaluation/components/FolderBrowser.jsx';
 import CloneTargetStep from './CloneTargetStep.jsx';
 import { RepoScanSummary } from './RepoScanSummary.jsx';
-import { useRepoScanStep } from '../../hooks/useRepoScanStep.js';
+import { useRepoScanStep, REPO_SCAN_SUB_STEP } from '../../hooks/useRepoScanStep.js';
 import { SCAN_SUB_STATE } from '../../onboardingVocab.js';
 import { t } from '../../../../strings/index.js';
 
@@ -94,12 +94,12 @@ export default function RepoScanStep({ state, actions, createProject, getProject
     handleSubmit, handleCloneTargetSubmit, handleFolderSelect,
   } = useRepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan });
 
-  if (subStep === 'cloneTarget') {
+  if (subStep === REPO_SCAN_SUB_STEP.CLONE_TARGET) {
     return (
       <CloneTargetStep
         repoUrl={state.repo.value?.trim()}
         onSubmit={handleCloneTargetSubmit}
-        onBack={() => { setSubStep('input'); setCloneError(null); }}
+        onBack={() => { setSubStep(REPO_SCAN_SUB_STEP.INPUT); setCloneError(null); }}
         submitting={cloneSubmitting}
         error={cloneError}
         stepIndex={stepIndex}

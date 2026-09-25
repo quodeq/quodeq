@@ -1,6 +1,6 @@
 // src/quodeq/ui/src/utils/reportBuilder/principleBuilder.js
 import { formatDate, groupBySeverity, buildComplianceSection, buildViolationsSection, showsCompliance, runSuffix } from './shared.js';
-import { SEVERITY } from '../../vocab/severity.js';
+import { SEVERITY, SEVERITY_FILTER_ALL } from '../../vocab/severity.js';
 import { FINDING_TYPE } from '../../vocab/findingType.js';
 
 function buildPrincipleHeaderSection({ principle, dimension, score, grade, runId, dateLabel, principleData }) {
@@ -39,17 +39,17 @@ function buildPrincipleHeaderSection({ principle, dimension, score, grade, runId
  */
 export function buildPrincipleReport({ principle, dimension, score, grade, violations, violationsBySeverity, compliance, principleData, runId, dateLabel, severityFilter }) {
   const rawViolations = violations || [];
-  const complianceList = (compliance || []).filter((c) => c.file || c.reason || c.snippet);
+  const complianceList = (compliance || []).filter((c) => c.file || c.reason || c.snippet || c.detailDeferred);
 
   const lines = buildPrincipleHeaderSection({ principle, dimension, score, grade, runId, dateLabel, principleData });
 
   const showViolations = severityFilter !== FINDING_TYPE.COMPLIANCE;
   const showCompliance = showsCompliance(severityFilter);
 
-  const filteredViolations = (showViolations && severityFilter && severityFilter !== 'all')
+  const filteredViolations = (showViolations && severityFilter && severityFilter !== SEVERITY_FILTER_ALL)
     ? rawViolations.filter((v) => (v.severity || SEVERITY.MINOR).toLowerCase() === severityFilter)
     : (showViolations ? rawViolations : []);
-  const bySeverity = (violationsBySeverity && (!severityFilter || severityFilter === 'all'))
+  const bySeverity = (violationsBySeverity && (!severityFilter || severityFilter === SEVERITY_FILTER_ALL))
     ? violationsBySeverity
     : groupBySeverity(filteredViolations);
 

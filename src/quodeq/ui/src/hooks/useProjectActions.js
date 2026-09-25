@@ -18,14 +18,17 @@ import { chooseDialog } from '../utils/chooseDialog.js';
 import { t } from '../strings/index.js';
 import { apiErrorMessage } from '../strings/apiErrors.js';
 import { HTTP_STATUS } from '../constants.js';
+import { DIALOG_VARIANT } from '../vocab/dialogVariant.js';
 
 // Strip filesystem-unfriendly characters so a project name like
 // "foo/bar" or "..\\evil" can't influence the download path.
+const MAX_EXPORT_FILENAME_LENGTH = 100; // keeps the downloaded .zip's name reasonable
+
 function sanitizeFilename(name) {
   return String(name || '')
     .replace(/[/\\:*?"<>|\x00-\x1f]+/g, '_')
     .replace(/^\.+/, '_')
-    .slice(0, 100) || 'project';
+    .slice(0, MAX_EXPORT_FILENAME_LENGTH) || 'project';
 }
 
 function makeFail(onError) {
@@ -97,9 +100,11 @@ function makeAttemptImport(importProject) {
   };
 }
 
+const IMPORT_CONFLICT_SAME_UUID = 'same_uuid'; // backend import-conflict kind: same project uuid already exists locally
+
 function makeResolveImportConflict(attemptImport) {
   return async function _resolveImportConflict(file, err) {
-    const isSameUuid = err.kind === 'same_uuid';
+    const isSameUuid = err.kind === IMPORT_CONFLICT_SAME_UUID;
     // Four whole sentences rather than one with an optional ` "name"` spliced
     // in: the quoting style is locale-dependent (guillemets, low-high quotes)
     // and the name does not sit in the same place in every word order.
@@ -114,9 +119,9 @@ function makeResolveImportConflict(attemptImport) {
     const actions = isSameUuid
       ? [
           { key: 'copy', label: t('projects.importAsCopy'), variant: 'default' },
-          { key: 'replace', label: t('projects.replace'), variant: 'danger' },
+          { key: 'replace', label: t('projects.replace'), variant: DIALOG_VARIANT.DANGER },
         ]
-      : [{ key: 'copy', label: t('projects.importAsCopy'), variant: 'primary' }];
+      : [{ key: 'copy', label: t('projects.importAsCopy'), variant: DIALOG_VARIANT.PRIMARY }];
     const choice = await chooseDialog({
       title: t('projects.alreadyExistsTitle'),
       message,

@@ -8,6 +8,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from quodeq.shared.constants import LOCALHOST
+
 # Leading http(s) scheme of a repository URL. Shared by the api and services
 # URL normalizers so both layers agree on what counts as a scheme.
 SCHEME_RE = re.compile(r"^(https?://)")
@@ -46,7 +48,7 @@ def looks_like_authority(candidate: str) -> bool:
         return False
     if not all(c.isalnum() or c in "-._~[]" for c in host):
         return False
-    return "." in host or host.startswith("[") or host == "localhost"
+    return "." in host or host.startswith("[") or host == LOCALHOST
 
 
 def _strip_userinfo(url: str) -> str:

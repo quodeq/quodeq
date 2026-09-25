@@ -6,17 +6,10 @@ import {
 } from './galaxyFolderDraw.js';
 import { useCanvasSize } from './galaxyCanvasSize.js';
 import { CAMERA, MIN_VISIBLE_ALPHA } from './galaxyTuning.js';
+import { DRIFT } from './galaxyDrift.js';
 
 const TRANS = 0.8;
 const FLY_DURATION = 1.4;
-// Idle star drift: sine on x, cosine on y. Speeds and phases are
-// intentionally unequal so the two axes never sync into a straight-line
-// wobble. One amplitude (world units) serves both axes.
-const DRIFT_SPEED_X = 0.015;
-const DRIFT_SPEED_Y = 0.012;
-const DRIFT_PHASE_X = 1.1;
-const DRIFT_PHASE_Y = 0.8;
-const DRIFT_AMPLITUDE = 2;
 // The very first frame of a fly is painted at this alpha rather than the
 // ramp's value, so the transition starts from a visible scene.
 const INITIAL_FLY_ALPHA = 0.85;
@@ -62,9 +55,9 @@ function advanceFrameCamera(cam, fly, refs, scene, opts) {
 function updateStarPositions(activeScene, frame, fly, refs) {
   const { t, W, H } = frame;
   activeScene.rootStars.forEach((s, i) => {
-    const drift = Math.sin(t * DRIFT_SPEED_X + i * DRIFT_PHASE_X) * DRIFT_AMPLITUDE;
+    const drift = Math.sin(t * DRIFT.speedX + i * DRIFT.phaseX) * DRIFT.amplitude;
     s.x = W / 2 + s.ox + drift;
-    s.y = H / 2 + s.oy + Math.cos(t * DRIFT_SPEED_Y + i * DRIFT_PHASE_Y) * DRIFT_AMPLITUDE;
+    s.y = H / 2 + s.oy + Math.cos(t * DRIFT.speedY + i * DRIFT.phaseY) * DRIFT.amplitude;
   });
   if (fly) return;
   const focusedFolder = refs.focusedFolderRef.current;

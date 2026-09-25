@@ -2,6 +2,7 @@
  * Pure helpers for the setup card's "detected files" line and time-budget
  * chips. No React — node-testable.
  */
+import { SECONDS_PER_MINUTE } from '../../../utils/time.js';
 
 // Extension → display language for the detected-files line. Only analyzable
 // extensions (mirrors _CODE_EXTENSIONS in services/_fs_scan.py); everything
@@ -64,7 +65,7 @@ export const BUDGET_CHOICES_S = [BUDGET_5_MIN_S, BUDGET_10_MIN_S, BUDGET_20_MIN_
 /** "10:00" for seconds, "no limit" for 0/negative. */
 export function formatBudgetLabel(seconds) {
   if (!(seconds > 0)) return 'no limit';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
+  const m = Math.floor(seconds / SECONDS_PER_MINUTE);
+  const s = Math.floor(seconds % SECONDS_PER_MINUTE);
   return `${m}:${String(s).padStart(2, '0')}`;
 }

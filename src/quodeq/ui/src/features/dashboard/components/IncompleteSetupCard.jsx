@@ -5,10 +5,7 @@ import { t } from '../../../strings/index.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { writeString } from '../../../adapters/storage.js';
 import { LAST_CLONE_ROOT_STORAGE_KEY } from '../../../constants.js';
-
-// repository_info.json value written by the pre-clone registration flow: the
-// project exists only as a remote URL, with no local checkout yet.
-const LEGACY_ONLINE_LOCATION = 'online';
+import { PROJECT_LOCATION } from '../../../models/project.js';
 
 /**
  * Surfaces a "Complete setup" CTA on the project view for legacy projects
@@ -22,7 +19,7 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  if (!projectInfo || projectInfo.location !== LEGACY_ONLINE_LOCATION) return null;
+  if (!projectInfo || projectInfo.location !== PROJECT_LOCATION.ONLINE) return null;
   const repoUrl = projectInfo.path || projectInfo.repo || '';
 
   async function handleSubmit({ cloneDest, ephemeral }) {

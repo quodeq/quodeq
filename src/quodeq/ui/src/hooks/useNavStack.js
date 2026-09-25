@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useTransition } from 'react';
 import { toHistoryEntry, handlePopState } from './navHistoryEntry.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
-const DEFAULT_PAGE = 'overview';
+const DEFAULT_PAGE = NAV_TAB.OVERVIEW;
 
 /** Default history adapter delegating to window.history. */
 const defaultHistoryAdapter = {

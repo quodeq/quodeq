@@ -12,6 +12,7 @@ _SEVERITY_CHOICES = [s.value for s in SEVERITY_ORDER]
 _DEFAULT_N_SUBAGENTS = 5
 _MODE_NUMERICAL = "numerical"
 _MODE_GRADES = "grades"
+_OUTPUT_FLAG = "--output"
 
 # Spells out the single-letter counters in the progress lines the scan emits.
 # They are abbreviated there to keep the line readable at a glance.
@@ -32,7 +33,7 @@ progress lines:
 def _add_output_args(parser: argparse.ArgumentParser) -> None:
     """Register output and scoring mode arguments."""
     parser.add_argument(
-        "-o", "--output", default=get_evaluations_dir(), help="Reports output directory"
+        "-o", _OUTPUT_FLAG, default=get_evaluations_dir(), help="Reports output directory"
     )
     parser.add_argument(
         "-m", "--mode", default=_MODE_NUMERICAL,
@@ -196,7 +197,7 @@ def _add_export_subcommand(subparsers) -> None:
     export_sub = export_parser.add_subparsers(dest="export_format")
     sarif_parser = export_sub.add_parser("sarif", help="Export findings as a SARIF 2.1.0 file")
     sarif_parser.add_argument("--evaluation-dir", required=True, help="Directory containing evaluation/<dim>.json reports")
-    sarif_parser.add_argument("-o", "--output", required=True, help="Path to write the .sarif file")
+    sarif_parser.add_argument("-o", _OUTPUT_FLAG, required=True, help="Path to write the .sarif file")
     sarif_parser.add_argument(
         "--min-severity", default=None, choices=_SEVERITY_CHOICES,
         help="Drop findings below this severity.",
@@ -232,7 +233,7 @@ def _add_review_subcommand(subparsers) -> None:
              "--pool-budget is a deprecated alias.",
     )
     review_parser.add_argument(
-        "--output",
+        _OUTPUT_FLAG,
         help="Evaluation output directory (default: ~/.quodeq/evaluations)",
     )
     review_parser.add_argument(

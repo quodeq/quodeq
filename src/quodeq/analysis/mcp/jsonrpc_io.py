@@ -29,8 +29,12 @@ def read_message() -> dict | None:
         if not line:
             continue
         try:
-            return json.loads(line)
+            msg = json.loads(line)
         except json.JSONDecodeError:
             sys.stderr.write(f"Skipping malformed JSON: {line[:_MAX_LOG_LINE_PREVIEW]}\n")
             continue
+        if not isinstance(msg, dict):
+            sys.stderr.write(f"Skipping non-object JSON-RPC message: {line[:_MAX_LOG_LINE_PREVIEW]}\n")
+            continue
+        return msg
     return None

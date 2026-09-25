@@ -8,6 +8,7 @@
  */
 import { useLocalApiConcurrencyTest } from './useLocalApiConcurrencyTest.js';
 import { t } from '../../../strings/index.js';
+import { PROVIDER_SETTING_KEY } from '../../../constants.js';
 
 /**
  * Wire a provider tab's auto-detect button.
@@ -26,7 +27,7 @@ export function useLocalApiTabTest({ probe, errorKey, update, enabled = true }) 
   const onRunTest = async () => {
     if (!enabled) return;
     const result = await runConcurrencyTest();
-    if (result?.recommended) update('subagents', String(result.recommended));
+    if (result?.recommended) update(PROVIDER_SETTING_KEY.SUBAGENTS, String(result.recommended));
   };
   return {
     testing,

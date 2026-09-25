@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { LATEST_RUN_ID } from '../constants.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 // Builds the prev/next/latest/view/select handlers that operate on the
 // overview run index.
@@ -6,22 +8,22 @@ function makeRunNavigatorHandlers({ overviewRunIndex, setOverviewRunIndex, avail
   function handleRunPrev() {
     const idx = Math.min(overviewRunIndex + 1, availableRuns.length - 1);
     setOverviewRunIndex(idx);
-    onRunChange(availableRuns[idx]?.runId || 'latest');
+    onRunChange(availableRuns[idx]?.runId || LATEST_RUN_ID);
   }
 
   function handleRunNext() {
     const idx = Math.max(overviewRunIndex - 1, 0);
     setOverviewRunIndex(idx);
-    onRunChange(availableRuns[idx]?.runId || 'latest');
+    onRunChange(availableRuns[idx]?.runId || LATEST_RUN_ID);
   }
 
   function handleRunLatest() {
     setOverviewRunIndex(0);
-    onRunChange(availableRuns[0]?.runId || 'latest');
+    onRunChange(availableRuns[0]?.runId || LATEST_RUN_ID);
   }
 
   function handleRunView() {
-    onNavigate('run', { runId: currentOverviewRun });
+    onNavigate(NAV_TAB.RUN, { runId: currentOverviewRun });
   }
 
   function handleRunSelect(runId) {
@@ -50,7 +52,7 @@ export function useRunNavigator({ selectedRun, availableRuns, onRunChange, onNav
 
   useEffect(() => {
     if (!availableRuns.length) return;
-    if (selectedRun === 'latest') {
+    if (selectedRun === LATEST_RUN_ID) {
       setOverviewRunIndex(0);
     } else {
       const idx = availableRuns.findIndex((r) => r.runId === selectedRun);
@@ -58,7 +60,7 @@ export function useRunNavigator({ selectedRun, availableRuns, onRunChange, onNav
     }
   }, [selectedRun, availableRuns]);
 
-  const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || 'latest';
+  const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || LATEST_RUN_ID;
 
   const handlers = makeRunNavigatorHandlers({ overviewRunIndex, setOverviewRunIndex, availableRuns, onRunChange, onNavigate, currentOverviewRun });
 

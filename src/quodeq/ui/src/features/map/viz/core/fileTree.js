@@ -1,4 +1,4 @@
-import { SEVERITY } from '../../../../vocab/severity.js';
+import { SEVERITY, SEVERITY_FILTER_ALL } from '../../../../vocab/severity.js';
 import { FINDING_TYPE } from '../../../../vocab/findingType.js';
 
 function createNode(name, path, isFile) {
@@ -96,7 +96,7 @@ export function treeNodeToFileObj(node, { severity } = {}) {
   const items = collectItems(node);
   let violations = items.filter((i) => i.type === FINDING_TYPE.VIOLATION);
   let compliance = items.filter((i) => i.type === FINDING_TYPE.COMPLIANCE);
-  if (severity && severity !== 'all') {
+  if (severity && severity !== SEVERITY_FILTER_ALL) {
     violations = violations.filter((v) => (v.severity || SEVERITY.MINOR) === severity);
     compliance = []; // severity filter shows only violations
   }

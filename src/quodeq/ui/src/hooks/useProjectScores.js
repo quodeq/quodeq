@@ -16,6 +16,7 @@ import { resolveAsOf, deriveAvailableRuns } from './projectScoresDerived.js';
 import { t } from '../strings/index.js';
 import { STALE_TIME_MS, refetchWhileError } from './queryDefaults.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { LATEST_RUN_ID } from '../constants.js';
 
 /**
  * @param {{
@@ -113,7 +114,7 @@ export function useProjectScores({ selectedProject, selectedRun, selectedSource 
   // fall back to 'latest' so the cards keep showing the last finished
   // evaluation instead of going blank mid-flight. Resolution waits for
   // latestQuery so we never fire the scoped query with a stale asOf.
-  const isLatestSelection = !selectedRun || selectedRun === "latest";
+  const isLatestSelection = !selectedRun || selectedRun === LATEST_RUN_ID;
   const asOf = useMemo(
     () => resolveAsOf({ isLatestSelection, selectedRun, latestQueryData: latestQuery.data }),
     [isLatestSelection, selectedRun, latestQuery.data]

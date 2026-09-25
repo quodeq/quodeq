@@ -14,11 +14,17 @@ import unicodedata
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 
+from quodeq.shared.constants import GIT_BIN, GIT_DIR_NAME, GIT_FLAG_C
 from quodeq.shared.repo import normalize_remote_url
 
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT_S = 10
+
+# stream_log_names' churn-history window. Public: also the fallback default
+# for analysis/subagents/_git_scoring.py's git_lookback_months config knob,
+# which forwards it into stream_log_names(months=...).
+DEFAULT_GIT_LOOKBACK_MONTHS = 3
 
 
 def run_git(
@@ -28,7 +34,7 @@ def run_git(
     """Run ``git *args`` and return stdout, or None on any failure."""
     try:
         result = subprocess.run(
-            ["git", *args],
+            [GIT_BIN, *args],
             cwd=str(cwd) if cwd is not None else None,
             capture_output=True, text=True, encoding="utf-8", timeout=timeout,
         )
@@ -98,7 +104,7 @@ def _tracked_rels(
     """Tracked paths as git reports them, or None when it cannot answer."""
     try:
         out = run_git(
-            ["-C", str(path), "ls-files", "-z", "--cached", *pathspec], timeout=timeout,
+            [GIT_FLAG_C, str(path), "ls-files", "-z", "--cached", *pathspec], timeout=timeout,
         )
     except UnicodeDecodeError:
         # run_git decodes stdout as strict UTF-8; a tracked path carrying
@@ -112,10 +118,10 @@ def _tracked_rels(
 
 def list_branches(repo_dir: Path, *, timeout: float = _DEFAULT_TIMEOUT_S) -> list[str]:
     """Local branch names of *repo_dir*; empty when not a git repo."""
-    if not (repo_dir / ".git").exists():
+    if not (repo_dir / GIT_DIR_NAME).exists():
         return []
     out = run_git(
-        ["-C", str(repo_dir), "branch", "--format=%(refname:short)"],
+        [GIT_FLAG_C, str(repo_dir), "branch", "--format=%(refname:short)"],
         timeout=timeout,
     )
     if out is None:
@@ -126,7 +132,7 @@ def list_branches(repo_dir: Path, *, timeout: float = _DEFAULT_TIMEOUT_S) -> lis
 
 def remote_origin_url_raw(repo_dir: Path | str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> str | None:
     """``git remote get-url origin`` verbatim, or None when absent/unreadable."""
-    out = run_git(["-C", str(repo_dir), "remote", "get-url", "origin"], timeout=timeout)
+    out = run_git([GIT_FLAG_C, str(repo_dir), "remote", "get-url", "origin"], timeout=timeout)
     if out is None:
         return None
     origin = out.strip()
@@ -141,7 +147,7 @@ def git_remote_url(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> st
     ``host/owner/repo`` via ``shared._repo.normalize_remote_url``.
     """
     out = run_git(
-        ["-C", repo_path, "config", "--get", "remote.origin.url"], timeout=timeout,
+        [GIT_FLAG_C, repo_path, "config", "--get", "remote.origin.url"], timeout=timeout,
     )
     if out is None:
         return None
@@ -149,7 +155,7 @@ def git_remote_url(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> st
 
 
 def stream_log_names(
-    repo_dir: Path, *, months: int = 3, timeout: float = _DEFAULT_TIMEOUT_S,
+    repo_dir: Path, *, months: int = DEFAULT_GIT_LOOKBACK_MONTHS, timeout: float = _DEFAULT_TIMEOUT_S,
 ) -> Iterator[str]:
     """Yield ``git log --name-only`` lines one at a time (streaming Popen).
 

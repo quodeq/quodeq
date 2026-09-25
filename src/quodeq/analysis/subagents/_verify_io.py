@@ -8,13 +8,18 @@ from typing import Any
 
 from quodeq.core.types.finding_type import FINDING_TYPES
 from quodeq.data.fs.report_parser.runs import list_runs
+from quodeq.shared.constants import EVIDENCE_DIRNAME
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import open_text
+
+# How many of the project's most recent runs to scan for a usable previous
+# evidence file before giving up.
+_RECENT_RUNS_SEARCH_LIMIT = 20
 
 
 def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_id: str, dim_id: str) -> Path | None:
     """Find the JSONL evidence file from the most recent previous run."""
-    runs = list_runs(reports_root, project_uuid, limit=20)
+    runs = list_runs(reports_root, project_uuid, limit=_RECENT_RUNS_SEARCH_LIMIT)
     for run in runs:
         if run.run_id == current_run_id:
             continue
@@ -22,7 +27,7 @@ def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_i
         # Only use evidence from runs that completed (have a scored report)
         if not (run_dir / "evaluation" / f"{dim_id}.json").is_file():
             continue
-        prev_jsonl = run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
+        prev_jsonl = run_dir / EVIDENCE_DIRNAME / f"{dim_id}_evidence.jsonl"
         if prev_jsonl.exists() and prev_jsonl.stat().st_size > 0:
             return prev_jsonl
     return None
@@ -74,9 +79,9 @@ def load_previous_findings(
 def resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
     """Walk up from evidence_dir to find run_id, project_uuid, reports_base."""
     edir = Path(evidence_dir)
-    while edir.name != "evidence" and edir != edir.parent:
+    while edir.name != EVIDENCE_DIRNAME and edir != edir.parent:
         edir = edir.parent
-    if edir.name != "evidence":
+    if edir.name != EVIDENCE_DIRNAME:
         return None
     run_dir = edir.parent
     return run_dir.name, run_dir.parent.name, run_dir.parent.parent

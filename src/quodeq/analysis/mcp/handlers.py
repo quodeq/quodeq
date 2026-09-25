@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from quodeq import __version__
+from quodeq.core.jsonrpc import JsonRpcErrorCode
 from quodeq.analysis.mcp.jsonrpc_io import JSONRPC_VERSION, send as _send, ok as _ok
 from quodeq.analysis.mcp.schemas import (
     DEFAULT_FILE_BATCH_SIZE,
@@ -26,10 +27,10 @@ if TYPE_CHECKING:
     from quodeq.analysis.subagents.file_queue import FileQueue
     from quodeq.analysis.mcp.findings_server import FindingsRouter
 
-_JSONRPC_METHOD_NOT_FOUND = -32601
 _MCP_DEFAULT_PROTOCOL_VERSION = "2024-11-05"
 _SERVER_NAME = "quodeq-findings"
 _SERVER_VERSION = __version__ or "0.0.0"
+_CONTENT_TYPE_TEXT = "text"  # MCP tool-result content block type; every reply here is plain text
 
 
 def _max_file_batch_size(env: dict[str, str] | None = None) -> int:
@@ -76,7 +77,7 @@ def _handle_report_finding(request_id: object, args: dict, router: FindingsRoute
     """Handle a `report_finding` tool call."""
     message, _is_dup = router.receive(args)
     return _ok(request_id, {
-        "content": [{"type": "text", "text": message}],
+        "content": [{"type": _CONTENT_TYPE_TEXT, "text": message}],
     })
 
 
@@ -86,7 +87,7 @@ def _handle_get_next_files(
     """Handle a `get_next_files` tool call."""
     if queue is None:
         return _ok(request_id, {
-            "content": [{"type": "text", "text": "No file queue configured. Ensure the evaluation was started with a file manifest and the queue path is set."}],
+            "content": [{"type": _CONTENT_TYPE_TEXT, "text": "No file queue configured. Ensure the evaluation was started with a file manifest and the queue path is set."}],
             "isError": True,
         })
     count = args.get("count", DEFAULT_FILE_BATCH_SIZE)
@@ -96,11 +97,11 @@ def _handle_get_next_files(
     files = queue.take(count, agent_id=agent_id)
     if not files:
         return _ok(request_id, {
-            "content": [{"type": "text", "text": "DONE. Queue empty — no more files to analyse. Stop immediately and do not call any more tools."}],
+            "content": [{"type": _CONTENT_TYPE_TEXT, "text": "DONE. Queue empty — no more files to analyse. Stop immediately and do not call any more tools."}],
         })
     file_list = "\n".join(files)
     return _ok(request_id, {
-        "content": [{"type": "text", "text": f"{len(files)} files to analyse:\n{file_list}"}],
+        "content": [{"type": _CONTENT_TYPE_TEXT, "text": f"{len(files)} files to analyse:\n{file_list}"}],
     })
 
 
@@ -111,18 +112,18 @@ def _handle_mark_file_done(request_id: object, args: dict, router: FindingsRoute
     reason = args.get("reason") or None
     if not isinstance(file, str) or not isinstance(status, str):
         return _ok(request_id, {
-            "content": [{"type": "text", "text": "mark_file_done requires 'file' (string) and 'status' (\"ok\"|\"error\")"}],
+            "content": [{"type": _CONTENT_TYPE_TEXT, "text": "mark_file_done requires 'file' (string) and 'status' (\"ok\"|\"error\")"}],
             "isError": True,
         })
     try:
         router.mark_file_done(file=file, status=status, reason=reason)
     except ValueError as exc:
         return _ok(request_id, {
-            "content": [{"type": "text", "text": str(exc)}],
+            "content": [{"type": _CONTENT_TYPE_TEXT, "text": str(exc)}],
             "isError": True,
         })
     return _ok(request_id, {
-        "content": [{"type": "text", "text": "marked"}],
+        "content": [{"type": _CONTENT_TYPE_TEXT, "text": "marked"}],
     })
 
 
@@ -145,7 +146,7 @@ def handle_tools_call(
         return _handle_mark_file_done(request_id, args, router)
 
     return _ok(request_id, {
-        "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
+        "content": [{"type": _CONTENT_TYPE_TEXT, "text": f"Unknown tool: {name}"}],
         "isError": True,
     })
 
@@ -154,4 +155,4 @@ def handle_unknown_method(req_id: object, method: str) -> None:
     """Send a JSON-RPC method-not-found error for unrecognised methods."""
     if req_id is not None:
         _send({"jsonrpc": JSONRPC_VERSION, "id": req_id,
-               "error": {"code": _JSONRPC_METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})
+               "error": {"code": JsonRpcErrorCode.METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})

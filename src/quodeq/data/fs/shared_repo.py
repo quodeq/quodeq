@@ -40,6 +40,7 @@ from quodeq.data.fs.shared_repo_git import (  # noqa: F401 -- re-exported for ex
     shared_evaluations_root,
     shared_repo_path,
 )
+from quodeq.shared.constants import GIT_DIR_NAME
 # Re-exported: format/bootstrap, index sync and publish attribution live in
 # shared_repo_meta.py; services/shared_repo.py and wiring.py import them
 # through this module.
@@ -113,7 +114,7 @@ def ensure_shared_clone(url: str, env: Mapping[str, str] | None = None) -> Path 
     """
     with clone_lock(url, env):
         repo = shared_repo_path(url, env)
-        if (repo / ".git").exists():
+        if (repo / GIT_DIR_NAME).exists():
             return repo
         repo.parent.mkdir(parents=True, exist_ok=True)
         ok, out = run_git(["clone", "--", url, str(repo)])
@@ -144,7 +145,7 @@ def _fetch_and_reset_clone(url: str, repo: Path, timeout: int) -> tuple[bool, st
     # `.git/shallow` is present, try `git fetch --unshallow origin` first; a
     # failure there (network hiccup, odd remote) is not fatal -- fall through
     # to the plain fetch below, and a later refresh call retries the unshallow.
-    if (repo / ".git" / "shallow").exists():
+    if (repo / GIT_DIR_NAME / "shallow").exists():
         run_git(["fetch", "--unshallow", "origin"], cwd=repo, timeout=timeout)
     ok, out = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout)
     if not ok:
@@ -190,7 +191,7 @@ def refresh_shared_clone(
     """
     with clone_lock(url, env):
         repo = shared_repo_path(url, env)
-        if not (repo / ".git").exists():
+        if not (repo / GIT_DIR_NAME).exists():
             return _refresh_missing_clone(url, env)
         return _fetch_and_reset_clone(url, repo, timeout)
 
@@ -202,7 +203,7 @@ def last_synced_at(url: str, env: Mapping[str, str] | None = None) -> float | No
     """
     repo = shared_repo_path(url, env)
     for name in ("FETCH_HEAD", "HEAD"):
-        candidate = repo / ".git" / name
+        candidate = repo / GIT_DIR_NAME / name
         try:
             return candidate.stat().st_mtime
         except OSError:

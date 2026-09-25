@@ -1,7 +1,8 @@
 // src/quodeq/ui/src/utils/reportBuilder/shared.js
 import { KNOWN_SEVERITIES } from '../constants.js';
-import { SEVERITY } from '../../vocab/severity.js';
+import { SEVERITY, SEVERITY_FILTER_ALL } from '../../vocab/severity.js';
 import { FINDING_TYPE } from '../../vocab/findingType.js';
+import { roundOneDecimal } from '../rounding.js';
 
 const SNIPPET_MAX_LINES = 5;
 // Short run-id shown in report headers ("**Run:** 3f9c1a2b").
@@ -28,7 +29,7 @@ export function formatDate() {
  */
 export function formatScore(value) {
   if (value == null) return '\u2014';
-  return `${Math.round(parseFloat(value) * 10) / 10}/10`;
+  return `${roundOneDecimal(parseFloat(value))}/10`;
 }
 
 /**
@@ -153,7 +154,7 @@ export function runSuffix(runId) {
  * @returns {boolean}
  */
 export function severityMatches(severityFilter, severity) {
-  return !severityFilter || severityFilter === 'all' || severityFilter === severity;
+  return !severityFilter || severityFilter === SEVERITY_FILTER_ALL || severityFilter === severity;
 }
 
 /**

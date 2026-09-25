@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from enum import StrEnum
 
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared._log_format import (  # noqa: F401
@@ -27,12 +28,21 @@ _logger.propagate = False
 _logger.setLevel(logging.INFO)
 
 
+class _EnvLogLevel(StrEnum):
+    """LOG_LEVEL values this module accepts (mirrors stdlib logging level names)."""
+
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+
+
 def _apply_env_log_level(
     level: str | None = None, env: Mapping[str, str] | None = None,
 ) -> None:
     """Apply *level* (or LOG_LEVEL env var) to the logger. Injectable for testing."""
     env_level = (level or resolve_env(env).get("LOG_LEVEL", "")).upper()
-    if env_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
+    if env_level in _EnvLogLevel:
         _logger.setLevel(getattr(logging, env_level))
 
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import threading
 from dataclasses import dataclass
+from http import HTTPStatus
 from typing import Callable
 
 from flask import Flask, Response, jsonify, request
@@ -23,9 +24,11 @@ from quodeq.api._assistant_helpers import (
     get_repository,
     local_provider_busy,
 )
+from quodeq.api._constants import (
+    CODE_INVALID_PARAM, CODE_MISSING_PARAM, CODE_UNKNOWN_SESSION, MESSAGE_UNKNOWN_SESSION)
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.api.assistant_turn_state import AssistantTurnState, turn_state
-from quodeq.api.helpers import json_error
+from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.assistant.cancel import CancelToken
 from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.orchestrator import TurnRequest
@@ -133,13 +136,15 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
     repo = get_repository(app)
     session = repo.get_session(sid)
     if session is None:
-        return json_error("unknown session", 404, "UNKNOWN_SESSION")
-    body = request.get_json(silent=True) or {}
+        return json_error(MESSAGE_UNKNOWN_SESSION, HTTPStatus.NOT_FOUND, CODE_UNKNOWN_SESSION)
+    body = optional_json_object_or_error(CODE_INVALID_PARAM)
+    if not isinstance(body, dict):
+        return jsonify(body[0]), body[1]
     text = str(body.get("text", "")).strip()
     if not text:
-        return json_error("text required", 400, "MISSING_PARAM")
+        return json_error("text required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     if local_provider_busy(session["provider"]):
-        return json_error("model busy with analysis", 409, "PROVIDER_BUSY")
+        return json_error("model busy with analysis", HTTPStatus.CONFLICT, "PROVIDER_BUSY")
     if (session.get("source") or ProjectSource.LOCAL) == ProjectSource.SHARED:
         shared_error = gates.shared_source_error()
         if shared_error is not None:
@@ -147,7 +152,7 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
     state = turn_state(app)
     cancel = state.claim_turn(sid)
     if cancel is None:
-        return json_error("a turn is already running", 409, "TURN_IN_PROGRESS")
+        return json_error("a turn is already running", HTTPStatus.CONFLICT, "TURN_IN_PROGRESS")
     # Everything from here through Thread.start() must free the slot on
     # failure — otherwise an exception (e.g. build_tool_context blowing
     # up) leaves `sid` claimed forever and every future POST to this
@@ -162,31 +167,32 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
         # reported the specific reason; this is just the narrow window
         # where the shared clone changed state in between.
         state.release_turn(sid)
-        return jsonify({"error": "shared repository unavailable", "code": "SHARED_REPO_UNAVAILABLE"}), 409
+        return jsonify(
+            {"error": "shared repository unavailable", "code": "SHARED_REPO_UNAVAILABLE"}), HTTPStatus.CONFLICT
     except Exception:
         state.release_turn(sid)
         raise
-    return jsonify({"accepted": True}), 202
+    return jsonify({"accepted": True}), HTTPStatus.ACCEPTED
 
 
 def _stop_assistant_turn(app: Flask, sid: str):
     if get_repository(app).get_session(sid) is None:
-        return json_error("unknown session", 404, "UNKNOWN_SESSION")
+        return json_error(MESSAGE_UNKNOWN_SESSION, HTTPStatus.NOT_FOUND, CODE_UNKNOWN_SESSION)
     token = turn_state(app).cancel_token(sid)
     if token is None:
-        return json_error("no turn running", 409, "NO_TURN_RUNNING")
+        return json_error("no turn running", HTTPStatus.CONFLICT, "NO_TURN_RUNNING")
     # Fire outside the lock: cancel() runs kill hooks (proc-tree kill /
     # client close) that must not serialize other sessions' turn claims.
     token.cancel()
     # 202: the turn thread still has to unwind; the SSE `stopped` frame is
     # the authoritative end-of-turn signal for the UI.
-    return jsonify({"stopping": True}), 202
+    return jsonify({"stopping": True}), HTTPStatus.ACCEPTED
 
 
 def _assistant_events(app: Flask, sid: str):
     repo = get_repository(app)
     if repo.get_session(sid) is None:
-        return json_error("unknown session", 404, "UNKNOWN_SESSION")
+        return json_error(MESSAGE_UNKNOWN_SESSION, HTTPStatus.NOT_FOUND, CODE_UNKNOWN_SESSION)
     raw = request.headers.get("Last-Event-ID") or request.args.get("after", "0")
     try:
         after = int(raw)
@@ -195,7 +201,7 @@ def _assistant_events(app: Flask, sid: str):
 
     state = turn_state(app)
     if not state.try_open_sse_stream():
-        return json_error("too many open event streams", 429, "TOO_MANY_STREAMS")
+        return json_error("too many open event streams", HTTPStatus.TOO_MANY_REQUESTS, "TOO_MANY_STREAMS")
 
     release = _sse_release_guard(state)
 

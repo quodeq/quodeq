@@ -15,13 +15,14 @@ import threading
 import time
 import uuid
 
+from quodeq.shared.constants import PLATFORM_WIN32
 from quodeq.terminal.links import child_cwd
 from quodeq.terminal.manager import TerminalManager
 
 
 def shell_name() -> str:
     """Display name of the shell the PTY backends will spawn (e.g. "zsh")."""
-    if sys.platform == "win32":
+    if sys.platform == PLATFORM_WIN32:
         from quodeq.terminal._pty_windows import resolve_shell
 
         path = resolve_shell()

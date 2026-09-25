@@ -13,26 +13,28 @@ import { useThemeIsDark } from '../../../hooks/useThemeIsDark.js';
 import { t } from '../../../strings/index.js';
 import { DATA_THEME_ATTR } from '../../../constants.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
-import { VIEW_MODES } from '../mapVocab.js';
+import { VIEW_MODES, VIZ_STYLE, GALAXY_MODE } from '../mapVocab.js';
+import { THEME_FAMILY } from '../../../vocab/theme.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 // data-theme attr for forcing the viz dark while the app is light: keep the
 // active theme family, swap the mode suffix. Attribute values: absent =
 // daruma family in system mode; otherwise 'light' | 'dark' | '<family>-<mode>'.
 function getDarkThemeAttr() {
   const attr = document.documentElement.getAttribute(DATA_THEME_ATTR) || '';
-  const family = attr.replace(/-?(dark|light)$/, '') || 'daruma';
-  return family === 'daruma' ? 'dark' : `${family}-dark`;
+  const family = attr.replace(/-?(dark|light)$/, '') || THEME_FAMILY.DARUMA;
+  return family === THEME_FAMILY.DARUMA ? 'dark' : `${family}-dark`;
 }
 
 const VIZ_STYLES = [
-  { id: 'zoompack', label: t('map.vizCirclePack'), enabled: true },
-  { id: 'galaxy', label: 'Galaxy', enabled: true },
-  { id: 'riskmatrix', label: t('map.vizRiskMatrix'), enabled: true },
+  { id: VIZ_STYLE.ZOOMPACK, label: t('map.vizCirclePack'), enabled: true },
+  { id: VIZ_STYLE.GALAXY, label: 'Galaxy', enabled: true },
+  { id: VIZ_STYLE.RISKMATRIX, label: t('map.vizRiskMatrix'), enabled: true },
 ];
 
 const GALAXY_MODES = [
-  { id: 'filesystem', label: t('map.vizFileSystem') },
-  { id: 'standards', label: 'Standards' },
+  { id: GALAXY_MODE.FILESYSTEM, label: t('map.vizFileSystem') },
+  { id: GALAXY_MODE.STANDARDS, label: 'Standards' },
 ];
 
 function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
@@ -86,7 +88,7 @@ function MapControls({ viewState, galaxyState, dimensionState }) {
   return (
     <div className="map-controls">
       <DimensionFilter allDimensions={allDimensions} selectedDimensions={selectedDimensions} onToggle={onToggleDimension} />
-      {vizStyle === 'zoompack' && (
+      {vizStyle === VIZ_STYLE.ZOOMPACK && (
         <div className="map-pill-group">
           {VIEW_MODES.map((m) => (
             <button key={m.id} type="button" className={`map-pill${viewMode === m.id ? ' active' : ''}`} onClick={() => setViewMode(m.id)} aria-pressed={viewMode === m.id}>
@@ -95,7 +97,7 @@ function MapControls({ viewState, galaxyState, dimensionState }) {
           ))}
         </div>
       )}
-      {vizStyle === 'galaxy' && (
+      {vizStyle === VIZ_STYLE.GALAXY && (
         <div className="map-pill-group">
           {GALAXY_MODES.map((m) => (
             <button key={m.id} type="button" className={`map-pill${galaxyMode === m.id ? ' active' : ''}`} onClick={() => setGalaxyMode(m.id)} aria-pressed={galaxyMode === m.id}>
@@ -132,7 +134,7 @@ function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }
   const { showLabels, setShowLabels, darkMode, setDarkMode, breadcrumb, resetKey, projectName, standardTypes } = display;
   return (
     <div className="map-viz-container" {...(darkMode && !appIsDark ? { [DATA_THEME_ATTR]: getDarkThemeAttr() } : {})}>
-      {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} projectName={projectName} />}
+      {vizStyle !== VIZ_STYLE.GALAXY && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} projectName={projectName} />}
       <div className="map-viz-toggles">
         <label className="map-label-toggle">
           <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
@@ -145,10 +147,10 @@ function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }
           </label>
         )}
       </div>
-      {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
-      {vizStyle === 'zoompack' && <ZoomablePackView node={fullTree} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} currentPath={currentPath} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={fullTree} currentPath={currentPath} onPathChange={onPathChange} onFileClick={onFileClick} showLabels={showLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} />}
+      {vizStyle === VIZ_STYLE.RISKMATRIX && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
+      {vizStyle === VIZ_STYLE.ZOOMPACK && <ZoomablePackView node={fullTree} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} currentPath={currentPath} />}
+      {vizStyle === VIZ_STYLE.GALAXY && galaxyMode === GALAXY_MODE.STANDARDS && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
+      {vizStyle === VIZ_STYLE.GALAXY && galaxyMode === GALAXY_MODE.FILESYSTEM && <GalaxyFolderView node={fullTree} currentPath={currentPath} onPathChange={onPathChange} onFileClick={onFileClick} showLabels={showLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} />}
     </div>
   );
 }
@@ -204,7 +206,7 @@ function MapNoEvaluationsState({ selectedSource, selectedProject, projectName, i
         title={t('map.noEvaluationsYet')}
         description={t('map.runEvaluationDesc', { project: projectName || selectedProject })}
         actionLabel={t('map.startEvaluation')}
-        onAction={() => onNavigate?.('evaluate')}
+        onAction={() => onNavigate?.(NAV_TAB.EVALUATE)}
       />
     </MapEmpty>
   );
@@ -233,7 +235,7 @@ function MapNoProjectsState({ onNavigate }) {
         title={t('map.noProjectsYet')}
         description={t('map.addProjectDesc')}
         actionLabel={t('map.addProject')}
-        onAction={() => onNavigate?.('projects')}
+        onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
       />
     </MapEmpty>
   );
@@ -246,7 +248,7 @@ function MapNoProjectSelectedState({ onNavigate }) {
         title={t('map.noProjectSelected')}
         description={t('map.pickProjectDesc')}
         actionLabel={t('map.chooseProject')}
-        onAction={() => onNavigate?.('projects')}
+        onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
       />
     </MapEmpty>
   );

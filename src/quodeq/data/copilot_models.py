@@ -18,9 +18,11 @@ from quodeq.shared.utils import sanitize_sensitive
 
 _log = logging.getLogger(__name__)
 _DISCOVERY_TIMEOUT_S = 15
+_OS_NAME_NT = "nt"  # os.name value
 _STOP_TIMEOUT_S = 2
 _MAX_MESSAGE_BYTES = 1024 * 1024
 _REQUEST_ID = "quodeq-models"
+_POLICY_STATE_ENABLED = "enabled"  # Copilot's model-policy state for an account-available model
 
 # LSP-style RPC framing: the writer builds the header from these, the reader
 # checks/strips the same prefix and terminator, so both sides stay in sync.
@@ -56,7 +58,7 @@ def _model_ids(result: object) -> list[str]:
         if policy is not None:
             if not isinstance(policy, dict):
                 raise _ModelDiscoveryError("Copilot returned an invalid model policy.")
-            if policy.get("state") != "enabled":
+            if policy.get("state") != _POLICY_STATE_ENABLED:
                 continue
         available.append(model_id)
     if not available:
@@ -130,7 +132,7 @@ async def _query_models(
                 "--disable-builtin-mcps", "--no-custom-instructions", "--no-ask-user",
                 cwd=Path(directory), env=env, stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == _OS_NAME_NT else 0,
             )
             if process.stdin is None or process.stdout is None:
                 raise RuntimeError("Could not open Copilot model discovery pipes.")

@@ -15,6 +15,7 @@ from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.wiring import SQLiteStateStore, SqliteFindingsRepository
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
+from quodeq.shared.constants import JSON_SUFFIX
 from quodeq.services.scoring._response_builders import (
     build_response_from_eval_files,
     build_response_from_grade_tables,
@@ -47,7 +48,7 @@ def _prefer_eval_rescore(deps: ScoringDeps, project_dir: Path, run_dir: Path) ->
     return (
         has_project_wide_filters
         and eval_dir.is_dir()
-        and any(p.suffix == ".json" for p in eval_dir.iterdir())
+        and any(p.suffix == JSON_SUFFIX for p in eval_dir.iterdir())
     )
 
 

@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { buildPrincipleReport } from '../../../utils/reportBuilder.js';
 import { useRegisterWindowSpec, ReportContent } from '../../side-pane/index.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 
 function filterTitleSuffix(filter) {
-  if (!filter || filter === 'all') return '';
+  if (!filter || filter === SEVERITY_FILTER_ALL) return '';
   return ` (${filter})`;
 }
 

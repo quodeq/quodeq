@@ -19,6 +19,10 @@ class ReviewError(RuntimeError):
 
 
 _GH_MISSING = "gh CLI not found. Install with 'brew install gh' and run 'gh auth login'."
+_GH_VIEW = "view"  # gh <resource> view
+_GH_JSON_FLAG = "--json"
+_DEFAULT_POOL_TIME_LIMIT_S = 300  # PR-diff eval budget when the caller sets none
+_GH_TIMEOUT_S = 60
 
 
 def _run_gh(args: list[str]) -> str:
@@ -26,14 +30,18 @@ def _run_gh(args: list[str]) -> str:
 
     A missing gh binary becomes the one ReviewError every caller shares; a
     non-zero exit propagates as ``subprocess.CalledProcessError`` so each
-    caller words its own failure.
+    caller words its own failure. A hung ``gh`` call (bad auth, dead network)
+    is bounded to ``_GH_TIMEOUT_S`` rather than blocking the review forever.
     """
     try:
         result = subprocess.run(
             ["gh", *args], capture_output=True, text=True, encoding="utf-8", check=True,
+            timeout=_GH_TIMEOUT_S,
         )
     except FileNotFoundError:
         raise ReviewError(_GH_MISSING)
+    except subprocess.TimeoutExpired:
+        raise ReviewError(f"gh command timed out after {_GH_TIMEOUT_S}s: gh {' '.join(args)}")
     return result.stdout
 
 
@@ -45,14 +53,14 @@ def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
     if pr_override is not None:
         # Still need baseRefName, so ask gh about this PR.
         try:
-            out = _run_gh(["pr", "view", str(pr_override), "--json", "number,baseRefName"])
+            out = _run_gh(["pr", _GH_VIEW, str(pr_override), _GH_JSON_FLAG, "number,baseRefName"])
         except subprocess.CalledProcessError as exc:
             raise ReviewError(f"Could not find PR #{pr_override}: {exc.stderr.strip()}")
         data = json.loads(out)
         return data["number"], data["baseRefName"]
 
     try:
-        out = _run_gh(["pr", "view", "--json", "number,baseRefName"])
+        out = _run_gh(["pr", _GH_VIEW, _GH_JSON_FLAG, "number,baseRefName"])
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()
         if "no pull requests found" in stderr.lower():
@@ -79,7 +87,7 @@ def get_github_token() -> str:
 def get_repo_info() -> tuple[str, str]:
     """Get (owner, repo) from the current git repository via gh."""
     try:
-        out = _run_gh(["repo", "view", "--json", "owner,name"])
+        out = _run_gh(["repo", _GH_VIEW, _GH_JSON_FLAG, "owner,name"])
     except subprocess.CalledProcessError:
         raise ReviewError(
             "Could not determine GitHub repo. "
@@ -138,7 +146,7 @@ def _run_pr_diff_and_locate_evidence(
         base_ref=f"origin/{base_branch}",
         output_dir=output_dir,
         dimensions=expand_dimension_aliases(dims) if dims else None,
-        time_limit=pool_budget if pool_budget is not None else 300,
+        time_limit=pool_budget if pool_budget is not None else _DEFAULT_POOL_TIME_LIMIT_S,
     )
     duration = int(time.time() - start)
     if exit_code != 0:

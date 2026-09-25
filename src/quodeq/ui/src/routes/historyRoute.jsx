@@ -3,11 +3,13 @@
  * verbatim (move-only refactor).
  */
 import { lazy } from 'react';
+import { LATEST_RUN_ID } from '../constants.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 const HistoryPage = lazy(() => import('../features/history/components/HistoryPage.jsx'));
 
 function resolveHistorySelectedRunId(selectedRun, trend) {
-  if (selectedRun && selectedRun !== 'latest' && trend.some((t) => t.runId === selectedRun)) return selectedRun;
+  if (selectedRun && selectedRun !== LATEST_RUN_ID && trend.some((t) => t.runId === selectedRun)) return selectedRun;
   return trend.length > 0 ? trend[0].runId : null;
 }
 
@@ -17,14 +19,15 @@ export function historyRoute(params, props) {
   return (
     <HistoryPage
       trend={trend}
+      partialRuns={props.dashboardData.dashboard?.partialRuns || []}
       selection={{
         selectedRunId: resolveHistorySelectedRunId(props.navigation.historySelectedRun, trend),
         selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,
       }}
       availableRuns={runs}
       callbacks={{
-        onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
-        onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
+        onRunClick: (runId, dateLabel) => props.navigation.handleNavigate(NAV_TAB.HISTORY_RUN, { runId, dateLabel }),
+        onDimensionClick: (dim) => props.navigation.handleNavigate(NAV_TAB.EXPLORER, { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
         onNavigate: props.navigation.handleNavigate,
         onRunChange: props.navigation.setHistorySelectedRun,
         // Run deletion changes the accumulated rollup the Overview grade is

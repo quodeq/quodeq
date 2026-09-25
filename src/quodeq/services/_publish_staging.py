@@ -33,9 +33,9 @@ from quodeq.services.wiring import (
     replace_json_file,
     run_git,
 )
+from quodeq.shared.constants import EVIDENCE_DIRNAME, MANIFEST_FILENAME
 
 _RUN_FILES = (STATUS_FILENAME, DIMENSIONS_FILENAME, "events.jsonl")
-_EVIDENCE_DIR = "evidence"
 _EVALUATION_DIR = "evaluation"
 _SCAN_FILENAME = "scan.json"
 
@@ -59,11 +59,11 @@ def copy_run(run_dir: Path, dest_run_dir: Path) -> None:
     ensure_dir(dest_run_dir)
     for name in _RUN_FILES:
         copy_file_if_exists(run_dir / name, dest_run_dir / name)
-    evidence = run_dir / _EVIDENCE_DIR
+    evidence = run_dir / EVIDENCE_DIRNAME
     if evidence.is_dir():
-        dest_evidence = dest_run_dir / _EVIDENCE_DIR
+        dest_evidence = dest_run_dir / EVIDENCE_DIRNAME
         ensure_dir(dest_evidence)
-        copy_file_if_exists(evidence / "manifest.json", dest_evidence / "manifest.json")
+        copy_file_if_exists(evidence / MANIFEST_FILENAME, dest_evidence / MANIFEST_FILENAME)
         copy_matching_files(evidence, dest_evidence, "*_evidence.jsonl")
     evaluation = run_dir / _EVALUATION_DIR
     if evaluation.is_dir():

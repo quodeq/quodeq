@@ -26,7 +26,13 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import path_from_body, json_error, scan_target_error as _scan_target_error
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, QUERY_FLAG_TRUE
+from quodeq.api.helpers import (
+    json_error,
+    optional_json_object_or_error,
+    path_from_body,
+    scan_target_error as _scan_target_error,
+)
 from quodeq.services.fs_project_helpers import (
     project_record_exists,
     read_project_record,
@@ -66,10 +72,10 @@ def _scan_inputs(project: str) -> tuple[Path | None, tuple[Response, int] | None
     try:
         validate_path_segment(project)
     except ValueError:
-        return None, json_error("Invalid project name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return None, json_error("Invalid project name", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     project_dir = _contained_project_dir(project)
     if project_dir is None:
-        return None, json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return None, json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return project_dir, None
 
 
@@ -90,7 +96,7 @@ def _local_scan_root(project_dir: Path) -> tuple[Path | None, tuple[Response, in
     # Check if local — read the project's repository record (via the
     # service layer; the route keeps no repository_info.json knowledge).
     if not project_record_exists(project_dir):
-        return None, json_error("No scan available", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return None, json_error("No scan available", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     info = read_project_record(project_dir)
     if info is None:
         return None, json_error(
@@ -144,13 +150,15 @@ def project_estimates(project: str) -> Response | tuple[Response, int]:
 
     raw_dims = request.args.get("dimensions", "")
     requested = [d.strip() for d in raw_dims.split(",") if d.strip()] or None
-    clean_scan = request.args.get("cleanScan", "false").strip().lower() == "true"
+    clean_scan = request.args.get("cleanScan", "false").strip().lower() == QUERY_FLAG_TRUE
     return jsonify(project_estimates_payload(project_dir, requested, clean_scan))
 
 
 def scan_path() -> Response | tuple[Response, int]:
     """Scan a local directory path directly (no registered project required)."""
-    data = request.get_json(silent=True) or {}
+    data = optional_json_object_or_error(CODE_INVALID_INPUT)
+    if not isinstance(data, dict):
+        return jsonify(data[0]), data[1]
     target = path_from_body(data)
     if isinstance(target, tuple):
         body, status = target

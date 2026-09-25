@@ -12,10 +12,10 @@ import tomllib
 import xml.etree.ElementTree as ET
 from functools import lru_cache
 
-# Same bound as ``_dependency_parsers._PARSE_CACHE_MAX`` (that module imports
-# from here, so the constant cannot come from it): parse each manifest text
-# once, not once per discipline rule that probes it.
-_PARSE_CACHE_MAX = 64
+from quodeq.config._constants import PARSE_CACHE_MAX
+
+_XML_TAG_GROUP_ID = "groupId"
+_XML_TAG_ARTIFACT_ID = "artifactId"
 
 
 def _json_dep_names(
@@ -55,7 +55,7 @@ _PACKAGE_JSON_DEP_KEYS = (
 )
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _package_json_names(content: str) -> frozenset[str]:
     return _json_dep_names(content, _PACKAGE_JSON_DEP_KEYS)
 
@@ -67,7 +67,7 @@ def has_package_json_dependency(content: str, needle: str) -> bool:
 # --- Cargo.toml --------------------------------------------------------------
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _cargo_dep_names(content: str) -> frozenset[str]:
     try:
         data = tomllib.loads(content)
@@ -104,7 +104,7 @@ def has_cargo_dependency(content: str, needle: str) -> bool:
 # --- go.mod ------------------------------------------------------------------
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _go_mod_modules(content: str) -> frozenset[str]:
     """Return the set of module paths declared in ``require`` directives."""
     modules: set[str] = set()
@@ -146,7 +146,7 @@ def has_go_mod_module(content: str, needle: str) -> bool:
 # --- composer.json -----------------------------------------------------------
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _composer_dep_names(content: str) -> frozenset[str]:
     # composer's require/require-dev are objects by spec, so a list there is
     # not a dependency list -- keep it unread, as this parser always has.
@@ -160,7 +160,7 @@ def has_composer_dependency(content: str, needle: str) -> bool:
 # --- pom.xml (Maven) ---------------------------------------------------------
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _pom_coords(content: str) -> frozenset[str]:
     """Return all groupId / artifactId text values declared in *content*.
 
@@ -180,7 +180,7 @@ def _pom_coords(content: str) -> frozenset[str]:
     for elem in root.iter():
         # Strip default Maven namespace if present (``{http://maven.apache.org/POM/4.0.0}groupId``).
         tag = elem.tag.rsplit("}", 1)[-1]
-        if tag in ("groupId", "artifactId") and elem.text:
+        if tag in (_XML_TAG_GROUP_ID, _XML_TAG_ARTIFACT_ID) and elem.text:
             coords.add(elem.text.strip())
     return frozenset(coords)
 
@@ -211,7 +211,7 @@ def _strip_gradle_comments(content: str) -> str:
     return _GRADLE_LINE_COMMENT.sub("", _GRADLE_BLOCK_COMMENT.sub("", content))
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _gradle_searchable(content: str) -> str:
     """Comment-stripped, lowercased text the substring probe runs against.
 

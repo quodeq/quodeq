@@ -13,9 +13,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.analysis.provider_cache import get_provider_configs
-from quodeq.config.provider import Provider
+from quodeq.config.provider import Provider, ProviderType
 from quodeq.services._browse_mixin import FsBrowseMixin
 from quodeq.services.wiring import fetch_anthropic_models, fetch_copilot_models, run_cli_models_command
+from quodeq.shared.constants import MACHINE_ARM64, PLATFORM_DARWIN
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
 from quodeq.shared.log_sink import SHARED_LOG
@@ -29,6 +30,7 @@ _ANTHROPIC_API_TIMEOUT_S = 8
 _DEFAULT_CLIENT_SORT_ORDER = 50  # ai_providers.json's "order" default when unset
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _AI_DEFAULTS_PATH = _PACKAGE_ROOT / "config" / "ai_defaults.json"
+_REQUIRES_PLATFORM_DARWIN_ARM64 = "darwin-arm64"  # ai_providers.json's "requires_platform" value
 
 
 def _load_fallback_claude_models() -> list[str]:
@@ -66,15 +68,16 @@ def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
     # Include API providers from config alongside default CLI tools
     api_ids = frozenset(
         pid for pid, cfg in get_provider_configs().items()
-        if cfg.get("type") == "api"
+        if cfg.get("type") == ProviderType.API
     )
     return _DEFAULT_CLIENT_IDS | api_ids
 
 
 def _platform_matches(requires: str) -> bool:
     """Return True if the current platform satisfies the requires_platform constraint."""
-    if requires == "darwin-arm64":
-        return sys.platform == "darwin" and _platform_module.machine() == "arm64"
+    if requires == _REQUIRES_PLATFORM_DARWIN_ARM64:
+        is_darwin = sys.platform == PLATFORM_DARWIN
+        return is_darwin and _platform_module.machine() == MACHINE_ARM64
     return True
 
 
@@ -124,7 +127,7 @@ class FsToolingMixin(FsBrowseMixin):
             candidates = self._CLI_CANDIDATES
 
         for c in candidates:
-            clients.append({**c, "type": "cli", "installed": bool(shutil.which(c["id"]))})
+            clients.append({**c, "type": ProviderType.CLI, "installed": bool(shutil.which(c["id"]))})
 
         # API providers: always available (no CLI binary needed)
         provider_configs = get_provider_configs()
@@ -134,7 +137,7 @@ class FsToolingMixin(FsBrowseMixin):
         for provider_id, cfg in provider_configs.items():
             # "custom" is the user-defined endpoint slot; it is configured in
             # Settings, not offered in the client-discovery list.
-            if cfg.get("type") == "api" and provider_id != Provider.CUSTOM:
+            if cfg.get("type") == ProviderType.API and provider_id != Provider.CUSTOM:
                 requires = cfg.get("requires_platform", "")
                 if requires and not _platform_matches(requires):
                     continue
@@ -142,7 +145,7 @@ class FsToolingMixin(FsBrowseMixin):
                     clients.append({
                         "id": provider_id,
                         "label": api_label_overrides.get(provider_id, provider_id.capitalize()),
-                        "type": "api",
+                        "type": ProviderType.API,
                         "installed": True,
                     })
 

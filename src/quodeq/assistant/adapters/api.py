@@ -20,6 +20,7 @@ from quodeq.assistant.adapters._fallback import (
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.frame_type import FrameType
 from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, guard_tool_result
+from quodeq.assistant.message_role import MessageRole
 from quodeq.assistant.tools.registry import ToolRegistry
 from quodeq.shared.env_resolve import resolve_env
 
@@ -27,6 +28,8 @@ _logger = logging.getLogger(__name__)
 _TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
 _CAP_NOTE = "\n\n*(stopped: tool iteration limit reached)*"
 _OPENAI_API_HOST = "api.openai.com"
+# How often the stream-drain loop re-checks cancel.cancelled between chunks.
+_CANCEL_POLL_INTERVAL_S = 0.25
 
 
 def _extra_body(config: "ApiTurnConfig", env: Mapping[str, str] | None = None) -> dict:
@@ -83,11 +86,16 @@ _OLLAMA_DEFAULT_API_KEY = "ollama"
 
 
 def _default_client(config: ApiTurnConfig):
+    # max_retries=2, unlike analysis/_api_call.py's 0: that path re-dispatches
+    # a lossy failure on the next run, so it leaves retries to the caller. The
+    # assistant has no later re-dispatch for a turn, and the SDK only retries
+    # before any response chunk has streamed, so a retry here cannot replay
+    # partial output or double-call a tool.
     return openai.OpenAI(
         base_url=config.api_base,
         api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY,
         timeout=_TIMEOUT,
-        max_retries=0,
+        max_retries=2,
     )
 
 
@@ -125,7 +133,7 @@ def _iter_with_cancel(stream, cancel):
         if cancel.cancelled:
             raise TurnCancelled("")
         try:
-            item = q.get(timeout=0.25)
+            item = q.get(timeout=_CANCEL_POLL_INTERVAL_S)
         except queue.Empty:
             continue
         if item is _STREAM_DONE:
@@ -185,7 +193,7 @@ def _dispatch_tool_calls(
     appended before any tool-result message, and each call's emit/convo-append
     pair must land before the next call's is dispatched.
     """
-    convo.append({"role": "assistant", "content": text or None,
+    convo.append({"role": MessageRole.ASSISTANT, "content": text or None,
                   "tool_calls": [
                       {"id": c["id"], "type": "function",
                        "function": {"name": c["name"],
@@ -200,7 +208,7 @@ def _dispatch_tool_calls(
         emit(frame)
         fenced, warnings = guard_tool_result(result, call["name"])
         _emit_warnings(emit, warnings)
-        convo.append({"role": "tool", "tool_call_id": call["id"],
+        convo.append({"role": MessageRole.TOOL, "tool_call_id": call["id"],
                       "content": fenced})
 
 
@@ -212,8 +220,8 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
     if not config.native_tools:
         contract = fallback_contract(registry.openai_tools())
         convo = [dict(convo[0], content=convo[0]["content"] + contract),
-                 *convo[1:]] if convo and convo[0]["role"] == "system" else (
-            [{"role": "system", "content": contract.strip()}, *convo])
+                 *convo[1:]] if convo and convo[0]["role"] == MessageRole.SYSTEM else (
+            [{"role": MessageRole.SYSTEM, "content": contract.strip()}, *convo])
     factory = client_factory or _default_client
     text = ""
     with factory(config) as client:
@@ -240,8 +248,8 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
                 emit(frame)
                 fenced, warnings = guard_tool_result(result, name)
                 _emit_warnings(emit, warnings)
-                convo.append({"role": "assistant", "content": text})
-                convo.append({"role": "user", "content": fenced})
+                convo.append({"role": MessageRole.ASSISTANT, "content": text})
+                convo.append({"role": MessageRole.USER, "content": fenced})
                 continue
             if not tool_calls:
                 return text

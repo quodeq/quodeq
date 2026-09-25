@@ -1,18 +1,11 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { drawFrame } from './galaxyViewDraw.js';
 import { CAMERA } from './galaxyTuning.js';
+import { DRIFT } from './galaxyDrift.js';
 import { interpolateCamera } from './galaxyCameraLerp.js';
 
 const TRANSITION_DURATION_S = 0.8;
 
-// Idle drift for a clustered star: sine on x, cosine on y. The speeds and
-// phases are deliberately unequal so the two axes never sync into a
-// straight-line wobble. One amplitude (world units) serves both axes.
-const DRIFT_SPEED_X = 0.015;
-const DRIFT_SPEED_Y = 0.012;
-const DRIFT_PHASE_X = 1.1;
-const DRIFT_PHASE_Y = 0.8;
-const DRIFT_AMPLITUDE = 2;
 // A star on the single-group ring instead breathes along the ring itself.
 const RING_RADIUS_FRACTION = 0.22;
 const RING_WOBBLE_SPEED = 0.02;
@@ -41,9 +34,9 @@ const FIT_VIEW_MARGIN_PX = 20;
 function updateStarPositions(stars, W, H, SP, t) {
   stars.forEach((s, i) => {
     if (s._clusterCx !== undefined) {
-      const drift = Math.sin(t * DRIFT_SPEED_X + i * DRIFT_PHASE_X) * DRIFT_AMPLITUDE;
+      const drift = Math.sin(t * DRIFT.speedX + i * DRIFT.phaseX) * DRIFT.amplitude;
       s.x = W / 2 + s._clusterCx + s._ox + drift;
-      s.y = H / 2 + s._clusterCy + s._oy + Math.cos(t * DRIFT_SPEED_Y + i * DRIFT_PHASE_Y) * DRIFT_AMPLITUDE;
+      s.y = H / 2 + s._clusterCy + s._oy + Math.cos(t * DRIFT.speedY + i * DRIFT.phaseY) * DRIFT.amplitude;
     } else {
       const a = s.ba + Math.sin(t * RING_WOBBLE_SPEED + i * RING_WOBBLE_PHASE) * RING_WOBBLE_AMPLITUDE;
       s.x = W / 2 + Math.cos(a) * (SP + s.j);

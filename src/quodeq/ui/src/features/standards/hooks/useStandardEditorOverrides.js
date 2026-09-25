@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useStandardsOverrides } from './useStandardsOverrides.js';
-import { applyParamOverride, countCustomizedRequirements, decideSave } from '../overridesModel.js';
+import { applyParamOverride, countCustomizedRequirements, decideSave, SAVE_DECISION_COMMIT } from '../overridesModel.js';
 import { useAppState } from '../../../hooks/useAppState.js';
 import { t } from '../../../strings/index.js';
 
@@ -70,7 +70,7 @@ export function useStandardEditorOverrides({ standard, editable, save, onSaved, 
     try {
       const impact = await previewOverrides(overrides);
       const decision = decideSave({ overridesDirty, impact });
-      if (decision === 'commit') { await commitSave(); return; }
+      if (decision === SAVE_DECISION_COMMIT) { await commitSave(); return; }
       setPendingImpact(decision.confirm);
     } catch (err) {
       setOverridesSaveError(err?.message || t('standards.saveOverridesFailed'));

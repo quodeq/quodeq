@@ -34,10 +34,11 @@ import {
   REF_LINE_OPACITY_EVEN,
   REF_LINE_OPACITY_ODD,
 } from './scoreChartHelpers.js';
+import { SCORE_SCALE_MAX } from '../constants.js';
 
 // Bars are read as a fraction of a full 0-10 score, so the axis is absolute
 // rather than fitted to the data (see RunHistoryPanel's note).
-const SCORE_AXIS_DOMAIN = [0, 10];
+const SCORE_AXIS_DOMAIN = [0, SCORE_SCALE_MAX];
 const SELECTED_DOT_RADIUS = 4;
 const TREND_LINE_STROKE_WIDTH = 2;
 const TREND_LINE_OPACITY = 0.9;

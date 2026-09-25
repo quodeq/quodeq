@@ -45,8 +45,12 @@ function dimStarTotals(dim) {
   return { violations, compliance, score };
 }
 
+// Fallback standardType key for a dimension standardTypes doesn't classify:
+// groupDimensionsByType's catch-all bucket, listed last among constellations.
+const DEFAULT_STANDARD_TYPE = '_default';
+
 export const CONSTELLATION_LABELS = {
-  builtin: t('map.constellationBuiltin'), quodeq: t('map.constellationQuodeq'), community: t('map.constellationCommunity'), custom: t('map.constellationCustom'), _default: '',
+  builtin: t('map.constellationBuiltin'), quodeq: t('map.constellationQuodeq'), community: t('map.constellationCommunity'), custom: t('map.constellationCustom'), [DEFAULT_STANDARD_TYPE]: '',
 };
 
 /** Group dimensions by standard type, returning the groups and whether they warrant constellations. */
@@ -54,14 +58,14 @@ function groupDimensionsByType(dimensions, standardTypes) {
   const dimGroups = {};
   dimensions.forEach(dim => {
     const id = (dim.dimension || '').toLowerCase();
-    const type = standardTypes[id] || '_default';
+    const type = standardTypes[id] || DEFAULT_STANDARD_TYPE;
     if (!dimGroups[type]) dimGroups[type] = [];
     dimGroups[type].push(dim);
   });
 
-  const groupKeys = Object.keys(dimGroups).filter(k => k !== '_default');
-  if (dimGroups._default) groupKeys.push('_default');
-  const useConstellations = groupKeys.length > 1 || (groupKeys.length === 1 && groupKeys[0] !== '_default');
+  const groupKeys = Object.keys(dimGroups).filter(k => k !== DEFAULT_STANDARD_TYPE);
+  if (dimGroups[DEFAULT_STANDARD_TYPE]) groupKeys.push(DEFAULT_STANDARD_TYPE);
+  const useConstellations = groupKeys.length > 1 || (groupKeys.length === 1 && groupKeys[0] !== DEFAULT_STANDARD_TYPE);
 
   return { dimGroups, groupKeys, useConstellations };
 }

@@ -3,6 +3,8 @@ import { collapseByPeriod, collectPeriodDimensions, bucketKey, extractDimensionP
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import { formatRunId } from '../../../utils/formatters.js';
+import { GRANULARITY } from '../../../utils/granularity.js';
+import { LATEST_RUN_ID } from '../../../constants.js';
 
 // Sparkline history length for the per-dimension period series (matches the
 // old DimensionScorePanel SPARKLINE_LIMIT).
@@ -58,7 +60,7 @@ function useOverviewRunSelection({ trend, periodTrend, dayRuns, overviewRunIndex
     return periodTrend[0]?.runId || null;
   }, [selectedRunId, trend, periodTrend, granularity]);
 
-  const currentOverviewRun = effectiveSelectedId || dayRuns[overviewRunIndex]?.runId || 'latest';
+  const currentOverviewRun = effectiveSelectedId || dayRuns[overviewRunIndex]?.runId || LATEST_RUN_ID;
   const selectedDayDimNames = useMemo(
     () => collectPeriodDimensions(trend, currentOverviewRun, granularity) || collectPeriodDimensions(trend, selectedRunId, granularity),
     [trend, currentOverviewRun, selectedRunId, granularity]
@@ -94,7 +96,7 @@ function useDimTrends(filteredDimensions, filteredTrend, currentOverviewRun, gra
 }
 
 function usePeriodTrends(trend, granularity) {
-  const dayTrend = useMemo(() => collapseByPeriod(trend, 'day'), [trend]);
+  const dayTrend = useMemo(() => collapseByPeriod(trend, GRANULARITY.DAY), [trend]);
   const periodTrend = useMemo(() => collapseByPeriod(trend, granularity), [trend, granularity]);
   return { dayTrend, periodTrend };
 }
@@ -104,7 +106,7 @@ function usePeriodTrends(trend, granularity) {
 function useVisibleFilteredTrends({ trend, dayTrend, periodTrend, granularity, accumulatedDimensions }) {
   const visibleIds = useMemo(() => readVisibleStandardIds(), [accumulatedDimensions]);
   const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
-  const filteredDayTrend = useMemo(() => filterTrendByVisibleStandardsDaily(trend, dayTrend, visibleSet, 'day'), [trend, dayTrend, visibleSet]);
+  const filteredDayTrend = useMemo(() => filterTrendByVisibleStandardsDaily(trend, dayTrend, visibleSet, GRANULARITY.DAY), [trend, dayTrend, visibleSet]);
   const filteredPeriodTrend = useMemo(() => filterTrendByVisibleStandardsDaily(trend, periodTrend, visibleSet, granularity), [trend, periodTrend, visibleSet, granularity]);
   // Raw (per-run) filtered trend — sparklines show every evaluation, not the
   // period-collapsed representatives.
@@ -123,7 +125,7 @@ function useVisibleFilteredTrends({ trend, dayTrend, periodTrend, granularity, a
  * chips, the chart and the cards cannot disagree about which run is showing.
  */
 export function useAccumulatedComputations(data) {
-  const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId, granularity = 'day' } = data;
+  const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId, granularity = GRANULARITY.DAY } = data;
   const dayRuns = dailyRuns || availableRuns;
   const { dayTrend, periodTrend } = usePeriodTrends(trend, granularity);
 

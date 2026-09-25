@@ -1,6 +1,7 @@
 """Chunked incremental line reading shared by the progress/JSONL readers."""
 from __future__ import annotations
 
+import codecs
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -28,6 +29,7 @@ def iter_line_batches(
     read this call. They get read afresh, from the correct offset, on the
     caller's next call.
     """
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
     partial = ""
     pending: tuple[list[str], int] | None = None
     with open(path, "rb") as f:
@@ -36,12 +38,13 @@ def iter_line_batches(
             raw = f.read(chunk)
             if not raw:
                 break
-            text = partial + raw.decode("utf-8", errors="replace")
+            text = partial + decoder.decode(raw)
             split = text.split("\n")
             partial = split.pop()
             if pending is not None:
                 yield pending
             pending = (split, len(raw))
+    partial += decoder.decode(b"", final=True)
     if pending is not None:
         lines, nbytes = pending
         if partial.strip():

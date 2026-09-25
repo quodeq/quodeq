@@ -130,6 +130,7 @@ def build_dashboard_result(
             "dateLabel": selected_run.date_label,
         },
         "trend": payload.trend,
+        "partialRuns": payload.partial_runs,
         "dimensions": dim_dicts,
         "previousByDimension": {k: slim_history_dim(v) for k, v in payload.previous_by_dimension.items()},
         "stalePreviousByDimension": {k: slim_history_dim(v) for k, v in payload.stale_previous_by_dimension.items()},

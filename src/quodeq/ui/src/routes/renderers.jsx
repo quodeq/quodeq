@@ -17,6 +17,7 @@ import { historyRoute } from './historyRoute.jsx';
 import { compareRoute } from './compareRoute.jsx';
 import { buildDashboardDataBundle } from './dashboardDataBundle.js';
 import { buildNavigationBundle } from './navigationBundle.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 import {
   EvaluateCase, SettingsCase, renderEvalPrincipleDetail,
   resolveSelectionAfterSharedDisconnect,
@@ -48,8 +49,10 @@ export { resolveSelectionAfterSharedDisconnect };
 // Tabs that are reachable with zero projects. `projects` is in here so a
 // fresh-install user can land on Projects and add their first one without
 // hitting the "no analyzed projects yet" wall.
-const NO_PROJECT_TABS = ['projects', 'evaluate', 'standards', 'settings', 'help', 'grade-formula', 'compare'];
-const SELF_HANDLED_EMPTY = new Set(['overview', 'map', 'violations', 'history']);
+const NO_PROJECT_TABS = [
+  NAV_TAB.PROJECTS, NAV_TAB.EVALUATE, NAV_TAB.STANDARDS, NAV_TAB.SETTINGS, NAV_TAB.HELP, NAV_TAB.GRADE_FORMULA, NAV_TAB.COMPARE,
+];
+const SELF_HANDLED_EMPTY = new Set([NAV_TAB.OVERVIEW, NAV_TAB.MAP, NAV_TAB.VIOLATIONS, NAV_TAB.HISTORY]);
 
 /**
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string, projects: Array, onGoToProjects: Function, onGoToSettings: Function, preselectDims: string[]|undefined }} props
@@ -78,7 +81,7 @@ export const ROUTE_RENDERERS = {
   map: mapRoute,
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry, onProjectsRetry: props.dashboardData.onProjectsRetry }} runMode={true} />,
   history: historyRoute,
-  'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry }} runMode={true} />,
+  [NAV_TAB.HISTORY_RUN]: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRetry: props.dashboardData.onRetry }} runMode={true} />,
   explorer: (params, props) => (
     <ExplorerPage
       project={params.fromProject || props.navigation.selectedProject}
@@ -112,8 +115,8 @@ export const ROUTE_RENDERERS = {
         selectedProject={props.navigation.selectedProject}
         projects={props.navigation.projects}
         preselectDims={params.preselectDims}
-        onGoToProjects={() => props.navigation.navTab('projects')}
-        onGoToSettings={() => props.navigation.navTab('settings')}
+        onGoToProjects={() => props.navigation.navTab(NAV_TAB.PROJECTS)}
+        onGoToSettings={() => props.navigation.navTab(NAV_TAB.SETTINGS)}
       />
     );
   },
@@ -136,8 +139,8 @@ export const ROUTE_RENDERERS = {
       })}
     />
   ),
-  evalprinciple: renderEvalPrincipleDetail,
-  'eval-principle-detail': renderEvalPrincipleDetail,
+  [NAV_TAB.EVAL_PRINCIPLE]: renderEvalPrincipleDetail,
+  [NAV_TAB.EVAL_PRINCIPLE_DETAIL]: renderEvalPrincipleDetail,
   finding: (params, props) => (
     <FindingDetailPage
       finding={params.finding}
@@ -156,7 +159,7 @@ export const ROUTE_RENDERERS = {
   ),
   settings: (params, props) => <SettingsCase
     settings={props.settings}
-    onOpenGradeFormula={() => props.navigation.handleNavigate('grade-formula')}
+    onOpenGradeFormula={() => props.navigation.handleNavigate(NAV_TAB.GRADE_FORMULA)}
     onSharedDisconnected={() => {
       const next = resolveSelectionAfterSharedDisconnect({
         selectedSource: props.navigation.selectedSource,
@@ -165,7 +168,7 @@ export const ROUTE_RENDERERS = {
       if (next) props.navigation.handleProjectChange(next.id, next.source);
     }}
   />,
-  'grade-formula': (params, props) => <GradeFormulaPage navigation={props.navigation} />,
+  [NAV_TAB.GRADE_FORMULA]: (params, props) => <GradeFormulaPage navigation={props.navigation} />,
   projects: (params, props) => (
     <ProjectsPage
       projects={props.navigation.projects}
@@ -176,7 +179,7 @@ export const ROUTE_RENDERERS = {
       actions={{
         onSelect: (id, source) => {
           props.navigation.handleProjectChange(id, source);
-          props.navigation.navTab('overview');
+          props.navigation.navTab(NAV_TAB.OVERVIEW);
         },
         onDelete: props.navigation.handleDeleteProject,
         onExport: props.navigation.handleExportProject,
@@ -184,12 +187,12 @@ export const ROUTE_RENDERERS = {
         onAddProject: props.navigation.onAddProject,
         onImportProject: props.navigation.onImportProject,
         onResumeSetup: props.navigation.onResumeSetup,
-        onFiltersChange: (filters) => props.navigation.handleNavigateReplace('projects', { filters }),
+        onFiltersChange: (filters) => props.navigation.handleNavigateReplace(NAV_TAB.PROJECTS, { filters }),
         onProjectsReload: props.navigation.loadProjects,
       }}
     />
   ),
-  standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab('evaluate', { preselectDims: dims })} />,
+  standards: (params, props) => <StandardsPage onRescan={(dims) => props.navigation.navTab(NAV_TAB.EVALUATE, { preselectDims: dims })} />,
   help: () => <HelpPage />,
   compare: compareRoute,
 };

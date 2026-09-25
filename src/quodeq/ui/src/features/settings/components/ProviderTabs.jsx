@@ -1,6 +1,7 @@
 import useProviderSettings from '../hooks/useProviderSettings.js';
 import { useProviderTabsState } from '../hooks/useProviderTabsState.js';
-import { classifyProvider, defaultsForProvider } from './providerUtils.js';
+import { classifyProvider, defaultsForProvider, PROVIDER_CLASSIFICATION } from './providerUtils.js';
+import { PROVIDER } from '../../../vocab/provider.js';
 import OllamaTab from './OllamaTab.jsx';
 import LlamaCppTab from './LlamaCppTab.jsx';
 import OmlxTab from './OmlxTab.jsx';
@@ -64,16 +65,16 @@ function TabContent({ provider, providerConfig }) {
   const defaults = defaultsForProvider(classification, provider.id);
   const { state, update } = useProviderSettings(provider.id, defaults);
 
-  if (classification === 'local-api') {
-    if (provider.id === 'llamacpp') {
+  if (classification === PROVIDER_CLASSIFICATION.LOCAL_API) {
+    if (provider.id === PROVIDER.LLAMACPP) {
       return <LlamaCppTab state={state} update={update} />;
     }
-    if (provider.id === 'omlx') {
+    if (provider.id === PROVIDER.OMLX) {
       return <OmlxTab state={state} update={update} />;
     }
     return <OllamaTab state={state} update={update} />;
   }
-  if (classification === 'cli') {
+  if (classification === PROVIDER_CLASSIFICATION.CLI) {
     return <CliProviderTab providerId={provider.id} state={state} update={update} />;
   }
   return <CloudProviderTab providerId={provider.id} providerConfig={providerConfig} state={state} update={update} />;

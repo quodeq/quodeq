@@ -22,7 +22,7 @@ from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.core.run.exit_reason import ExitReason
 from quodeq.data.fs.standards_loader import read_req_to_principle_map
-from quodeq.shared.constants import DEFAULT_TIME_LIMIT
+from quodeq.shared.constants import CONSOLIDATED_DIMENSION_KEY, DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 
 # Re-export public API so existing imports keep working.
@@ -47,7 +47,7 @@ class SubagentPool:
         dimension = options.dimension
         if isinstance(dimension, list):
             self._dimensions, self._dimension = dimension, ",".join(dimension)
-            self._dimension_key = "consolidated"
+            self._dimension_key = CONSOLIDATED_DIMENSION_KEY
         else:
             self._dimensions = [dimension] if dimension else []
             self._dimension, self._dimension_key = dimension, dimension
@@ -93,7 +93,7 @@ class SubagentPool:
         dimension key would never match a real delete key anyway. The counts
         then stay raw, which is the pre-existing behaviour.
         """
-        if self._dimension_key == "consolidated":
+        if self._dimension_key == CONSOLIDATED_DIMENSION_KEY:
             return None
         try:
             from quodeq.services.suppression import matcher_for  # noqa: PLC0415

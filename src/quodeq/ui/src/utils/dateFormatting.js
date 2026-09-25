@@ -1,7 +1,10 @@
-import { isoWeekKey, localDayKey, YEAR_MONTH_KEY_LENGTH } from './dailyGrouping.js';
+import { isoWeekKey, localDayKey, YEAR_MONTH_KEY_LENGTH, ISO_DATE_LENGTH } from './dailyGrouping.js';
 import { LOCALE, t } from '../strings/index.js';
-import { SECONDS_PER_HOUR } from './time.js';
+import { SECONDS_PER_HOUR, SECONDS_PER_MINUTE } from './time.js';
 import { GRANULARITY } from './granularity.js';
+import { LATEST_RUN_ID } from '../constants.js';
+
+const DEFAULT_CALLER_NAME = 'dateFormatting'; // default `where` tag for the warn-log callers below
 
 // Intl formatters are comparatively expensive to construct, and these run in
 // list renders. Build once at module scope.
@@ -35,7 +38,7 @@ export function formatShortDate(dateStr) {
  */
 export function formatRunId(runId, dateLabel) {
   if (dateLabel) return dateLabel;
-  if (!runId || runId === 'latest') return 'Latest';
+  if (!runId || runId === LATEST_RUN_ID) return 'Latest';
   // Truncate UUID for compact display
   const s = String(runId);
   return s.length > RUN_ID_TRUNCATE_LENGTH ? s.slice(0, RUN_ID_TRUNCATE_LENGTH) + '…' : s;
@@ -53,8 +56,8 @@ export function formatDuration(s) {
   if (s == null || !Number.isFinite(s)) return '—';
   const total = Math.max(0, Math.floor(s));
   const h = Math.floor(total / SECONDS_PER_HOUR);
-  const m = Math.floor((total % SECONDS_PER_HOUR) / 60);
-  const sec = total % 60;
+  const m = Math.floor((total % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
+  const sec = total % SECONDS_PER_MINUTE;
   if (h > 0) return `${h}h ${m}m ${sec}s`;
   if (m > 0) return `${m}m ${sec}s`;
   return `${sec}s`;
@@ -72,11 +75,11 @@ export function formatDurationCoarse(s) {
   if (s == null || !Number.isFinite(s)) return '—';
   const total = Math.max(0, Math.round(s));
   const h = Math.floor(total / SECONDS_PER_HOUR);
-  const m = Math.floor((total % SECONDS_PER_HOUR) / 60);
+  const m = Math.floor((total % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
   const parts = [];
   if (h > 0) parts.push(`${h}h`);
   if (m > 0) parts.push(`${m}m`);
-  if (parts.length === 0) parts.push(`${total % 60}s`);
+  if (parts.length === 0) parts.push(`${total % SECONDS_PER_MINUTE}s`);
   return parts.join(' ');
 }
 
@@ -113,7 +116,7 @@ export function formatPeriodLabel(entry, granularity = GRANULARITY.DAY) {
     // Intl has no week-of-year format, so this one stays a catalog pattern.
     return (y && w) ? t('common.weekOfYear', { week: Number(w), year: y }) : fallback;
   }
-  if (iso.length > 10) {
+  if (iso.length > ISO_DATE_LENGTH) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) return DAY_MONTH_YEAR.format(d);
   }
@@ -138,7 +141,7 @@ const HOUR_MINUTE_OPTS = { hour: '2-digit', minute: '2-digit' };
  * @param {string} [where='dateFormatting'] Names the caller in the warning.
  * @returns {string}
  */
-export function formatRunDate(dateISO, fallback = '', where = 'dateFormatting') {
+export function formatRunDate(dateISO, fallback = '', where = DEFAULT_CALLER_NAME) {
   if (!dateISO) return fallback;
   try {
     return new Date(dateISO).toLocaleDateString(LOCALE, DAY_LONG_MONTH_YEAR_OPTS);
@@ -158,7 +161,7 @@ export function formatRunDate(dateISO, fallback = '', where = 'dateFormatting') 
  * @param {string} [where='dateFormatting'] Names the caller in the warning.
  * @returns {string}
  */
-export function formatRunDateTime(dateISO, fallback = '', where = 'dateFormatting') {
+export function formatRunDateTime(dateISO, fallback = '', where = DEFAULT_CALLER_NAME) {
   if (!dateISO) return fallback;
   try {
     const d = new Date(dateISO);
@@ -177,7 +180,7 @@ export function formatRunDateTime(dateISO, fallback = '', where = 'dateFormattin
  * @param {string} [where='dateFormatting']
  * @returns {string}
  */
-export function formatRunTime(dateISO, fallback = '', where = 'dateFormatting') {
+export function formatRunTime(dateISO, fallback = '', where = DEFAULT_CALLER_NAME) {
   if (!dateISO) return fallback;
   try {
     return new Date(dateISO).toLocaleTimeString(LOCALE, HOUR_MINUTE_OPTS);

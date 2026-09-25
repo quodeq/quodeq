@@ -20,6 +20,7 @@ from quodeq.api.routes_registry import register_all_routes
 from quodeq.api.security import configure_security
 from quodeq.config.paths import default_paths
 from quodeq.services.base import ActionProvider
+from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_static_dist
@@ -29,6 +30,9 @@ _logger = logging.getLogger(__name__)
 _DEFAULT_EVALUATION_RATE_LIMIT_WINDOW = 300
 _DEFAULT_EVALUATION_RATE_LIMIT_MAX = 10
 _MULTIPART_FRAMING_HEADROOM_BYTES = 1 * 1024 * 1024  # 1 MiB over the zip cap for multipart overhead
+
+_BIND_HOST_ANY = "0.0.0.0"  # binds to every interface
+_BIND_HOST_LOOPBACK = "127.0.0.1"  # binds to loopback only
 
 
 def _default_provider(env: Mapping[str, str] | None = None) -> ActionProvider:
@@ -52,7 +56,7 @@ def _configure_logging(
     log_buffer = LogBuffer()
     app.extensions["log_buffer"] = log_buffer
 
-    verbose = resolve_env(env).get("QUODEQ_VERBOSE") == "1"
+    verbose = resolve_env(env).get("QUODEQ_VERBOSE") == ENV_TRUTHY
     for name in ("werkzeug", "quodeq.api"):
         lgr = logging.getLogger(name)
         lgr.handlers = [log_buffer.handler]
@@ -69,7 +73,7 @@ def _register_health_route(app: Flask, verbose: bool) -> None:
         """Return a simple health-check response with server info."""
         host = get_action_api_host()
         port = get_action_api_port()
-        display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
+        display_host = "localhost" if host in (_BIND_HOST_LOOPBACK, _BIND_HOST_ANY) else host
         payload: dict[str, object] = {
             "ok": True,
             "version": __version__,

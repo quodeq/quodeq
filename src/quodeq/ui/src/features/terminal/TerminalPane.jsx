@@ -6,6 +6,7 @@ import TerminalSessionView from './TerminalSessionView.jsx';
 import TerminalHeader from './TerminalHeader.jsx';
 import { LockIcon } from '../../components/CopyButton.jsx';
 import { t } from '../../strings/index.js';
+import { TERMINAL_RESTART_EVENT } from '../../constants.js';
 
 // The panel's footer line: shell, session count and the localhost-only
 // padlock.
@@ -49,8 +50,8 @@ function TerminalSessionViews({ sessions, paneLive, active, activeId, onGone, re
 function useTerminalRestartListener(reconcile) {
   useEffect(() => {
     const onRestart = () => reconcile();
-    window.addEventListener('quodeq:terminal-restart', onRestart);
-    return () => window.removeEventListener('quodeq:terminal-restart', onRestart);
+    window.addEventListener(TERMINAL_RESTART_EVENT, onRestart);
+    return () => window.removeEventListener(TERMINAL_RESTART_EVENT, onRestart);
   }, [reconcile]);
 }
 

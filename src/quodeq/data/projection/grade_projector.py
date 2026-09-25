@@ -19,6 +19,7 @@ from quodeq.data.fs.grade_formula_store import load_params
 from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
+from quodeq.shared.constants import JSON_SUFFIX
 from quodeq.core.scoring.projector_scoring import (
     GRADE_ALGO_VERSION,
     PrincipleGradeScale,
@@ -42,7 +43,7 @@ def _read_source_file_count(run_dir: Path) -> int:
     if not eval_dir.is_dir():
         return 0
     for path in eval_dir.iterdir():
-        if path.suffix != ".json":
+        if path.suffix != JSON_SUFFIX:
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))

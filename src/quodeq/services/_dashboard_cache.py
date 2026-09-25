@@ -16,6 +16,7 @@ from typing import Callable
 
 from quodeq.core.types import DimensionResult
 from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
+from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 
 
@@ -41,10 +42,7 @@ def run_dim_cache_max(override: int | None = None, env: dict[str, str] | None = 
     """Return the run-dimension cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    try:
-        return int(resolve_env(env).get("QUODEQ_RUN_DIM_CACHE_MAX", str(DEFAULT_RUN_DIM_CACHE_MAX)))
-    except (ValueError, TypeError):
-        return DEFAULT_RUN_DIM_CACHE_MAX
+    return env_int("QUODEQ_RUN_DIM_CACHE_MAX", DEFAULT_RUN_DIM_CACHE_MAX, minimum=0, env=resolve_env(env))
 
 
 class DimensionCache:
@@ -81,6 +79,17 @@ class DimensionCache:
 
 _shared_dimension_cache = DimensionCache()
 
+# Scalar-only entries for the history trend (score/grade/principles per run),
+# kept apart from the full-data cache above so the two never collide. Entries
+# are small, so the bound fits every run of several projects at once.
+_shared_trend_scalar_cache = DimensionCache()
+TREND_SCALAR_CACHE_MAX = 4096
+
+
+def shared_trend_scalar_cache() -> DimensionCache:
+    """The process-wide scalar cache the trend fetcher's fast path reads through."""
+    return _shared_trend_scalar_cache
+
 
 def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
     """Create the default run-dimension LRU cache and its lock.
@@ -96,10 +105,14 @@ def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]],
 def clear_shared_dimension_cache(cache: DimensionCache | None = None) -> None:
     """Drop all cached run-dimension data (e.g. after a formula change).
 
-    Clears *cache*, defaulting to the module-wide instance production
-    shares (the dashboard and the grade-formula-change hook).
+    Clears *cache* when given. By default clears both module-wide instances
+    production shares: the full-data cache and the trend scalar cache.
     """
-    (cache or _shared_dimension_cache).clear()
+    if cache is not None:
+        cache.clear()
+        return
+    _shared_dimension_cache.clear()
+    _shared_trend_scalar_cache.clear()
 
 
 def make_run_dimension_fetcher(
@@ -126,6 +139,8 @@ def make_run_dimension_fetcher(
 __all__ = [
     "DashboardCacheConfig",
     "DimensionCache",
+    "TREND_SCALAR_CACHE_MAX",
     "clear_shared_dimension_cache",
     "create_dimension_cache",
+    "shared_trend_scalar_cache",
 ]

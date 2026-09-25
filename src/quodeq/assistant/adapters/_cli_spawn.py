@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Callable
 from quodeq.config.provider import Provider
+from quodeq.shared.constants import SYSTEM_DARWIN, SYSTEM_LINUX
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.copilot import build_copilot_env
 
@@ -34,13 +35,17 @@ _DANGEROUS_FLAGS = (
 # This flag is therefore permitted ONLY when both conditions hold in the argv.
 _BYPASS_SANDBOX_FLAG = "--dangerously-bypass-approvals-and-sandbox"
 _EXTERNAL_SANDBOX_LAUNCHERS = ("sandbox-exec", "bwrap", "firejail")
+_FLAG_DISABLE = "--disable"
+_SHELL_TOOL_ARG = "shell_tool"
+_FLAG_DISABLE_SHELL_TOOL_EQ = "--disable=shell_tool"  # codex: single-token disable spelling
+_CONFIG_SHELL_TOOL_FALSE = "features.shell_tool=false"  # codex: config-override disable spelling
 
 
 def _shell_tool_disabled(argv: list[str]) -> bool:
     for i, token in enumerate(argv):
-        if token in ("--disable=shell_tool", "features.shell_tool=false"):
+        if token in (_FLAG_DISABLE_SHELL_TOOL_EQ, _CONFIG_SHELL_TOOL_FALSE):
             return True
-        if token == "--disable" and i + 1 < len(argv) and argv[i + 1] == "shell_tool":
+        if token == _FLAG_DISABLE and i + 1 < len(argv) and argv[i + 1] == _SHELL_TOOL_ARG:
             return True
     return False
 
@@ -123,7 +128,7 @@ def external_sandbox_prefix(*, writable_dirs: list[str],
     codex never runs unsandboxed with its internal sandbox bypassed.
     """
     system = platform.system()
-    if system == "Darwin":
+    if system == SYSTEM_DARWIN:
         profile = _seatbelt_profile(writable_dirs=writable_dirs, writable_files=writable_files)
         tmp = tempfile.NamedTemporaryFile("w", suffix=".sb", delete=False)
         tmp.write(profile)
@@ -132,7 +137,7 @@ def external_sandbox_prefix(*, writable_dirs: list[str],
         def _cleanup() -> None:
             Path(tmp.name).unlink(missing_ok=True)
         return ["sandbox-exec", "-f", tmp.name], _cleanup
-    if system == "Linux":
+    if system == SYSTEM_LINUX:
         if shutil.which("bwrap"):
             return _bwrap_prefix(writable_dirs, writable_files), lambda: None
         if shutil.which("firejail"):

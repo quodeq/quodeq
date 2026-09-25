@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 # Re-exported for backward compatibility with callers that still import
 # Judgment from this module.
 from quodeq.core.events.models import Judgment as Judgment
+from quodeq.core.types.scoring import ConfidenceLevel
 
 DEFAULT_WEIGHT = "Medium (x2)"
 _HIGH_CONFIDENCE_THRESHOLD = 10  # minimum total instances for "high" confidence
@@ -43,7 +44,7 @@ def violations_per_100_files(count: int, files_read: int | None) -> float | None
     """
     if not files_read or files_read <= 0:
         return None
-    return round(100.0 * count / files_read, 1)
+    return round(PERCENT_SCALE * count / files_read, 1)
 
 
 def classify_confidence_level(
@@ -80,10 +81,10 @@ def classify_confidence_level(
 
     total = n_violations + n_compliance
     if total >= high_threshold:
-        return "high"
+        return ConfidenceLevel.HIGH
     if total >= medium_threshold:
-        return "medium"
-    return "low"
+        return ConfidenceLevel.MEDIUM
+    return ConfidenceLevel.LOW
 
 
 @dataclass
@@ -167,7 +168,7 @@ class Evidence:
     def summary(self) -> dict:
         """Return an aggregate summary of findings, confidence, and balance across all principles."""
         total = sum(p.metrics.get("total_instances", 0) for p in self.principles.values())
-        low_conf = [k for k, p in self.principles.items() if p.metrics.get("confidence_level") == "low"]
+        low_conf = [k for k, p in self.principles.items() if p.metrics.get("confidence_level") == ConfidenceLevel.LOW]
         unbalanced = [k for k, p in self.principles.items() if not p.metrics.get("is_balanced", True)]
         return {
             "total_findings": total,
@@ -175,9 +176,9 @@ class Evidence:
             "low_confidence_principles": low_conf,
             "unbalanced_principles": unbalanced,
             "overall_confidence": (
-                "low" if len(low_conf) > len(self.principles) / _LOW_CONF_MAJORITY_DIVISOR
-                else "medium" if low_conf
-                else "high"
+                ConfidenceLevel.LOW if len(low_conf) > len(self.principles) / _LOW_CONF_MAJORITY_DIVISOR
+                else ConfidenceLevel.MEDIUM if low_conf
+                else ConfidenceLevel.HIGH
             ),
             "dismissed_count": self.dismissed_count,
         }

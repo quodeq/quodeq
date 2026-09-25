@@ -7,7 +7,8 @@ helpers, so the historical import path still resolves.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from collections.abc import Sequence
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -18,7 +19,7 @@ from quodeq.core.types import DimensionResult, DimensionSummary
 
 from quodeq.services._dashboard_cache import DashboardCacheConfig, make_run_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
-from quodeq.services.dashboard_trend import build_accumulated_trend
+from quodeq.services.dashboard_trend import build_accumulated_trend, build_partial_run_entries
 from quodeq.services.scoring_deps import ScoringDeps
 from quodeq.services.trend_fetcher import make_trend_fetcher
 from quodeq.services.wiring import RunInfo, read_run_status_json
@@ -107,6 +108,9 @@ class DashboardPayload:
     previous_by_dimension: dict[str, DimensionResult]
     stale_previous_by_dimension: dict[str, DimensionResult]
     stale_dimensions: list[DimensionResult]
+    # Cancelled runs with their own scores, for the History list only. Not
+    # part of ``trend``: see ``dashboard_trend.build_partial_run_entries``.
+    partial_runs: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -168,6 +172,7 @@ def _select_history_window(
 def _make_history_fetcher(
     reports_root: Path, project: str, window: _HistoryWindow,
     params: ScoringParams, cc: DashboardCacheConfig,
+    partial_runs: Sequence[RunInfo] = (),
 ) -> Callable[[str], list[DimensionResult]]:
     """Build the shared history dimension fetcher: cache-backed,
     dismiss-adjusted, SCALAR-only -- the same fetcher the /scores endpoint
@@ -178,9 +183,9 @@ def _make_history_fetcher(
     rescoring FULL data for every history run (up to max_history_runs())
     was the ~2s cost this replaces.
 
-    In-progress freshness is preserved: the fast path re-reads each request
-    (fresh per-call cache), and the heavy path's cacheable_run_ids guard makes
-    in-progress runs compute-through without persisting a partial set. Stale-
+    In-progress freshness is preserved: on both paths the cacheable_run_ids
+    guard makes in-progress runs compute-through without persisting a
+    partial set. Stale-
     partial detection is preserved inside read_run_scalars, which falls back to
     full read_run_data whenever the SQL scalar projection disagrees with the
     on-disk evaluation/*.json count -- the same self-heal the old status-aware
@@ -196,7 +201,10 @@ def _make_history_fetcher(
     here rather than a per-run scoped one -- per-run scoping only makes sense
     when a single run is in play, which this path is not.
     """
+    # Cancelled runs are terminal too, so their scalar sets are as stable as
+    # a done run's and safe to persist.
     cacheable_run_ids = {r.run_id for r in window.runs if r.status is RunState.DONE}
+    cacheable_run_ids.update(r.run_id for r in partial_runs)
     from quodeq.services.score_cache import score_cache_version  # noqa: PLC0415
     dim_cache_config = replace(cc, version=score_cache_version(reports_root / project, params))
     return make_trend_fetcher(
@@ -217,7 +225,12 @@ def compute_dashboard_payload(
     """Compute history-dependent parts of the dashboard response."""
     selected_dim_names = {d.dimension for d in ctx.dimensions}
     window = _select_history_window(ctx.runs, ctx.run.run_id, max_history_runs())
-    get_run_dimensions = _make_history_fetcher(reports_root, project, window, params, cc)
+    # Same scan ceiling as the trend, so an old project's cancelled runs
+    # cannot make the request walk more runs than its history does.
+    cancelled_runs = [r for r in ctx.runs if r.status is RunState.CANCELLED][:window.max_history]
+    get_run_dimensions = _make_history_fetcher(
+        reports_root, project, window, params, cc, partial_runs=cancelled_runs,
+    )
     previous_by_dimension = collect_previous_scores(
         window.runs, window.index, selected_dim_names, get_run_dimensions,
     )
@@ -231,4 +244,5 @@ def compute_dashboard_payload(
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,
         stale_dimensions=stale_dimensions,
+        partial_runs=build_partial_run_entries(cancelled_runs, get_run_dimensions, params=params),
     )

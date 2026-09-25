@@ -1,3 +1,5 @@
+import { URL_PROTOCOL } from '../../constants.js';
+
 export function openExternal(url) {
   if (!url) return;
   // The URL originates from the remote update API (latest_url / download_url),
@@ -11,7 +13,7 @@ export function openExternal(url) {
     console.warn('[openExternal] could not parse url:', err);
     return;
   }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+  if (parsed.protocol !== URL_PROTOCOL.HTTP && parsed.protocol !== URL_PROTOCOL.HTTPS) return;
   const api = typeof window !== 'undefined' && window.pywebview && window.pywebview.api;
   if (api && typeof api.open_browser === 'function') {
     try {

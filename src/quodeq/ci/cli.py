@@ -8,6 +8,8 @@ from pathlib import Path
 
 from quodeq.shared.env_resolve import resolve_env
 
+_CI_ACTION_REPORT = "report"  # only ci subcommand today
+
 
 def handle_ci(args: argparse.Namespace, env: Mapping[str, str] | None = None) -> int:
     """Handle the `quodeq ci` subcommand. Returns exit code.
@@ -15,7 +17,7 @@ def handle_ci(args: argparse.Namespace, env: Mapping[str, str] | None = None) ->
     *env* is this subcommand's composition root: the only place GITHUB_TOKEN
     is read, ``None`` meaning the real environment.
     """
-    if args.ci_action == "report":
+    if args.ci_action == _CI_ACTION_REPORT:
         return _handle_report(args, env)
     print("Usage: quodeq ci report [options]", file=sys.stderr)
     return 1

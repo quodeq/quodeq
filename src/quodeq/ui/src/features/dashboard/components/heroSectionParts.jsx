@@ -7,6 +7,7 @@
  */
 import { StatStrip, Stat } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
+import { HERO_CARD_KIND } from '../dashboardVocab.js';
 
 /**
  * The hero panel: the section, its header row and the stat strip inside it.
@@ -54,8 +55,8 @@ export function ComplianceAndRatioStats({ compliance, totalChecks, ratio, onComp
  */
 export function heroCardHandlers(onCardNavigate, { violations, compliance }) {
   return {
-    handleViolations: onCardNavigate && violations > 0 ? () => onCardNavigate('violations') : undefined,
-    handleCompliance: onCardNavigate && compliance > 0 ? () => onCardNavigate('compliance') : undefined,
+    handleViolations: onCardNavigate && violations > 0 ? () => onCardNavigate(HERO_CARD_KIND.VIOLATIONS) : undefined,
+    handleCompliance: onCardNavigate && compliance > 0 ? () => onCardNavigate(HERO_CARD_KIND.COMPLIANCE) : undefined,
     handleSeverity: onCardNavigate ? (level) => onCardNavigate(level) : undefined,
   };
 }

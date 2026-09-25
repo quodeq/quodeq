@@ -34,6 +34,9 @@ from quodeq.dashboard._build_npm import (  # noqa: F401
 )
 
 
+_UI_ENTRY_FILENAME = "index.html"  # presence marks a built (not just created) static dir
+
+
 def _static_dir_bundled() -> Path:
     """Path to the wheel-bundled static dist directory.
 
@@ -66,7 +69,7 @@ def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
         log_info(f"Dev mode: building from {source_dir}")
 
         if no_build:
-            if not (static_dir / "index.html").exists():
+            if not (static_dir / _UI_ENTRY_FILENAME).exists():
                 raise FileNotFoundError(
                     f"No cached dashboard build found at {static_dir}.\n"
                     "Run `quodeq dashboard --dev` without --no-build first."
@@ -85,7 +88,7 @@ def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
 
     # Production: the wheel ships a pre-built UI. Never invoke npm here.
     static_dir = _static_dir_bundled()
-    if not (static_dir / "index.html").exists():
+    if not (static_dir / _UI_ENTRY_FILENAME).exists():
         raise FileNotFoundError(
             "UI static assets are missing from the installed quodeq package.\n"
             "This usually means the wheel was built without running the UI build first.\n"

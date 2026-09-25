@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { MIN_SUBAGENTS } from '../../../constants.js';
+import { MIN_SUBAGENTS, PROVIDER_SETTING_KEY } from '../../../constants.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 import { SettingsRowLabel, RemoteSubagentsRow } from './settingsRowParts.jsx';
 import { clampSubagentsTo } from './localApiSubagents.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
+import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
 
 // A cloud tab falls back to the minimum when the entry is unusable.
 const clampCloudSubagents = (raw) => clampSubagentsTo(raw, String(MIN_SUBAGENTS));
@@ -33,7 +34,7 @@ function ModelRow({ hint, browseUrl, state, update, testing, testResult, runTest
           className={`settings-model-input${!state.model ? ' settings-model-input--required' : ''}`}
           value={state.model || ''}
           placeholder={t('settings.typeModelId')}
-          onChange={(e) => update('model', e.target.value)}
+          onChange={(e) => update(PROVIDER_SETTING_KEY.MODEL, e.target.value)}
           aria-label={t('settings.modelIdentifierAria')}
           autoCapitalize="off"
           autoCorrect="off"
@@ -82,7 +83,7 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
   return (
     <>
       <ModelRow hint={hint} browseUrl={browseUrl} state={state} update={update} testing={testing} testResult={testResult} runTest={runTest} />
-      <TimeLimitSetting state={state} update={update} providerType="cloud-api" />
+      <TimeLimitSetting state={state} update={update} providerType={PROVIDER_CLASSIFICATION.CLOUD_API} />
       <RemoteSubagentsRow state={state} update={update} clampSubagents={clampCloudSubagents} />
       <details className="settings-advanced">
         <summary className="settings-advanced-toggle">{t('settings.advanced')}</summary>

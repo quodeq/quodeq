@@ -26,7 +26,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../../api/ApiContext.jsx";
 import { apiErrorMessage } from "../../../strings/apiErrors.js";
-import { confirmCancelEvaluation } from "../cancelDialog.js";
+import { confirmCancelEvaluation, CANCEL_CHOICE } from "../cancelDialog.js";
 import { useRunEventStream } from "./useRunEventStream.js";
 import { evaluationKeys } from "../../../api/queryKeys.js";
 import { LOCAL_API_PROVIDERS } from "../../../vocab/provider.js";
@@ -84,7 +84,7 @@ function useCancelEvaluationCallback(cancelMutation) {
       : confirmCancelEvaluation;
     const choice = await confirm();
     if (!choice) return;
-    cancelMutation.mutate({ discard: choice === "discard" });
+    cancelMutation.mutate({ discard: choice === CANCEL_CHOICE.DISCARD });
   }, [cancelMutation]);
 }
 

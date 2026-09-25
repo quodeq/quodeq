@@ -32,6 +32,7 @@ _MIN_SIZE = 500_000
 # Level 6 is zlib's default: ~5x on these payloads at a fraction of the cost of
 # level 9, which buys little on already-repetitive JSON.
 _LEVEL = 6
+_MIME_JSON = "application/json"  # the only mimetype this hook compresses
 
 
 def configure_compression(app: Flask) -> None:
@@ -43,7 +44,7 @@ def configure_compression(app: Flask) -> None:
         # in-memory body to compress and must not be buffered here.
         if response.direct_passthrough or response.is_streamed:
             return response
-        if response.mimetype != "application/json":
+        if response.mimetype != _MIME_JSON:
             return response
         if response.headers.get("Content-Encoding"):
             return response

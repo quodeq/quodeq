@@ -1,4 +1,5 @@
 import DimensionGaugeCard from '../../dashboard/components/DimensionGaugeCard.jsx';
+import { GRADE } from '../../../vocab/grade.js';
 
 /**
  * Renders one DimensionGaugeCard per principle. Adapts a principleGrade-style
@@ -26,7 +27,7 @@ export default function PrinciplesCardsRow({ principles = [], onPrincipleClick }
       style={{ '--qd-cards-count': Math.max(1, principles.length) }}
     >
       {principles.map((p) => {
-        const isInsufficient = (p.grade || '').toLowerCase() === 'insufficient';
+        const isInsufficient = (p.grade || '').toLowerCase() === GRADE.INSUFFICIENT.toLowerCase();
         const item = principleToItem(p);
         return (
           <DimensionGaugeCard

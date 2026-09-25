@@ -8,6 +8,7 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
+from quodeq.shared.constants import GIT_BIN
 from quodeq.shared.env_resolve import resolve_env
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 CACHE_ENV = "QUODEQ_CACHE_ROOT"
 # Seconds; a first clone of a results repo can legitimately take minutes.
 DEFAULT_GIT_TIMEOUT_S = 300
+EVALUATIONS_DIRNAME = "evaluations"  # the clone's evaluations/ tree; see shared_evaluations_root
 
 
 def git_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -49,7 +51,7 @@ def run_git(
     """
     try:
         proc = subprocess.run(
-            ["git", *args],
+            [GIT_BIN, *args],
             cwd=str(cwd) if cwd else None,
             env=git_env(env),
             stdin=subprocess.DEVNULL,
@@ -93,4 +95,4 @@ def shared_repo_path(url: str, env: Mapping[str, str] | None = None) -> Path:
 
 def shared_evaluations_root(url: str, env: Mapping[str, str] | None = None) -> Path:
     """The clone's evaluations/ tree, laid out like the local evaluations dir."""
-    return shared_repo_path(url, env) / "evaluations"
+    return shared_repo_path(url, env) / EVALUATIONS_DIRNAME

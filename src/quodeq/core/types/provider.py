@@ -21,3 +21,10 @@ class Provider(StrEnum):
     LLAMACPP = "llamacpp"
     OPENROUTER = "openrouter"
     CUSTOM = "custom"
+
+
+class ProviderType(StrEnum):
+    """How quodeq talks to a provider: a local CLI subprocess or an HTTP API (provider config "type")."""
+
+    CLI = "cli"
+    API = "api"

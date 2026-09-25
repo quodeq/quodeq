@@ -17,6 +17,7 @@ import { formatDuration, formatDurationCoarse } from '../../../utils/formatters.
 import { exitReasonInfo, exitReasonWarn } from '../../../models/exitReason.js';
 import { t } from '../../../strings/index.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
+import { PERCENT } from '../../../constants.js';
 
 const STATUS_MARKERS = { arrow: '→', check: '✓', error: 'Error:', failed: 'failed' };
 function isStatusLine(line) {
@@ -78,7 +79,7 @@ export function ScanProgressBar({ showCoverage, cachedFiles, cachedPctWidth, run
         role="progressbar"
         aria-label={t('evaluate.scanProgressAria')}
         aria-valuemin={0}
-        aria-valuemax={100}
+        aria-valuemax={PERCENT}
         aria-valuenow={Math.round(showCoverage ? coveredPct : overallPct)}
         title={showCoverage ? t('evaluate.cachedBarTitle', { count: cachedFiles }) : undefined}
       >

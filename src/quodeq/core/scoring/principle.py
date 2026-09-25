@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from quodeq.core.types import PrincipleScore
+from quodeq.core.types import ConfidenceLevel, PrincipleScore
 from quodeq.core.evidence.model import DEFAULT_WEIGHT
 from quodeq.core.scoring.constants import Grade
 from quodeq.core.scoring.overall import MODE_NUMERICAL
@@ -75,7 +75,7 @@ def _score_numerical(
 ) -> PrincipleScore:
     """Score a single principle in numerical mode."""
     kwargs = _base_kwargs(ctx)
-    if ctx.conf_level == "low":
+    if ctx.conf_level == ConfidenceLevel.LOW:
         return PrincipleScore(
             **kwargs, base_score=0,
             deductions=build_deductions({}, scale_multiplier=ctx.scale_mult),
@@ -102,7 +102,7 @@ def _score_graded(
     ``_score_numerical``; the legacy graded ladder is not user-tunable.
     """
     kwargs = _base_kwargs(ctx)
-    if ctx.conf_level == "low":
+    if ctx.conf_level == ConfidenceLevel.LOW:
         return PrincipleScore(
             **kwargs, base_grade=Grade.INSUFFICIENT, severity_drops=0,
             grade=Grade.INSUFFICIENT,
@@ -123,7 +123,7 @@ def _build_context(
     """Build scoring context for a single principle from its evidence data."""
     metrics = pdata.get("metrics", {})
     pct = metrics.get("compliance_percentage", 0.0)
-    conf_level = metrics.get("confidence_level", "medium")
+    conf_level = metrics.get("confidence_level", ConfidenceLevel.MEDIUM)
     vt_counts, ct_counts, using_taxonomy = compute_tallies(
         pdata.get("violations", []), pdata.get("compliance", []),
     )

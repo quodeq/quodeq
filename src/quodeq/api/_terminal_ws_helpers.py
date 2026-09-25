@@ -15,6 +15,7 @@ import threading
 
 from flask_sock import ConnectionClosed
 
+from quodeq.terminal.constants import PTY_DEFAULT_COLS, PTY_DEFAULT_ROWS, PTY_READ_MAX_BYTES
 from quodeq.terminal.sessions import TerminalSessionRegistry
 
 _logger = logging.getLogger(__name__)
@@ -23,6 +24,9 @@ _logger = logging.getLogger(__name__)
 # keys off these: a retry against a held lock or a closed gate can never
 # succeed, so it must not loop — only unexpected drops are retried.
 WS_CLOSE_NOT_FOUND = 4004  # unknown session id; client reconciles via /sessions
+
+_WS_TAG_DATA = "0"  # server->client / client->server data frame prefix
+_WS_TAG_CONTROL = "1"  # client->server control frame tag (resize)
 
 
 def resolve_ws_session(registry: TerminalSessionRegistry, sid: str | None):
@@ -44,13 +48,13 @@ def resolve_ws_session(registry: TerminalSessionRegistry, sid: str | None):
 
 def pump_terminal_out(manager, ws, stop: threading.Event) -> None:
     while not stop.is_set():
-        data = manager.read(65536)
+        data = manager.read(PTY_READ_MAX_BYTES)
         if not data:
             if not manager.alive:
                 break
             continue
         try:
-            ws.send("0" + data)
+            ws.send(_WS_TAG_DATA + data)
         except Exception:
             break
     stop.set()
@@ -60,13 +64,15 @@ def setup_terminal_session(manager, ws) -> bool:
     """Ensure the PTY exists and replay scrollback. Returns False on setup
     failure (already logged and reported to the client)."""
     try:
-        manager.ensure_session(cwd=os.path.expanduser("~"), cols=80, rows=24)
+        manager.ensure_session(
+            cwd=os.path.expanduser("~"), cols=PTY_DEFAULT_COLS, rows=PTY_DEFAULT_ROWS,
+        )
         # Replay scrollback so a reattaching client sees recent history.
         # Already text: the manager decodes incrementally, so the ring
         # never holds a torn multi-byte character.
         sb = manager.scrollback()
         if sb:
-            ws.send("0" + sb)
+            ws.send(_WS_TAG_DATA + sb)
         return True
     except Exception:
         # Spawn failure or early disconnect must not propagate past
@@ -93,9 +99,9 @@ def terminal_read_loop(ws, manager, stop: threading.Event, apply_control) -> Non
             if msg is None:
                 continue
             tag, payload = msg[:1], msg[1:]
-            if tag == "0":
+            if tag == _WS_TAG_DATA:
                 manager.write(payload.encode("utf-8"))
-            elif tag == "1":
+            elif tag == _WS_TAG_CONTROL:
                 apply_control(manager, payload)
     except Exception:
         # A write to a dead/killed process (or any other failure in this

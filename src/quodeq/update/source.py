@@ -11,6 +11,7 @@ from http import HTTPStatus
 import httpx
 
 from quodeq import __version__
+from quodeq.update.channel import CHANNEL_FROZEN, CHANNEL_WHEEL
 from quodeq.update.compare import normalize
 
 _logger = logging.getLogger(__name__)
@@ -55,7 +56,7 @@ _ASSET_PATTERNS = {
 
 
 def _pick_download_url(release: dict, channel: str, platform: str) -> str | None:
-    if channel != "frozen":
+    if channel != CHANNEL_FROZEN:
         return None
     pattern = _ASSET_PATTERNS.get(platform)
     if pattern is None:
@@ -105,7 +106,7 @@ def fetch_latest(
         etag=new_etag,
     )
 
-    if channel == "wheel":
+    if channel == CHANNEL_WHEEL:
         try:
             pypi = httpx.get(_PYPI_URL, headers={"User-Agent": _user_agent()}, timeout=_TIMEOUT)
             if pypi.status_code == HTTPStatus.OK:

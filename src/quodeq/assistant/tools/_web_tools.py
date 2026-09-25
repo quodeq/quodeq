@@ -23,6 +23,7 @@ _USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36")
 _TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=10.0)
 _MAX_RESULTS = 8
+_DEFAULT_SEARCH_RESULTS = 5  # results returned when the model omits max_results
 _MAX_FETCH_BYTES = 2 * 1024 * 1024
 _MAX_FETCH_SECONDS = 60.0  # total budget: read=30.0 is per-read-op, so a slow
 # drip (1 byte per 29s) would otherwise wedge the turn thread indefinitely
@@ -30,6 +31,7 @@ _MAX_TEXT_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON head
 _MAX_TITLE_CHARS = 300  # per search result; keeps _MAX_RESULTS results well under the fence
 _MAX_SNIPPET_CHARS = 500  # per search result, same budget
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+_TAG_ANCHOR = "a"  # DDG result-link <a> tag name
 
 
 def _decode_ddg_href(href: str) -> str:
@@ -57,7 +59,7 @@ class _DdgResultParser(HTMLParser):
                 self._depth += 1
             return
         classes = (dict(attrs).get("class") or "").split()
-        if tag == "a" and "result__a" in classes:
+        if tag == _TAG_ANCHOR and "result__a" in classes:
             url = _decode_ddg_href(dict(attrs).get("href") or "")
             self.results.append({"title": "", "url": url, "snippet": ""})
             self._target, self._container, self._depth = "title", tag, 1
@@ -87,7 +89,7 @@ class _DdgResultParser(HTMLParser):
         self._flush()  # an unterminated target tag still yields its accumulated text
 
 
-def _search_web(query: str, max_results: int = 5) -> dict:
+def _search_web(query: str, max_results: int = _DEFAULT_SEARCH_RESULTS) -> dict:
     query = str(query or "").strip()
     if not query:
         raise ToolError("query must not be empty")
@@ -230,7 +232,7 @@ def _fetch_url(url: str) -> dict:
     except (httpx.HTTPError, httpx.InvalidURL) as exc:
         raise ToolError(f"could not fetch {url}: {exc}") from exc
     text = _decode_fetch_body(body, encoding, content_type)
-    return {"url": url, "status": 200, "content_type": content_type,
+    return {"url": url, "status": HTTPStatus.OK, "content_type": content_type,
             "text": text[:_MAX_TEXT_CHARS],
             "truncated": hit_byte_cap or len(text) > _MAX_TEXT_CHARS}
 
@@ -242,7 +244,7 @@ def register_web_tools(registry: ToolRegistry) -> None:
         {"type": "object",
          "properties": {
              "query": {"type": "string", "description": "Search query."},
-             "max_results": {"type": "integer", "minimum": 1, "maximum": 8,
+             "max_results": {"type": "integer", "minimum": 1, "maximum": _MAX_RESULTS,
                              "description": "How many results to return (default 5)."},
          },
          "required": ["query"]},

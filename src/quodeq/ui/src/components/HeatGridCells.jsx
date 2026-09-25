@@ -1,7 +1,9 @@
 import { severityCellStyle, complianceRateCellStyle, severityColor, complianceRateColor } from '../features/map/viz/core/mapColors.js';
 import { t } from '../strings/index.js';
+import { PERCENT } from '../constants.js';
 import { activateOnKey } from '../utils/a11y.js';
 import { SEVERITY_ORDER } from '../vocab/severity.js';
+import { SORT_DIR } from '../vocab/sortDirection.js';
 
 // The catalog has no pluralisation, so a count of one takes its own key. An
 // unnamed row gets its fallback from the catalog too, not a bare literal.
@@ -84,10 +86,31 @@ function HealthCell({ row, total, rate, flat }) {
   );
 }
 
-export default function HeatGridCells({ row, onCellClick, variant = 'heat' }) {
+// The two render treatments this component and its callers (HeatGridView,
+// DimensionHeatGridView, ViolationsPage) pass as `variant`.
+export const HEAT_GRID_VARIANT = Object.freeze({ HEAT: 'heat', FLAT: 'flat' });
+
+/**
+ * Column-header click handler shared by the map and violations heat grids
+ * (HeatGridView.jsx, DimensionHeatGridView.jsx): clicking the active column
+ * flips its direction; clicking a different column selects it, defaulting to
+ * ascending only for `ascCol` (the name column in both grids).
+ */
+export function makeColumnSortHandler({ sortCol, setSortCol, setSortDir, ascCol }) {
+  return (col) => {
+    if (sortCol === col) {
+      setSortDir((d) => (d === SORT_DIR.ASC ? SORT_DIR.DESC : SORT_DIR.ASC));
+    } else {
+      setSortCol(col);
+      setSortDir(col === ascCol ? SORT_DIR.ASC : SORT_DIR.DESC);
+    }
+  };
+}
+
+export default function HeatGridCells({ row, onCellClick, variant = HEAT_GRID_VARIANT.HEAT }) {
   const total = row.violations + row.compliance;
-  const rate = total > 0 ? Math.round(row.complianceRate * 100) + '%' : '—';
-  const flat = variant === 'flat';
+  const rate = total > 0 ? Math.round(row.complianceRate * PERCENT) + '%' : '—';
+  const flat = variant === HEAT_GRID_VARIANT.FLAT;
 
   return (
     <>

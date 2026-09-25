@@ -14,6 +14,8 @@ from quodeq.assistant.tools.registry import ToolRegistry
 from quodeq.assistant.tools.write_tools import register_write_tools
 from quodeq.assistant import AssistantRepository
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
+from quodeq.core.jsonrpc import JsonRpcErrorCode
+from quodeq.core.mcp_method import McpMethod
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 
 _PROTOCOL = "2024-11-05"
@@ -51,20 +53,20 @@ def serve(registry: ToolRegistry, *, stdin: TextIO, stdout: TextIO, stderr: Text
             break
         method, req_id = msg.get("method"), msg.get("id")
         try:
-            if method == "initialize":
+            if method == McpMethod.INITIALIZE:
                 _jsonrpc.send(_jsonrpc.ok(req_id, {
                     "protocolVersion": _PROTOCOL, "capabilities": {"tools": {}},
                     "serverInfo": {"name": _SERVER_NAME, "version": "1"}}), stdout)
-            elif method == "tools/list":
+            elif method == McpMethod.TOOLS_LIST:
                 _jsonrpc.send(_jsonrpc.ok(req_id, _tools_list(registry)), stdout)
-            elif method == "tools/call":
+            elif method == McpMethod.TOOLS_CALL:
                 _jsonrpc.send(_jsonrpc.ok(req_id, _tools_call(registry, msg.get("params", {}))), stdout)
-            elif method == "ping":
+            elif method == McpMethod.PING:
                 _jsonrpc.send(_jsonrpc.ok(req_id, {}), stdout)
             elif method and method.startswith("notifications/"):
                 continue
             else:
-                _jsonrpc.send(_jsonrpc.err(req_id, -32601, f"method not found: {method}"), stdout)
+                _jsonrpc.send(_jsonrpc.err(req_id, JsonRpcErrorCode.METHOD_NOT_FOUND, f"method not found: {method}"), stdout)
         except Exception as exc:  # noqa: BLE001 - server must not die on one bad request
             stderr.write(f"assistant mcp dispatch error: {exc}\n")
             stderr.flush()
@@ -72,7 +74,7 @@ def serve(registry: ToolRegistry, *, stdin: TextIO, stdout: TextIO, stderr: Text
                 # The exception detail is written to stderr above; the client
                 # frame carries only a generic message so internal failure
                 # detail is not exposed to MCP callers.
-                _jsonrpc.send(_jsonrpc.err(req_id, -32603, "internal error"), stdout)
+                _jsonrpc.send(_jsonrpc.err(req_id, JsonRpcErrorCode.INTERNAL_ERROR, "internal error"), stdout)
 
 
 def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:

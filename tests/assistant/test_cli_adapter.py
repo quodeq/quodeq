@@ -1,7 +1,14 @@
 """CLI adapter streaming: token frames, echo suppression, tool-use frames, codex items."""
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
 import pytest
 
-from quodeq.assistant.adapters.cli import run_cli_turn
+from quodeq.assistant.adapters.cli import (
+    McpConfigRef, TurnResources, release_turn_resources, run_cli_turn,
+)
+from quodeq.core.constants import MCP_STYLE_CLI_REGISTER
 
 from ._cli_adapter_helpers import FakeProc, _config, _repo, _session
 
@@ -217,3 +224,32 @@ def test_codex_mcp_tool_call_emits_single_frame(tmp_path):
     assert text == "The scope is X."
     assert [f for f in frames if f["type"] == "tool_call"] == [
         {"type": "tool_call", "name": "get_context"}]
+
+
+class TestReleaseTurnResourcesIsolatesCleanupFailures:
+    """One failing cleanup step must not stop the steps after it."""
+
+    def test_sandbox_and_unlink_failures_do_not_stop_the_rest(self, tmp_path, monkeypatch):
+        cwd = tmp_path / "scratch"
+        cwd.mkdir()
+        resources = TurnResources(cwd=str(cwd), sandbox_cleanup=_raise_os_error)
+        mcp_config_ref = McpConfigRef(str(tmp_path / "mcp.json"), None)
+        cli_cfg = SimpleNamespace(mcp_style=MCP_STYLE_CLI_REGISTER, cmd="claude")
+
+        monkeypatch.setattr(Path, "unlink", _raise_permission_error)
+
+        with patch(
+            "quodeq.assistant.adapters._cli_cleanup.mcp_config.unregister_cli_mcp"
+        ) as unregister:
+            release_turn_resources(resources, mcp_config_ref=mcp_config_ref, cli_cfg=cli_cfg)
+
+        assert not cwd.exists()
+        unregister.assert_called_once_with("claude")
+
+
+def _raise_os_error():
+    raise OSError("sandbox cleanup boom")
+
+
+def _raise_permission_error(self, missing_ok=False):
+    raise PermissionError("denied")

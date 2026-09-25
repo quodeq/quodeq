@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from enum import StrEnum
 from typing import NamedTuple
 
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
@@ -23,6 +24,9 @@ _MIN_NPM_MAJOR = 10
 # metacharacters, so even on the Windows shell=True path (needed for npm
 # .cmd shim resolution) a value like "x & calc.exe" can never reach cmd.exe.
 SAFE_CMD_TOKEN_RE = re.compile(r"[A-Za-z0-9._-]+")
+
+_VERSION_FLAG = "--version"
+_NPM = "npm"
 
 
 def run_version_cmd(cmd: list[str]) -> str:
@@ -54,10 +58,18 @@ def _parse_major(version_str: str) -> int:
     return int(cleaned.split(".")[0])
 
 
+class _ToolStatus(StrEnum):
+    """Classified outcome of one tool's ``--version`` probe."""
+
+    OK = "ok"
+    MISSING = "missing"
+    OUTDATED = "outdated"
+
+
 class _VersionCheck(NamedTuple):
     """Classified outcome of one tool's ``--version`` probe."""
 
-    status: str  # "ok", "missing" or "outdated"
+    status: _ToolStatus
     version: str  # the reported version string, "" when the probe failed
     error: Exception | None  # the probe failure, kept for exception chaining
 
@@ -71,24 +83,24 @@ def _probe_tool_version(cmd: list[str], min_major: int) -> _VersionCheck:
     try:
         version_str = run_version_cmd(cmd)
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
-        return _VersionCheck("missing", "", exc)
+        return _VersionCheck(_ToolStatus.MISSING, "", exc)
     try:
         major = _parse_major(version_str)
     except (ValueError, IndexError):
-        return _VersionCheck("ok", version_str, None)
+        return _VersionCheck(_ToolStatus.OK, version_str, None)
     if major < min_major:
-        return _VersionCheck("outdated", version_str, None)
-    return _VersionCheck("ok", version_str, None)
+        return _VersionCheck(_ToolStatus.OUTDATED, version_str, None)
+    return _VersionCheck(_ToolStatus.OK, version_str, None)
 
 
 def _check_tool_version(cmd: list[str], tool_name: str, min_major: int, install_hint: str) -> None:
     """Raise RuntimeError if *tool_name* is missing or below *min_major*."""
     check = _probe_tool_version(cmd, min_major)
-    if check.status == "missing":
+    if check.status == _ToolStatus.MISSING:
         raise RuntimeError(
             f"{tool_name} {min_major}+ is required but not found.\n{install_hint}"
         ) from check.error
-    if check.status == "outdated":
+    if check.status == _ToolStatus.OUTDATED:
         raise RuntimeError(
             f"{tool_name} {check.version} is below the minimum required version {min_major}.x.\n"
             f"{install_hint}"
@@ -97,12 +109,12 @@ def _check_tool_version(cmd: list[str], tool_name: str, min_major: int, install_
 
 def check_node(min_major: int = _MIN_NODE_MAJOR) -> None:
     """Raise RuntimeError if Node.js is missing or below minimum version."""
-    _check_tool_version(["node", "--version"], "Node.js", min_major, _INSTALL_HINT_NODE)
+    _check_tool_version(["node", _VERSION_FLAG], "Node.js", min_major, _INSTALL_HINT_NODE)
 
 
 def check_npm(min_major: int = _MIN_NPM_MAJOR) -> None:
     """Raise RuntimeError if npm is missing or below minimum version."""
-    _check_tool_version(["npm", "--version"], "npm", min_major, _INSTALL_HINT_NODE)
+    _check_tool_version([_NPM, _VERSION_FLAG], _NPM, min_major, _INSTALL_HINT_NODE)
 
 
 def _collect_tool_issue(cmd: list[str], tool_name: str, min_major: int) -> str | None:
@@ -112,9 +124,9 @@ def _collect_tool_issue(cmd: list[str], tool_name: str, min_major: int) -> str |
     a single error instead of failing fast on the first one.
     """
     check = _probe_tool_version(cmd, min_major)
-    if check.status == "missing":
+    if check.status == _ToolStatus.MISSING:
         return f"{tool_name} {min_major}+ not found on PATH"
-    if check.status == "outdated":
+    if check.status == _ToolStatus.OUTDATED:
         return f"{tool_name} {check.version} is below the minimum required version {min_major}.x"
     return None
 
@@ -133,10 +145,10 @@ def check_dashboard_dev_prereqs() -> None:
     packages) gets the full story in one message with one install command.
     """
     issues: list[str] = []
-    node_issue = _collect_tool_issue(["node", "--version"], "Node.js", _MIN_NODE_MAJOR)
+    node_issue = _collect_tool_issue(["node", _VERSION_FLAG], "Node.js", _MIN_NODE_MAJOR)
     if node_issue is not None:
         issues.append(node_issue)
-    npm_issue = _collect_tool_issue(["npm", "--version"], "npm", _MIN_NPM_MAJOR)
+    npm_issue = _collect_tool_issue([_NPM, _VERSION_FLAG], _NPM, _MIN_NPM_MAJOR)
     if npm_issue is not None:
         issues.append(npm_issue)
     if not issues:

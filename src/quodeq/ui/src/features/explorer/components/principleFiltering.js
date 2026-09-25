@@ -1,13 +1,15 @@
 import { useMemo } from 'react';
 import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { usePrincipleData } from './explorerDataHooks.js';
-import { SEVERITY } from '../../../vocab/severity.js';
+import { useHydratedCompliance } from '../hooks/useHydratedCompliance.js';
+import { SEVERITY, SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 
 /** Split an evalPrincipal's violations into per-severity buckets and totals. */
 export function computeEvalPrincipleData(evalPrincipal) {
   const { principleData, dimViolations = [], dimCompliance = [] } = evalPrincipal;
   const violations = (principleData?.violations?.length > 0) ? principleData.violations : dimViolations;
-  const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet);
+  // A deferred /scores item has no reason/snippet yet but is still a real check.
+  const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet || c.detailDeferred);
   const violationsBySeverity = {};
   const sevCounts = { critical: 0, major: 0, minor: 0 };
   for (const sev of KNOWN_SEVERITIES) violationsBySeverity[sev] = [];
@@ -22,7 +24,7 @@ export function computeEvalPrincipleData(evalPrincipal) {
 /** Narrow the per-severity buckets to the active filter (or pass through
  * for 'all'/no filter). */
 export function filterBySeveritySelection(filteredBySeverity, activeSevFilter) {
-  if (!activeSevFilter || activeSevFilter === 'all') return filteredBySeverity;
+  if (!activeSevFilter || activeSevFilter === SEVERITY_FILTER_ALL) return filteredBySeverity;
   const filtered = {};
   for (const sev of Object.keys(filteredBySeverity)) {
     filtered[sev] = sev === activeSevFilter ? filteredBySeverity[sev] : [];
@@ -37,7 +39,8 @@ export function filterBySeveritySelection(filteredBySeverity, activeSevFilter) {
  * active severity selection.
  */
 export function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
-  const { violations, compliance, violationsBySeverity } = useMemo(() => computeEvalPrincipleData(evalPrincipal), [evalPrincipal]);
+  const { violations, compliance: slimCompliance, violationsBySeverity } = useMemo(() => computeEvalPrincipleData(evalPrincipal), [evalPrincipal]);
+  const compliance = useHydratedCompliance(slimCompliance);
 
   const {
     liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
