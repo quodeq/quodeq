@@ -29,10 +29,9 @@ from quodeq.llm_bridge._ollama import (
     estimate_max_agents,
 )
 from quodeq.config.llm_bridge_env import llamacpp_base_url
+from quodeq.llm_bridge._constants import TIMEOUT_S
 
 _log = logging.getLogger(__name__)
-
-_TIMEOUT_S = 3
 #: Everything a probe against a llama-server may raise: the socket/HTTP
 #: layer (OSError, which urllib's URLError and ConnectionRefusedError both
 #: subclass) and a body that is not the JSON we expect (ValueError, which
@@ -66,7 +65,7 @@ def get_llamacpp_status(base_url: str | None = None) -> dict:
     root = _normalize_base(base_url or _default_base_url())
     try:
         req = urllib.request.Request(f"{root}/health")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
             data = json.loads(resp.read() or b"{}")
             return {
                 "running": True,
@@ -88,7 +87,7 @@ def list_llamacpp_models(base_url: str | None = None) -> list[dict]:
     root = _normalize_base(base_url or _default_base_url())
     try:
         req = urllib.request.Request(f"{root}/v1/models")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             entries = data.get("data", []) or []
             return [

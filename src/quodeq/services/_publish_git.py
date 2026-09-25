@@ -25,9 +25,10 @@ from quodeq.services.wiring import (
 
 _GIT_REMOTE_ORIGIN = "origin"
 _GIT_HEAD = "HEAD"
+_GIT_TIMEOUT_S = 300  # clone/push over a slow remote can legitimately take minutes
 
 
-def _run_git(args, *, cwd=None, timeout=300):
+def _run_git(args, *, cwd=None, timeout=_GIT_TIMEOUT_S):
     from quodeq.services import shared_publish as _sp
 
     return _sp.run_git(args, cwd=cwd, timeout=timeout)

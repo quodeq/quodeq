@@ -18,10 +18,11 @@ _ASSUME_NATIVE = frozenset({Provider.OPENROUTER, Provider.CUSTOM})
 _PROBE_CACHE_SIZE = 64
 _probe_answers: LRUDict[tuple[str, str], bool] = LRUDict(_PROBE_CACHE_SIZE)
 _probe_lock = threading.Lock()
+_PROBE_TIMEOUT_S = 5.0
 
 
 def _default_probe(url: str, json: dict) -> dict:
-    resp = httpx.post(url, json=json, timeout=5.0)
+    resp = httpx.post(url, json=json, timeout=_PROBE_TIMEOUT_S)
     resp.raise_for_status()
     return resp.json()
 

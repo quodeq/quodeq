@@ -13,8 +13,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from quodeq.shared.constants import CMD_DISCOVERY_TIMEOUT_S
+
 _HEALTH_TIMEOUT = 1.0
-_CMD_DISCOVERY_TIMEOUT_S = 5
 _API_HEALTH_PATH = "/api/health"
 _API_EVALUATIONS_PATH = "/api/evaluations"
 _LOCAL_BASE_URL = "http://127.0.0.1"
@@ -70,7 +71,7 @@ def _find_commands_uncached(
         try:
             result = subprocess.run(
                 ["which", name], capture_output=True, text=True, encoding="utf-8",
-                timeout=_CMD_DISCOVERY_TIMEOUT_S, env=env,
+                timeout=CMD_DISCOVERY_TIMEOUT_S, env=env,
             )
             cmds[name] = result.stdout.strip() if result.returncode == 0 else None
         except (subprocess.TimeoutExpired, OSError):

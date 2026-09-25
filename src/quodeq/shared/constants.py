@@ -52,6 +52,22 @@ OMLX_DEFAULT_BASE_URL = "http://localhost:8000"
 
 SECRET_SUFFIX_CHARS = 4  # how many trailing credential characters a log or settings mask may show
 
+# Time unit conversion. Read by analysis/runner_markers.py and
+# analysis/subagents/_heartbeat.py to render elapsed seconds as mm:ss.
+SECONDS_PER_MINUTE = 60
+
+# Exponential-backoff retry formula shared by two independent network
+# retry loops (config/_asvs_network.py's ASVS fetch, update/download.py's
+# release download): base_delay * 2**attempt + uniform(0, jitter).
+RETRY_BASE_DELAY_S = 0.5
+RETRY_JITTER_S = 0.3
+
+# Bound on a `which`/shell-discovery subprocess probe. Shared by
+# shared/frozen.py's PATH discovery and menubar/_health.py's per-command
+# `which` probe; both are local subprocess calls, so a short timeout still
+# leaves headroom for a slow shell init.
+CMD_DISCOVERY_TIMEOUT_S = 5
+
 # Per-run subdirectory holding evidence/*.jsonl, manifest.json and the live
 # stream files. Named by analysis/data/services alike (analysis writes it,
 # data and services read it), so it lives here rather than in one layer.

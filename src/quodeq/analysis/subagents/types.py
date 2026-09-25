@@ -3,6 +3,11 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+# Default batch size for WorkQueue.take(). Shared with the concrete
+# FileQueue implementation (analysis/subagents/file_queue.py) so the
+# protocol's default and the implementation's default never drift apart.
+DEFAULT_TAKE_COUNT = 5
+
 
 @runtime_checkable
 class WorkQueue(Protocol):
@@ -13,7 +18,7 @@ class WorkQueue(Protocol):
     protocol to plug into the same orchestration layer.
     """
 
-    def take(self, count: int = 5, agent_id: str = "") -> list[str]:
+    def take(self, count: int = DEFAULT_TAKE_COUNT, agent_id: str = "") -> list[str]:
         """Atomically remove and return the next *count* items."""
         ...
 

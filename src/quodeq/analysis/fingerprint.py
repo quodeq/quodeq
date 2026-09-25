@@ -28,6 +28,7 @@ from quodeq.data.fs.standards_prefs import load_project_overrides
 from quodeq.shared.lru import LRUDict
 
 _HASH_CHUNK_SIZE = 1 << 16  # 64 KiB
+_FILE_CAP, _OVERRIDE_CAP, _PARAMS_CAP = 4096, 1024, 1024  # HashCache LRU capacities (file hashes churn most)
 
 
 def hash_file(path: Path) -> str | None:
@@ -126,8 +127,8 @@ class HashCache:
     """
 
     def __init__(
-        self, *, file_capacity: int = 4096,
-        override_capacity: int = 1024, params_capacity: int = 1024,
+        self, *, file_capacity: int = _FILE_CAP,
+        override_capacity: int = _OVERRIDE_CAP, params_capacity: int = _PARAMS_CAP,
     ) -> None:
         self._lock = threading.Lock()
         self._file_hashes: LRUDict[_StatKey, str | None] = LRUDict(file_capacity)

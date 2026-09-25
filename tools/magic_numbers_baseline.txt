@@ -3,38 +3,12 @@
 # against). The fix is a named constant that carries meaning and unit.
 # Burn to zero; never add.
 # Regenerate intentionally: python tools/check_magic_numbers.py --update-baseline
-quodeq/analysis/_api_call.py:A:8
-quodeq/analysis/cache/dimension_runner.py:A:5.0
-quodeq/analysis/cache/failure_streak.py:A:5.0
-quodeq/analysis/fingerprint.py:A:1024
-quodeq/analysis/fingerprint.py:A:4096
-quodeq/analysis/subagents/_git_scoring.py:A:3
-quodeq/analysis/subagents/_verify_io.py:A:20
-quodeq/analysis/subagents/file_queue.py:A:5
-quodeq/analysis/subagents/priority_scoring.py:A:2000
-quodeq/analysis/subagents/priority_scoring.py:A:5
-quodeq/analysis/subagents/types.py:A:5
-quodeq/assistant/adapters/api.py:A:0.25
-quodeq/assistant/adapters/capabilities.py:A:5.0
-quodeq/assistant/guard.py:A:8
-quodeq/assistant/mcp/server.py:A:-32601
-quodeq/assistant/mcp/server.py:A:-32603
-quodeq/assistant/tools/_read_tools.py:A:100
-quodeq/assistant/tools/_read_tools.py:A:20
-quodeq/assistant/tools/_read_tools.py:A:50
-quodeq/assistant/tools/_read_tools_violations.py:A:99
-quodeq/assistant/tools/_web_tools.py:A:5
-quodeq/assistant/tools/_web_tools.py:A:8
-quodeq/assistant/tools/_web_tools.py:R:200
 quodeq/config/_asvs_network.py:A:3
 quodeq/config/_fetch_client.py:A:15
 quodeq/config/_fetch_client_class.py:A:0.5
 quodeq/config/_fetch_client_class.py:A:15
 quodeq/config/_fetch_client_class.py:A:5
 quodeq/config/clone_env.py:A:300
-quodeq/core/scoring/_tallies.py:A:0.25
-quodeq/core/scoring/internals.py:R:10.0
-quodeq/core/scoring/internals.py:R:3
 quodeq/dashboard/_build_npm.py:A:300
 quodeq/dashboard/_build_npm.py:A:600
 quodeq/dashboard/_instance.py:A:0.5
@@ -49,17 +23,8 @@ quodeq/data/ports/findings.py:A:100
 quodeq/data/sqlite/assistant_repository.py:A:500
 quodeq/data/sqlite/findings_repository.py:A:100
 quodeq/data/sqlite/index_sync.py:A:30
-quodeq/llm_bridge/_ollama.py:A:1.3
-quodeq/llm_bridge/embeddings.py:A:64
 quodeq/menubar/_health.py:A:4
 quodeq/menubar/_process.py:A:5
-quodeq/services/_filesystem_helpers.py:A:4
-quodeq/services/_publish_git.py:A:300
-quodeq/services/_run_status_readers.py:A:500
-quodeq/services/score_cache.py:A:6
-quodeq/services/scoring/_fetchers.py:A:100
-quodeq/services/warmup.py:A:0.1
-quodeq/services/warmup.py:A:10
 quodeq/shared/run_heartbeat.py:A:5.0
 quodeq/update/download.py:A:3
 quodeq/update/selfupdate.py:A:0.5

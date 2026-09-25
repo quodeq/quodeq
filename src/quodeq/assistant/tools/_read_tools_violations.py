@@ -31,7 +31,7 @@ from quodeq.core.types.severity import Severity
 VIOLATION_FIELDS = ("principle", "file", "line", "severity", "title", "reason")
 # get_violations paging limits.
 _VIOLATIONS_DEFAULT_LIMIT = 40
-_VIOLATIONS_MAX_LIMIT = 100
+VIOLATIONS_MAX_LIMIT = 100
 # Severity ordering (critical/major first). Unknown severities sort last.
 # The Severity members are the canonical keys; the rest are synonyms models
 # and older reports use for the same rungs.
@@ -39,6 +39,9 @@ _SEVERITY_RANK = {
     Severity.CRITICAL: 0, "blocker": 0, "high": 1, Severity.MAJOR: 1,
     "moderate": 2, "medium": 2, Severity.MINOR: 3, "low": 3, "info": 4, "trivial": 4,
 }
+# Sort rank for a severity string outside _SEVERITY_RANK: worse (sorts last)
+# than any real rung, so an unrecognized severity never hides among sorted ones.
+_UNKNOWN_SEVERITY_RANK = 99
 
 
 def available_names(ctx: ToolContext, dims: list[dict]) -> str:
@@ -89,14 +92,14 @@ def trim_violation(v: dict) -> dict:
 
 def _severity_key(v: dict):
     sev = (v.get("severity") or "").lower()
-    return (_SEVERITY_RANK.get(sev, 99), _principle_of(v) or "")
+    return (_SEVERITY_RANK.get(sev, _UNKNOWN_SEVERITY_RANK), _principle_of(v) or "")
 
 
 def get_violations(ctx: ToolContext, dimension: str | None = None,
                     limit: int = _VIOLATIONS_DEFAULT_LIMIT) -> dict:
     """One page of violations for the run or overview scope, severity first,
     with per-principle counts."""
-    limit = max(1, min(int(limit), _VIOLATIONS_MAX_LIMIT))
+    limit = max(1, min(int(limit), VIOLATIONS_MAX_LIMIT))
     if has_run(ctx):
         raw, dim_out, hidden = _violations_from_run(ctx, dimension)
     else:

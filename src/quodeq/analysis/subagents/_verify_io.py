@@ -12,10 +12,14 @@ from quodeq.shared.constants import EVIDENCE_DIRNAME
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import open_text
 
+# How many of the project's most recent runs to scan for a usable previous
+# evidence file before giving up.
+_RECENT_RUNS_SEARCH_LIMIT = 20
+
 
 def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_id: str, dim_id: str) -> Path | None:
     """Find the JSONL evidence file from the most recent previous run."""
-    runs = list_runs(reports_root, project_uuid, limit=20)
+    runs = list_runs(reports_root, project_uuid, limit=_RECENT_RUNS_SEARCH_LIMIT)
     for run in runs:
         if run.run_id == current_run_id:
             continue

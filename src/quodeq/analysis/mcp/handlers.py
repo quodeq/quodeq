@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from quodeq import __version__
+from quodeq.core.jsonrpc import JsonRpcErrorCode
 from quodeq.analysis.mcp.jsonrpc_io import JSONRPC_VERSION, send as _send, ok as _ok
 from quodeq.analysis.mcp.schemas import (
     DEFAULT_FILE_BATCH_SIZE,
@@ -26,7 +27,6 @@ if TYPE_CHECKING:
     from quodeq.analysis.subagents.file_queue import FileQueue
     from quodeq.analysis.mcp.findings_server import FindingsRouter
 
-_JSONRPC_METHOD_NOT_FOUND = -32601
 _MCP_DEFAULT_PROTOCOL_VERSION = "2024-11-05"
 _SERVER_NAME = "quodeq-findings"
 _SERVER_VERSION = __version__ or "0.0.0"
@@ -155,4 +155,4 @@ def handle_unknown_method(req_id: object, method: str) -> None:
     """Send a JSON-RPC method-not-found error for unrecognised methods."""
     if req_id is not None:
         _send({"jsonrpc": JSONRPC_VERSION, "id": req_id,
-               "error": {"code": _JSONRPC_METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})
+               "error": {"code": JsonRpcErrorCode.METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})

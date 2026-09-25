@@ -10,6 +10,7 @@ import urllib.error
 import urllib.request
 import os
 
+from quodeq.shared.constants import RETRY_BASE_DELAY_S, RETRY_JITTER_S
 from quodeq.shared.url_validation import validate_url_safe
 
 _logger = logging.getLogger(__name__)
@@ -17,8 +18,6 @@ _logger = logging.getLogger(__name__)
 _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
 
 DEFAULT_FETCH_TIMEOUT_S = 30
-_RETRY_BASE_DELAY_S = 0.5
-_RETRY_JITTER_S = 0.3
 _MAX_FETCH_BYTES = 50 * 1024 * 1024  # ASVS standard docs are well under this; guards against a compromised/misconfigured allowlisted host
 
 
@@ -44,7 +43,7 @@ def fetch_with_retry(url: str, timeout: int = DEFAULT_FETCH_TIMEOUT_S, max_retri
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
             last_exc = exc
             if attempt < max_retries - 1:
-                time.sleep(_RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, _RETRY_JITTER_S))
+                time.sleep(RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, RETRY_JITTER_S))
             continue
         if len(data) > _MAX_FETCH_BYTES:
             raise ConnectionError(

@@ -13,9 +13,9 @@ from typing import Callable
 
 import httpx
 
+from quodeq.shared.constants import RETRY_BASE_DELAY_S, RETRY_JITTER_S
+
 _TIMEOUT = httpx.Timeout(10.0, read=60.0)
-_RETRY_BASE_DELAY_S = 0.5
-_RETRY_JITTER_S = 0.3
 _SERVER_ERROR_STATUS = 500
 
 
@@ -56,5 +56,5 @@ def download_file(
         except httpx.TransportError as exc:
             last_exc = exc
         if attempt < attempts - 1:
-            sleep(_RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, _RETRY_JITTER_S))
+            sleep(RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, RETRY_JITTER_S))
     raise last_exc

@@ -14,7 +14,7 @@ from quodeq.analysis.subagents._queue_state import (
     read_state,
     write_state,
 )
-from quodeq.analysis.subagents.types import WorkQueue  # noqa: F401 — re-export
+from quodeq.analysis.subagents.types import DEFAULT_TAKE_COUNT, WorkQueue  # noqa: F401 — re-export
 
 _KEY_FILES = "files"
 _KEY_AGENT = "agent"
@@ -57,7 +57,7 @@ class FileQueue:
     # Public API
     # ------------------------------------------------------------------
 
-    def take(self, count: int = 5, agent_id: str = "") -> list[str]:
+    def take(self, count: int = DEFAULT_TAKE_COUNT, agent_id: str = "") -> list[str]:
         """Atomically remove and return the next *count* files.
 
         Example::
