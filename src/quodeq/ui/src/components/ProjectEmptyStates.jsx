@@ -3,7 +3,7 @@ import { t } from '../strings/index.js';
 import { NAV_TAB } from '../vocab/navTab.js';
 
 /**
- * Project-level empty states the overview and history pages both show.
+ * Project-level empty states the overview, history and violations pages show.
  * Each page keeps its own branch order and frame; only the content is shared.
  */
 

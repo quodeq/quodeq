@@ -8,10 +8,16 @@ import { t } from '../../../strings/index.js';
  * handling.
  */
 export default function StandardsModal({ title, titleId, dialogRef, onCancel, actions, children }) {
-  const labelled = titleId ? { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId } : {};
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div ref={dialogRef} className="modal-dialog" {...labelled} onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        className="modal-dialog"
+        role={titleId ? 'dialog' : undefined}
+        aria-modal={titleId ? 'true' : undefined}
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+      >
         <h3 id={titleId} className="modal-title">{title}</h3>
         {children}
         <div className="modal-actions">

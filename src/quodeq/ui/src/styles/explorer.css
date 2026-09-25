@@ -725,7 +725,7 @@
    DeferredMount fallback for the file/principle detail lists. Static
    dimmed blocks (house idiom, see dashboard.css .overview-skeleton__bar):
    36px header row + 160px card rows, mirroring the pages'
-   estimateItemSize so the fallback commit and the mounted VirtualList
+   ROW_HEIGHT_PX (rowSizeEstimator) so the fallback commit and the mounted VirtualList
    occupy the same slot at the same scale. */
 .card-list-skeleton {
   display: flex;

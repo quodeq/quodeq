@@ -5,7 +5,7 @@ import { GALAXY_VIEW_HOVER_TYPE } from '../core/galaxyHitTypes.js';
 import { ZOOM_DIMENSION_LEVEL, ZOOM_PRINCIPLE_LEVEL, CANVAS_FONT_FAMILY } from '../core/galaxyTunables.js';
 import { drawStarfield, fillBackgroundGradient } from './galaxyStarfield.js';
 import {
-  clusterDimming, fadeOutFrom, unfocusedClusterAlpha, selectedZoomFade, principleParticleFade, principleLabelAlpha, PRINCIPLE_FADE_SPAN,
+  clusterDimming, clusterFade, fadeOutFrom, unfocusedClusterAlpha, selectedZoomFade, principleParticleFade, principleLabelAlpha, PRINCIPLE_FADE_SPAN,
 } from './galaxyFade.js';
 import { withinRadius } from '../core/hitTest.js';
 import {
@@ -73,7 +73,7 @@ function drawConstellations(ctx, scene, view, opts, tc) {
   const { w2s, showLabels, W, H } = opts;
   const { r: mr, g: mg, b: mb } = tc.textMuted;
   if (cam.z >= CONSTELLATION.hideAtZoom) return;
-  const conAlpha = fadeOutFrom(cam.z, 1, 2);
+  const conAlpha = clusterFade(cam.z);
   (scene.constellations || []).forEach(con => {
     const isFocused = nav.clusterCx == null || (con.cx === nav.clusterCx && con.cy === nav.clusterCy);
     const conClusterDim = isFocused ? 1 : unfocusedClusterAlpha(cam.z);

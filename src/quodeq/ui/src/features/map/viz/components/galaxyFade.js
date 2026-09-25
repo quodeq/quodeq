@@ -55,7 +55,19 @@ export function clusterDimming(s, cam, nav) {
  * @returns {number}
  */
 export function unfocusedClusterAlpha(camZ) {
-  return Math.max(UNFOCUSED_CLUSTER_MIN_ALPHA, fadeOutFrom(camZ, CLUSTER_DIM_START_ZOOM, CLUSTER_DIM_SPAN));
+  return Math.max(UNFOCUSED_CLUSTER_MIN_ALPHA, clusterFade(camZ));
+}
+
+/**
+ * The cluster-level fade: 1 at the galaxy zoom, 0 once the camera has zoomed
+ * a full cluster span past it. Constellations fade on it; unfocused clusters
+ * fade on it down to their floor.
+ *
+ * @param {number} camZ - the camera zoom.
+ * @returns {number}
+ */
+export function clusterFade(camZ) {
+  return fadeOutFrom(camZ, CLUSTER_DIM_START_ZOOM, CLUSTER_DIM_SPAN);
 }
 
 /**

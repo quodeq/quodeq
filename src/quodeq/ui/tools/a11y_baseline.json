@@ -19,7 +19,7 @@
   "src/features/standards/components/ReferenceEditor.jsx": 4,
   "src/features/standards/components/StandardEditor.jsx": 1,
   "src/features/standards/components/StandardTree.jsx": 2,
-  "src/features/standards/components/StandardsModal.jsx": 4,
+  "src/features/standards/components/StandardsModal.jsx": 3,
   "src/features/standards/components/StandardsTable.jsx": 2,
   "src/features/terminal/TerminalSessionView.jsx": 1
 }
