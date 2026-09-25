@@ -5,6 +5,8 @@ dismiss/verify drafts.
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
@@ -17,6 +19,7 @@ from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.scoring import rescore_accumulated, scored_run_dimensions
 from quodeq.services.wiring import iter_eval_reports
+from quodeq.shared.lru import LRUDict
 from quodeq.shared.serialization import coerce_line, to_camel_dict
 
 _logger = logging.getLogger(__name__)
@@ -98,27 +101,34 @@ def no_scope_error() -> ToolError:
         "scope, then ask the user to open a project overview or select a run.")
 
 
-def _eval_json_finding_keys(ctx: ToolContext, add) -> None:
+def _eval_json_finding_keys(ctx: ToolContext, add) -> bool:
     """Keys from the run's UNCAPPED eval-JSON violations (the
-    get_report/get_violations source)."""
+    get_report/get_violations source). False when a dimension file could
+    not be read, so the caller does not memoize a partial set."""
     eval_dir = ctx.run_dir / "evaluation"
     if not eval_dir.is_dir():
-        return
+        return True
     # skip_corrupt=True: parse each dimension file INDEPENDENTLY, so one
     # corrupt/truncated file (a known failure mode of deadline-cut runs)
-    # drops only its own findings, not every healthy dimension's keys.
+    # drops only its own findings, not every healthy dimension's keys. The
+    # helper skips silently, so a report count short of the file count is
+    # how a skipped file shows up here.
+    expected = len(list(eval_dir.glob("*.json")))
+    parsed = 0
     for _dimension, data in iter_eval_reports(eval_dir, skip_corrupt=True):
+        parsed += 1
         for v in (data.get("violations") or []):
             add(v)
+    return parsed == expected
 
 
-def _sql_finding_keys(ctx: ToolContext, keys: set[tuple]) -> None:
+def _sql_finding_keys(ctx: ToolContext, keys: set[tuple]) -> bool:
     """Keys from the SQL findings table (the search_findings source). Read
     only an EXISTING db so a read-only draft never creates evaluation.db or
     kicks a projection on a run that has none -- when there is no db there
-    are no SQL findings to miss anyway."""
+    are no SQL findings to miss anyway. False when the db was unreadable."""
     if not (ctx.run_dir / EVALUATION_DB_FILENAME).is_file():
-        return
+        return True
     try:
         for req, file, line in findings_repo(ctx, ctx.run_dir).list_keys():
             keys.add((str(req or ""), str(file or ""), coerce_line(line)))
@@ -126,6 +136,8 @@ def _sql_finding_keys(ctx: ToolContext, keys: set[tuple]) -> None:
         _logger.warning(
             "evaluation.db unreadable in %s; finding keys may be incomplete",
             ctx.run_dir, exc_info=True)
+        return False
+    return True
 
 
 def _accumulated_finding_keys(ctx: ToolContext, add) -> None:
@@ -140,6 +152,70 @@ def _accumulated_finding_keys(ctx: ToolContext, add) -> None:
         _logger.debug("accumulated findings unavailable for identity keys: %s", exc)
 
 
+def _identity(v: dict) -> tuple:
+    return (requirement_of(v), str(v.get("file") or ""), coerce_line(v.get("line")))
+
+
+# Run-scope identity keys, memoized per (run dir, repo factory) under a stat
+# stamp of every file they are read from. The model often drafts several
+# dismissals in one turn; each draft used to re-parse every eval JSON and
+# re-query evaluation.db. Bounded so a long-lived server cannot grow it.
+_RUN_KEYS_MEMO_SIZE = 64
+# A file modified this recently may change again inside the filesystem's
+# mtime granularity (coarse on Linux) with the same size, so a stamp taken
+# over it cannot prove freshness: such reads are served but not memoized.
+_SETTLE_NS = 3_000_000_000
+_RUN_KEY_SOURCES = ("evaluation.db", "evaluation.db-wal", "events.jsonl")
+_run_keys_memo: LRUDict[tuple, tuple[tuple, frozenset[tuple]]] = LRUDict(_RUN_KEYS_MEMO_SIZE)
+_run_keys_lock = threading.Lock()
+
+
+def _source_stamp(run_dir: Path) -> tuple:
+    """(name, mtime_ns, size, ino) for every file the run-scope keys come
+    from; a missing file stamps as (name, None, None, None). The inode
+    catches a file replaced in place (same mtime, same size, new content)
+    that an mtime/size stamp alone would miss."""
+    eval_dir = run_dir / "evaluation"
+    paths = sorted(eval_dir.glob("*.json")) if eval_dir.is_dir() else []
+    paths.extend(run_dir / name for name in _RUN_KEY_SOURCES)
+    stamp = []
+    for path in paths:
+        try:
+            st = path.stat()
+        except OSError:
+            stamp.append((path.name, None, None, None))
+        else:
+            stamp.append((path.name, st.st_mtime_ns, st.st_size, st.st_ino))
+    return tuple(stamp)
+
+
+def _is_settled(stamp: tuple) -> bool:
+    newest = max((mtime for _name, mtime, _size, _ino in stamp if mtime is not None), default=0)
+    return newest < time.time_ns() - _SETTLE_NS
+
+
+def _run_finding_keys(ctx: ToolContext) -> frozenset[tuple]:
+    """The run scope's identity keys, from the memo when no source changed.
+
+    A partial read (a corrupt dimension file or an unreadable db) is
+    returned but never memoized, so the next draft retries the source.
+    """
+    memo_key = (ctx.run_dir, ctx.findings_repo_factory)
+    stamp = _source_stamp(ctx.run_dir)
+    with _run_keys_lock:
+        cached = _run_keys_memo.get(memo_key)
+    if cached is not None and cached[0] == stamp:
+        return cached[1]
+    keys: set[tuple] = set()
+    complete = _eval_json_finding_keys(ctx, lambda v: keys.add(_identity(v)))
+    complete = _sql_finding_keys(ctx, keys) and complete
+    frozen = frozenset(keys)
+    if complete and _is_settled(stamp):
+        with _run_keys_lock:
+            _run_keys_memo.put(memo_key, (stamp, frozen))
+    return frozen
+
+
 def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
     """Every ``(req, file, line)`` identity the model can see in this scope.
 
@@ -150,7 +226,8 @@ def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
 
     - run scope: the UNCAPPED eval-JSON violations (get_report/get_violations)
       AND the SQL findings table (search_findings) -- the two can drift, and a
-      finding present in only one must still be dismissable.
+      finding present in only one must still be dismissable. Memoized per run
+      under a stat stamp of those files (see ``_run_finding_keys``).
     - overview scope: the accumulated per-dimension-latest violations.
 
     Best-effort: each source is guarded independently so one unreadable source
@@ -158,15 +235,8 @@ def finding_keys_in_scope(ctx: ToolContext) -> set[tuple]:
     usable, and a wholly unreadable scope surfaces as "no matching finding"
     rather than a stack trace.
     """
-    keys: set[tuple] = set()
-
-    def _add(v: dict) -> None:
-        keys.add((requirement_of(v), str(v.get("file") or ""),
-                  coerce_line(v.get("line"))))
-
     if has_run(ctx):
-        _eval_json_finding_keys(ctx, _add)
-        _sql_finding_keys(ctx, keys)
-    else:
-        _accumulated_finding_keys(ctx, _add)
+        return set(_run_finding_keys(ctx))
+    keys: set[tuple] = set()
+    _accumulated_finding_keys(ctx, lambda v: keys.add(_identity(v)))
     return keys

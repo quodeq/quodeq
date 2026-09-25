@@ -1,7 +1,8 @@
 name: Quodeq Review
 
-# Runs a security-focused Quodeq evaluation on PR creation and posts findings
-# as a GitHub pull request review.
+# Runs a security and performance Quodeq evaluation on PR creation and posts
+# findings as a GitHub pull request review. Diff mode runs the dimensions one
+# after another and pool_budget is a run-wide cap, so it is sized for both.
 #
 # Requires a self-hosted runner labeled "quodeq" with Ollama running locally.
 
@@ -18,10 +19,10 @@ on:
         type: number
       dimensions:
         description: "Dimensions (comma-separated, aliases allowed)"
-        default: "sec"
+        default: "sec,perf"
       pool_budget:
         description: "Pool budget in seconds"
-        default: "180"
+        default: "360"
       base_ref:
         description: "Base ref to diff against (for workflow_dispatch)"
         default: "origin/develop"
@@ -97,8 +98,8 @@ jobs:
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             {
               echo "pr=$PR_NUMBER_EVENT"
-              echo "dimensions=sec"
-              echo "pool_budget=180"
+              echo "dimensions=sec,perf"
+              echo "pool_budget=360"
               echo "base_ref=origin/$PR_BASE_REF"
             } >> "$GITHUB_OUTPUT"
           else
