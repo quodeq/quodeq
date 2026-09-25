@@ -5,6 +5,7 @@
  */
 import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
 import { consequenceOf, consequenceLevel } from './compareFleet.js';
+import { roundOneDecimal } from '../../utils/rounding.js';
 
 // Score drop over the delta window (0-10 scale) that earns a row the
 // "declining" reason. Deliberately not trendUtils.DECLINING_THRESHOLD:
@@ -49,7 +50,7 @@ export function buildDimensionsBoard(rows, now, summariesById) {
       label: entry.label,
       avg: mean(entry.perProject.map((p) => p.score)),
       delta: entry.deltas.length
-        ? Math.round(mean(entry.deltas) * 10) / 10
+        ? roundOneDecimal(mean(entry.deltas))
         : null,
       violations: entry.violations,
       perProject: entry.perProject

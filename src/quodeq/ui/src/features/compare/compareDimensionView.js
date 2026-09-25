@@ -5,9 +5,7 @@
 import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
 import { roundScore1 } from './compareFormatters.js';
 import { CONSEQUENCE_LEVEL } from './compareFleet.js';
-
-// Score scale: every dimension/principle score is 0-10.
-const MAX_SCORE = 10;
+import { SCORE_SCALE_MAX } from '../../constants.js';
 
 // Outlier detection: a principle counts as an outlier when the worst project
 // sits at least this many points under the next-worst score, or below the
@@ -24,7 +22,7 @@ const DROP_ELEVATED_DELTA_THRESHOLD = -1;
 // when ranking which outliers/drops surface first in the attention strip.
 const DROP_WEIGHT_FACTOR = 2;
 
-// Higher than any real 0-10 average (MAX_SCORE) so a principle with no
+// Higher than any real 0-10 average (SCORE_SCALE_MAX) so a principle with no
 // average never wins the "weakest" comparison below.
 const AVG_SENTINEL_ABOVE_MAX = 11;
 
@@ -61,7 +59,7 @@ export function buildDimensionAttention(view) {
       score: worst.score,
       gap: gap >= OUTLIER_GAP_THRESHOLD ? gap : null,
       cell: worst,
-      weight: (MAX_SCORE - worst.score) + gap,
+      weight: (SCORE_SCALE_MAX - worst.score) + gap,
     });
   }
   for (const s of view.standings) {
@@ -72,7 +70,7 @@ export function buildDimensionAttention(view) {
       level: s.delta <= DROP_ELEVATED_DELTA_THRESHOLD ? CONSEQUENCE_LEVEL.ELEVATED : CONSEQUENCE_LEVEL.WATCH,
       delta: s.delta,
       row: s.row,
-      weight: Math.abs(s.delta) * DROP_WEIGHT_FACTOR + (MAX_SCORE - (s.score ?? MAX_SCORE)),
+      weight: Math.abs(s.delta) * DROP_WEIGHT_FACTOR + (SCORE_SCALE_MAX - (s.score ?? SCORE_SCALE_MAX)),
     });
   }
   return items.sort((a, b) => b.weight - a.weight);

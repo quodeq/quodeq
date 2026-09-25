@@ -15,6 +15,7 @@ import { cssVar } from '../../../components/scoreChartHelpers.js';
 import { fallbackDelta } from '../../../utils/dimensionUtils.js';
 import { t } from '../../../strings/index.js';
 import { scoreBarColorVar } from './scoreBarColor.js';
+import { SCORE_SCALE_MAX } from '../../../constants.js';
 
 const CHART_LEFT_MARGIN = -16;
 const CHART_HEIGHT = 160;
@@ -23,7 +24,7 @@ const CHART_CELL_OPACITY = 0.85;
 const CHART_Y_TICK_QUARTER = 2.5;
 const CHART_Y_TICK_HALF = 5;
 const CHART_Y_TICK_THREE_QUARTER = 7.5;
-const CHART_Y_TICKS = [0, CHART_Y_TICK_QUARTER, CHART_Y_TICK_HALF, CHART_Y_TICK_THREE_QUARTER, 10];
+const CHART_Y_TICKS = [0, CHART_Y_TICK_QUARTER, CHART_Y_TICK_HALF, CHART_Y_TICK_THREE_QUARTER, SCORE_SCALE_MAX];
 const CHART_BAR_CORNER_RADIUS = 3;
 const CHART_BAR_RADIUS = [CHART_BAR_CORNER_RADIUS, CHART_BAR_CORNER_RADIUS, 0, 0];
 const TREND_UP_ANGLE = 70;
@@ -146,7 +147,7 @@ function DimensionBarChart({ data, onBarClick }) {
           tickLine={false}
         />
         <YAxis
-          domain={[0, 10]}
+          domain={[0, SCORE_SCALE_MAX]}
           ticks={CHART_Y_TICKS}
           tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
           axisLine={false}

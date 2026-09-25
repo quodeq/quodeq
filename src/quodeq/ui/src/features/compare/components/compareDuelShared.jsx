@@ -3,11 +3,9 @@
  * dimensions table and principles list.
  */
 import { t } from '../../../strings/index.js';
-import { score1 as fmtScore1 } from '../compareFormatters.js';
+import { score1 as fmtScore1, SCORE_TO_PCT } from '../compareFormatters.js';
 
 export { score1, signed1 } from '../compareFormatters.js';
-
-const SCORE_TO_PCT = 10; // 0-10 score to bar width in percent
 
 export function gapClass(gap) {
   if (gap == null || gap === 0) return 'compare-duel__gap--even';

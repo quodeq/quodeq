@@ -9,6 +9,12 @@ export const ENV_TRUE = 'true';
 
 export const ISO_25010_URL = 'https://www.iso.org/';
 
+// Upper bound of every dimension/principle/overall score axis: scores are
+// always shown and compared on a 0-10 scale. Shared across the score charts,
+// compare views, the grade-formula boundary editor and the map visualization
+// so they all agree on where "full score" is.
+export const SCORE_SCALE_MAX = 10;
+
 // Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).
 // These client-side defaults can be overridden by server config (ai_providers.json).
 export const DEFAULT_MAX_SUBAGENTS = 5;

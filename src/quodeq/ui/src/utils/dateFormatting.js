@@ -1,4 +1,4 @@
-import { isoWeekKey, localDayKey, YEAR_MONTH_KEY_LENGTH } from './dailyGrouping.js';
+import { isoWeekKey, localDayKey, YEAR_MONTH_KEY_LENGTH, ISO_DATE_LENGTH } from './dailyGrouping.js';
 import { LOCALE, t } from '../strings/index.js';
 import { SECONDS_PER_HOUR } from './time.js';
 import { GRANULARITY } from './granularity.js';
@@ -116,7 +116,7 @@ export function formatPeriodLabel(entry, granularity = GRANULARITY.DAY) {
     // Intl has no week-of-year format, so this one stays a catalog pattern.
     return (y && w) ? t('common.weekOfYear', { week: Number(w), year: y }) : fallback;
   }
-  if (iso.length > 10) {
+  if (iso.length > ISO_DATE_LENGTH) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) return DAY_MONTH_YEAR.format(d);
   }

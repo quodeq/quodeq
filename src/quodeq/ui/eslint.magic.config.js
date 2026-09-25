@@ -12,10 +12,10 @@
 // events, queries and breakpoints: src/constants.js. Unit conversions:
 // src/utils/time.js. See CONTRIBUTING.md, Code Style.
 //
-// Ignored values are self-describing: -1/0/1/2 (sentinels, unit steps), 10
-// and 100 (the 0-10 score scale and percent), 24/60/1000 (time unit
-// conversions). Tests and fixtures are excluded: there the literal is the
-// expected value, which is the contract under test.
+// Ignored values are self-describing: -1/0/1/2 (sentinels, unit steps).
+// The score scale, percent and time unit factors (10, 24, 60, 100, 1000)
+// are named constants, not ignored. Tests and fixtures are excluded: there
+// the literal is the expected value, which is the contract under test.
 export default [
   {
     files: ['src/**/*.js', 'src/**/*.jsx'],
@@ -34,7 +34,7 @@ export default [
       'no-magic-numbers': [
         'error',
         {
-          ignore: [-1, 0, 1, 2, 10, 24, 60, 100, 1000],
+          ignore: [-1, 0, 1, 2, 24, 60, 100, 1000],
           ignoreArrayIndexes: true,
           ignoreDefaultValues: true,
           ignoreClassFieldInitialValues: true,

@@ -8,6 +8,8 @@ const CURSOR_WEIGHT = 0.3;
 const NEAREST_STAR_WEIGHT = 0.7;
 // Each such click multiplies the zoom by this, capped at ten fit zooms.
 const ZOOM_STEP_MULTIPLIER = 2.5;
+// Zoom-toward-cursor cap, in multiples of the scene's fit zoom.
+const MAX_ZOOM_FIT_MULTIPLES = 10;
 
 /** Click on a hovered star: focus a folder (or drop focus if already
  * focused), or zoom into a file. */
@@ -56,7 +58,7 @@ function zoomTowardCursor(refs, { startTransition, saveNav, getFitZoom, scene, s
   const tx = nearestStar ? wx * CURSOR_WEIGHT + nearestStar.x * NEAREST_STAR_WEIGHT : wx;
   const ty = nearestStar ? wy * CURSOR_WEIGHT + nearestStar.y * NEAREST_STAR_WEIGHT : wy;
   const newZ = cam.z * ZOOM_STEP_MULTIPLIER;
-  const maxZ = getFitZoom(curScene) * 10;
+  const maxZ = getFitZoom(curScene) * MAX_ZOOM_FIT_MULTIPLES;
   refs.zoomTargetRef.current = { x: tx, y: ty, z: Math.min(newZ, maxZ) };
   startTransition(false);
   saveNav();

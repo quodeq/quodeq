@@ -2,15 +2,20 @@
 // cards and pickers. Kept in one place so every surface renders scores,
 // counts and short labels the same way.
 import { LOCALE } from '../../strings/index.js';
+import { roundOneDecimal } from '../../utils/rounding.js';
 
 // Per-project principle bar height, as a percent of the bar track: a near-
 // zero score still renders a visible sliver instead of disappearing.
 export const MIN_BAR_HEIGHT_PCT = 15;
 
+// 0-10 score to bar height/width in percent (a full 10 score fills the bar).
+// Shared by every principle/standing/duel bar so they all scale the same way.
+export const SCORE_TO_PCT = 10;
+
 // Scores are compared and shown at one decimal throughout the tab; rounding
 // in one place keeps a computed gap agreeing with the numbers it was derived
 // from.
-export const roundScore1 = (n) => Math.round(n * 10) / 10;
+export const roundScore1 = roundOneDecimal;
 
 export const nf = (n) => (n == null ? '—' : Number(n).toLocaleString(LOCALE));
 export const score1 = (s) => (s == null ? '—' : roundScore1(s).toFixed(1));

@@ -21,6 +21,12 @@ const TEXT_ALIGN_CENTER = 'center';
 // to ZOOM_DIMENSION_LEVEL: once principles appear the label stops growing.
 const LABEL_SCALE_CAP = ZOOM_DIMENSION_LEVEL;
 
+// World-unit padding beyond a cluster's spread for its dashed ring, before
+// the zoom scale is applied.
+const CONSTELLATION_RING_PADDING_WORLD = 10;
+// Screen-pixel gap between the dashed ring and its label above it.
+const CONSTELLATION_LABEL_GAP_PX = 10;
+
 /**
  * Render one animation frame on the galaxy canvas.
  *
@@ -72,7 +78,7 @@ function drawConstellations(ctx, scene, view, opts, tc) {
     const conClusterDim = isFocused ? 1 : Math.max(UNFOCUSED_CLUSTER_MIN_ALPHA, 1 - (cam.z - 1) / 2);
     // Dashed circle around cluster
     const csc = w2s(W / 2 + con.cx, H / 2 + con.cy);
-    const circleR = (con.spread + 10) * cam.z;
+    const circleR = (con.spread + CONSTELLATION_RING_PADDING_WORLD) * cam.z;
     ctx.beginPath(); ctx.arc(csc.x, csc.y, circleR, 0, TAU);
     ctx.strokeStyle = `rgba(${mr},${mg},${mb},${CONSTELLATION.ringAlpha * conAlpha * conClusterDim})`;
     ctx.lineWidth = 1;
@@ -90,7 +96,7 @@ function drawConstellations(ctx, scene, view, opts, tc) {
     // Constellation label — above the dashed circle
     if (showLabels && con.label) {
       const lx = csc.x;
-      const ly = csc.y - circleR - 10;
+      const ly = csc.y - circleR - CONSTELLATION_LABEL_GAP_PX;
       ctx.font = `600 ${CONSTELLATION.labelFontPx}px ${CANVAS_FONT_FAMILY}`;
       ctx.textAlign = TEXT_ALIGN_CENTER;
       ctx.fillStyle = `rgba(${mr},${mg},${mb},${CONSTELLATION.labelAlpha * conAlpha * conClusterDim})`;

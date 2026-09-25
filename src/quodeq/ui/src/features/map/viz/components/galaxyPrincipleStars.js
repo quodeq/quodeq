@@ -10,6 +10,7 @@ import {
   NEUTRAL_SCORE, RNG_MIDPOINT,
 } from '../core/galaxyCore.js';
 import { SEVERITY } from '../../../../vocab/severity.js';
+import { SCORE_SCALE_MAX } from '../../../../constants.js';
 
 // Principle-level geometry, in world units. Radii and orbit distances grow
 // with the square root of a principle's finding count, so one huge principle
@@ -71,7 +72,7 @@ export function computePrincipleScore(rawScore, grade, violationCount, complianc
   if (Number.isFinite(parsed)) return parsed;
   if (grade) return gradeToScore(grade);
   const total = violationCount + complianceCount;
-  return total > 0 ? (complianceCount / total) * 10 : NEUTRAL_SCORE;
+  return total > 0 ? (complianceCount / total) * SCORE_SCALE_MAX : NEUTRAL_SCORE;
 }
 
 /**

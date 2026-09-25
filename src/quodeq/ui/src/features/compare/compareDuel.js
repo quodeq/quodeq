@@ -3,6 +3,7 @@
  * compareModel.js — see compareModel.js for the module-level docs.
  */
 import { sortedByDate, round1 } from './compareModel.js';
+import { ISO_DATE_LENGTH } from '../../utils/dailyGrouping.js';
 
 const gapOf = (x, y) => (x != null && y != null ? round1(x - y) : null);
 
@@ -58,7 +59,7 @@ function _diffPrinciples(dimensions, a, b) {
 function _buildDuelSeries(id, summariesById) {
   const daily = new Map();
   for (const e of sortedByDate(summariesById?.[id]?.trend)) {
-    daily.set(String(e.dateISO).slice(0, 10), e);
+    daily.set(String(e.dateISO).slice(0, ISO_DATE_LENGTH), e);
   }
   return Array.from(daily.values()).map((e) => ({ dateISO: e.dateISO, value: e.numericAverage }));
 }

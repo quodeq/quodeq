@@ -11,6 +11,7 @@ import {
   VIOLATION_ORBS, LABEL_ALPHA, FOLDER_NEBULA, FOLDER_NEBULA_DASH,
   FOLDER_STAR, FOLDER_LABEL,
 } from './galaxyTuning.js';
+import { SCORE_SCALE_MAX } from '../../../../constants.js';
 
 export { starShapeFor } from './galaxyFolderCues.js';
 // Re-exported so the folder canvas's draw surface stays in one module.
@@ -70,7 +71,7 @@ function drawNebulaBlobs(ctx, spec, centre, radius, col, alpha) {
 export function drawNebula(ctx, curNode, frame) {
   if (!curNode) return;
   const { W, H, t } = frame;
-  const nbCol = scoreRGB((curNode.complianceRate || 0) * 10);
+  const nbCol = scoreRGB((curNode.complianceRate || 0) * SCORE_SCALE_MAX);
   const { r: nr, g: ng, b: nb } = nbCol;
   const nbR = Math.max(W, H) * NEBULA.sceneRadiusFraction;
   const nbGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, nbR);

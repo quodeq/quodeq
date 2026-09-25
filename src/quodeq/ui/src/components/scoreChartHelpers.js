@@ -1,5 +1,5 @@
 import { scoreColorClass } from '../utils/formatters.js';
-import { DATA_THEME_ATTR } from '../constants.js';
+import { DATA_THEME_ATTR, SCORE_SCALE_MAX } from '../constants.js';
 
 /**
  * Shared helpers for the run/score history bar charts (Overview, History,
@@ -93,9 +93,9 @@ const SCORE_DOMAIN_PADDING = 0.5;
 
 export function scoreDomain(values) {
   const valid = (values || []).filter((n) => Number.isFinite(n));
-  if (!valid.length) return [0, 10];
+  if (!valid.length) return [0, SCORE_SCALE_MAX];
   const lo = Math.max(0, Math.floor(Math.min(...valid) - SCORE_DOMAIN_PADDING));
-  const hi = Math.min(10, Math.ceil(Math.max(...valid) + SCORE_DOMAIN_PADDING));
+  const hi = Math.min(SCORE_SCALE_MAX, Math.ceil(Math.max(...valid) + SCORE_DOMAIN_PADDING));
   return [lo, hi > lo ? hi : lo + 1];
 }
 

@@ -10,6 +10,8 @@ import {
 } from './compareModel.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 import { SORT_DIR } from '../../vocab/sortDirection.js';
+import { roundOneDecimal } from '../../utils/rounding.js';
+import { SCORE_SCALE_MAX } from '../../constants.js';
 
 // consequenceLevel's return values, in ascending severity. CompareFleetView
 // and useCompareScopeActions both compare against CLEAR to decide whether a
@@ -26,6 +28,10 @@ const SEVERE_AT = 18;
 const ELEVATED_AT = 11;
 const WATCH_AT = 6;
 const STALE_FACTOR = 1.35;
+// Added to the file count before log10 so a 0-file (or tiny) project still
+// produces a finite, small size weight instead of -Infinity/a sharp cliff
+// near log10(0..1).
+const FILE_COUNT_LOG_OFFSET = 10;
 
 function topLanguage(languageStats) {
   if (!languageStats || typeof languageStats !== 'object') return null;
@@ -153,9 +159,9 @@ export function buildRow(project, summary, now) {
 /** Higher = more deserving of attention. 0 for rows without a score. */
 export function consequenceOf(row) {
   if (row.score == null) return 0;
-  const sizeWeight = Math.log10((row.totalFiles ?? 0) + 10);
+  const sizeWeight = Math.log10((row.totalFiles ?? 0) + FILE_COUNT_LOG_OFFSET);
   const staleness = row.stale ? STALE_FACTOR : 1;
-  return (10 - row.score) * sizeWeight * staleness;
+  return (SCORE_SCALE_MAX - row.score) * sizeWeight * staleness;
 }
 
 export function consequenceLevel(value) {
@@ -184,7 +190,7 @@ export function buildFleet(rows) {
   const weighted = scored.filter((r) => r.delta != null && r.totalFiles);
   const weightSum = weighted.reduce((a, r) => a + r.totalFiles, 0);
   const delta = weightSum
-    ? Math.round((weighted.reduce((a, r) => a + r.delta * r.totalFiles, 0) / weightSum) * 10) / 10
+    ? roundOneDecimal(weighted.reduce((a, r) => a + r.delta * r.totalFiles, 0) / weightSum)
     : null;
   const severity = scored.reduce(
     (acc, r) => ({
@@ -208,7 +214,7 @@ export function buildFleet(rows) {
     lead,
     trail,
     spread: lead && trail
-      ? Math.round((lead.score - trail.score) * 10) / 10
+      ? roundOneDecimal(lead.score - trail.score)
       : null,
     count: rows.length,
     scoredCount: scored.length,

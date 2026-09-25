@@ -22,6 +22,10 @@ const ETA_FINISHING_SEC = 45;          // below this, "finishing" reads truer th
 // Round the "~N min left" estimate to a legible step instead of showing an
 // exact minute that visibly jitters as the rate estimate wobbles.
 const MINUTE_ROUNDING_STEP = 5;
+// Below this many minutes remaining, round to the nearest minute (5-minute
+// steps would be too coarse close to done); at or above, round to
+// MINUTE_ROUNDING_STEP.
+const MINUTE_PRECISE_BELOW = 10;
 
 /**
  * Files/sec from a buffer of {t, taken} samples (t = epoch ms, ascending).
@@ -66,7 +70,7 @@ export function formatEta(remainingFiles, rate) {
   if (etaSec <= ETA_FINISHING_SEC) return 'finishing';
   if (etaSec < SECONDS_PER_HOUR) {
     const rawMin = etaSec / 60;
-    let min = rawMin < 10 ? Math.max(1, Math.round(rawMin)) : Math.round(rawMin / MINUTE_ROUNDING_STEP) * MINUTE_ROUNDING_STEP;
+    let min = rawMin < MINUTE_PRECISE_BELOW ? Math.max(1, Math.round(rawMin)) : Math.round(rawMin / MINUTE_ROUNDING_STEP) * MINUTE_ROUNDING_STEP;
     if (min >= 60) return '~1h left';
     return `~${min} min left`;
   }
