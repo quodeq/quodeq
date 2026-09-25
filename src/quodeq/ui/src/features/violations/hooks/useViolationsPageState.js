@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { computeSummaryFromDimensions } from '../../../utils/visibleStandardsSummary.js';
-import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
+import { writeCachedState } from '../../../utils/pageStateCache.js';
+import { useTabScopedPageState } from '../../../hooks/useTabScopedPageState.js';
 import { useDismissedFindings } from '../components/useDismissedFindings.js';
 
 // This page's pageStateCache scope key.
@@ -19,16 +20,8 @@ const PAGE_STATE_SCOPE = 'violations';
 export function useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh, cache }) {
   // Round-tripping through a file detail does NOT change tabKey, so the
   // cache survives unmount and the tree resumes where it was.
-  const lastTabKeyRef = useRef(tabKey);
-  const reset = cache ? cache.resetCachedScope : resetCachedScope;
-  const read = cache ? cache.readCachedState : readCachedState;
-  if (lastTabKeyRef.current !== tabKey) {
-    reset(PAGE_STATE_SCOPE, selectedProject);
-    lastTabKeyRef.current = tabKey;
-  }
-
-  const cached = read(PAGE_STATE_SCOPE, selectedProject, {
-    fileCurrentPath: '',
+  const cached = useTabScopedPageState({
+    namespace: PAGE_STATE_SCOPE, scope: selectedProject, tabKey, defaults: { fileCurrentPath: '' }, cache,
   });
 
   // Fires on every mount, including plain drill-down/back navigation with no

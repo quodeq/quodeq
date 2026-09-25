@@ -1,6 +1,6 @@
-import { useRef, useEffect } from 'react';
+import { useEffect } from 'react';
 import { treeNodeToFileObj } from '../viz/index.js';
-import { readCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
+import { useTabScopedPageState } from '../../../hooks/useTabScopedPageState.js';
 import { useDashboardFullHeight } from './useDashboardFullHeight.js';
 import { useStandardTypes } from './useStandardTypes.js';
 import { useMapDisplayPrefs } from './useMapDisplayPrefs.js';
@@ -43,14 +43,9 @@ function useMapNavParams(nav) {
  * `cache` is an optional injected page-state cache; with none given this
  * goes through the module's own free functions (the shared default). */
 function useMapTabCache(selectedProject, tabKey, cache) {
-  const lastTabKeyRef = useRef(tabKey);
-  const reset = cache ? cache.resetCachedScope : resetCachedScope;
-  const read = cache ? cache.readCachedState : readCachedState;
-  if (lastTabKeyRef.current !== tabKey) {
-    reset('map', selectedProject);
-    lastTabKeyRef.current = tabKey;
-  }
-  return read('map', selectedProject, { selectedDimensionsArr: [] });
+  return useTabScopedPageState({
+    namespace: 'map', scope: selectedProject, tabKey, defaults: { selectedDimensionsArr: [] }, cache,
+  });
 }
 
 /** Assembles the hook's return object — kept as one literal (not spread
