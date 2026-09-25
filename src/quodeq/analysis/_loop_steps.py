@@ -106,7 +106,7 @@ def _retry_dim_callback(dimension: str, ev: Evidence, run: LoopRun) -> None:
             f"[loop] {dimension} - callback broken pipe, "
             f"retried after silencing stdout, result persisted",
         )
-    except Exception as exc:  # noqa: BLE001
+    except (OSError, ValueError, KeyError, TypeError, ArithmeticError) as exc:
         log.warning(
             f"[loop] {dimension} - callback retry after broken pipe raised "
             f"{type(exc).__name__}: {exc} - result NOT persisted, continuing loop",
@@ -137,7 +137,7 @@ def finalize_dim_result(
             run.deps.on_dimension_done(dimension, ev)
     except BrokenPipeError:
         _retry_dim_callback(dimension, ev, run)
-    except Exception as exc:  # noqa: BLE001
+    except (OSError, ValueError, KeyError, TypeError, ArithmeticError) as exc:
         log.warning(
             f"[loop] {dimension} - callback raised "
             f"{type(exc).__name__}: {exc} - result kept, continuing loop",

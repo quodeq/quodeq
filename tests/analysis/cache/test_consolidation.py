@@ -246,3 +246,24 @@ def test_already_consolidated_entries_are_not_rewritten(tmp_path: Path, cache):
     mark_run_consolidated(run_dir, recording)
 
     assert recording.puts == []
+
+
+def test_whole_body_catch_is_narrowed_to_os_and_value_errors(tmp_path: Path, cache, caplog, monkeypatch):
+    """mark_run_consolidated's own except (wrapping the whole function body,
+    below the already-isolated per-key loop) narrows to (OSError, ValueError).
+    A failure upstream of the loop (e.g. _collect_keys) must still degrade
+    silently instead of turning a completed run into a failed one."""
+    import quodeq.analysis.cache.consolidation as consolidation_module
+
+    def boom(_evidence_dir):
+        raise OSError("evidence dir listing failed")
+
+    monkeypatch.setattr(consolidation_module, "_collect_keys", boom)
+    run_dir = _run_dir(
+        tmp_path, "done", {"security_dispatch_keys.json": {"a.py": "key1"}},
+    )
+
+    with caplog.at_level(logging.WARNING):
+        mark_run_consolidated(run_dir, cache)
+
+    assert any("Consolidation pass failed" in r.getMessage() for r in caplog.records)

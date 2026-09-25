@@ -142,7 +142,10 @@ def test_router_callback_exception_does_not_break_marker_write_or_accumulation()
     from quodeq.analysis.mcp.enricher import CompiledContext
 
     def boom(_file: str, _findings: list[dict]) -> None:
-        raise RuntimeError("simulated cache write failure")
+        # OSError, not an arbitrary Exception: mark_file_done's on_file_done
+        # catch narrows to (OSError, ValueError, TypeError), the shapes a
+        # real cache write can raise.
+        raise OSError("simulated cache write failure")
 
     fh = io.StringIO()
     router = FindingsRouter(fh, context=CompiledContext(), on_file_done=boom)

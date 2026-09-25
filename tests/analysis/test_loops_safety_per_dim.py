@@ -7,6 +7,8 @@ helpers live in tests/analysis/_loops_safety_fixtures.py.
 """
 from __future__ import annotations
 
+import pytest
+
 from quodeq.analysis._loops import LoopDeps, run_per_dimension_loop
 
 from tests.analysis._loops_safety_fixtures import _FakeEvidence, _config, _ctx, _runner_from
@@ -48,7 +50,12 @@ class TestPerDimLoopSafety:
         # Callback fired for all three, and usability was retried once.
         assert callback_calls == ["security", "usability", "usability", "flexibility"]
 
-    def test_callback_generic_exception_does_not_drop_subsequent_dims(self):
+    def test_callback_recognized_exception_does_not_drop_subsequent_dims(self):
+        """finalize_dim_result's except narrows to (OSError, ValueError,
+        KeyError, TypeError, ArithmeticError) -- the shapes _score_dimension's
+        write path can actually raise. One of those from the callback must
+        still log and let the loop continue, exactly like the old bare
+        ``except Exception`` did."""
         cfg = _config()
         seen: list[str] = []
 
@@ -58,7 +65,7 @@ class TestPerDimLoopSafety:
 
         def on_done(dim, _ev):
             if dim == "reliability":
-                raise AttributeError("boom")  # arbitrary class loop didn't catch before
+                raise KeyError("boom")
 
         result = run_per_dimension_loop(
             cfg, ["security", "reliability", "performance"], _ctx(3),
@@ -66,6 +73,26 @@ class TestPerDimLoopSafety:
         )
         assert seen == ["security", "reliability", "performance"]
         assert set(result) == {"security", "reliability", "performance"}
+
+    def test_callback_exception_outside_the_narrowed_types_propagates(self):
+        """An exception the callback's contract doesn't name (a real bug, not
+        a recognized I/O/data failure) is no longer swallowed here -- it
+        propagates out of the per-dimension loop to whatever wraps
+        run_per_dimension_loop, instead of being silently logged away."""
+        cfg = _config()
+
+        def process_fn(_c, dim, _i, _ctx):
+            return _FakeEvidence()
+
+        def on_done(dim, _ev):
+            if dim == "reliability":
+                raise AttributeError("not a narrowed type")
+
+        with pytest.raises(AttributeError, match="not a narrowed type"):
+            run_per_dimension_loop(
+                cfg, ["security", "reliability", "performance"], _ctx(3),
+                LoopDeps(runner=_runner_from(process_fn), on_dimension_done=on_done),
+            )
 
     def test_unexpected_exception_in_runner_logs_and_continues(self):
         cfg = _config()

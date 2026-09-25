@@ -94,3 +94,18 @@ class TestFailSoft:
         monkeypatch.setitem(registry.CHECKERS, "framework-imports", boom)
 
         assert _judge(project, compiled(STANDARD)) == []
+
+    def test_a_broken_standard_does_not_take_the_run_down(
+        self, project, compiled, monkeypatch,
+    ):
+        """deterministic_judgments' except narrows to (OSError,
+        json.JSONDecodeError, KeyError, TypeError): a standard that fails to
+        load must lose only the deterministic findings, not the run."""
+        from quodeq.analysis.checks import runner
+
+        def boom(_compiled_dir, _dimension, _evaluators_dir):
+            raise OSError("standard unreadable")
+
+        monkeypatch.setattr(runner, "load_requirement_checks", boom)
+
+        assert _judge(project, compiled(STANDARD)) == []

@@ -256,7 +256,7 @@ def call_api(
     ) as client:
         try:
             response = client.chat.completions.create(**create_kwargs)
-        except Exception as exc:
+        except (openai.OpenAIError, httpx.HTTPError) as exc:
             _handle_call_exception(exc, config, start)
             return [], True
 

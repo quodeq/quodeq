@@ -38,7 +38,7 @@ class TieredCache:
             return None
         try:
             hit = self._remote.get(key)
-        except Exception as exc:  # noqa: BLE001 — remote failures must never propagate
+        except (OSError, ValueError) as exc:  # remote failures must never propagate
             _logger.warning("remote cache get failed for %s: %s", key, exc)
             return None
         if hit is None:
@@ -53,7 +53,7 @@ class TieredCache:
             return
         try:
             self._remote.put(key, entry)
-        except Exception as exc:  # noqa: BLE001 — remote failures must never propagate
+        except (OSError, ValueError) as exc:  # remote failures must never propagate
             _logger.warning("remote cache put failed for %s: %s", key, exc)
 
     def has(self, key: str) -> bool:
@@ -64,7 +64,7 @@ class TieredCache:
             return False
         try:
             return self._remote.has(key)
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError) as exc:  # remote failures must never propagate
             _logger.warning("remote cache has failed for %s: %s", key, exc)
             return False
 
@@ -89,7 +89,7 @@ class TieredCache:
             return
         try:
             self._remote.delete(key)
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError) as exc:  # remote failures must never propagate
             _logger.warning("remote cache delete failed for %s: %s", key, exc)
 
     def stats(self) -> CacheStats:

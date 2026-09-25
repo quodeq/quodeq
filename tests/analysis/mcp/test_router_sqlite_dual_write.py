@@ -59,7 +59,10 @@ def test_router_swallows_event_log_errors_to_preserve_jsonl_durability(tmp_path:
 
     class _FailingEventLog:
         def emit(self, event):
-            raise RuntimeError("simulated event log failure")
+            # OSError, not an arbitrary Exception: _emit_event's catch
+            # narrows to (OSError, ValueError, KeyError, TypeError), the
+            # shapes a real event-log write/serialization can raise.
+            raise OSError("simulated event log failure")
 
     fh = io.StringIO()
     router = FindingsRouter(fh, event_log=_FailingEventLog())

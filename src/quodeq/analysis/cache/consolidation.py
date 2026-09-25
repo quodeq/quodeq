@@ -113,7 +113,7 @@ def mark_run_consolidated(
         _logger.info(
             "cache: consolidated %d entries for run %s", flipped, run_dir.name,
         )
-    except Exception:  # noqa: BLE001 — post-scan side effect, never propagates
+    except (OSError, ValueError):  # post-scan side effect, never propagates
         _logger.warning(
             "Consolidation pass failed for %s (evaluation results are safe)",
             run_dir, exc_info=True,
