@@ -21,8 +21,6 @@ export function isSharedSource(selectedSource) {
   return selectedSource === PROJECT_SOURCE.SHARED;
 }
 
-export { findProject } from '../utils/projectIdentity.js';
-
 /**
  * The onDismiss handler a detail route passes down, or undefined for a
  * shared-source project.

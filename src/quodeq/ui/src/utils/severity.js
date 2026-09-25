@@ -8,6 +8,10 @@
  *   unknown folded into minor so critical+major+minor always equals the
  *   violation total: summaryBucket / countBySeverity. One implementation
  *   keeps chip sums equal to totals when a finding lacks a severity.
+ * - Some views (explorer principle filtering, the galaxy viz, dimension
+ *   utils) count raw severities instead: countKnownSeverities. It does not
+ *   fold unknown into minor, so critical+major+minor can fall short of the
+ *   violation total when a finding's severity isn't one of the three.
  */
 import { KNOWN_SEVERITIES } from './constants.js';
 import { SEVERITY } from '../vocab/severity.js';

@@ -6,9 +6,9 @@
  * renderers.jsx rather than in it so the route table stays a table.
  */
 import { lazy } from 'react';
-import { findProject, makeDismissHandler } from './dismissWiring.js';
+import { makeDismissHandler } from './dismissWiring.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
-import { projectIdOrSelf } from '../utils/projectIdentity.js';
+import { findProject, projectIdOrSelf } from '../utils/projectIdentity.js';
 
 const EvaluateScreen = lazy(() => import('../features/evaluation/components/EvaluateScreen.jsx'));
 const SettingsPage = lazy(() => import('../features/settings/components/SettingsPage.jsx'));

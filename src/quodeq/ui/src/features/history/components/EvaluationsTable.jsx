@@ -17,7 +17,6 @@ const DELTA_CLASS = {
   flat: 'history-delta',
 };
 
-
 // Splits an ISO timestamp into the row's two-line date/time cell. A
 // malformed timestamp degrades to the caller's fallback label rather than
 // throwing mid-render.

@@ -2,9 +2,9 @@ import { t } from '../../../../strings/index.js';
 import { countKnownSeverities } from '../../../../utils/severity.js';
 import { NAV_TAB } from '../../../../vocab/navTab.js';
 
-// The overlay's fixed styling, hoisted out of the JSX: one object per element
-// for the whole module instead of a fresh one on every panel render, and each
-// property readable on its own line.
+// The overlay's fixed styling: one object per element for the whole module
+// instead of a fresh one on every panel render, and each property readable
+// on its own line.
 const PANEL_STYLE = {
   position: 'absolute',
   top: 12,

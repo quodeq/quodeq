@@ -1,14 +1,14 @@
 /**
  * Route renderers: the per-route view composition App.jsx's MainContent
  * dispatches to, plus the prop-bundle builders the renderers consume.
- * App state arrives via the explicit `props` bundles — no context. Everything here is exported so
- * the route contracts stay unit-testable without mounting the whole App
- * (which needs ~8 providers).
+ * App state arrives via the explicit `props` bundles — no context.
+ * Everything here is exported so the route contracts stay unit-testable
+ * without mounting the whole App (which needs ~8 providers).
  */
 import { lazy } from 'react';
 import EmptyState from '../components/EmptyState.jsx';
 import EmptyStateWithTour from '../features/onboarding/components/EmptyStateWithTour.jsx';
-import { isSharedSource, findProject, makeDismissHandler } from './dismissWiring.js';
+import { isSharedSource, makeDismissHandler } from './dismissWiring.js';
 import { t } from '../strings/index.js';
 import { buildEvalPrincipal, ViolationsRoute } from './violationsRoute.jsx';
 import { mapRoute } from './mapRoute.jsx';
@@ -31,13 +31,13 @@ const GradeFormulaPage = lazy(() => import('../features/grade-formula/GradeFormu
 const StandardsPage = lazy(() => import('../features/standards/StandardsPage.jsx'));
 const HelpPage = lazy(() => import('../features/help/components/HelpPage.jsx'));
 
-// The source gate, the project lookup, buildEvalPrincipal,
-// buildDashboardDataBundle and buildNavigationBundle are re-exported below
+// The source gate, buildEvalPrincipal, buildDashboardDataBundle and
+// buildNavigationBundle are re-exported below
 // (their consumers -- App.jsx, this file's own route renderers, and the tests
 // that pin producer/consumer contracts -- all import them from here); they
 // are defined in sibling modules: dismissWiring.js,
 // violationsRoute.jsx, dashboardDataBundle.js and navigationBundle.js.
-export { isSharedSource, findProject, makeDismissHandler };
+export { isSharedSource, makeDismissHandler };
 export { buildEvalPrincipal };
 export { buildDashboardDataBundle };
 export { buildNavigationBundle };
