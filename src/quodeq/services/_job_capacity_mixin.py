@@ -8,8 +8,8 @@ Mixed into ``JobManager`` there; expects ``self._lock``, ``self._processes``,
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.config.services_env import max_concurrent_jobs as _resolve_max_concurrent_jobs
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
@@ -57,7 +57,7 @@ class JobCapacityMixin:
         )
         self._log.error(message)
         job.status = JobStatus.FAILED
-        job.ended_at = datetime.now(timezone.utc).isoformat()
+        job.ended_at = utc_now_iso()
         job.exit_code = _EXIT_CODE_TOO_MANY_JOBS
         job.logs.append(message)
         with self._lock:

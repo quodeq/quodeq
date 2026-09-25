@@ -101,3 +101,19 @@ def test_dict_jobs_and_dict_projects_are_supported():
 def test_non_list_evaluations_payload_yields_none(items):
     provider = StubProvider(items)
     assert find_active_evaluation(provider, _REPORTS) is None
+
+
+def test_dict_output_project_wins_over_the_legacy_project_key():
+    provider = StubProvider(
+        [{"jobId": "j1", "status": "running", "outputProject": "gone", "project": "proj-1"}],
+        projects=[{"id": "proj-1", "name": "Proj"}],
+    )
+    assert find_active_evaluation(provider, _REPORTS) is None
+
+
+def test_dict_job_with_an_empty_output_project_falls_back_to_project():
+    provider = StubProvider(
+        [{"jobId": "j1", "status": "running", "outputProject": "", "project": "gone"}],
+        projects=[{"id": "proj-1", "name": "Proj"}],
+    )
+    assert find_active_evaluation(provider, _REPORTS) is None

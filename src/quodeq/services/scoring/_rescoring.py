@@ -28,6 +28,16 @@ from quodeq.shared.validation import validate_path_segment
 _logger = logging.getLogger(__name__)
 
 
+def _dim_key(dim: dict) -> str:
+    """A serialized dimension's lookup key: its name, lower-cased ("" when absent)."""
+    return (dim.get("dimension") or "").lower()
+
+
+def _source_run_id(dim: dict) -> str | None:
+    """The run an accumulated dimension was sourced from (``fromRunId``, else ``runId``)."""
+    return dim.get("fromRunId") or dim.get("runId")
+
+
 def rescore_runs_by_dimension(
     dims: list[dict], reports_root: Path, project: str,
     keys: SuppressionKeys, params: ScoringParams = DEFAULT_PARAMS,
@@ -40,8 +50,8 @@ def rescore_runs_by_dimension(
     validate_path_segment(project)
     dim_to_run: dict[str, str] = {}
     for d in dims:
-        key = (d.get("dimension") or "").lower()
-        rid = d.get("fromRunId") or d.get("runId")
+        key = _dim_key(d)
+        rid = _source_run_id(d)
         if key and rid:
             dim_to_run[key] = rid
 
@@ -59,10 +69,7 @@ def rescore_runs_by_dimension(
             result = rescore_dimensions(
                 run_dims, run_keys,
                 params=params, run_dir=reports_root / project / run_id)
-            seen_runs[run_id] = {
-                (rd.get("dimension") or "").lower(): rd
-                for rd in result.get("dimensions", [])
-            }
+            seen_runs[run_id] = {_dim_key(rd): rd for rd in result.get("dimensions", [])}
         rd = seen_runs[run_id].get(dim_key)
         if rd:
             rescored_by_dim[dim_key] = rd
@@ -71,19 +78,14 @@ def rescore_runs_by_dimension(
 
 def dims_expecting_rescore(dims: list[dict]) -> set[str]:
     """Dimension keys that carry a source run and therefore expect a rescore."""
-    return {
-        (d.get("dimension") or "").lower()
-        for d in dims
-        if (d.get("dimension") or "") and (d.get("fromRunId") or d.get("runId"))
-    }
+    return {_dim_key(d) for d in dims if _dim_key(d) and _source_run_id(d)}
 
 
 def merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> list[dict]:
     """Merge rescored data into accumulated dimensions."""
     new_dims = []
     for d in dims:
-        key = (d.get("dimension") or "").lower()
-        rd = rescored_by_dim.get(key)
+        rd = rescored_by_dim.get(_dim_key(d))
         if rd:
             new_dims.append({
                 **d,

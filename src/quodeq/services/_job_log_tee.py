@@ -163,6 +163,18 @@ def _open_run_log_writer(job_id: str, ctx: TeeContext) -> RunLogWriter | None:
     return writer
 
 
+def _flush_pre_marker_buffer(job_id: str, writer: RunLogWriter, ctx: TeeContext) -> None:
+    """Write the job's buffered pre-marker lines to *writer*, then reset the buffer.
+
+    A write error propagates with the buffer left as is; each caller decides
+    what a failed flush means (``tee_run_log`` lets it surface,
+    ``drain_pre_marker_buffer`` logs it and still resets the buffer).
+    """
+    for pending in ctx.pre_marker_buffer.get(job_id, []):
+        writer.write(pending)
+    ctx.pre_marker_buffer[job_id] = _new_buffer()
+
+
 def drain_pre_marker_buffer(job_id: str, ctx: TeeContext) -> None:
     """Attempt to resolve run_dir and flush any buffered pre-marker lines.
 
@@ -177,11 +189,10 @@ def drain_pre_marker_buffer(job_id: str, ctx: TeeContext) -> None:
     if writer is None:
         return
     try:
-        for pending in ctx.pre_marker_buffer.get(job_id, []):
-            writer.write(pending)
+        _flush_pre_marker_buffer(job_id, writer, ctx)
     except OSError as exc:  # IOError is OSError; BrokenPipeError is a subclass
         ctx.log.warning(f"Drain write error for job {job_id}: {exc}")
-    ctx.pre_marker_buffer[job_id] = _new_buffer()
+        ctx.pre_marker_buffer[job_id] = _new_buffer()
 
 
 def tee_run_log(job_id: str, line: str, ctx: TeeContext) -> None:
@@ -201,8 +212,5 @@ def tee_run_log(job_id: str, line: str, ctx: TeeContext) -> None:
         if writer is None:
             ctx.pre_marker_buffer.setdefault(job_id, _new_buffer()).append(line)
             return
-        # Flush any buffered pre-marker lines.
-        for pending in ctx.pre_marker_buffer.get(job_id, []):
-            writer.write(pending)
-        ctx.pre_marker_buffer[job_id] = _new_buffer()
+        _flush_pre_marker_buffer(job_id, writer, ctx)
     writer.write(line)

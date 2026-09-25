@@ -45,8 +45,6 @@ from quodeq.services.scoring._response_builders import (  # noqa: F401
     build_response_from_eval_files,
     build_response_from_grade_tables,
     build_summary_from_dim_dicts,
-    build_totals_from_findings,
-    severity_bucket,
 )
 from quodeq.services.scoring._rescoring import (  # noqa: F401
     dims_expecting_rescore,

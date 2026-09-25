@@ -12,6 +12,26 @@ from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services.accumulated import numeric_average
 
 
+class RunInfoPayload(TypedDict):
+    """A run's identity on the wire: id plus its ISO and display dates.
+
+    Every response that names a run (``availableRuns``, ``selectedRun``,
+    ``trend``) carries these three keys, in this order.
+    """
+    runId: str
+    dateISO: str | None
+    dateLabel: str
+
+
+def run_info_payload(info: RunInfo) -> RunInfoPayload:
+    """*info*'s ``runId``, ``dateISO`` and ``dateLabel`` wire keys."""
+    return {
+        "runId": info.run_id,
+        "dateISO": info.date_iso,
+        "dateLabel": info.date_label,
+    }
+
+
 class DimensionDetail(TypedDict):
     """One dimension's score/grade/delta within a single run's trend entry.
 
@@ -89,9 +109,7 @@ def _build_trend_entry(
         if dim.dimension:
             prev_by_dim[dim.dimension] = dim
     return {
-        "runId": item.run_id,
-        "dateISO": item.date_iso,
-        "dateLabel": item.date_label,
+        **run_info_payload(item),
         # Surface the run's RunState so the History row can render
         # "running" instead of a misleading completion time while the
         # evaluation is still RunState.RUNNING (some dims have scored,

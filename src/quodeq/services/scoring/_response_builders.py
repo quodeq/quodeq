@@ -12,10 +12,8 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from quodeq.shared.serialization import to_camel_dict
-from quodeq.core.evidence.model import violations_per_100_files
-from quodeq.core.types.finding import Finding, SeverityTally, Totals
+from quodeq.core.types.finding import Finding
 from quodeq.core.types.finding_type import FindingType
-from quodeq.core.types.severity import Severity
 from quodeq.core.scoring.dimension_summary import build_dimension_summary
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
@@ -23,7 +21,7 @@ from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.types.dimension import DimensionResult
 from quodeq.services.dashboard import make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
-from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.dismissed import dismissed_keys, recount_totals
 from quodeq.services.ports import GradeTablesReader
 from quodeq.services.wiring import (
     SQLiteStateStore,
@@ -35,46 +33,6 @@ from quodeq.services.rescore import rescore_dimensions
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
-
-
-_UNKNOWN_BUCKET = "unknown"
-_BUCKET_BY_SEVERITY: dict[str, Severity] = {s.value: s for s in Severity}
-
-
-def severity_bucket(severity: str) -> Severity | str:
-    """Map DB severity strings to the legacy tally buckets.
-
-    The DB stores ``critical``, ``high``, ``medium``, ``low``, ``minor``. Only
-    ``critical``, ``major``, and ``minor`` have dedicated buckets; everything
-    else (including ``high``, ``medium``, ``low``) falls into ``unknown``.
-    This mirrors the legacy ``recount_totals`` in ``services/dismissed.py`` —
-    a pre-existing bucketing choice, kept as is.
-    """
-    s = (severity or "").lower()
-    return _BUCKET_BY_SEVERITY.get(s, _UNKNOWN_BUCKET)
-
-
-def build_totals_from_findings(
-    violations: list[Finding], compliance_count: int, files_read: int | None = None,
-) -> Totals:
-    """Build a Totals dataclass from a list of active (non-dismissed) violations."""
-    critical = major = minor = unknown = 0
-    for v in violations:
-        bucket = severity_bucket(v.severity or "")
-        if bucket == Severity.CRITICAL:
-            critical += 1
-        elif bucket == Severity.MAJOR:
-            major += 1
-        elif bucket == Severity.MINOR:
-            minor += 1
-        else:
-            unknown += 1
-    return Totals(
-        violation_count=len(violations),
-        compliance_count=compliance_count,
-        severity=SeverityTally(critical=critical, major=major, minor=minor, unknown=unknown),
-        violations_per100_files=violations_per_100_files(len(violations), files_read),
-    )
 
 
 def build_dimension_dict(
@@ -102,9 +60,7 @@ def build_dimension_dict(
     ]
 
     files_read = dim_row.get("files_read")
-    totals = build_totals_from_findings(
-        violations, compliance_count=len(compliance), files_read=files_read,
-    )
+    totals = recount_totals(violations, compliance_count=len(compliance), files_read=files_read)
 
     dim = DimensionResult(
         dimension=dim_row["dimension"],

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Callable, Protocol, runtime_checkable
 
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
+from quodeq.shared.clock import utc_now_iso
 from quodeq.shared.constants import CC_MARKER_KEY
 
 REPORT_PATH_MARKER = "Report path:"
@@ -57,13 +58,11 @@ class JobLaunchOptions:
 
 def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: JobStatus) -> "Job":
     """A fresh job record for *cmd*, started now, carrying *launch*'s run metadata."""
-    from datetime import datetime, timezone  # noqa: PLC0415
-
     return Job(
         job_id=job_id,
         status=status,
         command=cmd,
-        started_at=datetime.now(timezone.utc).isoformat(),
+        started_at=utc_now_iso(),
         ended_at=None,
         exit_code=None,
         ai_provider=launch.ai_provider,
@@ -74,10 +73,8 @@ def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: Jo
 
 def mark_spawn_failed(job: "Job", exc: BaseException, *, status: JobStatus, exit_code: int) -> None:
     """Close *job* as failed-to-start: terminal status, end time, exit code and a log line."""
-    from datetime import datetime, timezone  # noqa: PLC0415
-
     job.status = status
-    job.ended_at = datetime.now(timezone.utc).isoformat()
+    job.ended_at = utc_now_iso()
     job.exit_code = exit_code
     job.logs.append(f"Failed to start process: {exc}")
 

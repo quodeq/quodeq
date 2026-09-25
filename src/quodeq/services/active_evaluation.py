@@ -28,22 +28,27 @@ from quodeq.services.base import ActionProvider
 # read off the wire, including the legacy "project" key fallback.
 
 
+def _read_field(item: Any, attr: str, *wire_keys: str) -> str | None:
+    """*item*'s *attr* when it is an entity; for a wire dict, the first truthy
+    of *wire_keys* (the last one's value, falsy or not, when none is)."""
+    if not isinstance(item, dict):
+        return getattr(item, attr, None)
+    value = item.get(wire_keys[0])
+    for key in wire_keys[1:]:
+        value = value or item.get(key)
+    return value
+
+
 def _job_status(job: Any) -> str | None:
-    if isinstance(job, dict):
-        return job.get("status")
-    return getattr(job, "status", None)
+    return _read_field(job, "status", "status")
 
 
 def _job_project(job: Any) -> str | None:
-    if isinstance(job, dict):
-        return job.get("outputProject") or job.get("project")
-    return getattr(job, "output_project", None)
+    return _read_field(job, "output_project", "outputProject", "project")
 
 
 def _project_id(entry: Any) -> str | None:
-    if isinstance(entry, dict):
-        return entry.get("id")
-    return getattr(entry, "id", None)
+    return _read_field(entry, "id", "id")
 
 
 def find_active_evaluation(

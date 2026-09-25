@@ -122,14 +122,14 @@ src/quodeq/services/_mutation_scoring.py:86:broad-except
 src/quodeq/services/_post_run_hook.py:37:broad-except
 src/quodeq/services/_post_run_hook.py:45:broad-except
 src/quodeq/services/_run_discard.py:135:broad-except
-src/quodeq/services/active_evaluation.py:69:broad-except
+src/quodeq/services/active_evaluation.py:74:broad-except
 src/quodeq/services/background.py:141:broad-except
 src/quodeq/services/cache_maintenance.py:24:broad-except
 src/quodeq/services/cache_maintenance.py:40:broad-except
 src/quodeq/services/evidence_rescore.py:196:broad-except
 src/quodeq/services/grade_formula.py:121:broad-except
 src/quodeq/services/grade_formula_job.py:197:broad-except
-src/quodeq/services/mutation_rescore.py:188:broad-except
+src/quodeq/services/mutation_rescore.py:186:broad-except
 src/quodeq/services/project_registration.py:166:broad-except
 src/quodeq/services/score_run.py:232:broad-except
 src/quodeq/services/shared_publish.py:195:broad-except

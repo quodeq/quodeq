@@ -36,6 +36,16 @@ from quodeq.shared.log_sink import LoggerSink
 logger = logging.getLogger(__name__)
 # What the LogSink-typed callees get. A bare Logger has no ``success``.
 _log_sink = LoggerSink(logger)
+
+_LINE_KEY_FIELDS = ("req", "file", "line")  # a dismissed/restored finding's key
+_DELETE_KEY_FIELDS = ("dimension", "principle", "file")  # a deletion sweeps this whole key
+
+
+def _finding_key(finding: dict[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
+    """The *fields* of *finding* a delta names it by (absent ones as None)."""
+    return {field: finding.get(field) for field in fields}
+
+
 # One bounded runner for every fallback projection in the process. It holds
 # no threads while idle (workers exit on an empty queue), so a module-level
 # instance costs nothing until a fallback actually fires.
@@ -85,11 +95,7 @@ def dismiss_delta(
     the Overview accumulated dimension grades from the rescored ``scores``.
     """
     envelope = _mutation_envelope(evaluations_dir, project, run_id, "dismiss")
-    envelope["dismissed"] = {
-        "req": dismissed.get("req"),
-        "file": dismissed.get("file"),
-        "line": dismissed.get("line"),
-    }
+    envelope["dismissed"] = _finding_key(dismissed, _LINE_KEY_FIELDS)
     # Name the project so the assistant apply handler patches the cache keyed
     # on the delta's own project, not the live-selected one. The manual route
     # passes its own projectId to applyMutationDelta and ignores this field, so
@@ -110,11 +116,7 @@ def restore_delta(
     (refetch on next view). ``restored`` carries the finding key.
     """
     envelope = _mutation_envelope(evaluations_dir, project, run_id, "restore")
-    envelope["restored"] = {
-        "req": restored.get("req"),
-        "file": restored.get("file"),
-        "line": restored.get("line"),
-    }
+    envelope["restored"] = _finding_key(restored, _LINE_KEY_FIELDS)
     return envelope
 
 
@@ -129,11 +131,7 @@ def delete_delta(
     INVALIDATES the run-detail violation source.
     """
     envelope = _mutation_envelope(evaluations_dir, project, run_id, "delete")
-    envelope["deleted"] = {
-        "dimension": deleted.get("dimension"),
-        "principle": deleted.get("principle"),
-        "file": deleted.get("file"),
-    }
+    envelope["deleted"] = _finding_key(deleted, _DELETE_KEY_FIELDS)
     return envelope
 
 

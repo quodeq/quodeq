@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.core.run.state import RunState
 from quodeq.core.types import ProjectEntry
 from quodeq.services.wiring import (
@@ -93,7 +93,7 @@ def backfill_onboarding_field(
             data["onboardingCompletedAt"] = heal_completed_at
             write_repository_info(project_dir, data)
         return data
-    data["onboardingCompletedAt"] = data.get("createdAt") or datetime.now(timezone.utc).isoformat()
+    data["onboardingCompletedAt"] = data.get("createdAt") or utc_now_iso()
     write_repository_info(project_dir, data)
     return data
 
@@ -149,7 +149,7 @@ def _backfill_and_read_meta(
     *pre_read_info*: when provided, uses this dict instead of reading from disk.
     """
     project_dir = reports_root / entry_name
-    heal_at = (runs[-1].date_iso or datetime.now(timezone.utc).isoformat()) if runs else None
+    heal_at = (runs[-1].date_iso or utc_now_iso()) if runs else None
     backfilled = backfill_onboarding_field(
         project_dir, pre_read_data=pre_read_info, heal_completed_at=heal_at,
     ) if backfill else None

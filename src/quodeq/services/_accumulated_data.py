@@ -81,9 +81,12 @@ def make_slim_run_fetcher(
 
     *max_size* <= 0 disables caching entirely (every call reads through).
     """
+    def read_slim(run_id: str) -> list[DimensionResult]:
+        return _strip_findings(_read_run_data_safely(reports_root, project, run_id))
+
     def get_slim(run_id: str) -> list[DimensionResult]:
         if max_size <= 0:
-            return _strip_findings(_read_run_data_safely(reports_root, project, run_id))
+            return read_slim(run_id)
         key = (str(reports_root), project, run_id,
                run_fingerprint(reports_root / project / run_id))
         with lock:
@@ -91,7 +94,7 @@ def make_slim_run_fetcher(
             if hit is not None:
                 cache.move_to_end(key)
                 return hit
-        slim = _strip_findings(_read_run_data_safely(reports_root, project, run_id))
+        slim = read_slim(run_id)
         with lock:
             cache[key] = slim
             cache.move_to_end(key)

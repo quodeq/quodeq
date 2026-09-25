@@ -10,7 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.types import DimensionResult
+from quodeq.core.types import DimensionResult, OverallScore
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.report import PrincipleGrade
@@ -43,6 +43,28 @@ def _compliance_count(dim: DimensionResult) -> int:
     return dim.totals.compliance_count if dim.totals else len(dim.compliance)
 
 
+def _rescored(
+    dim: DimensionResult, filtered_violations: list[Finding],
+    principle_grades: list[PrincipleGrade], overall: OverallScore,
+) -> DimensionResult:
+    """*dim* carrying the filtered violations, the new principle grades, the
+    overall score and grade from *overall*, and recounted totals.
+
+    Shared by the evidence path and the legacy fallback: the two differ only
+    in how they arrive at *principle_grades* and *overall*.
+    """
+    return replace(
+        dim,
+        violations=filtered_violations,
+        principles=principle_grades,
+        overall_score=(f"{overall.weighted_score}/10"
+                       if overall.weighted_score is not None else None),
+        overall_grade=overall.grade or overall.weighted_grade,
+        totals=recount_totals(filtered_violations, compliance_count=_compliance_count(dim),
+                              files_read=dim.files_read),
+    )
+
+
 def _rescore_from_evidence(
     dim: DimensionResult, filtered_violations: list[Finding],
     keys: SuppressionKeys, run_dir: Path, params: ScoringParams,
@@ -69,17 +91,7 @@ def _rescore_from_evidence(
         )
         for ps in scores.principles.values()
     ]
-    overall = scores.overall
-    return replace(
-        dim,
-        violations=filtered_violations,
-        principles=principle_grades,
-        overall_score=(f"{overall.weighted_score}/10"
-                       if overall.weighted_score is not None else None),
-        overall_grade=overall.grade or overall.weighted_grade,
-        totals=recount_totals(filtered_violations, compliance_count=_compliance_count(dim),
-                              files_read=dim.files_read),
-    )
+    return _rescored(dim, filtered_violations, principle_grades, scores.overall)
 
 
 def _rescore_legacy_fallback(
@@ -95,20 +107,7 @@ def _rescore_legacy_fallback(
     )
 
     overall = weighted_overall(principle_scores, MODE_NUMERICAL, params)
-    overall_score_str = f"{overall.weighted_score}/10" if overall.weighted_score is not None else None
-    overall_grade = overall.grade or overall.weighted_grade
-
-    new_totals = recount_totals(filtered_violations, compliance_count=_compliance_count(dim),
-                                files_read=dim.files_read)
-
-    return replace(
-        dim,
-        violations=filtered_violations,
-        principles=principle_grades,
-        overall_score=overall_score_str,
-        overall_grade=overall_grade,
-        totals=new_totals,
-    )
+    return _rescored(dim, filtered_violations, principle_grades, overall)
 
 
 def rescore_dimension(

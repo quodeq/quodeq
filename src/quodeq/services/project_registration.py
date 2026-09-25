@@ -10,10 +10,10 @@ Split into two sibling modules plus this orchestrator:
 from __future__ import annotations
 
 import functools
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.wiring import (
     list_project_dirs,
@@ -186,5 +186,5 @@ def mark_onboarding_complete(project_dir: Path) -> None:
     data = read_repository_info(project_dir)
     if data is None or data.get("onboardingCompletedAt"):
         return
-    data["onboardingCompletedAt"] = datetime.now(timezone.utc).isoformat()
+    data["onboardingCompletedAt"] = utc_now_iso()
     write_repository_info(project_dir, data)
