@@ -148,9 +148,9 @@ def test_pre_stamp_db_heals_on_first_contact(tmp_path: Path) -> None:
 
 
 def test_grade_algo_version_is_three() -> None:
-    """v3: the tally groups untagged findings by ``req`` (issue #1274).
+    """v3: the tally groups findings by ``req`` before ``vt`` (issue #1274).
 
-    Grade tables stamped v2 were computed with reason-grouped tallies, so a
+    Grade tables stamped v2 were computed with vt-grouped tallies, so a
     run untouched since then must re-derive; the staleness test above proves
     the mechanism, this pins the version that triggers it.
     """

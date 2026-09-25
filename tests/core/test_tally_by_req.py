@@ -1,10 +1,12 @@
-"""Tally groups untagged findings by requirement code, not reason text.
+"""Tally groups findings by requirement code first.
 
-A fresh self-evaluation carried 945 maintainability findings with no ``vt``,
-944 distinct reasons and 30 distinct ``req`` codes. Grouping by reason made
-the weighted volume equal the instance count, so the ceiling punished volume
-and the score fell as coverage grew. ``req`` is the stable taxonomy every
-finding already carries.
+A fresh self-evaluation carried 945 maintainability findings with 187
+distinct ``vt`` tags, 91 of them used once and seven spellings of "magic
+literal" under M-MDF-1 alone: ``vt`` is free text the model invents per
+finding, so grouping by it made the type count drift with paraphrase.
+Compliance was mostly untagged and grouped by ``reason``. ``req`` is the
+stable taxonomy every finding carries, so it is the primary key on both
+lists; ``vt`` and ``reason`` only serve findings that have no ``req``.
 """
 from __future__ import annotations
 
@@ -39,10 +41,19 @@ def test_distinct_req_are_distinct_types():
     assert tally_types(items) == {"critical": 0, "major": 1, "minor": 2}
 
 
-def test_vt_wins_over_req():
+def test_req_wins_over_vt():
     items = [
         _v("minor", "a", req="M-MDF-1", vt="magic-number"),
         _v("minor", "b", req="M-MDF-1", vt="magic-string"),
+    ]
+    assert tally_types(items)["minor"] == 1
+
+
+def test_vt_fallback_when_no_req():
+    items = [
+        _v("minor", "a", vt="magic-number"),
+        _v("minor", "b", vt="magic-number"),
+        _v("minor", "c", vt="magic-string"),
     ]
     assert tally_types(items)["minor"] == 2
 

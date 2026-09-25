@@ -17,8 +17,7 @@ def _tally_types_fallback(items: list[dict], key_fields: tuple[str, ...]) -> dic
     present key in *key_fields*.
 
     Unlike taxonomy-only tallying, an item is never dropped: when its preferred
-    key (``vt``) is absent it falls back to the next key (``req``, then
-    ``reason``). A single
+    key is absent it falls back to the next key in *key_fields*. A single
     tagged finding can therefore no longer flip a principle into a mode that
     discards its untagged findings.
     """
@@ -33,13 +32,14 @@ def _tally_types_fallback(items: list[dict], key_fields: tuple[str, ...]) -> dic
 def tally_types(items: list[dict]) -> dict[str, int]:
     """Count distinct violation/compliance types per severity.
 
-    Grouping key, first present wins: the ``vt`` taxonomy code, then the
-    ``req`` requirement code every finding carries, then the free-text
-    ``reason``. Nothing is dropped, so the result is continuous in taxonomy
-    coverage. Grouping by ``req`` is what keeps the weighted volume a count
-    of kinds rather than a count of instances (see issue #1274).
+    Grouping key, first present wins: the ``req`` requirement code every
+    finding carries, then the ``vt`` tag, then the free-text ``reason``.
+    Nothing is dropped. ``req`` leads because ``vt`` is a tag the model
+    invents per finding and paraphrases between runs (seven spellings of
+    "magic literal" under one requirement in a single run), so a ``vt``-led
+    tally drifted with wording; ``req`` is the stable taxonomy (issue #1274).
     """
-    return _tally_types_fallback(items, ("vt", "req", "reason"))
+    return _tally_types_fallback(items, ("req", "vt", "reason"))
 
 
 def weighted_sum(

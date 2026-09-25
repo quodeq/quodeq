@@ -99,9 +99,9 @@ evidence -> tally violation types -> tally compliance types
 
 ## Violation Type Counting
 
-Violations are grouped into distinct types per severity bucket. The grouping key is the first present of: the `vt` taxonomy code, the `req` requirement code (every finding carries one), the free-text `reason`. Ten findings under `M-MDF-1` count as one minor type; a finding tagged `vt` groups by that tag instead.
+Violations and compliance are grouped into distinct types per severity bucket. The grouping key is the first present of: the `req` requirement code (every finding carries one), the `vt` tag, the free-text `reason`. Ten findings under `M-MDF-1` count as one minor type whatever their `vt` spelling.
 
-Grouping by `req` is what keeps the weighted volume a count of kinds. Before v3 of the grade algorithm, untagged findings grouped by `reason`, so every paraphrase was a new type and the ceiling tracked the instance count (issue #1274).
+Before v3 of the grade algorithm the key was `vt` then `reason`. `vt` is a tag the model invents per finding and paraphrases between runs (one self-evaluation held seven spellings of "magic literal" under a single requirement, and half of its 187 tags were used once), and compliance was mostly untagged, so hundreds of compliance "types" inflated the lift. Leading with `req` makes the type count stable across runs (issue #1274). A canonical `vt` taxonomy per standard can later add resolution inside a requirement without giving the instability back.
 
 ## Overall Score
 
