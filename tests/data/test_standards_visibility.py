@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -66,6 +67,19 @@ def test_non_string_entries_are_dropped(tmp_path):
     path.write_text(json.dumps({"version": 1, "visibleStandardIds": ["security", 3, None]}),
                     encoding="utf-8")
     assert load_visible_standard_ids(tmp_path) == ("security",)
+
+
+def test_an_unnamed_read_failure_propagates(tmp_path, monkeypatch):
+    """The catch narrows to (OSError, ValueError, RecursionError); a bug
+    that raises anything else must not be silently absorbed as 'defaults'."""
+    save_visible_standard_ids(tmp_path, ["security"])
+
+    def _boom(self, *a, **kw):
+        raise RuntimeError("unexpected read failure")
+
+    monkeypatch.setattr(Path, "read_text", _boom)
+    with pytest.raises(RuntimeError, match="unexpected read failure"):
+        load_visible_standard_ids(tmp_path)
 
 
 def test_validate_accepts_known_ids():

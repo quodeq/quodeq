@@ -100,13 +100,13 @@ def _sync_status_backed_run(
         cached_value = row[0] if row is not None else None
     try:
         _upsert_if_changed(db, run_dir, project_uuid=project_uuid, run_id=run_id, cached_mtime=cached_value)
-    except Exception as exc:  # noqa: BLE001 - one malformed status.json must not stop syncing the rest
+    except (sqlite3.Error, OverflowError) as exc:
         _logger.warning("skipping run %s: %s", run_dir, exc, exc_info=True)
         return
     # Always check staleness, even on mtime-unchanged runs.
     try:
         check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
-    except Exception as exc:
+    except (sqlite3.Error, OSError, OverflowError, ValueError) as exc:
         _logger.warning("stale-check failed for %s: %s", run_dir, exc, exc_info=True)
 
 
@@ -123,7 +123,7 @@ def _sync_one_run(
     else:
         try:
             sync_legacy_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
-        except Exception as exc:
+        except (sqlite3.Error, OSError) as exc:
             _logger.warning("legacy sync failed for %s: %s", run_dir, exc, exc_info=True)
 
 
@@ -188,7 +188,7 @@ def sync_project_dates(db: sqlite3.Connection, project_dir: Path, project_uuid: 
                     db, run_dir, project_uuid=project_uuid, run_id=run_dir.name,
                     cached_mtime=cached_mtimes.get(run_dir.name),
                 )
-            except Exception:  # noqa: BLE001 - one run's date-sync failure must not stop syncing the rest
+            except (sqlite3.Error, OverflowError):
                 _logger.warning("date-sync upsert failed for %s", run_dir, exc_info=True)
 
 

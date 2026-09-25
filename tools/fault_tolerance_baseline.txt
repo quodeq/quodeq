@@ -12,17 +12,6 @@ src/quodeq/dashboard/_webview_token.py:88:suppress
 src/quodeq/dashboard/_webview_window_close.py:207:broad-except
 src/quodeq/dashboard/_webview_window_close.py:237:broad-except
 src/quodeq/dashboard/_webview_window_native_ops.py:190:broad-except
-src/quodeq/data/fs/compiled_standards.py:36:broad-except
-src/quodeq/data/fs/run_artifacts.py:72:suppress
-src/quodeq/data/fs/standards_prefs.py:116:broad-except
-src/quodeq/data/fs/standards_prefs.py:41:broad-except
-src/quodeq/data/fs/standards_prefs.py:86:broad-except
-src/quodeq/data/fs/suppression_rules.py:42:broad-except
-src/quodeq/data/migrations/dismissed_json_to_actions_log.py:65:broad-except
-src/quodeq/data/sqlite/run_index.py:103:broad-except
-src/quodeq/data/sqlite/run_index.py:109:broad-except
-src/quodeq/data/sqlite/run_index.py:126:broad-except
-src/quodeq/data/sqlite/run_index.py:191:broad-except
 src/quodeq/services/_post_run_hook.py:37:broad-except
 src/quodeq/services/_post_run_hook.py:45:broad-except
 src/quodeq/services/_run_discard.py:135:broad-except
@@ -31,7 +20,6 @@ src/quodeq/services/cache_maintenance.py:40:broad-except
 src/quodeq/services/grade_formula_job.py:197:broad-except
 src/quodeq/services/project_registration.py:164:broad-except
 src/quodeq/services/shared_publish.py:195:broad-except
-src/quodeq/shared/resource_sampler.py:167:broad-except
 src/quodeq/update/checker.py:79:broad-except
 src/quodeq/update/checker.py:82:broad-except
 src/quodeq/update/checker.py:90:broad-except

@@ -6,4 +6,4 @@
 # Entries are line-keyed (relpath:lineno:callee): when an edit shifts a
 # site, hand-edit its line number instead of regenerating blind.
 src/quodeq/analysis/cache/_replay.py:145:emit
-src/quodeq/data/migrations/dismissed_json_to_actions_log.py:63:emit
+src/quodeq/data/migrations/dismissed_json_to_actions_log.py:72:emit

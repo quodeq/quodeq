@@ -34,16 +34,23 @@ class TestReadFindingDetails:
 
         assert read_finding_details(tmp_path, {("X", "f", 1)}) == {}
 
-    def test_locked_or_io_erroring_db_degrades_gracefully(self, tmp_path, monkeypatch):
+    def test_locked_or_io_erroring_db_degrades_gracefully(self, tmp_path, monkeypatch, caplog):
         """open_evaluation_db wraps a locked/IO-erroring DB as RuntimeError
         (Task D10); the best-effort contract this docstring describes must
-        still hold for that failure mode, not just sqlite3.DatabaseError."""
+        still hold for that failure mode, not just sqlite3.DatabaseError.
+        The failure must also be visible, not just swallowed silently."""
+        import logging
+
         from quodeq.data.sqlite.findings_queries import read_finding_details
 
         _seed(tmp_path, req="X-1", file="src/a.py", line=10)
         _break_reopen_with_operational_error(monkeypatch)
 
-        assert read_finding_details(tmp_path, {("X-1", "src/a.py", 10)}) == {}
+        with caplog.at_level(logging.WARNING, logger="quodeq.data.sqlite.findings_queries"):
+            out = read_finding_details(tmp_path, {("X-1", "src/a.py", 10)})
+
+        assert out == {}
+        assert any(str(tmp_path) in r.message for r in caplog.records)
 
     def test_matches_requirement_less_findings_via_null_or_empty(self, tmp_path):
         """A finding with no requirement id is stored with requirement NULL;
@@ -133,13 +140,22 @@ class TestReadRunKeySets:
 
         assert read_run_key_sets(tmp_path) == (set(), set())
 
-    def test_locked_or_io_erroring_db_degrades_gracefully(self, tmp_path, monkeypatch):
+    def test_locked_or_io_erroring_db_degrades_gracefully(self, tmp_path, monkeypatch, caplog):
+        """The failure degrades to empty sets, and (since the result is
+        never memoized) must be visible rather than silently repeated on
+        every request without a trace."""
+        import logging
+
         from quodeq.data.sqlite.findings_queries import read_run_key_sets
 
         _seed(tmp_path)
         _break_reopen_with_operational_error(monkeypatch)
 
-        assert read_run_key_sets(tmp_path) == (set(), set())
+        with caplog.at_level(logging.WARNING, logger="quodeq.data.sqlite.findings_queries"):
+            out = read_run_key_sets(tmp_path)
+
+        assert out == (set(), set())
+        assert any(str(tmp_path) in r.message for r in caplog.records)
 
 
 class TestFindDismissedMatching:

@@ -48,11 +48,17 @@ _DEFAULT_LOCKS = _MigrationLocks()
 def _fold_legacy_entries(writer: ActionLogWriter, entries: list) -> int:
     """Emit a FindingDismissed event for each legacy dismissed.json entry.
 
-    Tolerant per-entry: a malformed entry is logged and skipped rather than
-    aborting the whole fold.
+    Tolerant per-entry for shape and value problems: a non-dict entry, or one
+    whose fields don't convert, is logged and skipped rather than aborting
+    the whole fold. An ``OSError`` from ``writer.emit`` (a genuine write
+    failure) is NOT caught here: it propagates out of ``migrate_if_needed``
+    so the done marker is never written and the next call retries the fold.
     """
     count = 0
     for entry in entries:
+        if not isinstance(entry, dict):
+            _logger.warning("Skipping non-dict dismissed entry: %r", entry)
+            continue
         try:
             payload = FindingDismissed(
                 req=str(entry.get("req", "")),
@@ -60,10 +66,11 @@ def _fold_legacy_entries(writer: ActionLogWriter, entries: list) -> int:
                 line=int(entry.get("line", 0)),
                 reason=None,
             )
-            writer.emit(FindingDismissedEvent(payload=payload))
-            count += 1
-        except Exception:
-            _logger.exception("Failed to migrate dismissed entry: %s", entry)
+        except (TypeError, ValueError):
+            _logger.warning("Failed to migrate dismissed entry: %s", entry)
+            continue
+        writer.emit(FindingDismissedEvent(payload=payload))
+        count += 1
     return count
 
 

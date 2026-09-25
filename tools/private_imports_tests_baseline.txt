@@ -760,8 +760,8 @@ tests/data/fs/test_project_identity_remote.py:6:private-module:quodeq.data.fs._m
 tests/data/fs/test_resolution_fail_clean.py:8:private-module:quodeq.data.fs._models.ProjectIdentity
 tests/data/fs/test_resolution_fail_clean.py:9:private-module:quodeq.data.fs._resolution.create_project
 tests/data/fs/test_resolution_fail_clean.py:9:private-name:quodeq.data.fs._resolution._REPO_INFO_FILENAME
-tests/data/migrations/test_dismissed_json_to_actions_log.py:88:private-name:quodeq.data.migrations.dismissed_json_to_actions_log._DEFAULT_LOCKS
-tests/data/migrations/test_dismissed_json_to_actions_log.py:88:private-name:quodeq.data.migrations.dismissed_json_to_actions_log._MigrationLocks
+tests/data/migrations/test_dismissed_json_to_actions_log.py:164:private-name:quodeq.data.migrations.dismissed_json_to_actions_log._DEFAULT_LOCKS
+tests/data/migrations/test_dismissed_json_to_actions_log.py:164:private-name:quodeq.data.migrations.dismissed_json_to_actions_log._MigrationLocks
 tests/data/projection/test_grade_projector.py:6:private-name:quodeq.data.projection.grade_projector._read_source_file_count
 tests/data/sqlite/test_assistant_schema.py:7:private-module:quodeq.data.sqlite._assistant_schema.ASSISTANT_DDL
 tests/data/sqlite/test_assistant_schema.py:7:private-module:quodeq.data.sqlite._assistant_schema.ASSISTANT_SCHEMA_VERSION

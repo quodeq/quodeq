@@ -38,7 +38,7 @@ def load_visible_standard_ids(project_root: str | Path | None) -> tuple[str, ...
         return DEFAULT_VISIBLE_STANDARDS
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001 - config must never fail a scan; see module docstring
+    except (OSError, ValueError, RecursionError) as exc:
         _logger.warning(
             "Ignoring unreadable or malformed standards visibility %s: %s", path, exc)
         return DEFAULT_VISIBLE_STANDARDS
@@ -83,7 +83,7 @@ def load_project_overrides(project_root: str | Path | None) -> dict[str, dict]:
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001 - config must never fail a scan; see module docstring
+    except (OSError, ValueError, RecursionError) as exc:
         _logger.warning(
             "Ignoring unreadable or malformed standards overrides %s: %s", path, exc)
         return {}
@@ -113,7 +113,7 @@ def collect_declared_params(compiled_dir: Path) -> dict[str, dict]:
     for path in sorted(Path(compiled_dir).glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:  # noqa: BLE001 - one bad standard must not sink the rest
+        except (OSError, ValueError, RecursionError) as exc:
             _logger.warning("Skipping unreadable declared params in %s: %s", path, exc)
             continue
         for principle in data.get("principles", []):

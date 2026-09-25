@@ -132,8 +132,9 @@ def write_json_state(
         tmp_fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
         dump_json_and_replace(tmp_fd, tmp_name, path, asdict(state), indent=2)
     except OSError as exc:
-        # fail-silent: this write is never worth crashing over
-        logger.debug("%s state write failed (fail-soft): %s", label, exc)
+        # fail-silent: this write is never worth crashing over, but a warning
+        # (not debug) means the failure is actually visible.
+        logger.warning("%s state write failed (fail-soft): %s", label, exc)
         if tmp_name is not None:
             try:
                 os.unlink(tmp_name)

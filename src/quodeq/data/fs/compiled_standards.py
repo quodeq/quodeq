@@ -33,7 +33,7 @@ def iter_compiled_standards(compiled_dir: Path) -> Iterator[tuple[str, dict]]:
     for path in sorted(compiled_dir.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:  # noqa: BLE001 - one bad standard must never 500 a request
+        except (OSError, ValueError, RecursionError) as exc:
             _logger.warning("Skipping unreadable compiled standard %s: %s", path, exc)
             continue
         if isinstance(data, dict):
