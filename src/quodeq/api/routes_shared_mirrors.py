@@ -27,14 +27,12 @@ from flask import Flask, Response, current_app, jsonify, request
 
 from quodeq.api.helpers import json_error
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
-from quodeq.core.types.project_source import ProjectSource
 from quodeq.services import fs_reports, fs_projects
 from quodeq.services.compare import build_compare_summary
 from quodeq.services.runs_unit import build_runs_unit
 from quodeq.services.scoring import get_project_scores, get_scores_slim
+from quodeq.services.shared_listing import enrich_shared_info, list_shared_projects
 from quodeq.services.shared_repo import (
-    published_meta,
-    last_synced_at,
     refresh_shared_clone,
     shared_index_db_path,
     sync_shared_index,
@@ -49,41 +47,12 @@ def _shared_projects(
     eval_root: Path, url: str,
     refresh_clone: Callable[[str], tuple[bool, object]], sync_index: Callable[[str], object],
 ):
-    stale = None
-    if request.args.get("refresh") == "1":
-        # Refresh-on-read: the UI calls this on tab entry to force the
-        # clone up to date before listing, rather than showing whatever
-        # was last fetched. A failed refresh (host unreachable) is not
-        # fatal -- fall through and serve the existing (now-stale)
-        # clone contents, just flag it. The index is only re-synced
-        # after a successful refresh; there is nothing new to index
-        # when the fetch itself failed.
-        ok, _ = refresh_clone(url)
-        if ok:
-            sync_index(url)
-            stale = False
-        else:
-            stale = True
-    # backfill=False: the shared clone is a git worktree, not a local
-    # evaluations dir -- writing onboardingCompletedAt into
-    # repository_info.json here would dirty it, and a dirty worktree can
-    # make publish's `pull --rebase` refuse (confusing wedge) the next
-    # time someone publishes into this clone.
-    # inline_summaries=True: this route has no warm-up engine to fill a
-    # missing project-card summary later, so a cache miss must compute
-    # it inline here instead of reporting it pending forever.
-    projects = fs_projects.build_project_list(
-        eval_root, backfill=False, inline_summaries=True,
+    listing = list_shared_projects(
+        eval_root, url,
+        refresh=request.args.get("refresh") == "1",
+        refresh_clone=refresh_clone, sync_index=sync_index,
+        serialize=to_camel_dict,
     )
-    listing = {"projects": [to_camel_dict(p) for p in projects]}
-    meta = published_meta(url)
-    for project in listing["projects"]:
-        key = project.get("id") or project.get("name")
-        project.update(meta.get(key, {}))
-        project["source"] = ProjectSource.SHARED
-    listing["lastSynced"] = last_synced_at(url)
-    if stale is not None:
-        listing["stale"] = stale
     return jsonify(listing)
 
 
@@ -121,9 +90,7 @@ def shared_project_info(project: str, eval_root: Path, url: str):
     # badge has no "published by <name>" to show. `project` here is the
     # directory name under the clone root, the exact key published_meta
     # indexes by.
-    meta = published_meta(url)
-    info.update(meta.get(project, {}))
-    info["source"] = ProjectSource.SHARED
+    enrich_shared_info(info, project, url)
     return jsonify(info)
 
 

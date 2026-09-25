@@ -118,6 +118,17 @@ class WarmupEngine:
             self._pending.append(project_id)
             self._cond.notify()
 
+    def enqueue_pending(self, entries: list) -> None:
+        """Re-enqueue every entry still marked ``summary_pending``.
+
+        Self-healing: the projects route calls this on every page it
+        returns, bounding the re-enqueue to page size instead of the full
+        project count.
+        """
+        for entry in entries:
+            if getattr(entry, "summary_pending", False):
+                self.enqueue(entry.id)
+
     def snapshot(self) -> dict | None:
         """Return warm-up progress for the API, or None before ``start``."""
         with self._cond:

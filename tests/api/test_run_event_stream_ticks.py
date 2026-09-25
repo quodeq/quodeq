@@ -207,3 +207,54 @@ def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
 # evals. See ``routes_findings.py`` and the API-level tests for the new
 # mutation-returns-scores contract.
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Wire-characterization: exact SSE frame sequence, byte for byte.
+#
+# The SSE watcher's artifact readers (status.json / evaluation/<dim>.json /
+# events.jsonl) live in services/run_event_readers.py; api/_run_event_watcher.py
+# only orchestrates them. These two tests pin the exact SSE frame text a
+# finished/pending run produces so moving the readers between layers cannot
+# change what goes over the wire.
+# ---------------------------------------------------------------------------
+
+def test_finished_run_sse_sequence_is_byte_identical(tmp_path: Path):
+    """A run with one dimension, one finding, and a terminal status emits
+    exactly: status, dimension-completed, finding, done -- in that order,
+    with the exact SSE frame text (not just "some frame of this type")."""
+    _write_status(tmp_path, state="done")
+    _write_dim_eval(tmp_path, "timeliness", score=90)
+    _write_finding_event(tmp_path, p="P1", line=1)
+
+    frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
+    non_keepalive = [f for f in frames if not f.startswith(":")]
+
+    assert len(non_keepalive) == 4, non_keepalive
+    status_frame, dim_frame, finding_frame, done_frame = non_keepalive
+
+    assert status_frame == (
+        'event: status\ndata: {"state":"done"}\n\n'
+    )
+    assert dim_frame == (
+        'event: dimension-completed\n'
+        'data: {"dimension":"timeliness","score":90}\n\n'
+    )
+    assert finding_frame.startswith('id: ')
+    assert '\nevent: finding\n' in finding_frame
+    assert finding_frame.endswith(
+        'data: {"id":1,"practice_id":"P1","dimension":"dim","requirement":null,'
+        '"verdict":"violation","severity":"medium","file":"x.py","line":1,'
+        '"end_line":null,"title":"t","reason":"r","snippet":"s","confidence":100,'
+        '"provenance_downgrade":false,"scope_downgrade":null,"carried_forward":false}\n\n'
+    )
+    assert done_frame == 'event: done\ndata: {"state":"done"}\n\n'
+
+
+def test_pending_run_emits_only_status_pending_when_status_json_absent(tmp_path: Path):
+    """No status.json yet: exactly one status frame reporting `pending`,
+    nothing else -- the watcher's read-failure/absence defaults stay
+    byte-identical across the reader move."""
+    frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
+    non_keepalive = [f for f in frames if not f.startswith(":")]
+    assert non_keepalive == ['event: status\ndata: {"state":"pending"}\n\n']

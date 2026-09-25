@@ -139,9 +139,7 @@ def _list_projects(
     # Self-healing warm-up: anything still pending on the page being
     # returned goes (back) on the queue, bounding this to page size
     # instead of the full project count.
-    for entry in projects:
-        if getattr(entry, "summary_pending", False):
-            warmup.enqueue(entry.id)
+    warmup.enqueue_pending(projects)
     # Serialize at the boundary: providers hand back ProjectEntry
     # entities (or already-serialized dicts from remote providers).
     wire = [p if isinstance(p, dict) else to_camel_dict(p) for p in projects]
