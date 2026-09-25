@@ -219,14 +219,13 @@ class TestProviderTestFieldTypes:
         assert resp.status_code == 400
         assert resp.get_json()["code"] == "INVALID_PARAM"
 
-    def test_null_api_key_is_treated_as_absent(self, client):
+    def test_null_api_key_is_treated_as_absent(self, client, monkeypatch):
         """An explicit JSON null for api_key is not a type error (it's the
         same as omitting the field): the route falls through to env-var
         resolution instead of 400ing."""
-        with patch("quodeq.api.llm_bridge_routes.check_cloud_connection") as mock_check, \
-                patch("quodeq.api.llm_bridge_routes.resolve_api_key") as mock_resolve:
+        monkeypatch.setenv("OPENROUTER_API_KEY", _TEST_API_KEY)
+        with patch("quodeq.api.llm_bridge_routes.check_cloud_connection") as mock_check:
             mock_check.return_value = {"success": True, "model": "test", "latency_ms": 200}
-            mock_resolve.return_value = (_TEST_API_KEY, "OPENROUTER_API_KEY")
             resp = client.post("/api/provider/test", json={
                 "provider": "openrouter",
                 "model": "test",
@@ -236,3 +235,4 @@ class TestProviderTestFieldTypes:
 
         assert resp.status_code == 200
         mock_check.assert_called_once()
+        assert mock_check.call_args.kwargs["api_key"] == _TEST_API_KEY
