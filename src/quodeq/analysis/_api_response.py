@@ -9,12 +9,13 @@ from __future__ import annotations
 import json
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 import httpx
 import openai
 
 from quodeq.analysis._api_schema import parse_findings
+from quodeq.analysis._drop_stats import DropStatsCounter
 from quodeq.analysis._drop_stats import format_reasons as _format_drop_reasons
 from quodeq.analysis._drop_stats import record as _record_drop_stats
 
@@ -177,6 +178,16 @@ def _apply_repair(
     return max(0, dropped - recovered)
 
 
+def _record_drop_stats_for(
+    counter: DropStatsCounter | None, *, dropped: int, kept: int, reasons: Mapping[str, int],
+) -> None:
+    """Record onto *counter*, or the module-wide default when None."""
+    if counter is not None:
+        counter.record(dropped=dropped, kept=kept, reasons=reasons)
+    else:
+        _record_drop_stats(dropped=dropped, kept=kept, reasons=reasons)
+
+
 def finish_call(
     model: str,
     finish_reason: str | None,
@@ -184,6 +195,7 @@ def finish_call(
     start: float,
     *,
     reask: Callable[[list[dict]], list[dict]] | None = None,
+    counter: DropStatsCounter | None = None,
 ) -> tuple[list[dict], bool]:
     """Parse *text*, attempt a snippet repair re-ask, record drop stats and
     log the call's outcome.
@@ -210,7 +222,7 @@ def finish_call(
     elapsed = time.monotonic() - start
     # Feed the per-run aggregate so the dimension loops can report ONE
     # drop-ratio signal at end of run instead of N scattered per-call lines.
-    _record_drop_stats(dropped=dropped, kept=len(findings), reasons=drop_reasons)
+    _record_drop_stats_for(counter, dropped=dropped, kept=len(findings), reasons=drop_reasons)
 
     # A length-truncated response is an incomplete analysis: the model ran out of
     # output budget mid-stream, so findings after the cut are simply gone. Treat

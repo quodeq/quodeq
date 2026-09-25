@@ -110,13 +110,48 @@ class TestRunCliAnalysis:
 
         provider_cfg = {"codex": {"type": "cli", "mcp_style": "cli-register"}}
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider_cfg), \
-             patch("quodeq.analysis.subprocess.register_cli_mcp", return_value="quodeq-findings") as mock_reg, \
+             patch(
+                 "quodeq.analysis.subprocess.DEFAULT_CLI_MCP_REGISTRY.ensure_registered",
+                 return_value="quodeq-findings",
+             ) as mock_reg, \
+             patch("quodeq.analysis.subprocess.build_ai_cmd", return_value=(["codex", "exec", "test"], None)), \
+             patch("quodeq.analysis.subprocess.build_analysis_env", return_value={}), \
+             patch("quodeq.analysis.subprocess.spawn_and_monitor", return_value=(mock_process, False)), \
+             patch("quodeq.analysis.subprocess.check_process_result"):
+            # cfg.run_config is None here, so the call site falls back to
+            # the process-default registry.
+            _run_cli_analysis(tmp_path, "test", stream, cfg)
+            mock_reg.assert_called_once()
+
+    def test_registers_cli_mcp_on_the_run_scoped_registry_when_run_config_is_set(self, tmp_path):
+        """Two agents of the same run must see the SAME registration cache,
+        so the call site reads ``cfg.run_config.mcp_registry``, not the
+        process-default, whenever a RunConfig is carried."""
+        from quodeq.analysis.run_types import RunConfig
+
+        stream = tmp_path / "stream.json"
+        jsonl = tmp_path / "evidence.jsonl"
+        run_config = RunConfig(src=tmp_path, language="python")
+        cfg = AnalysisConfig(ai_cmd="codex", jsonl_file=jsonl, run_config=run_config)
+        mock_process = MagicMock()
+        mock_process.returncode = 0
+
+        provider_cfg = {"codex": {"type": "cli", "mcp_style": "cli-register"}}
+        with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider_cfg), \
+             patch.object(
+                 run_config.mcp_registry, "ensure_registered", return_value="quodeq-findings",
+             ) as mock_reg, \
+             patch(
+                 "quodeq.analysis.subprocess.DEFAULT_CLI_MCP_REGISTRY.ensure_registered",
+             ) as mock_default_reg, \
              patch("quodeq.analysis.subprocess.build_ai_cmd", return_value=(["codex", "exec", "test"], None)), \
              patch("quodeq.analysis.subprocess.build_analysis_env", return_value={}), \
              patch("quodeq.analysis.subprocess.spawn_and_monitor", return_value=(mock_process, False)), \
              patch("quodeq.analysis.subprocess.check_process_result"):
             _run_cli_analysis(tmp_path, "test", stream, cfg)
-            mock_reg.assert_called_once()
+
+        mock_reg.assert_called_once()
+        mock_default_reg.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

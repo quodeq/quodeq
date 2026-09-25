@@ -5,7 +5,7 @@ import json
 from collections.abc import Mapping
 
 from quodeq.analysis._dim_order import apply_dim_deadline
-from quodeq.analysis._drop_stats import DropStatsCounter, report_run_drop_stats
+from quodeq.analysis._drop_stats import report_run_drop_stats
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.runner_markers import emit_marker
 from quodeq.core.evidence.model import Evidence
@@ -34,7 +34,7 @@ from quodeq.analysis._loop_steps import (
 
 def _run_post_loop_guards(
     config: RunConfig, result: dict[str, Evidence],
-    drop_counter: DropStatsCounter | None, skipped_count: int, log: LogSink,
+    skipped_count: int, log: LogSink,
 ) -> None:
     """Drop-stats report + the fatal-cancel/zero-findings/reachability guards.
 
@@ -43,8 +43,12 @@ def _run_post_loop_guards(
     ``drop_stats`` dashboard marker is emitted here (not inside
     ``report_run_drop_stats``) -- this loop is the composition root for
     that seam, mirroring the "reads == 0" no-op rule the report itself uses.
+
+    Reads the run's own drop counter (``config.drop_counter``) rather than
+    taking one as a parameter, so every dimension loop of this run reports
+    the same shared accumulator.
     """
-    stats = report_run_drop_stats(drop_counter, log=log)
+    stats = report_run_drop_stats(config.drop_counter, log=log)
     if stats.parsed:
         emit_marker(
             "drop_stats",
@@ -101,7 +105,7 @@ def run_incremental_loop(
         f"[loop] incremental finished: processed {len(result)} of {len(dimensions)} dim(s) "
         f"({', '.join(result) if result else 'none'})",
     )
-    _run_post_loop_guards(config, result, deps.drop_counter, 0, log)
+    _run_post_loop_guards(config, result, 0, log)
     return result
 
 
@@ -195,5 +199,5 @@ def run_per_dimension_loop(
         f"[loop] per-dimension finished: processed {len(result)} of {len(dimensions)} dim(s) "
         f"({', '.join(result) if result else 'none'}, {skipped_count} skipped)",
     )
-    _run_post_loop_guards(config, result, deps.drop_counter, skipped_count, log)
+    _run_post_loop_guards(config, result, skipped_count, log)
     return result

@@ -10,13 +10,13 @@
 # introduced in the same change.
 src/quodeq/_cli_evaluate_finalize.py:71:broad-except
 src/quodeq/_cli_scoring.py:127:broad-except
-src/quodeq/analysis/_api_call.py:268:broad-except
+src/quodeq/analysis/_api_call.py:275:broad-except
 src/quodeq/analysis/_api_runner.py:104:broad-except
-src/quodeq/analysis/_loop_steps.py:108:broad-except
-src/quodeq/analysis/_loop_steps.py:139:broad-except
-src/quodeq/analysis/_loop_steps.py:182:broad-except
-src/quodeq/analysis/_loop_steps.py:184:broad-except
-src/quodeq/analysis/_loops.py:141:broad-except
+src/quodeq/analysis/_loop_steps.py:107:broad-except
+src/quodeq/analysis/_loop_steps.py:138:broad-except
+src/quodeq/analysis/_loop_steps.py:181:broad-except
+src/quodeq/analysis/_loop_steps.py:183:broad-except
+src/quodeq/analysis/_loops.py:145:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:166:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:174:broad-except
 src/quodeq/analysis/_run_lifecycle_support.py:204:broad-except

@@ -113,6 +113,30 @@ class TestDropStatsRecording:
             call_api("prompt", api_config)
         assert _drop_stats.consume().parsed == 0
 
+    def test_call_with_run_config_records_on_the_run_scoped_counter(self, api_config, tmp_path):
+        """A config carrying a RunConfig (the pool/CLI path) records onto
+        its ``drop_counter`` -- shared by every pool worker thread of that
+        run -- instead of the process-wide default."""
+        from dataclasses import replace
+
+        from quodeq.analysis import _drop_stats
+        from quodeq.analysis.run_types import RunConfig
+
+        run_config = RunConfig(src=tmp_path, language="python")
+        scoped_config = replace(api_config, run_config=run_config)
+        malformed = {"t": "violation", "file": "b.py", "line": 1, "w": "y",
+                     "snippet": "code", "reason": "bad"}  # no req -> dropped
+        content = json.dumps({"findings": [malformed]})
+        client = _mock_raw_client(content)
+        with patch("openai.OpenAI") as mock_oa:
+            mock_oa.return_value.__enter__.return_value = client
+            call_api("prompt", scoped_config)
+
+        stats = run_config.drop_counter.consume()
+        assert stats.dropped == 1
+        # The process-wide default counter must stay untouched.
+        assert _drop_stats.consume().parsed == 0
+
 
 class TestApiRunnerConfig:
     """ApiRunnerConfig dataclass."""

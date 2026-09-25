@@ -12,7 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
+from quodeq.analysis._command import CliMcpRegistry
 from quodeq.analysis._dimensions import DimensionsConfig
+from quodeq.analysis._drop_stats import DropStatsCounter
 from quodeq.analysis.dispatch_policy import DispatchPolicy, default_dispatch_policy
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis._config import HeartbeatCallback
@@ -128,6 +130,14 @@ class RunConfig:
     # live snapshot on demand" via :meth:`dispatch_policy` — see there for why that
     # resolution is deliberately NOT cached onto this field.
     dispatch: DispatchPolicy | None = None
+    # Per-run drop-stats accumulator and CLI-MCP registration cache. Fields
+    # (not module globals) so ``dataclasses.replace()`` copies and pool
+    # worker threads of the SAME run share one owner each, while two
+    # concurrent runs in one process stay isolated. Consumers that receive
+    # no ``RunConfig`` (``run_config=None``) fall back to each owner's own
+    # module-level default instead.
+    drop_counter: DropStatsCounter = field(default_factory=DropStatsCounter)
+    mcp_registry: CliMcpRegistry = field(default_factory=CliMcpRegistry)
 
     def classify_cache(self, dim_id: str) -> "ClassifyStash | None":
         """This run's stashed classify result for *dim_id*, or None."""

@@ -10,7 +10,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import httpx
 import openai
@@ -22,6 +22,9 @@ from quodeq.analysis.errors import (
 )
 from quodeq.shared.constants import OLLAMA_DEFAULT_BASE_URL, OLLAMA_DEFAULT_PORT
 from quodeq.shared.url_validation import validate_url_safe
+
+if TYPE_CHECKING:
+    from quodeq.analysis.run_types import RunConfig
 
 _log = logging.getLogger(__name__)
 
@@ -65,6 +68,10 @@ class ApiRunnerConfig:
     """QUODEQ_API_READ_TIMEOUT: a positive value replaces the read budget outright."""
     repair_enabled: bool = True
     """False (QUODEQ_DISABLE_FINDING_REPAIR) skips the snippet repair re-ask."""
+    run_config: "RunConfig | None" = None
+    """The run's RunConfig, so ``finish_call`` records drops on its shared
+    drop counter. ``None`` (legacy/direct callers) falls back to the
+    module-default counter. Filled by ``build_batch_api_config``."""
 
 
 @functools.lru_cache(maxsize=_WARN_CACHE_MAX_BASES)
@@ -278,4 +285,5 @@ def call_api(
             functools.partial(repair_snippetless, client, create_kwargs, config.model)
             if config.repair_enabled else None
         )
-        return finish_call(config.model, finish_reason, text, start, reask=reask)
+        counter = config.run_config.drop_counter if config.run_config is not None else None
+        return finish_call(config.model, finish_reason, text, start, reask=reask, counter=counter)
