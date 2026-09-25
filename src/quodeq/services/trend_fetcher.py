@@ -238,5 +238,5 @@ def make_trend_fetcher(
 
     return make_scalar_trend_fetcher(
         reports_root, project, cacheable_run_ids,
-        deps.read_run_scalars or _default_read_run_scalars,
+        deps.read_run_scalars or _default_read_run_scalars, log=SHARED_LOG,
     )
