@@ -26,6 +26,7 @@ import tomllib
 from functools import lru_cache
 from typing import Callable
 
+from quodeq.config._constants import PARSE_CACHE_MAX
 from quodeq.config._dependency_parsers_python import (  # re-export
     has_pyproject_dependency,
     has_requirements_txt_dependency,
@@ -40,9 +41,9 @@ from quodeq.config._dependency_parsers_compiled import (  # re-export
 )
 
 # Discipline rules probe the same manifest once per rule, so each parser below
-# is memoized per file text. Bounded so a long-lived dashboard does not pin
-# every manifest it ever read.
-_PARSE_CACHE_MAX = 64
+# is memoized per file text (PARSE_CACHE_MAX, shared with the two sibling
+# parser modules via quodeq.config._constants). Bounded so a long-lived
+# dashboard does not pin every manifest it ever read.
 
 # --- Gemfile (Ruby DSL) ------------------------------------------------------
 
@@ -59,7 +60,7 @@ def _strip_hash_comments(content: str) -> str:
     return "\n".join(out)
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _gemfile_gems(content: str) -> frozenset[str]:
     body = _strip_hash_comments(content)
     return frozenset(m.group(1).lower() for m in _GEMFILE_GEM.finditer(body))
@@ -81,7 +82,7 @@ def has_gemfile_gem(content: str, needle: str) -> bool:
 _MIX_DEP = re.compile(r"\{:(\w+)\s*,")
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _mix_deps(content: str) -> frozenset[str]:
     body = _strip_hash_comments(content)
     return frozenset(m.group(1).lower() for m in _MIX_DEP.finditer(body))
@@ -99,7 +100,7 @@ def has_mix_dep(content: str, needle: str) -> bool:
 # --- pubspec.yaml (Dart) -----------------------------------------------------
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _pubspec_deps(content: str) -> frozenset[str]:
     """First-level keys under ``dependencies:`` / ``dev_dependencies:``.
 
@@ -143,7 +144,7 @@ def has_pubspec_dependency(content: str, needle: str) -> bool:
 # --- Project.toml (Julia) ----------------------------------------------------
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _julia_deps(content: str) -> frozenset[str]:
     try:
         data = tomllib.loads(content)

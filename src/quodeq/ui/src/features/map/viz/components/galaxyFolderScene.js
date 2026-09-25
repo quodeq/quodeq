@@ -4,6 +4,7 @@ import {
   RNG_MIDPOINT, MIN_SEPARATION_PX, REPULSION_PASSES_LARGE,
 } from '../core/galaxyCore.js';
 import { SEVERITY } from '../../../../vocab/severity.js';
+import { SCORE_SCALE_MAX } from '../../../../constants.js';
 
 /* ── Position consistency engine ── */
 
@@ -61,6 +62,8 @@ const FOLDER_RADIUS_BASE_PX = 6; // before the sqrt-of-contents growth term
 const FILE_RADIUS_BASE_PX = 5;
 // The folder gap widens with the star count, up to this many stars.
 const FOLDER_GAP_STAR_CAP = 20;
+// Base pixel gap folders keep from neighbors before the star-count term.
+const FOLDER_GAP_BASE_PX = 10;
 // Fit margin, as a multiple of a star's radius (wider with particles).
 const FIT_MARGIN_RATIO_WITH_PARTICLES = 3;
 const FIT_MARGIN_RATIO_PLAIN = 2;
@@ -152,7 +155,7 @@ function placeRootStars(positioned, W, H) {
       : FILE_RADIUS_BASE_PX + Math.sqrt(c.violations || 1) * RADIUS_MULTIPLIER;
     const rate = c.complianceRate || 0;
     const sev = c.severity || { critical: 0, major: 0, minor: 0 };
-    const col = scoreRGB(rate * 10);
+    const col = scoreRGB(rate * SCORE_SCALE_MAX);
 
     const distFactor = ip.isFolder ? (FOLDER_DIST_MIN + ip.dist * FOLDER_DIST_MAX) : (FILE_DIST_MIN + ip.dist * FILE_DIST_MAX);
     const dist = positioned.length === 1 ? 0 : spread * distFactor;
@@ -192,7 +195,7 @@ function recenterStars(rootStars) {
 
 /** Push overlapping stars apart until every pair clears its gap (folders need more room than files). */
 function applyRepulsion(rootStars, n) {
-  const folderGap = 10 + Math.min(n, FOLDER_GAP_STAR_CAP) * 1.0;
+  const folderGap = FOLDER_GAP_BASE_PX + Math.min(n, FOLDER_GAP_STAR_CAP) * 1.0;
   const fileGap = 1;
   const repulsionIters = rootStars.length > LARGE_SCENE_STARS ? REPULSION_PASSES_LARGE : rootStars.length > MEDIUM_SCENE_STARS ? REPULSION_PASSES_MEDIUM : REPULSION_PASSES_SMALL;
   for (let iter = 0; iter < repulsionIters; iter++) {

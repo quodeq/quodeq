@@ -13,6 +13,8 @@ _logger = logging.getLogger(__name__)
 # relaxation. Must match quodeq.api.security._ENV_WEBVIEW_TOKEN.
 ENV_WEBVIEW_TOKEN = "QUODEQ_WEBVIEW_TOKEN"
 
+_TOKEN_BYTES = 24  # secrets.token_urlsafe's input size for the per-launch webview token
+
 _webview_token: str | None = None
 
 
@@ -26,7 +28,7 @@ def get_webview_token() -> str:
     """
     global _webview_token
     if _webview_token is None:
-        _webview_token = secrets.token_urlsafe(24)
+        _webview_token = secrets.token_urlsafe(_TOKEN_BYTES)
     return _webview_token
 
 

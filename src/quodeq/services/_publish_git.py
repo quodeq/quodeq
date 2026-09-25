@@ -27,10 +27,11 @@ _GIT_REMOTE_ORIGIN = "origin"
 _GIT_HEAD = "HEAD"
 
 
-def _run_git(args, *, cwd=None, timeout=300):
+def _run_git(args, *, cwd=None):
+    """Thin wrapper over shared_publish.run_git (see module docstring)."""
     from quodeq.services import shared_publish as _sp
 
-    return _sp.run_git(args, cwd=cwd, timeout=timeout)
+    return _sp.run_git(args, cwd=cwd)
 
 
 def _app_version() -> str:

@@ -39,6 +39,9 @@ _ASSET_SUFFIX = "-macOS.dmg"
 _HDIUTIL = "hdiutil"  # macOS disk-image CLI to mount/unmount the downloaded update
 
 _ACTIVE_PHASES = frozenset({"downloading", "verifying", "installing", "relaunching"})
+_PERCENT_COMPLETE = 100  # a phase-transition progress value, not a running download's percent
+_EXIT_DELAY_S = 0.5  # gives the HTTP response reporting "relaunching" time to flush
+_TEST_JOIN_TIMEOUT_S = 5  # _join_for_tests' cap on waiting for the update thread
 
 _lock = threading.Lock()
 _progress: dict = {"phase": "idle", "percent": 0, "error": None}
@@ -163,7 +166,7 @@ def _request_app_exit() -> None:
         except Exception:  # noqa: BLE001 - shutdown callback is best-effort
             _logger.debug("shutdown callback failed", exc_info=True)
     # Give the HTTP response that reported "relaunching" time to flush.
-    threading.Timer(0.5, lambda: os._exit(0)).start()
+    threading.Timer(_EXIT_DELAY_S, lambda: os._exit(0)).start()
 
 
 def _verify_mounted_app(mnt: Path, app_name: str, team: str, target_version: str) -> Path:
@@ -200,7 +203,7 @@ def _run_update(download_url: str, target_version: str, install_app: Path, team:
             lambda done, total: _set(percent=min(99, done * 100 // total) if total else 0),
         )
 
-        _set(phase="verifying", percent=100)
+        _set(phase="verifying", percent=_PERCENT_COMPLETE)
         _check(
             ["spctl", "-a", "-t", "open", "--context", "context:primary-signature", str(dmg)],
             "The downloaded update is not notarized by Apple",
@@ -220,7 +223,7 @@ def _run_update(download_url: str, target_version: str, install_app: Path, team:
         mounted = False
 
         _swap_bundle(staging, install_app)
-        _set(phase="relaunching", percent=100)
+        _set(phase="relaunching", percent=_PERCENT_COMPLETE)
         _spawn_relauncher(install_app)
         _request_app_exit()
     except UpdateError as exc:
@@ -285,4 +288,4 @@ def _reset_for_tests() -> None:
 def _join_for_tests() -> None:
     thread = _thread
     if thread is not None and thread.is_alive():
-        thread.join(timeout=5)
+        thread.join(timeout=_TEST_JOIN_TIMEOUT_S)

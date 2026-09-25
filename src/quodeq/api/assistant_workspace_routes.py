@@ -6,6 +6,7 @@ worktree/branch always comes from the session's stored row, never the client."""
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
 from pathlib import Path
 
 from flask import Flask, jsonify
@@ -29,7 +30,7 @@ def _lookup(app: Flask, sid: str):
     repo = get_repository(app)
     session = repo.get_session(sid)
     if session is None:
-        return None, None, None, json_error(MESSAGE_UNKNOWN_SESSION, 404, CODE_UNKNOWN_SESSION)
+        return None, None, None, json_error(MESSAGE_UNKNOWN_SESSION, HTTPStatus.NOT_FOUND, CODE_UNKNOWN_SESSION)
     run_assistant_hygiene(app)
     return repo, session, repo.get_worktree(sid), None
 
@@ -65,7 +66,7 @@ def _workspace_diff(app: Flask, sid: str):
     if err:
         return err
     if row is None or row["status"] != WorktreeStatus.ACTIVE:
-        return json_error("no active worktree", 404, CODE_NO_ACTIVE_WORKTREE)
+        return json_error("no active worktree", HTTPStatus.NOT_FOUND, CODE_NO_ACTIVE_WORKTREE)
     try:
         text = diff_text(Path(row["path"]))
         truncated = len(text) > _MAX_DIFF_CHARS
@@ -73,7 +74,7 @@ def _workspace_diff(app: Flask, sid: str):
                         "stats": diff_stats(Path(row["path"]))})
     except WorktreeError as exc:
         _logger.warning("workspace diff failed for %s: %s", sid, exc)
-        return json_error("failed to compute the workspace diff", 500, "WORKSPACE_DIFF_FAILED")
+        return json_error("failed to compute the workspace diff", HTTPStatus.INTERNAL_SERVER_ERROR, "WORKSPACE_DIFF_FAILED")
 
 
 def _workspace_target(app: Flask, sid: str):
@@ -86,7 +87,7 @@ def _workspace_target(app: Flask, sid: str):
     if err:
         return None, None, err
     if row is None:
-        return None, None, json_error("no worktree", 404, CODE_NO_ACTIVE_WORKTREE)
+        return None, None, json_error("no worktree", HTTPStatus.NOT_FOUND, CODE_NO_ACTIVE_WORKTREE)
     return repo, row, None
 
 
@@ -98,9 +99,9 @@ def _turn_conflict(outcome):
     if outcome.kind == OutcomeKind.TURN_BUSY:
         return json_error(
             "a turn or workspace action is in progress; wait for it to finish",
-            409, "TURN_IN_PROGRESS")
+            HTTPStatus.CONFLICT, "TURN_IN_PROGRESS")
     if outcome.kind == OutcomeKind.NOT_ACTIVE:
-        return json_error(f"worktree already {outcome.detail}", 409, "WORKTREE_CONFLICT")
+        return json_error(f"worktree already {outcome.detail}", HTTPStatus.CONFLICT, "WORKTREE_CONFLICT")
     return None
 
 
@@ -115,7 +116,7 @@ def _workspace_apply(app: Flask, sid: str):
         return conflict
     if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace apply failed for %s: %s", sid, outcome.detail)
-        return json_error("failed to apply the workspace changes", 409, "WORKSPACE_APPLY_FAILED")
+        return json_error("failed to apply the workspace changes", HTTPStatus.CONFLICT, "WORKSPACE_APPLY_FAILED")
     return jsonify({"applied": True, "stats": outcome.stats})
 
 
@@ -134,7 +135,7 @@ def _workspace_pr(app: Flask, sid: str):
         return conflict
     if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace pr creation failed for %s: %s", sid, outcome.detail)
-        return json_error("failed to create the pull request", 500, "WORKSPACE_PR_FAILED")
+        return json_error("failed to create the pull request", HTTPStatus.INTERNAL_SERVER_ERROR, "WORKSPACE_PR_FAILED")
     return jsonify(outcome.result)
 
 
@@ -152,10 +153,10 @@ def _workspace_discard(app: Flask, sid: str):
     if conflict is not None:
         return conflict
     if outcome.kind == OutcomeKind.GONE:
-        return json_error("no worktree", 404, CODE_NO_ACTIVE_WORKTREE)
+        return json_error("no worktree", HTTPStatus.NOT_FOUND, CODE_NO_ACTIVE_WORKTREE)
     if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace discard failed for %s: %s", sid, outcome.detail)
-        return json_error("failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")
+        return json_error("failed to discard the workspace", HTTPStatus.INTERNAL_SERVER_ERROR, "WORKSPACE_DISCARD_FAILED")
     return jsonify({"discarded": True})
 
 

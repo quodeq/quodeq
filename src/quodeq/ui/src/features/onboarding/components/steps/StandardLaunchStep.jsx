@@ -1,7 +1,7 @@
 import { TermHeader, StatStrip, Stat } from '../../../../components/terminal/index.js';
 import HelpHint from '../../../../components/HelpHint.jsx';
 import { t } from '../../../../strings/index.js';
-import { SECONDS_PER_HOUR } from '../../../../utils/time.js';
+import { SECONDS_PER_HOUR, SECONDS_PER_MINUTE } from '../../../../utils/time.js';
 
 
 // This step's own <input> type: a single-standard first project picks one
@@ -10,7 +10,7 @@ const INPUT_TYPE = Object.freeze({ RADIO: 'radio', CHECKBOX: 'checkbox' });
 
 function formatTimeLimit(seconds) {
   if (!seconds || seconds <= 0) return 'No limit';
-  if (seconds < SECONDS_PER_HOUR) return `${Math.round(seconds / 60)} min`;
+  if (seconds < SECONDS_PER_HOUR) return `${Math.round(seconds / SECONDS_PER_MINUTE)} min`;
   return `${Math.round(seconds / SECONDS_PER_HOUR)} h`;
 }
 

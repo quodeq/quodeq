@@ -46,7 +46,7 @@ def weighted_sum(
 ) -> float:
     """Sum type counts weighted by severity."""
     weights = severity_weight if severity_weight is not None else SEVERITY_WEIGHT
-    fallback = weights.get("minor", 0.25)
+    fallback = weights.get("minor", SEVERITY_WEIGHT[Severity.MINOR])
     return sum(
         count * weights.get(sev, fallback)
         for sev, count in type_counts.items()

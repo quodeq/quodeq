@@ -18,3 +18,8 @@ test('the magic-number ceiling stays at zero', () => {
   const source = readFileSync(join(here, 'check_magic.mjs'), 'utf8');
   assert.match(source, /const TOTAL_CEILING = 0;/);
 });
+
+test('the magic-number ignore list stays [-1, 0, 1, 2]', () => {
+  const source = readFileSync(join(here, '..', 'eslint.magic.config.js'), 'utf8');
+  assert.match(source, /ignore:\s*\[-1,\s*0,\s*1,\s*2\]/);
+});

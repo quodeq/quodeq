@@ -11,10 +11,7 @@ import re
 import tomllib
 from functools import lru_cache
 
-# Same bound as ``_dependency_parsers._PARSE_CACHE_MAX`` (that module imports
-# from here, so the constant cannot come from it): parse each manifest text
-# once, not once per discipline rule that probes it.
-_PARSE_CACHE_MAX = 64
+from quodeq.config._constants import PARSE_CACHE_MAX
 
 # PEP 503: package names are case-insensitive and ``[-_.]+`` normalize to ``-``.
 _PEP503_SEP = re.compile(r"[-_.]+")
@@ -58,7 +55,7 @@ def _names_from_dict_keys(items: object) -> set[str]:
 # --- pyproject.toml ----------------------------------------------------------
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _pyproject_dep_names(content: str) -> frozenset[str]:
     try:
         data = tomllib.loads(content)
@@ -100,7 +97,7 @@ def has_pyproject_dependency(content: str, needle: str) -> bool:
 # --- requirements.txt --------------------------------------------------------
 
 
-@lru_cache(maxsize=_PARSE_CACHE_MAX)
+@lru_cache(maxsize=PARSE_CACHE_MAX)
 def _requirements_txt_names(content: str) -> frozenset[str]:
     names: set[str] = set()
     for raw in content.splitlines():

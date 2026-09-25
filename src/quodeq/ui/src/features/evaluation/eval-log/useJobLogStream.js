@@ -3,8 +3,8 @@ import { t } from '../../../strings/index.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
 import { LOG_STREAM_STATUS } from '../../../vocab/logStreamStatus.js';
 import { EMPTY_LOG_BUFFER, LOG_BUFFER_MAX_LINES, appendLines, clearLines } from '../../../utils/logBuffer.js';
+import { STREAM_INACTIVITY_MS } from '../../../constants.js';
 
-const INACTIVITY_MS = 60000;
 // Timer fallback for the rAF batching below: browsers throttle rAF to 0 in
 // background tabs, so without this the queue would never drain there.
 const FLUSH_FALLBACK_MS = 50;
@@ -54,7 +54,7 @@ function makeResetInactivity({ inactivityRef, es, setStatus }) {
     inactivityRef.current = setTimeout(() => {
       es.close();
       setStatus(LOG_STREAM_STATUS.ERROR);
-    }, INACTIVITY_MS);
+    }, STREAM_INACTIVITY_MS);
   };
 }
 

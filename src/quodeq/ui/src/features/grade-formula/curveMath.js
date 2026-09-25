@@ -7,13 +7,14 @@
 //     (`return 10.0 - math.log2(1.0 + wv) * params.ceil_scale`)
 // These are PREVIEW-ONLY curves (a function of weighted-violations alone,
 // ignoring compliance lift/floors); the real score is computed server-side.
+import { SCORE_SCALE_MAX } from '../../constants.js';
 
 /** Base score curve: 10 at wv=0, hyperbolic decay past it. */
 export function baseCurve(wv, baseK) {
-  return wv === 0 ? 10 : 10 / (1 + baseK * wv);
+  return wv === 0 ? SCORE_SCALE_MAX : SCORE_SCALE_MAX / (1 + baseK * wv);
 }
 
 /** Ceiling curve: the maximum achievable score given the violation weight. */
 export function ceilingCurve(wv, ceilScale) {
-  return wv === 0 ? 10 : 10 - Math.log2(1 + wv) * ceilScale;
+  return wv === 0 ? SCORE_SCALE_MAX : SCORE_SCALE_MAX - Math.log2(1 + wv) * ceilScale;
 }

@@ -11,6 +11,7 @@ import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t, LOCALE } from '../../../strings/index.js';
 import { computeCoverageInfo, buildPartialTooltip } from './dimensionGaugeMath.js';
 import { activateOnKey } from '../../../utils/a11y.js';
+import { SCORE_SCALE_MAX } from '../../../constants.js';
 
 /**
  * Findings the scan produced but scoring never saw, because the principle they
@@ -137,7 +138,7 @@ function computeGaugeRing(overallScore) {
   const { value: scoreDisplay } = splitScore(overallScore);
   const scoreNum = parseFloat(overallScore);
   const hasScore = !Number.isNaN(scoreNum);
-  const pct = hasScore ? Math.max(0, Math.min(scoreNum / 10, 1)) : 0;
+  const pct = hasScore ? Math.max(0, Math.min(scoreNum / SCORE_SCALE_MAX, 1)) : 0;
   const label = hasScore ? scoreToGradeLabel(scoreNum) : null;
   return {
     scoreDisplay,

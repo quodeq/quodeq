@@ -17,6 +17,7 @@ import threading
 from collections import deque
 
 from quodeq.terminal.backend import PtyBackend
+from quodeq.terminal.constants import PTY_READ_MAX_BYTES
 
 
 class TerminalManager:
@@ -53,7 +54,7 @@ class TerminalManager:
             self._backend = self._factory()
             self._backend.spawn(cwd=cwd, cols=cols, rows=rows)
 
-    def read(self, max_bytes: int = 65536) -> str:
+    def read(self, max_bytes: int = PTY_READ_MAX_BYTES) -> str:
         """Return decoded output, holding back a trailing partial character.
 
         May return "" even when bytes arrived (all of them belonged to a

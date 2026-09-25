@@ -216,6 +216,7 @@ export const DIM_LABEL = Object.freeze({
 export const PRINCIPLE = Object.freeze({
   scaleFraction: 0.12,
   orbitRingAlpha: 0.1,
+  orbitRingColor: { r: 50, g: 55, b: 80 }, orbitRingWidthPx: 0.5,
   linkAlpha: 0.04, linkWidthPx: 0.8,
   siblingScaleCap: 0.8,
   siblingReferenceZoom: 5,

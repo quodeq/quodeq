@@ -9,18 +9,21 @@ import urllib.request
 import urllib.error
 
 from quodeq.config.llm_bridge_env import ollama_base_url
+from quodeq.llm_bridge._constants import LOCAL_SERVER_PROBE_TIMEOUT_S
 from quodeq.shared.constants import SYSTEM_DARWIN, SYSTEM_LINUX
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
-_TIMEOUT_S = 3
 # The /health body's own status word (llama-server and omlx both send it);
 # not a quodeq vocabulary.
 HEALTH_OK = "ok"
 _MAX_PARALLEL_AGENTS = 5
 _SYSCTL_TIMEOUT_S = 3
 _NVIDIA_SMI_TIMEOUT_S = 5
+# KV-cache/context overhead beyond a model's raw weight size, applied when
+# sizing how many concurrent agents fit in GPU memory.
+_CONTEXT_OVERHEAD_FACTOR = 1.3
 _MIB_TO_BYTES = 1024 * 1024
 # Per-context host-memory budget when a backend reports no real VRAM/size
 # data (llamacpp's /v1/models and omlx alike): assume the loaded model
@@ -54,7 +57,7 @@ def get_ollama_status(base_url: str | None = None) -> dict:
     base_url = _resolved_base(base_url)
     try:
         req = _safe_request(f"{base_url}/api/version")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             return {
                 "running": True,
@@ -72,7 +75,7 @@ def list_ollama_models(base_url: str | None = None) -> list[dict]:
     base_url = _resolved_base(base_url)
     try:
         req = _safe_request(f"{base_url}/api/tags")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             models = data.get("models", [])
             return [
@@ -95,7 +98,7 @@ def get_running_model_info(base_url: str | None = None) -> dict | None:
     base_url = _resolved_base(base_url)
     try:
         req = _safe_request(f"{base_url}/api/ps")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             models = data.get("models", [])
             if models:
@@ -114,7 +117,7 @@ def get_running_model_info(base_url: str | None = None) -> dict | None:
 def estimate_max_agents(
     model_size: float,
     gpu_memory: float,
-    overhead_factor: float = 1.3,
+    overhead_factor: float = _CONTEXT_OVERHEAD_FACTOR,
 ) -> dict:
     """Estimate max parallel agents from model size and GPU memory."""
     if model_size <= 0 or gpu_memory <= 0:

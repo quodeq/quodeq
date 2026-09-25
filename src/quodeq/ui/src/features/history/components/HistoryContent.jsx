@@ -7,6 +7,7 @@ import { t } from '../../../strings/index.js';
 import { EvaluationsTable } from './EvaluationsTable.jsx';
 import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { roundOneDecimal } from '../../../utils/rounding.js';
 
 // Deferred so the History page's first paint doesn't carry the chart library.
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
@@ -40,7 +41,7 @@ export function computeDeltas(rows) {
   for (let i = rows.length - 1; i >= 0; i--) {
     const curr = parseFloat(rows[i].numericAverage);
     if (Number.isNaN(curr)) continue;
-    if (!Number.isNaN(nextScored)) deltas[i] = Math.round((curr - nextScored) * 10) / 10;
+    if (!Number.isNaN(nextScored)) deltas[i] = roundOneDecimal(curr - nextScored);
     nextScored = curr;
   }
   return deltas;

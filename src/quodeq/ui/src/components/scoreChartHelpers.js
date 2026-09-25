@@ -1,5 +1,5 @@
 import { scoreColorClass } from '../utils/formatters.js';
-import { DATA_THEME_ATTR } from '../constants.js';
+import { DATA_THEME_ATTR, SCORE_SCALE_MAX } from '../constants.js';
 
 /**
  * Shared helpers for the run/score history bar charts (Overview, History,
@@ -93,9 +93,9 @@ const SCORE_DOMAIN_PADDING = 0.5;
 
 export function scoreDomain(values) {
   const valid = (values || []).filter((n) => Number.isFinite(n));
-  if (!valid.length) return [0, 10];
+  if (!valid.length) return [0, SCORE_SCALE_MAX];
   const lo = Math.max(0, Math.floor(Math.min(...valid) - SCORE_DOMAIN_PADDING));
-  const hi = Math.min(10, Math.ceil(Math.max(...valid) + SCORE_DOMAIN_PADDING));
+  const hi = Math.min(SCORE_SCALE_MAX, Math.ceil(Math.max(...valid) + SCORE_DOMAIN_PADDING));
   return [lo, hi > lo ? hi : lo + 1];
 }
 
@@ -128,3 +128,10 @@ export const REF_LINE_OPACITY_ODD = 0.2;
 /** Fixed chart height for the History tab's score chart (HistoryChartPanel),
  * shared with its Suspense placeholder so the two never drift apart. */
 export const HISTORY_CHART_HEIGHT = 220;
+
+// Fixed pixel height for the compact panel bar charts: the dashboard's
+// run-history panel, the explorer's dimension-score-history panel, and
+// history's per-dimension-scores-for-one-run panel. Not HISTORY_CHART_HEIGHT
+// above (220px, the History tab's own score line chart) — a different,
+// shorter chart shape, deliberately a different height.
+export const PANEL_CHART_HEIGHT_PX = 160;

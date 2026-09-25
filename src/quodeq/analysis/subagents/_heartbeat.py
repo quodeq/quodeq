@@ -10,10 +10,10 @@ from typing import Callable
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.core.evidence.req_mapping import PrincipleResolver
 from quodeq.data.fs.evidence_tally import FindingTally, tally_unique_findings
+from quodeq.shared.constants import SECONDS_PER_MINUTE
 from quodeq.shared.logging import log_info, log_warning
 
 _HEARTBEAT_INTERVAL = 10
-_SECONDS_PER_MINUTE = 60
 _HEARTBEAT_FMT = (
     "[{dimension}] {mins}m{secs:02d}s | "
     "{violations} v · {compliance} c{suppressed}{quarantined} | "
@@ -73,7 +73,7 @@ def heartbeat_loop(
     while not stop.wait(_HEARTBEAT_INTERVAL):
         try:
             elapsed = int(time.monotonic() - start)
-            mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
+            mins, secs = divmod(elapsed, SECONDS_PER_MINUTE)
             tally = _read_tally(
                 ctx.jsonl_path, ctx.lock, ctx.suppressed, ctx.resolver,
             )

@@ -1,6 +1,6 @@
-import { isoWeekKey, localDayKey, YEAR_MONTH_KEY_LENGTH } from './dailyGrouping.js';
+import { isoWeekKey, localDayKey, YEAR_MONTH_KEY_LENGTH, ISO_DATE_LENGTH } from './dailyGrouping.js';
 import { LOCALE, t } from '../strings/index.js';
-import { SECONDS_PER_HOUR } from './time.js';
+import { SECONDS_PER_HOUR, SECONDS_PER_MINUTE } from './time.js';
 import { GRANULARITY } from './granularity.js';
 import { LATEST_RUN_ID } from '../constants.js';
 
@@ -56,8 +56,8 @@ export function formatDuration(s) {
   if (s == null || !Number.isFinite(s)) return '—';
   const total = Math.max(0, Math.floor(s));
   const h = Math.floor(total / SECONDS_PER_HOUR);
-  const m = Math.floor((total % SECONDS_PER_HOUR) / 60);
-  const sec = total % 60;
+  const m = Math.floor((total % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
+  const sec = total % SECONDS_PER_MINUTE;
   if (h > 0) return `${h}h ${m}m ${sec}s`;
   if (m > 0) return `${m}m ${sec}s`;
   return `${sec}s`;
@@ -75,11 +75,11 @@ export function formatDurationCoarse(s) {
   if (s == null || !Number.isFinite(s)) return '—';
   const total = Math.max(0, Math.round(s));
   const h = Math.floor(total / SECONDS_PER_HOUR);
-  const m = Math.floor((total % SECONDS_PER_HOUR) / 60);
+  const m = Math.floor((total % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
   const parts = [];
   if (h > 0) parts.push(`${h}h`);
   if (m > 0) parts.push(`${m}m`);
-  if (parts.length === 0) parts.push(`${total % 60}s`);
+  if (parts.length === 0) parts.push(`${total % SECONDS_PER_MINUTE}s`);
   return parts.join(' ');
 }
 
@@ -116,7 +116,7 @@ export function formatPeriodLabel(entry, granularity = GRANULARITY.DAY) {
     // Intl has no week-of-year format, so this one stays a catalog pattern.
     return (y && w) ? t('common.weekOfYear', { week: Number(w), year: y }) : fallback;
   }
-  if (iso.length > 10) {
+  if (iso.length > ISO_DATE_LENGTH) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) return DAY_MONTH_YEAR.format(d);
   }

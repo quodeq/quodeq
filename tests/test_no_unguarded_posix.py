@@ -44,8 +44,8 @@ _ALLOWLIST: set[str] = {
     # are therefore never reached on Windows, and each call is wrapped to
     # degrade gracefully anyway. The ps call in _is_quodeq_process only sees
     # pids from find_pids_on_port, which returns [] off-darwin.
-    "menubar/_process.py:84",
-    "menubar/_process.py:96",
+    "menubar/_process.py:85",
+    "menubar/_process.py:97",
     "menubar/_app_lifecycle.py:158",
     "menubar/_app_lifecycle.py:170",
 }

@@ -10,9 +10,9 @@ import {
   periodOrDateLabel,
   tooltipScore,
 } from '../../../components/scoreChartPanel.jsx';
+import { PANEL_CHART_HEIGHT_PX } from '../../../components/scoreChartHelpers.js';
 
 const MAX_CHART_RUNS = 20;
-const CHART_HEIGHT = 160;
 const MAX_BAR_SIZE = 28;
 // The chart needs two points before a trend line means anything.
 const MIN_CHART_POINTS = 2;
@@ -59,7 +59,7 @@ export const RunHistoryTooltip = makeScoreTooltip({
 });
 
 const CHART_PRESENTATION = {
-  height: CHART_HEIGHT,
+  height: PANEL_CHART_HEIGHT_PX,
   fillHeight: true,
   maxBarSize: MAX_BAR_SIZE,
   gradientId: 'scoreAreaGrad',

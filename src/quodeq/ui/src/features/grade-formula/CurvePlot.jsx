@@ -1,5 +1,6 @@
 import { t } from '../../strings/index.js';
 import { baseCurve, ceilingCurve } from './curveMath.js';
+import { SCORE_SCALE_MAX } from '../../constants.js';
 const W = 220;
 const H = 130;
 const PAD_L = 26;
@@ -15,7 +16,7 @@ const TICK_LABEL_Y_OFFSET = 3;
 const SVG_LINETO = ' L ';
 
 const x = (wv) => PAD_L + (wv / MAX_WV) * PLOT_W;
-const y = (score) => PAD_T + ((10 - score) / 10) * PLOT_H;
+const y = (score) => PAD_T + ((SCORE_SCALE_MAX - score) / SCORE_SCALE_MAX) * PLOT_H;
 
 function pathFor(fn) {
   const pts = [];

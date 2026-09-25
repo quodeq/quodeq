@@ -17,7 +17,13 @@ from typing import Any, Callable
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import CODE_INVALID_PARAM, CODE_MISSING_PARAM, CODE_NOT_FOUND, QUERY_FLAG_TRUE
+from quodeq.api._constants import (
+    CODE_INVALID_PARAM,
+    CODE_MISSING_PARAM,
+    CODE_NOT_FOUND,
+    MAX_FINDINGS_LIST_LIMIT,
+    QUERY_FLAG_TRUE,
+)
 from quodeq.api.helpers import json_error, optional_json_object_or_error, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed_listing import load_dismissed
@@ -35,7 +41,6 @@ from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import resolve_child_dir, validate_path_segment
 
 _logger = logging.getLogger(__name__)
-_MAX_FINDINGS_LIST_LIMIT = 5000
 
 
 def _invalid_body_fields(
@@ -111,10 +116,10 @@ def _finding_target_or_error(
     file = body.get("file", "")
     line = body.get("line")
     if not project or not req or not file or line is None:
-        return None, (jsonify({"error": "project, req, file, and line are required", "code": CODE_MISSING_PARAM}), 400)
+        return None, (jsonify({"error": "project, req, file, and line are required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST)
     type_err = _invalid_body_fields(body, ("project", "req", "file", "fingerprint"), ("line",))
     if type_err:
-        return None, (jsonify({"error": type_err, "code": CODE_INVALID_PARAM}), 400)
+        return None, (jsonify({"error": type_err, "code": CODE_INVALID_PARAM}), HTTPStatus.BAD_REQUEST)
     return {"project": project, "req": req, "file": file, "line": line}, None
 
 
@@ -141,11 +146,11 @@ def _list_project_entries(
     # No limit param → return everything (capped at the hard maximum).
     # A malformed or out-of-range limit/offset answers 400; an explicit
     # limit above the hard maximum stays clamped (the UI asks for 5000).
-    paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+    paging = page_params(request.args, default_limit=MAX_FINDINGS_LIST_LIMIT)
     if isinstance(paging[0], dict):
         return paging
     limit, offset = paging
-    limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
+    limit = min(limit, MAX_FINDINGS_LIST_LIMIT)
     project_dir = _project_dir_or_none(_eval_dir(app), project)
     if project_dir is None:
         return jsonify([])
@@ -171,7 +176,7 @@ def _mutate_finding(
         _eval_dir(app), target["project"], run_id,
         {"req": target["req"], "file": target["file"], "line": target["line"]},
     )
-    return jsonify({"scores": scores, "delta": delta}), 200
+    return jsonify({"scores": scores, "delta": delta}), HTTPStatus.OK
 
 
 def _mutate_project(
@@ -187,11 +192,11 @@ def _mutate_project(
     project = body.get("project", "")
     run_id = _run_id(body)
     if not project:
-        return jsonify({"error": "project is required", "code": CODE_MISSING_PARAM}), 400
+        return jsonify({"error": "project is required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST
     count = mutate(_project_dir(_eval_dir(app), project))
     scores = _scores_with_fallback(app, project, run_id)
     delta = delta_for(_eval_dir(app), project, run_id)
-    return jsonify({"ok": True, count_key: count, "scores": scores, "delta": delta}), 200
+    return jsonify({"ok": True, count_key: count, "scores": scores, "delta": delta}), HTTPStatus.OK
 
 
 def _dismiss(app: Flask) -> tuple[Response, int]:
@@ -220,17 +225,17 @@ def _delete(app: Flask) -> tuple[Response, int]:
     file = body.get("file", "")
     run_id = _run_id(body)
     if not project or not dimension or not principle or not file:
-        return jsonify({"error": "project, dimension, principle, and file are required", "code": CODE_MISSING_PARAM}), 400
+        return jsonify({"error": "project, dimension, principle, and file are required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST
     type_err = _invalid_body_fields(body, ("project", "dimension", "principle", "file"))
     if type_err:
-        return jsonify({"error": type_err, "code": CODE_INVALID_PARAM}), 400
+        return jsonify({"error": type_err, "code": CODE_INVALID_PARAM}), HTTPStatus.BAD_REQUEST
     swept = delete_finding(_project_dir(_eval_dir(app), project), body)
     scores = _scores_with_fallback(app, project, run_id)
     delta = delete_delta(
         _eval_dir(app), project, run_id,
         {"dimension": dimension, "principle": principle, "file": file},
     )
-    return jsonify({"ok": True, "swept": swept, "scores": scores, "delta": delta}), 200
+    return jsonify({"ok": True, "swept": swept, "scores": scores, "delta": delta}), HTTPStatus.OK
 
 
 def _delete_all(app: Flask) -> tuple[Response, int]:
@@ -249,7 +254,7 @@ def _unverify(app: Flask) -> tuple[Response, int]:
     if err is not None:
         return err
     unverify_finding(_project_dir(_eval_dir(app), target["project"]), body)
-    return jsonify({"ok": True}), 200
+    return jsonify({"ok": True}), HTTPStatus.OK
 
 
 def register_findings_routes(app: Flask) -> None:

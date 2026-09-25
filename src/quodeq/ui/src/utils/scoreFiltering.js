@@ -8,8 +8,7 @@
 import { bucketKey, isBucketEligible } from './dailyGrouping.js';
 import { scoreToGradeLabel } from './gradeThresholds.js';
 import { countBySeverity } from './severity.js';
-
-const roundOneDecimal = (n) => Math.round(n * 10) / 10;
+import { roundOneDecimal } from './rounding.js';
 
 // Mean of the scores that are present, rounded to one decimal. null when
 // nothing is left after dropping the missing ones.

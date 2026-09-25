@@ -6,6 +6,8 @@ The two reasons differ only in whether Origin is checked; see
 """
 from __future__ import annotations
 
+from http import HTTPStatus
+
 from flask import current_app, request
 
 from quodeq.api._constants import CODE_FORBIDDEN
@@ -36,4 +38,4 @@ def gate_reason() -> str | None:
 
 
 def forbidden():
-    return json_error("forbidden", 403, CODE_FORBIDDEN)  # code + message once, for six routes
+    return json_error("forbidden", HTTPStatus.FORBIDDEN, CODE_FORBIDDEN)  # code + message once, for six routes

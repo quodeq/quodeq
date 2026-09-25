@@ -8,6 +8,7 @@ import { usePaneDragPlumbing } from './hooks/usePaneDragPlumbing.js';
 import { useInnerDividerDrag, MIN_WINDOW_RATIO, DEFAULT_SPLIT_RATIO } from './hooks/useInnerDividerDrag.js';
 import './SidePane.css';
 import { KEY } from '../../vocab/keyboard.js';
+import { PERCENT } from '../../constants.js';
 
 // Build weights from ratios: walk through, treating each ratios[i] as the
 // split between weights[i] and weights[i+1] of their combined share.
@@ -61,9 +62,9 @@ function InnerRowDivider({ i, windowCount, ratios, setRatios, onInnerDividerPoin
       role="separator"
       aria-orientation="horizontal"
       aria-label={t('sidePane.resizeBetween', { first: i + 1, second: i + 2 })}
-      aria-valuenow={Math.round((ratios[i] ?? DEFAULT_SPLIT_RATIO) * 100)}
+      aria-valuenow={Math.round((ratios[i] ?? DEFAULT_SPLIT_RATIO) * PERCENT)}
       aria-valuemin={0}
-      aria-valuemax={100}
+      aria-valuemax={PERCENT}
       tabIndex={0}
       onPointerDown={onInnerDividerPointerDown(i)}
       onKeyDown={(e) => {

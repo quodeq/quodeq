@@ -24,6 +24,11 @@ _logger = logging.getLogger(__name__)
 # error, large enough that we don't spin.
 _POLL_INTERVAL_S = 0.5
 
+# How long stop_and_join waits for the watcher thread to exit. Public: the
+# dim runner (cache/dimension_runner.py) passes it explicitly at its own
+# call site instead of relying on the default.
+STOP_JOIN_TIMEOUT_S = 5.0
+
 
 class CircuitBreakerError(Exception):
     """Raised by the dim runner when the failure-streak watcher trips.
@@ -76,7 +81,7 @@ class FailureStreakWatcher:
             )
         self._thread.start()
 
-    def stop_and_join(self, *, timeout: float = 5.0) -> None:
+    def stop_and_join(self, *, timeout: float = STOP_JOIN_TIMEOUT_S) -> None:
         """Signal the watcher to stop and wait up to ``timeout`` for it."""
         self._stop.set()
         if self._thread is not None:

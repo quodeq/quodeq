@@ -3,9 +3,9 @@ import { DEFAULT_TIME_LIMIT_S, PROVIDER_SETTING_KEY } from '../../../constants.j
 import HelpHint from '../../../components/HelpHint.jsx';
 import { t } from '../../../strings/index.js';
 import { STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
+import { SECONDS_PER_MINUTE } from '../../../utils/time.js';
 import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
 
-const SECONDS_PER_MINUTE = 60;
 const MIN_MINUTES = 1;
 const MAX_MINUTES = 60;
 const DEFAULT_TIME_LIMIT_MINUTES = Math.max(MIN_MINUTES, Math.round(DEFAULT_TIME_LIMIT_S / SECONDS_PER_MINUTE));

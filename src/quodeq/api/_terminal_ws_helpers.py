@@ -15,6 +15,7 @@ import threading
 
 from flask_sock import ConnectionClosed
 
+from quodeq.terminal.constants import PTY_DEFAULT_COLS, PTY_DEFAULT_ROWS, PTY_READ_MAX_BYTES
 from quodeq.terminal.sessions import TerminalSessionRegistry
 
 _logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ def resolve_ws_session(registry: TerminalSessionRegistry, sid: str | None):
 
 def pump_terminal_out(manager, ws, stop: threading.Event) -> None:
     while not stop.is_set():
-        data = manager.read(65536)
+        data = manager.read(PTY_READ_MAX_BYTES)
         if not data:
             if not manager.alive:
                 break
@@ -63,7 +64,9 @@ def setup_terminal_session(manager, ws) -> bool:
     """Ensure the PTY exists and replay scrollback. Returns False on setup
     failure (already logged and reported to the client)."""
     try:
-        manager.ensure_session(cwd=os.path.expanduser("~"), cols=80, rows=24)
+        manager.ensure_session(
+            cwd=os.path.expanduser("~"), cols=PTY_DEFAULT_COLS, rows=PTY_DEFAULT_ROWS,
+        )
         # Replay scrollback so a reattaching client sees recent history.
         # Already text: the manager decodes incrementally, so the ring
         # never holds a torn multi-byte character.

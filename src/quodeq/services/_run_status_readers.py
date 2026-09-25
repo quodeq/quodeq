@@ -20,6 +20,9 @@ from quodeq.core.run.state import TERMINAL_STATES, parse_run_state
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
 
+_RUN_LOG_TAIL_LINES = 500  # lines of run.log the dashboard shows; enough context without a full read
+_TAIL_READ_INITIAL_CHUNK_BYTES = 8192  # doubles each pass until max_lines is satisfied
+
 
 def status_json_terminal(run_dir: Path) -> bool:
     """Return True when the run's status.json says it ended."""
@@ -39,7 +42,7 @@ def status_json_terminal(run_dir: Path) -> bool:
         return False
 
 
-def tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
+def tail_run_log(run_dir: Path, max_lines: int = _RUN_LOG_TAIL_LINES) -> list[str]:
     """Return the last *max_lines* lines from run.log.
 
     Reads backward from the end in growing chunks instead of the whole file,
@@ -53,7 +56,7 @@ def tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
         return []
     try:
         file_size = log_path.stat().st_size
-        chunk = 8192
+        chunk = _TAIL_READ_INITIAL_CHUNK_BYTES
         data = b""
         with log_path.open("rb") as fp:
             read_to = file_size

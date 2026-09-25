@@ -6,6 +6,7 @@ from typing import Any
 
 from quodeq.core.scoring.constants import (  # noqa: F401 — re-exports
     GRADE_LADDER,
+    MAX_SCORE,
     SCALE_TIER_NAMES,
     MAX_PENALTY_MULTIPLIER,
     RATIO_DAMPENING_TABLE,
@@ -44,8 +45,8 @@ def violation_base(
     """
     wv = weighted_sum(violation_type_counts, params.severity_weight)
     if wv == 0:
-        return 10.0
-    return 10.0 / (1.0 + params.base_k * wv)
+        return float(MAX_SCORE)
+    return MAX_SCORE / (1.0 + params.base_k * wv)
 
 
 def compliance_lift(
@@ -75,8 +76,8 @@ def violation_ceiling(
     """
     wv = weighted_sum(violation_type_counts, params.severity_weight)
     if wv == 0:
-        return 10.0
-    return 10.0 - math.log2(1.0 + wv) * params.ceil_scale
+        return float(MAX_SCORE)
+    return MAX_SCORE - math.log2(1.0 + wv) * params.ceil_scale
 
 
 def severity_grade_floor(
@@ -90,7 +91,7 @@ def severity_grade_floor(
         return params.floor_major
     if violation_type_counts.get("minor", 0) > 0:
         return params.floor_minor
-    return 10.0
+    return float(MAX_SCORE)
 
 
 def finding_to_scoring_dict(f: Finding) -> dict[str, Any]:
@@ -141,7 +142,7 @@ def principle_score_and_grade(
     """
     base = violation_base(vt_counts, params=params)
     lift = compliance_lift(ct_counts, vt_counts, params=params)
-    raw = base + (10.0 - base) * lift
+    raw = base + (MAX_SCORE - base) * lift
     final = clamp_principle_score(raw, vt_counts, params=params)
     grade = score_to_grade_label(final, params=params)
     return final, grade
@@ -191,10 +192,14 @@ def drop_grade(grade: str, drops: int) -> str:
     return GRADE_LADDER[new_position]
 
 
+_MULTIPLIER_TRIPLE = 3  # the "x3" of WEIGHT_TRIPLE, spelled out
+_MULTIPLIER_DOUBLE = 2  # the "x2" of WEIGHT_DOUBLE, spelled out
+
+
 def weight_as_multiplier(weight_str: str) -> int:
     """Extract the integer multiplier from a weight label like 'High (x3)'."""
     if WEIGHT_TRIPLE in weight_str:
-        return 3
+        return _MULTIPLIER_TRIPLE
     if WEIGHT_DOUBLE in weight_str:
-        return 2
+        return _MULTIPLIER_DOUBLE
     return 1
