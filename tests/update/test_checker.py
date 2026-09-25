@@ -1,4 +1,6 @@
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.update import checker
@@ -74,6 +76,19 @@ def test_get_status_suppresses_dismissed(tmp_path) -> None:
     write_state(UpdateState(latest_version="9.9.9", dismissed_version="9.9.9"), env)
     with patch("quodeq.update.checker.__version__", "1.4.0"):
         status = checker.get_status(env)
+    assert status["update_available"] is False
+
+
+def test_get_status_survives_a_type_corrupt_latest_version(tmp_path) -> None:
+    """A numeric latest_version in update_state.json used to raise
+    AttributeError inside is_newer's normalize() (an int has no .strip()),
+    which escaped get_status and, from there, cli.py's
+    maybe_emit_cli_notice after every command. The corrupt field is now
+    dropped on read, so get_status must not raise."""
+    env = _env(tmp_path)
+    Path(env["QUODEQ_UPDATE_STATE_PATH"]).write_text(json.dumps({"latest_version": 5}))
+    status = checker.get_status(env)
+    assert status["latest"] is None
     assert status["update_available"] is False
 
 

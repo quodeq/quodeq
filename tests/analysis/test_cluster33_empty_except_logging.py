@@ -12,6 +12,7 @@ import pytest
 
 from quodeq.analysis import _api_standards_text, _loop_state
 from quodeq.analysis._run_lifecycle_support import _SIGNALS_TO_HANDLE, SignalGuard
+from quodeq.analysis.run_lifecycle import mark_unfinished_dims_incomplete
 from quodeq.analysis.subagents import _queue_state
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
 from quodeq.config import ai_provider
@@ -96,12 +97,16 @@ def test_load_standards_text_logs_corrupt_json_and_falls_back(tmp_path) -> None:
     """The compiled JSON is corrupt; the handler logs it and falls through
     to the (absent) .md file, the same failure path
     ``test_subprocess_coverage.py::test_falls_back_to_md`` exercises for the
-    success case."""
+    success case. Warning level (not debug): a compiled-standards read
+    failure changes what the model sees, so it must not be silent by
+    default."""
     (tmp_path / "security.json").write_text("{not json")
-    with patch.object(_api_standards_text._log, "debug") as debug:
+    with patch.object(_api_standards_text._log, "warning") as warning:
         result = _api_standards_text.load_standards_text(tmp_path, "security")
-    assert debug.called
-    assert "compiled standards file skipped" in debug.call_args.args[0]
+    assert warning.called
+    message = warning.call_args.args[0] % warning.call_args.args[1:]
+    assert "compiled standards file skipped" in message
+    assert "security" in message
     assert result == ""
 
 
@@ -133,6 +138,34 @@ def test_gather_source_files_logs_unreadable_file(tmp_path, monkeypatch) -> None
     assert flaky not in result
     assert messages
     assert "source file skipped" in messages[0][0]
+
+
+def test_mark_unfinished_dims_incomplete_logs_and_returns_zero_for_bad_run_dir(
+    recording_log,
+) -> None:
+    """A run_dir that isn't a real Path makes read_dimensions' own ``/``
+    join raise TypeError; the flip must log and return 0, not raise."""
+    flipped = mark_unfinished_dims_incomplete(
+        object(), "not_reached", log=recording_log,  # type: ignore[arg-type]
+    )
+    assert flipped == 0
+    assert recording_log.warning_messages
+    assert "failed to read dimensions for flip" in recording_log.warning_messages[0]
+
+
+def test_mark_unfinished_dims_incomplete_logs_and_returns_zero_for_non_object_dimensions_json(
+    tmp_path, recording_log,
+) -> None:
+    """A dimensions.json that parses but isn't an object (e.g. ``[]``) makes
+    read_dimensions' result raise AttributeError on ``.get``; the flip must
+    log and return 0, not raise."""
+    (tmp_path / "dimensions.json").write_text("[]", encoding="utf-8")
+    flipped = mark_unfinished_dims_incomplete(
+        tmp_path, "not_reached", log=recording_log,
+    )
+    assert flipped == 0
+    assert recording_log.warning_messages
+    assert "failed to read dimensions for flip" in recording_log.warning_messages[0]
 
 
 def test_write_env_logs_cleanup_failure_and_reraises(tmp_path, monkeypatch) -> None:

@@ -22,7 +22,7 @@ import pytest
 
 from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
 from quodeq.services._job_model import Job
-from quodeq.services.jobs import JobManager
+from quodeq.services.jobs import InMemoryJobStore, JobManager
 from quodeq.shared import constants as _constants_module
 from quodeq.shared.constants import (
     CC_MARKER_KEY, CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START,
@@ -89,7 +89,7 @@ def test_setup_marker_from_the_shared_constant_sets_phase():
     job = _job()
     line = json.dumps({CC_MARKER_KEY: CC_PHASE_SETUP, "dimensions": ["security"]})
 
-    JobManager._apply_marker(job, line)
+    JobManager(job_store=InMemoryJobStore())._apply_marker(job, line)
 
     assert job.phase == CC_PHASE_SETUP
     assert job.dimensions == ["security"]
@@ -99,7 +99,7 @@ def test_report_path_marker_from_the_shared_constant_sets_output():
     job = _job()
     line = json.dumps({CC_MARKER_KEY: CC_PHASE_REPORT_PATH, "project": "p1", "runId": "r1"})
 
-    JobManager._apply_marker(job, line)
+    JobManager(job_store=InMemoryJobStore())._apply_marker(job, line)
 
     assert job.output_project == "p1"
     assert job.output_run_id == "r1"

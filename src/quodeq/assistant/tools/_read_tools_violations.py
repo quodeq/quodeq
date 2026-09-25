@@ -159,7 +159,10 @@ def _violations_from_run(ctx: ToolContext, dimension: str | None):
         # has no answer -- read_eval_report re-checks existence itself, but
         # the is_file() above still gates the not-found error message so a
         # missing dim never falls through to scored_run_dims for nothing.
-        report = read_eval_report(eval_dir, dimension) or {}
+        try:
+            report = read_eval_report(eval_dir, dimension) or {}
+        except (OSError, ValueError) as exc:
+            raise ToolError(f"could not read report for dimension: {dimension}") from exc
         return report.get("violations") or [], dimension, []
     if not eval_dir.is_dir():
         raise ToolError(

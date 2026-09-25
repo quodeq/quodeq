@@ -67,7 +67,7 @@ def _resolve_walk_root(src: Path, scope_path: str | None) -> Path:
 
 def _walk_and_group(
     src: Path, walk: ManifestWalkSpec, scope_path: str | None = None,
-) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter], int]:
+) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter], int, int]:
     """Walk *src* (or a scoped subdirectory) once, grouping files by language.
 
     When *scope_path* is given (relative to *src*), only files under that
@@ -75,7 +75,8 @@ def _walk_and_group(
     expressed relative to *src* so callers see the same format regardless.
     *walk.ignore_patterns* (.quodeqignore) are anchored at *src*, not the scope.
 
-    The fourth element is how many files the git-tracked filter skipped.
+    The fourth element is how many files the git-tracked filter skipped; the
+    fifth is how many directories the walk could not list.
     """
     files_by_lang: dict[str, list[str]] = {}
     ext_counts: Counter[str] = Counter()
@@ -86,7 +87,10 @@ def _walk_and_group(
         files_by_lang.setdefault(lang, []).append(rel)
         ext_counts[suffix] += 1
         ext_counts_by_lang.setdefault(lang, Counter())[suffix] += 1
-    return files_by_lang, ext_counts, ext_counts_by_lang, counts.skipped_untracked
+    return (
+        files_by_lang, ext_counts, ext_counts_by_lang,
+        counts.skipped_untracked, counts.unreadable_dirs,
+    )
 
 
 def _build_single_scope_manifest(
@@ -96,7 +100,7 @@ def _build_single_scope_manifest(
     scope_path: str | None,
 ) -> SourceManifest:
     """Legacy single-scope path: walk once at the (optionally scoped) root."""
-    files_by_lang, ext_counts, ext_counts_by_lang, skipped = _walk_and_group(
+    files_by_lang, ext_counts, ext_counts_by_lang, skipped, unreadable = _walk_and_group(
         src, walk, scope_path=scope_path,
     )
     all_source_files_count = sum(len(f) for f in files_by_lang.values())
@@ -128,6 +132,7 @@ def _build_single_scope_manifest(
         total_files=all_source_files_count,
         language_stats=dict(ext_counts),
         skipped_untracked=skipped,
+        unreadable_dirs=unreadable,
     )
 
 
@@ -193,6 +198,11 @@ def build_manifest(
     exactly as before. What the filter dropped is reported on the manifest as
     ``skipped_untracked`` and logged once, so a run that scores fewer files
     than the reader can see says why.
+
+    Directories the walk could not list (permission denied, vanished
+    mid-walk) are reported on the manifest as ``unreadable_dirs`` and logged
+    once at warning when non-zero, so a partially-scanned repo does not look
+    identical to a fully-scanned one.
     """
     walk = ManifestWalkSpec(
         ext_map=detection.get("extensions", {}),
@@ -202,13 +212,25 @@ def build_manifest(
         tracked_files=tracked_files if tracked_files is not None else list_tracked_files(src),
     )
     manifest = _dispatch_manifest_build(src, walk, disciplines_conf, scope_path)
+    _log_manifest_diagnostics(manifest, src)
+    return manifest
+
+
+def _log_manifest_diagnostics(manifest: SourceManifest, src: Path) -> None:
+    """Log the walk's skipped/unreadable counts once each, when non-zero."""
     skipped = manifest.skipped_untracked
     if skipped:
         _logger.info(
             "Skipped %d untracked file%s under %s (only what git tracks is scored)",
             skipped, "" if skipped == 1 else "s", src,
         )
-    return manifest
+    unreadable = manifest.unreadable_dirs
+    if unreadable:
+        _logger.warning(
+            "%d director%s under %s could not be listed (permission denied or "
+            "vanished mid-walk); the manifest may be missing source under them",
+            unreadable, "y" if unreadable == 1 else "ies", src,
+        )
 
 
 def _dispatch_manifest_build(

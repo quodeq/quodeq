@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types import DimensionResult
 from quodeq.core.utils.io import resolve_child_dir
@@ -56,6 +57,7 @@ def _compute_result(
     reports_root: Path, project: str, all_run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
     params: ScoringParams = DEFAULT_PARAMS,
+    *, log: LogSink = NULL_LOG,
 ) -> AccumulatedResult:
     """Load run data and compute trends, severity, and scores.
 
@@ -79,12 +81,15 @@ def _compute_result(
     matches the Overview behind the click.
     """
     eligible_run_infos = select_default_view_runs(all_run_infos)
-    return _build_accumulated_for_runs(reports_root, project, eligible_run_infos, cache_config, params)
+    return _build_accumulated_for_runs(
+        reports_root, project, eligible_run_infos, cache_config, params, log=log,
+    )
 
 
 def _load_run_dimensions(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
+    *, log: LogSink = NULL_LOG,
 ) -> tuple[dict[str, DimensionResult], dict[str, DimensionResult], list[DimensionResult]]:
     _cache, _lock, _max = resolve_cache(cache_config)
     ctx = DimensionCacheContext(cache=_cache, lock=_lock, max_size=_max)
@@ -96,7 +101,7 @@ def _load_run_dimensions(
     else:
         walk_cache, walk_lock, walk_max = WALK_CACHE, WALK_CACHE_LOCK, walk_cache_max()
     get_run_slim = make_slim_run_fetcher(
-        reports_root, project, walk_cache, walk_lock, walk_max,
+        reports_root, project, walk_cache, walk_lock, walk_max, log=log,
     )
     return read_all_run_data(
         reports_root, project, run_infos, get_run_data, get_run_slim=get_run_slim,
@@ -114,10 +119,11 @@ def _build_accumulated_for_runs(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
     params: ScoringParams = DEFAULT_PARAMS,
+    *, log: LogSink = NULL_LOG,
 ) -> AccumulatedResult:
     """Read run data and assemble the accumulated result for *run_infos*."""
     latest_by_dim, prev_occurrence, prev_run_latest = _load_run_dimensions(
-        reports_root, project, run_infos, cache_config,
+        reports_root, project, run_infos, cache_config, log=log,
     )
     all_dims = _suppress_run_dimensions(latest_by_dim, reports_root / project)
     dims_with_trend = compute_accumulated_trends(all_dims, prev_occurrence)
@@ -146,6 +152,7 @@ def _compute_parent_accumulated(
     scope: _ParentScope,
     cache_config: AccumulatedCacheConfig | None,
     params: ScoringParams = DEFAULT_PARAMS,
+    *, log: LogSink = NULL_LOG,
 ) -> dict[str, Any] | None:
     """Merge latest findings from all children (and optional own dims) and score."""
     all_dims: list[DimensionResult] = list(scope.extra_dims) if scope.extra_dims else []
@@ -155,7 +162,7 @@ def _compute_parent_accumulated(
         child_runs = list_runs(reports_root, child, limit=_MAX_CHILD_RUNS_CONSIDERED)
         if not child_runs:
             continue
-        result = _compute_result(reports_root, child, child_runs, cache_config, params)
+        result = _compute_result(reports_root, child, child_runs, cache_config, params, log=log)
         for d in result.all_dimensions:
             dim_source[d.dimension] = child
         all_dims.extend(result.all_dimensions)
@@ -177,6 +184,7 @@ def compute_accumulated(
     reports_dir: str, project: str, as_of: str | None,
     *, cache_config: AccumulatedCacheConfig | None = None,
     params: ScoringParams | None = None,
+    log: LogSink = NULL_LOG,
 ) -> dict[str, Any] | None:
     """Compute the accumulated (cross-run) view for *project*.
 
@@ -204,16 +212,18 @@ def compute_accumulated(
     # Pure parent (no own runs) — aggregate children only
     if not all_run_infos and children:
         return _compute_parent_accumulated(
-            reports_root, _ParentScope(project, children), cache_config, params,
+            reports_root, _ParentScope(project, children), cache_config, params, log=log,
         )
 
     # Has own runs — check if also has children to merge
-    own_result = _compute_result(reports_root, project, all_run_infos, cache_config, params)
+    own_result = _compute_result(
+        reports_root, project, all_run_infos, cache_config, params, log=log,
+    )
     if not children:
         return build_accumulated_response(project, own_result, params)
 
     # Has both own runs AND children — merge everything
     return _compute_parent_accumulated(
         reports_root, _ParentScope(project, children, own_result.all_dimensions),
-        cache_config, params,
+        cache_config, params, log=log,
     )

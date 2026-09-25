@@ -114,7 +114,8 @@ def read_through(
         cached = _read_row(table, project, version)
         if cached is not None:
             return cached
-    except sqlite3.Error:
+    except sqlite3.Error as exc:
+        log.warning(f"score-cache read failed for {table.label} {project}: {exc}")
         return compute()
     with _single_flight(table.kind, project, version):
         # Re-check: a caller we waited on may have computed and cached it.
@@ -243,7 +244,8 @@ def make_cache_backed_fetcher(
     try:
         with open_score_cache() as conn:
             by_run_version = read_all_cached_rows(conn, project)
-    except sqlite3.Error:
+    except sqlite3.Error as exc:
+        log.warning(f"score-cache bulk read failed for {project}: {exc}")
         by_run_version = {}
 
     def fetch(run_id: str) -> list[DimensionResult]:

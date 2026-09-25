@@ -17,6 +17,7 @@ from quodeq.data.fs.standards_prefs import load_visible_standard_ids
 from quodeq.core.jsonrpc import JsonRpcErrorCode
 from quodeq.core.mcp_method import McpMethod
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
+from quodeq.shared.fault_isolation import run_isolated
 
 _PROTOCOL = "2024-11-05"
 _SERVER_NAME = "quodeq-assistant"
@@ -40,41 +41,66 @@ def _tools_call(registry: ToolRegistry, params: dict) -> dict:
             "isError": not result.get("ok", False)}
 
 
+class _StderrLog:
+    """Adapts an injected ``stderr`` TextIO to the ``Warns`` protocol
+    ``run_isolated`` expects (this module has no stdlib logging of its own,
+    and stdin/stdout/stderr are already this process's injected seam)."""
+
+    def __init__(self, stderr: TextIO) -> None:
+        self._stderr = stderr
+
+    def warning(self, message: str) -> None:
+        self._stderr.write(f"assistant mcp dispatch error: {message}\n")
+        self._stderr.flush()
+
+
+def _dispatch_one(registry: ToolRegistry, msg: dict, stdout: TextIO) -> None:
+    """Handle one JSON-RPC request or notification, answering on *stdout*.
+
+    Notifications (no ``id``, and any ``notifications/*`` method) get no
+    response.
+    """
+    method, req_id = msg.get("method"), msg.get("id")
+    if method == McpMethod.INITIALIZE:
+        _jsonrpc.send(_jsonrpc.ok(req_id, {
+            "protocolVersion": _PROTOCOL, "capabilities": {"tools": {}},
+            "serverInfo": {"name": _SERVER_NAME, "version": "1"}}), stdout)
+    elif method == McpMethod.TOOLS_LIST:
+        _jsonrpc.send(_jsonrpc.ok(req_id, _tools_list(registry)), stdout)
+    elif method == McpMethod.TOOLS_CALL:
+        _jsonrpc.send(_jsonrpc.ok(req_id, _tools_call(registry, msg.get("params", {}))), stdout)
+    elif method == McpMethod.PING:
+        _jsonrpc.send(_jsonrpc.ok(req_id, {}), stdout)
+    elif method and method.startswith("notifications/"):
+        return
+    else:
+        _jsonrpc.send(_jsonrpc.err(req_id, JsonRpcErrorCode.METHOD_NOT_FOUND, f"method not found: {method}"), stdout)
+
+
+def _send_internal_error(req_id: object, stdout: TextIO) -> None:
+    if req_id is not None:  # notifications have no id and expect no response
+        # The exception detail is logged to stderr by run_isolated; the
+        # client frame carries only a generic message so internal failure
+        # detail is not exposed to MCP callers.
+        _jsonrpc.send(_jsonrpc.err(req_id, JsonRpcErrorCode.INTERNAL_ERROR, "internal error"), stdout)
+
+
 def serve(registry: ToolRegistry, *, stdin: TextIO, stdout: TextIO, stderr: TextIO) -> None:
     """Read JSON-RPC frames off *stdin* until EOF, answering on *stdout*.
 
     One bad request never ends the loop: the detail goes to *stderr* and the
-    client gets a generic -32603 frame. Notifications carry no id and get no
-    response.
+    client gets a generic -32603 frame.
     """
+    log = _StderrLog(stderr)
     while True:
         msg = _jsonrpc.read_message(stdin)
         if msg is None:
             break
-        method, req_id = msg.get("method"), msg.get("id")
-        try:
-            if method == McpMethod.INITIALIZE:
-                _jsonrpc.send(_jsonrpc.ok(req_id, {
-                    "protocolVersion": _PROTOCOL, "capabilities": {"tools": {}},
-                    "serverInfo": {"name": _SERVER_NAME, "version": "1"}}), stdout)
-            elif method == McpMethod.TOOLS_LIST:
-                _jsonrpc.send(_jsonrpc.ok(req_id, _tools_list(registry)), stdout)
-            elif method == McpMethod.TOOLS_CALL:
-                _jsonrpc.send(_jsonrpc.ok(req_id, _tools_call(registry, msg.get("params", {}))), stdout)
-            elif method == McpMethod.PING:
-                _jsonrpc.send(_jsonrpc.ok(req_id, {}), stdout)
-            elif method and method.startswith("notifications/"):
-                continue
-            else:
-                _jsonrpc.send(_jsonrpc.err(req_id, JsonRpcErrorCode.METHOD_NOT_FOUND, f"method not found: {method}"), stdout)
-        except Exception as exc:  # noqa: BLE001 - server must not die on one bad request
-            stderr.write(f"assistant mcp dispatch error: {exc}\n")
-            stderr.flush()
-            if req_id is not None:  # notifications have no id and expect no response
-                # The exception detail is written to stderr above; the client
-                # frame carries only a generic message so internal failure
-                # detail is not exposed to MCP callers.
-                _jsonrpc.send(_jsonrpc.err(req_id, JsonRpcErrorCode.INTERNAL_ERROR, "internal error"), stdout)
+        run_isolated(
+            lambda msg=msg: _dispatch_one(registry, msg, stdout),
+            label="assistant mcp dispatch", log=log,
+            on_error=lambda _exc, req_id=msg.get("id"): _send_internal_error(req_id, stdout),
+        )
 
 
 def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:

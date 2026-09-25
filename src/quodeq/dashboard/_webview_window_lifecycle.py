@@ -42,14 +42,14 @@ def _run_macos_loaded_hooks(window: object) -> None:
     # Best-effort — never block the controls.
     try:
         set_macos_app_identity()
-    except Exception:
-        logger.debug("macOS app-identity setup failed", exc_info=True)
+    except (AttributeError, TypeError, ValueError):
+        logger.warning("macOS app-identity setup failed", exc_info=True)
     # Native Help menu → dashboard help tab. Best-effort like the identity
     # setup: a failure must never block window chrome.
     try:
         install_macos_help_menu(window)
-    except Exception:
-        logger.debug("macOS Help menu setup failed", exc_info=True)
+    except (AttributeError, TypeError, ValueError):
+        logger.warning("macOS Help menu setup failed", exc_info=True)
 
 
 def make_on_loaded(window: object) -> "Callable[[], None]":

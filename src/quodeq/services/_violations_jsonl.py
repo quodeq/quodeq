@@ -94,6 +94,7 @@ def _parse_jsonl_findings(
         try:
             obj = json.loads(raw)
         except json.JSONDecodeError:
+            _logger.warning("Skipping malformed JSONL line in findings file: %s", raw[:200])
             continue
         if not isinstance(obj, dict):
             continue

@@ -193,7 +193,7 @@ def rescore_dimension_from_evidence(
     # to the stored score" — one bad dimension must not fail the whole run.
     try:
         result = score_evidence(evidence, mode="numerical", params=request.params)
-    except Exception as exc:  # noqa: BLE001
+    except (ValueError, KeyError, TypeError, ArithmeticError) as exc:
         _logger.warning("Evidence rescore failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return EvidenceRescore(None, excluded)
     return EvidenceRescore(result, excluded)

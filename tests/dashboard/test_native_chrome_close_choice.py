@@ -1,5 +1,8 @@
 """Close-confirm dialog choice: platform dispatch, NSAlert mapping and _cancel_evaluation."""
+import logging
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from quodeq.dashboard import _webview_window as ww
 from quodeq.dashboard import _webview_window_close as wwc
@@ -35,6 +38,52 @@ class TestOnClosingChoice:
         window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
         with patch.object(ww.sys, "platform", "linux"):
             assert ww.ask_close_choice(window) == "keep"
+
+    def test_ask_close_choice_non_macos_dialog_error_logs_the_traceback(self, caplog):
+        window = MagicMock()
+        window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
+        with patch.object(ww.sys, "platform", "linux"), \
+             caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_close"):
+            assert ww.ask_close_choice(window) == "keep"
+        matching = [r for r in caplog.records if "close dialog failed" in r.getMessage()]
+        assert matching, [r.getMessage() for r in caplog.records]
+        assert any(r.exc_info for r in matching)
+
+    def test_ask_close_choice_non_macos_out_of_scope_error_propagates(self):
+        """R-FT-7 — an error outside (WebViewException, OSError, RuntimeError)
+        must now propagate instead of being swallowed as 'keep'."""
+        window = MagicMock()
+        window.create_confirmation_dialog.side_effect = ValueError("bad args")
+        with patch.object(ww.sys, "platform", "linux"):
+            with pytest.raises(ValueError, match="bad args"):
+                ww.ask_close_choice(window)
+
+    # --- _ask_close_choice_isolated: the fault-isolation boundary above -----
+    # ask_close_choice. prompt_close_choice_and_finish runs as a bare
+    # threading.Thread target with no run_isolated above it, so an
+    # out-of-tuple ask_close_choice error (anything past its own narrowed
+    # (WebViewException, OSError, RuntimeError)) must be caught HERE instead.
+
+    def test_isolated_out_of_scope_error_yields_keep(self):
+        window = MagicMock()
+        with patch.object(wwc, "ask_close_choice", side_effect=ValueError("boom")):
+            assert wwc._ask_close_choice_isolated(window) == "keep"
+
+    def test_isolated_out_of_scope_error_logs_the_traceback(self, caplog):
+        window = MagicMock()
+        with patch.object(wwc, "ask_close_choice", side_effect=ValueError("boom")), \
+             caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_close"):
+            assert wwc._ask_close_choice_isolated(window) == "keep"
+        matching = [r for r in caplog.records if "close dialog failed" in r.getMessage()]
+        assert matching, [r.getMessage() for r in caplog.records]
+        assert any(r.exc_info for r in matching)
+        assert "Traceback (most recent call last)" in caplog.text
+        assert "ValueError: boom" in caplog.text
+
+    def test_isolated_returns_the_real_choice_when_no_error(self):
+        window = MagicMock()
+        with patch.object(wwc, "ask_close_choice", return_value="cancel"):
+            assert wwc._ask_close_choice_isolated(window) == "cancel"
 
     # --- NSAlert return -> choice mapping (pure) ----------------------------
 
@@ -91,6 +140,15 @@ class TestOnClosingChoice:
         api._base_url = "http://127.0.0.1:7863"
         with patch("urllib.request.urlopen",
                     side_effect=urllib.error.URLError("boom")):
+            api._cancel_evaluation("job-42")  # must not raise
+
+    def test_cancel_evaluation_swallows_truncated_response(self):
+        # http.client.HTTPException (e.g. IncompleteRead) is not an OSError.
+        import http.client
+        api = ww.WindowApi()
+        api._base_url = "http://127.0.0.1:7863"
+        with patch("urllib.request.urlopen",
+                    side_effect=http.client.IncompleteRead(b"partial")):
             api._cancel_evaluation("job-42")  # must not raise
 
 
@@ -150,3 +208,46 @@ class TestMacConfirmClose:
         # or the worker would hang (the deadlock class this file already hit).
         choice, _, _ = self._run(run_modal_error=RuntimeError("boom"))
         assert choice == "keep"
+
+    def test_runmodal_error_logs_the_traceback(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_close"):
+            choice, _, _ = self._run(run_modal_error=RuntimeError("boom"))
+        assert choice == "keep"
+        matching = [r for r in caplog.records if "failed" in r.getMessage()]
+        assert matching, [r.getMessage() for r in caplog.records]
+        assert any(r.exc_info for r in matching)
+
+    def test_build_macos_alert_stores_the_choice_before_releasing_done(self):
+        """The worker thread in macos_confirm_close wakes on done.release()
+        and immediately reads result["choice"]. If the release ever fires
+        before the choice is written, that worker can read the stale
+        default instead of the user's answer -- this proves the write
+        happens first, by recording the choice at the moment release()
+        itself is called (a real threading.Semaphore can't observe this: by
+        the time a real worker wakes up, the write has always already
+        happened in memory, race or not)."""
+        import AppKit
+
+        alert = MagicMock()
+        alert.addButtonWithTitle_.side_effect = lambda title: MagicMock()
+        alert.runModal.return_value = AppKit.NSAlertSecondButtonReturn  # -> "cancel"
+
+        result = {"choice": "keep"}
+
+        class _OrderRecordingSemaphore:
+            def __init__(self) -> None:
+                self.choice_at_release = "not released yet"
+
+            def release(self) -> None:
+                self.choice_at_release = result["choice"]
+
+        fake_done = _OrderRecordingSemaphore()
+
+        with patch.object(AppKit, "NSAlert") as NSAlert, \
+             patch.object(AppKit, "NSApplication"), \
+             patch.object(AppKit, "NSRunningApplication"):
+            NSAlert.alloc.return_value.init.return_value = alert
+            wwc._build_macos_alert(result, fake_done)
+
+        assert result["choice"] == "cancel"
+        assert fake_done.choice_at_release == "cancel"

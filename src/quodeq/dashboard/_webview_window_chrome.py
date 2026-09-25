@@ -16,6 +16,7 @@ import threading
 from types import ModuleType
 
 from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
+from quodeq.shared.fault_isolation import run_isolated
 
 logger = logging.getLogger(__name__)
 
@@ -156,21 +157,21 @@ def set_macos_fullscreen_class(window: object, is_full: bool) -> None:
     """
     flag = "true" if is_full else "false"
     js = f"document.documentElement.classList.toggle('macos-fullscreen', {flag})"
-    evaluate_js_in_background(window, js, "fullscreen class toggle failed")
+    evaluate_js_in_background(window, js, "fullscreen class toggle")
 
 
-def evaluate_js_in_background(window: object, js: str, failure: str) -> None:
+def evaluate_js_in_background(window: object, js: str, label: str) -> None:
     """Run *js* in *window* on a short-lived worker thread.
 
     For callers on the AppKit main thread or a GUI backend thread, where
     ``evaluate_js`` deadlocks waiting on the JS engine. A failure (the
-    window may be tearing down) is logged at debug level as *failure*.
+    window may be tearing down) is logged under *label*.
     """
     def _run() -> None:
-        try:
-            window.evaluate_js(js)  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001 — window may be tearing down
-            logger.debug(failure, exc_info=True)
+        run_isolated(
+            lambda: window.evaluate_js(js),  # type: ignore[union-attr]
+            label=label, log=logger,
+        )
 
     threading.Thread(target=_run, daemon=True).start()
 

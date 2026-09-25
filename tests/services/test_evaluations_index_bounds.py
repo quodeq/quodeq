@@ -38,6 +38,27 @@ def _make_index(tmp_path: Path, reports_root: Path) -> EvaluationsIndex:
     )
 
 
+def test_internal_jobs_logs_and_returns_empty_when_list_jobs_raises(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    from unittest.mock import patch
+
+    reports_root = tmp_path / "reports"
+    index = _make_index(tmp_path, reports_root)
+
+    def _raise(*_args, **_kwargs):
+        raise AttributeError("no list_jobs on this store")
+
+    monkeypatch.setattr(index._jobs, "list_jobs", _raise)
+
+    with patch("quodeq.services._evaluations_index._logger.warning") as warning:
+        result = index._internal_jobs()
+
+    assert result == []
+    assert warning.called
+    assert "list_jobs failed" in warning.call_args.args[0]
+
+
 def test_list_pushes_states_filter_into_sql_instead_of_fetching_every_row(
     tmp_path: Path, monkeypatch,
 ) -> None:

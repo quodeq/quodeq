@@ -41,7 +41,12 @@ class _LiveManager:
 
 
 class _FlakyManager(_LiveManager):
-    """Raises on the first ensure_session (spawn failure), succeeds afterwards."""
+    """Raises on the first ensure_session (spawn failure), succeeds afterwards.
+
+    OSError, not RuntimeError: this is what a real PtyBackend.spawn() raises
+    (os.openpty()/subprocess.Popen() failures are both OSError), and that is
+    the exception type setup_terminal_session's except now narrows to.
+    """
     def __init__(self):
         super().__init__()
         self._calls = 0
@@ -49,7 +54,7 @@ class _FlakyManager(_LiveManager):
     def ensure_session(self, *, cwd, cols, rows):
         self._calls += 1
         if self._calls == 1:
-            raise RuntimeError("boom: shell spawn failed")
+            raise OSError("boom: shell spawn failed")
         self._alive = True
 
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -100,7 +101,7 @@ def _fetch_report_changed_lines(args: argparse.Namespace, token: str) -> dict[st
         return fetch_pr_changed_lines(
             owner=args.owner, repo=args.repo, pr_number=args.pr, token=token,
         )
-    except Exception as exc:
+    except (RuntimeError, OSError, http.client.HTTPException, ValueError) as exc:
         print(
             f"Warning: could not fetch PR diff to scope comments ({exc.__class__.__name__}: {exc}); "
             "posting summary-only review.",

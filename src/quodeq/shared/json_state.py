@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import tempfile
+import typing
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Generic, TypeVar
@@ -38,12 +39,34 @@ def state_file_path(
     return str(Path(base) / filename)
 
 
+def _matches_declared_type(value: Any, hint: Any) -> bool:
+    """True when *value* fits *hint* (a resolved dataclass field annotation).
+
+    *hint* missing (no annotation could be resolved) fits anything, so a
+    schema this helper cannot introspect never drops a field it shouldn't.
+    A parameterized generic (e.g. ``list[str]``) also fits anything: none of
+    the fields this module reads use one today, and ``isinstance`` rejects
+    those outright rather than checking the element type.
+    """
+    if hint is None:
+        return True
+    try:
+        return isinstance(value, hint)
+    except TypeError:
+        return True
+
+
 def read_json_state(path: Path, cls: type[_StateT]) -> _StateT:
     """Load *path* into a *cls* instance, falling back to defaults.
 
     A missing, unreadable, non-JSON or non-object file yields ``cls()``.
     Unknown keys are dropped so an older process can read a file written by
-    a newer one.
+    a newer one. A known key whose value's runtime type does not match the
+    field's declared type is dropped too, so a type-corrupt file (e.g. a
+    number where a version string belongs) still yields a *cls* instance
+    every field of which has the type callers expect -- one bad field must
+    not turn into an ``AttributeError`` several calls downstream, in code
+    that has no reason to expect this file's shape.
     """
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -52,7 +75,11 @@ def read_json_state(path: Path, cls: type[_StateT]) -> _StateT:
     if not isinstance(raw, dict):
         return cls()
     known = {f for f in cls().__dict__}
-    return cls(**{k: v for k, v in raw.items() if k in known})
+    hints = typing.get_type_hints(cls)
+    return cls(**{
+        k: v for k, v in raw.items()
+        if k in known and _matches_declared_type(v, hints.get(k))
+    })
 
 
 def dump_json_to_fd(

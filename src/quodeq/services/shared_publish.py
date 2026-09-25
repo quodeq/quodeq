@@ -226,7 +226,7 @@ def start_publish(
             daemon=True,
         )
         thread.start()
-    except Exception:
+    except RuntimeError:
         status.set(state=PublishState.ERROR, error="Failed to start publish background job.", finished_at=time.time())
         logger.exception("failed to start publish thread")
         return PublishStartResult.FAILED

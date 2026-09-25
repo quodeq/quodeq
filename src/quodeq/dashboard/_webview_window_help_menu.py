@@ -15,7 +15,7 @@ from quodeq.shared.constants import PLATFORM_DARWIN
 
 _help_target: object | None = None  # keep the Help-menu handler alive (menu item holds a weak ref)
 _help_menu_installed = False  # the _HelpHandler ObjC class may only be defined once
-_HELP_NAV_FAILED = "help-menu navigation failed"  # debug line when the help tab cannot be opened
+_HELP_NAV_LABEL = "help-menu navigation"  # names the logged failure when the help tab cannot be opened
 _HELP_MENU_TITLE = "Help"  # top-level menu title, shared by the macOS Apple menu and the non-macOS menu bar
 
 # Payload both native shells dispatch to open the help tab; routed by the
@@ -30,7 +30,7 @@ def _build_help_handler(window: object) -> object:
     class _HelpHandler(NSObject):
         def openHelp_(self, sender):  # noqa: ARG002 — ObjC selector signature
             # Menu actions fire on the AppKit main thread.
-            evaluate_js_in_background(window, NAVIGATE_HELP_JS, _HELP_NAV_FAILED)
+            evaluate_js_in_background(window, NAVIGATE_HELP_JS, _HELP_NAV_LABEL)
 
     return _HelpHandler.alloc().init()
 
@@ -150,6 +150,6 @@ def non_macos_menu(window: object) -> "list[object] | None":
 
     def _open_help() -> None:
         # Menu callbacks fire on the backend's GUI thread.
-        evaluate_js_in_background(window, NAVIGATE_HELP_JS, _HELP_NAV_FAILED)
+        evaluate_js_in_background(window, NAVIGATE_HELP_JS, _HELP_NAV_LABEL)
 
     return [wm.Menu(_HELP_MENU_TITLE, [wm.MenuAction("quodeq Help", _open_help)])]

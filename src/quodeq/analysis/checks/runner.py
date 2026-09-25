@@ -8,6 +8,7 @@ check that can take a run down is worse than a check that does not exist.
 from __future__ import annotations
 
 import dataclasses
+import json
 import logging
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -49,7 +50,9 @@ def deterministic_judgments(
         return []
     try:
         declared = load_requirement_checks(compiled_dir, dimension, evaluators_dir)
-    except Exception:  # a broken standard must not stop the run
+    except (  # a broken standard must not stop the run
+        OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError,
+    ):
         _logger.warning("checks: could not read %s's standard", dimension, exc_info=True)
         return []
     if not declared:

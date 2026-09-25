@@ -98,7 +98,7 @@ def _acc_ctx(tmp_path, monkeypatch, visible_standard_ids=None):
     repo.create_session(session_id="s1", provider="ollama")
     monkeypatch.setattr(
         "quodeq.services.fs_reports.get_accumulated",
-        lambda reports_dir, project, as_of: _ACC)
+        lambda reports_dir, project, as_of, **_kwargs: _ACC)
     return ToolContext(
         repository=repo, session_id="s1", run_dir=None, repo_root=None,
         evaluators_dir=tmp_path / "evaluators", compiled_dir=tmp_path / "compiled",

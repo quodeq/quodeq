@@ -155,7 +155,10 @@ def load_standards_text(
                               dimension, len(text), limit)
                 return _truncate(text, limit)
         except (OSError, _json.JSONDecodeError) as exc:
-            _log.debug("compiled standards file skipped: %s", exc)
+            _log.warning(
+                "compiled standards file skipped for dimension %s (%s): %s",
+                dimension, json_path, exc,
+            )
     md_path = compiled_dir / f"{dimension}.md"
     if md_path.exists():
         try:

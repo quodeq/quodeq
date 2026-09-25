@@ -43,7 +43,7 @@ def scan_json_exists(project_dir: Path) -> bool:
 def read_repository_info(project_dir: Path) -> dict | None:
     """Parsed ``repository_info.json``, or None when absent, corrupt, or
     not a JSON object."""
-    return read_json_object(project_dir / REPOSITORY_INFO_FILENAME, raise_non_utf8=True)
+    return read_json_object(project_dir / REPOSITORY_INFO_FILENAME)
 
 
 def write_repository_info(project_dir: Path, data: dict) -> bool:
@@ -73,7 +73,7 @@ def write_scan_json(scan: ScanData, output_dir: Path) -> None:
 def read_scan_json(project_dir: Path) -> dict | None:
     """Parsed ``scan.json``, or None when absent, corrupt, or not a JSON
     object. Mirrors :func:`read_repository_info`'s contract."""
-    return read_json_object(project_dir / SCAN_FILENAME, raise_non_utf8=True)
+    return read_json_object(project_dir / SCAN_FILENAME)
 
 
 def remove_project_dir(project_dir: Path) -> bool:

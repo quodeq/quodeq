@@ -7,6 +7,7 @@ not to data.
 from __future__ import annotations
 
 import logging
+import sqlite3
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from pathlib import Path
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.scoring.projector_scoring import compute_run_score
 from quodeq.services.ports import GradeTablesReader
+from quodeq.shared.fault_isolation import run_isolated
 from quodeq.services.wiring import (  # noqa: F401 — grade_formula_store names are re-exported API
     SQLiteStateStore,
     UnsupportedSchemaError,
@@ -118,7 +120,7 @@ def _recompute_with_retries(run_dir: Path, params: ScoringParams) -> bool:
         try:
             recompute_grades(run_dir, params=params)
             return True
-        except Exception:  # noqa: BLE001 — one bad run must not block the rest
+        except (sqlite3.Error, OSError, ValueError, RuntimeError):
             if attempt < _APPLY_RETRIES:
                 time.sleep(_APPLY_RETRY_SLEEP_S)
                 continue
@@ -160,6 +162,24 @@ def apply_to_all_runs(
         clear_shared_dimension_cache()
 
 
+def _rescore_one_run(run_dir: Path, params: ScoringParams) -> bool:
+    """One run's rescore step -- the sole statement ``run_isolated`` wraps in
+    ``_rescore_runs``' loop body.
+
+    ``_recompute_with_retries`` already retries and reports its own surface
+    (``sqlite3.Error``, ``OSError``, ``ValueError``, ``RuntimeError``) itself,
+    returning False rather than raising. Anything outside that tuple -- a
+    genuine bug in the recompute path -- used to propagate straight out of
+    this loop and abort the whole apply pass, leaving the rescore-pending
+    marker set so a restart hit the very same run and failed the same way
+    again. It must instead cost only this run: every other run still gets
+    rescored, so it propagates here for ``run_isolated`` to log with a
+    traceback and hand to ``on_error``, which reports this run failed the
+    same way the narrowed-tuple path already does.
+    """
+    return _recompute_with_retries(run_dir, params)
+
+
 def _rescore_runs(
     run_dirs: list[Path],
     params: ScoringParams,
@@ -175,7 +195,13 @@ def _rescore_runs(
     for done, run_dir in enumerate(run_dirs, start=1):
         if should_abort is not None and should_abort():
             return ApplyResult(rescored=rescored, failed=failed, aborted=True)
-        if _recompute_with_retries(run_dir, params):
+        ok = run_isolated(
+            lambda rd=run_dir: _rescore_one_run(rd, params),
+            label=f"grade-formula rescore for {run_dir.name!r}",
+            log=_logger,
+            on_error=lambda _exc: False,
+        )
+        if ok:
             rescored += 1
         else:
             failed.append(run_dir.name)

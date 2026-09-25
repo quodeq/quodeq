@@ -104,7 +104,7 @@ def _retry_dim_callback(dimension: str, ev: Evidence, run: LoopRun) -> None:
             f"[loop] {dimension} - callback broken pipe, "
             f"retried after silencing stdout, result persisted",
         )
-    except Exception as exc:  # noqa: BLE001
+    except (OSError, ValueError, KeyError, TypeError, ArithmeticError) as exc:
         log.warning(
             f"[loop] {dimension} - callback retry after broken pipe raised "
             f"{type(exc).__name__}: {exc} - result NOT persisted, continuing loop",
@@ -135,7 +135,7 @@ def finalize_dim_result(
             run.deps.on_dimension_done(dimension, ev)
     except BrokenPipeError:
         _retry_dim_callback(dimension, ev, run)
-    except Exception as exc:  # noqa: BLE001
+    except (OSError, ValueError, KeyError, TypeError, ArithmeticError) as exc:
         log.warning(
             f"[loop] {dimension} - callback raised "
             f"{type(exc).__name__}: {exc} - result kept, continuing loop",
@@ -149,15 +149,15 @@ def _stdout_gone(exc: BrokenPipeError) -> tuple[None, BrokenPipeError]:
     return None, exc
 
 
-def _dispatch_incremental_dim(
+def _attempt_incremental_dim(
     config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
 ) -> tuple[Evidence | None, BaseException | None]:
-    """Run one dimension incrementally, falling back to a full scan on failure.
+    """Try the incremental run, falling back to a full scan on a known-bad exception.
 
-    Returns ``(ev, last_exc)``: ``ev`` is the resulting Evidence (or None if
-    both the incremental attempt and any fallback failed), ``last_exc`` is
-    the most recent exception encountered (or None on success), used to
-    pick the dim-state ``INCOMPLETE`` reason.
+    A failure of a type this function doesn't recognize (from either the
+    incremental attempt or the fallback) is left to propagate --
+    ``run_incremental_loop`` isolates it, along with the rest of the step
+    (finalize included), at the loop-iteration boundary.
     """
     runner, log = deps.runner, deps.log
     try:
@@ -182,39 +182,39 @@ def _dispatch_incremental_dim(
             return runner.run(fallback_config, dimension, idx, ctx, emit_log=True), None
         except BrokenPipeError as inner_exc:
             return _stdout_gone(inner_exc)
-        except Exception as inner_exc:  # noqa: BLE001
+        except (OSError, KeyError, ValueError, RuntimeError) as inner_exc:
             return None, inner_exc
-    except Exception as exc:  # noqa: BLE001
-        # Loop-level diagnostic: an unanticipated exception class would
-        # otherwise propagate up silently and the lifecycle would treat it
-        # as failed without saying which dim. Log + swallow + continue so
-        # subsequent dims still run; the surfaced log line gives us the
-        # trail we need next time this happens.
-        log.warning(
-            f"[loop] {dimension} - unexpected exception "
-            f"{type(exc).__name__}: {exc} - skipping dim, continuing loop",
-        )
-        return None, exc
 
 
 def run_one_incremental_dim(
     config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, run: LoopRun,
-) -> bool:
-    """Run one incremental-loop iteration for *dimension*.
+) -> None:
+    """Run one incremental dimension: RUNNING -> dispatch (+ fallback) ->
+    finalize-or-incomplete.
 
-    Returns True if the loop should stop before this dimension ran (deadline
-    or cancellation reached), in which case the caller must break the loop
-    without counting the iteration as completed.
+    A known-bad exception from the incremental attempt or its full-scan
+    fallback is handled inside ``_attempt_incremental_dim`` itself: both
+    attempts failing on a recognized exception type is a clean
+    ``(None, exc)``, not a raise. Anything else -- an exception type neither
+    attempt recognizes, or one from ``finalize_dim_result``'s
+    ``on_dimension_done`` callback -- propagates out of this function
+    uncaught. Exactly one boundary per iteration: ``run_incremental_loop``
+    isolates the whole step (dispatch, fallback *and* finalize) at the
+    loop-iteration boundary, so one dimension's bug cannot abort the rest of
+    the run. (There used to be a second, nested ``run_isolated`` here around
+    the dispatch/fallback pair alone; removed -- one boundary per iteration
+    is the contract, and the outer one's ``on_error`` records the identical
+    INCOMPLETE reason via the same ``interruption_reason`` call.)
+
+    The caller (``run_incremental_loop``) has already logged the "entering
+    iteration" line and checked ``loop_should_stop`` before calling this.
     """
     log = run.deps.log
-    log.info(f"[loop] entering iteration {idx}/{ctx.total} for {dimension}")
-    if loop_should_stop(config, dimension, log):
-        return True
     run_dir = run_dir_for(config)
     safe_write_dim_state(run_dir, dimension, DimTransition(DimState.RUNNING), log=log)
     emit_marker(CC_PHASE_ANALYZING, dimension=dimension)
     log.info(f"-> [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
-    ev, last_exc = _dispatch_incremental_dim(config, dimension, idx, ctx, run.deps)
+    ev, last_exc = _attempt_incremental_dim(config, dimension, idx, ctx, run.deps)
     if ev:
         finalize_dim_result(
             run_dir, dimension, ev, run,
@@ -226,4 +226,3 @@ def run_one_incremental_dim(
             DimTransition(DimState.INCOMPLETE, reason=interruption_reason(last_exc)), log=log,
         )
     log.info(f"[loop] completed iteration {idx}/{ctx.total} for {dimension} (ev={'set' if ev else 'None'})")
-    return False

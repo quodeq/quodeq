@@ -33,3 +33,31 @@ def test_project_all_runs_uses_injected_repo_factory(tmp_path):
 
     assert seen == [tmp_path / "r1"]
     assert not (tmp_path / "r1" / "evaluation.db").exists()
+
+
+def test_project_all_runs_isolates_a_failing_run_and_continues(tmp_path, recording_log):
+    from quodeq.services.mutation_rescore import project_all_runs
+
+    (tmp_path / "r1").mkdir()
+    (tmp_path / "r1" / "events.jsonl").write_text("")
+    (tmp_path / "r2").mkdir()
+    (tmp_path / "r2" / "events.jsonl").write_text("")
+
+    seen = []
+
+    class _FlakyRepo:
+        def __init__(self, run_dir) -> None:
+            self._run_dir = run_dir
+
+        def ensure_projected(self) -> None:
+            if self._run_dir.name == "r1":
+                raise RuntimeError("boom")
+            seen.append(self._run_dir)
+
+    project_all_runs(tmp_path, repo_factory=_FlakyRepo, log=recording_log)
+
+    assert seen == [tmp_path / "r2"]
+    matching = [m for m in recording_log.warning_messages if "failed" in m]
+    assert matching, recording_log.warning_messages
+    assert "Traceback (most recent call last)" in matching[0]
+    assert "RuntimeError: boom" in matching[0]

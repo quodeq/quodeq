@@ -43,21 +43,15 @@ def copy_matching_files(src_dir: Path, dest_dir: Path, pattern: str) -> None:
         shutil.copy2(src, dest_dir / src.name)
 
 
-def read_json_object(path: Path, *, raise_non_utf8: bool = False) -> dict | None:
+def read_json_object(path: Path) -> dict | None:
     """Parsed JSON object at *path*.
 
     None when the file is absent, not valid JSON, not a JSON object, or not
-    UTF-8 text. ``raise_non_utf8=True`` lets the UnicodeDecodeError of a
-    non-UTF-8 file propagate instead, for callers that treat a non-UTF-8
-    record as an error rather than a missing one.
+    UTF-8 text.
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except UnicodeDecodeError:
-        if raise_non_utf8:
-            raise
-        return None
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
     return data if isinstance(data, dict) else None
 

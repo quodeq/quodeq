@@ -8,6 +8,7 @@ from pathlib import Path
 
 from quodeq.shared.utils import get_evaluations_dir, get_static_dist
 from quodeq.shared.env import get_dashboard_port
+from quodeq.shared.fault_isolation import run_isolated
 from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
 from ._build import default_static_dir
 
@@ -87,11 +88,16 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
     )
 
 
+class _StderrLog:
+    """Adapts ``sys.stderr`` to the ``Warns`` protocol ``run_isolated``
+    expects (this module has no stdlib logging of its own)."""
+
+    def warning(self, message: str) -> None:
+        print(f"Error: {message}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point for the dashboard command."""
-    config = parse_args(argv)
-    try:
-        return run_dashboard(config)
-    except Exception as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
+    return run_isolated(
+        lambda: run_dashboard(parse_args(argv)), label="dashboard", log=_StderrLog(), on_error=lambda _exc: 1,
+    )

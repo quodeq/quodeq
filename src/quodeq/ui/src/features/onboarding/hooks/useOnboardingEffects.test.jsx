@@ -12,7 +12,7 @@ vi.mock('./useWizardDraft.js', () => ({
 }));
 
 // eslint-disable-next-line import/first -- must follow the vi.mock hoist above
-import { getProjectScan } from '../../../api/index.js';
+import { getProjectScan, listStandards } from '../../../api/index.js';
 
 function setup(overrides = {}) {
   const wizard = {
@@ -41,5 +41,22 @@ describe('useOnboardingEffects', () => {
         expect.any(Error),
       );
     });
+  });
+
+  it('logs a failed standards fetch instead of swallowing it', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    listStandards.mockRejectedValueOnce(new Error('standards fetch failed'));
+    getProjectScan.mockResolvedValueOnce(null);
+    const setStandards = vi.fn();
+
+    setup({ setStandards });
+
+    await waitFor(() => {
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('[useOnboardingEffects] standards fetch failed'),
+        expect.any(Error),
+      );
+    });
+    expect(setStandards).toHaveBeenCalledWith([]);
   });
 });

@@ -102,6 +102,32 @@ def _clear_process_cache():
 # Cross-call reuse
 # ---------------------------------------------------------------------------
 
+def test_slim_walk_read_failure_logs_and_the_run_is_skipped(tmp_path, recording_log, monkeypatch):
+    """A single run's read_run_data failure during the slim classification
+    walk must not abort the whole accumulated view -- it already degraded
+    to skipping that run's dimensions; the walk must also say so."""
+    from quodeq.data.fs.report_parser.runs import read_run_data as real_read_run_data
+
+    root, runs_desc = _project_with_runs(tmp_path, "proj", 5)
+    flaky_run = runs_desc[2]
+
+    def _flaky(reports_root, project, run_id):
+        if run_id == flaky_run:
+            raise ValueError("corrupt eval file")
+        return real_read_run_data(reports_root, project, run_id)
+
+    monkeypatch.setattr("quodeq.services._accumulated_data.read_run_data", _flaky)
+
+    result = compute_accumulated(str(root), "proj", runs_desc[0], log=recording_log)
+
+    assert result is not None
+    assert recording_log.warning_messages
+    assert any(
+        "read_run_data failed" in msg and flaky_run in msg
+        for msg in recording_log.warning_messages
+    )
+
+
 def test_neighbouring_as_of_selections_reuse_the_run_walk(tmp_path, counting_reader):
     """The second day selected must not re-read every run's findings again.
 

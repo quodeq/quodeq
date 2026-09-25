@@ -17,14 +17,15 @@ findings/consolidated-tasks.md):
    never told to stop.
 
 This test proves the end-to-end fix for #3, using a fake manager whose
-write() raises to stand in for "a write to a dead/killed process mid-session"
-(the exact failure mode #1 now prevents at its source -- see
-test_pty_windows.py's `test_write_to_dead_process_is_a_noop_not_an_exception`
-for that half; this test proves that *if* such a write exception ever
-reaches `terminal_read_loop` -- whether from a race, a different backend, or
-any other cause -- the loop no longer swallows it silently: it logs, and it
-signals `stop` so the concurrently-running write-side pump actually exits
-instead of spinning unsignaled forever.
+write() raises OSError (what a real PTY write failure -- os.write() on a
+closed master fd -- actually raises; test_pty_windows.py's
+`test_write_to_dead_process_is_a_noop_not_an_exception` covers the #1 fix
+that normally swallows it at the source) to stand in for "a write to a
+dead/killed process mid-session": this test proves that *if* such an
+OSError ever reaches `terminal_read_loop` -- whether from a race or a
+different backend -- the loop no longer swallows it silently: it logs, and
+it signals `stop` so the concurrently-running write-side pump actually
+exits instead of spinning unsignaled forever.
 """
 from __future__ import annotations
 
@@ -50,7 +51,7 @@ class _DeadProcessManager:
         return ""
 
     def write(self, data):
-        raise RuntimeError("write to dead process")
+        raise OSError("write to dead process")
 
 
 class _OneShotWriteWs:

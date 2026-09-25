@@ -34,6 +34,7 @@ from quodeq.menubar._health import (
     is_evaluating as _is_evaluating,
 )
 from quodeq.menubar._process import find_running_port as _find_running_port_cached
+from quodeq.shared.fault_isolation import run_isolated
 
 _DEFAULT_APP_PORT = 7863
 _POLL_INTERVAL = env_int("QUODEQ_POLL_INTERVAL", 5)
@@ -67,6 +68,21 @@ def _load_config(env: Mapping[str, str] | None = None) -> tuple[int, tuple[int, 
             _cfg_log.warning("Invalid port value %r in QUODEQ_PORTS; skipping", p)
     ports = tuple(ports_list) if ports_list else tuple(int(p) for p in _DEFAULT_PORTS.split(","))
     return app_port, ports
+
+
+def _run_check_updates() -> None:
+    """Force an update check and report the result via a notification."""
+    from quodeq.update.checker import get_status, run_check  # noqa: PLC0415
+
+    run_check(force=True)
+    status = get_status()
+    if status.get("update_available"):
+        rumps.notification(
+            _APP_NAME, "Update available",
+            f"{status['current']} → {status['latest']}",
+        )
+    else:
+        rumps.notification(_APP_NAME, "Up to date", f"You're on {status['current']}.")
 
 
 class QuodeqApp(DashboardLifecycleMixin, rumps.App):
@@ -134,27 +150,14 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
         """
         try:
             _state.set_enabled(False)
-        except Exception:
+        except (OSError, ValueError):
             _logging.getLogger(__name__).debug("could not disable menubar preference on quit", exc_info=True)
         _control.remove_pidfile()
         rumps.quit_application()
 
     def _on_check_updates(self, _sender):
         """Force a check and report the result via a notification."""
-        try:
-            from quodeq.update.checker import get_status, run_check
-
-            run_check(force=True)
-            status = get_status()
-            if status.get("update_available"):
-                rumps.notification(
-                    _APP_NAME, "Update available",
-                    f"{status['current']} → {status['latest']}",
-                )
-            else:
-                rumps.notification(_APP_NAME, "Up to date", f"You're on {status['current']}.")
-        except Exception:
-            _logging.getLogger(__name__).debug("update check failed", exc_info=True)
+        run_isolated(_run_check_updates, label="update check", log=_logging.getLogger(__name__))
 
     def _find_running_port(self) -> int | None:
         """Find the running dashboard port (delegates to cached helper)."""
@@ -204,7 +207,7 @@ class QuodeqApp(DashboardLifecycleMixin, rumps.App):
                 self._update_item.title = "Update Available. Click to view"
             else:
                 self._update_item.title = "Check for Updates…"
-        except Exception:
+        except (OSError, ValueError):
             _logging.getLogger(__name__).debug("update availability check failed", exc_info=True)
 
 
@@ -220,7 +223,7 @@ def _set_accessory_policy() -> None:
         NSApplication.sharedApplication().setActivationPolicy_(
             NSApplicationActivationPolicyAccessory,
         )
-    except Exception:
+    except ImportError:
         _logging.getLogger(__name__).debug("could not set accessory policy", exc_info=True)
 
 

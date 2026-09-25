@@ -12,7 +12,10 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from quodeq._cli_resolution import ResolvedInputs
+from quodeq.analysis.cache.consolidation import mark_run_consolidated
 from quodeq.analysis.diff_resolver import DiffResolveError
+from quodeq.shared.fault_isolation import run_isolated
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.logging import log_error, log_info, log_warning
 
 
@@ -68,8 +71,37 @@ def write_sarif_if_requested(args: argparse.Namespace, evaluation_dir: Path) -> 
         out.write_text(json.dumps(doc, indent=2), encoding="utf-8")
         count = sum(len(r["results"]) for r in doc["runs"])
         log_info(f"Wrote {count} finding(s) to SARIF: {out}")
-    except Exception as exc:  # noqa: BLE001 — fail-soft: SARIF must never sink a scan
+    except (OSError, ValueError) as exc:
+        # OSError: reading a report file or writing the SARIF output.
+        # ValueError: json.JSONDecodeError/UnicodeDecodeError from a
+        # malformed report on disk (both are ValueError subclasses).
         log_warning(f"SARIF export failed (evaluation results are safe): {exc}")
+
+
+def _local_cache_backend():
+    """Composition root: wire the concrete cache backend here rather than
+    leaving mark_run_consolidated to build it internally. Deferred import so
+    a patch on ``quodeq.analysis.cache.local.LocalFileBackend`` is honored."""
+    from quodeq.analysis.cache.local import LocalFileBackend  # noqa: PLC0415
+    return LocalFileBackend()
+
+
+def _consolidate_run_cache(evaluation_dir: Path) -> None:
+    """Post-run cache consolidation, isolated from the run's own result.
+
+    ``mark_run_consolidated`` is already fail-soft internally (its own
+    whole-body catch degrades on (OSError, ValueError) rather than raising),
+    but this call sits after the run lifecycle has closed and
+    finalize_run_evaluate's return value becomes the process exit code -- so
+    an exception type that guard doesn't recognize must still never turn a
+    finished run's zero exit code into a nonzero one. ``run_isolated`` is
+    that backstop. Tests patch ``quodeq._cli_evaluate_finalize.mark_run_consolidated``
+    -- mock.patch resolves where a name is used, not where it's defined.
+    """
+    run_isolated(
+        lambda: mark_run_consolidated(evaluation_dir.parent, cache=_local_cache_backend()),
+        label="post-run cache consolidation", log=SHARED_LOG,
+    )
 
 
 def finalize_run_evaluate(args: argparse.Namespace, evaluation_dir: Path, result: int) -> int:
@@ -84,11 +116,7 @@ def finalize_run_evaluate(args: argparse.Namespace, evaluation_dir: Path, result
     # (a cancelled/failed/killed run leaves entries unconsolidated, so their
     # findings still read as new in the live feed).
     if not no_scored_reports:
-        from quodeq.analysis.cache.consolidation import mark_run_consolidated
-        from quodeq.analysis.cache.local import LocalFileBackend
-        # Composition root: wire the concrete cache backend here rather than
-        # leaving mark_run_consolidated to build it internally.
-        mark_run_consolidated(evaluation_dir.parent, cache=LocalFileBackend())
+        _consolidate_run_cache(evaluation_dir)
     # Only export SARIF on success and only when scored reports exist.
     if result == 0 and getattr(args, "sarif", None) and not no_scored_reports:
         write_sarif_if_requested(args, evaluation_dir)

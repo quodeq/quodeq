@@ -67,6 +67,7 @@ def _walk_and_partition_by_scope(
     Counter[str],
     dict[str, dict[str, Counter]],
     int,
+    int,
 ]:
     """Walk *src* once, bucketing files by their owning subproject scope.
 
@@ -75,8 +76,9 @@ def _walk_and_partition_by_scope(
     shouldn't appear in any target. Callers that must not lose unclassified source
     pass ``"."`` among *scope_paths* as a catch-all (see build_multi_scope_manifest).
 
-    The fourth element is how many files the git-tracked filter skipped: the
-    filter lives in the shared walk, so a monorepo run gets it too.
+    The fourth element is how many files the git-tracked filter skipped; the
+    fifth is how many directories the walk could not list. Both live in the
+    shared walk, so a monorepo run gets them too.
     """
     files_by_scope_lang: dict[str, dict[str, list[str]]] = {s: {} for s in scope_paths}
     ext_counts_overall: Counter[str] = Counter()
@@ -94,7 +96,7 @@ def _walk_and_partition_by_scope(
         ext_counts_by_scope_lang[owner].setdefault(lang, Counter())[suffix] += 1
     return (
         files_by_scope_lang, ext_counts_overall, ext_counts_by_scope_lang,
-        counts.skipped_untracked,
+        counts.skipped_untracked, counts.unreadable_dirs,
     )
 
 
@@ -160,7 +162,7 @@ def build_multi_scope_manifest(
     """Produce a manifest with one target group per detected subproject scope."""
     scope_paths, matches_by_scope = _resolve_scope_paths(sub_results)
     (
-        files_by_scope, ext_counts_overall, ext_counts_by_scope_lang, skipped,
+        files_by_scope, ext_counts_overall, ext_counts_by_scope_lang, skipped, unreadable,
     ) = _walk_and_partition_by_scope(src, walk, scope_paths)
 
     targets = _build_scope_targets(
@@ -171,5 +173,5 @@ def build_multi_scope_manifest(
     total = sum(t.total_files for t in targets)
     return SourceManifest(
         targets=targets, total_files=total, language_stats=dict(ext_counts_overall),
-        skipped_untracked=skipped,
+        skipped_untracked=skipped, unreadable_dirs=unreadable,
     )

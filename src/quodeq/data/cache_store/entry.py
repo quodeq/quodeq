@@ -24,15 +24,14 @@ ENTRY_FORMAT_VERSION = 3
 
 
 def quodeq_version() -> str:
-    """Best-effort current quodeq version string for provenance.
+    """Current quodeq version string for provenance, or "" if unset.
 
-    Lazily imported so this module stays import-cheap and never raises if the
-    package metadata is unavailable (e.g. running from an uninstalled tree)."""
-    try:
-        from quodeq import __version__  # noqa: PLC0415
-        return __version__ or ""
-    except Exception:  # noqa: BLE001 — provenance must never break a cache write
-        return ""
+    Lazily imported so this module stays import-cheap. Package metadata
+    resolution failures (e.g. running from an uninstalled tree) already
+    yield ``__version__ is None`` at import time (see ``quodeq/__init__.py``),
+    not a raise, so there is nothing left here worth swallowing."""
+    from quodeq import __version__  # noqa: PLC0415
+    return __version__ or ""
 
 
 def build_provenance(

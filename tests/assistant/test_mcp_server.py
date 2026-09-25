@@ -123,6 +123,28 @@ def test_dispatch_exception_answers_with_error_frame():
     assert "kaboom" in stderr.getvalue()
 
 
+def test_dispatch_failure_is_isolated_and_logs_traceback_to_stderr():
+    reg = _registry()
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    reg.dispatch = _boom
+    stdin = io.StringIO(
+        json.dumps({"jsonrpc": "2.0", "id": 9, "method": "tools/call",
+                     "params": {"name": "get_scores", "arguments": {}}}) + "\n"
+        + json.dumps({"jsonrpc": "2.0", "id": 10, "method": "ping", "params": {}}) + "\n",
+    )
+    stdout, stderr = io.StringIO(), io.StringIO()
+    server.serve(reg, stdin=stdin, stdout=stdout, stderr=stderr)
+    frames = [json.loads(l) for l in stdout.getvalue().splitlines() if l.strip()]
+    assert len(frames) == 2
+    assert frames[0]["error"]["code"] == -32603
+    assert frames[1]["result"] == {}  # ping still answered: the failure didn't kill the loop
+    assert "Traceback (most recent call last)" in stderr.getvalue()
+    assert "RuntimeError: boom" in stderr.getvalue()
+
+
 def test_all_cli_arguments_have_help_text():
     parser = argparse.ArgumentParser()
     server._build_arg_parser(parser)

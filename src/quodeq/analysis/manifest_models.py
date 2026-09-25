@@ -66,12 +66,17 @@ class SourceManifest:
     can see is worse than a lower one, so the count travels with the manifest.
     Zero means nothing was dropped, including when there is no git repository
     to ask.
+
+    ``unreadable_dirs`` is how many directories the walk could not list
+    (permission denied, vanished mid-walk). Same rationale: a partially-
+    scanned repo must not look identical to a fully-scanned one.
     """
 
     targets: list[AnalysisTarget] = field(default_factory=list)
     total_files: int = 0
     language_stats: dict[str, int] = field(default_factory=dict)
     skipped_untracked: int = 0
+    unreadable_dirs: int = 0
 
     # --- backward-compat properties (delegate to primary target) ---
 

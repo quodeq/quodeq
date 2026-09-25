@@ -1,3 +1,5 @@
+import httpx
+
 from quodeq.assistant.adapters.capabilities import supports_native_tools
 
 
@@ -25,8 +27,11 @@ def test_ollama_show_probe_positive_and_negative():
 
 
 def test_ollama_probe_error_means_false():
+    # httpx.ConnectError, not OSError: the probe's except was narrowed to
+    # (httpx.HTTPError, ValueError) (R-FT-7) -- what the real default probe's
+    # httpx.post()/raise_for_status()/resp.json() calls actually raise.
     def probe_boom(url, json):
-        raise OSError("connection refused")
+        raise httpx.ConnectError("connection refused")
 
     assert not supports_native_tools("ollama", "http://localhost:11434/v1", "m", probe=probe_boom)
 
@@ -54,7 +59,7 @@ def test_a_successful_probe_is_asked_once_per_model(monkeypatch):
 
 
 def test_a_failed_probe_is_asked_again(monkeypatch):
-    calls = _counting_default_probe(monkeypatch, OSError("connection refused"))
+    calls = _counting_default_probe(monkeypatch, httpx.ConnectError("connection refused"))
     base = "http://cache-miss-host:11434/v1"
     assert not supports_native_tools("ollama", base, "qwen3")
     assert not supports_native_tools("ollama", base, "qwen3")

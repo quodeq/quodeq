@@ -16,6 +16,8 @@ path.
 from __future__ import annotations
 
 import logging
+import threading
+from pathlib import Path
 from typing import Any
 
 from quodeq.services.background import BackgroundRunner, ThreadBackgroundRunner
@@ -31,6 +33,7 @@ from quodeq.services._mutation_scoring import (  # noqa: F401 — re-export
     resolve_default_run_id,
     slim_scores,
 )
+from quodeq.shared.fault_isolation import run_isolated
 from quodeq.shared.log_sink import LoggerSink
 
 logger = logging.getLogger(__name__)
@@ -149,6 +152,35 @@ def delete_all_delta(
     return _mutation_envelope(evaluations_dir, project, run_id, "delete_all")
 
 
+def _project_all_runs_and_release(proj_dir: Path, lock: threading.Lock) -> None:
+    """Run the project-wide projection sweep; always release *lock* after.
+
+    Called only once *lock* is already held (see _try_project_all_runs).
+    No ``log=`` kwarg: tests patch ``project_all_runs`` wholesale with a bare
+    ``(project_dir)`` side_effect, so the call site must stay
+    single-positional-arg compatible. The NULL_LOG default means an
+    individual run's own projection failure is already logged at warning by
+    ``project_all_runs`` itself (it falls back to this module's logger when
+    no log is injected); a failure escaping ``project_all_runs`` itself
+    (e.g. a directory-listing or repo-factory error) is caught at the
+    ``_bg_project`` boundary instead.
+    """
+    try:
+        project_all_runs(proj_dir)
+    finally:
+        lock.release()
+
+
+def _try_project_all_runs(proj_dir: Path, lock: threading.Lock) -> None:
+    """Acquire *lock* non-blockingly and, if won, run the projection sweep.
+
+    Skips (rather than queues) when another projection for the same project
+    already holds the lock -- it already covers the latest actions.
+    """
+    if lock.acquire(blocking=False):
+        _project_all_runs_and_release(proj_dir, lock)
+
+
 def rescore_with_fallback(
     evaluations_dir: str, project: str, run_id: str | None,
     *, runner: BackgroundRunner | None = None,
@@ -171,33 +203,11 @@ def rescore_with_fallback(
             return scores
 
         def _bg_project() -> None:
-            # Non-blocking acquire on purpose: skip rather than queue.
-            # An in-flight projection already covers the latest actions.
-            if not lock.acquire(blocking=False):
-                return
-            try:
-                # No log= kwarg: tests patch project_all_runs wholesale with a
-                # bare (project_dir) side_effect, so the call site must stay
-                # single-positional-arg compatible. NULL_LOG default means an
-                # individual run's own projection failure is already logged
-                # at warning by project_all_runs itself (it falls back to
-                # this module's logger when no log is injected).
-                project_all_runs(proj_dir)
-            except Exception as exc:  # noqa: BLE001 -- last-resort fallback: a failure that
-                # escapes project_all_runs itself (e.g. a directory-listing
-                # or repo-factory error, not an individual run's projection,
-                # which project_all_runs already handles per-run) would
-                # otherwise only reach ThreadBackgroundRunner.submit's own
-                # debug-level swallow -- invisible at this process's default
-                # INFO level (shared/logging.py). Log at warning here,
-                # matching the level project_all_runs itself already uses
-                # for per-run failures, so this stays visible in production.
-                logger.warning(
-                    "Background projection fallback failed for project %r "
-                    "(run_id=%r): %s", project, run_id, exc,
-                )
-            finally:
-                lock.release()
+            run_isolated(
+                lambda: _try_project_all_runs(proj_dir, lock),
+                label=f"background projection fallback for project {project!r} (run_id={run_id!r})",
+                log=logger,
+            )
 
         (runner or _SHARED_RUNNER).submit(
             _bg_project, name=f"rescore-project-{project}",

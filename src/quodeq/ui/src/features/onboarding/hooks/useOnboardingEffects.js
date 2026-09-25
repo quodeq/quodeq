@@ -24,7 +24,10 @@ export function useOnboardingEffects({ wizard, entry, setStandards }) {
     const visibleSet = new Set(readVisibleStandardIds().map((id) => (id || '').toLowerCase()));
     listStandards()
       .then((all) => setStandards(all.filter((s) => visibleSet.has((s.id || '').toLowerCase()))))
-      .catch(() => setStandards([]));
+      .catch((err) => {
+        console.warn('[useOnboardingEffects] standards fetch failed:', err);
+        setStandards([]);
+      });
   }, []);
 
   // Persist a draft on every step transition or relevant state change.

@@ -98,7 +98,12 @@ def maybe_emit_cli_notice(stream=None, env: dict[str, str] | None = None) -> Non
                 f"{tag}: {status['current']} → {status['latest']}. Run: {action}",
                 file=out,
             )
-    except Exception:  # pragma: no cover - defensive
+    except (OSError, ValueError):  # pragma: no cover - defensive
+        # check_async/get_status/set_settings already fail-soft internally
+        # (json_state.py swallows OSError/ValueError). The realistic sources
+        # here are both on print(..., file=out): OSError from a closed/broken
+        # stdout pipe, and UnicodeEncodeError (a ValueError subclass) when
+        # out's encoding can't render the "→" glyph.
         _logger.debug("update notice failed", exc_info=True)
 
 

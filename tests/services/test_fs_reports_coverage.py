@@ -44,6 +44,25 @@ class TestEnrichWithCoverage:
         result = _enrich_with_coverage(str(tmp_path), "proj", payload)
         assert "totalFiles" not in result
 
+    def test_non_utf8_scan_json(self, tmp_path):
+        from quodeq.services import fs_reports
+        (tmp_path / "proj").mkdir()
+        (tmp_path / "proj" / "scan.json").write_bytes(b"\xff\xfe\x00\x01")
+        payload = {"score": 80}
+        result = fs_reports._enrich_with_coverage(str(tmp_path), "proj", payload)
+        assert "totalFiles" not in result
+
+    def test_scan_json_not_an_object(self, tmp_path):
+        """scan.json holding a JSON array (or any non-object) must not crash
+        on the .get() calls -- skip enrichment instead."""
+        from quodeq.services import fs_reports
+        (tmp_path / "proj").mkdir()
+        (tmp_path / "proj" / "scan.json").write_text(json.dumps([1, 2, 3]))
+        payload = {"score": 80}
+        result = fs_reports._enrich_with_coverage(str(tmp_path), "proj", payload)
+        assert "totalFiles" not in result
+        assert result == payload
+
 
 class TestGetDimensionEval:
     def test_path_traversal(self, tmp_path):
