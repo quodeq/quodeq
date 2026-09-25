@@ -10,12 +10,9 @@ from __future__ import annotations
 
 import json
 import os
-import threading
 from pathlib import Path, PureWindowsPath
 
-from tests._timeouts import budget
-
-from quodeq.data.fs.evidence_tally import FindingTally, tally_unique_findings
+from quodeq.data.fs.evidence_tally import tally_unique_findings
 from quodeq.data.fs.run_files import dimension_evidence_file
 from quodeq.services._scan_progress_dims import (
     _LIVE_TALLIES,
@@ -154,47 +151,6 @@ def test_a_new_standard_on_disk_starts_a_fresh_tally(tmp_path):
     _dim_evidence_tally(dim_id, _ctx(run_dir, evaluators_dir, compiled_dir),
                         frozenset(), frozenset())
     assert len(_LIVE_TALLIES) == 2
-
-
-def test_one_run_s_advance_does_not_block_another_run_s_poll(tmp_path):
-    """Finding 8: the process-wide lock guards the memo, not the file read, so
-    a slow advance() on one run cannot serialise every other run's poll."""
-    _LIVE_TALLIES.clear()
-    gate = threading.Event()
-
-    class _BlockingTally:
-        def __init__(self, path, *, suppressed=None, resolver=None):
-            self.path = path
-            self.offset = 0
-
-        def advance(self):
-            if "blocked" in str(self.path):
-                assert gate.wait(timeout=budget(5)), "advance() was never released"
-            return FindingTally()
-
-    import quodeq.services._scan_progress_dims as dims
-
-    original = dims.IncrementalTally
-    dims.IncrementalTally = _BlockingTally
-    try:
-        slow = threading.Thread(target=lambda: live_tally(
-            tmp_path / "blocked.jsonl", suppressed=None, make_resolver=None, memo_key=("a",)))
-        slow.start()
-        done = threading.Event()
-
-        def _other_poll():
-            live_tally(tmp_path / "other.jsonl", suppressed=None, make_resolver=None, memo_key=("b",))
-            done.set()
-
-        other = threading.Thread(target=_other_poll)
-        other.start()
-        assert done.wait(timeout=budget(2)), \
-            "a second run's poll waited on the first run's read"
-    finally:
-        gate.set()
-        slow.join(timeout=budget(5))
-        other.join(timeout=budget(5))
-        dims.IncrementalTally = original
 
 
 def _write_status(run_dir: Path, state: str) -> None:

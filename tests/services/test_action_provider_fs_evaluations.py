@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from quodeq.services.base import EvaluationOptions
+from quodeq.services.evaluation_mixin import SubprocessDispatcher
 from quodeq.services.filesystem import FilesystemActionProvider
 
 
@@ -102,6 +103,18 @@ def test_browse_repo_filters_hidden(tmp_path: Path, monkeypatch) -> None:
     names = [entry["name"] for entry in payload["directories"]]
     assert "visible" in names
     assert ".hidden" not in names
+
+
+def test_provider_wires_a_subprocess_dispatcher_bound_to_its_jobs(tmp_path: Path) -> None:
+    """FilesystemActionProvider must inject dispatcher=SubprocessDispatcher(jobs)
+    into FsEvaluationMixin, not rely on the mixin's own fallback."""
+    jobs = StubJobs()
+    provider = FilesystemActionProvider(job_manager=jobs)
+
+    dispatcher = provider._eval_handler.dispatcher
+
+    assert isinstance(dispatcher, SubprocessDispatcher)
+    assert dispatcher._jobs is jobs
 
 
 def test_start_evaluation_uses_cli_module(tmp_path: Path) -> None:
