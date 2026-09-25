@@ -215,7 +215,7 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
     const sr = p.radius * pScale;
     // orbit ring
     ctx.beginPath(); ctx.arc(dsc.x, dsc.y, Math.hypot(sc.x - dsc.x, sc.y - dsc.y), 0, TAU);
-    ctx.strokeStyle = `rgba(50,55,80,${PRINCIPLE.orbitRingAlpha * pAlpha})`; ctx.lineWidth = 0.5; ctx.stroke();
+    ctx.strokeStyle = rgba(PRINCIPLE.orbitRingColor, PRINCIPLE.orbitRingAlpha * pAlpha); ctx.lineWidth = PRINCIPLE.orbitRingWidthPx; ctx.stroke();
     // connection line
     ctx.beginPath(); ctx.moveTo(dsc.x, dsc.y); ctx.lineTo(sc.x, sc.y);
     ctx.strokeStyle = rgba(dim.col, PRINCIPLE.linkAlpha * pAlpha); ctx.lineWidth = PRINCIPLE.linkWidthPx; ctx.stroke();

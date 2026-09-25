@@ -34,14 +34,15 @@ __all__ = [
     # these from here.
     "WEBVIEW_TOKEN_UA_PREFIX", "WEBVIEW_UA_MARKER", "diag",
     "quodeq_version", "webview_user_agent",
-    "MENU_POLL_INTERVAL_S",  # defined here, exported for _webview_window_help_menu's poller
+    "MENU_POLL_INTERVAL_S", "MENU_POLL_MAX_ATTEMPTS",  # defined here, exported for _webview_window_help_menu's poller
 ]
 
 _APP_DISPLAY_NAME = "quodeq"
 
-# NSTimer poll interval for the About/Help native-menu install pollers. Public:
-# shared with _webview_window_help_menu's _schedule_help_menu_poller.
+# NSTimer poll cadence for the About/Help native-menu install pollers, and how many
+# attempts (~5s) before one gives up. Public: shared with _webview_window_help_menu.
 MENU_POLL_INTERVAL_S = 0.2
+MENU_POLL_MAX_ATTEMPTS = 25
 
 _WM_SETICON = 0x0080  # Win32 WM_SETICON: set a window's icon via SendMessage
 
@@ -168,7 +169,7 @@ def _schedule_about_install_poller(target: object) -> None:
     from Foundation import NSTimer  # noqa: PLC0415
 
     state = {"attempts": 0, "timer": None}
-    max_attempts = 25  # ~5 seconds at 200ms
+    max_attempts = MENU_POLL_MAX_ATTEMPTS
 
     class _InstallPoller(NSObject):
         def tryInstall_(self, timer):  # noqa: ARG002

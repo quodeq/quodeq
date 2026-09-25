@@ -3,6 +3,11 @@ import CurvePlot from './CurvePlot.jsx';
 import GradeBoundaryBar from './GradeBoundaryBar.jsx';
 import { t } from '../../strings/index.js';
 
+// Bounds shared by the three severity-weight sliders below.
+const SEVERITY_WEIGHT_MIN = 0.05;
+const SEVERITY_WEIGHT_MAX = 10;
+const SEVERITY_WEIGHT_STEP = 0.05;
+
 /**
  * Per-severity weight sliders, plus the critical-to-minor ratio they imply.
  * @param {object} props.draft - the draft formula being edited.
@@ -14,11 +19,11 @@ export function SeverityTab({ draft, update }) {
   const ratio = w.minor > 0 ? Math.round(w.critical / w.minor) : 0;
   return (
     <div>
-      <ParamSlider label={t('gradeFormula.weightCritical')} value={w.critical} min={0.05} max={10} step={0.05}
+      <ParamSlider label={t('gradeFormula.weightCritical')} value={w.critical} min={SEVERITY_WEIGHT_MIN} max={SEVERITY_WEIGHT_MAX} step={SEVERITY_WEIGHT_STEP}
         hint={t('gradeFormula.hintCritical')} onChange={setW('critical')} />
-      <ParamSlider label={t('gradeFormula.weightMajor')} value={w.major} min={0.05} max={10} step={0.05}
+      <ParamSlider label={t('gradeFormula.weightMajor')} value={w.major} min={SEVERITY_WEIGHT_MIN} max={SEVERITY_WEIGHT_MAX} step={SEVERITY_WEIGHT_STEP}
         hint={t('gradeFormula.hintMajor')} onChange={setW('major')} />
-      <ParamSlider label={t('gradeFormula.weightMinor')} value={w.minor} min={0.05} max={10} step={0.05}
+      <ParamSlider label={t('gradeFormula.weightMinor')} value={w.minor} min={SEVERITY_WEIGHT_MIN} max={SEVERITY_WEIGHT_MAX} step={SEVERITY_WEIGHT_STEP}
         hint={t('gradeFormula.hintMinor')} onChange={setW('minor')} />
       <span className="settings-description">
         {t('gradeFormula.criticalWeighs')} {ratio}{t('gradeFormula.timesMinor')}

@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 import threading
 
-from quodeq.dashboard._webview_window_about import MENU_POLL_INTERVAL_S, diag
+from quodeq.dashboard._webview_window_about import MENU_POLL_INTERVAL_S, MENU_POLL_MAX_ATTEMPTS, diag
 from quodeq.dashboard._webview_window_chrome import logger
 from quodeq.shared.constants import PLATFORM_DARWIN
 
@@ -76,7 +76,7 @@ def _schedule_help_menu_poller(target: object) -> None:
     from Foundation import NSTimer  # noqa: PLC0415
 
     state = {"attempts": 0, "timer": None}
-    max_attempts = 25  # ~5 seconds at 200ms
+    max_attempts = MENU_POLL_MAX_ATTEMPTS
 
     class _HelpMenuPoller(NSObject):
         def tryInstall_(self, timer):  # noqa: ARG002

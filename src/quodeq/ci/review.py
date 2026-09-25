@@ -21,6 +21,7 @@ class ReviewError(RuntimeError):
 _GH_MISSING = "gh CLI not found. Install with 'brew install gh' and run 'gh auth login'."
 _GH_VIEW = "view"  # gh <resource> view
 _GH_JSON_FLAG = "--json"
+_DEFAULT_POOL_TIME_LIMIT_S = 300  # PR-diff eval budget when the caller sets none
 _GH_TIMEOUT_S = 60
 
 
@@ -145,7 +146,7 @@ def _run_pr_diff_and_locate_evidence(
         base_ref=f"origin/{base_branch}",
         output_dir=output_dir,
         dimensions=expand_dimension_aliases(dims) if dims else None,
-        time_limit=pool_budget if pool_budget is not None else 300,
+        time_limit=pool_budget if pool_budget is not None else _DEFAULT_POOL_TIME_LIMIT_S,
     )
     duration = int(time.time() - start)
     if exit_code != 0:

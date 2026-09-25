@@ -6,6 +6,10 @@ const RATE_HIGH = 0.9;
 const RATE_MEDIUM = 0.7;
 const RATE_LOW = 0.4;
 
+// Cell background tint: how much of the severity/compliance colour shows
+// through before it fades to transparent.
+const CELL_BG_MIX_PCT = 22;
+
 const SEVERITY_STATE_KEYS = {
   critical: 'map.stateCritical',
   major: 'map.stateMajor',
@@ -17,10 +21,10 @@ const SEVERITY_STATE_KEYS = {
 // the same lookup read through different fields, and the compliance entry is
 // the no-violations fallback.
 const BUCKETS = {
-  critical: { color: 'var(--color-sev-critical-text)', background: 'color-mix(in srgb, var(--color-sev-critical-text) 22%, transparent)', borderColor: 'var(--color-sev-critical-border)' },
-  major: { color: 'var(--color-sev-major-text)', background: 'color-mix(in srgb, var(--color-sev-major-text) 22%, transparent)', borderColor: 'var(--color-sev-major-border)' },
-  minor: { color: 'var(--color-sev-minor-text)', background: 'color-mix(in srgb, var(--color-sev-minor-text) 22%, transparent)', borderColor: 'var(--color-sev-minor-border)' },
-  compliance: { color: 'var(--color-compliance)', background: 'color-mix(in srgb, var(--color-compliance) 22%, transparent)', borderColor: 'var(--color-compliance-border)' },
+  critical: { color: 'var(--color-sev-critical-text)', background: `color-mix(in srgb, var(--color-sev-critical-text) ${CELL_BG_MIX_PCT}%, transparent)`, borderColor: 'var(--color-sev-critical-border)' },
+  major: { color: 'var(--color-sev-major-text)', background: `color-mix(in srgb, var(--color-sev-major-text) ${CELL_BG_MIX_PCT}%, transparent)`, borderColor: 'var(--color-sev-major-border)' },
+  minor: { color: 'var(--color-sev-minor-text)', background: `color-mix(in srgb, var(--color-sev-minor-text) ${CELL_BG_MIX_PCT}%, transparent)`, borderColor: 'var(--color-sev-minor-border)' },
+  compliance: { color: 'var(--color-compliance)', background: `color-mix(in srgb, var(--color-compliance) ${CELL_BG_MIX_PCT}%, transparent)`, borderColor: 'var(--color-compliance-border)' },
 };
 
 // The compliance-rate ladder, best first: a rate at or above the threshold

@@ -44,7 +44,7 @@ def violations_per_100_files(count: int, files_read: int | None) -> float | None
     """
     if not files_read or files_read <= 0:
         return None
-    return round(100.0 * count / files_read, 1)
+    return round(PERCENT_SCALE * count / files_read, 1)
 
 
 def classify_confidence_level(

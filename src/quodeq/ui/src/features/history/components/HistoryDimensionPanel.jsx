@@ -153,9 +153,9 @@ function DimensionBarChart({ data, onBarClick }) {
           tickLine={false}
         />
         <Tooltip content={DimensionTooltip} cursor={false} isAnimationActive={false} />
-        <ReferenceLine y={2.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
-        <ReferenceLine y={5}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
-        <ReferenceLine y={7.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+        <ReferenceLine y={CHART_Y_TICK_QUARTER} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+        <ReferenceLine y={CHART_Y_TICK_HALF}    stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
+        <ReferenceLine y={CHART_Y_TICK_THREE_QUARTER} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
         <Bar
           dataKey="numericScore"
           radius={CHART_BAR_RADIUS}

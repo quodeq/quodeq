@@ -22,6 +22,9 @@ export { drawStarfield } from './galaxyStarfield.js';
 // magnitude smaller) when two labels compete for the same space.
 const FOLDER_IMPORTANCE_BOOST = 1000;
 
+// Dimmer than GalaxyView's CONSTELLATION.lineAlpha: the folder view's lines are denser.
+const FOLDER_CONSTELLATION_LINE_ALPHA = 0.25;
+
 /**
  * Paint the canvas background gradient and return the theme colours every
  * other draw helper in this module reads. The scene itself is not consulted:
@@ -97,14 +100,14 @@ export function drawNebula(ctx, curNode, frame) {
 export function drawConstellationLines(ctx, activeScene, tc, w2s) {
   const { lines, rootStars } = activeScene;
   if (lines.length === 0) return;
-  const { r: mr, g: mg, b: mb } = tc.textMuted;
+  const muted = tc.textMuted;
   ctx.beginPath();
   for (const l of lines) {
     const sa = w2s(rootStars[l.a].x, rootStars[l.a].y);
     const sb = w2s(rootStars[l.b].x, rootStars[l.b].y);
     ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y);
   }
-  ctx.strokeStyle = `rgba(${mr},${mg},${mb},0.25)`;
+  ctx.strokeStyle = rgba(muted, FOLDER_CONSTELLATION_LINE_ALPHA);
   ctx.lineWidth = 0.8; ctx.stroke();
 }
 
