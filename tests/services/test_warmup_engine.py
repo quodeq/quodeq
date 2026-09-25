@@ -6,6 +6,7 @@ work to a daemon thread; the projects route stays a pure read.
 """
 from __future__ import annotations
 
+import logging
 import threading
 import time
 
@@ -236,6 +237,40 @@ def test_display_name_failure_falls_back_to_the_project_id(tmp_path, make_engine
     assert entered.wait(5)
     assert eng.snapshot()["currentProjectName"] == "p1"
     release.set()
+
+
+def test_display_name_out_of_scope_error_logs_and_still_warms_the_next_project(
+    tmp_path, make_engine, monkeypatch, caplog,
+):
+    """A bug outside (OSError, ValueError) must not kill the score-warmup
+    thread: run_isolated (the sole statement in _worker's loop body) logs it
+    at warning with a traceback and the worker keeps draining the queue."""
+    def display_name_boom(_reports_dir, project_id):
+        if project_id == "bad":
+            raise AttributeError("unexpected bug")
+        return project_id
+
+    monkeypatch.setattr("quodeq.services.warmup._project_display_name", display_name_boom)
+    seen = []
+
+    def warm(reports_dir, pid):
+        seen.append(pid)
+
+    caplog.set_level(logging.WARNING, logger="quodeq.services.warmup")
+    eng = make_engine(
+        warm_fn=warm, list_fn=lambda _rd: [("bad", "2026-08-01"), ("good", "2026-07-01")],
+    )
+    eng.start(str(tmp_path))
+    assert _wait_until(lambda: eng.snapshot() is not None and eng.snapshot()["projectsDone"] == 2)
+    # "bad" aborts before warm_fn runs; "good" still warms -- the thread survived.
+    assert seen == ["good"]
+
+    matching = [r for r in caplog.records if "score warmup" in r.getMessage()]
+    assert matching, [(r.levelname, r.getMessage()) for r in caplog.records]
+    assert matching[0].levelno == logging.WARNING
+    assert "bad" in matching[0].getMessage()
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "AttributeError" in caplog.text
 
 
 def test_bad_repository_info_json_does_not_kill_worker(tmp_path, make_engine):

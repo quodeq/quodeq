@@ -58,7 +58,6 @@ src/quodeq/services/cache_maintenance.py:40:broad-except
 src/quodeq/services/grade_formula_job.py:197:broad-except
 src/quodeq/services/project_registration.py:164:broad-except
 src/quodeq/services/shared_publish.py:195:broad-except
-src/quodeq/services/warmup.py:174:broad-except
 src/quodeq/shared/resource_sampler.py:146:broad-except
 src/quodeq/terminal/_pty_windows.py:75:broad-except
 src/quodeq/update/checker.py:84:broad-except

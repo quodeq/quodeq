@@ -1128,7 +1128,7 @@ tests/services/test_violations_stream_coverage.py:92:private-name:quodeq.service
 tests/services/test_violations_stream_coverage.py:98:private-name:quodeq.services._violations_stream._StreamAccumulator
 tests/services/test_violations_stream_coverage.py:98:private-name:quodeq.services._violations_stream._parse_stream_line
 tests/services/test_violations_stream_coverage.py:9:private-name:quodeq.services._violations_stream._try_parse_text_line
-tests/services/test_warmup_engine.py:184:private-name:quodeq.services.warmup._warm_project
+tests/services/test_warmup_engine.py:185:private-name:quodeq.services.warmup._warm_project
 tests/shared/test_coerce_line.py:36:private-module:quodeq.assistant.tools._read_tools_violations
 tests/shared/test_config_loader.py:5:private-module:quodeq.shared._config
 tests/shared/test_copilot.py:7:private-module:quodeq.assistant.adapters._cli_spawn.build_chat_env
