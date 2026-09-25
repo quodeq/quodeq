@@ -6,6 +6,7 @@ work to a daemon thread; the projects route stays a pure read.
 """
 from __future__ import annotations
 
+import logging
 import threading
 import time
 
@@ -189,6 +190,87 @@ def test_default_warm_project_runs_against_a_real_project_dir(tmp_path, monkeypa
     (project / "repository_info.json").write_text('{"name": "proj"}', encoding="utf-8")
 
     _warm_project(str(tmp_path), "proj")  # must not raise
+
+
+def test_start_survives_a_project_listing_failure(tmp_path, make_engine):
+    """A real enumeration failure (e.g. a bad run directory tripping
+    validate_path_segment, or a filesystem stat error) must not stop the
+    engine from starting -- it just starts with an empty queue."""
+    def boom(_rd):
+        raise OSError("listing failed")
+
+    eng = make_engine(warm_fn=lambda *_: None, list_fn=boom)
+    eng.start(str(tmp_path))
+    assert _wait_until(lambda: eng.snapshot() is not None)
+    assert eng.snapshot()["projectsTotal"] == 0
+
+
+def test_start_lets_an_out_of_scope_listing_error_propagate(tmp_path, make_engine):
+    """A bug in the listing seam outside (OSError, ValueError) is a genuine
+    defect and must surface at startup, not be silently absorbed."""
+    def boom(_rd):
+        raise RuntimeError("unexpected bug")
+
+    eng = make_engine(warm_fn=lambda *_: None, list_fn=boom)
+    with pytest.raises(RuntimeError, match="unexpected bug"):
+        eng.start(str(tmp_path))
+
+
+def test_display_name_failure_falls_back_to_the_project_id(tmp_path, make_engine, monkeypatch):
+    """A bad/unreadable repository_info.json (or any (OSError, ValueError)
+    from _project_display_name) must not crash the worker -- the progress
+    display just falls back to the raw project id."""
+    entered = threading.Event()
+    release = threading.Event()
+
+    def boom(_reports_dir, _project_id):
+        raise ValueError("bad metadata")
+
+    monkeypatch.setattr("quodeq.services.warmup._project_display_name", boom)
+
+    def warm(reports_dir, pid):
+        entered.set()
+        release.wait(5)
+
+    eng = make_engine(warm_fn=warm, list_fn=lambda _rd: [("p1", "2026-08-01")])
+    eng.start(str(tmp_path))
+    assert entered.wait(5)
+    assert eng.snapshot()["currentProjectName"] == "p1"
+    release.set()
+
+
+def test_display_name_out_of_scope_error_logs_and_still_warms_the_next_project(
+    tmp_path, make_engine, monkeypatch, caplog,
+):
+    """A bug outside (OSError, ValueError) must not kill the score-warmup
+    thread: run_isolated (the sole statement in _worker's loop body) logs it
+    at warning with a traceback and the worker keeps draining the queue."""
+    def display_name_boom(_reports_dir, project_id):
+        if project_id == "bad":
+            raise AttributeError("unexpected bug")
+        return project_id
+
+    monkeypatch.setattr("quodeq.services.warmup._project_display_name", display_name_boom)
+    seen = []
+
+    def warm(reports_dir, pid):
+        seen.append(pid)
+
+    caplog.set_level(logging.WARNING, logger="quodeq.services.warmup")
+    eng = make_engine(
+        warm_fn=warm, list_fn=lambda _rd: [("bad", "2026-08-01"), ("good", "2026-07-01")],
+    )
+    eng.start(str(tmp_path))
+    assert _wait_until(lambda: eng.snapshot() is not None and eng.snapshot()["projectsDone"] == 2)
+    # "bad" aborts before warm_fn runs; "good" still warms -- the thread survived.
+    assert seen == ["good"]
+
+    matching = [r for r in caplog.records if "score warmup" in r.getMessage()]
+    assert matching, [(r.levelname, r.getMessage()) for r in caplog.records]
+    assert matching[0].levelno == logging.WARNING
+    assert "bad" in matching[0].getMessage()
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "AttributeError" in caplog.text
 
 
 def test_bad_repository_info_json_does_not_kill_worker(tmp_path, make_engine):

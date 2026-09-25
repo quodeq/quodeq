@@ -95,16 +95,20 @@ def test_rescore_with_fallback_logs_background_projection_failure_at_warning(
 
     deadline = time.monotonic() + 2
     while time.monotonic() < deadline:
-        if any("projection blew up" in r.message for r in caplog.records):
+        if any("failed" in r.getMessage() for r in caplog.records):
             break
         time.sleep(0.02)
 
-    matching = [r for r in caplog.records if "projection blew up" in r.message]
+    matching = [r for r in caplog.records if "failed" in r.getMessage()]
     assert matching, (
         "background projection failure was not logged at WARNING (fell "
         f"back to debug-only visibility?); records seen: "
-        f"{[(r.levelname, r.message) for r in caplog.records]}"
+        f"{[(r.levelname, r.getMessage()) for r in caplog.records]}"
     )
     assert matching[0].name == "quodeq.services.mutation_rescore"
     assert matching[0].levelno == logging.WARNING
-    assert "cluster17-fallback-proj" in matching[0].message
+    assert "cluster17-fallback-proj" in matching[0].getMessage()
+    # The traceback (not just the exception's str()) now reaches the log,
+    # via the run_isolated fault-isolation boundary.
+    assert "projection blew up" in caplog.text
+    assert "Traceback (most recent call last)" in caplog.text

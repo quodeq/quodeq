@@ -51,7 +51,9 @@ def _compute_accumulated_payload(req: _ScoresRequest, rescore_complete: list[boo
     """Compute accumulated dims + summary, rescored, tracking coverage in
     *rescore_complete* (a 1-element list used as an outparam) so the caller's
     cache-eligibility check can see it."""
-    acc = compute_accumulated(str(req.reports_root), req.project, req.as_of, params=req.params)
+    acc = compute_accumulated(
+        str(req.reports_root), req.project, req.as_of, params=req.params, log=SHARED_LOG,
+    )
     if acc is None:
         acc = {"dimensions": [], "summary": {}}
     payload, complete = rescore_accumulated_with_coverage(

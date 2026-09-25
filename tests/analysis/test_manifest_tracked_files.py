@@ -174,7 +174,7 @@ def test_multi_scope_walk_filters_untracked(tmp_path: Path) -> None:
         tracked_files={(tmp_path / "pkg" / "kept.py").resolve()},
     )
 
-    files_by_scope, _, _, skipped = _walk_and_partition_by_scope(tmp_path, spec, ["pkg"])
+    files_by_scope, _, _, skipped, _ = _walk_and_partition_by_scope(tmp_path, spec, ["pkg"])
     assert files_by_scope["pkg"]["python"] == ["pkg/kept.py"]
     assert skipped == 1
 

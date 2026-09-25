@@ -90,7 +90,8 @@ class EvaluationsIndex:
         """In-memory jobs from the ``JobManager``; empty when it cannot list them."""
         try:
             return self._jobs.list_jobs(reports_root=None)
-        except (AttributeError, TypeError):
+        except (AttributeError, TypeError) as exc:
+            _logger.warning("list_jobs failed: %s", exc)
             return []
 
     def _indexed_snapshots(

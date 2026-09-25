@@ -217,3 +217,13 @@ def test_get_violations_without_run(ctx):
     out = build_registry(no_run).dispatch("get_violations", {"dimension": "security"})
     assert out["ok"] is False
     assert "get_context" in out["error"]
+
+
+def test_get_violations_surfaces_a_tool_error_for_corrupt_report(ctx):
+    (ctx.run_dir / "evaluation" / "security.json").write_text("{not json", encoding="utf-8")
+    out = build_registry(ctx).dispatch("get_violations", {"dimension": "security"})
+    assert out["ok"] is False
+    assert "security" in out["error"]
+    # The raw parse exception text never reaches the model/user-facing error.
+    assert "not json" not in out["error"]
+    assert "Expecting" not in out["error"]

@@ -15,6 +15,7 @@ Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
 """
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -101,7 +102,7 @@ def _build_router_context(
             **_repo_signals(work_dir),
             **_precedent_signals(project_dir, run_dir),
         )
-    except Exception as exc:  # noqa: BLE001 - degrade gracefully to raw findings on enrichment setup failure
+    except (OSError, json.JSONDecodeError) as exc:
         _log.warning("Could not build enrichment context: %s -- writing raw", exc)
         return None
 

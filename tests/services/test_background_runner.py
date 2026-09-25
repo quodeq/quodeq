@@ -93,7 +93,7 @@ def test_100_blocking_tasks_use_at_most_4_threads_and_drop_the_overflow():
     assert "dropped task blocking" in sink.warnings[0]
 
 
-def test_a_failing_task_is_logged_at_debug_and_the_next_task_still_runs():
+def test_a_failing_task_is_logged_at_warning_with_traceback_and_the_next_task_still_runs():
     sink = _Sink()
     runner = ThreadBackgroundRunner(log=sink)
     after = threading.Event()
@@ -107,7 +107,10 @@ def test_a_failing_task_is_logged_at_debug_and_the_next_task_still_runs():
 
     assert after.wait(budget(5))
     _join_new_workers(before)
-    assert any("boom" in line for line in sink.debugs)
+    [message] = sink.warnings
+    assert "failed" in message
+    assert "Traceback (most recent call last)" in message
+    assert "RuntimeError: boom" in message
 
 
 def test_idle_runner_holds_no_threads_and_a_later_submit_starts_a_worker():

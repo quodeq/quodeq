@@ -136,7 +136,7 @@ def _configure_paths_and_cleanup(app: Flask, env: dict[str, str] | None = None) 
 
     try:
         sweep_orphaned_clones(get_clones_dir(env), Path(get_evaluations_dir(env=env)))
-    except Exception as exc:  # pragma: no cover - best-effort cleanup
+    except OSError as exc:  # pragma: no cover - best-effort cleanup
         _logger.warning("Orphaned-clone sweep failed at startup: %s", exc)
 
     if "STANDARDS_EVALUATORS_DIR" not in app.config:
@@ -271,7 +271,7 @@ def _start_background_work() -> None:
         from quodeq.shared.log_sink import SHARED_LOG  # noqa: PLC0415
         warmup_engine.start(reports_dir())
         start_cache_maintenance(log=SHARED_LOG)
-    except Exception:  # pragma: no cover - warm-up must never block serving
+    except (ImportError, RuntimeError, OSError):  # pragma: no cover - warm-up must never block serving
         _logger.warning("warm-up start failed", exc_info=True)
 
 

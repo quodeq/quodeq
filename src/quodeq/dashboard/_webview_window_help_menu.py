@@ -14,6 +14,7 @@ from quodeq.dashboard._webview_diag import diag_stream
 from quodeq.dashboard._webview_window_about import MENU_POLL_INTERVAL_S, MENU_POLL_MAX_ATTEMPTS
 from quodeq.dashboard._webview_window_chrome import logger
 from quodeq.shared.constants import PLATFORM_DARWIN
+from quodeq.shared.fault_isolation import run_isolated
 
 _help_target: object | None = None  # keep the Help-menu handler alive (menu item holds a weak ref)
 _help_menu_installed = False  # the _HelpHandler ObjC class may only be defined once
@@ -37,10 +38,10 @@ def _build_help_handler(window: object) -> object:
             # Menu actions fire on the AppKit main thread, where evaluate_js
             # deadlocks (it blocks on the JS engine) — hop to a worker thread.
             def _run() -> None:
-                try:
-                    window.evaluate_js(NAVIGATE_HELP_JS)  # type: ignore[union-attr]
-                except Exception:  # noqa: BLE001 — window may be tearing down
-                    logger.debug("help-menu navigation failed", exc_info=True)
+                run_isolated(
+                    lambda: window.evaluate_js(NAVIGATE_HELP_JS),  # type: ignore[union-attr]
+                    label="help-menu navigation", log=logger,
+                )
             threading.Thread(target=_run, daemon=True).start()
 
     return _HelpHandler.alloc().init()
@@ -163,10 +164,10 @@ def non_macos_menu(window: object) -> "list[object] | None":
         # Menu callbacks fire on the backend's GUI thread, where evaluate_js
         # can deadlock — hop to a worker thread (same discipline as macOS).
         def _run() -> None:
-            try:
-                window.evaluate_js(NAVIGATE_HELP_JS)  # type: ignore[union-attr]
-            except Exception:  # noqa: BLE001 — window may be tearing down
-                logger.debug("help-menu navigation failed", exc_info=True)
+            run_isolated(
+                lambda: window.evaluate_js(NAVIGATE_HELP_JS),  # type: ignore[union-attr]
+                label="help-menu navigation", log=logger,
+            )
         threading.Thread(target=_run, daemon=True).start()
 
     return [wm.Menu(_HELP_MENU_TITLE, [wm.MenuAction("quodeq Help", _open_help)])]

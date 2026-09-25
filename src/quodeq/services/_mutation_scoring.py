@@ -10,7 +10,9 @@ entry too (see ``tests/tools/test_logging_boundary.py``).
 """
 from __future__ import annotations
 
+import json
 import logging
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -83,7 +85,7 @@ def rescore_run(
         return slim_scores(get_scores_raw(reports_root, project, run_id))
     except FileNotFoundError:
         return None
-    except Exception as exc:  # noqa: BLE001
+    except (sqlite3.Error, OSError, json.JSONDecodeError, ValueError, KeyError, RuntimeError) as exc:
         # Never let a rescore failure break the mutation — the dismiss is
         # already persisted in actions.jsonl. Log and return None so the
         # client falls back to a refetch.
@@ -105,7 +107,7 @@ def resolve_default_run_id(evaluations_dir: str, project: str) -> str | None:
     reports_root = Path(evaluations_dir).resolve()
     try:
         runs = list_runs(reports_root, project)
-    except Exception as exc:  # noqa: BLE001 - unable to list runs, return None to use fallback
+    except (OSError, ValueError) as exc:
         _logger.warning("Failed to resolve default run for %s: %s", project, exc)
         return None
     if not runs:

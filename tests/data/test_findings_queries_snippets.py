@@ -71,6 +71,14 @@ class TestDismissedSnippetReaders:
 
         assert read_semantic_eligible_dismissals(tmp_path) == []
 
+    def test_semantic_eligible_swallows_an_unreadable_db(self, tmp_path, monkeypatch):
+        from quodeq.data.sqlite.findings_queries import read_semantic_eligible_dismissals
+
+        _seed(tmp_path, req="X-1", file="src/a.py", line=10)
+        _break_reopen_with_operational_error(monkeypatch)
+
+        assert read_semantic_eligible_dismissals(tmp_path) == []
+
 
 class TestReadActiveFindings:
     """The scores response builder (services.scoring) used to inline this SELECT."""

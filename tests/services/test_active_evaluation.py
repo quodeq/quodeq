@@ -86,6 +86,17 @@ def test_projects_failure_falls_back_to_first_running_job():
     assert job is not None and job.job_id == "j1"
 
 
+def test_projects_failure_logs_before_falling_back(recording_log):
+    provider = StubProvider(
+        [_job("j1", project="gone")],
+        projects_error=OSError("projects listing broke"),
+    )
+    job = find_active_evaluation(provider, _REPORTS, log=recording_log)
+    assert job is not None and job.job_id == "j1"
+    assert recording_log.warning_messages
+    assert "project list failed" in recording_log.warning_messages[0]
+
+
 def test_dict_jobs_and_dict_projects_are_supported():
     # Remote/stub providers hand back wire dicts; the rule reads the same
     # keys the webview used to read ("project" as the legacy fallback).

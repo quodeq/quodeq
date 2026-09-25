@@ -23,6 +23,7 @@ from quodeq.core.scoring.engine import score_evidence
 from quodeq.services.scored_jobs_registry import ScoringClaims
 from quodeq.services.background import BackgroundRunner
 from quodeq.services.grade_formula import load_params
+from quodeq.shared.fault_isolation import run_isolated
 from quodeq.shared.log_sink import log_malformed_jsonl_line, log_quarantined_findings
 from quodeq.services.wiring import (
     dimension_queue_file,
@@ -229,13 +230,10 @@ def score_terminal_run_once(
     }
 
     def _score_in_bg() -> None:
-        try:
-            score_completed_evidence(reports_dir, _score_args)
-        except Exception as exc:  # noqa: BLE001 - fire-and-forget background task, any error must not propagate
-            _logger.debug(
-                "Could not score cancelled dimension for %s: %s",
-                _score_args.get("outputRunId"), exc,
-            )
+        run_isolated(
+            lambda: score_completed_evidence(reports_dir, _score_args),
+            label=f"score cancelled dimension for {_score_args.get('outputRunId')}", log=_logger,
+        )
 
     if not runner.submit(_score_in_bg, name=f"score-{job_id}"):
         # Dropped (queue full): give the claim back so the next GET retries.

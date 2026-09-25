@@ -114,6 +114,40 @@ def test_apply_to_all_runs_reports_failed_runs_and_continues(tmp_path, formula_p
     assert cleared["n"] == 1  # cache cleared despite the partial failure
 
 
+def test_apply_to_all_runs_isolates_an_out_of_scope_recompute_error_and_continues(
+    tmp_path, formula_path, monkeypatch,
+):
+    """recompute_grades' retried surface is (sqlite3.Error, OSError,
+    ValueError, RuntimeError) -- open_evaluation_db's own raises plus a
+    locked/corrupt db. A bug outside that surface (e.g. a KeyError from a
+    corrupt evidence file) used to abort the whole apply pass and leave the
+    rescore-pending marker set, so a restart hit the same run and failed the
+    same way again. It must instead cost only that run: the run is reported
+    in .failed and every other run still gets rescored."""
+    project = tmp_path / "proj"
+    for name in ("run-bad", "run-good"):
+        d = project / name
+        d.mkdir(parents=True)
+        (d / "events.jsonl").write_text("")
+
+    seen = []
+
+    def flaky(run_dir, params=None):
+        seen.append(run_dir.name)
+        if run_dir.name == "run-bad":
+            raise KeyError("corrupt evidence")
+
+    monkeypatch.setattr("quodeq.services.grade_formula.recompute_grades", flaky)
+    monkeypatch.setattr(
+        "quodeq.services.dashboard.clear_shared_dimension_cache", lambda: None,
+    )
+
+    result = grade_formula.apply_to_all_runs(tmp_path)
+    assert result.rescored == 1
+    assert result.failed == ["run-bad"]
+    assert seen == ["run-bad", "run-good"]
+
+
 def test_apply_to_all_runs_clears_cache_when_root_missing(formula_path, monkeypatch, tmp_path):
     """Cache is cleared even when reports_root doesn't exist (returns 0)."""
     cleared = {"called": False}

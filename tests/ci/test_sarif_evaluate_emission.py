@@ -54,3 +54,15 @@ def test_write_sarif_noop_when_flag_absent(tmp_path):
     _seed_reports(eval_dir)
     # sarif=None -> nothing written, no error.
     write_sarif_if_requested(_Args(sarif=None), eval_dir)
+
+
+def test_write_sarif_is_fail_soft_on_malformed_report(tmp_path):
+    """A corrupt report JSON raises json.JSONDecodeError (a ValueError
+    subclass) out of load_evaluation_reports; must be swallowed too."""
+    eval_dir = tmp_path / "evaluation"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    (eval_dir / "reliability.json").write_text("{not valid json", encoding="utf-8")
+    out = tmp_path / "q.sarif"
+
+    write_sarif_if_requested(_Args(sarif=str(out)), eval_dir)  # must NOT raise
+    assert not out.exists()

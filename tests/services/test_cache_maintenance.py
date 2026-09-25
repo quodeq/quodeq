@@ -38,3 +38,15 @@ def test_start_cache_maintenance_survives_failures(tmp_path: Path, monkeypatch):
     thread = start_cache_maintenance(tmp_path / "results", standards_dir=None)
     thread.join(timeout=10)
     assert not thread.is_alive()  # swallowed and logged, never propagated
+
+
+def test_default_standards_dir_survives_a_default_paths_failure(tmp_path, monkeypatch):
+    """default_paths() does filesystem stat work (is_dir/parents walk) to
+    locate the bundled data dir; a permission/IO error there must not stop
+    maintenance from starting -- it just runs without a standards_dir."""
+    def boom():
+        raise OSError("permission denied")
+    monkeypatch.setattr("quodeq.services.cache_maintenance.default_paths", boom)
+    thread = start_cache_maintenance(tmp_path / "results", standards_dir=None)
+    thread.join(timeout=10)
+    assert not thread.is_alive()

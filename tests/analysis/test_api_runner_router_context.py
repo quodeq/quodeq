@@ -76,6 +76,43 @@ class TestSyncCacheWrite:
         )
 
 
+class TestBuildRouterContextDegradesOnEnrichmentSetupFailure:
+    def test_unreadable_compiled_standards_degrades_to_none(self, tmp_path, monkeypatch, caplog):
+        """_build_router_context's except narrows to (OSError, json.JSONDecodeError):
+        a failure loading compiled refs/requirements must still degrade to
+        raw-findings mode (ctx=None), not abort the run."""
+        import logging
+
+        def boom(*_a, **_kw):
+            raise OSError("disk read failed")
+
+        monkeypatch.setattr("quodeq.analysis._api_runner.load_compiled_refs", boom)
+
+        with caplog.at_level(logging.WARNING, logger="quodeq.analysis._api_runner"):
+            ctx = _build_router_context(
+                tmp_path, "security", None, tmp_path, tmp_path / "run-1",
+            )
+
+        assert ctx is None
+        assert any("Could not build enrichment context" in r.message for r in caplog.records)
+
+    def test_malformed_compiled_standards_json_degrades_to_none(self, tmp_path, monkeypatch):
+        """Same contract for the other tuple member: a compiled-standards
+        read that raises json.JSONDecodeError must also degrade, not abort."""
+        import json
+
+        def boom(*_a, **_kw):
+            raise json.JSONDecodeError("bad json", "doc", 0)
+
+        monkeypatch.setattr("quodeq.analysis._api_runner.load_compiled_requirements", boom)
+
+        ctx = _build_router_context(
+            tmp_path, "security", None, tmp_path, tmp_path / "run-1",
+        )
+
+        assert ctx is None
+
+
 class TestBuildRouterContextCorpus:
     """`_build_router_context` wires precedent_corpus (env-gated, never raises)."""
 

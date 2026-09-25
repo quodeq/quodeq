@@ -83,7 +83,7 @@ def test_project_all_runs_explicit_log_none_falls_back_like_omitting_it(tmp_path
     with caplog.at_level(logging.WARNING, logger="quodeq.services.mutation_rescore"):
         project_all_runs(tmp_path, repo_factory=_BoomRepo, log=None)
 
-    matching = [r for r in caplog.records if "boom-explicit-none" in r.message]
+    matching = [r for r in caplog.records if r.exc_info and "boom-explicit-none" in str(r.exc_info[1])]
     assert matching, [(r.name, r.message) for r in caplog.records]
     assert matching[0].name == "quodeq.services.mutation_rescore"
 
@@ -108,6 +108,34 @@ def test_project_all_runs_falls_back_to_the_mutation_rescore_logger_by_name(tmp_
     with caplog.at_level(logging.WARNING, logger="quodeq.services.mutation_rescore"):
         project_all_runs(tmp_path, repo_factory=_BoomRepo)
 
-    matching = [r for r in caplog.records if "boom-default" in r.message]
+    matching = [r for r in caplog.records if r.exc_info and "boom-default" in str(r.exc_info[1])]
     assert matching, [(r.name, r.message) for r in caplog.records]
     assert matching[0].name == "quodeq.services.mutation_rescore"
+
+
+def test_project_all_runs_isolates_a_failing_run_and_continues(tmp_path, recording_log):
+    from quodeq.services.mutation_rescore import project_all_runs
+
+    (tmp_path / "r1").mkdir()
+    (tmp_path / "r1" / "events.jsonl").write_text("")
+    (tmp_path / "r2").mkdir()
+    (tmp_path / "r2" / "events.jsonl").write_text("")
+
+    seen = []
+
+    class _FlakyRepo:
+        def __init__(self, run_dir) -> None:
+            self._run_dir = run_dir
+
+        def ensure_projected(self) -> None:
+            if self._run_dir.name == "r1":
+                raise RuntimeError("boom")
+            seen.append(self._run_dir)
+
+    project_all_runs(tmp_path, repo_factory=_FlakyRepo, log=recording_log)
+
+    assert seen == [tmp_path / "r2"]
+    matching = [m for m in recording_log.warning_messages if "failed" in m]
+    assert matching, recording_log.warning_messages
+    assert "Traceback (most recent call last)" in matching[0]
+    assert "RuntimeError: boom" in matching[0]

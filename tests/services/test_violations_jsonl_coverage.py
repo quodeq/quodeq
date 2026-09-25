@@ -46,6 +46,13 @@ class TestParseJsonlFindings:
         assert v == []
         assert c == []
 
+    def test_invalid_json_logs_a_warning_per_malformed_line(self):
+        with patch("quodeq.services._violations_jsonl._logger.warning") as warning:
+            _parse_jsonl_findings(["not json", "{bad"], "security")
+        assert warning.call_count == 2
+        assert "not json" in warning.call_args_list[0].args[1]
+        assert "malformed" in warning.call_args_list[0].args[0].lower()
+
     def test_missing_principle(self):
         v, c = _parse_jsonl_findings([json.dumps({"t": "violation"})], "sec")
         assert v == []

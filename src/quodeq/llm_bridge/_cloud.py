@@ -64,7 +64,7 @@ def check_cloud_connection(
             )
             latency = int((time.monotonic() - start) * 1000)
             return {"success": True, "model": model, "latency_ms": latency}
-    except Exception as exc:
+    except (openai.OpenAIError, httpx.HTTPError) as exc:
         # Surface the exception type and HTTP status codes without leaking
         # internal details like file paths, stack traces, or server headers.
         error_type = type(exc).__name__

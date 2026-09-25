@@ -2,9 +2,35 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from quodeq.analysis._command import _build_mcp_server_args
 from quodeq.analysis._config import AnalysisConfig
+from quodeq.analysis.subprocess import build_ai_cmd
+
+
+def test_build_ai_cmd_logs_unknown_mcp_style(tmp_path, monkeypatch):
+    """An unrecognized provider mcp_style used to drop MCP args silently.
+
+    Driven through the public ``build_ai_cmd`` seam (not the private
+    ``_mcp_arg_builders.build_mcp_args`` it delegates to), matching how a
+    real caller reaches this path.
+    """
+    jsonl = tmp_path / "findings.jsonl"
+    config = AnalysisConfig(jsonl_file=jsonl, ai_cmd="some-provider")
+    provider_cfg = {"some-provider": {"mcp_style": "not-a-real-style", "cmd": "some-provider"}}
+    monkeypatch.setattr(
+        "quodeq.analysis._command._get_provider_configs", lambda: provider_cfg,
+    )
+
+    with patch("quodeq.analysis._command._log.warning") as warning:
+        args, mcp_config_path = build_ai_cmd("prompt", config)
+
+    assert mcp_config_path is None
+    assert warning.called
+    message = warning.call_args.args[0]
+    assert "not-a-real-style" in message
+    assert "some-provider" in message
 
 
 # ---------------------------------------------------------------------------

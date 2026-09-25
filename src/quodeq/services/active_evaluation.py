@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import ActionProvider
@@ -47,7 +48,7 @@ def _project_id(entry: Any) -> str | None:
 
 
 def find_active_evaluation(
-    provider: ActionProvider, reports_dir: str,
+    provider: ActionProvider, reports_dir: str, *, log: LogSink = NULL_LOG,
 ) -> JobSnapshot | dict[str, Any] | None:
     """Return the first non-stale running evaluation job, or None.
 
@@ -66,7 +67,8 @@ def find_active_evaluation(
         data = provider.list_projects(reports_dir)
         projects = data.get("projects", []) if isinstance(data, dict) else []
         project_ids = {_project_id(p) for p in projects}
-    except Exception:  # noqa: BLE001 - transient glitch in project list: fall back to first running job
+    except Exception as exc:  # noqa: BLE001 - transient glitch in project list: fall back to first running job
+        log.warning(f"project list failed while checking active-evaluation staleness: {exc}")
         return running[0]
     for j in running:
         project = _job_project(j)
