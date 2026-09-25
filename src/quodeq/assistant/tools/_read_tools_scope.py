@@ -4,7 +4,6 @@ dismiss/verify drafts.
 """
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
@@ -17,6 +16,7 @@ from quodeq.services import fs_reports
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.scoring import rescore_accumulated, scored_run_dimensions
+from quodeq.services.wiring import iter_eval_reports
 from quodeq.shared.serialization import coerce_line, to_camel_dict
 
 _logger = logging.getLogger(__name__)
@@ -104,14 +104,10 @@ def _eval_json_finding_keys(ctx: ToolContext, add) -> None:
     eval_dir = ctx.run_dir / "evaluation"
     if not eval_dir.is_dir():
         return
-    # Parse each dimension file INDEPENDENTLY: one corrupt/truncated file
-    # (a known failure mode of deadline-cut runs) must drop only its own
-    # findings, not discard every healthy dimension's keys.
-    for p in sorted(eval_dir.glob("*.json")):
-        try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
+    # skip_corrupt=True: parse each dimension file INDEPENDENTLY, so one
+    # corrupt/truncated file (a known failure mode of deadline-cut runs)
+    # drops only its own findings, not every healthy dimension's keys.
+    for _dimension, data in iter_eval_reports(eval_dir, skip_corrupt=True):
         for v in (data.get("violations") or []):
             add(v)
 

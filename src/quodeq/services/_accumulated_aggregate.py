@@ -14,6 +14,7 @@ from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams, dimension_weighted_average
 from quodeq.core.scoring.report_grades import calculate_trend, most_frequent_grade, parse_numeric_score
 from quodeq.core.types import DimensionResult
+from quodeq.core.types.severity import SEVERITY_ORDER
 from quodeq.shared.serialization import to_camel_dict
 
 
@@ -66,6 +67,29 @@ def aggregate_severity_counts(all_dimensions: list[DimensionResult]) -> dict[str
         "totalViolations": total_violations, "totalCompliance": total_compliance,
         "critical": critical, "major": major, "minor": minor,
     }
+
+
+def severity_counts_from_payload(dims: list[dict]) -> tuple[int, dict[str, int]]:
+    """Count total violations and per-severity buckets from *dims*' own
+    ``violations`` lists, not any baked totals field.
+
+    Unlike :func:`aggregate_severity_counts` (which sums the ``totals``
+    fields baked onto each ``DimensionResult`` at write time), this counts
+    the payload-shaped ``violations`` lists directly -- the same lists
+    ``get_report``/``get_violations`` serve. That keeps the count correct
+    even when a totals field and its list disagree (e.g. a hidden-standards
+    filter already dropped some dimensions from *dims* while their baked
+    totals were computed over the unfiltered set).
+    """
+    severity = {bucket: 0 for bucket in SEVERITY_ORDER}
+    total = 0
+    for d in dims:
+        for v in (d.get("violations") or []):
+            total += 1
+            level = (v.get("severity") or "").lower()
+            if level in severity:
+                severity[level] += 1
+    return total, severity
 
 
 def compute_accumulated_scores(
