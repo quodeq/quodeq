@@ -46,8 +46,8 @@ _ALLOWLIST: set[str] = {
     # pids from find_pids_on_port, which returns [] off-darwin.
     "menubar/_process.py:85",
     "menubar/_process.py:97",
-    "menubar/_app_lifecycle.py:158",
-    "menubar/_app_lifecycle.py:170",
+    "menubar/_app_lifecycle.py:156",
+    "menubar/_app_lifecycle.py:168",
 }
 
 

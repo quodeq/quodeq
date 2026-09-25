@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any, Iterable
 
 from quodeq.config._discipline_rule import DEFAULT_DETECT_PRIORITY, strip_quotes
+from quodeq.shared.csv_values import split_csv
 
 # Conf keys that map to indexed positions in detect_files / detect_contains
 _FILE_KEYS = {"detect_file": 0, "detect_file_alt": 1, "detect_file_alt2": 2}
@@ -27,7 +28,7 @@ KNOWN_KEYS: frozenset[str] = frozenset(
 
 
 def _parse_csv(value: str) -> tuple[str, ...]:
-    return tuple(part.strip() for part in value.split(",") if part.strip())
+    return tuple(split_csv(value))
 
 
 def _set_indexed(lst: list[str | None], index: int, value: str) -> None:

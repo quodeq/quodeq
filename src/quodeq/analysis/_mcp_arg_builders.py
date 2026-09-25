@@ -20,6 +20,7 @@ from quodeq.analysis._config import (
     MCP_TOOL_MARK_FILE_DONE,
     MCP_TOOL_REPORT_FINDING,
 )
+from quodeq.analysis.cache import model_id_from
 from quodeq.analysis._mcp_config import codex_mcp_config_arg, create_mcp_config
 from quodeq.config.analysis_env import ai_tools, base_ai_args
 from quodeq.core.constants import (
@@ -178,19 +179,12 @@ def build_model_budget_prompt_args(
 def resolve_model_id(config: AnalysisConfig) -> str:
     """Pick the most specific model identifier available for cache keys.
 
-    Mirrors ``cache.dimension_helpers.model_id_from`` when a RunConfig is
-    carried; otherwise falls back to ``AnalysisConfig.ai_model``; otherwise
-    ``"unknown"``.
+    Uses the carried RunConfig's options (the same rule the cache keys use);
+    without them, ``AnalysisConfig.ai_model``; otherwise ``"unknown"``.
     """
     rc = config.run_config
-    if rc is not None:
-        opts = getattr(rc, "options", None)
-        if opts is not None:
-            return (
-                getattr(opts, "subagent_model", None)
-                or getattr(opts, "ai_model", None)
-                or "unknown"
-            )
+    if rc is not None and getattr(rc, "options", None) is not None:
+        return model_id_from(rc)
     return config.ai_model or "unknown"
 
 

@@ -144,6 +144,12 @@ def finalize_dim_result(
         run.result.setdefault(dimension, ev)
 
 
+def _stdout_gone(exc: BrokenPipeError) -> tuple[None, BrokenPipeError]:
+    """Silence the closed stdout and report the dimension as not run because of *exc*."""
+    silence_broken_stdout()
+    return None, exc
+
+
 def _dispatch_incremental_dim(
     config: RunConfig, dimension: str, idx: int, ctx: AnalysisContext, deps: LoopDeps,
 ) -> tuple[Evidence | None, BaseException | None]:
@@ -158,8 +164,7 @@ def _dispatch_incremental_dim(
     try:
         return runner.run(config, dimension, idx, ctx, emit_log=False), None
     except BrokenPipeError as exc:
-        silence_broken_stdout()
-        return None, exc
+        return _stdout_gone(exc)
     except (OSError, KeyError, ValueError, RuntimeError) as exc:
         if cancellation.is_cancelled():
             # The run is being torn down (signal, breaker, fatal provider
@@ -177,8 +182,7 @@ def _dispatch_incremental_dim(
         try:
             return runner.run(fallback_config, dimension, idx, ctx, emit_log=True), None
         except BrokenPipeError as inner_exc:
-            silence_broken_stdout()
-            return None, inner_exc
+            return _stdout_gone(inner_exc)
         except Exception as inner_exc:  # noqa: BLE001
             return None, inner_exc
     except Exception as exc:  # noqa: BLE001

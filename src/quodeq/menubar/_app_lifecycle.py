@@ -68,12 +68,16 @@ class DashboardLifecycleMixin:
         try:
             self._do_start_inner()
         except (OSError, subprocess.SubprocessError, ValueError) as e:
-            self._set_error(f"Error: {e}")
-            self._status_item.title = STATUS_STOPPED
-            self._cleanup_stderr_log()
+            self._stop_with_error(f"Error: {e}")
         finally:
             with self._state_lock:
                 self._starting = False
+
+    def _stop_with_error(self, message: str) -> None:
+        """Show *message*, show the dashboard as stopped and drop its stderr log."""
+        self._set_error(message)
+        self._status_item.title = STATUS_STOPPED
+        self._cleanup_stderr_log()
 
     def _cleanup_stderr_log(self) -> None:
         """Remove the stderr log tempfile if it exists."""
@@ -90,9 +94,7 @@ class DashboardLifecycleMixin:
             return True
         except OSError as e:
             stderr_log.close()
-            self._set_error(f"Failed: {e}")
-            self._status_item.title = STATUS_STOPPED
-            self._cleanup_stderr_log()
+            self._stop_with_error(f"Failed: {e}")
             return False
 
     def _do_start_inner(self):
@@ -119,11 +121,9 @@ class DashboardLifecycleMixin:
             _logging.getLogger(__name__).warning(
                 "Dashboard crashed (exit code %s): %s", self._process.returncode, sanitized,
             )
-        self._set_error(
+        self._stop_with_error(
             f"Dashboard stopped unexpectedly (exit code {self._process.returncode}). Try restarting."
         )
-        self._status_item.title = STATUS_STOPPED
-        self._cleanup_stderr_log()
 
     def _wait_for_dashboard(self, stderr_log):
         """Poll until the dashboard responds or process crashes."""
@@ -134,9 +134,7 @@ class DashboardLifecycleMixin:
             self._cleanup_stderr_log()
 
         def on_timeout():
-            self._set_error("Timeout: dashboard did not respond")
-            self._status_item.title = STATUS_STOPPED
-            self._cleanup_stderr_log()
+            self._stop_with_error("Timeout: dashboard did not respond")
 
         _wait_for_dashboard(
             process=self._process,

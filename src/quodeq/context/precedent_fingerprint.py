@@ -1,10 +1,9 @@
 """Exact-match precedent fingerprinting.
 
-A precedent is a finding that was previously dismissed for this project.
-On the next evaluation, the scanner will likely surface the same code
-pattern again; without precedent tracking, the user has to dismiss it
-every run. This module computes a stable fingerprint for each dismissed
-finding so the post-LLM pipeline can downweight matches.
+Each finding the user dismissed in this project gets a stable
+fingerprint, so when a later scan reports the same code pattern the
+post-LLM pipeline can downweight it instead of asking for another dismissal
+(see ``precedent.py`` for the precedent pipeline as a whole).
 
 Fingerprint = sha256 of ``(req, normalized_snippet)``. Whitespace and
 trailing punctuation are normalized so cosmetic edits to surrounding

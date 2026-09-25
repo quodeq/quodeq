@@ -181,7 +181,7 @@ def apply_macos_fullscreen_chrome(
     Calls through _webview_window_chrome (imported here as _chrome) for
     apply_unified_toolbar, so a patch on either module's copy is visible.
     """
-    nswindow = getattr(window, "native", None) if window is not None else None
+    nswindow = _chrome.native_window(window)
     if nswindow is not None:
         try:
             if is_full:

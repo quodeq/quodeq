@@ -7,6 +7,7 @@ import threading
 from datetime import datetime, timezone
 
 from quodeq import __version__
+from quodeq.shared.clock import utc_now_iso
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.update import channel as _channel
 from quodeq.update import selfupdate as _selfupdate
@@ -16,10 +17,6 @@ from quodeq.update.state import UpdateState, read_state, write_state
 
 _logger = logging.getLogger(__name__)
 _DEFAULT_INTERVAL = 86400
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _interval(env: dict[str, str]) -> int:
@@ -65,7 +62,7 @@ def run_check(env: dict[str, str] | None = None, force: bool = False) -> None:
         if not force and not should_check(state, env):
             return
         # Stamp the attempt time before the network call so it persists even on failure.
-        state.last_check_ts = _now_iso()
+        state.last_check_ts = utc_now_iso()
         try:
             info = fetch_latest(_channel.detect_channel(), state.etag)
             if info is None:

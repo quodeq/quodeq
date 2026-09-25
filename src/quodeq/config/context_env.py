@@ -8,7 +8,6 @@ reads them itself; they are resolved here, lazily per call, and passed in.
 """
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +20,7 @@ from quodeq.shared.env import (
     get_precedent_similarity_threshold,
     semantic_precedents_enabled,
 )
+from quodeq.shared.env_resolve import resolve_env
 
 CACHE_ROOT_ENV = "QUODEQ_CACHE_ROOT"  # override the cache root for tests / sandboxing
 DISABLE_ONLINE_CACHE_ENV = "QUODEQ_DISABLE_ONLINE_CACHE"
@@ -30,13 +30,13 @@ _DISABLED_TRUTHY = frozenset({ENV_TRUTHY, "true", "yes"})
 
 def cache_root_override(env: Mapping[str, str] | None = None) -> Path | None:
     """The ``QUODEQ_CACHE_ROOT`` override, or None when unset/blank."""
-    raw = (os.environ if env is None else env).get(CACHE_ROOT_ENV, "").strip()
+    raw = resolve_env(env).get(CACHE_ROOT_ENV, "").strip()
     return Path(raw) if raw else None
 
 
 def online_cache_disabled(env: Mapping[str, str] | None = None) -> bool:
     """True when the user has flipped the online-cache kill switch."""
-    raw = (os.environ if env is None else env).get(DISABLE_ONLINE_CACHE_ENV, "")
+    raw = resolve_env(env).get(DISABLE_ONLINE_CACHE_ENV, "")
     return raw.strip() in _DISABLED_TRUTHY
 
 
@@ -66,7 +66,7 @@ def precedent_settings(env: Mapping[str, str] | None = None) -> PrecedentSetting
     """QUODEQ_SEMANTIC_PRECEDENTS (default off), QUODEQ_EMBEDDING_MODEL, the
     embeddings base URL and QUODEQ_PRECEDENT_SIMILARITY (default 0.85; out of
     range or invalid -> default), each with its existing parse rule."""
-    src = os.environ if env is None else env
+    src = resolve_env(env)
     return PrecedentSettings(
         enabled=semantic_precedents_enabled(src),
         model=get_embedding_model(src),

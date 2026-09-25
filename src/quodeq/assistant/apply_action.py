@@ -12,7 +12,7 @@ from enum import StrEnum
 
 from quodeq.assistant.action_status import ActionStatus
 from quodeq.assistant.tools.actions import ACTIONS, ActionConflict, ActionContext, ActionSpec
-from quodeq.core.types.project_source import ProjectSource
+from quodeq.core.types.project_source import ProjectSource, session_source
 from quodeq.data.ports.assistant import AssistantStore
 
 
@@ -46,7 +46,7 @@ def _is_read_only_action(repo: AssistantStore, action: Mapping) -> bool:
     id.
     """
     owner = repo.get_session(action["session_id"])
-    return owner is not None and (owner.get("source") or ProjectSource.LOCAL) == ProjectSource.SHARED
+    return owner is not None and session_source(owner) == ProjectSource.SHARED
 
 
 def apply_drafted_action(

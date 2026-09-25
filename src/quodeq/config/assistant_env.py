@@ -5,8 +5,8 @@ source path is resolved here, lazily per call, and passed in.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
+from quodeq.shared.env_resolve import resolve_env
 
 
 def assistant_context_path(env: dict[str, str] | None = None) -> Path:
@@ -15,7 +15,7 @@ def assistant_context_path(env: dict[str, str] | None = None) -> Path:
     Unset means the packaged quodeq_context.md.
     """
     default = Path(__file__).resolve().parent.parent / "data" / "assistant" / "quodeq_context.md"
-    return Path((os.environ if env is None else env).get("QUODEQ_ASSISTANT_CONTEXT_PATH", str(default)))
+    return Path(resolve_env(env).get("QUODEQ_ASSISTANT_CONTEXT_PATH", str(default)))
 
 
 def read_assistant_context(env: dict[str, str] | None = None) -> str:

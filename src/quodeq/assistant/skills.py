@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.csv_values import split_csv
 
 _logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def _parse(text: str) -> Skill | None:
         meta[key.strip()] = value.strip()
     if not meta.get("name") or not meta.get("description"):
         return None
-    views = tuple(v.strip() for v in meta.get("views", "").split(",") if v.strip())
+    views = tuple(split_csv(meta.get("views", "")))
     return Skill(meta["name"], meta["description"], body.strip(),
                  argument_hint=meta.get("argument_hint", ""), views=views,
                  requires_write=meta.get("requires_write", "").strip().lower() == _FRONT_MATTER_TRUE)

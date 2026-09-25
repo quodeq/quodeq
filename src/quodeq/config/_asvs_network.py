@@ -8,10 +8,10 @@ import random
 import time
 import urllib.error
 import urllib.request
-import os
 
 from quodeq.shared.constants import RETRY_BASE_DELAY_S, RETRY_JITTER_S
 from quodeq.shared.url_validation import validate_url_safe
+from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def verify_integrity(
     """
     actual_hash = hashlib.sha256(content).hexdigest()
     if expected_hash is None:
-        expected_hash = (os.environ if env is None else env).get("QUODEQ_ASVS_SHA256")
+        expected_hash = resolve_env(env).get("QUODEQ_ASVS_SHA256")
     if skip_integrity is None:
         skip_integrity = False
     if expected_hash and actual_hash != expected_hash:

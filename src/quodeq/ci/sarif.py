@@ -27,6 +27,7 @@ _RANK = {"critical": 4, "major": 3, "high": 3, "minor": 2}
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 _UNKNOWN = "unknown"  # severity/dimension fallback
+_CWE_LABEL_PREFIX = "cwe-"  # req_ref labels naming a CWE entry, lower-cased
 
 
 def _severity_level(severity: str | None) -> str:
@@ -50,6 +51,11 @@ def _rule_id(dimension: str | None, principle: str | None) -> str:
     return f"{(dimension or 'unknown').lower()}/{_slug(principle) or 'unknown'}"
 
 
+def _is_cwe_label(label: str) -> bool:
+    """True when a req_ref *label* names a CWE entry (``CWE-79``, any case)."""
+    return label.lower().startswith(_CWE_LABEL_PREFIX)
+
+
 def _cwe_tags(req_refs: list[dict[str, Any]] | None) -> list[str]:
     """GitHub-form CWE tags (``external/cwe/cwe-NNN``) from a violation's req_refs.
 
@@ -60,7 +66,7 @@ def _cwe_tags(req_refs: list[dict[str, Any]] | None) -> list[str]:
     seen: set[str] = set()
     for ref in req_refs or []:
         label = str(ref.get("label", "")).strip().lower()
-        if not label.startswith("cwe-"):
+        if not _is_cwe_label(label):
             continue
         tag = f"external/cwe/{label}"
         if tag not in seen:
@@ -132,7 +138,7 @@ def _result(violation: dict[str, Any], dimension: str, *, include_snippets: bool
                 "cwe": [
                     str(r.get("label"))
                     for r in (violation.get("req_refs") or [])
-                    if str(r.get("label", "")).lower().startswith("cwe-")
+                    if _is_cwe_label(str(r.get("label", "")))
                 ],
             }
         },

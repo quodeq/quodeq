@@ -1,20 +1,17 @@
 """Signal-guard, atexit-guard, exit-classification, and status-write helpers
 for RunLifecycleContext.
 
-Split out of ``run_lifecycle.py`` (file-size ratchet): these are
-self-contained process-level primitives and pure helpers with no dependency
-on the lifecycle state machine itself (the exception -> state mapping in
-``__exit__``), so they compose cleanly as standalone collaborators owned by
-``RunLifecycleContext``.
+These are process-level primitives and pure helpers with no dependency on
+the lifecycle state machine itself (the exception -> state mapping in
+``__exit__``), owned by ``RunLifecycleContext`` as standalone collaborators.
 
-``_StatusWriter`` and ``LifecycleDeps`` live here too: the context takes its
+``StatusWriter`` and ``LifecycleDeps`` live here too: the context takes its
 collaborators (status writer, heartbeat, resource sampler) via a
 ``LifecycleDeps`` bundle, defaulting to the production implementations, so
 tests can inject recorders/stubs without patching module attributes.
 
-``SignalGuard`` and ``AtexitGuard`` live in ``_run_lifecycle_guards.py`` (a
-further file-size split) and are re-exported here so existing imports keep
-resolving.
+``SignalGuard`` and ``AtexitGuard`` are defined in ``_run_lifecycle_guards.py``
+and re-exported here.
 """
 from __future__ import annotations
 
@@ -35,6 +32,7 @@ from quodeq.core.run.exit_reason import ExitReason
 from quodeq.shared import cancellation
 from quodeq.core.run.state import RunState, RunStatus, TERMINAL_STATES
 from quodeq.data.fs.run_status_store import read_status
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 
 
 class _Stoppable(Protocol):
@@ -44,11 +42,7 @@ class _Stoppable(Protocol):
     def stop(self) -> None: ...
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-class _StatusWriter:
+class StatusWriter:
     """Owns every status.json write for one run.
 
     The run's identity (dir, job, start time, dimensions) is fixed at
@@ -59,8 +53,7 @@ class _StatusWriter:
 
     ``write_status`` is taken as a constructor keyword rather than called by
     bare name, so tests inject a recorder via ``LifecycleDeps`` instead of
-    patching a module attribute. Built via ``new_status_writer`` below, not
-    imported directly by name.
+    patching a module attribute.
     """
 
     def __init__(
@@ -75,7 +68,7 @@ class _StatusWriter:
     ) -> None:
         self.run_dir = run_dir
         self.job_id = job_id
-        self.started_at = _now_iso()
+        self.started_at = utc_now_iso(timespec=ISO_SECONDS)
         self.dimensions = list(dimensions)
         self.phase: str | None = None
         self.current_dimension: str | None = None
@@ -100,28 +93,6 @@ class _StatusWriter:
             time_limit_s=self.time_limit_s,
         )
         self._write_status(self.run_dir, status)
-
-
-def new_status_writer(
-    run_dir: Path,
-    job_id: str,
-    dimensions: list[str],
-    *,
-    ai_provider: str | None = None,
-    ai_model: str | None = None,
-    write_status: Callable[[Path, RunStatus], None],
-) -> _StatusWriter:
-    """Build a ``_StatusWriter``.
-
-    A public wrapper so ``run_lifecycle.py`` never imports the leading-
-    underscore class name directly (the private-import gate treats that as
-    a violation even between sibling files in the same package).
-    """
-    return _StatusWriter(
-        run_dir, job_id, dimensions,
-        ai_provider=ai_provider, ai_model=ai_model,
-        write_status=write_status,
-    )
 
 
 @dataclass(frozen=True)
@@ -206,11 +177,11 @@ def seed_dimension_states(
 
 
 def run_signal_shutdown(
-    heartbeat: _Stoppable, resources: _Stoppable, status: _StatusWriter, signum: int, *, log: LogSink,
+    heartbeat: _Stoppable, resources: _Stoppable, status: StatusWriter, signum: int, *, log: LogSink,
 ) -> None:
     """Write CANCELLED status and close out unfinished dims for a caught signal.
 
-    ``status`` is the run's ``_StatusWriter``: it supplies the run dir the
+    ``status`` is the run's ``StatusWriter``: it supplies the run dir the
     dim states live in and the deadline the signal is judged against.
 
     A signal landing AFTER the run's own deadline is the watchdog enforcing
@@ -247,7 +218,7 @@ def run_signal_shutdown(
 
 
 def finalize_run_on_atexit(
-    run_dir: Path, heartbeat: _Stoppable, resources: _Stoppable, status: _StatusWriter,
+    run_dir: Path, heartbeat: _Stoppable, resources: _Stoppable, status: StatusWriter,
 ) -> None:
     """Write CANCELLED status if the process is exiting without a terminal state."""
     current = read_status(run_dir)

@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import sys
 import threading
+from types import ModuleType
 
 from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
 
@@ -24,19 +25,41 @@ _DWMWA_USE_IMMERSIVE_DARK_MODE_PRE_20H1 = 19  # the undocumented id builds befor
 _S_OK = 0  # HRESULT success
 
 
+def native_window(window: object) -> object | None:
+    """The pywebview *window*'s native handle (the NSWindow on macOS), or None before it exists."""
+    return getattr(window, "native", None) if window is not None else None
+
+
+def macos_native_window(window: object) -> tuple[object, ModuleType] | None:
+    """``(nswindow, AppHelper)`` for *window* on macOS, or None.
+
+    None off macOS, without PyObjC, or before the native handle exists: the
+    macOS chrome helpers are then no-ops. ``AppHelper.callAfter`` runs work
+    on the UI thread.
+    """
+    if sys.platform != PLATFORM_DARWIN:
+        return None
+    try:
+        from PyObjCTools import AppHelper  # noqa: PLC0415
+    except ImportError:
+        return None
+    nswindow = native_window(window)
+    if nswindow is None:
+        return None
+    return nswindow, AppHelper
+
+
 def set_macos_titlebar_appearance(window: object, dark: bool) -> None:
     """Set the macOS native titlebar to dark or light aqua (on the UI thread)."""
-    if sys.platform != PLATFORM_DARWIN:
+    native = macos_native_window(window)
+    if native is None:
         return
+    nswindow, AppHelper = native
     try:
         from AppKit import (  # noqa: PLC0415
             NSAppearance, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
         )
-        from PyObjCTools import AppHelper  # noqa: PLC0415
     except ImportError:
-        return
-    nswindow = getattr(window, "native", None) if window is not None else None
-    if nswindow is None:
         return
     name = NSAppearanceNameDarkAqua if dark else NSAppearanceNameAqua
 
@@ -60,17 +83,15 @@ def show_macos_traffic_lights(window: object) -> None:
     to re-apply on resize. Runs on the UI thread; no-op before the native
     handle exists.
     """
-    if sys.platform != PLATFORM_DARWIN:
+    native = macos_native_window(window)
+    if native is None:
         return
+    nswindow, AppHelper = native
     try:
         from AppKit import (  # noqa: PLC0415
             NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton,
         )
-        from PyObjCTools import AppHelper  # noqa: PLC0415
     except ImportError:
-        return
-    nswindow = getattr(window, "native", None) if window is not None else None
-    if nswindow is None:
         return
 
     def _apply() -> None:
@@ -109,15 +130,12 @@ def set_macos_unified_toolbar(window: object) -> None:
     native handle exists.
     """
     global _macos_toolbar_installed
-    if _macos_toolbar_installed or sys.platform != PLATFORM_DARWIN:
+    if _macos_toolbar_installed:
         return
-    try:
-        from PyObjCTools import AppHelper  # noqa: PLC0415
-    except ImportError:
+    native = macos_native_window(window)
+    if native is None:
         return
-    nswindow = getattr(window, "native", None) if window is not None else None
-    if nswindow is None:
-        return
+    nswindow, AppHelper = native
     _macos_toolbar_installed = True
 
     def _apply() -> None:
@@ -138,12 +156,21 @@ def set_macos_fullscreen_class(window: object, is_full: bool) -> None:
     """
     flag = "true" if is_full else "false"
     js = f"document.documentElement.classList.toggle('macos-fullscreen', {flag})"
+    evaluate_js_in_background(window, js, "fullscreen class toggle failed")
 
+
+def evaluate_js_in_background(window: object, js: str, failure: str) -> None:
+    """Run *js* in *window* on a short-lived worker thread.
+
+    For callers on the AppKit main thread or a GUI backend thread, where
+    ``evaluate_js`` deadlocks waiting on the JS engine. A failure (the
+    window may be tearing down) is logged at debug level as *failure*.
+    """
     def _run() -> None:
         try:
             window.evaluate_js(js)  # type: ignore[union-attr]
         except Exception:  # noqa: BLE001 — window may be tearing down
-            logger.debug("fullscreen class toggle failed", exc_info=True)
+            logger.debug(failure, exc_info=True)
 
     threading.Thread(target=_run, daemon=True).start()
 

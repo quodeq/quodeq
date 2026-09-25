@@ -33,8 +33,8 @@ tests/analysis/cache/test_telemetry.py:51:private-module:quodeq.analysis._dimens
 tests/analysis/cache/test_telemetry.py:51:private-module:quodeq.analysis._dimension_steps.parse_dimension_evidence
 tests/analysis/cache/test_telemetry.py:51:private-module:quodeq.analysis._dimension_steps.run_dimension_analysis
 tests/analysis/conftest.py:30:private-module:quodeq.analysis._api_runner.ApiRunnerConfig
-tests/analysis/mcp/test_findings_server.py:10:private-name:quodeq.analysis.mcp.findings_server._build_compiled_context
-tests/analysis/mcp/test_findings_server.py:10:private-name:quodeq.analysis.mcp.findings_server._build_router
+tests/analysis/mcp/test_findings_server.py:11:private-name:quodeq.analysis.mcp.findings_server._build_compiled_context
+tests/analysis/mcp/test_findings_server.py:11:private-name:quodeq.analysis.mcp.findings_server._build_router
 tests/analysis/mcp/test_findings_server_cache.py:125:private-name:quodeq.analysis.mcp.findings_server._build_router
 tests/analysis/mcp/test_findings_server_cache.py:147:private-name:quodeq.analysis.mcp.findings_server._build_router
 tests/analysis/mcp/test_findings_server_cache.py:169:private-name:quodeq.analysis.mcp.findings_server._build_router
@@ -95,8 +95,6 @@ tests/analysis/test_api_runner_parsing.py:93:private-module:quodeq.analysis._dro
 tests/analysis/test_api_runner_router_context.py:10:private-module:quodeq.analysis._api_runner.ApiAnalysisRequest
 tests/analysis/test_api_runner_router_context.py:10:private-module:quodeq.analysis._api_runner.run_api_analysis
 tests/analysis/test_api_runner_router_context.py:10:private-name:quodeq.analysis._api_runner._build_router_context
-tests/analysis/test_api_runner_router_context.py:111:private-module:quodeq.analysis._api_runner.api_runner_module
-tests/analysis/test_api_runner_router_context.py:139:private-module:quodeq.analysis._api_runner.api_runner_module
 tests/analysis/test_api_schema_drop_reasons.py:12:private-module:quodeq.analysis._api_schema.parse_findings
 tests/analysis/test_api_schema_drop_reasons.py:13:private-module:quodeq.analysis._drop_stats.format_reasons
 tests/analysis/test_api_schema_severity_coercion.py:19:private-module:quodeq.analysis._api_schema.parse_findings
@@ -813,10 +811,10 @@ tests/llm_bridge/test_embeddings.py:6:private-name:quodeq.llm_bridge.embeddings.
 tests/llm_bridge/test_env_injection_sites.py:9:private-module:quodeq.llm_bridge._llamacpp
 tests/llm_bridge/test_env_injection_sites.py:9:private-module:quodeq.llm_bridge._ollama
 tests/llm_bridge/test_env_injection_sites.py:9:private-module:quodeq.llm_bridge._providers
+tests/llm_bridge/test_llamacpp.py:12:private-module:quodeq.llm_bridge._local_server.normalize_base
 tests/llm_bridge/test_llamacpp.py:7:private-module:quodeq.llm_bridge._llamacpp.get_llamacpp_status
 tests/llm_bridge/test_llamacpp.py:7:private-module:quodeq.llm_bridge._llamacpp.list_llamacpp_models
 tests/llm_bridge/test_llamacpp.py:7:private-module:quodeq.llm_bridge._llamacpp.run_concurrency_test
-tests/llm_bridge/test_llamacpp.py:7:private-name:quodeq.llm_bridge._llamacpp._normalize_base
 tests/llm_bridge/test_memory_fraction_shared.py:16:private-module:quodeq.llm_bridge._llamacpp
 tests/llm_bridge/test_memory_fraction_shared.py:8:private-module:quodeq.llm_bridge._ollama.DEFAULT_MEMORY_FRACTION
 tests/llm_bridge/test_models.py:5:private-module:quodeq.llm_bridge._models.get_known_models
@@ -825,7 +823,7 @@ tests/llm_bridge/test_ollama.py:9:private-module:quodeq.llm_bridge._ollama.get_o
 tests/llm_bridge/test_ollama.py:9:private-module:quodeq.llm_bridge._ollama.get_running_model_info
 tests/llm_bridge/test_ollama.py:9:private-module:quodeq.llm_bridge._ollama.list_ollama_models
 tests/llm_bridge/test_ollama.py:9:private-module:quodeq.llm_bridge._ollama.run_concurrency_test
-tests/llm_bridge/test_omlx.py:7:private-name:quodeq.llm_bridge.omlx._normalize_base
+tests/llm_bridge/test_omlx.py:11:private-module:quodeq.llm_bridge._local_server.normalize_base
 tests/llm_bridge/test_omlx_models.py:7:private-name:quodeq.llm_bridge.omlx._list_model_dirs
 tests/llm_bridge/test_providers.py:103:private-module:quodeq.llm_bridge._providers
 tests/llm_bridge/test_providers.py:110:private-module:quodeq.llm_bridge._providers

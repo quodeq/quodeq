@@ -4,7 +4,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
-from datetime import datetime, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
 from quodeq.analysis._dim_order import DimEstimates, order_by_backlog
@@ -26,6 +25,7 @@ from quodeq.core.run.dimensions import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis.runner_markers import emit_marker
 from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_SCORING, CC_PHASE_SETUP
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG
 
@@ -86,7 +86,7 @@ def _run_dry_run(
     scope = _DryRunScope(
         run_dir=run_dir_for(config),
         evidence_dir=config.work_dir or config.src,
-        date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        date_str=utc_now_iso(timespec=ISO_SECONDS),
         total=ctx.total,
     )
     result: dict[str, Evidence] = {}

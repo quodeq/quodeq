@@ -6,6 +6,7 @@ import socket
 from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.config_loader import get_default_host as _get_default_host
+from quodeq.shared.csv_values import split_csv
 
 _DEFAULT_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
 MAX_PORT_SCAN_TRIES = 20
@@ -20,7 +21,7 @@ def local_host_names(
     extra = resolve_env(env).get("QUODEQ_LOCAL_HOSTS", "")
     base = set(defaults or _DEFAULT_LOCAL_HOSTS)
     if extra:
-        base.update(h.strip() for h in extra.split(",") if h.strip())
+        base.update(split_csv(extra))
     return frozenset(base)
 
 

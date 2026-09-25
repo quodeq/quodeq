@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 from quodeq.analysis._ignore import load_ignore_patterns
 from quodeq.analysis.manifest_build_scope import build_multi_scope_manifest
@@ -20,18 +22,31 @@ from quodeq.data.git_cli import list_tracked_files
 
 _logger = logging.getLogger(__name__)
 
+_T = TypeVar("_T")
+
+
+def _guard_detection(disciplines_conf: Path, detect: Callable[[], _T]) -> _T | None:
+    """Run *detect*; when the registry is unreadable or invalid, log it and return None."""
+    try:
+        return detect()
+    except (ValueError, OSError) as exc:
+        _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
+        return None
+
 
 def _build_targets_from_disciplines(
     src: Path, disciplines_conf: Path,
     files_by_lang: dict[str, list[str]], ext_counts_by_lang: dict[str, Counter],
 ) -> list[AnalysisTarget]:
     """Build AnalysisTarget list for a single-scope walk via root-level detection."""
-    try:
+    def detect() -> tuple[DisciplineRegistry, list[str]]:
         registry = DisciplineRegistry.from_file(disciplines_conf)
-        matches = registry.detect_matches(src)
-    except (ValueError, OSError) as exc:
-        _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
+        return registry, registry.detect_matches(src)
+
+    detected = _guard_detection(disciplines_conf, detect)
+    if detected is None:
         return []
+    registry, matches = detected
     return build_targets_from_matches(registry, matches, files_by_lang, ext_counts_by_lang)
 
 
@@ -129,12 +144,9 @@ def _resolve_registry_and_scopes(
     """
     registry: DisciplineRegistry | None = None
     if disciplines_conf and disciplines_conf.exists():
-        try:
-            registry = DisciplineRegistry.from_file(disciplines_conf)
-        except (ValueError, OSError) as exc:
-            _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
-            return None, None
-
+        registry = _guard_detection(
+            disciplines_conf, lambda: DisciplineRegistry.from_file(disciplines_conf),
+        )
     if registry is None:
         return None, None
 

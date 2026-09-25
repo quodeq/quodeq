@@ -124,6 +124,19 @@ def _show_macos_close_alert(result: dict, done: threading.Semaphore) -> None:
         done.release()
 
 
+def _confirm_close_dialog(window: object) -> bool:
+    """pywebview's 2-button close dialog: True for OK (keep scanning), False for Cancel (stay)."""
+    return bool(window.create_confirmation_dialog(CLOSE_CONFIRM_TITLE, CLOSE_CONFIRM_BODY))
+
+
+def _running_job(api: "WindowApi") -> dict | None:
+    """The scan running now, or None when there is none or the lookup fails."""
+    try:
+        return api._get_running_evaluation()
+    except Exception:
+        return None
+
+
 def ask_close_choice(window: object) -> str:
     """Ask the user how to close while a scan runs; return 'keep', 'cancel', or 'stay'.
 
@@ -141,9 +154,7 @@ def ask_close_choice(window: object) -> str:
     if sys.platform == PLATFORM_DARWIN:
         return macos_confirm_close(window)
     try:
-        ok = bool(window.create_confirmation_dialog(
-            CLOSE_CONFIRM_TITLE, CLOSE_CONFIRM_BODY,
-        ))
+        ok = _confirm_close_dialog(window)
     except Exception:
         return CloseChoice.KEEP
     return CloseChoice.KEEP if ok else CloseChoice.STAY
@@ -200,16 +211,11 @@ def _make_on_closing_inline(api: "WindowApi", window: object) -> "Callable[[], b
     ``sys.platform`` (this handler is already the win32-only branch).
     """
     def _on_closing() -> bool:
-        try:
-            job = api._get_running_evaluation()
-        except Exception:
-            job = None
+        job = _running_job(api)
         if not job:
             return True
         try:
-            return bool(window.create_confirmation_dialog(
-                CLOSE_CONFIRM_TITLE, CLOSE_CONFIRM_BODY,
-            ))
+            return _confirm_close_dialog(window)
         except Exception:
             # If the native dialog can't render, don't trap the user.
             return True
@@ -235,10 +241,7 @@ def _make_on_closing_async(api: "WindowApi", window: object) -> "Callable[[], bo
     def _on_closing() -> bool:
         if state["confirmed"]:
             return True  # user already confirmed; let the re-issued close through
-        try:
-            job = api._get_running_evaluation()
-        except Exception:
-            job = None
+        job = _running_job(api)
         if not job:
             return True
         if not state["prompting"]:

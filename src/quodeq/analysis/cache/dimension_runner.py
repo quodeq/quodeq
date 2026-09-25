@@ -94,6 +94,16 @@ class _MissDispatch:
     dispatcher: Callable[..., Evidence | None]
 
 
+def _parse_dim_jsonl(
+    config: RunConfig, ctx: AnalysisContext, cctx: CacheContext,
+) -> Evidence | None:
+    """Parse the dim's findings JSONL, crediting the files it actually read."""
+    return parse_evidence_from_jsonl(
+        config, ctx, cctx.jsonl,
+        files_read=compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
+    )
+
+
 def _handle_all_hits(
     config: RunConfig, ctx: AnalysisContext, cctx: CacheContext,
 ) -> Evidence | None:
@@ -104,10 +114,7 @@ def _handle_all_hits(
     write_findings(cctx.jsonl, cctx.classify, append=True, trust_model=cctx.trust_model)
     if cctx.jsonl.exists():
         deduplicate_jsonl(cctx.jsonl)
-    return parse_evidence_from_jsonl(
-        config, ctx, cctx.jsonl,
-        files_read=compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
-    )
+    return _parse_dim_jsonl(config, ctx, cctx)
 
 
 def _prepare_miss_dispatch(config: RunConfig, dim_id: str, cctx: CacheContext) -> RunConfig:
@@ -159,10 +166,7 @@ def _handle_breaker_trip(
     dimension, flagging failure_streak. Raises when there is nothing to
     salvage, so the dim is marked INCOMPLETE as before."""
     if cctx.jsonl.exists():
-        salvaged = parse_evidence_from_jsonl(
-            config, ctx, cctx.jsonl,
-            files_read=compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
-        )
+        salvaged = _parse_dim_jsonl(config, ctx, cctx)
         if salvaged is not None and salvaged.principles:
             salvaged.exit_reason = ExitReason.FAILURE_STREAK
             return salvaged
@@ -180,17 +184,9 @@ def _handle_dispatch_result(
             cctx.classify.cached_findings or cctx.classify.unconsolidated_findings
         )
         if replayed_anything and cctx.jsonl.exists():
-            return parse_evidence_from_jsonl(
-                config, ctx, cctx.jsonl,
-                files_read=compute_files_read(
-                    cctx.classify, cctx.jsonl, cctx.files,
-                ),
-            )
+            return _parse_dim_jsonl(config, ctx, cctx)
         return None
-    return parse_evidence_from_jsonl(
-        config, ctx, cctx.jsonl,
-        files_read=compute_files_read(cctx.classify, cctx.jsonl, cctx.files),
-    )
+    return _parse_dim_jsonl(config, ctx, cctx)
 
 
 def _dispatch_misses_with_watchers(

@@ -5,10 +5,10 @@ import json
 from unittest.mock import patch, MagicMock
 
 from quodeq.llm_bridge.omlx import (
-    _normalize_base,
     read_omlx_api_key,
     get_omlx_status,
 )
+from quodeq.llm_bridge._local_server import normalize_base
 
 
 class TestReadOmlxApiKey:
@@ -89,13 +89,13 @@ class TestReadOmlxApiKey:
 
 class TestNormalizeBase:
     def test_strips_v1_suffix(self):
-        assert _normalize_base("http://localhost:8000/v1") == "http://localhost:8000"
+        assert normalize_base("http://localhost:8000/v1") == "http://localhost:8000"
 
     def test_strips_trailing_slash(self):
-        assert _normalize_base("http://localhost:8000/") == "http://localhost:8000"
+        assert normalize_base("http://localhost:8000/") == "http://localhost:8000"
 
     def test_leaves_root_alone(self):
-        assert _normalize_base("http://localhost:8000") == "http://localhost:8000"
+        assert normalize_base("http://localhost:8000") == "http://localhost:8000"
 
 
 class TestGetOmlxStatus:

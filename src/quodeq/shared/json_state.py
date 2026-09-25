@@ -11,9 +11,9 @@ import json
 import logging
 import os
 import tempfile
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 
 from quodeq.shared.env_paths import home_state_dir
 from quodeq.shared.env_resolve import resolve_env
@@ -55,6 +55,22 @@ def read_json_state(path: Path, cls: type[_StateT]) -> _StateT:
     return cls(**{k: v for k, v in raw.items() if k in known})
 
 
+def dump_json_to_fd(
+    fd: int, data: object, *, indent: int | None = None, fsync: bool = False,
+) -> None:
+    """Write *data* as JSON into the open file *fd* and close it.
+
+    *fsync* forces the bytes to disk before the close, for files a crash must
+    not leave empty once they are published. *fd* is closed on return or on
+    error.
+    """
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=indent)
+        if fsync:
+            fh.flush()
+            os.fsync(fh.fileno())
+
+
 def dump_json_and_replace(
     fd: int, tmp_path: str, path: Path, data: object, *,
     indent: int | None = None, mode: int | None = None,
@@ -68,8 +84,7 @@ def dump_json_and_replace(
     *mode*, when given, is set on the temp file before the replace, so the
     file is never visible at *path* with looser permissions.
     """
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, indent=indent)
+    dump_json_to_fd(fd, data, indent=indent)
     if mode is not None:
         os.chmod(tmp_path, mode)
     os.replace(tmp_path, str(path))
@@ -97,3 +112,31 @@ def write_json_state(
                 os.unlink(tmp_name)
             except OSError as inner_exc:
                 logger.debug("temp %s state file %s not removed: %s", label, tmp_name, inner_exc)
+
+
+@dataclass(frozen=True)
+class JsonStateFile(Generic[_StateT]):
+    """One named state file: where it lives, how it is read, how it is written.
+
+    *explicit_var* is the env var that overrides the location, *filename* the
+    name under the state directory, *cls* the dataclass stored in it, *label*
+    the name used in *logger*'s debug lines when a write fails.
+    """
+
+    cls: type[_StateT]
+    explicit_var: str
+    filename: str
+    label: str
+    logger: logging.Logger
+
+    def path(self, env: dict[str, str] | None = None) -> str:
+        """The file's path; *env* overrides ``os.environ`` for tests."""
+        return state_file_path(self.explicit_var, self.filename, env)
+
+    def read(self, path: str) -> _StateT:
+        """The state stored at *path*, or defaults when the file is missing or corrupt."""
+        return read_json_state(Path(path), self.cls)
+
+    def write(self, state: _StateT, path: str) -> None:
+        """Persist *state* to *path* atomically; failures are logged, never raised."""
+        write_json_state(state, Path(path), self.label, self.logger)

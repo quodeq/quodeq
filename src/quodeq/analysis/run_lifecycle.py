@@ -1,6 +1,6 @@
 """RunLifecycleContext — the run's lifecycle context manager.
 
-Composed from collaborators that each own one concern: ``_StatusWriter``
+Composed from collaborators that each own one concern: ``StatusWriter``
 (every status.json write, in ``_run_lifecycle_support.py``), ``SignalGuard``
 (install/restore of the run's signal handlers), ``AtexitGuard`` (the
 process-exit fallback hook), plus the shared heartbeat/resource samplers. The
@@ -40,11 +40,11 @@ from quodeq.analysis._run_lifecycle_support import (
     AtexitGuard,
     LifecycleDeps,
     SignalGuard,
+    StatusWriter,
     finalize_run_on_atexit,
     is_circuit_breaker_error,
     is_named_error,
     mark_unfinished_dims_incomplete,
-    new_status_writer,
     run_signal_shutdown,
     seed_dimension_states,
 )
@@ -71,7 +71,7 @@ class RunLifecycleContext:
         self._run_dir = run_dir
         self._dimensions = list(dimensions)
         self._current_state = RunState.PENDING
-        self._status = new_status_writer(
+        self._status = StatusWriter(
             run_dir, job_id, dimensions,
             ai_provider=ai_provider, ai_model=ai_model,
             write_status=deps.write_status or write_status,
@@ -100,10 +100,25 @@ class RunLifecycleContext:
         self._resources.start()
         return self
 
+    def _record_exit(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None,
+    ) -> None:
+        """Move a run that is not yet terminal to the end state its exit cause implies."""
+        if exc_type is None:
+            self._exit_clean()
+        elif issubclass(exc_type, SystemExit):
+            self._exit_system_exit()
+        elif issubclass(exc_type, BrokenPipeError):
+            self._exit_broken_pipe()
+        elif is_circuit_breaker_error(exc_type):
+            self._exit_circuit_breaker()
+        elif is_named_error(exc_type, "FatalProviderError"):
+            self._exit_fatal_provider(exc_value)
+        else:
+            self._exit_other_exception(exc_type)
+
     def _exit_clean(self) -> None:
         """No exception — pipeline is expected to have transitioned to finalizing."""
-        if self._current_state in TERMINAL_STATES:
-            return
         if self._current_state != RunState.FINALIZING:
             # Caller didn't explicitly call transition_to_finalizing(); do it now.
             self._transition(RunState.FINALIZING)
@@ -122,39 +137,34 @@ class RunLifecycleContext:
 
     def _exit_system_exit(self) -> None:
         """SystemExit raised by our signal handler; state already written there."""
-        if self._current_state not in TERMINAL_STATES:
-            self._transition(RunState.CANCELLED, exit_reason="systemexit")
+        self._transition(RunState.CANCELLED, exit_reason="systemexit")
 
     def _exit_broken_pipe(self) -> None:
         """The child's inherited stdout pipe closed under us (parent restarted
         mid-scan). The analysis itself already ran and the evidence is on
         disk, so this transitions to DONE rather than FAILED.
         """
-        if self._current_state not in TERMINAL_STATES:
-            if self._current_state != RunState.FINALIZING:
-                self._transition(RunState.FINALIZING)
-            self._transition(RunState.DONE, exit_reason=self._pending_exit_reason)
+        if self._current_state != RunState.FINALIZING:
+            self._transition(RunState.FINALIZING)
+        self._transition(RunState.DONE, exit_reason=self._pending_exit_reason)
 
     def _exit_circuit_breaker(self) -> None:
         """Circuit breaker tripped — auto-protection, not user cancel. Distinct
         exit_reason makes the History entry distinguishable from regular failures.
         """
-        if self._current_state not in TERMINAL_STATES:
-            self._transition(RunState.FAILED, exit_reason=ExitReason.FAILURE_STREAK)
+        self._transition(RunState.FAILED, exit_reason=ExitReason.FAILURE_STREAK)
 
     def _exit_fatal_provider(self, exc: BaseException | None) -> None:
         """Provider reported an unrecoverable condition (quota, auth, credits).
         Distinct exit_reason so the History entry says why instead of a
         generic exception.
         """
-        if self._current_state not in TERMINAL_STATES:
-            self._transition(RunState.FAILED, exit_reason=provider_exit_reason(getattr(exc, "reason", None)))
+        self._transition(RunState.FAILED, exit_reason=provider_exit_reason(getattr(exc, "reason", None)))
 
     def _exit_other_exception(self, exc_type: type[BaseException] | None) -> None:
         """Any other exception → failed."""
-        if self._current_state not in TERMINAL_STATES:
-            exc_name = exc_type.__name__ if exc_type else "UnknownError"
-            self._transition(RunState.FAILED, exit_reason=f"exception: {exc_name}")
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        self._transition(RunState.FAILED, exit_reason=f"exception: {exc_name}")
 
     def __exit__(
         self,
@@ -164,18 +174,8 @@ class RunLifecycleContext:
     ) -> bool:
         self._heartbeat.stop()
         self._resources.stop()
-        if exc_type is None:
-            self._exit_clean()
-        elif issubclass(exc_type, SystemExit):
-            self._exit_system_exit()
-        elif issubclass(exc_type, BrokenPipeError):
-            self._exit_broken_pipe()
-        elif is_circuit_breaker_error(exc_type):
-            self._exit_circuit_breaker()
-        elif is_named_error(exc_type, "FatalProviderError"):
-            self._exit_fatal_provider(exc_value)
-        else:
-            self._exit_other_exception(exc_type)
+        if self._current_state not in TERMINAL_STATES:
+            self._record_exit(exc_type, exc_value)
         self._signals.restore()
         self._atexit.deregister()
         return False  # never swallow exceptions
