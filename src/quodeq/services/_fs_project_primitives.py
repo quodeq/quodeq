@@ -1,9 +1,8 @@
 """Small metadata-reading primitives for the filesystem action provider.
 
-Split out of _fs_metadata.py: the leaf reads (scan summary, path
-existence, project metadata extraction, repository info) that
-``_compute_summary`` and the project-entry builders assemble into a project
-card.
+Split out of _fs_metadata.py: the leaf reads (path existence, project
+metadata extraction, repository info) that ``_compute_summary`` and the
+project-entry builders assemble into a project card.
 """
 from __future__ import annotations
 
@@ -11,15 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.types.project_source import ProjectLocation
-from quodeq.services.wiring import read_repository_info, read_scan_json
-
-
-def read_scan_summary(reports_root: Path, entry_name: str) -> dict[str, Any]:
-    """Read scan.json and return coverage fields, or empty dict if not available."""
-    data = read_scan_json(reports_root / entry_name)
-    if data is None:
-        return {}
-    return {"scanDate": data.get("scanned_at"), "totalFiles": data.get("total_files")}
+from quodeq.services.wiring import read_repository_info
 
 
 def check_path_exists(path: str | None, location: str | None) -> bool | None:

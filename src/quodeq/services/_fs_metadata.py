@@ -1,9 +1,8 @@
 """Metadata and detection helpers for the filesystem action provider.
 
 Split into two sibling modules plus this orchestrator:
-  - _fs_project_primitives.py: leaf metadata reads (read_scan_summary,
-    check_path_exists, extract_project_metadata, read_repo_info,
-    local_repo_root).
+  - _fs_project_primitives.py: leaf metadata reads (check_path_exists,
+    extract_project_metadata, read_repo_info, local_repo_root).
   - _fs_discipline.py: language-stat and discipline-inference helpers
     (read_language_stats, read_discipline_from_eval,
     find_discipline_in_run, infer_discipline, project_has_fingerprints).
@@ -28,7 +27,6 @@ from quodeq.services._fs_project_primitives import (  # noqa: F401 — re-export
     check_path_exists,
     extract_project_metadata,
     read_repo_info,
-    read_scan_summary,
 )
 from quodeq.services._fs_discipline import (  # noqa: F401 — re-export
     find_discipline_in_run,

@@ -964,7 +964,6 @@ tests/services/test_fs_metadata_repo_info.py:12:private-module:quodeq.services._
 tests/services/test_fs_metadata_repo_info.py:12:private-module:quodeq.services._fs_metadata.read_discipline_from_eval
 tests/services/test_fs_metadata_repo_info.py:12:private-module:quodeq.services._fs_metadata.read_language_stats
 tests/services/test_fs_metadata_repo_info.py:12:private-module:quodeq.services._fs_metadata.read_repo_info
-tests/services/test_fs_metadata_scan.py:10:private-module:quodeq.services._fs_metadata.read_scan_summary
 tests/services/test_fs_project_helpers_onboarding_find_existing.py:11:private-module:quodeq.services._repo_index.load_repo_index
 tests/services/test_fs_project_helpers_onboarding_find_existing.py:11:private-module:quodeq.services._repo_index.repo_index_key
 tests/services/test_fs_project_helpers_onboarding_find_existing.py:11:private-module:quodeq.services._repo_index.save_repo_index

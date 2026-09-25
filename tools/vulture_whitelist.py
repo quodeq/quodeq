@@ -109,7 +109,6 @@ _.update_status  # api/routes_update.py: Flask view function; the route decorato
 _.JudgmentPayload  # core/events/models.py: Judgment field; read by name through serialization or a dict key (89 refs).
 _.PERSISTED_MARKERS  # core/finding_markers.py: FindingMarker field; read by name through serialization or a dict key (4 refs).
 _.accumulatedDimensionsCount  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (5 refs).
-_.accumulated_dimensions_count  # core/types/dashboard.py: TrendPoint field; read by name through serialization or a dict key (1 refs).
 _.active_agents  # services/_scan_progress_types.py: _DimProgress field; read by name through serialization or a dict key (2 refs).
 _.analyzed  # analysis/subagents/_consolidated.py: _ConsolidatedRunContext field; read by name through serialization or a dict key (82 refs).
 _.analyzed_files  # core/types/project.py: ProjectEntry field; read by name through serialization or a dict key (3 refs).
@@ -179,7 +178,6 @@ _.choose_highest_priority  # config/_discipline_detection.py: Referenced only fr
 _.clear_cached_queues  # analysis/subagents/_pool_scaling.py: Referenced only from tests/, which this scan does not cover (1 refs).
 _.clear_grades  # data/sqlite/state_store.py: Referenced only from tests/, which this scan does not cover (1 refs).
 _.clear_stale_payloads  # services/_score_cache_stale.py: Referenced only from tests/, which this scan does not cover (1 refs).
-_.confidence_label  # core/scoring/engine.py: Referenced only from tests/, which this scan does not cover (7 refs).
 _.get_current_provider  # config/ai_provider.py: Referenced only from tests/, which this scan does not cover (6 refs).
 _.get_latest_timestamp  # data/events/reader.py: Referenced only from tests/, which this scan does not cover (5 refs).
 _.get_valid_categories  # config/disciplines.py: Referenced only from tests/, which this scan does not cover (4 refs).
@@ -224,7 +222,6 @@ _._poll  # menubar/app.py: Referenced as a name or key elsewhere (2 refs outside
 _.read_deadline_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (1 refs outside the definition).
 _.read_dimensions_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (7 refs outside the definition).
 _.read_provider_model_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (1 refs outside the definition).
-_.read_scan_summary  # services/_fs_project_primitives.py: Referenced as a name or key elsewhere (9 refs outside the definition).
 _.read_time_limit_from_status  # services/_run_status_readers.py: Referenced as a name or key elsewhere (7 refs outside the definition).
 _._tee_run_log  # services/_job_monitor_mixin.py: Referenced as a name or key elsewhere (5 refs outside the definition).
 _.clear_accumulated_process_cache  # services/_accumulated_cache.py: Referenced as a name or key elsewhere (8 refs outside the definition).

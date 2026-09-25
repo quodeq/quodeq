@@ -5,7 +5,6 @@ file-size boundary; ``__all__`` below is the public surface.
 """
 from __future__ import annotations
 
-from .dashboard import AccumulatedSummary, DashboardSummary, TrendPoint
 from .dimension import DimensionResult, DimensionSummary, GradeBreakdown
 from .evidence import EvidenceFileMeta
 from .finding import Finding, ReqRef, SeverityTally, Totals
@@ -18,9 +17,7 @@ from .scoring import ConfidenceLevel, Deductions, OverallScore, PrincipleScore, 
 from .violation import ProgressInfo, ViolationFileEntry, ViolationResponse, ViolationSummary
 
 __all__ = [
-    "AccumulatedSummary",
     "ConfidenceLevel",
-    "DashboardSummary",
     "Deductions",
     "DimensionResult",
     "DimensionSummary",
@@ -45,7 +42,6 @@ __all__ = [
     "ScoringResult",
     "SeverityTally",
     "Totals",
-    "TrendPoint",
     "ViolationFileEntry",
     "ViolationResponse",
     "ViolationSummary",
