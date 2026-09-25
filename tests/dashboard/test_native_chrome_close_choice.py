@@ -159,3 +159,38 @@ class TestMacConfirmClose:
         matching = [r for r in caplog.records if "failed" in r.getMessage()]
         assert matching, [r.getMessage() for r in caplog.records]
         assert any(r.exc_info for r in matching)
+
+    def test_build_macos_alert_stores_the_choice_before_releasing_done(self):
+        """The worker thread in macos_confirm_close wakes on done.release()
+        and immediately reads result["choice"]. If the release ever fires
+        before the choice is written, that worker can read the stale
+        default instead of the user's answer -- this proves the write
+        happens first, by recording the choice at the moment release()
+        itself is called (a real threading.Semaphore can't observe this: by
+        the time a real worker wakes up, the write has always already
+        happened in memory, race or not)."""
+        import AppKit
+
+        alert = MagicMock()
+        alert.addButtonWithTitle_.side_effect = lambda title: MagicMock()
+        alert.runModal.return_value = AppKit.NSAlertSecondButtonReturn  # -> "cancel"
+
+        result = {"choice": "keep"}
+
+        class _OrderRecordingSemaphore:
+            def __init__(self) -> None:
+                self.choice_at_release = "not released yet"
+
+            def release(self) -> None:
+                self.choice_at_release = result["choice"]
+
+        fake_done = _OrderRecordingSemaphore()
+
+        with patch.object(AppKit, "NSAlert") as NSAlert, \
+             patch.object(AppKit, "NSApplication"), \
+             patch.object(AppKit, "NSRunningApplication"):
+            NSAlert.alloc.return_value.init.return_value = alert
+            wwc._build_macos_alert(result, fake_done)
+
+        assert result["choice"] == "cancel"
+        assert fake_done.choice_at_release == "cancel"

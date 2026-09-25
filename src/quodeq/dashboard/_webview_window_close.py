@@ -92,11 +92,16 @@ def macos_confirm_close(_window: object) -> str:
     return result["choice"]
 
 
-def _build_macos_alert(done: threading.Semaphore) -> str:
-    """Build and run the 3-button NSAlert on the GUI thread and return the choice.
+def _build_macos_alert(result: dict, done: threading.Semaphore) -> None:
+    """Build and run the 3-button NSAlert on the GUI thread, storing the
+    choice in *result*.
 
-    Always releases *done*, even if AppKit/PyObjC or the modal itself fails —
-    the worker thread waiting on it must never be left hanging.
+    *result* is written BEFORE *done* is released (both inside the try, the
+    release in `finally`): the worker thread blocked on `done.acquire()` in
+    macos_confirm_close must never wake and read the not-yet-updated
+    default. *done* is always released, even if AppKit/PyObjC or the modal
+    itself fails — the worker thread waiting on it must never be left
+    hanging.
     """
     try:
         import AppKit  # noqa: PLC0415
@@ -116,7 +121,7 @@ def _build_macos_alert(done: threading.Semaphore) -> str:
         # button is default) still fixes the return codes mapped below.
         quit_btn.setKeyEquivalent_("")
         stay.setKeyEquivalent_("\r")
-        return alert_return_to_choice(
+        result["choice"] = alert_return_to_choice(
             alert.runModal(),
             AppKit.NSAlertFirstButtonReturn,
             AppKit.NSAlertSecondButtonReturn,
@@ -130,12 +135,10 @@ def _run_macos_close_alert(result: dict, done: threading.Semaphore) -> None:
     *result*. See macos_confirm_close.
 
     Isolated: any AppKit/PyObjC failure (activation, alert construction,
-    runModal) falls back to 'keep' rather than trapping the user.
+    runModal) falls back to 'keep' (result's initial value, since a failure
+    before the assignment leaves it untouched) rather than trapping the user.
     """
-    result["choice"] = run_isolated(
-        lambda: _build_macos_alert(done), label="macOS close alert", log=_logger,
-        on_error=lambda _exc: CloseChoice.KEEP,
-    )
+    run_isolated(lambda: _build_macos_alert(result, done), label="macOS close alert", log=_logger)
 
 
 def ask_close_choice(window: object) -> str:
