@@ -116,7 +116,7 @@ def test_session_kill_removes_only_that_session(app):
                headers={"Origin": "http://localhost"}, base_url="http://localhost")
     assert r.status_code == 200
     assert a.manager.killed and not b.manager.killed
-    assert [s["id"] for s in registry.list()] == [b.id]
+    assert [s.id for s in registry.list()] == [b.id]
 
 
 def test_session_kill_unknown_is_404(app):
@@ -124,6 +124,71 @@ def test_session_kill_unknown_is_404(app):
     r = c.post("/api/terminal/sessions/nope/kill",
                headers={"Origin": "http://localhost"}, base_url="http://localhost")
     assert r.status_code == 404
+
+
+class _PidManager:
+    """Fake PTY manager with a settable pid, so child_cwd's input is
+    deterministic instead of depending on a real process."""
+
+    def __init__(self):
+        self.killed = False
+        self._alive = True
+        self.pid = None
+
+    def kill(self):
+        self.killed = True
+        self._alive = False
+
+    @property
+    def alive(self):
+        return self._alive
+
+
+def test_sessions_wire_shape_is_exact(monkeypatch):
+    # Characterizes the full /sessions JSON body: the `~` collapse for a cwd
+    # under $HOME, an unchanged cwd outside $HOME, and cwd: None for a dead
+    # PTY. HOME/USERPROFILE are isolated so the collapse never depends on the
+    # real home (deterministic on Windows too).
+    monkeypatch.setenv("HOME", "/Users/vik")
+    monkeypatch.setenv("USERPROFILE", "/Users/vik")
+    import quodeq.terminal.sessions as sessions_mod
+
+    cwd_by_pid = {1: "/Users/vik/project", 2: "/opt/other", 3: None}
+    monkeypatch.setattr(sessions_mod, "child_cwd", lambda pid: cwd_by_pid.get(pid))
+
+    app = Flask(__name__)
+    app.config["QUODEQ_API_KEY"] = None
+    app.config["QUODEQ_BIND_HOST"] = "127.0.0.1"
+    registry = TerminalSessionRegistry(manager_factory=_PidManager)
+    register_terminal_routes(app, registry=registry)
+
+    under_home = registry.create()
+    under_home.manager.pid = 1
+    outside_home = registry.create()
+    outside_home.manager.pid = 2
+    dead = registry.create()
+    dead.manager.pid = 3
+    dead.manager._alive = False
+
+    r = app.test_client().get("/api/terminal/sessions", base_url="http://localhost")
+    assert r.status_code == 200
+    assert r.get_json() == {
+        "sessions": [
+            {
+                "id": under_home.id, "name": under_home.name, "alive": True,
+                "createdAt": under_home.created_at, "cwd": "~/project",
+            },
+            {
+                "id": outside_home.id, "name": outside_home.name, "alive": True,
+                "createdAt": outside_home.created_at, "cwd": "/opt/other",
+            },
+            {
+                "id": dead.id, "name": dead.name, "alive": False,
+                "createdAt": dead.created_at, "cwd": None,
+            },
+        ],
+        "max": TerminalSessionRegistry.MAX_SESSIONS,
+    }
 
 
 class _ResizeRecorder:

@@ -14,10 +14,23 @@ import sys
 import threading
 import time
 import uuid
+from dataclasses import dataclass
 
 from quodeq.shared.constants import PLATFORM_WIN32
 from quodeq.terminal.links import child_cwd
 from quodeq.terminal.manager import TerminalManager
+
+
+@dataclass(frozen=True)
+class TerminalSessionView:
+    """Wire-agnostic snapshot of one tab. ``cwd`` is raw (no ``~`` collapse,
+    no camelCase) — the route owns that shaping."""
+
+    id: str
+    name: str
+    alive: bool
+    created_at: float
+    cwd: str | None
 
 
 def shell_name() -> str:
@@ -48,21 +61,17 @@ class TerminalSession:
         self.conn_lock = threading.Lock()
         self.created_at = time.time()
 
-    def to_dict(self) -> dict:
-        """Wire shape for the tab strip. ``cwd`` is the shell's current
-        directory with $HOME collapsed to ``~``, or None when the PTY is
-        gone."""
-        cwd = child_cwd(self.manager.pid)
-        home = os.path.expanduser("~")
-        if cwd and home != "~" and (cwd == home or cwd.startswith(home + os.sep)):
-            cwd = "~" + cwd[len(home):]
-        return {
-            "id": self.id,
-            "name": self.name,
-            "alive": self.manager.alive,
-            "createdAt": self.created_at,
-            "cwd": cwd,
-        }
+    def to_view(self) -> TerminalSessionView:
+        """Snapshot for the tab strip. ``cwd`` is the shell's raw current
+        directory (or None when the PTY is gone); the route collapses $HOME
+        to ``~`` and builds the camelCase wire keys."""
+        return TerminalSessionView(
+            id=self.id,
+            name=self.name,
+            alive=self.manager.alive,
+            created_at=self.created_at,
+            cwd=child_cwd(self.manager.pid),
+        )
 
 
 class TerminalSessionRegistry:
@@ -116,12 +125,12 @@ class TerminalSessionRegistry:
                 return session
             return self._create_locked() or next(iter(self._sessions.values()))
 
-    def list(self) -> list[dict]:
-        """Snapshot every session as a wire dict. The client reconciles its
-        tab strip against this instead of keeping its own list."""
+    def list(self) -> list[TerminalSessionView]:
+        """Snapshot every session as a view. The client reconciles its tab
+        strip against this instead of keeping its own list."""
         with self._lock:
             sessions = list(self._sessions.values())
-        return [s.to_dict() for s in sessions]
+        return [s.to_view() for s in sessions]
 
     def kill(self, sid: str) -> bool:
         """Kill one session's PTY and remove it. False if unknown."""
