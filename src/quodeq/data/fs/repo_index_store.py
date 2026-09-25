@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.shared.json_state import dump_json_and_replace
 
 
 def read_repo_index(path: Path) -> dict[str, str]:
@@ -36,9 +37,7 @@ def write_repo_index(path: Path, data: dict[str, str], *, log: LogSink = NULL_LO
     """
     fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp_path, str(path))
+        dump_json_and_replace(fd, tmp_path, path, data, indent=2)
     except OSError:
         if os.path.exists(tmp_path):
             try:

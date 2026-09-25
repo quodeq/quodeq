@@ -1,10 +1,10 @@
 """Per-tick artifact readers for the SSE run-event watcher.
 
 Reads status.json, evaluation/<dim>.json, and events.jsonl for
-``api/_run_event_watcher.py``'s ``compute_tick``. Split out so the API layer
-stops touching those files directly and instead goes through the same
-readers (``wiring.read_eval_report``, ``wiring.EventLogReader``) every other
-service uses.
+``api/_run_event_watcher.py``'s ``compute_tick``, so the API layer never
+touches those files directly and goes through the same readers
+(``wiring.read_eval_report``, ``wiring.EventLogReader``) every other service
+uses.
 
 ``read_status`` is the one exception: it reads status.json inline rather
 than through ``wiring.read_status`` (``data/fs/run_status_store.read_status``)
@@ -33,7 +33,7 @@ from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.run.state import RunState
 from quodeq.services import wiring
 from quodeq.shared.constants import JSON_SUFFIX
-from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.env import env_int
 
 DEFAULT_FINDINGS_BATCH = 500
 """Per-tick cap on findings pulled from the event log for the SSE stream.
@@ -54,14 +54,9 @@ is always emitted on the very first tick even when there is no status.json.
 
 def findings_batch_size(env: Mapping[str, str] | None = None) -> int:
     """QUODEQ_SSE_FINDINGS_BATCH, default DEFAULT_FINDINGS_BATCH; 0/invalid -> default."""
-    raw = resolve_env(env).get("QUODEQ_SSE_FINDINGS_BATCH")
-    if not raw:
-        return DEFAULT_FINDINGS_BATCH
-    try:
-        value = int(raw)
-    except ValueError:
-        return DEFAULT_FINDINGS_BATCH
-    return value if value > 0 else DEFAULT_FINDINGS_BATCH
+    return env_int(
+        "QUODEQ_SSE_FINDINGS_BATCH", DEFAULT_FINDINGS_BATCH, minimum=1, env=env, warn=False,
+    )
 
 
 def read_status(run_dir: Path, *, log: LogSink = NULL_LOG) -> tuple[dict[str, Any], float]:
@@ -73,9 +68,8 @@ def read_status(run_dir: Path, *, log: LogSink = NULL_LOG) -> tuple[dict[str, An
     started yet, not an error), exactly one WARNING -- logged here, with
     the real exception text -- on a read/parse failure, no log at all when
     the JSON parses but isn't a dict (also not an error, just not a status
-    payload). Schema version is not validated, matching the pre-move
-    reader; a newer schema than this code understands is served as-is
-    rather than downgraded to pending.
+    payload). Schema version is not validated; a newer schema than this
+    code understands is served as-is rather than downgraded to pending.
     """
     path = run_dir / wiring.STATUS_FILENAME
     try:
@@ -124,9 +118,8 @@ def read_dim_eval(
         return None
     if data is None:
         # wiring.read_eval_report returns None (no exception) for a missing
-        # file, but the pre-move inline reader read the file directly and
-        # logged the OSError text it got from that -- reproduce that exact
-        # text here so the message stays byte-identical across the move.
+        # file. Build the OSError a direct read would raise, so the warning
+        # below logs the same text a direct read would.
         missing = FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT))
         missing.filename = str(path)
         log.warning(f"dimension eval read failed at {path}: {missing}")

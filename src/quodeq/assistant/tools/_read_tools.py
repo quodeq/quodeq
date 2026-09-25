@@ -4,7 +4,7 @@ from __future__ import annotations
 import dataclasses
 
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._read_tools_common import raw_run_dims, validate_dimension
+from quodeq.assistant.tools._read_tools_common import find_dimension, raw_run_dims, validate_dimension
 from quodeq.assistant.tools._read_tools_scope import (
     accumulated_dims,
     finding_keys_in_scope,  # noqa: F401 - re-export (actions.py, external tests)
@@ -16,7 +16,7 @@ from quodeq.assistant.tools._read_tools_scope import (
 )
 from quodeq.assistant.tools._read_tools_violations import (
     VIOLATIONS_MAX_LIMIT,
-    available_names,
+    accumulated_dimension,
     get_violations,
     hidden_ids,
     trim_violation,
@@ -28,6 +28,7 @@ from quodeq.core.standards.visibility import partition_visible
 from quodeq.data.fs.report_parser.finding_details import read_eval_report
 from quodeq.data.fs.run_files import count_eval_files
 from quodeq.services.standards import StandardsService
+from quodeq.core.utils.numbers import clamp
 
 # Cap violations embedded in a full report so a single get_report stays small.
 _REPORT_VIOLATION_CAP = 40
@@ -50,7 +51,7 @@ def _search_findings(ctx: ToolContext, query: str, limit: int = _SEARCH_FINDINGS
     # query's hits) so a dimension whose rows never come back from SQL is
     # still reported as withheld.
     hidden = hidden_ids(ctx, list(repo.count_by_dimension()))
-    hits = repo.search(query, limit=max(1, min(int(limit), _SEARCH_FINDINGS_MAX_LIMIT)),
+    hits = repo.search(query, limit=clamp(int(limit), 1, _SEARCH_FINDINGS_MAX_LIMIT),
                         exclude_dimensions=hidden or None)
     # Model-facing key is "requirement"; the Finding attribute is `req`
     # (see data/sqlite/row_mappers.py row_to_finding).
@@ -91,6 +92,17 @@ def _get_scores(ctx: ToolContext) -> dict:
     }
 
 
+def _named_principles(entry: dict) -> list[dict]:
+    """*entry*'s principles, each also carrying ``name``.
+
+    Run-scoped principles are keyed "name"; the accumulated (PrincipleGrade)
+    shape keys the same thing "principle". Callers can always read ``name``
+    regardless of scope, and no existing key is dropped.
+    """
+    return [{**p, "name": p.get("name") or p.get("principle")}
+            for p in (entry.get("principles") or [])]
+
+
 def _get_report_from_run(ctx: ToolContext, dimension: str) -> dict:
     data = read_eval_report(ctx.run_dir / "evaluation", dimension)
     if data is None:
@@ -101,15 +113,13 @@ def _get_report_from_run(ctx: ToolContext, dimension: str) -> dict:
     viols = data.get("violations") or []
     scored = scored_run_dims(ctx)
     if scored is not None:
-        entry = next((d for d in scored if d.get("dimension") == dimension), None)
+        entry = find_dimension(scored, dimension)
         if entry is not None:
             # Swap in the dismiss-adjusted fields; keep the raw report's
-            # shape (coveragePct etc.) untouched. Principles get the same
-            # "name" normalization as the accumulated branch below.
+            # shape (coveragePct etc.) untouched.
             out["overallScore"] = entry.get("overallScore")
             out["overallGrade"] = entry.get("overallGrade")
-            out["principles"] = [{**p, "name": p.get("name") or p.get("principle")}
-                                 for p in (entry.get("principles") or [])]
+            out["principles"] = _named_principles(entry)
             out["totals"] = entry.get("totals")
             viols = entry.get("violations") or []
     out["violations"] = [trim_violation(v) for v in viols[:_REPORT_VIOLATION_CAP]]
@@ -120,17 +130,9 @@ def _get_report_from_accumulated(ctx: ToolContext, dimension: str) -> dict:
     dims = accumulated_dims(ctx)
     if dims is None:
         raise no_scope_error()
-    entry = next((d for d in dims if d.get("dimension") == dimension), None)
-    if entry is None:
-        avail = available_names(ctx, dims)
-        raise ToolError(
-            f"no report for dimension: {dimension}. Available: {avail or '(none)'}")
+    entry = accumulated_dimension(ctx, dims, dimension)
     viols = entry.get("violations") or []
-    # Run-scoped principles are keyed "name"; the accumulated (PrincipleGrade)
-    # shape keys the same thing "principle" -- normalize so callers can always
-    # read `name` regardless of scope, without dropping any existing keys.
-    principles = [{**p, "name": p.get("name") or p.get("principle")}
-                  for p in (entry.get("principles") or [])]
+    principles = _named_principles(entry)
     return {
         "dimension": entry.get("dimension"),
         "overallScore": entry.get("overallScore"),

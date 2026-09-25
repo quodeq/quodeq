@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { MIN_SUBAGENTS, PROVIDER_SETTING_KEY } from '../../../constants.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
-import { SettingsRowLabel, RemoteSubagentsRow } from './settingsRowParts.jsx';
+import { SettingsRowLabel, RemoteSubagentsRow, SettingsAdvanced } from './settingsRowParts.jsx';
 import { clampSubagentsTo } from './localApiSubagents.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
@@ -85,12 +85,9 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
       <ModelRow hint={hint} browseUrl={browseUrl} state={state} update={update} testing={testing} testResult={testResult} runTest={runTest} />
       <TimeLimitSetting state={state} update={update} providerType={PROVIDER_CLASSIFICATION.CLOUD_API} />
       <RemoteSubagentsRow state={state} update={update} clampSubagents={clampCloudSubagents} />
-      <details className="settings-advanced">
-        <summary className="settings-advanced-toggle">{t('settings.advanced')}</summary>
-        <div className="settings-advanced-content">
-          <AdvancedAnalysisSettings state={state} update={update} />
-        </div>
-      </details>
+      <SettingsAdvanced>
+        <AdvancedAnalysisSettings state={state} update={update} />
+      </SettingsAdvanced>
     </>
   );
 }

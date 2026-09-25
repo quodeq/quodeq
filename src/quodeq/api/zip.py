@@ -7,7 +7,6 @@ import os
 import tempfile
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from http import HTTPStatus
 from pathlib import Path
 
@@ -17,6 +16,7 @@ from quodeq.api._constants import CODE_NOT_FOUND
 from quodeq.api.helpers import ClientMessageError, json_error
 from quodeq.services.fs_project_helpers import read_project_record
 from quodeq.shared.constants import MANIFEST_FILENAME
+from quodeq.shared.clock import utc_now_iso
 from quodeq.shared.env import env_int
 
 _logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ def _build_manifest(project_path: Path) -> dict[str, object]:
         "repo_path": info.get("path"),
         "remote_url": info.get("remote_url"),
         "discipline": info.get("discipline"),
-        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "exported_at": utc_now_iso(),
         "quodeq_version": _qd_version,
     }
 

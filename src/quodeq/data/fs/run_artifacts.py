@@ -1,8 +1,7 @@
 """Copy/replace mechanics for staging run artifacts (shared-repo publish).
 
 services/shared_publish decides WHAT gets published (the source-of-truth
-allowlist, the glob patterns) and used to perform the shutil/os mechanics
-inline too; the mechanics live here. Errors propagate: the publish flow
+allowlist, the glob patterns); the shutil/os mechanics live here. Errors propagate: the publish flow
 converts OSError into a user-facing PublishError at its own boundary, so
 nothing here may swallow one.
 """
@@ -14,6 +13,8 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
+
+from quodeq.shared.json_state import dump_json_and_replace
 
 
 def ensure_dir(path: Path) -> None:
@@ -46,9 +47,7 @@ def read_json_object(path: Path) -> dict | None:
     """Parsed JSON object at *path*.
 
     None when the file is absent, not valid JSON, not a JSON object, or not
-    UTF-8 text. A generic counterpart to ``project_files``'s per-artifact
-    readers, for JSON stores outside the per-project ``repository_info.json``
-    / ``scan.json`` pair.
+    UTF-8 text.
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -66,9 +65,7 @@ def replace_json_file(path: Path, data: dict) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
     cleanup_tmp: str | None = tmp_path
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(json.dumps(data))
-        os.replace(tmp_path, str(path))
+        dump_json_and_replace(fd, tmp_path, path, data)
         cleanup_tmp = None  # ownership transferred to final path
     finally:
         if cleanup_tmp is not None:

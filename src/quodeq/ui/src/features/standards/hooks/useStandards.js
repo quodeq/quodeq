@@ -1,9 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { standardsKeys } from '../../../api/queryKeys.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { STANDARDS_CHANGED_REASON, notifyStandardsChanged } from '../../../constants.js';
+import { useStandardsQuery } from './useStandardsQuery.js';
 
 export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
 
@@ -71,10 +71,7 @@ function groupStandards(standards) {
  */
 export function useStandards({ onDuplicated } = {}) {
   const { listStandards, deleteStandard, duplicateStandard } = useApi();
-  const queryClient = useQueryClient();
-  const [mutationError, setMutationError] = useState(null);
-
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, setMutationError, queryClient } = useStandardsQuery({
     queryKey: standardsKeys.list(),
     queryFn: () => listStandards(),
   });
@@ -103,13 +100,11 @@ export function useStandards({ onDuplicated } = {}) {
 
   const grouped = useMemo(() => groupStandards(standards), [standards]);
 
-  const combinedError = mutationError || (error ? error.message : null);
-
   return {
     standards,
     grouped,
     loading: isLoading,
-    error: combinedError,
+    error,
     refresh,
     handleDelete,
     handleDuplicate,

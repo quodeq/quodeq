@@ -9,17 +9,16 @@ bugs at the cost of a few ms per call.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.finding_type import FindingType
 from quodeq.data.fs.grade_formula_store import load_params
+from quodeq.data.fs.report_parser.finding_details import iter_readable_eval_reports
 from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
-from quodeq.shared.constants import JSON_SUFFIX
 from quodeq.core.scoring.projector_scoring import (
     GRADE_ALGO_VERSION,
     PrincipleGradeScale,
@@ -39,16 +38,7 @@ def _read_source_file_count(run_dir: Path) -> int:
     ``classify_confidence_level``, matching the CLI's behaviour for runs
     without a known file count.
     """
-    eval_dir = run_dir / "evaluation"
-    if not eval_dir.is_dir():
-        return 0
-    for path in eval_dir.iterdir():
-        if path.suffix != JSON_SUFFIX:
-            continue
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
+    for _dimension, data in iter_readable_eval_reports(run_dir):
         if not isinstance(data, dict):
             continue  # a valid-JSON-but-non-dict file: skip, don't crash the loop
         count = data.get("sourceFileCount")

@@ -21,7 +21,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.assistant._worktree_git import (
-    WorktreeError, WorktreeStatus, run_git, run_git_bytes, diff_stats, diff_text, worktrees_base,
+    WorktreeError, WorktreeStatus, run_git, run_git_bytes, diff_stats, diff_text,
+    mark_intent_to_add, worktrees_base,
 )
 from quodeq.shared.constants import GIT_BIN, GIT_DIR_NAME, GIT_FLAG_C
 
@@ -110,7 +111,7 @@ class WorktreeManager:
         deletions, binary and non-UTF-8 changes survive the roundtrip. The
         patch file lives OUTSIDE the worktree so a failed cleanup can never
         leak it into a later diff or apply."""
-        self._git_worktree(_GIT_VERB_ADD, "-N", ".")
+        mark_intent_to_add(self.path)
         patch = run_git_bytes([GIT_BIN, GIT_FLAG_C, str(self.path), "diff", "HEAD",
                             "--binary"])
         if not patch.strip():
@@ -152,13 +153,13 @@ class WorktreeManager:
         except WorktreeError as exc:
             if committed:
                 self._git_worktree("reset", "--soft", "HEAD~1")
-            return {"prUrl": None, "branch": self.branch, "pushed": False,
-                    "message": (f"Push failed: {exc}. The changes are back in the"
-                                " worktree; apply them or open a PR manually.")}
+            return self._pr_result(None, pushed=False, message=(
+                f"Push failed: {exc}. The changes are back in the"
+                " worktree; apply them or open a PR manually."))
         if shutil.which("gh") is None:
-            return {"prUrl": None, "branch": self.branch, "pushed": True,
-                    "message": ("Branch pushed. Install and authenticate the gh"
-                                " CLI, or open the PR from your git host.")}
+            return self._pr_result(None, pushed=True, message=(
+                "Branch pushed. Install and authenticate the gh"
+                " CLI, or open the PR from your git host."))
         # gh runs with the parent process env on purpose (it needs the user's
         # own auth). It is NOT routed through the scrubbed-env CLI spawner
         # used for AI provider CLIs; that scrubber exists to keep secrets
@@ -169,11 +170,13 @@ class WorktreeManager:
                         "--body", body or "", "--head", self.branch],
                        cwd=self.path)
         except WorktreeError as exc:
-            return {"prUrl": None, "branch": self.branch, "pushed": True,
-                    "message": f"gh pr create failed: {exc}"}
+            return self._pr_result(None, pushed=True, message=f"gh pr create failed: {exc}")
         url = out.strip().splitlines()[-1] if out.strip() else None
-        return {"prUrl": url, "branch": self.branch, "pushed": True,
-                "message": "PR created"}
+        return self._pr_result(url, pushed=True, message="PR created")
+
+    def _pr_result(self, pr_url: str | None, *, pushed: bool, message: str) -> dict:
+        """The ``create_pr`` outcome the assistant shows: PR link, branch, push state, message."""
+        return {"prUrl": pr_url, "branch": self.branch, "pushed": pushed, "message": message}
 
 
 def ensure_session_worktree(repository, *, repo_root: Path, project_id: str | None,
@@ -187,7 +190,7 @@ def ensure_session_worktree(repository, *, repo_root: Path, project_id: str | No
                                           session_id, base=base)
     if manager.path.exists():  # crash leftover or terminal reuse: start clean
         shutil.rmtree(manager.path, ignore_errors=True)
-        run_git([GIT_BIN, GIT_FLAG_C, str(repo_root), _GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_PRUNE])
+        manager._git_repo(_GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_PRUNE)
     manager.create()
     repository.upsert_worktree(session_id=session_id, project_id=project_id,
                                repo_root=str(repo_root), path=str(manager.path),

@@ -6,8 +6,6 @@ call, and passed in.
 """
 from __future__ import annotations
 
-import os
-
 from quodeq.shared.env import env_int
 
 # One month of slack over the default git churn lookback (git_lookback_months,
@@ -33,8 +31,4 @@ def clone_shallow_months(env: dict[str, str] | None = None) -> int:
     larger git churn lookback, or set to 0 to force full-history clones.
     Malformed values fall back to the default (4).
     """
-    raw = (os.environ if env is None else env).get("QUODEQ_CLONE_SHALLOW_MONTHS", "")
-    try:
-        return int(raw) if raw else _DEFAULT_SHALLOW_MONTHS
-    except ValueError:
-        return _DEFAULT_SHALLOW_MONTHS
+    return env_int("QUODEQ_CLONE_SHALLOW_MONTHS", _DEFAULT_SHALLOW_MONTHS, env=env, warn=False)

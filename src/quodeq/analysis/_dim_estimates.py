@@ -75,6 +75,16 @@ def _log_excluded_once(log: LogSink, n_excluded: int, excluded_logged: bool) -> 
     return excluded_logged
 
 
+def _estimate(
+    count: int, reason: DimEstimateReason, total: int, cached: int, excluded: int,
+) -> dict[str, Any]:
+    """Build one dim's estimate record (the shape the dashboard reads)."""
+    return {
+        "count": count, "reason": reason, "total": total, "cached": cached,
+        "excluded": excluded,
+    }
+
+
 def _estimate_incremental(
     config: RunConfig, dim_id: str, files: list[str],
     cache: LocalFileBackend, n_excluded: int, *, count_only: bool = False,
@@ -89,11 +99,7 @@ def _estimate_incremental(
         reason = DimEstimateReason.FIRST_RUN
     else:
         reason = DimEstimateReason.INCREMENTAL
-    return {
-        "count": miss_count, "reason": reason,
-        "total": len(files), "cached": len(files) - miss_count,
-        "excluded": n_excluded,
-    }
+    return _estimate(miss_count, reason, len(files), len(files) - miss_count, n_excluded)
 
 
 def _estimate_non_incremental(
@@ -102,14 +108,8 @@ def _estimate_non_incremental(
     """Estimate one dim's count/reason for a non-incremental (diff/full) run."""
     if file_filter is not None:
         count = sum(1 for f in files if f in file_filter)
-        return {
-            "count": count, "reason": DimEstimateReason.DIFF, "total": count, "cached": 0,
-            "excluded": n_excluded,
-        }
-    return {
-        "count": len(files), "reason": DimEstimateReason.FULL, "total": len(files), "cached": 0,
-        "excluded": n_excluded,
-    }
+        return _estimate(count, DimEstimateReason.DIFF, count, 0, n_excluded)
+    return _estimate(len(files), DimEstimateReason.FULL, len(files), 0, n_excluded)
 
 
 def compute_dim_estimates(
@@ -140,10 +140,7 @@ def compute_dim_estimates(
         n_excluded = len(excluded)
         excluded_logged = _log_excluded_once(log, n_excluded, excluded_logged)
         if not files:
-            estimates[dim_id] = {
-                "count": 0, "reason": DimEstimateReason.EMPTY, "total": 0, "cached": 0,
-                "excluded": n_excluded,
-            }
+            estimates[dim_id] = _estimate(0, DimEstimateReason.EMPTY, 0, 0, n_excluded)
             continue
         if config.options.incremental:
             estimates[dim_id] = _estimate_incremental(

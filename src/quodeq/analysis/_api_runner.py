@@ -3,13 +3,8 @@
 Calls LLM APIs directly via the raw OpenAI client and writes findings as
 JSONL evidence -- the same format the CLI runner produces via MCP.
 
-``_Finding`` (in ``_api_schema``) is a lenient short-key variant of the
-canonical ``Judgment`` (``quodeq.core.events.models``). Local models drop
-required fields and balk at long field names under load -- this type's short
-keys (``req``/``t``/``w``) and Field descriptions are tuned for that
-constraint. The downstream wire-dict → Judgment lift happens via
-``quodeq.core.finding_mappings.wire_dict_to_judgment`` after
-``FindingEnricher`` maps ``req`` to ``practice_id``.
+The model's reply is parsed with the lenient short-key schema in
+``_api_schema``; the findings router enriches each one before it is written.
 
 Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
 """
@@ -28,18 +23,12 @@ from quodeq.analysis._api_enrichment import (
     resolve_file_paths,
 )
 from quodeq.analysis.errors import FatalProviderError
+from quodeq.analysis.mcp.precedent_signals import precedent_signals
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 from quodeq.analysis.mcp.schemas import FileDoneStatus
-from quodeq.config.context_env import precedent_settings
-from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
 from quodeq.data.fs.standards_loader import load_compiled_refs, load_compiled_requirements
-from quodeq.data.sqlite.findings_queries import (
-    dismissed_source_stamp,
-    read_dismissed_snippets_strict,
-)
-from quodeq.services.precedent_dismiss import precedent_match_hook
 from quodeq.shared.log_sink import LoggerSink
 
 if TYPE_CHECKING:
@@ -54,26 +43,6 @@ def _repo_signals(work_dir: Path | None) -> dict[str, object]:
     if work_dir is None:
         return {"project_shape": None, "trust_model": None}
     return {"project_shape": detect_shape(work_dir), "trust_model": resolve_trust_model(work_dir)}
-
-
-def _precedent_signals(project_dir: Path | None, run_dir: Path | None) -> dict[str, object]:
-    """The already-dismissed findings the router downweights against.
-
-    The strict reader raises on a failed open, so the per-run memo skips the
-    run instead of remembering it as having no dismissals.
-    """
-    if not project_dir:
-        return {"precedent_fingerprints": set(), "precedent_corpus": None,
-                "on_precedent_match": precedent_match_hook(None, log=LoggerSink(_log))}
-    return {
-        "precedent_fingerprints": load_precedent_fingerprints(
-            project_dir, read_dismissed=read_dismissed_snippets_strict,
-            source_stamp=dismissed_source_stamp,
-        ),
-        "precedent_corpus": (
-            load_precedent_corpus(project_dir, run_dir, settings=precedent_settings()) if run_dir else None),
-        "on_precedent_match": precedent_match_hook(project_dir, log=LoggerSink(_log)),
-    }
 
 
 def _build_router_context(
@@ -100,7 +69,7 @@ def _build_router_context(
             dimension=dimension,
             work_dir=work_dir,
             **_repo_signals(work_dir),
-            **_precedent_signals(project_dir, run_dir),
+            **precedent_signals(project_dir, run_dir, log=LoggerSink(_log)),
         )
     except (OSError, json.JSONDecodeError) as exc:
         _log.warning("Could not build enrichment context: %s -- writing raw", exc)

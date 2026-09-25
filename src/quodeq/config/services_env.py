@@ -2,17 +2,16 @@
 
 ``quodeq.services`` inner modules never read the environment directly;
 overrides are resolved here, lazily per call, and passed in (or read once by
-a composition point and threaded through). Each resolver mirrors the exact
-default/parse rule the service module it replaces used to apply -- see each
-docstring for the one-line contract.
+a composition point and threaded through). Each resolver's docstring
+states its default/parse rule in one line.
 """
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.shared.env import env_float, env_int
+from quodeq.shared.env_resolve import resolve_env
 
 RUN_DIM_CACHE_MAX_DEFAULT = 256
 MAX_HISTORY_RUNS_DEFAULT = 100
@@ -50,7 +49,7 @@ def job_persist_dir(env: Mapping[str, str] | None = None) -> Path:
     ``~/.quodeq``. Hardcoding the home fallback here let pytest runs write
     fake jobs into the developer's real dashboard.
     """
-    explicit = (os.environ if env is None else env).get("QUODEQ_JOB_PERSIST_DIR")
+    explicit = resolve_env(env).get("QUODEQ_JOB_PERSIST_DIR")
     if explicit:
         return Path(explicit)
     from quodeq.shared.env import get_index_db_path  # noqa: PLC0415 -- avoid import-time cost

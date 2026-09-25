@@ -15,7 +15,9 @@ from quodeq.api._log_tail_helpers import (
     resolve_stream_log_path,
     stream_terminal_state,
 )
+from quodeq.api._sse_log_helpers import event_stream_response, initial_offset
 from quodeq.api._sse_log_helpers import sse_tail_generator as _sse_tail_generator
+from quodeq.api.helpers import json_error
 from quodeq.shared.validation import validate_path_segment
 
 
@@ -51,14 +53,6 @@ def _is_preparing_job(provider, job_id: str) -> bool:
     return False
 
 
-def _initial_offset(last_event_id: str) -> int:
-    """Parse the SSE ``Last-Event-ID`` header (a byte offset); 0 when absent or malformed."""
-    try:
-        return int(last_event_id) if last_event_id else 0
-    except ValueError:
-        return 0
-
-
 def _job_done_checker(provider, job_id: str):
     """Return a zero-arg callable reporting whether *job_id* has completed."""
     def is_done() -> bool:
@@ -68,26 +62,25 @@ def _job_done_checker(provider, job_id: str):
     return is_done
 
 
-def _sse_log_response(provider, job_id: str, initial_offset: int) -> Response:
+def _sse_log_response(provider, job_id: str, offset: int) -> Response:
     """Build the ``text/event-stream`` response tailing *job_id*'s run.log."""
-    resp = Response(
-        _sse_tail_generator(
-            functools.partial(resolve_stream_log_path, provider, job_id),
-            initial_offset,
-            is_done=_job_done_checker(provider, job_id),
-            line_filter=is_visible_log_line,
-            terminal_state=functools.partial(stream_terminal_state, provider, job_id),
-        ),
-        mimetype="text/event-stream",
-    )
-    resp.headers["Cache-Control"] = "no-cache"
-    resp.headers["X-Accel-Buffering"] = "no"
-    return resp
+    return event_stream_response(_sse_tail_generator(
+        functools.partial(resolve_stream_log_path, provider, job_id),
+        offset,
+        is_done=_job_done_checker(provider, job_id),
+        line_filter=is_visible_log_line,
+        terminal_state=functools.partial(stream_terminal_state, provider, job_id),
+    ))
 
 
 def _invalid_job_id() -> tuple[Response, int]:
     """The 400 both log routes answer a malformed job id with."""
-    return jsonify({"error": "invalid job id", "code": CODE_INVALID_INPUT}), HTTPStatus.BAD_REQUEST
+    return json_error("invalid job id", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
+
+
+def _log_unavailable(status: int) -> tuple[Response, int]:
+    """The error both log routes answer an absent run.log with, at *status*."""
+    return json_error("log unavailable", status, CODE_NOT_FOUND)
 
 
 def _job_log_inputs(job_id: str):
@@ -119,7 +112,7 @@ def register_log_stream_routes(app: Flask) -> None:
             return _invalid_job_id()
         provider, log_path, err = resolved
         if log_path is None:
-            return jsonify({"error": "log unavailable", "code": CODE_NOT_FOUND}), err
+            return _log_unavailable(err)
         since = max(0, request.args.get("since", 0, type=int))
         lines, next_offset = read_tail(log_path, since)
         done = _job_done_checker(provider, job_id)()
@@ -138,6 +131,6 @@ def register_log_stream_routes(app: Flask) -> None:
         # recognise as live — otherwise the dashboard pane would show
         # "stream disconnected" until the user reopens the console.
         if log_path is None and not _is_preparing_job(provider, job_id):
-            return jsonify({"error": "log unavailable", "code": CODE_NOT_FOUND}), err
-        initial_offset = _initial_offset(request.headers.get("Last-Event-ID", ""))
-        return _sse_log_response(provider, job_id, initial_offset)
+            return _log_unavailable(err)
+        offset = initial_offset(request.headers.get("Last-Event-ID", ""))
+        return _sse_log_response(provider, job_id, offset)

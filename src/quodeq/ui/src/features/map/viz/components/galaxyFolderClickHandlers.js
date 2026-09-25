@@ -80,21 +80,30 @@ function flyBackToParent(refs, nav, size) {
   };
 }
 
+/** Drops the innermost zoom or focus: a zoomed file (with its zoom target),
+ * else a zoom target, else a focused folder. False when none was set. */
+function dropZoomOrFocus(refs) {
+  if (refs.zoomedFileRef.current) {
+    refs.zoomedFileRef.current = null;
+    refs.zoomTargetRef.current = null;
+    return true;
+  }
+  if (refs.zoomTargetRef.current) {
+    refs.zoomTargetRef.current = null;
+    return true;
+  }
+  if (refs.focusedFolderRef.current) {
+    refs.focusedFolderRef.current = null;
+    return true;
+  }
+  return false;
+}
+
 /** Click on empty space: zoom out of whatever is focused/zoomed, else
  * zoom toward the cursor at the root, else fly back to the parent folder. */
 export function handleEmptySpaceClick(refs, nav, params) {
   const { startTransition, saveNav, getFitZoom, scene, size } = params;
-  if (refs.zoomedFileRef.current) {
-    refs.zoomedFileRef.current = null;
-    refs.zoomTargetRef.current = null;
-    startTransition(true);
-    saveNav();
-  } else if (refs.zoomTargetRef.current) {
-    refs.zoomTargetRef.current = null;
-    startTransition(true);
-    saveNav();
-  } else if (refs.focusedFolderRef.current) {
-    refs.focusedFolderRef.current = null;
+  if (dropZoomOrFocus(refs)) {
     startTransition(true);
     saveNav();
   } else if (nav.path.length <= 1) {

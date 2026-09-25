@@ -26,6 +26,9 @@ const NEEDLE_MASK_ID = 'needle-hole-mask';
 // table on FileDetailPage, just sized up for the sidebar rail.
 const ICON_FOLDER = cloneElement(BASE_ICON_FOLDER, { width: 18, height: 18 });
 
+// Both logo chevrons: clickable, and they ease into their hover colour and glow.
+const LOGO_CHEVRON_STYLE = { fill: 'var(--logo-chevron)', cursor: 'pointer', transition: 'fill 180ms ease, filter 180ms ease' };
+
 function Logo() {
   return (
     <svg viewBox={LOGO_VIEWBOX} role="img" aria-label={BRAND_NAME} width="32" height="32" style={{overflow:'visible'}}>
@@ -35,8 +38,8 @@ function Logo() {
         </filter>
         <LogoNeedleMask id={NEEDLE_MASK_ID} />
       </defs>
-      <path id="left-chevron" d={LOGO_LEFT_CHEVRON_D} transform={LOGO_PATH_TRANSFORM} style={{fill:'var(--logo-chevron)',cursor:'pointer',transition:'fill 180ms ease, filter 180ms ease'}} />
-      <path id="right-chevron" d={LOGO_RIGHT_CHEVRON_D} transform={LOGO_PATH_TRANSFORM} style={{fill:'var(--logo-chevron)',cursor:'pointer',transition:'fill 180ms ease, filter 180ms ease'}} />
+      <path id="left-chevron" d={LOGO_LEFT_CHEVRON_D} transform={LOGO_PATH_TRANSFORM} style={LOGO_CHEVRON_STYLE} />
+      <path id="right-chevron" d={LOGO_RIGHT_CHEVRON_D} transform={LOGO_PATH_TRANSFORM} style={LOGO_CHEVRON_STYLE} />
       <path d={LOGO_Q_D} transform={LOGO_PATH_TRANSFORM} fillRule="evenodd" style={{fill:'var(--logo-q)'}} />
       <g mask={`url(#${NEEDLE_MASK_ID})`}>
         <path d={LOGO_NEEDLE_LIGHT_D} style={{fill:'var(--logo-needle)'}} />

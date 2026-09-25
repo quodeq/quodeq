@@ -185,20 +185,9 @@ def test_job_manager_shutdown_logs_when_kill_tree_fails(recording_log, monkeypat
     assert manager._processes == {}
 
 
-def test_violation_location_logs_unparsable_line() -> None:
-    debug_messages: list[str] = []
-
-    class _Sink:
-        def info(self, message: str) -> None: ...
-        def warning(self, message: str) -> None: ...
-        def error(self, message: str) -> None: ...
-        def success(self, message: str) -> None: ...
-
-        def debug(self, message: str) -> None:
-            debug_messages.append(message)
-
+def test_violation_location_logs_unparsable_line(recording_log) -> None:
     location = violations.violation_location(
-        {"req": "REQ-1", "file": "main.py:not-a-number"}, log=_Sink())
+        {"req": "REQ-1", "file": "main.py:not-a-number"}, log=recording_log)
     assert location == ("main.py:not-a-number", 0)
-    (message,) = debug_messages
+    (message,) = recording_log.debug_messages
     assert "violation line could not be parsed" in message

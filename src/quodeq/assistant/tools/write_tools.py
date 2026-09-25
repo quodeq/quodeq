@@ -22,11 +22,17 @@ _MAX_DIFF_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON head
 _PARAM_PATH = "path"  # tool parameter name, repeated across this module's schemas
 
 
-def _jail_write(ctx: ToolContext, rel_path: str) -> Path:
+def _worktree_dir(ctx: ToolContext) -> Path:
+    """The conversation's worktree; a ToolError when write access is off."""
     if ctx.worktree_dir is None:
         raise ToolError("write access is not enabled for this conversation")
+    return ctx.worktree_dir
+
+
+def _jail_write(ctx: ToolContext, rel_path: str) -> Path:
+    worktree_dir = _worktree_dir(ctx)
     target = jail(ctx, rel_path)
-    rel_parts = target.relative_to(ctx.worktree_dir.resolve()).parts
+    rel_parts = target.relative_to(worktree_dir.resolve()).parts
     if [p.lower() for p in rel_parts[:2]] == [".github", "workflows"]:
         raise ToolError("editing CI workflow files is not allowed")
     return target
@@ -83,11 +89,10 @@ def _delete_repo_file(ctx: ToolContext, path: str) -> dict:
 
 
 def _get_worktree_diff(ctx: ToolContext) -> dict:
-    if ctx.worktree_dir is None:
-        raise ToolError("write access is not enabled for this conversation")
+    worktree_dir = _worktree_dir(ctx)
     try:
-        text = diff_text(ctx.worktree_dir)
-        stats = diff_stats(ctx.worktree_dir)
+        text = diff_text(worktree_dir)
+        stats = diff_stats(worktree_dir)
     except WorktreeError as exc:
         raise ToolError(str(exc)) from exc
     return {"diff": text[:_MAX_DIFF_CHARS],

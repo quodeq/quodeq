@@ -17,8 +17,9 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import {
-  UI_ROOT, collectCounts, diffCounts, loadBaseline, total, writeBaseline, parseGateArgs,
+  UI_ROOT, collectCounts, diffCounts, exitWith, loadBaseline, okSummary, writeBaseline, parseGateArgs,
 } from './_ratchet_common.mjs';
+import { catalogKeyRefs } from './i18n_rules.mjs';
 
 const BASELINE_PATH = path.join(UI_ROOT, 'tools', 'strings_baseline.json');
 const CATALOG_PATH = path.join(UI_ROOT, 'src', 'strings', 'en.json');
@@ -46,7 +47,6 @@ function checkCatalog() {
 // UI silently shows "settings.needModelBeforeEval" where a sentence belongs.
 // The jsx-no-literals ratchet cannot see this (there is no literal left), and
 // tests only catch it where they assert on the exact copy -- so check it here.
-const T_CALL = /\bt(?:Rich)?\(\s*'([a-zA-Z0-9_.]+)'/g;
 
 function sourceFiles(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -62,8 +62,8 @@ function checkKeysResolve() {
   const missing = [];
   for (const file of sourceFiles(path.join(UI_ROOT, 'src'))) {
     const src = readFileSync(file, 'utf8');
-    for (const m of src.matchAll(T_CALL)) {
-      if (!(m[1] in catalog)) missing.push([m[1], path.relative(UI_ROOT, file)]);
+    for (const key of catalogKeyRefs(src)) {
+      if (!(key in catalog)) missing.push([key, path.relative(UI_ROOT, file)]);
     }
   }
   for (const [key, file] of missing) {
@@ -109,16 +109,10 @@ async function main() {
   }
 
   if (grew.length === 0 && shrank.length === 0 && catalogOk) {
-    console.log(`OK: no new hardcoded strings (${total(counts)} grandfathered across ${Object.keys(counts).length} files).`);
+    console.log(okSummary('hardcoded strings', counts));
     return 0;
   }
   return 1;
 }
 
-main().then(
-  (code) => process.exit(code),
-  (err) => {
-    console.error(err.message || err);
-    process.exit(2);
-  },
-);
+exitWith(main());

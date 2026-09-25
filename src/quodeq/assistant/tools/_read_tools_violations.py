@@ -8,7 +8,12 @@ from __future__ import annotations
 import heapq
 
 from quodeq.assistant.tools._context import ToolContext
-from quodeq.assistant.tools._read_tools_common import raw_run_dims, requirement_of, validate_dimension
+from quodeq.assistant.tools._read_tools_common import (
+    find_dimension,
+    raw_run_dims,
+    requirement_of,
+    validate_dimension,
+)
 from quodeq.assistant.tools._read_tools_scope import (
     accumulated_dims,
     has_run,
@@ -23,6 +28,7 @@ from quodeq.core.standards.visibility import (
 )
 from quodeq.core.types.severity import Severity
 from quodeq.services.wiring import read_eval_report
+from quodeq.core.utils.numbers import clamp
 
 # Trimmed violation shape shared by get_report and get_violations. We keep only
 # the fields that let the model locate and explain an issue and DROP the large
@@ -52,6 +58,20 @@ def available_names(ctx: ToolContext, dims: list[dict]) -> str:
     names = [d.get("dimension") for d in dims if d.get("dimension")]
     shown, _ = partition_visible(names, ctx.visible_standard_ids)
     return ", ".join(sorted(shown))
+
+
+def accumulated_dimension(
+    ctx: ToolContext, dims: list[dict], dimension: str, *, hint: str = "",
+) -> dict:
+    """The accumulated entry for *dimension*; a ToolError listing the visible ones when absent.
+
+    *hint* is appended to the error to point the model at another tool.
+    """
+    entry = find_dimension(dims, dimension)
+    if entry is None:
+        avail = available_names(ctx, dims)
+        raise ToolError(f"no report for dimension: {dimension}. Available: {avail or '(none)'}{hint}")
+    return entry
 
 
 def hidden_ids(ctx: ToolContext, names: list[str]) -> list[str]:
@@ -99,7 +119,7 @@ def get_violations(ctx: ToolContext, dimension: str | None = None,
                     limit: int = _VIOLATIONS_DEFAULT_LIMIT) -> dict:
     """One page of violations for the run or overview scope, severity first,
     with per-principle counts."""
-    limit = max(1, min(int(limit), VIOLATIONS_MAX_LIMIT))
+    limit = clamp(int(limit), 1, VIOLATIONS_MAX_LIMIT)
     if has_run(ctx):
         raw, dim_out, hidden = _violations_from_run(ctx, dimension)
     else:
@@ -132,7 +152,7 @@ def _violations_from_run(ctx: ToolContext, dimension: str | None):
                 "for accumulated scores across runs.")
         scored = scored_run_dims(ctx)
         if scored is not None:
-            entry = next((d for d in scored if d.get("dimension") == dimension), None)
+            entry = find_dimension(scored, dimension)
             if entry is not None:
                 return entry.get("violations") or [], dimension, []
         # Fall back to the raw report only when the dismiss/delete rescore
@@ -160,12 +180,8 @@ def _violations_from_accumulated(ctx: ToolContext, dimension: str | None):
     if dims is None:
         raise no_scope_error()
     if dimension:
-        entry = next((d for d in dims if d.get("dimension") == dimension), None)
-        if entry is None:
-            avail = available_names(ctx, dims)
-            raise ToolError(
-                f"no report for dimension: {dimension}. Available: "
-                f"{avail or '(none)'}. Or try get_overview for accumulated scores.")
+        entry = accumulated_dimension(
+            ctx, dims, dimension, hint=". Or try get_overview for accumulated scores.")
         return entry.get("violations") or [], dimension, []
     kept, hidden = visible_only(ctx, dims)
     raw: list = []

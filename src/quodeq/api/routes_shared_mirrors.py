@@ -1,19 +1,18 @@
 """Read-only mirrors of the project read endpoints, scoped to the shared clone.
 
-Split out of routes_shared.py. Each route below delegates to the
-SAME service function its local counterpart uses (see
-api/routes_project_list.py, routes_project_data.py, _scores_routes.py,
-routes_runs.py, routes_findings.py), with the shared clone's evaluations
-root standing in for the local reports directory. The response shape is
-therefore identical to the local route's; only the data source differs.
+Each route below delegates to the SAME service function its local
+counterpart uses (see api/routes_project_list.py, routes_project_data.py,
+_scores_routes.py, routes_runs.py, routes_findings.py), with the shared
+clone's evaluations root standing in for the local reports directory. The
+response shape is therefore identical to the local route's; only the data
+source differs.
 
 Read-only invariant: no finding-mutation routes exist in this module or
 anywhere under /api/shared/*, per routes_shared.py's module docstring.
 
 ``refresh_shared_clone`` and ``sync_shared_index`` are imported directly
-from their real owner (rather than looked up on the ``routes_shared``
-facade, which no longer re-exports them), so this module never imports back
-a sibling that imports it. Tests patch
+from their real owner, never through the ``routes_shared`` facade, so this
+module never imports back a sibling that imports it. Tests patch
 "quodeq.api.routes_shared_mirrors.refresh_shared_clone" /
 "...sync_shared_index".
 """
@@ -26,7 +25,7 @@ from typing import Callable
 from flask import Flask, Response, current_app, jsonify, request
 
 from quodeq.api._constants import CODE_NOT_FOUND, QUERY_FLAG_TRUE_NUMERIC
-from quodeq.api.helpers import json_error
+from quodeq.api.helpers import dimension_eval_response, json_error, validate_segment
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
 from quodeq.services import fs_reports, fs_projects
 from quodeq.services.compare import build_compare_summary
@@ -42,7 +41,7 @@ from quodeq.services.shared_repo import (
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.serialization import to_camel_dict
 
-from .routes_shared_common import logger, validate_segment, with_shared_root
+from .routes_shared_common import logger, with_shared_root
 
 _PROJECT_NOT_FOUND = "Project not found"  # repeated across the shared-mirror read routes
 
@@ -201,15 +200,10 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
     if err:
         return err
     evaluators_dir = current_app.config.get("STANDARDS_EVALUATORS_DIR")
-    payload = fs_reports.get_dimension_eval(
+    return dimension_eval_response(fs_reports.get_dimension_eval(
         str(eval_root), project, run_id, dim,
         evaluators_dir=Path(evaluators_dir) if evaluators_dir else None,
-    )
-    if payload is None:
-        return json_error("Eval file not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-    if payload.get("waiting"):
-        return jsonify(payload), HTTPStatus.ACCEPTED
-    return jsonify(payload)
+    ))
 
 
 @with_shared_root

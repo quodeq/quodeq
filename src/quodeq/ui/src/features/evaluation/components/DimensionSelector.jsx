@@ -19,9 +19,14 @@ function typeInfo(dim) {
   return { label: t(labelKey), className, order };
 }
 
+// The name a dimension is shown and sorted by: its label, else its id.
+function dimensionName(dim) {
+  return dim.label || dim.id;
+}
+
 // The dimension's ISO 25010 mapping when it has one, its own name otherwise.
 function dimensionTitle(dim) {
-  return dim.iso_25010 ? t('evaluate.iso25010Title', { value: dim.iso_25010 }) : dim.label || dim.id;
+  return dim.iso_25010 ? t('evaluate.iso25010Title', { value: dim.iso_25010 }) : dimensionName(dim);
 }
 
 // Both the compact chip and the full card are one toggle button for one
@@ -49,7 +54,7 @@ function DimensionChip({ dim, isSelected, onToggle }) {
       onToggle={onToggle}
       className={`dimension-chip-btn${isSelected ? ' selected' : ''}`}
     >
-      {dim.label || dim.id}
+      {dimensionName(dim)}
       <span className={`dimension-chip-type ${info.className}`}>{info.label}</span>
     </DimensionToggle>
   );
@@ -67,7 +72,7 @@ function DimensionCard({ dim, isSelected, onToggle, meta, metaLoading }) {
       <span className="eval-dim-card__check" aria-hidden="true">{isSelected ? '✓' : ''}</span>
       <span className="eval-dim-card__body">
         <span className="eval-dim-card__title-row">
-          <span className="eval-dim-card__name">{dim.label || dim.id}</span>
+          <span className="eval-dim-card__name">{dimensionName(dim)}</span>
           {/* Plain bordered tag on purpose: the legacy dimension-chip-type--*
               classes paint a tinted pill that fights the card style and
               drops contrast on several themes. */}
@@ -153,7 +158,7 @@ export default function DimensionSelector({ allDimensions, selectedDims, onToggl
     const oa = typeConfig(a).order;
     const ob = typeConfig(b).order;
     if (oa !== ob) return oa - ob;
-    return (a.label || a.id).localeCompare(b.label || b.id);
+    return dimensionName(a).localeCompare(dimensionName(b));
   }), [allDimensions]);
 
   const shared = { sorted, selectedDims, onToggle, onSelectAll, onClearAll };

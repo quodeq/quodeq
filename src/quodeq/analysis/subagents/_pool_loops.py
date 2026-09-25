@@ -70,6 +70,18 @@ def _respawn_for_surplus(ctx: LoopContext, just_done: int) -> None:
         ctx.submit_fn()
 
 
+def _collect_finished(ctx: LoopContext, ev_paths: EvidencePaths) -> set[Future[SubagentResult]]:
+    """Collect the agents that finished since the last poll, then check the failure streak.
+
+    The streak check cancels the run when the finished agents push the
+    consecutive-failure count to the limit.
+    """
+    done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
+    if done:
+        check_agent_failure_streak(ctx.results, ctx.agent_failure_streak_limit)
+    return done
+
+
 def scout_loop(ctx: LoopContext) -> None:
     """Scout-then-scale loop: one agent first, then fill the pool when the
     scout finishes or times out. Each later poll respawns for the pending
@@ -83,9 +95,7 @@ def scout_loop(ctx: LoopContext) -> None:
         return
     ctx.submit_fn()
     while ctx.futures:
-        done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
-        if done:
-            check_agent_failure_streak(ctx.results, ctx.agent_failure_streak_limit)
+        done = _collect_finished(ctx, ev_paths)
         scale_ctx = ScaleUpContext(
             ctx.queue, ctx.queue_path, ctx.submit_fn,
             deadline_at=ctx.deadline_at, run_deadline_at=ctx.run_deadline_at,
@@ -117,9 +127,7 @@ def immediate_loop(ctx: LoopContext) -> None:
         # No deadline-kill here: Future.cancel() is a no-op for running
         # threads. Enforcement is the spawn-gate in should_respawn() plus
         # the per-agent max_duration clamp set in build_agent_config().
-        done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
-        if done:
-            check_agent_failure_streak(ctx.results, ctx.agent_failure_streak_limit)
+        done = _collect_finished(ctx, ev_paths)
         if not done:
             time.sleep(FUTURE_POLL_INTERVAL_S)
             continue

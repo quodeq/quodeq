@@ -1,16 +1,16 @@
 """Project-building helpers for the filesystem action provider.
 
-Split: parent-detection and the max-projects-listed limit moved to
-_fs_project_parents.py, re-exported here for fs_projects.py's import.
+Parent-detection and the max-projects-listed limit are defined in
+_fs_project_parents.py and re-exported here for fs_projects.py's import.
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.core.run.state import RunState
 from quodeq.core.types import ProjectEntry
 from quodeq.services.wiring import (
@@ -35,7 +35,9 @@ from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
     max_projects_listed,
 )
 from quodeq.services._registration_url import strip_credentials
-from quodeq.services._repo_index import load_repo_index, repo_index_key, save_repo_index
+from quodeq.services._repo_index import (
+    RepoIdentity, load_repo_index, repo_index_key, save_repo_index,
+)
 from quodeq.shared.env import score_cache_disabled
 
 _logger = logging.getLogger(__name__)
@@ -93,7 +95,7 @@ def backfill_onboarding_field(
             data["onboardingCompletedAt"] = heal_completed_at
             write_repository_info(project_dir, data)
         return data
-    data["onboardingCompletedAt"] = data.get("createdAt") or datetime.now(timezone.utc).isoformat()
+    data["onboardingCompletedAt"] = data.get("createdAt") or utc_now_iso()
     write_repository_info(project_dir, data)
     return data
 
@@ -149,7 +151,7 @@ def _backfill_and_read_meta(
     *pre_read_info*: when provided, uses this dict instead of reading from disk.
     """
     project_dir = reports_root / entry_name
-    heal_at = (runs[-1].date_iso or datetime.now(timezone.utc).isoformat()) if runs else None
+    heal_at = (runs[-1].date_iso or utc_now_iso()) if runs else None
     backfilled = backfill_onboarding_field(
         project_dir, pre_read_data=pre_read_info, heal_completed_at=heal_at,
     ) if backfill else None
@@ -217,11 +219,7 @@ def _repo_identity_matches(
     data = read_repository_info(project_dir)
     if data is None:
         return False
-    return (
-        data.get("name") == expected_name
-        and data.get("path") == repo_resolved
-        and (data.get("scopePath") or None) == (scope_path or None)
-    )
+    return RepoIdentity(expected_name, repo_resolved, scope_path).matches_record(data)
 
 
 def find_existing_project(reports_root: str, repo: str, scope_path: str | None) -> str | None:

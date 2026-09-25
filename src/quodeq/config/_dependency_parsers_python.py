@@ -1,17 +1,16 @@
 """Structured matchers for Python dependency manifests: pyproject.toml and
 requirements.txt.
 
-Split from ``_dependency_parsers.py`` to keep that file under the size
-ratchet's 300-line cap. ``has_pyproject_dependency`` / ``has_requirements_txt_dependency``
-stay re-exported from there.
+``_dependency_parsers.py`` re-exports ``has_pyproject_dependency`` and
+``has_requirements_txt_dependency``.
 """
 from __future__ import annotations
 
 import re
-import tomllib
 from functools import lru_cache
 
 from quodeq.config._constants import PARSE_CACHE_MAX
+from quodeq.config.manifest_tables import toml_table
 
 # PEP 503: package names are case-insensitive and ``[-_.]+`` normalize to ``-``.
 _PEP503_SEP = re.compile(r"[-_.]+")
@@ -57,9 +56,8 @@ def _names_from_dict_keys(items: object) -> set[str]:
 
 @lru_cache(maxsize=PARSE_CACHE_MAX)
 def _pyproject_dep_names(content: str) -> frozenset[str]:
-    try:
-        data = tomllib.loads(content)
-    except tomllib.TOMLDecodeError:
+    data = toml_table(content)
+    if data is None:
         return frozenset()
 
     names: set[str] = set()

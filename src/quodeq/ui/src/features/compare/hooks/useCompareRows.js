@@ -4,6 +4,7 @@ import {
   buildDimensionView, buildDuelView, sortRows, COMPARE_VIEW_FLEET,
 } from '../compareModel.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { projectId } from '../../../utils/projectIdentity.js';
 
 /**
  * Every row + its "open this project" affordance: rows carry their own
@@ -12,7 +13,7 @@ import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
  */
 function useFleetRows({ fleetProjects, summariesById, now, onOpenProject }) {
   const rows = useMemo(() => {
-    const built = fleetProjects.map((p) => buildRow(p, summariesById[p.id || p.name], now));
+    const built = fleetProjects.map((p) => buildRow(p, summariesById[projectId(p)], now));
     // Shared summaries pass through unfiltered (a remote project has no
     // local standards config), so a standard the user disabled everywhere
     // could re-enter the fleet through a remote row. The fleet speaks the

@@ -12,7 +12,7 @@ from quodeq.analysis.subagents._pool_models import (
     PoolOptions,
     PoolPaths,
     SubagentResult,
-    AGENT_ID_PREFIX,
+    agent_id_for,
     HEARTBEAT_JOIN_TIMEOUT_S,
 )
 from quodeq.analysis.subagents._pool_worker import WorkerContext, build_agent_config, run_single_agent
@@ -77,7 +77,7 @@ class SubagentPool:
         )
 
     def _submit_agent(self, executor: ThreadPoolExecutor) -> None:
-        self._finished[f"{AGENT_ID_PREFIX}-{self._next_idx}"] = False
+        self._finished[agent_id_for(self._next_idx)] = False
         self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
         self._next_idx += 1
 

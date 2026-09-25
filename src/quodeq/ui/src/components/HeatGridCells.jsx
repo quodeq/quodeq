@@ -4,11 +4,12 @@ import { PERCENT } from '../constants.js';
 import { activateOnKey } from '../utils/a11y.js';
 import { SEVERITY_ORDER } from '../vocab/severity.js';
 import { SORT_DIR } from '../vocab/sortDirection.js';
+import { pluralKey } from '../utils/plural.js';
 
 // The catalog has no pluralisation, so a count of one takes its own key. An
 // unnamed row gets its fallback from the catalog too, not a bare literal.
 const rowLabel = (row) => row.name || t('heatGrid.unnamedRow');
-const violationsAriaKey = (count) => (count === 1 ? 'heatGrid.violationsCellAriaOne' : 'heatGrid.violationsCellAria');
+const violationsAriaKey = (count) => pluralKey(count, 'heatGrid.violationsCellAriaOne', 'heatGrid.violationsCellAria');
 
 /**
  * Renders the severity + violations + health cells for a heat grid row.
@@ -18,11 +19,9 @@ const violationsAriaKey = (count) => (count === 1 ? 'heatGrid.violationsCellAria
  *  - DimensionHeatGridView (Violations tab by-dimension/by-file tables) —
  *    pass `variant="flat"` for the leaner text-only treatment.
  *
- * This used to be two copies (one here, one under features/map/viz/components)
- * that drifted apart: the violations copy gained keyboard activation + aria
- * labels while the map copy gained the `viz-focusable` keyboard focus ring.
- * They were merged into this file so every clickable cell in both grids gets
- * the same treatment — keep it that way rather than re-forking.
+ * Both grids share these cells so every clickable cell gets the same keyboard
+ * activation, aria labels and `viz-focusable` focus ring; keep one copy
+ * rather than forking it per grid.
  */
 function SeverityCell({ row, sev, flat, onCellClick }) {
   const count = row.severity[sev];
@@ -41,7 +40,7 @@ function SeverityCell({ row, sev, flat, onCellClick }) {
         onKeyDown={hasValue ? activateOnKey(() => onCellClick?.({ row, severity: sev })) : undefined}
         role={hasValue ? 'button' : undefined}
         tabIndex={hasValue ? 0 : undefined}
-        aria-label={t(count === 1 ? 'heatGrid.severityCellAriaOne' : 'heatGrid.severityCellAria', { severity: sev, count, label: rowLabel(row) })}
+        aria-label={t(pluralKey(count, 'heatGrid.severityCellAriaOne', 'heatGrid.severityCellAria'), { severity: sev, count, label: rowLabel(row) })}
       >
         {count || '—'}
       </div>

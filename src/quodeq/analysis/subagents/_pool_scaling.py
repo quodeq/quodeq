@@ -11,13 +11,15 @@ from typing import Callable
 from quodeq.analysis.subagents._pool_models import (
     ScaleUpState,
     SubagentResult,
-    AGENT_ID_PREFIX,
+    agent_id_for,
+    agent_stream_file,
 )
 from quodeq.analysis.errors import REASON_AGENT_FAILURE_STREAK
 from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
 from quodeq.config.analysis_env import AGENT_FAILURE_STREAK_DEFAULT
 from quodeq.shared import cancellation
 from quodeq.shared.logging import log_warning
+from quodeq.core.utils.numbers import clamp
 
 
 @dataclass
@@ -166,7 +168,7 @@ def compute_scale_up(remaining: int, free_slots: int) -> int:
     queue can still feed. No files-per-agent estimate; a slot launched for
     a file that another agent takes first exits on its empty take (one
     turn for a CLI agent, nothing for the API runner)."""
-    return max(0, min(remaining, free_slots))
+    return clamp(remaining, 0, free_slots)
 
 
 def collect_done(
@@ -179,7 +181,7 @@ def collect_done(
     done_futures = {f for f in futures if f.done()}
     for future in done_futures:
         idx = futures[future]
-        agent_id = f"{AGENT_ID_PREFIX}-{idx}"
+        agent_id = agent_id_for(idx)
         try:
             result = future.result()
         except (OSError, RuntimeError, ValueError) as exc:
@@ -187,7 +189,7 @@ def collect_done(
             result = SubagentResult(
                 agent_id=agent_id,
                 jsonl_file=paths.shared_jsonl_path,
-                stream_file=paths.evidence_dir / f"{paths.dimension_key}_{agent_id}.stream",
+                stream_file=agent_stream_file(paths.evidence_dir, paths.dimension_key, agent_id),
                 success=False,
                 error=str(exc),
             )

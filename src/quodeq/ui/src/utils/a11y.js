@@ -36,6 +36,17 @@ export function activateOnKey(handler) {
   };
 }
 
+/**
+ * `onClick` and `onKeyDown` props that run `action` on a click or on Enter
+ * or Space, for an element acting as a button.
+ *
+ * @param {() => void} action
+ * @returns {{onClick: Function, onKeyDown: Function}}
+ */
+export function activationHandlers(action) {
+  return { onClick: action, onKeyDown: activateOnKey(action) };
+}
+
 /** The tabbable descendants of `root`, in document order (see the selector's limits above). */
 export function focusables(root) {
   return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR));

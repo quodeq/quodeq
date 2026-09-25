@@ -167,6 +167,9 @@ class EvaluationActions(Protocol):
         """
         ...
 
+    # The protocol states the signature FsEvaluationMixin implements; the two
+    # must match token for token, so this stub is a clone by design.
+    # jscpd:ignore-start
     def list_evaluations(
         self,
         *,
@@ -177,6 +180,7 @@ class EvaluationActions(Protocol):
         """Return evaluation jobs. If *states* is given, only jobs whose status
         is in the set are returned (e.g. {"running", "done"} to hide cancelled/failed)."""
         ...
+    # jscpd:ignore-end
 
     def delete_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
         """Delete a finished evaluation's on-disk artifacts and index row.

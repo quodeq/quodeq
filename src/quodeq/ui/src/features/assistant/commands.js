@@ -25,6 +25,17 @@ export const VISIBLE_META_COMMANDS = META_COMMANDS.filter((c) => !c.hidden);
 // guaranteed-to-fail first tool call, so the view's pill row is capped.
 const MAX_PILLS_PER_VIEW = 4;
 
+// Skills the session may offer: read-only (remote) sessions have no
+// draft_action server-side, so write-shaped skills would dead-end there.
+function offeredSkills(catalog, readOnly) {
+  return (catalog?.skills ?? []).filter((s) => !readOnly || !s.requiresWrite);
+}
+
+// One skill's line in the /help and /skills listings.
+function skillLine(s) {
+  return `- \`/${s.name}${s.argumentHint ? ` ${s.argumentHint}` : ''}\` ${s.description}`;
+}
+
 export function parseMetaCommand(text) {
   const first = text.trim().split(/\s+/)[0];
   if (!first.startsWith('/')) return null;
@@ -35,29 +46,24 @@ export function parseMetaCommand(text) {
 export function matchCommands(catalog, draft, { readOnly = false } = {}) {
   if (!draft.startsWith('/') || /\s/.test(draft)) return [];
   const prefix = draft.slice(1).toLowerCase();
-  // Read-only (remote) sessions have no draft_action server-side, so
-  // write-shaped skills would dead-end; hide them from autocomplete too,
-  // same rule as pillsForView.
-  const skills = (catalog?.skills ?? [])
-    .filter((s) => !readOnly || !s.requiresWrite)
+  const skills = offeredSkills(catalog, readOnly)
     .map((s) => ({ name: s.name, description: s.description, argumentHint: s.argumentHint || '' }));
   return [...VISIBLE_META_COMMANDS.map((c) => ({ ...c, argumentHint: '' })), ...skills]
     .filter((c) => c.name.startsWith(prefix));
 }
 
 function commandLines(catalog, readOnly) {
-  const skills = (catalog?.skills ?? []).filter((s) => !readOnly || !s.requiresWrite);
   return [
     ...VISIBLE_META_COMMANDS.map((c) => `- \`/${c.name}\` ${c.description}`),
-    ...skills.map((s) => `- \`/${s.name}${s.argumentHint ? ` ${s.argumentHint}` : ''}\` ${s.description}`),
+    ...offeredSkills(catalog, readOnly).map(skillLine),
   ].join('\n');
 }
 
 export function buildMetaResponse(kind, catalog, { readOnly = false } = {}) {
   if (kind === META_COMMAND_NAME.SKILLS) {
-    const skills = (catalog?.skills ?? []).filter((s) => !readOnly || !s.requiresWrite);
+    const skills = offeredSkills(catalog, readOnly);
     if (!skills.length) return t('assistant.noSkillPacks');
-    return `**Skills**\n${skills.map((s) => `- \`/${s.name}${s.argumentHint ? ` ${s.argumentHint}` : ''}\` ${s.description}`).join('\n')}`;
+    return `**Skills**\n${skills.map(skillLine).join('\n')}`;
   }
   if (kind === META_COMMAND_NAME.ACTIONS) {
     const actions = catalog?.actions ?? [];
@@ -72,9 +78,7 @@ export function buildMetaResponse(kind, catalog, { readOnly = false } = {}) {
 
 export function pillsForView(catalog, view, { readOnly = false } = {}) {
   if (!view) return [];
-  // Read-only (remote) sessions have no draft_action server-side, so
-  // write-shaped skills would dead-end; hide their pills entirely.
-  const skills = (catalog?.skills ?? []).filter((s) => !readOnly || !s.requiresWrite);
+  const skills = offeredSkills(catalog, readOnly);
   // Only skills declared for this view: a padded pill whose skill cannot run
   // in the current scope invites a guaranteed-to-fail first tool call.
   return skills

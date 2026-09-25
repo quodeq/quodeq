@@ -1,10 +1,8 @@
-"""Re-export shim: project-identity import helpers now live in
-``services/project_import_identity.py`` (SEP-03: the API layer must not walk
-directories or parse/rewrite ``repository_info.json`` itself).
+"""API-side names for the project-identity import helpers.
 
-Kept for ``tests/api/test_import_identity.py``'s existing import path;
-production code (``api/import_project.py``) imports from the new home
-directly.
+The helpers live in ``services/project_import_identity.py`` because the API
+layer must not walk directories or parse or rewrite ``repository_info.json``
+itself (SEP-03). ``tests/api/test_import_identity.py`` imports them from here.
 """
 from __future__ import annotations
 

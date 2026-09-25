@@ -135,3 +135,23 @@ export const HISTORY_CHART_HEIGHT = 220;
 // above (220px, the History tab's own score line chart) — a different,
 // shorter chart shape, deliberately a different height.
 export const PANEL_CHART_HEIGHT_PX = 160;
+
+/**
+ * Hover and selection props for a chart whose points are runs: activating a
+ * point reports its run id to `onBarClick`, and points stay inert when there
+ * is no handler.
+ * @param {Object} params
+ * @param {number|null} params.hoveredIndex
+ * @param {(index: number|null) => void} params.setHoveredIndex
+ * @param {string|null} params.selectedRunId
+ * @param {(runId: string) => void} [params.onBarClick]
+ * @returns {{hoveredIndex: number|null, setHoveredIndex: Function, selectedRunId: string|null, onActivate: Function|undefined}}
+ */
+export function runChartInteraction({ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }) {
+  return {
+    hoveredIndex,
+    setHoveredIndex,
+    selectedRunId,
+    onActivate: onBarClick ? (point) => onBarClick(point.runId) : undefined,
+  };
+}

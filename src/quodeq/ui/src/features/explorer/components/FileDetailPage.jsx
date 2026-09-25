@@ -3,7 +3,7 @@ import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { ComplianceCard } from './EvalCards.jsx';
 import ViolationCard from './ViolationCard.jsx';
 import FileDetailHeader from './FileDetailHeader.jsx';
-import { GroupHeader, LowConfidenceToggle, estimateItemSize, itemKey } from './fileDetailWidgets.jsx';
+import { GroupHeader, LowConfidenceToggle, ROW_HEIGHT_PX, fileFindingKey } from './fileDetailWidgets.jsx';
 import { useFileDetailFiltering } from './useFileDetailFiltering.js';
 import { useFileDetailWindowSpecs } from './useFileDetailWindowSpecs.jsx';
 import { useDashboardScrollElement } from './VirtualList.jsx';
@@ -63,8 +63,8 @@ function FileDetailBody({
         resetKey={virtualKey}
         items={items}
         scrollElement={scrollElement}
-        estimateSize={estimateItemSize(items)}
-        getItemKey={itemKey(items)}
+        rowHeights={ROW_HEIGHT_PX}
+        findingKey={fileFindingKey}
         renderItem={(item) => renderFileDetailItem(item, { onDismiss, handleDismiss, setLowConfExpanded })}
       />
     </>

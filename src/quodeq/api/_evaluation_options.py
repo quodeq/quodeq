@@ -1,9 +1,7 @@
 """Request payload -> EvaluationOptions.
 
-Split out of ``_evaluation_helpers.py`` (which was at the 300-line cap) when
-``build_evaluation_options`` was broken into ``_parse_limits`` and
-``_parse_flags``. Depends on ``_evaluation_helpers`` for the shared coercion
-primitives, never the other way round.
+Depends on ``_evaluation_helpers`` for the shared coercion primitives, never
+the other way round.
 """
 from __future__ import annotations
 
@@ -11,6 +9,7 @@ from typing import NamedTuple
 
 from quodeq.api._evaluation_helpers import coerce_int, resolve_clean_scan
 from quodeq.config.ai_provider import get_api_key_secure
+from quodeq.core.utils.numbers import clamp
 from quodeq.services.base import (
     DEFAULT_MAX_SUBAGENTS, DEFAULT_TIME_LIMIT, EvaluationOptions,
 )
@@ -47,8 +46,8 @@ def _parse_limits(body: dict) -> _Limits:
     field = "poolBudget" if "poolBudget" in body and "timeLimit" not in body else "timeLimit"
     raw_limit = coerce_int(body.get("timeLimit", body.get("poolBudget")), DEFAULT_TIME_LIMIT, field)
     return _Limits(
-        max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, subagents)),
-        0 if raw_limit == 0 else max(_MIN_TIME_LIMIT, min(_MAX_TIME_LIMIT, raw_limit)),
+        clamp(subagents, _MIN_SUBAGENTS, _MAX_SUBAGENTS),
+        0 if raw_limit == 0 else clamp(raw_limit, _MIN_TIME_LIMIT, _MAX_TIME_LIMIT),
     )
 
 
@@ -92,7 +91,7 @@ def build_evaluation_options(payload: dict) -> EvaluationOptions:
         time_limit=limits.time_limit,
         clean_scan=flags.clean_scan,
         per_dimension=bool(payload.get("perDimension", False)),
-        context_size=max(0, min(_MAX_CONTEXT_SIZE, context_size)),
+        context_size=clamp(context_size, 0, _MAX_CONTEXT_SIZE),
         branch=payload.get("branch") or None,
         scope_path=flags.scope_path,
         provider_api_key=flags.provider_api_key,

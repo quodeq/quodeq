@@ -1,10 +1,8 @@
 """Project-identity helpers for import: collision detection and index updates.
 
-Moved out of ``api/_import_identity.py`` (SEP-03: the API layer must not walk
-directories or parse/rewrite ``repository_info.json`` itself). That module
-now re-exports these names for ``tests/api/test_import_identity.py``'s
-existing import path; production code (``api/import_project.py``) imports
-from here directly.
+The import route uses these to find an existing project with the same
+identity, rewrite the imported ``repository_info.json`` with its new UUID and
+register it in ``project_index.json``.
 """
 from __future__ import annotations
 
@@ -20,9 +18,15 @@ from quodeq.services.project_index import (
     save_index,
 )
 from quodeq.core.types.project_source import ProjectLocation
+from quodeq.services._repo_index import RepoIdentity
 from quodeq.services.wiring import read_repository_info, write_repository_info
 
 REPO_INFO_FILENAME = "repository_info.json"
+
+
+def _optional_str(info: dict[str, Any], key: str) -> str | None:
+    value = info.get(key)
+    return value if isinstance(value, str) else None
 
 
 def identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
@@ -30,10 +34,10 @@ def identity_from_info(info: dict[str, Any]) -> ProjectIdentity:
     return ProjectIdentity(
         project_name=str(info.get("name") or ""),
         repo_path=str(info.get("path") or ""),
-        discipline=info.get("discipline") if isinstance(info.get("discipline"), str) else None,
+        discipline=_optional_str(info, "discipline"),
         location=str(info.get("location") or ProjectLocation.LOCAL),
-        scope_path=info.get("scopePath") if isinstance(info.get("scopePath"), str) else None,
-        remote_url=info.get("remote_url") if isinstance(info.get("remote_url"), str) else None,
+        scope_path=_optional_str(info, "scopePath"),
+        remote_url=_optional_str(info, "remote_url"),
     )
 
 
@@ -47,29 +51,6 @@ def _index_collision(reports_root: Path, identity: ProjectIdentity, ignore_uuid:
     return None
 
 
-def _info_matches_identity(data: dict[str, Any], identity: ProjectIdentity) -> bool:
-    if data.get("name") != identity.project_name:
-        return False
-    if data.get("path") != identity.repo_path:
-        return False
-    if (data.get("scopePath") or None) != (identity.scope_path or None):
-        return False
-    return True
-
-
-def _heal_index(
-    reports_root: Path, identity: ProjectIdentity, uuid: str, *, log: LogSink = NULL_LOG,
-) -> None:
-    """Write a fallback-walk hit back into the index so the next lookup for
-    this identity takes the fast path."""
-    try:
-        index = load_index(reports_root)
-        index[index_key(identity)] = uuid
-        save_index(reports_root, index)
-    except OSError as exc:
-        log.warning(f"import: could not update project_index.json: {exc}")
-
-
 def _walk_for_collision(
     reports_root: Path, identity: ProjectIdentity, ignore_uuid: str, *, log: LogSink = NULL_LOG,
 ) -> str | None:
@@ -77,13 +58,14 @@ def _walk_for_collision(
     directly, mirroring ``_scan_legacy_projects``'s self-healing pattern."""
     if not reports_root.is_dir():
         return None
+    wanted = RepoIdentity(identity.project_name, identity.repo_path, identity.scope_path)
     for child in reports_root.iterdir():
         if not child.is_dir() or child.name == ignore_uuid:
             continue
         data = read_repository_info(child)
-        if data is None or not _info_matches_identity(data, identity):
+        if data is None or not wanted.matches_record(data):
             continue
-        _heal_index(reports_root, identity, child.name, log=log)
+        update_index(reports_root, identity, child.name, log=log)
         return child.name
     return None
 

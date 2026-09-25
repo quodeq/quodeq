@@ -7,6 +7,7 @@ import TerminalHeader from './TerminalHeader.jsx';
 import { LockIcon } from '../../components/CopyButton.jsx';
 import { t } from '../../strings/index.js';
 import { TERMINAL_RESTART_EVENT } from '../../constants.js';
+import { pluralKey } from '../../utils/plural.js';
 
 // The panel's footer line: shell, session count and the localhost-only
 // padlock.
@@ -15,9 +16,7 @@ function TerminalStatusBar({ shell, sessions, activeSession }) {
     <div className="tty-statusbar">
       {shell && <span>{shell}</span>}
       {shell && <span className="tty-statusbar-sep" aria-hidden="true">·</span>}
-      <span>{sessions.length === 1
-        ? t('terminal.sessionsOne', { count: sessions.length })
-        : t('terminal.sessionsMany', { count: sessions.length })}</span>
+      <span>{t(pluralKey(sessions.length, 'terminal.sessionsOne', 'terminal.sessionsMany'), { count: sessions.length })}</span>
       <span className="tty-statusbar-sep" aria-hidden="true">·</span>
       {/* The gate only ever admits loopback clients (terminal/gate.py); a
           shell in a browser deserves a visible, if quiet, answer to "who

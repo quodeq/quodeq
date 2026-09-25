@@ -6,7 +6,6 @@ Delegates to internal modules for network I/O and JSON parsing.
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
@@ -22,6 +21,7 @@ from quodeq.config._asvs_network import (  # noqa: F401
     DEFAULT_FETCH_TIMEOUT_S,
 )
 from quodeq.config._asvs_parser import parse_asvs_content as _parse_asvs_content
+from quodeq.shared.env_resolve import resolve_env
 
 _ASVS_DEFAULT_LEVEL = 1
 _ASVS_ALLOWED_HOSTS = frozenset({"raw.githubusercontent.com", "github.com", "owasp.org"})
@@ -35,7 +35,7 @@ def _asvs_version(override: str | None = None, env: dict[str, str] | None = None
     """Return the ASVS version string. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return (os.environ if env is None else env).get("QUODEQ_ASVS_VERSION", _DEFAULT_ASVS_VERSION)
+    return resolve_env(env).get("QUODEQ_ASVS_VERSION", _DEFAULT_ASVS_VERSION)
 
 
 @dataclass(frozen=True)

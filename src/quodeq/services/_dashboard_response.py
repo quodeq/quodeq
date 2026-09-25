@@ -1,6 +1,6 @@
 """Serialization of the dashboard response.
 
-Split out of ``dashboard``: this is the wire boundary — everything here turns
+This is the wire boundary — everything here turns
 already-computed domain objects into the camelCase dict the UI consumes, and
 nothing here reads history or resolves runs. Declared in
 ``tests/tools/test_serialization_boundary.py``.
@@ -13,6 +13,7 @@ from typing import Any
 from quodeq.core.types import DimensionResult
 from quodeq.shared.serialization import to_camel_dict
 
+from quodeq.services.dashboard_trend import run_info_payload
 from quodeq.services.wiring import RunInfo
 from quodeq.services._dashboard_history import DashboardPayload
 
@@ -42,16 +43,13 @@ def attach_exit_reason_to_dim(
     """
     per_dim = dim_dict.get("exit_reason") or dim_dict.get("exitReason")
     chosen = per_dim or run_exit_reason
-    if chosen is None:
-        # Drop the snake_case key if present, to keep the response clean.
-        if "exit_reason" in dim_dict:
-            out = dict(dim_dict)
-            out.pop("exit_reason", None)
-            return out
+    if chosen is None and "exit_reason" not in dim_dict:
         return dim_dict
+    # Copy, and drop the snake_case key if present to keep the response clean.
     out = dict(dim_dict)
     out.pop("exit_reason", None)
-    out["exitReason"] = chosen
+    if chosen is not None:
+        out["exitReason"] = chosen
     return out
 
 
@@ -104,6 +102,7 @@ def build_dashboard_result(
 ) -> dict[str, Any]:
     """Assemble the final dashboard response dict from pre-computed parts."""
     exit_reason = annotations.exit_reason
+    selected_info = run_info_payload(selected_run)
     dim_dicts = [
         attach_dismissed_count_to_dim(
             attach_exit_reason_to_dim(to_camel_dict(d), exit_reason),
@@ -114,20 +113,12 @@ def build_dashboard_result(
     ]
     return {
         "project": project,
-        "availableRuns": [
-            {"runId": item.run_id, "dateISO": item.date_iso, "dateLabel": item.date_label, "status": item.status}
-            for item in runs
-        ],
-        "selectedRun": {
-            "runId": selected_run.run_id,
-            "dateISO": selected_run.date_iso,
-            "dateLabel": selected_run.date_label,
-            "exitReason": exit_reason,
-        },
+        "availableRuns": [{**run_info_payload(item), "status": item.status} for item in runs],
+        "selectedRun": {**selected_info, "exitReason": exit_reason},
         "summary": {
             **to_camel_dict(payload.selected_summary),
-            "dateISO": selected_run.date_iso,
-            "dateLabel": selected_run.date_label,
+            "dateISO": selected_info["dateISO"],
+            "dateLabel": selected_info["dateLabel"],
         },
         "trend": payload.trend,
         "partialRuns": payload.partial_runs,

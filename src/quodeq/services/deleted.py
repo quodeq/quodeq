@@ -13,9 +13,9 @@ sweeping matching dismissed entries).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.core.dismissals import DismissedEntry, DismissedKeys
 from quodeq.core.finding_identity import DismissKey, finding_dismiss_keys, snippet_fingerprint
 from quodeq.data.ports.actions_log import ActionLog
@@ -59,7 +59,7 @@ def _entry_from_finding(finding: dict) -> dict:
         "dimension": finding.get("dimension", ""),
         "principle": finding.get("principle", ""),
         "file": finding.get("file", ""),
-        "deleted_at": datetime.now(timezone.utc).isoformat(),
+        "deleted_at": utc_now_iso(),
     }
 
 
@@ -73,29 +73,38 @@ def delete_finding(project_dir: Path, finding: dict, *, writer: ActionLog | None
     new_key = _key(finding)
     if not new_key[1] or not new_key[2]:
         return 0
-    swept = 0
     with locked_deleted_store(project_dir):
         existing = load_deleted(project_dir)
-        if new_key not in {_key(e) for e in existing}:
-            existing.append(_entry_from_finding(finding))
+        if _append_new_entries(existing, [finding]):
             write_deleted_entries(project_dir, existing)
-        swept = _sweep_dismissed_matching(project_dir, new_key, writer=writer)
-    return swept
+        return _sweep_dismissed_matching(project_dir, new_key, writer=writer)
 
 
-def _add_deleted_entries(project_dir: Path, findings: list[dict]) -> None:
-    """Append a deleted entry per unique, fully-keyed finding and write the store.
+def _append_new_entries(existing: list[dict], findings: list[dict]) -> int:
+    """Append to *existing* a deleted entry per unique, fully-keyed finding it lacks.
 
-    Caller holds the deleted-store lock.
+    Returns how many were appended; writing the store is the caller's call.
     """
-    existing = load_deleted(project_dir)
     existing_keys = {_key(e) for e in existing}
+    added = 0
     for finding in findings:
         k = _key(finding)
         if not k[1] or not k[2] or k in existing_keys:
             continue
         existing.append(_entry_from_finding(finding))
         existing_keys.add(k)
+        added += 1
+    return added
+
+
+def _add_deleted_entries(project_dir: Path, findings: list[dict]) -> None:
+    """Append a deleted entry per unique, fully-keyed finding and write the store.
+
+    Caller holds the deleted-store lock. The store is written even when
+    nothing new was appended.
+    """
+    existing = load_deleted(project_dir)
+    _append_new_entries(existing, findings)
     write_deleted_entries(project_dir, existing)
 
 

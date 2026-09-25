@@ -1,13 +1,8 @@
 """Low-level git primitives and constants for the assistant worktree layer.
 
-Split out of ``worktree.py`` to break its facade cycle with
-``_worktree_manager.py`` / ``_worktree_gc.py``: those two modules used to
-import these primitives back from ``worktree.py`` (which itself imports
-them at the bottom, after re-exporting ``WorktreeManager`` etc.), relying on
-Python's partial-module-init ordering to avoid a real ImportError. This
-module is a true leaf -- it imports nothing from ``worktree.py``,
-``_worktree_manager.py``, or ``_worktree_gc.py`` -- so every consumer,
-including ``worktree.py`` itself, imports it as a plain top-level import.
+A leaf module: it imports nothing from ``worktree.py``,
+``_worktree_manager.py`` or ``_worktree_gc.py``, so every one of them
+imports it as a plain top-level import.
 
 All git/gh invocations are argv lists (never shell strings) with explicit
 -C paths. Output is decoded manually so no text-mode file handles are opened.
@@ -90,12 +85,17 @@ def run_git(argv: list[str], *, cwd: Path | None = None) -> str:
     return run_git_bytes(argv, cwd=cwd).decode(TEXT_ENCODING, errors="replace")
 
 
+def mark_intent_to_add(worktree: Path) -> None:
+    """``git add -N .`` in *worktree*, so a diff against HEAD shows untracked files too."""
+    run_git([GIT_BIN, GIT_FLAG_C, str(worktree), "add", "-N", "."])
+
+
 def diff_text(worktree: Path) -> str:
     """Unified diff of the worktree, including untracked files (intent-to-add).
 
     Diffs against HEAD, not the index: `git add -N .` records a tracked file's
     deletion in the index, so a plain worktree-vs-index diff would hide it."""
-    run_git([GIT_BIN, GIT_FLAG_C, str(worktree), "add", "-N", "."])
+    mark_intent_to_add(worktree)
     return run_git([GIT_BIN, GIT_FLAG_C, str(worktree), "diff", "HEAD"])
 
 
@@ -105,7 +105,7 @@ def diff_stats(worktree: Path) -> list[dict]:
     Binary files report 0/0 (numstat writes "-"). Unparseable lines are
     skipped rather than raising.
     """
-    run_git([GIT_BIN, GIT_FLAG_C, str(worktree), "add", "-N", "."])
+    mark_intent_to_add(worktree)
     out = run_git([GIT_BIN, GIT_FLAG_C, str(worktree), "diff", "HEAD", "--numstat"])
     stats = []
     for line in out.splitlines():

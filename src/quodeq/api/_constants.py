@@ -32,12 +32,18 @@ CODE_INVALID_CLONE_DEST = "INVALID_CLONE_DEST"
 # routes_project_create's discipline field type check.
 CODE_INVALID_DISCIPLINE = "INVALID_DISCIPLINE"
 CODE_NOT_FOUND = "NOT_FOUND"
+CODE_PROJECT_EXISTS = "PROJECT_EXISTS"  # 409 for a project already registered or imported
+CODE_GONE = "GONE"  # the run a job pointed at has no directory any more
 CODE_FORBIDDEN = "FORBIDDEN"
 CODE_UNKNOWN_SESSION = "UNKNOWN_SESSION"
 CODE_NO_ACTIVE_WORKTREE = "NO_ACTIVE_WORKTREE"
 # routes_shared_pull's optional "action" field (copy|replace) on a pull collision.
 CODE_INVALID_ACTION = "INVALID_ACTION"
 MESSAGE_UNKNOWN_SESSION = "unknown session"
+MESSAGE_INVALID_PROJECT_NAME = "Invalid project name"  # 400 for a malformed <project> segment
+# No shared results repository is configured (shared routes, assistant shared sessions).
+CODE_NO_SHARED_REPO = "NO_SHARED_REPO"
+MESSAGE_NO_SHARED_REPO = "no shared repository configured"
 
 # Hard cap on a findings-listing page, local and shared-clone mirrors alike
 # (routes_findings.py, routes_shared_findings_mirrors.py).

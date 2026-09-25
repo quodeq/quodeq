@@ -2,6 +2,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { LocalApiTabLayout, LocalApiModelSelectRow, ModelPickerSelect } from './LocalApiTabLayout.jsx';
 import { useOmlxModels } from '../hooks/useOmlxModels.js';
 import { useLocalApiTabTest } from '../hooks/useLocalApiTabTest.js';
+import { warnAndRethrow } from '../settingsHelpers.js';
 import { t } from '../../../strings/index.js';
 import { tRich } from '../../../strings/rich.jsx';
 import { PROVIDER_SETTING_KEY } from '../../../constants.js';
@@ -48,10 +49,7 @@ export default function OmlxTab({ state, update }) {
   const { omlxStatus, models, modelsError } = useOmlxModels({ apiBase, apiKey });
 
   const concurrency = useLocalApiTabTest({
-    probe: () => testOmlxConcurrency(state.model, apiBase || undefined, apiKey || undefined).catch((err) => {
-      console.warn('omlx concurrency test failed', err);
-      throw err;
-    }),
+    probe: warnAndRethrow(() => testOmlxConcurrency(state.model, apiBase || undefined, apiKey || undefined), 'omlx'),
     errorKey: 'settings.concurrencyTestFailedOmlx',
     update,
     enabled: !!state.model,

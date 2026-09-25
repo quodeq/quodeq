@@ -51,6 +51,11 @@ def raw_run_dims(eval_dir: Path) -> list[dict]:
     return out
 
 
+def find_dimension(dims: list[dict], dimension: str) -> dict | None:
+    """The entry for *dimension* in a list of per-dimension results, or None."""
+    return next((d for d in dims if d.get("dimension") == dimension), None)
+
+
 def requirement_of(v: dict) -> str:
     """The requirement id of a violation, normalized to ``""`` when absent.
 

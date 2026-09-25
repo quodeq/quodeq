@@ -216,8 +216,7 @@ class SQLiteStateStore(StateStoreMetaMixin):
                 (``{"dimension": ..., "score": ..., "grade": ...}``).
         """
         with self._db() as conn:
-            conn.execute(DELETE_DIMENSION_SCORES_SQL)
-            conn.execute("DELETE FROM principle_grades")
+            _delete_grades(conn)
             # One prepared statement per table instead of one Python/SQLite
             # round-trip per row; rows land in the order given.
             conn.executemany(
@@ -244,8 +243,7 @@ class SQLiteStateStore(StateStoreMetaMixin):
     def clear_grades(self) -> None:
         """Empty both grade tables. Findings are left alone."""
         with self._db() as conn:
-            conn.execute(DELETE_DIMENSION_SCORES_SQL)
-            conn.execute("DELETE FROM principle_grades")
+            _delete_grades(conn)
             conn.commit()
 
     def read_dimension_scores(self) -> list[dict]:
@@ -279,3 +277,9 @@ class SQLiteStateStore(StateStoreMetaMixin):
         """Compute the run-level score from non-null dimension scores (weighted when params enable dimension weights)."""
         rows = self.read_dimension_scores()
         return compute_run_score(rows, params=params if params is not None else DEFAULT_PARAMS)
+
+
+def _delete_grades(conn: sqlite3.Connection) -> None:
+    """Delete every row of both grade tables (no commit)."""
+    conn.execute(DELETE_DIMENSION_SCORES_SQL)
+    conn.execute("DELETE FROM principle_grades")

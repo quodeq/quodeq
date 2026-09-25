@@ -1,7 +1,7 @@
 """Run-config assembly phases for ``cli_evaluation.build_run_config``.
 
-Split out so the orchestrator stays a short list of phase calls: this module
-owns the dimension filter, the flag/env-derived caps (``_RunLimits``) and the
+Keeps the orchestrator a short list of phase calls: this module owns the
+dimension filter, the flag/env-derived caps (``_RunLimits``) and the
 ``AnalysisOptions`` mapping. ``build_run_config`` itself stays in
 ``cli_evaluation`` because tests patch ``default_paths`` at that module's path.
 
@@ -29,6 +29,7 @@ from quodeq.config.analysis_env import (
     FAILURE_STREAK_THRESHOLD_DEFAULT, agent_failure_streak_limit, default_max_duration,
     default_max_turns, failure_streak_override,
 )
+from quodeq.shared.csv_values import split_csv
 from quodeq.shared.logging import log_info
 from quodeq.shared.utils import get_ai_cmd_path
 
@@ -123,6 +124,6 @@ def build_analysis_options(
 
 def dimensions_filter_for(args: argparse.Namespace) -> list[str] | None:
     expanded_dimensions = expand_dimension_aliases(args.dimensions)
-    dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
+    dimensions_filter = split_csv(expanded_dimensions) if expanded_dimensions else None
     log_info(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
     return dimensions_filter

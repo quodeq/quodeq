@@ -1,8 +1,6 @@
 """JSON serialization and disk-backed job store.
 
-Split from ``_job_model.py`` to keep that file under the size ratchet's
-300-line cap. ``FileJobStore``/``create_job_store`` stay re-exported from
-there. Moved verbatim.
+``FileJobStore``/``create_job_store`` are re-exported from ``_job_model.py``.
 """
 from __future__ import annotations
 
@@ -20,6 +18,7 @@ from pathlib import Path
 # tests/tools/test_logging_boundary.py's DECLARED_LOGGING_SITES).
 from quodeq.config.services_env import job_persist_dir as _resolve_job_persist_dir
 from quodeq.core.run.job_status import JobStatus, parse_job_status
+from quodeq.shared.clock import utc_now_iso
 from quodeq.services._job_model import InMemoryJobStore, Job, JobStore, MAX_LOG_LINES, logger
 
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
@@ -128,10 +127,13 @@ class FileJobStore(InMemoryJobStore):
     def delete(self, job_id: str) -> None:
         with self._lock:
             self._jobs.pop(job_id, None)
-            path = self._persist_dir / f"{job_id}.json"
-            path.unlink(missing_ok=True)
+            self._job_path(job_id).unlink(missing_ok=True)
 
     # -- persistence helpers -------------------------------------------------
+
+    def _job_path(self, job_id: str) -> Path:
+        """Where *job_id*'s record lives: ``{persist_dir}/{job_id}.json``."""
+        return self._persist_dir / f"{job_id}.json"
 
     def _write(self, job: Job) -> None:
         """Write a single job to disk. Caller must hold the lock."""
@@ -139,7 +141,7 @@ class FileJobStore(InMemoryJobStore):
 
     def _write_data(self, job_id: str, data: dict) -> None:
         """Write pre-serialized job data to disk. Does NOT require the lock."""
-        path = self._persist_dir / f"{job_id}.json"
+        path = self._job_path(job_id)
         tmp = path.with_suffix(".tmp")
         try:
             tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -170,7 +172,7 @@ class FileJobStore(InMemoryJobStore):
                     # Stamp an end time or _cleanup_stale (which only prunes
                     # jobs with ended_at) keeps the flipped job forever.
                     if not job.ended_at:
-                        job.ended_at = datetime.now(timezone.utc).isoformat()
+                        job.ended_at = utc_now_iso()
                     self._jobs[job.job_id] = job
                     self._write(job)
                 else:
@@ -199,7 +201,7 @@ class FileJobStore(InMemoryJobStore):
         for jid in stale_ids:
             logger.info("Cleaning up stale job %s", jid)
             self._jobs.pop(jid, None)
-            (self._persist_dir / f"{jid}.json").unlink(missing_ok=True)
+            self._job_path(jid).unlink(missing_ok=True)
 
 
 def create_job_store() -> JobStore:

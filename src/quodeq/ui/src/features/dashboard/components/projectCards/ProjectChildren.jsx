@@ -1,12 +1,13 @@
 import { ProjectCard } from './ProjectCard.jsx';
 import { CardFooter } from './CardFooter.jsx';
+import { projectIdOrSelf } from '../../../../utils/projectIdentity.js';
 
 export function ProjectChildren({ childList, selectedProject, onSelect, confirmActions, onResumeSetup, publishActions, entryLookup }) {
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   return (
     <div className="project-children-outer">
       {childList.map((child) => {
-        const childId = child.id || child.name || child;
+        const childId = projectIdOrSelf(child);
         const childEntry = entryLookup?.get(childId);
         // Origin-URL-matched shared entries never share the child's own id,
         // so child.publishedAt (only set for id matches, see usePublish's

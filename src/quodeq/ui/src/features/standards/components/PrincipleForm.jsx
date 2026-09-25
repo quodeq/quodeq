@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { t } from '../../../strings/index.js';
+import { pluralKey } from '../../../utils/plural.js';
 
 export default function PrincipleForm({ principle, principleIndex, onUpdateField, editable }) {
   const nameRef = useRef(null);
@@ -41,9 +42,7 @@ export default function PrincipleForm({ principle, principleIndex, onUpdateField
 
       <div className="principle-form-meta">
         <span className="principle-form-req-count">
-          {(principle.requirements?.length ?? 0) === 1
-            ? t('standards.requirementsCountOne', { count: principle.requirements?.length ?? 0 })
-            : t('standards.requirementsCountMany', { count: principle.requirements?.length ?? 0 })}
+          {t(pluralKey(principle.requirements?.length ?? 0, 'standards.requirementsCountOne', 'standards.requirementsCountMany'), { count: principle.requirements?.length ?? 0 })}
         </span>
       </div>
     </div>

@@ -17,6 +17,7 @@ from quodeq.config.analysis_env import non_scout_providers, subagent_model_overr
 from quodeq.shared.constants import CC_PHASE_DEADLINE_EXTENDED, DEFAULT_TIME_LIMIT
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd
+from quodeq.core.utils.numbers import clamp
 
 _MAX_FILES_PER_AGENT = 30
 _MAX_FILES_PER_AGENT_CAP = 50
@@ -54,7 +55,7 @@ def _resolve_time_limit(user_budget: int | None, queue_size: int) -> int:
     if queue_size <= 0:
         return DEFAULT_TIME_LIMIT
     needed = queue_size * _SECONDS_PER_FILE_AUTOSCALE
-    return min(_MAX_AUTO_POOL_BUDGET, max(DEFAULT_TIME_LIMIT, needed))
+    return clamp(needed, DEFAULT_TIME_LIMIT, _MAX_AUTO_POOL_BUDGET)
 
 
 def _extend_run_deadline(options: AnalysisOptions, time_limit: int) -> None:

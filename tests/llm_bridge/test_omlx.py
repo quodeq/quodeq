@@ -5,10 +5,10 @@ import json
 from unittest.mock import patch, MagicMock
 
 from quodeq.llm_bridge.omlx import (
-    _normalize_base,
     read_omlx_api_key,
     get_omlx_status,
 )
+from quodeq.llm_bridge._local_server import normalize_base
 
 
 class TestReadOmlxApiKey:
@@ -89,21 +89,27 @@ class TestReadOmlxApiKey:
 
 class TestNormalizeBase:
     def test_strips_v1_suffix(self):
-        assert _normalize_base("http://localhost:8000/v1") == "http://localhost:8000"
+        assert normalize_base("http://localhost:8000/v1") == "http://localhost:8000"
 
     def test_strips_trailing_slash(self):
-        assert _normalize_base("http://localhost:8000/") == "http://localhost:8000"
+        assert normalize_base("http://localhost:8000/") == "http://localhost:8000"
 
     def test_leaves_root_alone(self):
-        assert _normalize_base("http://localhost:8000") == "http://localhost:8000"
+        assert normalize_base("http://localhost:8000") == "http://localhost:8000"
+
+
+def _mock_http_response(body: bytes) -> MagicMock:
+    """A urlopen() response double usable as a context manager, mirroring http.client.HTTPResponse."""
+    resp = MagicMock()
+    resp.read.return_value = body
+    resp.__enter__ = lambda s: s
+    resp.__exit__ = MagicMock(return_value=False)
+    return resp
 
 
 class TestGetOmlxStatus:
     def test_running(self):
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = b'{"status":"ok"}'
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp = _mock_http_response(b'{"status":"ok"}')
 
         with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp):
             result = get_omlx_status("http://localhost:8000")
@@ -113,10 +119,7 @@ class TestGetOmlxStatus:
         assert "8000" in result["address"]
 
     def test_running_with_v1_suffix(self):
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = b"{}"
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp = _mock_http_response(b"{}")
 
         with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp) as mock_open:
             get_omlx_status("http://localhost:8000/v1")
@@ -135,10 +138,7 @@ class TestGetOmlxStatus:
     def test_non_object_body_still_reports_running(self):
         """A health body that is valid JSON but not an object must not raise;
         the server responded, so it is running with the default status."""
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = b'["ok"]'
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp = _mock_http_response(b'["ok"]')
 
         with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp):
             result = get_omlx_status("http://localhost:8000")
@@ -147,10 +147,7 @@ class TestGetOmlxStatus:
         assert result["status"] == "ok"
 
     def test_malformed_body_reports_not_running(self):
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = b"<html>bad gateway</html>"
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp = _mock_http_response(b"<html>bad gateway</html>")
 
         with patch("quodeq.llm_bridge.omlx.urllib.request.urlopen", return_value=mock_resp):
             result = get_omlx_status("http://localhost:8000")

@@ -28,6 +28,7 @@ import CompareDuelView from './CompareDuelView.jsx';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { SORT_DIR } from '../../../vocab/sortDirection.js';
 import { COMPARE_VIEW_FLEET } from '../compareModel.js';
+import { projectId } from '../../../utils/projectIdentity.js';
 
 function buildSharedProps({
   rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir, setSortDir,
@@ -67,7 +68,7 @@ function buildSharedProps({
  */
 function useFleetProjects(projects) {
   const localProjects = useMemo(
-    () => (projects || []).filter((p) => p && (p.id || p.name)),
+    () => (projects || []).filter((p) => p && projectId(p)),
     [projects],
   );
   const sharedProjects = useSharedCompareProjects();
@@ -75,7 +76,7 @@ function useFleetProjects(projects) {
     const entries = mergeProjects(localProjects, sharedProjects);
     return entries.map((e) => {
       if (e.local) return e.local;
-      const raw = e.shared.id || e.shared.name;
+      const raw = projectId(e.shared);
       return { ...e.shared, id: `shared:${raw}`, sourceId: raw, source: PROJECT_SOURCE.SHARED };
     });
   }, [localProjects, sharedProjects]);

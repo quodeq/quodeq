@@ -1,18 +1,19 @@
 import { useAppState } from '../../hooks/useAppState.js';
 import { useAssistantProvider } from '../settings/hooks/useAssistantProvider.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
+import { projectId } from '../../utils/projectIdentity.js';
 
 /**
  * Canonical id/name for the selected project, so the session key and the
  * backend runDir lookup agree with the rest of the app (which keys on
- * `p.id || p.name`). Falls back to the raw selection while the projects list
+ * projectId). Falls back to the raw selection while the projects list
  * has not loaded, and to undefined when nothing is selected.
  */
 function resolveProjectId(selectedProject, projects) {
   const found = selectedProject && Array.isArray(projects)
-    ? projects.find((p) => (p.id || p.name) === selectedProject)
+    ? projects.find((p) => projectId(p) === selectedProject)
     : null;
-  return found ? (found.id || found.name) : (selectedProject || undefined);
+  return found ? projectId(found) : (selectedProject || undefined);
 }
 
 /**

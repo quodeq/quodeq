@@ -48,37 +48,47 @@ function makeFakeApi(overrides = {}) {
   };
 }
 
-function renderHistoryPage(selectedSource, overrides = {}) {
+function makeCallbacks() {
+  return {
+    onRunClick: vi.fn(),
+    onDimensionClick: vi.fn(),
+    onNavigate: vi.fn(),
+    onRunChange: vi.fn(),
+    onRunDeleted: vi.fn(),
+  };
+}
+
+function renderWithProps(props) {
   const QC = withQueryClient();
   const fakeApi = makeFakeApi();
   render(
     <QC>
       <ApiProvider value={fakeApi}>
         <HistoryPage
-          trend={trend}
-          selection={{ selectedRunId: 'r1' }}
-          availableRuns={availableRuns}
           dimensions={{}}
-          callbacks={{
-            onRunClick: vi.fn(),
-            onDimensionClick: vi.fn(),
-            onNavigate: vi.fn(),
-            onRunChange: vi.fn(),
-            onRunDeleted: vi.fn(),
-          }}
-          projectInfo={{ displayName: 'Test Project' }}
-          projects={[{ id: 'proj1', name: 'proj1' }]}
+          callbacks={makeCallbacks()}
           projectsLoaded
-          selectedProject="proj1"
-          selectedSource={selectedSource}
           loading={false}
           isFetching={false}
-          {...overrides}
+          {...props}
         />
       </ApiProvider>
     </QC>,
   );
   return fakeApi;
+}
+
+function renderHistoryPage(selectedSource, overrides = {}) {
+  return renderWithProps({
+    trend,
+    selection: { selectedRunId: 'r1' },
+    availableRuns,
+    projectInfo: { displayName: 'Test Project' },
+    projects: [{ id: 'proj1', name: 'proj1' }],
+    selectedProject: 'proj1',
+    selectedSource,
+    ...overrides,
+  });
 }
 
 describe('HistoryPage — delete-run source gating', () => {
@@ -107,36 +117,16 @@ describe('HistoryPage — delete-run source gating', () => {
 // Covers evaluate CTA gating, teammate persona (shared selection + zero
 // local projects), and the shared read-only chip.
 function renderHistoryPageWithData(overrides = {}) {
-  const QC = withQueryClient();
-  const fakeApi = makeFakeApi();
-  render(
-    <QC>
-      <ApiProvider value={fakeApi}>
-        <HistoryPage
-          trend={[]}
-          selection={{ selectedRunId: null }}
-          availableRuns={[]}
-          dimensions={{}}
-          callbacks={{
-            onRunClick: vi.fn(),
-            onDimensionClick: vi.fn(),
-            onNavigate: vi.fn(),
-            onRunChange: vi.fn(),
-            onRunDeleted: vi.fn(),
-          }}
-          projectInfo={null}
-          projects={[]}
-          projectsLoaded
-          selectedProject="shared-1"
-          selectedSource="shared"
-          loading={false}
-          isFetching={false}
-          {...overrides}
-        />
-      </ApiProvider>
-    </QC>,
-  );
-  return fakeApi;
+  return renderWithProps({
+    trend: [],
+    selection: { selectedRunId: null },
+    availableRuns: [],
+    projectInfo: null,
+    projects: [],
+    selectedProject: 'shared-1',
+    selectedSource: 'shared',
+    ...overrides,
+  });
 }
 
 describe('HistoryPage — evaluate CTA gating for shared (Critical 1)', () => {

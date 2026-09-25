@@ -1,4 +1,4 @@
-import { SEVERITY } from '../vocab/severity.js';
+import { countKnownSeverities } from './severity.js';
 /**
  * Shared helpers for dimension data used by dashboard overview panels.
  */
@@ -24,15 +24,6 @@ export function fallbackDelta(dim) {
   return !Number.isNaN(curr) && !Number.isNaN(prev) ? curr - prev : null;
 }
 
-function severityCounts(violations) {
-  const counts = { critical: 0, major: 0, minor: 0 };
-  (violations || []).forEach((v) => {
-    const s = (v.severity || SEVERITY.MINOR).toLowerCase();
-    if (counts[s] !== undefined) counts[s]++;
-  });
-  return counts;
-}
-
 /**
  * Sort dimensions by violation severity (critical > major > minor),
  * keeping only dimensions that have at least one violation.
@@ -40,7 +31,7 @@ function severityCounts(violations) {
 export function sortDimensionsByViolationSeverity(dimensions) {
   return dimensions
     .filter((d) => (d.violations || []).length > 0)
-    .map((dim) => ({ dim, counts: severityCounts(dim.violations) }))
+    .map((dim) => ({ dim, counts: countKnownSeverities(dim.violations, { ignoreCase: true }) }))
     .sort((a, b) => {
       if (b.counts.critical !== a.counts.critical) return b.counts.critical - a.counts.critical;
       if (b.counts.major !== a.counts.major) return b.counts.major - a.counts.major;

@@ -6,6 +6,8 @@ import { GradeChip, LanguageNumbers, ProjectCardChips, PublishedMeta, LocalPubli
 import { PROJECT_SOURCE } from '../../../../vocab/projectSource.js';
 import { KEY } from '../../../../vocab/keyboard.js';
 import { PROJECT_LOCATION } from '../../../../models/project.js';
+import { projectIdOrSelf } from '../../../../utils/projectIdentity.js';
+import { pluralKey } from '../../../../utils/plural.js';
 
 function ProjectCardTopLeft({ project, id, name, grade, score, onResumeSetup }) {
   return (
@@ -43,7 +45,7 @@ function ProjectCardTopRight({ project, chips, discipline, date }) {
     <div className="project-card-top-right">
       <ProjectCardChips chips={chips} />
       {discipline && <span className="project-meta-tag">{discipline}</span>}
-      <span className="project-meta-item">{project.runsCount === 1 ? t('projects.runsOne', { count: project.runsCount }) : t('projects.runsMany', { count: project.runsCount })}</span>
+      <span className="project-meta-item">{t(pluralKey(project.runsCount, 'projects.runsOne', 'projects.runsMany'), { count: project.runsCount })}</span>
       {date && <span className="project-meta-date">{date}</span>}
     </div>
   );
@@ -65,7 +67,7 @@ function ProjectCardBottom({ project, chips, resolvedPublishedAt, cardChildren }
 
 export function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren, chips, publishedAt }) {
   const { onSelect, footer, isChild = false, onResumeSetup } = cardProps;
-  const id = project.id || project.name || project;
+  const id = projectIdOrSelf(project);
   const name = project.name || project;
   const grade = gradeLabel(project.overallGrade ?? project.latestGrade);
   const score = project.latestScore != null ? parseFloat(project.latestScore).toFixed(1) : null;

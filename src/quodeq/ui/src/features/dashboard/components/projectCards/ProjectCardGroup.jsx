@@ -4,6 +4,7 @@ import { CardFooter } from './CardFooter.jsx';
 import { ProjectPathContent } from './ProjectPathContent.jsx';
 import { ProjectChildren } from './ProjectChildren.jsx';
 import { t } from '../../../../strings/index.js';
+import { projectIdOrSelf } from '../../../../utils/projectIdentity.js';
 
 export function useRelocateDialog(onRelocate) {
   const [relocating, setRelocating] = useState(null);
@@ -31,10 +32,10 @@ export function useRelocateDialog(onRelocate) {
 export function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions, onResumeSetup, publishActions, action, chips, publishedAt, entryLookup }) {
   const { confirmActions, relocateActions } = dialogActions;
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
-  const id = p.id || p.name || p;
+  const id = projectIdOrSelf(p);
   const isSelected = id === selectedProject;
   const hasChildren = !!(childProjects?.[id]?.length);
-  const childSelected = hasChildren && childProjects[id].some((c) => (c.id || c.name || c) === selectedProject);
+  const childSelected = hasChildren && childProjects[id].some((c) => projectIdOrSelf(c) === selectedProject);
   return (
     <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
       <ProjectCard project={p} isSelected={isSelected} chips={chips} publishedAt={publishedAt} cardProps={{ onSelect, onResumeSetup, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} publishActions={publishActions} action={action} /> }}>

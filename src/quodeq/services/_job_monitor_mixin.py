@@ -1,9 +1,8 @@
 """JobManager's log/marker parsing and background process-monitoring behavior.
 
-Split from ``jobs.py`` to keep that file under the size ratchet's 300-line
-cap. ``JobMonitorMixin`` is mixed into ``JobManager`` there; the state it
+``JobMonitorMixin`` is mixed into ``JobManager`` (``jobs.py``); the state it
 reads is declared on the class below and owned by ``JobManager.__init__``,
-which assigns every one of those attributes. Only the methods moved.
+which assigns every one of those attributes.
 
 The constants both modules need live in ``_job_model``, which imports
 neither, so nothing here imports ``jobs``.
@@ -14,10 +13,10 @@ import json
 import subprocess
 import threading
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.config.services_env import job_timeout_cap_s as _resolve_job_timeout_cap_s
 from quodeq.services._job_log_tee import TeeContext, consume_stream, drain_pre_marker_buffer, tee_run_log
 from quodeq.services._job_model import (
@@ -223,7 +222,7 @@ class JobMonitorMixin:
                 return
             job.exit_code = exit_code
             job.exit_reason = exit_reason
-            job.ended_at = datetime.now(timezone.utc).isoformat()
+            job.ended_at = utc_now_iso()
             if exit_code == 0:
                 job.status = JobStatus.DONE
             elif exit_reason in DEADLINE_EXIT_REASONS:

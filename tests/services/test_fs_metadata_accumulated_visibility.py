@@ -1,12 +1,9 @@
 """Tests for _fs_metadata.py — read_accumulated_summary and standards
 visibility selection.
 
-Split from test_fs_metadata.py (further split out of
-test_fs_metadata_accumulated.py to stay under the file-size cap): dims
-absent from the latest run's config, hidden-standards exclusion, the
+Dims absent from the latest run's config, hidden-standards exclusion, the
 default ISO selection, cache invalidation on visibility change, and the
-SQL-grade/loaded-params overlay all part of the same TestReadAccumulatedSummary
-suite in the original file.
+SQL-grade/loaded-params overlay.
 """
 from __future__ import annotations
 
@@ -14,6 +11,8 @@ import json
 from unittest.mock import patch
 
 from quodeq.services._fs_metadata import read_accumulated_summary
+
+from tests.services.conftest import seed_security_findings
 
 
 class TestReadAccumulatedSummary:
@@ -175,10 +174,8 @@ class TestReadAccumulatedSummary:
         """
         import dataclasses
 
-        from quodeq.core.events.models import Judgment
         from quodeq.core.scoring.params import DEFAULT_PARAMS
         from quodeq.data.fs.report_parser.runs import RunInfo
-        from quodeq.data.projection.grade_projector import recompute_grades
         from quodeq.data.sqlite.state_store import SQLiteStateStore
         from quodeq.services import grade_formula
         from quodeq.services.dashboard import clear_shared_dimension_cache
@@ -193,20 +190,7 @@ class TestReadAccumulatedSummary:
         (run_dir / "events.jsonl").write_text("")
 
         store = SQLiteStateStore(run_dir)
-        for i in range(6):
-            store.record_finding(Judgment(
-                practice_id="p1", dimension="security", req=f"req{i}",
-                verdict="violation", severity="major", file=f"f{i}.py", line=1,
-                title=f"t{i}", reason=f"r{i}",
-            ))
-        for i in range(8):
-            store.record_finding(Judgment(
-                practice_id="p1", dimension="security", req=f"c{i}",
-                verdict="compliance", severity="minor", file=f"g{i}.py", line=1,
-                title=f"ct{i}", reason=f"cr{i}",
-            ))
-        store.save_projected_size((run_dir / "events.jsonl").stat().st_size)
-        recompute_grades(run_dir, params=DEFAULT_PARAMS)
+        seed_security_findings(store, run_dir)
 
         baked = {r["dimension"]: r for r in store.read_dimension_scores()}["security"]
         eval_dir = run_dir / "evaluation"

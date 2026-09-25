@@ -1,4 +1,4 @@
-import { headerRowKey, ROW_KIND } from './findingListRows.js';
+import { ROW_KIND } from './findingListRows.js';
 import { FINDING_TYPE } from '../../../vocab/findingType.js';
 
 // Re-exported so the file-detail pane keeps importing its row widgets from
@@ -14,20 +14,9 @@ export function GroupHeader({ title, count }) {
   );
 }
 
-// Virtual-list row estimates for the file detail pane. The severity and
-// compliance headers and the low-confidence toggle are all one header row;
-// FALLBACK covers an item the list has not materialised yet.
-const ROW_HEIGHT_PX = Object.freeze({ FALLBACK: 140, HEADER: 36, VIOLATION: 160 });
-
-export function estimateItemSize(items) {
-  return (i) => {
-    const item = items[i];
-    if (!item) return ROW_HEIGHT_PX.FALLBACK;
-    if (item.kind === ROW_KIND.SEV_HEADER || item.kind === ROW_KIND.COMPLIANCE_HEADER) return ROW_HEIGHT_PX.HEADER;
-    if (item.kind === ROW_KIND.LOW_CONF_TOGGLE) return ROW_HEIGHT_PX.HEADER;
-    return ROW_HEIGHT_PX.VIOLATION;
-  };
-}
+// Virtual-list row estimates for the file detail pane; `missing` covers an
+// item the list has not materialised yet.
+export const ROW_HEIGHT_PX = Object.freeze({ missing: 140, header: 36, row: 160 });
 
 /** Identity of one finding row: dimension, file, line, principle and title. */
 function findingKey(prefix, v) {
@@ -39,16 +28,11 @@ function complianceKey(c) {
   return `c-${c.dimension || ''}:${c.file || ''}:${c.line ?? ''}:${c.principle || ''}`;
 }
 
-export function itemKey(items) {
-  return (i) => {
-    const item = items[i];
-    if (!item) return i;
-    const header = headerRowKey(item);
-    if (header) return header;
-    if (item.kind === ROW_KIND.LOW_CONF_TOGGLE) return 'h-lowconf';
-    if (item.kind === FINDING_TYPE.VIOLATION) return findingKey('v', item.v);
-    if (item.kind === ROW_KIND.LOW_CONF_ROW) return findingKey('lc', item.v);
-    if (item.kind === FINDING_TYPE.COMPLIANCE) return complianceKey(item.c);
-    return i;
-  };
+/** Virtual-list key of a non-header row of the file detail pane. */
+export function fileFindingKey(item, i) {
+  if (item.kind === ROW_KIND.LOW_CONF_TOGGLE) return 'h-lowconf';
+  if (item.kind === FINDING_TYPE.VIOLATION) return findingKey('v', item.v);
+  if (item.kind === ROW_KIND.LOW_CONF_ROW) return findingKey('lc', item.v);
+  if (item.kind === FINDING_TYPE.COMPLIANCE) return complianceKey(item.c);
+  return i;
 }

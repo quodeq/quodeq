@@ -179,6 +179,20 @@ def _stream_once(client, config, messages, session: ApiTurnSession):
     return "".join(text_parts), [calls[i] for i in sorted(calls)]
 
 
+def _run_tool(
+    registry: ToolRegistry, emit: Callable[[dict], None], name: str, arguments: dict,
+) -> str:
+    """Run one tool call, emit its frame and any guard warnings, and return the fenced result."""
+    result = registry.dispatch(name, arguments)
+    frame = {"type": FrameType.TOOL_CALL, "name": name, "ok": result["ok"]}
+    if _args_summary(arguments):
+        frame["argsSummary"] = _args_summary(arguments)
+    emit(frame)
+    fenced, warnings = guard_tool_result(result, name)
+    _emit_warnings(emit, warnings)
+    return fenced
+
+
 def _dispatch_tool_calls(
     convo: list[dict],
     tool_calls: list[dict],
@@ -200,14 +214,7 @@ def _dispatch_tool_calls(
                                     "arguments": c["arguments"] or "{}"}}
                       for c in tool_calls]})
     for call in tool_calls:
-        arguments = _parse_args(call["arguments"])
-        result = registry.dispatch(call["name"], arguments)
-        frame = {"type": FrameType.TOOL_CALL, "name": call["name"], "ok": result["ok"]}
-        if _args_summary(arguments):
-            frame["argsSummary"] = _args_summary(arguments)
-        emit(frame)
-        fenced, warnings = guard_tool_result(result, call["name"])
-        _emit_warnings(emit, warnings)
+        fenced = _run_tool(registry, emit, call["name"], _parse_args(call["arguments"]))
         convo.append({"role": MessageRole.TOOL, "tool_call_id": call["id"],
                       "content": fenced})
 
@@ -241,13 +248,7 @@ def run_api_turn(*, messages: list[dict], config: ApiTurnConfig,
                 if prompted is None:
                     return text
                 name, arguments = prompted
-                result = registry.dispatch(name, arguments)
-                frame = {"type": FrameType.TOOL_CALL, "name": name, "ok": result["ok"]}
-                if _args_summary(arguments):
-                    frame["argsSummary"] = _args_summary(arguments)
-                emit(frame)
-                fenced, warnings = guard_tool_result(result, name)
-                _emit_warnings(emit, warnings)
+                fenced = _run_tool(registry, emit, name, arguments)
                 convo.append({"role": MessageRole.ASSISTANT, "content": text})
                 convo.append({"role": MessageRole.USER, "content": fenced})
                 continue

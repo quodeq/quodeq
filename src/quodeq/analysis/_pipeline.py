@@ -4,7 +4,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
-from datetime import datetime, timezone
 
 from quodeq.analysis._dim_estimates import compute_dim_estimates, write_dim_estimates
 from quodeq.analysis._dim_order import DimEstimates, order_by_backlog
@@ -26,6 +25,7 @@ from quodeq.core.run.dimensions import DimState
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.analysis.runner_markers import emit_marker
 from quodeq.shared.constants import CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_SCORING, CC_PHASE_SETUP
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.log_sink import SHARED_LOG
 
@@ -86,7 +86,7 @@ def _run_dry_run(
     scope = _DryRunScope(
         run_dir=run_dir_for(config),
         evidence_dir=config.work_dir or config.src,
-        date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        date_str=utc_now_iso(timespec=ISO_SECONDS),
         total=ctx.total,
     )
     result: dict[str, Evidence] = {}
@@ -140,11 +140,10 @@ def _prepare_run_context(
     Cache is constructed here (composition root) rather than left for
     process_dimension_with_cache to default lazily, so every dimension in
     this run shares one LocalFileBackend. The cache maintenance (schema
-    migration, content-index build, legacy GC) that used to ride along with
-    the lazy default is called explicitly here instead -- it's still
-    once-per-(root, schema)-per-process (see ensure_cache_ready's own memo),
-    just triggered at runner construction instead of on the first
-    cache-is-None dimension call.
+    migration, content-index build, legacy GC) is called explicitly here,
+    once per (root, schema) per process (see ensure_cache_ready's own memo),
+    at runner construction rather than on the first cache-is-None dimension
+    call.
     """
     dimensions, ctx = load_analysis_context(config)
     if config.classify_stash is None:

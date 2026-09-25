@@ -6,6 +6,7 @@ import {
   useVisibleStandardsFiltered,
 } from './useAppShellHooks.js';
 import { useAssistantActionAppliedEffect } from './useAppEffects.js';
+import { findProject } from '../utils/projectIdentity.js';
 
 /**
  * Boot-time extras plus the dismiss-delta bridge shared by the manual dismiss
@@ -33,7 +34,7 @@ export function useAppDismissBridge(state) {
  * topbar run progress, in the order App has always called them.
  */
 export function useAppChrome({ state, sharedSignal }) {
-  const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
+  const selectedProjectInfo = findProject(state.projects, state.selectedProject);
   const isEvaluating = computeIsEvaluating(state);
   const wizard = useAppWizardBounce({ state, selectedProjectInfo, isEvaluating, sharedSignal });
   const { activePage, navSwapAt, navTab, activeTab } = state;

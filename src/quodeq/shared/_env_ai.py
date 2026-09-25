@@ -1,14 +1,13 @@
 """Environment-based configuration accessors -- AI provider/CLI selection."""
 from __future__ import annotations
 
-import os
-
 from quodeq.shared._config import get_config
+from quodeq.shared.env_resolve import resolve_env
 
 
 def get_ai_provider(env: dict[str, str] | None = None) -> str:
     """Return the AI provider from environment or default."""
-    return (os.environ if env is None else env).get("AI_PROVIDER", get_config()["ai_provider_default"])
+    return resolve_env(env).get("AI_PROVIDER", get_config()["ai_provider_default"])
 
 
 def get_ai_cmd(env: dict[str, str] | None = None) -> str:
@@ -17,7 +16,7 @@ def get_ai_cmd(env: dict[str, str] | None = None) -> str:
     Falls back to AI_PROVIDER when AI_CMD is not set, so that
     ``AI_PROVIDER=ollama`` implies ``AI_CMD=ollama`` unless overridden.
     """
-    _env = os.environ if env is None else env
+    _env = resolve_env(env)
     if "AI_CMD" in _env:
         return _env["AI_CMD"]
     if "AI_PROVIDER" in _env:
@@ -27,7 +26,7 @@ def get_ai_cmd(env: dict[str, str] | None = None) -> str:
 
 def get_ai_model(env: dict[str, str] | None = None) -> str | None:
     """Return the AI model from environment, or None."""
-    return (os.environ if env is None else env).get("AI_MODEL") or None
+    return resolve_env(env).get("AI_MODEL") or None
 
 
 def get_ai_cmd_path(env: dict[str, str] | None = None) -> str | None:
@@ -38,4 +37,4 @@ def get_ai_cmd_path(env: dict[str, str] | None = None) -> str | None:
     entry. Lets an alternate install or wrapper (e.g. a `claude-api` script
     that switches CLAUDE_CONFIG_DIR) run with unchanged provider behavior.
     """
-    return (os.environ if env is None else env).get("AI_CMD_PATH") or None
+    return resolve_env(env).get("AI_CMD_PATH") or None

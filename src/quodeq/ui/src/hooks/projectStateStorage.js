@@ -4,6 +4,7 @@
  */
 import { PROJECT_SOURCE, DEFAULT_PROJECT_SOURCE } from '../vocab/projectSource.js';
 import { readString, writeString } from '../adapters/storage.js';
+import { projectId, projectIdOrSelf } from '../utils/projectIdentity.js';
 
 export const STORAGE_KEY = 'quodeq_selected_project';
 export const SOURCE_STORAGE_KEY = 'quodeq_selected_source';
@@ -66,9 +67,9 @@ export function resolveInitialProject({ list, currentProject, currentSource, onC
     if (onNoProjects) onNoProjects();
     return;
   }
-  const match = current && list.find((p) => (p.id || p.name) === current);
+  const match = current && list.find((p) => projectId(p) === current);
   if (!match) {
-    const pick = list[0].id || list[0].name || list[0];
+    const pick = projectIdOrSelf(list[0]);
     onChangeProject(pick);
   }
 }

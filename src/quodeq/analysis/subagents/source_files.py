@@ -10,14 +10,10 @@ def _resolve_source_files(config: RunConfig) -> tuple[list[str], set[str]] | Non
 
     None when neither the target nor the manifest has source files.
     """
-    if config.target is not None and config.target.source_files:
-        files = config.target.source_files
-        extensions = set(config.target.language_stats.keys()) if config.target.language_stats else set()
-        return files, extensions
-    if config.manifest is not None and config.manifest.source_files:
-        files = config.manifest.source_files
-        extensions = set(config.manifest.language_stats.keys()) if config.manifest.language_stats else set()
-        return files, extensions
+    for source in (config.target, config.manifest):
+        if source is not None and source.source_files:
+            extensions = set(source.language_stats.keys()) if source.language_stats else set()
+            return source.source_files, extensions
     return None
 
 

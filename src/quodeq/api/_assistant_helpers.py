@@ -1,6 +1,6 @@
 """Request plumbing for assistant routes: repo/context construction, busy check.
 
-Split into three modules plus this thin facade:
+A thin facade over three modules:
   - _assistant_hygiene.py: ``run_assistant_hygiene``, ``session_ttl_days``,
     ``SharedSourceUnavailable``.
   - _assistant_location.py: ``resolve_run_location``,
@@ -8,13 +8,12 @@ Split into three modules plus this thin facade:
     ``resolve_repo_root``, ``get_repository``.
   - _assistant_events.py: ``event_frames``, ``POLL_SECONDS``, ``IDLE_LIMIT``.
 
-The moved names stay imported here (re-exported) so callers across the
-codebase and tests can keep patching/importing "quodeq.api._assistant_helpers.
-<name>". None of the split modules import back through this facade any
-more (each imports its own dependencies directly), so a patch on one of the
-split names here only reaches code that -- like this module -- reads it via
-the facade at call time; see each split module's docstring for its own
-patch target.
+Their names are re-exported here, so callers and tests can import or patch
+"quodeq.api._assistant_helpers.<name>". None of the three modules imports
+through this facade (each imports its own dependencies directly), so a
+patch on one of those names here only reaches code that, like this module,
+reads it via the facade at call time; see each module's docstring for its
+own patch target.
 """
 from __future__ import annotations
 
@@ -34,7 +33,7 @@ from quodeq.services.shared_repo import (
 )
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared.env import get_evaluations_dir
-from quodeq.core.types.project_source import ProjectSource
+from quodeq.core.types.project_source import ProjectSource, session_source
 
 from quodeq.api._assistant_hygiene import (  # noqa: F401 — re-export/patch target
     SharedSourceUnavailable,
@@ -53,6 +52,7 @@ from quodeq.api._assistant_events import (  # noqa: F401 — re-export/patch tar
     POLL_SECONDS,
     event_frames,
 )
+from quodeq.api.routes_common import standards_compiled_dir
 
 
 def build_action_context(app: Flask) -> ActionContext:
@@ -66,7 +66,7 @@ def build_action_context(app: Flask) -> ActionContext:
     return ActionContext(
         evaluations_dir=Path(app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()),
         evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
-        compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
+        compiled_dir=standards_compiled_dir(app),
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
     )
 
@@ -83,7 +83,7 @@ def _resolve_shared_source(session: dict) -> tuple[Path, Path | None]:
     must stop an already-open session's reads too, same as every
     /api/shared/* route enforces at request time.
     """
-    if (session.get("source") or ProjectSource.LOCAL) != ProjectSource.SHARED:
+    if session_source(session) != ProjectSource.SHARED:
         return Path(get_evaluations_dir()), None
     settings = read_settings()
     if not settings.url:
@@ -105,7 +105,7 @@ def build_tool_context(
     revisited with a schema v2 if needed.
     """
     run_dir = session.get("run_id")
-    source = session.get("source") or ProjectSource.LOCAL
+    source = session_source(session)
     reports_dir, score_cache_path = _resolve_shared_source(session)
     repo_root = (
         Path(session["project_uuid"]) if session.get("project_uuid") else None)
@@ -127,7 +127,7 @@ def build_tool_context(
         run_dir=Path(run_dir) if run_dir else None,
         repo_root=repo_root,
         evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),
-        compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
+        compiled_dir=standards_compiled_dir(app),
         dimensions_file=Path(app.config["STANDARDS_DIMENSIONS_FILE"]),
         repo_is_git=repo_root is not None and (repo_root / ".git").exists(),
         project_id=session.get("project_id"),

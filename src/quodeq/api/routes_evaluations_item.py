@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
@@ -11,9 +10,9 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api._constants import CODE_NOT_FOUND, QUERY_FLAG_TRUE
 from quodeq.services.scored_jobs_registry import claim_scoring, release_scoring, reset_scored_jobs
 from quodeq.core.run.job_status import JobStatus
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import error_response, json_error, jsonify_error
 from quodeq.shared.serialization import to_camel_dict
-from quodeq.api.routes_common import reports_dir
+from quodeq.api.routes_common import reports_dir, standards_compiled_dir
 from quodeq.services.background import BackgroundRunner, ThreadBackgroundRunner
 from quodeq.services.base import ActionProvider
 from quodeq.services.scan_progress import build_scan_progress
@@ -84,8 +83,7 @@ def _cancel_running(provider: ActionProvider, job_id: str) -> Response | tuple[R
     if not ok:
         if discard:
             release_scoring(job_id)
-        body, status = error_response("Could not cancel job", HTTPStatus.CONFLICT, "CONFLICT")
-        return jsonify(body), status
+        return json_error("Could not cancel job", HTTPStatus.CONFLICT, "CONFLICT")
     return jsonify({"ok": True, "action": "cancelled", "discarded": discard})
 
 
@@ -93,16 +91,14 @@ def _delete_finished(provider: ActionProvider, job_id: str) -> Response | tuple[
     _logger.info("delete_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
     ok = provider.delete_evaluation(job_id, reports_dir=reports_dir())
     if not ok:
-        body, status = error_response("Job could not be deleted", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-        return jsonify(body), status
+        return json_error("Job could not be deleted", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify({"ok": True, "action": "deleted"})
 
 
 def _get_evaluation(app: Flask, provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
     job = provider.get_evaluation_status(job_id, reports_dir=reports_dir())
     if not job:
-        body, status = error_response(_JOB_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-        return jsonify(body), status
+        return json_error(_JOB_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     score_terminal_run_once(job_id, job, _background(app), reports_dir())
     payload = to_camel_dict(job)
     payload["dimStates"] = _read_dim_states(job)
@@ -113,8 +109,7 @@ def _get_evaluation_progress(app: Flask, provider: ActionProvider, job_id: str) 
     """Return live progress for a scan (works for internal and external runs)."""
     run_dir = provider.get_log_run_dir(job_id) if hasattr(provider, "get_log_run_dir") else None
     if run_dir is None:
-        body, status = error_response(_JOB_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-        return jsonify(body), status
+        return json_error(_JOB_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     # Total time limit for the whole run. The snapshot carries the
     # budget for both internal jobs (JobManager) and index-served runs
     # (read from status.json). 0 = unlimited -> no budget shown.
@@ -126,11 +121,10 @@ def _get_evaluation_progress(app: Flask, provider: ActionProvider, job_id: str) 
             time_limit_s = raw
     progress = build_scan_progress(
         job_id, run_dir, time_limit_s=time_limit_s,
-        compiled_dir=Path(app.config["STANDARDS_COMPILED_DIR"]),
+        compiled_dir=standards_compiled_dir(app),
     )
     if progress is None:
-        body, status = error_response("Run not ready", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-        return jsonify(body), status
+        return json_error("Run not ready", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify(to_camel_dict(progress))
 
 
@@ -150,13 +144,11 @@ def _cancel_or_delete_evaluation(provider: ActionProvider, job_id: str) -> Respo
     """
     snapshot = provider.get_evaluation_status(job_id, reports_dir=reports_dir())
     if snapshot is None:
-        body, status = error_response(_JOB_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-        return jsonify(body), status
+        return json_error(_JOB_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     intent = request.args.get("intent", "").lower() or None
     conflict = _resolve_cancel_intent(snapshot, intent)
     if conflict is not None:
-        body, status = conflict
-        return jsonify(body), status
+        return jsonify_error(conflict)
     if snapshot.status == JobStatus.RUNNING:
         return _cancel_running(provider, job_id)
     return _delete_finished(provider, job_id)

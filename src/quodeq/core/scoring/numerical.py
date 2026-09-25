@@ -90,16 +90,14 @@ def count_grade_drops(violation_type_counts: dict[str, int], scale_multiplier: i
     n_critical = violation_type_counts.get("critical", 0)
     n_major = violation_type_counts.get("major", 0)
 
-    critical_drops = 0
-    for min_count, levels in _CRITICAL_DROP_TABLE:
-        if n_critical >= min_count * scale_multiplier:
-            critical_drops = levels
-            break
-
-    major_drops = 0
-    for min_count, levels in _MAJOR_DROP_TABLE:
-        if n_major >= min_count * scale_multiplier:
-            major_drops = levels
-            break
-
+    critical_drops = _table_drops(n_critical, _CRITICAL_DROP_TABLE, scale_multiplier)
+    major_drops = _table_drops(n_major, _MAJOR_DROP_TABLE, scale_multiplier)
     return max(critical_drops, major_drops)
+
+
+def _table_drops(count: int, table: list[tuple[int, int]], scale_multiplier: int) -> int:
+    """Levels of the first *table* row whose scaled threshold *count* reaches, else 0."""
+    for min_count, levels in table:
+        if count >= min_count * scale_multiplier:
+            return levels
+    return 0

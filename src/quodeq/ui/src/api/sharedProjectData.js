@@ -12,6 +12,7 @@ import { epochSecondsToMs } from './sharedStatus.js';
 import { LATEST_RUN_ID } from '../constants.js';
 import { asOfQuery, parseAccumulated, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { sharedProjectPath } from './paths.js';
 
 // ── Project List & Info ─────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ export async function sharedListProjects({ refresh = false } = {}) {
  *   the backend's epoch seconds to epoch-milliseconds.
  */
 export async function sharedGetProjectInfo(projectId) {
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/info`);
+  const data = await request(`${sharedProjectPath(projectId)}/info`);
   const project = createProject(data);
   project.publishedBy = data?.publishedBy ?? null;
   project.publishedAt = epochSecondsToMs(data?.publishedAt);
@@ -73,7 +74,7 @@ export async function sharedGetProjectInfo(projectId) {
  * @returns {Promise<{runs: Array}>}
  */
 export function sharedGetRuns(projectId) {
-  return request(`/shared/projects/${encodeURIComponent(projectId)}/runs`);
+  return request(`${sharedProjectPath(projectId)}/runs`);
 }
 
 // ── Dashboard & Scores ──────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ export function sharedGetRuns(projectId) {
  * @returns {Promise<import('../models/dashboard.js').Dashboard>}
  */
 export async function sharedGetDashboard(projectId, run = LATEST_RUN_ID) {
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/dashboard${runQuery(run)}`);
+  const data = await request(`${sharedProjectPath(projectId)}/dashboard${runQuery(run)}`);
   return createDashboard(data);
 }
 
@@ -97,7 +98,7 @@ export async function sharedGetDashboard(projectId, run = LATEST_RUN_ID) {
  * @returns {Promise<{project: string, summary: Object, dimensions: Array, trend: Array, runsCount: number, lastRun: Object|null}>}
  */
 export async function sharedGetCompareSummary(projectId) {
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/compare-summary`);
+  const data = await request(`${sharedProjectPath(projectId)}/compare-summary`);
   return parseSlimDimensions(data);
 }
 
@@ -108,7 +109,7 @@ export async function sharedGetCompareSummary(projectId) {
  * @returns {Promise<Object>}
  */
 export async function sharedGetAccumulated(projectId, asOfRun = null) {
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/accumulated${asOfQuery(asOfRun)}`);
+  const data = await request(`${sharedProjectPath(projectId)}/accumulated${asOfQuery(asOfRun)}`);
   return parseAccumulated(data);
 }
 
@@ -119,7 +120,7 @@ export async function sharedGetAccumulated(projectId, asOfRun = null) {
  * @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>}
  */
 export async function sharedGetProjectScores(projectId, asOfRun = null) {
-  const data = await request(`/shared/projects/${encodeURIComponent(projectId)}/scores${asOfQuery(asOfRun)}`);
+  const data = await request(`${sharedProjectPath(projectId)}/scores${asOfQuery(asOfRun)}`);
   return parseUnifiedScores(data);
 }
 
@@ -131,7 +132,7 @@ export async function sharedGetProjectScores(projectId, asOfRun = null) {
  */
 export async function sharedGetRunScores(projectId, runId) {
   const data = await request(
-    `/shared/projects/${encodeURIComponent(projectId)}/scores/${encodeURIComponent(runId)}`
+    `${sharedProjectPath(projectId)}/scores/${encodeURIComponent(runId)}`
   );
   return parseSlimDimensions(data);
 }
@@ -147,7 +148,7 @@ export async function sharedGetRunScores(projectId, runId) {
  */
 export async function sharedGetDimensionEval(projectId, runId, dimension) {
   const data = await request(
-    `/shared/projects/${encodeURIComponent(projectId)}/dimensions/${encodeURIComponent(dimension)}/eval?run=${encodeURIComponent(runId)}`
+    `${sharedProjectPath(projectId)}/dimensions/${encodeURIComponent(dimension)}/eval?run=${encodeURIComponent(runId)}`
   );
   return createDimensionEval(data);
 }
@@ -160,7 +161,7 @@ export async function sharedGetDimensionEval(projectId, runId, dimension) {
  */
 export function sharedGetViolations(projectId, runId) {
   return request(
-    `/shared/projects/${encodeURIComponent(projectId)}/violations?run=${encodeURIComponent(runId)}`
+    `${sharedProjectPath(projectId)}/violations?run=${encodeURIComponent(runId)}`
   );
 }
 
@@ -181,7 +182,7 @@ const SHARED_DISMISSED_REQUEST_LIMIT = 5000;
  */
 export function sharedListDismissedFindings(projectId) {
   return request(
-    `/shared/projects/${encodeURIComponent(projectId)}/findings/dismissed`
+    `${sharedProjectPath(projectId)}/findings/dismissed`
     + `?limit=${SHARED_DISMISSED_REQUEST_LIMIT}`
   );
 }
@@ -192,5 +193,5 @@ export function sharedListDismissedFindings(projectId) {
  * @returns {Promise<Array>} Entries: { req, file, line, note, verifiedAt }
  */
 export function sharedListVerifiedFindings(projectId) {
-  return request(`/shared/projects/${encodeURIComponent(projectId)}/findings/verified`);
+  return request(`${sharedProjectPath(projectId)}/findings/verified`);
 }

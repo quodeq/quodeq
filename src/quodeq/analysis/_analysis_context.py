@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import json as _json
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.prompts.builder import load_template
 from quodeq.config.paths import default_paths
+from quodeq.shared.clock import ISO_SECONDS, utc_now_iso
 from quodeq.shared.logging import log_warning
 
 
@@ -87,7 +87,7 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "AnalysisCont
 
     ctx = AnalysisContext(
         dimensions_data=dims_data,
-        date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        date_str=utc_now_iso(timespec=ISO_SECONDS),
         template=load_template(config.options.template_path),
         subagent_template=load_template(template_name="cli_subagent_prompt.md"),
         total=len(dimensions),

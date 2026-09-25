@@ -6,7 +6,7 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND
-from quodeq.api.helpers import json_error
+from quodeq.api.helpers import dimension_eval_response, json_error
 from quodeq.api.routes_common import reports_dir
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider
@@ -60,12 +60,7 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         err = _validate_params(project=project, run_id=run_id, dimension=dimension)
         if err:
             return err
-        payload = provider.get_dimension_eval(reports_dir(), project, run_id, dimension)
-        if payload is None:
-            return json_error("Eval file not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-        if payload.get("waiting"):
-            return jsonify(payload), HTTPStatus.ACCEPTED
-        return jsonify(payload)
+        return dimension_eval_response(provider.get_dimension_eval(reports_dir(), project, run_id, dimension))
 
     @app.get("/api/projects/<project>/runs/<run_id>/violations")
     def run_violations(project: str, run_id: str) -> Response | tuple[Response, int]:

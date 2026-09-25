@@ -1,21 +1,29 @@
 """Environment-based configuration accessors -- filesystem paths."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from quodeq.shared._env_sanitize import sanitized_env_path
+from quodeq.shared.env_resolve import resolve_env
 
 _QUODEQ_HOME_DIRNAME = ".quodeq"  # base state dir under the user's home
 
 
+def home_state_dir() -> Path:
+    """``~/.quodeq``, the default base for Quodeq's state (``QUODEQ_DIR`` is not consulted).
+
+    Read on each call so test monkeypatches of ``Path.home`` are honored.
+    """
+    return Path.home() / _QUODEQ_HOME_DIRNAME
+
+
 def get_static_dist(env: dict[str, str] | None = None) -> str | None:
     """Return the static dist path from environment, or the user-level cache."""
-    from_env = (os.environ if env is None else env).get("QUODEQ_STATIC_DIST")
+    from_env = resolve_env(env).get("QUODEQ_STATIC_DIST")
     if from_env:
         return from_env
     # Check user-level cache (built on demand by `quodeq dashboard`)
-    cached = Path.home() / _QUODEQ_HOME_DIRNAME / "static"
+    cached = home_state_dir() / "static"
     if cached.is_dir() and (cached / "index.html").exists():
         return str(cached)
     return None
@@ -28,17 +36,17 @@ def get_evaluations_dir(default: str | None = None, env: dict[str, str] | None =
     Recomputes the default on each call so test monkeypatches of ``Path.home``
     are honored.
     """
-    from_env = (os.environ if env is None else env).get("QUODEQ_EVALUATIONS_DIR")
+    from_env = resolve_env(env).get("QUODEQ_EVALUATIONS_DIR")
     if from_env:
         return sanitized_env_path(from_env)
     if default is not None:
         return default
-    return str(Path.home() / _QUODEQ_HOME_DIRNAME / "evaluations")
+    return str(home_state_dir() / "evaluations")
 
 
 def get_findings_file(env: dict[str, str] | None = None) -> str | None:
     """Return the findings file path from environment, or None."""
-    return (os.environ if env is None else env).get("FINDINGS_FILE")
+    return resolve_env(env).get("FINDINGS_FILE")
 
 
 def get_quodeq_dir(env: dict[str, str] | None = None) -> Path:
@@ -47,10 +55,10 @@ def get_quodeq_dir(env: dict[str, str] | None = None) -> Path:
     Resolution order: QUODEQ_DIR env var, then ~/.quodeq. Recomputes the
     default on each call so test monkeypatches of ``Path.home`` are honored.
     """
-    from_env = (os.environ if env is None else env).get("QUODEQ_DIR")
+    from_env = resolve_env(env).get("QUODEQ_DIR")
     if from_env:
         return Path(sanitized_env_path(from_env))
-    return Path.home() / _QUODEQ_HOME_DIRNAME
+    return home_state_dir()
 
 
 def get_clones_dir(env: dict[str, str] | None = None) -> Path:
@@ -60,10 +68,10 @@ def get_clones_dir(env: dict[str, str] | None = None) -> Path:
     Recomputes the default on each call so test monkeypatches of
     ``Path.home`` are honored.
     """
-    from_env = (os.environ if env is None else env).get("QUODEQ_CLONES_DIR")
+    from_env = resolve_env(env).get("QUODEQ_CLONES_DIR")
     if from_env:
         return Path(sanitized_env_path(from_env))
-    return Path.home() / _QUODEQ_HOME_DIRNAME / "clones"
+    return home_state_dir() / "clones"
 
 
 def get_grade_formula_path(env: dict[str, str] | None = None) -> str:
@@ -75,10 +83,10 @@ def get_grade_formula_path(env: dict[str, str] | None = None) -> str:
     score assertions). Recomputes the default on each call so test
     monkeypatches of ``Path.home`` are honored.
     """
-    environ = env if env is not None else os.environ
+    environ = resolve_env(env)
     if "QUODEQ_GRADE_FORMULA_PATH" in environ:
         return sanitized_env_path(environ["QUODEQ_GRADE_FORMULA_PATH"])
-    return str(Path.home() / _QUODEQ_HOME_DIRNAME / "grade_formula.json")
+    return str(home_state_dir() / "grade_formula.json")
 
 
 def get_run_dir(env: dict[str, str] | None = None) -> Path:
@@ -88,9 +96,9 @@ def get_run_dir(env: dict[str, str] | None = None) -> Path:
     absolute so two processes reading it from different working directories
     agree on the same sockets and pid files.
     """
-    raw = (os.environ if env is None else env).get("QUODEQ_RUN_DIR")
+    raw = resolve_env(env).get("QUODEQ_RUN_DIR")
     if raw and not Path(raw).is_absolute():
         raise ValueError(f"QUODEQ_RUN_DIR must be an absolute path, got: {raw!r}")
-    run_dir = Path(raw) if raw else Path.home() / _QUODEQ_HOME_DIRNAME / "run"
+    run_dir = Path(raw) if raw else home_state_dir() / "run"
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir

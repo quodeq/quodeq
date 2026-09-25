@@ -1,10 +1,10 @@
 /**
- * The History tab's route renderer, moved out of routes/renderers.jsx
- * verbatim (move-only refactor).
+ * The History tab's route renderer.
  */
 import { lazy } from 'react';
 import { LATEST_RUN_ID } from '../constants.js';
 import { NAV_TAB } from '../vocab/navTab.js';
+import { findProject } from '../utils/projectIdentity.js';
 
 const HistoryPage = lazy(() => import('../features/history/components/HistoryPage.jsx'));
 
@@ -44,7 +44,7 @@ export function historyRoute(params, props) {
       isFetching={props.dashboardData.isFetching}
       error={props.dashboardData.error}
       onRetry={props.dashboardData.onRetry}
-      projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
+      projectInfo={findProject(props.navigation.projects, props.navigation.selectedProject)}
     />
   );
 }

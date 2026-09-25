@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from quodeq.shared.errors import ClientMessageError
 
@@ -17,6 +17,8 @@ _MAX_REQ_TEXT = 2000
 
 _FIELD_NAME = "name"
 _FIELD_DESCRIPTION = "description"
+_NAME_AND_DESCRIPTION_LIMITS = ((_FIELD_NAME, _MAX_NAME), (_FIELD_DESCRIPTION, _MAX_DESCRIPTION))  # standard + principle
+_REQUIREMENT_LIMITS = (("text", _MAX_REQ_TEXT), (_FIELD_DESCRIPTION, _MAX_DESCRIPTION))  # requirement text fields
 
 _INJECTION_PATTERNS = [
     re.compile(r"ignore\s+(all\s+|previous\s+)?(instructions|prompts)", re.IGNORECASE),
@@ -57,27 +59,33 @@ def _truncate_field(cleaned: dict, key: str, limit: int) -> None:
         cleaned[key] = _truncate(cleaned[key], limit)
 
 
+def _pick(source: dict, allowed: set[str], limits: tuple[tuple[str, int], ...] = ()) -> dict:
+    """*source* reduced to the *allowed* keys, each ``(key, limit)`` in *limits* truncated."""
+    cleaned = {k: source[k] for k in allowed if k in source}
+    for key, limit in limits:
+        _truncate_field(cleaned, key, limit)
+    return cleaned
+
+
+def _whitelist_children(cleaned: dict, key: str, whitelist: Callable[[dict], dict]) -> None:
+    """Replace a list under *key* in place by its dict items, each run through *whitelist*."""
+    if isinstance(cleaned.get(key), list):
+        cleaned[key] = [whitelist(item) for item in cleaned[key] if isinstance(item, dict)]
+
+
 def _whitelist_ref(ref: dict) -> dict:
-    return {k: ref[k] for k in _ALLOWED_REF if k in ref}
+    return _pick(ref, _ALLOWED_REF)
 
 
 def _whitelist_requirement(req: dict) -> dict:
-    cleaned = {k: req[k] for k in _ALLOWED_REQUIREMENT if k in req}
-    _truncate_field(cleaned, "text", _MAX_REQ_TEXT)
-    _truncate_field(cleaned, _FIELD_DESCRIPTION, _MAX_DESCRIPTION)
-    if "refs" in cleaned and isinstance(cleaned["refs"], list):
-        cleaned["refs"] = [_whitelist_ref(r) for r in cleaned["refs"] if isinstance(r, dict)]
+    cleaned = _pick(req, _ALLOWED_REQUIREMENT, _REQUIREMENT_LIMITS)
+    _whitelist_children(cleaned, "refs", _whitelist_ref)
     return cleaned
 
 
 def _whitelist_principle(principle: dict) -> dict:
-    cleaned = {k: principle[k] for k in _ALLOWED_PRINCIPLE if k in principle}
-    _truncate_field(cleaned, _FIELD_NAME, _MAX_NAME)
-    _truncate_field(cleaned, _FIELD_DESCRIPTION, _MAX_DESCRIPTION)
-    if "requirements" in cleaned and isinstance(cleaned["requirements"], list):
-        cleaned["requirements"] = [
-            _whitelist_requirement(r) for r in cleaned["requirements"] if isinstance(r, dict)
-        ]
+    cleaned = _pick(principle, _ALLOWED_PRINCIPLE, _NAME_AND_DESCRIPTION_LIMITS)
+    _whitelist_children(cleaned, "requirements", _whitelist_requirement)
     return cleaned
 
 
@@ -127,13 +135,8 @@ def _principle_errors(data: dict) -> list[str]:
 
 def _sanitized(data: dict) -> dict:
     """*data* reduced to the allowed keys, with every text field truncated."""
-    cleaned = {k: data[k] for k in _ALLOWED_TOP if k in data}
-    _truncate_field(cleaned, _FIELD_NAME, _MAX_NAME)
-    _truncate_field(cleaned, _FIELD_DESCRIPTION, _MAX_DESCRIPTION)
-    if isinstance(cleaned.get("principles"), list):
-        cleaned["principles"] = [
-            _whitelist_principle(p) for p in cleaned["principles"] if isinstance(p, dict)
-        ]
+    cleaned = _pick(data, _ALLOWED_TOP, _NAME_AND_DESCRIPTION_LIMITS)
+    _whitelist_children(cleaned, "principles", _whitelist_principle)
     return cleaned
 
 

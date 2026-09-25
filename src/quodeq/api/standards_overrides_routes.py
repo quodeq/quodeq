@@ -13,6 +13,7 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api._constants import QUERY_FLAG_TRUTHY
 from quodeq.api.helpers import json_object_or_error
 from quodeq.api.standards_project import invalid_body, invalid_payload, project_root_or_error
+from quodeq.api.routes_common import standards_compiled_dir
 from quodeq.core.standards.overrides import validate_overrides
 from quodeq.services.standards_overrides import changed_dimensions, override_counts_by_dimension
 from quodeq.services.standards_prefs import (
@@ -32,7 +33,7 @@ def _declared_params(app: Flask) -> dict:
     dirs may declare the same req-id with identical specs — merging is safe;
     compiled declarations win on collision (dict-update order: evaluators first).
     """
-    compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
+    compiled_dir = standards_compiled_dir(app)
     evaluators_dir = Path(app.config["STANDARDS_EVALUATORS_DIR"])
     return {**collect_declared_params(evaluators_dir), **collect_declared_params(compiled_dir)}
 
@@ -51,7 +52,7 @@ def _get_standards_overrides(app: Flask, project_id: str) -> Response:
     root, err = project_root_or_error(project_id)
     if err is not None:
         return err
-    compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
+    compiled_dir = standards_compiled_dir(app)
     overrides = load_project_overrides(root)
     return jsonify({"overrides": overrides, "counts": override_counts_by_dimension(overrides, compiled_dir)})
 
@@ -69,7 +70,7 @@ def _put_standards_overrides(app: Flask, project_id: str) -> Response:
     clean, errors = validate_overrides(raw, _declared_params(app))
     if errors:
         return invalid_payload("Invalid overrides", "invalid_overrides", errors)
-    compiled_dir = Path(app.config["STANDARDS_COMPILED_DIR"])
+    compiled_dir = standards_compiled_dir(app)
     changed = changed_dimensions(compiled_dir, load_project_overrides(root), clean)
     dry_run = request.args.get("dryRun", "").lower() in QUERY_FLAG_TRUTHY
     if not dry_run:

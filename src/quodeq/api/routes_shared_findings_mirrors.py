@@ -1,7 +1,7 @@
 """Read-only mirrors of the dismissed/verified findings listings, scoped to the shared clone.
 
-Split out of routes_shared_mirrors.py to keep that module under the size
-limit. Same read-only invariant: nothing here mutates a finding.
+Same read-only invariant as routes_shared_mirrors.py: nothing here mutates a
+finding.
 """
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ from typing import Callable
 from flask import Flask, jsonify, request
 
 from quodeq.api._constants import MAX_FINDINGS_LIST_LIMIT
-from quodeq.api.helpers import page_params
+from quodeq.api.helpers import page_params, validate_segment
 from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services.verified import verified_entries
 
-from .routes_shared_common import shared_project_dir, validate_segment, with_shared_root
+from .routes_shared_common import shared_project_dir, with_shared_root
 
 
 def _shared_findings_page(project: str, eval_root: Path, lister: Callable[..., list]):
@@ -39,7 +39,7 @@ def _shared_findings_page(project: str, eval_root: Path, lister: Callable[..., l
 # namespace shared by mutation routes too. Every other shared mirror
 # nests ``project`` as a URL path segment, so these two follow that
 # convention instead of the local route's exact URL shape -- the response
-# bodies (bare JSON array, same item shape) are unchanged.
+# bodies (bare JSON array, same item shape) match the local routes.
 @with_shared_root
 def shared_dismissed_findings(project: str, eval_root: Path):
     """List the findings dismissed in the shared clone, as a bare JSON array."""

@@ -10,6 +10,7 @@ import { attachComplianceDetailRefs } from './complianceDetail.js';
 import { createViolations } from '../models/violation.js';
 import { asOfQuery, parseAccumulated, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
 import { LATEST_RUN_ID } from '../constants.js';
+import { projectPath } from './paths.js';
 
 // ── Unified Scores ─────────────────────────────────────────────────────
 
@@ -19,7 +20,7 @@ let scoresGeneration = 0;
 
 /** @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>} */
 export async function getProjectScores(projectId, asOfRun = null) {
-  const data = await request(`/projects/${encodeURIComponent(projectId)}/scores${asOfQuery(asOfRun)}`);
+  const data = await request(`${projectPath(projectId)}/scores${asOfQuery(asOfRun)}`);
   scoresGeneration += 1;
   return attachComplianceDetailRefs(parseUnifiedScores(data), projectId, asOfRun, scoresGeneration);
 }
@@ -35,13 +36,13 @@ export async function getComplianceDetail(projectId, { dimension, asOf, principl
   if (asOf) params.set('asOf', asOf);
   if (principle) params.set('principle', principle);
   if (pathPrefix) params.set('pathPrefix', pathPrefix);
-  const data = await request(`/projects/${encodeURIComponent(projectId)}/compliance-detail?${params}`);
+  const data = await request(`${projectPath(projectId)}/compliance-detail?${params}`);
   return createViolations(data?.items);
 }
 
 /** @returns {Promise<{dimensions: Array, summary: Object}>} */
 export async function getRunScores(projectId, runId) {
-  const data = await request(`/projects/${encodeURIComponent(projectId)}/scores/${encodeURIComponent(runId)}`);
+  const data = await request(`${projectPath(projectId)}/scores/${encodeURIComponent(runId)}`);
   return parseSlimDimensions(data);
 }
 
@@ -52,7 +53,7 @@ export async function getRunScores(projectId, runId) {
  * @returns {Promise<{project: string, summary: Object, dimensions: Array, trend: Array, runsCount: number, lastRun: Object|null}>}
  */
 export async function getCompareSummary(projectId) {
-  const data = await request(`/projects/${encodeURIComponent(projectId)}/compare-summary`);
+  const data = await request(`${projectPath(projectId)}/compare-summary`);
   return parseSlimDimensions(data);
 }
 
@@ -60,13 +61,13 @@ export async function getCompareSummary(projectId) {
 
 /** @returns {Promise<import('../models/dashboard.js').Dashboard>} */
 export async function getDashboard(projectId, run = LATEST_RUN_ID) {
-  const data = await request(`/projects/${encodeURIComponent(projectId)}/dashboard${runQuery(run)}`);
+  const data = await request(`${projectPath(projectId)}/dashboard${runQuery(run)}`);
   return createDashboard(data);
 }
 
 /** @returns {Promise<Object>} */
 export async function getAccumulated(projectId, asOfRun = null) {
-  const data = await request(`/projects/${encodeURIComponent(projectId)}/accumulated${asOfQuery(asOfRun)}`);
+  const data = await request(`${projectPath(projectId)}/accumulated${asOfQuery(asOfRun)}`);
   return parseAccumulated(data);
 }
 
@@ -75,7 +76,7 @@ export async function getAccumulated(projectId, asOfRun = null) {
 /** @returns {Promise<import('../models/dimension.js').DimensionEval>} */
 export async function getDimensionEval(projectId, runId, dimension) {
   const data = await request(
-    `/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/dimensions/${encodeURIComponent(dimension)}/eval`
+    `${projectPath(projectId)}/runs/${encodeURIComponent(runId)}/dimensions/${encodeURIComponent(dimension)}/eval`
   );
   return createDimensionEval(data);
 }

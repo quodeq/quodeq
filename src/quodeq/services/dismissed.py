@@ -186,7 +186,12 @@ def recount_totals(
     old_totals: Totals | None = None,
     files_read: int | None = None,
 ) -> Totals:
-    """Recompute totals from a filtered violations list."""
+    """Recompute totals from a filtered violations list.
+
+    Only ``critical``, ``major`` and ``minor`` have buckets; any other
+    severity (the findings DB's ``high``, ``medium``, ``low`` among them)
+    counts as ``unknown``.
+    """
     cc = compliance_count if compliance_count is not None else (old_totals.compliance_count if old_totals else 0)
     critical = major = minor = unknown = 0
     for v in violations:

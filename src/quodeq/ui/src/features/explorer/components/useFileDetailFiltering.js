@@ -5,6 +5,7 @@ import { FINDING_TYPE } from '../../../vocab/findingType.js';
 import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 import { ROW_KIND } from './findingListRows.js';
 import { useHydratedCompliance } from '../hooks/useHydratedCompliance.js';
+import { emptySeverityCounts } from '../../../utils/severity.js';
 
 const dismissKey = (v) => `${v.file}:${v.line}`;
 
@@ -13,7 +14,7 @@ const dismissKey = (v) => `${v.file}:${v.line}`;
 function computeLiveBuckets(violationsBySeverity, dismissedSet) {
   const low = [];
   const high = {};
-  const counts = { critical: 0, major: 0, minor: 0 };
+  const counts = emptySeverityCounts();
   let total = 0;
   for (const sev of KNOWN_SEVERITIES) {
     const bucket = (violationsBySeverity?.[sev] || []).filter((v) => !dismissedSet.has(dismissKey(v)));

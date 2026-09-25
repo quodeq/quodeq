@@ -28,6 +28,7 @@ from pathlib import Path
 from quodeq.data.cache_store.backend import CacheStats
 from quodeq.data.cache_store.entry import CacheEntry
 from quodeq.data.cache_store.index import INDEX_FILENAME, ContentIndex, IndexEntry, IndexRow
+from quodeq.shared.env_paths import home_state_dir
 from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ def default_cache_root(env: Mapping[str, str] | None = None) -> Path:
     ``os.environ`` when provided.
     """
     raw = resolve_env(env).get(_ROOT_ENV, "").strip()
-    base = Path(raw) if raw else Path.home() / ".quodeq" / "cache"
+    base = Path(raw) if raw else home_state_dir() / "cache"
     return base / _RESULTS_SUBDIR
 
 

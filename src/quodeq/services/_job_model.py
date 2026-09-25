@@ -1,8 +1,7 @@
 """Job data model, store protocol, and in-memory store implementation.
 
 JSON serialization (``_job_to_json``/``_job_from_json``) and the disk-backed
-``FileJobStore``/``create_job_store`` live in ``_job_file_store.py`` -- split
-out to keep this module under the size ratchet's 300-line cap, and
+``FileJobStore``/``create_job_store`` live in ``_job_file_store.py`` and are
 re-exported from here.
 """
 
@@ -18,6 +17,7 @@ from typing import TYPE_CHECKING, Callable, Protocol, runtime_checkable
 
 from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
+from quodeq.shared.clock import utc_now_iso
 from quodeq.shared.constants import CC_MARKER_KEY
 
 REPORT_PATH_MARKER = "Report path:"
@@ -57,13 +57,11 @@ class JobLaunchOptions:
 
 def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: JobStatus) -> "Job":
     """A fresh job record for *cmd*, started now, carrying *launch*'s run metadata."""
-    from datetime import datetime, timezone  # noqa: PLC0415
-
     return Job(
         job_id=job_id,
         status=status,
         command=cmd,
-        started_at=datetime.now(timezone.utc).isoformat(),
+        started_at=utc_now_iso(),
         ended_at=None,
         exit_code=None,
         ai_provider=launch.ai_provider,
@@ -74,10 +72,8 @@ def new_job(job_id: str, cmd: list[str], launch: JobLaunchOptions, *, status: Jo
 
 def mark_spawn_failed(job: "Job", exc: BaseException, *, status: JobStatus, exit_code: int) -> None:
     """Close *job* as failed-to-start: terminal status, end time, exit code and a log line."""
-    from datetime import datetime, timezone  # noqa: PLC0415
-
     job.status = status
-    job.ended_at = datetime.now(timezone.utc).isoformat()
+    job.ended_at = utc_now_iso()
     job.exit_code = exit_code
     job.logs.append(f"Failed to start process: {exc}")
 
@@ -108,12 +104,17 @@ class Job:
     ended_at: str | None
     exit_code: int | None
     logs: deque[str] = field(default_factory=lambda: deque(maxlen=MAX_LOG_LINES))
+    # The live record declares the fields its frozen JobSnapshot
+    # (core/types/job.py) carries; a frozen and a mutable dataclass cannot
+    # share them by inheritance, so this block repeats that one by design.
+    # jscpd:ignore-start
     output_project: str | None = None
     output_run_id: str | None = None
     phase: str | None = None
     deadline_at: str | None = None
     current_dimension: str | None = None
     dimensions: list[str] | None = None
+    # jscpd:ignore-end
     ai_provider: str | None = None
     ai_model: str | None = None
     time_limit_s: int | None = None  # 0 = unlimited, None = unknown

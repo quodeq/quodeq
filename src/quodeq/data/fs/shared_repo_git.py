@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.shared.constants import GIT_BIN
+from quodeq.shared.env_paths import home_state_dir
 from quodeq.shared.env_resolve import resolve_env
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ def shared_cache_base(env: Mapping[str, str] | None = None) -> Path:
     """Root of every shared-repo cache: ``$QUODEQ_CACHE_ROOT/shared`` or ``~/.quodeq/cache/shared``."""
     e = resolve_env(env)
     base = e.get(CACHE_ENV)
-    root = Path(base) if base else Path.home() / ".quodeq" / "cache"
+    root = Path(base) if base else home_state_dir() / "cache"
     return root / "shared"
 
 

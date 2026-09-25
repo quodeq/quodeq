@@ -24,7 +24,7 @@ from quodeq.api._constants import (
     MAX_FINDINGS_LIST_LIMIT,
     QUERY_FLAG_TRUE,
 )
-from quodeq.api.helpers import json_error, optional_json_object_or_error, page_params
+from quodeq.api.helpers import json_error, optional_json_object_or_response, page_params
 from quodeq.services.deleted import delete_all_dismissed, delete_finding
 from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services.dismissed import dismiss_finding, restore_finding, restore_all_findings
@@ -103,24 +103,25 @@ def _project_dir(evaluations_dir: str, project: str) -> Path:
     return resolved
 
 
-def _finding_target_or_error(
-    body: dict[str, Any],
-) -> tuple[dict[str, Any] | None, tuple[Response, int] | None]:
-    """Parse and validate the project/req/file/line target shared by dismiss,
-    restore, and unverify. Returns the target dict, or None plus the ready
-    error response. ``fingerprint`` (restore names a dismissed entry by it)
-    is optional and only type-checked here.
+def _finding_request() -> tuple[dict[str, Any], dict[str, Any], None] | tuple[None, None, tuple[Response, int]]:
+    """Read the body naming one finding for dismiss, restore and unverify.
+
+    Returns ``(body, target, None)``, or ``(None, None, error)`` for a bad
+    body or target. ``fingerprint`` (restore's key) is only type-checked.
     """
+    body = optional_json_object_or_response(CODE_INVALID_PARAM)
+    if not isinstance(body, dict):
+        return None, None, body
     project = body.get("project", "")
     req = body.get("req", "")
     file = body.get("file", "")
     line = body.get("line")
     if not project or not req or not file or line is None:
-        return None, (jsonify({"error": "project, req, file, and line are required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST)
+        return None, None, json_error("project, req, file, and line are required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     type_err = _invalid_body_fields(body, ("project", "req", "file", "fingerprint"), ("line",))
     if type_err:
-        return None, (jsonify({"error": type_err, "code": CODE_INVALID_PARAM}), HTTPStatus.BAD_REQUEST)
-    return {"project": project, "req": req, "file": file, "line": line}, None
+        return None, None, json_error(type_err, HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM)
+    return body, {"project": project, "req": req, "file": file, "line": line}, None
 
 
 def _eval_dir(app: Flask) -> str:
@@ -163,10 +164,7 @@ def _mutate_finding(
     delta_for: Callable[..., Any],
 ) -> tuple[Response, int]:
     """Apply *mutate* to the finding named in the request body, then rescore."""
-    body = optional_json_object_or_error(CODE_INVALID_PARAM)
-    if not isinstance(body, dict):
-        return jsonify(body[0]), body[1]
-    target, err = _finding_target_or_error(body)
+    body, target, err = _finding_request()
     if err is not None:
         return err
     run_id = _run_id(body)
@@ -186,13 +184,13 @@ def _mutate_project(
     count_key: str,
 ) -> tuple[Response, int]:
     """Apply *mutate* to every entry of the request body's project, then rescore."""
-    body = optional_json_object_or_error(CODE_INVALID_PARAM)
+    body = optional_json_object_or_response(CODE_INVALID_PARAM)
     if not isinstance(body, dict):
-        return jsonify(body[0]), body[1]
+        return body
     project = body.get("project", "")
     run_id = _run_id(body)
     if not project:
-        return jsonify({"error": "project is required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST
+        return json_error("project is required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     count = mutate(_project_dir(_eval_dir(app), project))
     scores = _scores_with_fallback(app, project, run_id)
     delta = delta_for(_eval_dir(app), project, run_id)
@@ -216,19 +214,19 @@ def _restore_all(app: Flask) -> tuple[Response, int]:
 
 
 def _delete(app: Flask) -> tuple[Response, int]:
-    body = optional_json_object_or_error(CODE_INVALID_PARAM)
+    body = optional_json_object_or_response(CODE_INVALID_PARAM)
     if not isinstance(body, dict):
-        return jsonify(body[0]), body[1]
+        return body
     project = body.get("project", "")
     dimension = body.get("dimension", "")
     principle = body.get("principle", "")
     file = body.get("file", "")
     run_id = _run_id(body)
     if not project or not dimension or not principle or not file:
-        return jsonify({"error": "project, dimension, principle, and file are required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST
+        return json_error("project, dimension, principle, and file are required", HTTPStatus.BAD_REQUEST, CODE_MISSING_PARAM)
     type_err = _invalid_body_fields(body, ("project", "dimension", "principle", "file"))
     if type_err:
-        return jsonify({"error": type_err, "code": CODE_INVALID_PARAM}), HTTPStatus.BAD_REQUEST
+        return json_error(type_err, HTTPStatus.BAD_REQUEST, CODE_INVALID_PARAM)
     swept = delete_finding(_project_dir(_eval_dir(app), project), body)
     scores = _scores_with_fallback(app, project, run_id)
     delta = delete_delta(
@@ -247,10 +245,7 @@ def _delete_all(app: Flask) -> tuple[Response, int]:
 
 
 def _unverify(app: Flask) -> tuple[Response, int]:
-    body = optional_json_object_or_error(CODE_INVALID_PARAM)
-    if not isinstance(body, dict):
-        return jsonify(body[0]), body[1]
-    target, err = _finding_target_or_error(body)
+    body, target, err = _finding_request()
     if err is not None:
         return err
     unverify_finding(_project_dir(_eval_dir(app), target["project"]), body)
@@ -263,8 +258,7 @@ def register_findings_routes(app: Flask) -> None:
     @app.errorhandler(_ProjectNotFoundError)
     def _handle_project_not_found(_exc: _ProjectNotFoundError) -> tuple[Response, int]:
         # Same {"error", "code"} shape every other error branch in this
-        # file returns, instead of Flask's default 404 HTML page that the
-        # bare abort() _project_dir used to call would give.
+        # file returns, instead of Flask's default 404 HTML page.
         return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
 
     @app.get("/api/findings/dismissed")

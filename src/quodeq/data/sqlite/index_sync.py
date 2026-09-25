@@ -10,11 +10,11 @@ import dataclasses
 import logging
 import sqlite3
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.core.run.exit_reason import ExitReason
 from quodeq.core.run.job_status import external_job_id
+from quodeq.shared.clock import utc_iso_from_epoch
 from quodeq.shared.constants import EVIDENCE_DIRNAME, MANIFEST_FILENAME
 from quodeq.shared.process import is_pid_alive as _is_pid_alive
 from quodeq.shared.run_heartbeat import HEARTBEAT_FILENAME
@@ -70,7 +70,7 @@ def _heartbeat_iso(run_dir: Path) -> str | None:
     m = _heartbeat_mtime(run_dir)
     if m is None:
         return None
-    return datetime.fromtimestamp(m, tz=timezone.utc).isoformat(timespec="seconds")
+    return utc_iso_from_epoch(m)
 
 
 def status_mtime_ns(run_dir: Path) -> int:
@@ -147,7 +147,7 @@ def sync_legacy_run(
         started_ts = manifest_path.stat().st_mtime
     except OSError:
         started_ts = time.time()
-    started_iso = datetime.fromtimestamp(started_ts, tz=timezone.utc).isoformat(timespec="seconds")
+    started_iso = utc_iso_from_epoch(started_ts)
 
     db.execute(
         _UPSERT_SQL,

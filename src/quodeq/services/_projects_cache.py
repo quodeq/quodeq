@@ -6,8 +6,8 @@ edits feel stale. The cache holds ``ProjectEntry`` entities — serialization
 to the camelCase wire shape happens at the route.
 
 Two independent tiers:
-  * The full/unpaginated payload (``list()`` with no offset/limit) keeps its
-    original single-flight, whole-list caching, unchanged, and used by every
+  * The full/unpaginated payload (``list()`` with no offset/limit) uses
+    single-flight, whole-list caching, used by every
     non-paginated caller (``active_evaluation``, the shared-repo route,
     direct provider callers).
   * A paginated request (offset and/or limit given) instead caches a cheap
@@ -27,6 +27,14 @@ from quodeq.core.types import ProjectEntry
 from quodeq.services import _fs_project_index, fs_projects
 
 _DEFAULT_TTL_S = 5
+
+
+def _stamp_unless_pending(entries: list[ProjectEntry]) -> float:
+    """The freshness stamp for a just-built tier: now, or 0.0 (cold) while any
+    entry's summary is still pending, so the UI's poll sees each filled grade."""
+    if any(getattr(e, "summary_pending", False) for e in entries):
+        return 0.0
+    return time.monotonic()
 
 
 class ProjectsCache:
@@ -73,10 +81,7 @@ class ProjectsCache:
             # While any summary is still pending (warm-up in flight), leave the
             # cache cold so the UI's poll sees each newly filled grade. The
             # build is a pure cache read now, so re-running it is cheap.
-            if any(getattr(p, "summary_pending", False) for p in projects):
-                self._stamp = 0.0
-            else:
-                self._stamp = time.monotonic()
+            self._stamp = _stamp_unless_pending(projects)
             return self._payload
 
     def _list_page(self, reports_dir: str, offset: int, limit: int) -> dict[str, Any]:
@@ -135,10 +140,7 @@ class ProjectsCache:
             self._hydrated[entry.id] = entry
         # Same "stay cold while pending" rule as the full-payload tier: a
         # still-pending summary must not be cached past the warm-up filling it.
-        if any(getattr(e, "summary_pending", False) for e in built):
-            self._hydrated_stamp = 0.0
-        else:
-            self._hydrated_stamp = time.monotonic()
+        self._hydrated_stamp = _stamp_unless_pending(built)
 
     def invalidate(self) -> None:
         """Drop all cached data; next ``list`` call re-reads from disk."""

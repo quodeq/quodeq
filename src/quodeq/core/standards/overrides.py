@@ -71,6 +71,16 @@ def _param_requirements(dimension_data: dict) -> Iterator[tuple[str, dict, dict]
             yield req_id, req, params
 
 
+def _declared_defaults(params: dict) -> dict[str, object]:
+    """``{name: default}`` for a requirement's params block (None when a spec has no default)."""
+    return {name: (spec or {}).get("default") for name, spec in params.items()}
+
+
+def _non_default_values(values: dict[str, int], defaults: dict[str, object]) -> dict[str, int]:
+    """The entries of *values* that differ from *defaults* (a name missing there compares with None)."""
+    return {name: value for name, value in values.items() if value != defaults.get(name)}
+
+
 def dimension_params(
     dimension_data: dict, overrides: dict[str, dict],
 ) -> tuple[dict[str, dict[str, int]], dict[str, dict[str, int]]]:
@@ -87,10 +97,7 @@ def dimension_params(
     for req_id, req, params in _param_requirements(dimension_data):
         values = effective_params(req, overrides.get(req_id))
         effective[req_id] = values
-        diff = {
-            name: value for name, value in values.items()
-            if value != (params.get(name) or {}).get("default")
-        }
+        diff = _non_default_values(values, _declared_defaults(params))
         if diff:
             non_default[req_id] = diff
     return effective, non_default
@@ -125,13 +132,10 @@ def non_default_from_effective(
     """
     defaults: dict[str, dict[str, object]] = {}
     for req_id, _req, params in _param_requirements(dimension_data):
-        defaults[req_id] = {
-            name: (spec or {}).get("default") for name, spec in params.items()
-        }
+        defaults[req_id] = _declared_defaults(params)
     non_default: dict[str, dict[str, int]] = {}
     for req_id, values in (effective or {}).items():
-        declared = defaults.get(req_id, {})
-        diff = {name: v for name, v in values.items() if v != declared.get(name)}
+        diff = _non_default_values(values, defaults.get(req_id, {}))
         if diff:
             non_default[req_id] = diff
     return non_default

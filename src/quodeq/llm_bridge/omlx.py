@@ -20,10 +20,21 @@ from pathlib import Path
 
 from quodeq.config.llm_bridge_env import omlx_api_key, omlx_base_url
 from quodeq.llm_bridge._constants import LOCAL_SERVER_PROBE_TIMEOUT_S
+from quodeq.llm_bridge._local_server import (
+    bare_model_entry,
+    concurrency_result,
+    normalize_base,
+    server_address,
+)
 from quodeq.llm_bridge._ollama import DEFAULT_MEMORY_FRACTION, HEALTH_OK, detect_memory, estimate_max_agents
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
+
+
+def _omlx_home() -> Path:
+    """omlx's own settings and models directory, ``~/.omlx``."""
+    return Path.home() / ".omlx"
 
 
 def read_omlx_api_key(env: Mapping[str, str] | None = None) -> str:
@@ -36,7 +47,7 @@ def read_omlx_api_key(env: Mapping[str, str] | None = None) -> str:
     if env_key:
         return env_key
     try:
-        cfg = json.loads((Path.home() / ".omlx" / "settings.json").read_text(encoding="utf-8"))
+        cfg = json.loads((_omlx_home() / "settings.json").read_text(encoding="utf-8"))
         api_key = cfg.get("auth", {}).get("api_key", "")
         if api_key:
             _log.warning(
@@ -46,14 +57,6 @@ def read_omlx_api_key(env: Mapping[str, str] | None = None) -> str:
         return api_key
     except (OSError, json.JSONDecodeError):
         return ""
-
-
-def _normalize_base(base_url: str) -> str:
-    """Strip trailing /v1 so /health and /v1/models both work."""
-    stripped = base_url.rstrip("/")
-    if stripped.endswith("/v1"):
-        stripped = stripped[: -len("/v1")]
-    return stripped
 
 
 def _safe_request(url: str) -> urllib.request.Request:
@@ -71,7 +74,7 @@ def _safe_request(url: str) -> urllib.request.Request:
 
 def get_omlx_status(base_url: str | None = None) -> dict:
     """Check if an omlx server is running and reachable."""
-    root = _normalize_base(base_url or omlx_base_url())
+    root = normalize_base(base_url or omlx_base_url())
     try:
         req = _safe_request(f"{root}/health")
         with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
@@ -81,7 +84,7 @@ def get_omlx_status(base_url: str | None = None) -> dict:
             return {
                 "running": True,
                 "status": data.get("status", HEALTH_OK),
-                "address": root.replace("http://", ""),
+                "address": server_address(root),
             }
     except (urllib.error.URLError, ConnectionRefusedError, OSError, ValueError) as exc:
         _log.warning("omlx status check failed: %s", exc)
@@ -90,10 +93,10 @@ def get_omlx_status(base_url: str | None = None) -> dict:
 
 def _list_model_dirs() -> list[dict]:
     """Read ~/.omlx/models/ and return one entry per directory (follows symlinks)."""
-    models_dir = Path.home() / ".omlx" / "models"
+    models_dir = _omlx_home() / "models"
     try:
         return [
-            {"name": entry.name, "size": 0, "quantization": "", "family": ""}
+            bare_model_entry(entry.name)
             for entry in sorted(models_dir.iterdir())
             if entry.is_dir()  # is_dir() follows symlinks
         ]
@@ -108,7 +111,7 @@ def list_omlx_models(base_url: str | None = None, api_key: str | None = None) ->
     when the API returns nothing, which handles symlinked model directories that
     omlx does not enumerate via the OpenAI-compatible endpoint.
     """
-    root = _normalize_base(base_url or omlx_base_url())
+    root = normalize_base(base_url or omlx_base_url())
     try:
         req = _safe_request(f"{root}/v1/models")
         key = api_key if api_key is not None else read_omlx_api_key()
@@ -118,7 +121,7 @@ def list_omlx_models(base_url: str | None = None, api_key: str | None = None) ->
             data = json.loads(resp.read())
             entries = (data.get("data") or []) if isinstance(data, dict) else []
             models = [
-                {"name": m.get("id", ""), "size": 0, "quantization": "", "family": ""}
+                bare_model_entry(m.get("id", ""))
                 for m in entries
                 if isinstance(m, dict) and m.get("id")
             ]
@@ -134,26 +137,11 @@ def run_concurrency_test(_model: str, base_url: str | None = None, api_key: str 
     gpu_memory = detect_memory()
     models = list_omlx_models(base_url, api_key)
     if not models:
-        return {
-            "recommended": 1,
-            "vram_per_context": 0,
-            "gpu_memory": gpu_memory,
-            "reason": "omlx is not running or no models available",
-        }
+        return concurrency_result(1, 0, gpu_memory, "omlx is not running or no models available")
 
     if gpu_memory <= 0:
-        vram_per_context = 1
-        return {
-            "recommended": 1,
-            "vram_per_context": vram_per_context,
-            "gpu_memory": gpu_memory,
-            "reason": "Could not detect host memory",
-        }
+        return concurrency_result(1, 1, gpu_memory, "Could not detect host memory")
 
     vram_per_context = max(int(gpu_memory * DEFAULT_MEMORY_FRACTION), 1)
     result = estimate_max_agents(model_size=vram_per_context, gpu_memory=gpu_memory)
-    return {
-        "recommended": result["estimate"],
-        "vram_per_context": vram_per_context,
-        "gpu_memory": gpu_memory,
-    }
+    return concurrency_result(result["estimate"], vram_per_context, gpu_memory)

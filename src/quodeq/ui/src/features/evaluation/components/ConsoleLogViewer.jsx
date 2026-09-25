@@ -114,13 +114,9 @@ function makeScrollWatcherEffect({ scrollRef, contentRef, followRef, programmati
       lastScrollHeight.current = el.scrollHeight;
       if (grew) {
         // Scroll event caused by content growth, not by the user. Keep follow
-        // state untouched; if still following, snap back to bottom — unless
-        // the user is mid-selection inside the scroller.
-        if (followRef.current && !hasActiveSelectionInside(el)) {
-          programmaticScroll.current = true;
-          el.scrollTop = el.scrollHeight;
-          requestAnimationFrame(() => { programmaticScroll.current = false; });
-        }
+        // state untouched; if still following, snap back to bottom (a live
+        // selection inside the scroller still wins, see snapToBottom).
+        if (followRef.current) snapToBottom(el, programmaticScroll, lastScrollHeight);
         return;
       }
       const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;

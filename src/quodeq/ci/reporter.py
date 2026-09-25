@@ -24,6 +24,9 @@ _DEFAULT_GITHUB_API = "https://api.github.com"
 _FILES_PAGE_SIZE = 100
 _HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 _REQUEST_TIMEOUT_SECONDS = 30.0
+_GITHUB_MEDIA_TYPE = "application/vnd.github+json"  # GitHub's REST media type
+_GITHUB_API_VERSION = "2022-11-28"  # REST API version the payloads are written against
+_JSON_CONTENT_TYPE = "application/json"  # request body of a write
 
 
 def _github_api_base(env: dict[str, str] | None = None) -> str:
@@ -94,13 +97,22 @@ def _github_call(req: Request) -> list | dict:
         raise RuntimeError(f"GitHub API request failed: {exc.reason}") from exc
 
 
+def _authorized(req: Request, token: str, *, json_body: bool = False) -> Request:
+    """Add the GitHub auth, media-type and API-version headers to *req*.
+
+    *json_body* also declares a JSON request body (for writes).
+    """
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Accept", _GITHUB_MEDIA_TYPE)
+    if json_body:
+        req.add_header("Content-Type", _JSON_CONTENT_TYPE)
+    req.add_header("X-GitHub-Api-Version", _GITHUB_API_VERSION)
+    return req
+
+
 def _github_get(url: str, token: str) -> list | dict:
     """Authenticated GET to the GitHub API. Returns parsed JSON."""
-    req = Request(url, method="GET")
-    req.add_header("Authorization", f"Bearer {token}")
-    req.add_header("Accept", "application/vnd.github+json")
-    req.add_header("X-GitHub-Api-Version", "2022-11-28")
-    return _github_call(req)
+    return _github_call(_authorized(Request(url, method="GET"), token))
 
 
 def fetch_pr_changed_lines(
@@ -136,18 +148,21 @@ def fetch_pr_changed_lines(
     return result
 
 
+def _on_changed_line(path: str | None, line: int | None, changed_lines: dict[str, set[int]]) -> bool:
+    """True when *path* and *line* are set and *line* is a changed line of *path*."""
+    return bool(path) and line is not None and line in changed_lines.get(path, set())
+
+
 def _violation_anchorable(violation: dict, changed_lines: dict[str, set[int]]) -> bool:
     """True when a violation's file+line falls on a PR changed line.
 
-    Mirrors ``filter_comments_to_diff``'s keep condition (a comment's path is
-    its violation's ``file`` and its line is the violation's ``line``), so a
-    violation is anchorable exactly when its inline comment would survive the
-    filter. Used to identify the NEW violations GitHub cannot anchor, which are
-    then listed in the summary instead of silently dropped.
+    A comment's path is its violation's ``file`` and its line is the
+    violation's ``line``, so a violation is anchorable exactly when its inline
+    comment would survive ``filter_comments_to_diff``. Used to identify the NEW
+    violations GitHub cannot anchor, which are then listed in the summary
+    instead of silently dropped.
     """
-    path = violation.get("file")
-    line = violation.get("line")
-    return bool(path) and line is not None and line in changed_lines.get(path, set())
+    return _on_changed_line(violation.get("file"), violation.get("line"), changed_lines)
 
 
 def filter_comments_to_diff(
@@ -162,9 +177,7 @@ def filter_comments_to_diff(
     kept: list[dict] = []
     dropped = 0
     for c in comments:
-        path = c.get("path")
-        line = c.get("line")
-        if path and line is not None and line in changed_lines.get(path, set()):
+        if _on_changed_line(c.get("path"), c.get("line"), changed_lines):
             kept.append(c)
         else:
             dropped += 1
@@ -282,9 +295,4 @@ def post_review(
 def _github_request(url: str, payload: dict, token: str) -> dict:
     """Make an authenticated POST to the GitHub API."""
     data = json.dumps(payload).encode()
-    req = Request(url, data=data, method="POST")
-    req.add_header("Authorization", f"Bearer {token}")
-    req.add_header("Accept", "application/vnd.github+json")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("X-GitHub-Api-Version", "2022-11-28")
-    return _github_call(req)
+    return _github_call(_authorized(Request(url, data=data, method="POST"), token, json_body=True))

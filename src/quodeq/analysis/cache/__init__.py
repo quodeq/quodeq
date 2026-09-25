@@ -31,6 +31,7 @@ from quodeq.analysis.cache.dimension_helpers import (
     classify_files_via_cache,
     count_cache_misses,
     format_provenance_drift,
+    model_id_from,
     persist_dispatch_results,
 )
 from quodeq.analysis.cache.entry import CacheEntry
@@ -74,5 +75,6 @@ __all__ = [
     "ensure_cache_ready",
     "format_provenance_drift",
     "maybe_collect_legacy_entries",
+    "model_id_from",
     "persist_dispatch_results",
 ]

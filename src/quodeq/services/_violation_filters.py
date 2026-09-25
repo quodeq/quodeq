@@ -64,6 +64,22 @@ def deleted_key_for_violation(v: dict, dimension: str, principle: str | None = N
     return (dimension or "", principle or "", raw_file)
 
 
+def _unsuppressed(
+    violations: list[dict], dkeys: "DismissedKeys | set[tuple]", delkeys: "set[tuple] | None",
+    dimension: str, principle: str | None,
+) -> list[dict]:
+    """*violations* minus the dismissed and the permanently deleted ones.
+
+    *principle* is None for a result's top-level list (each violation names
+    its own) and the group name for a principle group's list.
+    """
+    return [
+        v for v in violations
+        if not _violation_dismissed(v, dkeys, principle)
+        and (not delkeys or deleted_key_for_violation(v, dimension, principle) not in delkeys)
+    ]
+
+
 def filter_dismissed_from_result(
     result: "ViolationResponse | dict[str, Any] | None",
     dkeys: "DismissedKeys | set[tuple]",
@@ -75,17 +91,9 @@ def filter_dismissed_from_result(
         return result
     if isinstance(result, dict):
         if "violations" in result:
-            result["violations"] = [
-                v for v in result["violations"]
-                if not _violation_dismissed(v, dkeys, None)
-                and (not delkeys or deleted_key_for_violation(v, dimension) not in delkeys)
-            ]
+            result["violations"] = _unsuppressed(result["violations"], dkeys, delkeys, dimension, None)
         for p in result.get("principles", []):
             if "violations" in p:
                 group_principle = p.get("name", "") or ""
-                p["violations"] = [
-                    v for v in p["violations"]
-                    if not _violation_dismissed(v, dkeys, group_principle)
-                    and (not delkeys or deleted_key_for_violation(v, dimension, group_principle) not in delkeys)
-                ]
+                p["violations"] = _unsuppressed(p["violations"], dkeys, delkeys, dimension, group_principle)
     return result

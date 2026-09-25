@@ -1,7 +1,36 @@
 import os
 import stat
+from pathlib import Path
 
 import pytest
+
+from quodeq.core.events.models import Judgment
+from quodeq.core.scoring.params import DEFAULT_PARAMS
+from quodeq.data.projection.grade_projector import recompute_grades
+from quodeq.data.sqlite.state_store import SQLiteStateStore
+
+
+def seed_security_findings(store: SQLiteStateStore, run_dir: Path) -> None:
+    """Record 6 security violations and 8 compliance findings under practice p1,
+    then bake default-params grades.
+
+    Marks the (empty) events.jsonl as fully projected first so ensure_projected
+    is a no-op and won't wipe the grades baked here.
+    """
+    for i in range(6):
+        store.record_finding(Judgment(
+            practice_id="p1", dimension="security", req=f"req{i}",
+            verdict="violation", severity="major", file=f"f{i}.py", line=1,
+            title=f"t{i}", reason=f"r{i}",
+        ))
+    for i in range(8):
+        store.record_finding(Judgment(
+            practice_id="p1", dimension="security", req=f"c{i}",
+            verdict="compliance", severity="minor", file=f"g{i}.py", line=1,
+            title=f"ct{i}", reason=f"cr{i}",
+        ))
+    store.save_projected_size((run_dir / "events.jsonl").stat().st_size)
+    recompute_grades(run_dir, params=DEFAULT_PARAMS)
 
 
 @pytest.fixture

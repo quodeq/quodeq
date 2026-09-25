@@ -2,9 +2,8 @@
 
 Numeric helpers and the ports/keys/urls accessors stay here; AI-provider,
 filesystem-path, sqlite-DB, and embedding accessors live in the four
-siblings below and are re-exported so every existing import path
-(``from quodeq.shared.env import <name>``, including this project-wide
-fan-in's many call sites) keeps working unchanged.
+siblings below and are re-exported, so ``from quodeq.shared.env import <name>`` works for every
+accessor (this module is a project-wide fan-in with many call sites).
 
 ``sanitized_env_path`` lives in the leaf module ``_env_sanitize.py`` (not
 defined here) so ``env_paths.py``/``_env_db.py`` can import it without a
@@ -13,12 +12,12 @@ cycle back through this module -- see that module's docstring.
 from __future__ import annotations
 
 import logging
-import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import TypeVar
 
 from quodeq.shared._config import get_config
 from quodeq.shared._env_sanitize import sanitized_env_path  # noqa: F401 — re-export
+from quodeq.shared.env_resolve import resolve_env
 
 
 def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
@@ -34,31 +33,34 @@ def _env_number(
     default: _NumberT,
     kind: Callable[[str], _NumberT],
     minimum: _NumberT | None,
-    env: dict[str, str] | None,
+    env: Mapping[str, str] | None,
+    warn: bool = True,
 ) -> _NumberT:
     """Read an env var through *kind*; warn and return *default* on failure.
 
     When *minimum* is given, parsed values below it also fall back to *default*.
+    ``warn=False`` falls back without logging.
     """
-    raw = (os.environ if env is None else env).get(var)
-    if raw is not None:
-        log = logging.getLogger(__name__)
-        try:
-            value = kind(raw)
-        except ValueError:
-            log.warning(
+    raw = resolve_env(env).get(var)
+    if raw is None:
+        return default
+    try:
+        value = kind(raw)
+    except ValueError:
+        if warn:
+            logging.getLogger(__name__).warning(
                 "Invalid %s=%r (expected %s), using default %r",
                 var, raw, "integer" if kind is int else "number", default,
             )
-        else:
-            if minimum is not None and value < minimum:
-                log.warning(
-                    "Out-of-range %s=%r (minimum %r), using default %r",
-                    var, raw, minimum, default,
-                )
-            else:
-                return value
-    return default
+        return default
+    if minimum is not None and value < minimum:
+        if warn:
+            logging.getLogger(__name__).warning(
+                "Out-of-range %s=%r (minimum %r), using default %r",
+                var, raw, minimum, default,
+            )
+        return default
+    return value
 
 
 def env_int(
@@ -66,13 +68,16 @@ def env_int(
     default: int,
     *,
     minimum: int | None = None,
-    env: dict[str, str] | None = None,
+    env: Mapping[str, str] | None = None,
+    warn: bool = True,
 ) -> int:
     """Read an env var as an int; warn and return *default* on parse failure.
 
     When *minimum* is given, parsed values below it also fall back to *default*.
+    ``warn=False`` is for values read on every poll, where a bad setting
+    would repeat the same warning each tick.
     """
-    return _env_number(var, default, int, minimum, env)
+    return _env_number(var, default, int, minimum, env, warn)
 
 
 def env_float(
@@ -96,7 +101,7 @@ def get_action_api_port(env: dict[str, str] | None = None) -> int:
 
 def get_action_api_host(env: dict[str, str] | None = None) -> str:
     """Return the action API host from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_ACTION_API_HOST", get_config()["default_host"])
+    return resolve_env(env).get("QUODEQ_ACTION_API_HOST", get_config()["default_host"])
 
 
 def get_dashboard_port(env: dict[str, str] | None = None) -> int:
@@ -106,22 +111,22 @@ def get_dashboard_port(env: dict[str, str] | None = None) -> int:
 
 def get_anthropic_api_key(env: dict[str, str] | None = None) -> str | None:
     """Return the Anthropic API key from environment, or None."""
-    return (os.environ if env is None else env).get("ANTHROPIC_API_KEY") or None
+    return resolve_env(env).get("ANTHROPIC_API_KEY") or None
 
 
 def get_asvs_url(env: dict[str, str] | None = None) -> str:
     """Return the OWASP ASVS JSON URL from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_ASVS_URL", get_config()["asvs_url"])
+    return resolve_env(env).get("QUODEQ_ASVS_URL", get_config()["asvs_url"])
 
 
 def get_github_search_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub repository search URL from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_GITHUB_SEARCH_URL", get_config()["github_search_url"])
+    return resolve_env(env).get("QUODEQ_GITHUB_SEARCH_URL", get_config()["github_search_url"])
 
 
 def get_github_raw_base_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub raw content base URL from environment or default."""
-    return (os.environ if env is None else env).get("QUODEQ_GITHUB_RAW_BASE_URL", get_config()["github_raw_base_url"])
+    return resolve_env(env).get("QUODEQ_GITHUB_RAW_BASE_URL", get_config()["github_raw_base_url"])
 
 
 # ---------------------------------------------------------------------------

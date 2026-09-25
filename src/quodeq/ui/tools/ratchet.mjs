@@ -10,7 +10,7 @@
 // tools/_ratchet_common.mjs, shared with tools/check_strings.mjs.
 import path from 'node:path';
 import {
-  UI_ROOT, collectCounts, diffCounts, loadBaseline, total, writeBaseline, parseGateArgs,
+  UI_ROOT, collectCounts, diffCounts, exitWith, loadBaseline, okSummary, total, writeBaseline, parseGateArgs,
 } from './_ratchet_common.mjs';
 
 /**
@@ -77,9 +77,7 @@ export async function runRatchet({ script, configPath, baselinePath, rules, ceil
   }
 
   if (grew.length === 0 && shrank.length === 0 && !overCeiling) {
-    console.log(
-      `OK: no new ${noun} (${total(counts)} grandfathered across ${Object.keys(counts).length} files).`,
-    );
+    console.log(okSummary(noun, counts));
     return 0;
   }
   return 1;
@@ -87,11 +85,5 @@ export async function runRatchet({ script, configPath, baselinePath, rules, ceil
 
 /** Wrapper entry point: run the gate and exit with its code (2 on a crash). */
 export function main(gate) {
-  runRatchet(gate).then(
-    (code) => process.exit(code),
-    (err) => {
-      console.error(err.message || err);
-      process.exit(2);
-    },
-  );
+  exitWith(runRatchet(gate));
 }

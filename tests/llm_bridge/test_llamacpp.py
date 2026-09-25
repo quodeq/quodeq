@@ -5,22 +5,22 @@ import json
 from unittest.mock import patch, MagicMock
 
 from quodeq.llm_bridge._llamacpp import (
-    _normalize_base,
     get_llamacpp_status,
     list_llamacpp_models,
     run_concurrency_test,
 )
+from quodeq.llm_bridge._local_server import normalize_base
 
 
 class TestNormalizeBase:
     def test_strips_v1_suffix(self):
-        assert _normalize_base("http://localhost:8080/v1") == "http://localhost:8080"
+        assert normalize_base("http://localhost:8080/v1") == "http://localhost:8080"
 
     def test_strips_trailing_slash(self):
-        assert _normalize_base("http://localhost:8080/") == "http://localhost:8080"
+        assert normalize_base("http://localhost:8080/") == "http://localhost:8080"
 
     def test_leaves_root_alone(self):
-        assert _normalize_base("http://localhost:8080") == "http://localhost:8080"
+        assert normalize_base("http://localhost:8080") == "http://localhost:8080"
 
 
 class TestGetLlamacppStatus:

@@ -23,12 +23,13 @@ _PATTERNS = re.compile(
 # Known, already-handled sites (src-relative "path.py:LINE"). Audited 2026-05-30.
 _ALLOWLIST: set[str] = {
     # kill_tree POSIX branch, in the else of `if sys.platform == "win32"`
-    # (win32 uses taskkill /F /T). Hoisted from analysis/_process.py so
-    # services/ and analysis/ can share one implementation.
-    "shared/process_kill.py:34",
+    # (win32 uses taskkill /F /T). Used by services/ to terminate
+    # background job process trees.
+    "shared/process_kill.py:38",
     # kill_proc_tree POSIX branch, in the else of `if sys.platform == "win32"`
-    # (win32 uses taskkill /F /T). Hoisted from assistant to shared.
-    "shared/process_kill.py:71",
+    # (win32 uses taskkill /F /T). Used by terminal/ PTY sessions and the
+    # assistant CLI provider adapters to terminate subprocess trees.
+    "shared/process_kill.py:74",
     # pgrep / ps are wrapped in `except (OSError, ...)` -> returns _UNKNOWN, so
     # on Windows (FileNotFoundError) resource sampling degrades gracefully.
     "shared/resource_sampler.py:60",
@@ -46,8 +47,8 @@ _ALLOWLIST: set[str] = {
     # pids from find_pids_on_port, which returns [] off-darwin.
     "menubar/_process.py:85",
     "menubar/_process.py:97",
-    "menubar/_app_lifecycle.py:158",
-    "menubar/_app_lifecycle.py:170",
+    "menubar/_app_lifecycle.py:156",
+    "menubar/_app_lifecycle.py:168",
 }
 
 

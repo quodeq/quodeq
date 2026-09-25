@@ -1,5 +1,5 @@
 import ComparePanel from './ComparePanel.jsx';
-import TrendBadge from '../../../components/TrendBadge.jsx';
+import CompareDeltaBadge from './CompareDeltaBadge.jsx';
 import { scoreColorClass, scoreGradeColorVar, complianceRatio } from '../../../utils/formatters.js';
 import { scoreToGradeLabel } from '../../../utils/gradeThresholds.js';
 import { t } from '../../../strings/index.js';
@@ -38,13 +38,7 @@ function StandingScoreCells({ s }) {
         <span className="compare-standings__tier">{scoreToGradeLabel(s.score) || ''}</span>
       </span>
       <span className="compare-standings__delta">
-        {s.delta != null ? (
-          <TrendBadge delta={s.delta} />
-        ) : s.lastDelta != null ? (
-          <span className="compare-delta--old" title={t('compare.oldDeltaTip')}>
-            <TrendBadge delta={s.lastDelta} />
-          </span>
-        ) : null}
+        <CompareDeltaBadge delta={s.delta} lastDelta={s.lastDelta} />
       </span>
     </>
   );

@@ -251,10 +251,10 @@ def test_additive_upgrades_skip_a_db_without_findings():
 
 
 def test_table_exists_reports_presence():
-    from quodeq.data.sqlite._migrations_additive import _table_exists
+    from quodeq.data.sqlite._migrations_additive import table_exists
 
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE findings (id INTEGER PRIMARY KEY)")
-    assert _table_exists(conn, "findings") is True
-    assert _table_exists(conn, "absent") is False
+    assert table_exists(conn, "findings") is True
+    assert table_exists(conn, "absent") is False
     conn.close()

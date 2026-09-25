@@ -1,19 +1,17 @@
 """Use case: register a project (resolve identity, clone if needed, scan).
 
-Extracted from ``evaluation_mixin`` so the API layer has a public entry
-point instead of importing private helpers.
-
-Split into two sibling modules plus this orchestrator:
+The API layer's public entry point for registration. This orchestrator
+works with two sibling modules:
   - _registration_url.py: credential-stripping and origin-remote reads.
   - _registration_scan.py: the zero-run scan fallback and parent-project scan.
 """
 from __future__ import annotations
 
 import functools
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from quodeq.shared.clock import utc_now_iso
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.wiring import (
     list_project_dirs,
@@ -186,5 +184,5 @@ def mark_onboarding_complete(project_dir: Path) -> None:
     data = read_repository_info(project_dir)
     if data is None or data.get("onboardingCompletedAt"):
         return
-    data["onboardingCompletedAt"] = datetime.now(timezone.utc).isoformat()
+    data["onboardingCompletedAt"] = utc_now_iso()
     write_repository_info(project_dir, data)

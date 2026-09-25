@@ -5,11 +5,12 @@ import { GALAXY_VIEW_HOVER_TYPE } from '../core/galaxyHitTypes.js';
 import { ZOOM_DIMENSION_LEVEL, ZOOM_PRINCIPLE_LEVEL, CANVAS_FONT_FAMILY } from '../core/galaxyTunables.js';
 import { drawStarfield, fillBackgroundGradient } from './galaxyStarfield.js';
 import {
-  clusterDimming, selectedZoomFade, principleParticleFade, principleLabelAlpha, PRINCIPLE_FADE_SPAN,
+  clusterDimming, clusterFade, fadeOutFrom, unfocusedClusterAlpha, selectedZoomFade, principleParticleFade, principleLabelAlpha, PRINCIPLE_FADE_SPAN,
 } from './galaxyFade.js';
+import { withinRadius } from '../core/hitTest.js';
 import {
   STAR, VIOLATION_ORBS, MIN_VISIBLE_ALPHA, LABEL_ALPHA,
-  FOCUS_RING, FOCUS_RING_DASH, UNFOCUSED_CLUSTER_MIN_ALPHA, DIM_FADE_SPAN,
+  FOCUS_RING, FOCUS_RING_DASH, DIM_FADE_SPAN,
   CONSTELLATION, CONSTELLATION_RING_DASH, CONSTELLATION_LINE_DASH,
   DIM_PARTICLE, DIM_LABEL, PRINCIPLE,
 } from './galaxyTuning.js';
@@ -72,10 +73,10 @@ function drawConstellations(ctx, scene, view, opts, tc) {
   const { w2s, showLabels, W, H } = opts;
   const { r: mr, g: mg, b: mb } = tc.textMuted;
   if (cam.z >= CONSTELLATION.hideAtZoom) return;
-  const conAlpha = Math.max(0, 1 - (cam.z - 1) / 2);
+  const conAlpha = clusterFade(cam.z);
   (scene.constellations || []).forEach(con => {
     const isFocused = nav.clusterCx == null || (con.cx === nav.clusterCx && con.cy === nav.clusterCy);
-    const conClusterDim = isFocused ? 1 : Math.max(UNFOCUSED_CLUSTER_MIN_ALPHA, 1 - (cam.z - 1) / 2);
+    const conClusterDim = isFocused ? 1 : unfocusedClusterAlpha(cam.z);
     // Dashed circle around cluster
     const csc = w2s(W / 2 + con.cx, H / 2 + con.cy);
     const circleR = (con.spread + CONSTELLATION_RING_PADDING_WORLD) * cam.z;
@@ -144,7 +145,7 @@ function drawOneDimStar(ctx, target, view, opts, tc) {
   const sr = s.radius * pulse * cam.z * STAR.screenRadiusFraction;
   const clusterDim = clusterDimming(s, cam, nav);
   // All dim-level decorations fade out once we zoom past galaxy level
-  const dimFade = isSelected ? 1 : Math.max(0, 1 - (cam.z - ZOOM_DIMENSION_LEVEL) / DIM_FADE_SPAN) * clusterDim;
+  const dimFade = isSelected ? 1 : fadeOutFrom(cam.z, ZOOM_DIMENSION_LEVEL, DIM_FADE_SPAN) * clusterDim;
   // Orbiting principle particles fade out as the principle planets fade in,
   // and the label hides on the same curve once zoomed past galaxy level.
   const decorAlpha = isSelected ? selectedZoomFade(cam.z) : dimFade;
@@ -163,13 +164,12 @@ function drawOneDimStar(ctx, target, view, opts, tc) {
   }
   // Keyboard focus ring (a11y, #675) — drawn at the dim's hit radius so it
   // lines up with where Enter activates.
+  const hitR = Math.max(sr * 2, DIM_LABEL.hitRadiusMinPx);
   if (nav.depth === 0 && opts.focusedIdx === i) {
-    drawFocusRing(ctx, sc.x, sc.y, Math.max(sr * 2, DIM_LABEL.hitRadiusMinPx) + FOCUS_RING.padPx, tc);
+    drawFocusRing(ctx, sc.x, sc.y, hitR + FOCUS_RING.padPx, tc);
   }
   if (!animating && nav.depth === 0 && mx >= 0) {
-    const dx = mx - sc.x, dy = my - sc.y;
-    const hitR = Math.max(sr * 2, DIM_LABEL.hitRadiusMinPx);
-    if (dx * dx + dy * dy < hitR * hitR) return { type: GALAXY_VIEW_HOVER_TYPE.DIM, idx: i, data: s };
+    if (withinRadius(mx, my, sc.x, sc.y, hitR)) return { type: GALAXY_VIEW_HOVER_TYPE.DIM, idx: i, data: s };
   }
   return null;
 }
@@ -239,13 +239,12 @@ function drawPrinciples(ctx, scene, view, opts, tc) {
       ctx.fillStyle = rgba(tc.textMuted, PRINCIPLE.scoreAlpha * la);
       ctx.fillText(p.score.toFixed(1), sc.x, sc.y + sr + PRINCIPLE.scoreOffsetPx);
     }
+    const hitR = sr + PRINCIPLE.hitPadPx;
     if (nav.depth === 1 && opts.focusedIdx === pi) {
-      drawFocusRing(ctx, sc.x, sc.y, sr + PRINCIPLE.hitPadPx + FOCUS_RING.padPx, tc);
+      drawFocusRing(ctx, sc.x, sc.y, hitR + FOCUS_RING.padPx, tc);
     }
     if (!animating && nav.depth === 1 && pAlpha > PRINCIPLE.hitMinAlpha && mx >= 0) {
-      const dx = mx - sc.x, dy = my - sc.y;
-      const hitR = sr + PRINCIPLE.hitPadPx;
-      if (dx * dx + dy * dy < hitR * hitR) newHovered = { type: GALAXY_VIEW_HOVER_TYPE.PRIN, idx: pi, data: p };
+      if (withinRadius(mx, my, sc.x, sc.y, hitR)) newHovered = { type: GALAXY_VIEW_HOVER_TYPE.PRIN, idx: pi, data: p };
     }
   });
   return newHovered;

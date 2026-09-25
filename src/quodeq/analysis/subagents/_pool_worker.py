@@ -9,7 +9,8 @@ from typing import Any
 
 from quodeq.analysis.subagents._pool_models import (
     SubagentResult,
-    AGENT_ID_PREFIX,
+    agent_id_for,
+    agent_stream_file,
     DEFAULT_MAX_DURATION_S,
 )
 from quodeq.analysis.errors import REASON_PROVIDER_FATAL, FatalProviderError
@@ -48,9 +49,9 @@ def build_agent_config(
         The agent's AnalysisConfig, the shared per-dimension evidence JSONL
         every agent in the pool appends to, and this agent's own stream file.
     """
-    agent_id = f"{AGENT_ID_PREFIX}-{idx}"
+    agent_id = agent_id_for(idx)
     jsonl_file = wctx.evidence_dir / f"{wctx.dimension_key}_evidence.jsonl"
-    stream_file = wctx.evidence_dir / f"{wctx.dimension_key}_{agent_id}.stream"
+    stream_file = agent_stream_file(wctx.evidence_dir, wctx.dimension_key, agent_id)
     bc = base_config
     agent_dur = bc.max_duration or DEFAULT_MAX_DURATION_S
     # Clamp to remaining budget so the last in-flight agent dies on or
@@ -87,9 +88,16 @@ def run_single_agent(
     wctx: WorkerContext,
 ) -> SubagentResult:
     """Run a single subagent. Returns SubagentResult."""
-    agent_id = f"{AGENT_ID_PREFIX}-{idx}"
+    agent_id = agent_id_for(idx)
     ac, jsonl_file, stream_file = build_agent_config(idx, base_config, wctx)
     run_fn = wctx.run_fn if wctx.run_fn is not None else run_analysis
+
+    def failed(exc: Exception) -> SubagentResult:
+        return SubagentResult(
+            agent_id=agent_id, jsonl_file=jsonl_file,
+            stream_file=stream_file, success=False, error=str(exc),
+        )
+
     try:
         run_fn(
             work_dir=work_dir,
@@ -110,13 +118,7 @@ def run_single_agent(
             f"-- cancelling run, no further agents will be spawned"
         )
         cancellation.request_cancel(reason=f"{REASON_PROVIDER_FATAL}:{exc.reason}: {exc}")
-        return SubagentResult(
-            agent_id=agent_id, jsonl_file=jsonl_file,
-            stream_file=stream_file, success=False, error=str(exc),
-        )
+        return failed(exc)
     except AnalysisError as exc:
         log_warning(f"Subagent {agent_id} failed: {exc}")
-        return SubagentResult(
-            agent_id=agent_id, jsonl_file=jsonl_file,
-            stream_file=stream_file, success=False, error=str(exc),
-        )
+        return failed(exc)

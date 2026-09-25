@@ -100,12 +100,10 @@ def resolve_previous_evidence(
     previous evidence exists.
     """
     paths = resolve_evidence_paths(evidence_dir)
-    if paths is None:
-        if cache is not None:
-            cache[cache_key] = ([], 0, 0)
-        return None, False
-    current_run_id, project_uuid, reports_base = paths
-    prev_jsonl = _find_previous_evidence(reports_base, project_uuid, current_run_id, dim_id)
+    prev_jsonl = None
+    if paths is not None:
+        current_run_id, project_uuid, reports_base = paths
+        prev_jsonl = _find_previous_evidence(reports_base, project_uuid, current_run_id, dim_id)
     if prev_jsonl is None:
         if cache is not None:
             cache[cache_key] = ([], 0, 0)

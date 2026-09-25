@@ -7,17 +7,14 @@
 // way to grandfather a violation is tools/naming_baseline.json, which landed
 // empty and may only shrink.
 import namingRule from './tools/naming_rule.mjs';
+import { JSX_MODULE_LANGUAGE_OPTIONS } from './tools/eslint_shared_config.mjs';
 
 export default [
   {
     files: ['src/**/*.{js,jsx}'],
     ignores: ['src/**/*.{test,fixtures}.{js,jsx}'],
     plugins: { naming: { rules: { 'module-names': namingRule } } },
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
+    languageOptions: JSX_MODULE_LANGUAGE_OPTIONS,
     rules: { 'naming/module-names': 'error' },
   },
 ];

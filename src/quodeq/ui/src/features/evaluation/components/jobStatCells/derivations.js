@@ -9,6 +9,7 @@ import { SCAN_MODE } from '../scanModes.js';
 import { MS_PER_SECOND, SECONDS_PER_MINUTE, MINUTES_PER_HOUR, SECONDS_PER_HOUR } from '../../../../utils/time.js';
 import { DIM_STATE } from '../../../../vocab/dimState.js';
 import { SEVERITY_ORDER } from '../../../../vocab/severity.js';
+import { emptySeverityCounts } from '../../../../utils/severity.js';
 
 // Throughput estimate tuning. The eval completes only a few files per MINUTE
 // (one slow LLM call per file), so the rate is shown per minute and measured
@@ -114,8 +115,8 @@ export function msUntilNextSecond(elapsedMs) {
  * time since that payload landed. Anchoring to the server (instead of
  * Date.parse(job.startedAt) vs client Date.now()) makes the clock immune to
  * client/server clock skew and keeps every clock on the screen in lock-step
- * — the stat strip and the footer previously mixed client wall-clock with
- * 2s-stale poll data and visibly disagreed.
+ * — mixing client wall-clock with 2s-stale poll data would make the stat
+ * strip and the footer visibly disagree.
  *
  * Fallback order when the server hasn't reported an elapsed yet (first
  * render before any poll, legacy runs): job wall-clock timestamps, else null.
@@ -170,7 +171,7 @@ export function buildDimensionCycle(progress) {
 
 /** Severity buckets across the live feed's `{dim: Violation[]}` map. */
 export function sumSeverities(liveViolations) {
-  const counts = { critical: 0, major: 0, minor: 0 };
+  const counts = emptySeverityCounts();
   for (const vs of Object.values(liveViolations || {})) {
     for (const v of vs || []) {
       const sev = String(v?.severity || '').toLowerCase();
