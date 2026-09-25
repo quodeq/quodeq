@@ -224,8 +224,8 @@ tests/analysis/test_loops_safety_retry.py:11:private-module:quodeq.analysis._loo
 tests/analysis/test_loops_safety_retry.py:11:private-module:quodeq.analysis._loops.run_per_dimension_loop
 tests/analysis/test_manifest_monorepo.py:15:private-name:quodeq.analysis.manifest_build_scope._deepest_scope
 tests/analysis/test_manifest_monorepo.py:15:private-name:quodeq.analysis.manifest_build_scope._scope_resolver
-tests/analysis/test_manifest_tracked_files.py:150:private-name:quodeq.analysis.manifest_build_scope._walk_and_partition_by_scope
-tests/analysis/test_manifest_tracked_files.py:188:private-module:quodeq._cli_resolution.build_cli_manifest
+tests/analysis/test_manifest_tracked_files.py:167:private-name:quodeq.analysis.manifest_build_scope._walk_and_partition_by_scope
+tests/analysis/test_manifest_tracked_files.py:205:private-module:quodeq._cli_resolution.build_cli_manifest
 tests/analysis/test_mcp_config_coverage.py:11:private-module:quodeq.analysis._config.AgentParams
 tests/analysis/test_mcp_config_coverage.py:12:private-module:quodeq.analysis._mcp_config.create_mcp_config
 tests/analysis/test_mcp_config_coverage.py:209:private-module:quodeq.analysis._mcp_config.codex_mcp_config_arg
@@ -272,8 +272,8 @@ tests/analysis/test_process_coverage.py:72:private-name:quodeq.analysis._process
 tests/analysis/test_process_coverage.py:81:private-name:quodeq.analysis._process._terminate_process
 tests/analysis/test_process_coverage.py:92:private-name:quodeq.analysis._process._run_with_heartbeat
 tests/analysis/test_process_coverage.py:93:private-module:quodeq.analysis._config.AnalysisConfig
-tests/analysis/test_prompt_context.py:1:private-module:quodeq.analysis.prompts._context.PromptContext
-tests/analysis/test_prompt_context.py:54:private-module:quodeq.analysis.subagents._prompts.build_subagent_prompt
+tests/analysis/test_prompt_context.py:5:private-module:quodeq.analysis.prompts._context.PromptContext
+tests/analysis/test_prompt_context.py:93:private-module:quodeq.analysis.subagents._prompts.build_subagent_prompt
 tests/analysis/test_prompt_trust_model.py:5:private-name:quodeq.analysis.api_prompt_assembly._format_shape_block
 tests/analysis/test_provenance_gate_behavioral.py:50:private-module:quodeq.analysis._api_runner.ApiRunnerConfig
 tests/analysis/test_provenance_gate_behavioral.py:50:private-module:quodeq.analysis._api_runner.call_api

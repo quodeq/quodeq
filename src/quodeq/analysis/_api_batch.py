@@ -15,7 +15,7 @@ intercept the prompt patch ``quodeq.analysis._api_batch.assemble_api_prompt``
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -59,12 +59,21 @@ class _BatchContext:
 
 def _resolve_standards_text(
     work_dir: Path, cfg: AnalysisConfig, env: Mapping[str, str],
+    *, overrides_loader: Callable[[Path], Mapping[str, dict]] | None = None,
 ) -> str:
     """Load the compiled standards text for the API prompt, with the
-    project's own requirement overrides applied."""
-    from quodeq.data.fs.standards_prefs import load_project_overrides  # noqa: PLC0415
+    project's own requirement overrides applied.
 
-    overrides = load_project_overrides(work_dir)
+    *overrides_loader* defaults to the data-layer ``load_project_overrides``
+    (tests pass a fake).
+    """
+    if overrides_loader is None:
+        # Lazy default resolution: the concrete data-layer loader is only
+        # imported when no loader was injected.
+        from quodeq.data.fs.standards_prefs import load_project_overrides  # noqa: PLC0415
+        overrides_loader = load_project_overrides
+
+    overrides = overrides_loader(work_dir)
     # env is the resolved process environment (run_analysis defaults it to
     # os.environ), passed explicitly so these lookups skip os.environ itself.
     return load_standards_text(
@@ -75,6 +84,7 @@ def _resolve_standards_text(
 
 def build_api_batch_context(
     work_dir: Path, cfg: AnalysisConfig, env: Mapping[str, str], stream_file: Path,
+    *, overrides_loader: Callable[[Path], Mapping[str, dict]] | None = None,
 ) -> _BatchContext | None:
     """Resolve the per-dimension batch inputs, or None when the queue is
     exhausted (``gather_api_source_files`` has already written the stream's
@@ -87,7 +97,7 @@ def build_api_batch_context(
     if source_files is None:
         return None
 
-    standards_text = _resolve_standards_text(work_dir, cfg, env)
+    standards_text = _resolve_standards_text(work_dir, cfg, env, overrides_loader=overrides_loader)
     # Resolved once per dimension: the same declared-then-detected trust
     # model the finding sink applies, briefed here to cut out-of-scope findings.
     trust_model = resolve_trust_model(work_dir)

@@ -11,26 +11,36 @@ on the lifecycle state machine itself (the exception -> state mapping in
 collaborators (status writer, heartbeat, resource sampler) via a
 ``LifecycleDeps`` bundle, defaulting to the production implementations, so
 tests can inject recorders/stubs without patching module attributes.
+
+``SignalGuard`` and ``AtexitGuard`` live in ``_run_lifecycle_guards.py`` (a
+further file-size split) and are re-exported here so existing imports keep
+resolving.
 """
 from __future__ import annotations
 
-import atexit
 import signal
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
-from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.analysis._run_lifecycle_guards import (  # noqa: F401 -- re-export
+    AtexitGuard,
+    SignalGuard,
+    SIGNALS_TO_HANDLE as _SIGNALS_TO_HANDLE,
+)
+from quodeq.core.observability import LogSink
 from quodeq.shared import cancellation
 from quodeq.core.run.state import RunState, RunStatus, TERMINAL_STATES
 from quodeq.data.fs.run_status_store import read_status
 
-_SIGNALS_TO_HANDLE = (signal.SIGINT, signal.SIGTERM)
-# SIGHUP is POSIX-only. Included conditionally below.
-if hasattr(signal, "SIGHUP"):
-    _SIGNALS_TO_HANDLE = _SIGNALS_TO_HANDLE + (signal.SIGHUP,)
+
+class _Stoppable(Protocol):
+    """What ``run_signal_shutdown``/``finalize_run_on_atexit`` need from the
+    heartbeat and resource-sampler collaborators: only ``stop()``."""
+
+    def stop(self) -> None: ...
 
 
 def _now_iso() -> str:
@@ -125,52 +135,6 @@ class LifecycleDeps:
     resources_factory: Callable[[], Any] | None = None
 
 
-class SignalGuard:
-    """Install *handler* on the run's signals; restore the originals after."""
-
-    def __init__(self, handler: Any, *, log: LogSink = NULL_LOG) -> None:
-        self._handler = handler
-        self._previous: dict[int, Any] = {}
-        self._log = log
-
-    def install(self) -> None:
-        for sig in _SIGNALS_TO_HANDLE:
-            try:
-                self._previous[sig] = signal.getsignal(sig)
-                signal.signal(sig, self._handler)
-            except (OSError, ValueError) as exc:
-                # Can fail in non-main threads; tests may run under such a case.
-                self._log.debug(f"signal handler for {sig!r} not installed: {exc}")
-
-    def restore(self) -> None:
-        for sig, prev in self._previous.items():
-            try:
-                signal.signal(sig, prev)
-            except (OSError, ValueError) as exc:
-                self._log.debug(f"signal handler for {sig!r} not restored: {exc}")
-        self._previous.clear()
-
-
-class AtexitGuard:
-    """Register *callback* with atexit once, and deregister it once."""
-
-    def __init__(self, callback: Any) -> None:
-        self._callback = callback
-        self._registered = False
-
-    def register(self) -> None:
-        atexit.register(self._callback)
-        self._registered = True
-
-    def deregister(self) -> None:
-        if not self._registered:
-            return
-        # atexit.unregister is a no-op for a callback that is not registered
-        # and does not raise for one; there is nothing to guard.
-        atexit.unregister(self._callback)
-        self._registered = False
-
-
 def _deadline_has_passed(deadline_at: str | None) -> bool:
     """True when *deadline_at* (an ISO timestamp) is set and already behind us."""
     if not deadline_at:
@@ -243,7 +207,7 @@ def seed_dimension_states(
 
 
 def run_signal_shutdown(
-    heartbeat: Any, resources: Any, status: Any, signum: int, *, log: LogSink,
+    heartbeat: _Stoppable, resources: _Stoppable, status: _StatusWriter, signum: int, *, log: LogSink,
 ) -> None:
     """Write CANCELLED status and close out unfinished dims for a caught signal.
 
@@ -284,7 +248,7 @@ def run_signal_shutdown(
 
 
 def finalize_run_on_atexit(
-    run_dir: Path, heartbeat: Any, resources: Any, status: Any,
+    run_dir: Path, heartbeat: _Stoppable, resources: _Stoppable, status: _StatusWriter,
 ) -> None:
     """Write CANCELLED status if the process is exiting without a terminal state."""
     current = read_status(run_dir)

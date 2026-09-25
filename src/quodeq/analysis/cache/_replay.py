@@ -225,6 +225,7 @@ def write_findings(
     jsonl: Path, classify: ClassifyResult, *, append: bool,
     emit_events: bool = True,
     trust_model: TrustModel | None = None,
+    writer_factory: Callable[[Path], EventEmitter] | None = None,
 ) -> None:
     """Replay cached findings into this run's evidence JSONL.
 
@@ -242,10 +243,11 @@ def write_findings(
     Both groups are re-gated and both are mirrored to events.jsonl. Skipping
     the unconsolidated group in the event log would resurrect the UI-vs-CLI
     score disagreement that emit_cached_findings exists to prevent.
+    *writer_factory* is forwarded to :func:`emit_cached_findings`.
     """
     findings = classify.cached_findings
     pending = list(classify.unconsolidated_findings)
     _regate_replayed_findings(findings, pending, trust_model)
     stamped = _stamp_and_write_findings(jsonl, findings, pending, append=append)
     if emit_events:
-        emit_cached_findings(_events_log_path(jsonl), stamped)
+        emit_cached_findings(_events_log_path(jsonl), stamped, writer_factory=writer_factory)

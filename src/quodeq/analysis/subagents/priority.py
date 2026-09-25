@@ -6,6 +6,7 @@ This module is the public entry point.  Implementation is split across:
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,9 @@ class PriorityContext:
     evidence_dir: Path | None = None
     config: Any = None
     log: LogSink = NULL_LOG
+    # None = production default (load_priority_config(), looked up at call
+    # time so tests can inject a fixed config without patching the loader).
+    priority_config: Mapping[str, Any] | None = None
 
 
 def prioritize_files(
@@ -68,7 +72,11 @@ def prioritize_files(
     evidence_dir = context.evidence_dir if context else None
     config = context.config if context else None
     log = context.log if context else NULL_LOG
-    priority_config = load_priority_config()
+    injected_priority_config = context.priority_config if context else None
+    priority_config = (
+        injected_priority_config if injected_priority_config is not None
+        else load_priority_config()
+    )
     fan_in_divisor = priority_config.get("fan_in_divisor", _DEFAULT_FAN_IN_DIVISOR)
     fan_in_max = priority_config.get("fan_in_max", _DEFAULT_FAN_IN_MAX)
     max_prev_violations = priority_config.get("previous_violations_max", _DEFAULT_PREV_VIOLATIONS_MAX)

@@ -72,6 +72,35 @@ def test_emit_cached_findings_uses_injected_writer_factory(tmp_path: Path):
     assert all(e.payload.title in {"carry-a", "carry-b"} for e in writers[0].events)
 
 
+def test_write_findings_forwards_injected_writer_factory(tmp_path: Path):
+    """writer_factory is a call-time seam on write_findings too: it must
+    forward through to emit_cached_findings' own seam instead of the call
+    silently reverting to the concrete EventLogWriter."""
+    class _RecordingWriter:
+        def __init__(self, path: Path) -> None:
+            self.path = path
+            self.events = []
+
+        def emit(self, event) -> None:
+            self.events.append(event)
+
+    writers: list[_RecordingWriter] = []
+
+    def factory(path: Path) -> _RecordingWriter:
+        writer = _RecordingWriter(path)
+        writers.append(writer)
+        return writer
+
+    jsonl = tmp_path / "security_evidence.jsonl"
+    write_findings(
+        jsonl, _replay([_finding("carry-a")]), append=False, writer_factory=factory,
+    )
+
+    assert len(writers) == 1
+    assert writers[0].path == jsonl.parent.parent / "events.jsonl"
+    assert len(writers[0].events) == 1
+
+
 def test_write_findings_does_not_mutate_the_source_dicts(tmp_path: Path):
     """The dicts belong to the cache entry. Stamping in place risks the
     persist watcher writing the flag back into the cache, which would make
