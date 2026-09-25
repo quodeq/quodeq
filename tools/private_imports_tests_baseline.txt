@@ -215,8 +215,8 @@ tests/analysis/test_loops_drop_stats.py:20:private-module:quodeq.analysis._loops
 tests/analysis/test_loops_drop_stats.py:20:private-module:quodeq.analysis._loops.run_incremental_loop
 tests/analysis/test_loops_drop_stats.py:20:private-module:quodeq.analysis._loops.run_per_dimension_loop
 tests/analysis/test_loops_reachability.py:23:private-module:quodeq.analysis._loops.check_model_reachable
-tests/analysis/test_loops_safety_incremental.py:14:private-module:quodeq.analysis._loops.LoopDeps
-tests/analysis/test_loops_safety_incremental.py:14:private-module:quodeq.analysis._loops.run_incremental_loop
+tests/analysis/test_loops_safety_incremental.py:13:private-module:quodeq.analysis._loops.LoopDeps
+tests/analysis/test_loops_safety_incremental.py:13:private-module:quodeq.analysis._loops.run_incremental_loop
 tests/analysis/test_loops_safety_per_dim.py:10:private-module:quodeq.analysis._loops.LoopDeps
 tests/analysis/test_loops_safety_per_dim.py:10:private-module:quodeq.analysis._loops.run_per_dimension_loop
 tests/analysis/test_loops_safety_retry.py:11:private-module:quodeq.analysis._loops.LoopDeps

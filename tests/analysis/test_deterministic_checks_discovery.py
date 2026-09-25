@@ -99,12 +99,30 @@ class TestFailSoft:
         self, project, compiled, monkeypatch,
     ):
         """deterministic_judgments' except narrows to (OSError,
-        json.JSONDecodeError, KeyError, TypeError): a standard that fails to
-        load must lose only the deterministic findings, not the run."""
+        json.JSONDecodeError, KeyError, TypeError, AttributeError): a
+        standard that fails to load must lose only the deterministic
+        findings, not the run."""
         from quodeq.analysis.checks import runner
 
         def boom(_compiled_dir, _dimension, _evaluators_dir):
             raise OSError("standard unreadable")
+
+        monkeypatch.setattr(runner, "load_requirement_checks", boom)
+
+        assert _judge(project, compiled(STANDARD)) == []
+
+    def test_a_standard_with_a_non_dict_principle_entry_does_not_take_the_run_down(
+        self, project, compiled, monkeypatch,
+    ):
+        """A compiled standard whose ``principles`` list holds a non-dict
+        entry (e.g. a plain string) makes extract_requirement_checks'
+        ``principle.get(...)`` raise AttributeError deep inside
+        load_requirement_checks; that must lose only the deterministic
+        findings, not the run."""
+        from quodeq.analysis.checks import runner
+
+        def boom(_compiled_dir, _dimension, _evaluators_dir):
+            raise AttributeError("'str' object has no attribute 'get'")
 
         monkeypatch.setattr(runner, "load_requirement_checks", boom)
 

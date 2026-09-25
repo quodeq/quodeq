@@ -203,7 +203,6 @@ _.reset_provider_config_cache  # analysis/provider_cache.py: Referenced only fro
 _.store_api_key_secure  # config/ai_provider.py: Referenced only from tests/, which this scan does not cover (21 refs).
 _.tb  # shared/run_log.py: Referenced only from tests/, which this scan does not cover (2 refs).
 _.tool_uses  # assistant/adapters/_stream.py: Referenced only from tests/, which this scan does not cover (6 refs).
-_.unreadable_dirs  # analysis/manifest_targets.py: WalkCounts field; referenced only from tests/, which this scan does not cover.
 _.update_verdict  # data/sqlite/state_store.py: Referenced only from tests/, which this scan does not cover (12 refs).
 _.wait_for_trip  # analysis/cache/failure_streak.py: Referenced only from tests/, which this scan does not cover (3 refs).
 _.wait_idle  # services/grade_formula_job.py: Referenced only from tests/, which this scan does not cover (7 refs).

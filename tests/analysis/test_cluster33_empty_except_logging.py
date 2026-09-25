@@ -153,6 +153,21 @@ def test_mark_unfinished_dims_incomplete_logs_and_returns_zero_for_bad_run_dir(
     assert "failed to read dimensions for flip" in recording_log.warning_messages[0]
 
 
+def test_mark_unfinished_dims_incomplete_logs_and_returns_zero_for_non_object_dimensions_json(
+    tmp_path, recording_log,
+) -> None:
+    """A dimensions.json that parses but isn't an object (e.g. ``[]``) makes
+    read_dimensions' result raise AttributeError on ``.get``; the flip must
+    log and return 0, not raise."""
+    (tmp_path / "dimensions.json").write_text("[]", encoding="utf-8")
+    flipped = mark_unfinished_dims_incomplete(
+        tmp_path, "not_reached", log=recording_log,
+    )
+    assert flipped == 0
+    assert recording_log.warning_messages
+    assert "failed to read dimensions for flip" in recording_log.warning_messages[0]
+
+
 def test_write_env_logs_cleanup_failure_and_reraises(tmp_path, monkeypatch) -> None:
     paths = ConfigPaths.from_root(tmp_path)
 

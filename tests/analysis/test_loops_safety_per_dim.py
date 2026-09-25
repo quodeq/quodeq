@@ -173,6 +173,11 @@ class TestPerDimLoopSafety:
         assert matching, recording_log.warning_messages
         assert "Traceback (most recent call last)" in matching[0]
         assert "AttributeError: boom" in matching[0]
+        # The boundary covers dispatch + finalize, not dispatch alone, so its
+        # label must say "step" -- "dispatch" alone would mislead a reader
+        # into thinking the finalize half was untouched.
+        assert "security step" in matching[0]
+        assert "security dispatch" not in matching[0]
 
     def test_diagnostic_log_lines_are_emitted(self, recording_log):
         cfg = _config()

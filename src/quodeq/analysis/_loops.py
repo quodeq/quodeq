@@ -227,7 +227,7 @@ def run_per_dimension_loop(
             lambda config=config, dimension=dimension, idx=idx: _run_one_dimension(
                 config, dimension, idx, ctx, run,
             ),
-            label=f"[{step}] {dimension} dispatch",
+            label=f"[{step}] {dimension} step",
             log=log,
             on_error=lambda exc, dimension=dimension, step=step: _skip_dim(
                 run_dir_for(config), dimension, step, log, "unexpected", exc,

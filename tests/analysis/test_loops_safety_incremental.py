@@ -8,7 +8,6 @@ tests/analysis/_loops_safety_fixtures.py.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.analysis._loops import LoopDeps, run_incremental_loop
@@ -149,15 +148,21 @@ class TestIncrementalLoopSafety:
         assert "Traceback (most recent call last)" in matching[0]
         assert "AttributeError: boom" in matching[0]
 
-    def test_fallback_exception_outside_the_narrowed_types_still_reaches_the_boundary(self, recording_log):
+    def test_fallback_exception_outside_the_narrowed_types_still_reaches_the_boundary(
+        self, recording_log, tmp_path,
+    ):
         """The fallback's own except narrows to (OSError, KeyError, ValueError,
         RuntimeError); anything else must escape to the loop-iteration boundary.
 
         Needs a real RunConfig (not the MagicMock fixture): the fallback path
         calls ``dataclasses.replace(config, ...)``, which requires a genuine
         dataclass instance.
+
+        ``run_dir`` is pinned to ``tmp_path`` so the loop's dim-state write
+        (``dimensions.json``) lands in the test's own directory instead of
+        falling back to ``src`` and writing into the process cwd.
         """
-        cfg = RunConfig(src=Path("."), language="python")
+        cfg = RunConfig(src=tmp_path, language="python", run_dir=tmp_path)
         cfg.options.skip_scoring = True
         attempts = {"n": 0}
 

@@ -50,7 +50,9 @@ def deterministic_judgments(
         return []
     try:
         declared = load_requirement_checks(compiled_dir, dimension, evaluators_dir)
-    except (OSError, json.JSONDecodeError, KeyError, TypeError):  # a broken standard must not stop the run
+    except (  # a broken standard must not stop the run
+        OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError,
+    ):
         _logger.warning("checks: could not read %s's standard", dimension, exc_info=True)
         return []
     if not declared:

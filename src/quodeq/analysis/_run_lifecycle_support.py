@@ -163,7 +163,8 @@ def mark_unfinished_dims_incomplete(run_dir: Path, reason: str, *, log: LogSink)
     from quodeq.data.fs.dimensions_state_store import read_dimensions, write_dim_state
     try:
         entries = read_dimensions(run_dir).get("dimensions", {})
-    except TypeError as exc:  # a run_dir that isn't a real Path
+    except (TypeError, AttributeError) as exc:  # a run_dir that isn't a real
+        # Path, or a dimensions.json that parses but isn't an object (e.g. `[]`)
         log.warning(f"failed to read dimensions for flip: {exc}")
         return 0
     flipped = 0

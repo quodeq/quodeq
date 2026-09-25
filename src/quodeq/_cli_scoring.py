@@ -129,8 +129,9 @@ def _adjusted_score(
         # validate_path_segment(dim_id) rejects a path-traversal/separator
         # character. Everything else rescore_dimension_from_evidence calls is
         # already fail-soft internally (evidence_rescore._parse_evidence_jsonl
-        # catches (OSError, ValueError, KeyError) and returns None;
-        # score_evidence has its own local except Exception).
+        # catches (OSError, ValueError, KeyError) and returns None; the
+        # score_evidence call site catches (ValueError, KeyError, TypeError,
+        # ArithmeticError)).
         _logger.warning("suppression-aware rescore failed for dim %s: %s", dim, exc, exc_info=True)
         return None, 0
     if rescored.excluded == 0 or rescored.result is None:
