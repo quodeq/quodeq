@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
-from quodeq.shared.env_paths import get_run_dir
+from quodeq.shared.env_paths import ensure_run_dir
 from quodeq.shared.frozen import is_frozen, subprocess_cmd
 
 _logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ _PIDFILE_NAME = "menubar.pid"
 
 
 def _pidfile_path() -> Path:
-    return get_run_dir() / _PIDFILE_NAME
+    return ensure_run_dir() / _PIDFILE_NAME
 
 
 def is_supported() -> bool:

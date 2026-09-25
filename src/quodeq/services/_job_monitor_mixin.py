@@ -56,6 +56,7 @@ class JobMonitorMixin:
     _processes: dict[str, Any]
     _on_job_complete: Callable[[str, Job], None] | None
     _job_timeout_cap_s_override: float | None
+    _watchdog_grace_s: float
 
     @staticmethod
     def _apply_marker(job: Job, line: str) -> None:
@@ -171,6 +172,7 @@ class JobMonitorMixin:
         """Return True when the watchdog should SIGKILL the job process now."""
         return watchdog_should_kill(
             job_id, started_at, store=self._store, job_timeout_cap_s=self._job_timeout_cap_s,
+            grace_s=self._watchdog_grace_s,
         )
 
     def _run_status_exit_reason(self, job: Job | None) -> str | None:

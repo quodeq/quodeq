@@ -1088,10 +1088,10 @@ tests/services/test_tooling_mixin.py:10:private-name:quodeq.services.tooling_mix
 tests/services/test_tooling_mixin.py:10:private-name:quodeq.services.tooling_mixin._load_fallback_claude_models
 tests/services/test_violations_coverage.py:6:private-name:quodeq.services.violations._max_violation_files
 tests/services/test_violations_jsonl_coverage.py:106:private-name:quodeq.services._violations_jsonl._build_resolver
-tests/services/test_violations_jsonl_coverage.py:120:private-name:quodeq.services._violations_jsonl._build_resolver
-tests/services/test_violations_jsonl_coverage.py:126:private-name:quodeq.services._violations_jsonl._build_resolver
-tests/services/test_violations_jsonl_coverage.py:133:private-module:quodeq.services._violations_jsonl.parse_violations_from_jsonl
-tests/services/test_violations_jsonl_coverage.py:142:private-module:quodeq.services._violations_jsonl.parse_violations_from_jsonl
+tests/services/test_violations_jsonl_coverage.py:133:private-name:quodeq.services._violations_jsonl._build_resolver
+tests/services/test_violations_jsonl_coverage.py:139:private-name:quodeq.services._violations_jsonl._build_resolver
+tests/services/test_violations_jsonl_coverage.py:146:private-module:quodeq.services._violations_jsonl.parse_violations_from_jsonl
+tests/services/test_violations_jsonl_coverage.py:155:private-module:quodeq.services._violations_jsonl.parse_violations_from_jsonl
 tests/services/test_violations_jsonl_coverage.py:9:private-name:quodeq.services._violations_jsonl._parse_jsonl_findings
 tests/services/test_violations_resolve_phases.py:14:private-name:quodeq.services.violations._resolve_from_source
 tests/services/test_violations_resolve_phases.py:14:private-name:quodeq.services.violations._suppression_keys
@@ -1126,7 +1126,7 @@ tests/shared/test_resource_sampler.py:18:private-name:quodeq.shared.resource_sam
 tests/shared/test_resource_sampler.py:18:private-name:quodeq.shared.resource_sampler._ollama_rss_mb
 tests/shared/test_resource_sampler.py:18:private-name:quodeq.shared.resource_sampler._self_rss_mb
 tests/shared/test_security.py:4:private-module:quodeq.shared._security.sanitize_sensitive
-tests/shared/test_sqlite_kill_switch.py:52:private-module:quodeq.data.fs.report_parser._evidence.load_evidence_map
+tests/shared/test_sqlite_kill_switch.py:60:private-module:quodeq.data.fs.report_parser._evidence.load_evidence_map
 tests/shared/test_utils.py:11:private-module:quodeq.shared._diff.show_diff
 tests/terminal/test_pty_unix.py:107:private-module:quodeq.terminal._pty_unix.resolve_shell
 tests/terminal/test_pty_unix.py:34:private-module:quodeq.terminal._pty_unix.UnixPty

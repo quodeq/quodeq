@@ -15,7 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.observability import LogSink
 from quodeq.shared.validation import validate_path_segment, validate_resolved_within
 
 
@@ -71,7 +71,7 @@ def resolve_project_dir(evaluations_dir: str, project: str) -> Path:
 def project_all_runs(
     project_dir: Path,
     repo_factory: Callable[[Path], Any] | None = None,
-    *, log: LogSink = NULL_LOG,
+    *, log: LogSink | None = None,
 ) -> None:
     """Trigger projection across every run dir of the project.
 
@@ -85,7 +85,10 @@ def project_all_runs(
 
     Projection is incremental (gated by checkpoint + log-size), so this is
     cheap in steady state; the first call after a fresh dismiss replays only
-    the actions-log delta.
+    the actions-log delta. *log* defaults to (and resolved at call time to)
+    the ``mutation_rescore`` facade's own declared logger -- named
+    ``quodeq.services.mutation_rescore``, which caplog tests capture -- so
+    this sibling module never needs its own ``getLogger()`` call.
     """
     if not project_dir.is_dir():
         return
@@ -99,10 +102,11 @@ def project_all_runs(
         try:
             repo_factory(run_dir).ensure_projected()
         except Exception as exc:  # noqa: BLE001 - one run's projection failure must not stop projecting the rest
-            if log is NULL_LOG:
+            _log = log
+            if _log is None:
                 # No caller-injected log (the production call site can't pass
                 # one — tests patch this whole function with a bare
                 # single-arg side_effect). Fall back to the facade's own
                 # declared logger instead of a new getLogger() here.
-                from quodeq.services.mutation_rescore import logger as log  # noqa: PLC0415
-            log.warning(f"Projection after mutation failed for {run_dir}: {exc}")
+                from quodeq.services.mutation_rescore import logger as _log  # noqa: PLC0415
+            _log.warning(f"Projection after mutation failed for {run_dir}: {exc}")

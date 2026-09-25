@@ -110,6 +110,30 @@ class TestWatchdogDeadlineKill:
         assert job.exit_code == EXIT_CODE_TIMEOUT
 
 
+class TestWatchdogGraceCapturedAtConstruction:
+    """#10799 — ``watchdog_should_kill`` takes ``grace_s`` as a plain
+    parameter; ``JobManager.__init__`` captures ``WATCHDOG_DEADLINE_GRACE_S``
+    once, at construction, rather than the watchdog re-reading the module
+    constant on every tick. Allowed observable delta (see the plan): a patch
+    made after construction no longer affects an already-built manager."""
+
+    def test_grace_is_captured_at_construction_time(self, monkeypatch):
+        from quodeq.services import jobs as jobs_mod
+
+        monkeypatch.setattr(jobs_mod, "WATCHDOG_DEADLINE_GRACE_S", 42)
+        mgr = JobManager(job_store=InMemoryJobStore())
+        assert mgr._watchdog_grace_s == 42
+
+    def test_a_later_patch_does_not_affect_an_already_built_manager(self, monkeypatch):
+        from quodeq.services import jobs as jobs_mod
+
+        monkeypatch.setattr(jobs_mod, "WATCHDOG_DEADLINE_GRACE_S", 111)
+        mgr = JobManager(job_store=InMemoryJobStore())
+
+        monkeypatch.setattr(jobs_mod, "WATCHDOG_DEADLINE_GRACE_S", 999)
+        assert mgr._watchdog_grace_s == 111
+
+
 class TestRunStatusDeadlineFallback:
     """The analysis side can exit on its own after recording a deadline.
 

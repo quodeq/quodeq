@@ -67,6 +67,7 @@ def _try_evidence_formats(
     if opts.exists_fn(jsonl_path) and opts.stat_fn(jsonl_path).st_size > 0:
         return parse_violations_from_jsonl(
             jsonl_path, stream_path, ctx, compiled_dir=opts.compiled_dir, keys=keys,
+            evaluators_dir=opts.evaluators_dir,
         )
 
     if opts.exists_fn(stream_path):

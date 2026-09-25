@@ -116,7 +116,7 @@ src/quodeq/menubar/app.py:137:broad-except
 src/quodeq/menubar/app.py:156:broad-except
 src/quodeq/menubar/app.py:207:broad-except
 src/quodeq/menubar/app.py:223:broad-except
-src/quodeq/services/_mutation_projection.py:101:broad-except
+src/quodeq/services/_mutation_projection.py:104:broad-except
 src/quodeq/services/_mutation_scoring.py:108:broad-except
 src/quodeq/services/_mutation_scoring.py:86:broad-except
 src/quodeq/services/_post_run_hook.py:37:broad-except

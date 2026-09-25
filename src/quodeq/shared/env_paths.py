@@ -81,16 +81,22 @@ def get_grade_formula_path(env: dict[str, str] | None = None) -> str:
     return str(Path.home() / _QUODEQ_HOME_DIRNAME / "grade_formula.json")
 
 
-def get_run_dir(env: dict[str, str] | None = None) -> Path:
-    """Return the user-private runtime directory, creating it if needed.
+def run_dir_path(env: dict[str, str] | None = None) -> Path:
+    """Return the user-private runtime directory, without creating it.
 
     ``QUODEQ_RUN_DIR`` overrides the default ``~/.quodeq/run``; it must be
     absolute so two processes reading it from different working directories
-    agree on the same sockets and pid files.
+    agree on the same sockets and pid files. Pure: callers that need the
+    directory to exist use :func:`ensure_run_dir`.
     """
     raw = (os.environ if env is None else env).get("QUODEQ_RUN_DIR")
     if raw and not Path(raw).is_absolute():
         raise ValueError(f"QUODEQ_RUN_DIR must be an absolute path, got: {raw!r}")
-    run_dir = Path(raw) if raw else Path.home() / _QUODEQ_HOME_DIRNAME / "run"
+    return Path(raw) if raw else Path.home() / _QUODEQ_HOME_DIRNAME / "run"
+
+
+def ensure_run_dir(env: dict[str, str] | None = None) -> Path:
+    """Return :func:`run_dir_path`, creating it (and parents) if needed."""
+    run_dir = run_dir_path(env)
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir

@@ -48,11 +48,12 @@ def score_cache_disabled(env: dict[str, str] | None = None) -> bool:
     return environ.get("QUODEQ_DISABLE_SCORE_CACHE", "").strip().lower() in SQLITE_DISABLE_TRUTHY
 
 
-def sqlite_disabled() -> bool:
+def sqlite_disabled(env: dict[str, str] | None = None) -> bool:
     """Return True when QUODEQ_DISABLE_SQLITE is set to a truthy value.
 
     Operator kill switch for the SQLite findings store. When True, the
     analysis pipeline only writes JSONL and read paths only consult JSONL/JSON.
     """
-    raw = os.environ.get("QUODEQ_DISABLE_SQLITE", "")
+    environ = env if env is not None else os.environ
+    raw = environ.get("QUODEQ_DISABLE_SQLITE", "")
     return raw.strip().lower() in SQLITE_DISABLE_TRUTHY

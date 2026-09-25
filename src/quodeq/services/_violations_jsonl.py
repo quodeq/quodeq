@@ -114,18 +114,22 @@ def _parse_jsonl_findings(
 _load_req_to_principle = load_req_to_principle
 
 
-def _build_resolver(dimension: str, compiled_dir: Path | None) -> PrincipleResolver:
+def _build_resolver(
+    dimension: str, compiled_dir: Path | None, evaluators_dir: Path | None = None,
+) -> PrincipleResolver:
     """Resolve *dimension*'s principle set the same way the report path does.
 
     Routes through the shared builder in ``core.evidence._req_mapping`` rather
     than reading evaluators here, so this path inherits the compiled-standard
     fallback. Without it the map is empty on a stock install (the evaluators
     dir exists but is empty for built-in dimensions) and every requirement ID
-    would look unmappable.
+    would look unmappable. *evaluators_dir* defaults to ``default_paths()``'s,
+    resolved at call time so a caller can inject a different one for testing.
     """
     validate_path_segment(dimension)  # dimension reaches a path join downstream
+    _evaluators_dir = evaluators_dir if evaluators_dir is not None else default_paths().evaluators_dir
     return build_principle_resolver(
-        dimension, default_paths().evaluators_dir, compiled_dir,
+        dimension, _evaluators_dir, compiled_dir,
         req_map_reader=read_req_to_principle_map,
     )
 
@@ -134,10 +138,11 @@ def parse_violations_from_jsonl(
     jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
     compiled_dir: Path | None = None,
     keys: SuppressionKeys | None = None,
+    evaluators_dir: Path | None = None,
 ) -> ViolationResponse | None:
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
-    resolver = _build_resolver(ctx.dimension, compiled_dir)
+    resolver = _build_resolver(ctx.dimension, compiled_dir, evaluators_dir)
     try:
         with open_text(jsonl_path) as _f:
             violations, compliance = _parse_jsonl_findings(

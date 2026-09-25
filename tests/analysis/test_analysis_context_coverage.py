@@ -109,3 +109,49 @@ class TestLoadCustomDimensions:
         assert result == ["existing"]
         assert "Skipping custom evaluator" in caplog.text
         assert "array.json" in caplog.text
+
+
+class TestEvaluatorsDirFallback:
+    """#10856 — config.evaluators_dir is read directly (the field always
+    exists on RunConfig); the ``paths=`` kwarg is only consulted when the
+    config didn't carry one, and is resolved at call time (not baked into
+    the signature as ``paths=default_paths()``)."""
+
+    def test_paths_kwarg_supplies_the_fallback_evaluators_dir(self, tmp_path: Path):
+        ev = tmp_path / "injected-evaluators"
+        ev.mkdir()
+        (ev / "custom.json").write_text(json.dumps({"id": "injected-dim"}), encoding="utf-8")
+
+        class _FakePaths:
+            evaluators_dir = ev
+
+        config = RunConfig(
+            src=tmp_path,
+            language="python",
+            options=AnalysisOptions(dimensions=["injected-dim"]),
+            dimensions_data={"applies": []},
+            evaluators_dir=None,
+        )
+        dimensions, _ctx = load_analysis_context(config, paths=_FakePaths())
+        assert dimensions == ["injected-dim"]
+
+    def test_configs_own_evaluators_dir_wins_over_the_injected_paths(self, tmp_path: Path):
+        own = tmp_path / "own-evaluators"
+        own.mkdir()
+        (own / "custom.json").write_text(json.dumps({"id": "own-dim"}), encoding="utf-8")
+        other = tmp_path / "other-evaluators"
+        other.mkdir()
+        (other / "custom.json").write_text(json.dumps({"id": "other-dim"}), encoding="utf-8")
+
+        class _FakePaths:
+            evaluators_dir = other
+
+        config = RunConfig(
+            src=tmp_path,
+            language="python",
+            options=AnalysisOptions(dimensions=["own-dim"]),
+            dimensions_data={"applies": []},
+            evaluators_dir=own,
+        )
+        dimensions, _ctx = load_analysis_context(config, paths=_FakePaths())
+        assert dimensions == ["own-dim"]
