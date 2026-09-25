@@ -97,7 +97,7 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     not registered, so NOT_FOUND is reserved for that case.
     """
     project = request.view_args["project"]
-    data = optional_json_object_or_error("INVALID_INPUT")
+    data = optional_json_object_or_error(CODE_INVALID_INPUT)
     if not isinstance(data, dict):
         return jsonify(data[0]), data[1]
     raw_path = path_from_body(data)

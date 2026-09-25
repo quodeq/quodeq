@@ -23,7 +23,8 @@ from quodeq.api._assistant_helpers import (
     get_repository,
     local_provider_busy,
 )
-from quodeq.api._constants import CODE_INVALID_PARAM, CODE_UNKNOWN_SESSION, MESSAGE_UNKNOWN_SESSION
+from quodeq.api._constants import (
+    CODE_INVALID_PARAM, CODE_MISSING_PARAM, CODE_UNKNOWN_SESSION, MESSAGE_UNKNOWN_SESSION)
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.api.assistant_turn_state import AssistantTurnState, turn_state
 from quodeq.api.helpers import json_error, optional_json_object_or_error
@@ -140,7 +141,7 @@ def _post_assistant_message(app: Flask, sid: str, gates: TurnGates):
         return jsonify(body[0]), body[1]
     text = str(body.get("text", "")).strip()
     if not text:
-        return json_error("text required", 400, "MISSING_PARAM")
+        return json_error("text required", 400, CODE_MISSING_PARAM)
     if local_provider_busy(session["provider"]):
         return json_error("model busy with analysis", 409, "PROVIDER_BUSY")
     if (session.get("source") or ProjectSource.LOCAL) == ProjectSource.SHARED:

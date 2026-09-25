@@ -188,7 +188,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         rate_error = check_eval_rate_limit(eval_rate_store)
         if rate_error is not None:
             return rate_error
-        payload = optional_json_object_or_error("INVALID_INPUT")
+        payload = optional_json_object_or_error(CODE_INVALID_INPUT)
         if not isinstance(payload, dict):
             return jsonify(payload[0]), payload[1]
         start_request, error = _validated_start_request(payload)

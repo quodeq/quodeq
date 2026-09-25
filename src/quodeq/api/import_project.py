@@ -27,6 +27,7 @@ from typing import Any
 
 from flask import Response, jsonify, request
 
+from quodeq.api._constants import CODE_INVALID_ACTION
 from quodeq.api.helpers import error_response
 from quodeq.api.zip import (
     EXTRACT_HEADROOM,
@@ -247,7 +248,7 @@ def import_zip_stream(
     if action is not None and action not in _ALLOWED_ACTIONS:
         return _error_outcome(
             f"Invalid action; expected one of {sorted(_ALLOWED_ACTIONS)}.",
-            HTTPStatus.BAD_REQUEST, "INVALID_ACTION",
+            HTTPStatus.BAD_REQUEST, CODE_INVALID_ACTION,
         )
     size_limit = max_zip_size_bytes()
     with open_upload(stream, size_limit) as upload:

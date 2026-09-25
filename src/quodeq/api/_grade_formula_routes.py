@@ -12,7 +12,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import CODE_INVALID_INPUT, QUERY_FLAG_TRUE
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND, QUERY_FLAG_TRUE
 from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.api.routes_common import reports_dir
 from quodeq.core.scoring.params import (
@@ -79,7 +79,7 @@ def _preview_response() -> Response | tuple[Response, int]:
     if result is None:
         return json_error(
             "No evaluation with an event log found for this project",
-            HTTPStatus.NOT_FOUND, "NOT_FOUND",
+            HTTPStatus.NOT_FOUND, CODE_NOT_FOUND,
         )
     return jsonify(result)
 

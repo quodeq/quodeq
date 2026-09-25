@@ -16,7 +16,8 @@ from pathlib import Path
 
 from flask import Response, jsonify
 
-from quodeq.api._constants import CODE_INVALID_CLONE_DEST, CODE_INVALID_REPO
+from quodeq.api._constants import (
+    CODE_INVALID_CLONE_DEST, CODE_INVALID_DISCIPLINE, CODE_INVALID_INPUT, CODE_INVALID_REPO)
 from quodeq.api.helpers import (
     json_error,
     optional_json_object_or_error,
@@ -62,7 +63,7 @@ def _parse_create_project_request(
             return None, json_error(err, HTTPStatus.BAD_REQUEST, "INVALID_SCOPE")
     discipline = data.get("discipline")
     if discipline is not None and not isinstance(discipline, str):
-        return None, json_error("discipline must be a string", HTTPStatus.BAD_REQUEST, "INVALID_DISCIPLINE")
+        return None, json_error("discipline must be a string", HTTPStatus.BAD_REQUEST, CODE_INVALID_DISCIPLINE)
     discipline = discipline or None
     clone_dest = data.get("cloneDest")
     if clone_dest is not None and not isinstance(clone_dest, str):
@@ -210,7 +211,7 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
     or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
     ``ephemeral`` are ignored.
     """
-    body = optional_json_object_or_error("INVALID_INPUT")
+    body = optional_json_object_or_error(CODE_INVALID_INPUT)
     if not isinstance(body, dict):
         return jsonify(body[0]), body[1]
     parsed, error = _parse_create_project_request(body)

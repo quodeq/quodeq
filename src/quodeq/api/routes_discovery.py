@@ -5,7 +5,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import CODE_FORBIDDEN, QUERY_FLAG_TRUTHY
+from quodeq.api._constants import CODE_FORBIDDEN, CODE_INVALID_INPUT, CODE_NOT_FOUND, QUERY_FLAG_TRUTHY
 from quodeq.api._evaluation_helpers import ai_cmd_path_error
 from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.shared.serialization import to_camel_dict
@@ -18,10 +18,10 @@ from quodeq.services.plugin_discovery import discover_plugins
 # to the same 404 triple browse_repo returns for an unrecognized code.
 _BROWSE_ERROR_MAP = {
     "PATH_OUTSIDE_BOUNDARY": (HTTPStatus.FORBIDDEN, CODE_FORBIDDEN, "Path must be within the user's home directory"),
-    "PATH_NOT_DIRECTORY": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT", "Path is not a directory"),
-    "PATH_NOT_FOUND": (HTTPStatus.NOT_FOUND, "INVALID_INPUT", "Path not found or not accessible"),
+    "PATH_NOT_DIRECTORY": (HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT, "Path is not a directory"),
+    "PATH_NOT_FOUND": (HTTPStatus.NOT_FOUND, CODE_INVALID_INPUT, "Path not found or not accessible"),
 }
-_BROWSE_ERROR_DEFAULT = (HTTPStatus.NOT_FOUND, "INVALID_INPUT", "Path not found or not accessible")
+_BROWSE_ERROR_DEFAULT = (HTTPStatus.NOT_FOUND, CODE_INVALID_INPUT, "Path not found or not accessible")
 
 
 def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
@@ -41,10 +41,10 @@ def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
 # come through verbatim from the provider so the responses stay identical to
 # when this handler did the filesystem work itself.
 _MKDIR_ERROR_MAP = {
-    "MISSING_FIELDS": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT"),
-    "INVALID_NAME": (HTTPStatus.BAD_REQUEST, "INVALID_INPUT"),
+    "MISSING_FIELDS": (HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT),
+    "INVALID_NAME": (HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT),
     "PATH_OUTSIDE_BOUNDARY": (HTTPStatus.FORBIDDEN, CODE_FORBIDDEN),
-    "PARENT_NOT_FOUND": (HTTPStatus.NOT_FOUND, "NOT_FOUND"),
+    "PARENT_NOT_FOUND": (HTTPStatus.NOT_FOUND, CODE_NOT_FOUND),
     "ALREADY_EXISTS": (HTTPStatus.CONFLICT, "CONFLICT"),
     "MKDIR_FAILED": (HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR"),
 }
@@ -59,7 +59,7 @@ def _handle_browse_mkdir(provider: ActionProvider) -> Response | tuple[Response,
     non-string value is treated as missing rather than raising an
     unhandled 500; a non-object body answers a coded 400.
     """
-    data = optional_json_object_or_error("INVALID_INPUT")
+    data = optional_json_object_or_error(CODE_INVALID_INPUT)
     if not isinstance(data, dict):
         return jsonify(data[0]), data[1]
     parent = data.get("path")
@@ -102,7 +102,7 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify({
             "ok": reason is None,
             "error": reason,
-            "code": None if reason is None else "INVALID_INPUT",
+            "code": None if reason is None else CODE_INVALID_INPUT,
         })
 
     @app.get("/api/plugins")

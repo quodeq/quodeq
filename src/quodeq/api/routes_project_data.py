@@ -5,7 +5,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import CODE_NOT_FOUND
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND
 from quodeq.api.helpers import json_error
 from quodeq.api.routes_common import reports_dir
 from quodeq.shared.serialization import to_camel_dict
@@ -24,7 +24,7 @@ def _validate_params(**params: str) -> tuple[Response, int] | None:
         except ValueError:
             return json_error(
                 f"{name} must be a plain path segment, got {value!r}",
-                HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+                HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
             )
     return None
 
