@@ -1,9 +1,7 @@
 /**
- * Fleet-wide row and aggregate builders for the Compare tab.
- *
- * Split out of compareModel.js (which keeps the shared primitives and
- * re-exports everything here) — see compareModel.js for the module-level
- * docs on inputs.
+ * Fleet-wide row and aggregate builders for the Compare tab. compareModel.js
+ * keeps the shared primitives, re-exports these builders and documents the
+ * inputs.
  */
 import {
   STALE_AFTER_DAYS, nameKey, parseScore10, daysBetween, trendDelta, mean,

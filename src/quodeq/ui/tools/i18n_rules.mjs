@@ -234,6 +234,25 @@ const noProseLiterals = {
   },
 };
 
+// Catalog keys referenced in source: t('k') and tRich('k') name one key,
+// pluralKey(n, 'k.one', 'k.many') names two. check_strings.mjs checks every
+// key found here against en.json.
+const T_CALL = /\bt(?:Rich)?\(\s*'([a-zA-Z0-9_.]+)'/g;
+const PLURAL_KEY_CALL = /\bpluralKey\([^,()]+,\s*'([a-zA-Z0-9_.]+)',\s*'([a-zA-Z0-9_.]+)'/g;
+
+/**
+ * Every literal catalog key a source file references.
+ * @param {string} src File contents.
+ * @returns {Generator<string>} Keys in source order per call shape.
+ */
+export function* catalogKeyRefs(src) {
+  for (const m of src.matchAll(T_CALL)) yield m[1];
+  for (const m of src.matchAll(PLURAL_KEY_CALL)) {
+    yield m[1];
+    yield m[2];
+  }
+}
+
 export default {
   rules: {
     'no-literal-visible-attrs': noLiteralVisibleAttrs,

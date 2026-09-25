@@ -9,16 +9,24 @@ const CLIENTS = [
 ];
 
 describe('ProviderPillGroup', () => {
-  it('renders one tab per client, marking the active one and the uninstalled ones', () => {
+  it('renders the pills as a tablist', () => {
     const { container } = render(<ProviderPillGroup clients={CLIENTS} activeId="claude" onSelect={() => {}} />);
     expect(container.firstChild).toHaveClass('settings-pill-group');
     expect(container.firstChild).toHaveAttribute('role', 'tablist');
+  });
+
+  it('marks the active installed client selected, enabled and untitled', () => {
+    render(<ProviderPillGroup clients={CLIENTS} activeId="claude" onSelect={() => {}} />);
     const claude = screen.getByRole('tab', { name: 'Claude' });
-    const ollama = screen.getByRole('tab', { name: 'Ollama' });
     expect(claude).toHaveAttribute('aria-selected', 'true');
     expect(claude).toHaveAttribute('aria-disabled', 'false');
     expect(claude).not.toHaveAttribute('title');
     expect(claude.className).toBe('settings-pill settings-pill--active');
+  });
+
+  it('marks an uninstalled client disabled, with an explanatory title', () => {
+    render(<ProviderPillGroup clients={CLIENTS} activeId="claude" onSelect={() => {}} />);
+    const ollama = screen.getByRole('tab', { name: 'Ollama' });
     expect(ollama).toHaveAttribute('aria-selected', 'false');
     expect(ollama).toHaveAttribute('aria-disabled', 'true');
     expect(ollama).toHaveAttribute('title');

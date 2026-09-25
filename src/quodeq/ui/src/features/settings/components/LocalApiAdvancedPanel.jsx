@@ -6,11 +6,10 @@ import { t } from '../../../strings/index.js';
 import { SettingsRowLabel, SettingsAdvanced } from './settingsRowParts.jsx';
 
 /**
- * Shared `<details>` advanced-settings panel for the local-API tabs
- * (Omlx/LlamaCpp/Ollama): max-parallel-agents input + auto-detect button +
- * test result/error, plus AdvancedAnalysisSettings. Was duplicated (with
- * only the subagents description and the auto-detect button's disabled
- * condition differing per provider) before this extraction.
+ * Advanced-settings panel for the local-API tabs (Omlx/LlamaCpp/Ollama):
+ * max-parallel-agents input + auto-detect button + test result/error, plus
+ * AdvancedAnalysisSettings. The subagents description and the auto-detect
+ * button's disabled condition come from the tab.
  */
 export function LocalApiAdvancedPanel({
   subagentsDescription, state, update, testing, testDisabled, onRunTest, testResult, testError,

@@ -61,7 +61,7 @@ function NotReadyToast({ message, onDismiss }) {
 }
 
 // Header block: the terminal header + (when there's more than zero runs) the
-// run navigator. Extracted verbatim from HistoryContent's JSX.
+// run navigator.
 function HistoryTopHeader({ trend, languageSub, selectedSource, availableRuns, runNav, onRunClick }) {
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
   return (

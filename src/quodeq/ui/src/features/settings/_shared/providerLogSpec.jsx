@@ -3,6 +3,7 @@ import { t } from '../../../strings/index.js';
 import { LOG_STREAM_STATUS } from '../../../vocab/logStreamStatus.js';
 import { EMPTY_LOG_BUFFER } from '../../../utils/logBuffer.js';
 
+// Title suffix per stream status, so the window title says whether the log is live.
 const STATUS_LABEL = {
   [LOG_STREAM_STATUS.IDLE]: '',
   [LOG_STREAM_STATUS.STREAMING]: ' · running',

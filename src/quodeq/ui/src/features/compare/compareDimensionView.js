@@ -1,6 +1,6 @@
 /**
- * Single-dimension drill-down builders for the Compare tab. Split out of
- * compareModel.js — see compareModel.js for the module-level docs.
+ * Single-dimension drill-down builders for the Compare tab. compareModel.js
+ * documents the inputs.
  */
 import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
 import { roundOneDecimal } from '../../utils/rounding.js';

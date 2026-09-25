@@ -8,8 +8,8 @@ const MODE_OPTIONS = [
 ];
 
 /**
- * AssistantProviderTabs.jsx's "model source" mode picker + the default-mode
- * "follows analysis" summary row. Extracted verbatim.
+ * The assistant's "model source" mode picker, plus the summary row that shows
+ * which analysis provider and model the default mode follows.
  */
 export function AssistantModeRows({ enabled, mode, setMode, active, activeProvider, model }) {
   return (

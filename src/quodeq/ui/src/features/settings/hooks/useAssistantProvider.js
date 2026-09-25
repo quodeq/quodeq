@@ -59,6 +59,8 @@ function makePersistingSetter({ storage, setState, broadcast }, { keyFor, stored
   };
 }
 
+// Per-setter storage key, stored form and refusal warning; the model setter
+// is built separately because its key depends on the active provider.
 const SETTERS = {
   setEnabled: {
     onRefused: (err) => console.warn('[useAssistantProvider] Could not persist assistant enabled:', err),
