@@ -144,7 +144,11 @@ class TestSingleFlightHold:
                 order.append("first-in")
                 entered.set()
                 assert release.wait(timeout=5), "first holder was never released"
-            order.append("first-out")
+                # Appended before the `with` exits (and so before hold()
+                # releases the lock), so it happens-before the second caller
+                # can possibly enter -- the ordering is guaranteed by the
+                # lock itself, not by scheduling luck after the block exits.
+                order.append("first-out")
 
         t1 = threading.Thread(target=first)
         t1.start()
