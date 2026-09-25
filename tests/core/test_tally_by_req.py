@@ -1,14 +1,14 @@
 """Tally groups untagged findings by requirement code, not reason text.
 
-Run 27acff42 carried 945 maintainability findings with no ``vt``, 944
-distinct reasons and 30 distinct ``req`` codes. Grouping by reason made the
-weighted volume equal the instance count, so the ceiling punished volume
+A fresh self-evaluation carried 945 maintainability findings with no ``vt``,
+944 distinct reasons and 30 distinct ``req`` codes. Grouping by reason made
+the weighted volume equal the instance count, so the ceiling punished volume
 and the score fell as coverage grew. ``req`` is the stable taxonomy every
 finding already carries.
 """
 from __future__ import annotations
 
-from quodeq.core.scoring._tallies import tally_types
+from quodeq.core.scoring.internals import tally_types
 
 
 def _v(severity: str, reason: str, req: str | None = None, vt: str | None = None) -> dict:
