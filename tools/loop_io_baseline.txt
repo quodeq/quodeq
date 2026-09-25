@@ -1,0 +1,9 @@
+# Grandfathered loop-IO sites: a file, database, lock or event-log call
+# made once per loop iteration (see tools/check_loop_io.py for the rule
+# and its exemptions). Burn this list down; do not grow it without a
+# justification in the PR.
+# Regenerate intentionally: python tools/check_loop_io.py --update-baseline
+# Entries are line-keyed (relpath:lineno:callee): when an edit shifts a
+# site, hand-edit its line number instead of regenerating blind.
+src/quodeq/analysis/cache/_replay.py:145:emit
+src/quodeq/data/migrations/dismissed_json_to_actions_log.py:63:emit

@@ -78,6 +78,14 @@ def write_sarif_if_requested(args: argparse.Namespace, evaluation_dir: Path) -> 
         log_warning(f"SARIF export failed (evaluation results are safe): {exc}")
 
 
+def _local_cache_backend():
+    """Composition root: wire the concrete cache backend here rather than
+    leaving mark_run_consolidated to build it internally. Deferred import so
+    a patch on ``quodeq.analysis.cache.local.LocalFileBackend`` is honored."""
+    from quodeq.analysis.cache.local import LocalFileBackend  # noqa: PLC0415
+    return LocalFileBackend()
+
+
 def _consolidate_run_cache(evaluation_dir: Path) -> None:
     """Post-run cache consolidation, isolated from the run's own result.
 
@@ -91,7 +99,7 @@ def _consolidate_run_cache(evaluation_dir: Path) -> None:
     -- mock.patch resolves where a name is used, not where it's defined.
     """
     run_isolated(
-        lambda: mark_run_consolidated(evaluation_dir.parent),
+        lambda: mark_run_consolidated(evaluation_dir.parent, cache=_local_cache_backend()),
         label="post-run cache consolidation", log=SHARED_LOG,
     )
 

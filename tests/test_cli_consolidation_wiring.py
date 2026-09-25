@@ -142,3 +142,43 @@ def test_consolidation_failure_does_not_flip_a_finished_runs_exit_code(
     matching = [r for r in caplog.records if "post-run cache consolidation" in r.getMessage()]
     assert matching, caplog.records
     assert "AttributeError" in matching[0].getMessage()
+
+
+def test_run_evaluate_passes_a_local_file_backend_cache(tmp_path: Path, monkeypatch):
+    """finalize_run_evaluate is the composition root: it must build the
+    concrete LocalFileBackend itself and hand it to mark_run_consolidated,
+    rather than leaving that call to fall back internally."""
+    src = tmp_path / "src"
+    src.mkdir()
+    evaluation_dir = tmp_path / "reports" / "proj" / "run1" / "evaluation"
+    evaluation_dir.mkdir(parents=True)
+    evidence_dir = evaluation_dir.parent / "evidence"
+    evidence_dir.mkdir()
+    paths = (tmp_path / "reports", evidence_dir, evaluation_dir)
+
+    monkeypatch.setattr(
+        cli_evaluation, "resolve_evaluation_inputs",
+        lambda a: ResolvedInputs(
+            src=src, language="python",
+            manifest=SourceManifest(), dims_data={"applies": []},
+        ),
+    )
+    monkeypatch.setattr(cli_evaluation, "setup_run_dirs", lambda a, s: paths)
+    monkeypatch.setattr(cli_evaluation, "run_pipeline_with_cleanup", lambda a, i, p: 0)
+
+    received: list = []
+    monkeypatch.setattr(
+        "quodeq._cli_evaluate_finalize.mark_run_consolidated",
+        lambda run_dir, cache=None: received.append(cache),
+    )
+
+    class _SentinelBackend:
+        pass
+
+    monkeypatch.setattr(
+        "quodeq.analysis.cache.local.LocalFileBackend", _SentinelBackend,
+    )
+
+    assert cli_evaluation.run_evaluate(_args(tmp_path)) == 0
+    assert len(received) == 1
+    assert isinstance(received[0], _SentinelBackend)

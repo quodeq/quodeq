@@ -48,6 +48,7 @@ from quodeq.shared.env_resolve import resolve_env
 # tiny/negative value from turning every tick into a keepalive frame.
 _HEARTBEAT_S = env_float("QUODEQ_SSE_HEARTBEAT_S", 15.0, minimum=0.1)
 _EVENT_TYPE_STATUS = "status"  # compute_tick's event tuple tag for a status.json change
+_DEFAULT_TICK_MS = 250  # QUODEQ_SSE_TICK_MS fallback: observer poll cadence
 
 
 def _tick_ms(env: Mapping[str, str] | None = None) -> int:
@@ -55,9 +56,9 @@ def _tick_ms(env: Mapping[str, str] | None = None) -> int:
     to force a single-tick drain. Reading at module import time made the env
     var a no-op for tests that set it inside the test body."""
     try:
-        return int(resolve_env(env).get("QUODEQ_SSE_TICK_MS", "250"))
+        return int(resolve_env(env).get("QUODEQ_SSE_TICK_MS", str(_DEFAULT_TICK_MS)))
     except ValueError:
-        return 250
+        return _DEFAULT_TICK_MS
 
 
 def _is_terminal(status_payload: str) -> tuple[bool, str]:

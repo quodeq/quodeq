@@ -1,12 +1,14 @@
 """Tests for SubagentPool — parallel agent orchestration and JSONL merging."""
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
@@ -108,5 +110,56 @@ class TestSubagentPool:
             results = pool.run()
 
         assert len(results) == 1
+
+
+class TestSuppressionPredicateEvaluatorsDir:
+    """The pool's suppression matcher reads its evaluators dir off
+    base_config.run_config (row 9184), the same value _start_heartbeat's
+    principle resolver already reads -- not the process-global default."""
+
+    def _pool(self, tmp_path: Path, evaluators_dir: Path | None) -> SubagentPool:
+        project_dir = tmp_path / "project"
+        run_dir = project_dir / "run1"
+        (run_dir / "evidence").mkdir(parents=True)
+        (project_dir / "deleted.json").write_text(json.dumps(
+            [{"dimension": "reliability", "principle": "Fault Tolerance", "file": "a.py"}]))
+        run_config = RunConfig(src=tmp_path, language="python", evaluators_dir=evaluators_dir)
+        return SubagentPool(
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=run_dir / "evidence",
+                            queue_path=tmp_path / "queue.json"),
+            options=PoolOptions(n_agents=1, prompt="p", dimension="reliability"),
+            config=AnalysisConfig(run_config=run_config),
+        )
+
+    def test_matcher_uses_run_configs_evaluators_dir(self, tmp_path: Path) -> None:
+        evaluators_dir = tmp_path / "run-evaluators"
+        evaluators_dir.mkdir()
+        (evaluators_dir / "reliability.json").write_text(json.dumps(
+            {"principles": [{"name": "Fault Tolerance", "requirements": [{"id": "R-FT-1"}]}]}))
+        pool = self._pool(tmp_path, evaluators_dir)
+
+        suppressed = pool._suppression_predicate()
+
+        assert suppressed is not None
+        assert suppressed({"t": "violation", "p": "R-FT-1", "file": "a.py", "line": 1})
+
+    def test_no_run_config_evaluators_dir_falls_back_to_the_global_default_only(
+        self, tmp_path: Path, monkeypatch,
+    ) -> None:
+        """With no run_config.evaluators_dir, the matcher falls back to the
+        process-global default (build_matcher's own call-time default), not
+        some other value: pins that the pool reads run_config first and only
+        reaches the global default when run_config carries none."""
+        global_dir = tmp_path / "global-evaluators"  # deliberately has no mapping
+        global_dir.mkdir()
+        import quodeq.services.suppression as suppression_mod
+        monkeypatch.setattr(suppression_mod, "default_paths", lambda: type(
+            "P", (), {"evaluators_dir": global_dir})())
+        pool = self._pool(tmp_path, None)
+
+        suppressed = pool._suppression_predicate()
+
+        assert suppressed is not None
+        assert not suppressed({"t": "violation", "p": "R-FT-1", "file": "a.py", "line": 1})
 
 

@@ -27,6 +27,22 @@ def test_silence_broken_stdout_survives_unopenable_devnull(monkeypatch, tmp_path
     assert sys.stderr is err
 
 
+def test_safe_write_dim_state_uses_injected_write_state(tmp_path) -> None:
+    """write_state is a call-time seam: when set, safe_write_dim_state must
+    call it instead of the concrete data-layer write_dim_state."""
+    calls: list[tuple] = []
+
+    def _fake_write_state(run_dir, dim, state, *, reason=None, exit_reason=None):
+        calls.append((run_dir, dim, state, reason, exit_reason))
+
+    transition = _loop_state.DimTransition(state="running")
+    _loop_state.safe_write_dim_state(
+        tmp_path, "security", transition, write_state=_fake_write_state,
+    )
+
+    assert calls == [(tmp_path, "security", "running", None, None)]
+
+
 def test_signal_guard_logs_install_failure_off_main_thread(recording_log) -> None:
     guard = SignalGuard(lambda *_: None, log=recording_log)
     worker = threading.Thread(target=guard.install)

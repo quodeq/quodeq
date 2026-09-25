@@ -13,8 +13,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from quodeq.shared.constants import CMD_DISCOVERY_TIMEOUT_S
+
 _HEALTH_TIMEOUT = 1.0
-_CMD_DISCOVERY_TIMEOUT_S = 5
 _API_HEALTH_PATH = "/api/health"
 _API_EVALUATIONS_PATH = "/api/evaluations"
 _LOCAL_BASE_URL = "http://127.0.0.1"
@@ -23,6 +24,7 @@ _DEFAULT_COMMANDS = ("python3", "node", "claude")
 # cross-cutting shared/config (tools/check_imports.py); JobStatus lives in
 # core/, so this compares against the value directly instead.
 _JOB_STATUS_RUNNING = "running"
+_COMMAND_CACHE_MAXSIZE = 4  # distinct (names,) tuples find_commands is called with
 
 
 def _icons_dir() -> Path:
@@ -57,7 +59,7 @@ def find_commands(
     return _find_commands_uncached(names, env)
 
 
-@functools.lru_cache(maxsize=4)
+@functools.lru_cache(maxsize=_COMMAND_CACHE_MAXSIZE)
 def _find_commands_cached(names: tuple[str, ...]) -> dict[str, str | None]:
     return _find_commands_uncached(names, env=None)
 
@@ -70,7 +72,7 @@ def _find_commands_uncached(
         try:
             result = subprocess.run(
                 ["which", name], capture_output=True, text=True, encoding="utf-8",
-                timeout=_CMD_DISCOVERY_TIMEOUT_S, env=env,
+                timeout=CMD_DISCOVERY_TIMEOUT_S, env=env,
             )
             cmds[name] = result.stdout.strip() if result.returncode == 0 else None
         except (subprocess.TimeoutExpired, OSError):

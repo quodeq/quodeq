@@ -6,17 +6,19 @@ makes the model emit a malformed finding shape across many files) is
 invisible without eyeballing thousands of per-call lines. The
 ``_drop_stats`` accumulator aggregates per-call (dropped, kept) counts
 across the run; the dimension loops report the aggregate once at end of
-run, elevate a single warning when the drop ratio crosses the threshold,
-and emit a structured ``drop_stats`` marker for the dashboard stream.
+run and elevate a single warning when the drop ratio crosses the threshold.
+
+``report_run_drop_stats`` takes an injected ``log: LogSink`` (core has no
+stdlib logging) rather than a module logger; the dashboard ``drop_stats``
+marker is emitted by the caller (``_loops.py``), not here -- see
+``tests/analysis/test_loops_drop_stats.py`` for that half.
 """
 from __future__ import annotations
-
-import json
-import logging
 
 import pytest
 
 from quodeq.analysis import _drop_stats
+from tests.conftest import RecordingLog
 
 
 @pytest.fixture(autouse=True)
@@ -24,17 +26,6 @@ def _isolated_counter(monkeypatch):
     # The module wrappers delegate to the default counter; swap in a fresh
     # instance so nothing leaks in from (or out to) other tests.
     monkeypatch.setattr(_drop_stats, "_default_counter", _drop_stats.DropStatsCounter())
-
-
-@pytest.fixture(autouse=True)
-def _propagate_quodeq_logs():
-    # The quodeq logger has propagate=False (StderrHandler only); flip it so
-    # pytest's caplog handler (on the root logger) receives the records.
-    qlog = logging.getLogger("quodeq")
-    orig = qlog.propagate
-    qlog.propagate = True
-    yield
-    qlog.propagate = orig
 
 
 class TestAccumulator:
@@ -59,66 +50,56 @@ class TestAccumulator:
         assert a.consume() == _drop_stats.DropStats(dropped=2, kept=8)
         assert b.consume() == _drop_stats.DropStats(dropped=1, kept=0)
 
-    def test_report_accepts_an_explicit_counter(self, caplog):
+    def test_report_accepts_an_explicit_counter(self):
         counter = _drop_stats.DropStatsCounter()
         counter.record(dropped=1, kept=9)
-        with caplog.at_level(logging.INFO):
-            stats = _drop_stats.report_run_drop_stats(counter)
+        log = RecordingLog()
+        stats = _drop_stats.report_run_drop_stats(counter, log=log)
         assert stats.dropped == 1 and stats.kept == 9
-        assert "dropped 1 of 10" in caplog.text
+        assert any("dropped 1 of 10" in m for m in log.info_messages)
         # The explicit counter was consumed; the default stayed untouched.
         assert counter.consume().parsed == 0
         assert _drop_stats.consume().parsed == 0
 
 
 class TestReport:
-    def test_silent_when_no_api_calls_recorded(self, caplog, capsys):
-        """CLI-provider runs (no API calls) must not gain a noise line or a
-        spurious marker."""
-        with caplog.at_level(logging.INFO):
-            stats = _drop_stats.report_run_drop_stats()
+    def test_silent_when_no_api_calls_recorded(self):
+        """CLI-provider runs (no API calls) must not gain a noise line."""
+        log = RecordingLog()
+        stats = _drop_stats.report_run_drop_stats(log=log)
         assert stats.parsed == 0
-        assert caplog.records == []
-        assert capsys.readouterr().out == ""
+        assert log.info_messages == []
+        assert log.warning_messages == []
 
-    def test_logs_summary_below_threshold_without_warning(self, caplog):
+    def test_logs_summary_below_threshold_without_warning(self):
         _drop_stats.record(dropped=1, kept=99)  # 1% < 5% threshold
-        with caplog.at_level(logging.INFO):
-            _drop_stats.report_run_drop_stats()
-        infos = [r for r in caplog.records if r.levelno == logging.INFO]
-        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
-        assert len(infos) == 1
-        assert "dropped 1 of 100" in infos[0].getMessage()
-        assert warnings == []
+        log = RecordingLog()
+        _drop_stats.report_run_drop_stats(log=log)
+        assert len(log.info_messages) == 1
+        assert "dropped 1 of 100" in log.info_messages[0]
+        assert log.warning_messages == []
 
-    def test_elevates_single_warning_above_threshold(self, caplog):
+    def test_elevates_single_warning_above_threshold(self):
         _drop_stats.record(dropped=2, kept=8)  # 20% > 5% threshold
-        with caplog.at_level(logging.INFO):
-            _drop_stats.report_run_drop_stats()
-        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
-        assert len(warnings) == 1
-        assert "20.0%" in warnings[0].getMessage()
+        log = RecordingLog()
+        _drop_stats.report_run_drop_stats(log=log)
+        assert len(log.warning_messages) == 1
+        assert "20.0%" in log.warning_messages[0]
 
-    def test_no_warning_at_exactly_the_threshold(self, caplog):
+    def test_no_warning_at_exactly_the_threshold(self):
         """The threshold is strict: 'crosses', not 'reaches'."""
         _drop_stats.record(dropped=1, kept=19)  # exactly 5%
-        with caplog.at_level(logging.INFO):
-            _drop_stats.report_run_drop_stats()
-        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
-        assert warnings == []
+        log = RecordingLog()
+        _drop_stats.report_run_drop_stats(log=log)
+        assert log.warning_messages == []
 
-    def test_emits_drop_stats_marker(self, capsys):
-        """Structured marker for the dashboard / SSE stream, mirroring the
-        per-dim ``cache_stats`` marker pattern."""
+    def test_no_log_when_default_sink_used(self, capsys):
+        """Default ``log`` is the silent NULL_LOG -- production callers that
+        forget to inject the shared sink get no output, not a crash."""
         _drop_stats.record(dropped=2, kept=8)
-        _drop_stats.report_run_drop_stats()
-        out = capsys.readouterr().out
-        markers = [json.loads(ln) for ln in out.splitlines() if ln.strip()]
-        drop_markers = [m for m in markers if m.get("_cc") == "drop_stats"]
-        assert len(drop_markers) == 1
-        assert drop_markers[0]["dropped"] == 2
-        assert drop_markers[0]["kept"] == 8
-        assert drop_markers[0]["ratio"] == pytest.approx(0.2)
+        stats = _drop_stats.report_run_drop_stats()
+        assert stats.dropped == 2
+        assert capsys.readouterr().out == ""
 
     def test_report_consumes_the_accumulator(self):
         """One report per run: a second report (or next run in the same

@@ -3,26 +3,12 @@ import { DEFAULT_TIME_LIMIT_S, PROVIDER_SETTING_KEY } from '../../../constants.j
 import HelpHint from '../../../components/HelpHint.jsx';
 import { t } from '../../../strings/index.js';
 import { STORED_TRUE, STORED_FALSE } from '../../../adapters/storage.js';
+import { SECONDS_PER_MINUTE } from '../../../utils/time.js';
 import { PROVIDER_CLASSIFICATION } from './providerUtils.js';
 
-const SECONDS_PER_MINUTE = 60;
 const MIN_MINUTES = 1;
 const MAX_MINUTES = 60;
 const DEFAULT_TIME_LIMIT_MINUTES = Math.max(MIN_MINUTES, Math.round(DEFAULT_TIME_LIMIT_S / SECONDS_PER_MINUTE));
-
-export const SUBAGENTS_HINT_REMOTE = (
-  <>
-    <p>{t('settings.subagentsHintRemoteP1')}</p>
-    <p>{t('settings.subagentsHintRemoteP2')}</p>
-  </>
-);
-
-export const SUBAGENTS_HINT_OLLAMA = (
-  <>
-    <p>{t('settings.subagentsHintOllamaP1')}</p>
-    <p>{t('settings.subagentsHintOllamaP2')}</p>
-  </>
-);
 
 const ANALYSIS_MODE_HINT = (
   <>

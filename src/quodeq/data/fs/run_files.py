@@ -16,7 +16,8 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
-from quodeq.shared.constants import EVIDENCE_DIRNAME, JSON_SUFFIX
+from quodeq.core.run.state import RunState, parse_run_state
+from quodeq.shared.constants import EVIDENCE_DIRNAME, JSON_SUFFIX, MANIFEST_FILENAME
 
 _logger = logging.getLogger(__name__)
 
@@ -30,11 +31,17 @@ _FINGERPRINT_FILES = ("evaluation.db", "evaluation.db-wal", "events.jsonl")
 _EVIDENCE_SUFFIX = "_evidence.jsonl"
 
 
-def count_eval_files(run_dir: Path) -> int | None:
+def count_eval_files(run_dir: Path, *, strict: bool = False) -> int | None:
     """Number of ``evaluation/*.json`` files, or None when the dir is absent.
 
     None vs 0 matters: callers anchored on the directory existing (unit
     tests that pre-seed caches) must treat "no directory" as "no signal".
+
+    *strict*: when the directory exists but listing it raises OSError (e.g.
+    a permissions problem), the default swallows that to None -- "no
+    signal", like every other read in this module. ``strict=True``
+    re-raises instead, for callers where an unreadable (as opposed to
+    absent) eval dir must not silently look like "nothing to see here".
     """
     eval_dir = run_dir / "evaluation"
     if not eval_dir.is_dir():
@@ -42,26 +49,53 @@ def count_eval_files(run_dir: Path) -> int | None:
     try:
         return sum(1 for p in eval_dir.iterdir() if p.suffix == JSON_SUFFIX)
     except OSError:
+        if strict:
+            raise
         return None
 
 
-def read_run_state(run_dir: Path) -> str | None:
-    """The ``state`` string from ``status.json``, or None when absent,
-    corrupt, non-dict, or non-string.
+def read_run_state(run_dir: Path) -> RunState | None:
+    """The run's current ``RunState``, from ``status.json``.
 
-    Unlike ``run_status_store.read_status`` this never raises (no schema
-    check): it feeds cache guards, where any read problem must degrade to
-    "no signal".
+    None when the file is absent, corrupt, non-dict, or its ``state`` value
+    is not a recognized (current or legacy) spelling. Unlike
+    ``run_status_store.read_status`` this never raises (no schema check): it
+    feeds cache guards and status readers, where any read problem must
+    degrade to "no signal".
     """
-    path = run_dir / "status.json"
-    if not path.is_file():
+    data = read_run_status_json(run_dir)
+    state = data.get("state") if isinstance(data, dict) else None
+    if not isinstance(state, str):
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        return parse_run_state(state)
+    except ValueError:
         return None
-    state = data.get("state") if isinstance(data, dict) else None
-    return state if isinstance(state, str) else None
+
+
+def read_run_manifest(run_dir: Path) -> dict | None:
+    """Parsed ``evidence/manifest.json`` for one run.
+
+    None when absent, corrupt, or not a JSON object -- mirrors
+    ``project_files.read_repository_info``'s contract.
+    """
+    manifest_path = run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def has_fingerprint_files(evidence_dir: Path) -> bool:
+    """True when *evidence_dir* holds any ``*_fingerprint.json`` file.
+
+    Raises OSError when the directory exists but cannot be listed (e.g. a
+    permissions problem): callers that need to distinguish "no
+    fingerprints" from "couldn't check" must see the failure, not a silent
+    False.
+    """
+    return any(f.name.endswith("_fingerprint.json") for f in evidence_dir.iterdir())
 
 
 def list_dimension_evidence(run_dir: Path) -> list[tuple[str, Path, int]] | None:

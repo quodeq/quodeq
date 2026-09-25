@@ -10,6 +10,7 @@ See ``tests.conftest.RecordingLog`` / the ``recording_log`` fixture.
 """
 from __future__ import annotations
 
+import json
 
 from quodeq.services._registration_scan import scan_parent_project
 
@@ -57,6 +58,31 @@ def test_scan_parent_project_no_op_when_no_parent(tmp_path, recording_log):
     scan_parent_project(project_dir, reports_path, repo_path, log=recording_log)
 
     assert recording_log.warning_messages == []
+
+
+def test_scan_parent_project_contains_scan_project_oserror(tmp_path, recording_log, monkeypatch):
+    """scan_project failing (e.g. a bad scan.json write) must be logged and
+    swallowed, not propagate into registration -- the whole point of this
+    helper being best-effort."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    info_path = project_dir / "repository_info.json"
+    info_path.write_text(json.dumps({"parent": "parent-uuid"}), encoding="utf-8")
+
+    reports_path = tmp_path / "reports"
+    repo_path = tmp_path / "repo"
+
+    def _boom(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("quodeq.services._registration_scan.scan_project", _boom)
+
+    scan_parent_project(project_dir, reports_path, repo_path, log=recording_log)  # must not raise
+
+    assert any(
+        "parent project" in m.lower() and str(info_path) in m
+        for m in recording_log.warning_messages
+    ), f"expected a warning naming {info_path}, got: {recording_log.warning_messages}"
 
 
 def test_scan_parent_project_defaults_to_null_log(tmp_path):

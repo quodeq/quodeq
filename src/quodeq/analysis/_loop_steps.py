@@ -31,7 +31,7 @@ from quodeq.analysis.dimension_runner import DimensionRunner, log_dimension_resu
 from quodeq.shared.constants import CC_PHASE_ANALYZING
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.data.fs.dimensions_state_store import DimState
+from quodeq.core.run.dimensions import DimState
 from quodeq.shared import cancellation
 
 

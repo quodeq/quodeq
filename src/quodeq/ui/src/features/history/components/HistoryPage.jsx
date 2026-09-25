@@ -4,7 +4,7 @@ import { useRunningRunsRefresh } from '../../../hooks/useRunningRunsRefresh.js';
 import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
 import { usePrefetchRun } from '../../dashboard/hooks/usePrefetchRun.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
-import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
+import { filterRunsByVisibleStandards, filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import { t } from '../../../strings/index.js';
 import { formatRunDateTime } from '../../../utils/formatters.js';
@@ -89,7 +89,7 @@ function renderNoRowsEmptyState({
 // moved, into HistoryEmptyStates.jsx (see that file's header comment).
 function renderHistoryEmptyState({
   projectsLoaded, projects, selectedSource, selectedProject, onNavigate,
-  availableRuns, trend, loading, error, isFetching, isRefreshing, projectInfo, onRetry,
+  availableRuns, trend, partialRuns, loading, error, isFetching, isRefreshing, projectInfo, onRetry,
 }) {
   if (!projectsLoaded) return <LoadingScreen />;
   // The LOCAL projects list can legitimately be empty while a teammate is
@@ -110,11 +110,11 @@ function renderHistoryEmptyState({
       </HistoryEmptyShell>
     );
   }
-  // Guard on the rows the table will actually show (trend + cancelled +
+  // Guard on the rows the table will actually show (trend + partial +
   // in-progress, minus hidden failures), not just `trend`. A project whose
   // only runs are cancelled has an empty trend but real rows to list, and
   // its scores already show on the Overview.
-  if (visibleHistoryRows(availableRuns, trend).length === 0) {
+  if (visibleHistoryRows(availableRuns, trend, partialRuns).length === 0) {
     return renderNoRowsEmptyState({
       selectedSource, loading, error, isFetching, isRefreshing, projectInfo, selectedProject, onNavigate, onRetry,
     });
@@ -122,7 +122,7 @@ function renderHistoryEmptyState({
   return null;
 }
 
-export default function HistoryPage({ trend: rawTrend, selection, availableRuns, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = PROJECT_SOURCE.LOCAL, loading, isFetching, error, onRetry }) {
+export default function HistoryPage({ trend: rawTrend, partialRuns: rawPartialRuns = [], selection, availableRuns, callbacks, projectInfo, projects = [], projectsLoaded, selectedProject, selectedSource = PROJECT_SOURCE.LOCAL, loading, isFetching, error, onRetry }) {
   const { selectedRunId } = selection;
   const { onRunClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
@@ -134,6 +134,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   const { prefetchRun, cancelPrefetch } = usePrefetchRun(selectedProject, selectedSource);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
+  const partialRuns = useMemo(() => filterRunsByVisibleStandards(rawPartialRuns, visibleSet), [rawPartialRuns, visibleSet]);
 
   const handleDeleteRun = useHistoryDeleteRun({ selectedSource, deleteEvaluation, onRunDeleted });
 
@@ -150,13 +151,13 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   const isRefreshing = isFetching && !loading;
   const emptyState = renderHistoryEmptyState({
     projectsLoaded, projects, selectedSource, selectedProject, onNavigate,
-    availableRuns, trend, loading, error, isFetching, isRefreshing, projectInfo, onRetry,
+    availableRuns, trend, partialRuns, loading, error, isFetching, isRefreshing, projectInfo, onRetry,
   });
   if (emptyState) return emptyState;
 
   return (
     <HistoryContent
-      data={{ trend, selectedRunId, availableRuns }}
+      data={{ trend, partialRuns, selectedRunId, availableRuns }}
       isRefreshing={isRefreshing}
       callbacks={{
         onRunClick, onRunHover: prefetchRun, onRunHoverEnd: cancelPrefetch, onRunChange,

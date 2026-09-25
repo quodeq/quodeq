@@ -72,9 +72,9 @@ def _patch_providers(cfg: dict):
 class TestCmdBinaryOverride:
     """AI_CMD_PATH redirects argv[0] while the provider id keeps keying config."""
 
-    def test_ai_cmd_path_replaces_argv0(self, monkeypatch):
-        monkeypatch.setenv("AI_CMD_PATH", "/opt/bin/claude-api")
-        config = AnalysisConfig(ai_cmd="claude", ai_model="sonnet-4")
+    def test_ai_cmd_path_replaces_argv0(self):
+        # The run resolves AI_CMD_PATH once; the builder reads the config field.
+        config = AnalysisConfig(ai_cmd="claude", ai_model="sonnet-4", ai_cmd_path="/opt/bin/claude-api")
         with _patch_providers(_CLAUDE_CFG):
             args, _ = build_ai_cmd("Analyze", config)
         assert args[0] == "/opt/bin/claude-api"
@@ -83,7 +83,7 @@ class TestCmdBinaryOverride:
         assert "--tools" in args
 
     def test_without_override_argv0_is_provider_id(self, monkeypatch):
-        monkeypatch.delenv("AI_CMD_PATH", raising=False)
+        monkeypatch.setenv("AI_CMD_PATH", "/from/process")  # not read here any more
         config = AnalysisConfig(ai_cmd="claude", ai_model="sonnet-4")
         with _patch_providers(_CLAUDE_CFG):
             args, _ = build_ai_cmd("Analyze", config)

@@ -16,9 +16,8 @@ every incremental run — and dim coverage never converged to 100%.
 so a ``RunConfig``, the queue builder, and the dispatch-time worker can all
 resolve the SAME values for one run instead of each independently
 re-reading env/provider-cache state. ``default_dispatch_policy()`` is the
-factory that resolves those live values; the three module-level functions
-below are thin back-compat wrappers over a freshly-built policy, kept for
-existing callers that don't carry a ``RunConfig``/``DispatchPolicy`` around.
+factory that resolves those live values; callers read the run's policy off
+``RunConfig.dispatch_policy()`` rather than re-resolving it per call.
 """
 from __future__ import annotations
 
@@ -105,21 +104,3 @@ def default_dispatch_policy(
         stat_size=stat_size,
     )
 
-
-def provider_is_api(ai_cmd: str | None = None) -> bool:
-    """True when the active (or given) provider dispatches via direct API.
-
-    Thin back-compat wrapper over a freshly-built :func:`default_dispatch_policy`.
-    """
-    cmd = ai_cmd or get_ai_cmd()
-    return default_dispatch_policy(ai_cmd=cmd).provider_is_api()
-
-
-def split_api_dispatchable(
-    root: Path, rel_files: list[str],
-) -> tuple[list[str], list[str]]:
-    """Split *rel_files* into (dispatchable, excluded), preserving order.
-
-    Thin back-compat wrapper over a freshly-built :func:`default_dispatch_policy`.
-    """
-    return default_dispatch_policy().split_api_dispatchable(root, rel_files)

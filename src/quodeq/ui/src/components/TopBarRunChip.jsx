@@ -1,4 +1,5 @@
 import { t } from '../strings/index.js';
+import { PERCENT } from '../constants.js';
 
 /**
  * TopBar.jsx's live-run chip (replaces the dimmed Evaluate button while a
@@ -40,7 +41,7 @@ export function TopBarProgressHairline({ evaluating, runProgress }) {
       role="progressbar"
       aria-label={t('topbar.runProgressAria')}
       aria-valuemin={0}
-      aria-valuemax={100}
+      aria-valuemax={PERCENT}
       aria-valuenow={Math.round(runProgress.percent)}
     >
       <span style={{ width: `${runProgress.percent}%` }} />

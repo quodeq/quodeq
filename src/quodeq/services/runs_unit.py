@@ -12,11 +12,11 @@ from pathlib import Path
 
 from quodeq.core.run.state import ACTIVE_STATES, TERMINAL_STATES, RunState, parse_run_state
 from quodeq.core.scoring.report_grades import most_frequent_grade, parse_numeric_score
-from quodeq.data.fs.report_parser.runs import read_run_scalars
-from quodeq.data.sqlite.run_index import (
+from quodeq.services.wiring import (
     RunRow,
     list_runs_for_project,
     open_index,
+    read_run_scalars,
     sync_index,
 )
 

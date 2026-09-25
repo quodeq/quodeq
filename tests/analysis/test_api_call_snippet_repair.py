@@ -159,14 +159,13 @@ class TestFinishCallRepair:
         finish_call("test-model", "stop", _payload(_GOOD, _SNIPPET_PRESENT), 0.0, reask=reask)
         reask.assert_not_called()
 
-    def test_kill_switch_disables_the_reask(self, monkeypatch):
+    def test_exported_kill_switch_is_not_read_here(self, monkeypatch):
+        # The switch is resolved once per dimension (build_batch_api_config)
+        # into ApiRunnerConfig.repair_enabled; finish_call never reads it.
         monkeypatch.setenv("QUODEQ_DISABLE_FINDING_REPAIR", "1")
-        reask = MagicMock()
-        findings, _ = finish_call(
-            "test-model", "stop", _payload(_GOOD, _SNIPPETLESS), 0.0, reask=reask,
-        )
-        reask.assert_not_called()
-        assert [f["req"] for f in findings] == ["A-1"]
+        reask = MagicMock(return_value=[])
+        finish_call("test-model", "stop", _payload(_GOOD, _SNIPPETLESS), 0.0, reask=reask)
+        reask.assert_called_once()
 
 
 class TestCallApiRepairRoundTrip:
@@ -181,12 +180,22 @@ class TestCallApiRepairRoundTrip:
         choice = MagicMock(message=msg, finish_reason="stop")
         return MagicMock(choices=[choice])
 
-    def _run(self, responses: list):
+    def _run(self, responses: list, config: ApiRunnerConfig | None = None):
         with patch("openai.OpenAI") as mock_oa:
             client = self._client(responses)
             mock_oa.return_value.__enter__.return_value = client
-            findings, lossy = call_api("the source", _config())
+            findings, lossy = call_api("the source", config or _config())
         return findings, lossy, client
+
+    def test_repair_disabled_skips_the_reask(self):
+        findings, _, client = self._run(
+            [self._response(_payload(_GOOD, _SNIPPETLESS))],
+            config=ApiRunnerConfig(
+                model="test-model", api_base="http://localhost:11434/v1", repair_enabled=False,
+            ),
+        )
+        assert client.chat.completions.create.call_count == 1
+        assert [f["req"] for f in findings] == ["A-1"]
 
     def test_second_call_replays_findings_and_source(self):
         findings, lossy, client = self._run([

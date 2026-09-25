@@ -12,7 +12,7 @@ import sys
 from collections.abc import MutableMapping
 from os.path import expanduser
 
-from quodeq.shared.constants import MACHINE_ARM64, PLATFORM_WIN32
+from quodeq.shared.constants import CMD_DISCOVERY_TIMEOUT_S, MACHINE_ARM64, PLATFORM_WIN32
 from quodeq.shared.env_resolve import resolve_env_mut
 
 _logger = logging.getLogger(__name__)
@@ -24,8 +24,6 @@ _MODULE_MAP = {
     "evaluate": "quodeq.cli",
     "menubar": "quodeq.menubar",
 }
-
-_CMD_DISCOVERY_TIMEOUT_S = 5
 
 # SECURITY: Only allow well-known shell paths to prevent execution of
 # arbitrary binaries via a crafted $SHELL environment variable.
@@ -87,7 +85,7 @@ def source_user_path(env: MutableMapping[str, str] | None = None) -> None:
             shell = "/bin/zsh"
         result = subprocess.run(
             [shell, "-c", cmd], capture_output=True, text=True, encoding="utf-8",
-            timeout=_CMD_DISCOVERY_TIMEOUT_S,
+            timeout=CMD_DISCOVERY_TIMEOUT_S,
         )
         if result.returncode == 0 and result.stdout.strip():
             environ["PATH"] = result.stdout.strip()

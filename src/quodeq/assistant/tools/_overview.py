@@ -13,16 +13,12 @@ import logging
 from quodeq.assistant.tools._context import ToolContext
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_entries_visible
-from quodeq.core.types.severity import SEVERITY_ORDER
 from quodeq.services import get_accumulated
+from quodeq.services.accumulated import severity_counts_from_payload
 from quodeq.services.scoring import rescore_accumulated
 from quodeq.shared.log_sink import LoggerSink
 
 _logger = logging.getLogger(__name__)
-
-# Severity buckets recomputed for the filtered summary. Unknown/missing
-# severities are ignored rather than added as a fourth bucket.
-_SEVERITY_BUCKETS = SEVERITY_ORDER
 
 
 def _build_filtered_summary(payload: dict, kept: list[dict], hidden: list) -> dict:
@@ -47,14 +43,7 @@ def _build_filtered_summary(payload: dict, kept: list[dict], hidden: list) -> di
     # value computed here could contradict the number on screen -- the
     # divergence this filtering exists to prevent. Counts are exact, so
     # they are recomputed rather than dropped.
-    severity = {bucket: 0 for bucket in _SEVERITY_BUCKETS}
-    total = 0
-    for d in kept:
-        for v in (d.get("violations") or []):
-            total += 1
-            level = (v.get("severity") or "").lower()
-            if level in severity:
-                severity[level] += 1
+    total, severity = severity_counts_from_payload(kept)
     return {
         "totalViolations": total,
         "dimensionCount": len(kept),

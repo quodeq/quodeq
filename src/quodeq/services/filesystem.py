@@ -31,10 +31,12 @@ from quodeq.services._evaluations_index import EvaluationsIndex
 from quodeq.services._post_run_hook import PostRunHook
 from quodeq.services._projects_cache import ProjectsCache
 from quodeq.services.base import ActionProvider, CreateProjectResult, EvaluationOptions, NewProjectSpec
+from quodeq.services._evaluation_dispatch import SubprocessDispatcher
 from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.jobs import JobManager
 from quodeq.services.project_registration import register_project_with_rollback
 from quodeq.services.tooling_mixin import FsToolingMixin
+from quodeq.shared.env import get_clones_dir
 from quodeq.shared.log_sink import SHARED_LOG
 
 
@@ -89,9 +91,13 @@ class FilesystemActionProvider(ActionProvider):
         compiled_dir: Path | None = None,
         index_db_path: Path | None = None,
         reports_root: Path | None = None,
+        evaluators_dir: Path | None = None,
+        clones_dir: Path | None = None,
     ) -> None:
         self._reports_root = _resolve_reports_root(reports_root)
         self._compiled_dir = compiled_dir
+        self._evaluators_dir = evaluators_dir
+        self._clones_dir = clones_dir
         self._jobs = job_manager if job_manager is not None else _default_job_manager(self._reports_root)
         self._projects = ProjectsCache()
         self._evaluations = EvaluationsIndex(
@@ -105,6 +111,7 @@ class FilesystemActionProvider(ActionProvider):
             jobs=self._jobs,
             get_status_fn=lambda job_id, reports_dir=None:
                 self._evaluations.get_status(job_id, reports_dir=reports_dir),
+            dispatcher=SubprocessDispatcher(self._jobs),
         )
         self._tooling = _default_tooling()
 
@@ -203,8 +210,17 @@ class FilesystemActionProvider(ActionProvider):
         self._projects.invalidate()
 
     def create_project(self, reports_dir: str, spec: NewProjectSpec) -> CreateProjectResult:
-        """Clone if needed, scan, and register a project, rolling back every step on failure."""
-        return register_project_with_rollback(reports_dir, spec, log=SHARED_LOG)
+        """Clone if needed, scan, and register a project, rolling back every step on failure.
+
+        *clones_dir* (where an ephemeral URL clone lands) is resolved here --
+        the provider composition point -- from the constructor override, else
+        QUODEQ_CLONES_DIR: ``register_project``/``_project_registration_steps``
+        never read that env var themselves.
+        """
+        clones_dir = self._clones_dir if self._clones_dir is not None else get_clones_dir()
+        return register_project_with_rollback(
+            reports_dir, spec, clones_dir=clones_dir, log=SHARED_LOG,
+        )
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
         """Repoint a registered project at *new_path*. Return True on success."""
@@ -233,9 +249,11 @@ class FilesystemActionProvider(ActionProvider):
     def get_dimension_eval(
         self, reports_dir: str, project: str, run_id: str, dimension: str,
     ) -> dict[str, Any] | None:
-        """Return one dimension's parsed evaluation, resolved against ``_compiled_dir``."""
+        """Return one dimension's parsed evaluation, resolved against
+        ``_compiled_dir`` and ``_evaluators_dir``."""
         return fs_reports.get_dimension_eval(
-            reports_dir, project, run_id, dimension, compiled_dir=self._compiled_dir,
+            reports_dir, project, run_id, dimension,
+            compiled_dir=self._compiled_dir, evaluators_dir=self._evaluators_dir,
         )
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:

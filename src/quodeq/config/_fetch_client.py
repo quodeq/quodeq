@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import threading
 
-from quodeq.config._fetch_client_class import FetchClient
+from quodeq.config._fetch_client_class import DEFAULT_FETCH_CLIENT_TIMEOUT_S, FetchClient
 
 
 # Module-level singleton with thread-safe lazy initialization.
@@ -17,7 +17,7 @@ _fetch_client_lock = threading.Lock()
 _fetch_client_instance: FetchClient | None = None
 
 
-def get_fetch_client(timeout_s: int = 15) -> FetchClient:
+def get_fetch_client(timeout_s: int = DEFAULT_FETCH_CLIENT_TIMEOUT_S) -> FetchClient:
     """Return the module-level FetchClient singleton, creating it lazily.
 
     For tests, call ``set_fetch_client(mock)`` before the code under test.

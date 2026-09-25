@@ -31,21 +31,21 @@ _ALLOWLIST: set[str] = {
     "shared/process_kill.py:71",
     # pgrep / ps are wrapped in `except (OSError, ...)` -> returns _UNKNOWN, so
     # on Windows (FileNotFoundError) resource sampling degrades gracefully.
-    "shared/resource_sampler.py:44",
     "shared/resource_sampler.py:60",
+    "shared/resource_sampler.py:77",
     # child_cwd's macOS branch: only reached when `platform == "darwin"` and
     # wrapped in `except (..., subprocess.SubprocessError)`, so Windows never
     # runs it and a missing lsof degrades to None. Used to resolve clickable
     # terminal links against the shell's live cwd.
-    "terminal/links.py:84",
+    "terminal/links.py:87",
     # quodeq/menubar/ is darwin-only by construction: control.is_supported()
     # gates every spawn on sys.platform == "darwin", and app/_app_lifecycle
     # only run inside the rumps process that spawn starts. lsof/killpg/pkill/ps
     # are therefore never reached on Windows, and each call is wrapped to
     # degrade gracefully anyway. The ps call in _is_quodeq_process only sees
     # pids from find_pids_on_port, which returns [] off-darwin.
-    "menubar/_process.py:84",
-    "menubar/_process.py:96",
+    "menubar/_process.py:85",
+    "menubar/_process.py:97",
     "menubar/_app_lifecycle.py:158",
     "menubar/_app_lifecycle.py:170",
 }

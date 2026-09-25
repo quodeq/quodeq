@@ -18,6 +18,12 @@ class ToolContext:
     evaluators_dir: Path
     compiled_dir: Path
     dimensions_file: Path
+    # Whether repo_root is a local git checkout the assistant may write to.
+    # Resolved once by the composition root (api/_assistant_helpers.
+    # build_tool_context, the assistant MCP server's _build_registry_from_args)
+    # so orchestrator.py's write-grant check never probes the filesystem
+    # itself. False (never grantable) for any context built without it.
+    repo_is_git: bool = False
     # Accumulated/overview scope: the evaluations-dir project name and the
     # evaluations root. Both optional so run-scoped-only sessions still work.
     project_id: str | None = None

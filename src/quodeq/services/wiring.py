@@ -27,6 +27,7 @@ from quodeq.data.fs.project_files import (  # noqa: F401
     read_scan_total_files,
     remove_project_dir,
     repository_info_exists,
+    scan_json_exists,
     write_repository_info,
 )
 
@@ -52,37 +53,52 @@ from quodeq.data.fs.dimension_report.report_io import write_dimension_report  # 
 
 # Run-directory readers and discard-time cleanup mechanics.
 from quodeq.data.fs.run_files import (  # noqa: F401
+    count_eval_files,
     dimension_evidence_file,
     dimension_queue_file,
     dimension_report_exists,
     evidence_file_size,
     file_mtime,
+    has_fingerprint_files,
     list_dimension_evidence,
     queue_file_exists,
     read_dispatched_cache_keys,
     read_queue_files_count,
     read_queue_state,
+    read_run_manifest,
+    read_run_state,
     read_run_status_json,
     remove_matching_files,
+    run_fingerprint,
 )
+
+# Run-directory removal (rmtree) and reports-root fallback scanning.
+from quodeq.data.fs.run_dirs import remove_run_directory, scan_reports_root_for_run  # noqa: F401
 
 # Run-artifact copy/replace mechanics (shared-repo publish staging).
 from quodeq.data.fs.run_artifacts import (  # noqa: F401
     copy_file_if_exists,
     copy_matching_files,
     ensure_dir,
+    read_json_object,
     replace_json_file,
 )
+
+# Repo-identity index (.repo_index.json) raw JSON read/write mechanics.
+from quodeq.data.fs.repo_index_store import read_repo_index, write_repo_index  # noqa: F401
 
 # Agent stream files.
 from quodeq.data.fs.stream_files import (  # noqa: F401
     count_active_agent_streams,
+    iter_stream_lines,
     latest_dim_activity_mtime,
 )
 
 # Legacy per-run evaluation/*.json finding details (SQL twin:
 # quodeq.data.sqlite.findings_queries.read_finding_details).
 from quodeq.data.fs.report_parser.finding_details import (  # noqa: F401
+    iter_eval_reports,
+    read_eval_report,
     read_finding_details_from_json_eval,
 )
 
@@ -114,6 +130,7 @@ from quodeq.data.fs.standards_store import (  # noqa: F401
 from quodeq.data.actions_log import (  # noqa: F401
     ACTIONS_LOG_FILENAME,
     ActionLogWriter,
+    merge_action_log_files,
     read_action_events,
 )
 from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_needed  # noqa: F401
@@ -129,19 +146,32 @@ from quodeq.data.fs.standards_loader import (  # noqa: F401
     read_req_to_principle_map,
 )
 
+# Per-project standards-visibility preferences.
+from quodeq.data.fs.standards_prefs import load_visible_standard_ids  # noqa: F401
+
 # Filesystem report parser: JSON/markdown eval-report parsing.
-from quodeq.data.fs.report_parser import (  # noqa: F401
-    OVERALL_PRINCIPLE,
-    parse_eval_from_json,
-    parse_eval_markdown,
-)
+from quodeq.data.fs.report_parser import OVERALL_PRINCIPLE, parse_eval_from_json, parse_eval_markdown  # noqa: F401
 
 # Event Log reader.
 from quodeq.data.events.reader import EventLogReader  # noqa: F401
 
-# SQLite run index (module) + the stale-run cancellation helper.
+# SQLite run index (module, for its attribute-style callers) + the specific
+# names services import by name, plus the stale-run cancellation helper.
 from quodeq.data.sqlite import run_index  # noqa: F401
+from quodeq.data.sqlite.run_index import (  # noqa: F401
+    RunRow,
+    list_runs_for_project,
+    open_index,
+    sync_index,
+)
 from quodeq.data.sqlite.index_sync import force_promote_to_cancelled_stale  # noqa: F401
+
+# External (CLI-started) run liveness resolution: safe run-id segment check
+# and the .pid file read.
+from quodeq.data.fs.report_parser.external_pid import (  # noqa: F401
+    is_safe_run_segment,
+    resolve_external_pid,
+)
 
 # AI client discovery: CLI ``/models`` subprocess + Anthropic HTTP API.
 from quodeq.data.cli_models import run_cli_models_command  # noqa: F401
@@ -161,7 +191,8 @@ from quodeq.data.fs.report_parser.runs import (  # noqa: F401
 from quodeq.data.fs.repo_handler import is_valid_repo_url  # noqa: F401
 from quodeq.data.fs.children import find_children  # noqa: F401
 
-# Shared-results repo: clone lifecycle, git invocation, layout + format checks.
+# Shared-results repo: clone lifecycle, git invocation, layout + format
+# checks, path/state lookups, and remote-URL validation.
 from quodeq.data.fs.shared_repo import (  # noqa: F401
     MARKER_FILENAME,
     PUBLISHED_META_FILENAME,
@@ -170,9 +201,18 @@ from quodeq.data.fs.shared_repo import (  # noqa: F401
     check_repo_format,
     clone_lock,
     ensure_shared_clone,
+    last_synced_at,
+    published_meta,
+    read_state,
     refresh_shared_clone,
     remove_clone_dir,
     run_git,
+    shared_cache_dir,
+    shared_evaluations_root,
+    shared_index_db_path,
+    shared_score_cache_path,
+    sync_shared_index,
+    validate_remote_url,
 )
 
 # Run status + dim-state file names and readers.
@@ -219,7 +259,7 @@ from quodeq.data.fs.evidence_tally import (  # noqa: F401
 )
 
 # Local git repo statistics.
-from quodeq.data.fs.git_stats import count_commits_since  # noqa: F401
+from quodeq.data.fs.git_stats import count_commits_since, last_fetched_mtime  # noqa: F401
 
 # Project-identity index (project_index.json): load/save + the identity key
 # a project resolves to. The api layer reaches this via the public facade

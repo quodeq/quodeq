@@ -14,8 +14,12 @@ from pathlib import Path
 from quodeq.core.run.state import RunState
 from quodeq.core.types import ProjectEntry
 from quodeq.services.wiring import (
+    RunInfo,
+    list_project_dirs,
     read_repository_info,
+    read_scan_json,
     repository_info_exists,
+    scan_json_exists,  # noqa: F401 — re-export, so api routes never import wiring directly
     write_repository_info,
 )
 from quodeq.services._fs_metadata import (
@@ -30,9 +34,9 @@ from quodeq.services._fs_project_parents import (  # noqa: F401 — re-export
     find_best_parent,
     max_projects_listed,
 )
-from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services._registration_url import strip_credentials
 from quodeq.services._repo_index import load_repo_index, repo_index_key, save_repo_index
+from quodeq.shared.env import score_cache_disabled
 
 _logger = logging.getLogger(__name__)
 
@@ -162,11 +166,9 @@ def build_project_entry(
 ) -> ProjectEntry:
     """Build a frozen ProjectEntry from its directory and run list.
 
-    ``options.inline_summaries`` mirrors ``build_project_list``'s parameter of
-    the same name, forwarded to ``read_accumulated_summary`` as
-    ``compute_on_miss``: the shared-repo route has no warm-up engine, so it
-    keeps computing a missing summary inline instead of reporting it pending.
-    See ``_backfill_and_read_meta`` for the ``options.backfill`` rationale.
+    ``options.inline_summaries`` mirrors ``build_project_list``'s ``compute_on_miss``
+    forward; QUODEQ_DISABLE_SCORE_CACHE is resolved once here as ``cache_enabled``.
+    See ``_backfill_and_read_meta`` for ``options.backfill``.
     *pre_read_info*: when provided, uses this dict instead of reading from disk.
     """
     info, meta = _backfill_and_read_meta(
@@ -174,6 +176,7 @@ def build_project_entry(
     )
     latest_grade, latest_score, files_count, summary_pending = read_accumulated_summary(
         reports_root, entry_name, runs, compute_on_miss=options.inline_summaries,
+        cache_enabled=not score_cache_disabled(),
     )
     latest_done_run_id = _derive_latest_done_run_id(runs)
     return ProjectEntry(
@@ -262,14 +265,13 @@ def find_existing_project(reports_root: str, repo: str, scope_path: str | None) 
         index.pop(key, None)
         save_repo_index(reports_path, index)
 
-    for child in reports_path.iterdir():
-        if not child.is_dir():
-            continue
+    for name in sorted(list_project_dirs(reports_path)):
+        child = reports_path / name
         if not _repo_identity_matches(child, expected_name, repo_resolved, scope_path):
             continue
-        index[key] = child.name
+        index[key] = name
         save_repo_index(reports_path, index)
-        return child.name
+        return name
     return None
 
 
@@ -286,3 +288,12 @@ def project_record_exists(project_dir: Path) -> bool:
 def read_project_record(project_dir: Path) -> dict | None:
     """The project's repository record; None when absent or unreadable."""
     return read_repository_info(project_dir)
+
+
+def read_cached_scan(project_dir: Path) -> dict | None:
+    """The project's existing scan.json; None when absent or unreadable.
+
+    Gives the API layer a service-level entry so scan routes keep zero
+    filesystem code (mirrors :func:`read_project_record`).
+    """
+    return read_scan_json(project_dir)

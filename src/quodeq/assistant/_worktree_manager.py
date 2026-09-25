@@ -1,11 +1,14 @@
 """WorktreeManager: create/apply/commit/PR lifecycle for one session's git
 worktree.
 
-Split from ``worktree.py`` to keep that file under the size ratchet's
-300-line cap. Moved verbatim; the low-level git helpers (``run_git``,
-``run_git_bytes``, ``WorktreeError``, ``diff_text``, ``diff_stats``,
-``worktrees_base``) stay imported from ``worktree.py`` rather than
-duplicated.
+Each session gets its own worktree under ``worktrees_base()``, named from
+the project id and a short session-id suffix, on a ``quodeq/fix-*`` branch.
+``create()`` allocates the worktree and branch, retrying on a name
+collision; ``apply_to_repo()`` turns the worktree's diff into a binary
+patch applied onto the user's working tree, uncommitted; ``commit_all()``
+and ``create_pr()`` carry it further into a pushed branch and PR.
+``ensure_session_worktree()`` is the module-level entry point: reuse an
+existing active worktree for the session, or create a fresh one.
 """
 from __future__ import annotations
 
@@ -17,7 +20,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.assistant.worktree import (
+from quodeq.assistant._worktree_git import (
     WorktreeError, WorktreeStatus, run_git, run_git_bytes, diff_stats, diff_text, worktrees_base,
 )
 from quodeq.shared.constants import GIT_BIN, GIT_DIR_NAME, GIT_FLAG_C

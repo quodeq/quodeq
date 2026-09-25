@@ -104,6 +104,18 @@ def test_get_scores_and_report(ctx):
     assert missing["ok"] is False
 
 
+def test_get_scores_with_run_but_no_eval_dir_raises(ctx):
+    # A selected run whose evaluation/ dir doesn't exist yet (or was never
+    # created) must raise, not silently report empty scores.
+    import shutil
+
+    shutil.rmtree(ctx.run_dir / "evaluation")
+    reg = build_registry(ctx)
+    out = reg.dispatch("get_scores", {})
+    assert out["ok"] is False
+    assert out["error"] == "no evaluation reports in this run"
+
+
 def test_get_report_includes_trimmed_violations(ctx):
     reg = build_registry(ctx)
     report = reg.dispatch("get_report", {"dimension": "security"})["result"]

@@ -17,6 +17,7 @@ from quodeq.analysis.run_types import RunConfig
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult, group_findings_by_file
 from quodeq.analysis.mcp.severity_gates import apply_severity_gates
 from quodeq.context.trust_model import TrustModel
+from quodeq.data.fs.stream_files import append_jsonl_strict
 from quodeq.data.ports.events import EventEmitter
 
 _logger = logging.getLogger(__name__)
@@ -28,6 +29,22 @@ def evidence_dir(config: RunConfig) -> Path:
 
 def dim_jsonl_path(config: RunConfig, dim_id: str) -> Path:
     return evidence_dir(config) / f"{dim_id}_evidence.jsonl"
+
+
+def write_dispatch_keys_sidecar(
+    config: RunConfig, dim_id: str, keys: dict[str, str],
+) -> None:
+    """Record the cache keys this dim is about to dispatch (miss path).
+
+    ``consolidation.mark_run_consolidated`` reads this sidecar alongside
+    ``<dim>_replayed_unconsolidated_keys.json`` to know which entries a
+    completed run consolidates. Unlike that sidecar, this one is always
+    written when the miss path runs at all -- the caller only reaches this
+    point once there is at least one miss to dispatch.
+    """
+    sidecar = evidence_dir(config) / f"{dim_id}_dispatch_keys.json"
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(json.dumps(keys, indent=2), encoding="utf-8")
 
 
 def write_replayed_keys_sidecar(
@@ -194,15 +211,13 @@ def _stamp_and_write_findings(
     cache, making a later fresh scan of the same file look carried.
 
     Consolidated first, then unconsolidated, so the JSONL keeps reading
-    foundation-then-new. Returns the stamped list for event mirroring.
+    foundation-then-new. Returns the stamped list for event mirroring. The
+    actual file write is the data layer's ``append_jsonl_strict``; this
+    function owns only the stamping rule.
     """
     stamped = [{**finding, "carried_forward": True} for finding in findings]
     stamped += [dict(finding) for finding in pending]
-    jsonl.parent.mkdir(parents=True, exist_ok=True)
-    mode = "a" if append else "w"
-    with jsonl.open(mode, encoding="utf-8") as out:
-        for finding in stamped:
-            out.write(json.dumps(finding) + "\n")
+    append_jsonl_strict(jsonl, stamped, append=append)
     return stamped
 
 
@@ -210,6 +225,7 @@ def write_findings(
     jsonl: Path, classify: ClassifyResult, *, append: bool,
     emit_events: bool = True,
     trust_model: TrustModel | None = None,
+    writer_factory: Callable[[Path], EventEmitter] | None = None,
 ) -> None:
     """Replay cached findings into this run's evidence JSONL.
 
@@ -227,10 +243,11 @@ def write_findings(
     Both groups are re-gated and both are mirrored to events.jsonl. Skipping
     the unconsolidated group in the event log would resurrect the UI-vs-CLI
     score disagreement that emit_cached_findings exists to prevent.
+    *writer_factory* is forwarded to :func:`emit_cached_findings`.
     """
     findings = classify.cached_findings
     pending = list(classify.unconsolidated_findings)
     _regate_replayed_findings(findings, pending, trust_model)
     stamped = _stamp_and_write_findings(jsonl, findings, pending, append=append)
     if emit_events:
-        emit_cached_findings(_events_log_path(jsonl), stamped)
+        emit_cached_findings(_events_log_path(jsonl), stamped, writer_factory=writer_factory)

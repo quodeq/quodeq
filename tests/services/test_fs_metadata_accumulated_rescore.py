@@ -126,13 +126,12 @@ class TestPerDimensionRunDirRescore:
     @patch("quodeq.services._fs_metadata.summarize_dimensions")
     @patch("quodeq.services._fs_metadata.read_run_data")
     def test_dimension_rescored_from_its_sourced_run_not_the_newest(
-        self, mock_read, mock_summarize, tmp_path, monkeypatch,
+        self, mock_read, mock_summarize, tmp_path,
     ):
         from quodeq.core.scoring.params import DEFAULT_PARAMS
         from quodeq.data.fs.report_parser.runs import RunInfo
         from quodeq.services.dismissed import dismiss_finding, dismissed_keys
 
-        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         reports_root = tmp_path / "evaluations"
         project = "proj-two-run"
         project_dir = reports_root / project
@@ -169,7 +168,7 @@ class TestPerDimensionRunDirRescore:
             RunInfo(run_id=_RUN_NEW_ID, date_iso="2026-01-02", date_label="Jan 02", status=RunState.DONE),
             RunInfo(run_id=_RUN_OLD_ID, date_iso="2026-01-01", date_label="Jan 01", status=RunState.DONE),
         ]
-        read_accumulated_summary(reports_root, project, runs, DEFAULT_PARAMS)
+        read_accumulated_summary(reports_root, project, runs, DEFAULT_PARAMS, cache_enabled=False)
 
         acc_dims = mock_summarize.call_args[0][0]
         dim_a_result = next(d for d in acc_dims if d.dimension == _DIM_A)

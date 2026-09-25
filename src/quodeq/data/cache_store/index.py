@@ -34,11 +34,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.data.sqlite.constants import SQLITE_BUSY_TIMEOUT_MS
+
 _logger = logging.getLogger(__name__)
 
 INDEX_FILENAME = ".index.db"
 _live_instances: "weakref.WeakSet[ContentIndex]" = weakref.WeakSet()
-_BUSY_TIMEOUT_MS = 5000
+_DEFAULT_FIND_LIMIT = 50  # ContentIndex.find's default row cap
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS entries (
   key          TEXT PRIMARY KEY,
@@ -110,7 +112,7 @@ class ContentIndex:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(self._path), check_same_thread=False)
         try:
-            conn.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
+            conn.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
             conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript(_SCHEMA_SQL)
         except sqlite3.Error:
@@ -208,7 +210,7 @@ class ContentIndex:
     # -- reads ------------------------------------------------------------
 
     def find(
-        self, content_hash: str, dimension: str, params_hash: str, *, limit: int = 50,
+        self, content_hash: str, dimension: str, params_hash: str, *, limit: int = _DEFAULT_FIND_LIMIT,
     ) -> list[IndexRow]:
         """Rows with these inputs, newest first. Empty on any failure."""
         if not content_hash:

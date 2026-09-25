@@ -88,7 +88,7 @@ def scored_run_dimensions(
     dismissed = (d.dismissed_keys or dismissed_keys)(project_dir)
     deleted = (d.deleted_keys or deleted_keys)(project_dir)
     dims = (d.read_run_data or read_run_data)(reports_root, project, run_id)
-    rules = load_suppression_rules(project_dir)
+    rules = (d.load_suppression_rules or load_suppression_rules)(project_dir)
     # Rules are suppression state too: skipping the rescore when only rules
     # exist would silently return raw scores for a project whose ADRs are
     # expressed as patterns rather than per-line dismissals.

@@ -36,6 +36,24 @@ def test_shared_dimension_eval_invalid_run_segment(client, shared_clone_fixture)
     assert resp.status_code == 400
 
 
+def test_shared_dimension_eval_passes_app_evaluators_dir(app, client, shared_clone_fixture, monkeypatch):
+    """The route resolves evaluators_dir from the app's own config (CLEA-DEP-07,
+    row 10718) instead of get_dimension_eval reading global config itself."""
+    from pathlib import Path
+
+    calls: list[object] = []
+    original = fs_reports.get_dimension_eval
+
+    def spy(*args, **kwargs):
+        calls.append(kwargs.get("evaluators_dir"))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(fs_reports, "get_dimension_eval", spy)
+    resp = client.get("/api/shared/projects/proj-a/dimensions/Security/eval?run=run-1")
+    assert resp.status_code == 200
+    assert calls == [Path(app.config["STANDARDS_EVALUATORS_DIR"])]
+
+
 # --- GET /api/shared/projects/<project>/violations ----------------------------
 
 def test_shared_violations(client, shared_clone_fixture):

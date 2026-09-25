@@ -23,6 +23,13 @@ _logger = logging.getLogger(__name__)
 # payload this client fetches (standards documents, release metadata).
 _DEFAULT_MAX_BODY_BYTES = 10 * 1024 * 1024
 
+# The timeout FetchClient uses when a caller does not pick one. Public: also
+# used by _fetch_client.get_fetch_client()'s own default, which forwards it
+# unchanged to this constructor.
+DEFAULT_FETCH_CLIENT_TIMEOUT_S = 15
+_DEFAULT_CIRCUIT_THRESHOLD = 5  # consecutive failures before the circuit breaker trips
+_DEFAULT_RETRY_BACKOFF_S = 0.5  # QUODEQ_RETRY_BACKOFF_S fallback
+
 
 class FetchClient:
     """Thread-safe HTTP fetcher with circuit breaker (trips after repeated failures)."""
@@ -47,15 +54,18 @@ class FetchClient:
         with self._lock:
             return self._failures >= self._CIRCUIT_THRESHOLD
 
-    def __init__(self, timeout_s: int = 15, allow_private: bool | None = None, env: dict[str, str] | None = None) -> None:
+    def __init__(
+        self, timeout_s: int = DEFAULT_FETCH_CLIENT_TIMEOUT_S,
+        allow_private: bool | None = None, env: dict[str, str] | None = None,
+    ) -> None:
         self._lock = threading.Lock()
         self._failures = 0
         self._timeout = timeout_s
         self._env = env
         _e = self._env if self._env is not None else os.environ
-        self._CIRCUIT_THRESHOLD = env_int("QUODEQ_CIRCUIT_THRESHOLD", 5, minimum=1, env=_e)
+        self._CIRCUIT_THRESHOLD = env_int("QUODEQ_CIRCUIT_THRESHOLD", _DEFAULT_CIRCUIT_THRESHOLD, minimum=1, env=_e)
         self._MAX_RETRIES = env_int("QUODEQ_MAX_RETRIES", 2, minimum=0, env=_e)
-        self._RETRY_BACKOFF_S = env_float("QUODEQ_RETRY_BACKOFF_S", 0.5, minimum=0.0, env=_e)
+        self._RETRY_BACKOFF_S = env_float("QUODEQ_RETRY_BACKOFF_S", _DEFAULT_RETRY_BACKOFF_S, minimum=0.0, env=_e)
         self._MAX_BODY_BYTES = env_int("QUODEQ_MAX_RESPONSE_BYTES", _DEFAULT_MAX_BODY_BYTES, minimum=1, env=_e)
         if allow_private is not None:
             self._allow_private: bool = allow_private

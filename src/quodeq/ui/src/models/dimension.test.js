@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSlimDimension } from './dimension.js';
+import { createSlimDimension, dimensionViolationCount } from './dimension.js';
+
+test('dimensionViolationCount prefers a numeric totalViolations', () => {
+  assert.equal(dimensionViolationCount({ totalViolations: 4, violations: [1, 2] }), 4);
+});
+
+test('dimensionViolationCount falls back to the violations list length when totals are missing', () => {
+  assert.equal(dimensionViolationCount({ violations: [1, 2, 3] }), 3);
+});
+
+test('dimensionViolationCount is 0 when neither totals nor a violations list is present', () => {
+  assert.equal(dimensionViolationCount({}), 0);
+});
 
 // mergeRescoreIntoEval (explorerDataHooks.js) treats `violations != null` as a
 // tri-state: an ABSENT violations key means "keep the prior Explorer

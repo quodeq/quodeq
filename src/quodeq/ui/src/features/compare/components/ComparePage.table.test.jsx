@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 vi.mock('../../../api/index.js', () => ({
   getCompareSummary: vi.fn(),
   getDimensionEval: vi.fn(),
+  sharedGetCompareSummary: vi.fn(),
 }));
 vi.mock('../../../api/standards.js', () => ({
   getStandardsVisibility: vi.fn(),
@@ -12,11 +13,10 @@ vi.mock('../../../api/standards.js', () => ({
 }));
 vi.mock('../../../api/shared.js', () => ({
   sharedListProjects: vi.fn(),
-  sharedGetCompareSummary: vi.fn(),
 }));
 
-import { getCompareSummary, getDimensionEval } from '../../../api/index.js';
-import { sharedListProjects, sharedGetCompareSummary } from '../../../api/shared.js';
+import { getCompareSummary, getDimensionEval, sharedGetCompareSummary } from '../../../api/index.js';
+import { sharedListProjects } from '../../../api/shared.js';
 import { PROJECTS, summary, renderPage, iso } from './_comparePage.fixtures.jsx';
 
 /**

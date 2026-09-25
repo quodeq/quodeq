@@ -3,8 +3,8 @@ import { assistantEventsUrl } from '../../api/assistant.js';
 import { t } from '../../strings/index.js';
 import { FRAME_TYPE } from '../../vocab/frameType.js';
 import { MESSAGE_ROLE } from './messageRole.js';
+import { STREAM_INACTIVITY_MS } from '../../constants.js';
 
-const INACTIVITY_MS = 60000;
 // Max characters revealed per flush tick. Delta-streaming providers (ollama,
 // claude) send frames smaller than this, so they render unchanged; providers
 // without deltas (codex) deliver a whole message as ONE frame, which sweeps
@@ -101,7 +101,7 @@ function createInactivityGuard({ inactivity, setError, endTurn }) {
     // EventSource with nothing left to reconnect it, wedging the drawer.
     // Leaving the connection open lets the next turn (or a heartbeat)
     // recover it.
-    inactivity.current = setTimeout(() => { setError(t('assistant.streamTimedOut')); endTurn(); }, INACTIVITY_MS);
+    inactivity.current = setTimeout(() => { setError(t('assistant.streamTimedOut')); endTurn(); }, STREAM_INACTIVITY_MS);
   };
 }
 

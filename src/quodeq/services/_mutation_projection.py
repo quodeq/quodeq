@@ -91,7 +91,7 @@ def project_all_runs(
     if not project_dir.is_dir():
         return
     if repo_factory is None:
-        from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: PLC0415
+        from quodeq.services.wiring import SqliteFindingsRepository  # noqa: PLC0415
         repo_factory = SqliteFindingsRepository
     if log is NULL_LOG:
         # No caller-injected log (the production call site can't pass one —

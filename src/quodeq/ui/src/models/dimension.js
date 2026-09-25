@@ -55,6 +55,19 @@ import { createPrinciple, createPrincipleGrade } from './principle.js';
 const OBJECT_TYPE_NAME = 'object'; // typeof sentinel shared by every raw-payload factory's "is this a plain object" guard below
 
 /**
+ * A dimension's violation count for display: the totals count when present,
+ * else the length of the violations list, else 0.
+ *
+ * @param {Dimension|Object} dim
+ * @returns {number}
+ */
+export function dimensionViolationCount(dim) {
+  if (typeof dim.totalViolations === 'number') return dim.totalViolations;
+  if (Array.isArray(dim.violations)) return dim.violations.length;
+  return 0;
+}
+
+/**
  * Create a canonical Dimension from a raw dashboard API object.
  *
  * @param {Object} raw

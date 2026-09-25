@@ -11,6 +11,7 @@ from unittest.mock import patch
 from quodeq.services.base import NewProjectSpec
 from quodeq.services.project_registration import register_project as _register_project
 from quodeq.services.project_registration import register_project_with_rollback
+from quodeq.shared.env import get_clones_dir
 
 
 def _read_info(reports_root: Path, uuid: str) -> dict:
@@ -29,7 +30,9 @@ def test_register_url_repo_persists_origin_url(tmp_path, monkeypatch):
         (dest / "main.py").write_text("print('hi')\n")
 
     with patch("quodeq.services._project_registration_steps.run_git_clone", side_effect=fake_clone):
-        uuid = _register_project(str(reports), NewProjectSpec(url, None, ephemeral=True))
+        uuid = _register_project(
+            str(reports), NewProjectSpec(url, None, ephemeral=True), clones_dir=get_clones_dir(),
+        )
 
     assert _read_info(reports, uuid)["originUrl"] == url
 

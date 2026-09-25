@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json as _json
+from http import HTTPStatus
 
 from flask import Response, request
 
@@ -27,7 +28,7 @@ def conditional_json(payload: object, *, max_age: int = 0) -> Response:
     body = _json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
     tag = etag_for(body)
     if request.headers.get("If-None-Match") == tag:
-        resp = Response(status=304)
+        resp = Response(status=HTTPStatus.NOT_MODIFIED)
         resp.headers["ETag"] = tag
         return resp
     resp = Response(body, mimetype="application/json")

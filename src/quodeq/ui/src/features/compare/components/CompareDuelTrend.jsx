@@ -12,6 +12,7 @@ import { t, LOCALE } from '../../../strings/index.js';
 import { MS_PER_DAY } from '../../../utils/time.js';
 import { DELTA_WINDOW_DAYS } from '../compareModel.js';
 import { trendDomain, monotonePath } from '../compareTrendModel.js';
+import { PERCENT } from '../../../constants.js';
 
 const W = 640;
 const H = 240;
@@ -98,7 +99,7 @@ function DuelTrendAxis({ ticks, y }) {
         <span
           key={v}
           className="compare-duel-trend__tick"
-          style={{ top: `${(y(v) / H) * 100}%` }}
+          style={{ top: `${(y(v) / H) * PERCENT}%` }}
         >
           {v}
         </span>

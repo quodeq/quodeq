@@ -18,7 +18,7 @@ class TestCardUsesDefaultViewRuns:
     @patch("quodeq.services._fs_metadata.summarize_dimensions")
     @patch("quodeq.services._fs_metadata.read_run_data")
     def test_newer_noncomplete_run_does_not_drive_the_card(
-        self, mock_read, mock_summarize, monkeypatch,
+        self, mock_read, mock_summarize,
     ):
         """The repositories card must consult the same run set as the
         Overview (select_default_view_runs). It used to iterate ALL runs
@@ -28,7 +28,6 @@ class TestCardUsesDefaultViewRuns:
         from quodeq.core.types import DimensionResult
         from quodeq.data.fs.report_parser.runs import RunInfo
 
-        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         mock_read.return_value = [
             DimensionResult(dimension="security", overall_score="7.0/10",
                             overall_grade="B", files_read=5, source_file_count=5),
@@ -42,7 +41,7 @@ class TestCardUsesDefaultViewRuns:
             RunInfo(run_id="run-complete", date_iso="2026-01-01", date_label="Jan 01", status=RunState.DONE),
         ]
         grade, score, files, _pending = read_accumulated_summary(
-            Path("/r"), "proj-card-eligibility", runs,
+            Path("/r"), "proj-card-eligibility", runs, cache_enabled=False,
         )
         read_run_ids = {call.args[2] for call in mock_read.call_args_list}
         assert read_run_ids == {"run-complete"}, (
@@ -54,12 +53,11 @@ class TestCardUsesDefaultViewRuns:
     @patch("quodeq.services._fs_metadata.summarize_dimensions")
     @patch("quodeq.services._fs_metadata.read_run_data")
     def test_card_falls_back_to_cancelled_when_no_complete_run(
-        self, mock_read, mock_summarize, monkeypatch,
+        self, mock_read, mock_summarize,
     ):
         from quodeq.core.types import DimensionResult
         from quodeq.data.fs.report_parser.runs import RunInfo
 
-        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         mock_read.return_value = [
             DimensionResult(dimension="security", overall_score="6.0/10",
                             overall_grade="C", files_read=5, source_file_count=5),
@@ -72,7 +70,7 @@ class TestCardUsesDefaultViewRuns:
             RunInfo(run_id="run-failed", date_iso="2026-01-01", date_label="Jan 01", status=RunState.FAILED),
         ]
         grade, score, files, _pending = read_accumulated_summary(
-            Path("/r"), "proj-card-fallback", runs,
+            Path("/r"), "proj-card-fallback", runs, cache_enabled=False,
         )
         read_run_ids = {call.args[2] for call in mock_read.call_args_list}
         assert read_run_ids == {"run-cancelled"}
@@ -80,7 +78,7 @@ class TestCardUsesDefaultViewRuns:
 
     @patch("quodeq.services._fs_metadata.read_run_data")
     def test_card_skips_zero_coverage_stub_like_the_overview(
-        self, mock_read, monkeypatch,
+        self, mock_read,
     ):
         """A newer cancelled run's coverage-0 stub (filesRead=0) must not
         drive the project card, exactly like the accumulated Overview. The
@@ -88,7 +86,6 @@ class TestCardUsesDefaultViewRuns:
         from quodeq.core.types import DimensionResult
         from quodeq.data.fs.report_parser.runs import RunInfo
 
-        monkeypatch.setenv("QUODEQ_DISABLE_SCORE_CACHE", "1")
         per_run = {
             "run-stub": [DimensionResult(
                 dimension="security", overall_score="9.9/10", overall_grade="A",
@@ -105,7 +102,7 @@ class TestCardUsesDefaultViewRuns:
             RunInfo(run_id="run-real", date_iso="2026-01-01", date_label="Jan 01", status=RunState.CANCELLED),
         ]
         grade, score, files, _pending = read_accumulated_summary(
-            Path("/r"), "proj-card-stub", runs,
+            Path("/r"), "proj-card-stub", runs, cache_enabled=False,
         )
         # The card score must be the real run's 6.0, not the stub's 9.9.
         assert score == 6.0, f"card took the coverage-0 stub, got {score}"

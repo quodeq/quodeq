@@ -129,10 +129,12 @@ class TestBuildAiCmdEdgeCases:
     def _patch(self, cfg):
         return patch("quodeq.analysis._command._get_provider_configs", return_value=cfg)
 
-    def test_no_model_skips_model_flag(self):
+    def test_no_model_skips_model_flag(self, monkeypatch):
+        # build_ai_cmd no longer falls back to AI_MODEL itself (run_analysis
+        # fills ai_model first), so an exported value must not leak in here.
+        monkeypatch.setenv("AI_MODEL", "from-process")
         config = AnalysisConfig(ai_cmd="minimal", ai_model=None)
-        with self._patch(_MINIMAL_PROVIDER), \
-             patch("quodeq.analysis._command.get_ai_model", return_value=None):
+        with self._patch(_MINIMAL_PROVIDER):
             args, _ = build_ai_cmd("test", config)
         assert "--model" not in args
 

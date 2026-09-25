@@ -43,8 +43,8 @@ shared_constants = {
 _PRODUCERS = {
     "quodeq.analysis._pipeline": (
         "CC_PHASE_SETUP", "CC_PHASE_ANALYZING", "CC_PHASE_SCORING",
+        "CC_PHASE_ANALYZING_START",
     ),
-    "quodeq.analysis._pipeline_setup": ("CC_PHASE_ANALYZING_START",),
     "quodeq.analysis._loop_steps": ("CC_PHASE_ANALYZING",),
     "quodeq.analysis.dimension_runner": ("CC_PHASE_ANALYZING", "CC_PHASE_SCORING"),
     "quodeq.analysis.subagents._pool_launcher": ("CC_PHASE_DEADLINE_EXTENDED",),

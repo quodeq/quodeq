@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,7 +15,8 @@ from quodeq.analysis.errors import (
 )
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.shared import cancellation
-from quodeq.data.fs.dimensions_state_store import DimState, write_dim_state, IllegalDimTransitionError
+from quodeq.core.run.dimensions import DimState, IllegalDimTransitionError
+from quodeq.data.fs.dimensions_state_store import write_dim_state
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +34,7 @@ class DimTransition:
 
 def safe_write_dim_state(
     run_dir: Path | None, dim: str, transition: DimTransition, *, log: LogSink = NULL_LOG,
+    write_state: Callable[..., None] | None = None,
 ) -> None:
     """Best-effort dim-state write. Never raises into the loop.
 
@@ -39,7 +42,8 @@ def safe_write_dim_state(
     want state I/O failures to crash the loop. Logged at WARNING for
     visibility. Lifecycle errors (illegal transition) are also swallowed:
     if the state machine rejects the transition, that's a bug we want to
-    see in logs but not crash on.
+    see in logs but not crash on. *write_state* defaults to the data-layer
+    ``write_dim_state`` (tests pass a fake).
     """
     if run_dir is None:
         return
@@ -47,8 +51,9 @@ def safe_write_dim_state(
         run_dir = Path(run_dir)
     except (TypeError, ValueError):
         return
+    writer = write_state if write_state is not None else write_dim_state
     try:
-        write_dim_state(
+        writer(
             run_dir, dim, transition.state,
             reason=transition.reason, exit_reason=transition.exit_reason,
         )

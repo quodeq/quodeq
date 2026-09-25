@@ -11,6 +11,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Callable
 
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import DimensionResult
 from quodeq.services._dashboard_cache import TREND_SCALAR_CACHE_MAX, shared_trend_scalar_cache
 from quodeq.services.cache import DimensionCacheContext, make_lru_dimension_fetcher
@@ -22,6 +23,7 @@ _Fetcher = Callable[[str], list[DimensionResult]]
 def make_scalar_trend_fetcher(
     reports_root: Path, project: str, cacheable_run_ids: set[str] | None,
     read_scalars: Callable[[Path, str, str], list[DimensionResult]],
+    *, log: LogSink = NULL_LOG,
 ) -> _Fetcher:
     """Fast path: scalars through the process-wide trend scalar cache.
 
@@ -29,10 +31,14 @@ def make_scalar_trend_fetcher(
     one request reads an in-progress run once and the next request re-reads it.
     """
     def read_scalars_only(rr: Path, proj: str, run_id: str) -> list[DimensionResult]:
-        return [
-            replace(d, violations=[], compliance=[])
-            for d in read_scalars(rr, proj, run_id)
-        ]
+        # Same tolerance as the cached path's disk read: a run that cannot be
+        # read is skipped, never a failed request.
+        try:
+            dims = read_scalars(rr, proj, run_id)
+        except (OSError, ValueError, KeyError) as exc:
+            log.warning(f"Failed to read run scalars for {proj}/{run_id}: {exc}")
+            return []
+        return [replace(d, violations=[], compliance=[]) for d in dims]
 
     cache = shared_trend_scalar_cache()
     ctx = DimensionCacheContext(

@@ -293,4 +293,11 @@ _.row_factory  # data/projection/grade_projector.py: sqlite3 connection attribut
 _.insert_finding  # data/ports/findings.py: FindingsRepository port method; adapters implement it and callers go through the port.
 _.list_by_dimension  # data/ports/findings.py: FindingsRepository port method; adapters implement it and callers go through the port.
 _.read_run_score_from_dim_scores  # data/ports/grade_tables.py: GradeTablesReader port method; adapters implement it and callers go through the port.
+
+# Backward-compat default constants: the resolver now lives in
+# config/services_env.py, so these local aliases are no longer read inside
+# their own module; their only remaining static reference is the seam test
+# that asserts the resolver's default (tests/services/test_env_seams_t5.py).
+_.DEFAULT_RUN_DIM_CACHE_MAX  # services/_dashboard_cache.py: only caller is tests/services/test_env_seams_t5.py.
+_.DEFAULT_MAX_HISTORY_RUNS  # services/_dashboard_history.py: only caller is tests/services/test_env_seams_t5.py.
 _.set_verdict  # data/ports/findings.py: FindingsRepository port method; adapters implement it and callers go through the port.

@@ -7,6 +7,11 @@ from typing import Any, Protocol, runtime_checkable
 
 from quodeq.core.types.project_source import ProjectSource
 
+# events_after's default page size. Mirrored by the concrete SQLite
+# implementation (quodeq.data.sqlite.assistant_repository), which imports it
+# from here rather than keeping its own copy.
+DEFAULT_EVENTS_LIMIT = 500
+
 
 @dataclass(frozen=True)
 class SessionScope:
@@ -104,7 +109,7 @@ class AssistantStore(Protocol):
         ...
 
     def events_after(self, session_id: str, after_seq: int,
-                     limit: int = 500) -> list[tuple[int, dict]]:
+                     limit: int = DEFAULT_EVENTS_LIMIT) -> list[tuple[int, dict]]:
         """Frames strictly after *after_seq*, ordered by sequence."""
         ...
 

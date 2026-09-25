@@ -2,8 +2,10 @@
 
 MCP/tool/model argument construction lives in _mcp_arg_builders.py;
 build_ai_cmd and the CLI MCP registration block stay here since their
-patch targets (_get_provider_configs, get_ai_model, subprocess.run) are
-resolved against this module.
+patch targets (_get_provider_configs, subprocess.run) are resolved against
+this module. Nothing here reads the environment for provider selection:
+``subprocess.run_analysis`` fills ``ai_cmd``/``ai_model``/``ai_cmd_path``/
+``cache_root`` on the config before any of this runs.
 """
 from __future__ import annotations
 
@@ -26,10 +28,8 @@ from quodeq.analysis._mcp_arg_builders import (
     resolve_standards_dir,
 )
 from quodeq.analysis.provider_cache import get_provider_configs as _get_provider_configs
-from quodeq.analysis.cache.local import default_cache_root as _default_cache_root
 from quodeq.config.process_env import process_environment_copy
 from quodeq.config.provider import Provider, ProviderType
-from quodeq.shared.utils import get_ai_cmd, get_ai_model
 from quodeq.shared.copilot import build_copilot_env
 from quodeq.shared.log_sink import LoggerSink
 
@@ -48,12 +48,16 @@ def build_ai_cmd(
     prompt: str, config: AnalysisConfig,
     work_dir: Path | None = None,
 ) -> tuple[list[str], Path | None]:
-    """Build the AI CLI command line and optional MCP config path."""
-    cmd = config.ai_cmd or get_ai_cmd()
-    model = config.ai_model or get_ai_model()
+    """Build the AI CLI command line and optional MCP config path.
+
+    *config* carries the resolved provider id, model and binary override
+    (``run_analysis`` fills them); a direct caller sets them itself.
+    """
+    cmd = config.ai_cmd
+    model = config.ai_model
     provider_cfg = _get_provider_configs().get(cmd, {})
 
-    args = build_base_args(cmd, provider_cfg)
+    args = build_base_args(cmd, provider_cfg, ai_cmd_path=config.ai_cmd_path)
     mcp_args, mcp_config_path = build_mcp_args(
         config, provider_cfg, work_dir, log=LoggerSink(_log),
     )
@@ -118,8 +122,9 @@ def _build_mcp_server_args(
     # MUST match classify_files_via_cache's inputs so CLI- and API-path keys
     # agree for the same project state. See cache_writer.build_cache_writer
     # and cache.dimension_helpers.model_id_from for the reference.
+    if config.cache_root is not None:
+        mcp_args.extend(["--cache-root", str(config.cache_root)])
     mcp_args.extend([
-        "--cache-root", str(_default_cache_root()),
         "--model-id", resolve_model_id(config),
         "--language", resolve_language(config),
     ])
@@ -154,14 +159,14 @@ def register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = N
     with _cli_mcp_lock:
         if key in _cli_mcp_registered:
             return name
-        _unregister_cli_mcp(cmd, name)
+        _unregister_cli_mcp(cmd, name, config.ai_cmd_path)
         # Skip agent-id: all agents share one MCP server, so per-agent
         # file caps don't apply — the queue distributes freely.
         mcp_args = _build_mcp_server_args(config, work_dir, skip_agent_id=True)
         provider_cfg = _get_provider_configs().get(cmd, {})
         # Codex/Copilot use "-- cmd args", Gemini uses "cmd args" (no separator)
         use_separator = provider_cfg.get("mcp_add_separator", True)
-        register_cmd = [cmd_binary(cmd), _MCP_SUBCOMMAND, "add", name]
+        register_cmd = [cmd_binary(cmd, config.ai_cmd_path), _MCP_SUBCOMMAND, "add", name]
         if use_separator:
             register_cmd.append("--")
         register_cmd.extend(mcp_args)
@@ -175,13 +180,13 @@ def register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = N
             return None
 
 
-def _unregister_cli_mcp(cmd: str, name: str) -> None:
+def _unregister_cli_mcp(cmd: str, name: str, ai_cmd_path: str | None = None) -> None:
     """Remove the findings MCP server via `<cmd> mcp remove`."""
     if not _is_known_cli_provider(cmd):
         return
     try:
         subprocess.run(
-            [cmd_binary(cmd), _MCP_SUBCOMMAND, "remove", name],
+            [cmd_binary(cmd, ai_cmd_path), _MCP_SUBCOMMAND, "remove", name],
             check=False, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError) as exc:

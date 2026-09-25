@@ -36,6 +36,8 @@ class TeeContext:
     All fields are owned and mutated by JobManager; see the module docstring
     for the invariant governing who else may touch the dicts. Pre-marker
     lines are capped at ``MAX_LOG_LINES`` per job, like the job log.
+    ``open_writer`` defaults to ``RunLogWriter`` (tests pass a fake); it is
+    declared last so existing positional constructions keep working.
     """
     store: JobStore
     reports_root: Path | None
@@ -43,6 +45,7 @@ class TeeContext:
     pre_marker_buffer: dict[str, deque[str]]
     log: LogSink
     flush_batch: Callable[[str, list[str]], bool]
+    open_writer: Callable[[Path], RunLogWriter] | None = None
 
 
 def _new_buffer() -> deque[str]:
@@ -154,7 +157,8 @@ def _open_run_log_writer(job_id: str, ctx: TeeContext) -> RunLogWriter | None:
     run_dir = ctx.reports_root / job.output_project / job.output_run_id
     if not run_dir.is_dir():
         return None
-    writer = RunLogWriter(run_dir)
+    open_writer = ctx.open_writer if ctx.open_writer is not None else RunLogWriter
+    writer = open_writer(run_dir)
     ctx.run_log_writers[job_id] = writer
     return writer
 

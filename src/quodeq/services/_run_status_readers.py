@@ -12,34 +12,25 @@ that a circular import.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from quodeq.core.run.job_status import is_external_job_id
-from quodeq.core.run.state import TERMINAL_STATES, parse_run_state
+from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.core.types.job import JobSnapshot
-from quodeq.data.sqlite import run_index as _run_index
+from quodeq.services.wiring import read_run_state, read_run_status_json
+from quodeq.services.wiring import run_index as _run_index
+
+_RUN_LOG_TAIL_LINES = 500  # lines of run.log the dashboard shows; enough context without a full read
+_TAIL_READ_INITIAL_CHUNK_BYTES = 8192  # doubles each pass until max_lines is satisfied
 
 
 def status_json_terminal(run_dir: Path) -> bool:
     """Return True when the run's status.json says it ended."""
-    status_path = run_dir / "status.json"
-    if not status_path.exists():
-        return False
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False
-    state = data.get("state")
-    if not isinstance(state, str):
-        return False
-    try:
-        return parse_run_state(state) in TERMINAL_STATES
-    except ValueError:
-        return False
+    state = read_run_state(run_dir)
+    return state is not None and state in TERMINAL_STATES
 
 
-def tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
+def tail_run_log(run_dir: Path, max_lines: int = _RUN_LOG_TAIL_LINES) -> list[str]:
     """Return the last *max_lines* lines from run.log.
 
     Reads backward from the end in growing chunks instead of the whole file,
@@ -53,7 +44,7 @@ def tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
         return []
     try:
         file_size = log_path.stat().st_size
-        chunk = 8192
+        chunk = _TAIL_READ_INITIAL_CHUNK_BYTES
         data = b""
         with log_path.open("rb") as fp:
             read_to = file_size
@@ -79,16 +70,10 @@ def tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
     return lines[-max_lines:] if len(lines) > max_lines else lines
 
 
-def _load_status_json(run_dir: Path) -> dict | None:
-    """Load and parse status.json, or None if unavailable."""
-    status_path = run_dir / "status.json"
-    if not status_path.is_file():
-        return None
-    try:
-        data = json.loads(status_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    return data if isinstance(data, dict) else None
+def _load_status_json(run_dir: Path) -> dict:
+    """Load and parse status.json; ``{}`` when missing, unreadable, or not a dict."""
+    data = read_run_status_json(run_dir)
+    return data if isinstance(data, dict) else {}
 
 
 def _dimensions_from_data(run_dir: Path, data: dict | None) -> list[str] | None:
@@ -101,7 +86,7 @@ def _dimensions_from_data(run_dir: Path, data: dict | None) -> list[str] | None:
     if dims:
         return dims
     from quodeq.shared.dim_estimates_io import read_dim_estimates
-    from quodeq.data.fs.dimensions_state_store import read_dimensions
+    from quodeq.services.wiring import read_dimensions
     recovered: dict[str, None] = {}
     dim_records = read_dimensions(run_dir).get("dimensions")
     record_keys = dim_records.keys() if isinstance(dim_records, dict) else ()

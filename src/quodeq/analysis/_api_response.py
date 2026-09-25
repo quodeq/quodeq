@@ -17,7 +17,6 @@ import openai
 from quodeq.analysis._api_schema import parse_findings
 from quodeq.analysis._drop_stats import format_reasons as _format_drop_reasons
 from quodeq.analysis._drop_stats import record as _record_drop_stats
-from quodeq.config.analysis_env import finding_repair_disabled
 
 _log = logging.getLogger(__name__)
 
@@ -195,15 +194,16 @@ def finish_call(
     the full lossy-vs-dropped contract.
 
     *reask*, when supplied, takes the snippetless dropped nodes and returns
-    whatever validated findings a single repair call recovers.
-    QUODEQ_DISABLE_FINDING_REPAIR is the operator kill switch.
+    whatever validated findings a single repair call recovers. The operator
+    kill switch (QUODEQ_DISABLE_FINDING_REPAIR) is applied by the caller,
+    which passes ``reask=None`` when repair is off.
     """
     drop_reasons: dict[str, int] = {}
     dropped_nodes: list[dict] = []
     findings, dropped = parse_findings(
         text, drop_reasons=drop_reasons, dropped_sink=dropped_nodes,
     )
-    if dropped and reask is not None and not finding_repair_disabled():
+    if dropped and reask is not None:
         dropped = _apply_repair(
             findings, dropped, dropped_nodes, drop_reasons, reask, model,
         )

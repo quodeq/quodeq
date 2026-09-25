@@ -11,10 +11,19 @@ import {
   VIOLATION_ORBS, LABEL_ALPHA, FOLDER_NEBULA, FOLDER_NEBULA_DASH,
   FOLDER_STAR, FOLDER_LABEL,
 } from './galaxyTuning.js';
+import { SCORE_SCALE_MAX, PERCENT } from '../../../../constants.js';
 
 export { starShapeFor } from './galaxyFolderCues.js';
 // Re-exported so the folder canvas's draw surface stays in one module.
 export { drawStarfield } from './galaxyStarfield.js';
+
+// Added to a folder star's label-collision importance so a folder outranks
+// any ordinary file (whose importance is only violations + radius, orders of
+// magnitude smaller) when two labels compete for the same space.
+const FOLDER_IMPORTANCE_BOOST = 1000;
+
+// Dimmer than GalaxyView's CONSTELLATION.lineAlpha: the folder view's lines are denser.
+const FOLDER_CONSTELLATION_LINE_ALPHA = 0.25;
 
 /**
  * Paint the canvas background gradient and return the theme colours every
@@ -70,7 +79,7 @@ function drawNebulaBlobs(ctx, spec, centre, radius, col, alpha) {
 export function drawNebula(ctx, curNode, frame) {
   if (!curNode) return;
   const { W, H, t } = frame;
-  const nbCol = scoreRGB((curNode.complianceRate || 0) * 10);
+  const nbCol = scoreRGB((curNode.complianceRate || 0) * SCORE_SCALE_MAX);
   const { r: nr, g: ng, b: nb } = nbCol;
   const nbR = Math.max(W, H) * NEBULA.sceneRadiusFraction;
   const nbGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, nbR);
@@ -91,14 +100,14 @@ export function drawNebula(ctx, curNode, frame) {
 export function drawConstellationLines(ctx, activeScene, tc, w2s) {
   const { lines, rootStars } = activeScene;
   if (lines.length === 0) return;
-  const { r: mr, g: mg, b: mb } = tc.textMuted;
+  const muted = tc.textMuted;
   ctx.beginPath();
   for (const l of lines) {
     const sa = w2s(rootStars[l.a].x, rootStars[l.a].y);
     const sb = w2s(rootStars[l.b].x, rootStars[l.b].y);
     ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y);
   }
-  ctx.strokeStyle = `rgba(${mr},${mg},${mb},0.25)`;
+  ctx.strokeStyle = rgba(muted, FOLDER_CONSTELLATION_LINE_ALPHA);
   ctx.lineWidth = 0.8; ctx.stroke();
 }
 
@@ -191,7 +200,7 @@ function collectStarLabel(s, sc, sr, cam, showLabels) {
   const lh = fontSize + FOLDER_LABEL.heightPadPx;
   const lx = sc.x;
   const ly = sc.y - sr - FOLDER_LABEL.offsetPx * fs;
-  const importance = (s.isFolder ? 1000 : 0) + (s.violations || 0) + (s.radius || 0);
+  const importance = (s.isFolder ? FOLDER_IMPORTANCE_BOOST : 0) + (s.violations || 0) + (s.radius || 0);
   return { s, sc, sr, fs, label, fontSize, lx, ly, lw, lh, importance, col: s.col };
 }
 
@@ -279,7 +288,7 @@ export function drawLabels(ctx, pendingLabels, tc) {
     } else if (lb.s.isFolder) {
       ctx.font = `${subSize}px ${CANVAS_FONT_FAMILY}`;
       ctx.fillStyle = rgba(tc.textMuted, FOLDER_LABEL.rateAlpha);
-      ctx.fillText((lb.s.complianceRate * 100).toFixed(0) + '%', lb.sc.x, lb.sc.y + lb.sr + subDrop);
+      ctx.fillText((lb.s.complianceRate * PERCENT).toFixed(0) + '%', lb.sc.x, lb.sc.y + lb.sr + subDrop);
     }
   });
 }

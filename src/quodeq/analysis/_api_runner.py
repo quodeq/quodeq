@@ -21,10 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from quodeq.analysis._api_call import (
-    ApiRunnerConfig,
-    call_api,
-)
+from quodeq.analysis._api_call import ApiRunnerConfig, call_api
 from quodeq.analysis._api_enrichment import (
     derive_run_paths,
     infer_end_line,
@@ -33,6 +30,7 @@ from quodeq.analysis._api_enrichment import (
 from quodeq.analysis.errors import FatalProviderError
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 from quodeq.analysis.mcp.schemas import FileDoneStatus
+from quodeq.config.context_env import precedent_settings
 from quodeq.context.precedent import load_precedent_corpus, load_precedent_fingerprints
 from quodeq.context.project_shape import detect_shape
 from quodeq.context.trust_model import resolve_trust_model
@@ -72,7 +70,8 @@ def _precedent_signals(project_dir: Path | None, run_dir: Path | None) -> dict[s
             project_dir, read_dismissed=read_dismissed_snippets_strict,
             source_stamp=dismissed_source_stamp,
         ),
-        "precedent_corpus": load_precedent_corpus(project_dir, run_dir) if run_dir else None,
+        "precedent_corpus": (
+            load_precedent_corpus(project_dir, run_dir, settings=precedent_settings()) if run_dir else None),
         "on_precedent_match": precedent_match_hook(project_dir, log=LoggerSink(_log)),
     }
 

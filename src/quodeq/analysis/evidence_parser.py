@@ -37,14 +37,19 @@ def evidence_parse_options(config: RunConfig, compiled_dir: Path | None) -> Evid
 def parse_evidence_file(
     config: RunConfig, ctx: AnalysisContext,
     jsonl_file: Path, files_read: int,
+    options: EvidenceParseOptions | None = None,
 ) -> Evidence:
     """Parse *jsonl_file* into Evidence, with no existence guard.
 
     The dimension name comes from the judgments in the file, not from the
     caller. Callers that need "no evidence yet" to read as None check the
     file first (see :func:`parse_evidence_from_jsonl`).
+
+    *options* defaults to the production readers and log sinks built by
+    :func:`evidence_parse_options` (tests pass a fake).
     """
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+    resolved_options = options if options is not None else evidence_parse_options(config, compiled_dir)
     return parse_jsonl_to_evidence(
         jsonl_file,
         EvidenceContext(
@@ -52,7 +57,7 @@ def parse_evidence_file(
             date_str=ctx.date_str, source_file_count=config.source_file_count,
             files_read=files_read, module=config.target.name if config.target else "",
         ),
-        evidence_parse_options(config, compiled_dir),
+        resolved_options,
     )
 
 

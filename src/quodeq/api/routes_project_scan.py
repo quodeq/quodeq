@@ -1,11 +1,11 @@
 """Project scan and estimate routes.
 
 Split from routes_project_list.py to keep that file under the size ratchet's
-300-line cap. ``reports_dir`` is looked up dynamically through the
-routes_project_list facade (rather than imported directly) so that
-``patch("quodeq.api.routes_project_list.reports_dir", ...)`` in existing
-tests still takes effect for these routes, which are registered from inside
-``register_project_list_routes``.
+300-line cap. ``reports_dir`` is looked up dynamically through its real
+owner, ``routes_common`` (rather than through the routes_project_list
+facade that just re-exports it), so this module never imports back a
+sibling that imports it. Tests patch
+"quodeq.api.routes_common.reports_dir".
 
 Handlers are module-level functions attached to *app* via
 ``app.get(rule)(handler)`` in ``register_project_scan_routes`` rather than
@@ -18,7 +18,6 @@ decorator form and the direct-call form both end up calling
 from __future__ import annotations
 
 import dataclasses
-import json
 import logging
 import os
 from http import HTTPStatus
@@ -35,7 +34,9 @@ from quodeq.api.helpers import (
 )
 from quodeq.services.fs_project_helpers import (
     project_record_exists,
+    read_cached_scan,
     read_project_record,
+    scan_json_exists,
 )
 from quodeq.services.fs_scan import scan_project
 from quodeq.shared.validation import validate_path_segment
@@ -45,8 +46,8 @@ _logger = logging.getLogger(__name__)
 
 
 def _reports_dir() -> str:
-    from quodeq.api import routes_project_list as _facade
-    return _facade.reports_dir()
+    from quodeq.api.routes_common import reports_dir as _owner_reports_dir
+    return _owner_reports_dir()
 
 
 def _contained_project_dir(project: str) -> Path | None:
@@ -81,14 +82,13 @@ def _scan_inputs(project: str) -> tuple[Path | None, tuple[Response, int] | None
 
 def _cached_scan_response(project_dir: Path) -> Response | None:
     """The project's existing scan.json as a response, or None to rescan."""
-    scan_path = project_dir / "scan.json"
-    if not scan_path.exists():
+    if not scan_json_exists(project_dir):
         return None
-    try:
-        return jsonify(json.loads(scan_path.read_text(encoding="utf-8")))
-    except (json.JSONDecodeError, OSError) as exc:
-        _logger.debug("existing scan.json for %s unreadable, rescanning: %s", project_dir.name, exc)
+    scan = read_cached_scan(project_dir)
+    if scan is None:
+        _logger.debug("existing scan.json for %s unreadable, rescanning: %s", project_dir.name, "invalid JSON")
         return None
+    return jsonify(scan)
 
 
 def _local_scan_root(project_dir: Path) -> tuple[Path | None, tuple[Response, int] | None]:

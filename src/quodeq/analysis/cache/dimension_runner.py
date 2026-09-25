@@ -24,7 +24,6 @@ since ``mock.patch`` resolves where a name is used.
 """
 from __future__ import annotations
 
-import json
 import logging
 import threading
 from collections.abc import Callable
@@ -39,6 +38,7 @@ from quodeq.analysis.cache._dimension_context import (
     prepare_cache_context,
 )
 from quodeq.analysis.cache.failure_streak import (
+    STOP_JOIN_TIMEOUT_S,
     CircuitBreakerError,
     FailureStreakWatcher,
 )
@@ -51,7 +51,7 @@ from quodeq.analysis.cache._persist_watcher import (
 from quodeq.analysis.cache._replay import (
     compute_files_read,
     emit_cached_findings,  # noqa: F401 -- re-export
-    evidence_dir,
+    write_dispatch_keys_sidecar,
     write_findings,
 )
 from quodeq.analysis.cache.backend import CacheBackend
@@ -59,7 +59,6 @@ from quodeq.analysis.subagents.runner import (
     DimensionCallbacks,
     process_dimension_with_subagents,
 )
-from quodeq.config.analysis_env import failure_streak_override
 from quodeq.core.evidence.model import Evidence
 
 _logger = logging.getLogger(__name__)
@@ -119,9 +118,7 @@ def _prepare_miss_dispatch(config: RunConfig, dim_id: str, cctx: CacheContext) -
     miss_config = replace(config, options=miss_options)
     if classify.cached_findings or classify.unconsolidated_findings:
         write_findings(cctx.jsonl, classify, append=True, trust_model=cctx.trust_model)
-    sidecar = evidence_dir(config) / f"{dim_id}_dispatch_keys.json"
-    sidecar.parent.mkdir(parents=True, exist_ok=True)
-    sidecar.write_text(json.dumps(classify.miss_keys, indent=2), encoding="utf-8")
+    write_dispatch_keys_sidecar(config, dim_id, classify.miss_keys)
     return miss_config
 
 
@@ -148,9 +145,8 @@ def _start_watchers(
 
     breaker = FailureStreakWatcher(
         cctx.jsonl,
-        threshold=resolve_failure_streak_threshold(
-            config.options, override=failure_streak_override(),
-        ),
+        # The CLI already folded QUODEQ_FAILURE_STREAK into the options.
+        threshold=resolve_failure_streak_threshold(config.options),
     )
     breaker.start()
     return stop_event, watcher, breaker
@@ -215,7 +211,7 @@ def _dispatch_misses_with_watchers(
         # final persist tick on long dims). Breaker keeps its own 5s cap.
         stop_event.set()
         watcher.join()
-        breaker.stop_and_join(timeout=5.0)
+        breaker.stop_and_join(timeout=STOP_JOIN_TIMEOUT_S)
     if breaker.trip_event is not None:
         return _handle_breaker_trip(config, dispatch.ctx, cctx)
     return _handle_dispatch_result(
@@ -229,7 +225,7 @@ def process_dimension_with_cache(
     """V2 entry point — content-addressed cache replaces V1 change
     detection. Falls through to ``opts.dispatcher`` when there's no
     source-file list to classify (matches V1's no-files fallback)."""
-    cctx = prepare_cache_context(config, dim_id, opts.cache)
+    cctx = prepare_cache_context(config, dim_id, opts.cache, log=opts.callbacks.log)
     if cctx is None:
         return opts.dispatcher(config, dim_id, idx, ctx, opts.callbacks)
 

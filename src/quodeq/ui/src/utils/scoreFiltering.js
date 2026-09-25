@@ -8,8 +8,7 @@
 import { bucketKey, isBucketEligible } from './dailyGrouping.js';
 import { scoreToGradeLabel } from './gradeThresholds.js';
 import { countBySeverity } from './severity.js';
-
-const roundOneDecimal = (n) => Math.round(n * 10) / 10;
+import { roundOneDecimal } from './rounding.js';
 
 // Mean of the scores that are present, rounded to one decimal. null when
 // nothing is left after dropping the missing ones.
@@ -73,6 +72,22 @@ export function filterTrendByVisibleStandards(trend, visibleSet) {
   }
   return trend
     .map((entry) => projectEntry(entry, visibleSet, accByRun.get(entry.runId) ?? null))
+    .filter((entry) => entry.dimensionDetails.length > 0);
+}
+
+/**
+ * Narrow standalone run entries (the dashboard's partialRuns) to the visible
+ * dimensions. Unlike the trend these carry no accumulated score, so nothing
+ * is walked: each entry keeps its own recomputed run average and a null
+ * accumulated average.
+ *
+ * @param {Array} entries - Run entries in trend shape
+ * @param {Set<string>} visibleSet - Lowercase dimension IDs to include
+ * @returns {Array} Entries with at least one visible dimension, same order
+ */
+export function filterRunsByVisibleStandards(entries, visibleSet) {
+  return (entries || [])
+    .map((entry) => projectEntry(entry, visibleSet, null))
     .filter((entry) => entry.dimensionDetails.length > 0);
 }
 

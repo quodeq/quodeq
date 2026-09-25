@@ -32,6 +32,40 @@ class TestCountEvalFiles:
         (d / "notes.txt").write_text("x")
         assert count_eval_files(tmp_path) == 2
 
+    def test_strict_false_default_swallows_oserror_from_existing_dir(self, tmp_path, monkeypatch):
+        from pathlib import Path
+
+        from quodeq.data.fs.run_files import count_eval_files
+
+        (tmp_path / "evaluation").mkdir()
+
+        def explode(self):
+            raise OSError("permission denied")
+
+        monkeypatch.setattr(Path, "iterdir", explode)
+        assert count_eval_files(tmp_path) is None
+
+    def test_strict_true_reraises_oserror_from_existing_dir(self, tmp_path, monkeypatch):
+        from pathlib import Path
+
+        import pytest
+
+        from quodeq.data.fs.run_files import count_eval_files
+
+        (tmp_path / "evaluation").mkdir()
+
+        def explode(self):
+            raise OSError("permission denied")
+
+        monkeypatch.setattr(Path, "iterdir", explode)
+        with pytest.raises(OSError):
+            count_eval_files(tmp_path, strict=True)
+
+    def test_strict_true_still_returns_none_for_missing_dir(self, tmp_path):
+        from quodeq.data.fs.run_files import count_eval_files
+
+        assert count_eval_files(tmp_path, strict=True) is None
+
 
 class TestReadRunState:
     def test_missing_returns_none(self, tmp_path):

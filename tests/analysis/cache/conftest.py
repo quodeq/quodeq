@@ -21,6 +21,7 @@ from quodeq.analysis.cache import LocalFileBackend
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
 from quodeq.analysis.subagents.runner import DimensionCallbacks
 from quodeq.core.evidence.model import Evidence
+from quodeq.core.observability import NULL_LOG, LogSink
 
 
 def _make_manifest(file_names: list[str]) -> SourceManifest:
@@ -81,8 +82,13 @@ def _make_ctx():
     )
 
 
-def _make_callbacks() -> DimensionCallbacks:
-    """Real callbacks aren't needed when the dispatcher boundary is mocked."""
+def _make_callbacks(*, log: LogSink = NULL_LOG) -> DimensionCallbacks:
+    """Real callbacks aren't needed when the dispatcher boundary is mocked.
+
+    *log* defaults to the silent sink; pass a ``RecordingLog`` to assert on
+    the classify/invalidate log lines ``_dimension_context.py`` emits
+    through ``opts.callbacks.log``.
+    """
     from quodeq.analysis._dimension_steps import (
         build_dimension_prompt,
         parse_dimension_evidence,
@@ -92,6 +98,7 @@ def _make_callbacks() -> DimensionCallbacks:
         build_prompt=build_dimension_prompt,
         run_analysis=run_dimension_analysis,
         parse_evidence=parse_dimension_evidence,
+        log=log,
     )
 
 

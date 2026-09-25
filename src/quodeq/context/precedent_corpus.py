@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.config.context_env import PrecedentSettings, precedent_settings
 from quodeq.context.precedent_fingerprint import fingerprint, precedent_text
 from quodeq.context.precedent_store import (
     AvailabilityFn,
@@ -180,18 +181,16 @@ def resolve_embed_and_availability(
 def _resolve_available_embedder(
     embed_fn: EmbedFn | None,
     availability_fn: AvailabilityFn | None,
+    settings: PrecedentSettings,
 ) -> Embedder | None:
     """Resolve model/embed_fn/batch_timeout, or None when unavailable.
 
-    Wraps :func:`resolve_embed_and_availability` with the model/base_url
-    lookup and the availability check + degrade-log, so
+    Wraps :func:`resolve_embed_and_availability` with the settings' model/
+    base_url and the availability check + degrade-log, so
     ``load_precedent_corpus`` only has to handle a single
     None-or-proceed branch.
     """
-    from quodeq.shared.env import get_embedding_base_url, get_embedding_model  # noqa: PLC0415
-
-    model = get_embedding_model()
-    base_url = get_embedding_base_url()
+    model, base_url = settings.model, settings.base_url
     embed_fn, availability_fn, batch_timeout = resolve_embed_and_availability(
         embed_fn, availability_fn, model, base_url,
     )
@@ -258,22 +257,20 @@ def load_precedent_corpus(
     embed_fn: EmbedFn | None = None,
     availability_fn: AvailabilityFn | None = None,
     store: VectorStoreFns | None = None,
+    settings: PrecedentSettings | None = None,
 ) -> "PrecedentCorpus | None":
     """Build the semantic corpus, or None. NEVER raises (never breaks a scan).
 
     Test seams: *embed_fn*/*availability_fn* default to llm_bridge's
-    production callables, *store* to ``data.sqlite.precedent_vectors``. The
+    production callables, *store* to ``data.sqlite.precedent_vectors``,
+    *settings* to the process env (callers resolve and pass their own). The
     run-dir marker file is the cross-process circuit breaker: one process's
     failure disables the tier for sibling agents, respawns, and per-call API
     context rebuilds.
     """
     import httpx  # noqa: PLC0415 -- lazy: see precedent_store.openai_errors()'s docstring
-    from quodeq.shared.env import (  # noqa: PLC0415 -- cross-cutting layer
-        get_precedent_similarity_threshold,
-        semantic_precedents_enabled,
-    )
-
-    if not semantic_precedents_enabled():
+    settings = settings if settings is not None else precedent_settings()
+    if not settings.enabled:
         _logger.debug("Semantic precedents: flag off")
         return None
     marker = run_dir / MARKER_NAME
@@ -282,7 +279,7 @@ def load_precedent_corpus(
             _logger.debug("Semantic precedents: circuit marker present")
             return None
 
-        embedder = _resolve_available_embedder(embed_fn, availability_fn)
+        embedder = _resolve_available_embedder(embed_fn, availability_fn, settings)
         if embedder is None:
             return None
 
@@ -293,7 +290,7 @@ def load_precedent_corpus(
         if store is None:
             store = _resolve_store()
 
-        policy = CorpusBuildPolicy(marker=marker, threshold=get_precedent_similarity_threshold())
+        policy = CorpusBuildPolicy(marker=marker, threshold=settings.similarity_threshold)
         return _embed_and_build_corpus(store, project_dir, texts, embedder, policy)
     except (*openai_errors(), httpx.HTTPError, RuntimeError, sqlite3.Error, OSError, ValueError) as exc:
         _logger.warning("Semantic precedent corpus unavailable: %s", exc)

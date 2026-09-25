@@ -9,7 +9,7 @@ from typing import Any
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_NOT_FOUND, QUERY_FLAG_TRUE
-from quodeq.api._scored_jobs_registry import claim_scoring, release_scoring, reset_scored_jobs
+from quodeq.services.scored_jobs_registry import claim_scoring, release_scoring, reset_scored_jobs
 from quodeq.core.run.job_status import JobStatus
 from quodeq.api.helpers import error_response
 from quodeq.shared.serialization import to_camel_dict
@@ -17,8 +17,8 @@ from quodeq.api.routes_common import reports_dir
 from quodeq.services.background import BackgroundRunner, ThreadBackgroundRunner
 from quodeq.services.base import ActionProvider
 from quodeq.services.scan_progress import build_scan_progress
+from quodeq.services.score_run import score_terminal_run_once
 from quodeq.services.run_events import read_run_dim_states
-from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
 
@@ -40,50 +40,6 @@ def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
     if not project or not run_id:
         return {}
     return read_run_dim_states(reports_dir(), project, run_id)
-
-
-def _run_score_completed_evidence(reports_dir: Path, score_args: dict) -> None:
-    """Score completed dimensions via the patch-tested facade.
-
-    Deferred import so a patch on
-    ``quodeq.api._evaluation_routes.score_completed_evidence`` (the public
-    patch target) is honored regardless of this module.
-    """
-    from quodeq.api import _evaluation_routes as _facade  # noqa: PLC0415
-    _facade.score_completed_evidence(reports_dir, score_args)
-
-
-def _score_completed_dims_in_bg(app: Flask, job_id: str, job: Any) -> None:
-    """Score completed dimensions of a failed/cancelled *job*, once.
-
-    *job_id* is the route's URL parameter, not derived from *job* — a job
-    snapshot can be a plain dict (some providers/tests return one), so it
-    must not be assumed to carry a ``.job_id`` attribute.
-
-    Offloaded to a background thread so the GET returns immediately;
-    scoring may involve heavy I/O (reading evidence, writing score files).
-    claim_scoring() is atomic: exactly one concurrent GET wins the claim.
-    """
-    job_status = getattr(job, "status", None)
-    if job_status not in (JobStatus.FAILED, JobStatus.CANCELLED):
-        return
-    if not claim_scoring(job_id):
-        return
-    _reports = reports_dir()
-    _score_args = {
-        "outputProject": job.output_project,
-        "outputRunId": job.output_run_id,
-    }
-
-    def _score_in_bg() -> None:
-        run_isolated(
-            lambda: _run_score_completed_evidence(_reports, _score_args),
-            label=f"score cancelled dimension for {_score_args.get('outputRunId')}", log=_logger,
-        )
-
-    if not _background(app).submit(_score_in_bg, name=f"score-{job_id}"):
-        # Dropped (queue full): give the claim back so the next GET retries.
-        release_scoring(job_id)
 
 
 _INTENT_CANCEL = "cancel"  # ?intent= values the query declares
@@ -147,7 +103,7 @@ def _get_evaluation(app: Flask, provider: ActionProvider, job_id: str) -> Respon
     if not job:
         body, status = error_response(_JOB_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
         return jsonify(body), status
-    _score_completed_dims_in_bg(app, job_id, job)
+    score_terminal_run_once(job_id, job, _background(app), reports_dir())
     payload = to_camel_dict(job)
     payload["dimStates"] = _read_dim_states(job)
     return jsonify(payload)

@@ -15,6 +15,7 @@ from quodeq.assistant.tools._read_tools_scope import (
     scored_run_dims,
 )
 from quodeq.assistant.tools._read_tools_violations import (
+    VIOLATIONS_MAX_LIMIT,
     available_names,
     get_violations,
     hidden_ids,
@@ -25,13 +26,18 @@ from quodeq.assistant.tools._constants import JSON_SCHEMA_TYPE_OBJECT, JSON_SCHE
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_visible
 from quodeq.data.fs.report_parser.finding_details import read_eval_report
+from quodeq.data.fs.run_files import count_eval_files
 from quodeq.services.standards import StandardsService
 
 # Cap violations embedded in a full report so a single get_report stays small.
 _REPORT_VIOLATION_CAP = 40
+# search_findings paging: same default/max split as get_violations, sized
+# for its own result shape (full finding rows, not trimmed violations).
+_SEARCH_FINDINGS_DEFAULT_LIMIT = 20
+_SEARCH_FINDINGS_MAX_LIMIT = 50
 
 
-def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
+def _search_findings(ctx: ToolContext, query: str, limit: int = _SEARCH_FINDINGS_DEFAULT_LIMIT) -> dict:
     run_dir = require_run(ctx)
     repo = findings_repo(ctx, run_dir)
     # Hidden dims must be known BEFORE the query runs, so the exclusion can be
@@ -44,7 +50,7 @@ def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
     # query's hits) so a dimension whose rows never come back from SQL is
     # still reported as withheld.
     hidden = hidden_ids(ctx, list(repo.count_by_dimension()))
-    hits = repo.search(query, limit=max(1, min(int(limit), 50)),
+    hits = repo.search(query, limit=max(1, min(int(limit), _SEARCH_FINDINGS_MAX_LIMIT)),
                         exclude_dimensions=hidden or None)
     # Model-facing key is "requirement"; the Finding attribute is `req`
     # (see data/sqlite/row_mappers.py row_to_finding).
@@ -60,12 +66,11 @@ def _get_scores(ctx: ToolContext) -> dict:
     # A specific run selected → that run's dims. Otherwise the accumulated
     # (per-dimension-latest) scores — the default dashboard/overview view.
     if has_run(ctx):
-        eval_dir = ctx.run_dir / "evaluation"
-        if not eval_dir.is_dir():
+        if count_eval_files(ctx.run_dir) is None:
             raise ToolError("no evaluation reports in this run")
         scored = scored_run_dims(ctx)
         if scored is None:
-            scored = raw_run_dims(eval_dir)
+            scored = raw_run_dims(ctx.run_dir / "evaluation")
         kept, hidden = visible_only(ctx, scored)
         return {
             "scores": {d["dimension"]: {
@@ -179,7 +184,7 @@ def _register_findings_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "or get_report instead.",
         {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {
             "query": {"type": JSON_SCHEMA_TYPE_STRING},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+            "limit": {"type": "integer", "minimum": 1, "maximum": _SEARCH_FINDINGS_MAX_LIMIT},
         }, "required": ["query"]},
         lambda **kw: _search_findings(ctx, **kw)))
     registry.register(ToolSpec(
@@ -189,7 +194,7 @@ def _register_findings_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "one is selected, otherwise the accumulated (per-dimension-latest) view.",
         {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {
             "dimension": {"type": JSON_SCHEMA_TYPE_STRING},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+            "limit": {"type": "integer", "minimum": 1, "maximum": VIOLATIONS_MAX_LIMIT},
         }},
         lambda **kw: get_violations(ctx, **kw)))
 

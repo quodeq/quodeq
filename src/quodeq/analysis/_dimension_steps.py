@@ -12,6 +12,7 @@ from quodeq.analysis.evidence_parser import parse_evidence_file
 from quodeq.core.evidence.model import Evidence
 from quodeq.analysis.prompts.builder import build_analysis_prompt, prompt_context
 from quodeq.analysis.runner_markers import make_heartbeat
+from quodeq.data.fs.run_files import evidence_file_size
 from quodeq.shared.logging import log_warning
 
 
@@ -37,17 +38,24 @@ def run_dimension_analysis(
     heartbeat = config.options.heartbeat_callback or make_heartbeat(dim_id, idx, ctx.total)
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+    opts = config.options
     ac_kwargs: dict[str, Any] = dict(
+        ai_cmd=config.ai_cmd,
+        ai_cmd_path=config.options.ai_cmd_path,
+        cache_root=config.options.cache_root,
         ai_model=config.options.ai_model,
         jsonl_file=jsonl_file,
         analysis_budget=config.options.analysis_budget,
         heartbeat_callback=heartbeat,
         compiled_dir=compiled_dir,
         dimension=dim_id,
+        # The run's single-agent ceilings apply when no explicit cap was set.
+        max_turns=opts.max_turns if opts.max_turns is not None else opts.default_max_turns,
+        max_duration=opts.max_duration if opts.max_duration is not None else opts.default_max_duration,
     )
     # Left out rather than passed as None so AnalysisConfig's own defaults win
     # for every budget the run did not set.
-    for name in ("max_turns", "max_duration", "time_limit", "deadline_at"):
+    for name in ("time_limit", "deadline_at"):
         value = getattr(config.options, name)
         if value is not None:
             ac_kwargs[name] = value
@@ -65,7 +73,7 @@ def _try_parse_stream_evidence(stream_file: Path, jsonl_file: Path) -> int:
 
     Returns the number of files read.
     """
-    mcp_produced = jsonl_file.exists() and jsonl_file.stat().st_size > 0
+    mcp_produced = evidence_file_size(jsonl_file) > 0
     mcp_status = get_mcp_status(stream_file)
     if mcp_status and mcp_status != MCP_STATUS_CONNECTED:
         log_warning(f"MCP findings server {mcp_status} — falling back to stream extraction")

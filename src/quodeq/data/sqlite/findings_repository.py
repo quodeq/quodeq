@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.types.finding import Finding
+from quodeq.data.ports.findings import DEFAULT_SEARCH_LIMIT
 from quodeq.data.projection.projector import Projector
 from quodeq.data.sqlite.row_mappers import (
     finding_dict_to_row,
@@ -127,7 +128,7 @@ class SqliteFindingsRepository:
     def search(
         self,
         query: str,
-        limit: int = 100,
+        limit: int = DEFAULT_SEARCH_LIMIT,
         *,
         exclude_dimensions: Iterable[str] | None = None,
     ) -> list[Finding]:

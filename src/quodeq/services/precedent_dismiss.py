@@ -23,9 +23,9 @@ from quodeq.core.events.models import FindingDismissed, FindingDismissedEvent
 from quodeq.core.finding_identity import coerce_line, snippet_fingerprint
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types.finding_type import FindingType
-from quodeq.data.actions_log import ActionLogWriter, read_action_events
 from quodeq.data.ports.actions_log import ActionLog
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.wiring import ActionLogWriter, read_action_events
 
 PRECEDENT_REASON = "Precedent: same requirement and code as a finding you dismissed."
 

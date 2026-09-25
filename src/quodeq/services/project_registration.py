@@ -69,13 +69,15 @@ def register_project(
 
     For URL inputs, clones the repo before scanning. Either ``spec.clone_dest``
     (a user-chosen parent directory) or ``spec.ephemeral=True`` must be set
-    when ``spec.repo`` is a URL. Ephemeral clones land under
-    ``~/.quodeq/clones/<uuid>/`` by default; pass *clones_dir* to use a
-    different (already-resolved) base directory instead of re-reading
-    QUODEQ_CLONES_DIR here.
+    when ``spec.repo`` is a URL. Ephemeral clones land under *clones_dir*
+    (only consulted when ``spec.ephemeral`` is set). This function never
+    reads QUODEQ_CLONES_DIR itself: the caller (the provider composing this
+    call -- ``FilesystemActionProvider``/``FsEvaluationMixin`` in
+    ``filesystem.py``/``evaluation_mixin.py``) resolves the default and
+    passes an already-resolved path.
 
     For local path inputs, scans in place; ``clone_dest`` and ``ephemeral``
-    are ignored.
+    are ignored, and *clones_dir* is never consulted.
 
     Returns the project's UUID.
     """

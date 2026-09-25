@@ -9,6 +9,11 @@ from tests.api._routes_shared_read_fixtures import app, client  # noqa: F401 -- 
 def test_shared_project_info(client, shared_clone_fixture):
     resp = client.get("/api/shared/projects/proj-a/info")
     assert resp.status_code == 200
+    body = resp.get_json()
+    # Pins services/shared_listing.py's enrich_shared_info publishedBy/source
+    # merge so it stays byte-identical to the list route's per-project merge.
+    assert body.get("publishedBy") == "tester"
+    assert body.get("source") == "shared"
 
 
 def test_shared_project_info_not_found(client, shared_clone_fixture):

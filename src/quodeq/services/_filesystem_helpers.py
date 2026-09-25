@@ -8,8 +8,11 @@ from pathlib import Path
 from quodeq.config.paths import default_paths
 from quodeq.core.observability import NULL_LOG, LogSink
 
+# Distinct dims_file paths memoized; a run configures at most a couple.
+_DIMS_FILE_CACHE_MAX = 4
 
-@functools.lru_cache(maxsize=4)
+
+@functools.lru_cache(maxsize=_DIMS_FILE_CACHE_MAX)
 def _read_dimensions_from_file(dims_file: str) -> tuple[str, ...]:
     """Read dimension IDs from a dimensions.json file (cached by path).
 

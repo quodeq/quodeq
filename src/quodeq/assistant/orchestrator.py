@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant._context import build_system_prompt, build_turn_message
@@ -15,8 +17,7 @@ from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.frame_type import FrameType
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.config.provider import ProviderType
-from quodeq.assistant.guard import (
-    MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
+from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS
 from quodeq.assistant.message_role import MessageRole
 from quodeq.assistant.skills import cached_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
@@ -24,6 +25,7 @@ from quodeq.assistant.tools.write_tools import register_write_tools
 from quodeq.assistant.worktree import ensure_session_worktree
 from quodeq.data.ports.assistant import AssistantStore
 from quodeq.llm_bridge import LOCAL_PROVIDERS
+from quodeq.services.score_cache import score_cache_path_override
 
 _logger = logging.getLogger(__name__)
 
@@ -130,23 +132,23 @@ def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
 
 
 def _attached_git_repo(tool_ctx: ToolContext) -> bool:
-    """True when the session has a local git checkout the assistant may write to."""
-    return tool_ctx.repo_root is not None and (tool_ctx.repo_root / ".git").exists()
+    """True when the session has a local git checkout, resolved by the composition root."""
+    return tool_ctx.repo_is_git
 
 
 def _write_is_grantable(request: TurnRequest, tool_ctx: ToolContext) -> bool:
-    """True when every server-side condition for write access holds.
+    """True when every server-side condition for write access holds: not
+    read-only, a local git repo attached, and a write-safe provider (the
+    client's write_enabled flag alone is never sufficient)."""
+    return bool(request.write_enabled and not tool_ctx.read_only
+                and _attached_git_repo(tool_ctx) and write_safe_provider(request.provider))
 
-    The client's write_enabled flag is necessary but never sufficient: the
-    session must not be read-only, it must have a local git repo attached,
-    and the provider's tool wiring must be per-invocation isolated.
-    """
-    return bool(
-        request.write_enabled
-        and not tool_ctx.read_only
-        and _attached_git_repo(tool_ctx)
-        and write_safe_provider(request.provider)
-    )
+
+def write_available(repo_root: str | None, provider: str, read_only: bool) -> bool:
+    """Whether the write-tool grant could ever activate for a new session:
+    not read-only, a local git repo attached, write-safe provider."""
+    return bool(not read_only and repo_root and (Path(repo_root) / ".git").exists()
+                and write_safe_provider(provider))
 
 
 def _resolve_write_grant(request: TurnRequest, repository: AssistantStore,
@@ -283,8 +285,10 @@ def run_turn(request: TurnRequest, *, repository: AssistantStore,
     """
     deps = _build_deps(request, repository, engines or TurnEngines(), cancel or CancelToken())
     emit = deps.emit
+    cache_ctx = score_cache_path_override(tool_ctx.score_cache_path) if tool_ctx.score_cache_path is not None else nullcontext()
     try:
-        _execute_turn(request, tool_ctx, deps)
+        with cache_ctx:
+            _execute_turn(request, tool_ctx, deps)
     except TurnCancelled as exc:
         # User-initiated stop, not a failure. Persist any partial answer so
         # the next turn's replayed history matches what the user saw.

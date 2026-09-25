@@ -4,6 +4,8 @@ Split out of assistant_routes.py.
 """
 from __future__ import annotations
 
+from http import HTTPStatus
+
 from flask import Flask, current_app, jsonify
 
 from quodeq.api._assistant_helpers import build_action_context, get_repository
@@ -25,11 +27,11 @@ def _resolution_error(outcome: ApplyOutcome | RejectOutcome):
     and an action someone already resolved (409) with the same text and code.
     """
     if outcome.kind == ActionOutcomeKind.UNKNOWN_ACTION:
-        return json_error("unknown action", 404, "UNKNOWN_ACTION")
+        return json_error("unknown action", HTTPStatus.NOT_FOUND, "UNKNOWN_ACTION")
     if outcome.kind == ActionOutcomeKind.READ_ONLY:
-        return json_error("read-only session", 403, "READ_ONLY_SESSION")
+        return json_error("read-only session", HTTPStatus.FORBIDDEN, "READ_ONLY_SESSION")
     if outcome.kind == ActionOutcomeKind.ALREADY:
-        return json_error(f"action already {outcome.detail}", 409, "ACTION_ALREADY_RESOLVED")
+        return json_error(f"action already {outcome.detail}", HTTPStatus.CONFLICT, "ACTION_ALREADY_RESOLVED")
     return None
 
 
@@ -43,12 +45,12 @@ def register_assistant_action_routes(app: Flask) -> None:
         if shared is not None:
             return shared
         if outcome.kind == ActionOutcomeKind.UNSUPPORTED:
-            return json_error("unsupported action type", 400, "UNSUPPORTED_ACTION_TYPE")
+            return json_error("unsupported action type", HTTPStatus.BAD_REQUEST, "UNSUPPORTED_ACTION_TYPE")
         if outcome.kind == ActionOutcomeKind.INVALID:
-            return json_error(outcome.detail, 400, CODE_INVALID_ACTION)
+            return json_error(outcome.detail, HTTPStatus.BAD_REQUEST, CODE_INVALID_ACTION)
         if outcome.kind == ActionOutcomeKind.CONFLICT:
-            return json_error(outcome.detail, 409, "ACTION_CONFLICT")
-        return jsonify({"applied": True, "result": outcome.result}), 200
+            return json_error(outcome.detail, HTTPStatus.CONFLICT, "ACTION_CONFLICT")
+        return jsonify({"applied": True, "result": outcome.result}), HTTPStatus.OK
 
     @app.post("/api/assistant/actions/<action_id>/reject")
     def reject_assistant_action(action_id: str):
@@ -57,4 +59,4 @@ def register_assistant_action_routes(app: Flask) -> None:
         shared = _resolution_error(outcome)
         if shared is not None:
             return shared
-        return jsonify({"status": "rejected"}), 200
+        return jsonify({"status": "rejected"}), HTTPStatus.OK

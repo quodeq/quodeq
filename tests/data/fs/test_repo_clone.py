@@ -8,7 +8,30 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from quodeq.data.fs.repo_clone import cleanup_cloned_repo, prepare_repository
+from quodeq.data.fs.repo_clone import (
+    OnlineCacheOps,
+    cleanup_cloned_repo,
+    prepare_repository,
+)
+
+
+class TestPrepareRepositoryInjectedCacheOps:
+    def test_uses_injected_cache_ops_instead_of_the_online_cache_module(self, tmp_path):
+        """cache_ops is a call-time seam: when set, prepare_repository must
+        call it instead of the concrete cache_disabled/ensure_clone."""
+        cached_dir = tmp_path / "cached-repo"
+        cached_dir.mkdir()
+        calls: list[str] = []
+
+        ops = OnlineCacheOps(
+            cache_disabled=lambda: calls.append("cache_disabled") or False,
+            ensure_clone=lambda url: (calls.append(f"ensure_clone:{url}"), cached_dir)[1],
+        )
+
+        result = prepare_repository("https://github.com/user/repo.git", cache_ops=ops)
+
+        assert calls == ["cache_disabled", "ensure_clone:https://github.com/user/repo.git"]
+        assert Path(result) == cached_dir.resolve()
 
 
 class TestPrepareRepositoryDestination:

@@ -4,6 +4,7 @@ import { pushSeverityRows, showTooltip } from './galaxyTooltipDom.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { countDescendants } from './galaxyFolderScene.js';
 import { t } from '../../../../strings/index.js';
+import { PERCENT } from '../../../../constants.js';
 
 const _descendantCountCache = new WeakMap();
 
@@ -32,7 +33,7 @@ export function createTooltipUpdater(refs) {
     const rows = [];
     const sev = d.severity || {};
     if (h.type === HIT_TARGET_TYPE.FOLDER) {
-      rows.push(row(t('map.compliance'), (d.complianceRate * 100).toFixed(0) + '%'));
+      rows.push(row(t('map.compliance'), (d.complianceRate * PERCENT).toFixed(0) + '%'));
       rows.push(row(t('map.violations'), d.violations));
       rows.push(row(t('map.contents'), _cachedDescendantCount(d._node)));
     } else {

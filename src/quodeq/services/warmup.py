@@ -20,6 +20,8 @@ from quodeq.shared.fault_isolation import run_isolated
 _logger = logging.getLogger(__name__)
 
 _FAILURE_BACKOFF_S = 60.0
+_WORKER_POLL_INTERVAL_S = 0.1  # how often the idle worker re-checks for shutdown
+_SHUTDOWN_JOIN_TIMEOUT_S = 10  # bound on reset_for_tests' wait for the worker to exit
 
 
 def _enumerate_projects(reports_dir: str) -> list[tuple[str, str]]:
@@ -120,6 +122,17 @@ class WarmupEngine:
             self._pending.append(project_id)
             self._cond.notify()
 
+    def enqueue_pending(self, entries: list) -> None:
+        """Re-enqueue every entry still marked ``summary_pending``.
+
+        Self-healing: the projects route calls this on every page it
+        returns, bounding the re-enqueue to page size instead of the full
+        project count.
+        """
+        for entry in entries:
+            if getattr(entry, "summary_pending", False):
+                self.enqueue(entry.id)
+
     def snapshot(self) -> dict | None:
         """Return warm-up progress for the API, or None before ``start``."""
         with self._cond:
@@ -142,7 +155,7 @@ class WarmupEngine:
             thread_to_join = self._thread
             self._cond.notify()  # Wake up worker if it's waiting
         if thread_to_join is not None:
-            thread_to_join.join(timeout=10)
+            thread_to_join.join(timeout=_SHUTDOWN_JOIN_TIMEOUT_S)
         # Clear all state after worker has stopped
         with self._cond:
             self._pending.clear()
@@ -189,7 +202,7 @@ class WarmupEngine:
         while True:
             with self._cond:
                 while not self._pending and not self._shutdown.is_set():
-                    self._cond.wait(timeout=0.1)
+                    self._cond.wait(timeout=_WORKER_POLL_INTERVAL_S)
                 if self._shutdown.is_set():
                     break
                 project_id = self._pending.popleft()

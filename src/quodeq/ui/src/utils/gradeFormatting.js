@@ -1,6 +1,18 @@
 import { getGradeThresholds } from './gradeThresholds.js';
 
 /**
+ * Format a numeric score (0-10) to one decimal place, or the placeholder
+ * dash when it doesn't parse to a number.
+ *
+ * @param {number|string|null|undefined} score
+ * @returns {string}
+ */
+export function formatScoreDisplay(score) {
+  const n = typeof score === 'number' ? score : parseFloat(score);
+  return Number.isNaN(n) ? '—' : n.toFixed(1);
+}
+
+/**
  * Grade-to-CSS-class mapping.
  * Full word keys take priority; single-letter keys serve as fallback.
  */

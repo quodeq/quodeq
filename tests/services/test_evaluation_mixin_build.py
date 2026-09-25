@@ -246,3 +246,19 @@ class TestDispatcherProperty:
         d = m.dispatcher
         assert isinstance(d, SubprocessDispatcher)
 
+    def test_constructor_injected_dispatcher_is_used(self):
+        """FsEvaluationMixin(dispatcher=...) seam: the injected fake, not a
+        freshly built SubprocessDispatcher, must back the property."""
+        custom = MagicMock()
+        m = FsEvaluationMixin(jobs=MagicMock(), dispatcher=custom)
+        assert m.dispatcher is custom
+
+    def test_no_dispatcher_arg_keeps_the_subprocess_fallback(self):
+        """Constructing without *dispatcher* must still fall back to
+        SubprocessDispatcher(self._jobs), like before the seam existed."""
+        jobs = MagicMock()
+        m = FsEvaluationMixin(jobs=jobs)
+        d = m.dispatcher
+        assert isinstance(d, SubprocessDispatcher)
+        assert d._jobs is jobs
+

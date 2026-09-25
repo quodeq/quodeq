@@ -10,14 +10,18 @@ from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
 
 
+_DEFAULT_POLL_MS = 100  # QUODEQ_LOG_STREAM_POLL_MS fallback
+_DEFAULT_MAX_WAIT_S = 10  # QUODEQ_LOG_STREAM_MAX_WAIT_S fallback
+
+
 def _poll_ms(env: Mapping[str, str] | None = None) -> int:
     """Poll interval between tail ticks; ``QUODEQ_LOG_STREAM_POLL_MS`` overrides."""
-    return env_int("QUODEQ_LOG_STREAM_POLL_MS", 100, minimum=1, env=resolve_env(env))
+    return env_int("QUODEQ_LOG_STREAM_POLL_MS", _DEFAULT_POLL_MS, minimum=1, env=resolve_env(env))
 
 
 def _max_wait_s(env: Mapping[str, str] | None = None) -> int:
     """Seconds to wait for a missing log file; ``QUODEQ_LOG_STREAM_MAX_WAIT_S`` overrides."""
-    return env_int("QUODEQ_LOG_STREAM_MAX_WAIT_S", 10, minimum=1, env=resolve_env(env))
+    return env_int("QUODEQ_LOG_STREAM_MAX_WAIT_S", _DEFAULT_MAX_WAIT_S, minimum=1, env=resolve_env(env))
 
 
 # Cadence for SSE comments emitted while waiting on a not-yet-existing log

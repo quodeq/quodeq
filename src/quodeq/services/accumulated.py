@@ -49,6 +49,7 @@ from quodeq.services._accumulated_aggregate import (  # noqa: F401 — re-export
     compute_accumulated_scores,
     compute_accumulated_trends,
     numeric_average,
+    severity_counts_from_payload,
 )
 
 

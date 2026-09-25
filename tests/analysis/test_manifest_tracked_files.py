@@ -65,6 +65,23 @@ def test_untracked_file_is_not_scanned(tmp_path: Path, detection: dict) -> None:
     assert manifest.skipped_untracked == 1
 
 
+def test_uses_injected_tracked_files_instead_of_asking_git(tmp_path: Path, detection: dict) -> None:
+    """tracked_files is a call-time seam: when set, build_manifest must
+    filter against it directly instead of calling list_tracked_files -- no
+    git repo is involved at all here, proving the injected set alone drives
+    the filtering."""
+    for name in ("app0.py", "app1.py", "app2.py"):
+        _write(tmp_path / name)
+
+    manifest = build_manifest(
+        tmp_path, detection, tracked_files={tmp_path.resolve() / "app0.py"},
+    )
+    # total_files is counted before per-language target thresholds apply, so
+    # it reflects the filter directly regardless of MIN_FILES_PER_TARGET.
+    assert manifest.total_files == 1
+    assert manifest.skipped_untracked == 2
+
+
 def test_skipped_untracked_is_zero_without_git(tmp_path: Path, detection: dict) -> None:
     for name in ("app0.py", "app1.py", "app2.py"):
         _write(tmp_path / name)

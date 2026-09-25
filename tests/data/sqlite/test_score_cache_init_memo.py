@@ -130,7 +130,7 @@ def test_a_locked_score_cache_is_not_deleted(db_path, monkeypatch) -> None:
     lock hit there would never reach this test; blocking on the schema's
     own CREATE TABLE avoids that path entirely.
     """
-    monkeypatch.setattr(score_cache_db, "_BUSY_TIMEOUT_MS", 50)
+    monkeypatch.setattr(score_cache_db, "SQLITE_BUSY_TIMEOUT_MS", 50)
     pre = sqlite3.connect(db_path)
     pre.execute("PRAGMA journal_mode = WAL")
     pre.close()

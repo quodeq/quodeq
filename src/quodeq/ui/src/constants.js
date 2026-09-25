@@ -1,4 +1,5 @@
 import { GRANULARITY } from './utils/granularity.js';
+import { SECONDS_PER_MINUTE, MS_PER_SECOND } from './utils/time.js';
 
 const UNDEFINED_TYPEOF = 'undefined'; // typeof sentinel for the event-dispatch helpers' "are we in a browser" guard
 
@@ -8,6 +9,26 @@ const UNDEFINED_TYPEOF = 'undefined'; // typeof sentinel for the event-dispatch 
 export const ENV_TRUE = 'true';
 
 export const ISO_25010_URL = 'https://www.iso.org/';
+
+// Upper bound of every dimension/principle/overall score axis: scores are
+// always shown and compared on a 0-10 scale. Shared across the score charts,
+// compare views, the grade-formula boundary editor and the map visualization
+// so they all agree on where "full score" is.
+export const SCORE_SCALE_MAX = 10;
+
+// Fraction-to-percent multiplier, and the ceiling of any value already on
+// the percent axis (a progress bar's aria-valuemax, a percent field's full
+// value). Shared by every `* 100` percent conversion and percent-scale
+// ceiling across the app so they all agree on what "100%" means. Not a
+// general-purpose "100" default — a value on a different 0-100 domain scale
+// (e.g. confidence) gets its own name next to that scale's other constants.
+export const PERCENT = 100;
+
+// Idle timeout for an SSE stream (the assistant chat and the eval job log):
+// no frame for this long and the stream is treated as stalled and torn
+// down. Shared by useAssistantStream and useJobLogStream so both time out
+// identically instead of drifting apart if one is tuned and not the other.
+export const STREAM_INACTIVITY_MS = SECONDS_PER_MINUTE * MS_PER_SECOND;
 
 // Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).
 // These client-side defaults can be overridden by server config (ai_providers.json).
@@ -20,6 +41,11 @@ export const TIME_LIMIT_STORAGE_KEY = 'cc-time-limit';
 
 export const AI_CMD_STORAGE_KEY = 'cc-ai-cmd';
 export const PER_DIMENSION_STORAGE_KEY = 'cc-per-dimension';
+
+// The analysis-power tier (fast/balanced/thorough): canonical home for
+// powerLevels.js's STORAGE_KEY, so hook-layer code (evaluationLifecycleHelpers.js)
+// doesn't have to import a UI components module for a storage key.
+export const ANALYSIS_POWER_STORAGE_KEY = 'quodeq-analysis-power';
 
 export const ACTIVE_PROVIDER_KEY = 'cc-active-provider';
 

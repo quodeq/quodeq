@@ -136,3 +136,18 @@ def test_run_outside_cacheable_set_is_read_fresh(tmp_path: Path) -> None:
         make_scoring_trend_fetcher(reports, project, cacheable_run_ids={"other"}, deps=deps)("r1")
 
     assert calls == ["r1", "r1"]
+
+
+def test_unreadable_run_outside_cacheable_set_is_skipped(tmp_path: Path) -> None:
+    """Runs the cache may not persist are read directly; a read error there
+    must be skipped like it is on the cached path, not raised."""
+    reports, project = _project(tmp_path)
+
+    def gone(_rr, _p, run_id):
+        raise FileNotFoundError(run_id)
+
+    fetcher = make_scoring_trend_fetcher(
+        reports, project, cacheable_run_ids={"other"}, deps=ScoringDeps(read_run_scalars=gone),
+    )
+
+    assert fetcher("r1") == []

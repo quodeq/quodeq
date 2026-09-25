@@ -89,7 +89,7 @@ def _check_cli_binary_override(provider: str, override: str) -> None:
         )
 
 
-def _check_cli_provider(provider: str) -> None:
+def _check_cli_provider(provider: str, *, env: dict[str, str] | None = None) -> None:
     """Check that a CLI provider binary is available on PATH."""
     if not SAFE_CMD_TOKEN_RE.fullmatch(provider):
         raise RuntimeError(
@@ -98,7 +98,7 @@ def _check_cli_provider(provider: str) -> None:
             f"Choose a provider in the dashboard Settings:\n"
             f"  quodeq"
         )
-    override = get_ai_cmd_path()
+    override = get_ai_cmd_path(env)
     if override:
         _check_cli_binary_override(provider, override)
         return
@@ -165,13 +165,15 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
             )
 
 
-def check_evaluate_prereqs() -> None:
+def check_evaluate_prereqs(env: dict[str, str] | None = None) -> None:
     """Check all prerequisites for the evaluate command.
 
     Checks the configured AI provider instead of always assuming Claude.
-    If no provider is configured, tells the user to select one.
+    If no provider is configured, tells the user to select one. *env* is the
+    caller's resolved environment (None reads the process environment); every
+    provider, binary-override and API-key lookup below goes through it.
     """
-    if not _is_provider_explicitly_configured():
+    if not _is_provider_explicitly_configured(env):
         raise RuntimeError(
             "No AI provider configured.\n\n"
             "Quodeq needs an AI provider to evaluate your code. You can use:\n\n"
@@ -180,12 +182,12 @@ def check_evaluate_prereqs() -> None:
             f"{_SETTINGS_HINT}"
         )
 
-    provider = get_ai_cmd()
+    provider = get_ai_cmd(env)
     configs = get_provider_configs()
     provider_cfg = configs.get(provider, {})
     provider_type = provider_cfg.get("type", ProviderType.CLI)
 
     if provider_type == ProviderType.CLI:
-        _check_cli_provider(provider)
+        _check_cli_provider(provider, env=env)
     elif provider_type == ProviderType.API:
-        _check_api_provider(provider)
+        _check_api_provider(provider, env=env)

@@ -14,6 +14,7 @@ import termios
 from quodeq.shared.constants import PLATFORM_DARWIN
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.process_kill import kill_proc_tree
+from quodeq.terminal.constants import PTY_READ_MAX_BYTES
 
 _logger = logging.getLogger(__name__)
 
@@ -116,7 +117,7 @@ class UnixPty:
             self._selector.unregister(key.fd)
         self._selector.register(fd, selectors.EVENT_READ)
 
-    def read(self, max_bytes: int = 65536) -> bytes:
+    def read(self, max_bytes: int = PTY_READ_MAX_BYTES) -> bytes:
         if self._master_fd is None or self._selector is None:
             return b""
         try:

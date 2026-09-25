@@ -56,16 +56,16 @@ class TestAgentFailureStreak:
         check_agent_failure_streak([_result(False)] * 4)
         assert not cancellation.is_cancelled()
 
-    def test_env_override(self, monkeypatch):
-        monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "2")
-        check_agent_failure_streak([_result(False)])
+    def test_run_limit_applies(self, monkeypatch):
+        # The run's limit arrives resolved; an exported value is not re-read.
+        monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "50")
+        check_agent_failure_streak([_result(False)], limit=2)
         assert not cancellation.is_cancelled()
-        check_agent_failure_streak([_result(False)] * 2)
+        check_agent_failure_streak([_result(False)] * 2, limit=2)
         assert cancellation.is_cancelled()
 
-    def test_zero_disables(self, monkeypatch):
-        monkeypatch.setenv("QUODEQ_AGENT_FAILURE_STREAK", "0")
-        check_agent_failure_streak([_result(False)] * 50)
+    def test_zero_disables(self):
+        check_agent_failure_streak([_result(False)] * 50, limit=0)
         assert not cancellation.is_cancelled()
 
 
@@ -84,6 +84,26 @@ class TestRunSingleAgentFatal:
         assert "quota gone" in result.error
         assert cancellation.is_cancelled()
         assert (cancellation.cancel_reason() or "").startswith(f"{REASON_PROVIDER_FATAL}:quota")
+
+    def test_uses_injected_run_fn_instead_of_the_module_default(self, tmp_path):
+        """WorkerContext.run_fn is a call-time seam: when set, run_single_agent
+        must call it instead of the concrete run_analysis, and never touch the
+        module-level default at all."""
+        calls: list[dict] = []
+        wctx = WorkerContext(
+            dimension="security", dimension_key="security",
+            evidence_dir=tmp_path, queue_path=tmp_path / "q.json",
+            run_fn=lambda **kwargs: calls.append(kwargs),
+        )
+        with patch(
+            "quodeq.analysis.subagents._pool_worker.run_analysis",
+            side_effect=AssertionError("the concrete run_analysis must not be called"),
+        ):
+            result = run_single_agent(0, tmp_path, "prompt", AnalysisConfig(), wctx)
+        assert len(calls) == 1
+        assert calls[0]["work_dir"] == tmp_path
+        assert calls[0]["prompt"] == "prompt"
+        assert result.success is True
 
 
 class TestLoopFatalMapping:

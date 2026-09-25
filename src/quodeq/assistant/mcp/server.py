@@ -14,6 +14,7 @@ from quodeq.assistant.tools.registry import ToolRegistry
 from quodeq.assistant.tools.write_tools import register_write_tools
 from quodeq.assistant import AssistantRepository
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids
+from quodeq.core.jsonrpc import JsonRpcErrorCode
 from quodeq.core.mcp_method import McpMethod
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository
 from quodeq.shared.fault_isolation import run_isolated
@@ -73,7 +74,7 @@ def _dispatch_one(registry: ToolRegistry, msg: dict, stdout: TextIO) -> None:
     elif method and method.startswith("notifications/"):
         return
     else:
-        _jsonrpc.send(_jsonrpc.err(req_id, -32601, f"method not found: {method}"), stdout)
+        _jsonrpc.send(_jsonrpc.err(req_id, JsonRpcErrorCode.METHOD_NOT_FOUND, f"method not found: {method}"), stdout)
 
 
 def _send_internal_error(req_id: object, stdout: TextIO) -> None:
@@ -81,7 +82,7 @@ def _send_internal_error(req_id: object, stdout: TextIO) -> None:
         # The exception detail is logged to stderr by run_isolated; the
         # client frame carries only a generic message so internal failure
         # detail is not exposed to MCP callers.
-        _jsonrpc.send(_jsonrpc.err(req_id, -32603, "internal error"), stdout)
+        _jsonrpc.send(_jsonrpc.err(req_id, JsonRpcErrorCode.INTERNAL_ERROR, "internal error"), stdout)
 
 
 def serve(registry: ToolRegistry, *, stdin: TextIO, stdout: TextIO, stderr: TextIO) -> None:
@@ -119,6 +120,7 @@ def _build_registry_from_args(ns: argparse.Namespace) -> ToolRegistry:
         evaluators_dir=Path(ns.evaluators_dir),
         compiled_dir=Path(ns.compiled_dir),
         dimensions_file=Path(ns.dimensions_file),
+        repo_is_git=repo_root is not None and (repo_root / ".git").exists(),
         project_id=ns.project_id or None,
         reports_dir=reports_dir,
         worktree_dir=Path(ns.worktree_dir) if getattr(ns, "worktree_dir", "") else None,

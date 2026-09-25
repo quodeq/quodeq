@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
+from http import HTTPStatus
 from typing import Callable
 
 from flask import Flask, Response, jsonify
@@ -19,7 +19,7 @@ from quodeq.api import _assistant_helpers
 from quodeq.api._constants import CODE_INVALID_PARAM
 from quodeq.api.helpers import error_response, optional_json_object_or_error
 from quodeq.assistant import SessionScope
-from quodeq.assistant.orchestrator import write_safe_provider
+from quodeq.assistant.orchestrator import write_available
 from quodeq.assistant.skills import RESERVED_COMMANDS, cached_skills
 from quodeq.assistant.tools.actions import ACTION_DESCRIPTIONS, ACTION_TYPES
 from quodeq.core.types.project_source import ProjectSource
@@ -43,24 +43,17 @@ def _validate_session_request(
     provider_cfg = gates.known_provider(str(body.get("provider", "")))
     if provider_cfg is None:
         body_, status = error_response(
-            "unknown or unsupported provider", 400, "INVALID_PROVIDER")
+            "unknown or unsupported provider", HTTPStatus.BAD_REQUEST, "INVALID_PROVIDER")
         return (jsonify(body_), status), ""
     source = str(body.get("source") or ProjectSource.LOCAL)
     if source not in ProjectSource:
-        body_, status = error_response("invalid source", 400, "INVALID_SOURCE")
+        body_, status = error_response("invalid source", HTTPStatus.BAD_REQUEST, "INVALID_SOURCE")
         return (jsonify(body_), status), source
     if source == ProjectSource.SHARED:
         shared_error = gates.shared_source_error()
         if shared_error is not None:
             return shared_error, source
     return None, source
-
-
-def _compute_write_available(source: str, repo_root: str | None, provider: str) -> bool:
-    return (source == ProjectSource.LOCAL
-            and bool(repo_root)
-            and (Path(repo_root) / ".git").exists()
-            and write_safe_provider(provider))
 
 
 def _resolve_session_scope(source: str, body: dict) -> tuple[str | None, str | None, str]:
@@ -124,12 +117,13 @@ def register_assistant_session_routes(app: Flask, gates: SessionGates) -> None:
             source=source,
             scope=SessionScope(repo_root, run_dir, str(project_id) if project_id else None),
         )
-        write_available = _compute_write_available(source, repo_root, str(body["provider"]))
+        read_only = source == ProjectSource.SHARED
         return jsonify({"sessionId": session_id,
                         "repoAttached": repo_root is not None,
                         "repoReason": repo_reason,
-                        "readOnly": source == ProjectSource.SHARED,
-                        "writeAvailable": write_available}), 201
+                        "readOnly": read_only,
+                        "writeAvailable": write_available(
+                            repo_root, str(body["provider"]), read_only)}), HTTPStatus.CREATED
 
     @app.get("/api/assistant/skills")
     def get_assistant_catalog():

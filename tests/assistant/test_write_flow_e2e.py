@@ -27,7 +27,8 @@ def test_edit_diff_apply_roundtrip(tmp_path, monkeypatch):
     ctx = ToolContext(
         repository=store, session_id="s1", run_dir=None, repo_root=repo,
         evaluators_dir=tmp_path / "e", compiled_dir=tmp_path / "c",
-        dimensions_file=tmp_path / "d.json", project_id="proj")
+        dimensions_file=tmp_path / "d.json", project_id="proj",
+        repo_is_git=True)
 
     def scripted_model_turn(*, messages, config, session, **_):
         # the "model": edit a file, self-review the diff, report done

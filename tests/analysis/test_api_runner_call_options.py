@@ -50,17 +50,17 @@ class TestResolveTimeout:
         )
         assert _resolve_timeout(cfg, is_openai=True) == _CLOUD_TIMEOUT
 
-    def test_env_override_wins(self, monkeypatch):
+    def test_read_timeout_override_wins(self):
         from quodeq.analysis._api_call import _resolve_timeout
-        monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "900")
+        # QUODEQ_API_READ_TIMEOUT arrives resolved, as read_timeout_s.
         cfg = ApiRunnerConfig(
-            model="m", api_base="http://localhost:11434/v1", n_subagents=2,
+            model="m", api_base="http://localhost:11434/v1", n_subagents=2, read_timeout_s=900,
         )
         assert _resolve_timeout(cfg, is_openai=False).read == 900.0
 
-    def test_env_override_garbage_is_ignored(self, monkeypatch):
+    def test_exported_env_is_not_read_per_call(self, monkeypatch):
         from quodeq.analysis._api_call import _resolve_timeout
-        monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "soon")
+        monkeypatch.setenv("QUODEQ_API_READ_TIMEOUT", "900")
         cfg = ApiRunnerConfig(
             model="m", api_base="http://localhost:11434/v1", n_subagents=2,
         )
@@ -114,11 +114,11 @@ class TestLocalOutputCap:
         kwargs = _create_kwargs(api_config)
         assert kwargs["max_tokens"] == 8192
 
-    def test_env_override_and_zero_disables(self, api_config, monkeypatch):
-        monkeypatch.setenv("QUODEQ_MAX_OUTPUT_TOKENS", "4096")
-        assert _create_kwargs(api_config)["max_tokens"] == 4096
-        monkeypatch.setenv("QUODEQ_MAX_OUTPUT_TOKENS", "0")
-        assert "max_tokens" not in _create_kwargs(api_config)
+    def test_override_and_zero_disables(self):
+        cfg = ApiRunnerConfig(model="m", api_base="http://localhost:8000/v1", max_tokens_override=4096)
+        assert _create_kwargs(cfg)["max_tokens"] == 4096
+        cfg = ApiRunnerConfig(model="m", api_base="http://localhost:8000/v1", max_tokens_override=0)
+        assert "max_tokens" not in _create_kwargs(cfg)
 
     def test_explicit_config_wins(self):
         cfg = ApiRunnerConfig(

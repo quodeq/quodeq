@@ -10,7 +10,8 @@ from pathlib import Path
 
 from quodeq.assistant.adapters._cli_spawn import build_chat_env
 from quodeq.assistant.skills import cached_skills, load_skills, skills_directory
-from quodeq.assistant.worktree import _DEFAULT_WORKTREE_TTL_H, worktree_ttl_hours, worktrees_base
+from quodeq.assistant._worktree_git import _DEFAULT_WORKTREE_TTL_H
+from quodeq.assistant.worktree import worktree_ttl_hours, worktrees_base
 
 
 class TestSkillsDirectory:

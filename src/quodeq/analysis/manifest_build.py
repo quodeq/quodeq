@@ -152,6 +152,8 @@ def build_manifest(
     detection: dict,
     disciplines_conf: Path | None = None,
     scope_path: str | None = None,
+    *,
+    tracked_files: set[Path] | None = None,
 ) -> SourceManifest:
     """Walk a repository and build a SourceManifest.
 
@@ -185,7 +187,7 @@ def build_manifest(
         skip_dirs=set(detection.get("skip_dirs", [])),
         skip_patterns=detection.get("skip_patterns", []),
         ignore_patterns=load_ignore_patterns(src),
-        tracked_files=list_tracked_files(src),
+        tracked_files=tracked_files if tracked_files is not None else list_tracked_files(src),
     )
     manifest = _dispatch_manifest_build(src, walk, disciplines_conf, scope_path)
     skipped = manifest.skipped_untracked

@@ -1,18 +1,24 @@
 """Reap leaked assistant worktrees and their ``quodeq/fix-*`` branches.
 
-Split from ``worktree.py`` to keep that file under the size ratchet's
-300-line cap. Moved verbatim.
+Sweeps the worktree table for two failure modes: an ``active`` row whose
+session was abandoned (dir already gone, or past the TTL), and a terminal
+row (applied/pr_created/discarded/stale) whose worktree dir survived a
+previous failed removal. Both cases go through ``WorktreeManager.remove()``
+via ``_default_manager`` (or an injected ``manager_factory`` in tests).
 """
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.assistant._worktree_git import WorktreeError, WorktreeStatus, worktree_ttl_hours
 from quodeq.assistant._worktree_manager import WorktreeManager
-from quodeq.assistant.worktree import WorktreeError, WorktreeStatus, worktree_ttl_hours
 
 _logger = logging.getLogger(__name__)
+
+ManagerFactory = Callable[[dict], WorktreeManager]
 
 
 def _row_age_hours(created_at: str | None, now: datetime) -> float | None:
@@ -29,18 +35,22 @@ def _row_age_hours(created_at: str | None, now: datetime) -> float | None:
     return None
 
 
-def _remove_worktree_row(row: dict) -> None:
+def _default_manager(row: dict) -> WorktreeManager:
+    return WorktreeManager(
+        repo_root=Path(row["repo_root"]), path=Path(row["path"]), branch=row["branch"],
+    )
+
+
+def _remove_worktree_row(row: dict, manager_factory: ManagerFactory | None = None) -> None:
     """Best-effort remove of a worktree dir + its branch from the row data."""
+    build_manager = manager_factory if manager_factory is not None else _default_manager
     try:
-        WorktreeManager(
-            repo_root=Path(row["repo_root"]), path=Path(row["path"]),
-            branch=row["branch"],
-        ).remove()
+        build_manager(row).remove()
     except WorktreeError as exc:
         _logger.warning("GC could not remove worktree %s: %s", row["path"], exc)
 
 
-def gc_worktrees(repository, ttl_hours: int | None = None) -> None:
+def gc_worktrees(repository, ttl_hours: int | None = None, manager_factory: ManagerFactory | None = None) -> None:
     """Reap leaked assistant worktrees + their ``quodeq/fix-*`` branches.
 
     Cleanup only happened on explicit apply/pr/discard, so a write session the
@@ -73,11 +83,11 @@ def gc_worktrees(repository, ttl_hours: int | None = None) -> None:
                 continue
             age = _row_age_hours(row["created_at"], now)
             if ttl <= 0 or (age is not None and age >= ttl):
-                _remove_worktree_row(row)
+                _remove_worktree_row(row, manager_factory)
                 repository.set_worktree_status(row["session_id"], WorktreeStatus.DISCARDED)
         elif dir_exists:
             # Terminal row whose worktree a failed remove left behind: retry.
-            _remove_worktree_row(row)
+            _remove_worktree_row(row, manager_factory)
 
 
 # Back-compat alias: the workspace route's one-shot GC calls this name.

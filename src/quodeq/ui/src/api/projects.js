@@ -126,12 +126,26 @@ export function scanPath(dirPath) {
 // Standards and findings APIs live in their own modules (see api/index.js).
 
 /**
+ * request()'s generic `Request failed: ${status}` fallback replaces each
+ * route's own wording when the envelope carries no `error` field. Restore
+ * the exact pre-request() text for that one case, in place, so callers that
+ * read err.message (e.g. via apiErrorMessage's fallback) see the same
+ * string as before the move onto request().
+ */
+function restoreFallbackMessage(err, label) {
+  if (err?.status !== undefined && !err?.body?.error) {
+    err.message = `${label} failed (${err.status})`;
+  }
+}
+
+/**
  * Import a previously-exported project zip.
  *
- * Uses raw fetch so we can (a) send multipart/form-data without the shared
- * request() wrapper forcing application/json, and (b) read err.status,
- * err.kind, err.existingProjectId on a 409 collision so the caller can
- * prompt the user to choose Replace / Import as copy / Cancel.
+ * Sends multipart/form-data (request() skips the JSON Content-Type for a
+ * FormData body) with no timeout — large project zips can take a while to
+ * upload. err.status, err.kind, err.existingProjectId, err.projectName come
+ * off request()'s err.body so the caller can prompt the user to choose
+ * Replace / Import as copy / Cancel on a 409 collision.
  *
  * @param {File|Blob} file - the .zip file to import
  * @param {{ action?: 'replace'|'copy' }} [opts]
@@ -142,25 +156,16 @@ export async function importProject(file, opts = {}) {
   const form = new FormData();
   form.append('file', file);
   if (opts.action) form.append('action', opts.action);
-  // No timeout: large project zips can take a while to upload.
-  const res = await fetch(`${BASE}/projects/import`, { method: 'POST', body: form });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(body.error || `importProject failed (${res.status})`);
-    err.status = res.status;
-    if (body.code) err.code = body.code;
-    if (body.kind) err.kind = body.kind;
-    if (body.existingProjectId) err.existingProjectId = body.existingProjectId;
-    if (body.projectName) err.projectName = body.projectName;
-    throw err;
+  try {
+    return await request('/projects/import', { method: 'POST', body: form, timeout: null });
+  } catch (e) {
+    if (e?.body?.kind) e.kind = e.body.kind;
+    if (e?.body?.existingProjectId) e.existingProjectId = e.body.existingProjectId;
+    if (e?.body?.projectName) e.projectName = e.body.projectName;
+    restoreFallbackMessage(e, 'importProject');
+    throw e;
   }
-  return body;
 }
-
-// Note: uses raw fetch (not the shared request() wrapper) so the wizard can
-// read err.status and err.existingProjectId on a 409 duplicate response —
-// request() throws plain Error and discards both. Refactoring request() to
-// enrich errors is a separate concern.
 
 /**
  * Register a new project without starting an evaluation.
@@ -171,27 +176,18 @@ export async function importProject(file, opts = {}) {
  * @throws {Error & { status: number, code?: string, existingProjectId?: string }} on non-2xx
  */
 export async function registerProject(payload) {
-  let res;
   try {
-    res = await fetch(`${BASE}/projects`, {
+    return await request('/projects', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(REGISTER_PROJECT_TIMEOUT_MS),
+      timeout: REGISTER_PROJECT_TIMEOUT_MS,
     });
   } catch (e) {
     if (e?.name === FETCH_ERROR_NAME.TIMEOUT || e?.name === FETCH_ERROR_NAME.ABORT) {
       throw new Error('Project registration timed out. The server may be unresponsive or the clone is taking too long; try again.');
     }
+    if (e?.body?.existingProjectId) e.existingProjectId = e.body.existingProjectId;
+    restoreFallbackMessage(e, 'registerProject');
     throw e;
   }
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(body.error || `registerProject failed (${res.status})`);
-    err.status = res.status;
-    if (body.code) err.code = body.code;
-    if (body.existingProjectId) err.existingProjectId = body.existingProjectId;
-    throw err;
-  }
-  return body;
 }

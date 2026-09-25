@@ -85,3 +85,18 @@ class TestGetDimensionEval:
         with patch("quodeq.services.fs_reports.resolve_dimension_eval", return_value=None):
             result = get_dimension_eval(str(tmp_path), "proj", "run1", "dim")
             assert result is None
+
+    def test_evaluators_dir_override_reaches_resolve_options(self, tmp_path):
+        """An injected *evaluators_dir* is used instead of the global
+        ``default_paths().evaluators_dir`` (CLEA-DEP-07, row 10718)."""
+        from quodeq.services.fs_reports import get_dimension_eval
+        run_dir = tmp_path / "proj" / "run1"
+        run_dir.mkdir(parents=True)
+        custom_evaluators = tmp_path / "custom-evaluators"
+        custom_evaluators.mkdir()
+        with patch("quodeq.services.fs_reports.resolve_dimension_eval", return_value=None) as mock_resolve:
+            get_dimension_eval(
+                str(tmp_path), "proj", "run1", "dim", evaluators_dir=custom_evaluators,
+            )
+        options = mock_resolve.call_args.kwargs["options"]
+        assert options.evaluators_dir == custom_evaluators

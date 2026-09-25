@@ -15,7 +15,7 @@ from quodeq.services._violations_shared import (
     ResponseOptions,
 )
 from quodeq.core.types.finding_type import FINDING_TYPES, FindingType
-from quodeq.shared.utils import open_text
+from quodeq.services.wiring import iter_stream_lines
 
 _logger = logging.getLogger(__name__)
 
@@ -94,11 +94,8 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> Vi
     """Extract violations from a live-stream event log file."""
     acc = _StreamAccumulator(dimension=ctx.dimension)
     try:
-        with open_text(stream_path) as _stream:
-            for raw_line in _stream:
-                stripped = raw_line.strip()
-                if stripped:
-                    _parse_stream_line(stripped, acc)
+        for stripped in iter_stream_lines(stream_path, missing_ok=False):
+            _parse_stream_line(stripped, acc)
     except OSError as exc:
         _logger.warning("Failed to read stream file: %s", exc)
         return None
