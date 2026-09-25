@@ -20,8 +20,11 @@ import dataclasses
 import pytest
 
 from quodeq.analysis import _drop_stats
-from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.run_types import RunConfig
+# subprocess.py's public __all__ re-exports AnalysisConfig; reusing that
+# keeps this file off the private-imports ratchet instead of importing
+# straight from _config.
+from quodeq.analysis.subprocess import AnalysisConfig
 from tests.conftest import RecordingLog
 
 

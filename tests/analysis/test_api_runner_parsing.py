@@ -9,6 +9,7 @@ import pytest
 
 pytest.importorskip("openai", reason="requires the openai SDK")
 
+from quodeq.analysis import _drop_stats
 from quodeq.analysis._api_runner import ApiRunnerConfig, call_api
 from quodeq.analysis._api_schema import _Finding, parse_findings
 
@@ -85,12 +86,10 @@ class TestDropStatsRecording:
     def _isolated_counter(self, monkeypatch):
         # call_api records through the module-default counter; swap in a
         # fresh instance so nothing leaks in from (or out to) other tests.
-        from quodeq.analysis import _drop_stats
         monkeypatch.setattr(
             _drop_stats, "_default_counter", _drop_stats.DropStatsCounter())
 
     def test_call_with_malformed_finding_records_drop_and_kept(self, api_config):
-        from quodeq.analysis import _drop_stats
         valid = {"req": "R1", "t": "violation", "file": "a.py", "line": 5,
                  "severity": "minor", "w": "x", "snippet": "code", "reason": "bad"}
         malformed = {"t": "violation", "file": "b.py", "line": 1, "w": "y",
@@ -105,7 +104,6 @@ class TestDropStatsRecording:
         assert stats.kept == 1
 
     def test_failed_call_records_nothing(self, api_config):
-        from quodeq.analysis import _drop_stats
         client = MagicMock()
         client.chat.completions.create.side_effect = httpx.ReadTimeout("timeout")
         with patch("openai.OpenAI") as mock_oa:
@@ -119,7 +117,6 @@ class TestDropStatsRecording:
         run -- instead of the process-wide default."""
         from dataclasses import replace
 
-        from quodeq.analysis import _drop_stats
         from quodeq.analysis.run_types import RunConfig
 
         run_config = RunConfig(src=tmp_path, language="python")

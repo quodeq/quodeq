@@ -5,13 +5,13 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 
-from quodeq.analysis._command import (
-    register_cli_mcp,
-    _unregister_cli_mcp,
-    DEFAULT_CLI_MCP_REGISTRY,
-)
+from quodeq.analysis._command import register_cli_mcp, _unregister_cli_mcp
 from quodeq.analysis._config import AnalysisConfig
 from quodeq.analysis.run_types import RunConfig
+# subprocess.py already imports this for its own run-scoped-registry fallback
+# (see _run_cli_analysis); reusing that public re-export here keeps this file
+# off the private-imports ratchet instead of importing straight from _command.
+from quodeq.analysis.subprocess import DEFAULT_CLI_MCP_REGISTRY
 
 
 # ---------------------------------------------------------------------------

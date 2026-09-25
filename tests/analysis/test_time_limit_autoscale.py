@@ -222,14 +222,18 @@ class TestLaunchPoolCarriesRunConfig:
         """``_build_pool_config`` must hand every agent's AnalysisConfig the
         SAME RunConfig instance (not a copy), so the run-scoped drop counter
         and MCP registry stay shared across pool worker threads -- see
-        ``RunConfig.drop_counter``/``mcp_registry``."""
-        from quodeq.analysis.subagents import _pool_launcher
+        ``RunConfig.drop_counter``/``mcp_registry``.
+
+        Imports through the public runner re-export and string patch targets
+        rather than the private _pool_launcher module, per the private-import
+        ratchet -- see TestLaunchPoolInjectedFactory below."""
+        from quodeq.analysis.subagents.runner import LaunchPoolParams, launch_pool
 
         config = RunConfig(
             src=tmp_path, language="python",
             options=AnalysisOptions(deadline_at=None, time_limit=600),
         )
-        params = _pool_launcher.LaunchPoolParams(
+        params = LaunchPoolParams(
             evidence_dir=tmp_path,
             queue_path=tmp_path / "queue.json",
             prompt="p",
@@ -242,10 +246,10 @@ class TestLaunchPoolCarriesRunConfig:
             pool.run.return_value = []
             return pool
 
-        with patch.object(_pool_launcher, "SubagentPool", side_effect=_fake_pool), \
-             patch.object(_pool_launcher, "get_ai_cmd", return_value="ollama"), \
+        with patch("quodeq.analysis.subagents._pool_launcher.SubagentPool", side_effect=_fake_pool), \
+             patch("quodeq.analysis.subagents._pool_launcher.get_ai_cmd", return_value="ollama"), \
              patch("quodeq.analysis.subagents._pool_launcher.emit_marker"):
-            _pool_launcher.launch_pool(config, "dim-x", params)
+            launch_pool(config, "dim-x", params)
 
         assert captured["config"].run_config is config
         assert captured["config"].run_config.drop_counter is config.drop_counter
