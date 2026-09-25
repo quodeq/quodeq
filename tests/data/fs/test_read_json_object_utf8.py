@@ -21,13 +21,11 @@ def test_generic_reader_reads_non_utf8_as_none(tmp_path):
     assert read_json_object(path) is None
 
 
-def test_project_record_readers_let_a_non_utf8_file_raise(tmp_path):
+def test_project_record_readers_read_a_non_utf8_file_as_none(tmp_path):
     (tmp_path / REPOSITORY_INFO_FILENAME).write_bytes(_NOT_UTF8)
     (tmp_path / SCAN_FILENAME).write_bytes(_NOT_UTF8)
-    with pytest.raises(UnicodeDecodeError):
-        read_repository_info(tmp_path)
-    with pytest.raises(UnicodeDecodeError):
-        read_scan_json(tmp_path)
+    assert read_repository_info(tmp_path) is None
+    assert read_scan_json(tmp_path) is None
 
 
 def test_scan_total_files_reads_a_non_utf8_scan_as_zero(tmp_path):
