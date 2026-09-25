@@ -115,7 +115,7 @@ def _maybe_consolidated_live_progress(job_id: str, ctx: ProgressContext) -> Scan
         or any((evidence_dir / f"{d}_queue.json").is_file() for d in ctx.dim_ids)
     ):
         return None
-    return _scan_progress(job_id, ctx, [consolidated_dim_progress(ctx.run_dir)])
+    return _scan_progress(job_id, ctx, [consolidated_dim_progress(ctx.run_dir, memo=ctx.live_tallies)])
 
 
 def _gather_progress_context(
@@ -169,7 +169,7 @@ def _build_per_dim_progress(job_id: str, ctx: ProgressContext) -> ScanProgress:
         # This poll was the last one that could learn anything from the run's
         # evidence files, so its resumable tallies go now rather than sitting
         # in the memo until 256 other keys evict them.
-        forget_live_tallies(ctx.run_dir)
+        forget_live_tallies(ctx.run_dir, memo=ctx.live_tallies)
 
     return _scan_progress(job_id, ctx, dim_results)
 

@@ -7,15 +7,15 @@ plain recompute, so no caller has to handle cache failure.
 from __future__ import annotations
 
 import sqlite3
-import threading
-from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Callable, Iterator
+from typing import Callable
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types import DimensionResult
 from quodeq.services._score_cache_stale import recall, refresh_in_background, remember
 from quodeq.services.wiring import (
+    DEFAULT_SINGLE_FLIGHT,
+    SingleFlight,
     open_score_cache,
     read_all_cached_rows,
     read_cached_accumulated,
@@ -43,31 +43,6 @@ def _log_write_failure(operation: str, exc: sqlite3.Error, *, log: LogSink) -> N
     log.warning(f"score-cache write failed for {operation}, degrading to recompute: {exc}")
 
 
-# In-flight computes by (kind, project, version). Concurrent misses on the
-# same key must share ONE compute: these computes walk a project's full run
-# history and can take minutes right after an upgrade invalidates every
-# cached row, and the client re-requests while the first compute is still
-# running. The registry entry is dropped once no thread holds the key's lock;
-# a waiter that raced the cleanup at worst recomputes (idempotent write).
-_INFLIGHT_GUARD = threading.Lock()
-_INFLIGHT: dict[tuple[str, str, str], threading.Lock] = {}
-
-
-@contextmanager
-def _single_flight(kind: str, project: str, version: str) -> Iterator[None]:
-    key = (kind, project, version)
-    with _INFLIGHT_GUARD:
-        lock = _INFLIGHT.setdefault(key, threading.Lock())
-    lock.acquire()
-    try:
-        yield
-    finally:
-        lock.release()
-        with _INFLIGHT_GUARD:
-            if not lock.locked() and _INFLIGHT.get(key) is lock:
-                del _INFLIGHT[key]
-
-
 @dataclass(frozen=True)
 class CacheTable:
     """One read-through score-cache table: how to read and write its rows."""
@@ -81,15 +56,19 @@ class CacheTable:
 
 @dataclass(frozen=True)
 class CacheSlot:
-    """One read-through cache slot: which table, and the (project, version) key.
+    """One read-through cache slot: which table, the (project, version) key,
+    and the single-flight registry that serialises concurrent misses on it.
 
     Bundled so ``read_through`` -- which also takes compute/cacheable/log/
-    enabled -- stays within the 6-parameter limit.
+    enabled -- stays within the 6-parameter limit. ``single_flight`` defaults
+    to the one process-wide :data:`DEFAULT_SINGLE_FLIGHT`; a caller-supplied
+    instance is for test isolation only, never a per-request substitute.
     """
 
     table: CacheTable
     project: str
     version: str
+    single_flight: SingleFlight | None = None
 
 
 def read_through(
@@ -117,7 +96,8 @@ def read_through(
             return cached
     except sqlite3.Error:
         return compute()
-    with _single_flight(table.kind, project, version):
+    flight = slot.single_flight if slot.single_flight is not None else DEFAULT_SINGLE_FLIGHT
+    with flight.hold((table.kind, project, version)):
         # Re-check: a caller we waited on may have computed and cached it.
         try:
             with open_score_cache() as conn:

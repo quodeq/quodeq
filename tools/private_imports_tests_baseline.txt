@@ -1052,12 +1052,11 @@ tests/services/test_run_status_readers.py:7:private-name:quodeq.services._run_st
 tests/services/test_runs_unit.py:5:private-name:quodeq.services.runs_unit._row_to_run_entry
 tests/services/test_scan_progress_live_tally.py:17:private-module:quodeq.services._scan_progress_dims.forget_live_tallies
 tests/services/test_scan_progress_live_tally.py:17:private-module:quodeq.services._scan_progress_dims.live_tally
-tests/services/test_scan_progress_live_tally.py:17:private-name:quodeq.services._scan_progress_dims._LIVE_TALLIES
 tests/services/test_scan_progress_live_tally.py:17:private-name:quodeq.services._scan_progress_dims._dim_evidence_tally
 tests/services/test_scan_progress_live_tally.py:17:private-name:quodeq.services._scan_progress_dims._standards_stamp
 tests/services/test_scan_progress_live_tally.py:17:private-name:quodeq.services._scan_progress_dims._suppression_stamp
-tests/services/test_scan_progress_live_tally.py:25:private-module:quodeq.services._scan_progress_types.ProgressContext
-tests/services/test_scan_progress_tally_factory.py:15:private-module:quodeq.services._scan_progress_dims.dims
+tests/services/test_scan_progress_live_tally.py:24:private-module:quodeq.services._scan_progress_types.ProgressContext
+tests/services/test_scan_progress_tally_factory.py:16:private-module:quodeq.services._scan_progress_dims.dims
 tests/services/test_scoped_accumulated.py:10:private-name:quodeq.services.accumulated._find_children
 tests/services/test_score_cache_in_progress.py:15:private-module:quodeq.services._external_jobs
 tests/services/test_score_cache_write_failure_logging.py:31:private-module:quodeq.services._fs_metadata
