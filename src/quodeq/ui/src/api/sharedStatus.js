@@ -13,6 +13,7 @@
  */
 
 import { request } from './request.js';
+import { MS_PER_SECOND } from '../utils/time.js';
 
 /**
  * Convert a UNIX epoch-seconds timestamp (as sent by the backend) to
@@ -23,7 +24,7 @@ import { request } from './request.js';
  * @returns {number|null}
  */
 export function epochSecondsToMs(seconds) {
-  return typeof seconds === 'number' && seconds ? seconds * 1000 : null;
+  return typeof seconds === 'number' && seconds ? seconds * MS_PER_SECOND : null;
 }
 
 // ── Config Management ───────────────────────────────────────────────────────

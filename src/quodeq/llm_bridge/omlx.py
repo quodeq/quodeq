@@ -19,12 +19,11 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from quodeq.config.llm_bridge_env import omlx_api_key, omlx_base_url
+from quodeq.llm_bridge._constants import LOCAL_SERVER_PROBE_TIMEOUT_S
 from quodeq.llm_bridge._ollama import DEFAULT_MEMORY_FRACTION, HEALTH_OK, detect_memory, estimate_max_agents
 from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
-
-_TIMEOUT_S = 3
 
 
 def read_omlx_api_key(env: Mapping[str, str] | None = None) -> str:
@@ -75,7 +74,7 @@ def get_omlx_status(base_url: str | None = None) -> dict:
     root = _normalize_base(base_url or omlx_base_url())
     try:
         req = _safe_request(f"{root}/health")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
             data = json.loads(resp.read() or b"{}")
             if not isinstance(data, dict):
                 data = {}
@@ -115,7 +114,7 @@ def list_omlx_models(base_url: str | None = None, api_key: str | None = None) ->
         key = api_key if api_key is not None else read_omlx_api_key()
         if key:
             req.add_header("Authorization", f"Bearer {key}")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             entries = (data.get("data") or []) if isinstance(data, dict) else []
             models = [

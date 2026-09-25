@@ -34,9 +34,17 @@ __all__ = [
     # these from here.
     "WEBVIEW_TOKEN_UA_PREFIX", "WEBVIEW_UA_MARKER", "diag",
     "quodeq_version", "webview_user_agent",
+    "MENU_POLL_INTERVAL_S", "MENU_POLL_MAX_ATTEMPTS",  # defined here, exported for _webview_window_help_menu's poller
 ]
 
 _APP_DISPLAY_NAME = "quodeq"
+
+# NSTimer poll cadence for the About/Help native-menu install pollers, and how many
+# attempts (~5s) before one gives up. Public: shared with _webview_window_help_menu.
+MENU_POLL_INTERVAL_S = 0.2
+MENU_POLL_MAX_ATTEMPTS = 25
+
+_WM_SETICON = 0x0080  # Win32 WM_SETICON: set a window's icon via SendMessage
 
 
 @dataclass
@@ -161,7 +169,7 @@ def _schedule_about_install_poller(target: object) -> None:
     from Foundation import NSTimer  # noqa: PLC0415
 
     state = {"attempts": 0, "timer": None}
-    max_attempts = 25  # ~5 seconds at 200ms
+    max_attempts = MENU_POLL_MAX_ATTEMPTS
 
     class _InstallPoller(NSObject):
         def tryInstall_(self, timer):  # noqa: ARG002
@@ -192,7 +200,7 @@ def _schedule_about_install_poller(target: object) -> None:
     state["poller"] = poller
     try:
         timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-            0.2, poller, "tryInstall:", None, True,
+            MENU_POLL_INTERVAL_S, poller, "tryInstall:", None, True,
         )
         state["timer"] = timer
     except (AttributeError, ValueError) as exc:
@@ -286,7 +294,7 @@ def set_app_icon() -> None:
                 hicon = ctypes.windll.user32.LoadImageW(0, path, 1, 0, 0, icon_flags)
                 if hicon:
                     ctypes.windll.user32.SendMessageW(
-                        ctypes.windll.kernel32.GetConsoleWindow(), 0x0080, 0, hicon,
+                        ctypes.windll.kernel32.GetConsoleWindow(), _WM_SETICON, 0, hicon,
                     )
         except (AttributeError, OSError) as exc:
             log_debug(f"windows taskbar icon not set: {exc}")

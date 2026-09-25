@@ -22,6 +22,7 @@ import {
   filterAccumulatedByVisibleStandards,
 } from '../../utils/scoreFiltering.js';
 import { MS_PER_DAY } from '../../utils/time.js';
+import { roundOneDecimal } from '../../utils/rounding.js';
 
 // Sentinel `view` value meaning "the fleet-wide landing view, not a
 // dimension drill-down": ComparePage's default and useCompareRows' guard
@@ -106,7 +107,7 @@ export function trendDelta(trend, now, pick = (e) => e.numericAverage) {
   if (entries.length < 2) return { delta: null, lastDelta: null, spark };
   const latest = entries[entries.length - 1];
   const previous = entries[entries.length - 2];
-  const lastDelta = Math.round((latest.value - previous.value) * 10) / 10;
+  const lastDelta = roundOneDecimal(latest.value - previous.value);
   const cutoff = new Date(now).getTime() - DELTA_WINDOW_DAYS * MS_PER_DAY;
   let baseline = entries[0];
   for (const e of entries) {
@@ -114,7 +115,7 @@ export function trendDelta(trend, now, pick = (e) => e.numericAverage) {
     else break;
   }
   if (baseline === latest) return { delta: null, lastDelta, spark };
-  return { delta: Math.round((latest.value - baseline.value) * 10) / 10, lastDelta, spark };
+  return { delta: roundOneDecimal(latest.value - baseline.value), lastDelta, spark };
 }
 
 export function mean(values) {
@@ -122,8 +123,6 @@ export function mean(values) {
   if (!xs.length) return null;
   return xs.reduce((a, b) => a + b, 0) / xs.length;
 }
-
-export const round1 = (x) => Math.round(x * 10) / 10;
 
 export {
   buildRow, consequenceOf, consequenceLevel, sortRows, buildFleet,

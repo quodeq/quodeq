@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from http import HTTPStatus
 from typing import Callable
 
 from flask import Flask, Response, jsonify
@@ -42,11 +43,11 @@ def _validate_session_request(
     provider_cfg = gates.known_provider(str(body.get("provider", "")))
     if provider_cfg is None:
         body_, status = error_response(
-            "unknown or unsupported provider", 400, "INVALID_PROVIDER")
+            "unknown or unsupported provider", HTTPStatus.BAD_REQUEST, "INVALID_PROVIDER")
         return (jsonify(body_), status), ""
     source = str(body.get("source") or ProjectSource.LOCAL)
     if source not in ProjectSource:
-        body_, status = error_response("invalid source", 400, "INVALID_SOURCE")
+        body_, status = error_response("invalid source", HTTPStatus.BAD_REQUEST, "INVALID_SOURCE")
         return (jsonify(body_), status), source
     if source == ProjectSource.SHARED:
         shared_error = gates.shared_source_error()
@@ -122,7 +123,7 @@ def register_assistant_session_routes(app: Flask, gates: SessionGates) -> None:
                         "repoReason": repo_reason,
                         "readOnly": read_only,
                         "writeAvailable": write_available(
-                            repo_root, str(body["provider"]), read_only)}), 201
+                            repo_root, str(body["provider"]), read_only)}), HTTPStatus.CREATED
 
     @app.get("/api/assistant/skills")
     def get_assistant_catalog():

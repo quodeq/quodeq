@@ -5,4 +5,4 @@ export { createDashboard } from './dashboard.js';
 export { createScanSummary } from './scan.js';
 export { createJob } from './job.js';
 export { createProject } from './project.js';
-export { isFrozenRun, isLowConfidence, scoreTier, LOW_CONFIDENCE_THRESHOLD, SCORE_THRESHOLDS } from './runRules.js';
+export { isFrozenRun, isLowConfidence, scoreTier, LOW_CONFIDENCE_THRESHOLD, FULL_CONFIDENCE, SCORE_THRESHOLDS } from './runRules.js';

@@ -1,4 +1,5 @@
 import { t } from '../../../../strings/index.js';
+import { PERCENT } from '../../../../constants.js';
 
 // Most severe first, so the panel reads the same in both branches. Labels
 // are resolved per build, not here, so a locale change is picked up.
@@ -46,7 +47,7 @@ export function buildLevelInfo({ scene, currentNode, zoomedFileRef, navRef, proj
   const rate = cn.complianceRate;
   const isRoot = navRef.current.path.length <= 1;
   const lines = [
-    { label: t('map.compliance'), value: (rate * 100).toFixed(0) + '%' },
+    { label: t('map.compliance'), value: (rate * PERCENT).toFixed(0) + '%' },
     { label: t('map.contents'), value: folderCount + fileCount },
     { label: t('map.violations'), value: cn.violations },
   ];

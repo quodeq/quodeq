@@ -111,9 +111,12 @@ def test_breaker_join_keeps_its_timeout():
     from quodeq.analysis.cache import dimension_runner
 
     src = inspect.getsource(dimension_runner._dispatch_misses_with_watchers)
-    assert "breaker.stop_and_join(timeout=5.0)" in src, (
-        "breaker.stop_and_join's 5s timeout is independent of the "
+    assert "breaker.stop_and_join(timeout=STOP_JOIN_TIMEOUT_S)" in src, (
+        "breaker.stop_and_join's timeout is independent of the "
         "watcher fix and must stay in place"
+    )
+    assert dimension_runner.STOP_JOIN_TIMEOUT_S == 5.0, (
+        "the breaker's join cap is still 5s (see failure_streak.py)"
     )
 
 

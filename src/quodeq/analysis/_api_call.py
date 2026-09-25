@@ -40,6 +40,10 @@ _CLOUD_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=30.0, pool=10.0)
 # lossy path (error marker, re-dispatch next run), so nothing is silently lost.
 _DEFAULT_LOCAL_MAX_TOKENS = 8192
 
+# Distinct base URLs the one-warning-per-base cache below remembers; a run
+# configures a handful of providers at most.
+_WARN_CACHE_MAX_BASES = 8
+
 
 @dataclass(frozen=True)
 class ApiRunnerConfig:
@@ -63,7 +67,7 @@ class ApiRunnerConfig:
     """False (QUODEQ_DISABLE_FINDING_REPAIR) skips the snippet repair re-ask."""
 
 
-@functools.lru_cache(maxsize=8)
+@functools.lru_cache(maxsize=_WARN_CACHE_MAX_BASES)
 def _warn_ollama_ctx_noop(api_base: str) -> None:
     """One warning per base URL: Ollama's /v1 endpoint ignores num_ctx
     (top-level and nested options alike, verified on 0.33.1), so a configured

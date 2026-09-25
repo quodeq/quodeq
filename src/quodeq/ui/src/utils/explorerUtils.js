@@ -11,6 +11,7 @@ export {
   buildSingleViolationPlanText,
 } from './planBuilder.js';
 import { KNOWN_SEVERITIES } from './constants.js';
+import { FULL_CONFIDENCE } from '../models/runRules.js';
 
 function normalizeSeverity(value) {
   const normalized = String(value || 'unknown').toLowerCase();
@@ -86,7 +87,7 @@ function aggregateViolationEntry(bucket, dimension, entry) {
     title: entry.title || '',
     reason: entry.reason || '',
     severity,
-    confidence: typeof entry.confidence === 'number' ? entry.confidence : 100,
+    confidence: typeof entry.confidence === 'number' ? entry.confidence : FULL_CONFIDENCE,
     provenanceDowngrade: entry.provenanceDowngrade ?? false,
     scopeDowngrade: entry.scopeDowngrade ?? null,
     ...(entry.cwe ? { cwe: entry.cwe } : {}),

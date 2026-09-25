@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from http import HTTPStatus
+
 from flask import Flask, Response, jsonify
 
 from quodeq.api._constants import CODE_MISSING_PARAM
@@ -23,7 +25,7 @@ def _selfupdate_start_response() -> Response | tuple[Response, int]:
     body = {"error": result["error"], "code": result["code"]}
     if "reason" in result:
         body["reason"] = result["reason"]
-    return jsonify(body), 409
+    return jsonify(body), HTTPStatus.CONFLICT
 
 
 def register_update_routes(app: Flask) -> None:
@@ -46,7 +48,7 @@ def register_update_routes(app: Flask) -> None:
             return jsonify(body[0]), body[1]
         version = body.get("version")
         if not version:
-            return jsonify({"error": "version is required", "code": CODE_MISSING_PARAM}), 400
+            return jsonify({"error": "version is required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST
         dismiss(version)
         return jsonify({"ok": True, "status": get_status()})
 

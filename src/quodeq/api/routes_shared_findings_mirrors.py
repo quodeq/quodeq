@@ -10,15 +10,12 @@ from typing import Callable
 
 from flask import Flask, jsonify, request
 
+from quodeq.api._constants import MAX_FINDINGS_LIST_LIMIT
 from quodeq.api.helpers import page_params
 from quodeq.services.dismissed_listing import load_dismissed
 from quodeq.services.verified import verified_entries
 
 from .routes_shared_common import shared_project_dir, validate_segment, with_shared_root
-
-# Mirrors quodeq.api.routes_findings._MAX_FINDINGS_LIST_LIMIT — the shared
-# findings mirrors clamp to the same hard cap as the local routes.
-_MAX_FINDINGS_LIST_LIMIT = 5000
 
 
 def _shared_findings_page(project: str, eval_root: Path, lister: Callable[..., list]):
@@ -29,11 +26,11 @@ def _shared_findings_page(project: str, eval_root: Path, lister: Callable[..., l
     project_dir = shared_project_dir(eval_root, project)
     if project_dir is None:
         return jsonify([])
-    paging = page_params(request.args, default_limit=_MAX_FINDINGS_LIST_LIMIT)
+    paging = page_params(request.args, default_limit=MAX_FINDINGS_LIST_LIMIT)
     if isinstance(paging[0], dict):
         return paging
     limit, offset = paging
-    limit = min(limit, _MAX_FINDINGS_LIST_LIMIT)
+    limit = min(limit, MAX_FINDINGS_LIST_LIMIT)
     return jsonify(lister(project_dir, offset=offset, limit=limit))
 
 

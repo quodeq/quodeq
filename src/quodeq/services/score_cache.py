@@ -63,6 +63,11 @@ from quodeq.shared.utils import TEXT_ENCODING
 if TYPE_CHECKING:
     from quodeq.core.dismissals import DismissedKeys
 
+# Bumped whenever the accumulated/project-card cache-key computation changes
+# (see the version history in the payload below); an old value recomputes
+# instead of serving a stale entry.
+_ACCUMULATED_CACHE_ALGO_VERSION = 6
+
 
 def _params_fingerprint(params: ScoringParams) -> str:
     """Deterministic serialization of the grade-formula params (sorted maps)."""
@@ -161,7 +166,7 @@ def accumulated_cache_version(
         # under algo 5 hashes identically to a correct recompute, so without
         # this bump it is served forever (tests/services/
         # test_accumulated_version_heals_poison.py pins the keyspace exit).
-        "algo": 6,
+        "algo": _ACCUMULATED_CACHE_ALGO_VERSION,
         "params": _params_fingerprint(params),
         "runs": sorted(list(t) for t in run_versions),
         "as_of": as_of or "",

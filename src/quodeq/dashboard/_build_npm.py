@@ -14,15 +14,18 @@ from quodeq.dashboard._build_hash import SYNC_ITEMS
 
 _UI_DIRNAME = "ui"  # bundled UI source directory name, both inside the package and in the repo
 
+_NPM_INSTALL_TIMEOUT_DEFAULT_S = 300  # QUODEQ_NPM_INSTALL_TIMEOUT_S fallback
+_NPM_BUILD_TIMEOUT_DEFAULT_S = 600  # QUODEQ_NPM_BUILD_TIMEOUT_S fallback
+
 
 def _npm_install_timeout_s(env: Mapping[str, str] | None = None) -> int:
     """Seconds allowed for ``npm ci``; ``QUODEQ_NPM_INSTALL_TIMEOUT_S`` overrides."""
-    return env_int("QUODEQ_NPM_INSTALL_TIMEOUT_S", 300, minimum=1, env=resolve_env(env))
+    return env_int("QUODEQ_NPM_INSTALL_TIMEOUT_S", _NPM_INSTALL_TIMEOUT_DEFAULT_S, minimum=1, env=resolve_env(env))
 
 
 def _npm_build_timeout_s(env: Mapping[str, str] | None = None) -> int:
     """Seconds allowed for ``npm run build``; ``QUODEQ_NPM_BUILD_TIMEOUT_S`` overrides."""
-    return env_int("QUODEQ_NPM_BUILD_TIMEOUT_S", 600, minimum=1, env=resolve_env(env))
+    return env_int("QUODEQ_NPM_BUILD_TIMEOUT_S", _NPM_BUILD_TIMEOUT_DEFAULT_S, minimum=1, env=resolve_env(env))
 
 
 def quodeq_dir(env: Mapping[str, str] | None = None) -> Path:

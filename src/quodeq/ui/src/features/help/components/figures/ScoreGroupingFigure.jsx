@@ -18,6 +18,7 @@ const SAMPLE_HEIGHT_11 = 77;
 const SAMPLE_HEIGHT_12 = 84;
 
 // SVG geometry for the bar row.
+const SVG_WIDTH = 320;
 const SVG_HEIGHT = 56;
 const BAR_START_X = 4;
 const BAR_SPACING = 26.5;
@@ -37,7 +38,7 @@ export default function ScoreGroupingFigure() {
         <span className="sg-figure__label">{t('overview.scoreHistoryLabel')} · {BAR_COUNT}{t('granularity.dayAbbrev')}</span>
         <span className="sg-figure__select">{t('common.periodDay')} &#9662;</span>
       </div>
-      <svg viewBox={`0 0 320 ${SVG_HEIGHT}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <svg viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
         {bars.map((h, i) => (
           <rect
             key={i}

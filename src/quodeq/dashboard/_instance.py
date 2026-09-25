@@ -242,7 +242,7 @@ class InstanceController:
             except OSError as exc:
                 _logger.debug("instance shutdown cleanup failed: %s", exc)
         if self._listen_thread:
-            self._listen_thread.join(timeout=0.5)
+            self._listen_thread.join(timeout=_SOCK_TIMEOUT)
         if not owns_socket:
             return
         if _IS_WIN32:

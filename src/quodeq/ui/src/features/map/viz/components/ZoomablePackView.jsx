@@ -7,6 +7,7 @@ import MapLegend from './MapLegend.jsx';
 import { t } from '../../../../strings/index.js';
 import { LABEL_GAP_PX } from './viewLabels.js';
 import { KEY } from '../../../../vocab/keyboard.js';
+import { PERCENT } from '../../../../constants.js';
 
 const BASE_SIZE = 600;
 const PAD = 20;
@@ -228,7 +229,7 @@ function PackTooltip({ circles, hover, mousePos, containerRef }) {
       <div className="map-tooltip-row"><span>{t('map.violations')}</span><span>{hd.violations}</span></div>
       <TooltipSeverityRows hd={hd} />
       <div className="map-tooltip-row"><span>{t('map.compliance')}</span><span>{hd.compliance}</span></div>
-      <div className="map-tooltip-row"><span>{t('map.rate')}</span><span>{total > 0 ? ((hd.compliance / total) * 100).toFixed(0) + '%' : '—'}</span></div>
+      <div className="map-tooltip-row"><span>{t('map.rate')}</span><span>{total > 0 ? ((hd.compliance / total) * PERCENT).toFixed(0) + '%' : '—'}</span></div>
     </div>
   );
 }

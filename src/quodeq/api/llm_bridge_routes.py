@@ -1,6 +1,8 @@
 """API routes for LLM bridge — provider status, models, testing."""
 from __future__ import annotations
 
+from http import HTTPStatus
+
 from flask import Flask, Response, jsonify, request
 
 from quodeq.config.ai_provider import store_api_key, get_api_key_secure
@@ -51,7 +53,7 @@ def ollama_test_concurrency() -> Response:
     """
     data = json_body()
     if data is None:
-        return jsonify(BODY_NOT_OBJECT), 400
+        return jsonify(BODY_NOT_OBJECT), HTTPStatus.BAD_REQUEST
     model, err = require_model_name(data, require_nonempty=True)
     if err is not None:
         return err
@@ -67,13 +69,13 @@ def ollama_estimate_agents() -> Response:
     """
     data = json_body()
     if data is None:
-        return jsonify(BODY_NOT_OBJECT), 400
+        return jsonify(BODY_NOT_OBJECT), HTTPStatus.BAD_REQUEST
     model_size = data.get("model_size", 0)
     gpu_memory = data.get("gpu_memory", 0)
     if (isinstance(model_size, bool) or isinstance(gpu_memory, bool)
             or not isinstance(model_size, (int, float))
             or not isinstance(gpu_memory, (int, float))):
-        return jsonify({"error": "model_size and gpu_memory must be numbers", "code": CODE_INVALID_PARAM}), 400
+        return jsonify({"error": "model_size and gpu_memory must be numbers", "code": CODE_INVALID_PARAM}), HTTPStatus.BAD_REQUEST
     return jsonify(estimate_max_agents(model_size=model_size, gpu_memory=gpu_memory))
 
 
@@ -95,7 +97,7 @@ def llamacpp_test_concurrency() -> Response:
     """
     data = json_body()
     if data is None:
-        return jsonify(BODY_NOT_OBJECT), 400
+        return jsonify(BODY_NOT_OBJECT), HTTPStatus.BAD_REQUEST
     model, err = require_model_name(data, require_nonempty=False)
     if err is not None:
         return err
@@ -140,14 +142,14 @@ def omlx_test_concurrency() -> Response:
     """
     data = json_body()
     if data is None:
-        return jsonify(BODY_NOT_OBJECT), 400
+        return jsonify(BODY_NOT_OBJECT), HTTPStatus.BAD_REQUEST
     model, err = require_model_name(data, require_nonempty=False)
     if err is not None:
         return err
     base_url = data.get("base_url") or ""
     api_key = data.get("api_key") or ""
     if not isinstance(base_url, str) or not isinstance(api_key, str):
-        return jsonify({"error": "base_url and api_key must be strings", "code": CODE_INVALID_PARAM}), 400
+        return jsonify({"error": "base_url and api_key must be strings", "code": CODE_INVALID_PARAM}), HTTPStatus.BAD_REQUEST
     base_url = base_url.strip() or None
     api_key = api_key.strip() or None
     err = invalid_base_url(base_url)
@@ -167,7 +169,7 @@ def provider_test() -> Response:
     """
     data = json_body()
     if data is None:
-        return jsonify(BODY_NOT_OBJECT), 400
+        return jsonify(BODY_NOT_OBJECT), HTTPStatus.BAD_REQUEST
     if (err := string_fields_error(data, ("provider", "api_base", "api_key", "model"))):
         return err
     provider_id = data.get("provider", "")
@@ -179,7 +181,7 @@ def provider_test() -> Response:
     if api_base:
         err = url_safety_error(api_base, allow_private=True)
         if err is not None:
-            return jsonify({"error": err, "code": "INVALID_URL"}), 400
+            return jsonify({"error": err, "code": "INVALID_URL"}), HTTPStatus.BAD_REQUEST
     if not api_key and api_key_env:
         return jsonify({
             "success": False,
@@ -215,13 +217,13 @@ def provider_store_key() -> Response:
     """
     data = json_body()
     if data is None:
-        return jsonify(BODY_NOT_OBJECT), 400
+        return jsonify(BODY_NOT_OBJECT), HTTPStatus.BAD_REQUEST
     provider = data.get("provider", "")
     api_key = data.get("apiKey", "")
     if not provider or not isinstance(provider, str):
-        return jsonify({"error": "provider is required", "code": CODE_MISSING_PARAM}), 400
+        return jsonify({"error": "provider is required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST
     if not api_key or not isinstance(api_key, str):
-        return jsonify({"error": "apiKey is required", "code": CODE_MISSING_PARAM}), 400
+        return jsonify({"error": "apiKey is required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST
     try:
         stored, secure = store_api_key(provider, api_key)
     except ValueError:
@@ -237,7 +239,7 @@ def provider_store_key() -> Response:
         return jsonify({
             "error": "Provider name must contain only letters, digits, '-' and '_'",
             "code": CODE_INVALID_PARAM,
-        }), 400
+        }), HTTPStatus.BAD_REQUEST
     return jsonify({"stored": stored, "secure": secure})
 
 
@@ -249,7 +251,7 @@ def provider_key_status() -> Response:
     """
     provider = request.args.get("provider", "")
     if not provider:
-        return jsonify({"error": "provider is required", "code": CODE_MISSING_PARAM}), 400
+        return jsonify({"error": "provider is required", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST
     return jsonify({"configured": get_api_key_secure(provider) is not None})
 
 

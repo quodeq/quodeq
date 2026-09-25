@@ -28,6 +28,8 @@ _logger = logging.getLogger(__name__)
 _TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
 _CAP_NOTE = "\n\n*(stopped: tool iteration limit reached)*"
 _OPENAI_API_HOST = "api.openai.com"
+# How often the stream-drain loop re-checks cancel.cancelled between chunks.
+_CANCEL_POLL_INTERVAL_S = 0.25
 
 
 def _extra_body(config: "ApiTurnConfig", env: Mapping[str, str] | None = None) -> dict:
@@ -131,7 +133,7 @@ def _iter_with_cancel(stream, cancel):
         if cancel.cancelled:
             raise TurnCancelled("")
         try:
-            item = q.get(timeout=0.25)
+            item = q.get(timeout=_CANCEL_POLL_INTERVAL_S)
         except queue.Empty:
             continue
         if item is _STREAM_DONE:

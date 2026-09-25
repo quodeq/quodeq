@@ -15,6 +15,7 @@ from quodeq.assistant.tools._read_tools_scope import (
     scored_run_dims,
 )
 from quodeq.assistant.tools._read_tools_violations import (
+    VIOLATIONS_MAX_LIMIT,
     available_names,
     get_violations,
     hidden_ids,
@@ -30,9 +31,13 @@ from quodeq.services.standards import StandardsService
 
 # Cap violations embedded in a full report so a single get_report stays small.
 _REPORT_VIOLATION_CAP = 40
+# search_findings paging: same default/max split as get_violations, sized
+# for its own result shape (full finding rows, not trimmed violations).
+_SEARCH_FINDINGS_DEFAULT_LIMIT = 20
+_SEARCH_FINDINGS_MAX_LIMIT = 50
 
 
-def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
+def _search_findings(ctx: ToolContext, query: str, limit: int = _SEARCH_FINDINGS_DEFAULT_LIMIT) -> dict:
     run_dir = require_run(ctx)
     repo = findings_repo(ctx, run_dir)
     # Hidden dims must be known BEFORE the query runs, so the exclusion can be
@@ -45,7 +50,7 @@ def _search_findings(ctx: ToolContext, query: str, limit: int = 20) -> dict:
     # query's hits) so a dimension whose rows never come back from SQL is
     # still reported as withheld.
     hidden = hidden_ids(ctx, list(repo.count_by_dimension()))
-    hits = repo.search(query, limit=max(1, min(int(limit), 50)),
+    hits = repo.search(query, limit=max(1, min(int(limit), _SEARCH_FINDINGS_MAX_LIMIT)),
                         exclude_dimensions=hidden or None)
     # Model-facing key is "requirement"; the Finding attribute is `req`
     # (see data/sqlite/row_mappers.py row_to_finding).
@@ -179,7 +184,7 @@ def _register_findings_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "or get_report instead.",
         {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {
             "query": {"type": JSON_SCHEMA_TYPE_STRING},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+            "limit": {"type": "integer", "minimum": 1, "maximum": _SEARCH_FINDINGS_MAX_LIMIT},
         }, "required": ["query"]},
         lambda **kw: _search_findings(ctx, **kw)))
     registry.register(ToolSpec(
@@ -189,7 +194,7 @@ def _register_findings_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "one is selected, otherwise the accumulated (per-dimension-latest) view.",
         {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {
             "dimension": {"type": JSON_SCHEMA_TYPE_STRING},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+            "limit": {"type": "integer", "minimum": 1, "maximum": VIOLATIONS_MAX_LIMIT},
         }},
         lambda **kw: get_violations(ctx, **kw)))
 

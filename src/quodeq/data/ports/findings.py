@@ -6,6 +6,11 @@ from typing import Any, Protocol, runtime_checkable
 
 from quodeq.core.types.finding import Finding
 
+# search's default result cap. Mirrored by the concrete SQLite implementation
+# (quodeq.data.sqlite.findings_repository), which imports it from here rather
+# than keeping its own copy.
+DEFAULT_SEARCH_LIMIT = 100
+
 
 @runtime_checkable
 class FindingsRepository(Protocol):
@@ -34,7 +39,7 @@ class FindingsRepository(Protocol):
         """Return total finding counts grouped by dimension."""
         ...
 
-    def search(self, query: str, limit: int = 100, *,
+    def search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT, *,
                exclude_dimensions: Iterable[str] | None = None) -> list[Finding]:
         """FTS5 search across reason and snippet.
 

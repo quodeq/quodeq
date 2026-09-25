@@ -2,6 +2,12 @@ import ParamSlider from './ParamSlider.jsx';
 import CurvePlot from './CurvePlot.jsx';
 import GradeBoundaryBar from './GradeBoundaryBar.jsx';
 import { t } from '../../strings/index.js';
+import { SCORE_SCALE_MAX } from '../../constants.js';
+
+// Bounds shared by the three severity-weight sliders below.
+const SEVERITY_WEIGHT_MIN = 0.05;
+const SEVERITY_WEIGHT_MAX = 10;
+const SEVERITY_WEIGHT_STEP = 0.05;
 
 /**
  * Per-severity weight sliders, plus the critical-to-minor ratio they imply.
@@ -14,11 +20,11 @@ export function SeverityTab({ draft, update }) {
   const ratio = w.minor > 0 ? Math.round(w.critical / w.minor) : 0;
   return (
     <div>
-      <ParamSlider label={t('gradeFormula.weightCritical')} value={w.critical} min={0.05} max={10} step={0.05}
+      <ParamSlider label={t('gradeFormula.weightCritical')} value={w.critical} min={SEVERITY_WEIGHT_MIN} max={SEVERITY_WEIGHT_MAX} step={SEVERITY_WEIGHT_STEP}
         hint={t('gradeFormula.hintCritical')} onChange={setW('critical')} />
-      <ParamSlider label={t('gradeFormula.weightMajor')} value={w.major} min={0.05} max={10} step={0.05}
+      <ParamSlider label={t('gradeFormula.weightMajor')} value={w.major} min={SEVERITY_WEIGHT_MIN} max={SEVERITY_WEIGHT_MAX} step={SEVERITY_WEIGHT_STEP}
         hint={t('gradeFormula.hintMajor')} onChange={setW('major')} />
-      <ParamSlider label={t('gradeFormula.weightMinor')} value={w.minor} min={0.05} max={10} step={0.05}
+      <ParamSlider label={t('gradeFormula.weightMinor')} value={w.minor} min={SEVERITY_WEIGHT_MIN} max={SEVERITY_WEIGHT_MAX} step={SEVERITY_WEIGHT_STEP}
         hint={t('gradeFormula.hintMinor')} onChange={setW('minor')} />
       <span className="settings-description">
         {t('gradeFormula.criticalWeighs')} {ratio}{t('gradeFormula.timesMinor')}
@@ -65,10 +71,10 @@ export function BoundariesTab({ draft, update }) {
       />
       <div style={{ marginTop: 14 }}>
         <span className="settings-label">{t('gradeFormula.severityFloors')}</span>
-        <ParamSlider label={t('gradeFormula.minorOnly')} value={draft.floorMinor} min={0} max={10} step={0.5}
+        <ParamSlider label={t('gradeFormula.minorOnly')} value={draft.floorMinor} min={0} max={SCORE_SCALE_MAX} step={0.5}
           hint={t('gradeFormula.hintFloorMinor')}
           onChange={(v) => update({ floorMinor: v })} />
-        <ParamSlider label={t('gradeFormula.floorMajor')} value={draft.floorMajor} min={0} max={10} step={0.5}
+        <ParamSlider label={t('gradeFormula.floorMajor')} value={draft.floorMajor} min={0} max={SCORE_SCALE_MAX} step={0.5}
           hint={t('gradeFormula.hintFloorMajor')}
           onChange={(v) => update({ floorMajor: v })} />
         <span className="settings-description">{t('gradeFormula.criticalNoFloor')}</span>

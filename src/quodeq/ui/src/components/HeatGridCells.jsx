@@ -1,5 +1,6 @@
 import { severityCellStyle, complianceRateCellStyle, severityColor, complianceRateColor } from '../features/map/viz/core/mapColors.js';
 import { t } from '../strings/index.js';
+import { PERCENT } from '../constants.js';
 import { activateOnKey } from '../utils/a11y.js';
 import { SEVERITY_ORDER } from '../vocab/severity.js';
 import { SORT_DIR } from '../vocab/sortDirection.js';
@@ -108,7 +109,7 @@ export function makeColumnSortHandler({ sortCol, setSortCol, setSortDir, ascCol 
 
 export default function HeatGridCells({ row, onCellClick, variant = HEAT_GRID_VARIANT.HEAT }) {
   const total = row.violations + row.compliance;
-  const rate = total > 0 ? Math.round(row.complianceRate * 100) + '%' : '—';
+  const rate = total > 0 ? Math.round(row.complianceRate * PERCENT) + '%' : '—';
   const flat = variant === HEAT_GRID_VARIANT.FLAT;
 
   return (

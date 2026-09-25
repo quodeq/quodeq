@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from http import HTTPStatus
+
 from flask import Flask, Response, jsonify
 
 from quodeq.api._constants import CODE_MISSING_PARAM
@@ -32,7 +34,7 @@ def register_menubar_routes(app: Flask) -> None:
             return jsonify(body[0]), body[1]
         enabled = body.get("enabled")
         if not isinstance(enabled, bool):
-            return jsonify({"error": "enabled must be a boolean", "code": CODE_MISSING_PARAM}), 400
+            return jsonify({"error": "enabled must be a boolean", "code": CODE_MISSING_PARAM}), HTTPStatus.BAD_REQUEST
         set_enabled(enabled)
         if enabled:
             control.spawn()

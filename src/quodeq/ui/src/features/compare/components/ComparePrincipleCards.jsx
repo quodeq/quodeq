@@ -1,13 +1,14 @@
 import ComparePanel from './ComparePanel.jsx';
 import { scoreGradeColorVar } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
-import { score1, MIN_BAR_HEIGHT_PCT } from '../compareFormatters.js';
+import { score1, MIN_BAR_HEIGHT_PCT, SCORE_TO_PCT } from '../compareFormatters.js';
+import { SCORE_SCALE_MAX } from '../../../constants.js';
 
 
 function PrincipleDonut({ score }) {
   const r = 26;
   const c = 2 * Math.PI * r;
-  const filled = c * Math.min(1, Math.max(0, (score ?? 0) / 10));
+  const filled = c * Math.min(1, Math.max(0, (score ?? 0) / SCORE_SCALE_MAX));
   return (
     <span className="compare-donut">
       <svg width="62" height="62" viewBox="0 0 62 62" aria-hidden="true">
@@ -70,7 +71,7 @@ function PrincipleBars({ p, onOpenPrinciple }) {
             <span
               className="compare-principle__bar"
               style={{
-                height: `${Math.max(MIN_BAR_HEIGHT_PCT, Math.round(pp.score * 10))}%`,
+                height: `${Math.max(MIN_BAR_HEIGHT_PCT, Math.round(pp.score * SCORE_TO_PCT))}%`,
                 background: scoreGradeColorVar(pp.score),
               }}
             />

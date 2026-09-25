@@ -38,6 +38,7 @@ from quodeq.analysis.cache._dimension_context import (
     prepare_cache_context,
 )
 from quodeq.analysis.cache.failure_streak import (
+    STOP_JOIN_TIMEOUT_S,
     CircuitBreakerError,
     FailureStreakWatcher,
 )
@@ -210,7 +211,7 @@ def _dispatch_misses_with_watchers(
         # final persist tick on long dims). Breaker keeps its own 5s cap.
         stop_event.set()
         watcher.join()
-        breaker.stop_and_join(timeout=5.0)
+        breaker.stop_and_join(timeout=STOP_JOIN_TIMEOUT_S)
     if breaker.trip_event is not None:
         return _handle_breaker_trip(config, dispatch.ctx, cctx)
     return _handle_dispatch_result(
