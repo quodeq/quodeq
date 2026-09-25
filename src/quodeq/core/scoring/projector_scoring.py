@@ -49,7 +49,7 @@ from quodeq.core.types.finding import Finding
 #
 # 1: implicit pre-stamp state (any DB without the run_meta key).
 # 2: ceiling beats floor in the principle-score clamp.
-GRADE_ALGO_VERSION = 2
+GRADE_ALGO_VERSION = 3  # v3: tally groups untagged findings by req (issue #1274)
 
 
 def _insufficient_grade(principle_id: str, finding_count: int, dismissed_count: int) -> dict[str, Any]:

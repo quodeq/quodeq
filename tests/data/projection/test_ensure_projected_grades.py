@@ -145,3 +145,15 @@ def test_pre_stamp_db_heals_on_first_contact(tmp_path: Path) -> None:
 
     assert store.get_grades_algo_version() == GRADE_ALGO_VERSION
     assert len(store.read_dimension_scores()) == 1
+
+
+def test_grade_algo_version_is_three() -> None:
+    """v3: the tally groups untagged findings by ``req`` (issue #1274).
+
+    Grade tables stamped v2 were computed with reason-grouped tallies, so a
+    run untouched since then must re-derive; the staleness test above proves
+    the mechanism, this pins the version that triggers it.
+    """
+    from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION
+
+    assert GRADE_ALGO_VERSION == 3
