@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import './styles/index.css';
-import { applyInitialTheme } from './applyInitialTheme.js';
+import { bootTheme } from './bootTheme.js';
 import { ApiProvider } from './api/ApiContext.jsx';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './api/queryClient.js';
@@ -16,11 +16,7 @@ function isMacPlatform() {
   return /Mac|iPhone|iPad|iPod/.test(platform) || /Mac OS X/.test(ua);
 }
 
-try {
-  applyInitialTheme();
-} catch (err) {
-  console.warn('[main] initial theme apply failed:', err);
-}
+bootTheme();
 
 // Tag <html> with the host platform and an `in-webview` class so CSS can
 // apply native-shell-only styling. The window now uses native OS chrome on
