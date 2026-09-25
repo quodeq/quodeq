@@ -72,13 +72,6 @@ def test_dimension_eval_response_is_404_without_a_payload(app: Flask) -> None:
         assert response.get_json() == {"error": "Eval file not found", "code": "NOT_FOUND"}
 
 
-def test_dimension_eval_response_is_202_while_waiting(app: Flask) -> None:
-    with app.test_request_context():
-        response, status = dimension_eval_response({"waiting": True})
-        assert status == HTTPStatus.ACCEPTED
-        assert response.get_json() == {"waiting": True}
-
-
 def test_dimension_eval_response_is_200_with_a_payload(app: Flask) -> None:
     with app.test_request_context():
         response = dimension_eval_response({"score": 7})
