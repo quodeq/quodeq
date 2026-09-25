@@ -193,6 +193,7 @@ def drop_grade(grade: str, drops: int) -> str:
 
 
 _MULTIPLIER_TRIPLE = 3  # the "x3" of WEIGHT_TRIPLE, spelled out
+_MULTIPLIER_DOUBLE = 2  # the "x2" of WEIGHT_DOUBLE, spelled out
 
 
 def weight_as_multiplier(weight_str: str) -> int:
@@ -200,5 +201,5 @@ def weight_as_multiplier(weight_str: str) -> int:
     if WEIGHT_TRIPLE in weight_str:
         return _MULTIPLIER_TRIPLE
     if WEIGHT_DOUBLE in weight_str:
-        return 2
+        return _MULTIPLIER_DOUBLE
     return 1

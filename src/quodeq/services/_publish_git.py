@@ -25,13 +25,21 @@ from quodeq.services.wiring import (
 
 _GIT_REMOTE_ORIGIN = "origin"
 _GIT_HEAD = "HEAD"
-_GIT_TIMEOUT_S = 300  # clone/push over a slow remote can legitimately take minutes
 
 
-def _run_git(args, *, cwd=None, timeout=_GIT_TIMEOUT_S):
+def _run_git(args, *, cwd=None, timeout=None):
+    """Thin wrapper over shared_publish.run_git (see module docstring).
+
+    No local timeout default: when the caller doesn't pass one, this falls
+    through to run_git's own default (data/fs/shared_repo_git.DEFAULT_GIT_TIMEOUT_S)
+    instead of retyping that value here.
+    """
     from quodeq.services import shared_publish as _sp
 
-    return _sp.run_git(args, cwd=cwd, timeout=timeout)
+    kwargs = {"cwd": cwd}
+    if timeout is not None:
+        kwargs["timeout"] = timeout
+    return _sp.run_git(args, **kwargs)
 
 
 def _app_version() -> str:

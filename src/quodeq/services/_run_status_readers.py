@@ -20,7 +20,7 @@ from quodeq.core.run.state import TERMINAL_STATES, parse_run_state
 from quodeq.core.types.job import JobSnapshot
 from quodeq.data.sqlite import run_index as _run_index
 
-_RUN_LOG_TAIL_LINES = 500
+_RUN_LOG_TAIL_LINES = 500  # lines of run.log the dashboard shows; enough context without a full read
 
 
 def status_json_terminal(run_dir: Path) -> bool:

@@ -28,7 +28,9 @@ from quodeq.data.fs.standards_prefs import load_project_overrides
 from quodeq.shared.lru import LRUDict
 
 _HASH_CHUNK_SIZE = 1 << 16  # 64 KiB
-_FILE_CAP, _OVERRIDE_CAP, _PARAMS_CAP = 4096, 1024, 1024  # HashCache LRU capacities (file hashes churn most)
+_FILE_HASH_CACHE_MAX_ENTRIES = 4096  # file hashes churn most of the three maps
+_OVERRIDE_CACHE_MAX_ENTRIES = 1024  # override hashes: far fewer distinct keys
+_PARAMS_CACHE_MAX_ENTRIES = 1024  # per-dimension params state: far fewer distinct keys
 
 
 def hash_file(path: Path) -> str | None:
@@ -114,21 +116,19 @@ class FileStat:
 class HashCache:
     """Lock-guarded, bounded LRU cache backing the fingerprint hash memoizers.
 
-    Three independent maps -- file hashes (compiled standards, prompts),
-    override hashes, per-dimension params state -- each keyed by a
-    ``(path, size, mtime_ns)`` stat tuple (the dimension-params key adds a
-    second file's stat), so an edited input misses on its own. The
-    module-default instance below is shared by the long-lived dashboard/API
-    server (cache maintenance, ``dimension_params_state``), not just one
-    ``quodeq evaluate`` process, so every map is a capped LRU: a run's hot
-    working set stays resident while stale keys from past runs age out.
-
+    Three independent maps -- file hashes (compiled standards, prompts), override
+    hashes, per-dimension params state -- each keyed by a ``(path, size, mtime_ns)``
+    stat tuple (the dimension-params key adds a second file's stat), so an edited
+    input misses on its own. The module-default instance below is shared by the
+    long-lived dashboard/API server (cache maintenance, ``dimension_params_state``),
+    not just one ``quodeq evaluate`` process, so every map is a capped LRU: a run's
+    hot working set stays resident while stale keys from past runs age out.
     Instantiable so tests get isolated caches with small capacities.
     """
 
     def __init__(
-        self, *, file_capacity: int = _FILE_CAP,
-        override_capacity: int = _OVERRIDE_CAP, params_capacity: int = _PARAMS_CAP,
+        self, *, file_capacity: int = _FILE_HASH_CACHE_MAX_ENTRIES,
+        override_capacity: int = _OVERRIDE_CACHE_MAX_ENTRIES, params_capacity: int = _PARAMS_CACHE_MAX_ENTRIES,
     ) -> None:
         self._lock = threading.Lock()
         self._file_hashes: LRUDict[_StatKey, str | None] = LRUDict(file_capacity)

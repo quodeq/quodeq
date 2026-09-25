@@ -23,7 +23,7 @@ _USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36")
 _TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=10.0)
 _MAX_RESULTS = 8
-_DEFAULT_SEARCH_RESULTS = 5
+_DEFAULT_SEARCH_RESULTS = 5  # results returned when the model omits max_results
 _MAX_FETCH_BYTES = 2 * 1024 * 1024
 _MAX_FETCH_SECONDS = 60.0  # total budget: read=30.0 is per-read-op, so a slow
 # drip (1 byte per 29s) would otherwise wedge the turn thread indefinitely

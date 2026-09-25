@@ -18,7 +18,7 @@ _ASSUME_NATIVE = frozenset({Provider.OPENROUTER, Provider.CUSTOM})
 _PROBE_CACHE_SIZE = 64
 _probe_answers: LRUDict[tuple[str, str], bool] = LRUDict(_PROBE_CACHE_SIZE)
 _probe_lock = threading.Lock()
-_PROBE_TIMEOUT_S = 5.0
+_PROBE_TIMEOUT_S = 5.0  # /api/show is a local Ollama call; short but enough for a cold-started daemon
 
 
 def _default_probe(url: str, json: dict) -> dict:

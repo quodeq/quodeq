@@ -9,7 +9,7 @@ import urllib.request
 import urllib.error
 
 from quodeq.config.llm_bridge_env import ollama_base_url
-from quodeq.llm_bridge._constants import TIMEOUT_S
+from quodeq.llm_bridge._constants import LOCAL_SERVER_PROBE_TIMEOUT_S
 from quodeq.shared.constants import SYSTEM_DARWIN, SYSTEM_LINUX
 from quodeq.shared.url_validation import validate_url_safe
 
@@ -57,7 +57,7 @@ def get_ollama_status(base_url: str | None = None) -> dict:
     base_url = _resolved_base(base_url)
     try:
         req = _safe_request(f"{base_url}/api/version")
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             return {
                 "running": True,
@@ -75,7 +75,7 @@ def list_ollama_models(base_url: str | None = None) -> list[dict]:
     base_url = _resolved_base(base_url)
     try:
         req = _safe_request(f"{base_url}/api/tags")
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             models = data.get("models", [])
             return [
@@ -98,7 +98,7 @@ def get_running_model_info(base_url: str | None = None) -> dict | None:
     base_url = _resolved_base(base_url)
     try:
         req = _safe_request(f"{base_url}/api/ps")
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=LOCAL_SERVER_PROBE_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             models = data.get("models", [])
             if models:

@@ -14,19 +14,17 @@ from typing import Callable
 from quodeq.core.scoring.params import DEFAULT_PARAMS, ScoringParams
 from quodeq.core.types.dimension import DimensionResult
 from quodeq.services.trend_fetcher import make_trend_fetcher
-from quodeq.services.dashboard import make_run_dimension_fetcher
+from quodeq.services.dashboard import DEFAULT_MAX_HISTORY_RUNS, make_run_dimension_fetcher
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.wiring import read_run_scalars
 from quodeq.services.scoring._deps import ScoringDeps, NO_DEPS
 from quodeq.shared.env import env_int
 
-_DEFAULT_MAX_HISTORY_RUNS = 100
-
 
 def max_history_runs() -> int:
     """Read max history runs from env at call time for lazy configuration."""
-    return env_int("QUODEQ_MAX_HISTORY_RUNS", _DEFAULT_MAX_HISTORY_RUNS, minimum=1)
+    return env_int("QUODEQ_MAX_HISTORY_RUNS", DEFAULT_MAX_HISTORY_RUNS, minimum=1)
 
 
 def make_scoring_trend_fetcher(

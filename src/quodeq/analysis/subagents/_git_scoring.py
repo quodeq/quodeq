@@ -15,7 +15,7 @@ _DEFAULT_CHURN_DIVISOR = 4
 _DEFAULT_CHURN_MAX = 5
 _DEFAULT_RECENCY_DAYS = 14
 _DEFAULT_RECENCY_MULTIPLIER = 1.5
-_DEFAULT_LOOKBACK_MONTHS = 3
+_DEFAULT_LOOKBACK_MONTHS = 3  # how far back to scan git log for churn/recency signals
 
 
 def _is_date_line(line: str) -> bool:
