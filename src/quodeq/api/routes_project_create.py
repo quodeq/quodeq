@@ -14,9 +14,13 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import Response, jsonify, request
+from flask import Response, jsonify
 
-from quodeq.api.helpers import json_error, scan_target_error as _scan_target_error
+from quodeq.api.helpers import (
+    json_error,
+    optional_json_object_or_error,
+    scan_target_error as _scan_target_error,
+)
 from quodeq.services.base import ActionProvider, NewProjectSpec
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import contained_path, relative_scope_error
@@ -43,7 +47,10 @@ def _parse_create_project_request(
 ) -> tuple[_CreateProjectRequest | None, tuple[Response, int] | None]:
     """Parse and validate the create_project request body. Returns
     (parsed, error): parsed is None on failure, error is None on success."""
-    repo = (data.get("repo") or "").strip()
+    raw_repo = data.get("repo")
+    if raw_repo is not None and not isinstance(raw_repo, str):
+        return None, json_error("repo must be a string", HTTPStatus.BAD_REQUEST, "INVALID_REPO")
+    repo = (raw_repo or "").strip()
     if not repo:
         return None, json_error("repo is required", HTTPStatus.BAD_REQUEST, "MISSING_REPO")
 
@@ -52,8 +59,14 @@ def _parse_create_project_request(
         err = relative_scope_error(str(scope_path))
         if err is not None:
             return None, json_error(err, HTTPStatus.BAD_REQUEST, "INVALID_SCOPE")
-    discipline = data.get("discipline") or None
-    clone_dest = data.get("cloneDest") or None
+    discipline = data.get("discipline")
+    if discipline is not None and not isinstance(discipline, str):
+        return None, json_error("discipline must be a string", HTTPStatus.BAD_REQUEST, "INVALID_DISCIPLINE")
+    discipline = discipline or None
+    clone_dest = data.get("cloneDest")
+    if clone_dest is not None and not isinstance(clone_dest, str):
+        return None, json_error("cloneDest must be a string", HTTPStatus.BAD_REQUEST, "INVALID_CLONE_DEST")
+    clone_dest = clone_dest or None
     ephemeral = bool(data.get("ephemeral", False))
     reports_root = _reports_dir()
 
@@ -196,7 +209,10 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
     or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
     ``ephemeral`` are ignored.
     """
-    parsed, error = _parse_create_project_request(request.get_json(silent=True) or {})
+    body = optional_json_object_or_error("INVALID_INPUT")
+    if not isinstance(body, dict):
+        return jsonify(body[0]), body[1]
+    parsed, error = _parse_create_project_request(body)
     if error is not None:
         return error
 

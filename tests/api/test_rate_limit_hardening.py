@@ -5,11 +5,14 @@ import json
 import os
 import stat
 import sys
+import threading
 from pathlib import Path
 
 import pytest
+from flask import Flask
 from unittest.mock import patch
 
+from quodeq.api._evaluation_helpers import check_eval_rate_limit
 from quodeq.api._rate_limit_file_store import FileRateLimitStore
 from quodeq.api._rate_limit_store import InMemoryRateLimitStore
 from quodeq.api._rate_limit_factory import _validated_rate_limit_path, _DEFAULT_RATE_LIMIT_FILE
@@ -19,6 +22,14 @@ from quodeq.api._rate_limit_config import (
     rate_limit_max,
     rate_limit_window,
 )
+
+
+@pytest.fixture
+def flask_app() -> Flask:
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    return app
+
 
 _skip_no_symlink = pytest.mark.skipif(
     sys.platform == "win32", reason="symlink/POSIX-mode semantics differ on Windows"
@@ -221,3 +232,35 @@ def test_in_memory_store_check_and_record_does_not_record_when_limited():
     assert store.check_and_record("1.2.3.4", 1000.0) is False  # 1st request: allowed
     assert store.check_and_record("1.2.3.4", 1001.0) is True   # 2nd: limited, not recorded
     assert store.check_and_record("1.2.3.4", 1002.0) is True   # still limited (2nd wasn't recorded twice)
+
+
+# ---------------------------------------------------------------------------
+# check_eval_rate_limit() -- must admit exactly one of two concurrent requests
+# ---------------------------------------------------------------------------
+
+def test_concurrent_eval_posts_admit_exactly_one(flask_app):
+    """The old check()-then-record() split let two racing requests both pass
+    check() before either recorded -- a Barrier makes that window
+    deterministic instead of relying on real thread-scheduling luck."""
+
+    class Store(InMemoryRateLimitStore):
+        barrier = threading.Barrier(2)
+
+        def check(self, ip, now):
+            result = super().check(ip, now)
+            self.barrier.wait(timeout=5)
+            return result
+
+    store = Store(window=60, max_requests=1)
+    results: list[object] = []
+
+    def post():
+        with flask_app.test_request_context(environ_base={"REMOTE_ADDR": "1.2.3.4"}):
+            results.append(check_eval_rate_limit(store))
+
+    threads = [threading.Thread(target=post) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+    assert sorted(r is None for r in results) == [False, True]

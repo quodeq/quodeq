@@ -93,6 +93,26 @@ class TestFetchClientConfigInjection:
         assert c._MAX_RETRIES == 2
         assert c._RETRY_BACKOFF_S == 0.5
 
+    def test_max_retries_falls_back_to_default_on_unparsable_value(self):
+        c = FetchClient(env={"QUODEQ_MAX_RETRIES": "abc"})
+        assert c._MAX_RETRIES == 2
+
+    def test_circuit_threshold_falls_back_to_default_below_minimum(self):
+        c = FetchClient(env={"QUODEQ_CIRCUIT_THRESHOLD": "0"})
+        assert c._CIRCUIT_THRESHOLD == 5
+
+    def test_max_retries_allows_zero(self):
+        c = FetchClient(env={"QUODEQ_MAX_RETRIES": "0"})
+        assert c._MAX_RETRIES == 0
+
+    def test_retry_backoff_allows_zero(self):
+        c = FetchClient(env={"QUODEQ_RETRY_BACKOFF_S": "0"})
+        assert c._RETRY_BACKOFF_S == 0.0
+
+    def test_max_response_bytes_falls_back_to_default_below_minimum(self):
+        c = FetchClient(env={"QUODEQ_MAX_RESPONSE_BYTES": "0"})
+        assert c._MAX_BODY_BYTES == 10 * 1024 * 1024
+
 
 class TestFetchRetry:
     def test_successful_fetch(self):
@@ -178,3 +198,13 @@ class TestFetchResponseSizeCap:
         with patch("urllib.request.urlopen", opener), patch("time.sleep"):
             c.fetch("https://example.com")
         assert opener.call_count == 1
+
+
+class TestFetchRetryBackoff:
+    def test_backoff_is_exponential_with_jitter(self):
+        c = FetchClient(allow_private=True, env={"QUODEQ_MAX_RETRIES": "3"})
+        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("net error")), \
+             patch("time.sleep") as mock_sleep, \
+             patch("random.uniform", return_value=0):
+            c.fetch("https://example.com")
+        assert [call.args[0] for call in mock_sleep.call_args_list] == [0.5, 1.0]

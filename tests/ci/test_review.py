@@ -118,6 +118,24 @@ def test_every_gh_call_reports_a_missing_gh_the_same_way(call):
             call()
 
 
+def test_run_gh_raises_review_error_on_timeout():
+    with patch(
+        "quodeq.ci.review.subprocess.run",
+        side_effect=sp.TimeoutExpired(["gh"], 60),
+    ):
+        with pytest.raises(ReviewError, match="timed out"):
+            review_module._run_gh(["pr", "view"])
+
+
+def test_run_gh_passes_a_60s_timeout():
+    mock_result = MagicMock()
+    mock_result.stdout = ""
+    with patch("quodeq.ci.review.subprocess.run", return_value=mock_result) as mock_run:
+        review_module._run_gh(["pr", "view"])
+    _args, kwargs = mock_run.call_args
+    assert kwargs["timeout"] == 60
+
+
 def test_gh_is_spawned_from_one_place():
     tree = ast.parse(Path(review_module.__file__).read_text(encoding="utf-8"))
     runs = [

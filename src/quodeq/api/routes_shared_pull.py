@@ -16,7 +16,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response
+from quodeq.api.helpers import error_response, optional_json_object_or_error
 from quodeq.api.import_project import import_zip_stream
 from quodeq.api.zip import build_project_zip
 
@@ -83,7 +83,9 @@ def shared_pull(project: str, eval_root: Path) -> Response | tuple[Response, int
         )
         return jsonify(body), status
 
-    payload = request.get_json(silent=True) or {}
+    payload = optional_json_object_or_error("INVALID_ACTION")
+    if not isinstance(payload, dict):
+        return jsonify(payload[0]), payload[1]
     action = payload.get("action")
     if action is not None and not isinstance(action, str):
         body, status = error_response("action must be a string", HTTPStatus.BAD_REQUEST, "INVALID_ACTION")

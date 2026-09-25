@@ -55,3 +55,18 @@ class TestCloudConnection:
 
         assert result["success"] is False
         assert "openai" in result["error"].lower()
+
+    def test_client_has_a_short_timeout_and_no_retries(self):
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        with patch("quodeq.llm_bridge._cloud.openai") as mock_openai:
+            mock_openai.OpenAI.return_value = mock_client
+            check_cloud_connection(
+                api_base="https://openrouter.ai/api/v1",
+                model="test-model",
+                api_key="sk-test",
+            )
+
+        _args, kwargs = mock_openai.OpenAI.call_args
+        assert kwargs["max_retries"] == 0
+        assert kwargs["timeout"].read == 30.0

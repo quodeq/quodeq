@@ -232,3 +232,10 @@ def test_create_session_rejects_the_location_word_online_as_a_source(action_clie
         "/api/assistant/sessions", json={"provider": "ollama", "source": "online"})
     assert resp.status_code == 400
     assert resp.get_json()["code"] == "INVALID_SOURCE"
+
+
+def test_create_session_non_object_body_has_code(action_client):  # 2582
+    resp = action_client.post("/api/assistant/sessions", json=[1])
+    assert resp.status_code == 400
+    assert resp.is_json
+    assert resp.get_json()["code"] == "INVALID_PARAM"

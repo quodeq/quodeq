@@ -81,6 +81,13 @@ def test_start_evaluation_requires_repo(client):
     assert payload["code"] == "INVALID_INPUT"
 
 
+def test_start_evaluation_non_object_body_has_code(client):  # 2523
+    response = client.post("/api/evaluations", json=[1], headers={"Origin": "http://localhost"})
+    assert response.status_code == 400
+    assert response.is_json
+    assert response.get_json()["code"] == "INVALID_INPUT"
+
+
 def test_dashboard_returns_project_data(client):
     response = client.get("/api/projects/demo/dashboard")
     assert response.status_code == 200
