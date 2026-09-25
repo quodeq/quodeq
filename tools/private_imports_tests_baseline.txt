@@ -709,8 +709,8 @@ tests/dashboard/test_native_chrome_close.py:5:private-module:quodeq.dashboard._w
 tests/dashboard/test_native_chrome_close.py:6:private-module:quodeq.dashboard._webview_window_close
 tests/dashboard/test_native_chrome_close_choice.py:7:private-module:quodeq.dashboard._webview_window
 tests/dashboard/test_native_chrome_close_choice.py:8:private-module:quodeq.dashboard._webview_window_close
-tests/dashboard/test_native_chrome_mac.py:7:private-module:quodeq.dashboard._webview_window
-tests/dashboard/test_native_chrome_mac.py:8:private-module:quodeq.dashboard._webview_window_chrome
+tests/dashboard/test_native_chrome_mac.py:8:private-module:quodeq.dashboard._webview_window
+tests/dashboard/test_native_chrome_mac.py:9:private-module:quodeq.dashboard._webview_window_chrome
 tests/dashboard/test_native_ops_except_narrowing.py:18:private-module:quodeq.dashboard._webview_window.download_via_dialog
 tests/dashboard/test_native_ops_except_narrowing.py:18:private-module:quodeq.dashboard._webview_window.fetch_running_evaluation
 tests/dashboard/test_open_browser_external_url.py:9:private-module:quodeq.dashboard._webview_window

@@ -202,6 +202,18 @@ class TestOnClosing:
         window.destroy.assert_called_once()
         api._cancel_evaluation.assert_not_called()
 
+    def test_out_of_tuple_dialog_error_does_not_trap_the_user(self):
+        # A ValueError is outside ask_close_choice's own narrowed
+        # (WebViewException, OSError, RuntimeError): prompt_close_choice_and_
+        # finish (a bare threading.Thread target, no run_isolated above it)
+        # must still commit the close via _ask_close_choice_isolated.
+        on_closing, window, api = self._wire(job={"jobId": "x"})
+        with patch.object(wwc, "ask_close_choice", side_effect=ValueError("bad args")):
+            assert on_closing() is False
+            self._join(on_closing)
+        window.destroy.assert_called_once()
+        api._cancel_evaluation.assert_not_called()
+
     # --- Windows / winforms: dialog runs inline on the UI thread (2-button) -
 
     def test_windows_no_job_closes_without_dialog(self):

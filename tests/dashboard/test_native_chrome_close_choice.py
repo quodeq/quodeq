@@ -58,6 +58,33 @@ class TestOnClosingChoice:
             with pytest.raises(ValueError, match="bad args"):
                 ww.ask_close_choice(window)
 
+    # --- _ask_close_choice_isolated: the fault-isolation boundary above -----
+    # ask_close_choice. prompt_close_choice_and_finish runs as a bare
+    # threading.Thread target with no run_isolated above it, so an
+    # out-of-tuple ask_close_choice error (anything past its own narrowed
+    # (WebViewException, OSError, RuntimeError)) must be caught HERE instead.
+
+    def test_isolated_out_of_scope_error_yields_keep(self):
+        window = MagicMock()
+        with patch.object(wwc, "ask_close_choice", side_effect=ValueError("boom")):
+            assert wwc._ask_close_choice_isolated(window) == "keep"
+
+    def test_isolated_out_of_scope_error_logs_the_traceback(self, caplog):
+        window = MagicMock()
+        with patch.object(wwc, "ask_close_choice", side_effect=ValueError("boom")), \
+             caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_close"):
+            assert wwc._ask_close_choice_isolated(window) == "keep"
+        matching = [r for r in caplog.records if "close dialog failed" in r.getMessage()]
+        assert matching, [r.getMessage() for r in caplog.records]
+        assert any(r.exc_info for r in matching)
+        assert "Traceback (most recent call last)" in caplog.text
+        assert "ValueError: boom" in caplog.text
+
+    def test_isolated_returns_the_real_choice_when_no_error(self):
+        window = MagicMock()
+        with patch.object(wwc, "ask_close_choice", return_value="cancel"):
+            assert wwc._ask_close_choice_isolated(window) == "cancel"
+
     # --- NSAlert return -> choice mapping (pure) ----------------------------
 
     def test_alert_return_to_choice_mapping(self):

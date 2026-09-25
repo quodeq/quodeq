@@ -36,9 +36,8 @@ src/quodeq/context/trust_model.py:125:broad-except
 src/quodeq/context/trust_model.py:192:broad-except
 src/quodeq/dashboard/_webview_token.py:86:suppress
 src/quodeq/dashboard/_webview_window_chrome.py:145:broad-except
-src/quodeq/dashboard/_webview_window_close.py:182:broad-except
-src/quodeq/dashboard/_webview_window_close.py:197:broad-except
-src/quodeq/dashboard/_webview_window_close.py:232:broad-except
+src/quodeq/dashboard/_webview_window_close.py:198:broad-except
+src/quodeq/dashboard/_webview_window_close.py:233:broad-except
 src/quodeq/dashboard/_webview_window_native_ops.py:190:broad-except
 src/quodeq/data/fs/compiled_standards.py:36:broad-except
 src/quodeq/data/fs/report_parser/run_dates.py:43:broad-except

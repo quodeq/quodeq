@@ -1,14 +1,13 @@
 """Close-confirmation dialog orchestration, backend dispatch, and the close-choice seam itself.
 
-ask_close_choice and prompt_close_choice_and_finish live here rather than
-in the facade (_webview_window.py): ask_close_choice is patch-tested
-against this module's own namespace (`patch.object(wwc, "ask_close_choice")`
-in tests/dashboard/test_native_chrome.py, where ``wwc`` is this module) and
-prompt_close_choice_and_finish bare-calls it from here, so both need to
-live together. The facade re-exports both names so
-``ww.ask_close_choice(window)`` direct calls keep working, but a patch on
-the facade's re-export would not intercept the bare call made from this
-module — tests patch this module directly.
+ask_close_choice and prompt_close_choice_and_finish live here rather than in the
+facade (_webview_window.py): ask_close_choice is patch-tested against this module's
+own namespace (`patch.object(wwc, "ask_close_choice")` in
+tests/dashboard/test_native_chrome.py, where ``wwc`` is this module) and
+prompt_close_choice_and_finish bare-calls it (via _ask_close_choice_isolated) from
+here, so both need to live together. The facade re-exports both names so
+``ww.ask_close_choice(window)`` direct calls keep working, but a patch on the
+facade's re-export would not intercept the bare call — tests patch this module directly.
 """
 from __future__ import annotations
 
@@ -55,11 +54,9 @@ _CLOSE_CONFIRM_BODY_3WAY = (
 
 
 def alert_return_to_choice(ret: int, first: int, second: int) -> str:
-    """Map an NSAlert ``runModal()`` return code to a close choice.
-
-    first button -> 'keep' (quit, scan continues), second -> 'cancel' (stop the
-    scan, then quit), anything else (third/Stay/Escape) -> 'stay'.
-    """
+    """Map an NSAlert ``runModal()`` return code to a close choice: first button ->
+    'keep' (quit, scan continues), second -> 'cancel' (stop the scan, then quit),
+    anything else (third/Stay/Escape) -> 'stay'."""
     if ret == first:
         return CloseChoice.KEEP
     if ret == second:
@@ -71,14 +68,13 @@ def macos_confirm_close(_window: object) -> str:
     """Show the macOS 3-button close dialog and return 'keep', 'cancel', or 'stay'.
 
     Runs the modal on the GUI/main thread (``NSAlert.runModal`` requires it) via
-    ``AppHelper.callAfter``, blocking the *calling* worker thread on a semaphore
-    — the same mechanism pywebview's own dialogs use, so this must be called OFF
-    the GUI thread. Falls back to 'keep' if AppKit is unavailable or the alert
-    fails, so the user is never trapped. No-op ('keep') off macOS.
+    ``AppHelper.callAfter``, blocking the *calling* worker thread on a semaphore —
+    the same mechanism pywebview's own dialogs use, so this must be called OFF the
+    GUI thread. Falls back to 'keep' if AppKit is unavailable or the alert fails, so
+    the user is never trapped. No-op ('keep') off macOS.
 
-    The alert is app-modal (not sheeted on the window), so the window argument
-    is accepted only for call-site symmetry with the 2-button branch and is
-    unused here.
+    The alert is app-modal (not sheeted on the window), so the window argument is
+    accepted only for call-site symmetry with the 2-button branch and unused here.
     """
     if sys.platform != PLATFORM_DARWIN:
         return CloseChoice.KEEP
@@ -95,15 +91,14 @@ def macos_confirm_close(_window: object) -> str:
 
 
 def _build_macos_alert(result: dict, done: threading.Semaphore) -> None:
-    """Build and run the 3-button NSAlert on the GUI thread, storing the
-    choice in *result*.
+    """Build and run the 3-button NSAlert on the GUI thread, storing the choice
+    in *result*.
 
     *result* is written BEFORE *done* is released (both inside the try, the
     release in `finally`): the worker thread blocked on `done.acquire()` in
-    macos_confirm_close must never wake and read the not-yet-updated
-    default. *done* is always released, even if AppKit/PyObjC or the modal
-    itself fails — the worker thread waiting on it must never be left
-    hanging.
+    macos_confirm_close must never wake and read the not-yet-updated default.
+    *done* is always released, even if AppKit/PyObjC or the modal itself fails
+    — the worker thread waiting on it must never be left hanging.
     """
     try:
         import AppKit  # noqa: PLC0415
@@ -147,14 +142,14 @@ def ask_close_choice(window: object) -> str:
     """Ask the user how to close while a scan runs; return 'keep', 'cancel', or 'stay'.
 
     macOS gets a 3-button native alert (keep scanning / cancel scan / stay); other
-    backends get pywebview's 2-button dialog (OK = keep scanning, Cancel = stay).
-    If the dialog can't render, return 'keep' so the user is never trapped in an
+    backends get pywebview's 2-button dialog (OK = keep scanning, Cancel = stay). If
+    the dialog can't render, return 'keep' so the user is never trapped in an
     un-closeable window.
 
     Patch-tested against this module's own namespace (``patch.object(wwc,
-    "ask_close_choice")`` in tests/dashboard/test_native_chrome.py) and
-    bare-calls macos_confirm_close, which is patch-tested the same way — both
-    live here so a patch on either is visible to the other.
+    "ask_close_choice")`` in tests/dashboard/test_native_chrome.py) and bare-calls
+    macos_confirm_close, patch-tested the same way — both live here so a patch on
+    either is visible to the other.
     """
     if sys.platform == PLATFORM_DARWIN:
         return macos_confirm_close(window)
@@ -168,19 +163,25 @@ def ask_close_choice(window: object) -> str:
     return CloseChoice.KEEP if ok else CloseChoice.STAY
 
 
+def _ask_close_choice_isolated(window: object) -> str:
+    """Fault-isolation boundary: prompt_close_choice_and_finish is a bare thread
+    target with no run_isolated above it, so an out-of-tuple dialog error must be
+    logged here, not silently swallowed, and must never trap the user mid-close."""
+    return run_isolated(
+        lambda: ask_close_choice(window), label="close dialog", log=_logger,
+        on_error=lambda _exc: CloseChoice.KEEP,
+    )
+
+
 def prompt_close_choice_and_finish(
     api: "WindowApi", window: object, state: dict, job_id: str | None,
 ) -> None:
-    """Worker body for the macOS/GTK/Qt close path: ask the close choice, act
-    on it, and (unless staying) commit the close. Runs OFF the GUI thread —
-    see _make_on_closing_async for why answering inline would self-deadlock.
-
-    Lives here because it bare-calls the patch-tested ask_close_choice.
+    """Worker body for the macOS/GTK/Qt close path: ask the close choice, act on it,
+    and (unless staying) commit the close. Runs OFF the GUI thread — see
+    _make_on_closing_async for why answering inline would self-deadlock. Lives here
+    because it bare-calls the patch-tested ask_close_choice.
     """
-    try:
-        choice = ask_close_choice(window)  # 'keep' | 'cancel' | 'stay'
-    except Exception:
-        choice = CloseChoice.KEEP  # never trap the user on an unexpected dialog error
+    choice = _ask_close_choice_isolated(window)  # 'keep' | 'cancel' | 'stay'
     if choice == CloseChoice.STAY:
         state["prompting"] = False  # re-promptable: a later close asks again
         return
@@ -283,17 +284,15 @@ def make_on_closing(api: "WindowApi", window: object) -> "Callable[[], bool]":
     synchronously on the GUI thread (on macOS, inside ``windowShouldClose:``).
     How the confirmation dialog can be shown from there depends on the backend:
 
-    * macOS / GTK / Qt — the native dialog marshals back onto the GUI thread and
-      then blocks its caller on a semaphore, so answering inline from the
-      GUI-thread closing handler self-deadlocks. So we veto the close, show the
-      dialog on a worker thread, and re-issue the close via ``window.destroy``
-      once the user confirms (see _make_on_closing_async).
+    * macOS / GTK / Qt — the native dialog marshals onto the GUI thread and blocks
+      its caller on a semaphore, so answering inline from the GUI-thread closing
+      handler self-deadlocks. So we veto the close, show the dialog on a worker
+      thread, and re-issue via ``window.destroy`` once confirmed (see _make_on_closing_async).
 
     * Windows — winforms' ``create_confirmation_dialog`` is a *direct* modal
       ``MessageBox.Show`` with no GUI-thread marshaling, so a worker thread would
-      make it ownerless/non-modal; it's shown inline instead (see
-      _make_on_closing_inline). winforms doesn't self-block, so there is no
-      deadlock.
+      make it ownerless/non-modal; shown inline instead (see _make_on_closing_inline).
+      winforms doesn't self-block, so there is no deadlock.
     """
     if sys.platform == PLATFORM_WIN32:
         return _make_on_closing_inline(api, window)

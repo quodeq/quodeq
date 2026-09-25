@@ -131,7 +131,7 @@ def _adjusted_score(
         # already fail-soft internally (evidence_rescore._parse_evidence_jsonl
         # catches (OSError, ValueError, KeyError) and returns None;
         # score_evidence has its own local except Exception).
-        _logger.debug("Suppression-aware rescore failed for dim %s: %s", dim, exc)
+        _logger.warning("suppression-aware rescore failed for dim %s: %s", dim, exc, exc_info=True)
         return None, 0
     if rescored.excluded == 0 or rescored.result is None:
         return None, rescored.excluded

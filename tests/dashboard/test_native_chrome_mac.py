@@ -1,5 +1,6 @@
 """macOS native chrome: traffic lights, app identity, fullscreen chrome/observer and exception logging."""
 import logging
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -54,6 +55,10 @@ class TestMacLoadedHooksExceptNarrowing:
     (see set_macos_app_identity / install_about_panel_override)."""
 
     def _run(self, **overrides):
+        # make_on_loaded's _on_loaded only calls _run_macos_loaded_hooks when
+        # sys.platform == "darwin" (else it's a no-op, or runs the win32
+        # titlebar branch for real) — force the branch so this class is
+        # deterministic on every CI host, not just macOS.
         window = MagicMock()
         patches = {
             "show_macos_traffic_lights": lambda w: None,
@@ -64,12 +69,12 @@ class TestMacLoadedHooksExceptNarrowing:
             "install_macos_help_menu": lambda w: None,
         }
         patches.update(overrides)
-        with patch.multiple(_LIFECYCLE, **patches):
+        with patch.object(ww.sys, "platform", "darwin"), patch.multiple(_LIFECYCLE, **patches):
             ww.make_on_loaded(window)()  # -> _on_loaded -> _run_macos_loaded_hooks
 
     def test_app_identity_failure_does_not_block_help_menu(self, caplog):
         help_called = []
-        with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
+        with caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_chrome"):
             self._run(
                 set_macos_app_identity=MagicMock(side_effect=AttributeError("boom")),
                 install_macos_help_menu=lambda w: help_called.append(1),
@@ -78,7 +83,7 @@ class TestMacLoadedHooksExceptNarrowing:
         assert "macOS app-identity setup failed" in caplog.text
 
     def test_help_menu_failure_is_swallowed(self, caplog):
-        with caplog.at_level(logging.DEBUG, logger="quodeq.dashboard._webview_window_chrome"):
+        with caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_chrome"):
             self._run(install_macos_help_menu=MagicMock(side_effect=TypeError("boom")))
         assert "macOS Help menu setup failed" in caplog.text
 
@@ -87,6 +92,22 @@ class TestMacLoadedHooksExceptNarrowing:
         must now propagate instead of being swallowed."""
         with pytest.raises(RuntimeError, match="boom"):
             self._run(set_macos_app_identity=MagicMock(side_effect=RuntimeError("boom")))
+
+    @pytest.mark.parametrize("real_host_platform", ["linux", "win32"])
+    def test_runs_on_non_macos_ci_hosts(self, real_host_platform, caplog):
+        """This class must be deterministic on the Linux and Windows CI legs,
+        not just macOS: simulate the real host platform (not just ww.sys,
+        which _run already overrides) to prove _run still forces the darwin
+        branch and exercises _run_macos_loaded_hooks either way."""
+        help_called = []
+        with patch.object(sys, "platform", real_host_platform), \
+             caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_chrome"):
+            self._run(
+                set_macos_app_identity=MagicMock(side_effect=AttributeError("boom")),
+                install_macos_help_menu=lambda w: help_called.append(1),
+            )
+        assert help_called == [1]
+        assert "macOS app-identity setup failed" in caplog.text
 
 
 class _SyncThread:
