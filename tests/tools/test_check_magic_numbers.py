@@ -153,3 +153,8 @@ def test_describe_shows_line_rule_literal_and_source(tmp_path):
     _keys(tmp_path, "def f(n):\n    return n > 50\n")
     [hit] = check_magic_numbers.scan_tree(tmp_path)
     assert check_magic_numbers.describe(hit) == "quodeq/mod.py:2 [C] 50: return n > 50"
+
+
+def test_baseline_is_empty():
+    lines = [l for l in (TOOLS / "magic_numbers_baseline.txt").read_text().splitlines() if l.strip() and not l.startswith("#")]
+    assert lines == []
