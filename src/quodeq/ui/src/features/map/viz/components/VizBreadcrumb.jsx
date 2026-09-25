@@ -1,3 +1,4 @@
+import { KEY } from '../../../../vocab/keyboard.js';
 /**
  * Shared breadcrumb for all map visualizations.
  * Renders absolute-positioned top-left, matching Galaxy style.
@@ -32,7 +33,7 @@ export default function VizBreadcrumb({ items }) {
               onMouseLeave={clickable ? (e) => { e.target.style.background = 'transparent'; e.target.style.color = 'var(--color-text-muted)'; } : undefined}
               tabIndex={clickable ? 0 : undefined}
               role={clickable ? 'button' : undefined}
-              onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.onClick(); } } : undefined}
+              onKeyDown={clickable ? (e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); item.onClick(); } } : undefined}
             >{item.label}</span>
           </span>
         );

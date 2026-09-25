@@ -21,6 +21,12 @@ from quodeq.services.import_validator import (
 
 _CUSTOM_DEFAULTS = {"type": TYPE_CUSTOM, "managed": False, "origin": None, "origin_hash": None}
 
+# import_from_file()'s result["status"] on a name collision with an existing
+# standard id (its other value, "imported", is not branched on by callers).
+# Re-exported by services/standards.py: api and assistant import it from
+# there (they may not reach into this private module).
+IMPORT_STATUS_CONFLICT = "conflict"
+
 
 def _write_and_load_detail(store: StandardsStore, path: Path, payload: dict) -> StandardDetail:
     """Persist *payload* at *path* and build the detail from what the store reads back."""
@@ -110,7 +116,7 @@ def import_from_file(data: dict, force: bool, evaluators_dir: Path, store: Stand
     existing = store.read(path) if store.exists(evaluators_dir, standard_id) else None
     if existing is not None and not force:
         p, r = count_principles_and_requirements(existing)
-        return {"status": "conflict", "detail": None,
+        return {"status": IMPORT_STATUS_CONFLICT, "detail": None,
                 "existing": build_custom_meta(existing, p, r), "warnings": warnings}
     if existing is not None and existing.get("managed", False):
         raise StandardProtectedError(f"Cannot overwrite managed standard '{standard_id}'")

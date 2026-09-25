@@ -19,6 +19,7 @@ from quodeq.data.mappers import parse_dimension_result
 from quodeq.data.fs.report_parser._evaluations import load_evaluations
 from quodeq.data.fs.report_parser.external_pid import resolve_external_pid
 from quodeq.data.fs.report_parser._evidence import load_evidence_map
+from quodeq.shared.constants import EVIDENCE_DIRNAME, JSON_SUFFIX, MANIFEST_FILENAME
 from quodeq.data.fs.report_parser._repository import (
     build_repository_info as build_repository_info,
 )
@@ -50,7 +51,7 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[Dimensi
         raise FileNotFoundError(f"Run not found: {project}/{run_id}")
     run_dir = Path(resolved_run)
     evaluations = load_evaluations(run_dir / "evaluation")
-    evidence_map = load_evidence_map(run_dir / "evidence")
+    evidence_map = load_evidence_map(run_dir / EVIDENCE_DIRNAME)
 
     dimensions: list[DimensionResult] = []
     for evaluation in evaluations:
@@ -127,7 +128,7 @@ def _read_run_scalars_from_sql(run_dir: Path) -> "tuple[list[dict], list[dict]] 
 
     eval_dir = run_dir / "evaluation"
     on_disk = (
-        sum(1 for p in eval_dir.iterdir() if p.suffix == ".json")
+        sum(1 for p in eval_dir.iterdir() if p.suffix == JSON_SUFFIX)
         if eval_dir.is_dir() else 0
     )
     if on_disk and len(dim_rows) != on_disk:
@@ -261,7 +262,7 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         # without a prescan never write evidence/manifest.json, and the SQLite
         # index (History) already accepts any run with a status.json — the two
         # enumerators must agree or the Overview 404s on runs History shows.
-        is_run = (run_dir / "evidence" / "manifest.json").exists() \
+        is_run = (run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME).exists() \
             or (run_dir / "status.json").is_file()
         if not is_run:
             continue

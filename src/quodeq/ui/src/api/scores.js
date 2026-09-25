@@ -9,6 +9,7 @@ import { request } from './request.js';
 import { attachComplianceDetailRefs } from './complianceDetail.js';
 import { createViolations } from '../models/violation.js';
 import { asOfQuery, parseAccumulated, parseSlimDimensions, parseUnifiedScores, runQuery } from './scoresShape.js';
+import { LATEST_RUN_ID } from '../constants.js';
 
 // ── Unified Scores ─────────────────────────────────────────────────────
 
@@ -58,7 +59,7 @@ export async function getCompareSummary(projectId) {
 // ── Dashboard ───────────────────────────────────────────────────────────
 
 /** @returns {Promise<import('../models/dashboard.js').Dashboard>} */
-export async function getDashboard(projectId, run = 'latest') {
+export async function getDashboard(projectId, run = LATEST_RUN_ID) {
   const data = await request(`/projects/${encodeURIComponent(projectId)}/dashboard${runQuery(run)}`);
   return createDashboard(data);
 }

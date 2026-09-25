@@ -13,6 +13,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify
 
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND
 from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
 from quodeq.services.compare import build_compare_summary
@@ -29,7 +30,7 @@ def register_compare_routes(app: Flask) -> None:
         try:
             validate_path_segment(project)
         except ValueError:
-            body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
             return jsonify(body), status
         try:
             result = build_compare_summary(Path(reports_dir()), project)
@@ -38,6 +39,6 @@ def register_compare_routes(app: Flask) -> None:
             body, status = error_response("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
             return jsonify(body), status
         if result is None:
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
             return jsonify(body), status
         return jsonify(result)

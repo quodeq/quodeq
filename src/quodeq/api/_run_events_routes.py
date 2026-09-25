@@ -12,6 +12,7 @@ from pathlib import Path
 
 from flask import Flask, Response, current_app, jsonify, request
 
+from quodeq.api._constants import CODE_NOT_FOUND
 from quodeq.api._run_event_stream import run_events_generator
 
 
@@ -36,7 +37,7 @@ def register_run_events_routes(app: Flask) -> None:
     def stream_run_events(job_id: str) -> Response | tuple[Response, int]:
         run_dir, err = _resolve_run_dir(job_id)
         if run_dir is None:
-            code = "GONE" if err == HTTPStatus.GONE else "NOT_FOUND"
+            code = "GONE" if err == HTTPStatus.GONE else CODE_NOT_FOUND
             return jsonify({"error": "run unavailable", "code": code}), err
 
         last_event_id_raw = request.headers.get("Last-Event-ID", "")

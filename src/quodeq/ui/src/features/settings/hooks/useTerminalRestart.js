@@ -1,6 +1,8 @@
 import { useApi } from '../../../api/ApiContext.jsx';
 import { t } from '../../../strings/index.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
+import { TERMINAL_RESTART_EVENT } from '../../../constants.js';
+import { DIALOG_VARIANT } from '../../../vocab/dialogVariant.js';
 
 /**
  * Settings' "Restart terminal" workflow: kill the server shell via useApi(),
@@ -19,11 +21,11 @@ export function useTerminalRestart() {
     const ok = await confirmDialog({
       title: t('settings.restartTerminalConfirmTitle'),
       message: t('settings.restartTerminalConfirmMessage'),
-      variant: 'danger',
+      variant: DIALOG_VARIANT.DANGER,
     });
     if (!ok) return;
     killTerminal()
-      .then(() => window.dispatchEvent(new Event('quodeq:terminal-restart')))
+      .then(() => window.dispatchEvent(new Event(TERMINAL_RESTART_EVENT)))
       .catch((err) => { console.warn('Terminal restart: kill failed, not reconnecting', err); });
   };
 }

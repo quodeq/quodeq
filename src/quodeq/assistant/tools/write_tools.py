@@ -11,12 +11,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.assistant.tools._context import ToolContext
+from quodeq.assistant.tools._constants import JSON_SCHEMA_TYPE_OBJECT, JSON_SCHEMA_TYPE_STRING
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.assistant.tools._repo_tools import jail
 from quodeq.assistant.worktree import WorktreeError, diff_stats, diff_text
+from quodeq.shared.utils import TEXT_ENCODING
 
 _MAX_CONTENT_BYTES = 65_536
 _MAX_DIFF_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON headroom
+_PARAM_PATH = "path"  # tool parameter name, repeated across this module's schemas
 
 
 def _jail_write(ctx: ToolContext, rel_path: str) -> Path:
@@ -40,7 +43,7 @@ def _edit_repo_file(ctx: ToolContext, path: str, old_string: str,
     if b"\x00" in raw[:1024]:
         raise ToolError("cannot edit a binary file")
     try:
-        text = raw.decode("utf-8")
+        text = raw.decode(TEXT_ENCODING)
     except UnicodeDecodeError as exc:
         raise ToolError("cannot edit a non-UTF-8 file, rewrite it with write_repo_file instead") from exc
     count = text.count(old_string) if old_string else 0
@@ -50,7 +53,7 @@ def _edit_repo_file(ctx: ToolContext, path: str, old_string: str,
         raise ToolError(
             f"old_string matches {count} times, add surrounding context to make it unique")
     new_text = text.replace(old_string, new_string, 1)
-    encoded = new_text.encode("utf-8")
+    encoded = new_text.encode(TEXT_ENCODING)
     if len(encoded) > _MAX_CONTENT_BYTES:
         raise ToolError(f"edited file would exceed {_MAX_CONTENT_BYTES} bytes")
     # write_bytes, not write_text: text mode translates "\n" to the platform
@@ -62,7 +65,7 @@ def _edit_repo_file(ctx: ToolContext, path: str, old_string: str,
 
 
 def _write_repo_file(ctx: ToolContext, path: str, content: str) -> dict:
-    data = content.encode("utf-8")
+    data = content.encode(TEXT_ENCODING)
     if len(data) > _MAX_CONTENT_BYTES:
         raise ToolError(f"content exceeds {_MAX_CONTENT_BYTES} bytes")
     target = _jail_write(ctx, path)
@@ -97,27 +100,27 @@ def register_write_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "edit_repo_file",
         "Replace ONE unique occurrence of old_string with new_string in a file "
         "of the fix worktree. Fails if old_string is absent or ambiguous.",
-        {"type": "object",
-         "properties": {"path": {"type": "string"}, "old_string": {"type": "string"},
-                        "new_string": {"type": "string"}},
-         "required": ["path", "old_string", "new_string"]},
+        {"type": JSON_SCHEMA_TYPE_OBJECT,
+         "properties": {"path": {"type": JSON_SCHEMA_TYPE_STRING}, "old_string": {"type": JSON_SCHEMA_TYPE_STRING},
+                        "new_string": {"type": JSON_SCHEMA_TYPE_STRING}},
+         "required": [_PARAM_PATH, "old_string", "new_string"]},
         lambda **kw: _edit_repo_file(ctx, **kw)))
     registry.register(ToolSpec(
         "write_repo_file",
         "Create or overwrite one file in the fix worktree.",
-        {"type": "object",
-         "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
-         "required": ["path", "content"]},
+        {"type": JSON_SCHEMA_TYPE_OBJECT,
+         "properties": {"path": {"type": JSON_SCHEMA_TYPE_STRING}, "content": {"type": JSON_SCHEMA_TYPE_STRING}},
+         "required": [_PARAM_PATH, "content"]},
         lambda **kw: _write_repo_file(ctx, **kw)))
     registry.register(ToolSpec(
         "delete_repo_file",
         "Delete one file in the fix worktree.",
-        {"type": "object", "properties": {"path": {"type": "string"}},
-         "required": ["path"]},
+        {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {"path": {"type": JSON_SCHEMA_TYPE_STRING}},
+         "required": [_PARAM_PATH]},
         lambda **kw: _delete_repo_file(ctx, **kw)))
     registry.register(ToolSpec(
         "get_worktree_diff",
         "Unified diff of every change made so far in the fix worktree. Call "
         "this to self-review before telling the user a fix is ready.",
-        {"type": "object", "properties": {}},
+        {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {}},
         lambda **kw: _get_worktree_diff(ctx, **kw)))

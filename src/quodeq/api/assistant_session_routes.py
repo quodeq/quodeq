@@ -15,6 +15,7 @@ from typing import Callable
 from flask import Flask, Response, jsonify
 
 from quodeq.api import _assistant_helpers
+from quodeq.api._constants import CODE_INVALID_PARAM
 from quodeq.api.helpers import error_response, optional_json_object_or_error
 from quodeq.assistant import SessionScope
 from quodeq.assistant.orchestrator import write_available
@@ -101,7 +102,7 @@ def register_assistant_session_routes(app: Flask, gates: SessionGates) -> None:
         # First assistant request of the process: reap leaked worktrees +
         # prune stale sessions before minting a new one (one-shot, best-effort).
         _assistant_helpers.run_assistant_hygiene(app)
-        body = optional_json_object_or_error("INVALID_PARAM")
+        body = optional_json_object_or_error(CODE_INVALID_PARAM)
         if not isinstance(body, dict):
             return jsonify(body[0]), body[1]
         error, source = _validate_session_request(body, gates)

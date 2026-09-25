@@ -75,6 +75,11 @@ function useRotatingTip(enabled) {
   return { tipKey: started ? order[idx] : null, fading };
 }
 
+// Non-default `variant` values (the default is 'fullscreen' -- see the
+// LoadingScreen doc below).
+const VARIANT_INLINE = 'inline';
+const VARIANT_SHELL = 'shell';
+
 /**
  * @param {{ message?: string, variant?: 'fullscreen'|'shell'|'inline', tips?: boolean }} props
  *
@@ -98,8 +103,8 @@ function useRotatingTip(enabled) {
 export default function LoadingScreen({ message, variant = 'fullscreen', tips = false, leaving = false }) {
   const { tipKey, fading } = useRotatingTip(tips);
   const classes = ['loading-screen'];
-  if (variant === 'inline') classes.push('loading-screen--inline');
-  if (variant === 'shell') classes.push('loading-screen--shell');
+  if (variant === VARIANT_INLINE) classes.push('loading-screen--inline');
+  if (variant === VARIANT_SHELL) classes.push('loading-screen--shell');
   // Known at mount, so the logo is lifted from the first frame and never
   // jumps when the first tip arrives.
   if (tips) classes.push('loading-screen--tips');

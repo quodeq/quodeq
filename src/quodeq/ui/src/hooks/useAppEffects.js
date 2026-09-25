@@ -5,6 +5,7 @@ import { hydrateVisibleStandardIds } from '../utils/visibleStandards.js';
 import { shouldBounceToEvaluate, shouldRedirectToRemoteRepositories } from '../appGating.js';
 import { buildAssistantActionAppliedHandler } from '../features/assistant/assistantAppBridge.js';
 import { ASSISTANT_ACTION_APPLIED_EVENT } from '../constants.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 // App.jsx's boot-time and navigation-guard effects. Each hook carries the
 // rationale for its own effect.
@@ -81,7 +82,7 @@ export function useEvaluateBounceEffect({ state, selectedProjectInfo, hasCurrent
       activeTab: state.activeTab,
       selectedSource: state.selectedSource,
     })) {
-      state.navTab('evaluate');
+      state.navTab(NAV_TAB.EVALUATE);
     }
   }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab, state.selectedSource]); // eslint-disable-line react-hooks/exhaustive-deps
 }
@@ -105,7 +106,7 @@ export function useInitialLandingEffect({ state, sharedSignal, activeTab, navTab
       sharedHasContent: sharedSignal.hasContent,
       activeTab,
     })) {
-      navTab('projects');
+      navTab(NAV_TAB.PROJECTS);
     }
   }, [state.projectsLoaded, state.projects.length, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent, activeTab, navTab]);
 }

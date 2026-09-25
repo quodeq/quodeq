@@ -197,6 +197,14 @@ def _run_publish(
         status.set(state=PublishState.ERROR, error="An unexpected error occurred while publishing.", finished_at=time.time())
 
 
+class PublishStartResult(StrEnum):
+    """``start_publish``'s return value."""
+
+    STARTED = "started"
+    ALREADY_RUNNING = "already_running"  # another publish holds the slot
+    FAILED = "failed"  # the worker thread could not be started; status dict carries the error
+
+
 def start_publish(
     project_id: str, url: str, *,
     evaluations_root: Path,
@@ -204,14 +212,14 @@ def start_publish(
 ) -> str:
     """Kick off a background publish.
 
-    Returns "started", "already_running" (another publish holds the slot),
-    or "failed" (the worker thread could not be started; the status dict
-    carries the error). Callers must not collapse the last two: one is a
-    409-style conflict, the other a server-side failure.
+    Returns ``PublishStartResult.STARTED``, ``ALREADY_RUNNING`` (another
+    publish holds the slot), or ``FAILED`` (the worker thread could not be
+    started; the status dict carries the error). Callers must not collapse
+    the last two: one is a 409-style conflict, the other a server-side failure.
     """
     status = status or _default_status
     if not status.claim(project_id):
-        return "already_running"
+        return PublishStartResult.ALREADY_RUNNING
     try:
         thread = threading.Thread(
             target=_run_publish, args=(project_id, url, evaluations_root, status),
@@ -221,5 +229,5 @@ def start_publish(
     except Exception:
         status.set(state=PublishState.ERROR, error="Failed to start publish background job.", finished_at=time.time())
         logger.exception("failed to start publish thread")
-        return "failed"
-    return "started"
+        return PublishStartResult.FAILED
+    return PublishStartResult.STARTED

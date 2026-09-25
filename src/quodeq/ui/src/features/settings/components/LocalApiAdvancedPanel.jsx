@@ -1,4 +1,4 @@
-import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
+import { MIN_SUBAGENTS, MAX_SUBAGENTS, PROVIDER_SETTING_KEY } from '../../../constants.js';
 import HelpHint from '../../../components/HelpHint.jsx';
 import { AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 import { SUBAGENTS_HINT_OLLAMA } from './subagentsHints.jsx';
@@ -36,8 +36,8 @@ export function LocalApiAdvancedPanel({
               min={MIN_SUBAGENTS}
               max={MAX_SUBAGENTS}
               value={state.subagents}
-              onChange={(e) => update('subagents', e.target.value)}
-              onBlur={(e) => { if (e.target.value !== '') update('subagents', clampSubagents(e.target.value)); }}
+              onChange={(e) => update(PROVIDER_SETTING_KEY.SUBAGENTS, e.target.value)}
+              onBlur={(e) => { if (e.target.value !== '') update(PROVIDER_SETTING_KEY.SUBAGENTS, clampSubagents(e.target.value)); }}
             />
             <button type="button" className="settings-action-btn" onClick={onRunTest} disabled={testDisabled}>
               {testing ? t('settings.testing') : t('settings.autoDetect')}

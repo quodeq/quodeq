@@ -4,6 +4,7 @@ import ViolationsSkeleton from './ViolationsSkeleton.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 function ViolationsSkeletonState() {
   return (
@@ -63,7 +64,7 @@ function renderNoDimensionDataState({
         title={t('overview.noEvalsTitle')}
         description={t('overview.noEvalsDesc', { name: projectName || selectedProject })}
         actionLabel={t('overview.startEvaluation')}
-        onAction={() => onNavigate?.('evaluate')}
+        onAction={() => onNavigate?.(NAV_TAB.EVALUATE)}
       />
     </div>
   );
@@ -91,7 +92,7 @@ export function renderViolationsEmptyState({
           title={t('overview.noProjectsTitle')}
           description={t('overview.noProjectsDesc')}
           actionLabel={t('overview.addProject')}
-          onAction={() => onNavigate?.('projects')}
+          onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
         />
       </div>
     );
@@ -104,7 +105,7 @@ export function renderViolationsEmptyState({
           title={t('overview.noProjectSelectedTitle')}
           description={t('violations.noProjectSelectedDesc')}
           actionLabel={t('overview.chooseProject')}
-          onAction={() => onNavigate?.('projects')}
+          onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
         />
       </div>
     );

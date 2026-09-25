@@ -3,6 +3,7 @@ import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import EmptyState from '../../../components/EmptyState.jsx';
 import { NoEvalsEmptyState } from '../../../components/ProjectEmptyStates.jsx';
 import { t } from '../../../strings/index.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 // These render only the *contents* of DashboardPage's `.dashboard-page` div
 // for each early-return branch -- never the `<>{null}<div className=...>`
@@ -34,7 +35,7 @@ export function NoLocalProjectsSharedContent({ onNavigate }) {
       title={t('overview.noLocalProjectsTitle')}
       description={t('overview.noLocalProjectsDesc')}
       actionLabel={t('overview.browseRemote')}
-      onAction={() => onNavigate?.('projects')}
+      onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
     />
   );
 }
@@ -45,7 +46,7 @@ export function NoProjectSelectedContent({ onNavigate }) {
       title={t('overview.noProjectSelectedTitle')}
       description={t('overview.noProjectSelectedDesc')}
       actionLabel={t('overview.chooseProject')}
-      onAction={() => onNavigate?.('projects')}
+      onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
     />
   );
 }

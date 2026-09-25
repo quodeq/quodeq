@@ -14,6 +14,7 @@
  */
 import { projectKeys } from "./queryKeys";
 import { violationKey } from "../utils/violationKey.js";
+import { LATEST_RUN_ID } from "../constants.js";
 
 function clampNonNegative(n) {
   return Math.max(0, n | 0);
@@ -68,7 +69,8 @@ function patchDimScore(dim, scoreByDim) {
 // rest (restore/delete and their -all bulk forms) can't cheaply/correctly
 // reconstruct the violation-list change, so they invalidate the run-detail
 // violation source and let it refetch on next view.
-const KNOWN_KINDS = new Set(["dismiss", "restore", "delete", "restore_all", "delete_all"]);
+const MUTATION_KIND_DISMISS = "dismiss"; // the one kind that splices the cached violation list locally
+const KNOWN_KINDS = new Set([MUTATION_KIND_DISMISS, "restore", "delete", "restore_all", "delete_all"]);
 
 // Patch dim score/grade in place, preserving referential identity for
 // untouched dims. ``spliceDismissed`` additionally removes the dismissed
@@ -160,7 +162,7 @@ function applyRunScopedPatches({ runId, projectId, patchScores, invalidateViolat
 
 function applyLatestPatches({ delta, projectId, runId, patchScores, patchAccumulated, patchAccumulatedDims, splices }) {
   if (!delta.isLatest) return;
-  patchScores(projectKeys.dashboard(projectId, "latest"), { spliceDismissed: splices });
+  patchScores(projectKeys.dashboard(projectId, LATEST_RUN_ID), { spliceDismissed: splices });
   if (delta.accumulated) {
     // A caller supplied the authoritative rollup — prefer it.
     patchAccumulated(projectKeys.scores(projectId, null), delta.accumulated);
@@ -201,7 +203,7 @@ export function applyMutationDelta(queryClient, projectId, delta) {
   const dismissed = delta.dismissed || {};
   // Only dismiss can splice locally — it carries the full violation key and is
   // a single-finding removal. Every other kind invalidates instead.
-  const splices = delta.kind === "dismiss";
+  const splices = delta.kind === MUTATION_KIND_DISMISS;
   const runId = delta.runId;
 
   const patchScores = makePatchScores(queryClient, scoreByDim, dismissed);

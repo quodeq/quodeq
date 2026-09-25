@@ -30,6 +30,7 @@ _MAX_TEXT_CHARS = 12_000  # guard.py fences tool results at 16k; leave JSON head
 _MAX_TITLE_CHARS = 300  # per search result; keeps _MAX_RESULTS results well under the fence
 _MAX_SNIPPET_CHARS = 500  # per search result, same budget
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+_TAG_ANCHOR = "a"  # DDG result-link <a> tag name
 
 
 def _decode_ddg_href(href: str) -> str:
@@ -57,7 +58,7 @@ class _DdgResultParser(HTMLParser):
                 self._depth += 1
             return
         classes = (dict(attrs).get("class") or "").split()
-        if tag == "a" and "result__a" in classes:
+        if tag == _TAG_ANCHOR and "result__a" in classes:
             url = _decode_ddg_href(dict(attrs).get("href") or "")
             self.results.append({"title": "", "url": url, "snippet": ""})
             self._target, self._container, self._depth = "title", tag, 1

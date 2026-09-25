@@ -31,6 +31,7 @@ from quodeq.analysis._run_lifecycle_guards import (  # noqa: F401 -- re-export
     SIGNALS_TO_HANDLE as _SIGNALS_TO_HANDLE,
 )
 from quodeq.core.observability import LogSink
+from quodeq.core.run.exit_reason import ExitReason
 from quodeq.shared import cancellation
 from quodeq.core.run.state import RunState, RunStatus, TERMINAL_STATES
 from quodeq.data.fs.run_status_store import read_status
@@ -148,9 +149,7 @@ def _deadline_has_passed(deadline_at: str | None) -> bool:
     return datetime.now(timezone.utc) >= deadline
 
 
-def mark_unfinished_dims_incomplete(
-    run_dir: Path, reason: str, *, log: LogSink,
-) -> int:
+def mark_unfinished_dims_incomplete(run_dir: Path, reason: str, *, log: LogSink) -> int:
     """Flip non-terminal dims to INCOMPLETE and return how many were flipped.
 
     Covers ``pending`` as well as ``running``. A dimension the run never
@@ -238,13 +237,13 @@ def run_signal_shutdown(
     except ValueError:
         name = f"signal_{signum}"
     deadline_enforced = _deadline_has_passed(status.deadline_at)
-    exit_reason = "deadline" if deadline_enforced else f"signal_{name}"
+    exit_reason = ExitReason.DEADLINE if deadline_enforced else f"signal_{name}"
     cancellation.request_cancel()
     heartbeat.stop()
     resources.stop()
     status.write(RunState.CANCELLED, exit_reason=exit_reason)
     mark_unfinished_dims_incomplete(
-        status.run_dir, "time_limit" if deadline_enforced else "cancelled", log=log)
+        status.run_dir, ExitReason.TIME_LIMIT if deadline_enforced else ExitReason.CANCELLED, log=log)
 
 
 def finalize_run_on_atexit(

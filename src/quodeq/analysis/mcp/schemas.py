@@ -27,6 +27,11 @@ class FileDoneStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+# router.py's file_done JSONL entries' "_marker" value; _loop_guards.py,
+# cache/_jsonl_state.py and cache/failure_streak.py all read it back.
+JSONL_MARKER_FILE_DONE = "file_done"
+
+
 REPORT_FINDING_NAME = "report_finding"
 REPORT_FINDING_DESC = (
     "Report a code quality finding (violation or compliance). "

@@ -27,6 +27,7 @@ from typing import Callable
 
 from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.config.analysis_env import max_api_file_size
+from quodeq.config.provider import ProviderType
 from quodeq.shared.utils import get_ai_cmd
 
 StatFn = Callable[[Path], int]
@@ -60,7 +61,7 @@ class DispatchPolicy:
 
     def provider_is_api(self) -> bool:
         """True when the active provider dispatches via direct API."""
-        return self.provider_configs.get(self.ai_cmd, {}).get("type", "cli") == "api"
+        return self.provider_configs.get(self.ai_cmd, {}).get("type", ProviderType.CLI) == ProviderType.API
 
     def split_api_dispatchable(
         self, root: Path, rel_files: list[str],

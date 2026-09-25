@@ -58,6 +58,7 @@ from quodeq.services._score_cache_fetch import (  # noqa: F401 — facade re-exp
     make_cache_backed_fetcher,
 )
 from quodeq.shared.env import get_score_cache_path  # noqa: F401 — facade re-export
+from quodeq.shared.utils import TEXT_ENCODING
 
 if TYPE_CHECKING:
     from quodeq.core.dismissals import DismissedKeys
@@ -95,7 +96,7 @@ def score_cache_version(project_dir: Path, params: ScoringParams) -> str:
         ],
         "params": _params_fingerprint(params),
     }, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(TEXT_ENCODING)).hexdigest()
 
 
 def run_scoped_version(
@@ -120,7 +121,7 @@ def run_scoped_version(
         "deleted": sorted(str(k) for k in (deleted_all & run_class_keys)),
         "params": _params_fingerprint(params),
     }, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(TEXT_ENCODING)).hexdigest()
 
 
 def accumulated_cache_version(
@@ -166,7 +167,7 @@ def accumulated_cache_version(
         "as_of": as_of or "",
         **({} if visible_dims is None else {"visible": sorted(visible_dims)}),
     }, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(TEXT_ENCODING)).hexdigest()
 
 
 _IN_FLIGHT = frozenset({RunState.PENDING, RunState.RUNNING, RunState.FINALIZING})
@@ -187,7 +188,7 @@ def accumulated_stale_scope(
               for rid, status, version in run_versions]
     payload = json.dumps({"acc": accumulated_cache_version(params, masked, as_of),
                           "suppression": suppression_fp}, sort_keys=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return hashlib.sha256(payload.encode(TEXT_ENCODING)).hexdigest()
 
 
 def per_run_versions(

@@ -19,6 +19,8 @@ hides the console button. Recommended launch:
 """
 from __future__ import annotations
 
+from quodeq.api._constants import CODE_NOT_FOUND
+
 import logging
 import sys
 from collections.abc import Mapping
@@ -28,9 +30,12 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._sse_log_helpers import sse_tail_generator
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
 from quodeq.shared.env_resolve import resolve_env
 
 _logger = logging.getLogger(__name__)
+
+_LLAMA_LOG_FILENAME = "llama-server.log"  # the filename probed at every candidate log directory
 
 
 def _default_log_paths(env: Mapping[str, str] | None = None) -> list[Path]:
@@ -62,17 +67,17 @@ def _default_log_paths(env: Mapping[str, str] | None = None) -> list[Path]:
         # Permission denied or read-only home — fall through to other
         # candidates rather than failing the whole probe.
         _logger.debug("could not create %s, trying the next log location: %s", quodeq_logs, exc)
-    candidates: list[Path] = [quodeq_logs / "llama-server.log"]
-    if sys.platform == "darwin":
-        candidates.append(home / "Library" / "Logs" / "llama-server.log")
-    elif sys.platform == "win32":
+    candidates: list[Path] = [quodeq_logs / _LLAMA_LOG_FILENAME]
+    if sys.platform == PLATFORM_DARWIN:
+        candidates.append(home / "Library" / "Logs" / _LLAMA_LOG_FILENAME)
+    elif sys.platform == PLATFORM_WIN32:
         local_app = environ.get("LOCALAPPDATA")
         if local_app:
             candidates.append(Path(local_app) / "llama.cpp" / "server.log")
     else:
         xdg_state = environ.get("XDG_STATE_HOME") or str(home / ".local" / "state")
-        candidates.append(Path(xdg_state) / "llama-server.log")
-    candidates.append(Path("/tmp/llama-server.log"))
+        candidates.append(Path(xdg_state) / _LLAMA_LOG_FILENAME)
+    candidates.append(Path("/tmp") / _LLAMA_LOG_FILENAME)
     return candidates
 
 
@@ -124,7 +129,7 @@ def register_llamacpp_log_routes(app: Flask, env: Mapping[str, str] | None = Non
             return (
                 jsonify({
                     "error": "llamacpp log unavailable",
-                    "code": "NOT_FOUND",
+                    "code": CODE_NOT_FOUND,
                     "help": (
                         "Could not locate a llama-server log file. Either redirect "
                         "llama-server's output to a standard path (e.g. on macOS: "

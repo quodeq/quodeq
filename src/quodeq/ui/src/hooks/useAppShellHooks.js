@@ -12,6 +12,7 @@ import { readVisibleStandardIds } from '../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from '../utils/scoreFiltering.js';
 import { useSidePane } from '../features/side-pane/index.js';
 import { useAssistantDrawer } from '../features/assistant/AssistantDrawerProvider.jsx';
+import { DRAWER_PANEL } from '../features/assistant/drawerPanelsModel.js';
 import { useAssistantProvider } from '../features/settings/hooks/useAssistantProvider.js';
 import { deriveAssistantContext } from '../features/assistant/useAssistantContext.js';
 import { buildAssistantSessionPayload } from '../features/assistant/assistantAppBridge.js';
@@ -84,7 +85,7 @@ export function useAppAssistant(state) {
   const { isOpen: assistantOpen, activeTab: drawerTab, startSession: startAssistantSession } = useAssistantDrawer();
   const { provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId, source: asstSource } = assistantCtx;
   useEffect(() => {
-    if (!assistantOpen || drawerTab !== 'assistant') return;
+    if (!assistantOpen || drawerTab !== DRAWER_PANEL.ASSISTANT) return;
     startAssistantSession(buildAssistantSessionPayload({
       provider: asstProvider, model: asstModel, projectId: asstProjectId, runId: asstRunId, source: asstSource,
     }));

@@ -9,6 +9,14 @@ import {
   STALE_AFTER_DAYS, nameKey, parseScore10, daysBetween, trendDelta, mean,
 } from './compareModel.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
+import { SORT_DIR } from '../../vocab/sortDirection.js';
+
+// consequenceLevel's return values, in ascending severity. CompareFleetView
+// and useCompareScopeActions both compare against CLEAR to decide whether a
+// row is worth surfacing in the attention strip / "select flagged" action.
+export const CONSEQUENCE_LEVEL = Object.freeze({
+  SEVERE: 'severe', ELEVATED: 'elevated', WATCH: 'watch', CLEAR: 'clear',
+});
 
 // Consequence thresholds. The score scales as
 // (10 - score) * log10(files + 10) * staleness, i.e. roughly 0..45 across
@@ -151,10 +159,10 @@ export function consequenceOf(row) {
 }
 
 export function consequenceLevel(value) {
-  if (value >= SEVERE_AT) return 'severe';
-  if (value >= ELEVATED_AT) return 'elevated';
-  if (value >= WATCH_AT) return 'watch';
-  return 'clear';
+  if (value >= SEVERE_AT) return CONSEQUENCE_LEVEL.SEVERE;
+  if (value >= ELEVATED_AT) return CONSEQUENCE_LEVEL.ELEVATED;
+  if (value >= WATCH_AT) return CONSEQUENCE_LEVEL.WATCH;
+  return CONSEQUENCE_LEVEL.CLEAR;
 }
 
 /**
@@ -162,9 +170,9 @@ export function consequenceLevel(value) {
  * to the bottom, whichever direction is active — an unevaluated project is
  * not "the worst project".
  */
-export function sortRows(rows, direction = 'desc') {
+export function sortRows(rows, direction = SORT_DIR.DESC) {
   const scored = rows.filter((r) => r.score != null)
-    .sort((a, b) => (direction === 'asc' ? a.score - b.score : b.score - a.score));
+    .sort((a, b) => (direction === SORT_DIR.ASC ? a.score - b.score : b.score - a.score));
   const unscored = rows.filter((r) => r.score == null);
   return scored.concat(unscored);
 }

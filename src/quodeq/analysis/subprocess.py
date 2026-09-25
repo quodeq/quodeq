@@ -52,7 +52,7 @@ from quodeq.analysis.provider_cache import get_provider_configs
 from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.errors import FatalProviderError, classify_fatal_provider_message
 from quodeq.config.process_env import process_environment
-from quodeq.config.provider import Provider
+from quodeq.config.provider import Provider, ProviderType
 from quodeq.core.constants import MCP_STYLE_CLI_REGISTER, MCP_STYLE_CONFIG_FILE
 from quodeq.core.stream.events import copilot_error, parse_stream_event
 from quodeq.shared.utils import sanitize_sensitive
@@ -81,7 +81,7 @@ def get_provider_type(ai_cmd: str) -> str:
     """Determine the provider type (cli or api) from the provider config."""
     configs = get_provider_configs()
     provider_cfg = configs.get(ai_cmd, {})
-    return provider_cfg.get("type", "cli")
+    return provider_cfg.get("type", ProviderType.CLI)
 
 
 def _run_cli_analysis(
@@ -224,7 +224,7 @@ def run_analysis(
     cfg = _fill_env_defaults(config or AnalysisConfig(), environ)
     provider_type = get_provider_type(cfg.ai_cmd)
 
-    if provider_type == "api":
+    if provider_type == ProviderType.API:
         _run_api_analysis_bridge(work_dir, stream_file, cfg, environ)
     else:
         # The API path falls back to the provider's configured model instead.

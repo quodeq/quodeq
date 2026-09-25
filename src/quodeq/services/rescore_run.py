@@ -16,6 +16,7 @@ from typing import Any
 from quodeq.services.deleted import deleted_keys as load_deleted_keys
 from quodeq.services.dismissed import dismissed_keys as load_dismissed_keys
 from quodeq.services.rescore import rescore_dimensions
+from quodeq.services.run_constants import LATEST_RUN
 from quodeq.services.run_reports import list_runs, read_run_data
 from quodeq.services.suppression import load_suppression_rules
 from quodeq.services.suppression_keys import SuppressionKeys
@@ -62,11 +63,11 @@ def resolve_latest_run_id(reports_root: Path, project: str) -> str | None:
 def rescore_project_run(reports_root: Path, project: str, run_id: str) -> RescoreOutcome:
     """Rescore *project*'s *run_id* after dismissals/deletions/suppressions.
 
-    *run_id* may be empty or ``"latest"``, both meaning the newest run.
+    *run_id* may be empty or ``LATEST_RUN``, both meaning the newest run.
     """
     try:
         validate_path_segment(project)
-        if run_id and run_id != "latest":
+        if run_id and run_id != LATEST_RUN:
             validate_path_segment(run_id)
     except ValueError:
         return RescoreOutcome(RescoreStatus.INVALID_PARAM)
@@ -82,7 +83,7 @@ def rescore_project_run(reports_root: Path, project: str, run_id: str) -> Rescor
     project = project_dir.name
 
     # Resolve run ID
-    if not run_id or run_id == "latest":
+    if not run_id or run_id == LATEST_RUN:
         latest = resolve_latest_run_id(reports_root, project)
         if latest is None:
             return RescoreOutcome(RescoreStatus.PROJECT_NOT_FOUND)

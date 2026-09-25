@@ -12,6 +12,9 @@ import { useExplorerPageSpecs } from './useExplorerPageSpecs.jsx';
 import { buildRadialPrinciples, buildEnrichedPrinciples } from './explorerPrincipleView.js';
 import { t } from '../../../strings/index.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
+import { HERO_CARD_KIND } from '../../dashboard/dashboardVocab.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 /** Empty/loading/error states, checked in order — extracted so the main
  * render stays a single happy-path return. */
@@ -94,8 +97,8 @@ function buildDimensionRootFile(evalData, allViolations, complianceByPrinciple) 
 function buildExplorerCardNavigation({ dimFile, onNavigate, project, activeRunId, activeDateLabel, sourceTab }) {
   const handleCardNavigate = (kind) => {
     if (!onNavigate) return;
-    const severityFilter = kind === 'violations' ? 'all' : kind;
-    onNavigate('file', { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project });
+    const severityFilter = kind === HERO_CARD_KIND.VIOLATIONS ? SEVERITY_FILTER_ALL : kind;
+    onNavigate(NAV_TAB.FILE, { file: dimFile, severityFilter, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project });
   };
   const onSeverityBadge = (level) => () => handleCardNavigate(level);
   return { handleCardNavigate, onSeverityBadge };
@@ -169,7 +172,7 @@ function ExplorerPageBody({
         </div>
         <TopOffendingFilesTable
           files={d.topFiles}
-          onFileClick={(f) => onNavigate?.('file', { file: f, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project })}
+          onFileClick={(f) => onNavigate?.(NAV_TAB.FILE, { file: f, runId: activeRunId, dateLabel: activeDateLabel, sourceTab, fromProject: project })}
         />
       </section>
     </div>
@@ -187,7 +190,7 @@ function buildExplorerViewData(d, onNavigate, sourceTab, buildEvalPrincipal, pri
     dim: String(d.evalData.dimension || '').toLowerCase(),
     radialPrinciples: principleViews.radialPrinciples,
     enrichedPrinciples: principleViews.enrichedPrinciples,
-    onPrincipleClick: (name) => onNavigate?.('evalprinciple', { evalPrincipal: buildEvalPrincipal(name), sourceTab }),
+    onPrincipleClick: (name) => onNavigate?.(NAV_TAB.EVAL_PRINCIPLE, { evalPrincipal: buildEvalPrincipal(name), sourceTab }),
     overallScoreNum: parseFloat(d.overallGrade?.score),
     isRefreshing: d.isFetching && !!d.evalData,
   };

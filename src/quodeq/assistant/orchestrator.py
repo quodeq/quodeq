@@ -16,8 +16,10 @@ from quodeq.assistant.adapters.cli_config import load_cli_chat_config
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.frame_type import FrameType
 from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
+from quodeq.config.provider import ProviderType
 from quodeq.assistant.guard import (
     MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS)
+from quodeq.assistant.message_role import MessageRole
 from quodeq.assistant.skills import cached_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
 from quodeq.assistant.tools.write_tools import register_write_tools
@@ -82,7 +84,7 @@ def _split_skill(text: str):
 
 
 def _provider_type(provider: str) -> str:
-    return get_provider_configs().get(provider, {}).get("type", "cli")
+    return get_provider_configs().get(provider, {}).get("type", ProviderType.CLI)
 
 
 # MCP config styles scoped to a single invocation: a per-turn temp config file
@@ -97,7 +99,7 @@ def write_safe_provider(provider: str) -> bool:
     """Whether the write grant may activate for this provider. API providers
     register tools in-process (no MCP config involved); CLI providers qualify
     only when their MCP config is per-invocation isolated."""
-    if _provider_type(provider) != "cli":
+    if _provider_type(provider) != ProviderType.CLI:
         return True
     try:
         return load_cli_chat_config(provider).mcp_style in _ISOLATED_MCP_STYLES
@@ -238,12 +240,12 @@ def _resolve_skill(raw_text: str) -> tuple[object | None, str, str | None]:
 def _persist_user_turn(request: TurnRequest, repository: AssistantStore, text: str) -> list[dict]:
     """Record the user's message and return the session history including it."""
     user_content = build_turn_message(text, request.ui_state)
-    repository.add_message(request.session_id, "user", user_content)
+    repository.add_message(request.session_id, MessageRole.USER, user_content)
     return repository.list_messages(request.session_id)
 
 
 def _compose_messages(skill, grants: _TurnGrants, history: list[dict]) -> list[dict]:
-    return [{"role": "system",
+    return [{"role": MessageRole.SYSTEM,
              "content": build_system_prompt(skill=skill,
                                             web_enabled=grants.web_tools_on,
                                             write_enabled=grants.write_on)},
@@ -252,7 +254,7 @@ def _compose_messages(skill, grants: _TurnGrants, history: list[dict]) -> list[d
 
 def _run_engine(request: TurnRequest, messages: list[dict], skill,
                 grants: _TurnGrants, deps: _EngineDeps) -> str:
-    if _provider_type(request.provider) == "cli":
+    if _provider_type(request.provider) == ProviderType.CLI:
         return _run_cli_engine(request, grants.tool_ctx, messages, skill, deps)
     return _run_api_engine(request, messages, skill, grants, deps)
 
@@ -269,7 +271,7 @@ def _execute_turn(request: TurnRequest, tool_ctx: ToolContext, deps: _EngineDeps
     web_tools_on = request.web_enabled and request.provider in LOCAL_PROVIDERS
     grants = _resolve_write_grant(request, deps.repository, tool_ctx, web_tools_on)
     final = _run_engine(request, _compose_messages(skill, grants, history), skill, grants, deps)
-    deps.repository.add_message(request.session_id, "assistant", final)
+    deps.repository.add_message(request.session_id, MessageRole.ASSISTANT, final)
     deps.emit({"type": FrameType.DONE})
 
 
@@ -292,7 +294,7 @@ def run_turn(request: TurnRequest, *, repository: AssistantStore,
         # User-initiated stop, not a failure. Persist any partial answer so
         # the next turn's replayed history matches what the user saw.
         if exc.partial:
-            repository.add_message(request.session_id, "assistant", exc.partial)
+            repository.add_message(request.session_id, MessageRole.ASSISTANT, exc.partial)
         emit({"type": FrameType.STOPPED})
     except Exception:  # noqa: BLE001 - turn thread must never die silently
         _logger.exception("assistant turn failed for session %s", request.session_id)

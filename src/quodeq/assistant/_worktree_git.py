@@ -19,7 +19,9 @@ from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path
 
+from quodeq.shared.constants import GIT_BIN, GIT_FLAG_C
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.utils import TEXT_ENCODING
 
 
 class WorktreeStatus(StrEnum):
@@ -64,10 +66,10 @@ class WorktreeError(Exception):
 
 def run_git_bytes(argv: list[str], *, cwd: Path | None = None) -> bytes:
     """Run *argv* and return its stdout bytes, raising WorktreeError on failure."""
-    if argv[0] == "git":
+    if argv[0] == GIT_BIN:
         # never let core.autocrlf (Git-for-Windows default: true) rewrite line
         # endings at checkout/diff/apply; the tool contract is byte-exact files
-        argv = ["git", "-c", "core.autocrlf=false", *argv[1:]]
+        argv = [GIT_BIN, "-c", "core.autocrlf=false", *argv[1:]]
     try:
         proc = subprocess.run(  # noqa: S603 - argv list, no shell
             argv, cwd=str(cwd) if cwd else None,
@@ -77,15 +79,15 @@ def run_git_bytes(argv: list[str], *, cwd: Path | None = None) -> bytes:
     except subprocess.TimeoutExpired as exc:
         raise WorktreeError(f"{argv[0]} timed out") from exc
     if proc.returncode != 0:
-        err = (proc.stderr or b"").decode("utf-8", errors="replace")
-        out = (proc.stdout or b"").decode("utf-8", errors="replace")
+        err = (proc.stderr or b"").decode(TEXT_ENCODING, errors="replace")
+        out = (proc.stdout or b"").decode(TEXT_ENCODING, errors="replace")
         raise WorktreeError((err or out).strip() or f"{argv[0]} failed")
     return proc.stdout or b""
 
 
 def run_git(argv: list[str], *, cwd: Path | None = None) -> str:
     """Run *argv* and return its stdout decoded as UTF-8."""
-    return run_git_bytes(argv, cwd=cwd).decode("utf-8", errors="replace")
+    return run_git_bytes(argv, cwd=cwd).decode(TEXT_ENCODING, errors="replace")
 
 
 def diff_text(worktree: Path) -> str:
@@ -93,8 +95,8 @@ def diff_text(worktree: Path) -> str:
 
     Diffs against HEAD, not the index: `git add -N .` records a tracked file's
     deletion in the index, so a plain worktree-vs-index diff would hide it."""
-    run_git(["git", "-C", str(worktree), "add", "-N", "."])
-    return run_git(["git", "-C", str(worktree), "diff", "HEAD"])
+    run_git([GIT_BIN, GIT_FLAG_C, str(worktree), "add", "-N", "."])
+    return run_git([GIT_BIN, GIT_FLAG_C, str(worktree), "diff", "HEAD"])
 
 
 def diff_stats(worktree: Path) -> list[dict]:
@@ -103,8 +105,8 @@ def diff_stats(worktree: Path) -> list[dict]:
     Binary files report 0/0 (numstat writes "-"). Unparseable lines are
     skipped rather than raising.
     """
-    run_git(["git", "-C", str(worktree), "add", "-N", "."])
-    out = run_git(["git", "-C", str(worktree), "diff", "HEAD", "--numstat"])
+    run_git([GIT_BIN, GIT_FLAG_C, str(worktree), "add", "-N", "."])
+    out = run_git([GIT_BIN, GIT_FLAG_C, str(worktree), "diff", "HEAD", "--numstat"])
     stats = []
     for line in out.splitlines():
         try:

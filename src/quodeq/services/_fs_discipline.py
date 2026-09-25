@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 from quodeq.services.wiring import RunInfo, has_fingerprint_files, read_run_manifest, safe_read_dir
+from quodeq.shared.constants import EVIDENCE_DIRNAME
 
 
 def read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, int]:
@@ -53,7 +54,7 @@ def infer_discipline(reports_root: Path, project: str) -> str | None:
     for run in sorted(safe_read_dir(reports_root / project), key=lambda e: e.name, reverse=True):
         if not run.is_dir():
             continue
-        found = find_discipline_in_run(reports_root / project / run.name / "evidence")
+        found = find_discipline_in_run(reports_root / project / run.name / EVIDENCE_DIRNAME)
         if found:
             return found
     return None
@@ -66,7 +67,7 @@ def project_has_fingerprints(reports_root: Path, project: str) -> bool:
         return False
     try:
         for run_dir in sorted(project_dir.iterdir(), reverse=True):
-            evidence_dir = run_dir / "evidence"
+            evidence_dir = run_dir / EVIDENCE_DIRNAME
             if not evidence_dir.is_dir():
                 continue
             if has_fingerprint_files(evidence_dir):

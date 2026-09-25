@@ -11,6 +11,8 @@ from pathlib import Path
 from flask import Flask, jsonify
 
 from quodeq.api._assistant_helpers import get_repository, run_assistant_hygiene
+from quodeq.api._constants import (
+    CODE_INVALID_PARAM, CODE_NO_ACTIVE_WORKTREE, CODE_UNKNOWN_SESSION, MESSAGE_UNKNOWN_SESSION)
 from quodeq.api.assistant_routes import release_app_turn, claim_app_turn
 from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.assistant.workspace_actions import (
@@ -27,7 +29,7 @@ def _lookup(app: Flask, sid: str):
     repo = get_repository(app)
     session = repo.get_session(sid)
     if session is None:
-        return None, None, None, json_error("unknown session", 404, "UNKNOWN_SESSION")
+        return None, None, None, json_error(MESSAGE_UNKNOWN_SESSION, 404, CODE_UNKNOWN_SESSION)
     run_assistant_hygiene(app)
     return repo, session, repo.get_worktree(sid), None
 
@@ -63,7 +65,7 @@ def _workspace_diff(app: Flask, sid: str):
     if err:
         return err
     if row is None or row["status"] != WorktreeStatus.ACTIVE:
-        return json_error("no active worktree", 404, "NO_ACTIVE_WORKTREE")
+        return json_error("no active worktree", 404, CODE_NO_ACTIVE_WORKTREE)
     try:
         text = diff_text(Path(row["path"]))
         truncated = len(text) > _MAX_DIFF_CHARS
@@ -84,7 +86,7 @@ def _workspace_target(app: Flask, sid: str):
     if err:
         return None, None, err
     if row is None:
-        return None, None, json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
+        return None, None, json_error("no worktree", 404, CODE_NO_ACTIVE_WORKTREE)
     return repo, row, None
 
 
@@ -121,7 +123,7 @@ def _workspace_pr(app: Flask, sid: str):
     repo, _row, err = _workspace_target(app, sid)
     if err:
         return err
-    req_body = optional_json_object_or_error("INVALID_PARAM")
+    req_body = optional_json_object_or_error(CODE_INVALID_PARAM)
     if not isinstance(req_body, dict):
         return jsonify(req_body[0]), req_body[1]
     draft = PrDraft(title=str(req_body.get("title", "")), body=str(req_body.get("body", "")))
@@ -150,7 +152,7 @@ def _workspace_discard(app: Flask, sid: str):
     if conflict is not None:
         return conflict
     if outcome.kind == OutcomeKind.GONE:
-        return json_error("no worktree", 404, "NO_ACTIVE_WORKTREE")
+        return json_error("no worktree", 404, CODE_NO_ACTIVE_WORKTREE)
     if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace discard failed for %s: %s", sid, outcome.detail)
         return json_error("failed to discard the workspace", 500, "WORKSPACE_DISCARD_FAILED")

@@ -17,6 +17,9 @@
 const SHORT = { critical: 'CRIT', major: 'MAJ', minor: 'MIN' };
 const LONG = { critical: 'critical', major: 'major', minor: 'minor' };
 const ABBR = { critical: 'crit', major: 'maj', minor: 'min' };
+// `format` values (see the JSDoc above).
+const FORMAT_SHORT = 'short';
+const FORMAT_COUNT_ABBR = 'count-abbr';
 
 function renderSevBadgeElement({ className, content, onClick, ariaLabel, level }) {
   if (onClick) {
@@ -47,7 +50,7 @@ function renderCountAbbrBadge({ baseClass, level, count, onClick, ariaLabel }) {
 }
 
 function renderTextBadge({ baseClass, level, format, count, onClick, ariaLabel }) {
-  const text = format === 'short' ? SHORT[level] : LONG[level];
+  const text = format === FORMAT_SHORT ? SHORT[level] : LONG[level];
   const className = `${baseClass}${onClick ? ' term-sev-badge--clickable' : ''}`;
   const content = (
     <>
@@ -58,12 +61,12 @@ function renderTextBadge({ baseClass, level, format, count, onClick, ariaLabel }
   return renderSevBadgeElement({ className, content, onClick, ariaLabel, level });
 }
 
-export default function SevBadge({ level, format = 'short', count, onClick, ariaLabel }) {
+export default function SevBadge({ level, format = FORMAT_SHORT, count, onClick, ariaLabel }) {
   if (!level || !(level in SHORT)) return null;
 
   const baseClass = `term-sev-badge term-sev-badge--${level}`;
 
-  if (format === 'count-abbr') {
+  if (format === FORMAT_COUNT_ABBR) {
     return renderCountAbbrBadge({ baseClass, level, count, onClick, ariaLabel });
   }
 

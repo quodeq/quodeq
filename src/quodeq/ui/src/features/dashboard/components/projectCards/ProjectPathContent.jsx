@@ -3,11 +3,13 @@ import Badge from '../../../../components/Badge.jsx';
 import { t } from '../../../../strings/index.js';
 import { formatPath } from './projectDisplayHelpers.js';
 import { copyToClipboard } from '../../../../utils/clipboard.js';
+import { KEY } from '../../../../vocab/keyboard.js';
+import { PROJECT_LOCATION } from '../../../../models/project.js';
 
 function RelocateRow({ id, relocatePath, relocateError, setRelocatePath, submitRelocate, setRelocating }) {
   return (
     <div className="project-relocate-row" onClick={(e) => e.stopPropagation()}>
-      <input className="project-relocate-input" aria-label={t('projects.relocatePathAria')} value={relocatePath} onChange={(e) => setRelocatePath(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(id); if (e.key === 'Escape') setRelocating(null); }} placeholder="/new/path/to/repo" autoFocus />
+      <input className="project-relocate-input" aria-label={t('projects.relocatePathAria')} value={relocatePath} onChange={(e) => setRelocatePath(e.target.value)} onKeyDown={(e) => { if (e.key === KEY.ENTER) submitRelocate(id); if (e.key === KEY.ESCAPE) setRelocating(null); }} placeholder="/new/path/to/repo" autoFocus />
       <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(id)}>{t('projects.save')}</button>
       <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>{t('common.cancel')}</button>
       {relocateError && <span className="project-relocate-error">{relocateError}</span>}
@@ -18,14 +20,14 @@ function RelocateRow({ id, relocatePath, relocateError, setRelocatePath, submitR
 export function ProjectPathContent({ id, p, relocateActions, subprojectCount = 0 }) {
   const { relocating, relocatePath, relocateError, setRelocatePath, submitRelocate, setRelocating, startRelocate } = relocateActions;
   const path = formatPath(p.path);
-  const pathMissing = p.location === 'local' && p.pathExists === false;
+  const pathMissing = p.location === PROJECT_LOCATION.LOCAL && p.pathExists === false;
   if (relocating === id) {
     return <RelocateRow id={id} relocatePath={relocatePath} relocateError={relocateError} setRelocatePath={setRelocatePath} submitRelocate={submitRelocate} setRelocating={setRelocating} />;
   }
   return (
     <div className="project-path-row">
       {pathMissing && <span className="project-path-missing">{t('projects.pathNotFound')}</span>}
-      {p.location === 'online' && p.path ? (
+      {p.location === PROJECT_LOCATION.ONLINE && p.path ? (
         <span onClick={(e) => e.stopPropagation()}>
           <CopyButton label={path} onClick={() => copyToClipboard(p.path)} />
         </span>

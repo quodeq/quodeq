@@ -1,3 +1,5 @@
+import { KEY } from '../../vocab/keyboard.js';
+
 /**
  * TermInput — terminal-style text input prefixed with a shell prompt
  * (e.g. `$ grep -r [input...]`).
@@ -38,7 +40,7 @@ export default function TermInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && onSubmit) onSubmit();
+          if (e.key === KEY.ENTER && onSubmit) onSubmit();
         }}
         spellCheck={false}
         autoComplete="off"

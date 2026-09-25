@@ -33,7 +33,7 @@ from quodeq.services._project_registration_steps import (
     resolve_project_slot,
 )
 from quodeq.services._repo_index import RepoIdentity, add_repo_index_entry
-from quodeq.services.base import CreateProjectResult, NewProjectSpec
+from quodeq.services.base import CreateProjectResult, CreateProjectStatus, NewProjectSpec
 from quodeq.shared.utils import is_repo_url
 
 
@@ -123,7 +123,7 @@ def _rollback_new_dirs(reports_root: str, before: set[str], *, log: LogSink = NU
 
 
 def _rollback_and_report(
-    rollback: Callable[[], None], status: str, message: str = "", **extra,
+    rollback: Callable[[], None], status: CreateProjectStatus, message: str = "", **extra,
 ) -> CreateProjectResult:
     """Run *rollback*, then build the failure result."""
     rollback()
@@ -149,7 +149,7 @@ def register_project_with_rollback(
     """
     existing = find_existing_project(reports_dir, spec.repo, spec.scope_path)
     if existing is not None:
-        return CreateProjectResult(status="duplicate", existing_project_id=existing)
+        return CreateProjectResult(status=CreateProjectStatus.DUPLICATE, existing_project_id=existing)
 
     reports_root_path = Path(reports_dir)
     before = _snapshot_project_dirs(reports_root_path)
@@ -158,10 +158,10 @@ def register_project_with_rollback(
     try:
         project_uuid = register_project(reports_dir, spec, clones_dir=clones_dir, log=log)
     except (FileNotFoundError, ValueError) as exc:
-        return _rollback_and_report(rollback, "invalid_repo", str(exc))
+        return _rollback_and_report(rollback, CreateProjectStatus.INVALID_REPO, str(exc))
     except CloneError as exc:
         return _rollback_and_report(
-            rollback, "clone_failed", str(exc), clone_error_kind=exc.kind,
+            rollback, CreateProjectStatus.CLONE_FAILED, str(exc), clone_error_kind=exc.kind,
         )
     except Exception as exc:
         # error_response (route layer) swallows the traceback Flask's own 500
@@ -169,12 +169,12 @@ def register_project_with_rollback(
         # generic, no-detail result (the exception text can carry filesystem
         # paths or backend internals that must not reach the remote caller).
         log.error(f"Registration failed for repo={strip_credentials(spec.repo)!r}: {exc}")
-        return _rollback_and_report(rollback, "internal_error")
+        return _rollback_and_report(rollback, CreateProjectStatus.INTERNAL_ERROR)
 
     # scan.json is now always present after register_project succeeds.
     project_dir = reports_root_path / project_uuid
     scan_data = read_scan_json(project_dir) or zero_run_scan_fallback()
-    return CreateProjectResult(status="created", project_id=project_uuid, scan_data=scan_data)
+    return CreateProjectResult(status=CreateProjectStatus.CREATED, project_id=project_uuid, scan_data=scan_data)
 
 
 def mark_onboarding_complete(project_dir: Path) -> None:

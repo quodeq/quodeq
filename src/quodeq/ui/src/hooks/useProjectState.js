@@ -5,8 +5,8 @@ import {
 } from './projectStateStorage.js';
 import { useProjectAutoRetry } from './useProjectAutoRetry.js';
 import { useProjectWarmupPoll } from './useProjectWarmupPoll.js';
+import { LATEST_RUN_ID } from '../constants.js';
 
-const DEFAULT_RUN = 'latest';
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY_MS = 400;
 const DEFAULT_SUMMARY_POLL_MS = 3000;
@@ -78,7 +78,7 @@ function makeHandleProjectChange({ setSelectedProject, setSelectedSource, setSel
   return function handleProjectChange(name, source = DEFAULT_SOURCE) {
     persistProject(setSelectedProject, name, storage);
     persistSource(setSelectedSource, source, storage);
-    setSelectedRun(DEFAULT_RUN);
+    setSelectedRun(LATEST_RUN_ID);
   };
 }
 
@@ -86,7 +86,7 @@ function makeSelectProjectAndRun({ setSelectedProject, setSelectedSource, setSel
   return function selectProjectAndRun(project, runId) {
     persistProject(setSelectedProject, project, storage);
     persistSource(setSelectedSource, DEFAULT_SOURCE, storage);
-    setSelectedRun(runId || DEFAULT_RUN);
+    setSelectedRun(runId || LATEST_RUN_ID);
   };
 }
 
@@ -99,7 +99,7 @@ function useProjectStateFields(storage) {
   const [projectsLoadFailed, setProjectsLoadFailed] = useState(false);
   const [selectedProject, setSelectedProject] = useState(() => readStoredProject(storage));
   const [selectedSource, setSelectedSource] = useState(() => readStoredSource(storage));
-  const [selectedRun, setSelectedRun] = useState(DEFAULT_RUN);
+  const [selectedRun, setSelectedRun] = useState(LATEST_RUN_ID);
   const loadInFlightRef = useRef(false);
   return {
     projects, setProjects, projectsLoaded, setProjectsLoaded, projectsLoadFailed, setProjectsLoadFailed,

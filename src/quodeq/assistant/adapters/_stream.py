@@ -3,13 +3,27 @@ from __future__ import annotations
 
 import json
 from quodeq.core.stream.events import (
+    BLOCK_TYPE_OUTPUT_TEXT, BLOCK_TYPE_TEXT, BLOCK_TYPE_TOOL_USE, ITEM_TYPE_AGENT_MESSAGE,
     EVENT_TYPE_ASSISTANT, EVENT_TYPE_ASSISTANT_MESSAGE, EVENT_TYPE_ERROR, EVENT_TYPE_ITEM_COMPLETED,
     EVENT_TYPE_RESULT, EVENT_TYPE_TOOL_EXECUTION_START, EVENT_TYPE_TURN_FAILED,
     copilot_error, copilot_event_data, texts_from_copilot,
 )
 
-_TEXT_TYPES = ("text", "output_text")
+_TEXT_TYPES = (BLOCK_TYPE_TEXT, BLOCK_TYPE_OUTPUT_TEXT)
 _ARGS_SUMMARY_MAX_CHARS = 80  # display truncation width for a tool call's args/command summary
+
+# Wire-format "type" values this dialect-agnostic parser branches on. Not in
+# core/stream/events.py's EVENT_TYPE_* family: those are already-imported
+# top-level event types, these are copilot/claude SSE-delta and codex
+# sub-item types, each compared in exactly one place below.
+_EVENT_TYPE_ASSISTANT_MESSAGE_DELTA = "assistant.message_delta"  # copilot delta wrapper
+_EVENT_TYPE_STREAM_EVENT = "stream_event"  # claude/gemini --include-partial-messages wrapper
+_EVENT_TYPE_ITEM_STARTED = "item.started"  # codex: a tool call begins
+_EVENT_TYPE_SESSION_START = "session.start"  # copilot: session/thread id announced
+_BLOCK_TYPE_CONTENT_BLOCK_DELTA = "content_block_delta"  # Anthropic SSE delta block type
+_DELTA_TYPE_TEXT_DELTA = "text_delta"  # Anthropic SSE delta's own type
+_ITEM_TYPE_MCP_TOOL_CALL = "mcp_tool_call"  # codex item type: an MCP tool invocation
+_ITEM_TYPE_COMMAND_EXECUTION = "command_execution"  # codex item type: a shell command
 
 
 def parse_line(line: str) -> dict | None:
@@ -41,16 +55,16 @@ def partial_text(event: dict) -> str | None:
     """Incremental text from a `stream_event` wrapper (claude/gemini
     --include-partial-messages): the Anthropic SSE `content_block_delta`
     carrying a `text_delta`. Thinking/tool-input deltas are not display text."""
-    if event.get("type") == "assistant.message_delta":
+    if event.get("type") == _EVENT_TYPE_ASSISTANT_MESSAGE_DELTA:
         text = copilot_event_data(event).get("deltaContent")
         return text if isinstance(text, str) else None
-    if event.get("type") != "stream_event":
+    if event.get("type") != _EVENT_TYPE_STREAM_EVENT:
         return None
     inner = event.get("event")
-    if not isinstance(inner, dict) or inner.get("type") != "content_block_delta":
+    if not isinstance(inner, dict) or inner.get("type") != _BLOCK_TYPE_CONTENT_BLOCK_DELTA:
         return None
     delta = inner.get("delta")
-    if not isinstance(delta, dict) or delta.get("type") != "text_delta":
+    if not isinstance(delta, dict) or delta.get("type") != _DELTA_TYPE_TEXT_DELTA:
         return None
     text = delta.get("text")
     return text if isinstance(text, str) else None
@@ -89,7 +103,7 @@ def assistant_text(event: dict) -> list[str]:
     if etype == EVENT_TYPE_ITEM_COMPLETED:
         item = event.get("item")
         item = item if isinstance(item, dict) else {}
-        if item.get("type") == "agent_message":
+        if item.get("type") == ITEM_TYPE_AGENT_MESSAGE:
             if isinstance(item.get("text"), str):
                 return [item["text"]]
             return _texts_from_blocks(item.get("content"))
@@ -104,11 +118,11 @@ def _args_summary(args) -> str:
 def _codex_tool_detail(item: dict) -> dict | None:
     """Map a codex `item` (mcp_tool_call / command_execution) to a tool frame."""
     itype = item.get("type")
-    if itype == "mcp_tool_call":
+    if itype == _ITEM_TYPE_MCP_TOOL_CALL:
         name = item.get("tool")
-        name = name if isinstance(name, str) and name else "mcp_tool_call"
+        name = name if isinstance(name, str) and name else _ITEM_TYPE_MCP_TOOL_CALL
         return {"name": name, "args_summary": _args_summary(item.get("arguments"))}
-    if itype == "command_execution":
+    if itype == _ITEM_TYPE_COMMAND_EXECUTION:
         cmd = item.get("command")
         return {"name": "shell", "args_summary": cmd[:_ARGS_SUMMARY_MAX_CHARS] if isinstance(cmd, str) else ""}
     return None
@@ -129,7 +143,7 @@ def tool_use_details(event: dict) -> list[dict]:
         if isinstance(name, str) and name:
             return [{"name": name, "args_summary": _args_summary(data.get("arguments"))}]
         return []
-    if etype == "item.started":
+    if etype == _EVENT_TYPE_ITEM_STARTED:
         item = event.get("item")
         detail = _codex_tool_detail(item) if isinstance(item, dict) else None
         return [detail] if detail else []
@@ -142,7 +156,7 @@ def tool_use_details(event: dict) -> list[dict]:
     details = []
     if isinstance(blocks, list):
         for b in blocks:
-            if isinstance(b, dict) and b.get("type") == "tool_use" and isinstance(b.get("name"), str):
+            if isinstance(b, dict) and b.get("type") == BLOCK_TYPE_TOOL_USE and isinstance(b.get("name"), str):
                 details.append({"name": b["name"], "args_summary": _args_summary(b.get("input"))})
     return details
 
@@ -187,6 +201,6 @@ def error_message(event: dict) -> str | None:
 def session_id(event: dict) -> str | None:
     """The CLI session/thread id *event* announces, under any dialect's spelling."""
     sid = event.get("session_id") or event.get("thread_id") or event.get("sessionId")
-    if not sid and event.get("type") == "session.start":
+    if not sid and event.get("type") == _EVENT_TYPE_SESSION_START:
         sid = copilot_event_data(event).get("sessionId")
     return sid if isinstance(sid, str) else None

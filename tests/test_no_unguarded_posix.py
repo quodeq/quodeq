@@ -25,10 +25,10 @@ _ALLOWLIST: set[str] = {
     # kill_tree POSIX branch, in the else of `if sys.platform == "win32"`
     # (win32 uses taskkill /F /T). Hoisted from analysis/_process.py so
     # services/ and analysis/ can share one implementation.
-    "shared/process_kill.py:32",
+    "shared/process_kill.py:34",
     # kill_proc_tree POSIX branch, in the else of `if sys.platform == "win32"`
     # (win32 uses taskkill /F /T). Hoisted from assistant to shared.
-    "shared/process_kill.py:69",
+    "shared/process_kill.py:71",
     # pgrep / ps are wrapped in `except (OSError, ...)` -> returns _UNKNOWN, so
     # on Windows (FileNotFoundError) resource sampling degrades gracefully.
     "shared/resource_sampler.py:60",
@@ -37,17 +37,17 @@ _ALLOWLIST: set[str] = {
     # wrapped in `except (..., subprocess.SubprocessError)`, so Windows never
     # runs it and a missing lsof degrades to None. Used to resolve clickable
     # terminal links against the shell's live cwd.
-    "terminal/links.py:84",
+    "terminal/links.py:87",
     # quodeq/menubar/ is darwin-only by construction: control.is_supported()
     # gates every spawn on sys.platform == "darwin", and app/_app_lifecycle
     # only run inside the rumps process that spawn starts. lsof/killpg/pkill/ps
     # are therefore never reached on Windows, and each call is wrapped to
     # degrade gracefully anyway. The ps call in _is_quodeq_process only sees
     # pids from find_pids_on_port, which returns [] off-darwin.
-    "menubar/_process.py:83",
-    "menubar/_process.py:95",
-    "menubar/_app_lifecycle.py:157",
-    "menubar/_app_lifecycle.py:169",
+    "menubar/_process.py:84",
+    "menubar/_process.py:96",
+    "menubar/_app_lifecycle.py:158",
+    "menubar/_app_lifecycle.py:170",
 }
 
 

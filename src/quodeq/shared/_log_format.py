@@ -10,6 +10,8 @@ from quodeq.shared.env_resolve import resolve_env
 LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
 logging.addLevelName(LOG_SUCCESS, "SUCCESS")
 
+_TERM_DUMB = "dumb"  # TERM value meaning no color support
+
 
 def should_use_color(env: Mapping[str, str] | None = None) -> bool:
     """Determine whether ANSI color codes should be emitted.
@@ -18,7 +20,7 @@ def should_use_color(env: Mapping[str, str] | None = None) -> bool:
     testable without environment mutation.
     """
     environ = resolve_env(env)
-    return not environ.get("NO_COLOR") and environ.get("TERM") != "dumb"
+    return not environ.get("NO_COLOR") and environ.get("TERM") != _TERM_DUMB
 
 
 USE_COLOR: bool = should_use_color()

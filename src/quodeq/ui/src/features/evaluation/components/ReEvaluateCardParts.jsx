@@ -14,6 +14,7 @@ import { toRepoRelativeScope } from '../../../utils/repoScope.js';
 import { queuedFileAnalyses } from '../scanEstimateRules.js';
 import { createScanSummary } from '../../../models/index.js';
 import { t, LOCALE } from '../../../strings/index.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 const BUTTON_ROW_GAP = '8px';
 const REPO_URL_PLACEHOLDER = 'https://github.com/org/repo';
@@ -33,7 +34,7 @@ export function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, 
           type="text"
           value={urlInput}
           onChange={(e) => setUrlInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleUrlRestore(); }}
+          onKeyDown={(e) => { if (e.key === KEY.ENTER) handleUrlRestore(); }}
           placeholder={REPO_URL_PLACEHOLDER}
           className="re-eval-url-input"
           disabled={urlSaving}

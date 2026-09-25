@@ -25,11 +25,17 @@ from pathlib import Path
 
 import webview
 
+from quodeq.shared.constants import LOCALHOST, PLATFORM_WIN32, SCHEME_HTTP, SCHEME_HTTPS
+
 _logger = logging.getLogger(__name__)
 
 _EVAL_CHECK_TIMEOUT_S = 0.5
 _CANCEL_TIMEOUT_S = 5.0
 _DOWNLOAD_TIMEOUT_S = 120
+_LOOPBACK_IPV4 = "127.0.0.1"  # loopback address a reload URL may target
+_LOOPBACK_IPV6 = "::1"  # loopback address (IPv6) a reload URL may target
+_SAFE_RELOAD_SCHEMES = frozenset({SCHEME_HTTP, SCHEME_HTTPS})  # is_safe_reload_url's allowed schemes
+_SAFE_RELOAD_HOSTS = frozenset({LOCALHOST, _LOOPBACK_IPV4, _LOOPBACK_IPV6})  # is_safe_reload_url's allowed hosts
 _PARTIAL_SUFFIX = ".part"  # suffix on the uniquely-named temp file a download streams into
 
 
@@ -153,7 +159,7 @@ def _stream_to(url: str, target: Path) -> None:
 def kill_api(pid: int) -> None:
     """Terminate the Flask API process."""
     try:
-        sig = signal.SIGTERM if sys.platform != "win32" else signal.CTRL_BREAK_EVENT
+        sig = signal.SIGTERM if sys.platform != PLATFORM_WIN32 else signal.CTRL_BREAK_EVENT
         os.kill(pid, sig)
     except (OSError, ProcessLookupError) as exc:
         _logger.debug("action API process already gone or not killable: %s", exc)
@@ -170,11 +176,7 @@ def is_safe_reload_url(url: str) -> bool:
         parsed = urllib.parse.urlparse(url)
     except ValueError:
         return False
-    return parsed.scheme in {"http", "https"} and parsed.hostname in {
-        "127.0.0.1",
-        "localhost",
-        "::1",
-    }
+    return parsed.scheme in _SAFE_RELOAD_SCHEMES and parsed.hostname in _SAFE_RELOAD_HOSTS
 
 
 def _current_url(window: object) -> str | None:

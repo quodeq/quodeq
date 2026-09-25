@@ -11,6 +11,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
+from quodeq.shared.constants import ENV_TRUTHY, SCHEME_HTTP, SCHEME_HTTPS
 from quodeq.shared.env import env_float, env_int
 from quodeq.shared.ssrf import is_private_address as _is_private_hostname
 
@@ -59,7 +60,7 @@ class FetchClient:
         if allow_private is not None:
             self._allow_private: bool = allow_private
         else:
-            self._allow_private = _e.get("QUODEQ_ALLOW_PRIVATE_URLS") == "1"
+            self._allow_private = _e.get("QUODEQ_ALLOW_PRIVATE_URLS") == ENV_TRUTHY
 
     def fetch(self, url: str, headers: dict | None = None) -> str | None:
         """Fetch *url* and return body text, or None on failure.
@@ -68,7 +69,7 @@ class FetchClient:
         private/internal addresses unless QUODEQ_ALLOW_PRIVATE_URLS=1.
         """
         parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https"):
+        if parsed.scheme not in (SCHEME_HTTP, SCHEME_HTTPS):
             _logger.warning("Blocked fetch with disallowed scheme: %s", parsed.scheme)
             return None
         hostname = parsed.hostname or ""

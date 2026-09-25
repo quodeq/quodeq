@@ -3,6 +3,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import {
   addPrincipleToStandard, removePrincipleFromStandard,
   addRequirementToStandard, removeRequirementFromStandard, updateStandardField,
+  NODE_TYPE,
 } from '../standardTreeModel.js';
 import { STANDARD_TYPES } from './useStandards.js';
 import { t } from '../../../strings/index.js';
@@ -29,7 +30,7 @@ function useTreeMutations(setStandard, setDirty, setSelectedNode) {
     // inside the updater to begin with — don't relocate it).
     setStandard((prev) => removePrincipleFromStandard(prev, index).standard);
     setDirty(true);
-    setSelectedNode({ type: 'root' });
+    setSelectedNode({ type: NODE_TYPE.ROOT });
   }, [setStandard, setDirty]);
 
   const addRequirement = useCallback((principleIndex) => {
@@ -47,7 +48,7 @@ function useTreeMutations(setStandard, setDirty, setSelectedNode) {
     // it never needed to read `prev` inside the updater.
     setStandard((prev) => removeRequirementFromStandard(prev, principleIndex, reqIndex).standard);
     setDirty(true);
-    setSelectedNode({ type: 'principle', index: principleIndex });
+    setSelectedNode({ type: NODE_TYPE.PRINCIPLE, index: principleIndex });
   }, [setStandard, setDirty]);
 
   return { addPrinciple, removePrinciple, addRequirement, removeRequirement };
@@ -101,13 +102,13 @@ export function useStandardDetail(standardId, isNew) {
   useEffect(() => {
     if (isNew) {
       setStandard({ id: '', name: '', description: '', weight: 1.0, source: '', type: STANDARD_TYPES.CUSTOM, managed: false, origin: null, originHash: null, principles: [] });
-      mutations.setSelectedNode({ type: 'root' });
+      mutations.setSelectedNode({ type: NODE_TYPE.ROOT });
       return;
     }
     if (!standardId) return;
     setLoading(true);
     getStandard(standardId)
-      .then((data) => { setStandard(data); mutations.setSelectedNode({ type: 'root' }); setError(null); })
+      .then((data) => { setStandard(data); mutations.setSelectedNode({ type: NODE_TYPE.ROOT }); setError(null); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [standardId, isNew]);

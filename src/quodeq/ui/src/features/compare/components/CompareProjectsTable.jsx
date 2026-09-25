@@ -6,6 +6,7 @@ import { scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { t } from '../../../strings/index.js';
 import ProjectRow from './ProjectRow.jsx';
 import { score1 } from '../compareFormatters.js';
+import { SORT_DIR } from '../../../vocab/sortDirection.js';
 
 
 function CollapsedUnevaluated({ unevaluated, showUnevaluated, setShowUnevaluated }) {
@@ -64,7 +65,7 @@ export default function CompareProjectsTable({
       header={t('compare.projectsHeader', { count: scopeCount })}
       note={(
         <>
-          {sortDir === 'desc' ? t('compare.sortNoteScore') : t('compare.sortNoteScoreAsc')}
+          {sortDir === SORT_DIR.DESC ? t('compare.sortNoteScore') : t('compare.sortNoteScoreAsc')}
           {' · '}
           {t('compare.rowOpenHint')}
         </>

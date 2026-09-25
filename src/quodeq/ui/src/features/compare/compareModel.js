@@ -23,6 +23,11 @@ import {
 } from '../../utils/scoreFiltering.js';
 import { MS_PER_DAY } from '../../utils/time.js';
 
+// Sentinel `view` value meaning "the fleet-wide landing view, not a
+// dimension drill-down": ComparePage's default and useCompareRows' guard
+// against building a dimension view for it.
+export const COMPARE_VIEW_FLEET = 'fleet';
+
 // Staleness means "the code moved since the grade was measured". The real
 // signal is commitsSinceLastRun from the backend (git commits since the last
 // scored run); the age fallback below only applies when that signal is

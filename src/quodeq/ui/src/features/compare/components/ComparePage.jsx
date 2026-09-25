@@ -26,6 +26,8 @@ import CompareFleetView from './CompareFleetView.jsx';
 import CompareDimensionView from './CompareDimensionView.jsx';
 import CompareDuelView from './CompareDuelView.jsx';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { SORT_DIR } from '../../../vocab/sortDirection.js';
+import { COMPARE_VIEW_FLEET } from '../compareModel.js';
 
 function buildSharedProps({
   rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir, setSortDir,
@@ -34,7 +36,7 @@ function buildSharedProps({
 }) {
   return {
     rows, orderedRows, scopeRows, fleet, board, attention, errorsById, sortDir,
-    toggleSortDir: () => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc')),
+    toggleSortDir: () => setSortDir((d) => (d === SORT_DIR.DESC ? SORT_DIR.ASC : SORT_DIR.DESC)),
     hasCoverage, pickerOpen, setPickerOpen, scopeIds, scopeCount, toggleProject,
     selectAll, selectFlagged, openDimension,
     // Expanded-row dimension chips jump to that project's own dimension
@@ -91,10 +93,10 @@ function useComparePageState({
   fleetProjects, summariesById, dimension, duel, onOpenProject, onOpenDimension,
   onSwitchDimension, onOpenEvalPrincipal,
 }) {
-  const view = dimension || 'fleet';
+  const view = dimension || COMPARE_VIEW_FLEET;
   // Score is the only table ordering (consequence ranked near-inverse of it
   // on real fleets); the toggle flips best-first / worst-first.
-  const [sortDir, setSortDir] = useState('desc');
+  const [sortDir, setSortDir] = useState(SORT_DIR.DESC);
   const [pickerOpen, setPickerOpen] = useState(false);
   // null scope = everything (including projects added later); an array is an
   // explicit selection.

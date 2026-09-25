@@ -20,6 +20,8 @@ from quodeq.analysis._drop_stats import record as _record_drop_stats
 
 _log = logging.getLogger(__name__)
 
+_FINISH_REASON_LENGTH = "length"  # the OpenAI-SDK finish_reason for output truncated by the token budget
+
 # Instruction for the repair re-ask: the model already holds the source (the
 # original user message) and its own snippetless findings (replayed as the
 # assistant turn), so the only new information it needs is what to fix.
@@ -214,7 +216,7 @@ def finish_call(
     # output budget mid-stream, so findings after the cut are simply gone. Treat
     # it as lossy so run_api_analysis writes an 'error' marker and the file(s)
     # re-dispatch next run, rather than caching a partial result as 'ok'.
-    truncated = finish_reason == "length"
+    truncated = finish_reason == _FINISH_REASON_LENGTH
     if truncated:
         _log.warning(
             "Model %s response was truncated (finish_reason=length) after %.0fs; "

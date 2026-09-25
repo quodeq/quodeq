@@ -3,7 +3,7 @@
 This module re-exports from focused sub-modules for backward compatibility.
 """
 
-from quodeq.data.fs.report_parser._eval_parsing import parse_eval_from_json
+from quodeq.data.fs.report_parser._eval_parsing import OVERALL_PRINCIPLE, parse_eval_from_json
 from quodeq.data.fs.report_parser._report_parsing import (
     build_finding,
     empty_severity_buckets,
@@ -12,6 +12,7 @@ from quodeq.data.fs.report_parser._report_parsing import (
 )
 
 __all__ = [
+    "OVERALL_PRINCIPLE",
     "build_finding",
     "empty_severity_buckets",
     "parse_eval_from_json",

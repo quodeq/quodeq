@@ -11,6 +11,7 @@ from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import CODE_FORBIDDEN
 from quodeq.api._rate_limit import RateLimitStore
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.constants import SECRET_SUFFIX_CHARS
@@ -31,6 +32,7 @@ _RATE_LIMIT_EXEMPT_PATHS = frozenset({
     "/api/findings/delete",
 })
 _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
+_SAFE_HTTP_METHODS = ("GET", "HEAD", "OPTIONS")  # never state-changing: skip CSRF + most rate limiting
 _BEARER_PREFIX = "Bearer "
 _MIN_BEARER_HEADER_LEN = len(_BEARER_PREFIX) + SECRET_SUFFIX_CHARS
 
@@ -161,20 +163,20 @@ def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
 
 def _check_csrf() -> Response | tuple[Response, int] | None:
     """Verify Origin header on state-changing requests."""
-    if request.method in ("GET", "HEAD", "OPTIONS"):
+    if request.method in _SAFE_HTTP_METHODS:
         return None
     origin = request.headers.get("Origin")
     if not origin:
-        return jsonify({"error": "Origin header required", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+        return jsonify({"error": "Origin header required", "code": CODE_FORBIDDEN}), HTTPStatus.FORBIDDEN
     allowed = {f"http://{request.host}", f"https://{request.host}"}
     if origin not in allowed:
-        return jsonify({"error": "Origin not allowed", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+        return jsonify({"error": "Origin not allowed", "code": CODE_FORBIDDEN}), HTTPStatus.FORBIDDEN
     return None
 
 
 def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] | None:
     """Enforce rate limiting on state-changing requests and sensitive GET endpoints."""
-    if request.method in ("GET", "HEAD", "OPTIONS") and request.path not in _RATE_LIMITED_GET_PATHS:
+    if request.method in _SAFE_HTTP_METHODS and request.path not in _RATE_LIMITED_GET_PATHS:
         return None
     if request.path in _RATE_LIMIT_EXEMPT_PATHS:
         return None

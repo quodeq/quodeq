@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { t } from '../../../strings/index.js';
 import { buildDimensionAttention } from '../compareModel.js';
+import { ATTENTION_KIND } from '../compareDimensionView.js';
 import CompareMatrix from './CompareMatrix.jsx';
 import CompareDimensionHeader, { DIMENSION_PANEL_ID, dimensionTabId } from './CompareDimensionHeader.jsx';
 import CompareDimensionStatCards from './CompareDimensionStatCards.jsx';
@@ -21,12 +22,12 @@ function buildAttentionItems(dimAttention, onOpenProject, onOpenPrinciple) {
   return dimAttention.map((item) => ({
     key: `${item.kind}-${item.name}-${item.principleLabel || ''}`,
     level: item.level,
-    accentScore: item.kind === 'outlier' ? item.score : item.row.score,
+    accentScore: item.kind === ATTENTION_KIND.OUTLIER ? item.score : item.row.score,
     name: item.name,
-    onNameClick: () => (item.kind === 'outlier'
+    onNameClick: () => (item.kind === ATTENTION_KIND.OUTLIER
       ? onOpenPrinciple?.(item.cell)
       : onOpenProject(item.row.id)),
-    why: item.kind === 'outlier'
+    why: item.kind === ATTENTION_KIND.OUTLIER
       ? [
         t('compare.dimReasonOutlier', { principle: item.principleLabel, score: score1(item.score) }),
         item.gap != null ? t('compare.dimReasonGap', { gap: score1(item.gap) }) : null,

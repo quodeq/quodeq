@@ -15,8 +15,9 @@ from typing import Callable
 
 from flask import Flask, Response, jsonify
 
+from quodeq.api._constants import CODE_INVALID_INPUT
 from quodeq.services.shared_connect import ConnectStatus, connect_shared_repo
-from quodeq.services.shared_publish import get_publish_status, start_publish
+from quodeq.services.shared_publish import PublishStartResult, get_publish_status, start_publish
 from quodeq.services.shared_repo import (
     RepoFormat,
     disconnect_shared_repo,
@@ -71,7 +72,7 @@ def shared_config_put() -> Response | tuple[Response, int]:
     Clones it and verifies it is a quodeq results repo before accepting, so a
     typo or a foreign repository fails here rather than on the first publish.
     """
-    body = optional_json_object_or_error("INVALID_INPUT")
+    body = optional_json_object_or_error(CODE_INVALID_INPUT)
     if not isinstance(body, dict):
         return jsonify(body[0]), body[1]
     url = str(body.get("url") or "").strip()
@@ -134,16 +135,16 @@ def _shared_refresh(refresh_clone: Callable[[str], tuple[bool, str | None]]) -> 
 def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tuple[Response, int]:
     err = path_segment_error(project)
     if err is not None:
-        return json_error(err, 400, "INVALID_INPUT")
+        return json_error(err, 400, CODE_INVALID_INPUT)
     settings = read_settings()
     if not settings.url:
         return json_error(
             "no shared repository configured", 400, "NO_SHARED_REPO"
         )
     outcome = start_publish(project, settings.url, evaluations_root=Path(reports_dir()))
-    if outcome == "already_running":
+    if outcome == PublishStartResult.ALREADY_RUNNING:
         return json_error("a publish is already running", 409, "PUBLISH_IN_PROGRESS")
-    if outcome != "started":
+    if outcome != PublishStartResult.STARTED:
         return json_error(
             "could not start the publish job, see server logs", 500, "PUBLISH_START_FAILED"
         )

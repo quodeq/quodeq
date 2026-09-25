@@ -20,6 +20,7 @@ from quodeq.api._terminal_ws_helpers import (
     setup_terminal_session,
     terminal_read_loop,
 )
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_MISSING_PARAM, CODE_UNKNOWN_SESSION
 from quodeq.api.helpers import json_error, optional_json_object_or_error
 from quodeq.terminal.links import (
     detect_editor,
@@ -106,7 +107,7 @@ def _terminal_session_kill(registry: TerminalSessionRegistry, sid):
     if gate_reason() is not None:
         return forbidden()
     if not registry.kill(sid):
-        return json_error("unknown session", 404, "UNKNOWN_SESSION")
+        return json_error("unknown session", 404, CODE_UNKNOWN_SESSION)
     return jsonify({"ok": True})
 
 
@@ -127,12 +128,12 @@ def _terminal_resolve(registry: TerminalSessionRegistry):
     single-user localhost app whose terminal already grants a full shell)."""
     if gate_reason() is not None:
         return forbidden()
-    body = optional_json_object_or_error("INVALID_INPUT")
+    body = optional_json_object_or_error(CODE_INVALID_INPUT)
     if not isinstance(body, dict):
         return jsonify(body[0]), body[1]
     paths = body.get("paths")
     if not isinstance(paths, list):
-        return json_error("paths must be a list", 400, "INVALID_INPUT")
+        return json_error("paths must be a list", 400, CODE_INVALID_INPUT)
     bases = _session_bases(registry, body)
     resolved = []
     for token in paths:
@@ -157,12 +158,12 @@ def _terminal_open(registry: TerminalSessionRegistry):
     raising, so a missing editor never surfaces as a 500."""
     if gate_reason() is not None:
         return forbidden()
-    body = optional_json_object_or_error("INVALID_INPUT")
+    body = optional_json_object_or_error(CODE_INVALID_INPUT)
     if not isinstance(body, dict):
         return jsonify(body[0]), body[1]
     path = body.get("path")
     if not isinstance(path, str) or not path:
-        return json_error("path is required", 400, "MISSING_PARAM")
+        return json_error("path is required", 400, CODE_MISSING_PARAM)
     # Confine the launch to the terminal's own working directories (shell
     # cwd, server cwd, home) and normalize the untrusted path to its real,
     # canonical form. Everything below uses this sanitized value, never the

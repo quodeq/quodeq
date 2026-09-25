@@ -4,6 +4,17 @@ import { resolveTerminalPaths, openInEditor } from '../../api/terminal.js';
 import { createUrlLinkProvider, createFileLinkProvider } from './terminalLinks.js';
 import { themeFromCss } from './xtermTheme.js';
 import { openExternal } from '../updates/openExternal.js';
+import { KEY_CODE } from '../../vocab/keyboard.js';
+
+// useTerminalSocket's status: idle -> connecting/reconnecting -> open, or a
+// terminal failure (busy/refused/gone). TerminalSessionView reads these back
+// to gate input, refit and the not-connected banner. Lives here rather than
+// on useTerminalSocket.js so tests that fully mock that hook module don't
+// also have to re-export this vocabulary.
+export const TERMINAL_STATUS = Object.freeze({
+  IDLE: 'idle', CONNECTING: 'connecting', OPEN: 'open', RECONNECTING: 'reconnecting',
+  BUSY: 'busy', REFUSED: 'refused', GONE: 'gone',
+});
 
 // xterm tuning. A real terminal font (Menlo = macOS Terminal default,
 // Monaco = iTerm's classic default), NOT the code-panel's JetBrains Mono.
@@ -21,7 +32,7 @@ const TERM_CURSOR_STYLE = 'bar'; // sleeker than the default square block
 // Two drawer chords are reserved for the host; return false so xterm lets them
 // bubble to the window handler instead of typing into the shell.
 export function isReservedChord(e) {
-  return e.code === 'Backquote' && (e.ctrlKey || e.metaKey);
+  return e.code === KEY_CODE.BACKQUOTE && (e.ctrlKey || e.metaKey);
 }
 
 /**

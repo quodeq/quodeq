@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.config.process_env import process_environment_copy
+from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env import (
     get_embedding_base_url,
     get_embedding_model,
@@ -24,7 +25,7 @@ from quodeq.shared.env import (
 CACHE_ROOT_ENV = "QUODEQ_CACHE_ROOT"  # override the cache root for tests / sandboxing
 DISABLE_ONLINE_CACHE_ENV = "QUODEQ_DISABLE_ONLINE_CACHE"
 
-_DISABLED_TRUTHY = frozenset({"1", "true", "yes"})
+_DISABLED_TRUTHY = frozenset({ENV_TRUTHY, "true", "yes"})
 
 
 def cache_root_override(env: Mapping[str, str] | None = None) -> Path | None:
@@ -47,7 +48,7 @@ def git_child_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
     biggest avoidable cost here.
     """
     child = process_environment_copy(env)
-    child["GIT_LFS_SKIP_SMUDGE"] = "1"
+    child["GIT_LFS_SKIP_SMUDGE"] = ENV_TRUTHY
     return child
 
 

@@ -66,6 +66,7 @@ from quodeq.dashboard._webview_window_native_ops import (  # noqa: F401 — re-e
     save_via_dialog,
     send_cancel_evaluation,
 )
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
 
 _logger = logging.getLogger(__name__)
 
@@ -73,6 +74,8 @@ _WINDOW_WIDTH = 1280
 _WINDOW_HEIGHT = 800
 _WINDOW_BG_COLOR = '#0d1117'
 _ARGV_API_PID = 3  # optional argv slot: pid of the API process to watch
+_TITLEBAR_THEME_DARK = "dark"  # mode value set_titlebar_theme accepts from the frontend
+_TITLEBAR_THEME_LIGHT = "light"  # mode value set_titlebar_theme accepts from the frontend
 
 
 class WindowApi:
@@ -132,12 +135,12 @@ class WindowApi:
         pywebviewready. Linux titlebars are window-manager controlled, so
         this is a no-op there.
         """
-        if mode not in ("dark", "light"):
+        if mode not in (_TITLEBAR_THEME_DARK, _TITLEBAR_THEME_LIGHT):
             return
-        dark = mode == "dark"
-        if sys.platform == "darwin":
+        dark = mode == _TITLEBAR_THEME_DARK
+        if sys.platform == PLATFORM_DARWIN:
             _chrome.set_macos_titlebar_appearance(self._window, dark)
-        elif sys.platform == "win32":
+        elif sys.platform == PLATFORM_WIN32:
             _chrome.set_windows_titlebar(dark)
 
 
@@ -155,7 +158,7 @@ def _create_window(url: str, api: "WindowApi") -> "webview.Window":
     """
     return webview.create_window(
         "quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
-        frameless=(sys.platform == "darwin"), easy_drag=False,
+        frameless=(sys.platform == PLATFORM_DARWIN), easy_drag=False,
         background_color=_WINDOW_BG_COLOR, hidden=True, js_api=api,
     )
 

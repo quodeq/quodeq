@@ -5,9 +5,9 @@ not core (tools/check_imports.py); every existing importer keeps this path.
 """
 from __future__ import annotations
 
-from quodeq.core.types.provider import Provider
+from quodeq.core.types.provider import Provider, ProviderType
 
-__all__ = ["PROVIDERS", "Provider"]
+__all__ = ["PROVIDERS", "Provider", "ProviderType"]
 
 
 # Provider -> the env var that carries its API key ("" when it needs none).

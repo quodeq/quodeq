@@ -5,11 +5,12 @@
  * without mounting the whole App (which needs ~8 providers).
  */
 import { PROJECT_SOURCE } from './vocab/projectSource.js';
+import { NAV_TAB } from './vocab/navTab.js';
 
 // Project-data tabs (overview/violations/map/history) — module scope so both
 // the App component's bounce effect and the exported shouldBounceToEvaluate
 // helper below share one definition.
-const PROJECT_DATA_TABS = ['overview', 'violations', 'map', 'history'];
+const PROJECT_DATA_TABS = [NAV_TAB.OVERVIEW, NAV_TAB.VIOLATIONS, NAV_TAB.MAP, NAV_TAB.HISTORY];
 
 /**
  * Whether the "no runs yet" bounce-to-Evaluate effect should fire. Exported
@@ -132,5 +133,5 @@ export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCou
   if ((projectsCount ?? 0) > 0) return false;
   if (selectedSource === PROJECT_SOURCE.SHARED) return false;
   if (!sharedHasContent) return false;
-  return activeTab === 'overview';
+  return activeTab === NAV_TAB.OVERVIEW;
 }

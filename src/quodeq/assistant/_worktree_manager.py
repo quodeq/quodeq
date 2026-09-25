@@ -23,17 +23,22 @@ from pathlib import Path
 from quodeq.assistant._worktree_git import (
     WorktreeError, WorktreeStatus, run_git, run_git_bytes, diff_stats, diff_text, worktrees_base,
 )
+from quodeq.shared.constants import GIT_BIN, GIT_DIR_NAME, GIT_FLAG_C
 
 _logger = logging.getLogger(__name__)
 
 _BRANCH_PREFIX = "quodeq/fix-"
 _MAX_BRANCH_TRIES = 5
+_DEFAULT_PROJECT_NAME = "project"  # fallback path segment when no project id is known
+_GIT_SUBCOMMAND_WORKTREE = "worktree"
+_GIT_VERB_ADD = "add"
+_GIT_VERB_PRUNE = "prune"
 
 
 def _safe_segment(value: str) -> str:
     """Collapse a user-facing name to a filesystem-safe single path segment."""
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value or "").strip("-.")
-    return cleaned or "project"
+    return cleaned or _DEFAULT_PROJECT_NAME
 
 
 @dataclass
@@ -44,11 +49,11 @@ class WorktreeManager:
 
     def _git_repo(self, *args: str) -> str:
         """Run git against the user's repository root and return its stdout."""
-        return run_git(["git", "-C", str(self.repo_root), *args])
+        return run_git([GIT_BIN, GIT_FLAG_C, str(self.repo_root), *args])
 
     def _git_worktree(self, *args: str) -> str:
         """Run git against this session's worktree and return its stdout."""
-        return run_git(["git", "-C", str(self.path), *args])
+        return run_git([GIT_BIN, GIT_FLAG_C, str(self.path), *args])
 
     @classmethod
     def for_session(cls, repo_root: Path, project_id: str, session_id: str,
@@ -56,15 +61,15 @@ class WorktreeManager:
         base = base or worktrees_base()
         short = session_id[:8]
         return cls(repo_root=Path(repo_root),
-                   path=base / _safe_segment(project_id or "project") / short,
+                   path=base / _safe_segment(project_id or _DEFAULT_PROJECT_NAME) / short,
                    branch=f"{_BRANCH_PREFIX}{short}")
 
     def exists(self) -> bool:
-        return self.path.is_dir() and (self.path / ".git").exists()
+        return self.path.is_dir() and (self.path / GIT_DIR_NAME).exists()
 
     def create(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._git_repo("worktree", "prune")
+        self._git_repo(_GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_PRUNE)
         if self.path.exists() and not self.exists():
             # stale leftover directory (crash, stray files); a live worktree has .git
             shutil.rmtree(self.path, ignore_errors=True)
@@ -73,7 +78,7 @@ class WorktreeManager:
             candidate = (self.branch if attempt == 0
                          else f"{self.branch}-{attempt + 1}")
             try:
-                self._git_repo("worktree", "add", "-b", candidate, str(self.path))
+                self._git_repo(_GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_ADD, "-b", candidate, str(self.path))
                 self.branch = candidate
                 return
             except WorktreeError as exc:
@@ -87,10 +92,10 @@ class WorktreeManager:
 
     def remove(self, delete_branch: bool = True) -> None:
         if self.exists():
-            self._git_repo("worktree", "remove", "--force", str(self.path))
+            self._git_repo(_GIT_SUBCOMMAND_WORKTREE, "remove", "--force", str(self.path))
         else:
             shutil.rmtree(self.path, ignore_errors=True)
-            self._git_repo("worktree", "prune")
+            self._git_repo(_GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_PRUNE)
         if delete_branch:
             try:
                 self._git_repo("branch", "-D", self.branch)
@@ -105,8 +110,8 @@ class WorktreeManager:
         deletions, binary and non-UTF-8 changes survive the roundtrip. The
         patch file lives OUTSIDE the worktree so a failed cleanup can never
         leak it into a later diff or apply."""
-        self._git_worktree("add", "-N", ".")
-        patch = run_git_bytes(["git", "-C", str(self.path), "diff", "HEAD",
+        self._git_worktree(_GIT_VERB_ADD, "-N", ".")
+        patch = run_git_bytes([GIT_BIN, GIT_FLAG_C, str(self.path), "diff", "HEAD",
                             "--binary"])
         if not patch.strip():
             raise WorktreeError("no changes to apply")
@@ -127,7 +132,7 @@ class WorktreeManager:
         status = self._git_worktree("status", "--porcelain")
         if not status.strip():
             return False
-        self._git_worktree("add", "-A")
+        self._git_worktree(_GIT_VERB_ADD, "-A")
         self._git_worktree(
             "-c", "user.name=Quodeq Assistant",
             "-c", "user.email=assistant@quodeq.local",
@@ -178,11 +183,11 @@ def ensure_session_worktree(repository, *, repo_root: Path, project_id: str | No
     if row and row["status"] == WorktreeStatus.ACTIVE and Path(row["path"]).is_dir():
         return WorktreeManager(repo_root=Path(row["repo_root"]),
                                path=Path(row["path"]), branch=row["branch"])
-    manager = WorktreeManager.for_session(repo_root, project_id or "project",
+    manager = WorktreeManager.for_session(repo_root, project_id or _DEFAULT_PROJECT_NAME,
                                           session_id, base=base)
     if manager.path.exists():  # crash leftover or terminal reuse: start clean
         shutil.rmtree(manager.path, ignore_errors=True)
-        run_git(["git", "-C", str(repo_root), "worktree", "prune"])
+        run_git([GIT_BIN, GIT_FLAG_C, str(repo_root), _GIT_SUBCOMMAND_WORKTREE, _GIT_VERB_PRUNE])
     manager.create()
     repository.upsert_worktree(session_id=session_id, project_id=project_id,
                                repo_root=str(repo_root), path=str(manager.path),

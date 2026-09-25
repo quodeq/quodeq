@@ -157,6 +157,15 @@ jobs:
         # locked in with `npm run lint:vocab:update`.
         run: npm run lint:vocab
 
+      - name: Check UI magic strings (magic-string ratchet)
+        working-directory: src/quodeq/ui
+        # Fails on a bare string the code compares against, or the same
+        # string 3+ times in one module, beyond the per-file counts in
+        # tools/magic_strings_baseline.json, or a baseline total above its
+        # committed ceiling. Shrunk counts are locked in with
+        # `npm run lint:magic-strings:update`.
+        run: npm run lint:magic-strings
+
       - name: Check UI naming style (naming ratchet)
         working-directory: src/quodeq/ui
         # Fails on a module constant holding a literal or frozen object that is

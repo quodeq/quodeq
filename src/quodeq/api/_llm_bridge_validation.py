@@ -11,9 +11,10 @@ from typing import Any
 
 from flask import Response, jsonify, request
 
+from quodeq.api._constants import CODE_INVALID_PARAM, CODE_MISSING_PARAM
 from quodeq.shared.url_validation import url_safety_error
 
-BODY_NOT_OBJECT = {"error": "request body must be a JSON object", "code": "INVALID_PARAM"}
+BODY_NOT_OBJECT = {"error": "request body must be a JSON object", "code": CODE_INVALID_PARAM}
 
 
 def json_body() -> dict | None:
@@ -36,7 +37,7 @@ def string_fields_error(data: Mapping[str, Any], names: tuple[str, ...]) -> tupl
     """
     for name in names:
         if name in data and data[name] is not None and not isinstance(data[name], str):
-            return jsonify({"error": f"{name} must be a string", "code": "INVALID_PARAM"}), 400
+            return jsonify({"error": f"{name} must be a string", "code": CODE_INVALID_PARAM}), 400
     return None
 
 
@@ -60,7 +61,7 @@ def _invalid_model_name(model: str) -> tuple[Response, int] | None:
     Prevents path traversal and null-byte injection.
     """
     if "\\" in model or ".." in model or "\0" in model:
-        return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
+        return jsonify({"error": "Invalid model name", "code": CODE_INVALID_PARAM}), 400
     return None
 
 
@@ -76,9 +77,9 @@ def require_model_name(
     model = data.get("model", "")
     if require_nonempty:
         if not model or not isinstance(model, str):
-            return None, (jsonify({"error": "model is required", "code": "MISSING_PARAM"}), 400)
+            return None, (jsonify({"error": "model is required", "code": CODE_MISSING_PARAM}), 400)
     elif not isinstance(model, str):
-        return None, (jsonify({"error": "model must be a string", "code": "INVALID_PARAM"}), 400)
+        return None, (jsonify({"error": "model must be a string", "code": CODE_INVALID_PARAM}), 400)
     err = _invalid_model_name(model)
     if err is not None:
         return None, err

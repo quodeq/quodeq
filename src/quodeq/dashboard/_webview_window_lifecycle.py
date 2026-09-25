@@ -21,6 +21,7 @@ from quodeq.dashboard._webview_window_chrome import (
 )
 from quodeq.dashboard._webview_window_fullscreen import install_macos_fullscreen_observer
 from quodeq.dashboard._webview_window_help_menu import install_macos_help_menu
+from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
 
 
 def _run_macos_loaded_hooks(window: object) -> None:
@@ -55,9 +56,9 @@ def make_on_loaded(window: object) -> "Callable[[], None]":
     """Return the ``loaded`` handler bound to *window* (mirrors make_on_reload)."""
     def _on_loaded() -> None:
         window.show()
-        if sys.platform == "darwin":
+        if sys.platform == PLATFORM_DARWIN:
             _run_macos_loaded_hooks(window)
-        elif sys.platform == "win32":
+        elif sys.platform == PLATFORM_WIN32:
             set_windows_titlebar(True)
 
     return _on_loaded

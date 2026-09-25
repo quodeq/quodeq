@@ -1,4 +1,5 @@
 import { t } from '../../../strings/index.js';
+import { ELLIPSIS_OPEN_KEY } from './crumbModel.js';
 
 /** The "…" chip that opens the hidden (collapsed-middle) ancestors as a
  * plain list — an ancestor menu is a path, not a choice. */
@@ -12,7 +13,7 @@ export default function NavBreadcrumbEllipsisMenu({ seg, sep, open, setOpenKey, 
           aria-label={t('explorer.showHiddenSegments')}
           aria-haspopup="menu"
           aria-expanded={open}
-          onClick={() => setOpenKey(open ? null : 'ellipsis')}
+          onClick={() => setOpenKey(open ? null : ELLIPSIS_OPEN_KEY)}
         >
           …
         </button>

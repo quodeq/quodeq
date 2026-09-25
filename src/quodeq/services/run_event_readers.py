@@ -32,6 +32,7 @@ from quodeq.core.events.models import EventType
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.run.state import RunState
 from quodeq.services import wiring
+from quodeq.shared.constants import JSON_SUFFIX
 from quodeq.shared.env_resolve import resolve_env
 
 DEFAULT_FINDINGS_BATCH = 500
@@ -41,8 +42,6 @@ Bounds the initial-snapshot burst so a run with tens of thousands of findings
 cannot OOM the API process. Subsequent ticks resume from the last event
 timestamp via the SSE Last-Event-ID mechanism.
 """
-
-DIM_FILENAME_SUFFIX = ".json"
 
 STATUS_MTIME_MISSING: float = 0.0
 """Sentinel mtime used when status.json does not exist.
@@ -98,9 +97,9 @@ def scan_completed_dimensions(run_dir: Path) -> set[str]:
     eval_dir = run_dir / "evaluation"
     try:
         return {
-            entry.name[: -len(DIM_FILENAME_SUFFIX)]
+            entry.name[: -len(JSON_SUFFIX)]
             for entry in eval_dir.iterdir()
-            if entry.is_file() and entry.name.endswith(DIM_FILENAME_SUFFIX)
+            if entry.is_file() and entry.name.endswith(JSON_SUFFIX)
         }
     except OSError:
         return set()
@@ -117,7 +116,7 @@ def read_dim_eval(
     authoritative — it always matches the filename stem for well-formed files.
     """
     eval_dir = run_dir / "evaluation"
-    path = eval_dir / f"{dimension}{DIM_FILENAME_SUFFIX}"
+    path = eval_dir / f"{dimension}{JSON_SUFFIX}"
     try:
         data = wiring.read_eval_report(eval_dir, dimension)
     except (OSError, ValueError) as exc:

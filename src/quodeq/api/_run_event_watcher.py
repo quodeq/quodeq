@@ -22,7 +22,6 @@ from quodeq.api._run_event_serializers import (
 )
 from quodeq.services.run_event_readers import (  # noqa: F401 — re-export
     DEFAULT_FINDINGS_BATCH,
-    DIM_FILENAME_SUFFIX,
     STATUS_MTIME_MISSING,
     findings_batch_size,
     read_dim_eval,

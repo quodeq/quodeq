@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from enum import StrEnum
 from typing import Callable
 
 from quodeq.cli_parser import build_parser  # re-export
@@ -49,6 +50,15 @@ from quodeq.cli_evaluation import (  # noqa: F401 — public re-exports
 )
 
 _logger = logging.getLogger(__name__)
+
+
+class Command(StrEnum):
+    """Top-level CLI subcommand names, as argparse's ``command`` dest reports them."""
+
+    EVALUATE = "evaluate"
+    CI = "ci"
+    REVIEW = "review"
+    EXPORT = "export"
 
 
 _COMMAND_HANDLERS: dict[str, Callable] = {
@@ -138,15 +148,15 @@ def main(argv: list[str] | None = None) -> int:
     if command is None:
         return dashboard_main(argv[1:] if argv is not None else sys.argv[1:])
 
-    if command == "evaluate":
+    if command == Command.EVALUATE:
         code = run_evaluate(args)
-    elif command == "ci":
+    elif command == Command.CI:
         from quodeq.ci.cli import handle_ci
         code = handle_ci(args)
-    elif command == "review":
+    elif command == Command.REVIEW:
         from quodeq.ci.review import handle_review
         code = handle_review(args)
-    elif command == "export":
+    elif command == Command.EXPORT:
         from quodeq.ci.export_cli import handle_export
         code = handle_export(args)
     else:

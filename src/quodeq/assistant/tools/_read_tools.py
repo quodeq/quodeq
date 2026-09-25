@@ -21,6 +21,7 @@ from quodeq.assistant.tools._read_tools_violations import (
     trim_violation,
     visible_only,
 )
+from quodeq.assistant.tools._constants import JSON_SCHEMA_TYPE_OBJECT, JSON_SCHEMA_TYPE_STRING
 from quodeq.assistant.tools.registry import ToolError, ToolRegistry, ToolSpec
 from quodeq.core.standards.visibility import partition_visible
 from quodeq.data.fs.report_parser.finding_details import read_eval_report
@@ -176,8 +177,8 @@ def _register_findings_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "Full-text search the selected run's findings. Requires a selected run; "
         "call get_context first if unsure. In overview scope, use get_violations "
         "or get_report instead.",
-        {"type": "object", "properties": {
-            "query": {"type": "string"},
+        {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {
+            "query": {"type": JSON_SCHEMA_TYPE_STRING},
             "limit": {"type": "integer", "minimum": 1, "maximum": 50},
         }, "required": ["query"]},
         lambda **kw: _search_findings(ctx, **kw)))
@@ -186,8 +187,8 @@ def _register_findings_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "List violations for a dimension (or all dimensions if omitted), "
         "severity-sorted with per-principle counts. Uses the selected run if "
         "one is selected, otherwise the accumulated (per-dimension-latest) view.",
-        {"type": "object", "properties": {
-            "dimension": {"type": "string"},
+        {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {
+            "dimension": {"type": JSON_SCHEMA_TYPE_STRING},
             "limit": {"type": "integer", "minimum": 1, "maximum": 100},
         }},
         lambda **kw: get_violations(ctx, **kw)))
@@ -202,14 +203,14 @@ def _register_score_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "latest run, aggregated — the default dashboard data). scores omits "
         "any dimension the user has hidden; those ids are named in "
         "hiddenStandardIds.",
-        {"type": "object", "properties": {}},
+        {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {}},
         lambda **kw: _get_scores(ctx, **kw)))
     registry.register(ToolSpec(
         "get_report",
         "Get the full report for one dimension: principles (score/grade) and "
         "violations. Uses the selected run if one is selected, otherwise that "
         "dimension's latest run from the accumulated view.",
-        {"type": "object", "properties": {"dimension": {"type": "string"}},
+        {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {"dimension": {"type": JSON_SCHEMA_TYPE_STRING}},
          "required": ["dimension"]},
         lambda **kw: _get_report(ctx, **kw)))
 
@@ -222,13 +223,13 @@ def _register_standards_tools(registry: ToolRegistry, ctx: ToolContext) -> None:
         "hiddenStandardIds. Pass include_hidden=true, or call "
         "get_standard(standard_id), when the user explicitly asks about a "
         "hidden standard.",
-        {"type": "object", "properties": {
+        {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {
             "include_hidden": {"type": "boolean"},
         }},
         lambda **kw: _list_standards(ctx, **kw)))
     registry.register(ToolSpec(
         "get_standard", "Get one standard's full principles and requirements.",
-        {"type": "object", "properties": {"standard_id": {"type": "string"}},
+        {"type": JSON_SCHEMA_TYPE_OBJECT, "properties": {"standard_id": {"type": JSON_SCHEMA_TYPE_STRING}},
          "required": ["standard_id"]},
         lambda **kw: _get_standard(ctx, **kw)))
 

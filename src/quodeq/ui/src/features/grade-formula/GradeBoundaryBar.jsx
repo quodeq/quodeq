@@ -1,4 +1,6 @@
 import { useRef } from 'react';
+import { KEY } from '../../vocab/keyboard.js';
+import { POINTER_EVENT } from '../../vocab/pointerEvent.js';
 
 // Upper bound of the 0-10 score axis: a number, so it needs no translation.
 const SCALE_MAX = 10;
@@ -40,13 +42,13 @@ function makeStartDrag({ barRef, ascRef, thresholds, onChange }) {
       applyAscValue(thresholds, live, dividerIdx, value, onChange);
     };
     const stop = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', stop);
-      window.removeEventListener('pointercancel', stop);
+      window.removeEventListener(POINTER_EVENT.MOVE, move);
+      window.removeEventListener(POINTER_EVENT.UP, stop);
+      window.removeEventListener(POINTER_EVENT.CANCEL, stop);
     };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', stop);
-    window.addEventListener('pointercancel', stop);
+    window.addEventListener(POINTER_EVENT.MOVE, move);
+    window.addEventListener(POINTER_EVENT.UP, stop);
+    window.addEventListener(POINTER_EVENT.CANCEL, stop);
   };
 }
 
@@ -121,8 +123,8 @@ function Segment({ i, width, hasDivider, dividerValue, onDrag, onStepKey }) {
           tabIndex={0}
           onPointerDown={onDrag(i)}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); onStepKey(i, MIN_GAP); }
-            else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); onStepKey(i, -MIN_GAP); }
+            if (e.key === KEY.ARROW_RIGHT || e.key === KEY.ARROW_UP) { e.preventDefault(); onStepKey(i, MIN_GAP); }
+            else if (e.key === KEY.ARROW_LEFT || e.key === KEY.ARROW_DOWN) { e.preventDefault(); onStepKey(i, -MIN_GAP); }
           }}
         />
       ) : null}

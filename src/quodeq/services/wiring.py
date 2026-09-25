@@ -150,7 +150,11 @@ from quodeq.data.fs.standards_loader import (  # noqa: F401
 from quodeq.data.fs.standards_prefs import load_visible_standard_ids  # noqa: F401
 
 # Filesystem report parser: JSON/markdown eval-report parsing.
-from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown  # noqa: F401
+from quodeq.data.fs.report_parser import (  # noqa: F401
+    OVERALL_PRINCIPLE,
+    parse_eval_from_json,
+    parse_eval_markdown,
+)
 
 # Event Log reader.
 from quodeq.data.events.reader import EventLogReader  # noqa: F401

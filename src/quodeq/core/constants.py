@@ -5,6 +5,14 @@ from __future__ import annotations
 
 FULL_CONFIDENCE = 100  # a finding the scanner is fully sure of; downweights subtract from this
 
+# Python's package-marker module stem; not a segment of the dotted package
+# name. Read by core/checks/framework_deps.py and data/fs/import_graph.py.
+INIT_STEM = "__init__"
+
+# sys.platform value. Lives here (not shared/constants.py) because core may
+# not import shared; shared/constants.py re-exports it for everyone else.
+PLATFORM_WIN32 = "win32"
+
 # Per-provider MCP wiring styles, keyed by the "mcp_style" field of the
 # ai_providers.json catalog. Read by both analysis/ (dimension-analysis
 # subprocess dispatch: _mcp_arg_builders.py, subprocess.py) and assistant/

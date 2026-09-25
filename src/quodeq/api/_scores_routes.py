@@ -15,6 +15,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
+from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND
 from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
 from quodeq.services.scoring import get_project_scores, get_scores_slim
@@ -28,7 +29,7 @@ def _validate(*params: str) -> tuple[Response, int] | None:
     try:
         validate_path_segment(*params)
     except ValueError:
-        body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
         return jsonify(body), status
     return None
 
@@ -43,7 +44,7 @@ def _load_scores(project: str) -> tuple[dict | None, tuple[Response, int] | None
         body, status = error_response("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
         return None, (jsonify(body), status)
     if result is None:
-        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
         return None, (jsonify(body), status)
     return result, None
 
@@ -70,7 +71,7 @@ def register_scores_routes(app: Flask) -> None:
         try:
             result = get_scores_slim(Path(eval_dir), project, run_id)
         except FileNotFoundError:
-            body, status = error_response("Run not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Run not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
             return jsonify(body), status
         except Exception:
             _logger.exception("Unexpected error fetching run scores for project %s run %s", project, run_id)
@@ -88,7 +89,7 @@ def _register_compliance_detail_route(app: Flask) -> None:
     def project_compliance_detail(project: str) -> Response | tuple[Response, int]:
         dimension = request.args.get("dimension")
         if not dimension:
-            body, status = error_response("dimension is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            body, status = error_response("dimension is required", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
             return jsonify(body), status
         err = _validate(project, dimension)
         if err:

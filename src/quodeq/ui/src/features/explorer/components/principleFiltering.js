@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { KNOWN_SEVERITIES } from '../../../utils/constants.js';
 import { usePrincipleData } from './explorerDataHooks.js';
 import { useHydratedCompliance } from '../hooks/useHydratedCompliance.js';
-import { SEVERITY } from '../../../vocab/severity.js';
+import { SEVERITY, SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 
 /** Split an evalPrincipal's violations into per-severity buckets and totals. */
 export function computeEvalPrincipleData(evalPrincipal) {
@@ -24,7 +24,7 @@ export function computeEvalPrincipleData(evalPrincipal) {
 /** Narrow the per-severity buckets to the active filter (or pass through
  * for 'all'/no filter). */
 export function filterBySeveritySelection(filteredBySeverity, activeSevFilter) {
-  if (!activeSevFilter || activeSevFilter === 'all') return filteredBySeverity;
+  if (!activeSevFilter || activeSevFilter === SEVERITY_FILTER_ALL) return filteredBySeverity;
   const filtered = {};
   for (const sev of Object.keys(filteredBySeverity)) {
     filtered[sev] = sev === activeSevFilter ? filteredBySeverity[sev] : [];

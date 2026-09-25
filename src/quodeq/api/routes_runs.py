@@ -7,6 +7,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify
 
+from quodeq.api._constants import CODE_INVALID_INPUT
 from quodeq.api._http_cache import conditional_json
 from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
@@ -24,7 +25,7 @@ def register_runs_routes(app: Flask) -> None:
         try:
             validate_path_segment(project)
         except ValueError:
-            body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            body, status = error_response("Invalid parameter", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
             return jsonify(body), status
         try:
             runs = build_runs_unit(Path(reports_dir()), Path(get_index_db_path()), project)

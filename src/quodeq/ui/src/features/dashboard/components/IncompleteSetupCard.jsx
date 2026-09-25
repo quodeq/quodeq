@@ -1,10 +1,7 @@
 import CloneTargetStep from '../../onboarding/components/steps/CloneTargetStep.jsx';
 import { useCompleteSetup } from '../hooks/useCompleteSetup.js';
 import { t } from '../../../strings/index.js';
-
-// repository_info.json value written by the pre-clone registration flow: the
-// project exists only as a remote URL, with no local checkout yet.
-const LEGACY_ONLINE_LOCATION = 'online';
+import { PROJECT_LOCATION } from '../../../models/project.js';
 
 /**
  * Surfaces a "Complete setup" CTA on the project view for legacy projects
@@ -19,7 +16,7 @@ export default function IncompleteSetupCard({ projectInfo, onComplete }) {
   // hook order stays stable across the legacy-online / not-applicable branches.
   const { open, setOpen, submitting, error, handleSubmit } = useCompleteSetup({ repoUrl, onComplete });
 
-  if (!projectInfo || projectInfo.location !== LEGACY_ONLINE_LOCATION) return null;
+  if (!projectInfo || projectInfo.location !== PROJECT_LOCATION.ONLINE) return null;
 
   if (!open) {
     return (

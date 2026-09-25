@@ -22,6 +22,7 @@ from quodeq.analysis.dimension_runner import DimensionRunner, log_dimension_resu
 from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 from quodeq.analysis.subagents.runner import process_consolidated_dimensions
 from quodeq.analysis.subprocess import get_provider_type
+from quodeq.config.provider import ProviderType
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.run.dimensions import DimState
 from quodeq.core.evidence.merge import merge_evidence
@@ -170,7 +171,7 @@ def _consolidated_is_available(config: RunConfig, dimensions: list[str]) -> bool
         config.options.consolidated
         and len(dimensions) > 1
         and config.options.max_subagents > 1
-        and get_provider_type(config.ai_cmd) != "api"
+        and get_provider_type(config.ai_cmd) != ProviderType.API
     )
 
 

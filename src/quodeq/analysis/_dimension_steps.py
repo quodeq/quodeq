@@ -7,7 +7,7 @@ from typing import Any
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream, run_analysis
 from quodeq.analysis.stream.parser import extract_evidence_from_stream
-from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid
+from quodeq.analysis.stream.validation import MCP_STATUS_CONNECTED, get_mcp_status, is_stream_valid
 from quodeq.analysis.evidence_parser import parse_evidence_file
 from quodeq.core.evidence.model import Evidence
 from quodeq.analysis.prompts.builder import build_analysis_prompt, prompt_context
@@ -75,7 +75,7 @@ def _try_parse_stream_evidence(stream_file: Path, jsonl_file: Path) -> int:
     """
     mcp_produced = evidence_file_size(jsonl_file) > 0
     mcp_status = get_mcp_status(stream_file)
-    if mcp_status and mcp_status != "connected":
+    if mcp_status and mcp_status != MCP_STATUS_CONNECTED:
         log_warning(f"MCP findings server {mcp_status} — falling back to stream extraction")
     if mcp_produced:
         return count_files_from_stream(stream_file)

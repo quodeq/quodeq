@@ -3,6 +3,7 @@ import { listVerifiedFindings, unverifyFinding } from '../../../api/findings.js'
 import { sharedListVerifiedFindings } from '../../../api/shared.js';
 import { ASSISTANT_ACTION_APPLIED_EVENT } from '../../../constants.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
+import { ACTION_TYPE } from '../../../vocab/actionType.js';
 
 /**
  * Project-level verified-badge state. Findings are keyed by
@@ -45,7 +46,7 @@ export function VerifiedFindingsProvider({ project, source = PROJECT_SOURCE.LOCA
 
   useEffect(() => {
     const handler = (event) => {
-      if (event.detail?.actionType === 'verify_finding') refresh();
+      if (event.detail?.actionType === ACTION_TYPE.VERIFY_FINDING) refresh();
     };
     window.addEventListener(ASSISTANT_ACTION_APPLIED_EVENT, handler);
     return () => window.removeEventListener(ASSISTANT_ACTION_APPLIED_EVENT, handler);

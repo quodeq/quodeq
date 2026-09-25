@@ -5,6 +5,7 @@
 
 import { createProject } from '../models/project.js';
 import { request, BASE } from './request.js';
+import { FETCH_ERROR_NAME } from '../constants.js';
 
 // ── Health ──────────────────────────────────────────────────────────────
 
@@ -182,7 +183,7 @@ export async function registerProject(payload) {
       timeout: REGISTER_PROJECT_TIMEOUT_MS,
     });
   } catch (e) {
-    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+    if (e?.name === FETCH_ERROR_NAME.TIMEOUT || e?.name === FETCH_ERROR_NAME.ABORT) {
       throw new Error('Project registration timed out. The server may be unresponsive or the clone is taking too long; try again.');
     }
     if (e?.body?.existingProjectId) e.existingProjectId = e.body.existingProjectId;

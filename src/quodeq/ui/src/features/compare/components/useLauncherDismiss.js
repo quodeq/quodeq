@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { KEY } from '../../../vocab/keyboard.js';
 
 /**
  * Dismiss mechanics shared by the duel and dimension launcher popovers: a
@@ -13,7 +14,7 @@ export function useLauncherDismiss(open, btnRef, menuRef, close) {
     const onDown = (e) => {
       if (!btnRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) close();
     };
-    const onEsc = (e) => { if (e.key === 'Escape') close(); };
+    const onEsc = (e) => { if (e.key === KEY.ESCAPE) close(); };
     const onAnchorMoved = (e) => {
       if (menuRef.current && e.target instanceof Node && menuRef.current.contains(e.target)) return;
       close();

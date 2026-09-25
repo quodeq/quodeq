@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from quodeq.core.finding_identity import coerce_line, finding_dismiss_keys
+from quodeq.shared.constants import JSON_SUFFIX
 
 
 def iter_eval_reports(eval_dir: Path, *, skip_corrupt: bool = False) -> Iterator[tuple[str, dict]]:
@@ -65,7 +66,7 @@ def read_finding_details_from_json_eval(
     wanted = set(keys)
     out: dict[tuple, dict] = {}
     for path in eval_dir.iterdir():
-        if path.suffix != ".json":
+        if path.suffix != JSON_SUFFIX:
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))

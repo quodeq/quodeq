@@ -18,6 +18,7 @@ from quodeq.api._evaluation_helpers import (
     clean_scan_conflict_error,
 )
 from quodeq.api._evaluation_options import build_evaluation_options
+from quodeq.api._constants import CODE_INVALID_INPUT
 from quodeq.api.helpers import (
     json_error,
     optional_json_object_or_error,
@@ -46,7 +47,7 @@ def _validate_start_payload(payload: dict) -> Response | tuple[Response, int] | 
     (or Flask's own error tuple) if invalid, else None."""
     validation_error = validate_evaluation_payload(payload)
     if validation_error:
-        return json_error(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return json_error(validation_error, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     ai_cmd = payload.get("aiCmd") or None
     ai_cmd_error = validate_ai_cmd(ai_cmd)
     if ai_cmd_error is not None:
@@ -77,12 +78,12 @@ def _pre_build_options_error(payload: dict) -> tuple[Response, int] | None:
     net, never a path that has to echo exception text."""
     conflict_err = clean_scan_conflict_error(payload)
     if conflict_err is not None:
-        return json_error(conflict_err, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return json_error(conflict_err, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     scope_path = payload.get("scopePath") or None
     if scope_path is not None:
         err = relative_scope_error(str(scope_path))
         if err is not None:
-            return json_error(err, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return json_error(err, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     return None
 
 
@@ -98,13 +99,13 @@ def _build_options_or_error(payload: dict) -> tuple[Any, tuple[Response, int] | 
         # InvalidEvaluationOption carries is written by coerce_int itself,
         # names only the field, and interpolates nothing from the request
         # (never raw exception formatting), so it is safe to return verbatim.
-        return None, json_error(exc.public_message, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return None, json_error(exc.public_message, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
     except ValueError:
         # Constant message, not str(exc): every other raise source is
         # pre-checked above. Keep it unbound so nothing here can ever echo
         # exception text.
         return None, json_error(
-            "Invalid evaluation options", HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            "Invalid evaluation options", HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
         )
 
 
@@ -187,7 +188,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         rate_error = check_eval_rate_limit(eval_rate_store)
         if rate_error is not None:
             return rate_error
-        payload = optional_json_object_or_error("INVALID_INPUT")
+        payload = optional_json_object_or_error(CODE_INVALID_INPUT)
         if not isinstance(payload, dict):
             return jsonify(payload[0]), payload[1]
         start_request, error = _validated_start_request(payload)
@@ -200,6 +201,6 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         except (FileNotFoundError, ValueError):
             return json_error(
                 "Invalid repository. Provide a local path or a URL like https://github.com/owner/repo.",
-                HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+                HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT,
             )
         return jsonify(to_camel_dict(job)), HTTPStatus.ACCEPTED

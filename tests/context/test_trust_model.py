@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 
@@ -150,6 +151,17 @@ def test_library_does_not_relax(tmp_path):
 def test_malformed_profile_degrades_never_raises(tmp_path, payload):
     _write_profile(tmp_path, payload)
     assert resolve_trust_model(tmp_path) == CONSERVATIVE
+
+
+def test_invalid_network_exposure_warning_lists_plain_strings(tmp_path, caplog):
+    """NETWORK_EXPOSURES holds NetworkExposure members for the dead-code
+    gate, but the warning's sorted(allowed) must still print plain strings
+    (the log line is a global-constraint-pinned output), not enum reprs
+    like ``<NetworkExposure.LAN: 'lan'>``."""
+    _write_profile(tmp_path, {"version": 1, "networkExposure": "carrier-pigeon"})
+    with caplog.at_level(logging.WARNING, logger="quodeq.context.trust_model"):
+        resolve_trust_model(tmp_path)
+    assert "['lan', 'loopback', 'public']" in caplog.text
 
 
 def test_unreadable_profile_degrades(tmp_path):

@@ -3,6 +3,7 @@
  * (move-only refactor).
  */
 import { lazy } from 'react';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 const MapPage = lazy(() => import('../features/map/components/MapPage.jsx'));
 
@@ -19,15 +20,15 @@ export function mapRoute(params, props) {
     const current = params.path || '';
     if (path === current) return;
     const stack = props.navigation.navStack || [];
-    for (let i = stack.length - 2; i >= 0 && stack[i].page === 'map'; i--) {
+    for (let i = stack.length - 2; i >= 0 && stack[i].page === NAV_TAB.MAP; i--) {
       if ((stack[i].path || '') === path) {
         props.navigation.navGoTo(i);
         return;
       }
     }
-    props.navigation.handleNavigate('map', { ...params, path });
+    props.navigation.handleNavigate(NAV_TAB.MAP, { ...params, path });
   };
-  const replaceView = (patch) => props.navigation.handleNavigateReplace('map', { ...params, ...patch });
+  const replaceView = (patch) => props.navigation.handleNavigateReplace(NAV_TAB.MAP, { ...params, ...patch });
   return <MapPage
     data={{
       accumulated: acc,

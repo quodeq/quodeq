@@ -6,6 +6,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.logging import log_warning
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32, get_evaluations_dir
@@ -55,7 +56,7 @@ def spawn_action_api(
     if cfg.static_dist:
         child_env[_ENV_STATIC_DIST] = str(cfg.static_dist)
     child_env[_ENV_EVALUATIONS_DIR] = cfg.evaluations_dir or get_evaluations_dir(env=env)
-    verbose = child_env.get("QUODEQ_VERBOSE") == "1"
+    verbose = child_env.get("QUODEQ_VERBOSE") == ENV_TRUTHY
     proc = subprocess.Popen(
         subprocess_cmd("api"),
         env=child_env,

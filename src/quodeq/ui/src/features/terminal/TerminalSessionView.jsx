@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import { useTerminalSocket } from './useTerminalSocket.js';
-import { createTerminalInstance, isReservedChord } from './terminalSetup.js';
+import { createTerminalInstance, isReservedChord, TERMINAL_STATUS } from './terminalSetup.js';
 import { themeFromCss } from './xtermTheme.js';
 import { t } from '../../strings/index.js';
 import { DATA_THEME_ATTR } from '../../constants.js';
@@ -24,7 +24,7 @@ function isHidden(el) {
 // reconciles the tab strip against /terminal/sessions; retrying is futile.
 function useGoneNotify(status, sessionId, onGone) {
   useEffect(() => {
-    if (status === 'gone') onGone?.(sessionId);
+    if (status === TERMINAL_STATUS.GONE) onGone?.(sessionId);
   }, [status, sessionId, onGone]);
 }
 
@@ -73,7 +73,7 @@ function fitAndResize(fit, term, resize, where) {
 function useRefitOnOpen({ status, resize, rootRef, fitRef, termRef }) {
   useEffect(() => {
     const el = rootRef.current;
-    if (status !== 'open' || !fitRef.current || !termRef.current || isHidden(el)) return;
+    if (status !== TERMINAL_STATUS.OPEN || !fitRef.current || !termRef.current || isHidden(el)) return;
     fitAndResize(fitRef.current, termRef.current, resize, 'refit-on-open');
   }, [status, resize]); // eslint-disable-line react-hooks/exhaustive-deps -- the refs (termRef, rootRef, fitRef) are read at run time, not tracked
 }
@@ -181,7 +181,7 @@ function useDisableInputWhenClosed(status, live, termRef) {
   useEffect(() => {
     const term = termRef.current;
     if (!term) return;
-    term.options.disableStdin = status !== 'open';
+    term.options.disableStdin = status !== TERMINAL_STATUS.OPEN;
   }, [status, live]); // eslint-disable-line react-hooks/exhaustive-deps -- the ref (termRef) is read at run time, not tracked
 }
 

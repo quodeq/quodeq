@@ -25,10 +25,12 @@ from typing import Callable
 
 from flask import Flask, Response, current_app, jsonify, request
 
+from quodeq.api._constants import CODE_NOT_FOUND, QUERY_FLAG_TRUE_NUMERIC
 from quodeq.api.helpers import json_error
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
 from quodeq.services import fs_reports, fs_projects
 from quodeq.services.compare import build_compare_summary
+from quodeq.services.run_constants import LATEST_RUN
 from quodeq.services.runs_unit import build_runs_unit
 from quodeq.services.scoring import get_project_scores, get_scores_slim
 from quodeq.services.shared_listing import enrich_shared_info, list_shared_projects
@@ -42,6 +44,8 @@ from quodeq.shared.serialization import to_camel_dict
 
 from .routes_shared_common import logger, validate_segment, with_shared_root
 
+_PROJECT_NOT_FOUND = "Project not found"  # repeated across the shared-mirror read routes
+
 
 def _shared_projects(
     eval_root: Path, url: str,
@@ -49,7 +53,7 @@ def _shared_projects(
 ):
     listing = list_shared_projects(
         eval_root, url,
-        refresh=request.args.get("refresh") == "1",
+        refresh=request.args.get("refresh") == QUERY_FLAG_TRUE_NUMERIC,
         refresh_clone=refresh_clone, sync_index=sync_index,
         serialize=to_camel_dict,
     )
@@ -84,7 +88,7 @@ def shared_project_info(project: str, eval_root: Path, url: str):
     if err:
         return err
     if not info:
-        return json_error("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Project info not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     # Same publishedBy/publishedAt enrichment as the list route
     # (shared_projects above) -- without it the UI's shared-project hero
     # badge has no "published by <name>" to show. `project` here is the
@@ -115,11 +119,11 @@ def shared_dashboard(project: str, eval_root: Path):
     err = validate_segment(project)
     if err:
         return err
-    run = request.args.get("run", "latest")
+    run = request.args.get("run", LATEST_RUN)
     try:
         payload = fs_reports.get_dashboard(str(eval_root), project, run, log=SHARED_LOG)
     except FileNotFoundError:
-        return json_error("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Dashboard data not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify(payload)
 
 
@@ -132,7 +136,7 @@ def shared_accumulated(project: str, eval_root: Path):
     as_of = request.args.get("asOf")
     payload = fs_reports.get_accumulated(str(eval_root), project, as_of)
     if payload is None:
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error(_PROJECT_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify(payload)
 
 
@@ -150,7 +154,7 @@ def shared_scores(project: str, eval_root: Path):
     if err:
         return err
     if result is None:
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error(_PROJECT_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify(result)
 
 
@@ -168,7 +172,7 @@ def shared_compare_summary(project: str, eval_root: Path):
     if err:
         return err
     if result is None:
-        return json_error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error(_PROJECT_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify(result)
 
 
@@ -181,7 +185,7 @@ def shared_run_scores(project: str, run_id: str, eval_root: Path):
     try:
         result = get_scores_slim(eval_root, project, run_id)
     except FileNotFoundError:
-        return json_error("Run not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Run not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify(result)
 
 
@@ -192,7 +196,7 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
     202 with ``waiting`` set when the dimension is still being written, so the
     UI polls instead of showing an error.
     """
-    run_id = request.args.get("run", "latest")
+    run_id = request.args.get("run", LATEST_RUN)
     err = validate_segment(project, dim, run_id)
     if err:
         return err
@@ -202,7 +206,7 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
         evaluators_dir=Path(evaluators_dir) if evaluators_dir else None,
     )
     if payload is None:
-        return json_error("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Eval file not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     if payload.get("waiting"):
         return jsonify(payload), HTTPStatus.ACCEPTED
     return jsonify(payload)
@@ -211,14 +215,14 @@ def shared_dimension_eval(project: str, dim: str, eval_root: Path):
 @with_shared_root
 def shared_violations(project: str, eval_root: Path):
     """Return one shared run's violations, camelCased for the UI."""
-    run_id = request.args.get("run", "latest")
+    run_id = request.args.get("run", LATEST_RUN)
     err = validate_segment(project, run_id)
     if err:
         return err
     try:
         payload = fs_reports.get_violations(str(eval_root), project, run_id, log=SHARED_LOG)
     except FileNotFoundError:
-        return json_error("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return json_error("Violation data not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return jsonify(to_camel_dict(payload))
 
 

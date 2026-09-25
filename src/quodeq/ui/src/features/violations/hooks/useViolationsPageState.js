@@ -4,6 +4,9 @@ import { computeSummaryFromDimensions } from '../../../utils/visibleStandardsSum
 import { readCachedState, writeCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
 import { useDismissedFindings } from '../components/useDismissedFindings.js';
 
+// This page's pageStateCache scope key.
+const PAGE_STATE_SCOPE = 'violations';
+
 /**
  * Fresh tab click (tabKey changed) drops the cached file-tree path so the
  * user lands at the root, then re-reads the (possibly just-reset) cache and
@@ -14,11 +17,11 @@ export function useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh })
   // cache survives unmount and the tree resumes where it was.
   const lastTabKeyRef = useRef(tabKey);
   if (lastTabKeyRef.current !== tabKey) {
-    resetCachedScope('violations', selectedProject);
+    resetCachedScope(PAGE_STATE_SCOPE, selectedProject);
     lastTabKeyRef.current = tabKey;
   }
 
-  const cached = readCachedState('violations', selectedProject, {
+  const cached = readCachedState(PAGE_STATE_SCOPE, selectedProject, {
     fileCurrentPath: '',
   });
 
@@ -43,7 +46,7 @@ export function useViolationsTabKeyReset({ tabKey, selectedProject, onRefresh })
 export function useViolationsData({ accumulatedDimensions, selectedProject, onReconcile, initialFilePath, dismissRefreshKey, selectedSource }) {
   const [fileCurrentPath, _setFileCurrentPath] = useState(initialFilePath);
   const setFileCurrentPath = (v) => {
-    writeCachedState('violations', selectedProject, { fileCurrentPath: v });
+    writeCachedState(PAGE_STATE_SCOPE, selectedProject, { fileCurrentPath: v });
     _setFileCurrentPath(v);
   };
 

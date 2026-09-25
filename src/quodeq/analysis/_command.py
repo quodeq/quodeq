@@ -29,7 +29,7 @@ from quodeq.analysis._mcp_arg_builders import (
 )
 from quodeq.analysis.provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.config.process_env import process_environment_copy
-from quodeq.config.provider import Provider
+from quodeq.config.provider import Provider, ProviderType
 from quodeq.shared.copilot import build_copilot_env
 
 _log = logging.getLogger(__name__)
@@ -38,6 +38,9 @@ _log = logging.getLogger(__name__)
 _SENSITIVE_ENV_KEYS = frozenset({
     "QUODEQ_API_KEY", "DATABASE_URL", "SECRET_KEY",
 })
+
+_MCP_SUBPACKAGE = "mcp"  # this module's mcp/ subpackage, holding findings_server.py
+_MCP_SUBCOMMAND = "mcp"  # the provider CLI's `<cmd> mcp add/remove` namespace
 
 
 def build_ai_cmd(
@@ -94,7 +97,7 @@ def _build_mcp_server_args(
     *skip_agent_id*: set True for cli-register MCP where all agents share
     one server — the per-agent file cap doesn't apply.
     """
-    mcp_script = str(Path(__file__).resolve().parent / "mcp" / "findings_server.py")
+    mcp_script = str(Path(__file__).resolve().parent / _MCP_SUBPACKAGE / "findings_server.py")
     mcp_args = [sys.executable, mcp_script, str(config.jsonl_file.resolve())]
     if config.compiled_dir and config.dimension:
         mcp_args.extend([
@@ -135,7 +138,7 @@ def _is_known_cli_provider(cmd: str) -> bool:
     program. Only ``type == "cli"`` providers reach this CLI-register path;
     API-type providers (ollama, omlx, custom, ...) never do.
     """
-    return _get_provider_configs().get(cmd, {}).get("type") == "cli"
+    return _get_provider_configs().get(cmd, {}).get("type") == ProviderType.CLI
 
 
 def register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = None) -> str | None:
@@ -160,7 +163,7 @@ def register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = N
         provider_cfg = _get_provider_configs().get(cmd, {})
         # Codex/Copilot use "-- cmd args", Gemini uses "cmd args" (no separator)
         use_separator = provider_cfg.get("mcp_add_separator", True)
-        register_cmd = [cmd_binary(cmd, config.ai_cmd_path), "mcp", "add", name]
+        register_cmd = [cmd_binary(cmd, config.ai_cmd_path), _MCP_SUBCOMMAND, "add", name]
         if use_separator:
             register_cmd.append("--")
         register_cmd.extend(mcp_args)
@@ -180,7 +183,7 @@ def _unregister_cli_mcp(cmd: str, name: str, ai_cmd_path: str | None = None) -> 
         return
     try:
         subprocess.run(
-            [cmd_binary(cmd, ai_cmd_path), "mcp", "remove", name],
+            [cmd_binary(cmd, ai_cmd_path), _MCP_SUBCOMMAND, "remove", name],
             check=False, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError) as exc:

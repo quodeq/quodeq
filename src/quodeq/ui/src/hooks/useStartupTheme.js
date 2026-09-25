@@ -9,6 +9,8 @@ import { useOneShotGate } from './useOneShotGate.js';
 import { useLinger } from './useLinger.js';
 import { PREFERS_DARK_QUERY, PYWEBVIEW_READY_EVENT } from '../constants.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
+import { THEME_MODE } from '../vocab/theme.js';
+import { NAV_TAB } from '../vocab/navTab.js';
 
 // How long the startup loader stays opaque after its data-hold releases,
 // covering the overview's final commit (lazy chart first render).
@@ -32,8 +34,8 @@ export function useEffectiveDark(themeMode) {
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
   }, []);
-  if (themeMode === 'dark') return true;
-  if (themeMode === 'light') return false;
+  if (themeMode === THEME_MODE.DARK) return true;
+  if (themeMode === THEME_MODE.LIGHT) return false;
   return prefersDark;
 }
 
@@ -62,7 +64,7 @@ export function useStartupTheme(settings) {
   const effectiveDark = useEffectiveDark(settings.themeMode);
   useNativeTitlebarSync(effectiveDark);
   const toggleTheme = () => {
-    settings.applyMode(effectiveDark ? 'light' : 'dark');
+    settings.applyMode(effectiveDark ? THEME_MODE.LIGHT : THEME_MODE.DARK);
   };
   return { effectiveDark, toggleTheme };
 }
@@ -86,7 +88,7 @@ export function shouldShowStartupLoader({
 }) {
   if (projectsLoadFailed) return false;
   if (!projectsLoaded) return true;
-  if (activeTab !== 'overview') return false;
+  if (activeTab !== NAV_TAB.OVERVIEW) return false;
   if ((projectsCount ?? 0) === 0 && selectedSource !== PROJECT_SOURCE.SHARED) return false;
   if (!selectedProject) return false;
   if (error) return false;

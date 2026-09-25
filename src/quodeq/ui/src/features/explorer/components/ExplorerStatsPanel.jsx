@@ -5,6 +5,7 @@ import StatGrid2x2 from './StatGrid2x2.jsx';
 import DimensionScoreHistoryPanel from './DimensionScoreHistoryPanel.jsx';
 import { t } from '../../../strings/index.js';
 import { SEVERITY_ORDER } from '../../../vocab/severity.js';
+import { HERO_CARD_KIND } from '../../dashboard/dashboardVocab.js';
 
 /** The score/violations/compliance/ratio stat grid + the run-history bar
  * chart — the left column of the dimension page's top grid. */
@@ -35,7 +36,7 @@ export default function ExplorerStatsPanel({
               ))}
             </span>
           ) : null}
-          onClick={onNavigate && allViolations.length > 0 ? () => onCardNavigate('violations') : undefined}
+          onClick={onNavigate && allViolations.length > 0 ? () => onCardNavigate(HERO_CARD_KIND.VIOLATIONS) : undefined}
           ariaLabel={allViolations.length > 0 ? t('overview.showAllViolationsAria') : undefined}
         />
         <Stat

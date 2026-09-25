@@ -6,6 +6,7 @@ import PackCircles from './PackCircles.jsx';
 import MapLegend from './MapLegend.jsx';
 import { t } from '../../../../strings/index.js';
 import { LABEL_GAP_PX } from './viewLabels.js';
+import { KEY } from '../../../../vocab/keyboard.js';
 
 const BASE_SIZE = 600;
 const PAD = 20;
@@ -253,7 +254,7 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
         style={{ width: '100%', height: '100%', overflow: 'hidden' }}
         tabIndex={0}
         onClick={handleBgClick}
-        onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); handleBgClick(); } }}
+        onKeyDown={(e) => { if (e.key === KEY.ESCAPE) { e.preventDefault(); handleBgClick(); } }}
         aria-label={t('map.zoomablePackAria')}
       >
         <defs>

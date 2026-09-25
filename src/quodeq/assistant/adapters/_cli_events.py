@@ -11,6 +11,7 @@ from typing import IO, Callable, NamedTuple
 from quodeq.assistant.adapters import _stream
 from quodeq.assistant.adapters._linereader import iter_lines
 from quodeq.assistant.frame_type import FrameType
+from quodeq.core.stream.events import EVENT_TYPE_RESULT
 
 _BENIGN_RAW_LINES = (
     "Reading additional input from stdin",
@@ -48,7 +49,7 @@ def _absorb_complete_message(event_texts: list[str], etype: str | None, state: _
     # content, not presence, so a differing echo still emits.
     joined = "".join(event_texts)
     is_echo = (joined == state.partial_buf
-               or (etype == "result" and joined == state.last_full))
+               or (etype == EVENT_TYPE_RESULT and joined == state.last_full))
     if not is_echo:
         for t in event_texts:
             state.emit({"type": FrameType.TOKEN, "text": t})
@@ -58,7 +59,7 @@ def _absorb_complete_message(event_texts: list[str], etype: str | None, state: _
 
 def _handle_stream_event(event: dict, state: _StreamState) -> None:
     etype = event.get("type")
-    if etype == "result" and "exitCode" not in event:
+    if etype == EVENT_TYPE_RESULT and "exitCode" not in event:
         state.saw_result = True
     err = _stream.error_message(event)
     if err:

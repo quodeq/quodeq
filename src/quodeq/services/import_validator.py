@@ -15,6 +15,9 @@ _MAX_NAME = 500
 _MAX_DESCRIPTION = 2000
 _MAX_REQ_TEXT = 2000
 
+_FIELD_NAME = "name"
+_FIELD_DESCRIPTION = "description"
+
 _INJECTION_PATTERNS = [
     re.compile(r"ignore\s+(all\s+|previous\s+)?(instructions|prompts)", re.IGNORECASE),
     re.compile(r"you\s+are\s+now", re.IGNORECASE),
@@ -61,7 +64,7 @@ def _whitelist_ref(ref: dict) -> dict:
 def _whitelist_requirement(req: dict) -> dict:
     cleaned = {k: req[k] for k in _ALLOWED_REQUIREMENT if k in req}
     _truncate_field(cleaned, "text", _MAX_REQ_TEXT)
-    _truncate_field(cleaned, "description", _MAX_DESCRIPTION)
+    _truncate_field(cleaned, _FIELD_DESCRIPTION, _MAX_DESCRIPTION)
     if "refs" in cleaned and isinstance(cleaned["refs"], list):
         cleaned["refs"] = [_whitelist_ref(r) for r in cleaned["refs"] if isinstance(r, dict)]
     return cleaned
@@ -69,8 +72,8 @@ def _whitelist_requirement(req: dict) -> dict:
 
 def _whitelist_principle(principle: dict) -> dict:
     cleaned = {k: principle[k] for k in _ALLOWED_PRINCIPLE if k in principle}
-    _truncate_field(cleaned, "name", _MAX_NAME)
-    _truncate_field(cleaned, "description", _MAX_DESCRIPTION)
+    _truncate_field(cleaned, _FIELD_NAME, _MAX_NAME)
+    _truncate_field(cleaned, _FIELD_DESCRIPTION, _MAX_DESCRIPTION)
     if "requirements" in cleaned and isinstance(cleaned["requirements"], list):
         cleaned["requirements"] = [
             _whitelist_requirement(r) for r in cleaned["requirements"] if isinstance(r, dict)
@@ -125,8 +128,8 @@ def _principle_errors(data: dict) -> list[str]:
 def _sanitized(data: dict) -> dict:
     """*data* reduced to the allowed keys, with every text field truncated."""
     cleaned = {k: data[k] for k in _ALLOWED_TOP if k in data}
-    _truncate_field(cleaned, "name", _MAX_NAME)
-    _truncate_field(cleaned, "description", _MAX_DESCRIPTION)
+    _truncate_field(cleaned, _FIELD_NAME, _MAX_NAME)
+    _truncate_field(cleaned, _FIELD_DESCRIPTION, _MAX_DESCRIPTION)
     if isinstance(cleaned.get("principles"), list):
         cleaned["principles"] = [
             _whitelist_principle(p) for p in cleaned["principles"] if isinstance(p, dict)
@@ -171,20 +174,20 @@ def scan_injection(data: dict) -> list[str]:
         for m in _match_patterns(text, _INJECTION_PATTERNS):
             warnings.append(f"Suspicious text in {location}: contains '{m.group()}'")
 
-    for field in ("name", "description", "source"):
+    for field in (_FIELD_NAME, _FIELD_DESCRIPTION, "source"):
         if isinstance(data.get(field), str):
             _check(data[field], f"standard {field}")
 
     for i, p in enumerate(data.get("principles", [])):
         if not isinstance(p, dict):
             continue
-        for field in ("name", "description"):
+        for field in (_FIELD_NAME, _FIELD_DESCRIPTION):
             if isinstance(p.get(field), str):
                 _check(p[field], f"principle '{p.get('name', i)}' {field}")
         for j, r in enumerate(p.get("requirements", [])):
             if not isinstance(r, dict):
                 continue
-            for field in ("text", "description"):
+            for field in ("text", _FIELD_DESCRIPTION):
                 if isinstance(r.get(field), str):
                     _check(r[field], f"principle '{p.get('name', i)}', requirement {j}")
 

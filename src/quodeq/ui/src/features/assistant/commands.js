@@ -4,14 +4,19 @@ import { t } from '../../strings/index.js';
 // META_COMMANDS mirrors RESERVED_COMMANDS in src/quodeq/assistant/skills.py
 // and doubles as the offline fallback when the catalog fetch fails.
 
+// The four built-in meta-command names, referenced by both the catalog
+// entries below and buildMetaResponse's dispatch (and, for CLEAR,
+// useAssistantComposer's local-only handling of parseMetaCommand's result).
+export const META_COMMAND_NAME = Object.freeze({ HELP: 'help', SKILLS: 'skills', ACTIONS: 'actions', CLEAR: 'clear' });
+
 export const META_COMMANDS = [
-  { name: 'help', description: t('assistant.cmdHelp') },
-  { name: 'skills', description: t('assistant.cmdSkills') },
+  { name: META_COMMAND_NAME.HELP, description: t('assistant.cmdHelp') },
+  { name: META_COMMAND_NAME.SKILLS, description: t('assistant.cmdSkills') },
   // Still answered locally if typed, but hidden from the welcome list,
   // /help, and autocomplete until the action registry gives it
   // more than one entry. The name stays reserved server-side.
-  { name: 'actions', description: t('assistant.cmdActions'), hidden: true },
-  { name: 'clear', description: t('assistant.cmdClear') },
+  { name: META_COMMAND_NAME.ACTIONS, description: t('assistant.cmdActions'), hidden: true },
+  { name: META_COMMAND_NAME.CLEAR, description: t('assistant.cmdClear') },
 ];
 
 export const VISIBLE_META_COMMANDS = META_COMMANDS.filter((c) => !c.hidden);
@@ -49,12 +54,12 @@ function commandLines(catalog, readOnly) {
 }
 
 export function buildMetaResponse(kind, catalog, { readOnly = false } = {}) {
-  if (kind === 'skills') {
+  if (kind === META_COMMAND_NAME.SKILLS) {
     const skills = (catalog?.skills ?? []).filter((s) => !readOnly || !s.requiresWrite);
     if (!skills.length) return t('assistant.noSkillPacks');
     return `**Skills**\n${skills.map((s) => `- \`/${s.name}${s.argumentHint ? ` ${s.argumentHint}` : ''}\` ${s.description}`).join('\n')}`;
   }
-  if (kind === 'actions') {
+  if (kind === META_COMMAND_NAME.ACTIONS) {
     const actions = catalog?.actions ?? [];
     if (!actions.length) return t('assistant.noDraftableActions');
     return `${t('assistant.actionsHeader')}\n${actions.map((a) => `- \`${a.type}\` ${a.description}`).join('\n')}`;

@@ -4,6 +4,7 @@
  */
 import { nameKey, parseScore10, trendDelta, mean } from './compareModel.js';
 import { roundScore1 } from './compareFormatters.js';
+import { CONSEQUENCE_LEVEL } from './compareFleet.js';
 
 // Score scale: every dimension/principle score is 0-10.
 const MAX_SCORE = 10;
@@ -27,6 +28,11 @@ const DROP_WEIGHT_FACTOR = 2;
 // average never wins the "weakest" comparison below.
 const AVG_SENTINEL_ABOVE_MAX = 11;
 
+// The two kinds of attention-strip item buildDimensionAttention emits: a
+// principle with an outlier project, or a standing that dropped hard.
+// CompareDimensionView.jsx's attention rendering branches on this.
+export const ATTENTION_KIND = Object.freeze({ OUTLIER: 'outlier', DROP: 'drop' });
+
 /**
  * Outliers inside ONE dimension, for its scoped needs-attention strip.
  * Two signals: a principle where one project sits far under the rest
@@ -48,9 +54,9 @@ export function buildDimensionAttention(view) {
     const gap = roundScore1(by[1].score - worst.score);
     if (gap < OUTLIER_GAP_THRESHOLD && worst.score >= OUTLIER_FLOOR_SCORE) continue;
     items.push({
-      kind: 'outlier',
+      kind: ATTENTION_KIND.OUTLIER,
       name: worst.name,
-      level: worst.score < OUTLIER_FLOOR_SCORE || gap >= OUTLIER_ELEVATED_GAP_THRESHOLD ? 'elevated' : 'watch',
+      level: worst.score < OUTLIER_FLOOR_SCORE || gap >= OUTLIER_ELEVATED_GAP_THRESHOLD ? CONSEQUENCE_LEVEL.ELEVATED : CONSEQUENCE_LEVEL.WATCH,
       principleLabel: p.label,
       score: worst.score,
       gap: gap >= OUTLIER_GAP_THRESHOLD ? gap : null,
@@ -61,9 +67,9 @@ export function buildDimensionAttention(view) {
   for (const s of view.standings) {
     if (s.delta == null || s.delta > DROP_DELTA_THRESHOLD) continue;
     items.push({
-      kind: 'drop',
+      kind: ATTENTION_KIND.DROP,
       name: s.row.name,
-      level: s.delta <= DROP_ELEVATED_DELTA_THRESHOLD ? 'elevated' : 'watch',
+      level: s.delta <= DROP_ELEVATED_DELTA_THRESHOLD ? CONSEQUENCE_LEVEL.ELEVATED : CONSEQUENCE_LEVEL.WATCH,
       delta: s.delta,
       row: s.row,
       weight: Math.abs(s.delta) * DROP_WEIGHT_FACTOR + (MAX_SCORE - (s.score ?? MAX_SCORE)),

@@ -17,10 +17,11 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from quodeq.core.run.state import RunState, parse_run_state
+from quodeq.shared.constants import EVIDENCE_DIRNAME, JSON_SUFFIX, MANIFEST_FILENAME
 
 _logger = logging.getLogger(__name__)
 
-_FINGERPRINT_DIRS = ("evaluation", "evidence")
+_FINGERPRINT_DIRS = ("evaluation", EVIDENCE_DIRNAME)
 # Files whose contents feed read_run_data for a single run. A completed run is
 # not immutable: dismissing a finding or applying a grade formula rewrites the
 # SQL grade tables that overlay_sql_grades reads back, so the fingerprint has
@@ -46,7 +47,7 @@ def count_eval_files(run_dir: Path, *, strict: bool = False) -> int | None:
     if not eval_dir.is_dir():
         return None
     try:
-        return sum(1 for p in eval_dir.iterdir() if p.suffix == ".json")
+        return sum(1 for p in eval_dir.iterdir() if p.suffix == JSON_SUFFIX)
     except OSError:
         if strict:
             raise
@@ -78,7 +79,7 @@ def read_run_manifest(run_dir: Path) -> dict | None:
     None when absent, corrupt, or not a JSON object -- mirrors
     ``project_files.read_repository_info``'s contract.
     """
-    manifest_path = run_dir / "evidence" / "manifest.json"
+    manifest_path = run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME
     try:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
@@ -104,7 +105,7 @@ def list_dimension_evidence(run_dir: Path) -> list[tuple[str, Path, int]] | None
     distinguish "run produced nothing at all" from "no evidence files". A
     file that vanishes between glob and stat reports size 0.
     """
-    evidence_dir = run_dir / "evidence"
+    evidence_dir = run_dir / EVIDENCE_DIRNAME
     if not evidence_dir.is_dir():
         return None
     out: list[tuple[str, Path, int]] = []
@@ -119,7 +120,7 @@ def list_dimension_evidence(run_dir: Path) -> list[tuple[str, Path, int]] | None
 
 def dimension_queue_file(run_dir: Path, dim_id: str) -> Path:
     """The dim's dispatch-queue path (``evidence/<dim>_queue.json``)."""
-    return run_dir / "evidence" / f"{dim_id}_queue.json"
+    return run_dir / EVIDENCE_DIRNAME / f"{dim_id}_queue.json"
 
 
 def queue_file_exists(run_dir: Path, dim_id: str) -> bool:
@@ -129,7 +130,7 @@ def queue_file_exists(run_dir: Path, dim_id: str) -> bool:
 
 def dimension_evidence_file(run_dir: Path, dim_id: str) -> Path:
     """The dim's raw evidence path (``evidence/<dim>_evidence.jsonl``)."""
-    return run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
+    return run_dir / EVIDENCE_DIRNAME / f"{dim_id}_evidence.jsonl"
 
 
 def evidence_file_size(path: Path) -> int:

@@ -23,6 +23,9 @@ from quodeq.services.wiring import (
     refresh_shared_clone,
 )
 
+_GIT_REMOTE_ORIGIN = "origin"
+_GIT_HEAD = "HEAD"
+
 
 def _run_git(args, *, cwd=None, timeout=300):
     from quodeq.services import shared_publish as _sp
@@ -88,7 +91,7 @@ def commit_staged_changes(repo: Path, project_id: str, count: int) -> None:
     ok_names, names_out = _run_git(["diff", "--cached", "--name-only"], cwd=repo)
     staged_names = [line.strip() for line in names_out.splitlines() if line.strip()]
     if ok_names and staged_names == [published_rel]:
-        _run_git(["checkout", "HEAD", "--", published_rel], cwd=repo)
+        _run_git(["checkout", _GIT_HEAD, "--", published_rel], cwd=repo)
 
     nothing_staged, _ = _run_git(["diff", "--cached", "--quiet"], cwd=repo)
     if not nothing_staged:
@@ -107,18 +110,18 @@ def _push(repo: Path) -> tuple[bool, str]:
     instead, deriving the target branch name from the remote's symref (or
     falling back to the local clone's current branch name).
     """
-    ok, out = _run_git(["push", "origin", "HEAD"], cwd=repo)
+    ok, out = _run_git(["push", _GIT_REMOTE_ORIGIN, _GIT_HEAD], cwd=repo)
     if ok:
         return ok, out
 
     # Fall back for a still-unborn remote default branch: push HEAD to an
     # explicit ref name rather than relying on origin/HEAD resolution.
     branch = _remote_default_branch(repo) or _local_branch_name(repo)
-    return _run_git(["push", "origin", f"HEAD:refs/heads/{branch}"], cwd=repo)
+    return _run_git(["push", _GIT_REMOTE_ORIGIN, f"HEAD:refs/heads/{branch}"], cwd=repo)
 
 
 def _remote_default_branch(repo: Path) -> str | None:
-    ok, out = _run_git(["ls-remote", "--symref", "origin", "HEAD"], cwd=repo)
+    ok, out = _run_git(["ls-remote", "--symref", _GIT_REMOTE_ORIGIN, _GIT_HEAD], cwd=repo)
     if not ok:
         return None
     for line in out.splitlines():
@@ -131,9 +134,9 @@ def _remote_default_branch(repo: Path) -> str | None:
 
 
 def _local_branch_name(repo: Path) -> str:
-    ok, out = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=repo)
+    ok, out = _run_git(["rev-parse", "--abbrev-ref", _GIT_HEAD], cwd=repo)
     name = out.strip()
-    return name if ok and name and name != "HEAD" else "main"
+    return name if ok and name and name != _GIT_HEAD else "main"
 
 
 def push_with_rebase_fallback(repo: Path) -> None:
@@ -143,7 +146,7 @@ def push_with_rebase_fallback(repo: Path) -> None:
 
     ok, out = _push(repo)
     if not ok:
-        ok_rebase, out_rebase = _run_git(["pull", "--rebase", "origin", "HEAD"], cwd=repo)
+        ok_rebase, out_rebase = _run_git(["pull", "--rebase", _GIT_REMOTE_ORIGIN, _GIT_HEAD], cwd=repo)
         if ok_rebase:
             ok, out = _push(repo)
         else:

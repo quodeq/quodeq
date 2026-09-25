@@ -3,6 +3,7 @@ import DimensionSparkline from '../../../components/DimensionSparkline.jsx';
 import { fallbackDelta } from '../../../utils/dimensionUtils.js';
 import { dimensionViolationCount } from '../../../models/index.js';
 import { t } from '../../../strings/index.js';
+import { KEY } from '../../../vocab/keyboard.js';
 
 function DimensionRow({ dim, onBarClick, delta, scores }) {
   const curr = parseFloat(dim.overallScore);
@@ -15,7 +16,7 @@ function DimensionRow({ dim, onBarClick, delta, scores }) {
       onClick={() => onBarClick?.(dim)}
       role={onBarClick ? 'button' : undefined}
       tabIndex={onBarClick ? 0 : undefined}
-      onKeyDown={onBarClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onBarClick(dim); } } : undefined}
+      onKeyDown={onBarClick ? (e) => { if (e.key === KEY.ENTER || e.key === ' ') { e.preventDefault(); onBarClick(dim); } } : undefined}
     >
       <span className="dim-score-label">{String(dim.dimension || '').toLowerCase()}</span>
       <span className="dim-score-spark">

@@ -8,6 +8,10 @@ const TYPE_CONFIG = {
 };
 const DEFAULT_TYPE_CONFIG = { labelKey: 'evaluate.stdIso', className: 'dimension-chip-type--builtin', order: 0 };
 
+// This component's own terminal-styled picker variant (ReEvaluateCard); the
+// default (no variant passed) is the chip grid. Not a shared UI concept.
+export const DIMENSION_SELECTOR_VARIANT_TERMINAL = 'terminal';
+
 function typeConfig(dim) { return TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG; }
 
 function typeInfo(dim) {
@@ -154,7 +158,7 @@ export default function DimensionSelector({ allDimensions, selectedDims, onToggl
 
   const shared = { sorted, selectedDims, onToggle, onSelectAll, onClearAll };
 
-  return variant === 'terminal'
+  return variant === DIMENSION_SELECTOR_VARIANT_TERMINAL
     ? <DimensionSelectorTerminal {...shared} dimMetas={dimMetas} metasLoading={metasLoading} />
     : <DimensionSelectorChips {...shared} />;
 }

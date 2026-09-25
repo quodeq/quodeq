@@ -37,6 +37,7 @@ from quodeq.assistant import LOCAL_PROVIDERS as _FIXED_ENDPOINT_PROVIDERS
 from quodeq.assistant import get_provider_configs
 from quodeq.assistant.orchestrator import TurnRequest, run_turn
 from quodeq.assistant.tools import ToolContext
+from quodeq.core.types.provider import ProviderType
 from quodeq.services.shared_repo import RepoFormat, read_state
 from quodeq.services.shared_settings import read_settings
 
@@ -47,7 +48,7 @@ def _api_provider(provider_id: str) -> dict | None:
     # of data/config/ai_providers.json) — not the {"providers": [...]} list
     # shape the original plan assumed.
     cfg = get_provider_configs().get(provider_id)
-    if cfg is None or cfg.get("type") != "api":
+    if cfg is None or cfg.get("type") != ProviderType.API:
         return None
     return cfg
 
@@ -88,7 +89,7 @@ def _turn_endpoint(provider: str, body: dict, provider_cfg: dict) -> tuple[str, 
     # override — the orchestrator's run_turn dispatches them internally
     # (spawning the CLI subprocess), so apiBase/apiKey are meaningless here and
     # left unset.
-    if catalog_cfg is not None and catalog_cfg.get("type") == "cli":
+    if catalog_cfg is not None and catalog_cfg.get("type") == ProviderType.CLI:
         return "", None
     if provider in _FIXED_ENDPOINT_PROVIDERS:
         return provider_cfg.get("api_base", ""), None

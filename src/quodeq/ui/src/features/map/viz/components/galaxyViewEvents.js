@@ -1,8 +1,10 @@
 import { rgb } from '../core/galaxyCore.js';
+import { GALAXY_VIEW_HOVER_TYPE } from '../core/galaxyHitTypes.js';
 import { pushSeverityRows, showTooltip } from './galaxyTooltipDom.js';
 import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { t } from '../../../../strings/index.js';
 import { SEVERITY } from '../../../../vocab/severity.js';
+import { KEY } from '../../../../vocab/keyboard.js';
 
 const CLUSTER_HIT_PADDING = 40; // world units of fat-finger slack around a constellation's spread
 
@@ -26,7 +28,7 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
   const row = (label, value, color) =>
     `<div style="display:flex;justify-content:space-between;gap:12px;color:${color || 'var(--color-text-muted)'}"><span>${escapeHtml(String(label))}</span><span style="color:${color || 'var(--color-text)'};font-weight:500">${escapeHtml(String(value))}</span></div>`;
   const rows = [row(t('map.score'), d.score.toFixed(1))];
-  if (hovered.type === 'dim') rows.push(row(t('map.principles'), d.principleCount));
+  if (hovered.type === GALAXY_VIEW_HOVER_TYPE.DIM) rows.push(row(t('map.principles'), d.principleCount));
   rows.push(row(t('map.violations'), d.violations));
   if (d.violations > 0) {
     // For dimensions: compute severity from raw violations; for principles: use stored counts
@@ -53,8 +55,8 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
 }
 
 function navigateIntoHovered(h, nav, navigateTo) {
-  if (nav.depth === 0 && h.type === 'dim') navigateTo(1, h.idx);
-  else if (nav.depth === 1 && h.type === 'prin') navigateTo(2, nav.dim, h.idx);
+  if (nav.depth === 0 && h.type === GALAXY_VIEW_HOVER_TYPE.DIM) navigateTo(1, h.idx);
+  else if (nav.depth === 1 && h.type === GALAXY_VIEW_HOVER_TYPE.PRIN) navigateTo(2, nav.dim, h.idx);
 }
 
 // The constellation whose hit circle contains the click, or null.
@@ -222,16 +224,16 @@ function makeHandleKeyDown({ animRef, move, activate, goUp }) {
   return (e) => {
     if (animRef.current) return; // mid-transition: let the camera settle first
     switch (e.key) {
-      case 'ArrowRight':
-      case 'ArrowDown':
+      case KEY.ARROW_RIGHT:
+      case KEY.ARROW_DOWN:
         e.preventDefault(); move(1); break;
-      case 'ArrowLeft':
-      case 'ArrowUp':
+      case KEY.ARROW_LEFT:
+      case KEY.ARROW_UP:
         e.preventDefault(); move(-1); break;
-      case 'Enter':
+      case KEY.ENTER:
       case ' ':
         e.preventDefault(); activate(); break;
-      case 'Escape':
+      case KEY.ESCAPE:
         if (goUp() !== false) e.preventDefault();
         break;
       default: break;

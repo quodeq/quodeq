@@ -1,4 +1,5 @@
 import { getThemeColors } from '../core/galaxyCore.js';
+import { HIT_TARGET_TYPE } from '../core/galaxyHitTypes.js';
 import { buildFolderScene } from './galaxyFolderScene.js';
 
 // A click on empty space near a star should read as "zoom in on that star",
@@ -11,7 +12,7 @@ const ZOOM_STEP_MULTIPLIER = 2.5;
 /** Click on a hovered star: focus a folder (or drop focus if already
  * focused), or zoom into a file. */
 export function handleNodeClick(refs, h, { startTransition, saveNav }) {
-  if (h.type === 'folder') {
+  if (h.type === HIT_TARGET_TYPE.FOLDER) {
     const s = h.data;
     const ff = refs.focusedFolderRef.current;
     if (ff && ff.starIdx === h.starIdx) {
@@ -25,7 +26,7 @@ export function handleNodeClick(refs, h, { startTransition, saveNav }) {
     }
     return;
   }
-  if (h.type === 'file') {
+  if (h.type === HIT_TARGET_TYPE.FILE) {
     const s = h.data;
     refs.focusedFolderRef.current = null;
     refs.zoomTargetRef.current = null;

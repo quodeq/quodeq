@@ -10,7 +10,14 @@ import json
 from enum import StrEnum
 from pathlib import Path
 
-from quodeq.data.fs.shared_repo_git import run_git, shared_cache_dir, shared_evaluations_root, shared_repo_path
+from quodeq.data.fs.shared_repo_git import (
+    EVALUATIONS_DIRNAME,
+    run_git,
+    shared_cache_dir,
+    shared_evaluations_root,
+    shared_repo_path,
+)
+from quodeq.shared.constants import GIT_DIR_NAME
 
 MARKER_FILENAME = "quodeq.json"
 FORMAT_NAME = "quodeq-shared-evaluations"
@@ -68,7 +75,7 @@ def check_repo_format(repo_root: Path) -> RepoFormat:
         return RepoFormat.OK
 
     try:
-        entries = [p for p in repo_root.iterdir() if p.name != ".git"]
+        entries = [p for p in repo_root.iterdir() if p.name != GIT_DIR_NAME]
     except OSError:
         return RepoFormat.FOREIGN
     return RepoFormat.EMPTY if not entries else RepoFormat.FOREIGN
@@ -82,7 +89,7 @@ def bootstrap_repo_layout(repo_root: Path) -> None:
     marker_content = json.dumps({"format": FORMAT_NAME, "version": FORMAT_VERSION}) + "\n"
     (repo_root / MARKER_FILENAME).write_text(marker_content, encoding="utf-8")
     (repo_root / ".gitignore").write_text(_GITIGNORE_CONTENT, encoding="utf-8")
-    evaluations = repo_root / "evaluations"
+    evaluations = repo_root / EVALUATIONS_DIRNAME
     evaluations.mkdir(exist_ok=True)
     (evaluations / ".gitkeep").write_text("", encoding="utf-8")
 
@@ -119,7 +126,7 @@ def read_state(url: str, env: dict | None = None) -> RepoFormat:
     unsupported_version | missing. "empty" (cloned, never published into)
     is servable -- routes return an empty listing for it."""
     repo = shared_repo_path(url, env)
-    if not (repo / ".git").exists():
+    if not (repo / GIT_DIR_NAME).exists():
         return RepoFormat.MISSING
     return check_repo_format(repo)
 
@@ -189,7 +196,7 @@ def _parse_attribution_log(out: str, wanted: set[str]) -> dict[str, dict]:
                 meta = None
             continue
         parts = token.lstrip("\n").split("/", 2)
-        if meta is None or len(parts) < 2 or parts[0] != "evaluations":  # noqa: PLR2004  # the "evaluations" and project segments
+        if meta is None or len(parts) < 2 or parts[0] != EVALUATIONS_DIRNAME:  # noqa: PLR2004  # the "evaluations" and project segments
             continue
         if parts[1] in wanted and parts[1] not in result:
             result[parts[1]] = meta

@@ -6,6 +6,8 @@ import logging
 import socket
 from functools import lru_cache
 
+from quodeq.shared.constants import LOCALHOST, LOCALHOST_LOCALDOMAIN
+
 _logger = logging.getLogger(__name__)
 
 _LRU_CACHE_SIZE = 256
@@ -14,7 +16,7 @@ _LRU_CACHE_SIZE = 256
 @lru_cache(maxsize=_LRU_CACHE_SIZE)
 def is_private_address(hostname: str) -> bool:
     """Return True if *hostname* resolves to a private/loopback/link-local address (cached)."""
-    if hostname in ("localhost", "localhost.localdomain"):
+    if hostname in (LOCALHOST, LOCALHOST_LOCALDOMAIN):
         return True
     try:
         addr = ipaddress.ip_address(hostname)
@@ -45,7 +47,7 @@ def is_private_address(hostname: str) -> bool:
 @lru_cache(maxsize=_LRU_CACHE_SIZE)
 def is_loopback_address(hostname: str) -> bool:
     """Return True if *hostname* is a loopback address (127.x.x.x or ::1) or 'localhost'."""
-    if hostname in ("localhost", "localhost.localdomain"):
+    if hostname in (LOCALHOST, LOCALHOST_LOCALDOMAIN):
         return True
     try:
         addr = ipaddress.ip_address(hostname)

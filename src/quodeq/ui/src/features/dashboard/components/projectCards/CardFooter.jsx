@@ -1,6 +1,6 @@
 import { DownloadGlyph, TrashGlyph } from '../../../../components/glyphs.jsx';
 import { t } from '../../../../strings/index.js';
-import { PUBLISH_STATE } from '../../dashboardVocab.js';
+import { PUBLISH_STATE, PROJECT_ACTION } from '../../dashboardVocab.js';
 
 const ACTION_ICON_SIZE = 13;
 
@@ -25,7 +25,7 @@ function PublishButton({ action, isThisPublishing, publishDisabled, onPublish, n
     >
       {isThisPublishing
         ? t('projects.publishing')
-        : action === 'publish' ? t('projects.actionPublish') : action === 'update' ? t('projects.actionUpdate') : action}
+        : action === PROJECT_ACTION.PUBLISH ? t('projects.actionPublish') : action === PROJECT_ACTION.UPDATE ? t('projects.actionUpdate') : action}
     </button>
   );
 }

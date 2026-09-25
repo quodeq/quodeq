@@ -15,6 +15,7 @@ from pathlib import Path
 
 from quodeq.core.run.exit_reason import ExitReason
 from quodeq.core.run.job_status import external_job_id
+from quodeq.shared.constants import EVIDENCE_DIRNAME, MANIFEST_FILENAME
 from quodeq.shared.process import is_pid_alive as _is_pid_alive
 from quodeq.shared.run_heartbeat import HEARTBEAT_FILENAME
 from quodeq.data.fs.run_status_store import (
@@ -118,7 +119,7 @@ def sync_legacy_run(
     """Synthesize a row from filesystem signals for a run with no status.json."""
     scan_path = run_dir / "scan.json"
     pid_path = run_dir / ".pid"
-    manifest_path = run_dir / "evidence" / "manifest.json"
+    manifest_path = run_dir / EVIDENCE_DIRNAME / MANIFEST_FILENAME
     if not manifest_path.exists():
         return  # not a real run
 

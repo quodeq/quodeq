@@ -2,6 +2,7 @@ import EmptyState from '../../../components/EmptyState.jsx';
 import HistorySkeleton from './HistorySkeleton.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import { t } from '../../../strings/index.js';
+import { NAV_TAB } from '../../../vocab/navTab.js';
 
 /**
  * HistoryPage.jsx's empty-state content pieces, extracted verbatim. The
@@ -24,7 +25,7 @@ export function NoProjectSelectedEmptyContent({ onNavigate }) {
       title={t('overview.noProjectSelectedTitle')}
       description={t('history.noProjectSelectedDesc')}
       actionLabel={t('overview.chooseProject')}
-      onAction={() => onNavigate?.('projects')}
+      onAction={() => onNavigate?.(NAV_TAB.PROJECTS)}
     />
   );
 }

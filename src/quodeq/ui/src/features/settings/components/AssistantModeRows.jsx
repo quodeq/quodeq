@@ -1,8 +1,9 @@
 import { t } from '../../../strings/index.js';
+import { ASSISTANT_MODE } from '../settingsVocab.js';
 
 const MODE_OPTIONS = [
-  { value: 'default', label: t('settings.modeDefault') },
-  { value: 'custom', label: t('settings.modeCustom') },
+  { value: ASSISTANT_MODE.DEFAULT, label: t('settings.modeDefault') },
+  { value: ASSISTANT_MODE.CUSTOM, label: t('settings.modeCustom') },
 ];
 
 /**
@@ -37,7 +38,7 @@ export function AssistantModeRows({ enabled, mode, setMode, active, activeProvid
       </div>
       )}
 
-      {enabled && mode === 'default' && (
+      {enabled && mode === ASSISTANT_MODE.DEFAULT && (
         <div className="settings-row settings-row--last">
           <span className="settings-description">
             {t('settings.followsAnalysis', {

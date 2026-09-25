@@ -12,6 +12,8 @@ from quodeq.shared.logging import log_info
 
 from quodeq.dashboard._build_hash import SYNC_ITEMS
 
+_UI_DIRNAME = "ui"  # bundled UI source directory name, both inside the package and in the repo
+
 
 def _npm_install_timeout_s(env: Mapping[str, str] | None = None) -> int:
     """Seconds allowed for ``npm ci``; ``QUODEQ_NPM_INSTALL_TIMEOUT_S`` overrides."""
@@ -46,7 +48,7 @@ def dev_build_workdir() -> Path:
 
 def get_ui_source_dir() -> Path:
     """Return the path to the UI source bundled inside the package."""
-    return Path(__file__).resolve().parent.parent / "ui"
+    return Path(__file__).resolve().parent.parent / _UI_DIRNAME
 
 
 def sync_source_to_workdir(source_dir: Path, workdir: Path) -> None:
@@ -106,11 +108,11 @@ def run_npm_build(
 def resolve_dev_source() -> Path:
     """Find the UI source directory for --dev mode (repo working copy)."""
     cwd = Path.cwd()
-    for candidate in (cwd / "ui" / "web", cwd / "src" / "quodeq" / "ui"):
+    for candidate in (cwd / _UI_DIRNAME / "web", cwd / "src" / "quodeq" / _UI_DIRNAME):
         if (candidate / "package.json").exists():
             return candidate
     for parent in cwd.parents:
-        candidate = parent / "ui" / "web"
+        candidate = parent / _UI_DIRNAME / "web"
         if (candidate / "package.json").exists():
             return candidate
     raise FileNotFoundError(
