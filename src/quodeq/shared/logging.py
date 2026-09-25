@@ -17,7 +17,6 @@ from quodeq.shared._log_format import (  # noqa: F401
     color,
     should_use_color,
     use_color,
-    USE_COLOR,
 )
 
 # Module-level logger configuration is intentional -- standard Python convention.

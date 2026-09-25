@@ -4,10 +4,6 @@ The webview's user-agent string lives in ``webview_user_agent`` and is
 re-exported here, where ``_webview_window`` and the drift tests have always
 imported it from.
 
-The About-panel install writes its progress to the webview diagnostic log
-(``_webview_diag``), which this module re-exports as ``diag`` for the help
-menu that writes to the same file.
-
 Leaf module for _webview_window.py — self-contained AppKit setup with no
 patch-tested cross-function co-location requirements (see
 tests/dashboard/test_native_chrome.py's TestMacAppIdentityIdempotent, which
@@ -19,7 +15,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from quodeq.dashboard._webview_diag import diag
+from quodeq.dashboard._webview_diag import diag_stream
 from quodeq.dashboard._webview_user_agent import (
     WEBVIEW_TOKEN_UA_PREFIX, WEBVIEW_UA_MARKER, quodeq_version,
     webview_user_agent,
@@ -32,7 +28,7 @@ __all__ = [
     "set_macos_app_identity",
     # Re-exported: _webview_window and the drift tests have always imported
     # these from here.
-    "WEBVIEW_TOKEN_UA_PREFIX", "WEBVIEW_UA_MARKER", "diag",
+    "WEBVIEW_TOKEN_UA_PREFIX", "WEBVIEW_UA_MARKER",
     "quodeq_version", "webview_user_agent",
     "MENU_POLL_INTERVAL_S", "MENU_POLL_MAX_ATTEMPTS",  # defined here, exported for _webview_window_help_menu's poller
 ]
@@ -178,21 +174,21 @@ def _schedule_about_install_poller(target: object) -> None:
             if main_menu is None or main_menu.numberOfItems() == 0:
                 if state["attempts"] >= max_attempts:
                     print(f"[quodeq-about] gave up after {state['attempts']} attempts — no main menu",
-                          file=diag, flush=True)
+                          file=diag_stream(), flush=True)
                     _stop_poll_timer(state)
                 return
             about_items = _find_about_items(main_menu)
             if not about_items:
                 if state["attempts"] >= max_attempts:
                     print(f"[quodeq-about] gave up — no About item found after {state['attempts']} attempts",
-                          file=diag, flush=True)
+                          file=diag_stream(), flush=True)
                     _stop_poll_timer(state)
                 return
             for item in about_items:
                 item.setTarget_(target)
                 item.setAction_("showAbout:")
             print(f"[quodeq-about] retargeted {len(about_items)} About item(s) on attempt {state['attempts']}",
-                  file=diag, flush=True)
+                  file=diag_stream(), flush=True)
             _stop_poll_timer(state)
 
     poller = _InstallPoller.alloc().init()
@@ -204,7 +200,7 @@ def _schedule_about_install_poller(target: object) -> None:
         )
         state["timer"] = timer
     except (AttributeError, ValueError) as exc:
-        print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=diag, flush=True)
+        print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=diag_stream(), flush=True)
 
 
 def install_about_panel_override() -> None:

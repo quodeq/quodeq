@@ -38,7 +38,7 @@ from quodeq.analysis._api_standards_text import (
     gather_source_files,  # noqa: F401 -- re-export
     load_standards_text,  # noqa: F401 -- re-export
     render_standards_grouped,  # noqa: F401 -- re-export
-    SKIP_DIRS,  # noqa: F401 -- re-export
+    skip_dirs,
 )
 from quodeq.analysis._command import (
     build_ai_cmd,
@@ -60,6 +60,17 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path, get_ai_model
 
 
 _log = logging.getLogger(__name__)
+
+
+_SKIP_DIRS_OLD_NAME = "SKIP_DIRS"  # eager `from x import SKIP_DIRS` would force
+# detection.json to load at import time (SKIP_DIRS lives lazily in _api_standards_text)
+
+
+def __getattr__(name: str):
+    if name == _SKIP_DIRS_OLD_NAME:
+        return skip_dirs()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 # Re-export public API so existing imports keep working
 __all__ = [

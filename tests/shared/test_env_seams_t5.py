@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -88,6 +89,40 @@ class TestShouldUseColor:
     def test_empty_injected_env_ignores_the_process(self, monkeypatch):
         monkeypatch.setenv("NO_COLOR", "1")
         assert should_use_color({}) is True
+
+
+class TestUseColorOldNameShim:
+    """USE_COLOR is now a __getattr__ shim (PEP 562) over use_color(),
+    decided at first use instead of at import.
+
+    USE_COLOR itself has no public re-export (logging.py dropped it -- see
+    the next test), so proving the shim matches the function needs a direct
+    import of the private _log_format module. Run in a subprocess instead
+    of importing it in this file directly, to avoid growing
+    tools/private_imports_tests_baseline.txt (shrink-only)."""
+
+    def test_use_color_old_name_matches_the_function(self):
+        # Compares against should_use_color() (the real decision), not
+        # use_color() -- USE_COLOR's shim calls use_color() internally, so
+        # comparing against use_color() would be tautological and could
+        # never fail even if the shim were wired wrong.
+        script = (
+            "from quodeq.shared._log_format import USE_COLOR, should_use_color\n"
+            "assert USE_COLOR == should_use_color(), (USE_COLOR, should_use_color())\n"
+            "print('OK')\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, text=True, check=False,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout
+
+    def test_shared_logging_no_longer_re_exports_use_color(self):
+        """logging.py's eager `from x import USE_COLOR` re-export would
+        defeat the lazy load; nothing imports it that way (see survey)."""
+        import quodeq.shared.logging as logging_mod
+
+        assert "USE_COLOR" not in vars(logging_mod)
 
 
 class TestApplyEnvLogLevel:
