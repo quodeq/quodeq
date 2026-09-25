@@ -77,6 +77,22 @@ export function filterTrendByVisibleStandards(trend, visibleSet) {
 }
 
 /**
+ * Narrow standalone run entries (the dashboard's partialRuns) to the visible
+ * dimensions. Unlike the trend these carry no accumulated score, so nothing
+ * is walked: each entry keeps its own recomputed run average and a null
+ * accumulated average.
+ *
+ * @param {Array} entries - Run entries in trend shape
+ * @param {Set<string>} visibleSet - Lowercase dimension IDs to include
+ * @returns {Array} Entries with at least one visible dimension, same order
+ */
+export function filterRunsByVisibleStandards(entries, visibleSet) {
+  return (entries || [])
+    .map((entry) => projectEntry(entry, visibleSet, null))
+    .filter((entry) => entry.dimensionDetails.length > 0);
+}
+
+/**
  * Filter trend and collapse to period entries (one per calendar day, week, or month).
  *
  * Walks the raw trend oldest-first to build accumulated averages,

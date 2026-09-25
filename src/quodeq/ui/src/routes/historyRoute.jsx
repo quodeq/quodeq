@@ -19,6 +19,7 @@ export function historyRoute(params, props) {
   return (
     <HistoryPage
       trend={trend}
+      partialRuns={props.dashboardData.dashboard?.partialRuns || []}
       selection={{
         selectedRunId: resolveHistorySelectedRunId(props.navigation.historySelectedRun, trend),
         selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,

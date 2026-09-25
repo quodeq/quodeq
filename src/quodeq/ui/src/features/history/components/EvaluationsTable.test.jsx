@@ -79,3 +79,18 @@ describe('EvaluationsTable in-progress row readiness', () => {
     expect(onRunClick).toHaveBeenCalledWith('run-1');
   });
 });
+
+describe('EvaluationsTable partial row', () => {
+  it('shows a cancelled run with its own grade and score, marked partial', () => {
+    const entry = {
+      runId: 'c1', status: 'cancelled', dateISO: '2026-05-02T10:00:00Z', dateLabel: '2 May 2026',
+      runNumericAverage: 6.5, runOverallGrade: 'Adequate', numericAverage: null,
+      dimensions: ['security'], dimensionsCount: 1,
+      dimensionDetails: [{ dimension: 'security', score: 6.5, grade: 'Adequate', delta: null }],
+    };
+    renderTable({ visible: [entry], deltas: [null], statusByRunId: new Map([['c1', 'cancelled']]) });
+
+    expect(screen.getByText('6.5')).toBeInTheDocument();
+    expect(screen.getByText('partial')).toBeInTheDocument();
+  });
+});
