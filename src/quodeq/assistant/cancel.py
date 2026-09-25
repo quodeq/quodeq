@@ -12,7 +12,7 @@ import logging
 import threading
 from typing import Callable
 
-import httpx
+from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
 
@@ -45,15 +45,17 @@ class CancelToken:
         return self._event.wait(timeout)
 
     def cancel(self) -> None:
-        """Set the flag and run every registered kill hook (once)."""
+        """Set the flag and run every registered kill hook (once).
+
+        Each hook is its own fault-isolation boundary: a kill hook is a
+        third-party/adapter callback (an httpx client's close(), a subprocess
+        kill), so a bug in one must not stop the rest from running.
+        """
         with self._lock:
             self._event.set()
             hooks, self._kill_hooks = self._kill_hooks, []
         for hook in hooks:
-            try:
-                hook()
-            except (OSError, httpx.HTTPError):
-                _logger.warning("kill hook failed", exc_info=True)
+            run_isolated(hook, label="cancel kill hook", log=_logger)
 
     def register_kill(self, hook: Callable[[], None]) -> None:
         """Run `hook` when cancelled; immediately if already cancelled (a stop
@@ -63,7 +65,11 @@ class CancelToken:
             if not self._event.is_set():
                 self._kill_hooks.append(hook)
                 return
-        try:
-            hook()
-        except (OSError, httpx.HTTPError):
-            _logger.warning("kill hook failed", exc_info=True)
+        _run_late_kill_hook(hook)
+
+
+def _run_late_kill_hook(hook: Callable[[], None]) -> None:
+    """register_kill's late-cancel path: the same fault-isolation boundary
+    cancel()'s loop gives every hook, for the one hook that runs immediately
+    because the token was already cancelled when it registered."""
+    run_isolated(hook, label="cancel kill hook", log=_logger)

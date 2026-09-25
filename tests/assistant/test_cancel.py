@@ -1,5 +1,5 @@
 """CancelToken / TurnCancelled: the stop-turn signalling primitives."""
-import pytest
+import logging
 
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 
@@ -28,10 +28,10 @@ def test_register_after_cancel_runs_hook_immediately():
 
 
 def test_register_after_cancel_swallows_a_realistic_kill_hook_failure():
-    """register_kill's immediate-call except was narrowed from bare
-    `Exception` to (OSError, httpx.HTTPError) (R-FT-7): the realistic surface
-    of its two production hooks (an httpx client's close(), a subprocess
-    kill that already never raises past OSError)."""
+    """register_kill's immediate-call path runs the hook inside the same
+    fault-isolation boundary cancel()'s loop uses (R-FT-7): a realistic
+    production failure (an httpx client's close(), a subprocess kill) must
+    not raise past register_kill."""
     token = CancelToken()
     token.cancel()
 
@@ -42,10 +42,8 @@ def test_register_after_cancel_swallows_a_realistic_kill_hook_failure():
 
 
 def test_hook_exception_does_not_block_other_hooks():
-    """cancel()'s per-hook except was narrowed from bare `Exception` to
-    (OSError, httpx.HTTPError) (R-FT-7), the same realistic surface as
-    register_kill's own narrowed except: a failing hook of that shape must
-    not stop later hooks from running."""
+    """Each kill hook runs inside its own fault-isolation boundary
+    (R-FT-7): a failing hook must not stop later hooks from running."""
     token = CancelToken()
     hits = []
 
@@ -59,23 +57,46 @@ def test_hook_exception_does_not_block_other_hooks():
     assert hits == ["second"]
 
 
-def test_hook_exception_outside_the_narrowed_tuple_propagates():
-    """A RuntimeError from a kill hook is not OSError/httpx.HTTPError, so it
-    is a real bug in the hook, not a best-effort kill failure: cancel() now
-    lets it escape instead of swallowing it, at the cost of any later hooks
-    in the same cancel() call not running."""
+def test_hook_exception_is_logged_and_the_next_hook_still_runs(caplog):
+    """A kill hook is a third-party/adapter callback, so cancel()'s
+    fault-isolation boundary covers ANY exception from it (not just
+    OSError/httpx.HTTPError): it must be logged with its traceback, and the
+    next hook in the same cancel() call must still run."""
     token = CancelToken()
     hits = []
 
     def boom():
-        raise RuntimeError("kill failed")
+        raise AttributeError("'NoneType' object has no attribute 'close'")
 
     token.register_kill(boom)
     token.register_kill(lambda: hits.append("second"))
-    with pytest.raises(RuntimeError):
+
+    with caplog.at_level(logging.WARNING, logger="quodeq.assistant.cancel"):
         token.cancel()
-    assert token.cancelled is True  # the flag is set before hooks run
-    assert hits == []  # the hook after the failing one never ran
+
+    assert token.cancelled is True
+    assert hits == ["second"]
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert warnings[0].exc_info is not None
+
+
+def test_late_cancel_hook_exception_is_logged_not_raised(caplog):
+    """The late-cancel path in register_kill (token already cancelled) gets
+    the same fault-isolation boundary as cancel()'s loop: an AttributeError
+    from the hook is logged with its traceback, not raised to the caller."""
+    token = CancelToken()
+    token.cancel()
+
+    def boom():
+        raise AttributeError("'NoneType' object has no attribute 'close'")
+
+    with caplog.at_level(logging.WARNING, logger="quodeq.assistant.cancel"):
+        token.register_kill(boom)  # must not raise past this point
+
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert warnings[0].exc_info is not None
 
 
 def test_cancel_is_idempotent_and_hooks_run_once():
