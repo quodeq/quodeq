@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
-from quodeq.core.types import JobSnapshot, ViolationSummary
+from quodeq.core.types import EvalPending, JobSnapshot, ViolationResponse, ViolationSummary
 from quodeq.shared.constants import (  # re-export for backward compat
     DEFAULT_MAX_SUBAGENTS,
     DEFAULT_TIME_LIMIT,
@@ -125,7 +125,9 @@ class ReportActions(Protocol):
         """Return accumulated dimension data across all runs up to as_of."""
         ...
 
-    def get_dimension_eval(self, reports_dir: str, project: str, run_id: str, dimension: str) -> dict:
+    def get_dimension_eval(
+        self, reports_dir: str, project: str, run_id: str, dimension: str,
+    ) -> ViolationResponse | dict | EvalPending | None:
         """Return parsed evaluation data for a single dimension in a run."""
         ...
 

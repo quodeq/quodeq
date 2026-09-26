@@ -76,6 +76,11 @@ def build_agent_config(
         # Propagate the RunConfig carrier so the API runner can wire a
         # synchronous cache writer into FindingsRouter.
         run_config=bc.run_config,
+        # Propagate the run's owners directly too, so a consumer that reads
+        # the AnalysisConfig field first (rather than through run_config)
+        # still resolves to the same run-shared instance.
+        drop_counter=bc.drop_counter,
+        mcp_registry=bc.mcp_registry,
     )
     return ac, jsonl_file, stream_file
 

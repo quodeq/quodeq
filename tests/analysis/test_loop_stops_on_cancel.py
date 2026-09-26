@@ -22,6 +22,9 @@ def _mk_config(tmp_path):
     config.options.deadline_at = None
     config.options.incremental_file_filter = None
     config.options.skip_scoring = True
+    # None falls back to the module-default drop counter (would otherwise
+    # be a MagicMock and break report_run_drop_stats's ratio formatting).
+    config.drop_counter = None
     return config
 
 

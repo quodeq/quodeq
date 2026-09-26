@@ -14,11 +14,6 @@ def grade_for_score(score: float) -> str:
     return score_to_grade_label(score)
 
 
-def confidence_label(level: str) -> str:
-    """Return a human-readable confidence label."""
-    return {"low": "Low", "medium": "Medium", "high": "High"}.get(level, level)
-
-
 def run_scoring(
     evidence: dict, mode: str, params: ScoringParams = DEFAULT_PARAMS,
 ) -> ScoringResult:

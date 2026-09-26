@@ -129,6 +129,19 @@ class TestBuildResolver:
         assert resolver.resolve("Authentication") == "Authentication"
         assert resolver.resolve("N/A") is None
 
+        # #10568 — evaluators_dir is injectable (defaults to
+        # default_paths().evaluators_dir, resolved at call time) and is
+        # authoritative over compiled_dir when it defines the dimension.
+        custom_evaluators = tmp_path / "custom-evaluators"
+        custom_evaluators.mkdir()
+        (custom_evaluators / "security.json").write_text(json.dumps({
+            "principles": [
+                {"name": "InjectedPrinciple", "requirements": [{"id": "REQ-9"}]},
+            ]
+        }))
+        injected = _build_resolver("security", compiled, evaluators_dir=custom_evaluators)
+        assert injected.resolve("REQ-9") == "InjectedPrinciple"
+
     def test_no_standard_stays_permissive(self, tmp_path):
         from quodeq.services._violations_jsonl import _build_resolver
         resolver = _build_resolver("security", tmp_path / "nonexistent")
@@ -162,6 +175,23 @@ class TestParseViolationsFromJsonl:
             assert result is not None
             assert result.dimension == "sec"
             assert len(result.violations) == 1
+
+        # #10568 — evaluators_dir flows from this public entry point into
+        # _build_resolver, instead of always reading default_paths().
+        custom_evaluators = tmp_path / "custom-evaluators"
+        custom_evaluators.mkdir()
+        (custom_evaluators / "sec").with_suffix(".json").write_text(json.dumps({
+            "principles": [
+                {"name": "InjectedPrinciple", "requirements": [{"id": "REQ-9"}]},
+            ]
+        }))
+        req_jsonl = tmp_path / "req-findings.jsonl"
+        req_jsonl.write_text(json.dumps({"req": "REQ-9", "t": "violation", "file": "a.py", "line": 1}) + "\n")
+        with patch("quodeq.services._violations_jsonl.build_req_refs_lookup", return_value=None):
+            injected = parse_violations_from_jsonl(req_jsonl, None, ctx, evaluators_dir=custom_evaluators)
+        assert injected is not None
+        assert len(injected.violations) == 1
+        assert injected.violations[0].practice_id == "InjectedPrinciple"
 
 
 # ---------------------------------------------------------------------------

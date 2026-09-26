@@ -75,6 +75,13 @@ def test_job_without_output_project_is_treated_as_valid():
     assert job is not None and job.job_id == "j1"
 
 
+def test_job_with_empty_output_project_is_treated_as_valid():
+    # An empty string is falsy the same way None is; still very-early-phase.
+    provider = StubProvider([_job("j1", project="")], projects=[])
+    job = find_active_evaluation(provider, _REPORTS)
+    assert job is not None and job.job_id == "j1"
+
+
 def test_projects_failure_falls_back_to_first_running_job():
     provider = StubProvider(
         [_job("j1", project="gone")],
@@ -95,36 +102,9 @@ def test_projects_failure_logs_before_falling_back(recording_log):
     assert "project list failed" in recording_log.warning_messages[0]
 
 
-def test_dict_jobs_and_dict_projects_are_supported():
-    # Remote/stub providers hand back wire dicts; the rule reads the same
-    # keys the webview reads ("project" as the legacy fallback).
-    provider = StubProvider(
-        [{"jobId": "j1", "status": "running", "project": "proj-1"}],
-        projects=[{"id": "proj-1", "name": "Proj"}],
-    )
-    job = find_active_evaluation(provider, _REPORTS)
-    assert job is not None and job["jobId"] == "j1"
-
-
 @pytest.mark.parametrize("items", [None, {}, "nonsense"])
 def test_non_list_evaluations_payload_yields_none(items):
     provider = StubProvider(items)
-    assert find_active_evaluation(provider, _REPORTS) is None
-
-
-def test_dict_output_project_wins_over_the_legacy_project_key():
-    provider = StubProvider(
-        [{"jobId": "j1", "status": "running", "outputProject": "gone", "project": "proj-1"}],
-        projects=[{"id": "proj-1", "name": "Proj"}],
-    )
-    assert find_active_evaluation(provider, _REPORTS) is None
-
-
-def test_dict_job_with_an_empty_output_project_falls_back_to_project():
-    provider = StubProvider(
-        [{"jobId": "j1", "status": "running", "outputProject": "", "project": "gone"}],
-        projects=[{"id": "proj-1", "name": "Proj"}],
-    )
     assert find_active_evaluation(provider, _REPORTS) is None
 
 

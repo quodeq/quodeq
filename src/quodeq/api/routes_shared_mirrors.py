@@ -26,7 +26,8 @@ from typing import Callable
 from flask import Flask, Response, current_app, jsonify, request
 
 from quodeq.api._constants import CODE_INTERNAL_ERROR, CODE_NOT_FOUND, QUERY_FLAG_TRUE_NUMERIC
-from quodeq.api.helpers import dimension_eval_response, json_error, validate_segment
+from quodeq.api.dimension_eval_wire import dimension_eval_response
+from quodeq.api.helpers import json_error, validate_segment
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
 from quodeq.services import fs_reports, fs_projects
 from quodeq.services.compare import build_compare_summary

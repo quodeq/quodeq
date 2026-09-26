@@ -102,19 +102,6 @@ def validate_segment(*segments: str, message: str = "Invalid parameter") -> tupl
     return None
 
 
-def dimension_eval_response(payload: dict[str, Any] | None) -> Response | tuple[Response, int]:
-    """The response for one dimension's evaluation, local or shared.
-
-    404 when there is no evaluation file, 202 while the dimension is still
-    being written (``waiting``) so the UI keeps polling, else the payload.
-    """
-    if payload is None:
-        return json_error("Eval file not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-    if payload.get("waiting"):
-        return jsonify(payload), HTTPStatus.ACCEPTED
-    return jsonify(payload)
-
-
 def path_from_body(data: dict[str, Any]) -> str | tuple[dict[str, Any], int]:
     """Return the request body's stripped ``path``, or a 400 error tuple.
 
@@ -292,3 +279,13 @@ def register_static_routes(app: Flask, static_dist: str | None) -> None:
         if path.startswith('api/'):
             return json_error("Not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
         return send_from_directory(str(dist), 'index.html')
+
+
+def dimension_eval_response(payload: Any) -> Response | tuple[Response, int]:
+    """Old path for the wire shaping now in ``api.dimension_eval_wire``.
+
+    Deferred import: ``dimension_eval_wire`` imports ``json_error`` from
+    this module, so importing it back at module level here would cycle.
+    """
+    from quodeq.api.dimension_eval_wire import dimension_eval_response as _impl  # noqa: PLC0415
+    return _impl(payload)

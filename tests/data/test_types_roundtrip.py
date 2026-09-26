@@ -10,7 +10,6 @@ from quodeq.data.mappers import (
     parse_parsed_report,
     parse_plugin_info,
     parse_project_entry,
-    parse_trend_point,
     parse_violation_response,
     parse_violation_summary,
 )
@@ -24,7 +23,6 @@ from tests.data.test_types import (
     PARSED_REPORT,
     PLUGIN_INFO,
     PROJECT_ENTRY,
-    TREND_POINT,
     VIOLATION_RESPONSE,
     VIOLATION_SUMMARY,
 )
@@ -75,8 +73,3 @@ class TestRoundTrip:
         raw = to_camel_dict(VIOLATION_SUMMARY)
         assert isinstance(raw, dict)
         assert parse_violation_summary(raw) == VIOLATION_SUMMARY
-
-    def test_trend_point(self) -> None:
-        raw = to_camel_dict(TREND_POINT)
-        assert isinstance(raw, dict)
-        assert parse_trend_point(raw) == TREND_POINT

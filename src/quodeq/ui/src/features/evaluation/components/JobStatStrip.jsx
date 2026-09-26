@@ -5,7 +5,7 @@ import {
   buildJobStatCells, computeRate, buildEtaHint,
   buildDimensionCycle, sumSeverities, deriveScanMode,
 } from './buildJobStatCells.js';
-import { recordRateSample, getRateSamples, forgetJob } from './rateSampleStore.js';
+import { defaultRateSampleStore } from './rateSampleStore.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useRunElapsed } from '../hooks/useRunElapsed.js';
 import { JOB_TERMINAL } from '../../../vocab/jobStatus.js';
@@ -30,11 +30,11 @@ function sumSuppressed(progress) {
 // Current throughput from the persisted sliding window (null → "estimating…"
 // until ~30s of samples accumulate). No whole-run average: it over-reads
 // because the parallel start burst-completes cached files cheaply.
-function computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal, elapsedS, hiddenCarriedCount }) {
+function computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal, elapsedS, hiddenCarriedCount, rateStore }) {
   if (!jobId) return [];
   const { takenFiles, totalFiles, overallPct } = computeOverallProgress(progress);
   const liveCount = sumLiveViolations(liveViolations);
-  const rate = isTerminal ? null : computeRate(getRateSamples(jobId));
+  const rate = isTerminal ? null : computeRate(rateStore.getRateSamples(jobId));
   const etaHint = isTerminal ? null : buildEtaHint({ rate, takenFiles, totalFiles });
   const suppressedCount = sumSuppressed(progress);
   return buildJobStatCells(job.status, {
@@ -47,7 +47,7 @@ function computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal,
   });
 }
 
-export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount = 0 }) {
+export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount = 0, rateStore = defaultRateSampleStore }) {
   const jobId = job?.jobId;
   const isTerminal = JOB_TERMINAL.has(job?.status);
 
@@ -56,29 +56,32 @@ export default function JobStatStrip({ job, liveViolations, hiddenCarriedCount =
   // the ELAPSED tile and the footer clock always agree.
   const elapsedS = useRunElapsed(job, progress, dataUpdatedAt);
 
-  // Throughput samples live in a module-level store (rateSampleStore.js) keyed
-  // by jobId, so the sliding-window rate SURVIVES navigating out of and back
-  // into a running job — re-entry shows the current rate immediately instead of
-  // re-measuring from "estimating…". One sample per completed poll (keyed on
-  // dataUpdatedAt, which advances every poll even when the data is identical, so
-  // a stall registers as flat samples and reads as "estimating…").
+  // Throughput samples live in rateStore (rateSampleStore.js), keyed by jobId,
+  // so the sliding-window rate SURVIVES navigating out of and back into a
+  // running job — re-entry shows the current rate immediately instead of
+  // re-measuring from "estimating…". Defaults to the module-lived
+  // defaultRateSampleStore so that survival holds in production; a test can
+  // inject its own store for isolation. One sample per completed poll (keyed
+  // on dataUpdatedAt, which advances every poll even when the data is
+  // identical, so a stall registers as flat samples and reads as
+  // "estimating…").
   useEffect(() => {
     if (!progress || isTerminal) return;
     const { takenFiles, totalFiles } = computeOverallProgress(progress);
     if (!(totalFiles > 0)) return;
-    recordRateSample(jobId, Date.now(), takenFiles);
-  }, [dataUpdatedAt, isTerminal, progress, jobId]);
+    rateStore.recordRateSample(jobId, Date.now(), takenFiles);
+  }, [dataUpdatedAt, isTerminal, progress, jobId, rateStore]);
 
   // A terminal job neither records nor reads a rate again, so drop its
   // samples; otherwise every job viewed in a session stays in the store.
   useEffect(() => {
-    if (isTerminal && jobId) forgetJob(jobId);
-  }, [isTerminal, jobId]);
+    if (isTerminal && jobId) rateStore.forgetJob(jobId);
+  }, [isTerminal, jobId, rateStore]);
 
   const cells = useMemo(
-    () => computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal, elapsedS, hiddenCarriedCount }),
+    () => computeJobStatCells({ jobId, job, progress, liveViolations, isTerminal, elapsedS, hiddenCarriedCount, rateStore }),
     // `elapsedS` advances once per second via useRunElapsed; the sample store is read (not a dep).
-    [jobId, job?.status, job?.exitReason, isTerminal, progress, liveViolations, hiddenCarriedCount, elapsedS],
+    [jobId, job?.status, job?.exitReason, isTerminal, progress, liveViolations, hiddenCarriedCount, elapsedS, rateStore],
   );
 
   if (!jobId) return null;

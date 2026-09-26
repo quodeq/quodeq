@@ -1,6 +1,7 @@
 """Color detection, ANSI formatter, and stderr handler for logging."""
 from __future__ import annotations
 
+import functools
 import logging
 import sys
 from collections.abc import Mapping
@@ -23,17 +24,24 @@ def should_use_color(env: Mapping[str, str] | None = None) -> bool:
     return not environ.get("NO_COLOR") and environ.get("TERM") != _TERM_DUMB
 
 
-USE_COLOR: bool = should_use_color()
-
-
+@functools.cache
 def use_color() -> bool:
-    """Return whether color output is enabled (cached at import time)."""
-    return USE_COLOR
+    """Return whether color output is enabled (decided once, at first use)."""
+    return should_use_color()
 
 
 def color(code: str) -> str:
     """Return the ANSI *code* if color is enabled, else empty string."""
-    return code if USE_COLOR else ""
+    return code if use_color() else ""
+
+
+_USE_COLOR_OLD_NAME = "USE_COLOR"  # __getattr__ shim for the old module-level constant
+
+
+def __getattr__(name: str):
+    if name == _USE_COLOR_OLD_NAME:
+        return use_color()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 _ANSI_GREY = "\033[0;90m"

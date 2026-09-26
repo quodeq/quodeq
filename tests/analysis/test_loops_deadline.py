@@ -13,6 +13,9 @@ def _mk_config(deadline_at):
     # walk the MagicMock Evidence and raise EvaluationError.
     config.options.skip_scoring = True
     config.source_file_count = 10
+    # None falls back to the module-default drop counter (would otherwise
+    # be a MagicMock and break report_run_drop_stats's ratio formatting).
+    config.drop_counter = None
     return config
 
 

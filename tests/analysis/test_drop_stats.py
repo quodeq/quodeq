@@ -15,9 +15,16 @@ marker is emitted by the caller (``_loops.py``), not here -- see
 """
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from quodeq.analysis import _drop_stats
+from quodeq.analysis.run_types import RunConfig
+# subprocess.py's public __all__ re-exports AnalysisConfig; reusing that
+# keeps this file off the private-imports ratchet instead of importing
+# straight from _config.
+from quodeq.analysis.subprocess import AnalysisConfig
 from tests.conftest import RecordingLog
 
 
@@ -107,3 +114,52 @@ class TestReport:
         _drop_stats.record(dropped=1, kept=1)
         _drop_stats.report_run_drop_stats()
         assert _drop_stats.consume().parsed == 0
+
+
+class TestRunScopedDropCounter:
+    """``RunConfig.drop_counter`` is the per-run owner (issue #606 PR3):
+    a field, not a module global, so it's shared exactly where the old
+    module-default was shared (one run, all its pool worker threads) and
+    isolated exactly where it wasn't (two runs in one process)."""
+
+    def test_two_analysis_configs_on_one_run_share_the_counter(self, tmp_path):
+        run_config = RunConfig(src=tmp_path, language="python")
+        cfg_a = AnalysisConfig(run_config=run_config)
+        cfg_b = AnalysisConfig(run_config=run_config)
+
+        cfg_a.run_config.drop_counter.record(dropped=1, kept=9)
+        cfg_b.run_config.drop_counter.record(dropped=2, kept=8)
+
+        stats = run_config.drop_counter.consume()
+        assert stats.dropped == 3
+        assert stats.kept == 17
+
+    def test_two_run_configs_have_isolated_counters(self, tmp_path):
+        a = RunConfig(src=tmp_path, language="python")
+        b = RunConfig(src=tmp_path, language="python")
+
+        a.drop_counter.record(dropped=5, kept=5)
+
+        assert b.drop_counter.consume().parsed == 0
+        assert a.drop_counter.consume().parsed == 10
+
+    def test_dataclasses_replace_copy_shares_the_same_counter(self, tmp_path):
+        """Pool worker threads run off a ``dataclasses.replace()`` copy of
+        the dimension's RunConfig (see ``_loop_steps._prepare_miss_dispatch``,
+        ``cache.dimension_runner``); the copy must keep recording onto the
+        SAME accumulator, not a fresh one."""
+        run_config = RunConfig(src=tmp_path, language="python")
+        copy = dataclasses.replace(run_config, work_dir=tmp_path)
+        assert copy.drop_counter is run_config.drop_counter
+
+    def test_equality_and_repr_ignore_the_owner_fields(self, tmp_path):
+        """M1: drop_counter/mcp_registry are excluded from __eq__ and
+        __repr__ (compare=False, repr=False), so two otherwise-identical
+        RunConfigs still compare equal and repr() never tries to print a
+        DropStatsCounter/CliMcpRegistry object address."""
+        a = RunConfig(src=tmp_path, language="python")
+        b = RunConfig(src=tmp_path, language="python")
+        assert a.drop_counter is not b.drop_counter  # isolated owners, as before
+        assert a == b  # ...but equality is unaffected, as before PR 3
+        assert "DropStatsCounter" not in repr(a)
+        assert "CliMcpRegistry" not in repr(a)

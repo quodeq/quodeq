@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+from quodeq.api import _run_event_stream as _run_event_stream_mod
 from quodeq.api._run_event_stream import (
     WatcherState,
     payload_as_sse_finding,
@@ -152,26 +153,92 @@ def test_watcher_state_with_emitted_dimensions():
 
 
 # ---------------------------------------------------------------------------
-# REL-023 -- a malformed QUODEQ_SSE_HEARTBEAT_S must not raise at module
-# import (that would prevent the API process from starting); it falls back
-# to the 15s default. Out-of-range values fall back too.
+# REL-023 -- a malformed QUODEQ_SSE_HEARTBEAT_S must not raise (that would
+# prevent the API process from starting); it falls back to the 15s default.
+# Out-of-range values fall back too. _heartbeat_s reads this per call (once
+# per stream), not once at module import.
 # ---------------------------------------------------------------------------
 
-def test_heartbeat_env_fallback_never_breaks_import(monkeypatch):
-    import importlib
+def test_heartbeat_env_fallback_never_raises():
+    mod = _run_event_stream_mod
 
-    from quodeq.api import _run_event_stream as mod
+    assert mod._heartbeat_s({"QUODEQ_SSE_HEARTBEAT_S": "not-a-number"}) == 15.0
+    assert mod._heartbeat_s({"QUODEQ_SSE_HEARTBEAT_S": "-3"}) == 15.0
+    assert mod._heartbeat_s({"QUODEQ_SSE_HEARTBEAT_S": "2.5"}) == 2.5
+    assert mod._heartbeat_s({}) == 15.0
 
-    try:
-        monkeypatch.setenv("QUODEQ_SSE_HEARTBEAT_S", "not-a-number")
-        assert importlib.reload(mod)._HEARTBEAT_S == 15.0
 
-        monkeypatch.setenv("QUODEQ_SSE_HEARTBEAT_S", "-3")
-        assert importlib.reload(mod)._HEARTBEAT_S == 15.0
+# M5 -- a malformed QUODEQ_SSE_HEARTBEAT_S used to warn once at import (the
+# old module constant). Now that it's read per stream, the warning must
+# still fire only once per process for a given bad value, not once per
+# stream -- see _heartbeat_s.
 
-        monkeypatch.setenv("QUODEQ_SSE_HEARTBEAT_S", "2.5")
-        assert importlib.reload(mod)._HEARTBEAT_S == 2.5
-    finally:
-        # Restore the module to its env-clean state for other tests.
-        monkeypatch.delenv("QUODEQ_SSE_HEARTBEAT_S", raising=False)
-        importlib.reload(mod)
+def test_heartbeat_malformed_value_warns_once_across_two_streams(monkeypatch):
+    """Two streams reading the SAME bad value must produce exactly one
+    warning, matching the once-at-import behavior before this value moved
+    to being read per stream."""
+    import logging as _logging
+
+    mod = _run_event_stream_mod
+    monkeypatch.setattr(mod, "_last_warned_heartbeat_raw", None)
+    calls: list[tuple] = []
+    monkeypatch.setattr(_logging.getLogger("quodeq.shared.env"), "warning", lambda *a: calls.append(a))
+
+    assert mod._heartbeat_s({"QUODEQ_SSE_HEARTBEAT_S": "not-a-number"}) == 15.0
+    assert mod._heartbeat_s({"QUODEQ_SSE_HEARTBEAT_S": "not-a-number"}) == 15.0
+
+    assert len(calls) == 1
+
+
+def test_heartbeat_a_different_malformed_value_warns_again(monkeypatch):
+    """A NEW bad value (not the last one warned) must still warn -- this
+    dedupes repeats of the same value, it isn't a blanket silence."""
+    import logging as _logging
+
+    mod = _run_event_stream_mod
+    monkeypatch.setattr(mod, "_last_warned_heartbeat_raw", "not-a-number")
+    calls: list[tuple] = []
+    monkeypatch.setattr(_logging.getLogger("quodeq.shared.env"), "warning", lambda *a: calls.append(a))
+
+    assert mod._heartbeat_s({"QUODEQ_SSE_HEARTBEAT_S": "still-not-a-number"}) == 15.0
+
+    assert len(calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# A QUODEQ_SSE_HEARTBEAT_S override set via monkeypatch.setenv must reach a
+# *new* stream through the entry point (run_events_generator), with no
+# heartbeat_seconds override passed explicitly -- proving it's read per
+# stream, not frozen at import. time.monotonic is faked so the test doesn't
+# depend on real wall-clock timing: the one status frame's last_emit_at and
+# the heartbeat check are 5s apart, which clears a 2.5s override but not the
+# 15s default.
+# ---------------------------------------------------------------------------
+
+def _fake_clock(values):
+    """A monotonic-like callable that returns *values* in order, then
+    repeats the last one -- avoids StopIteration if something else in the
+    process calls time.monotonic() during the test."""
+    values = list(values)
+    box = {"i": 0}
+
+    def _clock() -> float:
+        i = min(box["i"], len(values) - 1)
+        box["i"] += 1
+        return values[i]
+
+    return _clock
+
+
+def test_heartbeat_env_override_applies_to_a_new_stream(tmp_path, monkeypatch):
+    rgen = _run_event_stream_mod
+
+    monkeypatch.delenv("QUODEQ_SSE_HEARTBEAT_S", raising=False)
+    monkeypatch.setattr(rgen.time, "monotonic", _fake_clock([0.0, 0.0, 5.0]))
+    default_frames = list(rgen.run_events_generator(tmp_path, tick_seconds=0.0))
+    assert default_frames.count(":keepalive\n\n") == 1  # 5s < 15s default -- no extra beat
+
+    monkeypatch.setenv("QUODEQ_SSE_HEARTBEAT_S", "2.5")
+    monkeypatch.setattr(rgen.time, "monotonic", _fake_clock([0.0, 0.0, 5.0, 5.0]))
+    overridden_frames = list(rgen.run_events_generator(tmp_path, tick_seconds=0.0))
+    assert overridden_frames.count(":keepalive\n\n") == 2  # 5s >= 2.5s override -- extra beat

@@ -229,7 +229,6 @@ from quodeq.data.fs.dimensions_state_store import (  # noqa: F401
 # SQL grade tables + findings projection.
 from quodeq.data.sqlite.state_store import SQLiteStateStore  # noqa: F401
 from quodeq.data.sqlite.findings_repository import SqliteFindingsRepository  # noqa: F401
-
 # Score-cache store (connection + row-level reads/writes).
 from quodeq.data.sqlite.score_cache_db import (  # noqa: F401
     CACHE_WRITER_EPOCH,
@@ -257,6 +256,7 @@ from quodeq.data.fs.evidence_tally import (  # noqa: F401
     IncrementalTally,
     tally_unique_findings,
 )
+from quodeq.services._process_owners import DEFAULT_LIVE_TALLY_MEMO, DEFAULT_SINGLE_FLIGHT, DEFAULT_WALK_CACHE, LiveTallyMemo, SingleFlight, WalkCache  # noqa: F401
 
 # Local git repo statistics.
 from quodeq.data.fs.git_stats import count_commits_since, last_fetched_mtime  # noqa: F401

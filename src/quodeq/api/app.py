@@ -20,6 +20,7 @@ from quodeq.api.routes_registry import register_all_routes
 from quodeq.api.security import configure_security
 from quodeq.config.paths import default_paths
 from quodeq.services.base import ActionProvider
+from quodeq.services.scored_jobs_registry import ScoringClaims
 from quodeq.shared.constants import ENV_TRUTHY
 from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
@@ -98,8 +99,7 @@ def _configure_upload_limits(app: Flask) -> None:
 
 
 def _configure_extensions(app: Flask) -> None:
-    """Set up per-app extensions: assistant turn/SSE registry, background
-    task runner, grade-formula rescorer, and the CWE lookup cache."""
+    """Set up per-app extensions: caches, background runner, scoring claims."""
     # Per-app assistant turn/SSE registry (composition root for the state the
     # assistant routes used to keep in module globals).
     from quodeq.api.assistant_routes import AssistantTurnState
@@ -122,6 +122,7 @@ def _configure_extensions(app: Flask) -> None:
 
     from quodeq.api.standards_read_routes import CweCache
     app.extensions["cwe_cache"] = CweCache()
+    app.extensions["scoring_claims"] = ScoringClaims()
 
 
 def _configure_paths_and_cleanup(app: Flask, env: dict[str, str] | None = None) -> None:

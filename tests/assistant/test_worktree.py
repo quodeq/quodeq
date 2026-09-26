@@ -1,7 +1,7 @@
 import pytest
 
 from quodeq.assistant.worktree import (
-    WorktreeError, WorktreeManager, run_git, diff_stats, diff_text)
+    PrResultReason, WorktreeError, WorktreeManager, run_git, diff_stats, diff_text)
 from quodeq.assistant.worktree import ensure_session_worktree, gc_stale_worktrees
 from quodeq.data.ports.assistant import SessionScope
 from quodeq.data.sqlite.assistant_repository import AssistantRepository
@@ -167,15 +167,15 @@ def test_create_pr_fail_soft_without_gh(manager, monkeypatch):
     monkeypatch.setattr("quodeq.assistant.worktree.shutil.which", lambda _: None)
     # no origin remote in the fixture repo: push fails first, branch is kept
     result = manager.create_pr("t", "b")
-    assert result["prUrl"] is None
-    assert result["branch"] == manager.branch
-    assert "push failed" in result["message"].lower()
+    assert result.pr_url is None
+    assert result.branch == manager.branch
+    assert result.reason is PrResultReason.PUSH_FAILED
 
 
 def test_create_pr_push_failure_restores_worktree_changes(manager, repo):
     (manager.path / "app.py").write_bytes(b"print('bye')\n")
     result = manager.create_pr("t", "b")           # fixture repo has no origin -> push fails
-    assert result["pushed"] is False
+    assert result.pushed is False
     # changes are back in the working tree (not stranded in a commit)
     assert "print('bye')" in diff_text(manager.path)
     stats = manager.apply_to_repo()                 # in-app apply works again

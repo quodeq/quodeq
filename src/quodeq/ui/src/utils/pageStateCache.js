@@ -26,17 +26,6 @@ export const MAX_SCOPES_PER_NAMESPACE = 50;
 
 const GLOBAL_SCOPE_KEY = '__global__'; // key used when no scope (project id) is given
 
-const STORES = new Map(); // namespace -> Map<scope, state object>, oldest first
-
-function storeFor(namespace) {
-  let s = STORES.get(namespace);
-  if (!s) {
-    s = new Map();
-    STORES.set(namespace, s);
-  }
-  return s;
-}
-
 // Map iteration is insertion-ordered, so re-inserting on every touch keeps
 // the least recently used scope at the front for eviction.
 function touch(store, key, value) {
@@ -45,46 +34,102 @@ function touch(store, key, value) {
 }
 
 /**
+ * Build an independent page-state cache: its own namespace -> scope map,
+ * closing over its own eviction cap. `maxScopes` decouples the cap from
+ * MAX_SCOPES_PER_NAMESPACE for tests; production code shares one default
+ * instance (see `defaultPageStateCache` below).
+ */
+export function createPageStateCache({ maxScopes = MAX_SCOPES_PER_NAMESPACE } = {}) {
+  const STORES = new Map(); // namespace -> Map<scope, state object>, oldest first
+
+  function storeFor(namespace) {
+    let s = STORES.get(namespace);
+    if (!s) {
+      s = new Map();
+      STORES.set(namespace, s);
+    }
+    return s;
+  }
+
+  // The scope's surviving state merged over `defaults`, and a copy of
+  // `defaults` alone when the scope has nothing cached. Reading also marks
+  // the scope as recently used.
+  function read(namespace, scope, defaults) {
+    const key = scope || GLOBAL_SCOPE_KEY;
+    const store = storeFor(namespace);
+    const existing = store.get(key);
+    if (!existing) return { ...defaults };
+    touch(store, key, existing);
+    return { ...defaults, ...existing };
+  }
+
+  // Merges `patch` into the scope's cached state, evicting the least
+  // recently used scope once the namespace passes maxScopes.
+  function write(namespace, scope, patch) {
+    const key = scope || GLOBAL_SCOPE_KEY;
+    const store = storeFor(namespace);
+    const prev = store.get(key) || {};
+    touch(store, key, { ...prev, ...patch });
+    if (store.size > maxScopes) store.delete(store.keys().next().value);
+  }
+
+  // Drops one scope, so the next read falls back to the defaults. This is
+  // the "user clicked the tab itself" reset.
+  function resetScope(namespace, scope) {
+    storeFor(namespace).delete(scope || GLOBAL_SCOPE_KEY);
+  }
+
+  // Drop every namespace and scope.
+  function clearAll() {
+    STORES.clear();
+  }
+
+  return {
+    readCachedState: read,
+    writeCachedState: write,
+    resetCachedScope: resetScope,
+    clearAllCachedState: clearAll,
+  };
+}
+
+/** The app-wide page-state cache every production import shares. */
+export const defaultPageStateCache = createPageStateCache();
+
+/**
  * The scope's surviving state merged over `defaults`, and a copy of
  * `defaults` alone when the scope has nothing cached. Reading also marks the
- * scope as recently used.
+ * scope as recently used. Delegates to defaultPageStateCache; call
+ * createPageStateCache() for an independent cache.
  */
 export function readCachedState(namespace, scope, defaults) {
-  const key = scope || GLOBAL_SCOPE_KEY;
-  const store = storeFor(namespace);
-  const existing = store.get(key);
-  if (!existing) return { ...defaults };
-  touch(store, key, existing);
-  return { ...defaults, ...existing };
+  return defaultPageStateCache.readCachedState(namespace, scope, defaults);
 }
 
 /**
  * Merges `patch` into the scope's cached state, evicting the least recently
- * used scope once the namespace passes MAX_SCOPES_PER_NAMESPACE.
+ * used scope once the namespace passes MAX_SCOPES_PER_NAMESPACE. Delegates
+ * to defaultPageStateCache.
  */
 export function writeCachedState(namespace, scope, patch) {
-  const key = scope || GLOBAL_SCOPE_KEY;
-  const store = storeFor(namespace);
-  const prev = store.get(key) || {};
-  touch(store, key, { ...prev, ...patch });
-  if (store.size > MAX_SCOPES_PER_NAMESPACE) store.delete(store.keys().next().value);
+  return defaultPageStateCache.writeCachedState(namespace, scope, patch);
 }
 
 /**
  * Drops one scope, so the next read falls back to the defaults. This is the
- * "user clicked the tab itself" reset.
+ * "user clicked the tab itself" reset. Delegates to defaultPageStateCache.
  */
 export function resetCachedScope(namespace, scope) {
-  storeFor(namespace).delete(scope || GLOBAL_SCOPE_KEY);
+  return defaultPageStateCache.resetCachedScope(namespace, scope);
 }
 
 /**
  * Drop every namespace and scope.
  *
- * Test-isolation hook: the store is module-scoped, so without this a page's
- * cached state leaks into the next test in the same process. Production code
- * uses `resetCachedScope` for the narrower "user clicked the tab" reset.
+ * Test-isolation hook: the default cache is module-scoped, so without this a
+ * page's cached state leaks into the next test in the same process.
+ * Production code uses `resetCachedScope` for the narrower "user clicked the
+ * tab" reset.
  */
 export function clearAllCachedState() {
-  STORES.clear();
+  return defaultPageStateCache.clearAllCachedState();
 }

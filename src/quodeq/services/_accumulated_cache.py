@@ -1,16 +1,19 @@
 """The process-lived walk cache and the per-call accumulated-view LRU cache.
 
-Split out of ``accumulated.py``. The walk-cache globals
-(``WALK_CACHE``/``WALK_CACHE_LOCK``) are process-wide shared mutable state:
-``accumulated.py`` re-exports the OBJECTS themselves (not copies), so tests
-reaching in directly via ``clear_accumulated_process_cache`` see the same
-cache instance the computation path reads and writes.
+Split out of ``accumulated.py``. ``WalkCache`` holds the process-wide shared
+mutable state that used to be the bare module globals ``WALK_CACHE``/
+``WALK_CACHE_LOCK``: one instance lives per process
+(``services/_process_owners.py``), and ``accumulated.py`` reads its
+``cache``/``lock`` OBJECTS directly (not copies), so tests reaching in via
+``clear_accumulated_process_cache`` see the same cache instance the
+computation path reads and writes.
 """
 from __future__ import annotations
 
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from typing import Callable
 
 from quodeq.core.types import DimensionResult
 from quodeq.shared.env_resolve import resolve_env
@@ -23,24 +26,44 @@ _DEFAULT_ACC_CACHE_MAX = 256
 # still costs a few MB. Set QUODEQ_ACC_WALK_CACHE_MAX=0 to disable.
 _DEFAULT_WALK_CACHE_MAX = 2048
 
-# Process-lived so consecutive as-of selections on the Overview score-history
-# chart reuse the walk. Their run sets overlap in all but a run or two; a
-# per-call cache made every newly-selected day re-read the whole history.
-WALK_CACHE: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
-WALK_CACHE_LOCK = threading.Lock()
-
-
-def clear_accumulated_process_cache() -> None:
-    """Drop the process-lived walk cache. For tests and cache kill switches."""
-    with WALK_CACHE_LOCK:
-        WALK_CACHE.clear()
-
 
 def walk_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the walk-cache size limit (entries)."""
     if override is not None:
         return override
     return env_int("QUODEQ_ACC_WALK_CACHE_MAX", _DEFAULT_WALK_CACHE_MAX, minimum=0, env=resolve_env(env))
+
+
+class WalkCache:
+    """Process-lived cache for the accumulated-view run walk: cache, lock,
+    and a live size limit.
+
+    Process-lived so consecutive as-of selections on the Overview
+    score-history chart reuse the walk. Their run sets overlap in all but a
+    run or two; a per-call cache made every newly-selected day re-read the
+    whole history. ``max_size()`` calls *max_fn* on every invocation (not
+    once at construction) so ``QUODEQ_ACC_WALK_CACHE_MAX`` stays honoured
+    however late it is set, matching ``walk_cache_max``'s own contract.
+    """
+
+    def __init__(self, max_fn: Callable[[], int] = walk_cache_max) -> None:
+        self.cache: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
+        self.lock = threading.Lock()
+        self._max_fn = max_fn
+
+    def max_size(self) -> int:
+        return self._max_fn()
+
+    def clear(self) -> None:
+        with self.lock:
+            self.cache.clear()
+
+
+def clear_accumulated_process_cache() -> None:
+    """Drop the process-lived walk cache. For tests and cache kill switches."""
+    from quodeq.services._process_owners import DEFAULT_WALK_CACHE  # noqa: PLC0415 — avoids an import cycle: _process_owners imports WalkCache from here to build the process instance
+
+    DEFAULT_WALK_CACHE.clear()
 
 
 def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:

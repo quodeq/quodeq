@@ -1,6 +1,6 @@
-import { useRef, useEffect } from 'react';
+import { useEffect } from 'react';
 import { treeNodeToFileObj } from '../viz/index.js';
-import { readCachedState, resetCachedScope } from '../../../utils/pageStateCache.js';
+import { useTabScopedPageState } from '../../../hooks/useTabScopedPageState.js';
 import { useDashboardFullHeight } from './useDashboardFullHeight.js';
 import { useStandardTypes } from './useStandardTypes.js';
 import { useMapDisplayPrefs } from './useMapDisplayPrefs.js';
@@ -39,14 +39,13 @@ function useMapNavParams(nav) {
 }
 
 /** Fresh tab click drops the cache; round-tripping through a detail view
- * does not change tabKey, so cached state survives unmount/remount. */
-function useMapTabCache(selectedProject, tabKey) {
-  const lastTabKeyRef = useRef(tabKey);
-  if (lastTabKeyRef.current !== tabKey) {
-    resetCachedScope('map', selectedProject);
-    lastTabKeyRef.current = tabKey;
-  }
-  return readCachedState('map', selectedProject, { selectedDimensionsArr: [] });
+ * does not change tabKey, so cached state survives unmount/remount.
+ * `cache` is an optional injected page-state cache; with none given this
+ * goes through the module's own free functions (the shared default). */
+function useMapTabCache(selectedProject, tabKey, cache) {
+  return useTabScopedPageState({
+    namespace: 'map', scope: selectedProject, tabKey, defaults: { selectedDimensionsArr: [] }, cache,
+  });
 }
 
 /** Assembles the hook's return object — kept as one literal (not spread
@@ -89,8 +88,8 @@ function buildMapPageResult({
 
 // Per-mount plumbing: the tab-scoped state cache, the viewport lock, the
 // refresh on mount / tab re-click, and the standard types for constellations.
-function useMapPageLifecycle({ selectedProject, tabKey, callbacks }) {
-  const cached = useMapTabCache(selectedProject, tabKey);
+function useMapPageLifecycle({ selectedProject, tabKey, callbacks, cache }) {
+  const cached = useMapTabCache(selectedProject, tabKey, cache);
 
   // Lock parent to viewport height while map is active.
   useDashboardFullHeight();
@@ -110,21 +109,23 @@ function useMapPageLifecycle({ selectedProject, tabKey, callbacks }) {
  * standards fetch (useStandardTypes), display prefs (useMapDisplayPrefs),
  * the dimension filter (useMapDimensionFilter), the tree (useMapTreeState),
  * and storage via the shared adapters (adapters/storage.js + pageStateCache).
+ * `cache` is an optional injected page-state cache (see pageStateCache.js);
+ * omit it in production, where every page shares the module-level default.
  */
-export default function useMapPageState({ data, callbacks, nav, tabKey = 0 }) {
+export default function useMapPageState({ data, callbacks, nav, tabKey = 0, cache }) {
   const selectedProject = data?.projectName || data?.selectedProject || '__map__';
   const {
     currentPath, vizStyle, viewMode, galaxyMode,
     setCurrentPath, setVizStyle, setViewMode, setGalaxyMode,
   } = useMapNavParams(nav);
-  const { cached, standardTypes } = useMapPageLifecycle({ selectedProject, tabKey, callbacks });
+  const { cached, standardTypes } = useMapPageLifecycle({ selectedProject, tabKey, callbacks, cache });
 
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
 
   const { showLabels, setShowLabels, darkMode, setDarkMode } = useMapDisplayPrefs();
 
   const { dimensionNames, effectiveSelected, handleToggleDimension, filteredDimensions } = useMapDimensionFilter({
-    allDimensions, selectedProject, cachedSelectedArr: cached.selectedDimensionsArr,
+    allDimensions, selectedProject, cachedSelectedArr: cached.selectedDimensionsArr, cache,
   });
 
   const { fullTree, currentNode, breadcrumb, handleDrillDown, handleBreadcrumbNav } = useMapTreeState({

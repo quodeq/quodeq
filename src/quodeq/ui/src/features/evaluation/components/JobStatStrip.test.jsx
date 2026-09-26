@@ -7,7 +7,7 @@ vi.mock('../../../api/index.js', () => ({
   getEvaluationProgress: vi.fn(),
 }));
 import { getEvaluationProgress } from '../../../api/index.js';
-import { recordRateSample, getRateSamples, _resetRateSamples } from './rateSampleStore.js';
+import { createRateSampleStore, defaultRateSampleStore } from './rateSampleStore.js';
 
 function renderWithClient(ui) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -18,7 +18,10 @@ const runningJob = { jobId: 'job-1', status: 'running' };
 const doneJob    = { jobId: 'job-2', status: 'done' };
 
 describe('JobStatStrip', () => {
-  beforeEach(() => { getEvaluationProgress.mockReset(); _resetRateSamples(); });
+  // A fresh, injected store per test isolates every test's samples from the
+  // others and from the module-lived default -- no reset hook needed.
+  let rateStore;
+  beforeEach(() => { getEvaluationProgress.mockReset(); rateStore = createRateSampleStore(); });
 
   it('renders 4 stat cells for a running job', async () => {
     getEvaluationProgress.mockResolvedValue({
@@ -26,7 +29,7 @@ describe('JobStatStrip', () => {
       dimensions: [{ id: 'security', state: 'running', files: { taken: 138, total: 220 } }],
       totalElapsedS: 134,
     });
-    renderWithClient(<JobStatStrip job={runningJob} liveViolations={{ security: [{ severity: 'major' }, { severity: 'critical' }] }} />);
+    renderWithClient(<JobStatStrip job={runningJob} liveViolations={{ security: [{ severity: 'major' }, { severity: 'critical' }] }} rateStore={rateStore} />);
     // Wait on the dimension name, not the "analyzing" label: the label is the
     // same before and after the progress query lands, so it resolves against
     // the pre-data render and asserts nothing.
@@ -50,7 +53,7 @@ describe('JobStatStrip', () => {
       dimensions: [{ state: 'done', files: { taken: 220, total: 220 } }],
       totalElapsedS: 272,
     });
-    renderWithClient(<JobStatStrip job={doneJob} liveViolations={{ security: new Array(13).fill({}) }} />);
+    renderWithClient(<JobStatStrip job={doneJob} liveViolations={{ security: new Array(13).fill({}) }} rateStore={rateStore} />);
     expect(await screen.findByText('SCANNED')).toBeInTheDocument();
     expect(screen.getByText('VIOLATIONS')).toBeInTheDocument();
     expect(screen.getByText('DURATION')).toBeInTheDocument();
@@ -61,14 +64,14 @@ describe('JobStatStrip', () => {
 
   it('renders fallback values when progress query has no data yet', () => {
     getEvaluationProgress.mockResolvedValue(null);
-    renderWithClient(<JobStatStrip job={runningJob} liveViolations={{}} />);
+    renderWithClient(<JobStatStrip job={runningJob} liveViolations={{}} rateStore={rateStore} />);
     // The analyzing tile always renders; unknown data reads as preparing.
     expect(screen.getByText('analyzing')).toBeInTheDocument();
     expect(screen.getAllByText('preparing…').length).toBeGreaterThan(0);
   });
 
   it('returns null when job is missing', () => {
-    const { container } = renderWithClient(<JobStatStrip job={null} liveViolations={{}} />);
+    const { container } = renderWithClient(<JobStatStrip job={null} liveViolations={{}} rateStore={rateStore} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -77,7 +80,7 @@ describe('JobStatStrip', () => {
       dimensions: [{ state: 'running', files: { taken: 10, total: 1000 } }],
     });
     const job = { jobId: 'job-3', status: 'running', startedAt: new Date(Date.now() - 5000).toISOString() };
-    renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+    renderWithClient(<JobStatStrip job={job} liveViolations={{}} rateStore={rateStore} />);
     expect(await screen.findByText('estimating…')).toBeInTheDocument();
   });
 
@@ -91,7 +94,7 @@ describe('JobStatStrip', () => {
       dimensions: [{ state: 'running', files: { taken: 500, total: 3000 } }],
     });
     const job = { jobId: 'job-6', status: 'running', startedAt: new Date(now - 20 * 60 * 1000).toISOString() };
-    renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+    renderWithClient(<JobStatStrip job={job} liveViolations={{}} rateStore={rateStore} />);
     expect(await screen.findByText('estimating…')).toBeInTheDocument();
     expect(screen.queryByText(/files\/min/)).not.toBeInTheDocument();
     nowSpy.mockRestore();
@@ -106,7 +109,7 @@ describe('JobStatStrip', () => {
       .mockResolvedValue({ dimensions: [{ state: 'running', files: { taken: 35, total: 35 } }] });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const startedAt = new Date(Date.now() - 5000).toISOString();
-    const wrap = (j) => <QueryClientProvider client={client}><JobStatStrip job={j} liveViolations={{}} /></QueryClientProvider>;
+    const wrap = (j) => <QueryClientProvider client={client}><JobStatStrip job={j} liveViolations={{}} rateStore={rateStore} /></QueryClientProvider>;
     const { rerender } = render(wrap({ jobId: 'jt', status: 'running', startedAt }));
     expect(await screen.findByText('97%')).toBeInTheDocument();
     const before = getEvaluationProgress.mock.calls.length;
@@ -120,13 +123,13 @@ describe('JobStatStrip', () => {
     // 0.5 files/s = 30 files/min. On re-entry the rate is shown immediately.
     const now = new Date('2026-06-08T10:20:00Z').getTime();
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
-    recordRateSample('job-7', now - 60_000, 470);
-    recordRateSample('job-7', now, 500);
+    rateStore.recordRateSample('job-7', now - 60_000, 470);
+    rateStore.recordRateSample('job-7', now, 500);
     getEvaluationProgress.mockResolvedValue({
       dimensions: [{ state: 'running', files: { taken: 500, total: 3000 } }],
     });
     const job = { jobId: 'job-7', status: 'running', startedAt: new Date(now - 20 * 60 * 1000).toISOString() };
-    renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+    renderWithClient(<JobStatStrip job={job} liveViolations={{}} rateStore={rateStore} />);
     expect(await screen.findByText(/^~30 files\/min/)).toBeInTheDocument();
     expect(screen.queryByText('estimating…')).not.toBeInTheDocument();
     nowSpy.mockRestore();
@@ -144,7 +147,7 @@ describe('JobStatStrip', () => {
       totalElapsedS: 9999,
     });
     const job = { jobId: 'job-4', status: 'running', startedAt: new Date(now - 5000).toISOString() };
-    renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+    renderWithClient(<JobStatStrip job={job} liveViolations={{}} rateStore={rateStore} />);
     expect(await screen.findByText('1%')).toBeInTheDocument();
     expect(screen.getByText('2h 46m 39s')).toBeInTheDocument();
     nowSpy.mockRestore();
@@ -157,7 +160,7 @@ describe('JobStatStrip', () => {
       dimensions: [{ state: 'running', files: { taken: 10, total: 1000 } }],
     });
     const job = { jobId: 'job-4b', status: 'running', startedAt: new Date(now - 5000).toISOString() };
-    renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+    renderWithClient(<JobStatStrip job={job} liveViolations={{}} rateStore={rateStore} />);
     expect(await screen.findByText('1%')).toBeInTheDocument();
     expect(screen.getByText('5s')).toBeInTheDocument();
     nowSpy.mockRestore();
@@ -172,7 +175,7 @@ describe('JobStatStrip', () => {
         dimensions: [{ state: 'running', files: { taken: 10, total: 1000 } }],
       });
       const job = { jobId: 'job-5', status: 'running', startedAt: new Date(t0 - 5000).toISOString() };
-      renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+      renderWithClient(<JobStatStrip job={job} liveViolations={{}} rateStore={rateStore} />);
       await vi.advanceTimersByTimeAsync(0);     // flush the initial fetch
       expect(screen.getByText('5s')).toBeInTheDocument();
       await vi.advanceTimersByTimeAsync(2000);  // two 1s ticks
@@ -183,25 +186,69 @@ describe('JobStatStrip', () => {
   });
 
   it('forgets the throughput samples of a terminal job', async () => {
-    recordRateSample('job-2', 1000, 5);
+    rateStore.recordRateSample('job-2', 1000, 5);
     getEvaluationProgress.mockResolvedValue({
       dimensions: [{ state: 'done', files: { taken: 220, total: 220 } }],
       totalElapsedS: 272,
     });
-    renderWithClient(<JobStatStrip job={doneJob} liveViolations={{}} />);
+    renderWithClient(<JobStatStrip job={doneJob} liveViolations={{}} rateStore={rateStore} />);
     expect(await screen.findByText('SCANNED')).toBeInTheDocument();
-    expect(getRateSamples('job-2')).toEqual([]);
+    expect(rateStore.getRateSamples('job-2')).toEqual([]);
   });
 
   it('keeps the samples of a running job', async () => {
-    recordRateSample('job-1', 1000, 5);
+    rateStore.recordRateSample('job-1', 1000, 5);
     getEvaluationProgress.mockResolvedValue({
       currentDimension: 'security',
       dimensions: [{ id: 'security', state: 'running', files: { taken: 10, total: 20 } }],
       totalElapsedS: 5,
     });
-    renderWithClient(<JobStatStrip job={runningJob} liveViolations={{}} />);
+    renderWithClient(<JobStatStrip job={runningJob} liveViolations={{}} rateStore={rateStore} />);
     expect(await screen.findByText('security')).toBeInTheDocument();
-    expect(getRateSamples('job-1').length).toBeGreaterThanOrEqual(1);
+    expect(rateStore.getRateSamples('job-1').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('reads throughput from an injected rateStore and leaves the default store untouched', async () => {
+    const now = new Date('2026-06-08T10:20:00Z').getTime();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    rateStore.recordRateSample('job-8', now - 60_000, 470);
+    rateStore.recordRateSample('job-8', now, 500);
+    getEvaluationProgress.mockResolvedValue({
+      dimensions: [{ state: 'running', files: { taken: 500, total: 3000 } }],
+    });
+    const job = { jobId: 'job-8', status: 'running', startedAt: new Date(now - 20 * 60 * 1000).toISOString() };
+    renderWithClient(<JobStatStrip job={job} liveViolations={{}} rateStore={rateStore} />);
+    // The rate comes from the injected store's pre-seeded samples, not from
+    // an empty default -- so it shows a computed rate immediately instead of
+    // "estimating…".
+    expect(await screen.findByText(/^~30 files\/min/)).toBeInTheDocument();
+    // The default store (module-lived, shared by every caller that does not
+    // inject one) never saw this job at all.
+    expect(defaultRateSampleStore.getRateSamples('job-8')).toEqual([]);
+    nowSpy.mockRestore();
+  });
+
+  it('the default rate store (no rateStore prop) survives an unmount/remount', async () => {
+    defaultRateSampleStore.reset();
+    getEvaluationProgress.mockResolvedValue({
+      dimensions: [{ state: 'running', files: { taken: 10, total: 1000 } }],
+    });
+    const job = { jobId: 'job-9', status: 'running', startedAt: new Date(Date.now() - 5000).toISOString() };
+
+    const first = renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+    // A recorded sample is what flips the hint from nothing to "estimating…"
+    // (one sample isn't enough for a computed rate yet), so waiting on it
+    // proves the record-sample effect has already run.
+    await screen.findByText('estimating…');
+    first.unmount();
+
+    expect(defaultRateSampleStore.getRateSamples('job-9').length).toBeGreaterThanOrEqual(1);
+
+    renderWithClient(<JobStatStrip job={job} liveViolations={{}} />);
+    await screen.findByText('estimating…');
+    // Re-entry still has the buffer recorded before the unmount -- a remount
+    // never resets the module-lived default store.
+    expect(defaultRateSampleStore.getRateSamples('job-9').length).toBeGreaterThanOrEqual(1);
+    defaultRateSampleStore.reset();
   });
 });

@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import sys
 
-from quodeq.dashboard._webview_window_about import MENU_POLL_INTERVAL_S, MENU_POLL_MAX_ATTEMPTS, diag
+from quodeq.dashboard._webview_diag import diag_stream
+from quodeq.dashboard._webview_window_about import MENU_POLL_INTERVAL_S, MENU_POLL_MAX_ATTEMPTS
 from quodeq.dashboard._webview_window_chrome import evaluate_js_in_background
 from quodeq.shared.constants import PLATFORM_DARWIN
 
@@ -76,12 +77,12 @@ def _schedule_help_menu_poller(target: object) -> None:
             if main_menu is None or main_menu.numberOfItems() == 0:
                 if state["attempts"] >= max_attempts:
                     print(f"[quodeq-help] gave up after {state['attempts']} attempts — no main menu",
-                          file=diag, flush=True)
+                          file=diag_stream(), flush=True)
                     _stop_poll_timer(state)
                 return
             _build_help_menu(app, main_menu, target)
             print(f"[quodeq-help] installed Help menu on attempt {state['attempts']}",
-                  file=diag, flush=True)
+                  file=diag_stream(), flush=True)
             _stop_poll_timer(state)
 
         def scheduleTimer_(self, arg):  # noqa: ARG002 — ObjC selector signature
@@ -97,7 +98,7 @@ def _schedule_help_menu_poller(target: object) -> None:
                 )
                 state["timer"] = timer
             except (AttributeError, ValueError) as exc:
-                print(f"[quodeq-help] NSTimer schedule failed: {exc}", file=diag, flush=True)
+                print(f"[quodeq-help] NSTimer schedule failed: {exc}", file=diag_stream(), flush=True)
 
     poller = _HelpMenuPoller.alloc().init()
     # Retain the poller so it isn't GC'd while the timer holds a weak ref

@@ -7,8 +7,7 @@ from typing import Any
 
 from quodeq.config.paths import default_paths
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.core.types import ViolationResponse, ViolationSummary
-from quodeq.shared.serialization import to_camel_dict
+from quodeq.core.types import EvalPending, ViolationResponse, ViolationSummary
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import build_dashboard
 from quodeq.services.violations import ResolveOptions, aggregate_violations, resolve_dimension_eval
@@ -62,8 +61,15 @@ def get_dimension_eval(
     *,
     compiled_dir: Path | None = None,
     evaluators_dir: Path | None = None,
-) -> dict[str, Any] | None:
-    """Return parsed evaluation data for a single dimension in a run."""
+) -> ViolationResponse | dict[str, Any] | EvalPending | None:
+    """Return parsed evaluation data for a single dimension in a run.
+
+    The wire shaping (camelCase, the waiting/202 body) is owned by the
+    routes: this returns whatever ``resolve_dimension_eval`` produced (a
+    ``ViolationResponse``, or a stored camelCase dict), ``EvalPending`` when
+    the run directory exists but nothing has been written yet, or ``None``
+    when the run itself doesn't exist.
+    """
     base = (Path(reports_dir) / project / run_id).resolve()
     if not base.is_relative_to(Path(reports_dir).resolve()):
         return None
@@ -77,9 +83,9 @@ def get_dimension_eval(
         ),
     )
     if result is not None:
-        return to_camel_dict(result) if isinstance(result, ViolationResponse) else result
+        return result
     if base.is_dir():
-        return {"waiting": True, "project": project, "runId": run_id, "dimension": dimension}
+        return EvalPending(project, run_id, dimension)
     return None
 
 

@@ -237,6 +237,45 @@ class TestLaunchPoolExtendsDeadline:
         assert "deadline_extended" not in [c.args[0] for c in marker.call_args_list]
 
 
+class TestLaunchPoolCarriesRunConfig:
+    def test_pool_config_shares_the_run_config_and_its_owners(self, tmp_path):
+        """``_build_pool_config`` must hand every agent's AnalysisConfig the
+        SAME RunConfig instance (not a copy), so the run-scoped drop counter
+        and MCP registry stay shared across pool worker threads -- see
+        ``RunConfig.drop_counter``/``mcp_registry``.
+
+        Imports through the public runner re-export and string patch targets
+        rather than the private _pool_launcher module, per the private-import
+        ratchet -- see TestLaunchPoolInjectedFactory below."""
+        from quodeq.analysis.subagents.runner import LaunchPoolParams, launch_pool
+
+        config = RunConfig(
+            src=tmp_path, language="python",
+            options=AnalysisOptions(deadline_at=None, time_limit=600),
+        )
+        params = LaunchPoolParams(
+            evidence_dir=tmp_path,
+            queue_path=tmp_path / "queue.json",
+            prompt="p",
+        )
+        captured = {}
+
+        def _fake_pool(*, paths, options, config):
+            captured["config"] = config
+            pool = MagicMock()
+            pool.run.return_value = []
+            return pool
+
+        with patch("quodeq.analysis.subagents._pool_launcher.SubagentPool", side_effect=_fake_pool), \
+             patch("quodeq.analysis.subagents._pool_launcher.get_ai_cmd", return_value="ollama"), \
+             patch("quodeq.analysis.subagents._pool_launcher.emit_marker"):
+            launch_pool(config, "dim-x", params)
+
+        assert captured["config"].run_config is config
+        assert captured["config"].run_config.drop_counter is config.drop_counter
+        assert captured["config"].run_config.mcp_registry is config.mcp_registry
+
+
 class TestLaunchPoolInjectedFactory:
     def test_uses_injected_pool_factory_instead_of_the_concrete_subagent_pool(self, tmp_path):
         """pool_factory is a call-time seam: when set, launch_pool must build

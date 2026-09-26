@@ -6,7 +6,8 @@ from http import HTTPStatus
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND
-from quodeq.api.helpers import dimension_eval_response, json_error
+from quodeq.api.dimension_eval_wire import dimension_eval_response
+from quodeq.api.helpers import json_error
 from quodeq.api.routes_common import reports_dir
 from quodeq.shared.serialization import to_camel_dict
 from quodeq.services.base import ActionProvider

@@ -8,7 +8,7 @@ from typing import Any
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_NOT_FOUND, QUERY_FLAG_TRUE
-from quodeq.services.scored_jobs_registry import claim_scoring, release_scoring, reset_scored_jobs
+from quodeq.services.scored_jobs_registry import ScoringClaims
 from quodeq.core.run.job_status import JobStatus
 from quodeq.api.helpers import error_response, json_error, jsonify_error
 from quodeq.shared.serialization import to_camel_dict
@@ -27,6 +27,13 @@ def _background(app: Flask) -> BackgroundRunner:
     setdefault keeps bare test apps (register_evaluation_item_routes on a
     plain Flask) working."""
     return app.extensions.setdefault("background", ThreadBackgroundRunner())
+
+
+def _claims(app: Flask) -> ScoringClaims:
+    """The app's already-scored claims owner. ``create_app`` instantiates
+    it; setdefault keeps bare test apps (register_evaluation_item_routes on
+    a plain Flask) working."""
+    return app.extensions.setdefault("scoring_claims", ScoringClaims())
 
 
 def _read_dim_states(job: Any) -> dict[str, dict[str, Any]]:
@@ -65,24 +72,25 @@ def _resolve_cancel_intent(snapshot: Any, intent: str | None) -> tuple[dict, int
     return None
 
 
-def _cancel_running(provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
+def _cancel_running(app: Flask, provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
     discard = request.args.get("discard", "").lower() == QUERY_FLAG_TRUE
     _logger.info(
         "cancel_evaluation: job_id=%s, discard=%s, remote_addr=%s",
         job_id, discard, request.remote_addr,
     )
+    claims = _claims(app)
     if discard:
         # Claim the one-time scoring slot BEFORE the job flips to
         # cancelled: otherwise the UI's next status poll sees the
         # cancelled state and spawns _score_completed_evidence,
         # resurrecting a run the user just discarded.
-        claim_scoring(job_id)
+        claims.claim(job_id)
     ok = provider.cancel_evaluation(
         job_id, reports_dir=reports_dir(), discard_partial=discard,
     )
     if not ok:
         if discard:
-            release_scoring(job_id)
+            claims.release(job_id)
         return json_error("Could not cancel job", HTTPStatus.CONFLICT, "CONFLICT")
     return jsonify({"ok": True, "action": "cancelled", "discarded": discard})
 
@@ -99,7 +107,7 @@ def _get_evaluation(app: Flask, provider: ActionProvider, job_id: str) -> Respon
     job = provider.get_evaluation_status(job_id, reports_dir=reports_dir())
     if not job:
         return json_error(_JOB_NOT_FOUND, HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
-    score_terminal_run_once(job_id, job, _background(app), reports_dir())
+    score_terminal_run_once(job_id, job, _background(app), reports_dir(), claims=_claims(app))
     payload = to_camel_dict(job)
     payload["dimStates"] = _read_dim_states(job)
     return jsonify(payload)
@@ -128,7 +136,9 @@ def _get_evaluation_progress(app: Flask, provider: ActionProvider, job_id: str) 
     return jsonify(to_camel_dict(progress))
 
 
-def _cancel_or_delete_evaluation(provider: ActionProvider, job_id: str) -> Response | tuple[Response, int]:
+def _cancel_or_delete_evaluation(
+    app: Flask, provider: ActionProvider, job_id: str,
+) -> Response | tuple[Response, int]:
     """DELETE on a running job cancels it. DELETE on a finished job removes it from history.
 
     Query: ``?intent=cancel|delete`` declares what the client is asking
@@ -150,14 +160,14 @@ def _cancel_or_delete_evaluation(provider: ActionProvider, job_id: str) -> Respo
     if conflict is not None:
         return jsonify_error(conflict)
     if snapshot.status == JobStatus.RUNNING:
-        return _cancel_running(provider, job_id)
+        return _cancel_running(app, provider, job_id)
     return _delete_finished(provider, job_id)
 
 
 def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> None:
     """Register single-evaluation status and cancel routes."""
 
-    app.extensions["reset_scored_jobs"] = reset_scored_jobs
+    app.extensions["reset_scored_jobs"] = _claims(app).reset
 
     @app.get("/api/evaluations/<job_id>")
     def get_evaluation(job_id: str) -> Response | tuple[Response, int]:
@@ -169,4 +179,4 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
 
     @app.delete("/api/evaluations/<job_id>")
     def cancel_or_delete_evaluation(job_id: str) -> Response | tuple[Response, int]:
-        return _cancel_or_delete_evaluation(provider, job_id)
+        return _cancel_or_delete_evaluation(app, provider, job_id)

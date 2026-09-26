@@ -9,13 +9,13 @@ neither, so nothing here imports ``jobs``.
 """
 from __future__ import annotations
 
-import json
 import subprocess
 import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from quodeq.shared.cc_marker import parse_cc_marker
 from quodeq.shared.clock import utc_now_iso
 from quodeq.config.services_env import job_timeout_cap_s as _resolve_job_timeout_cap_s
 from quodeq.services._job_log_tee import TeeContext, consume_stream, drain_pre_marker_buffer, tee_run_log
@@ -32,7 +32,7 @@ from quodeq.core.run.job_status import JobStatus
 from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
 from quodeq.shared.run_log import RunLogWriter
 from quodeq.shared.constants import (
-    CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_DEADLINE_EXTENDED,
+    CC_MARKER_KEY, CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START, CC_PHASE_DEADLINE_EXTENDED,
     CC_PHASE_REPORT_PATH, CC_PHASE_SCORING, CC_PHASE_SETUP,
 )
 
@@ -55,15 +55,15 @@ class JobMonitorMixin:
     _processes: dict[str, Any]
     _on_job_complete: Callable[[str, Job], None] | None
     _job_timeout_cap_s_override: float | None
+    _watchdog_grace_s: float
 
     def _apply_marker(self, job: Job, line: str) -> None:
         """Parse a structured JSON marker and update job state."""
-        try:
-            marker = json.loads(line)
-        except json.JSONDecodeError:
+        marker = parse_cc_marker(line)
+        if marker is None:
             self._log.warning(f"malformed structured marker: {line!r}")
             return
-        phase = marker.get("_cc")
+        phase = marker.get(CC_MARKER_KEY)
         if phase == CC_PHASE_SETUP:
             job.phase = CC_PHASE_SETUP
             job.dimensions = marker.get("dimensions")
@@ -170,6 +170,7 @@ class JobMonitorMixin:
         """Return True when the watchdog should SIGKILL the job process now."""
         return watchdog_should_kill(
             job_id, started_at, store=self._store, job_timeout_cap_s=self._job_timeout_cap_s,
+            grace_s=self._watchdog_grace_s,
         )
 
     def _run_status_exit_reason(self, job: Job | None) -> str | None:

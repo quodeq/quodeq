@@ -4,7 +4,7 @@ Split out of ``mutation_rescore.py``. ``mutation_rescore.py`` is a
 DECLARED_LOGGING_SITES entry (still imports stdlib ``logging``); this sibling
 does not add a new logging import, so ``project_all_runs`` accepts an
 injected ``LogSink`` and, when none is passed, deferred-imports the facade's
-own declared ``_logger`` at the failure site — restoring the original
+own declared ``logger`` at call time — restoring the original
 exc-path logging without a new ``getLogger`` call here and without changing
 the (test-pinned) single-positional-arg production call site.
 """
@@ -15,7 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.observability import LogSink
 from quodeq.shared.fault_isolation import run_isolated
 from quodeq.shared.validation import validate_path_segment, validate_resolved_within
 
@@ -26,7 +26,7 @@ class ProjectLockRegistry:
     Intentionally unbounded: one tiny Lock object per distinct project name
     that has ever triggered a background projection on this host.  In practice
     this mirrors the number of projects on disk, which is small and naturally
-    bounded by real usage.  Contrast with scored_jobs (bounded LRU) — scored
+    bounded by real usage.  Contrast with ScoringClaims (bounded LRU) — scored
     jobs can accumulate many run-ids per project, so a size cap there is
     meaningful; here there is one entry per project, not per run.
 
@@ -72,7 +72,7 @@ def resolve_project_dir(evaluations_dir: str, project: str) -> Path:
 def project_all_runs(
     project_dir: Path,
     repo_factory: Callable[[Path], Any] | None = None,
-    *, log: LogSink = NULL_LOG,
+    *, log: LogSink | None = None,
 ) -> None:
     """Trigger projection across every run dir of the project.
 
@@ -86,14 +86,17 @@ def project_all_runs(
 
     Projection is incremental (gated by checkpoint + log-size), so this is
     cheap in steady state; the first call after a fresh dismiss replays only
-    the actions-log delta.
+    the actions-log delta. *log* defaults to (and resolved at call time to)
+    the ``mutation_rescore`` facade's own declared logger -- named
+    ``quodeq.services.mutation_rescore``, which caplog tests capture -- so
+    this sibling module never needs its own ``getLogger()`` call.
     """
     if not project_dir.is_dir():
         return
     if repo_factory is None:
         from quodeq.services.wiring import SqliteFindingsRepository  # noqa: PLC0415
         repo_factory = SqliteFindingsRepository
-    if log is NULL_LOG:
+    if log is None:
         # No caller-injected log (the production call site can't pass one —
         # tests patch this whole function with a bare single-arg
         # side_effect). Fall back to the facade's own declared logger

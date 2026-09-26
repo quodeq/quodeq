@@ -1,0 +1,168 @@
+"""Import-time state becomes lazy: no side effect on import, old names shim.
+
+Values that used to be computed at import time -- SKIP_DIRS (a detection.json
+read in analysis/_api_standards_text.py, re-exported eagerly by
+analysis/subprocess.py) and the webview diagnostic log (mkdir + open in
+dashboard/_webview_diag.py) -- are now ``functools.cache``-d accessors, with
+the old module-level name reached through a ``__getattr__`` shim (PEP 562)
+so ``from module import OLD_NAME`` still works. USE_COLOR's own shim/lazy
+tests live in tests/shared/test_env_seams_t5.py, next to should_use_color.
+
+Importing any of these modules must have no side effect (no file read, no
+mkdir, no open). Each side-effect test patches the filesystem
+call to raise RuntimeError -- not OSError, which both loaders catch
+internally as their production fallback path, so an OSError patch would
+pass even if the call still ran eagerly at import.
+
+analysis._api_standards_text and dashboard._webview_diag are private
+modules with no public re-export of their lazy accessor (skip_dirs,
+diag_stream) for a test to import directly without growing the
+private-import-tests ratchet (tools/private_imports_tests_baseline.txt,
+shrink-only). Both side-effect tests below spawn a fresh interpreter
+(subprocess) that imports the private module directly instead -- this also
+sidesteps a real gap in importlib.reload: reloading an already-cached
+module only re-executes ITS OWN top level, not a dependency's, so
+reload-testing the public re-exporter (analysis.subprocess) would silently
+pass even with the eager read still in place, once _api_standards_text is
+already cached from an earlier test in the session (verified: it does).
+Only _api_standards_text itself is patch-tested for the read (subprocess.py
+pulls in a much larger dependency tree -- jsonschema included -- that does
+its own legitimate file reads at import, which a blanket Path.read_text
+patch can't tell apart from the detection.json read under test); subprocess.py's
+shim is instead pinned by value equality below.
+
+test_diag_old_name_matches_diag_stream calls diag_stream() for real (the
+only test here that gets past a patched mkdir/open), so it really appends
+to the webview diag log -- a child process inherits the real HOME by
+default, and conftest's _isolate_quodeq_home fixture only covers QUODEQ_*
+env vars, not HOME/USERPROFILE (diag deliberately keeps the hardcoded
+Path.home() / ".quodeq" / "run" path, not the QUODEQ_RUN_DIR-aware one).
+_run_fresh_interpreter takes an env override; that one test passes
+_home_isolated_env(tmp_path) so it appends to a log under tmp_path instead
+of the developer's or CI runner's real ~/.quodeq/run/webview_debug.log.
+"""
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+def _run_fresh_interpreter(script: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    """Run *script* in a brand-new interpreter -- a genuinely fresh import,
+    unlike importlib.reload (see module docstring).
+
+    *env* defaults to the real process environment (subprocess.run's own
+    default). Pass an isolated one for any script that can reach
+    Path.home() for real, so it never touches the developer's or CI
+    runner's actual home directory."""
+    return subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, check=False, env=env,
+    )
+
+
+def _home_isolated_env(home: Path) -> dict[str, str]:
+    """A copy of the real environment with *home* substituted for the home
+    directory on every platform Path.home() reads it from.
+
+    USERPROFILE takes precedence over HOMEDRIVE+HOMEPATH in Python's own
+    expanduser() on Windows, so setting it is sufficient there; HOME covers
+    POSIX. Matches the repo's existing convention (for example
+    tests/services/test_tooling_mixin_browse.py's browse_tree fixture)."""
+    return {**os.environ, "HOME": str(home), "USERPROFILE": str(home)}
+
+
+class TestSkipDirsLazyImport:
+    """SKIP_DIRS: skip_dirs() with functools.cache, read once."""
+
+    def test_importing_api_standards_text_does_not_read_detection_json(self):
+        script = (
+            "import quodeq  # let package init read its own metadata before Path is patched\n"
+            "from pathlib import Path\n"
+            "def _boom(self, *a, **k):\n"
+            "    raise RuntimeError('detection.json must not be read at import time')\n"
+            "Path.read_text = _boom\n"
+            "import quodeq.analysis._api_standards_text\n"  # must not raise
+            "print('OK')\n"
+        )
+        result = _run_fresh_interpreter(script)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout
+
+    def test_skip_dirs_old_name_matches_the_function_through_the_shim(self):
+        script = (
+            "from quodeq.analysis._api_standards_text import SKIP_DIRS, skip_dirs\n"
+            "assert SKIP_DIRS == skip_dirs(), (SKIP_DIRS, skip_dirs())\n"
+            "from quodeq.analysis.subprocess import SKIP_DIRS as via_subprocess\n"
+            "assert via_subprocess == skip_dirs(), (via_subprocess, skip_dirs())\n"
+            "print('OK')\n"
+        )
+        result = _run_fresh_interpreter(script)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout
+
+
+class TestDiagStreamLazyImport:
+    """webview diag log: diag_stream() with functools.cache does the mkdir
+    and open on first call, not at import."""
+
+    def test_importing_webview_diag_does_not_touch_the_filesystem(self):
+        script = (
+            "import quodeq  # let package init read its own metadata before Path is patched\n"
+            "from pathlib import Path\n"
+            "def _boom(self, *a, **k):\n"
+            "    raise RuntimeError('diag log must not touch the filesystem at import time')\n"
+            "Path.mkdir = _boom\n"
+            "Path.open = _boom\n"
+            "import quodeq.dashboard._webview_diag\n"  # must not raise
+            "print('OK')\n"
+        )
+        result = _run_fresh_interpreter(script)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout
+
+    def test_diag_old_name_matches_diag_stream(self, tmp_path):
+        """Calls diag_stream() for real (unlike the test above, which never
+        gets past the patched mkdir/open), so it really appends to
+        ~/.quodeq/run/webview_debug.log -- isolate HOME/USERPROFILE at
+        tmp_path first so it never touches the real one."""
+        script = (
+            "import quodeq.dashboard._webview_diag as mod\n"
+            "assert mod.diag is mod.diag_stream(), (mod.diag, mod.diag_stream())\n"
+            "print('OK')\n"
+        )
+        result = _run_fresh_interpreter(script, env=_home_isolated_env(tmp_path))
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout
+        assert (tmp_path / ".quodeq" / "run" / "webview_debug.log").exists()
+
+    def test_webview_window_about_diag_old_name_matches_diag_stream(self, tmp_path):
+        """M3: dashboard._webview_window_about.diag is its own __getattr__
+        shim at its old path, delegating to the same diag_stream() the
+        module already imports."""
+        script = (
+            "import quodeq.dashboard._webview_window_about as mod\n"
+            "assert mod.diag is mod.diag_stream(), (mod.diag, mod.diag_stream())\n"
+            "print('OK')\n"
+        )
+        result = _run_fresh_interpreter(script, env=_home_isolated_env(tmp_path))
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout
+
+    def test_importing_webview_window_about_does_not_touch_the_filesystem(self):
+        """The shim must stay lazy: importing the module (which imports
+        diag_stream) must not itself trigger the mkdir + open."""
+        script = (
+            "import quodeq  # let package init read its own metadata before Path is patched\n"
+            "from pathlib import Path\n"
+            "def _boom(self, *a, **k):\n"
+            "    raise RuntimeError('diag log must not touch the filesystem at import time')\n"
+            "Path.mkdir = _boom\n"
+            "Path.open = _boom\n"
+            "import quodeq.dashboard._webview_window_about\n"  # must not raise
+            "print('OK')\n"
+        )
+        result = _run_fresh_interpreter(script)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout

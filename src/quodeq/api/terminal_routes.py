@@ -31,7 +31,7 @@ from quodeq.terminal.links import (
     resolve_path,
     safe_editor_path,
 )
-from quodeq.terminal.sessions import TerminalSessionRegistry, shell_name
+from quodeq.terminal.sessions import TerminalSessionRegistry, TerminalSessionView, shell_name
 
 
 # App-specific WS close codes (4000-4999 range). The client's auto-reconnect
@@ -91,11 +91,28 @@ def _terminal_status(registry: TerminalSessionRegistry):
     })
 
 
+def _session_wire(view: TerminalSessionView) -> dict:
+    """Route-owned wire shape for one tab: camelCase keys, $HOME collapsed to
+    ``~`` (None cwd, e.g. a dead PTY, passes through unchanged)."""
+    cwd = view.cwd
+    home = os.path.expanduser("~")
+    if cwd and home != "~" and (cwd == home or cwd.startswith(home + os.sep)):
+        cwd = "~" + cwd[len(home):]
+    return {
+        "id": view.id,
+        "name": view.name,
+        "alive": view.alive,
+        "createdAt": view.created_at,
+        "cwd": cwd,
+    }
+
+
 # env_reason, not the full gate: same-origin GETs carry no Origin
 # header (same reasoning as /status).
 @gated(env_reason)
 def _terminal_sessions(registry: TerminalSessionRegistry):
-    return jsonify({"sessions": registry.list(), "max": registry.MAX_SESSIONS})
+    sessions = [_session_wire(view) for view in registry.list()]
+    return jsonify({"sessions": sessions, "max": registry.MAX_SESSIONS})
 
 
 @gated()

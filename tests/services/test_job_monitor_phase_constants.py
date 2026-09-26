@@ -20,10 +20,12 @@ from datetime import datetime, timezone
 
 import pytest
 
+from quodeq.analysis.runner_markers import emit_marker
 from quodeq.core.stream.events import COPILOT_MCP_POLICY_REASON
 from quodeq.services._job_model import Job
 from quodeq.services.jobs import InMemoryJobStore, JobManager
 from quodeq.shared import constants as _constants_module
+from quodeq.shared.cc_marker import parse_cc_marker
 from quodeq.shared.constants import (
     CC_MARKER_KEY, CC_PHASE_ANALYZING, CC_PHASE_ANALYZING_START,
     CC_PHASE_DEADLINE_EXTENDED, CC_PHASE_REPORT_PATH, CC_PHASE_SCORING, CC_PHASE_SETUP,
@@ -103,3 +105,17 @@ def test_report_path_marker_from_the_shared_constant_sets_output():
 
     assert job.output_project == "p1"
     assert job.output_run_id == "r1"
+
+
+def test_parse_cc_marker_round_trips_every_phase_runner_markers_emits(capsys):
+    for phase in shared_constants.values():
+        emit_marker(phase, dimension="security")
+
+        line = capsys.readouterr().out.strip()
+
+        assert parse_cc_marker(line) == {CC_MARKER_KEY: phase, "dimension": "security"}
+
+
+@pytest.mark.parametrize("line", ["not json", "[1, 2, 3]", '"just a string"'])
+def test_parse_cc_marker_returns_none_for_non_marker_lines(line):
+    assert parse_cc_marker(line) is None

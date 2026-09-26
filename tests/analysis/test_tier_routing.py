@@ -132,6 +132,33 @@ class TestDimensionAnalysisModel:
             assert analysis_config is not None
             assert analysis_config.ai_model is None
 
+    def test_fallback_carries_the_runs_drop_counter_and_mcp_registry(self, tmp_path):
+        """I1: the single-agent fallback (no source files found for the pool
+        queue) must still reach the run's owners, without run_config (that
+        would turn on the per-file API cache writer for this fallback)."""
+        config = RunConfig(src=tmp_path, language="python")
+        ctx = AnalysisContext(
+            dimensions_data={}, date_str="2026-04-03", template="",
+            subagent_template="", total=1,
+        )
+
+        with patch("quodeq.analysis._dimension_steps.run_analysis") as mock_run:
+            mock_run.return_value = None
+            run_dimension_analysis(config, "security", "test prompt", 0, ctx)
+
+            call_kwargs = mock_run.call_args
+            analysis_config = call_kwargs.kwargs.get("config")
+            if analysis_config is None:
+                for arg in call_kwargs.args:
+                    if isinstance(arg, AnalysisConfig):
+                        analysis_config = arg
+                        break
+
+        assert analysis_config is not None
+        assert analysis_config.drop_counter is config.drop_counter
+        assert analysis_config.mcp_registry is config.mcp_registry
+        assert analysis_config.run_config is None
+
 
 class TestSubagentModelEnvVar:
     """Subagent model env vars should be standardized."""

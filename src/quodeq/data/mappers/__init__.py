@@ -35,7 +35,6 @@ from ._mapper_plugins import (
     parse_plugin_info,
 )
 from ._mapper_violations import (
-    parse_trend_point,
     parse_violation_response,
     parse_violation_summary,
 )
@@ -61,8 +60,7 @@ __all__ = [
     # plugins
     "parse_plugin_dimension",
     "parse_plugin_info",
-    # violations & trends
-    "parse_trend_point",
+    # violations
     "parse_violation_response",
     "parse_violation_summary",
 ]

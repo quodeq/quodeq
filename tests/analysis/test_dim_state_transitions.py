@@ -19,6 +19,9 @@ def _mk_config(work_dir: Path):
     config.source_file_count = 10
     config.work_dir = work_dir
     config.src = work_dir
+    # None falls back to the module-default drop counter (would otherwise
+    # be a MagicMock and break report_run_drop_stats's ratio formatting).
+    config.drop_counter = None
     return config
 
 
@@ -242,6 +245,9 @@ class TestRunDirResolution:
         config.options.skip_scoring = True
         config.options.incremental = False
         config.source_file_count = 1
+        # None falls back to the module-default drop counter (would otherwise
+        # be a MagicMock and break report_run_drop_stats's ratio formatting).
+        config.drop_counter = None
 
         with RunLifecycleContext(run_dir, "ext-test", ["security"]):
             # Seed wrote PENDING to <run_dir>/dimensions.json.

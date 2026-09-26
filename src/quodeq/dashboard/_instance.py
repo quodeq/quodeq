@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 from quodeq.shared.constants import PLATFORM_WIN32
-from quodeq.shared.env_paths import get_run_dir
+from quodeq.shared.env_paths import ensure_run_dir
 from quodeq.shared.fault_isolation import run_isolated
 from quodeq.shared.utils import TEXT_ENCODING
 
@@ -31,11 +31,17 @@ _WIN_PORT_FILE = "dashboard.port"
 
 
 def _default_sock_path() -> Path:
-    return get_run_dir() / "dashboard.sock"
+    # ensure (not the pure run_dir_path): this default is threaded via
+    # instance.sock_path into a spawned webview subprocess's argv, which
+    # binds the unix socket at this exact path without creating the parent
+    # dir itself (_server.py:_open_native_window, _webview_window.py).
+    return ensure_run_dir() / "dashboard.sock"
 
 
 def _default_port_file() -> Path:
-    return get_run_dir() / _WIN_PORT_FILE
+    # Same reasoning as _default_sock_path: the Windows child process writes
+    # the port file at this exact path with no mkdir step of its own.
+    return ensure_run_dir() / _WIN_PORT_FILE
 
 
 class InstanceController:

@@ -5,6 +5,7 @@ import logging
 from unittest.mock import patch
 
 from quodeq.api import _log_buffer, security as security_module
+from quodeq.shared.log_throttle import LogThrottle
 
 
 def _bad_record() -> logging.LogRecord:
@@ -27,9 +28,9 @@ def test_buffer_handler_still_appends_well_formed_records() -> None:
     assert any("3 items" in str(entry) for entry in buffer._entries)
 
 
-def test_csp_failure_logger_is_called_directly(monkeypatch) -> None:
-    monkeypatch.setattr(security_module, "_last_csp_ws_failure_log_at", None)
+def test_csp_failure_logger_is_called_directly() -> None:
+    throttle = LogThrottle(security_module._CSP_WS_FAILURE_LOG_INTERVAL_S)
     with patch.object(security_module._logger, "warning") as warning:
-        security_module._log_csp_ws_failure(ValueError("boom"))
+        security_module._log_csp_ws_failure(ValueError("boom"), throttle)
     warning.assert_called_once()
     assert "ValueError" in warning.call_args.args

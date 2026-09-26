@@ -20,7 +20,7 @@ from quodeq.core.run.job_status import JobStatus
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.data.fs.standards_loader import load_compiled_refs, read_req_to_principle_map
 from quodeq.core.scoring.engine import score_evidence
-from quodeq.services.scored_jobs_registry import claim_scoring, release_scoring
+from quodeq.services.scored_jobs_registry import ScoringClaims
 from quodeq.services.background import BackgroundRunner
 from quodeq.services.grade_formula import load_params
 from quodeq.shared.fault_isolation import run_isolated
@@ -204,7 +204,9 @@ def score_completed_evidence(
         _score_one_dimension(dim_id, jsonl_path, files_read, ctx, deps)
 
 
-def score_terminal_run_once(job_id: str, job: Any, runner: BackgroundRunner, reports_dir: str) -> None:
+def score_terminal_run_once(
+    job_id: str, job: Any, runner: BackgroundRunner, reports_dir: str, *, claims: ScoringClaims,
+) -> None:
     """Score a failed/cancelled *job*'s completed dimensions, once, off-thread.
 
     *job_id* is the caller's own identifier for the job, not derived from
@@ -213,14 +215,14 @@ def score_terminal_run_once(job_id: str, job: Any, runner: BackgroundRunner, rep
 
     Offloaded to *runner* so the caller (a GET route) returns immediately;
     scoring may involve heavy I/O (reading evidence, writing score files).
-    ``claim_scoring`` is atomic: exactly one concurrent call wins the claim.
-    A dropped submission (queue full) releases the claim so the next call
-    retries.
+    *claims* is the app's already-scored claims owner; ``claims.claim`` is
+    atomic, so exactly one concurrent call wins the claim. A dropped
+    submission (queue full) releases the claim so the next call retries.
     """
     job_status = getattr(job, "status", None)
     if job_status not in (JobStatus.FAILED, JobStatus.CANCELLED):
         return
-    if not claim_scoring(job_id):
+    if not claims.claim(job_id):
         return
     _score_args = {
         "outputProject": job.output_project,
@@ -235,4 +237,4 @@ def score_terminal_run_once(job_id: str, job: Any, runner: BackgroundRunner, rep
 
     if not runner.submit(_score_in_bg, name=f"score-{job_id}"):
         # Dropped (queue full): give the claim back so the next GET retries.
-        release_scoring(job_id)
+        claims.release(job_id)

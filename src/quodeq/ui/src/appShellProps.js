@@ -35,12 +35,12 @@ export function buildSidebarProps({
 export function buildTopBarProps({
   resolvedDisplayName, serverConnected, sidebarProvider, sidebarModel, selectedSource,
   projectsCount, onEvaluateClick, evaluating, topbarRunProgress, navTab, setSidebarPinned,
-  breadcrumb, mobileTitle, navStackLength, navPop, effectiveDark, toggleTheme,
+  breadcrumb, mobileTitle, navStackLength, navPop, effectiveDark, toggleTheme, serverUrl,
 }) {
   return {
     projectName: resolvedDisplayName,
     serverConnected,
-    serverUrl: typeof window !== 'undefined' ? window.location.origin : null,
+    serverUrl,
     provider: sidebarProvider,
     model: sidebarModel,
     selectedSource,

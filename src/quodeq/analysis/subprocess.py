@@ -38,12 +38,12 @@ from quodeq.analysis._api_standards_text import (
     gather_source_files,  # noqa: F401 -- re-export
     load_standards_text,  # noqa: F401 -- re-export
     render_standards_grouped,  # noqa: F401 -- re-export
-    SKIP_DIRS,  # noqa: F401 -- re-export
+    skip_dirs,
 )
 from quodeq.analysis._command import (
     build_ai_cmd,
     build_analysis_env,
-    register_cli_mcp,
+    DEFAULT_CLI_MCP_REGISTRY,
 )
 from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, SpawnPaths
 from quodeq.analysis._process import AnalysisError, check_process_result, spawn_and_monitor
@@ -60,6 +60,17 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_cmd_path, get_ai_model
 
 
 _log = logging.getLogger(__name__)
+
+
+_SKIP_DIRS_OLD_NAME = "SKIP_DIRS"  # eager `from x import SKIP_DIRS` would force
+# detection.json to load at import time (SKIP_DIRS lives lazily in _api_standards_text)
+
+
+def __getattr__(name: str):
+    if name == _SKIP_DIRS_OLD_NAME:
+        return skip_dirs()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 # Re-export public API so existing imports keep working
 __all__ = [
@@ -90,17 +101,31 @@ def _run_cli_analysis(
     """Run analysis via CLI subprocess."""
     ai_cmd = cfg.ai_cmd
     # ai_cmd comes from the AI_CMD/AI_PROVIDER env var and is gated to known
-    # providers in register_cli_mcp before any subprocess call; it runs via a
-    # subprocess list (no shell injection). Skipping shutil.which for CI/PATH.
+    # providers in CliMcpRegistry.ensure_registered before any subprocess
+    # call; it runs via a subprocess list (no shell injection). Skipping
+    # shutil.which for CI/PATH.
     configs = get_provider_configs()
     provider_cfg = configs.get(ai_cmd, {})
     mcp_style = provider_cfg.get("mcp_style", MCP_STYLE_CONFIG_FILE)
 
     # For cli-register providers (e.g. Gemini), register MCP server before the run.
-    # Registration is shared across all parallel agents — the first agent registers,
-    # and we never unregister during the run (cleanup happens at pool level).
+    # Registration is shared across all parallel agents of one run (the run's
+    # RunConfig owns the registry, so pool worker threads share it) — the
+    # first agent registers, and we never unregister during the run (cleanup
+    # happens at pool level). A run-less caller falls back to the process
+    # default registry.
     if mcp_style == MCP_STYLE_CLI_REGISTER and cfg.jsonl_file is not None:
-        register_cli_mcp(ai_cmd, cfg, work_dir)
+        # Prefer the field carried directly on this AnalysisConfig (every
+        # builder fills it from the run's RunConfig, including the
+        # single-agent fallback and consolidated mode, which don't set
+        # run_config), then run_config's registry, then the process default.
+        if cfg.mcp_registry is not None:
+            mcp_registry = cfg.mcp_registry
+        elif cfg.run_config is not None:
+            mcp_registry = cfg.run_config.mcp_registry
+        else:
+            mcp_registry = DEFAULT_CLI_MCP_REGISTRY
+        mcp_registry.ensure_registered(ai_cmd, cfg, work_dir)
 
     args, mcp_config_path = build_ai_cmd(prompt, cfg, work_dir=work_dir)
     stream_err = Path(str(stream_file) + ".err")
@@ -118,7 +143,7 @@ def _run_cli_analysis(
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
         # Don't unregister cli MCP here — other parallel agents may still need it.
-        # Cleanup happens via register_cli_mcp's idempotent remove-then-add on next run.
+        # Cleanup happens via ensure_registered's idempotent remove-then-add on next run.
 
     if not timed_out:
         if ai_cmd == Provider.COPILOT:

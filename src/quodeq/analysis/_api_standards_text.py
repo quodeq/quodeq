@@ -7,6 +7,7 @@ mock.patch targets.
 """
 from __future__ import annotations
 
+import functools
 import json as _json
 import logging
 import os
@@ -29,7 +30,21 @@ def _load_skip_dirs() -> frozenset[str]:
         return frozenset({"node_modules", ".git", "__pycache__", "venv", ".venv", "dist", "build"})
 
 
-SKIP_DIRS = _load_skip_dirs()
+@functools.cache
+def skip_dirs() -> frozenset[str]:
+    """Skip dirs from detection.json (shared with manifest builder), read once."""
+    return _load_skip_dirs()
+
+
+_SKIP_DIRS_OLD_NAME = "SKIP_DIRS"  # __getattr__ shim for the old module-level constant
+
+
+def __getattr__(name: str):
+    if name == _SKIP_DIRS_OLD_NAME:
+        return skip_dirs()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 # Code files first, style/markup last
 _CODE_EXTS = frozenset({".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs", ".rb", ".php", ".c", ".cpp", ".h", ".cs", ".swift", ".kt"})
 _MARKUP_EXTS = frozenset({".html", ".css", ".scss", ".vue", ".svelte"})
@@ -38,7 +53,7 @@ _MARKUP_EXTS = frozenset({".html", ".css", ".scss", ".vue", ".svelte"})
 def _walk_source_files(work_dir: Path, exts: frozenset[str]) -> Iterator[Path]:
     """Source files under *work_dir*, never descending into skip dirs or dot dirs."""
     for root, dirs, files in os.walk(work_dir):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
+        dirs[:] = [d for d in dirs if d not in skip_dirs() and not d.startswith(".")]
         for name in files:
             if not name.startswith(".") and os.path.splitext(name)[1] in exts:
                 yield Path(root, name)

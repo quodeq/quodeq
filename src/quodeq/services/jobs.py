@@ -104,6 +104,12 @@ class JobManager(JobMonitorMixin, JobCapacityMixin):
         # the QUODEQ_MAX_CONCURRENT_JOBS env var" (see _max_concurrent_jobs
         # in _job_capacity_mixin.py).
         self._max_concurrent_jobs_override = seams.max_concurrent_jobs
+        # Captured once, here, rather than read off the module on every
+        # watchdog tick: a fixed grace period for this manager's lifetime,
+        # so two ticks never disagree mid-run. A test or caller that mutates
+        # WATCHDOG_DEADLINE_GRACE_S after this manager is built no longer
+        # changes its behavior; mutate it before construction instead.
+        self._watchdog_grace_s = WATCHDOG_DEADLINE_GRACE_S
         # _run_log_writers and _pre_marker_buffer are owned exclusively by the
         # per-job _consume_stream thread started in start_job(). No other code
         # path may read or mutate these dicts — doing so reintroduces the
