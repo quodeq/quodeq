@@ -50,6 +50,20 @@ def test_publish_job_error_captured(tmp_path, monkeypatch, status):
     assert result["error"] == "boom"
 
 
+def test_publish_job_unexpected_error_captured(tmp_path, monkeypatch, status, caplog):
+    """An exception outside PublishError (a real bug, not a user-actionable
+    publish failure) must not leave the job stuck at "running": the
+    run_isolated boundary logs it with a traceback and marks the slot error."""
+    _run_inline(monkeypatch)
+    with patch.object(shared_publish, "publish_project", side_effect=RuntimeError("bug")):
+        with caplog.at_level("WARNING"):
+            start_publish("p1", "u", evaluations_root=tmp_path, status=status)
+    result = get_publish_status(status)
+    assert result["state"] == "error"
+    assert result["error"] == "An unexpected error occurred while publishing."
+    assert any("publish" in r.message for r in caplog.records)
+
+
 def test_publish_rejected_while_running(tmp_path, status):
     status.set(state="running", project="p0")
     assert start_publish("p1", "u", evaluations_root=tmp_path, status=status) == "already_running"

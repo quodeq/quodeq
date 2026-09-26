@@ -15,6 +15,7 @@ accidentally suppress a real evaluation.
 """
 from __future__ import annotations
 
+import sqlite3
 from typing import Any
 
 from quodeq.core.observability import NULL_LOG, LogSink
@@ -71,7 +72,7 @@ def find_active_evaluation(
         data = provider.list_projects(reports_dir)
         projects = data.get("projects", []) if isinstance(data, dict) else []
         project_ids = {_project_id(p) for p in projects}
-    except Exception as exc:  # noqa: BLE001 - transient glitch in project list: fall back to first running job
+    except (OSError, ValueError, sqlite3.Error) as exc:
         log.warning(f"project list failed while checking active-evaluation staleness: {exc}")
         return running[0]
     for j in running:

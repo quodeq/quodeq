@@ -110,7 +110,7 @@ def _score_one_dimension(
             dim_id, ctx.run_id[:8], files_read,
         )
     except (OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
-        deps.log.debug("Could not score cancelled dimension '%s': %s", dim_id, exc)
+        deps.log.warning("Could not score cancelled dimension '%s': %s", dim_id, exc)
 
 
 def _should_score_dimension(

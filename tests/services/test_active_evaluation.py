@@ -126,3 +126,15 @@ def test_dict_job_with_an_empty_output_project_falls_back_to_project():
         projects=[{"id": "proj-1", "name": "Proj"}],
     )
     assert find_active_evaluation(provider, _REPORTS) is None
+
+
+def test_projects_unnamed_exception_propagates():
+    """A RuntimeError from list_projects is outside the (OSError, ValueError,
+    sqlite3.Error) tuple: it is a programming error, not the transient
+    filesystem/index glitch the fallback guards, so it must propagate."""
+    provider = StubProvider(
+        [_job("j1", project="gone")],
+        projects_error=RuntimeError("bug in provider"),
+    )
+    with pytest.raises(RuntimeError, match="bug in provider"):
+        find_active_evaluation(provider, _REPORTS)

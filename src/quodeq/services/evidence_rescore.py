@@ -96,7 +96,7 @@ def _recompute_metrics(evidence, source_file_count: int) -> None:
 
 def _parse_evidence_jsonl(jsonl: Path, run_dir: Path, dim_id: str, request: EvidenceScoreRequest):
     """Parse the evidence jsonl into an Evidence object, or None on any
-    parse failure (logged at debug)."""
+    parse failure (logged at warning)."""
     compiled_dir, evaluators_dir = (request.standard_dirs_fn or standard_dirs)()
     try:
         return parse_jsonl_to_evidence(jsonl, EvidenceContext(
@@ -110,7 +110,7 @@ def _parse_evidence_jsonl(jsonl: Path, run_dir: Path, dim_id: str, request: Evid
             on_quarantine=log_quarantined_findings,
             on_malformed_line=log_malformed_jsonl_line))
     except (OSError, ValueError, KeyError) as exc:
-        _logger.debug("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
+        _logger.warning("Evidence rescore parse failed for %s/%s: %s", run_dir.name, dim_id, exc)
         return None
 
 

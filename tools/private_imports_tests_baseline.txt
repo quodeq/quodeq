@@ -1023,7 +1023,7 @@ tests/services/test_jobs_deadline_marker.py:78:private-name:quodeq.analysis._api
 tests/services/test_jobs_run_log_batching.py:9:private-name:quodeq.services._job_log_tee._iter_line_batches
 tests/services/test_per_run_versions_memo.py:15:private-name:quodeq.services.trend_fetcher._make_version_for
 tests/services/test_plugin_discovery.py:6:private-name:quodeq.services.plugin_discovery._discover_from_detection
-tests/services/test_post_run_hook.py:14:private-module:quodeq.services._post_run_hook.PostRunHook
+tests/services/test_post_run_hook.py:19:private-module:quodeq.services._post_run_hook.PostRunHook
 tests/services/test_project_summary_cache.py:5:private-module:quodeq.services._fs_metadata
 tests/services/test_projects_cache_entities.py:13:private-module:quodeq.services._projects_cache.mod
 tests/services/test_projects_cache_entities.py:15:private-module:quodeq.services._projects_cache.ProjectsCache
@@ -1085,11 +1085,11 @@ tests/services/test_tooling_mixin.py:10:private-name:quodeq.services.tooling_mix
 tests/services/test_tooling_mixin.py:10:private-name:quodeq.services.tooling_mixin._fetch_anthropic_models
 tests/services/test_tooling_mixin.py:10:private-name:quodeq.services.tooling_mixin._load_fallback_claude_models
 tests/services/test_violations_coverage.py:6:private-name:quodeq.services.violations._max_violation_files
-tests/services/test_violations_jsonl_coverage.py:113:private-name:quodeq.services._violations_jsonl._build_resolver
-tests/services/test_violations_jsonl_coverage.py:127:private-name:quodeq.services._violations_jsonl._build_resolver
+tests/services/test_violations_jsonl_coverage.py:119:private-name:quodeq.services._violations_jsonl._build_resolver
 tests/services/test_violations_jsonl_coverage.py:133:private-name:quodeq.services._violations_jsonl._build_resolver
-tests/services/test_violations_jsonl_coverage.py:140:private-module:quodeq.services._violations_jsonl.parse_violations_from_jsonl
-tests/services/test_violations_jsonl_coverage.py:149:private-module:quodeq.services._violations_jsonl.parse_violations_from_jsonl
+tests/services/test_violations_jsonl_coverage.py:139:private-name:quodeq.services._violations_jsonl._build_resolver
+tests/services/test_violations_jsonl_coverage.py:146:private-module:quodeq.services._violations_jsonl.parse_violations_from_jsonl
+tests/services/test_violations_jsonl_coverage.py:155:private-module:quodeq.services._violations_jsonl.parse_violations_from_jsonl
 tests/services/test_violations_jsonl_coverage.py:9:private-name:quodeq.services._violations_jsonl._parse_jsonl_findings
 tests/services/test_violations_resolve_phases.py:14:private-name:quodeq.services.violations._resolve_from_source
 tests/services/test_violations_resolve_phases.py:14:private-name:quodeq.services.violations._suppression_keys

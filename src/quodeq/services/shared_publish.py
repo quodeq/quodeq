@@ -42,6 +42,7 @@ from quodeq.services.wiring import (
     ensure_shared_clone,
     run_git,
 )
+from quodeq.shared.fault_isolation import run_isolated
 from quodeq.shared.validation import validate_path_segment
 
 __all__ = [
@@ -184,7 +185,7 @@ def get_publish_status(status: PublishStatus | None = None) -> dict:
     return (status or _default_status).copy()
 
 
-def _run_publish(
+def _do_publish(
     project_id: str, url: str, evaluations_root: Path, status: PublishStatus,
 ) -> None:
     try:
@@ -192,9 +193,20 @@ def _run_publish(
         status.set(state=PublishState.DONE, runs=count, error=None, finished_at=time.time())
     except PublishError as exc:
         status.set(state=PublishState.ERROR, error=str(exc), finished_at=time.time())
-    except Exception:  # never leave the job stuck in "running"
-        logger.exception("unexpected publish failure")
-        status.set(state=PublishState.ERROR, error="An unexpected error occurred while publishing.", finished_at=time.time())
+
+
+def _run_publish(
+    project_id: str, url: str, evaluations_root: Path, status: PublishStatus,
+) -> None:
+    run_isolated(
+        lambda: _do_publish(project_id, url, evaluations_root, status),
+        label="publish", log=logger,
+        on_error=lambda _exc: status.set(
+            state=PublishState.ERROR,
+            error="An unexpected error occurred while publishing.",
+            finished_at=time.time(),
+        ),
+    )
 
 
 class PublishStartResult(StrEnum):
