@@ -1,10 +1,9 @@
 """resolve_trust_model: a failure outside its narrow catches must propagate.
 
-Split from test_trust_model.py to keep that file under the size ratchet's
-300-line cap. Its degrade-on-malformed-input tests stay there; this sibling
-covers the other half of the reliability-cycle-2 narrowing -- an unnamed
-exception is a real bug, not advisory-data noise, and must reach the
-per-dim/startup fault-isolation boundary rather than be silently absorbed.
+Sibling of test_trust_model.py, which covers the degrade-on-malformed-input
+tests; this file covers the other half of the reliability-cycle-2 narrowing --
+an unnamed exception is a real bug, not advisory-data noise, and must reach
+the per-dim/startup fault-isolation boundary rather than be silently absorbed.
 """
 from __future__ import annotations
 

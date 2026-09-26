@@ -1,9 +1,9 @@
 """load_suppression_rules: a failure outside its narrow catches must propagate.
 
-Split out from tests/services/test_suppression_rules.py to keep that file
-under the size ratchet's 300-line cap. See that file's TestLoadSuppressionRules
-for the degrade-on-malformed-input coverage; this sibling covers the other
-half of the reliability-cycle-2 narrowing -- an unnamed exception is a real
+Sibling of tests/services/test_suppression_rules.py's
+TestLoadSuppressionRules, which covers the degrade-on-malformed-input
+coverage; this file covers the other half of the reliability-cycle-2
+narrowing -- an unnamed exception is a real
 bug, not advisory-data noise, and must reach the caller rather than being
 silently absorbed as "no rules".
 """

@@ -1,8 +1,7 @@
-"""Reader-thread error handling for the streamed API adapter: split out of
-``test_api_adapter.py`` to keep that file under the size ratchet.
+"""Reader-thread error handling for the streamed API adapter.
 
 ``_drain`` (the reader-thread body) catches the SDK/transport's own
-exception types itself now, rather than letting every exception fall
+exception types itself, rather than letting every exception fall
 through to the reader thread's ``run_isolated`` boundary. These two tests
 pin the resulting split: an expected SDK/transport error (in particular the
 one a cancel's kill hook causes by closing the client mid-read) produces no

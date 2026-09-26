@@ -165,7 +165,6 @@ def test_csp_header_propagates_a_failure_outside_the_narrowed_tuple(monkeypatch)
         raise RuntimeError("host parse exploded")
 
     monkeypatch.setattr(security_module, "_same_origin_ws_sources", _real_bug)
-    _reset_throttle(monkeypatch)
 
     app = create_app()
     with app.test_client() as client:

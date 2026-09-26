@@ -1,11 +1,9 @@
 """Server-derived write-tool grant and MCP server args for one assistant turn.
 
-Split out of orchestrator.py purely for file size. Every name below is used
-from orchestrator.py (and some from tests) across that module boundary, so
-none of them is underscore-private even though the module itself is;
-``orchestrator.py`` imports and re-exports them for backward-compatible
-imports (tests and ``api/assistant_session_routes.py`` import them from
-there).
+Every name below is used from orchestrator.py (and some from tests) across
+that module boundary, so none of them is underscore-private even though the
+module itself is; ``orchestrator.py`` imports and re-exports them so tests
+and ``api/assistant_session_routes.py`` can import them from there.
 """
 from __future__ import annotations
 

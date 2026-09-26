@@ -23,11 +23,10 @@ with every parser succeeding, caught by ``detect_shape``'s own narrowed
 guard, so those are the failure modes this module absorbs; anything else
 propagates to the caller's own fault-isolation boundary.
 
-``Deployment`` / ``ProjectShape`` live in ``_project_shape_types.py``;
-manifest-reading helpers live in ``_project_shape_io.py``; per-ecosystem
-signal detectors live in ``_project_shape_signals.py`` -- all split out to
-keep this module under the size ratchet's 300-line cap and re-exported (or,
-for the private signal functions, imported and called) from here.
+``Deployment`` / ``ProjectShape`` live in ``_project_shape_types.py`` and are
+re-exported from here; manifest-reading helpers live in
+``_project_shape_io.py``; per-ecosystem signal detectors live in
+``_project_shape_signals.py`` and are imported and called from here.
 """
 from __future__ import annotations
 

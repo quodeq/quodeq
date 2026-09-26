@@ -1,6 +1,5 @@
 """One run's sync step, plus the fault isolation run_index's batch loops need.
 
-Split out of run_index.py to keep it under the file-size limit.
 ``run_index.py`` owns the loops (``sync_index``, ``sync_project_dates``) that
 call ``sync_one_run_isolated``/``run_under_savepoint`` once per run, and
 ``sync_index_for_run`` for the single-run API path (already inside its own

@@ -318,13 +318,13 @@ tests/analysis/test_time_limit_autoscale.py:102:private-name:quodeq.analysis.sub
 tests/analysis/test_time_limit_autoscale.py:113:private-name:quodeq.analysis.subagents._pool_launcher._extend_run_deadline
 tests/analysis/test_time_limit_autoscale.py:123:private-name:quodeq.analysis.subagents._pool_launcher._extend_run_deadline
 tests/analysis/test_time_limit_autoscale.py:141:private-name:quodeq.analysis.subagents._pool_launcher._extend_run_deadline
-tests/analysis/test_time_limit_autoscale.py:174:private-module:quodeq.analysis.subagents._pool_launcher
 tests/analysis/test_time_limit_autoscale.py:19:private-name:quodeq.analysis.subagents._pool_launcher._MAX_AUTO_POOL_BUDGET
 tests/analysis/test_time_limit_autoscale.py:19:private-name:quodeq.analysis.subagents._pool_launcher._SECONDS_PER_FILE_AUTOSCALE
 tests/analysis/test_time_limit_autoscale.py:19:private-name:quodeq.analysis.subagents._pool_launcher._UNLIMITED_BUDGET
 tests/analysis/test_time_limit_autoscale.py:19:private-name:quodeq.analysis.subagents._pool_launcher._resolve_time_limit
-tests/analysis/test_time_limit_autoscale.py:210:private-module:quodeq.analysis.subagents._pool_launcher
 tests/analysis/test_time_limit_autoscale.py:81:private-name:quodeq.analysis.subagents._pool_launcher._extend_run_deadline
+tests/analysis/test_time_limit_autoscale_pool.py:24:private-module:quodeq.analysis.subagents._pool_launcher
+tests/analysis/test_time_limit_autoscale_pool.py:60:private-module:quodeq.analysis.subagents._pool_launcher
 tests/analysis/test_verify_io_coverage.py:100:private-name:quodeq.analysis.subagents._verify_io._find_previous_evidence
 tests/analysis/test_verify_io_coverage.py:109:private-name:quodeq.analysis.subagents._verify_io._find_previous_evidence
 tests/analysis/test_verify_io_coverage.py:10:private-name:quodeq.analysis.subagents._verify_io._parse_finding_line
