@@ -677,7 +677,7 @@ tests/dashboard/test_env_injection.py:14:private-module:quodeq.dashboard._api_sp
 tests/dashboard/test_env_injection.py:160:private-module:quodeq.dashboard._server.ensure_action_api_forced
 tests/dashboard/test_env_injection.py:161:private-module:quodeq.dashboard._webview_token.ENV_WEBVIEW_TOKEN
 tests/dashboard/test_env_injection.py:162:private-module:quodeq.dashboard._probes.ApiProbes
-tests/dashboard/test_instance.py:5:private-module:quodeq.dashboard._instance.InstanceController
+tests/dashboard/test_instance.py:7:private-module:quodeq.dashboard._instance.InstanceController
 tests/dashboard/test_instance_coverage.py:12:private-module:quodeq.dashboard._instance.InstanceController
 tests/dashboard/test_instance_coverage.py:177:private-name:quodeq.dashboard._instance._default_sock_path
 tests/dashboard/test_instance_coverage.py:183:private-name:quodeq.dashboard._instance._default_sock_path

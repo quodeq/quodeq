@@ -46,29 +46,33 @@ def should_check(state: UpdateState, env: dict[str, str] | None = None) -> bool:
     try:
         last = datetime.fromisoformat(state.last_check_ts)
         return (datetime.now(timezone.utc) - last).total_seconds() >= _interval(environ)
-    except ValueError:
+    except (ValueError, TypeError):
+        # ValueError: unparseable. TypeError: a naive timestamp (no tzinfo)
+        # makes the aware-minus-naive subtraction above raise.
         return True
 
 
 def run_check(env: dict[str, str] | None = None, force: bool = False) -> None:
     """Fetch the latest release and fold it into the on-disk state.
 
-    The attempt timestamp is stamped before the network call and persisted even
-    when the fetch fails, so a broken network cannot turn this into a per-launch
-    retry. *force* skips the ``should_check`` gate. Fails soft only for the
-    (AttributeError, TypeError) a malformed GitHub/PyPI JSON body leaks through
-    ``fetch_latest``; anything else is a bug and propagates (``check_async``'s
-    thread boundary is what isolates a direct call from a daemon thread).
+    The attempt timestamp is stamped and persisted BEFORE the network call, so
+    it survives every failure -- including one outside the narrowed except
+    below -- without turning this into a per-launch retry. *force* skips the
+    ``should_check`` gate. Fails soft only for the (AttributeError, TypeError)
+    a malformed GitHub/PyPI JSON body leaks through ``fetch_latest``; anything
+    else is a bug and propagates (``check_async``'s thread boundary is what
+    isolates a direct call from a daemon thread).
     """
     state = read_state(env)
     if not force and not should_check(state, env):
         return
-    # Stamp the attempt time before the network call so it persists even on failure.
+    # Persisted here, before the network call: the one write every launch is
+    # guaranteed to get, whatever fetch_latest does or raises.
     state.last_check_ts = utc_now_iso()
+    write_state(state, env)
     try:
         info = fetch_latest(_channel.detect_channel(), state.etag)
         if info is None:
-            write_state(state, env)
             return
         if info.not_modified:
             state.etag = info.etag or state.etag
@@ -82,7 +86,6 @@ def run_check(env: dict[str, str] | None = None, force: bool = False) -> None:
         write_state(state, env)
     except (AttributeError, TypeError) as exc:
         _logger.debug("update check failed: %s", exc, exc_info=True)
-        write_state(state, env)  # always persist last_check_ts
 
 
 def check_async(env: dict[str, str] | None = None) -> None:

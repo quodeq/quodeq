@@ -44,24 +44,26 @@ def test_run_check_persists_latest(tmp_path) -> None:
     assert state.last_check_ts is not None
 
 
-def test_run_check_is_fail_silent_for_malformed_json(tmp_path) -> None:
-    """A malformed-JSON leak from fetch_latest (AttributeError/TypeError, e.g.
-    a list item where a dict was expected) is caught; the attempt timestamp
-    is still persisted."""
+@pytest.mark.parametrize("exc", [AttributeError("boom"), TypeError("boom")])
+def test_run_check_is_fail_silent_for_the_narrowed_tuple(tmp_path, exc) -> None:
+    """A malformed-JSON leak from fetch_latest (e.g. a list item where a dict
+    was expected) is caught; the attempt timestamp is still persisted."""
     env = _env(tmp_path)
-    with patch("quodeq.update.checker.fetch_latest", side_effect=AttributeError("boom")):
+    with patch("quodeq.update.checker.fetch_latest", side_effect=exc):
         checker.run_check(env, force=True)  # must not raise
     assert read_state(env).last_check_ts is not None
 
 
-def test_run_check_propagates_an_unexpected_error(tmp_path) -> None:
-    """R-FT-7 -- an error outside (AttributeError, TypeError) (e.g. a
-    programming bug) must now propagate instead of being swallowed. The
-    check_async thread boundary is what isolates the daemon-thread path."""
+def test_run_check_propagates_an_unexpected_error_but_still_persists_the_attempt(tmp_path) -> None:
+    """R-FT-7 -- an error outside (AttributeError, TypeError) must propagate.
+    Review fix: fetch_latest can raise something outside that tuple too (e.g.
+    httpx.InvalidURL); the attempt must still be persisted -- it is written
+    BEFORE the network call now, not from inside this narrowed except."""
     env = _env(tmp_path)
     with patch("quodeq.update.checker.fetch_latest", side_effect=RuntimeError("boom")):
         with pytest.raises(RuntimeError, match="boom"):
             checker.run_check(env, force=True)
+    assert read_state(env).last_check_ts is not None
 
 
 def test_get_status_update_available(tmp_path) -> None:
@@ -150,6 +152,15 @@ def test_should_check_invalid_timestamp_returns_true(tmp_path) -> None:
     """should_check returns True when last_check_ts is unparseable."""
     env = _env(tmp_path)
     state = UpdateState(last_check_ts="not-a-date")
+    assert checker.should_check(state, env) is True
+
+
+def test_should_check_naive_timestamp_returns_true(tmp_path) -> None:
+    """Review fix -- a naive (no tzinfo) last_check_ts makes the aware-minus-
+    naive subtraction raise TypeError, which used to escape should_check and
+    500 the /api/update/check route. Now counts as 'due', per the docstring."""
+    env = _env(tmp_path)
+    state = UpdateState(last_check_ts="2026-01-01T00:00:00")
     assert checker.should_check(state, env) is True
 
 
@@ -261,7 +272,9 @@ def test_check_async_thread_survives_a_run_check_failure(tmp_path, caplog) -> No
         checker.check_async(env)  # must not raise
 
     assert "update check failed" in caplog.text
-    assert read_state(env).last_check_ts is None  # run_isolated caught it before write_state
+    # Review fix -- the attempt timestamp is now persisted BEFORE the network
+    # call, so it's there even though run_isolated caught the failure above.
+    assert read_state(env).last_check_ts is not None
 
 
 def test_check_async_logs_a_warning_on_thread_start_failure(tmp_path, caplog) -> None:
