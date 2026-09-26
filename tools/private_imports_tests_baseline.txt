@@ -457,7 +457,7 @@ tests/api/test_sse_log_helpers.py:14:private-module:quodeq.api._sse_log_helpers.
 tests/api/test_sse_log_helpers.py:14:private-module:quodeq.api._sse_log_helpers.sse_tail_generator
 tests/api/test_sse_log_helpers.py:14:private-module:quodeq.api._sse_log_helpers.tail_max_bytes
 tests/api/test_sse_log_helpers.py:14:private-name:quodeq.api._sse_log_helpers._tail_new_lines
-tests/api/test_terminal_routes.py:5:private-name:quodeq.api.terminal_routes._apply_control
+tests/api/test_terminal_routes.py:7:private-name:quodeq.api.terminal_routes._apply_control
 tests/api/test_terminal_ws_helpers.py:16:private-module:quodeq.api._terminal_ws_helpers
 tests/api/test_terminal_ws_helpers.py:17:private-module:quodeq.api._terminal_ws_helpers.setup_terminal_session
 tests/api/test_zip_coverage.py:171:private-name:quodeq.api.zip._ZipSizeLimitError

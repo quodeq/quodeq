@@ -1,4 +1,6 @@
 """Tests for the terminal HTTP routes: status, kill, session CRUD and control frames."""
+import os
+
 import pytest
 from flask import Flask
 
@@ -144,16 +146,21 @@ class _PidManager:
         return self._alive
 
 
-def test_sessions_wire_shape_is_exact(monkeypatch):
+def test_sessions_wire_shape_is_exact(monkeypatch, tmp_path):
     # Characterizes the full /sessions JSON body: the `~` collapse for a cwd
     # under $HOME, an unchanged cwd outside $HOME, and cwd: None for a dead
     # PTY. HOME/USERPROFILE are isolated so the collapse never depends on the
-    # real home (deterministic on Windows too).
-    monkeypatch.setenv("HOME", "/Users/vik")
-    monkeypatch.setenv("USERPROFILE", "/Users/vik")
+    # real home (deterministic on Windows too). Paths are built with
+    # os.path.join, rooted at tmp_path, so they use the platform's own
+    # separator instead of a hardcoded POSIX one.
+    home = os.path.join(str(tmp_path), "home", "vik")
+    outside = os.path.join(str(tmp_path), "other")
+    under_home_cwd = os.path.join(home, "project")
+    monkeypatch.setenv("HOME", home)
+    monkeypatch.setenv("USERPROFILE", home)
     import quodeq.terminal.sessions as sessions_mod
 
-    cwd_by_pid = {1: "/Users/vik/project", 2: "/opt/other", 3: None}
+    cwd_by_pid = {1: under_home_cwd, 2: outside, 3: None}
     monkeypatch.setattr(sessions_mod, "child_cwd", lambda pid: cwd_by_pid.get(pid))
 
     app = Flask(__name__)
@@ -176,11 +183,11 @@ def test_sessions_wire_shape_is_exact(monkeypatch):
         "sessions": [
             {
                 "id": under_home.id, "name": under_home.name, "alive": True,
-                "createdAt": under_home.created_at, "cwd": "~/project",
+                "createdAt": under_home.created_at, "cwd": "~" + os.sep + "project",
             },
             {
                 "id": outside_home.id, "name": outside_home.name, "alive": True,
-                "createdAt": outside_home.created_at, "cwd": "/opt/other",
+                "createdAt": outside_home.created_at, "cwd": outside,
             },
             {
                 "id": dead.id, "name": dead.name, "alive": False,
