@@ -25,6 +25,7 @@ from quodeq.core.standards.visibility import (
     VISIBILITY_RELPATH,
     normalize_ids,
 )
+from quodeq.shared.advisory_json import read_advisory_json
 
 _logger = logging.getLogger(__name__)
 
@@ -79,13 +80,12 @@ def load_project_overrides(project_root: str | Path | None) -> dict[str, dict]:
     if not project_root:
         return {}
     path = Path(project_root) / OVERRIDES_RELPATH
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, RecursionError) as exc:
+    data, err = read_advisory_json(path)
+    if err is not None:
         _logger.warning(
-            "Ignoring unreadable or malformed standards overrides %s: %s", path, exc)
+            "Ignoring unreadable or malformed standards overrides %s: %s", path, err)
+        return {}
+    if data is None:
         return {}
     overrides = data.get("overrides") if isinstance(data, dict) else None
     if not isinstance(overrides, dict):

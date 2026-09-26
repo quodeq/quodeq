@@ -46,13 +46,13 @@ being silently absorbed.
 """
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
 from quodeq.context.project_shape import Deployment, detect_shape
+from quodeq.shared.advisory_json import read_advisory_json
 
 _logger = logging.getLogger(__name__)
 
@@ -123,12 +123,11 @@ def _read_profile(project_root: Path) -> dict:
     nested arrays) overflowing the C decoder's call stack.
     """
     path = project_root / PROFILE_RELPATH
-    if not path.is_file():
+    data, err = read_advisory_json(path)
+    if err is not None:
+        _logger.warning("Ignoring unreadable or malformed project profile %s: %s", path, err)
         return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, RecursionError) as exc:
-        _logger.warning("Ignoring unreadable or malformed project profile %s: %s", path, exc)
+    if data is None:
         return {}
     if not isinstance(data, dict):
         _logger.warning("Ignoring project profile %s: not a JSON object", path)
