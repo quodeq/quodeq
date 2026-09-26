@@ -79,23 +79,20 @@ def _try_evidence_formats(
 def _apply_rescored_grades(
     result: "dict[str, Any] | None", base: Path, project: str, run_id: str, dimension: str,
 ) -> "dict[str, Any] | None":
-    """Overlay the project-wide dismiss-adjusted score/grade onto a parsed eval dict.
+    """Overlay the current score/grade onto a parsed eval dict.
 
-    ``parse_eval_from_json`` carries the frozen eval-time overall + principle
-    grades (in ``principleGrades`` / ``principles``). After dismissed and
-    deleted violations are filtered from the lists, those grades are stale --
-    they still describe the pre-dismiss scan. Recompute them with the SAME
-    ``scored_run_dimensions`` transform the accumulated overview, the per-run
-    explorer, and the dashboard selected run use, then substitute the
-    dimension's overall score/grade (the ``isOverall`` entry) and its
-    per-principle score/grade so the dimension detail agrees with every other
-    view. A no-op when there are no active dismissals/deletions.
+    ``parse_eval_from_json`` carries the overall + principle grades frozen at
+    eval time (in ``principleGrades`` / ``principles``). Those go stale in two
+    ways: dismissed and deleted violations are filtered from the lists, and
+    the grade tables are re-derived whenever the scoring formula changes.
+    Recompute with the SAME ``scored_run_dimensions`` transform the
+    accumulated overview, the per-run explorer, and the dashboard selected
+    run use (it reads the grade tables and applies suppressions), then
+    substitute the dimension's overall score/grade (the ``isOverall`` entry)
+    and its per-principle score/grade so the dimension detail agrees with
+    every other view.
     """
     if not isinstance(result, dict):
-        return result
-    # No active project-wide filters -> the eval-time grades are already correct;
-    # skip the extra run read. base.parent is the project dir.
-    if not _dismissed_keys(base.parent) and not _deleted_keys(base.parent):
         return result
     from quodeq.services.scoring import scored_run_dimensions  # noqa: PLC0415
 
