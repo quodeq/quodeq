@@ -17,18 +17,18 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.core.run.job_status import external_job_id
-from quodeq.data.sqlite.index_sync import (
-    check_stale_and_promote,
-    delete_orphan_non_terminal_rows,
-    status_mtime_ns,
-    sync_legacy_run,
-    upsert_from_status,
-)
+from quodeq.data.sqlite.index_sync import delete_orphan_non_terminal_rows
 from quodeq.data.sqlite._run_index_schema import (
     SCHEMA_VERSION,  # noqa: F401 — re-export
     open_index,  # noqa: F401 — re-export
 )
+from quodeq.data.sqlite._run_sync_step import (
+    run_under_savepoint,
+    sync_one_run,
+    sync_one_run_isolated,
+    upsert_if_changed,
+)
+from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
 
@@ -73,60 +73,6 @@ def _walk_run_dirs(evaluations_root: Path):
             yield project_dir.name, run_dir.name, run_dir
 
 
-def _upsert_if_changed(
-    db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
-    cached_mtime: int | None,
-) -> None:
-    """Upsert the run's row from ``status.json`` unless *cached_mtime* still matches it.
-
-    Raises whatever ``upsert_from_status`` raises; each caller owns its policy.
-    """
-    if cached_mtime is None or cached_mtime != status_mtime_ns(run_dir):
-        upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
-
-
-def _sync_status_backed_run(
-    db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
-    cached_mtimes: dict[str, int | None] | None = None,
-) -> None:
-    """Sync a run that has a ``status.json`` (the common, non-legacy case)."""
-    job_id = external_job_id(run_id)
-    if cached_mtimes is not None:
-        cached_value = cached_mtimes.get(job_id)
-    else:
-        row = db.execute(
-            "SELECT status_mtime FROM runs WHERE job_id = ?", (job_id,),
-        ).fetchone()
-        cached_value = row[0] if row is not None else None
-    try:
-        _upsert_if_changed(db, run_dir, project_uuid=project_uuid, run_id=run_id, cached_mtime=cached_value)
-    except (sqlite3.Error, OverflowError) as exc:
-        _logger.warning("skipping run %s: %s", run_dir, exc, exc_info=True)
-        return
-    # Always check staleness, even on mtime-unchanged runs.
-    try:
-        check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
-    except (sqlite3.Error, OSError, OverflowError, ValueError) as exc:
-        _logger.warning("stale-check failed for %s: %s", run_dir, exc, exc_info=True)
-
-
-def _sync_one_run(
-    db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
-    cached_mtimes: dict[str, int | None] | None = None,
-) -> None:
-    status_path = run_dir / "status.json"
-    if status_path.exists():
-        _sync_status_backed_run(
-            db, run_dir, project_uuid=project_uuid, run_id=run_id,
-            cached_mtimes=cached_mtimes,
-        )
-    else:
-        try:
-            sync_legacy_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
-        except (sqlite3.Error, OSError) as exc:
-            _logger.warning("legacy sync failed for %s: %s", run_dir, exc, exc_info=True)
-
-
 # ---------------------------------------------------------------------------
 # Public sync API
 # ---------------------------------------------------------------------------
@@ -136,6 +82,11 @@ def sync_index(db: sqlite3.Connection, evaluations_root: Path) -> None:
     changed since last seen OR that lacks an index row entirely. Promote
     stale non-terminal runs. Sweep non-terminal rows whose ``run_dir`` is
     gone — those can't be rescued by the heartbeat-based stale check.
+
+    Every run is one work-queue iteration under ``run_isolated``: one
+    malformed run must not stop syncing the rest, or roll back the rows
+    already synced earlier in this same call (the whole walk shares one
+    ``with db:`` transaction).
     """
     with db:
         cached_mtimes = {
@@ -143,9 +94,13 @@ def sync_index(db: sqlite3.Connection, evaluations_root: Path) -> None:
             for job_id, status_mtime in db.execute("SELECT job_id, status_mtime FROM runs")
         }
         for project_uuid, run_id, run_dir in _walk_run_dirs(evaluations_root):
-            _sync_one_run(
-                db, run_dir, project_uuid=project_uuid, run_id=run_id,
-                cached_mtimes=cached_mtimes,
+            run_isolated(
+                lambda: sync_one_run_isolated(
+                    db, run_dir, project_uuid=project_uuid, run_id=run_id,
+                    cached_mtimes=cached_mtimes,
+                ),
+                label=f"index sync {run_id}",
+                log=_logger,
             )
         delete_orphan_non_terminal_rows(db)
 
@@ -157,18 +112,21 @@ def sync_index_for_run(db: sqlite3.Connection, run_dir: Path) -> None:
     project_uuid = run_dir.parent.name
     run_id = run_dir.name
     with db:
-        _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+        sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
 
 
 def sync_project_dates(db: sqlite3.Connection, project_dir: Path, project_uuid: str) -> None:
     """Mtime-gated upsert of one project's runs' ``started_at`` into the index.
 
-    Lighter than :func:`sync_index` / ``_sync_one_run``: refreshes only rows whose
+    Lighter than :func:`sync_index` / ``sync_one_run``: refreshes only rows whose
     ``status.json`` mtime changed, and skips stale-promotion (the run date needs
     only the immutable ``started_at``). Runs without ``status.json`` are left to
     the caller's ``parse_run_date`` fallback. The mtime cache is prefetched for
     the whole project in one query (mirrors :func:`sync_index`'s ``cached_mtimes``
     at module scope), keyed by ``run_id`` since ``project_uuid`` is fixed here.
+
+    Every run is one work-queue iteration under ``run_isolated``, same as
+    :func:`sync_index`: one malformed run must not stop syncing the rest.
     """
     if not project_dir.is_dir():
         return
@@ -183,13 +141,16 @@ def sync_project_dates(db: sqlite3.Connection, project_dir: Path, project_uuid: 
         for run_dir in _visible_subdirs(project_dir):
             if not (run_dir / "status.json").exists():
                 continue
-            try:
-                _upsert_if_changed(
-                    db, run_dir, project_uuid=project_uuid, run_id=run_dir.name,
-                    cached_mtime=cached_mtimes.get(run_dir.name),
-                )
-            except (sqlite3.Error, OverflowError):
-                _logger.warning("date-sync upsert failed for %s", run_dir, exc_info=True)
+            run_isolated(
+                lambda: run_under_savepoint(
+                    db, lambda: upsert_if_changed(
+                        db, run_dir, project_uuid=project_uuid, run_id=run_dir.name,
+                        cached_mtime=cached_mtimes.get(run_dir.name),
+                    ),
+                ),
+                label=f"index sync {run_dir.name}",
+                log=_logger,
+            )
 
 
 # ---------------------------------------------------------------------------

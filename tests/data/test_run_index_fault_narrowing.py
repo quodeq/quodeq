@@ -1,28 +1,31 @@
-"""Narrowed catches around run_index's per-run sync steps.
+"""run_index's per-run fault isolation (SAVEPOINT + run_isolated boundary).
 
-Each catch narrows from a bare ``except Exception`` to the specific
-sqlite3/OSError/ValueError/OverflowError set that ``upsert_from_status``,
-``check_stale_and_promote`` and ``sync_legacy_run`` can actually raise.
-The named exception still takes the handler's path (logged, sync
-continues); anything else is a genuine bug and must propagate rather
-than being silently absorbed.
+sync_index()/sync_project_dates() walk many runs inside one shared ``with
+db:`` transaction. Each run is one work-queue iteration: a run whose sync
+step raises must not stop syncing the rest, must not roll back rows already
+committed for OTHER runs synced earlier in the same call, and must not
+leave a partial row for itself when it fails after an earlier write in the
+same step.
 """
 from __future__ import annotations
 
 import logging
-import sqlite3
 from pathlib import Path
-
-import pytest
 
 import quodeq.data.sqlite.run_index as run_index_mod
 from quodeq.data.fs.run_status_store import RunState, RunStatus, write_status
+from quodeq.data.sqlite.index_sync import check_stale_and_promote, upsert_from_status
 from quodeq.data.sqlite.run_index import open_index, sync_index, sync_project_dates
 
 _LOGGER_NAME = "quodeq.data.sqlite.run_index"
 
+# _run_sync_step is a private sibling of run_index (leading underscore): it
+# is patched by dotted string path below, never imported directly, so this
+# file stays on the public surface the same way its own production imports do.
+_CHECK_STALE_TARGET = "quodeq.data.sqlite._run_sync_step.check_stale_and_promote"
 
-def _seed_status_run(root: Path, project: str, run_id: str) -> Path:
+
+def _seed_run(root: Path, project: str, run_id: str) -> Path:
     d = root / project / run_id
     (d / "evidence").mkdir(parents=True)
     (d / "evidence" / "manifest.json").write_text("{}")
@@ -32,139 +35,140 @@ def _seed_status_run(root: Path, project: str, run_id: str) -> Path:
     return d
 
 
-def _seed_legacy_run(root: Path, project: str, run_id: str) -> Path:
-    d = root / project / run_id
-    (d / "evidence").mkdir(parents=True)
-    (d / "evidence" / "manifest.json").write_text("{}")
-    return d
-
-
-def _raise(exc: Exception):
-    def _thrower(*a, **kw):
-        raise exc
-    return _thrower
-
-
-class TestUpsertCatchNarrowing:
-    """``_sync_status_backed_run``'s ``_upsert_if_changed`` catch."""
-
-    def test_sqlite_error_is_caught_and_logged(self, tmp_path, monkeypatch, caplog):
+class TestSyncIndexPerRunIsolation:
+    def test_one_bad_run_does_not_stop_the_others(self, tmp_path, monkeypatch, caplog):
         reports = tmp_path / "reports"
-        _seed_status_run(reports, "p", "rA")
+        _seed_run(reports, "p", "good1")
+        _seed_run(reports, "p", "bad")
+        _seed_run(reports, "p", "good2")
         db = open_index(tmp_path / "idx.db")
-        monkeypatch.setattr(
-            run_index_mod, "_upsert_if_changed",
-            _raise(sqlite3.OperationalError("db is locked")),
-        )
+
+        def flaky_check(db, run_dir, *, project_uuid, run_id):
+            if run_id == "bad":
+                raise AttributeError("boom")
+            return check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+
+        monkeypatch.setattr(_CHECK_STALE_TARGET, flaky_check)
+
         try:
             with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
                 sync_index(db, reports)  # must not raise
-            assert any("skipping run" in r.message for r in caplog.records)
+
+            rows = {r[0] for r in db.execute("SELECT job_id FROM runs").fetchall()}
+            assert rows == {"ext-good1", "ext-good2"}, (
+                "the bad run must not be indexed, and the others must still be"
+            )
+            assert any("index sync bad" in r.message for r in caplog.records)
         finally:
             db.close()
 
-    def test_an_unnamed_failure_propagates(self, tmp_path, monkeypatch):
+    def test_a_bad_run_leaves_no_partial_row_from_its_own_earlier_write(
+        self, tmp_path, monkeypatch,
+    ):
+        """upsert_if_changed succeeds (writes the row) and THEN
+        check_stale_and_promote raises: the run's own successful upsert must
+        be rolled back by the per-run SAVEPOINT, not left as a half-synced
+        row."""
         reports = tmp_path / "reports"
-        _seed_status_run(reports, "p", "rA")
+        _seed_run(reports, "p", "bad")
         db = open_index(tmp_path / "idx.db")
+
         monkeypatch.setattr(
-            run_index_mod, "_upsert_if_changed", _raise(TypeError("unexpected bug")),
+            _CHECK_STALE_TARGET,
+            lambda *a, **kw: (_ for _ in ()).throw(AttributeError("boom")),
         )
+
         try:
-            with pytest.raises(TypeError, match="unexpected bug"):
-                sync_index(db, reports)
+            sync_index(db, reports)  # must not raise
+
+            rows = db.execute("SELECT job_id FROM runs").fetchall()
+            assert rows == [], "the failed run's own successful upsert must be rolled back"
         finally:
             db.close()
 
-
-class TestStaleCheckCatchNarrowing:
-    """``_sync_status_backed_run``'s ``check_stale_and_promote`` catch."""
-
-    def test_value_error_is_caught_and_logged(self, tmp_path, monkeypatch, caplog):
+    def test_second_sync_call_still_works_after_a_rolled_back_run(self, tmp_path, monkeypatch):
+        """The SAVEPOINT rollback must not corrupt the connection/transaction
+        for later work in a later sync_index call."""
         reports = tmp_path / "reports"
-        _seed_status_run(reports, "p", "rA")
+        _seed_run(reports, "p", "flaky")
         db = open_index(tmp_path / "idx.db")
-        monkeypatch.setattr(
-            run_index_mod, "check_stale_and_promote", _raise(ValueError("bad status")),
-        )
+
+        should_fail = {"value": True}
+
+        def flaky_check(db, run_dir, *, project_uuid, run_id):
+            if should_fail["value"]:
+                raise AttributeError("boom")
+            return check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+
+        monkeypatch.setattr(_CHECK_STALE_TARGET, flaky_check)
+
         try:
-            with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
-                sync_index(db, reports)  # must not raise
-            assert any("stale-check failed" in r.message for r in caplog.records)
-        finally:
-            db.close()
+            sync_index(db, reports)
+            assert db.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 0
 
-    def test_an_unnamed_failure_propagates(self, tmp_path, monkeypatch):
-        reports = tmp_path / "reports"
-        _seed_status_run(reports, "p", "rA")
-        db = open_index(tmp_path / "idx.db")
-        monkeypatch.setattr(
-            run_index_mod, "check_stale_and_promote", _raise(KeyError("unexpected bug")),
-        )
-        try:
-            with pytest.raises(KeyError):
-                sync_index(db, reports)
+            should_fail["value"] = False
+            sync_index(db, reports)  # a normal later call must still work
+
+            rows = {r[0] for r in db.execute("SELECT job_id FROM runs").fetchall()}
+            assert rows == {"ext-flaky"}
         finally:
             db.close()
 
 
-class TestLegacySyncCatchNarrowing:
-    """``_sync_one_run``'s ``sync_legacy_run`` catch."""
-
-    def test_sqlite_error_is_caught_and_logged(self, tmp_path, monkeypatch, caplog):
+class TestSyncProjectDatesPerRunIsolation:
+    def test_one_bad_run_does_not_stop_the_others(self, tmp_path, monkeypatch, caplog):
         reports = tmp_path / "reports"
-        _seed_legacy_run(reports, "p", "rA")
+        _seed_run(reports, "p", "good1")
+        _seed_run(reports, "p", "bad")
+        _seed_run(reports, "p", "good2")
         db = open_index(tmp_path / "idx.db")
-        monkeypatch.setattr(
-            run_index_mod, "sync_legacy_run", _raise(sqlite3.OperationalError("db is locked")),
-        )
-        try:
-            with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
-                sync_index(db, reports)  # must not raise
-            assert any("legacy sync failed" in r.message for r in caplog.records)
-        finally:
-            db.close()
 
-    def test_an_unnamed_failure_propagates(self, tmp_path, monkeypatch):
-        reports = tmp_path / "reports"
-        _seed_legacy_run(reports, "p", "rA")
-        db = open_index(tmp_path / "idx.db")
-        monkeypatch.setattr(
-            run_index_mod, "sync_legacy_run", _raise(AttributeError("unexpected bug")),
-        )
-        try:
-            with pytest.raises(AttributeError):
-                sync_index(db, reports)
-        finally:
-            db.close()
+        real_upsert = run_index_mod.upsert_if_changed
 
+        def flaky_upsert(db, run_dir, *, project_uuid, run_id, cached_mtime):
+            if run_id == "bad":
+                raise AttributeError("boom")
+            return real_upsert(
+                db, run_dir, project_uuid=project_uuid, run_id=run_id, cached_mtime=cached_mtime,
+            )
 
-class TestProjectDatesUpsertCatchNarrowing:
-    """``sync_project_dates``'s ``_upsert_if_changed`` catch."""
+        # sync_project_dates calls the name bound in run_index's own
+        # namespace (`from ... import upsert_if_changed`), not the one on
+        # _run_sync_step -- patch where it is used.
+        monkeypatch.setattr(run_index_mod, "upsert_if_changed", flaky_upsert)
 
-    def test_overflow_error_is_caught_and_logged(self, tmp_path, monkeypatch, caplog):
-        reports = tmp_path / "reports"
-        run_dir = _seed_status_run(reports, "p", "rA")
-        db = open_index(tmp_path / "idx.db")
-        monkeypatch.setattr(
-            run_index_mod, "_upsert_if_changed", _raise(OverflowError("too big for sqlite")),
-        )
         try:
             with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
-                sync_project_dates(db, run_dir.parent, "p")  # must not raise
-            assert any("date-sync upsert failed" in r.message for r in caplog.records)
+                sync_project_dates(db, reports / "p", "p")  # must not raise
+
+            rows = {r[0] for r in db.execute("SELECT run_id FROM runs").fetchall()}
+            assert rows == {"good1", "good2"}, (
+                "the bad run must not be indexed, and the others must still be"
+            )
+            assert any("index sync bad" in r.message for r in caplog.records)
         finally:
             db.close()
 
-    def test_an_unnamed_failure_propagates(self, tmp_path, monkeypatch):
+    def test_a_bad_run_leaves_no_partial_row_from_its_own_earlier_write(
+        self, tmp_path, monkeypatch,
+    ):
+        """The fake step performs a real write (mirroring what
+        ``upsert_if_changed`` itself would do) and then raises: the SAVEPOINT
+        must roll that write back too, not just skip a would-be write."""
         reports = tmp_path / "reports"
-        run_dir = _seed_status_run(reports, "p", "rA")
+        _seed_run(reports, "p", "bad")
         db = open_index(tmp_path / "idx.db")
-        monkeypatch.setattr(
-            run_index_mod, "_upsert_if_changed", _raise(TypeError("unexpected bug")),
-        )
+
+        def fake_upsert(db, run_dir, *, project_uuid, run_id, cached_mtime):
+            upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+            raise AttributeError("boom")
+
+        monkeypatch.setattr(run_index_mod, "upsert_if_changed", fake_upsert)
+
         try:
-            with pytest.raises(TypeError, match="unexpected bug"):
-                sync_project_dates(db, run_dir.parent, "p")
+            sync_project_dates(db, reports / "p", "p")  # must not raise
+
+            rows = db.execute("SELECT run_id FROM runs").fetchall()
+            assert rows == [], "the failed run's own successful write must be rolled back"
         finally:
             db.close()
