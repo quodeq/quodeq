@@ -99,8 +99,12 @@ def build_dashboard_result(
     selected_run: RunInfo,
     payload: DashboardPayload,
     annotations: DimensionAnnotations,
+    run_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Assemble the final dashboard response dict from pre-computed parts."""
+    """Assemble the final dashboard response dict from pre-computed parts.
+
+    *run_metadata* (commit SHA, per-dimension coverage) is merged into
+    ``selectedRun`` so the numbers are read next to what they cover."""
     exit_reason = annotations.exit_reason
     selected_info = run_info_payload(selected_run)
     dim_dicts = [
@@ -114,7 +118,7 @@ def build_dashboard_result(
     return {
         "project": project,
         "availableRuns": [{**run_info_payload(item), "status": item.status} for item in runs],
-        "selectedRun": {**selected_info, "exitReason": exit_reason},
+        "selectedRun": {**selected_info, "exitReason": exit_reason, **(run_metadata or {})},
         "summary": {
             **to_camel_dict(payload.selected_summary),
             "dateISO": selected_info["dateISO"],

@@ -6,6 +6,7 @@ from pathlib import Path
 from quodeq.core.events.models import Judgment, JudgmentPayload
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import PrincipleGradeRow, SQLiteStateStore
+_NO_COVERAGE = {"files_read": 0, "source_count": 0, "coverage_pct": 0.0}  # row written without a report
 
 
 def _payload(**kw) -> JudgmentPayload:
@@ -189,8 +190,7 @@ def test_record_dimension_score_round_trip(tmp_path: Path) -> None:
     store.record_dimension_score(dimension="Security", score=7.4, grade="B")
 
     rows = store.read_dimension_scores()
-    assert rows == [{"dimension": "Security", "score": 7.4, "grade": "B", "exit_reason": None,
-                     "files_read": 0, "source_count": 0, "coverage_pct": 0.0}]
+    assert rows == [{"dimension": "Security", "score": 7.4, "grade": "B", "exit_reason": None, **_NO_COVERAGE}]
 
 
 def test_record_dimension_score_upserts(tmp_path: Path) -> None:
@@ -199,8 +199,7 @@ def test_record_dimension_score_upserts(tmp_path: Path) -> None:
     store.record_dimension_score(dimension="Security", score=8.2, grade="B+")
 
     rows = store.read_dimension_scores()
-    assert rows == [{"dimension": "Security", "score": 8.2, "grade": "B+", "exit_reason": None,
-                     "files_read": 0, "source_count": 0, "coverage_pct": 0.0}]
+    assert rows == [{"dimension": "Security", "score": 8.2, "grade": "B+", "exit_reason": None, **_NO_COVERAGE}]
 
 
 def test_record_principle_grade_round_trip(tmp_path: Path) -> None:
