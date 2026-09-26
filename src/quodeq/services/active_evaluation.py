@@ -22,10 +22,10 @@ from quodeq.core.run.job_status import JobStatus
 from quodeq.core.types import JobSnapshot
 from quodeq.services.base import ActionProvider
 
-# Providers hand back JobSnapshot entities, but remote/stub providers may
-# return already-serialized wire dicts (the /api/evaluations route accepts
-# both) — the accessors below read the same wire fields the webview shell reads,
-# including the legacy "project" key fallback.
+# list_evaluations' protocol and its only provider (FilesystemActionProvider)
+# return list[JobSnapshot], so the job accessors below read the entity
+# directly. list_projects may still hand back a wire dict (remote/stub
+# providers), so _project_id keeps the dict fallback.
 
 
 def _read_field(item: Any, attr: str, *wire_keys: str) -> str | None:
@@ -39,12 +39,12 @@ def _read_field(item: Any, attr: str, *wire_keys: str) -> str | None:
     return value
 
 
-def _job_status(job: Any) -> str | None:
-    return _read_field(job, "status", "status")
+def _job_status(job: JobSnapshot) -> str | None:
+    return getattr(job, "status", None)
 
 
-def _job_project(job: Any) -> str | None:
-    return _read_field(job, "output_project", "outputProject", "project")
+def _job_project(job: JobSnapshot) -> str | None:
+    return getattr(job, "output_project", None)
 
 
 def _project_id(entry: Any) -> str | None:
@@ -53,12 +53,11 @@ def _project_id(entry: Any) -> str | None:
 
 def find_active_evaluation(
     provider: ActionProvider, reports_dir: str, *, log: LogSink = NULL_LOG,
-) -> JobSnapshot | dict[str, Any] | None:
+) -> JobSnapshot | None:
     """Return the first non-stale running evaluation job, or None.
 
-    The job comes back exactly as the provider produced it (entity or wire
-    dict); delivery layers serialize it the same way ``GET /api/evaluations``
-    serializes its items.
+    Delivery layers serialize the returned entity the same way
+    ``GET /api/evaluations`` serializes its items.
     """
     items = provider.list_evaluations(reports_dir=reports_dir)
     running = [

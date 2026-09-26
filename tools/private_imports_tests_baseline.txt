@@ -1005,8 +1005,8 @@ tests/services/test_job_model_file_store.py:12:private-name:quodeq.services._job
 tests/services/test_job_model_serialization.py:6:private-module:quodeq.services._job_model.Job
 tests/services/test_job_model_serialization.py:7:private-name:quodeq.services._job_file_store._job_from_json
 tests/services/test_job_model_serialization.py:7:private-name:quodeq.services._job_file_store._job_to_json
-tests/services/test_job_monitor_phase_constants.py:24:private-module:quodeq.services._job_model.Job
-tests/services/test_job_monitor_phase_constants.py:63:private-module:quodeq.services._job_monitor_mixin
+tests/services/test_job_monitor_phase_constants.py:25:private-module:quodeq.services._job_model.Job
+tests/services/test_job_monitor_phase_constants.py:65:private-module:quodeq.services._job_monitor_mixin
 tests/services/test_jobs_deadline_exit.py:22:private-module:quodeq.services._job_model.InMemoryJobStore
 tests/services/test_jobs_deadline_exit.py:22:private-module:quodeq.services._job_model.Job
 tests/services/test_jobs_deadline_exit.py:26:private-name:quodeq.services._job_file_store._job_from_json

@@ -95,17 +95,6 @@ def test_projects_failure_logs_before_falling_back(recording_log):
     assert "project list failed" in recording_log.warning_messages[0]
 
 
-def test_dict_jobs_and_dict_projects_are_supported():
-    # Remote/stub providers hand back wire dicts; the rule reads the same
-    # keys the webview reads ("project" as the legacy fallback).
-    provider = StubProvider(
-        [{"jobId": "j1", "status": "running", "project": "proj-1"}],
-        projects=[{"id": "proj-1", "name": "Proj"}],
-    )
-    job = find_active_evaluation(provider, _REPORTS)
-    assert job is not None and job["jobId"] == "j1"
-
-
 @pytest.mark.parametrize("items", [None, {}, "nonsense"])
 def test_non_list_evaluations_payload_yields_none(items):
     provider = StubProvider(items)

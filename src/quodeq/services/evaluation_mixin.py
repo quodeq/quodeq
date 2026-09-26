@@ -87,8 +87,8 @@ class FsEvaluationMixin:
     def _resolve_repo_target(repo: str) -> Path:
         if is_repo_url(repo):
             raise ValueError(
-                "URL repos are not supported here. Register the project via "
-                "POST /api/projects (which clones to disk) and pass the local path."
+                "URL repos are not supported here. Register the project first "
+                "(which clones it to disk) and pass the resulting local path."
             )
         resolved = Path(repo).resolve()
         if not resolved.exists():
