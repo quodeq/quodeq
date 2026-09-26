@@ -1,3 +1,4 @@
+import logging
 import time
 from pathlib import Path
 
@@ -115,3 +116,51 @@ def test_start_listening_reports_success_when_acquired(tmp_path: Path):
     ctrl.try_acquire()
     assert ctrl.start_listening(on_reload=lambda _url: None) is True
     ctrl.shutdown()
+
+
+def test_listener_survives_an_on_reload_failure_and_keeps_serving(tmp_path: Path):
+    """R-FT-7 -- an exception from on_reload (anything past the socket errors
+    _serve_one already handles) must not kill the listener thread; the next
+    reload must still reach it."""
+    sock_path = tmp_path / "test.sock"
+    received: list[str] = []
+
+    def _on_reload(url: str) -> None:
+        received.append(url)
+        if len(received) == 1:
+            raise RuntimeError("boom")
+
+    ctrl1 = InstanceController(sock_path)
+    assert ctrl1.try_acquire() is True
+    ctrl1.start_listening(on_reload=_on_reload)
+
+    InstanceController(sock_path).send_reload("http://localhost:7863/first")
+    time.sleep(0.2)
+    InstanceController(sock_path).send_reload("http://localhost:7863/second")
+    time.sleep(0.2)
+
+    ctrl1.shutdown()
+
+    assert received == [
+        "http://localhost:7863/first",
+        "http://localhost:7863/second",
+    ]
+
+
+def test_listener_logs_a_warning_on_an_on_reload_failure(tmp_path: Path, caplog):
+    sock_path = tmp_path / "test.sock"
+
+    def _on_reload(_url: str) -> None:
+        raise RuntimeError("boom")
+
+    ctrl1 = InstanceController(sock_path)
+    assert ctrl1.try_acquire() is True
+    with caplog.at_level(logging.WARNING, logger="quodeq.dashboard._instance"):
+        ctrl1.start_listening(on_reload=_on_reload)
+        InstanceController(sock_path).send_reload("http://localhost:7863")
+        time.sleep(0.2)
+    ctrl1.shutdown()
+
+    matching = [r for r in caplog.records if "reload listener failed" in r.getMessage()]
+    assert matching, [r.getMessage() for r in caplog.records]
+    assert any(r.exc_info for r in matching)

@@ -1,7 +1,10 @@
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from quodeq.update import checker
 from quodeq.update.source import LatestInfo
@@ -41,11 +44,24 @@ def test_run_check_persists_latest(tmp_path) -> None:
     assert state.last_check_ts is not None
 
 
-def test_run_check_is_fail_silent(tmp_path) -> None:
+def test_run_check_is_fail_silent_for_malformed_json(tmp_path) -> None:
+    """A malformed-JSON leak from fetch_latest (AttributeError/TypeError, e.g.
+    a list item where a dict was expected) is caught; the attempt timestamp
+    is still persisted."""
     env = _env(tmp_path)
-    with patch("quodeq.update.checker.fetch_latest", side_effect=RuntimeError("boom")):
+    with patch("quodeq.update.checker.fetch_latest", side_effect=AttributeError("boom")):
         checker.run_check(env, force=True)  # must not raise
     assert read_state(env).last_check_ts is not None
+
+
+def test_run_check_propagates_an_unexpected_error(tmp_path) -> None:
+    """R-FT-7 -- an error outside (AttributeError, TypeError) (e.g. a
+    programming bug) must now propagate instead of being swallowed. The
+    check_async thread boundary is what isolates the daemon-thread path."""
+    env = _env(tmp_path)
+    with patch("quodeq.update.checker.fetch_latest", side_effect=RuntimeError("boom")):
+        with pytest.raises(RuntimeError, match="boom"):
+            checker.run_check(env, force=True)
 
 
 def test_get_status_update_available(tmp_path) -> None:
@@ -224,3 +240,44 @@ def test_check_async_invokes_run_check(tmp_path) -> None:
 
     assert len(called_with) == 1
     assert called_with[0] == (env,)
+
+
+def test_check_async_thread_survives_a_run_check_failure(tmp_path, caplog) -> None:
+    """R-FT-7 -- the run_isolated boundary at the thread target: an exception
+    from run_check itself (e.g. an unexpected fetch_latest bug) is logged and
+    does not escape as an unhandled exception on the daemon thread."""
+    env = _env(tmp_path)
+
+    class _SyncThread:
+        def __init__(self, target, daemon=False):
+            self._target = target
+
+        def start(self):
+            self._target()  # run synchronously so the test can assert on it
+
+    with patch("quodeq.update.checker.threading.Thread", _SyncThread), \
+         patch("quodeq.update.checker.fetch_latest", side_effect=RuntimeError("boom")), \
+         caplog.at_level(logging.WARNING, logger="quodeq.update.checker"):
+        checker.check_async(env)  # must not raise
+
+    assert "update check failed" in caplog.text
+    assert read_state(env).last_check_ts is None  # run_isolated caught it before write_state
+
+
+def test_check_async_logs_a_warning_on_thread_start_failure(tmp_path, caplog) -> None:
+    """R-FT-7 -- Thread.start()'s only documented failure (RuntimeError) is
+    now logged at warning, not swallowed at debug."""
+    env = _env(tmp_path)
+
+    class _FailingThread:
+        def __init__(self, target, daemon=False):
+            pass
+
+        def start(self):
+            raise RuntimeError("can't start new thread")
+
+    with patch("quodeq.update.checker.threading.Thread", _FailingThread), \
+         caplog.at_level(logging.WARNING, logger="quodeq.update.checker"):
+        checker.check_async(env)  # must not raise
+
+    assert "could not start update-check thread" in caplog.text

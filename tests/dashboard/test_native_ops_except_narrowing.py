@@ -7,6 +7,10 @@ call sites (R-FT-7):
   ``(OSError, Exception)`` was a no-op (``OSError`` is already an
   ``Exception`` subclass); narrowed to plain ``OSError``, matching
   ``save_via_dialog``'s equivalent file-write catch immediately above it.
+
+``save_via_dialog``'s own warning-log addition is covered in
+tests/dashboard/test_native_chrome_close_choice.py (via the already-imported
+``ww`` module alias, to avoid a new named private import here).
 """
 from __future__ import annotations
 

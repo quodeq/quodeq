@@ -4,6 +4,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from unittest.mock import MagicMock, patch
 
+import pytest
+import webview
+
 from quodeq.dashboard._webview_window import (
     download_via_dialog,
     is_safe_reload_url,
@@ -101,6 +104,29 @@ class TestOnReloadGuard:
         on_reload("")
         window.load_url.assert_not_called()
         assert window.on_top is False  # raised, then released
+
+    def test_focus_still_raises_on_a_webview_exception(self):
+        # R-FT-7 -- _current_url's narrowed (WebViewException, AttributeError,
+        # RuntimeError): a backend-specific failure mid-teardown.
+        on_reload, window = self._make_handler()
+        window.get_current_url.side_effect = webview.errors.WebViewException("gone")
+        on_reload("")
+        window.load_url.assert_not_called()
+
+    def test_focus_still_raises_on_an_attribute_error(self):
+        on_reload, window = self._make_handler()
+        window.get_current_url.side_effect = AttributeError("no get_current_url")
+        on_reload("")
+        window.load_url.assert_not_called()
+
+    def test_focus_propagates_an_out_of_scope_get_current_url_error(self):
+        """R-FT-7 -- an error outside (WebViewException, AttributeError,
+        RuntimeError) (e.g. a programming bug) must now propagate instead of
+        being swallowed."""
+        on_reload, window = self._make_handler()
+        window.get_current_url.side_effect = ValueError("boom")
+        with pytest.raises(ValueError, match="boom"):
+            on_reload("")
 
     def test_focus_will_not_reload_an_unsafe_current_url(self):
         """Defence in depth: even self-reported URLs go through the guard."""

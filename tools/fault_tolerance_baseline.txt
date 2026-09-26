@@ -8,13 +8,3 @@
 # the baseline (update the shifted line number) over blind --update-baseline
 # regeneration, which can silently absorb a genuinely new violation
 # introduced in the same change.
-src/quodeq/dashboard/_webview_token.py:88:suppress
-src/quodeq/dashboard/_webview_window_close.py:207:broad-except
-src/quodeq/dashboard/_webview_window_close.py:237:broad-except
-src/quodeq/dashboard/_webview_window_native_ops.py:190:broad-except
-src/quodeq/update/checker.py:79:broad-except
-src/quodeq/update/checker.py:82:broad-except
-src/quodeq/update/checker.py:90:broad-except
-src/quodeq/update/selfupdate.py:166:broad-except
-src/quodeq/update/selfupdate.py:232:broad-except
-src/quodeq/update/selfupdate.py:276:broad-except

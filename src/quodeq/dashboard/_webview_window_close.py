@@ -204,8 +204,8 @@ def prompt_close_choice_and_finish(
     state["confirmed"] = True
     try:
         window.destroy()  # type: ignore[union-attr]
-    except Exception:
-        _logger.debug("window.destroy after close-confirm failed", exc_info=True)
+    except (webview.errors.WebViewException, RuntimeError, OSError) as exc:
+        _logger.warning("window.destroy after close-confirm failed: %s", exc, exc_info=True)
 
 
 def _spawn_close_prompt_worker(
@@ -234,8 +234,8 @@ def _make_on_closing_inline(api: "WindowApi", window: object) -> "Callable[[], b
             return True
         try:
             return _confirm_close_dialog(window)
-        except Exception:
-            # If the native dialog can't render, don't trap the user.
+        except (webview.errors.WebViewException, OSError, RuntimeError) as exc:
+            _logger.warning("native dialog failed; not trapping the user: %s", exc, exc_info=True)
             return True
     _on_closing._worker = None  # type: ignore[attr-defined]  # parity with the async path
     return _on_closing

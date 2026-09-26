@@ -1,7 +1,6 @@
 """Per-launch shared secret gating the webview's CSP unsafe-eval relaxation."""
 from __future__ import annotations
 
-import contextlib
 import logging
 import secrets
 import subprocess
@@ -85,8 +84,10 @@ def _send_token(window_proc: subprocess.Popen | None) -> None:
     finally:
         # Must close even when the write failed: the child blocks in
         # readline() until this end is closed.
-        with contextlib.suppress(OSError, ValueError):
+        try:
             stdin.close()
+        except (OSError, ValueError) as exc:
+            _logger.debug("webview token stdin close failed: %s", exc)
 
 
 def spawn_window_with_token(

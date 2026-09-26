@@ -210,6 +210,19 @@ def test_send_token_logs_on_write_failure() -> None:
     assert "webview token handoff failed" in debug.call_args.args[0]
 
 
+@pytest.mark.parametrize("exc", [OSError("already closed"), ValueError("closed pipe")])
+def test_send_token_logs_close_failure_instead_of_swallowing_it(exc) -> None:
+    """R-FT-7 -- the finally-block close() used to be a silent
+    contextlib.suppress(OSError, ValueError); a failed close is now logged,
+    and the write having already succeeded, close() must still be attempted."""
+    window_proc = MagicMock()
+    window_proc.stdin.close.side_effect = exc
+    with patch.object(webview_token._logger, "debug") as debug:
+        webview_token._send_token(window_proc)  # must not raise
+    assert debug.called
+    assert "stdin close failed" in debug.call_args.args[0]
+
+
 def test_apply_macos_fullscreen_chrome_logs_toolbar_failure(monkeypatch) -> None:
     class _FakeNative:
         def setToolbar_(self, _value):
