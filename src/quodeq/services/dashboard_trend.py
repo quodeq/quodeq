@@ -8,6 +8,7 @@ from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.scoring.report_grades import most_frequent_grade, parse_numeric_score
 from quodeq.core.types import DimensionResult
+from quodeq.core.types.severity import Severity
 from quodeq.data.fs.report_parser.runs import RunInfo
 from quodeq.services.accumulated import numeric_average
 
@@ -42,6 +43,9 @@ class DimensionDetail(TypedDict):
     score: float | None
     grade: str | None
     delta: float | None
+    violations: int
+    majors: int
+    openTypes: int
 
 
 class TrendEntry(TypedDict):
@@ -63,6 +67,9 @@ class TrendEntry(TypedDict):
     runOverallGrade: str | None
     numericAverage: float | None
     overallGrade: str | None
+    violations: int
+    majors: int
+    openTypes: int
 
 
 def _build_dimension_details(
@@ -83,8 +90,30 @@ def _build_dimension_details(
             "score": score,
             "grade": dim.overall_grade,
             "delta": delta,
+            **_dimension_counts(dim),
         })
     return details
+
+
+_BLOCKING = frozenset({Severity.CRITICAL, Severity.MAJOR})
+_COUNT_KEYS = ("violations", "majors", "openTypes")
+
+
+def _dimension_counts(dim: DimensionResult) -> dict[str, int]:
+    """The counts a user can watch converge: active violations, majors
+    (critical + major) and open requirement types (distinct ``req``)."""
+    active = list(dim.violations or [])
+    return {
+        "violations": len(active),
+        "majors": sum(1 for f in active if f.severity in _BLOCKING),
+        "openTypes": len({f.req for f in active if f.req}),
+    }
+
+
+def _run_counts(details: list[DimensionDetail]) -> dict[str, int]:
+    """Sums over the run's dimensions; open types are summed per dimension,
+    since a requirement code belongs to one dimension."""
+    return {key: sum(int(d.get(key) or 0) for d in details) for key in _COUNT_KEYS}
 
 
 def _build_trend_entry(
@@ -130,6 +159,7 @@ def _build_trend_entry(
             score_to_grade_label(acc_avg, params=params) if acc_avg is not None
             else (most_frequent_grade(acc_grades) if acc_grades else None)
         ),
+        **_run_counts(dim_details),
     }
 
 

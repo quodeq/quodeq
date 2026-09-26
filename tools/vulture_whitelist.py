@@ -110,6 +110,8 @@ _.update_status  # api/routes_update.py: Flask view function; the route decorato
 _.JudgmentPayload  # core/events/models.py: Judgment field; read by name through serialization or a dict key (89 refs).
 _.PERSISTED_MARKERS  # core/finding_markers.py: FindingMarker field; read by name through serialization or a dict key (4 refs).
 _.accumulatedDimensionsCount  # services/dashboard_trend.py: TrendEntry field; read by name through serialization or a dict key (5 refs).
+_.majors  # services/dashboard_trend.py: TrendEntry and DimensionDetail field; read by name through serialization or a dict key.
+_.openTypes  # services/dashboard_trend.py: TrendEntry and DimensionDetail field; read by name through serialization or a dict key.
 _.active_agents  # services/_scan_progress_types.py: _DimProgress field; read by name through serialization or a dict key (2 refs).
 _.analyzed  # analysis/subagents/_consolidated.py: _ConsolidatedRunContext field; read by name through serialization or a dict key (82 refs).
 _.analyzed_files  # core/types/project.py: ProjectEntry field; read by name through serialization or a dict key (3 refs).
