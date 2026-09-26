@@ -189,7 +189,8 @@ def test_record_dimension_score_round_trip(tmp_path: Path) -> None:
     store.record_dimension_score(dimension="Security", score=7.4, grade="B")
 
     rows = store.read_dimension_scores()
-    assert rows == [{"dimension": "Security", "score": 7.4, "grade": "B", "exit_reason": None}]
+    assert rows == [{"dimension": "Security", "score": 7.4, "grade": "B", "exit_reason": None,
+                     "files_read": 0, "source_count": 0, "coverage_pct": 0.0}]
 
 
 def test_record_dimension_score_upserts(tmp_path: Path) -> None:
@@ -198,7 +199,8 @@ def test_record_dimension_score_upserts(tmp_path: Path) -> None:
     store.record_dimension_score(dimension="Security", score=8.2, grade="B+")
 
     rows = store.read_dimension_scores()
-    assert rows == [{"dimension": "Security", "score": 8.2, "grade": "B+", "exit_reason": None}]
+    assert rows == [{"dimension": "Security", "score": 8.2, "grade": "B+", "exit_reason": None,
+                     "files_read": 0, "source_count": 0, "coverage_pct": 0.0}]
 
 
 def test_record_principle_grade_round_trip(tmp_path: Path) -> None:

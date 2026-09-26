@@ -158,6 +158,20 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
     for row in dimension_rows:
         row["exit_reason"] = exit_by_dim.get(str(row["dimension"]).lower())
 
+    # Coverage comes from the dimension report the CLI wrote; the grade
+    # tables carry it so the SQL read path can state density per 100 files.
+    from quodeq.data.fs.report_parser.finding_details import iter_readable_eval_reports  # noqa: PLC0415
+    coverage_by_dim = {
+        str(dim_id).lower(): report
+        for dim_id, report in iter_readable_eval_reports(run_dir)
+        if isinstance(report, dict)
+    }
+    for row in dimension_rows:
+        report = coverage_by_dim.get(str(row["dimension"]).lower(), {})
+        row["files_read"] = int(report.get("filesRead") or 0)
+        row["source_count"] = int(report.get("sourceFileCount") or 0)
+        row["coverage_pct"] = float(report.get("coveragePct") or 0.0)
+
     store = SQLiteStateStore(run_dir)
     store.batch_rewrite_grades(principle_rows, dimension_rows)
     # Stamp the math these tables now embody, so ensure_projected can tell a

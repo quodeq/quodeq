@@ -213,7 +213,8 @@ class SQLiteStateStore(StateStoreMetaMixin):
             principle_rows: Sequence of ``(dimension, principle_grade_dict)``
                 as returned by ``compute_run_grades``.
             dimension_rows: Sequence of dimension score dicts
-                (``{"dimension": ..., "score": ..., "grade": ...}``).
+                (``{"dimension", "score", "grade", "exit_reason", "files_read",
+                "source_count", "coverage_pct"}``; the coverage keys default to 0).
         """
         with self._db() as conn:
             _delete_grades(conn)
@@ -231,10 +232,11 @@ class SQLiteStateStore(StateStoreMetaMixin):
             )
             conn.executemany(
                 "INSERT INTO dimension_scores "
-                "(dimension, score, grade, exit_reason, completed_at) "
-                "VALUES (?, ?, ?, ?, datetime('now'))",
+                "(dimension, score, grade, exit_reason, files_read, source_count, coverage_pct, "
+                "completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
                 [
-                    (d["dimension"], d["score"], d["grade"], d.get("exit_reason"))
+                    (d["dimension"], d["score"], d["grade"], d.get("exit_reason"),
+                     d.get("files_read", 0), d.get("source_count", 0), d.get("coverage_pct", 0.0))
                     for d in dimension_rows
                 ],
             )
@@ -250,11 +252,12 @@ class SQLiteStateStore(StateStoreMetaMixin):
         """Return every ``dimension_scores`` row as a dict, ordered by dimension."""
         with self._db() as conn:
             rows = conn.execute(
-                "SELECT dimension, score, grade, exit_reason "
+                "SELECT dimension, score, grade, exit_reason, files_read, source_count, coverage_pct "
                 "FROM dimension_scores ORDER BY dimension"
             ).fetchall()
         return [
-            {"dimension": r[0], "score": r[1], "grade": r[2], "exit_reason": r[3]}
+            {"dimension": r[0], "score": r[1], "grade": r[2], "exit_reason": r[3],
+             "files_read": r[4], "source_count": r[5], "coverage_pct": r[6]}
             for r in rows
         ]
 
