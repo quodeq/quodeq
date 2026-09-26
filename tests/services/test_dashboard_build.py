@@ -46,9 +46,9 @@ class TestBuildDashboard:
         assert result["project"] == "proj"
         assert result["selectedRun"]["runId"] == "r1"
         # Run metadata rides on selectedRun: the commit (None for a seeded
-        # run) and per-dimension coverage read next to the numbers.
+        # run) and the per-dimension cache statistics.
         assert "commitSha" in result["selectedRun"]
-        assert isinstance(result["selectedRun"]["coverage"], dict)
+        assert isinstance(result["selectedRun"]["cacheStats"], dict)
         assert len(result["dimensions"]) == 1
         assert "trend" in result
 

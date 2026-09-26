@@ -6,7 +6,9 @@ from pathlib import Path
 
 from quodeq.core.events.models import Judgment
 from quodeq.data.projection.grade_projector import recompute_grades
+from quodeq.data.projection.projector import Projector
 from quodeq.data.sqlite.state_store import SQLiteStateStore
+from tests.api._scores_routes_helpers import _scorable_violations, _seed_run
 
 _DIM = "Security"
 _FILES_READ = 120
@@ -50,3 +52,15 @@ def test_coverage_defaults_when_report_lacks_fields(tmp_path: Path) -> None:
     recompute_grades(tmp_path)
     row = _row(tmp_path)
     assert (row["files_read"], row["source_count"]) == (0, 0)
+
+
+def test_report_written_after_projection_re_derives_coverage(tmp_path: Path) -> None:
+    """The CLI writes the report seconds after the last event. A read that
+    projects in that window must not freeze the coverage at zero."""
+    run_dir = _seed_run(tmp_path, "proj", "r1", _scorable_violations(5, dimension=_DIM.lower()))
+    log = run_dir / "events.jsonl"
+    assert _row(run_dir)["files_read"] == 0
+    _write_report(run_dir, sourceFileCount=_SOURCE_COUNT, filesRead=_FILES_READ,
+                  coveragePct=_COVERAGE)
+    Projector().ensure_projected(log, run_dir, project_dir=run_dir.parent)
+    assert _row(run_dir)["files_read"] == _FILES_READ

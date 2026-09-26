@@ -7,6 +7,7 @@ _CHECKPOINT_KEY = "projection_checkpoint"
 _PROJECTED_SIZE_KEY = "projection_event_log_size"
 _ACTIONS_SIZE_KEY = "actions_log_projected_size"
 _GRADES_ALGO_KEY = "grades_algo_version"
+_COVERAGE_STAMP_KEY = "coverage_report_stamp"
 
 T = TypeVar("T")
 
@@ -63,3 +64,11 @@ class StateStoreMetaMixin:
 
     def save_grades_algo_version(self, version: int) -> None:
         self._save_meta(_GRADES_ALGO_KEY, str(version))
+
+    def get_coverage_stamp(self) -> str | None:
+        """Report stamp (newest ``evaluation/*.json`` mtime) the coverage columns
+        were read from; None when the tables predate the stamp."""
+        return self._get_meta(_COVERAGE_STAMP_KEY, str)
+
+    def save_coverage_stamp(self, stamp: str) -> None:
+        self._save_meta(_COVERAGE_STAMP_KEY, stamp)
