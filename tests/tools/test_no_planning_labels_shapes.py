@@ -10,7 +10,7 @@ import re
 
 import pytest
 
-from tests.tools.test_no_planning_labels import REPO, _iter_sources, js_prose, labels_in, python_prose
+from tests.tools.test_no_planning_labels import REPO, iter_sources, js_prose, labels_in, python_prose
 
 
 def test_python_prose_reads_comments_and_docstrings_only():
@@ -50,7 +50,7 @@ def test_js_scanner_finds_every_comment_line():
     """
     comment_open = re.compile(r"^\s*(//|/\*|\{/\*)")
     missed = []
-    for path in _iter_sources():
+    for path in iter_sources():
         if path.suffix == ".py":
             continue
         source = path.read_text(encoding="utf-8")
