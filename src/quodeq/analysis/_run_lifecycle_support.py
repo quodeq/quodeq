@@ -64,11 +64,10 @@ class StatusWriter:
         *,
         ai_provider: str | None = None,
         ai_model: str | None = None,
-        commit_sha: str | None = None,
         write_status: Callable[[Path, RunStatus], None],
     ) -> None:
         self.run_dir = run_dir
-        self.commit_sha = commit_sha
+        self.commit_sha: str | None = None
         self.job_id = job_id
         self.started_at = utc_now_iso(timespec=ISO_SECONDS)
         self.dimensions = list(dimensions)

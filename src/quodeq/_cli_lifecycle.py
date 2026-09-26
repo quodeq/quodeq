@@ -214,15 +214,15 @@ def _run_lifecycle_body(
     try:
         ai_provider = get_ai_cmd()
         ai_model = hooks.get_ai_model()
-        commit_sha = None if is_repo_url(args.repo) else git_head_sha(str(inputs.src))
-        with RunLifecycleContext(
+        context = RunLifecycleContext(
             run_dir=paths.run_dir,
             job_id=external_job_id(paths.run_id),
             dimensions=dimensions_list,
             ai_provider=ai_provider,
             ai_model=ai_model,
-            commit_sha=commit_sha,
-        ) as lifecycle:
+        )
+        context.set_commit_sha(None if is_repo_url(args.repo) else git_head_sha(str(inputs.src)))
+        with context as lifecycle:
             try:
                 # "analyzing" gates dashboard per-dimension polling.
                 lifecycle.set_phase("analyzing")

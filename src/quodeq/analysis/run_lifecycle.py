@@ -65,7 +65,6 @@ class RunLifecycleContext:
         *,
         ai_provider: str | None = None,
         ai_model: str | None = None,
-        commit_sha: str | None = None,
         deps: LifecycleDeps | None = None,
     ) -> None:
         deps = deps or LifecycleDeps()
@@ -74,7 +73,7 @@ class RunLifecycleContext:
         self._current_state = RunState.PENDING
         self._status = StatusWriter(
             run_dir, job_id, dimensions,
-            ai_provider=ai_provider, ai_model=ai_model, commit_sha=commit_sha,
+            ai_provider=ai_provider, ai_model=ai_model,
             write_status=deps.write_status or write_status,
         )
         self._heartbeat = (deps.heartbeat_factory or HeartbeatThread)(run_dir)
@@ -192,6 +191,10 @@ class RunLifecycleContext:
         self._status.phase = phase
         self._status.current_dimension = current_dimension
         self._write(self._current_state)
+
+    def set_commit_sha(self, commit_sha: str | None) -> None:
+        """Record the commit the run evaluates; set before entering so the first write carries it."""
+        self._status.commit_sha = commit_sha
 
     def set_deadline(self, deadline_at: str | None) -> None:
         """Record the run-level deadline. Visible immediately in status.json."""
