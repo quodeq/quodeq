@@ -64,7 +64,7 @@ def deleted_key_for_violation(v: dict, dimension: str, principle: str | None = N
     return (dimension or "", principle or "", raw_file)
 
 
-def _unsuppressed(
+def unsuppressed(
     violations: list[dict], dkeys: "DismissedKeys | set[tuple]", delkeys: "set[tuple] | None",
     dimension: str, principle: str | None,
 ) -> list[dict]:
@@ -91,9 +91,9 @@ def filter_dismissed_from_result(
         return result
     if isinstance(result, dict):
         if "violations" in result:
-            result["violations"] = _unsuppressed(result["violations"], dkeys, delkeys, dimension, None)
+            result["violations"] = unsuppressed(result["violations"], dkeys, delkeys, dimension, None)
         for p in result.get("principles", []):
             if "violations" in p:
                 group_principle = p.get("name", "") or ""
-                p["violations"] = _unsuppressed(p["violations"], dkeys, delkeys, dimension, group_principle)
+                p["violations"] = unsuppressed(p["violations"], dkeys, delkeys, dimension, group_principle)
     return result

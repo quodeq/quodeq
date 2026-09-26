@@ -7,6 +7,9 @@ from typing import Any
 from quodeq.core.run.state import TERMINAL_STATES, RunState, parse_run_state
 from quodeq.core.run_diff import RunDiff, diff_findings
 from quodeq.core.utils.io import resolve_child_dir
+from quodeq.services._violation_filters import unsuppressed
+from quodeq.services.deleted import deleted_keys
+from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.wiring import (
     iter_readable_eval_reports,
     project_run_dates,
@@ -105,13 +108,16 @@ def diff_runs(reports_root: Path, project: str, run_id: str, against: str | None
     if against:
         _run_dir(project_dir, against)
     older = [] if against else _older_runs(reports_root, project, run_id)
+    # Dismissals and deletions are project-wide; a dismissed finding is neither
+    # new on every run nor resolved when it stops being reported.
+    dkeys, delkeys = dismissed_keys(project_dir), deleted_keys(project_dir)
     dimensions: dict[str, Any] = {}
     for dim, report in _reports(current_dir).items():
         base = against or _baseline_for(project_dir, older, dim)
         previous = (read_eval_report(_run_dir(project_dir, base) / _EVAL_DIR, dim) or {}) if base else {}
         entry = _payload(diff_findings(
-            previous.get(_KEY_VIOLATIONS) or [],
-            report.get(_KEY_VIOLATIONS) or [],
+            unsuppressed(previous.get(_KEY_VIOLATIONS) or [], dkeys, delkeys, dim, None),
+            unsuppressed(report.get(_KEY_VIOLATIONS) or [], dkeys, delkeys, dim, None),
             current_files=_files_seen(report),
         ))
         entry["againstRunId"] = base
