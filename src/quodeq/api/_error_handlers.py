@@ -1,8 +1,8 @@
 """App-wide fallback for exceptions no route caught.
 
-Route handlers narrow their own catches to the failure types they realize
-can happen (OSError, ValueError, sqlite3.Error, ...) and answer a coded
-JSON error for those. Anything outside that narrow tuple is a real bug, and
+Route handlers narrow their own catches to the specific exception types each
+call site can raise (OSError, ValueError, sqlite3.Error, ...) and answer a
+coded JSON error for those. Anything outside that narrow tuple is a real bug, and
 is left to escape the route on purpose (R-FT-7) rather than being papered
 over locally. Without this handler that escape reaches Flask's own default
 handling, which answers a plain HTML 500 with no machine-readable ``code``
@@ -41,5 +41,6 @@ def register_unhandled_error_handler(app: Flask) -> None:
             return exc
         _logger.error("Unhandled exception while serving a request", exc_info=exc)
         return json_error(
-            "An unexpected error occurred.", HTTPStatus.INTERNAL_SERVER_ERROR, CODE_INTERNAL_ERROR,
+            "Something went wrong on the server. Try again.",
+            HTTPStatus.INTERNAL_SERVER_ERROR, CODE_INTERNAL_ERROR,
         )

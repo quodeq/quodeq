@@ -16,8 +16,9 @@ signal and leaves the rest intact: a per-manifest read failure (``OSError``,
 a decode error) is absorbed in ``_project_shape_io.py``, deeply nested JSON
 or TOML overflows the parser's call stack and is absorbed there too
 (``RecursionError``), and a scalar where a list belongs raises ``TypeError``
-with every parser succeeding, caught by ``detect_shape``'s own boundary.
-``detect_shape``'s four callers (``_api_runner``, ``api_prompt_assembly``,
+with every parser succeeding, caught by ``detect_shape``'s own narrowed
+``except (OSError, TypeError)``. ``detect_shape``'s four callers
+(``_api_runner``, ``api_prompt_assembly``,
 ``mcp/findings_server``, and the ``context`` re-export) do not add their own
 guard, so those are the failure modes this module absorbs; anything else
 propagates to the caller's own fault-isolation boundary.

@@ -44,10 +44,6 @@ const CODE_KEYS = {
   PATH_MISSING: 'apiError.pathMissing',
   MISSING_PATH: 'apiError.pathMissing',
   NOT_DIR: 'apiError.notDirectory',
-  REGISTRATION_FAILED: 'apiError.registrationFailed',
-  // The app-wide fallback for an unexpected server error (any route,
-  // api/_error_handlers.py), not just registration.
-  INTERNAL_ERROR: 'apiError.internalError',
 
   // Provider configuration.
   MISSING_API_KEY: 'apiError.missingApiKey',

@@ -1,8 +1,8 @@
 """Run a dimension's deterministic checkers and fold the results into its evidence.
 
-Every step here is fail-soft: a checker that raises, a standard that will not
-load, a JSONL that will not open each costs the deterministic findings and
-nothing else. A check that can take a run down is worse than no check at all.
+Each named checker is isolated: one that raises costs only its own findings, and a
+standard that fails to load is handled the same way. Only ``apply_checks_for_run``'s
+own catch (OSError/TypeError/ValueError) stands between a checker bug and the dimension being marked INCOMPLETE at the per-dimension loop boundary.
 """
 from __future__ import annotations
 
@@ -268,8 +268,9 @@ def apply_checks_for_run(config, dimension: str, evidence: Evidence) -> int:
     rather than cached: they are properties of the whole import graph, and the
     per-file content cache has no key that could represent "the graph changed".
 
-    Swallows everything. This runs inside a dimension that has already
-    succeeded, and no deterministic check is worth failing that.
+    Catches the known-bad cases only: this dimension already succeeded, and none of
+    those are worth failing it for. A bug outside this tuple propagates instead, to
+    the per-dimension loop boundary, which marks the dimension INCOMPLETE.
     """
     try:
         source_files = _project_source_files(config)
@@ -294,6 +295,6 @@ def apply_checks_for_run(config, dimension: str, evidence: Evidence) -> int:
             jsonl_path=Path(evidence_dir) / f"{dimension}_evidence.jsonl",
             trust_model=trust_model,
         )
-    except (OSError, TypeError, ValueError):  # a check must never fail a dimension that already succeeded
+    except (OSError, TypeError, ValueError):  # known-bad cases must not fail a dimension that already succeeded
         _logger.warning("checks: skipped for %s", dimension, exc_info=True)
         return 0

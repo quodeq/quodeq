@@ -106,16 +106,25 @@ _STREAM_DONE = object()
 def _drain(stream, q: "queue.Queue", cancel: CancelToken) -> None:
     """Pull *stream*'s chunks onto *q* until exhausted or cancelled.
 
-    The reader-thread body ``_read`` wraps this single call in
-    ``run_isolated`` (the thread's fault-isolation boundary); any exception
-    the SDK's blocking read raises here is delivered to the consumer via
-    ``on_error=q.put``, same as it reached the queue before.
+    Catches the SDK/transport's own exception types itself and queues them
+    for the consumer, exactly as ``_iter_with_cancel`` expects: a cancelled
+    turn's kill hook closes the client out from under this blocking read
+    (that's the stop succeeding, not a failure -- ``_stream_once`` turns it
+    into ``TurnCancelled`` once ``cancel.cancelled`` is seen), and an
+    ordinary mid-stream network error is the consumer's to raise and the
+    turn thread's ``run_isolated`` boundary (``orchestrator.run_turn``) to
+    log once. Neither belongs to this reader thread's own
+    ``run_isolated`` (``_read``, below), which stays reserved for a genuine
+    bug in this loop.
     """
-    for chunk in stream:
-        q.put(chunk)
-        if cancel.cancelled:
-            return  # consumer is gone; stop producing
-    q.put(_STREAM_DONE)
+    try:
+        for chunk in stream:
+            q.put(chunk)
+            if cancel.cancelled:
+                return  # consumer is gone; stop producing
+        q.put(_STREAM_DONE)
+    except (openai.APIError, openai.OpenAIError, httpx.HTTPError) as exc:
+        q.put(exc)
 
 
 def _iter_with_cancel(stream, cancel):

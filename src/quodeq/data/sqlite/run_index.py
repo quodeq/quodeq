@@ -84,9 +84,10 @@ def sync_index(db: sqlite3.Connection, evaluations_root: Path) -> None:
     gone — those can't be rescued by the heartbeat-based stale check.
 
     Every run is one work-queue iteration under ``run_isolated``: one
-    malformed run must not stop syncing the rest, or roll back the rows
-    already synced earlier in this same call (the whole walk shares one
-    ``with db:`` transaction).
+    malformed run must not stop syncing the rest. Each run's SAVEPOINT is
+    outermost, so its RELEASE commits that run on its own; a failing run
+    is rolled back to its savepoint and skipped without touching rows
+    already committed by earlier runs in this same call.
     """
     with db:
         cached_mtimes = {

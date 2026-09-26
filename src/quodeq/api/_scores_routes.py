@@ -16,7 +16,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND
+from quodeq.api._constants import CODE_INTERNAL_ERROR, CODE_INVALID_INPUT, CODE_NOT_FOUND
 from quodeq.api.helpers import json_error, validate_segment
 from quodeq.api.routes_common import reports_dir
 from quodeq.services.scoring import get_project_scores, get_scores_slim
@@ -32,7 +32,7 @@ def _load_scores(project: str) -> tuple[dict | None, tuple[Response, int] | None
         result = get_project_scores(Path(eval_dir), project, as_of)
     except (OSError, sqlite3.Error, ValueError):
         _logger.exception("Unexpected error fetching scores for project %s", project)
-        return None, json_error("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+        return None, json_error("Failed to load scores", HTTPStatus.INTERNAL_SERVER_ERROR, CODE_INTERNAL_ERROR)
     if result is None:
         return None, json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
     return result, None

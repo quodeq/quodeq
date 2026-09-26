@@ -25,7 +25,7 @@ from typing import Callable
 
 from flask import Flask, Response, current_app, jsonify, request
 
-from quodeq.api._constants import CODE_NOT_FOUND, QUERY_FLAG_TRUE_NUMERIC
+from quodeq.api._constants import CODE_INTERNAL_ERROR, CODE_NOT_FOUND, QUERY_FLAG_TRUE_NUMERIC
 from quodeq.api.helpers import dimension_eval_response, json_error, validate_segment
 from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_mirror_routes
 from quodeq.services import fs_reports, fs_projects
@@ -68,7 +68,7 @@ def _load_or_500(
         return load(), None
     except (OSError, sqlite3.Error, ValueError):
         logger.exception(log_msg, project)
-        return None, json_error(error_msg, HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+        return None, json_error(error_msg, HTTPStatus.INTERNAL_SERVER_ERROR, CODE_INTERNAL_ERROR)
 
 
 @with_shared_root

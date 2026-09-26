@@ -15,7 +15,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify
 
-from quodeq.api._constants import CODE_NOT_FOUND
+from quodeq.api._constants import CODE_INTERNAL_ERROR, CODE_NOT_FOUND
 from quodeq.api.helpers import json_error, validate_segment
 from quodeq.api.routes_common import reports_dir
 from quodeq.services.compare import build_compare_summary
@@ -35,7 +35,7 @@ def register_compare_routes(app: Flask) -> None:
             result = build_compare_summary(Path(reports_dir()), project)
         except (OSError, ValueError, sqlite3.Error, subprocess.SubprocessError):
             _logger.exception("Unexpected error building compare summary for project %s", project)
-            return json_error("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+            return json_error("Failed to load compare summary", HTTPStatus.INTERNAL_SERVER_ERROR, CODE_INTERNAL_ERROR)
         if result is None:
             return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
         return jsonify(result)

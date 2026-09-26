@@ -162,8 +162,8 @@ def register_project_with_rollback(
         )
     except Exception:
         # An unhandled failure: clean up any partial project directory, then
-        # let it propagate. Flask's own 500 handler logs the traceback; the
-        # route never sees a coded INTERNAL_ERROR result for this case.
+        # let it propagate. The app-wide handler in api/_error_handlers.py
+        # logs the traceback and answers it with the coded INTERNAL_ERROR.
         rollback()
         raise
 

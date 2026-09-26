@@ -8,6 +8,7 @@ from pathlib import Path
 
 from flask import Flask, Response
 
+from quodeq.api._constants import CODE_INTERNAL_ERROR
 from quodeq.api._http_cache import conditional_json
 from quodeq.api.helpers import json_error, validate_segment
 from quodeq.api.routes_common import reports_dir
@@ -28,5 +29,5 @@ def register_runs_routes(app: Flask) -> None:
             runs = build_runs_unit(Path(reports_dir()), Path(get_index_db_path()), project)
         except (OSError, sqlite3.Error, ValueError):
             _logger.exception("Failed to build runs unit for %s", project)
-            return json_error("Failed to load runs", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
+            return json_error("Failed to load runs", HTTPStatus.INTERNAL_SERVER_ERROR, CODE_INTERNAL_ERROR)
         return conditional_json({"runs": runs}, max_age=0)
