@@ -192,9 +192,11 @@ class RunLifecycleContext:
         self._status.current_dimension = current_dimension
         self._write(self._current_state)
 
-    def set_commit_sha(self, commit_sha: str | None) -> None:
-        """Record the commit the run evaluates; set before entering so the first write carries it."""
+    def set_commit_sha(self, commit_sha: str | None, *, dirty: bool | None = None) -> None:
+        """Record the commit the run evaluates and whether the tree had uncommitted
+        changes; set before entering so the first write carries both."""
         self._status.commit_sha = commit_sha
+        self._status.commit_dirty = dirty
 
     def set_deadline(self, deadline_at: str | None) -> None:
         """Record the run-level deadline. Visible immediately in status.json."""

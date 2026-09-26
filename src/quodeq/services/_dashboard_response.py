@@ -130,4 +130,5 @@ def build_dashboard_result(
         "previousByDimension": {k: slim_history_dim(v) for k, v in payload.previous_by_dimension.items()},
         "stalePreviousByDimension": {k: slim_history_dim(v) for k, v in payload.stale_previous_by_dimension.items()},
         "staleDimensions": [slim_history_dim(d) for d in payload.stale_dimensions],
+        "sinceBaseline": payload.since_baseline,
     }

@@ -20,6 +20,7 @@ from quodeq.core.types import DimensionResult, DimensionSummary
 from quodeq.config.services_env import MAX_HISTORY_RUNS_DEFAULT
 from quodeq.config.services_env import max_history_runs as _resolve_max_history_runs
 from quodeq.services._dashboard_cache import DashboardCacheConfig, make_run_dimension_fetcher
+from quodeq.services.dashboard_since_baseline import since_baseline_summary
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.services.dashboard_trend import build_accumulated_trend, build_partial_run_entries
 from quodeq.services.scoring_deps import ScoringDeps
@@ -105,6 +106,9 @@ class DashboardPayload:
     # Cancelled runs with their own scores, for the History list only. Not
     # part of ``trend``: see ``dashboard_trend.build_partial_run_entries``.
     partial_runs: list[dict[str, Any]] = field(default_factory=list)
+    # Per-dimension baseline, majors delta, types closed / opened and the
+    # scoped new / resolved counts: see ``dashboard_since_baseline``.
+    since_baseline: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -239,4 +243,5 @@ def compute_dashboard_payload(
         stale_previous_by_dimension=stale_previous_by_dimension,
         stale_dimensions=stale_dimensions,
         partial_runs=build_partial_run_entries(cancelled_runs, get_run_dimensions, params=params),
+        since_baseline=since_baseline_summary(reports_root, project, ctx.run.run_id),
     )

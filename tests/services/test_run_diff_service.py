@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quodeq.core.events.models import FindingDismissed, FindingDismissedEvent
+from quodeq.data.actions_log import ActionLogWriter
 from quodeq.services.run_diff import LIST_CAP, diff_runs
 
 _PROJECT = "p"
@@ -49,3 +51,22 @@ def test_diff_runs_without_a_previous_run_reports_everything_new(tmp_path: Path)
     out = diff_runs(tmp_path, _PROJECT, _CURR, None)
     assert out["againstRunId"] is None
     assert out["dimensions"][_DIM]["counts"]["new"] == 1
+
+
+def test_dismissed_findings_are_left_out_of_both_sides(tmp_path: Path) -> None:
+    """A dismissed finding is neither "new" on every run nor "resolved" when
+    it stops being reported; the project's dismissals apply to the diff."""
+    prev = tmp_path / _PROJECT / _PREV
+    curr = tmp_path / _PROJECT / _CURR
+    _report(prev, [_v("M-REU-1", "b.py", 2, "dup()")], [])
+    _report(curr, [_v("M-ANA-9", "a.py", 5, "long")],
+            [{"req": "M-REU-1", "file": "b.py", "line": 1, "principle": "P"}])
+    writer = ActionLogWriter(tmp_path / _PROJECT)
+    writer.emit(FindingDismissedEvent(payload=FindingDismissed(req="M-ANA-9", file="a.py", line=5)))
+    writer.emit(FindingDismissedEvent(payload=FindingDismissed(req="M-REU-1", file="b.py", line=2)))
+
+    dim = diff_runs(tmp_path, _PROJECT, _CURR, _PREV)["dimensions"][_DIM]
+
+    assert dim["counts"] == {"carried": 0, "same": 0, "moved": 0, "new": 0,
+                             "resolved": 0, "notReevaluated": 0}
+    assert dim["types"]["perReq"] == {}

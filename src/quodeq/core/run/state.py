@@ -56,6 +56,9 @@ class RunStatus:
     ai_model: str | None = None
     time_limit_s: int | None = None
     commit_sha: str | None = None
+    # True when the working tree had uncommitted tracked changes at run start,
+    # so two runs on one commit may still have evaluated different code.
+    commit_dirty: bool | None = None
 
     @classmethod
     def from_status_dict(cls, d: dict[str, Any]) -> "RunStatus":
@@ -75,6 +78,7 @@ class RunStatus:
             ai_model=d.get("ai_model"),
             time_limit_s=d.get("time_limit_s"),
             commit_sha=d.get("commit_sha"),
+            commit_dirty=d.get("commit_dirty"),
         )
 
 

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Improvements
+- **Numbers that only move with the code**: the `quodeq evaluate` summary line now reads `dim: SCORE (N major, T open types, D per 100 files, C% coverage)`; the raw violation count is no longer on it, and a critical finding counts as major. Run history rows carry violations, majors and open requirement types per dimension, and the dashboard payload carries a since-baseline block per dimension (the previous run it was compared with, majors delta, requirement types closed and opened, new and resolved findings in the files changed between the two commits, or in every file when a commit is unknown or the tree was dirty).
+
 ## [1.11.0] - 2026-09-22
 
 ### Features

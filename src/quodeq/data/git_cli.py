@@ -161,6 +161,18 @@ def git_head_sha(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> str 
     return sha or None
 
 
+def git_worktree_dirty(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> bool | None:
+    """True when tracked files at *repo_path* differ from HEAD, False when clean,
+    None outside a repo. Untracked files do not count: they were not evaluated
+    at HEAD either way, so they cannot make two runs' commits incomparable."""
+    out = run_git(
+        [GIT_FLAG_C, repo_path, "status", "--porcelain", "--untracked-files=no"], timeout=timeout,
+    )
+    if out is None:
+        return None
+    return bool(out.strip())
+
+
 def stream_log_names(
     repo_dir: Path, *, months: int = DEFAULT_GIT_LOOKBACK_MONTHS, timeout: float = _DEFAULT_TIMEOUT_S,
 ) -> Iterator[str]:

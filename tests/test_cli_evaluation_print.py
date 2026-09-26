@@ -1,8 +1,9 @@
 """`print_scores` prints suppression-adjusted scores after a scan.
 
-Covers the target behaviour: every line carries the report's violation
-count, major count and density (violations per 100 files read) when the
-report exists; when a dismissal matches a just-scanned run's evidence, the
+Covers the target behaviour: every line carries the report's majors
+(critical + major), open requirement types, density (violations per 100
+files read) and coverage when the report exists; the raw count is not on
+the line; when a dismissal matches a just-scanned run's evidence, the
 evidence-based rescore replaces the grade and a `(N dismissed findings
 excluded)` suffix is appended; a dimension without a report prints the
 plain `  {dim}: {score}` line.
@@ -92,7 +93,7 @@ def test_dismissal_prints_adjusted_score_with_suffix(tmp_path, capsys):
     out = capsys.readouterr().out
     assert out == (
         f"  {DIM}: {expected.overall.weighted_score}/10"
-        "  (3 violations, 2 major, 60.0 per 100 files) (1 dismissed findings excluded)\n"
+        "  (2 major, 2 open types, 60.0 per 100 files, 50% coverage) (1 dismissed findings excluded)\n"
     )
 
 
@@ -108,7 +109,7 @@ def test_no_suppressions_prints_score_with_volume(tmp_path, capsys):
     print_scores({DIM: score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
-    assert out == f"  {DIM}: {score}  (1 violation, 1 major, 20.0 per 100 files)\n"
+    assert out == f"  {DIM}: {score}  (1 major, 1 open type, 20.0 per 100 files, 50% coverage)\n"
 
 
 def test_dimension_without_evidence_falls_back_to_original_line(tmp_path, capsys):
@@ -164,7 +165,7 @@ def test_rescore_exception_falls_back_to_original_line(tmp_path, capsys, monkeyp
     print_scores({DIM: original_score}, run_dir, project_dir, DEFAULT_PARAMS)
 
     out = capsys.readouterr().out
-    assert out == f"  {DIM}: {original_score}  (2 violations, 1 major, 40.0 per 100 files)\n"
+    assert out == f"  {DIM}: {original_score}  (2 major, 2 open types, 40.0 per 100 files, 50% coverage)\n"
 
 
 def test_rescore_out_of_scope_error_propagates(tmp_path, monkeypatch):
@@ -216,22 +217,37 @@ def test_excluded_count_ignores_quarantined_findings(tmp_path, monkeypatch):
     assert rescored.excluded == 0
 
 
+_TOTALS_FRESH = {"violationCount": 945, "severity": {"critical": 0, "major": 2, "minor": 943},
+                 "violationsPer100Files": 32.3}
+
+
+def test_line_leads_with_majors_types_density_coverage():
+    line = _format_score_line("maintainability", "9.1/10", _TOTALS_FRESH, open_types=30,
+                              coverage_pct=95.2)
+    assert line == "  maintainability: 9.1/10  (2 major, 30 open types, 32.3 per 100 files, 95% coverage)"
+
+
+def test_line_counts_critical_as_major():
+    totals = {**_TOTALS_FRESH, "severity": {"critical": 1, "major": 2, "minor": 0}}
+    assert "3 major" in _format_score_line("d", "5.0/10", totals, open_types=3, coverage_pct=100.0)
+
+
 def test_format_score_line_without_totals_is_plain():
     assert _format_score_line("security", "8.0/10", {}) == "  security: 8.0/10"
 
 
 def test_format_score_line_omits_density_when_none():
     totals = {"violationCount": 2, "severity": {"major": 1}, "violationsPer100Files": None}
-    assert _format_score_line("security", "8.0/10", totals) == "  security: 8.0/10  (2 violations, 1 major)"
+    assert _format_score_line("security", "8.0/10", totals) == "  security: 8.0/10  (1 major)"
 
 
 def test_format_score_line_appends_suffix():
     totals = {"violationCount": 1, "severity": {}}
     line = _format_score_line("security", "7.9/10", totals, suffix=" (1 dismissed findings excluded)")
-    assert line == "  security: 7.9/10  (1 violation, 0 major) (1 dismissed findings excluded)"
+    assert line == "  security: 7.9/10  (0 major) (1 dismissed findings excluded)"
 
 
 def test_format_score_line_tolerates_corrupt_counts():
     totals = {"violationCount": "many", "severity": {"major": None}}
     line = _format_score_line("security", "8.0/10", totals)
-    assert line == "  security: 8.0/10  (0 violations, 0 major)"
+    assert line == "  security: 8.0/10  (0 major)"
