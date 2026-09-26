@@ -7,6 +7,14 @@ from unittest.mock import patch
 from quodeq.dashboard._instance import InstanceController
 
 
+def _send_reload(sock_path: Path, url: str) -> None:
+    """Send a reload as a second instance does: learn the owner's address
+    first (on Windows try_acquire reads the TCP port file), then send."""
+    sender = InstanceController(sock_path)
+    assert sender.try_acquire() is False
+    sender.send_reload(url)
+
+
 def test_first_instance_acquires_lock(tmp_path: Path):
     sock_path = tmp_path / "test.sock"
     ctrl = InstanceController(sock_path)
@@ -136,9 +144,9 @@ def test_listener_survives_an_on_reload_failure_and_keeps_serving(tmp_path: Path
     assert ctrl1.try_acquire() is True
     ctrl1.start_listening(on_reload=_on_reload)
 
-    InstanceController(sock_path).send_reload("http://localhost:7863/first")
+    _send_reload(sock_path, "http://localhost:7863/first")
     time.sleep(0.2)
-    InstanceController(sock_path).send_reload("http://localhost:7863/second")
+    _send_reload(sock_path, "http://localhost:7863/second")
     time.sleep(0.2)
 
     ctrl1.shutdown()
@@ -159,7 +167,7 @@ def test_listener_logs_a_warning_on_an_on_reload_failure(tmp_path: Path, caplog)
     assert ctrl1.try_acquire() is True
     with caplog.at_level(logging.WARNING, logger="quodeq.dashboard._instance"):
         ctrl1.start_listening(on_reload=_on_reload)
-        InstanceController(sock_path).send_reload("http://localhost:7863")
+        _send_reload(sock_path, "http://localhost:7863")
         time.sleep(0.2)
     ctrl1.shutdown()
 
@@ -184,21 +192,24 @@ def test_listener_survives_a_connection_reset_and_closes_the_connection(tmp_path
     raised_on: dict[str, socket.socket] = {}
 
     def _flaky_recv(self, *args, **kwargs):
-        calls["n"] += 1
-        if calls["n"] == 1:
+        # Drain the client's payload first so its sendall() completes cleanly
+        # (closing conn unread would race the client with a spurious
+        # BrokenPipeError), then fail the first read that carried a reload.
+        # A liveness probe sends nothing, so it is never the one reset,
+        # whenever the listener thread gets to it.
+        data = real_recv(self, *args, **kwargs)
+        if data and calls["n"] == 0:
+            calls["n"] += 1
             raised_on["conn"] = self
-            # Drain the client's payload first so its sendall() completes
-            # cleanly (closing conn unread would race the client with a
-            # spurious BrokenPipeError on its side) -- only then simulate
-            # the read itself failing, e.g. a reset detected after the data.
-            real_recv(self, *args, **kwargs)
             raise ConnectionResetError("peer reset")
-        return real_recv(self, *args, **kwargs)
+        return data
 
+    sender = InstanceController(sock_path)
+    assert sender.try_acquire() is False
     with patch.object(socket.socket, "recv", _flaky_recv):
-        InstanceController(sock_path).send_reload("http://localhost:7863/first")
+        sender.send_reload("http://localhost:7863/first")
         time.sleep(0.2)
-        InstanceController(sock_path).send_reload("http://localhost:7863/second")
+        sender.send_reload("http://localhost:7863/second")
         time.sleep(0.2)
 
     ctrl1.shutdown()
