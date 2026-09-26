@@ -1,12 +1,13 @@
 """Accumulated (cross-run) view logic for the filesystem action provider.
 
-Split: the walk-cache globals and per-call LRU cache config moved
-to ``_accumulated_cache.py``; trend/severity/score aggregation (including the
+Split: the walk cache (``WalkCache``) and per-call LRU cache config moved to
+``_accumulated_cache.py``; trend/severity/score aggregation (including the
 wire-serialization call that builds the response payload) moved to
-``_accumulated_aggregate.py``. Both are re-exported here — the walk-cache
-globals are shared mutable state, so this module imports the OBJECTS (not
-copies) to keep identity intact for tests that reach in directly
-(``clear_accumulated_process_cache``).
+``_accumulated_aggregate.py``. Both are re-exported here. The process-wide
+walk cache is shared mutable state (one instance, ``DEFAULT_WALK_CACHE``, at
+the composition root -- see ``services/_process_owners.py``); this module
+reads its ``cache``/``lock`` OBJECTS directly (not copies) to keep identity
+intact for tests that reach in via ``clear_accumulated_process_cache``.
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ from quodeq.services.deleted import filter_deleted_from_dimensions
 from quodeq.services.scoring_view import select_default_view_runs
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
 from quodeq.services.wiring import (
+    DEFAULT_WALK_CACHE,
     RunInfo,
     find_children as _find_children,
     list_runs,
@@ -33,8 +35,7 @@ from quodeq.services._accumulated_data import make_slim_run_fetcher
 
 from quodeq.services._accumulated_cache import (  # noqa: F401 — re-export
     AccumulatedCacheConfig,
-    WALK_CACHE,
-    WALK_CACHE_LOCK,
+    WalkCache,
     acc_dim_cache_max,
     resolve_cache,
     walk_cache_max,
@@ -89,7 +90,7 @@ def _compute_result(
 def _load_run_dimensions(
     reports_root: Path, project: str, run_infos: list[RunInfo],
     cache_config: AccumulatedCacheConfig | None,
-    *, log: LogSink = NULL_LOG,
+    *, walk: WalkCache | None = None, log: LogSink = NULL_LOG,
 ) -> tuple[dict[str, DimensionResult], dict[str, DimensionResult], list[DimensionResult]]:
     _cache, _lock, _max = resolve_cache(cache_config)
     ctx = DimensionCacheContext(cache=_cache, lock=_lock, max_size=_max)
@@ -99,7 +100,8 @@ def _load_run_dimensions(
     if cache_config is not None:
         walk_cache, walk_lock, walk_max = _cache, _lock, _max
     else:
-        walk_cache, walk_lock, walk_max = WALK_CACHE, WALK_CACHE_LOCK, walk_cache_max()
+        owner = walk if walk is not None else DEFAULT_WALK_CACHE
+        walk_cache, walk_lock, walk_max = owner.cache, owner.lock, owner.max_size()
     get_run_slim = make_slim_run_fetcher(
         reports_root, project, walk_cache, walk_lock, walk_max, log=log,
     )

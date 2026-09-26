@@ -85,14 +85,11 @@ class TestRouteDiscardBlocksScoringResurrection:
         return app, provider
 
     @pytest.fixture(autouse=True)
-    def _reset_claim_registry(self, monkeypatch):
-        from quodeq.api._evaluation_routes import scored_jobs, scored_jobs_lock
+    def _no_api_key(self, monkeypatch):
+        # Each test builds its own app (self._make_app()), which gets its
+        # own fresh ScoringClaims instance, so there's no shared registry
+        # left over from another test to reset.
         monkeypatch.delenv("QUODEQ_API_KEY", raising=False)
-        with scored_jobs_lock:
-            scored_jobs.clear()
-        yield
-        with scored_jobs_lock:
-            scored_jobs.clear()
 
     def test_get_after_discard_cancel_does_not_score(self, tmp_path, monkeypatch):
         monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(tmp_path))

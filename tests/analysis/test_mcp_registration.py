@@ -5,12 +5,13 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 
-from quodeq.analysis._command import (
-    register_cli_mcp,
-    _unregister_cli_mcp,
-    _cli_mcp_registered,
-)
+from quodeq.analysis._command import register_cli_mcp, _unregister_cli_mcp
 from quodeq.analysis._config import AnalysisConfig
+from quodeq.analysis.run_types import RunConfig
+# subprocess.py already imports this for its own run-scoped-registry fallback
+# (see _run_cli_analysis); reusing that public re-export here keeps this file
+# off the private-imports ratchet instead of importing straight from _command.
+from quodeq.analysis.subprocess import DEFAULT_CLI_MCP_REGISTRY
 
 
 # ---------------------------------------------------------------------------
@@ -19,8 +20,8 @@ from quodeq.analysis._config import AnalysisConfig
 
 class TestRegisterCliMcp:
     def setup_method(self):
-        # Clear the global registry between tests
-        _cli_mcp_registered.clear()
+        # Clear the process-default registry between tests
+        DEFAULT_CLI_MCP_REGISTRY.clear()
 
     def test_register_success(self, tmp_path):
         jsonl = tmp_path / "findings.jsonl"
@@ -105,3 +106,37 @@ class TestUnregisterCliMcp:
              patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
             mock_run.side_effect = FileNotFoundError("mycli")
             _unregister_cli_mcp("mycli", "quodeq-findings")
+
+
+class TestRunScopedCliMcpRegistry:
+    """The registry is a ``RunConfig`` field (``mcp_registry``), so every
+    pool worker thread of one run shares one instance -- see
+    ``subprocess._run_cli_analysis``."""
+
+    def test_two_analysis_configs_on_one_run_share_the_registry(self, tmp_path):
+        run_config = RunConfig(src=tmp_path, language="python")
+        cfg_a = AnalysisConfig(jsonl_file=tmp_path / "a.jsonl", run_config=run_config)
+        cfg_b = AnalysisConfig(jsonl_file=tmp_path / "b.jsonl", run_config=run_config)
+        assert cfg_a.run_config.mcp_registry is cfg_b.run_config.mcp_registry
+
+    def test_two_run_configs_have_isolated_registries(self, tmp_path):
+        a = RunConfig(src=tmp_path, language="python")
+        b = RunConfig(src=tmp_path, language="python")
+        assert a.mcp_registry is not b.mcp_registry
+
+    def test_registering_same_cmd_twice_through_one_run_registry_runs_the_remove_then_add_once(
+        self, tmp_path,
+    ):
+        """Second call through the SAME run-scoped registry is a cache hit:
+        exactly one unregister (check=False) + one register (check=True),
+        never doubled."""
+        config = AnalysisConfig(jsonl_file=tmp_path / "findings.jsonl")
+        registry = RunConfig(src=tmp_path, language="python").mcp_registry
+        with patch("quodeq.analysis._command.subprocess.run") as mock_run, \
+             patch("quodeq.analysis._command._get_provider_configs", return_value={"mycli": {"type": "cli"}}):
+            mock_run.return_value = MagicMock(returncode=0)
+            first = registry.ensure_registered("mycli", config)
+            second = registry.ensure_registered("mycli", config)
+
+        assert first == second == "quodeq-findings"
+        assert mock_run.call_count == 2  # 1 unregister + 1 register, not 4

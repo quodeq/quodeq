@@ -37,6 +37,21 @@ class ViolationResponse:
 
 
 @dataclass(frozen=True, slots=True)
+class EvalPending:
+    """Marks a dimension whose evaluation is still being written to disk.
+
+    ``get_dimension_eval`` returns this instead of ``None`` when the run
+    directory exists but no evaluation file (JSON, markdown, or evidence) has
+    landed yet, so the route can answer 202 and the UI keeps polling instead
+    of treating the run as missing.
+    """
+
+    project: str
+    run_id: str
+    dimension: str
+
+
+@dataclass(frozen=True, slots=True)
 class ViolationFileEntry:
     """Per-file violation counts grouped by severity."""
 

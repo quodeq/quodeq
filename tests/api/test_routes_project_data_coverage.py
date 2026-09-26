@@ -7,6 +7,7 @@ import pytest
 from flask import Flask
 
 from quodeq.api.routes_project_data import register_project_data_routes
+from quodeq.core.types import EvalPending
 
 
 @pytest.fixture
@@ -77,7 +78,7 @@ class TestDimensionEvalRoute:
         assert resp.status_code == 404
 
     def test_waiting(self, client):
-        client._provider.get_dimension_eval.return_value = {"waiting": True}
+        client._provider.get_dimension_eval.return_value = EvalPending(project="p", run_id="r", dimension="d")
         resp = client.get("/api/projects/p/runs/r/dimensions/d/eval")
         assert resp.status_code == 202
 

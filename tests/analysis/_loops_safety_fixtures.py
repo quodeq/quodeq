@@ -34,6 +34,9 @@ def _config() -> MagicMock:
     # Default: no run-level deadline (would otherwise be a MagicMock and
     # break the numeric comparison in the loop's deadline guard).
     cfg.options.deadline_at = None
+    # None falls back to the module-default drop counter (would otherwise
+    # be a MagicMock and break report_run_drop_stats's ratio formatting).
+    cfg.drop_counter = None
     return cfg
 
 

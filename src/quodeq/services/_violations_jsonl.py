@@ -1,7 +1,6 @@
 """JSONL-specific parsing for extracting violations from MCP findings files."""
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Iterable
@@ -9,7 +8,7 @@ from typing import Iterable
 from quodeq.core.types import Finding, ViolationResponse
 from quodeq.core.evidence.req_mapping import PrincipleResolver, build_principle_resolver
 from quodeq.data.fs.standards_loader import build_req_refs_lookup, read_req_to_principle_map
-from quodeq.data.fs.stream_files import count_files_in_stream
+from quodeq.data.fs.stream_files import count_files_in_stream, decode_jsonl_objects
 from quodeq.services.violation_context import ViolationContext
 from quodeq.services.suppression import SuppressionMatcher, load_req_to_principle
 from quodeq.services.suppression_keys import SuppressionKeys
@@ -87,17 +86,11 @@ def _parse_jsonl_findings(
         # scored report can never map a req ID to different principles.
         req_to_principle=resolver.req_to_principle if resolver else {},
     )
-    for raw_line in lines:
-        raw = raw_line.strip()
-        if not raw:
-            continue
-        try:
-            obj = json.loads(raw)
-        except json.JSONDecodeError:
-            _logger.warning("Skipping malformed JSONL line in findings file: %s", raw[:200])
-            continue
-        if not isinstance(obj, dict):
-            continue
+
+    def _warn_malformed(raw: str) -> None:
+        _logger.warning("Skipping malformed JSONL line in findings file: %s", raw[:200])
+
+    for obj in decode_jsonl_objects(lines, on_malformed_line=_warn_malformed):
         resolved_obj = _resolve_and_dedupe(obj, matcher, resolver, seen)
         if resolved_obj is None:
             continue
@@ -115,18 +108,22 @@ def _parse_jsonl_findings(
 _load_req_to_principle = load_req_to_principle
 
 
-def _build_resolver(dimension: str, compiled_dir: Path | None) -> PrincipleResolver:
+def _build_resolver(
+    dimension: str, compiled_dir: Path | None, evaluators_dir: Path | None = None,
+) -> PrincipleResolver:
     """Resolve *dimension*'s principle set the same way the report path does.
 
     Routes through the shared builder in ``core.evidence._req_mapping`` rather
     than reading evaluators here, so this path inherits the compiled-standard
     fallback. Without it the map is empty on a stock install (the evaluators
     dir exists but is empty for built-in dimensions) and every requirement ID
-    would look unmappable.
+    would look unmappable. *evaluators_dir* defaults to ``default_paths()``'s,
+    resolved at call time so a caller can inject a different one for testing.
     """
     validate_path_segment(dimension)  # dimension reaches a path join downstream
+    _evaluators_dir = evaluators_dir if evaluators_dir is not None else default_paths().evaluators_dir
     return build_principle_resolver(
-        dimension, default_paths().evaluators_dir, compiled_dir,
+        dimension, _evaluators_dir, compiled_dir,
         req_map_reader=read_req_to_principle_map,
     )
 
@@ -135,10 +132,11 @@ def parse_violations_from_jsonl(
     jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
     compiled_dir: Path | None = None,
     keys: SuppressionKeys | None = None,
+    evaluators_dir: Path | None = None,
 ) -> ViolationResponse | None:
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
-    resolver = _build_resolver(ctx.dimension, compiled_dir)
+    resolver = _build_resolver(ctx.dimension, compiled_dir, evaluators_dir)
     try:
         with open_text(jsonl_path) as _f:
             violations, compliance = _parse_jsonl_findings(

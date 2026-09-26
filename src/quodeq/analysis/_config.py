@@ -5,9 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
+from quodeq.analysis._drop_stats import DropStatsCounter
 from quodeq.shared.constants import DEFAULT_TIME_LIMIT
 
 if TYPE_CHECKING:
+    from quodeq.analysis._command import CliMcpRegistry
     from quodeq.analysis.run_types import RunConfig
 
 HeartbeatCallback = Callable[[int, dict], None]
@@ -55,6 +57,14 @@ class AnalysisConfig:
     # lazy via ``from __future__ import annotations``) so ``run_types`` can
     # import this module at runtime without a cycle.
     run_config: RunConfig | None = None
+    # The run's drop-stats accumulator and CLI-MCP registration cache,
+    # carried directly rather than only through ``run_config`` so a builder
+    # that must NOT set ``run_config`` (no per-file cache writer) can still
+    # reach the run's owners. Every builder fills these from the same
+    # ``RunConfig`` it would have passed as ``run_config``. ``None`` falls
+    # back to ``run_config``'s owner, then the module-level default.
+    drop_counter: DropStatsCounter | None = None
+    mcp_registry: "CliMcpRegistry | None" = None
 
 
 @dataclass(frozen=True)

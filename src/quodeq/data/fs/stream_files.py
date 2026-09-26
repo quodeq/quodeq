@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
 from quodeq.core.stream.events import extract_files_from_event, parse_stream_event
@@ -135,6 +135,31 @@ def iter_stream_lines(path: Path, *, missing_ok: bool = True) -> Iterator[str]:
             stripped = raw_line.strip()
             if stripped:
                 yield stripped
+
+
+def decode_jsonl_objects(
+    lines: Iterable[str], *, on_malformed_line: Callable[[str], None] | None = None,
+) -> Iterator[dict]:
+    """Decode JSONL text *lines* into JSON objects.
+
+    Blank lines are skipped. A line that fails to parse as JSON is skipped;
+    when *on_malformed_line* is given, it is called with the raw (stripped)
+    line, letting a caller log the skip without this module owning a logging
+    policy. A line that parses to a non-object JSON value (list/str/number/
+    null) is silently skipped too.
+    """
+    for raw_line in lines:
+        raw = raw_line.strip()
+        if not raw:
+            continue
+        try:
+            obj = json.loads(raw)
+        except json.JSONDecodeError:
+            if on_malformed_line is not None:
+                on_malformed_line(raw)
+            continue
+        if isinstance(obj, dict):
+            yield obj
 
 
 def count_jsonl_lines(jsonl_file: Path) -> int:

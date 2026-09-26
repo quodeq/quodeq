@@ -20,10 +20,10 @@ def _get_config(override: Config | None = None) -> Config:
     return override if override is not None else _canonical_get_config()
 
 
-def _lazy_constant(key: str) -> str:
-    """Return a config value from the canonical singleton."""
+def _lazy_constant(key: str, config: Config | None = None) -> str:
+    """Return a config value from *config*, or the canonical singleton."""
     try:
-        return _get_config()[key]
+        return _get_config(config)[key]
     except KeyError:
         raise KeyError(
             f"Config key {key!r} not found in defaults.json "
@@ -31,19 +31,19 @@ def _lazy_constant(key: str) -> str:
         ) from None
 
 
-def get_anthropic_api_url() -> str:
+def get_anthropic_api_url(config: Config | None = None) -> str:
     """Return the Anthropic API URL from configuration."""
-    return _lazy_constant("anthropic_api_url")
+    return _lazy_constant("anthropic_api_url", config)
 
 
-def get_anthropic_api_version() -> str:
+def get_anthropic_api_version(config: Config | None = None) -> str:
     """Return the Anthropic API version from configuration."""
-    return _lazy_constant("anthropic_api_version")
+    return _lazy_constant("anthropic_api_version", config)
 
 
-def get_default_host() -> str:
+def get_default_host(config: Config | None = None) -> str:
     """Return the default host from configuration."""
-    return _lazy_constant("default_host")
+    return _lazy_constant("default_host", config)
 
 
 # Keep module-level names for backward compatibility, but now they are

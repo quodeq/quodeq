@@ -17,6 +17,7 @@ from quodeq.api.helpers import json_error
 from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.constants import SECRET_SUFFIX_CHARS
 from quodeq.shared.dashboard_ports import alt_port_origins
+from quodeq.shared.log_throttle import LogThrottle
 
 _logger = logging.getLogger(__name__)
 
@@ -126,15 +127,10 @@ _ALT_PORT_ORIGINS = alt_port_origins()
 # response; if the computation starts failing under some sustained condition
 # we still want the FIRST occurrence surfaced immediately, but must not turn a
 # per-request code path into a per-request log line -- that would make the
-# failure itself a new source of log-volume noise. Module-level, best-effort
-# (no lock): a rare double-log right at the window boundary under concurrent
-# requests is harmless: it's a diagnostic throttle, not a correctness
-# guarantee.
+# failure itself a new source of log-volume noise. The LogThrottle instance
+# lives per-app (created in configure_security); shared/log_throttle.py has
+# the lock-free rationale.
 _CSP_WS_FAILURE_LOG_INTERVAL_S = 60.0
-# None, not 0.0: time.monotonic() is seconds-since-boot, so a 0.0 sentinel
-# would silently drop the first failure on any machine up for less than the
-# interval (a desktop app launched at login).
-_last_csp_ws_failure_log_at: float | None = None
 
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
@@ -219,27 +215,21 @@ def _actor(api_key: str | None) -> str:
     return ""
 
 
-def _log_csp_ws_failure(exc: Exception) -> None:
+def _log_csp_ws_failure(exc: Exception, throttle: LogThrottle) -> None:
     """Surface a same-origin ws CSP computation failure, rate-limited.
 
     Runs inside ``after_request`` on every response, so this must never
     raise and must never become an unbounded log source on its own: only
     the exception's type name is logged (no header/request content, so
     nothing attacker-controlled reaches the log line), and repeats within
-    ``_CSP_WS_FAILURE_LOG_INTERVAL_S`` are dropped. A failing handler is the
-    handler's problem (stdlib handleError contract); this module does not
-    control its logger's handlers, and ``_add_security_headers`` already
-    logs unguarded on every request, so a guard here never covered the
-    real risk.
+    *throttle*'s interval are dropped. A failing handler is the handler's
+    problem (stdlib handleError contract); this module does not control
+    its logger's handlers, and ``_add_security_headers`` already logs
+    unguarded on every request, so a guard here never covered the real
+    risk.
     """
-    global _last_csp_ws_failure_log_at
-    now = time.monotonic()
-    if (
-        _last_csp_ws_failure_log_at is not None
-        and now - _last_csp_ws_failure_log_at < _CSP_WS_FAILURE_LOG_INTERVAL_S
-    ):
+    if not throttle.should_emit(time.monotonic()):
         return
-    _last_csp_ws_failure_log_at = now
     _logger.warning(
         "CSP same-origin ws/wss connect-src computation failed (%s); "
         "omitting that entry for this response (further repeats "
@@ -260,6 +250,7 @@ def configure_security(
     *env* is captured once here, at app-creation time, rather than read per
     request; ``None`` keeps the per-request lookup against ``os.environ``.
     """
+    csp_ws_failure_throttle = LogThrottle(_CSP_WS_FAILURE_LOG_INTERVAL_S)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
@@ -277,7 +268,7 @@ def configure_security(
             self_ws = _same_origin_ws_sources(request.host)
         except Exception as exc:
             self_ws = ""
-            _log_csp_ws_failure(exc)
+            _log_csp_ws_failure(exc, csp_ws_failure_throttle)
         is_webview = _is_trusted_webview(request.headers.get("User-Agent", ""), env)
         script_src = "script-src 'self' 'unsafe-eval'" if is_webview else "script-src 'self'"
         response.headers["Content-Security-Policy"] = (

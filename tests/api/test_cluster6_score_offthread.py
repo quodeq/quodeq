@@ -14,12 +14,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.api.app import create_app
-from quodeq.api._evaluation_routes import (
-    claim_scoring,
-    scored_jobs,
-    scored_jobs_lock,
-    SCORED_JOBS_MAX,
-)
+from quodeq.services.scored_jobs_registry import ScoringClaims, SCORED_JOBS_MAX
 from quodeq.services.base import ActionProvider
 from quodeq.services._job_model import JobSnapshot
 from tests._timeouts import budget
@@ -146,14 +141,13 @@ def test_get_evaluation_scores_only_once_for_same_job(client):
         time.sleep(0.1)
 
     assert call_count == 1, (
-        f"Expected scoring to run exactly once (dedup via _scored_jobs), "
+        f"Expected scoring to run exactly once (dedup via ScoringClaims), "
         f"got {call_count} calls."
     )
 
 
 def test_score_completed_dims_failure_is_isolated_and_logged(client, caplog):
-    """A raising score_completed_evidence must not crash the background task,
-    and must be logged with the traceback (fault-isolation boundary)."""
+    """A raising scorer is isolated and logged with its traceback."""
     with patch(
         "quodeq.services.score_run.score_completed_evidence",
         side_effect=RuntimeError("boom"),
@@ -212,27 +206,16 @@ def test_deadline_cancelled_job_still_triggers_salvage_scoring(reports_root):
     )
 
 
-# ---------------------------------------------------------------------------
-# Unit tests for claim_scoring (race-closure + bounded-registry guarantees)
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(autouse=True)
-def _reset_claim_registry():
-    """Ensure each test starts with a clean scored_jobs registry."""
-    with scored_jobs_lock:
-        scored_jobs.clear()
-    yield
-    with scored_jobs_lock:
-        scored_jobs.clear()
-
+# ScoringClaims unit tests: each builds its own instance, so nothing to reset.
 
 def test_claim_scoring_exactly_once_under_concurrency():
-    """claim_scoring returns True exactly once when N threads race on the same job_id.
+    """claim() returns True exactly once when N threads race on the same job_id.
 
-    A threading.Barrier lines all N threads up so they enter claim_scoring as
+    A threading.Barrier lines all N threads up so they enter claim() as
     simultaneously as possible, maximising the chance of exposing a race.
     Only one thread should win the claim; all others must get False.
     """
+    claims = ScoringClaims()
     n_threads = 10
     job_id = "race-job-concurrent"
     barrier = threading.Barrier(n_threads)
@@ -241,7 +224,7 @@ def test_claim_scoring_exactly_once_under_concurrency():
 
     def _try_claim():
         barrier.wait()  # synchronize all threads to the same starting line
-        claimed = claim_scoring(job_id)
+        claimed = claims.claim(job_id)
         with results_lock:
             results.append(claimed)
 
@@ -260,19 +243,58 @@ def test_claim_scoring_exactly_once_under_concurrency():
 
 
 def test_claim_scoring_registry_bounded():
-    """Registry never exceeds SCORED_JOBS_MAX entries.
-
-    Claims more than SCORED_JOBS_MAX distinct job_ids and verifies that
-    the registry size stays at or below the cap (oldest entries are evicted).
-    """
+    """Registry never exceeds SCORED_JOBS_MAX entries (oldest are evicted)."""
+    claims = ScoringClaims()
     overflow = SCORED_JOBS_MAX + 50
     for i in range(overflow):
-        claim_scoring(f"bounded-job-{i}")
+        claims.claim(f"bounded-job-{i}")
 
-    with scored_jobs_lock:
-        size = len(scored_jobs)
+    size = len(claims)
 
     assert size <= SCORED_JOBS_MAX, (
         f"Registry grew to {size}, exceeding the cap of {SCORED_JOBS_MAX}. "
         "Memory leak is still present."
     )
+
+
+def test_claim_scoring_evicts_oldest_first_like_the_old_ordereddict():
+    """LRU eviction order: overflowing by one drops the earliest-claimed
+    job_id, not an arbitrary one. Matches the old OrderedDict's
+    ``popitem(last=False)`` (insertion-order, not access-order, eviction).
+    """
+    claims = ScoringClaims(max_entries=3)
+    for job_id in ("a", "b", "c"):
+        assert claims.claim(job_id)
+
+    assert claims.claim("d")  # overflow by one: "a" (oldest) must be evicted
+
+    assert len(claims) == 3
+    # Check the still-claimed ids first: claim() returning False never
+    # mutates, so checking these first avoids a second eviction from the
+    # "a" re-claim below skewing which id "was evicted" means.
+    assert not claims.claim("b")  # "b" is still claimed
+    assert not claims.claim("c")  # "c" is still claimed
+    assert not claims.claim("d")  # "d" is still claimed
+    assert claims.claim("a")  # "a" was evicted by the overflow, so claimable again
+
+
+def test_release_allows_a_reclaim():
+    claims = ScoringClaims()
+    assert claims.claim("j1")
+    assert not claims.claim("j1")  # already claimed
+
+    claims.release("j1")
+
+    assert claims.claim("j1")  # released, so claimable again
+
+
+def test_reset_clears_every_claim():
+    claims = ScoringClaims()
+    claims.claim("j1")
+    claims.claim("j2")
+
+    claims.reset()
+
+    assert len(claims) == 0
+    assert claims.claim("j1")
+    assert claims.claim("j2")

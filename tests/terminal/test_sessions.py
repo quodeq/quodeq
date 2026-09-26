@@ -71,7 +71,7 @@ def test_create_returns_none_at_cap():
         assert reg.create() is not None
     assert reg.create() is None
     # killing one frees a slot
-    victim = reg.list()[0]["id"]
+    victim = reg.list()[0].id
     assert reg.kill(victim)
     assert reg.create() is not None
 
@@ -83,8 +83,8 @@ def test_list_reflects_sessions():
     listed = reg.list()
     assert len(listed) == 1
     item = listed[0]
-    assert item["id"] == a.id and item["name"] == a.name
-    assert item["alive"] is True and item["createdAt"] == a.created_at
+    assert item.id == a.id and item.name == a.name
+    assert item.alive is True and item.created_at == a.created_at
 
 
 def test_kill_removes_and_kills_only_target():

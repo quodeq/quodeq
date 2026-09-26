@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from quodeq.assistant.worktree import WorktreeError, WorktreeManager, WorktreeStatus
+from quodeq.assistant.worktree import PrResult, WorktreeError, WorktreeManager, WorktreeStatus
 from quodeq.data.ports.assistant import AssistantStore
 
 _logger = logging.getLogger(__name__)
@@ -158,13 +158,13 @@ class PrOutcome:
 
     ``detail`` carries the worktree's current status for "not_active", or
     the raw WorktreeError text for "failed" (server-side logging only).
-    ``result`` is ``WorktreeManager.create_pr``'s fail-soft body on success
-    (a missing/None ``prUrl`` there means push or ``gh`` failed, not that
-    this call raised).
+    ``result`` is ``WorktreeManager.create_pr``'s typed, fail-soft
+    ``PrResult`` on success (a missing/None ``pr_url`` there means push or
+    ``gh`` failed, not that this call raised).
     """
     kind: OutcomeKind
     detail: str = ""
-    result: dict | None = None
+    result: PrResult | None = None
 
 
 def create_workspace_pr(
@@ -185,7 +185,7 @@ def create_workspace_pr(
             result = manager.create_pr(draft.title, draft.body)
         except WorktreeError as exc:
             return PrOutcome(OutcomeKind.FAILED, detail=str(exc))
-        if result.get("prUrl"):
+        if result.pr_url:
             repo.set_worktree_status(sid, WorktreeStatus.PR_CREATED)
             _remove_quietly(manager, sid, "pr", delete_branch=False)  # branch lives on the remote PR
         return PrOutcome(OutcomeKind.CREATED, result=result)

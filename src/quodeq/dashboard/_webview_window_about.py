@@ -1,40 +1,31 @@
 """macOS app identity: dock icon, bundle name, and the rich About panel.
 
-The webview's user-agent string lives in ``webview_user_agent`` and is
-re-exported here, where ``_webview_window`` and the drift tests have always
-imported it from.
+The webview's user-agent string lives in ``webview_user_agent`` and is re-exported
+here, where ``_webview_window`` and the drift tests have always imported it from.
 
-The About-panel install writes its progress to the webview diagnostic log
-(``_webview_diag``), which this module re-exports as ``diag`` for the help
-menu that writes to the same file.
-
-Leaf module for _webview_window.py — self-contained AppKit setup with no
-patch-tested cross-function co-location requirements (see
-tests/dashboard/test_native_chrome.py's TestMacAppIdentityIdempotent, which
-only calls set_macos_app_identity directly). The facade re-exports
-set_macos_app_identity and icon_path, which it also calls itself.
+Leaf module for _webview_window.py — self-contained AppKit setup with no patch-tested
+cross-function co-location requirements (see tests/dashboard/test_native_chrome.py's
+TestMacAppIdentityIdempotent, which only calls set_macos_app_identity directly). The facade re-exports
+set_macos_app_identity and icon_path (also called from here), plus the old ``diag`` name below.
 """
 from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from quodeq.dashboard._webview_diag import diag
+from quodeq.dashboard._webview_diag import diag_stream
 from quodeq.dashboard._webview_user_agent import (
-    WEBVIEW_TOKEN_UA_PREFIX, WEBVIEW_UA_MARKER, quodeq_version,
-    webview_user_agent,
+    WEBVIEW_TOKEN_UA_PREFIX, WEBVIEW_UA_MARKER, quodeq_version, webview_user_agent,
 )
 from quodeq.shared.constants import PLATFORM_DARWIN, PLATFORM_WIN32
 from quodeq.shared.logging import log_debug
 
 __all__ = [
-    "icon_path", "install_about_panel_override", "set_app_icon",
-    "set_macos_app_identity",
-    # Re-exported: _webview_window and the drift tests have always imported
-    # these from here.
-    "WEBVIEW_TOKEN_UA_PREFIX", "WEBVIEW_UA_MARKER", "diag",
-    "quodeq_version", "webview_user_agent",
+    "icon_path", "install_about_panel_override", "set_app_icon", "set_macos_app_identity",
+    # Re-exported: _webview_window and the drift tests have always imported these from here.
+    "WEBVIEW_TOKEN_UA_PREFIX", "WEBVIEW_UA_MARKER", "quodeq_version", "webview_user_agent",
     "MENU_POLL_INTERVAL_S", "MENU_POLL_MAX_ATTEMPTS",  # defined here, exported for _webview_window_help_menu's poller
+    "diag",  # __getattr__ shim below: the old module-level diag stream name
 ]
 
 _APP_DISPLAY_NAME = "quodeq"
@@ -178,21 +169,21 @@ def _schedule_about_install_poller(target: object) -> None:
             if main_menu is None or main_menu.numberOfItems() == 0:
                 if state["attempts"] >= max_attempts:
                     print(f"[quodeq-about] gave up after {state['attempts']} attempts — no main menu",
-                          file=diag, flush=True)
+                          file=diag_stream(), flush=True)
                     _stop_poll_timer(state)
                 return
             about_items = _find_about_items(main_menu)
             if not about_items:
                 if state["attempts"] >= max_attempts:
                     print(f"[quodeq-about] gave up — no About item found after {state['attempts']} attempts",
-                          file=diag, flush=True)
+                          file=diag_stream(), flush=True)
                     _stop_poll_timer(state)
                 return
             for item in about_items:
                 item.setTarget_(target)
                 item.setAction_("showAbout:")
             print(f"[quodeq-about] retargeted {len(about_items)} About item(s) on attempt {state['attempts']}",
-                  file=diag, flush=True)
+                  file=diag_stream(), flush=True)
             _stop_poll_timer(state)
 
     poller = _InstallPoller.alloc().init()
@@ -204,7 +195,7 @@ def _schedule_about_install_poller(target: object) -> None:
         )
         state["timer"] = timer
     except (AttributeError, ValueError) as exc:
-        print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=diag, flush=True)
+        print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=diag_stream(), flush=True)
 
 
 def install_about_panel_override() -> None:
@@ -298,3 +289,12 @@ def set_app_icon() -> None:
                     )
         except (AttributeError, OSError) as exc:
             log_debug(f"windows taskbar icon not set: {exc}")
+
+
+_DIAG_OLD_NAME = "diag"  # __getattr__ shim for the old module-level diag stream
+
+
+def __getattr__(name: str):
+    if name == _DIAG_OLD_NAME:
+        return diag_stream()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

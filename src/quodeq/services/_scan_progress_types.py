@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.run.dimensions import DimState
+from quodeq.services._live_tally_memo import LiveTallyMemo
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,10 @@ class ProgressContext:
     evidence_dir: Path
     evaluators_dir: Path | None
     compiled_dir: Path | None
+    # None resolves to the one process-wide DEFAULT_LIVE_TALLY_MEMO at the
+    # point of use (services/_process_owners.py); tests inject a fresh
+    # LiveTallyMemo() instead for isolation.
+    live_tallies: LiveTallyMemo | None = None
 
 
 @dataclass

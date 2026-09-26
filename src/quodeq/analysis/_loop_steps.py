@@ -16,7 +16,6 @@ from dataclasses import dataclass, replace
 from collections.abc import Callable
 from pathlib import Path
 
-from quodeq.analysis._drop_stats import DropStatsCounter
 from quodeq.analysis._loop_state import (
     DimTransition,
     interruption_reason,
@@ -40,14 +39,14 @@ class LoopDeps:
 
     ``runner`` analyses a dimension; ``on_dimension_done`` receives each
     finished dimension's Evidence (scoring, in production); ``log`` is the
-    loop's sink and ``drop_counter`` the per-run drop-stats aggregate the
-    loop reports once it finishes.
+    loop's sink. The per-run drop-stats aggregate lives on
+    ``RunConfig.drop_counter`` instead of here, so every dimension loop of
+    one run (and its pool worker threads) shares the same counter.
     """
 
     runner: DimensionRunner
     on_dimension_done: Callable[[str, Evidence], None] | None = None
     log: LogSink = NULL_LOG
-    drop_counter: DropStatsCounter | None = None
 
 
 def default_loop_deps(

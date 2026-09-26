@@ -24,7 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quodeq.core.types import ViolationSummary
+from quodeq.core.types import EvalPending, ViolationResponse, ViolationSummary
 from quodeq.core.types.job import JobSnapshot
 from quodeq.services import fs_reports, fs_projects
 from quodeq.services._evaluations_index import EvaluationsIndex
@@ -248,7 +248,7 @@ class FilesystemActionProvider(ActionProvider):
 
     def get_dimension_eval(
         self, reports_dir: str, project: str, run_id: str, dimension: str,
-    ) -> dict[str, Any] | None:
+    ) -> ViolationResponse | dict[str, Any] | EvalPending | None:
         """Return one dimension's parsed evaluation, resolved against
         ``_compiled_dir`` and ``_evaluators_dir``."""
         return fs_reports.get_dimension_eval(

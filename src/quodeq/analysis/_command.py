@@ -77,8 +77,6 @@ def build_ai_cmd(
 
 _MCP_REGISTER_TIMEOUT_S = 10
 _MCP_SERVER_PREFIX = "quodeq-findings"
-_cli_mcp_lock = threading.Lock()
-_cli_mcp_registered: set[str] = set()  # tracks (cmd, name) pairs
 
 
 def _mcp_server_name() -> str:
@@ -144,40 +142,81 @@ def _is_known_cli_provider(cmd: str) -> bool:
     return _get_provider_configs().get(cmd, {}).get("type") == ProviderType.CLI
 
 
-def register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = None) -> str | None:
-    """Register the findings MCP server via `<cmd> mcp add`.
+class CliMcpRegistry:
+    """CLI-register MCP server names registered so far, for one scope.
 
-    Thread-safe: only the first caller registers; subsequent calls return
-    the cached name immediately.  Removes any stale registration first.
-    Returns the server name on success, None on failure.
+    Wraps the same lock-guarded set the old module globals held. Production
+    keys one instance per run (``RunConfig.mcp_registry``), shared by every
+    pool worker thread of that run via ``dataclasses.replace()`` copies, so
+    the first agent registers and the rest see the cached name. Tests (or
+    any caller with no run scope) get :data:`DEFAULT_CLI_MCP_REGISTRY`.
     """
-    if not _is_known_cli_provider(cmd):
-        _log.warning("Refusing to register MCP server: unknown CLI provider %r", cmd)
-        return None
-    name = _mcp_server_name()
-    key = f"{cmd}:{name}"
-    with _cli_mcp_lock:
-        if key in _cli_mcp_registered:
-            return name
-        _unregister_cli_mcp(cmd, name, config.ai_cmd_path)
-        # Skip agent-id: all agents share one MCP server, so per-agent
-        # file caps don't apply — the queue distributes freely.
-        mcp_args = _build_mcp_server_args(config, work_dir, skip_agent_id=True)
-        provider_cfg = _get_provider_configs().get(cmd, {})
-        # Codex/Copilot use "-- cmd args", Gemini uses "cmd args" (no separator)
-        use_separator = provider_cfg.get("mcp_add_separator", True)
-        register_cmd = [cmd_binary(cmd, config.ai_cmd_path), _MCP_SUBCOMMAND, "add", name]
-        if use_separator:
-            register_cmd.append("--")
-        register_cmd.extend(mcp_args)
-        _log.debug("Registering MCP server '%s': %s", name, " ".join(register_cmd))
-        try:
-            subprocess.run(register_cmd, check=True, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S)
-            _cli_mcp_registered.add(key)
-            return name
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as exc:
-            _log.warning("Failed to register MCP server '%s' via '%s mcp add': %s", name, cmd, exc)
+
+    def __init__(self) -> None:
+        self._cli_mcp_lock = threading.Lock()
+        self._cli_mcp_registered: set[str] = set()  # tracks (cmd, name) pairs
+
+    def ensure_registered(
+        self, cmd: str, config: AnalysisConfig, work_dir: Path | None = None,
+    ) -> str | None:
+        """Register the findings MCP server via `<cmd> mcp add`.
+
+        Thread-safe: only the first caller registers; subsequent calls return
+        the cached name immediately.  Removes any stale registration first.
+        Returns the server name on success, None on failure.
+        """
+        if not _is_known_cli_provider(cmd):
+            _log.warning("Refusing to register MCP server: unknown CLI provider %r", cmd)
             return None
+        name = _mcp_server_name()
+        key = f"{cmd}:{name}"
+        with self._cli_mcp_lock:
+            if key in self._cli_mcp_registered:
+                return name
+            _unregister_cli_mcp(cmd, name, config.ai_cmd_path)
+            # Skip agent-id: all agents share one MCP server, so per-agent
+            # file caps don't apply — the queue distributes freely.
+            mcp_args = _build_mcp_server_args(config, work_dir, skip_agent_id=True)
+            provider_cfg = _get_provider_configs().get(cmd, {})
+            # Codex/Copilot use "-- cmd args", Gemini uses "cmd args" (no separator)
+            use_separator = provider_cfg.get("mcp_add_separator", True)
+            register_cmd = [cmd_binary(cmd, config.ai_cmd_path), _MCP_SUBCOMMAND, "add", name]
+            if use_separator:
+                register_cmd.append("--")
+            register_cmd.extend(mcp_args)
+            _log.debug("Registering MCP server '%s': %s", name, " ".join(register_cmd))
+            try:
+                subprocess.run(register_cmd, check=True, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S)
+                self._cli_mcp_registered.add(key)
+                return name
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as exc:
+                _log.warning("Failed to register MCP server '%s' via '%s mcp add': %s", name, cmd, exc)
+                return None
+
+    def clear(self) -> None:
+        """Drop every cached registration (test isolation)."""
+        with self._cli_mcp_lock:
+            self._cli_mcp_registered.clear()
+
+    def __contains__(self, key: str) -> bool:
+        with self._cli_mcp_lock:
+            return key in self._cli_mcp_registered
+
+
+# Process-wide fallback for callers with no run-scoped registry (tests,
+# one-shot callers). Production runs get a fresh, isolated instance via
+# ``RunConfig.mcp_registry`` instead.
+DEFAULT_CLI_MCP_REGISTRY = CliMcpRegistry()
+
+
+def register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = None) -> str | None:
+    """Register the findings MCP server on the process-default registry.
+
+    Back-compat entry point for callers with no run scope; a run-scoped
+    caller uses ``config.run_config.mcp_registry.ensure_registered(...)``
+    directly (see ``subprocess._run_cli_analysis``).
+    """
+    return DEFAULT_CLI_MCP_REGISTRY.ensure_registered(cmd, config, work_dir)
 
 
 def _unregister_cli_mcp(cmd: str, name: str, ai_cmd_path: str | None = None) -> None:

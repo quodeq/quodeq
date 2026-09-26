@@ -15,6 +15,10 @@ def shared_analysis_config_kwargs(config: "RunConfig") -> dict[str, Any]:
     spread this into their ``AnalysisConfig(...)`` call. ``compiled_dir`` and
     ``ai_model`` are deliberately excluded: each caller computes those
     differently and passes its own value in.
+
+    ``drop_counter`` and ``mcp_registry`` are filled here too, so both modes
+    reach the run's owners even when a caller (the consolidated builder)
+    deliberately leaves ``run_config`` unset.
     """
     return {
         "analysis_budget": config.options.analysis_budget,
@@ -23,4 +27,6 @@ def shared_analysis_config_kwargs(config: "RunConfig") -> dict[str, Any]:
         "ai_cmd": config.ai_cmd,
         "ai_cmd_path": config.options.ai_cmd_path,
         "cache_root": config.options.cache_root,
+        "drop_counter": config.drop_counter,
+        "mcp_registry": config.mcp_registry,
     }

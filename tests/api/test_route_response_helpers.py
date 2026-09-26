@@ -8,12 +8,14 @@ from http import HTTPStatus
 import pytest
 from flask import Flask
 
+from quodeq.api import helpers
+from quodeq.api.dimension_eval_wire import dimension_eval_response
 from quodeq.api.helpers import (
-    dimension_eval_response,
     jsonify_error,
     optional_json_object_or_response,
     validate_segment,
 )
+from quodeq.core.types import EvalPending
 
 
 @pytest.fixture
@@ -71,15 +73,25 @@ def test_dimension_eval_response_is_404_without_a_payload(app: Flask) -> None:
         assert response.get_json() == {"error": "Eval file not found", "code": "NOT_FOUND"}
 
 
-def test_dimension_eval_response_is_202_while_waiting(app: Flask) -> None:
-    with app.test_request_context():
-        response, status = dimension_eval_response({"waiting": True})
-        assert status == HTTPStatus.ACCEPTED
-        assert response.get_json() == {"waiting": True}
-
-
 def test_dimension_eval_response_is_200_with_a_payload(app: Flask) -> None:
     with app.test_request_context():
         response = dimension_eval_response({"score": 7})
         assert response.status_code == HTTPStatus.OK
         assert response.get_json() == {"score": 7}
+
+
+def test_dimension_eval_response_is_202_for_an_eval_pending(app: Flask) -> None:
+    with app.test_request_context():
+        response, status = dimension_eval_response(EvalPending(project="p", run_id="r", dimension="d"))
+        assert status == HTTPStatus.ACCEPTED
+        assert response.get_json() == {"waiting": True, "project": "p", "runId": "r", "dimension": "d"}
+
+
+def test_helpers_dimension_eval_response_old_path_matches_the_moved_one(app: Flask) -> None:
+    """M3: api.helpers.dimension_eval_response is a shim at its old path,
+    now that the wire shaping moved to api.dimension_eval_wire."""
+    with app.test_request_context():
+        old_response, old_status = helpers.dimension_eval_response(None)
+        new_response, new_status = dimension_eval_response(None)
+        assert old_status == new_status == HTTPStatus.NOT_FOUND
+        assert old_response.get_json() == new_response.get_json()

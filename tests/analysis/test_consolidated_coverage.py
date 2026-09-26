@@ -48,6 +48,10 @@ class _MockRunConfig:
     source_file_count: int = 100
     ai_cmd: str = "claude"
     options: _MockOptions = field(default_factory=_MockOptions)
+    # Plain sentinels (not the real owner types) -- this test only checks
+    # that the builder forwards whatever the RunConfig carries, by identity.
+    drop_counter: object = field(default_factory=object)
+    mcp_registry: object = field(default_factory=object)
 
 
 @dataclass
@@ -107,6 +111,19 @@ class TestBuildConsolidatedConfig:
         assert ac.analysis_budget == "5.00"
         assert ac.max_turns == 50
         assert ac.max_duration == 900
+
+    def test_carries_the_runs_drop_counter_and_mcp_registry_without_run_config(self):
+        """I1: the consolidated builder deliberately never sets run_config
+        (that would turn on the per-file API cache writer for this mode),
+        so drop_counter/mcp_registry must be forwarded directly from the
+        RunConfig instead, for the consumers that check the AnalysisConfig
+        field first."""
+        config = _MockRunConfig()
+        with patch("quodeq.analysis.subagents._consolidated.default_subagent_model", return_value=None):
+            ac = _build_consolidated_config(config, ["security"], 5)
+        assert ac.drop_counter is config.drop_counter
+        assert ac.mcp_registry is config.mcp_registry
+        assert ac.run_config is None
 
 
 # ---------------------------------------------------------------------------

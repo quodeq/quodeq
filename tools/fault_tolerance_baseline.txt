@@ -21,8 +21,8 @@ src/quodeq/api/_run_event_watcher.py:97:broad-except
 src/quodeq/api/_scores_routes.py:32:broad-except
 src/quodeq/api/_scores_routes.py:63:broad-except
 src/quodeq/api/routes_runs.py:28:broad-except
-src/quodeq/api/routes_shared_mirrors.py:68:broad-except
-src/quodeq/api/security.py:278:broad-except
+src/quodeq/api/routes_shared_mirrors.py:69:broad-except
+src/quodeq/api/security.py:269:broad-except
 src/quodeq/assistant/adapters/api.py:128:broad-except
 src/quodeq/assistant/cancel.py:55:broad-except
 src/quodeq/assistant/orchestrator.py:298:broad-except
@@ -52,7 +52,7 @@ src/quodeq/data/sqlite/run_index.py:191:broad-except
 src/quodeq/services/_post_run_hook.py:37:broad-except
 src/quodeq/services/_post_run_hook.py:45:broad-except
 src/quodeq/services/_run_discard.py:135:broad-except
-src/quodeq/services/active_evaluation.py:74:broad-except
+src/quodeq/services/active_evaluation.py:73:broad-except
 src/quodeq/services/cache_maintenance.py:40:broad-except
 src/quodeq/services/grade_formula_job.py:197:broad-except
 src/quodeq/services/project_registration.py:164:broad-except

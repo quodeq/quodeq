@@ -8,15 +8,20 @@ import { writeCachedState } from '../../../utils/pageStateCache.js';
  * inside the state updater, so it stays a pure function of state and never
  * fires on the initial mount — only on a selection actually made this
  * session.
+ *
+ * `cache` is an optional injected page-state cache (see pageStateCache.js);
+ * with none given this calls the module's own `writeCachedState`, so it
+ * still goes through the shared default cache exactly as before.
  */
-function useCacheSelectedDimensions(selectedProject, selectedDimensions) {
+function useCacheSelectedDimensions(selectedProject, selectedDimensions, cache) {
   const mountedRef = useRef(false);
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
       return;
     }
-    writeCachedState('map', selectedProject, { selectedDimensionsArr: Array.from(selectedDimensions) });
+    const write = cache ? cache.writeCachedState : writeCachedState;
+    write('map', selectedProject, { selectedDimensionsArr: Array.from(selectedDimensions) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDimensions]);
 }
@@ -25,8 +30,10 @@ function useCacheSelectedDimensions(selectedProject, selectedDimensions) {
  * Dimension visibility + the map's own selection filter on top of it.
  * Selection defaults to all visible; an empty set means "no filter applied"
  * (show all), and the selection persists across unmount as an array.
+ * `cache` is an optional injected page-state cache; omit it to use the
+ * shared default (see pageStateCache.js).
  */
-export function useMapDimensionFilter({ allDimensions, selectedProject, cachedSelectedArr }) {
+export function useMapDimensionFilter({ allDimensions, selectedProject, cachedSelectedArr, cache }) {
   // Get visible standards and available dimension names. The ids are read on
   // every render and the Set is keyed on them, not on `allDimensions`: hiding
   // a standard elsewhere has to reach the map even when the same dimensions
@@ -45,7 +52,7 @@ export function useMapDimensionFilter({ allDimensions, selectedProject, cachedSe
   );
 
   const [selectedDimensions, setSelectedDimensions] = useState(() => new Set(cachedSelectedArr));
-  useCacheSelectedDimensions(selectedProject, selectedDimensions);
+  useCacheSelectedDimensions(selectedProject, selectedDimensions, cache);
 
   const effectiveSelected = useMemo(
     () => selectedDimensions.size === 0 ? new Set(dimensionNames) : selectedDimensions,

@@ -4,20 +4,23 @@ Split from ``scan_progress.py`` to keep that file under the size ratchet's
 300-line cap. Moved verbatim (``_dim_state``, ``_active_agents``,
 ``consolidated_dim_progress``), plus ``_dim_files_summary`` and
 ``build_dim_progress`` extracted from ``build_scan_progress``'s per-dim
-loop body (no logic change, same values, same order).
+loop body (no logic change, same values, same order). The live-tally memo
+(``_GuardedTally`` and its bounded store) moved out to
+``_live_tally_memo.py``; this module still owns the memo *key* construction
+(``_suppression_stamp``, ``_standards_stamp``) and ``live_tally`` itself.
 """
 from __future__ import annotations
 
-import threading
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.core.evidence.req_mapping import build_principle_resolver
 from quodeq.core.run.dimensions import DimState
+from quodeq.services._live_tally_memo import LiveTallyMemo
 from quodeq.services._scan_progress_elapsed import dim_elapsed_s
 from quodeq.services._scan_progress_types import DimProgress, ProgressContext
 from quodeq.services.wiring import (
+    DEFAULT_LIVE_TALLY_MEMO,
     FindingTally,
     IncrementalTally,
     count_active_agent_streams,
@@ -29,34 +32,8 @@ from quodeq.services.wiring import (
 )
 from quodeq.services.suppression import build_matcher
 from quodeq.shared.constants import CONSOLIDATED_DIMENSION_KEY, EVIDENCE_DIRNAME
-from quodeq.shared.lru import LRUDict
 
 _AGENT_ACTIVE_WINDOW_S = 30
-
-# Bounded process-wide memo of IncrementalTally objects, one per (evidence file,
-# suppression state) so a live-progress poll resumes where the last poll stopped
-# instead of re-parsing the file from byte 0 (findings
-# 5531/5532). The dashboard polls from several threads, hence the lock -- it covers the memo, not a read.
-_LIVE_TALLIES: LRUDict = LRUDict(256)
-_LIVE_TALLIES_LOCK = threading.Lock()
-
-
-@dataclass
-class _GuardedTally:
-    """One memoized ``IncrementalTally`` plus the lock that serialises it.
-
-    A tally is mutable state (offset, dedup set, counters) shared by every
-    poll of the same run and suppression state, so concurrent ``advance()``
-    calls on ONE tally have to be serialised. Its own lock, rather than the
-    memo's: two polls of different runs then read their files in parallel.
-    """
-
-    tally: IncrementalTally
-    lock: threading.Lock = field(default_factory=threading.Lock)
-
-    def advance(self) -> FindingTally:
-        with self.lock:
-            return self.tally.advance()
 
 
 def _suppression_stamp(dismissed, deleted) -> tuple | None:
@@ -100,6 +77,7 @@ def _standards_stamp(directory: Path | None) -> tuple[str, int]:
 def live_tally(
     path: Path, *, suppressed, make_resolver, memo_key: tuple | None,
     tally_factory: Callable[..., "IncrementalTally"] | None = None,
+    memo: LiveTallyMemo | None = None,
 ) -> FindingTally:
     """The file's tally, resumed from the last poll when *memo_key* is unchanged.
 
@@ -107,35 +85,28 @@ def live_tally(
     built. ``memo_key=None`` means this state cannot be keyed (see
     ``_suppression_stamp``): the file is tallied from scratch, nothing stored.
     ``tally_factory`` defaults to ``IncrementalTally`` (tests pass a fake).
+    ``memo`` defaults to the one process-wide :data:`DEFAULT_LIVE_TALLY_MEMO`.
     """
-    build = tally_factory if tally_factory is not None else IncrementalTally
+    build_tally = tally_factory if tally_factory is not None else IncrementalTally
     if memo_key is None:
-        return build(path, suppressed=suppressed, resolver=make_resolver and make_resolver()).advance()
-    key = (str(path), memo_key)
-    with _LIVE_TALLIES_LOCK:
-        guarded = _LIVE_TALLIES.get(key)
-        if guarded is None:
-            guarded = _GuardedTally(
-                build(path, suppressed=suppressed, resolver=make_resolver and make_resolver()))
-            _LIVE_TALLIES.put(key, guarded)
+        return build_tally(path, suppressed=suppressed, resolver=make_resolver and make_resolver()).advance()
+    owner = memo if memo is not None else DEFAULT_LIVE_TALLY_MEMO
+    guarded = owner.get_or_build(
+        (str(path), memo_key),
+        lambda: build_tally(path, suppressed=suppressed, resolver=make_resolver and make_resolver()),
+    )
     return guarded.advance()
 
 
-def forget_live_tallies(run_dir: Path) -> None:
+def forget_live_tallies(run_dir: Path, memo: LiveTallyMemo | None = None) -> None:
     """Drop every memoized tally for evidence files under *run_dir*.
 
     Called once a run is terminal: nothing more will be appended to its
-    evidence, so its dedup sets are dead weight until 256 other keys evict
-    them.
+    evidence, so its dedup sets are dead weight until other keys evict them.
+    ``memo`` defaults to the one process-wide :data:`DEFAULT_LIVE_TALLY_MEMO`.
     """
-    with _LIVE_TALLIES_LOCK:
-        for key in _LIVE_TALLIES.keys():
-            # Compared as paths, never as a "/"-prefixed string: a key is
-            # str(dimension_evidence_file(...)) and carries the platform's
-            # separator, so a hardcoded slash evicts nothing on Windows.
-            # with_segments parses the key in run_dir's own flavour.
-            if run_dir.with_segments(key[0]).is_relative_to(run_dir):
-                _LIVE_TALLIES.discard(key)
+    owner = memo if memo is not None else DEFAULT_LIVE_TALLY_MEMO
+    owner.forget(run_dir)
 
 
 def _active_agents(evidence_dir: Path, dim_id: str) -> int:
@@ -194,17 +165,19 @@ def _queue_file_counts(queue: dict) -> dict[str, int]:
     return {"taken": taken, "total": taken + pending}
 
 
-def consolidated_dim_progress(run_dir: Path) -> DimProgress:
+def consolidated_dim_progress(run_dir: Path, *, memo: LiveTallyMemo | None = None) -> DimProgress:
     """Progress row for a live consolidated (grouped) pass.
 
     Evidence counters are the raw cross-dimension tally: suppression netting is per-dimension
     and cannot be applied to the combined stream, so the live numbers may slightly over-read
-    what the finished reports will show.
+    what the finished reports will show. ``memo`` defaults to the one process-wide
+    :data:`DEFAULT_LIVE_TALLY_MEMO`.
     """
     evidence_dir = run_dir / EVIDENCE_DIRNAME
     queue = read_queue_state(dimension_queue_file(run_dir, CONSOLIDATED_DIMENSION_KEY)) or {}
     tally = live_tally(evidence_dir / "consolidated_evidence.jsonl",
-                       suppressed=None, make_resolver=None, memo_key=(CONSOLIDATED_DIMENSION_KEY,))
+                       suppressed=None, make_resolver=None, memo_key=(CONSOLIDATED_DIMENSION_KEY,),
+                       memo=memo)
     return DimProgress(
         id=CONSOLIDATED_DIMENSION_KEY,
         state=DimState.RUNNING,
@@ -251,6 +224,7 @@ def _dim_evidence_tally(dim_id: str, ctx: ProgressContext, dismissed, deleted):
         make_resolver=lambda: build_principle_resolver(
             dim_id, ctx.evaluators_dir, ctx.compiled_dir, req_map_reader=read_req_to_principle_map),
         memo_key=memo_key,
+        memo=ctx.live_tallies,
     )
 
 

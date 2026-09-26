@@ -12,10 +12,5 @@
 # Prefer hand-editing the baseline over blind regeneration, which can
 # silently absorb genuinely new dead code added in the same change.
 src/quodeq/core/events/models.py:112:has_valid_verdict
-src/quodeq/core/types/dashboard.py:41:previous_numeric_average
-src/quodeq/core/types/dashboard.py:44:dimension_count
-src/quodeq/core/types/dashboard.py:45:severity_critical
-src/quodeq/core/types/dashboard.py:46:severity_major
-src/quodeq/core/types/dashboard.py:47:severity_minor
 src/quodeq/core/types/project.py:40:scan_date
 src/quodeq/update/selfupdate.py:59:set_shutdown_callback

@@ -1,8 +1,7 @@
-"""Mapper functions for violation, progress, and trend dataclasses."""
+"""Mapper functions for violation and progress dataclasses."""
 
 from __future__ import annotations
 
-from quodeq.core.types.dashboard import TrendPoint
 from quodeq.core.types.finding import Finding
 from quodeq.core.types.violation import (
     VIOLATION_SCHEMA_VERSION,
@@ -16,8 +15,6 @@ from ._mapper_findings import parse_finding
 from ._mapper_helpers import (
     get_bool,
     get_int,
-    get_opt_float,
-    get_opt_str,
     require_str,
     get_str,
 )
@@ -86,21 +83,4 @@ def parse_violation_summary(raw: dict[str, object]) -> ViolationSummary:
         minor=get_int(raw, "minor"),
         files=files,
         schema_version=get_int(raw, "schemaVersion", VIOLATION_SCHEMA_VERSION),
-    )
-
-
-def parse_trend_point(raw: dict[str, object]) -> TrendPoint:
-    """Parse a raw dict into a TrendPoint dataclass."""
-    run_id = require_str(raw, "runId", "TrendPoint")
-    raw_dims = raw.get("dimensions")
-    dims = tuple(raw_dims) if isinstance(raw_dims, list) else ()
-    return TrendPoint(
-        run_id=run_id,
-        date_iso=get_opt_str(raw.get("dateIso")),
-        date_label=get_str(raw, "dateLabel"),
-        dimensions_count=get_int(raw, "dimensionsCount"),
-        dimensions=dims,
-        accumulated_dimensions_count=get_int(raw, "accumulatedDimensionsCount"),
-        overall_grade=get_opt_str(raw.get("overallGrade")),
-        numeric_average=get_opt_float(raw.get("numericAverage")),
     )

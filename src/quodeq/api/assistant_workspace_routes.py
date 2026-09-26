@@ -18,11 +18,36 @@ from quodeq.api.assistant_routes import release_app_turn, claim_app_turn
 from quodeq.api.helpers import json_error, optional_json_object_or_response
 from quodeq.assistant.workspace_actions import (
     OutcomeKind, PrDraft, apply_workspace, create_workspace_pr, discard_workspace)
-from quodeq.assistant.worktree import WorktreeError, WorktreeStatus, diff_stats, diff_text
+from quodeq.assistant.worktree import (
+    PrResult, PrResultReason, WorktreeError, WorktreeStatus, diff_stats, diff_text)
 
 _logger = logging.getLogger(__name__)
 
 _MAX_DIFF_CHARS = 2_000_000  # a diff this size is pathological; the UI never shows more
+
+_PR_MESSAGE_NO_GH = "Branch pushed. Install and authenticate the gh CLI, or open the PR from your git host."
+_PR_MESSAGE_CREATED = "PR created"
+
+
+def _pr_message(result: PrResult) -> str:
+    """The PR-result message text, rebuilt from ``result.reason`` plus
+    ``result.detail`` exactly as ``WorktreeManager.create_pr`` used to write
+    it before this shaping moved here. All 4 strings are wire-visible (the
+    UI shows them as-is), so they must stay byte-identical."""
+    if result.reason == PrResultReason.PUSH_FAILED:
+        return (f"Push failed: {result.detail}. The changes are back in the "
+                "worktree; apply them or open a PR manually.")
+    if result.reason == PrResultReason.GH_FAILED:
+        return f"gh pr create failed: {result.detail}"
+    if result.reason == PrResultReason.NO_GH:
+        return _PR_MESSAGE_NO_GH
+    return _PR_MESSAGE_CREATED
+
+
+def _pr_response(result: PrResult) -> dict:
+    """The route-owned camelCase wire body for a PR-creation attempt."""
+    return {"prUrl": result.pr_url, "branch": result.branch,
+            "pushed": result.pushed, "message": _pr_message(result)}
 
 
 def _lookup(app: Flask, sid: str):
@@ -137,7 +162,7 @@ def _workspace_pr(app: Flask, sid: str):
     if outcome.kind == OutcomeKind.FAILED:
         _logger.warning("workspace pr creation failed for %s: %s", sid, outcome.detail)
         return json_error("failed to create the pull request", HTTPStatus.INTERNAL_SERVER_ERROR, "WORKSPACE_PR_FAILED")
-    return jsonify(outcome.result)
+    return jsonify(_pr_response(outcome.result))
 
 
 def _workspace_discard(app: Flask, sid: str):
