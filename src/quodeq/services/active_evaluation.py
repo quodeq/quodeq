@@ -40,11 +40,11 @@ def _read_field(item: Any, attr: str, *wire_keys: str) -> str | None:
 
 
 def _job_status(job: JobSnapshot) -> str | None:
-    return getattr(job, "status", None)
+    return job.status
 
 
 def _job_project(job: JobSnapshot) -> str | None:
-    return getattr(job, "output_project", None)
+    return job.output_project
 
 
 def _project_id(entry: Any) -> str | None:
