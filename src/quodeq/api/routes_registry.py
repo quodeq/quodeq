@@ -33,6 +33,7 @@ from quodeq.api.routes_menubar import register_menubar_routes
 from quodeq.api._scores_routes import register_scores_routes
 from quodeq.api.routes_compare import register_compare_routes
 from quodeq.api.routes_runs import register_runs_routes
+from quodeq.api.routes_run_diff import register_run_diff_routes
 from quodeq.api.routes_shared import register_shared_routes
 from quodeq.api._grade_formula_routes import register_grade_formula_routes
 from quodeq.services.warmup import engine as warmup_engine
@@ -73,6 +74,7 @@ def register_all_routes(
     register_scores_routes(app)
     register_compare_routes(app)
     register_runs_routes(app)
+    register_run_diff_routes(app)
     register_shared_routes(app)
     register_grade_formula_routes(app)
     register_llm_bridge_routes(app)
