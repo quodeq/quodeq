@@ -25,6 +25,10 @@ FIELD_CONFIDENCE_INTERVAL_SNAKE = "confidence_interval"
 VIOLATION_FIELDS = (
     "file", "line", "end_line", "title", "reason",
     "snippet", "context", "scope", "severity", "req", "req_refs",
+    # The model's type tag. The tally groups by `req` and falls back to `vt`
+    # only for findings without one; the report keeps it so the raw evidence
+    # and the report agree on every scoring input.
+    "vt",
     # flatten_findings copies ONLY these keys into evaluation/<dim>.json.
     # Without this entry the cache-replay marker is dropped the moment a
     # dimension finishes and its report is written.
@@ -44,4 +48,5 @@ VIOLATION_FIELDS = (
 COMPLIANCE_FIELDS = (
     "file", "line", "end_line", "title", "reason",
     "snippet", "context", "scope", "req", "req_refs",
+    "vt",
 )
