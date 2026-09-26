@@ -52,6 +52,11 @@ def run_dimension_analysis(
         # The run's single-agent ceilings apply when no explicit cap was set.
         max_turns=opts.max_turns if opts.max_turns is not None else opts.default_max_turns,
         max_duration=opts.max_duration if opts.max_duration is not None else opts.default_max_duration,
+        # Carried directly (not via run_config) so this fallback's drops and
+        # CLI MCP registration land on the run's owners without also turning
+        # on the run_config-gated per-file API cache writer.
+        drop_counter=config.drop_counter,
+        mcp_registry=config.mcp_registry,
     )
     # Left out rather than passed as None so AnalysisConfig's own defaults win
     # for every budget the run did not set.

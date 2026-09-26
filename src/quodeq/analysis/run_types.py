@@ -143,8 +143,8 @@ class RunConfig:
     # concurrent runs in one process stay isolated. Consumers that receive
     # no ``RunConfig`` (``run_config=None``) fall back to each owner's own
     # module-level default instead.
-    drop_counter: DropStatsCounter = field(default_factory=DropStatsCounter)
-    mcp_registry: CliMcpRegistry = field(default_factory=_new_mcp_registry)
+    drop_counter: DropStatsCounter = field(default_factory=DropStatsCounter, compare=False, repr=False)
+    mcp_registry: CliMcpRegistry = field(default_factory=_new_mcp_registry, compare=False, repr=False)
 
     def classify_cache(self, dim_id: str) -> "ClassifyStash | None":
         """This run's stashed classify result for *dim_id*, or None."""

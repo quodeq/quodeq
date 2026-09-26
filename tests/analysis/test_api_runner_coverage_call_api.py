@@ -128,3 +128,28 @@ class TestCallApi:
         msgs = " ".join(r.message for r in caplog.records)
         assert "timed out" not in msgs
         assert "call failed" in msgs
+
+    def test_drop_counter_field_wins_over_run_configs_counter(self, tmp_path):
+        """I1: the single-agent fallback and consolidated builders carry the
+        run's drop counter directly on the config (no run_config, so the
+        API cache writer stays off for those paths). That field must be
+        checked before run_config's counter."""
+        from quodeq.analysis.run_types import RunConfig
+
+        direct_counter = RunConfig(src=tmp_path, language="python").drop_counter
+        run_config = RunConfig(src=tmp_path, language="python")
+        config = ApiRunnerConfig(
+            model="test-model", api_base="http://localhost:11434/v1", api_key="ollama",
+            drop_counter=direct_counter, run_config=run_config,
+        )
+
+        findings, lossy, *_ = self._run(
+            f'{{"findings":[{_GOOD},{_BAD_MISSING_REASON}]}}', config=config,
+        )
+
+        assert len(findings) == 1
+        stats = direct_counter.consume()
+        assert stats.dropped == 1
+        assert stats.kept == 1
+        # run_config's own (distinct) counter never saw the drop.
+        assert run_config.drop_counter.consume().parsed == 0

@@ -115,9 +115,16 @@ def _run_cli_analysis(
     # happens at pool level). A run-less caller falls back to the process
     # default registry.
     if mcp_style == MCP_STYLE_CLI_REGISTER and cfg.jsonl_file is not None:
-        mcp_registry = (
-            cfg.run_config.mcp_registry if cfg.run_config is not None else DEFAULT_CLI_MCP_REGISTRY
-        )
+        # Prefer the field carried directly on this AnalysisConfig (every
+        # builder fills it from the run's RunConfig, including the
+        # single-agent fallback and consolidated mode, which don't set
+        # run_config), then run_config's registry, then the process default.
+        if cfg.mcp_registry is not None:
+            mcp_registry = cfg.mcp_registry
+        elif cfg.run_config is not None:
+            mcp_registry = cfg.run_config.mcp_registry
+        else:
+            mcp_registry = DEFAULT_CLI_MCP_REGISTRY
         mcp_registry.ensure_registered(ai_cmd, cfg, work_dir)
 
     args, mcp_config_path = build_ai_cmd(prompt, cfg, work_dir=work_dir)

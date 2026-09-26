@@ -151,3 +151,15 @@ class TestRunScopedDropCounter:
         run_config = RunConfig(src=tmp_path, language="python")
         copy = dataclasses.replace(run_config, work_dir=tmp_path)
         assert copy.drop_counter is run_config.drop_counter
+
+    def test_equality_and_repr_ignore_the_owner_fields(self, tmp_path):
+        """M1: drop_counter/mcp_registry are excluded from __eq__ and
+        __repr__ (compare=False, repr=False), so two otherwise-identical
+        RunConfigs still compare equal and repr() never tries to print a
+        DropStatsCounter/CliMcpRegistry object address."""
+        a = RunConfig(src=tmp_path, language="python")
+        b = RunConfig(src=tmp_path, language="python")
+        assert a.drop_counter is not b.drop_counter  # isolated owners, as before
+        assert a == b  # ...but equality is unaffected, as before PR 3
+        assert "DropStatsCounter" not in repr(a)
+        assert "CliMcpRegistry" not in repr(a)

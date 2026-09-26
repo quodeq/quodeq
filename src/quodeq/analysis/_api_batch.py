@@ -164,6 +164,7 @@ def build_batch_api_config(
         read_timeout_s=api_read_timeout_override(env),
         repair_enabled=not finding_repair_disabled(env),
         run_config=cfg.run_config,
+        drop_counter=cfg.drop_counter,
     )
 
 

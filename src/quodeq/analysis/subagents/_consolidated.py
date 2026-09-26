@@ -45,7 +45,14 @@ def _build_consolidated_config(
     config: "RunConfig", dimensions: list[str], files_per_agent: int,
     compiled_dir: "Path | None" = None,
 ) -> AnalysisConfig:
-    """Build AnalysisConfig for consolidated mode."""
+    """Build AnalysisConfig for consolidated mode.
+
+    Deliberately does not set ``run_config`` (that would turn on the
+    per-file API cache writer for this mode); ``shared_analysis_config_kwargs``
+    still carries ``drop_counter``/``mcp_registry`` from *config* directly,
+    so consolidated-mode drops and CLI MCP registration land on the run's
+    owners.
+    """
     subagent_model = config.options.subagent_model or default_subagent_model() or config.options.ai_model
     time_limit_val = config.options.time_limit
     return AnalysisConfig(

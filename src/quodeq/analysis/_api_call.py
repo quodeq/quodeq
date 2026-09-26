@@ -17,6 +17,7 @@ import openai
 
 from quodeq.analysis._api_response import finish_call, repair_snippetless
 from quodeq.analysis._api_schema import SYSTEM_PROMPT
+from quodeq.analysis._drop_stats import DropStatsCounter
 from quodeq.analysis.errors import (
     REASON_PAYMENT, REASON_QUOTA, FatalProviderError, classify_fatal_provider_message,
 )
@@ -72,6 +73,9 @@ class ApiRunnerConfig:
     """The run's RunConfig, so ``finish_call`` records drops on its shared
     drop counter. ``None`` (legacy/direct callers) falls back to the
     module-default counter. Filled by ``build_batch_api_config``."""
+    drop_counter: "DropStatsCounter | None" = None
+    """Checked before ``run_config.drop_counter`` -- lets a caller that leaves
+    ``run_config`` unset (the fallback/consolidated builders) still reach it."""
 
 
 @functools.lru_cache(maxsize=_WARN_CACHE_MAX_BASES)
@@ -229,6 +233,13 @@ def _handle_call_exception(exc: Exception, config: ApiRunnerConfig, start: float
         )
 
 
+def _resolve_drop_counter(config: ApiRunnerConfig) -> DropStatsCounter | None:
+    """Config's own counter, then run_config's, then None (module default)."""
+    if config.drop_counter is not None:
+        return config.drop_counter
+    return config.run_config.drop_counter if config.run_config is not None else None
+
+
 def call_api(
     prompt: str,
     config: ApiRunnerConfig,
@@ -285,5 +296,5 @@ def call_api(
             functools.partial(repair_snippetless, client, create_kwargs, config.model)
             if config.repair_enabled else None
         )
-        counter = config.run_config.drop_counter if config.run_config is not None else None
+        counter = _resolve_drop_counter(config)
         return finish_call(config.model, finish_reason, text, start, reask=reask, counter=counter)
