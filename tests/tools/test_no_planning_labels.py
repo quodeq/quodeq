@@ -56,7 +56,7 @@ LABEL = re.compile("|".join(f"(?:{shape})" for shape in SHAPES), re.MULTILINE)
 _STATEMENT_START = (tokenize.INDENT, tokenize.DEDENT, tokenize.NEWLINE, tokenize.NL)
 
 
-def _iter_sources():
+def iter_sources():
     """Yield src/quodeq .py/.js/.jsx/.mjs and tests .py files, vendored dirs and this file aside.
 
     One walk per root, pruned before descending, so node_modules and the
@@ -245,7 +245,7 @@ def labels_in(text: str) -> list[str]:
 def collect_labels() -> list[str]:
     """Return `path:line: label -- text` for every label in scoped prose."""
     hits: list[str] = []
-    for path in _iter_sources():
+    for path in iter_sources():
         source = path.read_text(encoding="utf-8")
         extract = python_prose if path.suffix == ".py" else js_prose
         for lineno, text in extract(source):
