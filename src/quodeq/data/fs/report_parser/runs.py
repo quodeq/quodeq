@@ -15,7 +15,9 @@ from pathlib import Path
 from quodeq.core.run.state import TERMINAL_STATES, RunState, parse_run_state
 from quodeq.core.utils.io import resolve_child_dir
 from quodeq.core.types import DimensionResult
+from quodeq.core.types.finding import SeverityTally, Totals
 from quodeq.data.mappers import parse_dimension_result
+from quodeq.data.sqlite.dimension_counts import DimensionCounts, read_dimension_counts
 from quodeq.data.fs.report_parser._evaluations import load_evaluations
 from quodeq.data.fs.report_parser.external_pid import resolve_external_pid
 from quodeq.data.fs.report_parser._evidence import load_evidence_map
@@ -117,6 +119,7 @@ def _read_run_scalars_from_sql(run_dir: Path) -> "tuple[list[dict], list[dict]] 
         store = SQLiteStateStore(run_dir)
         dim_rows = store.read_dimension_scores()
         principle_rows = store.read_principle_grades()
+        counts = read_dimension_counts(run_dir)
     except sqlite3.DatabaseError:
         return None
 
@@ -134,11 +137,12 @@ def _read_run_scalars_from_sql(run_dir: Path) -> "tuple[list[dict], list[dict]] 
     if on_disk and len(dim_rows) != on_disk:
         return None
 
-    return dim_rows, principle_rows
+    return dim_rows, principle_rows, counts
 
 
 def _scalars_to_dimension_results(
     dim_rows: list[dict], principle_rows: list[dict],
+    counts: dict[str, DimensionCounts] | None = None,
 ) -> list[DimensionResult]:
     """Build sorted DimensionResults from validated SQL grade rows.
 
@@ -163,11 +167,23 @@ def _scalars_to_dimension_results(
             overall_score=f'{r["score"]}/10',
             overall_grade=r.get("grade"),
             principles=principles_by_dim.get(r["dimension"], []),
+            **_scalar_counts((counts or {}).get(r["dimension"])),
         )
         for r in dim_rows
     ]
     dimensions.sort(key=lambda d: d.dimension)
     return dimensions
+
+
+def _scalar_counts(c: "DimensionCounts | None") -> dict:
+    """``totals`` and ``open_types`` for a scalar dimension, or nothing when unknown."""
+    if c is None:
+        return {}
+    tally = SeverityTally(critical=c.critical, major=c.major, minor=c.minor)
+    return {
+        "totals": Totals(violation_count=c.violations, severity=tally),
+        "open_types": c.open_types,
+    }
 
 
 def read_run_scalars(
@@ -193,8 +209,8 @@ def read_run_scalars(
     sql_result = _read_run_scalars_from_sql(run_dir)
     if sql_result is None:
         return fallback_reader(reports_root, project, run_id)
-    dim_rows, principle_rows = sql_result
-    return _scalars_to_dimension_results(dim_rows, principle_rows)
+    dim_rows, principle_rows, counts = sql_result
+    return _scalars_to_dimension_results(dim_rows, principle_rows, counts)
 
 
 def _read_run_status(run_dir: Path) -> str | None:

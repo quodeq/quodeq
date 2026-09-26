@@ -93,7 +93,7 @@ def test_dismissal_prints_adjusted_score_with_suffix(tmp_path, capsys):
     out = capsys.readouterr().out
     assert out == (
         f"  {DIM}: {expected.overall.weighted_score}/10"
-        "  (3 major, 3 open types, 60.0 per 100 files, 50% coverage) (1 dismissed findings excluded)\n"
+        "  (2 major, 2 open types, 60.0 per 100 files, 50% coverage) (1 dismissed findings excluded)\n"
     )
 
 

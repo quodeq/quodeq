@@ -68,6 +68,8 @@ def _build_status_payload(status: RunStatus) -> dict[str, Any]:
         payload["ai_model"] = status.ai_model
     if status.commit_sha is not None:
         payload["commit_sha"] = status.commit_sha
+    if status.commit_dirty is not None:
+        payload["commit_dirty"] = status.commit_dirty
     return payload
 
 

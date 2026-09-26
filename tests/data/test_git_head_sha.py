@@ -5,7 +5,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from quodeq.data.git_cli import git_head_sha
+from quodeq.data.git_cli import git_head_sha, git_worktree_dirty
 
 _SHA_LENGTH = 40
 
@@ -27,3 +27,14 @@ def test_git_head_sha_reads_head(tmp_path: Path) -> None:
 
 def test_git_head_sha_none_outside_repo(tmp_path: Path) -> None:
     assert git_head_sha(str(tmp_path)) is None
+
+
+def test_git_worktree_dirty_reflects_uncommitted_changes(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    assert git_worktree_dirty(str(tmp_path)) is False
+    (tmp_path / "a.txt").write_text("b\n", encoding="utf-8")
+    assert git_worktree_dirty(str(tmp_path)) is True
+
+
+def test_git_worktree_dirty_none_outside_repo(tmp_path: Path) -> None:
+    assert git_worktree_dirty(str(tmp_path)) is None

@@ -21,9 +21,11 @@ from pathlib import Path
 
 from quodeq.core.scoring.params import ScoringParams
 from quodeq.core.types import ScoringResult
+from quodeq.core.types.severity import Severity
 from quodeq.data.fs.report_parser.finding_details import read_eval_report
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.violations import filter_dismissed_from_result
 from quodeq.services.evidence_rescore import EvidenceScoreRequest, standard_dirs
 
 _logger = logging.getLogger(__name__)
@@ -55,6 +57,24 @@ def _read_report(evaluation_dir: Path, dim_id: str) -> dict:
     except (OSError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def _active_violations(report: dict, dim: str, dismissed: object, deleted: set) -> list[dict]:
+    """The report's violations minus the project's dismissals and deletions."""
+    if not report:
+        return []
+    filtered = filter_dismissed_from_result(
+        {"violations": list(report.get("violations") or [])}, dismissed, deleted, dim,
+    )
+    return list((filtered or {}).get("violations") or [])
+
+
+def _severity_tally(findings: list[dict]) -> dict[str, int]:
+    tally = {Severity.CRITICAL: 0, Severity.MAJOR: 0, Severity.MINOR: 0}
+    for finding in findings:
+        key = finding.get("severity")
+        tally[key if key in tally else Severity.MINOR] += 1
+    return {str(k): v for k, v in tally.items()}
 
 
 def _format_score_line(
@@ -161,14 +181,19 @@ def print_scores(
     for dim, score in scores.items():
         report = _read_report(evaluation_dir, dim)
         totals = report.get("totals") if isinstance(report.get("totals"), dict) else {}
-        open_types = len({v.get("req") for v in report.get("violations") or [] if v.get("req")})
-        coverage = report.get("coveragePct")
         adjusted, excluded = (
             _adjusted_score(run_dir, dim, (dismissed, deleted), score, params)
             if (dismissed or deleted) else (None, 0)
         )
-        shown, suffix = ((score, "") if adjusted is None
-                         else (adjusted, f" ({excluded} dismissed findings excluded)"))
+        if adjusted is None:
+            # The score is the report's own, so the counts are the report's own too.
+            shown, suffix, counted = score, "", list(report.get("violations") or [])
+        else:
+            # The score excludes the suppressed findings, so the majors and the open types do too.
+            shown, suffix = adjusted, f" ({excluded} dismissed findings excluded)"
+            counted = _active_violations(report, dim, dismissed, deleted)
+            totals = {**totals, "severity": _severity_tally(counted)}
+        open_types = len({v.get("req") for v in counted if v.get("req")})
         print(_format_score_line(dim, shown, totals, suffix,
                                  open_types=open_types if report else None,
-                                 coverage_pct=coverage))
+                                 coverage_pct=report.get("coveragePct")))

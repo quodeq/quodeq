@@ -36,6 +36,9 @@ class DimensionResult:
     violations: list[Finding] = field(default_factory=list)
     compliance: list[Finding] = field(default_factory=list)
     totals: Totals | None = None
+    # Distinct requirement codes among active violations. Carried as a scalar
+    # so read paths that drop the findings can still count open types.
+    open_types: int | None = None
     source_file_count: int | None = None
     files_read: int | None = None
     # Findings excluded from scoring for naming a principle outside the

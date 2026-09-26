@@ -24,6 +24,7 @@ _KEY_VIOLATIONS = "violations"
 _KEY_COMPLIANCE = "compliance"
 _KEY_STATE = "state"
 _KEY_COMMIT_SHA = "commit_sha"
+_KEY_COMMIT_DIRTY = "commit_dirty"
 _EVAL_DIR = "evaluation"
 _JSON = ".json"
 
@@ -53,11 +54,18 @@ def _state_of(run_dir: Path) -> RunState | None:
         return None
 
 
-def _commit_sha(run_dir: Path) -> str | None:
+def _commit_state(run_dir: Path) -> tuple[str | None, bool | None]:
+    """``(commit_sha, commit_dirty)`` as recorded at run start, or Nones."""
     try:
-        return (read_status(run_dir) or {}).get(_KEY_COMMIT_SHA)
+        status = read_status(run_dir) or {}
     except (OSError, RuntimeError):
-        return None
+        return None, None
+    return status.get(_KEY_COMMIT_SHA), status.get(_KEY_COMMIT_DIRTY)
+
+
+def _comparable(base: tuple[str | None, bool | None], head: tuple[str | None, bool | None]) -> bool:
+    """Two commits bound the change set only when neither tree had uncommitted edits."""
+    return not base[1] and not head[1]
 
 
 def _older_runs(reports_root: Path, project: str, run_id: str) -> list[str]:
@@ -118,6 +126,7 @@ def _since_baseline(
         "changedFiles": None if files is None else len(files),
         "majorsDelta": scoped.majors_delta,
         "counts": {"new": len(scoped.new), "resolved": len(scoped.resolved)},
+        "types": {"closed": scoped.types_closed, "opened": scoped.types_opened},
         "new": scoped.new[:LIST_CAP], "resolved": scoped.resolved[:LIST_CAP],
     }
 
@@ -135,21 +144,23 @@ def diff_runs(reports_root: Path, project: str, run_id: str, against: str | None
     # new on every run nor resolved when it stops being reported.
     dkeys, delkeys = dismissed_keys(project_dir), deleted_keys(project_dir)
     repo_root = local_repo_root(reports_root, project)
-    current_sha = _commit_sha(current_dir)
+    head = _commit_state(current_dir)
     dimensions: dict[str, Any] = {}
     for dim, report in _reports(current_dir).items():
         base = against or _baseline_for(project_dir, older, dim)
+        base_state = _commit_state(_run_dir(project_dir, base)) if base else (None, None)
         previous = (read_eval_report(_run_dir(project_dir, base) / _EVAL_DIR, dim) or {}) if base else {}
         prev_active = unsuppressed(previous.get(_KEY_VIOLATIONS) or [], dkeys, delkeys, dim, None)
         curr_active = unsuppressed(report.get(_KEY_VIOLATIONS) or [], dkeys, delkeys, dim, None)
         seen = _files_seen(report)
         entry = _payload(diff_findings(prev_active, curr_active, current_files=seen))
         entry["againstRunId"] = base
-        entry["againstCommitSha"] = _commit_sha(_run_dir(project_dir, base)) if base else None
-        files = changed_files(repo_root, entry["againstCommitSha"], current_sha) if base else None
+        entry["againstCommitSha"], entry["againstCommitDirty"] = base_state
+        files = (changed_files(repo_root, base_state[0], head[0])
+                 if base and _comparable(base_state, head) else None)
         entry["sinceBaseline"] = _since_baseline(prev_active, curr_active, files, seen)
         dimensions[dim] = entry
     return {
-        "runId": run_id, "commitSha": current_sha,
+        "runId": run_id, "commitSha": head[0], "commitDirty": head[1],
         "againstRunId": against, "dimensions": dimensions,
     }

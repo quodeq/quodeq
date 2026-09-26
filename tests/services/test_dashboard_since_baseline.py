@@ -42,10 +42,45 @@ def test_dashboard_carries_since_baseline_summary(tmp_path: Path) -> None:
 
     since = result["sinceBaseline"][_DIM]
     assert since["againstRunId"] == _PREV
-    assert since["types"] == {"closed": ["M-REU-1"], "opened": ["M-ANA-9", "M-TST-5"]}
-    assert since["sinceBaseline"] == {"scope": "all", "changedFiles": None,
-                                      "counts": {"new": 2, "resolved": 1}}
+    # The scoped block carries everything the headline needs, with its scope.
+    assert since["sinceBaseline"] == {
+        "scope": "all", "changedFiles": None, "majorsDelta": 0,
+        "counts": {"new": 2, "resolved": 1},
+        "types": {"closed": ["M-REU-1"], "opened": ["M-ANA-9", "M-TST-5"]},
+    }
+    # The unscoped numbers are labelled as such, never mixed in.
+    assert since["all"] == {"majorsDelta": 0,
+                            "types": {"closed": ["M-REU-1"], "opened": ["M-ANA-9", "M-TST-5"]}}
     assert "new" not in since["sinceBaseline"]
+
+
+def test_dashboard_skips_the_summary_while_the_run_is_in_progress(tmp_path: Path) -> None:
+    _seed(tmp_path, _PREV, "2026-09-20T00:00:00Z", [_v("M-REU-1", "b.py")])
+    _seed(tmp_path, _CURR, "2026-09-26T00:00:00Z", [_v("M-ANA-9", "a.py")])
+    (tmp_path / _PROJECT / _CURR / "status.json").write_text(
+        json.dumps({"state": "running", "started_at": "2026-09-26T00:00:00Z"}), encoding="utf-8")
+    runs = [_make_run(_CURR, "2026-09-26"), _make_run(_PREV, "2026-09-20")]
+    summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
+    with (
+        patch("quodeq.services.dashboard.list_runs", return_value=runs),
+        patch("quodeq.services.dashboard.read_run_data", return_value=[_dim(_DIM, "B", "7.0")]),
+        patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
+    ):
+        result = build_dashboard(str(tmp_path), _PROJECT, _CURR)
+    assert result["sinceBaseline"] == {}
+
+
+def test_summary_is_memoized_until_the_run_or_suppressions_change(tmp_path: Path) -> None:
+    from quodeq.services import dashboard_since_baseline as module
+
+    _seed(tmp_path, _CURR, "2026-09-26T00:00:00Z", [_v("M-ANA-9", "a.py")])
+    calls = []
+    original = module.diff_runs
+    module.since_baseline_summary.cache_clear()
+    with patch.object(module, "diff_runs", side_effect=lambda *a: calls.append(a) or original(*a)):
+        module.since_baseline_summary(tmp_path, _PROJECT, _CURR)
+        module.since_baseline_summary(tmp_path, _PROJECT, _CURR)
+    assert len(calls) == 1
 
 
 def test_dashboard_without_reports_has_empty_since_baseline(tmp_path: Path) -> None:
