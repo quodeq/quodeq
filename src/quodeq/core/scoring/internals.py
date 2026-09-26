@@ -97,14 +97,17 @@ def severity_grade_floor(
 def finding_to_scoring_dict(f: Finding) -> dict[str, Any]:
     """Convert a Finding dataclass to the dict format scoring internals expect.
 
-    Only includes 'vt' when the finding has an explicit violation_type, so
-    ``evidence_has_taxonomy()`` selects the same mode (taxonomy vs reason)
-    that the original evaluation used.
+    Carries ``req`` so the tally groups untagged findings by requirement code
+    on the SQL path exactly as the evidence path does. Includes ``vt`` only
+    when the finding has an explicit violation_type, so
+    ``evidence_has_taxonomy()`` reports the same mode the evaluation used.
     """
     d: dict[str, Any] = {
         "severity": f.severity or "minor",
         "reason": f.reason or "",
     }
+    if f.req:
+        d["req"] = f.req
     if f.violation_type:
         d["vt"] = f.violation_type
     return d
