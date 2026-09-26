@@ -7,9 +7,11 @@ from typing import Any
 from quodeq.core.run.state import TERMINAL_STATES, RunState, parse_run_state
 from quodeq.core.run_diff import RunDiff, diff_findings
 from quodeq.core.utils.io import resolve_child_dir
+from quodeq.services._fs_project_primitives import local_repo_root
 from quodeq.services._violation_filters import unsuppressed
 from quodeq.services.deleted import deleted_keys
 from quodeq.services.dismissed import dismissed_keys
+from quodeq.services.run_changes import SCOPE_ALL, SCOPE_CHANGED, changed_files
 from quodeq.services.wiring import (
     iter_readable_eval_reports,
     project_run_dates,
@@ -99,6 +101,27 @@ def _payload(diff: RunDiff) -> dict[str, Any]:
     }
 
 
+def _in_scope(findings: list[dict], files: set[str] | None) -> list[dict]:
+    return findings if files is None else [f for f in findings if str(f.get("file") or "") in files]
+
+
+def _since_baseline(
+    previous: list[dict], current: list[dict], files: set[str] | None, current_files: set[str],
+) -> dict[str, Any]:
+    """The diff restricted to *files* (the paths changed between the two
+    commits); with *files* None the scope is every file and says so. Cold-cache
+    re-sampling of untouched files never lands here."""
+    scoped = diff_findings(_in_scope(previous, files), _in_scope(current, files),
+                           current_files=current_files)
+    return {
+        "scope": SCOPE_ALL if files is None else SCOPE_CHANGED,
+        "changedFiles": None if files is None else len(files),
+        "majorsDelta": scoped.majors_delta,
+        "counts": {"new": len(scoped.new), "resolved": len(scoped.resolved)},
+        "new": scoped.new[:LIST_CAP], "resolved": scoped.resolved[:LIST_CAP],
+    }
+
+
 def diff_runs(reports_root: Path, project: str, run_id: str, against: str | None) -> dict[str, Any]:
     """Per-dimension diff of *run_id*. With *against* every dimension uses that
     run; without it each dimension picks its own baseline (see ``_baseline_for``)
@@ -111,19 +134,22 @@ def diff_runs(reports_root: Path, project: str, run_id: str, against: str | None
     # Dismissals and deletions are project-wide; a dismissed finding is neither
     # new on every run nor resolved when it stops being reported.
     dkeys, delkeys = dismissed_keys(project_dir), deleted_keys(project_dir)
+    repo_root = local_repo_root(reports_root, project)
+    current_sha = _commit_sha(current_dir)
     dimensions: dict[str, Any] = {}
     for dim, report in _reports(current_dir).items():
         base = against or _baseline_for(project_dir, older, dim)
         previous = (read_eval_report(_run_dir(project_dir, base) / _EVAL_DIR, dim) or {}) if base else {}
-        entry = _payload(diff_findings(
-            unsuppressed(previous.get(_KEY_VIOLATIONS) or [], dkeys, delkeys, dim, None),
-            unsuppressed(report.get(_KEY_VIOLATIONS) or [], dkeys, delkeys, dim, None),
-            current_files=_files_seen(report),
-        ))
+        prev_active = unsuppressed(previous.get(_KEY_VIOLATIONS) or [], dkeys, delkeys, dim, None)
+        curr_active = unsuppressed(report.get(_KEY_VIOLATIONS) or [], dkeys, delkeys, dim, None)
+        seen = _files_seen(report)
+        entry = _payload(diff_findings(prev_active, curr_active, current_files=seen))
         entry["againstRunId"] = base
         entry["againstCommitSha"] = _commit_sha(_run_dir(project_dir, base)) if base else None
+        files = changed_files(repo_root, entry["againstCommitSha"], current_sha) if base else None
+        entry["sinceBaseline"] = _since_baseline(prev_active, curr_active, files, seen)
         dimensions[dim] = entry
     return {
-        "runId": run_id, "commitSha": _commit_sha(current_dir),
+        "runId": run_id, "commitSha": current_sha,
         "againstRunId": against, "dimensions": dimensions,
     }
