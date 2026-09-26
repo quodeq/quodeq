@@ -458,7 +458,7 @@ tests/api/test_run_event_stream_ticks.py:10:private-module:quodeq.api._run_event
 tests/api/test_run_event_stream_ticks.py:10:private-module:quodeq.api._run_event_stream.run_events_generator
 tests/api/test_run_events_routes.py:11:private-module:quodeq.api._run_events_routes.register_run_events_routes
 tests/api/test_run_events_routes.py:14:private-module:quodeq.services._evaluations_index.EvaluationsIndex
-tests/api/test_scores_routes.py:126:private-module:quodeq.data.sqlite._schema.SCHEMA_VERSION
+tests/api/test_scores_routes.py:133:private-module:quodeq.data.sqlite._schema.SCHEMA_VERSION
 tests/api/test_sse_log_helpers.py:14:private-module:quodeq.api._sse_log_helpers.DEFAULT_TAIL_MAX_BYTES
 tests/api/test_sse_log_helpers.py:14:private-module:quodeq.api._sse_log_helpers.ENV_TAIL_MAX_BYTES
 tests/api/test_sse_log_helpers.py:14:private-module:quodeq.api._sse_log_helpers.sse_tail_generator

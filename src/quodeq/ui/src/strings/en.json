@@ -9,6 +9,7 @@
   "apiError.confirmationRequired": "Confirm the deletion and try again.",
   "apiError.forbidden": "You do not have permission to do that.",
   "apiError.foreignRepo": "That repository belongs to a different project.",
+  "apiError.internalError": "Something went wrong on the server. Try again.",
   "apiError.invalidCloneDest": "That destination folder is not valid.",
   "apiError.invalidRepoUrl": "That repository URL is not valid.",
   "apiError.libraryNotConfigured": "The standards library is not configured.",

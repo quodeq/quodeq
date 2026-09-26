@@ -34,8 +34,11 @@ def test_project_runs_returns_json_500_on_a_read_failure(client, monkeypatch):
 
 def test_project_runs_propagates_an_error_outside_the_narrowed_tuple(client, monkeypatch):
     """A RuntimeError (not OSError/sqlite3.Error/ValueError) is a real bug in
-    build_runs_unit, not a read failure, so it now escapes the route instead
-    of being swallowed into a JSON 500."""
+    build_runs_unit, not a read failure, so the route's own narrow tuple
+    does not catch it. It still escapes the route -- the app-wide fallback
+    handler (api/_error_handlers.py) is what turns it into a coded 500
+    instead of Flask's default HTML page, and it never sees the route's own
+    "Failed to load runs" message or the exception's text."""
     import quodeq.api.routes_runs as routes_mod
 
     monkeypatch.setattr(
@@ -43,5 +46,10 @@ def test_project_runs_propagates_an_error_outside_the_narrowed_tuple(client, mon
         lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("unexpected bug")),
     )
 
-    with pytest.raises(RuntimeError):
-        client.get("/api/projects/myproject/runs")
+    resp = client.get("/api/projects/myproject/runs")
+
+    assert resp.status_code == 500
+    data = resp.get_json()
+    assert data["code"] == "INTERNAL_ERROR"
+    raw = resp.get_data(as_text=True)
+    assert "unexpected bug" not in raw

@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 from flask import Flask
 
+from quodeq.api._error_handlers import register_unhandled_error_handler
 from quodeq.api._log_buffer import LogBuffer
 from quodeq.api._index_routes import register_index_routes
 from quodeq.api._log_routes import register_log_routes
@@ -56,6 +57,7 @@ def register_all_routes(
         env: Environment mapping handed to the route groups that read one,
             captured here at app-creation time. None means ``os.environ``.
     """
+    register_unhandled_error_handler(app)
     register_project_list_routes(app, provider, warmup_engine)
     register_project_data_routes(app, provider)
     register_evaluation_list_routes(app, provider, eval_store)

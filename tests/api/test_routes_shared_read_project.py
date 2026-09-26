@@ -1,8 +1,6 @@
 """Per-project /api/shared mirrors: info, runs, dashboard, accumulated, scores and compare-summary."""
 from __future__ import annotations
 
-import pytest
-
 from tests.api._routes_shared_read_fixtures import app, client  # noqa: F401 -- pytest fixtures
 
 
@@ -63,8 +61,11 @@ def test_shared_project_info_propagates_an_error_outside_the_narrowed_tuple(
     client, shared_clone_fixture, monkeypatch,
 ):
     """A RuntimeError (not OSError/sqlite3.Error/ValueError) is a real bug in
-    get_project_info, not a read failure, so it now escapes the route
-    instead of being swallowed into a sanitized JSON 500."""
+    get_project_info, not a read failure, so the route's own narrow tuple
+    does not catch it, and it is not wrapped into the route's own sanitized
+    JSON 500. It still escapes the route -- the app-wide fallback handler
+    (api/_error_handlers.py) is what turns it into a generic coded 500
+    instead of Flask's default HTML page."""
     import quodeq.services.fs_projects as fs_projects_mod
 
     def _boom(*_args, **_kwargs):
@@ -72,8 +73,12 @@ def test_shared_project_info_propagates_an_error_outside_the_narrowed_tuple(
 
     monkeypatch.setattr(fs_projects_mod, "get_project_info", _boom)
 
-    with pytest.raises(RuntimeError):
-        client.get("/api/shared/projects/proj-a/info")
+    resp = client.get("/api/shared/projects/proj-a/info")
+
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["code"] == "INTERNAL_ERROR"
+    assert "unexpected bug" not in resp.get_data(as_text=True)
 
 
 # --- GET /api/shared/projects/<project>/runs ----------------------------------

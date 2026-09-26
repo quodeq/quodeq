@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Fault-tolerance ratchet: flag bare/empty/overly-broad exception handlers.
 
-Existing violations are grandfathered via tools/fault_tolerance_baseline.txt
-so the gate runs green in CI today while preventing NEW violations.
-Regenerate the baseline (only with justification) via:
+tools/fault_tolerance_baseline.txt is pinned empty (see
+tests/tools/test_fault_tolerance_baseline_is_empty.py): every prior
+grandfathered violation has been fixed, so any new one fails CI immediately
+instead of being added to the list. Regenerate the baseline (only with
+justification) via:
     python tools/check_fault_tolerance.py --update-baseline
 
 Entries are line-keyed (relpath:lineno:kind), so an unrelated line-count

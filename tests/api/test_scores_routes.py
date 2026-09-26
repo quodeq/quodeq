@@ -37,14 +37,21 @@ def test_project_run_scores_wraps_unexpected_error(client, monkeypatch):
 
 def test_project_run_scores_propagates_an_error_outside_the_narrowed_tuple(client, monkeypatch):
     """A RuntimeError (not OSError/sqlite3.Error/ValueError) is a real bug in
-    get_scores_slim, not a read failure, so it now escapes the route instead
-    of being wrapped into a SCORES_READ_FAILED 500."""
+    get_scores_slim, not a read failure, so the route's own narrow tuple
+    does not catch it, and it is not wrapped into a SCORES_READ_FAILED 500.
+    It still escapes the route -- the app-wide fallback handler
+    (api/_error_handlers.py) is what turns it into a generic coded 500
+    instead of Flask's default HTML page."""
     monkeypatch.setattr(
         "quodeq.api._scores_routes.get_scores_slim",
         lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("unexpected bug")),
     )
-    with pytest.raises(RuntimeError):
-        client.get("/api/projects/demo/scores/run123")
+    resp = client.get("/api/projects/demo/scores/run123")
+
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["code"] == "INTERNAL_ERROR"
+    assert "unexpected bug" not in resp.get_data(as_text=True)
 
 
 def test_get_scores_raw_reads_from_sql_after_projection(tmp_path: Path) -> None:

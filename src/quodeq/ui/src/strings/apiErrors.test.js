@@ -21,9 +21,18 @@ test('lookup is case-insensitive, because the backend emits both conventions', (
 test('unmapped and malformed codes resolve to null', () => {
   // NOT_FOUND is deliberately unmapped: it covers seven distinct backend
   // messages, so mapping it would replace a specific sentence with a vague one.
-  for (const code of ['NOT_FOUND', 'INVALID_INPUT', 'INTERNAL_ERROR', 'WAT', '', null, undefined, 42]) {
+  for (const code of ['NOT_FOUND', 'INVALID_INPUT', 'WAT', '', null, undefined, 42]) {
     assert.equal(apiErrorKey(code), null, `${String(code)} should not be mapped`);
   }
+});
+
+test('INTERNAL_ERROR maps to the generic server-error copy', () => {
+  // The app-wide fallback handler's code for an exception no route caught
+  // (api/_error_handlers.py). Every route can answer this, not just one
+  // screen, so it needs a generic message rather than a route-specific one.
+  const key = apiErrorKey('INTERNAL_ERROR');
+  assert.equal(key, 'apiError.internalError');
+  assert.ok(key in catalog, `${key} missing from en.json`);
 });
 
 test('inherited property names never resolve to a key', () => {

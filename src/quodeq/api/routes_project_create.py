@@ -168,15 +168,6 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
         }
         code, status = code_map.get(result.clone_error_kind, ("CLONE_FAILED", HTTPStatus.BAD_GATEWAY))
         return json_error(result.message, status, code)
-    if result.status == CreateProjectStatus.INTERNAL_ERROR:
-        # Return a generic message; the exception detail (which can carry
-        # filesystem paths or backend internals) is already logged by the
-        # provider, not sent to the remote caller.
-        return json_error(
-            "Registration failed due to an internal error.",
-            HTTPStatus.INTERNAL_SERVER_ERROR,
-            "REGISTRATION_FAILED",
-        )
     return None
 
 
