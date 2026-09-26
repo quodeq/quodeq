@@ -38,6 +38,7 @@ from quodeq.core.types.project_source import ProjectLocation
 from quodeq._cli_env import resolve_time_limit
 from quodeq._cli_resolution import ResolvedInputs
 from quodeq.data.fs.project_resolver import ProjectIdentity
+from quodeq.data.git_cli import git_head_sha
 from quodeq.shared.constants import CC_PHASE_REPORT_PATH
 from quodeq.shared.logging import log_error, log_info
 from quodeq.shared.utils import get_ai_cmd, is_repo_url
@@ -213,12 +214,14 @@ def _run_lifecycle_body(
     try:
         ai_provider = get_ai_cmd()
         ai_model = hooks.get_ai_model()
+        commit_sha = None if is_repo_url(args.repo) else git_head_sha(str(inputs.src))
         with RunLifecycleContext(
             run_dir=paths.run_dir,
             job_id=external_job_id(paths.run_id),
             dimensions=dimensions_list,
             ai_provider=ai_provider,
             ai_model=ai_model,
+            commit_sha=commit_sha,
         ) as lifecycle:
             try:
                 # "analyzing" gates dashboard per-dimension polling.

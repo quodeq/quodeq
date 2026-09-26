@@ -154,6 +154,13 @@ def git_remote_url(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> st
     return normalize_remote_url(out)
 
 
+def git_head_sha(repo_path: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> str | None:
+    """Full SHA of the commit checked out at *repo_path*, or None outside a repo."""
+    out = run_git([GIT_FLAG_C, repo_path, "rev-parse", "HEAD"], timeout=timeout)
+    sha = (out or "").strip()
+    return sha or None
+
+
 def stream_log_names(
     repo_dir: Path, *, months: int = DEFAULT_GIT_LOOKBACK_MONTHS, timeout: float = _DEFAULT_TIMEOUT_S,
 ) -> Iterator[str]:
