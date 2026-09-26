@@ -8,8 +8,8 @@ the old module-level name reached through a ``__getattr__`` shim (PEP 562)
 so ``from module import OLD_NAME`` still works. USE_COLOR's own shim/lazy
 tests live in tests/shared/test_env_seams_t5.py, next to should_use_color.
 
-Review Focus 3: importing any of these modules must have no side effect (no
-file read, no mkdir, no open). Each side-effect test patches the filesystem
+Importing any of these modules must have no side effect (no file read, no
+mkdir, no open). Each side-effect test patches the filesystem
 call to raise RuntimeError -- not OSError, which both loaders catch
 internally as their production fallback path, so an OSError patch would
 pass even if the call still ran eagerly at import.
@@ -28,7 +28,7 @@ already cached from an earlier test in the session (verified: it does).
 Only _api_standards_text itself is patch-tested for the read (subprocess.py
 pulls in a much larger dependency tree -- jsonschema included -- that does
 its own legitimate file reads at import, which a blanket Path.read_text
-patch can't tell apart from the one this task cares about); subprocess.py's
+patch can't tell apart from the detection.json read under test); subprocess.py's
 shim is instead pinned by value equality below.
 
 test_diag_old_name_matches_diag_stream calls diag_stream() for real (the
@@ -136,3 +136,33 @@ class TestDiagStreamLazyImport:
         assert result.returncode == 0, result.stdout + result.stderr
         assert "OK" in result.stdout
         assert (tmp_path / ".quodeq" / "run" / "webview_debug.log").exists()
+
+    def test_webview_window_about_diag_old_name_matches_diag_stream(self, tmp_path):
+        """M3: dashboard._webview_window_about.diag is its own __getattr__
+        shim at its old path, delegating to the same diag_stream() the
+        module already imports."""
+        script = (
+            "import quodeq.dashboard._webview_window_about as mod\n"
+            "assert mod.diag is mod.diag_stream(), (mod.diag, mod.diag_stream())\n"
+            "print('OK')\n"
+        )
+        result = _run_fresh_interpreter(script, env=_home_isolated_env(tmp_path))
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout
+
+    def test_importing_webview_window_about_does_not_touch_the_filesystem(self):
+        """The shim must stay lazy: importing the module (which imports
+        diag_stream) must not itself trigger the mkdir + open."""
+        script = (
+            "import quodeq  # let package init read its own metadata before Path is patched\n"
+            "from pathlib import Path\n"
+            "def _boom(self, *a, **k):\n"
+            "    raise RuntimeError('diag log must not touch the filesystem at import time')\n"
+            "Path.mkdir = _boom\n"
+            "Path.open = _boom\n"
+            "import quodeq.dashboard._webview_window_about\n"  # must not raise
+            "print('OK')\n"
+        )
+        result = _run_fresh_interpreter(script)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout

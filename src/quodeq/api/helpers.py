@@ -279,3 +279,13 @@ def register_static_routes(app: Flask, static_dist: str | None) -> None:
         if path.startswith('api/'):
             return json_error("Not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
         return send_from_directory(str(dist), 'index.html')
+
+
+def dimension_eval_response(payload: Any) -> Response | tuple[Response, int]:
+    """Old path for the wire shaping now in ``api.dimension_eval_wire``.
+
+    Deferred import: ``dimension_eval_wire`` imports ``json_error`` from
+    this module, so importing it back at module level here would cycle.
+    """
+    from quodeq.api.dimension_eval_wire import dimension_eval_response as _impl  # noqa: PLC0415
+    return _impl(payload)

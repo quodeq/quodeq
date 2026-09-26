@@ -241,7 +241,7 @@ def test_explicit_cache_config_still_isolates(tmp_path, counting_reader):
 
 # ---------------------------------------------------------------------------
 # G3 process-scoped owner: one WalkCache instance shared by every request
-# with no explicit cache_config (Review Focus 1).
+# with no explicit cache_config.
 # ---------------------------------------------------------------------------
 
 def test_two_request_paths_share_the_default_walk_cache_instance(tmp_path):

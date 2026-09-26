@@ -114,8 +114,9 @@ class TestWatchdogGraceCapturedAtConstruction:
     """#10799 — ``watchdog_should_kill`` takes ``grace_s`` as a plain
     parameter; ``JobManager.__init__`` captures ``WATCHDOG_DEADLINE_GRACE_S``
     once, at construction, rather than the watchdog re-reading the module
-    constant on every tick. Allowed observable delta (see the plan): a patch
-    made after construction no longer affects an already-built manager."""
+    constant on every tick, so a patch made after construction no longer
+    affects an already-built manager -- mutate the constant before
+    constructing the manager instead."""
 
     def test_grace_is_captured_at_construction_time(self, monkeypatch):
         from quodeq.services import jobs as jobs_mod

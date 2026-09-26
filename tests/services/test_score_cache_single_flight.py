@@ -129,7 +129,7 @@ def test_failed_compute_does_not_wedge_the_key(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # SingleFlight (the G3 process-scoped owner): low-level hold() semantics,
 # event-based (no sleeps), plus proof the two public call paths share one
-# process-wide instance (Review Focus 1).
+# process-wide instance.
 # ---------------------------------------------------------------------------
 
 class TestSingleFlightHold:

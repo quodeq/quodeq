@@ -124,6 +124,33 @@ class TestUseColorOldNameShim:
 
         assert "USE_COLOR" not in vars(logging_mod)
 
+    def test_shared_logging_use_color_shim_matches_use_color(self):
+        """M3: shared.logging.USE_COLOR is its own __getattr__ shim (not
+        just re-exporting _log_format's), at the old path callers used
+        before this attribute was dropped with no replacement."""
+        import quodeq.shared.logging as logging_mod
+
+        assert logging_mod.USE_COLOR == logging_mod.use_color()
+
+    def test_importing_shared_logging_does_not_decide_color(self):
+        """The shim must stay lazy: importing the module must not itself
+        call use_color()/should_use_color() (that would freeze NO_COLOR/TERM
+        at import again, the exact thing the shim exists to avoid)."""
+        script = (
+            "from quodeq.shared import _log_format\n"
+            "def _boom(*a, **k):\n"
+            "    raise RuntimeError('color must not be decided at import time')\n"
+            "_log_format.use_color = _boom\n"
+            "_log_format.should_use_color = _boom\n"
+            "import quodeq.shared.logging\n"  # must not raise
+            "print('OK')\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, text=True, check=False,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "OK" in result.stdout
+
 
 class TestApplyEnvLogLevel:
     def test_uses_the_injected_value(self, monkeypatch):

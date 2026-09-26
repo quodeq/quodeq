@@ -42,6 +42,7 @@ from quodeq.api._run_event_watcher import (  # noqa: F401 — re-export
 from quodeq.api._sse_log_helpers import sse_line
 from quodeq.core.run.state import TERMINAL_STATES
 from quodeq.shared.env import env_float, env_int
+from quodeq.shared.env_resolve import resolve_env
 
 _EVENT_TYPE_STATUS = "status"  # compute_tick's event tuple tag for a status.json change
 _DEFAULT_TICK_MS = 250  # QUODEQ_SSE_TICK_MS fallback: observer poll cadence
@@ -58,13 +59,26 @@ def _tick_ms(env: Mapping[str, str] | None = None) -> int:
     return env_int("QUODEQ_SSE_TICK_MS", _DEFAULT_TICK_MS, env=env, warn=False)
 
 
+_last_warned_heartbeat_raw: str | None = None  # dedupes the warning below across streams
+
+
 def _heartbeat_s(env: Mapping[str, str] | None = None) -> float:
     """Read the SSE :keepalive interval at call time, once per stream.
 
     env_float never raises, so a malformed QUODEQ_SSE_HEARTBEAT_S can't abort
-    a stream (it logs and falls back to the default).
+    a stream (it logs and falls back to the default). Only the first stream
+    to see a given raw value logs it -- same as when this value was still a
+    module constant decided once at import, before it moved to being read
+    per stream.
     """
-    return env_float("QUODEQ_SSE_HEARTBEAT_S", _DEFAULT_HEARTBEAT_S, minimum=_MIN_HEARTBEAT_S, env=env)
+    global _last_warned_heartbeat_raw
+    raw = resolve_env(env).get("QUODEQ_SSE_HEARTBEAT_S")
+    warn = raw != _last_warned_heartbeat_raw
+    value = env_float(
+        "QUODEQ_SSE_HEARTBEAT_S", _DEFAULT_HEARTBEAT_S, minimum=_MIN_HEARTBEAT_S, env=env, warn=warn,
+    )
+    _last_warned_heartbeat_raw = raw
+    return value
 
 
 def _is_terminal(status_payload: str) -> tuple[bool, str]:

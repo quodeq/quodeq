@@ -108,3 +108,8 @@ def ensure_run_dir(env: dict[str, str] | None = None) -> Path:
     run_dir = run_dir_path(env)
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
+
+
+def get_run_dir(env: dict[str, str] | None = None) -> Path:
+    """Old name for :func:`ensure_run_dir`, kept as a shim at its old path."""
+    return ensure_run_dir(env)

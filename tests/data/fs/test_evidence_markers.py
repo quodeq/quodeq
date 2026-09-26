@@ -1,8 +1,8 @@
 """Characterization for tally_evidence_markers: (ok, error) file_done counts
 from a dim's evidence JSONL.
 
-Pins the edge cases Review Focus 5 names before/after the R5a move from
-``analysis._loop_guards._tally_markers``: latest-status-wins per file, a
+Pins the edge cases that must survive the move from
+``analysis._loop_guards._tally_markers`` unchanged: latest-status-wins per file, a
 corrupt JSON line is skipped, a non-UTF8 line degrades via
 ``errors="replace"`` instead of raising, and a missing/empty file yields
 ``(0, 0)``.

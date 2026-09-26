@@ -8,6 +8,7 @@ from http import HTTPStatus
 import pytest
 from flask import Flask
 
+from quodeq.api import helpers
 from quodeq.api.dimension_eval_wire import dimension_eval_response
 from quodeq.api.helpers import (
     jsonify_error,
@@ -84,3 +85,13 @@ def test_dimension_eval_response_is_202_for_an_eval_pending(app: Flask) -> None:
         response, status = dimension_eval_response(EvalPending(project="p", run_id="r", dimension="d"))
         assert status == HTTPStatus.ACCEPTED
         assert response.get_json() == {"waiting": True, "project": "p", "runId": "r", "dimension": "d"}
+
+
+def test_helpers_dimension_eval_response_old_path_matches_the_moved_one(app: Flask) -> None:
+    """M3: api.helpers.dimension_eval_response is a shim at its old path,
+    now that the wire shaping moved to api.dimension_eval_wire."""
+    with app.test_request_context():
+        old_response, old_status = helpers.dimension_eval_response(None)
+        new_response, new_status = dimension_eval_response(None)
+        assert old_status == new_status == HTTPStatus.NOT_FOUND
+        assert old_response.get_json() == new_response.get_json()

@@ -13,7 +13,7 @@ snapshot through. Tests that monkeypatch
 ``quodeq.services.jobs.WATCHDOG_DEADLINE_GRACE_S`` *before* constructing the
 manager still see it take effect (the module global is read at construction
 time); a patch after construction no longer changes an already-built
-manager's grace -- see the plan's allowed observable delta.
+manager's grace, by design.
 """
 from __future__ import annotations
 

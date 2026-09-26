@@ -168,6 +168,43 @@ def test_heartbeat_env_fallback_never_raises():
     assert mod._heartbeat_s({}) == 15.0
 
 
+# M5 -- a malformed QUODEQ_SSE_HEARTBEAT_S used to warn once at import (the
+# old module constant). Now that it's read per stream, the warning must
+# still fire only once per process for a given bad value, not once per
+# stream -- see _heartbeat_s.
+
+def test_heartbeat_malformed_value_warns_once_across_two_streams(monkeypatch):
+    """Two streams reading the SAME bad value must produce exactly one
+    warning, matching the once-at-import behavior before this value moved
+    to being read per stream."""
+    import logging as _logging
+
+    mod = _run_event_stream_mod
+    monkeypatch.setattr(mod, "_last_warned_heartbeat_raw", None)
+    calls: list[tuple] = []
+    monkeypatch.setattr(_logging.getLogger("quodeq.shared.env"), "warning", lambda *a: calls.append(a))
+
+    assert mod._heartbeat_s({"QUODEQ_SSE_HEARTBEAT_S": "not-a-number"}) == 15.0
+    assert mod._heartbeat_s({"QUODEQ_SSE_HEARTBEAT_S": "not-a-number"}) == 15.0
+
+    assert len(calls) == 1
+
+
+def test_heartbeat_a_different_malformed_value_warns_again(monkeypatch):
+    """A NEW bad value (not the last one warned) must still warn -- this
+    dedupes repeats of the same value, it isn't a blanket silence."""
+    import logging as _logging
+
+    mod = _run_event_stream_mod
+    monkeypatch.setattr(mod, "_last_warned_heartbeat_raw", "not-a-number")
+    calls: list[tuple] = []
+    monkeypatch.setattr(_logging.getLogger("quodeq.shared.env"), "warning", lambda *a: calls.append(a))
+
+    assert mod._heartbeat_s({"QUODEQ_SSE_HEARTBEAT_S": "still-not-a-number"}) == 15.0
+
+    assert len(calls) == 1
+
+
 # ---------------------------------------------------------------------------
 # A QUODEQ_SSE_HEARTBEAT_S override set via monkeypatch.setenv must reach a
 # *new* stream through the entry point (run_events_generator), with no

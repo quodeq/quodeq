@@ -19,10 +19,10 @@ services -> data concretion.
 (where it is used) because that module reaches its shared instance through
 ``services.wiring``, which re-exports from this module -- defining the class
 where it is consumed would import this module from that one and back again.
-``WalkCache`` and ``LiveTallyMemo`` have no such constraint (their owning
-modules never need the *instance* back, only ``clear_accumulated_process_cache``
-does, via a deferred import) so they stay defined next to the state they
-replace.
+``WalkCache`` has no such constraint (``_accumulated_cache.py`` never needs
+the *instance* back, only ``clear_accumulated_process_cache`` does, via a
+deferred import) so it stays defined next to the state it replaces.
+``LiveTallyMemo`` moved to its own module, ``_live_tally_memo.py``, instead.
 """
 from __future__ import annotations
 

@@ -71,3 +71,12 @@ def log_debug(message: str, *, logger: logging.Logger | None = None) -> None:
 def log_error(message: str, *, logger: logging.Logger | None = None) -> None:
     """Log an error message."""
     (logger or _logger).error(message)
+
+
+_USE_COLOR_OLD_NAME = "USE_COLOR"  # __getattr__ shim for the old module-level constant
+
+
+def __getattr__(name: str):
+    if name == _USE_COLOR_OLD_NAME:
+        return use_color()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

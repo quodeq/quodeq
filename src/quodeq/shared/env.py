@@ -86,12 +86,15 @@ def env_float(
     *,
     minimum: float | None = None,
     env: dict[str, str] | None = None,
+    warn: bool = True,
 ) -> float:
     """Read an env var as a float; warn and return *default* on parse failure.
 
     When *minimum* is given, parsed values below it also fall back to *default*.
+    ``warn=False`` is for values read on every poll, where a bad setting
+    would repeat the same warning each time.
     """
-    return _env_number(var, default, float, minimum, env)
+    return _env_number(var, default, float, minimum, env, warn)
 
 
 def get_action_api_port(env: dict[str, str] | None = None) -> int:
