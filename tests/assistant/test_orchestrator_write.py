@@ -92,7 +92,7 @@ def test_cli_branch_passes_write_args(tmp_path, repo, monkeypatch):
         seen["worktree_dir"] = config.worktree_dir
         return "ok"
 
-    monkeypatch.setattr("quodeq.assistant.orchestrator._provider_type",
+    monkeypatch.setattr("quodeq.assistant.orchestrator.provider_type",
                         lambda p: "cli")
     run_turn(_request(True), repository=store, tool_ctx=ctx,
              engines=TurnEngines(turn_fn=None, cli_turn_fn=fake_cli_turn))

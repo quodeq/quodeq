@@ -1,4 +1,5 @@
-"""Orchestrates update checks. Every public entry point is fail-silent."""
+"""Orchestrates update checks. Every public entry point degrades gracefully on
+the failures fetch_latest/write_state document; a genuine bug propagates."""
 
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ from quodeq import __version__
 from quodeq.shared.clock import utc_now_iso
 from quodeq.shared.env import env_int
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.fault_isolation import run_isolated
 from quodeq.update import channel as _channel
 from quodeq.update import selfupdate as _selfupdate
 from quodeq.update.compare import is_newer
@@ -44,51 +46,57 @@ def should_check(state: UpdateState, env: dict[str, str] | None = None) -> bool:
     try:
         last = datetime.fromisoformat(state.last_check_ts)
         return (datetime.now(timezone.utc) - last).total_seconds() >= _interval(environ)
-    except ValueError:
+    except (ValueError, TypeError):
+        # ValueError: unparseable. TypeError: a naive timestamp (no tzinfo)
+        # makes the aware-minus-naive subtraction above raise.
         return True
 
 
 def run_check(env: dict[str, str] | None = None, force: bool = False) -> None:
     """Fetch the latest release and fold it into the on-disk state.
 
-    The attempt timestamp is stamped before the network call and persisted even
-    when the fetch fails, so a broken network cannot turn this into a per-launch
-    retry. *force* skips the ``should_check`` gate. Never raises.
+    The attempt timestamp is stamped and persisted BEFORE the network call, so
+    it survives every failure -- including one outside the narrowed except
+    below -- without turning this into a per-launch retry. *force* skips the
+    ``should_check`` gate. Fails soft only for the (AttributeError, TypeError)
+    a malformed GitHub/PyPI JSON body leaks through ``fetch_latest``; anything
+    else is a bug and propagates (``check_async``'s thread boundary is what
+    isolates a direct call from a daemon thread).
     """
+    state = read_state(env)
+    if not force and not should_check(state, env):
+        return
+    # Persisted here, before the network call: the one write every launch is
+    # guaranteed to get, whatever fetch_latest does or raises.
+    state.last_check_ts = utc_now_iso()
+    write_state(state, env)
     try:
-        state = read_state(env)
-        if not force and not should_check(state, env):
+        info = fetch_latest(_channel.detect_channel(), state.etag)
+        if info is None:
             return
-        # Stamp the attempt time before the network call so it persists even on failure.
-        state.last_check_ts = utc_now_iso()
-        try:
-            info = fetch_latest(_channel.detect_channel(), state.etag)
-            if info is None:
-                write_state(state, env)
-                return
-            if info.not_modified:
-                state.etag = info.etag or state.etag
-                write_state(state, env)
-                return
-            state.latest_version = info.version
-            state.latest_url = info.url
-            state.download_url = info.download_url
-            state.is_security = info.is_security
-            state.etag = info.etag
+        if info.not_modified:
+            state.etag = info.etag or state.etag
             write_state(state, env)
-        except Exception:
-            _logger.debug("update check failed", exc_info=True)
-            write_state(state, env)  # always persist last_check_ts
-    except Exception:  # pragma: no cover - outer blanket guard
-        _logger.debug("run_check failed", exc_info=True)
+            return
+        state.latest_version = info.version
+        state.latest_url = info.url
+        state.download_url = info.download_url
+        state.is_security = info.is_security
+        state.etag = info.etag
+        write_state(state, env)
+    except (AttributeError, TypeError) as exc:
+        _logger.debug("update check failed: %s", exc, exc_info=True)
 
 
 def check_async(env: dict[str, str] | None = None) -> None:
     """Run ``run_check`` on a daemon thread so startup is never blocked."""
     try:
-        threading.Thread(target=run_check, args=(env,), daemon=True).start()
-    except Exception:  # pragma: no cover
-        _logger.debug("could not start update-check thread", exc_info=True)
+        threading.Thread(
+            target=lambda: run_isolated(lambda: run_check(env), label="update check", log=_logger),
+            daemon=True,
+        ).start()
+    except RuntimeError as exc:
+        _logger.warning("could not start update-check thread: %s", exc, exc_info=True)
 
 
 def get_status(env: dict[str, str] | None = None) -> dict:

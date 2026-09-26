@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 
 def _write(d, name: str, payload) -> None:
     (d / f"{name}.json").write_text(json.dumps(payload), encoding="utf-8")
@@ -49,6 +51,23 @@ class TestIterCompiledStandards:
         from quodeq.data.fs.compiled_standards import iter_compiled_standards
 
         assert list(iter_compiled_standards(tmp_path / "nope")) == []
+
+    def test_an_unnamed_read_failure_propagates(self, tmp_path, monkeypatch):
+        """The catch narrows to (OSError, ValueError, RecursionError); a bug
+        that raises anything else must not be silently skipped as 'one bad
+        standard'."""
+        from pathlib import Path
+
+        from quodeq.data.fs.compiled_standards import iter_compiled_standards
+
+        _write(tmp_path, "good", {"id": "good"})
+
+        def _boom(self, *a, **kw):
+            raise RuntimeError("unexpected read failure")
+
+        monkeypatch.setattr(Path, "read_text", _boom)
+        with pytest.raises(RuntimeError, match="unexpected read failure"):
+            list(iter_compiled_standards(tmp_path))
 
 
 class TestRouteDelegation:

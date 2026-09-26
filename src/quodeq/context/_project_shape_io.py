@@ -57,7 +57,7 @@ def read_text(path: Path) -> str | None:
     except _ABSENT_MANIFEST:
         _logger.debug("Manifest %s vanished mid-scan", path)
         return None
-    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
+    except (OSError, UnicodeDecodeError) as exc:
         _logger.warning("Ignoring unreadable manifest %s: %s", path, exc)
         return None
 
@@ -71,11 +71,13 @@ def read_toml(path: Path) -> dict[str, object] | None:
     except _ABSENT_MANIFEST:
         _logger.debug("Manifest %s vanished mid-scan", path)
         return None
-    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
-        # Wider than OSError/TOMLDecodeError on purpose: tomllib is a
-        # recursive-descent parser, so deeply nested tables overflow the stack
-        # and raise RecursionError. It bottoms out far shallower than the C
-        # JSON decoder -- a few thousand levels, not tens of thousands.
+    except (OSError, ValueError, RecursionError) as exc:
+        # ValueError covers both tomllib.TOMLDecodeError and the
+        # UnicodeDecodeError tomllib.load raises on non-UTF-8 bytes (both are
+        # ValueError subclasses). RecursionError separately: tomllib is a
+        # recursive-descent parser, so deeply nested tables overflow the stack.
+        # It bottoms out far shallower than the C JSON decoder -- a few
+        # thousand levels, not tens of thousands.
         _logger.warning("Ignoring unreadable TOML manifest %s: %s", path, exc)
         return None
 
@@ -88,9 +90,9 @@ def read_json(path: Path) -> dict[str, object] | None:
         return None
     try:
         data = json.loads(text)
-    except Exception as exc:  # noqa: BLE001 - detection must never fail a scan
-        # Wider than json.JSONDecodeError: deeply nested arrays exhaust the C
-        # decoder's call stack and raise RecursionError, a RuntimeError.
+    except (ValueError, RecursionError) as exc:
+        # ValueError covers json.JSONDecodeError; RecursionError separately
+        # for deeply nested arrays that exhaust the C decoder's call stack.
         _logger.warning("Ignoring unreadable JSON manifest %s: %s", path, exc)
         return None
     return data if isinstance(data, dict) else None

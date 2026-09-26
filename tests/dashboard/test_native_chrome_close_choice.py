@@ -152,6 +152,37 @@ class TestOnClosingChoice:
             api._cancel_evaluation("job-42")  # must not raise
 
 
+class TestSaveViaDialogLogsFailure:
+    """save_via_dialog (_webview_window_native_ops, re-exported via ww): already
+    narrow to OSError; now also logs a warning with the traceback instead of
+    silently returning False. Exercised via the module alias already imported
+    above rather than a new named import, so it doesn't add a private-import
+    baseline entry."""
+
+    def _window(self, save_path: str) -> MagicMock:
+        window = MagicMock()
+        window.create_file_dialog.return_value = save_path
+        return window
+
+    def test_write_failure_logs_a_warning_with_the_path(self, tmp_path, caplog):
+        bad_path = str(tmp_path / "does-not-exist" / "output.txt")
+        window = self._window(bad_path)
+        with caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_native_ops"):
+            result = ww.save_via_dialog(window, "content", "output.txt")
+        assert result is False
+        matching = [r for r in caplog.records if bad_path in r.getMessage()]
+        assert matching, [r.getMessage() for r in caplog.records]
+        assert any(r.exc_info for r in matching)
+
+    def test_write_success_returns_true_without_logging(self, tmp_path, caplog):
+        good_path = str(tmp_path / "output.txt")
+        window = self._window(good_path)
+        with caplog.at_level(logging.WARNING, logger="quodeq.dashboard._webview_window_native_ops"):
+            result = ww.save_via_dialog(window, "content", "output.txt")
+        assert result is True
+        assert not caplog.records
+
+
 @_MACOS_ONLY
 class TestMacConfirmClose:
     """Exercise the real macos_confirm_close AppKit body with AppHelper.callAfter

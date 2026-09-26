@@ -135,6 +135,15 @@ def test_network_error_returns_none() -> None:
         assert fetch_latest("frozen") is None
 
 
+def test_invalid_url_returns_none() -> None:
+    """Review fix -- httpx.InvalidURL (e.g. from a malformed HTTPS_PROXY) is a
+    plain Exception subclass, not an httpx.HTTPError; it used to escape this
+    function's (httpx.HTTPError, ValueError) catch entirely, breaking the
+    documented "None on any failure" contract."""
+    with patch("quodeq.update.source.httpx.get", side_effect=httpx.InvalidURL("bad proxy url")):
+        assert fetch_latest("frozen") is None
+
+
 def test_bad_json_returns_none() -> None:
     r = _resp()
     r.json.side_effect = ValueError("bad json")

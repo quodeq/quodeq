@@ -131,7 +131,8 @@ def read_finding_details(run_dir: Path, keys: set[DismissKey]) -> dict[DismissKe
     try:
         with open_evaluation_db(run_dir) as conn:
             _fetch_detail_rows(conn, set(keys), out)
-    except (sqlite3.DatabaseError, RuntimeError):
+    except (sqlite3.DatabaseError, RuntimeError) as exc:
+        _logger.warning("Could not read finding details from %s: %s", run_dir, exc, exc_info=True)
         return out
     return out
 
@@ -172,7 +173,8 @@ def _read_run_key_sets_from_db(run_dir: Path) -> tuple[set[tuple], set[tuple]] |
                 dismiss |= finding_dismiss_keys(
                     req=req, principle=pid, file=file, line=line, snippet=snippet)
                 cls.add((str(dim or ""), str(pid or ""), str(file or "")))
-    except (sqlite3.DatabaseError, RuntimeError):
+    except (sqlite3.DatabaseError, RuntimeError) as exc:
+        _logger.warning("Could not read run key sets from %s: %s", run_dir, exc)
         return None
     return dismiss, cls
 

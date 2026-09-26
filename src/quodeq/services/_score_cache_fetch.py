@@ -122,11 +122,12 @@ def _read_row(table: CacheTable, project: str, version: str) -> dict | None:
         return table.read(conn, project, version)
 
 
-def _peek(table: CacheTable, project: str, version: str) -> dict | None:
+def _peek(table: CacheTable, project: str, version: str, *, log: LogSink = NULL_LOG) -> dict | None:
     """The exact-version cached payload, or None on a miss or SQLite error."""
     try:
         return _read_row(table, project, version)
-    except sqlite3.Error:
+    except sqlite3.Error as exc:
+        log.warning(f"score-cache peek failed for {table.label} {project}: {exc}")
         return None
 
 
@@ -161,7 +162,7 @@ def cached_accumulated(
     if stale_scope is None or not enabled:
         return read_through(cache_slot, compute, cacheable, log, enabled)
     slot = (table.kind, project, stale_scope)
-    hit = _peek(table, project, version)
+    hit = _peek(table, project, version, log=log)
     if hit is not None:
         remember(slot, hit)
         return hit

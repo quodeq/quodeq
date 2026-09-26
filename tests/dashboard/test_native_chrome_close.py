@@ -1,10 +1,15 @@
 """Native-chrome close handler: off-thread prompt on macOS/GTK/Qt, inline dialog on Windows."""
 import http.client
+import logging
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from quodeq.dashboard import _webview_window as ww
 from quodeq.dashboard import _webview_window_close as wwc
 from tests._timeouts import budget
+
+_LOGGER_NAME = "quodeq.dashboard._webview_window_close"
 
 
 class TestOnClosing:
@@ -254,3 +259,42 @@ class TestOnClosing:
         on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
         window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
         assert on_closing() is True
+
+    def test_windows_dialog_failure_logs_a_warning(self):
+        # R-FT-7 -- was `except Exception: return True` with no log at all.
+        on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
+        window.create_confirmation_dialog.side_effect = RuntimeError("no GUI")
+        with patch.object(wwc._logger, "warning") as warning:
+            assert on_closing() is True
+        assert warning.called
+        assert warning.call_args.kwargs.get("exc_info") is True
+
+    def test_windows_dialog_out_of_scope_error_propagates(self):
+        on_closing, window, api = self._wire(job={"jobId": "x"}, platform="win32")
+        window.create_confirmation_dialog.side_effect = ValueError("bad args")
+        with pytest.raises(ValueError, match="bad args"):
+            on_closing()
+
+
+class TestPromptCloseChoiceAndFinishDestroy:
+    """R-FT-7 -- window.destroy() in prompt_close_choice_and_finish, narrowed from
+    bare Exception/debug to (WebViewException, RuntimeError, OSError)/warning."""
+
+    def _run(self, destroy_error):
+        window = MagicMock()
+        window.destroy.side_effect = destroy_error
+        state = {"prompting": True, "confirmed": False}
+        with patch.object(wwc, "ask_close_choice", return_value="keep"):
+            wwc.prompt_close_choice_and_finish(MagicMock(), window, state, None)
+        return state
+
+    def test_in_tuple_destroy_failure_is_logged_as_a_warning(self, caplog):
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            state = self._run(RuntimeError("already gone"))
+        assert state["confirmed"] is True
+        assert any(r.exc_info for r in caplog.records
+                    if "window.destroy after close-confirm failed" in r.getMessage())
+
+    def test_out_of_tuple_destroy_failure_propagates(self):
+        with pytest.raises(ValueError, match="boom"):
+            self._run(ValueError("boom"))

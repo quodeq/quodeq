@@ -25,6 +25,7 @@ _ = _Dyn()
 _._add_security_headers  # api/security.py: Flask view function; the route decorator is its only caller.
 _._gzip_large_json  # api/_compression.py: Flask view function; the route decorator is its only caller.
 _._handle_project_not_found  # api/routes_findings.py: Flask view function; the route decorator is its only caller.
+_._handle_unexpected_error  # api/_error_handlers.py: Flask errorhandler; the decorator is its only caller.
 _._security_checks  # api/security.py: Flask view function; the route decorator is its only caller.
 _.ai_clients  # api/routes_discovery.py: Flask view function; the route decorator is its only caller.
 _.apply_assistant_action  # api/assistant_action_routes.py: Flask view function; the route decorator is its only caller.

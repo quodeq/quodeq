@@ -37,17 +37,22 @@ declaration in ``project-profile.json`` may relax that axis.
 single-host deployment and a horizontally scaled one are byte-identical on
 disk, so detection never fills it either.
 
-Nothing here may fail a scan. Every malformed-input branch warns and degrades.
+Every malformed-input branch this module knows about (an unreadable or
+malformed ``project-profile.json``, a bad enum/boolean field) warns and
+degrades rather than failing a scan. ``detect_shape`` (``project_shape.py``)
+is fail-soft the same way for its own known failure modes; this module no
+longer wraps it a second time, so a genuine bug there propagates instead of
+being silently absorbed.
 """
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
 from quodeq.context.project_shape import Deployment, detect_shape
+from quodeq.shared.advisory_json import read_advisory_json
 
 _logger = logging.getLogger(__name__)
 
@@ -110,20 +115,19 @@ def _read_profile(project_root: Path) -> dict:
     """Parse the profile file; ``{}`` for absent, unreadable or malformed.
 
     This is advisory data an operator hand-writes, with a well-defined
-    conservative fallback, so parsing failures of *any* kind degrade rather
-    than propagate -- not just the well-behaved ``OSError``/``ValueError``/
-    ``UnicodeDecodeError`` trio. In particular, deeply nested JSON (e.g. tens
-    of thousands of nested arrays) overflows the C decoder's call stack and
-    raises ``RecursionError``, which is a ``RuntimeError`` and would
-    otherwise escape and fail the scan.
+    conservative fallback, so a read/parse failure degrades rather than
+    propagates: ``OSError`` for an unreadable file, ``ValueError`` for
+    invalid JSON or non-UTF-8 bytes (``json.JSONDecodeError`` and
+    ``UnicodeDecodeError`` are both ``ValueError`` subclasses), and
+    ``RecursionError`` for deeply nested JSON (e.g. tens of thousands of
+    nested arrays) overflowing the C decoder's call stack.
     """
     path = project_root / PROFILE_RELPATH
-    if not path.is_file():
+    data, err = read_advisory_json(path)
+    if err is not None:
+        _logger.warning("Ignoring unreadable or malformed project profile %s: %s", path, err)
         return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001 - advisory data must never fail a scan
-        _logger.warning("Ignoring unreadable or malformed project profile %s: %s", path, exc)
+    if data is None:
         return {}
     if not isinstance(data, dict):
         _logger.warning("Ignoring project profile %s: not a JSON object", path)
@@ -187,21 +191,7 @@ def _detected_multi_tenant(project_root: Path) -> bool | None:
     and wrong here, because a library's paths may be fed from an HTTP
     request in the consuming application and the author cannot know.
     """
-    try:
-        shape = detect_shape(project_root)
-    except Exception as exc:  # noqa: BLE001 - unreadable/pathological manifests must not fail a scan
-        # detect_shape's own manifest readers (project_shape.py) only catch
-        # OSError/tomllib.TOMLDecodeError/json.JSONDecodeError, not every
-        # failure mode: deeply nested package.json/pyproject.toml/Cargo.toml
-        # content overflows the C JSON decoder's or tomllib's recursion limit
-        # and raises RecursionError, a RuntimeError subclass neither of those
-        # readers catches. project_root is analyzed, untrusted input with a
-        # well-defined conservative fallback, so any detection failure -- not
-        # just OSError -- must degrade here rather than escape and fail the
-        # scan. project_shape.py itself is out of scope for this fix; this
-        # catch is deliberately wide as the boundary that must not leak.
-        _logger.warning("Project shape detection failed for %s: %s", project_root, exc)
-        return None
+    shape = detect_shape(project_root)
     if shape.deployment is Deployment.WEB_SERVICE:
         return True
     if shape.deployment is Deployment.DESKTOP:

@@ -213,14 +213,26 @@ def test_signal_detector_exception_degrades_to_unknown(
 ) -> None:
     """The per-manifest readers already guard every known pathological input
     (see ``TestPathologicalManifestsDegrade`` below), so this exercises the
-    top-level backstop directly: something unanticipated escaping a signal
-    detector must still degrade the whole verdict to UNKNOWN rather than
-    raise, per detect_shape's own "nothing in this module may raise"
-    contract.
+    top-level backstop directly: a TypeError (e.g. a scalar where a signal
+    detector expects a list) must still degrade the whole verdict to
+    UNKNOWN rather than raise.
     """
     def _boom(repo: Path) -> None:
-        raise RuntimeError("unexpected failure in signal detection")
+        raise TypeError("unexpected failure in signal detection")
 
     monkeypatch.setattr("quodeq.context.project_shape.python_signals", _boom)
     shape = detect_shape(tmp_path)
     assert shape == ProjectShape()
+
+
+def test_an_unnamed_signal_detector_exception_propagates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """detect_shape's except narrows to (OSError, TypeError); anything else
+    from a signal detector must propagate, not be swallowed."""
+    def _boom(repo: Path) -> None:
+        raise RuntimeError("unexpected failure in signal detection")
+
+    monkeypatch.setattr("quodeq.context.project_shape.python_signals", _boom)
+    with pytest.raises(RuntimeError, match="unexpected failure in signal detection"):
+        detect_shape(tmp_path)

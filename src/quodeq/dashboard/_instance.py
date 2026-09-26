@@ -11,6 +11,7 @@ from typing import Callable
 
 from quodeq.shared.constants import PLATFORM_WIN32
 from quodeq.shared.env_paths import ensure_run_dir
+from quodeq.shared.fault_isolation import run_isolated
 from quodeq.shared.utils import TEXT_ENCODING
 
 _logger = logging.getLogger(__name__)
@@ -164,6 +165,42 @@ class InstanceController:
         self._port_file.write_text(str(self._tcp_port), encoding="utf-8")
         return True
 
+    def _serve_one(self, on_reload: Callable[[str], None]) -> bool:
+        """Accept one connection and handle it; return whether to keep listening.
+
+        ``socket.timeout`` on ``accept()`` is the expected idle poll. An
+        ``OSError`` from ``accept()`` means the LISTENING socket itself died
+        (logged unless we are shutting down ourselves, which closes it
+        deliberately) -- that is the only case that stops the loop. A
+        failure reading this one connection (e.g. a peer reset) is not the
+        listening socket dying, so it is logged and the loop keeps going;
+        the connection is always closed, on every path. Anything
+        ``on_reload`` raises is left uncaught here -- it is not a socket
+        problem, and the ``run_isolated`` wrapper around this call (in
+        ``start_listening``) is what must catch it so one bad reload can't
+        kill the listener thread.
+        """
+        try:
+            conn, _ = self._server_sock.accept()
+        except socket.timeout:
+            return True
+        except OSError:
+            if not self._shutdown_event.is_set():
+                _logger.debug("Listener socket error", exc_info=True)
+            return False
+        try:
+            data = conn.recv(_RECV_BUFFER_SIZE).decode(TEXT_ENCODING, errors="replace")
+        except OSError as exc:
+            _logger.debug("Reload connection error: %s", exc, exc_info=True)
+            return True
+        finally:
+            conn.close()
+        if data.startswith(_RELOAD_PREFIX):
+            url = data[len(_RELOAD_PREFIX):]
+            _logger.info("Received reload request: %s", url)
+            on_reload(url)
+        return True
+
     def start_listening(self, on_reload: Callable[[str], None]) -> bool:
         """Start a background thread that listens for reload commands.
 
@@ -183,19 +220,11 @@ class InstanceController:
 
         def _listen() -> None:
             while not self._shutdown_event.is_set():
-                try:
-                    conn, _ = self._server_sock.accept()
-                    data = conn.recv(_RECV_BUFFER_SIZE).decode(TEXT_ENCODING, errors="replace")
-                    conn.close()
-                    if data.startswith(_RELOAD_PREFIX):
-                        url = data[len(_RELOAD_PREFIX):]
-                        _logger.info("Received reload request: %s", url)
-                        on_reload(url)
-                except socket.timeout:
-                    continue
-                except OSError:
-                    if not self._shutdown_event.is_set():
-                        _logger.debug("Listener socket error", exc_info=True)
+                keep = run_isolated(
+                    lambda: self._serve_one(on_reload),
+                    label="reload listener", log=_logger, on_error=lambda _exc: True,
+                )
+                if not keep:
                     break
 
         self._listen_thread = threading.Thread(target=_listen, daemon=True)

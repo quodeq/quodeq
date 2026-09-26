@@ -34,6 +34,12 @@ class TestNonDictJsonlLineIsSkipped:
         _, compliance = _parse_jsonl_findings(lines, "security")
         assert len(compliance) == 1
 
+    def test_non_dict_line_logs_a_warning(self):
+        with patch("quodeq.services._violations_jsonl._logger.warning") as warning:
+            _parse_jsonl_findings(['[1, 2, 3]'], "security")
+        assert warning.call_count == 1
+        assert "non-object" in warning.call_args_list[0].args[0].lower()
+
 
 class TestParseJsonlFindings:
     def test_empty_lines(self):

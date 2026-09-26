@@ -140,7 +140,7 @@ def _start_watchers(
     persist_fn = make_persist_fn(config, dim_id, cctx, stop_event)
     watcher = threading.Thread(
         target=periodic_persist,
-        args=(stop_event, persist_fn, persist_interval_s, _logger.warning),
+        args=(stop_event, persist_fn, persist_interval_s, _logger),
         daemon=True,
         name=f"v2-cache-persist-{dim_id}",
     )

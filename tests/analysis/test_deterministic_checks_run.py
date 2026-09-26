@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from quodeq.core.evidence.model import Evidence
 from tests.analysis._deterministic_checks_fixtures import (  # noqa: F401 -- project/compiled are pytest fixtures
     SOURCES,
@@ -188,6 +190,23 @@ class TestRunWiring:
                             source_file_count=0, files_read=0, coverage_pct=0.0)
 
         assert apply_checks_for_run(MagicMock(), "clean-architecture", evidence) == 0
+
+    def test_an_unnamed_failure_propagates(self, project, compiled, tmp_path, monkeypatch):
+        """apply_checks_for_run's except narrows to (OSError, TypeError,
+        ValueError); anything else must propagate, not be swallowed as a
+        skipped dimension."""
+        from quodeq.analysis.checks import runner
+
+        def boom(_root):
+            raise RuntimeError("unexpected")
+
+        monkeypatch.setattr(runner, "resolve_trust_model", boom)
+        config = self._config(project, compiled(STANDARD), tmp_path)
+        evidence = Evidence(repository="r", language="python", date="d",
+                            source_file_count=3, files_read=3, coverage_pct=100.0)
+
+        with pytest.raises(RuntimeError, match="unexpected"):
+            runner.apply_checks_for_run(config, "clean-architecture", evidence)
 
     def test_the_dimension_runner_calls_it_with_the_parsed_evidence(self):
         from unittest.mock import MagicMock, patch

@@ -24,6 +24,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
+from quodeq.shared.fault_isolation import run_isolated
 from quodeq.shared.logging import log_info
 
 _logger = logging.getLogger(__name__)
@@ -96,6 +97,24 @@ def _fd_count(probes: ResourceProbes) -> int:
     return _UNKNOWN
 
 
+class _WarnOnce:
+    """``Warns`` adapter that logs only the first failure it sees.
+
+    ``_loop`` ticks in a tight interval loop; a per-iteration warning would
+    flood the log once the tick starts failing, so only the first failure
+    (with its traceback, from ``run_isolated``) is reported.
+    """
+
+    def __init__(self, logger: logging.Logger) -> None:
+        self._logger = logger
+        self._logged = False
+
+    def warning(self, message: str, /) -> None:
+        if not self._logged:
+            self._logger.warning(message)
+            self._logged = True
+
+
 def _format(elapsed_s: float, rss_mb: int, threads: int, fds: int, ollama_mb: int) -> str:
     mins, secs = divmod(int(elapsed_s), 60)
     return (
@@ -120,7 +139,7 @@ class ResourceSampler:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._started_at: float | None = None
-        self._error_logged = False
+        self._once_log = _WarnOnce(_logger)
 
     def start(self) -> None:
         """Start sampling and set the elapsed-time origin. Idempotent while running."""
@@ -162,14 +181,9 @@ class ResourceSampler:
 
     def _loop(self) -> None:
         while not self._stop.is_set():
-            try:
-                log_info(self.sample_once())
-            except Exception as exc:
-                # best-effort: never let observability kill the run. Log once
-                # (not per-iteration — this runs in a tight loop) via the
-                # standard logging module directly, since log_info is what
-                # just failed.
-                if not self._error_logged:
-                    _logger.warning("resource sampler tick failed: %s", exc)
-                    self._error_logged = True
+            run_isolated(
+                lambda: log_info(self.sample_once()),
+                label="resource sampler tick",
+                log=self._once_log,
+            )
             self._stop.wait(self._interval)

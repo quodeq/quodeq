@@ -146,3 +146,48 @@ def test_persist_mirrors_every_judgment_with_one_lock(tmp_path: Path, monkeypatc
     events = (tmp_path / "events.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(events) == 4
     assert lock.acquired == 1
+
+
+def test_persist_logs_and_keeps_the_jsonl_write_when_the_mirror_fails(
+    tmp_path: Path, monkeypatch, caplog,
+):
+    """A TypeError mirroring judgments into events.jsonl (e.g. a bad
+    payload json.dumps can't serialize) must be caught and logged: the
+    findings are already in the per-dim JSONL, so this only costs the
+    live-feed mirror."""
+    class _BrokenWriter:
+        def __init__(self, path: Path) -> None:
+            pass
+
+        def emit_many(self, events) -> None:
+            raise TypeError("not serializable")
+
+    monkeypatch.setattr("quodeq.data.events.writer.EventLogWriter", _BrokenWriter)
+    jsonl = tmp_path / "evidence" / "security.jsonl"
+    jsonl.parent.mkdir()
+    judgments = _judgments(1)
+    rows = [{"p": "P1", "file": "a.py", "line": 1}]
+
+    with caplog.at_level("WARNING"):
+        runner._persist(jsonl, judgments, rows)
+
+    assert jsonl.read_text(encoding="utf-8").strip() != ""
+    assert any("could not mirror findings to the event log" in r.message for r in caplog.records)
+
+
+def test_persist_propagates_an_unnamed_mirror_error(tmp_path: Path, monkeypatch):
+    """A mirror failure outside (OSError, TypeError, ValueError) must
+    propagate, not be swallowed."""
+    class _BrokenWriter:
+        def __init__(self, path: Path) -> None:
+            pass
+
+        def emit_many(self, events) -> None:
+            raise RuntimeError("unexpected")
+
+    monkeypatch.setattr("quodeq.data.events.writer.EventLogWriter", _BrokenWriter)
+    jsonl = tmp_path / "evidence" / "security.jsonl"
+    jsonl.parent.mkdir()
+
+    with pytest.raises(RuntimeError, match="unexpected"):
+        runner._persist(jsonl, _judgments(1), [{"p": "P1", "file": "a.py", "line": 1}])

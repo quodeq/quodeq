@@ -1,4 +1,6 @@
 """Orchestrator stop-turn cancellation and error-frame hygiene."""
+import logging
+
 from quodeq.assistant.orchestrator import TurnEngines, TurnRequest, run_turn
 
 from ._orchestrator_helpers import _request
@@ -9,7 +11,7 @@ from ._orchestrator_helpers import _request
 def test_cancelled_cli_turn_emits_stopped_and_persists_partial(setup, monkeypatch):
     from quodeq.assistant.cancel import TurnCancelled
     repo, ctx = setup
-    monkeypatch.setattr("quodeq.assistant.orchestrator.get_provider_configs",
+    monkeypatch.setattr("quodeq.assistant._turn_grants.get_provider_configs",
                         lambda: {"claude": {"type": "cli"}})
 
     def cancelled_cli_turn(**kwargs):
@@ -39,6 +41,42 @@ def test_cancelled_turn_without_partial_persists_no_assistant_message(setup):
     assert [m["role"] for m in repo.list_messages("s1")] == ["user"]
     frames = [f for _, f in repo.events_after("s1", 0)]
     assert frames[-1]["type"] == "stopped"
+
+
+def test_cancelled_turn_does_not_log_a_warning(setup, caplog):
+    """TurnCancelled is a routine, expected outcome (the user hit stop) --
+    handled inside _run_turn_body, outside run_isolated's boundary -- so it
+    must never surface as a logged failure the way a genuine turn error
+    does."""
+    from quodeq.assistant.cancel import TurnCancelled
+    repo, ctx = setup
+
+    def cancelled_turn(**_):
+        raise TurnCancelled("partial")
+
+    with caplog.at_level(logging.WARNING, logger="quodeq.assistant.orchestrator"):
+        run_turn(_request(), repository=repo, tool_ctx=ctx, engines=TurnEngines(
+            turn_fn=cancelled_turn, capability_fn=lambda *a, **k: True))
+
+    assert caplog.records == []
+
+
+def test_turn_failure_is_logged_with_a_traceback(setup, caplog):
+    """A genuine turn failure (not a user stop) must reach run_isolated's
+    boundary and be logged at WARNING with the traceback, not just turned
+    silently into an error frame."""
+    repo, ctx = setup
+
+    def failing_turn(**_):
+        raise RuntimeError("connection refused")
+
+    with caplog.at_level(logging.WARNING, logger="quodeq.assistant.orchestrator"):
+        run_turn(_request(), repository=repo, tool_ctx=ctx, engines=TurnEngines(
+            turn_fn=failing_turn, capability_fn=lambda *a, **k: True))
+
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert warnings[0].exc_info is not None
 
 
 def test_turn_failure_emits_generic_message_not_raw_exception(setup):

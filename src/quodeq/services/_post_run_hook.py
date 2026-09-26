@@ -8,6 +8,7 @@ target. Each step is also exposed as its own method for direct testing.
 from __future__ import annotations
 
 import logging
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,7 @@ class PostRunHook:
         reports = Path(self._reports_root) if self._reports_root is not None else _default_reports_root()
         try:
             self.cleanup_clone(project_uuid, reports)
-        except Exception:
+        except OSError:
             _logger.warning(
                 "Post-run cleanup failed for job %s — ephemeral clone may be left behind",
                 job_id,
@@ -42,7 +43,7 @@ class PostRunHook:
             )
         try:
             self.project_events(job, reports)
-        except Exception:
+        except (sqlite3.Error, OSError, ValueError):
             _logger.warning(
                 "Post-run projection failed for job %s — State Store may be incomplete",
                 job_id,

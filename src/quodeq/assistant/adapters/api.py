@@ -23,6 +23,7 @@ from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, guard_tool_result
 from quodeq.assistant.message_role import MessageRole
 from quodeq.assistant.tools.registry import ToolRegistry
 from quodeq.shared.env_resolve import resolve_env
+from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
 _TIMEOUT = httpx.Timeout(connect=10.0, read=500.0, write=30.0, pool=10.0)
@@ -102,6 +103,30 @@ def _default_client(config: ApiTurnConfig):
 _STREAM_DONE = object()
 
 
+def _drain(stream, q: "queue.Queue", cancel: CancelToken) -> None:
+    """Pull *stream*'s chunks onto *q* until exhausted or cancelled.
+
+    Catches the SDK/transport's own exception types itself and queues them
+    for the consumer, exactly as ``_iter_with_cancel`` expects: a cancelled
+    turn's kill hook closes the client out from under this blocking read
+    (that's the stop succeeding, not a failure -- ``_stream_once`` turns it
+    into ``TurnCancelled`` once ``cancel.cancelled`` is seen), and an
+    ordinary mid-stream network error is the consumer's to raise and the
+    turn thread's ``run_isolated`` boundary (``orchestrator.run_turn``) to
+    log once. Neither belongs to this reader thread's own
+    ``run_isolated`` (``_read``, below), which stays reserved for a genuine
+    bug in this loop.
+    """
+    try:
+        for chunk in stream:
+            q.put(chunk)
+            if cancel.cancelled:
+                return  # consumer is gone; stop producing
+        q.put(_STREAM_DONE)
+    except (openai.APIError, openai.OpenAIError, httpx.HTTPError) as exc:
+        q.put(exc)
+
+
 def _iter_with_cancel(stream, cancel):
     """Yield `stream`'s chunks while staying cancellable during a BLOCKED read.
 
@@ -119,14 +144,7 @@ def _iter_with_cancel(stream, cancel):
     q: queue.Queue = queue.Queue()
 
     def _read():
-        try:
-            for chunk in stream:
-                q.put(chunk)
-                if cancel.cancelled:
-                    return  # consumer is gone; stop producing
-            q.put(_STREAM_DONE)
-        except Exception as exc:  # noqa: BLE001 - delivered to the consumer
-            q.put(exc)
+        run_isolated(lambda: _drain(stream, q, cancel), label="SDK stream read", log=_logger, on_error=q.put)
 
     threading.Thread(target=_read, daemon=True).start()
     while True:

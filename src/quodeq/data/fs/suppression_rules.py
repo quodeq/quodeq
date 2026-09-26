@@ -39,7 +39,7 @@ def load_suppression_rules(project_dir: Path) -> tuple[SuppressionRule, ...]:
         return ()
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001 - a bad rules file must never fail a rescore
+    except (OSError, ValueError, RecursionError) as exc:
         _logger.warning(
             "Ignoring unreadable or malformed suppression rules %s: %s", path, exc)
         return ()

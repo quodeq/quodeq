@@ -39,8 +39,6 @@ src/quodeq/context/_project_shape_io.py:3
 src/quodeq/context/_project_shape_signals.py:3
 src/quodeq/context/_project_shape_types.py:3
 src/quodeq/context/precedent_corpus.py:135
-src/quodeq/context/project_shape.py:27
-src/quodeq/dashboard/_webview_window_about.py:117
 src/quodeq/data/cache_store/_migrate_params.py:3
 src/quodeq/data/fs/shared_repo_meta.py:3
 src/quodeq/data/sqlite/_migrations_ddl.py:3
@@ -281,7 +279,6 @@ tests/services/test_fs_metadata_accumulated.py:3
 tests/services/test_fs_metadata_accumulated_card.py:3
 tests/services/test_fs_metadata_accumulated_rescore.py:3
 tests/services/test_fs_metadata_repo_info.py:3
-tests/services/test_fs_metadata_scan.py:3
 tests/services/test_grade_formula_apply.py:3
 tests/services/test_grade_formula_event_log.py:3
 tests/services/test_grade_formula_persistence.py:3

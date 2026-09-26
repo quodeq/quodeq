@@ -1,7 +1,13 @@
 import json
 from pathlib import Path
 
+from quodeq.data.sqlite.index_sync import upsert_from_status
 from quodeq.data.sqlite.run_index import open_index, sync_project_dates, list_runs_for_project
+
+# upsert_from_status is called from _run_sync_step.py's own namespace (a
+# private sibling of run_index.py), not run_index's -- patched by dotted
+# string path so this file never imports the private module directly.
+_UPSERT_TARGET = "quodeq.data.sqlite._run_sync_step.upsert_from_status"
 
 
 def _write_status(run_dir: Path, started_at: str):
@@ -30,13 +36,11 @@ def test_syncs_started_at_and_is_mtime_gated(tmp_path, monkeypatch):
         }
         # Second call, nothing changed on disk -> no upserts (mtime gate).
         calls = {"n": 0}
-        import quodeq.data.sqlite.run_index as ri
-        real = ri.upsert_from_status
 
         def counting(*a, **k):
             calls["n"] += 1
-            return real(*a, **k)
-        monkeypatch.setattr(ri, "upsert_from_status", counting)
+            return upsert_from_status(*a, **k)
+        monkeypatch.setattr(_UPSERT_TARGET, counting)
         sync_project_dates(db, proj, "proj")
         assert calls["n"] == 0, "unchanged runs must not be re-read/upserted"
     finally:

@@ -105,8 +105,8 @@ def _build_about_credits() -> object | None:
 
 def _build_about_handler() -> object:
     """Build (but do not install) the ObjC handler whose showAbout_ shows the
-    rich About panel. Split out of install_about_panel_override so neither
-    half exceeds the function-size cap.
+    rich About panel. Kept as its own function, separate from
+    install_about_panel_override, so neither exceeds the function-size cap.
     """
     from AppKit import NSApplication, NSObject  # noqa: PLC0415
 

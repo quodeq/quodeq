@@ -85,7 +85,7 @@ def _extend_run_deadline(options: AnalysisOptions, time_limit: int) -> None:
     if options.on_deadline_extended is not None:
         try:
             options.on_deadline_extended(new_iso)
-        except Exception as exc:  # noqa: BLE001 — a status write must not kill the launch
+        except (OSError, TypeError, ValueError) as exc:
             log_warning(f"deadline extension notify failed: {exc}")
 
 

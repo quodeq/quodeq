@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+import quodeq.api._scores_routes as scores_mod
 from quodeq.api.app import create_app
 
 
@@ -20,10 +21,9 @@ def client(tmp_path, monkeypatch):
 
 
 def test_project_scores_returns_json_500_on_unexpected_error(client, monkeypatch):
-    """get_project_scores raising must yield a structured JSON 500, not a bare exception."""
-    import quodeq.api._scores_routes as scores_mod
-
-    monkeypatch.setattr(scores_mod, "get_project_scores", lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("db exploded")))
+    """get_project_scores raising OSError/sqlite3.Error/ValueError must yield
+    a structured JSON 500, not a bare exception."""
+    monkeypatch.setattr(scores_mod, "get_project_scores", lambda *a, **kw: (_ for _ in ()).throw(ValueError("corrupt scores payload")))
 
     resp = client.get("/api/projects/myproject/scores")
 
@@ -32,3 +32,19 @@ def test_project_scores_returns_json_500_on_unexpected_error(client, monkeypatch
     assert data is not None, "Response body must be JSON"
     assert "error" in data
     assert "code" in data
+
+
+def test_project_scores_propagates_an_error_outside_the_narrowed_tuple(client, monkeypatch):
+    """A RuntimeError (not OSError/sqlite3.Error/ValueError) is a real bug in
+    get_project_scores, not a read failure, so the route's own narrow tuple
+    does not catch it. It still escapes the route -- the app-wide fallback
+    handler (api/_error_handlers.py) is what turns it into a coded 500
+    instead of Flask's default HTML page, never echoing the exception text."""
+    monkeypatch.setattr(scores_mod, "get_project_scores", lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("db exploded")))
+
+    resp = client.get("/api/projects/myproject/scores")
+
+    assert resp.status_code == 500
+    data = resp.get_json()
+    assert data["code"] == "INTERNAL_ERROR"
+    assert "db exploded" not in resp.get_data(as_text=True)

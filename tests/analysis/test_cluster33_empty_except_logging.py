@@ -12,11 +12,17 @@ import pytest
 
 from quodeq.analysis import _api_standards_text, _loop_state
 from quodeq.analysis._run_lifecycle_support import _SIGNALS_TO_HANDLE, SignalGuard
-from quodeq.analysis.run_lifecycle import mark_unfinished_dims_incomplete
+from quodeq.analysis.run_lifecycle import (
+    mark_unfinished_dims_incomplete,
+    seed_dimension_states,
+)
 from quodeq.analysis.subagents import _queue_state
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
 from quodeq.config import ai_provider
 from quodeq.config.paths import ConfigPaths
+from quodeq.core.run.dimensions import DimState, IllegalDimTransitionError
+from quodeq.data.fs import dimensions_state_store
+from quodeq.data.fs.dimensions_state_store import write_dim_state
 
 
 def test_silence_broken_stdout_survives_unopenable_devnull(monkeypatch, tmp_path) -> None:
@@ -166,6 +172,78 @@ def test_mark_unfinished_dims_incomplete_logs_and_returns_zero_for_non_object_di
     assert flipped == 0
     assert recording_log.warning_messages
     assert "failed to read dimensions for flip" in recording_log.warning_messages[0]
+
+
+def test_mark_unfinished_dims_incomplete_logs_and_skips_on_illegal_transition(
+    tmp_path, recording_log, monkeypatch,
+) -> None:
+    """write_dim_state raising IllegalDimTransitionError for one dim must be
+    caught, logged, and skipped, not crash the flip for the rest."""
+    write_dim_state(tmp_path, "security", DimState.RUNNING)
+
+    def _raise(*_args, **_kwargs):
+        raise IllegalDimTransitionError("bad transition")
+
+    monkeypatch.setattr(dimensions_state_store, "write_dim_state", _raise)
+
+    flipped = mark_unfinished_dims_incomplete(tmp_path, "not_reached", log=recording_log)
+
+    assert flipped == 0
+    assert recording_log.warning_messages
+    assert "failed to mark dim security incomplete" in recording_log.warning_messages[0]
+
+
+def test_mark_unfinished_dims_incomplete_propagates_unnamed_write_error(
+    tmp_path, recording_log, monkeypatch,
+) -> None:
+    """A write_dim_state failure outside (OSError, IllegalDimTransitionError)
+    must propagate, not be swallowed."""
+    write_dim_state(tmp_path, "security", DimState.RUNNING)
+
+    def _raise(*_args, **_kwargs):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(dimensions_state_store, "write_dim_state", _raise)
+
+    with pytest.raises(RuntimeError, match="unexpected"):
+        mark_unfinished_dims_incomplete(tmp_path, "not_reached", log=recording_log)
+
+
+def test_seed_dimension_states_logs_and_continues_on_illegal_transition(
+    tmp_path, recording_log, monkeypatch,
+) -> None:
+    """One dim's write_dim_state raising IllegalDimTransitionError must be
+    caught and logged; the remaining dims still get seeded."""
+    calls: list[str] = []
+    real_write = write_dim_state
+
+    def _flaky(run_dir, dim, state, **kwargs):
+        if dim == "security":
+            raise IllegalDimTransitionError("bad transition")
+        calls.append(dim)
+        return real_write(run_dir, dim, state, **kwargs)
+
+    monkeypatch.setattr(dimensions_state_store, "write_dim_state", _flaky)
+
+    seed_dimension_states(tmp_path, ["security", "usability"], log=recording_log)
+
+    assert calls == ["usability"]
+    assert recording_log.warning_messages
+    assert "failed to seed dim state for security" in recording_log.warning_messages[0]
+
+
+def test_seed_dimension_states_propagates_unnamed_write_error(
+    tmp_path, recording_log, monkeypatch,
+) -> None:
+    """A write_dim_state failure outside (OSError, IllegalDimTransitionError)
+    must propagate, not be swallowed."""
+    def _raise(*_args, **_kwargs):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(dimensions_state_store, "write_dim_state", _raise)
+
+    with pytest.raises(RuntimeError, match="unexpected"):
+        seed_dimension_states(tmp_path, ["security"], log=recording_log)
 
 
 def test_write_env_logs_cleanup_failure_and_reraises(tmp_path, monkeypatch) -> None:

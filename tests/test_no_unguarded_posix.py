@@ -32,8 +32,8 @@ _ALLOWLIST: set[str] = {
     "shared/process_kill.py:74",
     # pgrep / ps are wrapped in `except (OSError, ...)` -> returns _UNKNOWN, so
     # on Windows (FileNotFoundError) resource sampling degrades gracefully.
-    "shared/resource_sampler.py:60",
-    "shared/resource_sampler.py:77",
+    "shared/resource_sampler.py:61",
+    "shared/resource_sampler.py:78",
     # child_cwd's macOS branch: only reached when `platform == "darwin"` and
     # wrapped in `except (..., subprocess.SubprocessError)`, so Windows never
     # runs it and a missing lsof degrades to None. Used to resolve clickable
