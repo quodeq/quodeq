@@ -106,9 +106,9 @@ def judgment_to_dict(j: Judgment) -> dict:
     d: dict = {"file": j.file}
     # Emit BOTH the long key (UI/report read 'violation_type', see
     # ui/src/models/violation.js and core/finding_mappings.py) AND the short
-    # key the scoring tally groups by ('vt', see core/scoring/_tallies.py).
-    # They carry the same value; keeping both fixes taxonomy scoring without
-    # breaking any consumer.
+    # key the scoring tally falls back to after 'req' ('vt', see
+    # core/scoring/_tallies.py). They carry the same value; keeping both
+    # serves every consumer.
     _optional = {"line": j.line, "end_line": j.end_line, "snippet": j.snippet,
                  "severity": j.severity, "violation_type": j.violation_type,
                  "vt": j.violation_type, "vt_raw": j.violation_type_raw,

@@ -44,12 +44,11 @@ def compute_tallies(
 ) -> tuple[dict[str, int], dict[str, int], bool]:
     """Tally distinct violation and compliance types per severity.
 
-    A ``vt`` taxonomy code is a per-finding grouping key, not a per-principle
-    mode switch: each finding is grouped by its ``vt`` when present and by its
-    ``reason`` otherwise, so a partly tagged principle still counts all of its
-    findings (including untagged criticals). ``using_taxonomy`` is reported
-    (any finding carries a ``vt``) for display only; it no longer changes which
-    findings are counted.
+    Each finding is grouped by its ``req`` requirement code, then by its
+    ``vt`` tag, then by its ``reason`` (see ``tally_types``), so a partly
+    tagged principle still counts all of its findings (including untagged
+    criticals). ``using_taxonomy`` is reported (any finding carries a ``vt``)
+    for display only; it does not change which findings are counted.
     """
     using_taxonomy = evidence_has_taxonomy(violations)
     vt_counts = tally_types(violations)
