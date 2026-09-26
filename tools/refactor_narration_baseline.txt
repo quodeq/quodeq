@@ -7,7 +7,7 @@ src/quodeq/_cli_resolution.py:3
 src/quodeq/_cli_resolution.py:36
 src/quodeq/_cli_resolution.py:41
 src/quodeq/_cli_scope.py:3
-src/quodeq/_cli_scoring.py:109
+src/quodeq/_cli_scoring.py:110
 src/quodeq/_cli_scoring.py:3
 src/quodeq/analysis/_api_batch.py:112
 src/quodeq/analysis/_api_response.py:3

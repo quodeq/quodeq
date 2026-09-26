@@ -1130,8 +1130,8 @@ tests/test_cli_env_injection.py:131:private-name:quodeq.cli_evaluation._resolve_
 tests/test_cli_env_injection.py:132:private-module:quodeq._cli_resolution.ResolvedInputs
 tests/test_cli_env_injection.py:14:private-module:quodeq._cli_env.cli_environ
 tests/test_cli_env_injection.py:76:private-module:quodeq._cli_run_config.resolve_limits
-tests/test_cli_evaluation_print.py:18:private-name:quodeq._cli_scoring._format_score_line
-tests/test_cli_evaluation_print.py:19:private-module:quodeq.analysis._report_io.write_dimension_report
+tests/test_cli_evaluation_print.py:19:private-name:quodeq._cli_scoring._format_score_line
+tests/test_cli_evaluation_print.py:20:private-module:quodeq.analysis._report_io.write_dimension_report
 tests/test_cli_evaluation_print_evidence_parse.py:18:private-module:quodeq.analysis._report_io.write_dimension_report
 tests/test_cli_evaluation_print_evidence_parse.py:52:private-module:quodeq._cli_scoring._scoring_mod
 tests/test_cli_run_config_flags.py:126:private-module:quodeq._cli_resolution.ResolvedInputs
