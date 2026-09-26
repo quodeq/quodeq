@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from tests.tools.test_no_planning_labels import REPO, iter_sources, js_prose, python_prose
 
@@ -45,6 +45,11 @@ def narration_in(text: str) -> list[str]:
     return [match.group(0) for match in NARRATION.finditer(text)]
 
 
+def site_key(path: PurePath, repo: PurePath, line: int) -> str:
+    """`path:line` with POSIX separators, so one baseline serves every OS."""
+    return f"{path.relative_to(repo).as_posix()}:{line}"
+
+
 def collect_sites() -> list[str]:
     """Return `path:line` for every narration phrase in scoped prose."""
     sites: list[str] = []
@@ -57,7 +62,7 @@ def collect_sites() -> list[str]:
         for lineno, text in extract(source):
             for match in NARRATION.finditer(text):
                 at = lineno + text[:match.start()].count("\n")
-                sites.append(f"{path.relative_to(REPO)}:{at}")
+                sites.append(site_key(path, REPO, at))
     return sites
 
 
