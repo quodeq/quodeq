@@ -73,5 +73,5 @@ class WindowsPty:
         if self._proc is not None:
             try:
                 self._proc.terminate(force=True)
-            except Exception:
+            except OSError:
                 _logger.warning("failed to terminate PTY process", exc_info=True)

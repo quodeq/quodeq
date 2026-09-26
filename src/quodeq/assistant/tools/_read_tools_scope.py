@@ -5,6 +5,7 @@ dismiss/verify drafts.
 from __future__ import annotations
 
 import logging
+import sqlite3
 import threading
 import time
 from pathlib import Path
@@ -141,7 +142,7 @@ def _sql_finding_keys(ctx: ToolContext, keys: set[tuple]) -> bool:
     try:
         for req, file, line in findings_repo(ctx, ctx.run_dir).list_keys():
             keys.add((str(req or ""), str(file or ""), coerce_line(line)))
-    except Exception:  # noqa: BLE001 - a corrupt db must not block the read
+    except (sqlite3.Error, OSError, ValueError):
         _logger.warning(
             "evaluation.db unreadable in %s; finding keys may be incomplete",
             ctx.run_dir, exc_info=True)

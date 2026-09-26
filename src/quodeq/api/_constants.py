@@ -32,6 +32,12 @@ CODE_INVALID_CLONE_DEST = "INVALID_CLONE_DEST"
 # routes_project_create's discipline field type check.
 CODE_INVALID_DISCIPLINE = "INVALID_DISCIPLINE"
 CODE_NOT_FOUND = "NOT_FOUND"
+# The app-wide fallback handler's code for an exception no route caught
+# (api/_error_handlers.py). Some narrowed route catches already answer this
+# same string as a bare literal for their own realistic failure types
+# (routes_runs.py, _scores_routes.py, routes_compare.py, _index_routes.py,
+# routes_shared_mirrors.py) -- both are "internal error, 500" to the client.
+CODE_INTERNAL_ERROR = "INTERNAL_ERROR"
 CODE_PROJECT_EXISTS = "PROJECT_EXISTS"  # 409 for a project already registered or imported
 CODE_GONE = "GONE"  # the run a job pointed at has no directory any more
 CODE_FORBIDDEN = "FORBIDDEN"

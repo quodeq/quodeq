@@ -86,6 +86,34 @@ def test_idempotent_does_not_rescore(tmp_path: Path):
     assert first_mtime == second_mtime
 
 
+def test_dimension_parse_failure_is_logged_at_warning_not_debug(tmp_path: Path, caplog):
+    """A parse/score failure inside the traced (OSError, JSONDecodeError,
+    ValueError, KeyError) surface for one dimension must be visible: it is
+    fail-soft (the other dimensions still score), but silent-at-debug hid a
+    real failure from anyone not already tailing debug logs."""
+    from quodeq.services.score_run import score_completed_evidence as _score_completed_evidence
+
+    reports, run = _seed_run(tmp_path)
+    _write_scan_json(reports, "proj")
+    _write_evidence_with_marker(run, "d1")
+    _write_queue(run, "d1")
+    write_dim_state(run, "d1", DimState.PENDING)
+    write_dim_state(run, "d1", DimState.RUNNING)
+    write_dim_state(run, "d1", DimState.DONE)
+
+    def _boom(*args, **kwargs):
+        raise ValueError("malformed evidence")
+
+    with caplog.at_level("WARNING", logger="quodeq.services.score_run"):
+        _score_completed_evidence(
+            str(reports), {"outputProject": "proj", "outputRunId": "run-1"},
+            parser=_boom,
+        )
+
+    assert not (run / "evaluation" / "d1.json").exists()
+    assert any("malformed evidence" in r.message for r in caplog.records)
+
+
 def test_cancelled_run_scoring_quarantines_off_standard_findings(tmp_path: Path, monkeypatch):
     """Scoring after cancellation must resolve the dimension's standard like a
     completed run does, so off-standard findings stay quarantined instead of

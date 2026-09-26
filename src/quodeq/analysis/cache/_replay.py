@@ -143,7 +143,7 @@ def emit_cached_findings(
         try:
             payload = wire_dict_to_judgment(finding)
             writer.emit(JudgmentCreatedEvent(payload=payload))
-        except Exception:  # noqa: BLE001 — event-log emit must never break a cache replay
+        except (OSError, TypeError, ValueError):
             _logger.warning(
                 "cache replay: event emit failed for finding p=%r file=%r line=%r",
                 finding.get("p"), finding.get("file"), finding.get("line"),

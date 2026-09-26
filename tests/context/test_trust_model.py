@@ -16,11 +16,7 @@ from quodeq.context.trust_model import (
     resolve_trust_model,
 )
 
-
-def _write_profile(root, payload):
-    path = root / PROFILE_RELPATH
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload), encoding="utf-8")
+from ._trust_model_helpers import _write_profile
 
 
 def _desktop_manifest(root):
@@ -208,8 +204,8 @@ def test_permission_denied_profile_degrades(tmp_path):
 
 def test_deeply_nested_profile_degrades(tmp_path):
     # Bracket nesting deep enough to overflow the C JSON decoder's recursion
-    # limit raises RecursionError, a RuntimeError subclass that the narrow
-    # (OSError, ValueError, UnicodeDecodeError) catch does not cover. This is
+    # limit raises RecursionError, which _read_profile's narrow
+    # (OSError, ValueError, RecursionError) catch covers explicitly. This is
     # advisory data with a conservative fallback, so it must degrade like any
     # other malformed profile, never escape and fail the scan.
     path = tmp_path / PROFILE_RELPATH
@@ -237,16 +233,19 @@ def test_boolean_version_is_rejected(tmp_path):
 def test_deeply_nested_package_json_degrades(tmp_path):
     # Same RecursionError overflow as the declared-side fix, but reached
     # through detection: detect_shape parses package.json via read_json,
-    # whose except json.JSONDecodeError does not catch RecursionError (a
-    # RuntimeError subclass). _detected_multi_tenant must degrade this too,
-    # not just the declared-profile path.
+    # whose narrow (ValueError, RecursionError) catch covers it directly at
+    # the io layer. _detected_multi_tenant no longer wraps detect_shape --
+    # the io-layer catch is what must degrade this, not the declared-profile
+    # path's own handler.
     (tmp_path / "package.json").write_text(
         "[" * 80000 + "]" * 80000, encoding="utf-8")
     assert resolve_trust_model(tmp_path) == CONSERVATIVE
 
 
 def test_deeply_nested_pyproject_toml_degrades(tmp_path):
-    # Same class of bug, via tomllib on the pyproject.toml detection path.
+    # Same class of overflow, via tomllib's own recursive-descent parser on
+    # the pyproject.toml detection path, caught by read_toml's narrow
+    # (OSError, ValueError, RecursionError).
     (tmp_path / "pyproject.toml").write_text(
         "a = " + "[" * 5000 + "]" * 5000, encoding="utf-8")
     assert resolve_trust_model(tmp_path) == CONSERVATIVE

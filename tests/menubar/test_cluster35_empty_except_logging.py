@@ -38,6 +38,8 @@ def test_kill_port_processes_logs_unsignalable_pid(monkeypatch) -> None:
 
 
 def test_write_state_logs_write_and_cleanup_failures(monkeypatch, tmp_path) -> None:
+    """The write failure itself is now a warning (visible); the secondary
+    temp-file cleanup failure stays at debug."""
     env = {"QUODEQ_DIR": str(tmp_path)}
     current = state.read_state(env)
 
@@ -49,11 +51,13 @@ def test_write_state_logs_write_and_cleanup_failures(monkeypatch, tmp_path) -> N
 
     monkeypatch.setattr(json_state.os, "replace", _replace_fails)
     monkeypatch.setattr(json_state.os, "unlink", _unlink_fails)
-    with patch.object(state._logger, "debug") as debug:
+    with patch.object(state._logger, "warning") as warning, \
+            patch.object(state._logger, "debug") as debug:
         state.write_state(current, env)  # must not raise
-    messages = [c.args[0] for c in debug.call_args_list]
-    assert any("state write failed" in m for m in messages)
-    assert any("not removed" in m for m in messages)
+    warning_messages = [c.args[0] for c in warning.call_args_list]
+    debug_messages = [c.args[0] for c in debug.call_args_list]
+    assert any("state write failed" in m for m in warning_messages)
+    assert any("not removed" in m for m in debug_messages)
 
 
 class _FakeSweepApp(_app_lifecycle.DashboardLifecycleMixin):

@@ -5,16 +5,10 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from quodeq.api._run_event_stream import (
-    WatcherState,
-    run_events_generator,
-    compute_tick,
-)
-from tests.api._run_event_stream_helpers import (
-    _write_dim_eval,
-    _write_finding_event,
-    _write_status,
-)
+import pytest
+
+from quodeq.api._run_event_stream import WatcherState, compute_tick, run_events_generator
+from tests.api._run_event_stream_helpers import _write_dim_eval, _write_finding_event, _write_status
 
 
 # --- compute_tick tests ---
@@ -90,15 +84,14 @@ def test_compute_tick_emits_findings_advances_counter(tmp_path: Path):
 
 
 def test_compute_tick_skips_findings_already_emitted(tmp_path: Path):
+    """First tick consumes both findings (same tick); a second tick sees
+    nothing new."""
     _write_status(tmp_path)
     _write_finding_event(tmp_path, "P1", line=1)
     _write_finding_event(tmp_path, "P2", line=2)
-    # First tick to consume first finding and record its timestamp
     state = WatcherState()
     _, state_after_first = compute_tick(tmp_path, state)
-    # Only P1 emitted — advance to just past P1's timestamp
-    assert state_after_first.last_event_counter == 2  # both are in the same tick
-    # Tick again: nothing new
+    assert state_after_first.last_event_counter == 2
     events, _ = compute_tick(tmp_path, state_after_first)
     finding_events = [e for e in events if e[0] == "finding"]
     assert finding_events == []
@@ -113,13 +106,13 @@ def test_compute_tick_handles_missing_events_jsonl(tmp_path: Path):
 
 
 def test_compute_tick_never_crashes_on_a_read_or_shaping_failure(tmp_path: Path, monkeypatch, caplog):
-    """Read and shaping failures both degrade to "no findings this tick"
-    instead of crashing compute_tick -- one guard covers both."""
+    """A malformed events.jsonl (OSError/ValueError/TypeError) degrades to
+    "no findings this tick" instead of crashing compute_tick."""
     _write_status(tmp_path)
     _write_finding_event(tmp_path, "P1", line=1)
 
     def _boom(*a, **k):
-        raise AttributeError("'NoneType' object has no attribute 'practice_id'")
+        raise ValueError("malformed events.jsonl payload")
     targets = ("quodeq.api._run_event_watcher.payload_as_sse_finding",
                "quodeq.api._run_event_watcher.read_new_findings_from_events")
     for target in targets:
@@ -135,6 +128,21 @@ def test_compute_tick_never_crashes_on_a_read_or_shaping_failure(tmp_path: Path,
         assert warnings[0].message.startswith(f"events.jsonl read failed for {tmp_path}: ")
 
 
+def test_compute_tick_propagates_a_shaping_error_outside_the_narrowed_tuple(tmp_path: Path, monkeypatch):
+    """An AttributeError is a real bug, not a malformed-file condition, so
+    it now escapes compute_tick instead of being swallowed as a warning."""
+    _write_status(tmp_path)
+    _write_finding_event(tmp_path, "P1", line=1)
+
+    def _boom(*a, **k):
+        raise AttributeError("'NoneType' object has no attribute 'practice_id'")
+
+    monkeypatch.setattr("quodeq.api._run_event_watcher.payload_as_sse_finding", _boom)
+    state = WatcherState()
+    with pytest.raises(AttributeError):
+        compute_tick(tmp_path, state)
+
+
 def test_compute_tick_handles_malformed_status_json(tmp_path: Path):
     (tmp_path / "status.json").write_text("not valid json {")
     state = WatcherState()
@@ -144,15 +152,8 @@ def test_compute_tick_handles_malformed_status_json(tmp_path: Path):
 
 
 def test_compute_tick_logs_exactly_once_on_corrupt_status_json(tmp_path: Path, caplog):
-    """Log parity with the pre-move inline reader: a corrupt status.json
-    produces exactly one WARNING total (across every logger, not just
-    api._run_event_watcher's own), with the "status.json read failed
-    at ...: ..." message -- not the two records a naive delegation to
-    wiring.read_status/read_run_status_json would produce (one logged
-    inside run_status_store, one logged again by this caller). Nothing
-    else in this minimal fixture (no evaluation dir, no events.jsonl) can
-    log, so any record beyond the one this reader emits is the regression
-    a fix-round review caught."""
+    """A corrupt status.json produces exactly one WARNING total (across
+    every logger), not one per delegated reader layer."""
     (tmp_path / "status.json").write_text("not valid json {")
     state = WatcherState()
     with caplog.at_level("WARNING"):
@@ -249,20 +250,14 @@ def test_run_events_generator_handles_already_terminal_run(tmp_path: Path):
     assert any("event: done" in f for f in non_keepalive)
 
 
-# Grade updates intentionally do NOT flow through SSE anymore -- see
-# WatcherState's docstring in _run_event_watcher.py. compute_tick only
-# emits lifecycle events (status, dimension-completed, finding, done) for
-# in-progress evals; routes_findings.py returns the rescored payload
-# synchronously on mutation instead.
-
-# Wire-characterization: exact SSE frame sequence, byte for byte -- pins
-# the frame text so moving readers between api/_run_event_watcher.py and
-# services/run_event_readers.py can't change what goes over the wire.
+# compute_tick only emits lifecycle events (status, dimension-completed,
+# finding, done); grade updates flow through routes_findings.py's mutation
+# response instead (see WatcherState's docstring in _run_event_watcher.py).
+# Wire-characterization below: exact SSE frame sequence, byte for byte.
 
 def test_finished_run_sse_sequence_is_byte_identical(tmp_path: Path):
-    """A run with one dimension, one finding, and a terminal status emits
-    exactly: status, dimension-completed, finding, done -- in that order,
-    with the exact SSE frame text (not just "some frame of this type")."""
+    """One dimension, one finding, a terminal status: exactly status,
+    dimension-completed, finding, done, with the exact SSE frame text."""
     _write_status(tmp_path, state="done")
     _write_dim_eval(tmp_path, "timeliness", score=90)
     _write_finding_event(tmp_path, p="P1", line=1)
@@ -293,8 +288,7 @@ def test_finished_run_sse_sequence_is_byte_identical(tmp_path: Path):
 
 def test_pending_run_emits_only_status_pending_when_status_json_absent(tmp_path: Path):
     """No status.json yet: exactly one status frame reporting `pending`,
-    nothing else -- the watcher's read-failure/absence defaults stay
-    byte-identical across the reader move."""
+    nothing else."""
     frames = list(run_events_generator(tmp_path, last_event_ts=None, tick_seconds=0.0))
     non_keepalive = [f for f in frames if not f.startswith(":")]
     assert non_keepalive == ['event: status\ndata: {"state":"pending"}\n\n']

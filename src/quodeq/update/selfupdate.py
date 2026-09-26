@@ -25,6 +25,7 @@ from urllib.parse import urlparse
 from quodeq.update.download import download_file as _download_file
 
 from quodeq.shared.constants import PLATFORM_DARWIN
+from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
 
@@ -46,7 +47,6 @@ _TEST_JOIN_TIMEOUT_S = 5  # _join_for_tests' cap on waiting for the update threa
 _lock = threading.Lock()
 _progress: dict = {"phase": "idle", "percent": 0, "error": None}
 _thread: threading.Thread | None = None
-_shutdown_callback = None
 
 # Test seam: when set, used as the hdiutil mountpoint instead of a temp dir.
 _mountpoint_for_tests: Path | None = None
@@ -54,12 +54,6 @@ _mountpoint_for_tests: Path | None = None
 
 class UpdateError(Exception):
     """A self-update failure with a message safe to show in the UI."""
-
-
-def set_shutdown_callback(callback) -> None:
-    """Install the app's graceful-quit function, used after a successful swap."""
-    global _shutdown_callback
-    _shutdown_callback = callback
 
 
 def _set(**fields) -> None:
@@ -158,13 +152,6 @@ def _check(argv: list[str], message: str) -> None:
 
 
 def _request_app_exit() -> None:
-    callback = _shutdown_callback
-    if callback is not None:
-        try:
-            callback()
-            return
-        except Exception:  # noqa: BLE001 - shutdown callback is best-effort
-            _logger.debug("shutdown callback failed", exc_info=True)
     # Give the HTTP response that reported "relaunching" time to flush.
     threading.Timer(_EXIT_DELAY_S, lambda: os._exit(0)).start()
 
@@ -193,6 +180,18 @@ def _verify_mounted_app(mnt: Path, app_name: str, team: str, target_version: str
 
 
 def _run_update(download_url: str, target_version: str, install_app: Path, team: str) -> None:
+    """Thread target: isolate _do_run_update so a bug there can't crash the
+    daemon thread silently. UpdateError is already handled (and logged)
+    inside _do_run_update; this boundary only catches what escapes that."""
+    run_isolated(
+        lambda: _do_run_update(download_url, target_version, install_app, team),
+        label="self-update",
+        log=_logger,
+        on_error=lambda _exc: _set(phase="error", error="Automatic update failed"),
+    )
+
+
+def _do_run_update(download_url: str, target_version: str, install_app: Path, team: str) -> None:
     tmp = Path(tempfile.mkdtemp(prefix="quodeq-selfupdate-"))
     mnt = _mountpoint_for_tests or (tmp / "mnt")
     mounted = False
@@ -229,9 +228,6 @@ def _run_update(download_url: str, target_version: str, install_app: Path, team:
     except UpdateError as exc:
         _logger.warning("self-update failed: %s", exc)
         _set(phase="error", error=str(exc))
-    except Exception:
-        _logger.warning("self-update failed", exc_info=True)
-        _set(phase="error", error="Automatic update failed")
     finally:
         if mounted:
             subprocess.run([_HDIUTIL, "detach", str(mnt)], capture_output=True, text=True, encoding="utf-8")
@@ -273,8 +269,8 @@ def cleanup_stale_staging(install_app: Path | None = None) -> None:
             app.parent / f".{app.name}.new"
         ]:
             shutil.rmtree(leftover, ignore_errors=True)
-    except Exception:
-        _logger.debug("stale staging cleanup failed", exc_info=True)
+    except OSError as exc:
+        _logger.warning("stale staging cleanup failed: %s", exc, exc_info=True)
 
 
 def _reset_for_tests() -> None:

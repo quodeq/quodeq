@@ -21,7 +21,10 @@ test('lookup is case-insensitive, because the backend emits both conventions', (
 test('unmapped and malformed codes resolve to null', () => {
   // NOT_FOUND is deliberately unmapped: it covers seven distinct backend
   // messages, so mapping it would replace a specific sentence with a vague one.
-  for (const code of ['NOT_FOUND', 'INVALID_INPUT', 'INTERNAL_ERROR', 'WAT', '', null, undefined, 42]) {
+  // INTERNAL_ERROR is the same story: it is the app-wide fallback for any
+  // unhandled exception (api/_error_handlers.py), so the backend's own
+  // sentence is what should reach the user, not one generic translated line.
+  for (const code of ['NOT_FOUND', 'INTERNAL_ERROR', 'INVALID_INPUT', 'WAT', '', null, undefined, 42]) {
     assert.equal(apiErrorKey(code), null, `${String(code)} should not be mapped`);
   }
 });

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import time
 from pathlib import Path
 
@@ -28,7 +29,7 @@ class CountingRepo:
     def list_keys(self) -> list[tuple]:
         self.reads += 1
         if self.fail:
-            raise RuntimeError("database disk image is malformed")
+            raise sqlite3.OperationalError("database disk image is malformed")
         return list(self.keys)
 
 

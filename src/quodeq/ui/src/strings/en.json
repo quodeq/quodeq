@@ -25,7 +25,6 @@
   "apiError.publishInProgress": "A publish is already running. Wait for it to finish.",
   "apiError.publishStartFailed": "Couldn't start the publish. Check the server logs.",
   "apiError.rateLimited": "Too many requests. Wait a moment and try again.",
-  "apiError.registrationFailed": "The project could not be registered. Check the path and try again.",
   "apiError.scoresReadFailed": "Couldn't load the scores for this run.",
   "apiError.sharedRepoCloneFailed": "Couldn't clone the shared repository. Check that git can reach it.",
   "apiError.sharedRepoRefreshFailed": "Couldn't refresh the shared repository.",

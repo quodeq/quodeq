@@ -138,7 +138,9 @@ def iter_stream_lines(path: Path, *, missing_ok: bool = True) -> Iterator[str]:
 
 
 def decode_jsonl_objects(
-    lines: Iterable[str], *, on_malformed_line: Callable[[str], None] | None = None,
+    lines: Iterable[str], *,
+    on_malformed_line: Callable[[str], None] | None = None,
+    on_non_object: Callable[[str], None] | None = None,
 ) -> Iterator[dict]:
     """Decode JSONL text *lines* into JSON objects.
 
@@ -146,7 +148,7 @@ def decode_jsonl_objects(
     when *on_malformed_line* is given, it is called with the raw (stripped)
     line, letting a caller log the skip without this module owning a logging
     policy. A line that parses to a non-object JSON value (list/str/number/
-    null) is silently skipped too.
+    null) is skipped too; *on_non_object*, when given, is called with it.
     """
     for raw_line in lines:
         raw = raw_line.strip()
@@ -160,6 +162,8 @@ def decode_jsonl_objects(
             continue
         if isinstance(obj, dict):
             yield obj
+        elif on_non_object is not None:
+            on_non_object(raw)
 
 
 def count_jsonl_lines(jsonl_file: Path) -> int:

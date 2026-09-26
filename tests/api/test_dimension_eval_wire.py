@@ -1,7 +1,7 @@
 """Route-level exact-equality characterization: GET .../dimensions/<dim>/eval.
 
 The dimension-eval wire shaping (``to_camel_dict``, the waiting/202 body)
-moved from ``services/fs_reports.py`` to the routes, so this pins the exact
+lives in the routes, not in ``services/fs_reports.py``. This pins the exact
 JSON body and status code for ``get_dimension_eval``'s four return shapes --
 a JSONL partial with progress, a markdown dimension, a stored JSON eval, and
 a pending dimension -- on both the local project route and its

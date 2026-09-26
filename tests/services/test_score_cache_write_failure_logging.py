@@ -103,6 +103,23 @@ def test_cached_accumulated_logs_on_write_failure(monkeypatch, tmp_path):
     assert any("write_cached_accumulated" in msg for msg in log.warnings)
 
 
+def test_cached_accumulated_stale_scope_peek_logs_on_read_failure(monkeypatch, tmp_path):
+    """_peek (the stale-while-revalidate exact-version check) used to swallow
+    a SQLite error with no log at all; a persistently broken cache on this
+    path degraded to full recompute with zero visibility."""
+    monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
+    monkeypatch.setattr(_score_cache_fetch, "read_cached_accumulated", _boom)
+
+    log = _FakeLog()
+    computed = {"score": 4.0}
+    result = _score_cache_fetch.cached_accumulated(
+        "proj", "v1", lambda: computed, stale_scope="s", log=log,
+    )
+
+    assert result is computed
+    assert any("score-cache peek failed" in msg for msg in log.warnings)
+
+
 def test_cached_project_summary_logs_on_write_failure(monkeypatch, tmp_path):
     monkeypatch.setenv("QUODEQ_SCORE_CACHE_PATH", str(tmp_path / "sc.db"))
     monkeypatch.setattr(_score_cache_fetch, "write_cached_project_summary", _boom)

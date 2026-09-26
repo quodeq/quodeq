@@ -1,12 +1,10 @@
 """Process-lived memo of resumable per-file findings tallies.
 
-Split out of ``_scan_progress_dims.py`` to keep that module under the size
-ratchet's 300-line cap. ``LiveTallyMemo`` wraps the bounded
-``(evidence file, suppression state) -> _GuardedTally`` mapping that used to
-be the bare module globals ``_LIVE_TALLIES``/``_LIVE_TALLIES_LOCK`` there; see
-``_scan_progress_dims.live_tally`` for why the memo exists at all (a live
-progress poll resumes an ``IncrementalTally`` instead of re-parsing an
-evidence file from byte 0 on every tick).
+``LiveTallyMemo`` wraps the bounded
+``(evidence file, suppression state) -> _GuardedTally`` mapping used by
+``_scan_progress_dims.py``; see ``_scan_progress_dims.live_tally`` for why
+the memo exists at all (a live progress poll resumes an ``IncrementalTally``
+instead of re-parsing an evidence file from byte 0 on every tick).
 """
 from __future__ import annotations
 

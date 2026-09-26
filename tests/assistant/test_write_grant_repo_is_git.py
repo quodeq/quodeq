@@ -1,4 +1,4 @@
-"""``_attached_git_repo`` reads ``ToolContext.repo_is_git`` (row 9198).
+"""``attached_git_repo`` reads ``ToolContext.repo_is_git`` (row 9198).
 
 The turn orchestrator used to probe the filesystem itself
 (``(tool_ctx.repo_root / ".git").exists()``) -- an io-in-orchestration
@@ -26,7 +26,7 @@ def _ctx(tmp_path, **overrides) -> ToolContext:
 
 
 def test_defaults_to_false_with_no_repo_root(tmp_path):
-    assert orchestrator._attached_git_repo(_ctx(tmp_path)) is False
+    assert orchestrator.attached_git_repo(_ctx(tmp_path)) is False
 
 
 def test_true_when_field_is_set_even_without_a_real_git_dir(tmp_path):
@@ -35,7 +35,7 @@ def test_true_when_field_is_set_even_without_a_real_git_dir(tmp_path):
     repo_root = tmp_path / "repo-no-git-dir"
     repo_root.mkdir()
     ctx = _ctx(tmp_path, repo_root=repo_root, repo_is_git=True)
-    assert orchestrator._attached_git_repo(ctx) is True
+    assert orchestrator.attached_git_repo(ctx) is True
 
 
 def test_false_when_field_is_unset_even_with_a_real_git_dir_on_disk(tmp_path):
@@ -46,4 +46,4 @@ def test_false_when_field_is_unset_even_with_a_real_git_dir_on_disk(tmp_path):
     repo_root.mkdir()
     (repo_root / ".git").mkdir()
     ctx = _ctx(tmp_path, repo_root=repo_root, repo_is_git=False)
-    assert orchestrator._attached_git_repo(ctx) is False
+    assert orchestrator.attached_git_repo(ctx) is False

@@ -30,6 +30,7 @@ from quodeq.analysis.cache._key_provenance import hash_prompts_combined
 from quodeq.analysis.cache.backend import CacheBackend
 from quodeq.analysis.cache.dimension_helpers import persist_dispatch_results
 from quodeq.analysis.fingerprint import hash_standards, dimension_params_state
+from quodeq.shared.fault_isolation import Warns, run_isolated
 
 # How often the watcher thread persists in-flight cache entries during
 # dispatch. Smaller = less work lost on cancel; larger = less I/O during
@@ -133,21 +134,17 @@ def resolve_failure_streak_threshold(opts: AnalysisOptions) -> int:
 
 def periodic_persist(
     stop_event: threading.Event, persist_fn: Callable[[], None],
-    interval: float, log_warning: Callable[..., None],
+    interval: float, log: Warns,
 ) -> None:
-    """Background thread: call persist_fn() until stop_event is set.
+    """Background thread: call persist_fn() each tick until stop_event is
+    set, then once more for the final persist (persist_fn sees the event
+    set and re-reads the JSONL in full).
 
-    Each tick is best-effort -- exceptions never propagate to the caller
-    and never kill the watcher. Final persist happens on stop signal;
-    persist_fn sees the event set and re-reads the JSONL in full.
+    Each call is the thread's fault-isolation boundary: a failure logs
+    with the traceback and never kills the watcher or the dispatch.
     """
-    while not stop_event.wait(timeout=interval):
-        try:
-            persist_fn()
-        except Exception as exc:  # noqa: BLE001 — never kill the dispatch
-            log_warning("incremental cache persist failed: %s", exc)
-    # Final persist after stop signaled (e.g. dispatch finished or raised).
-    try:
-        persist_fn()
-    except Exception as exc:  # noqa: BLE001
-        log_warning("final cache persist failed: %s", exc)
+    while True:
+        stopped = stop_event.wait(timeout=interval)
+        run_isolated(persist_fn, label="cache persist", log=log)
+        if stopped:
+            return

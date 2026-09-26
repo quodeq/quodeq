@@ -16,6 +16,7 @@ from quodeq.config.paths import default_paths
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.data.cache_store.local import default_cache_root
 from quodeq.data.cache_store.migrate import ensure_cache_ready
+from quodeq.shared.fault_isolation import run_isolated
 
 
 def _default_standards_dir() -> Path | None:
@@ -35,10 +36,7 @@ def start_cache_maintenance(
     std = standards_dir if standards_dir is not None else _default_standards_dir()
 
     def _run() -> None:
-        try:
-            ensure_cache_ready(target_root, standards_dir=std)
-        except Exception as exc:  # noqa: BLE001 - never propagate out of a daemon thread
-            log.warning(f"cache maintenance failed: {exc!r}")
+        run_isolated(lambda: ensure_cache_ready(target_root, standards_dir=std), label="cache maintenance", log=log)
 
     thread = threading.Thread(target=_run, name="cache-maintenance", daemon=True)
     thread.start()

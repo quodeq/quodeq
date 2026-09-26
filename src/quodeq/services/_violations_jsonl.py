@@ -90,7 +90,12 @@ def _parse_jsonl_findings(
     def _warn_malformed(raw: str) -> None:
         _logger.warning("Skipping malformed JSONL line in findings file: %s", raw[:200])
 
-    for obj in decode_jsonl_objects(lines, on_malformed_line=_warn_malformed):
+    def _warn_non_object(raw: str) -> None:
+        _logger.warning("Skipping non-object JSONL row in findings file: %s", raw[:200])
+
+    for obj in decode_jsonl_objects(
+        lines, on_malformed_line=_warn_malformed, on_non_object=_warn_non_object,
+    ):
         resolved_obj = _resolve_and_dedupe(obj, matcher, resolver, seen)
         if resolved_obj is None:
             continue

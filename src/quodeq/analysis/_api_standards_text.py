@@ -178,8 +178,8 @@ def load_standards_text(
     if md_path.exists():
         try:
             return _truncate(md_path.read_text(encoding="utf-8"), limit)
-        except OSError as exc:
-            _log.debug("standards text file unreadable: %s", exc)
+        except (OSError, UnicodeDecodeError) as exc:
+            _log.warning("standards text file unreadable: %s", exc)
     return ""
 
 

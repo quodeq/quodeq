@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import plistlib
 import shutil
 from pathlib import Path
@@ -200,6 +201,37 @@ def test_version_mismatch_errors(tmp_path: Path) -> None:
     assert selfupdate.describe(DMG_URL)["phase"] == "error"
 
 
+def test_unexpected_error_sets_the_generic_error_and_thread_ends_cleanly(tmp_path: Path) -> None:
+    """R-FT-7 -- _run_update is now a run_isolated boundary around
+    _do_run_update: a bug that isn't an UpdateError (e.g. a download-layer
+    crash) still lands on phase='error' with the generic message, and the
+    daemon thread ends instead of dying with an unhandled exception."""
+    install_app = _make_bundle(tmp_path / "Applications", version="1.10.1")
+
+    def _boom(_url: str, _target: Path, _progress) -> None:
+        raise RuntimeError("boom")
+
+    with patch("quodeq.update.selfupdate._download_file", _boom):
+        started = selfupdate.start(
+            DMG_URL, "1.11.0", install_app=install_app, team_id="ABCDE12345",
+        )
+        assert started is True
+        selfupdate._join_for_tests()
+
+    status = selfupdate.describe(DMG_URL)
+    assert status["phase"] == "error"
+    assert status["error"] == "Automatic update failed"
+    # Version untouched: the crash happened before any bundle swap.
+    version = plistlib.loads((install_app / "Contents" / "Info.plist").read_bytes())
+    assert version["CFBundleShortVersionString"] == "1.10.1"
+
+
+def test_set_shutdown_callback_hook_is_gone() -> None:
+    """R-FT-7 -- set_shutdown_callback had no caller in src or tests, so
+    _request_app_exit always used the timer path; the dead hook is removed."""
+    assert not hasattr(selfupdate, "set_shutdown_callback")
+
+
 def test_second_start_while_running_is_rejected(tmp_path: Path) -> None:
     install_app = _make_bundle(tmp_path / "Applications")
     with selfupdate._lock:
@@ -218,3 +250,23 @@ def test_cleanup_stale_staging(tmp_path: Path) -> None:
     assert not (parent / ".Quodeq.app.new").exists()
     assert (parent / "Other.app").exists()
     assert install_app.exists()
+
+
+def test_cleanup_stale_staging_logs_a_warning_on_an_os_error(tmp_path: Path, caplog) -> None:
+    """R-FT-7 -- narrowed from bare Exception/debug to OSError/warning. The
+    leftover scan (glob over the install dir) is where a realistic OSError
+    (e.g. a permission failure) comes from."""
+    install_app = _make_bundle(tmp_path / "Applications")
+    with patch.object(Path, "glob", side_effect=OSError("permission denied")), \
+         caplog.at_level(logging.WARNING, logger="quodeq.update.selfupdate"):
+        selfupdate.cleanup_stale_staging(install_app)  # must not raise
+    assert "stale staging cleanup failed" in caplog.text
+
+
+def test_cleanup_stale_staging_propagates_an_out_of_scope_error(tmp_path: Path) -> None:
+    """R-FT-7 -- an error outside OSError (e.g. a programming bug) must now
+    propagate instead of being swallowed."""
+    install_app = _make_bundle(tmp_path / "Applications")
+    with patch.object(Path, "glob", side_effect=RuntimeError("boom")):
+        with pytest.raises(RuntimeError, match="boom"):
+            selfupdate.cleanup_stale_staging(install_app)

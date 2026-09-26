@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
+import pytest
+
+import quodeq.data.actions_log as actions_log_mod
 from quodeq.core.events.models import FindingDismissed, FindingDismissedEvent
 from quodeq.data.actions_log import ActionLogWriter, read_action_events
-from quodeq.data.migrations.dismissed_json_to_actions_log import migrate_if_needed
+from quodeq.data.migrations.dismissed_json_to_actions_log import (
+    MIGRATION_MARKER,
+    migrate_if_needed,
+)
+
+_LOGGER_NAME = "quodeq.data.migrations.dismissed_json_to_actions_log"
 
 
 def _write_dismissed_json(project_dir: Path, entries: list[dict]) -> None:
@@ -82,6 +91,73 @@ def test_migration_preserves_dismissed_json_as_fallback(tmp_path: Path) -> None:
 
     # JSON file is intentionally left in place for one release.
     assert (project_dir / "dismissed.json").exists()
+
+
+def test_non_dict_entry_is_skipped_with_warning(tmp_path: Path, caplog) -> None:
+    """A non-dict entry (a shape bug in the legacy file) must not crash the
+    fold: it is logged and skipped, and the well-formed entries still land."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    _write_dismissed_json(project_dir, ["not-a-dict", {"req": "R1", "file": "a.py", "line": 10}])
+
+    with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        migrated = migrate_if_needed(project_dir)
+
+    assert migrated == 1
+    assert {e.payload.req for e in read_action_events(project_dir)} == {"R1"}
+    assert any("non-dict" in r.message for r in caplog.records)
+
+
+def test_entry_with_unconvertible_line_is_skipped_with_warning(tmp_path: Path, caplog) -> None:
+    """A malformed value (line that doesn't convert to int) is a TypeError/
+    ValueError from the conversion step, not a shape problem: logged and
+    skipped like the non-dict case, the rest of the fold still runs."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    _write_dismissed_json(project_dir, [
+        {"req": "R1", "file": "a.py", "line": "not-a-number"},
+        {"req": "R2", "file": "b.py", "line": 20},
+    ])
+
+    with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        migrated = migrate_if_needed(project_dir)
+
+    assert migrated == 1
+    assert {e.payload.req for e in read_action_events(project_dir)} == {"R2"}
+    assert any("Failed to migrate" in r.message for r in caplog.records)
+
+
+def test_emit_failure_leaves_marker_absent_and_a_retry_migrates(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """An OSError from writer.emit (a genuine write failure) is not caught
+    by the per-entry conversion guard: it must propagate so the done marker
+    is never written, and the next call retries the whole fold."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    _write_dismissed_json(project_dir, [{"req": "R1", "file": "a.py", "line": 10}])
+
+    real_emit = actions_log_mod.ActionLogWriter.emit
+    calls = {"n": 0}
+
+    def flaky_emit(self, event):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("disk full")
+        return real_emit(self, event)
+
+    monkeypatch.setattr(actions_log_mod.ActionLogWriter, "emit", flaky_emit)
+
+    with pytest.raises(OSError, match="disk full"):
+        migrate_if_needed(project_dir)
+
+    assert not (project_dir / MIGRATION_MARKER).exists()
+
+    migrated = migrate_if_needed(project_dir)
+
+    assert migrated == 1
+    assert (project_dir / MIGRATION_MARKER).exists()
+    assert {e.payload.req for e in read_action_events(project_dir)} == {"R1"}
 
 
 def test_injected_locks_are_used_and_resettable(tmp_path: Path) -> None:

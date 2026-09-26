@@ -99,7 +99,7 @@ def fetch_latest(
         if not isinstance(release, dict):
             return None
         new_etag = gh.headers.get("ETag")
-    except (httpx.HTTPError, ValueError):
+    except (httpx.HTTPError, httpx.InvalidURL, ValueError):
         return None
 
     version = normalize(str(release.get("tag_name") or "")) or None
@@ -121,6 +121,6 @@ def fetch_latest(
                 pypi_version = normalize(str(pypi_data.get("info", {}).get("version") or ""))
                 if pypi_version:
                     info.version = pypi_version
-        except (httpx.HTTPError, ValueError) as exc:
+        except (httpx.HTTPError, httpx.InvalidURL, ValueError) as exc:
             _logger.debug("PyPI version lookup failed, keeping the GitHub tag: %s", exc)
     return info

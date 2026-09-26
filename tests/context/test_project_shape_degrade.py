@@ -1,4 +1,5 @@
 """detect_shape never raises: pathological manifests degrade, absent ones stay quiet."""
+import json
 import logging
 from pathlib import Path
 
@@ -52,6 +53,20 @@ class TestPathologicalManifestsDegrade:
         _write(tmp_path / "pyproject.toml", '[project]\nname = "x"\ndependencies = 5\n')
         assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
 
+    def test_non_utf8_package_json_degrades(self, tmp_path: Path) -> None:
+        """read_text (called through read_json) narrows to
+        (OSError, UnicodeDecodeError): invalid UTF-8 bytes must degrade the
+        signal, not crash the scan."""
+        (tmp_path / "package.json").write_bytes(b'{"name": "\xff\xfe bad utf8"}')
+        assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
+
+    def test_non_utf8_pyproject_toml_degrades(self, tmp_path: Path) -> None:
+        """read_toml narrows to (OSError, ValueError, RecursionError):
+        tomllib.load raises UnicodeDecodeError (a ValueError subclass) on
+        non-UTF-8 bytes, which must degrade the signal, not crash the scan."""
+        (tmp_path / "pyproject.toml").write_bytes(b'[project]\nname = "\xff\xfe"\n')
+        assert detect_shape(tmp_path).deployment is Deployment.UNKNOWN
+
     def test_a_readable_manifest_still_detects_after_a_broken_sibling(
         self, tmp_path: Path, deeply_nested_json: str,
     ) -> None:
@@ -69,6 +84,61 @@ class TestPathologicalManifestsDegrade:
         shape = detect_shape(tmp_path)
         assert shape.deployment is Deployment.WEB_SERVICE
         assert shape.web_frameworks == ["flask"]
+
+
+class TestUnnamedReaderErrorsPropagate:
+    """Each _project_shape_io reader narrows to a specific tuple; anything
+    outside it is a real bug, not a malformed-manifest signal, and must
+    propagate rather than degrade. detect_shape's own except narrows to
+    (OSError, TypeError) (project_shape.py), so an exception belonging to
+    neither a reader's tuple nor that one reaches the caller untouched --
+    proof the reader itself doesn't swallow it."""
+
+    def test_read_text_unnamed_error_propagates(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """read_text narrows to (OSError, UnicodeDecodeError); reached here
+        through go_signals' main.go read, the only read_text call site not
+        also covered by read_json."""
+        (tmp_path / "go.mod").write_text("module example.com/tool\n\ngo 1.21\n", encoding="utf-8")
+        (tmp_path / "main.go").write_text("package main\n\nfunc main() {}\n", encoding="utf-8")
+
+        def _boom(*_a: object, **_kw: object) -> None:
+            raise LookupError("unexpected")
+
+        monkeypatch.setattr(Path, "read_text", _boom)
+        with pytest.raises(LookupError):
+            detect_shape(tmp_path)
+
+    def test_read_toml_unnamed_error_propagates(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """read_toml narrows to (OSError, ValueError, RecursionError),
+        reached through python_signals' pyproject.toml read (the first
+        manifest detect_shape probes)."""
+        (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\n', encoding="utf-8")
+
+        def _boom(*_a: object, **_kw: object) -> None:
+            raise LookupError("unexpected")
+
+        monkeypatch.setattr(Path, "open", _boom)
+        with pytest.raises(LookupError):
+            detect_shape(tmp_path)
+
+    def test_read_json_unnamed_error_propagates(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """read_json narrows to (ValueError, RecursionError). The read
+        itself must succeed (a real, valid package.json) so the failure is
+        isolated to json.loads, not to read_text underneath it."""
+        (tmp_path / "package.json").write_text('{"dependencies": {}}', encoding="utf-8")
+
+        def _boom(*_a: object, **_kw: object) -> None:
+            raise LookupError("unexpected")
+
+        monkeypatch.setattr(json, "loads", _boom)
+        with pytest.raises(LookupError):
+            detect_shape(tmp_path)
 
 
 class TestAbsentManifestsAreNotWarnings:

@@ -59,7 +59,6 @@ class CreateProjectStatus(StrEnum):
     DUPLICATE = "duplicate"
     INVALID_REPO = "invalid_repo"
     CLONE_FAILED = "clone_failed"
-    INTERNAL_ERROR = "internal_error"
 
 
 @dataclass(frozen=True)

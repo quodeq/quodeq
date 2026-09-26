@@ -29,13 +29,13 @@ from __future__ import annotations
 import enum
 import threading
 import time
-import traceback
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services import grade_formula
+from quodeq.shared.fault_isolation import run_isolated
 
 WORKER_THREAD_NAME = "grade-formula-rescore"
 # stop() waits this long for the worker. A pass checks for stop between runs,
@@ -184,22 +184,19 @@ class GradeFormulaRescorer:
                 self._pending = False
                 generation, root = self._generation, self._reports_root
                 self._done = self._total = 0
-            self._run_pass(generation, root)
+            run_isolated(
+                lambda g=generation, r=root: self._run_pass(g, r),
+                label=f"grade-formula rescore pass {generation}", log=self._log,
+                on_error=lambda _exc: self._finish(RescoreState.ERROR),
+            )
 
     def _run_pass(self, generation: int, root: Path) -> None:
         apply = self._apply_fn or grade_formula.apply_to_all_runs
         started = time.monotonic()
-        try:
-            result = apply(
-                root, progress=self._on_progress,
-                should_abort=lambda: self._superseded(generation),
-            )
-        except Exception as exc:  # noqa: BLE001 -- a failed pass must not kill the worker; it is reported as state=error
-            self._log.warning(
-                f"Grade-formula rescore pass {generation} failed: {exc}\n{traceback.format_exc()}"
-            )
-            self._finish(RescoreState.ERROR)
-            return
+        result = apply(
+            root, progress=self._on_progress,
+            should_abort=lambda: self._superseded(generation),
+        )
         if result.aborted:
             self._finish(RescoreState.IDLE)
             return

@@ -4,28 +4,34 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from contextlib import nullcontext
-from dataclasses import dataclass, replace
-from pathlib import Path
+from dataclasses import dataclass
 
-from quodeq.assistant import get_provider_configs
 from quodeq.assistant._context import build_system_prompt, build_turn_message
+from quodeq.assistant._turn_grants import (  # noqa: F401 — re-export
+    ISOLATED_MCP_STYLES,
+    TurnGrants,
+    attached_git_repo,
+    mcp_server_args,
+    provider_type,
+    resolve_write_grant,
+    write_available,
+    write_safe_provider,
+)
 from quodeq.assistant.adapters.api import ApiTurnConfig, ApiTurnSession, run_api_turn
 from quodeq.assistant.adapters.capabilities import supports_native_tools
 from quodeq.assistant.adapters.cli import CliTurnConfig, CliTurnSession, run_cli_turn
-from quodeq.assistant.adapters.cli_config import load_cli_chat_config
 from quodeq.assistant.cancel import CancelToken, TurnCancelled
 from quodeq.assistant.frame_type import FrameType
-from quodeq.core.constants import MCP_STYLE_CONFIG_ARG, MCP_STYLE_CONFIG_FILE
 from quodeq.config.provider import ProviderType
 from quodeq.assistant.guard import MAX_TOOL_ITERATIONS, SKILL_MAX_TOOL_ITERATIONS, WRITE_MAX_TOOL_ITERATIONS
 from quodeq.assistant.message_role import MessageRole
 from quodeq.assistant.skills import cached_skills
 from quodeq.assistant.tools import ToolContext, build_registry, register_web_tools
 from quodeq.assistant.tools.write_tools import register_write_tools
-from quodeq.assistant.worktree import ensure_session_worktree
 from quodeq.data.ports.assistant import AssistantStore
 from quodeq.llm_bridge import LOCAL_PROVIDERS
 from quodeq.services.score_cache import score_cache_path_override
+from quodeq.shared.fault_isolation import run_isolated
 
 _logger = logging.getLogger(__name__)
 
@@ -68,104 +74,11 @@ class _EngineDeps:
     cli_turn_fn: Callable
 
 
-@dataclass(frozen=True)
-class _TurnGrants:
-    web_tools_on: bool
-    write_on: bool
-    tool_ctx: ToolContext
-
-
 def _split_skill(text: str):
     if not text.startswith("/"):
         return None, text
     name, _, rest = text[1:].partition(" ")
     return name, rest.strip()
-
-
-def _provider_type(provider: str) -> str:
-    return get_provider_configs().get(provider, {}).get("type", ProviderType.CLI)
-
-
-# MCP config styles scoped to a single invocation: a per-turn temp config file
-# (claude) or an inline config override (codex). "cli-register" is NOT here:
-# it mutates a global settings file, so concurrent sessions could interleave
-# and a no-grant turn would spawn its MCP server against a grant turn's
-# registration, leaking write tools jailed to another session's worktree.
-_ISOLATED_MCP_STYLES = frozenset({MCP_STYLE_CONFIG_FILE, MCP_STYLE_CONFIG_ARG})
-
-
-def write_safe_provider(provider: str) -> bool:
-    """Whether the write grant may activate for this provider. API providers
-    register tools in-process (no MCP config involved); CLI providers qualify
-    only when their MCP config is per-invocation isolated."""
-    if _provider_type(provider) != ProviderType.CLI:
-        return True
-    try:
-        return load_cli_chat_config(provider).mcp_style in _ISOLATED_MCP_STYLES
-    except KeyError:
-        return False
-
-
-def _mcp_server_args(request: TurnRequest, tool_ctx: ToolContext) -> list[str]:
-    args = [
-        "--db-path", str(tool_ctx.repository.db_path),
-        "--session-id", request.session_id,
-        "--evaluators-dir", str(tool_ctx.evaluators_dir),
-        "--compiled-dir", str(tool_ctx.compiled_dir),
-        "--dimensions-file", str(tool_ctx.dimensions_file),
-    ]
-    if tool_ctx.run_dir is not None:
-        args += ["--run-dir", str(tool_ctx.run_dir)]
-    if tool_ctx.repo_root is not None:
-        args += ["--repo-root", str(tool_ctx.repo_root)]
-    if tool_ctx.project_id is not None:
-        args += ["--project-id", str(tool_ctx.project_id)]
-    if tool_ctx.reports_dir is not None:
-        args += ["--reports-dir", str(tool_ctx.reports_dir)]
-    if tool_ctx.worktree_dir is not None:
-        args += ["--enable-write", "--worktree-dir", str(tool_ctx.worktree_dir)]
-    if tool_ctx.read_only:
-        args += ["--read-only"]
-    if tool_ctx.score_cache_path is not None:
-        args += ["--score-cache-override", str(tool_ctx.score_cache_path)]
-    return args
-
-
-def _attached_git_repo(tool_ctx: ToolContext) -> bool:
-    """True when the session has a local git checkout, resolved by the composition root."""
-    return tool_ctx.repo_is_git
-
-
-def _write_is_grantable(request: TurnRequest, tool_ctx: ToolContext) -> bool:
-    """True when every server-side condition for write access holds: not
-    read-only, a local git repo attached, and a write-safe provider (the
-    client's write_enabled flag alone is never sufficient)."""
-    return bool(request.write_enabled and not tool_ctx.read_only
-                and _attached_git_repo(tool_ctx) and write_safe_provider(request.provider))
-
-
-def write_available(repo_root: str | None, provider: str, read_only: bool) -> bool:
-    """Whether the write-tool grant could ever activate for a new session:
-    not read-only, a local git repo attached, write-safe provider."""
-    return bool(not read_only and repo_root and (Path(repo_root) / ".git").exists()
-                and write_safe_provider(provider))
-
-
-def _resolve_write_grant(request: TurnRequest, repository: AssistantStore,
-                          tool_ctx: ToolContext, web_tools_on: bool) -> _TurnGrants:
-    """Server-derived write grant, mirror of web_tools_on: the client flag
-    alone is never enough. Requires an attached LOCAL git repo and a
-    provider whose tool wiring is per-invocation isolated. When granted,
-    ensures the session worktree exists and points tool_ctx at it. Returns
-    a _TurnGrants bundling that tool_ctx, write_on, and the caller-supplied
-    web_tools_on."""
-    write_on = _write_is_grantable(request, tool_ctx)
-    if write_on:
-        manager = ensure_session_worktree(
-            repository, repo_root=tool_ctx.repo_root,
-            project_id=tool_ctx.project_id, session_id=request.session_id)
-        tool_ctx = replace(tool_ctx, worktree_dir=manager.path)
-    return _TurnGrants(web_tools_on=web_tools_on, write_on=write_on, tool_ctx=tool_ctx)
 
 
 def _run_cli_engine(request: TurnRequest, tool_ctx: ToolContext, messages: list[dict],
@@ -179,7 +92,7 @@ def _run_cli_engine(request: TurnRequest, tool_ctx: ToolContext, messages: list[
         config=CliTurnConfig(
             provider=request.provider, model=request.model,
             scratch_base=tool_ctx.repository.db_path.parent,
-            mcp_server_args=_mcp_server_args(request, tool_ctx),
+            mcp_server_args=mcp_server_args(request, tool_ctx),
             db_path=tool_ctx.repository.db_path,
             web_enabled=request.web_enabled,
             system_prompt=messages[0]["content"],
@@ -194,7 +107,7 @@ def _run_cli_engine(request: TurnRequest, tool_ctx: ToolContext, messages: list[
 
 
 def _run_api_engine(request: TurnRequest, messages: list[dict], skill,
-                     grants: _TurnGrants, deps: _EngineDeps) -> str:
+                     grants: TurnGrants, deps: _EngineDeps) -> str:
     config = ApiTurnConfig(
         api_base=request.api_base, api_key=request.api_key,
         model=request.model,
@@ -243,7 +156,7 @@ def _persist_user_turn(request: TurnRequest, repository: AssistantStore, text: s
     return repository.list_messages(request.session_id)
 
 
-def _compose_messages(skill, grants: _TurnGrants, history: list[dict]) -> list[dict]:
+def _compose_messages(skill, grants: TurnGrants, history: list[dict]) -> list[dict]:
     return [{"role": MessageRole.SYSTEM,
              "content": build_system_prompt(skill=skill,
                                             web_enabled=grants.web_tools_on,
@@ -252,8 +165,8 @@ def _compose_messages(skill, grants: _TurnGrants, history: list[dict]) -> list[d
 
 
 def _run_engine(request: TurnRequest, messages: list[dict], skill,
-                grants: _TurnGrants, deps: _EngineDeps) -> str:
-    if _provider_type(request.provider) == ProviderType.CLI:
+                grants: TurnGrants, deps: _EngineDeps) -> str:
+    if provider_type(request.provider) == ProviderType.CLI:
         return _run_cli_engine(request, grants.tool_ctx, messages, skill, deps)
     return _run_api_engine(request, messages, skill, grants, deps)
 
@@ -268,21 +181,18 @@ def _execute_turn(request: TurnRequest, tool_ctx: ToolContext, deps: _EngineDeps
     # In-process web tools are local-API-only: claude gets NATIVE web
     # tools via argv, and cloud APIs (openrouter/custom) stay excluded.
     web_tools_on = request.web_enabled and request.provider in LOCAL_PROVIDERS
-    grants = _resolve_write_grant(request, deps.repository, tool_ctx, web_tools_on)
+    grants = resolve_write_grant(request, deps.repository, tool_ctx, web_tools_on)
     final = _run_engine(request, _compose_messages(skill, grants, history), skill, grants, deps)
     deps.repository.add_message(request.session_id, MessageRole.ASSISTANT, final)
     deps.emit({"type": FrameType.DONE})
 
 
-def run_turn(request: TurnRequest, *, repository: AssistantStore,
-             tool_ctx: ToolContext, engines: TurnEngines | None = None,
-             cancel: CancelToken | None = None) -> None:
-    """Run one turn end to end, emitting stream events through ``deps.emit``.
-
-    Never raises: a stop becomes a ``stopped`` event (with any partial answer
-    persisted), anything else is logged and becomes a generic ``error`` event,
-    because this runs on a turn thread that must not die silently.
-    """
+def _run_turn_body(request: TurnRequest, repository: AssistantStore, tool_ctx: ToolContext,
+                   engines: TurnEngines | None, cancel: CancelToken | None) -> None:
+    """One turn: persist, contextualize, run the engine, persist, emit. A user
+    stop (``TurnCancelled``) is handled here, not by ``run_turn``'s
+    ``run_isolated`` boundary, so it becomes a ``stopped`` event, not a
+    logged failure."""
     deps = _build_deps(request, repository, engines or TurnEngines(), cancel or CancelToken())
     emit = deps.emit
     cache_ctx = score_cache_path_override(tool_ctx.score_cache_path) if tool_ctx.score_cache_path is not None else nullcontext()
@@ -295,6 +205,20 @@ def run_turn(request: TurnRequest, *, repository: AssistantStore,
         if exc.partial:
             repository.add_message(request.session_id, MessageRole.ASSISTANT, exc.partial)
         emit({"type": FrameType.STOPPED})
-    except Exception:  # noqa: BLE001 - turn thread must never die silently
-        _logger.exception("assistant turn failed for session %s", request.session_id)
-        emit({"type": FrameType.ERROR, "message": "The assistant hit an unexpected error. Check the server logs for details."})
+
+
+def run_turn(request: TurnRequest, *, repository: AssistantStore,
+             tool_ctx: ToolContext, engines: TurnEngines | None = None,
+             cancel: CancelToken | None = None) -> None:
+    """Run one turn end to end. ``run_isolated`` is the turn thread's
+    fault-isolation boundary (the only caller is
+    ``assistant_turn_routes._worker``): anything but a user stop (handled
+    inside ``_run_turn_body``) is logged with its traceback and becomes a
+    generic ``error`` event."""
+    run_isolated(
+        lambda: _run_turn_body(request, repository, tool_ctx, engines, cancel),
+        label=f"assistant turn for session {request.session_id}", log=_logger,
+        on_error=lambda _exc: repository.append_event(request.session_id, {
+            "type": FrameType.ERROR,
+            "message": "The assistant hit an unexpected error. Check the server logs for details."}),
+    )

@@ -1,4 +1,5 @@
-"""update best-effort handlers log at debug."""
+"""update best-effort handlers: the write failure itself logs at warning
+(visible), the secondary temp-file cleanup failure stays at debug."""
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -19,8 +20,10 @@ def test_write_state_logs_write_and_cleanup_failures(monkeypatch, tmp_path) -> N
 
     monkeypatch.setattr(json_state.os, "replace", _replace_fails)
     monkeypatch.setattr(json_state.os, "unlink", _unlink_fails)
-    with patch.object(state._logger, "debug") as debug:
+    with patch.object(state._logger, "warning") as warning, \
+            patch.object(state._logger, "debug") as debug:
         state.write_state(current, env)
-    messages = [c.args[0] for c in debug.call_args_list]
-    assert any("state write failed" in m for m in messages)
-    assert any("not removed" in m for m in messages)
+    warning_messages = [c.args[0] for c in warning.call_args_list]
+    debug_messages = [c.args[0] for c in debug.call_args_list]
+    assert any("state write failed" in m for m in warning_messages)
+    assert any("not removed" in m for m in debug_messages)

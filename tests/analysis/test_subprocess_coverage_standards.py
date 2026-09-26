@@ -169,6 +169,16 @@ class TestLoadStandardsText:
     def test_returns_empty_when_files_missing(self, tmp_path):
         assert load_standards_text(tmp_path, "nonexistent") == ""
 
+    def test_non_utf8_md_warns_and_returns_empty(self, tmp_path, caplog):
+        """The .md fallback's except narrows to (OSError, UnicodeDecodeError)
+        and logs at warning (not debug): a read failure here changes what
+        the model sees, so it must not be silent by default."""
+        (tmp_path / "security.md").write_bytes(b"\xff\xfe not utf-8")
+        with caplog.at_level("WARNING"):
+            result = load_standards_text(tmp_path, "security")
+        assert result == ""
+        assert any("standards text file unreadable" in r.message for r in caplog.records)
+
 
 # ---------------------------------------------------------------------------
 # render_standards_grouped: malformed compiled-JSON shapes

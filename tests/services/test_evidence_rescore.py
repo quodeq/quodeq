@@ -219,6 +219,23 @@ def test_scoring_engine_exception_returns_none_for_fallback(run_dir, monkeypatch
     assert out is None
 
 
+def test_parse_failure_is_logged_at_warning_not_debug(run_dir, monkeypatch, caplog):
+    """A parse-time failure inside the traced (OSError, ValueError, KeyError)
+    surface must be visible: it degrades every caller (dashboard, /api/rescore,
+    trend fetcher) to the stored score silently otherwise, with nothing in the
+    logs above debug level to explain why."""
+    def _boom(*args, **kwargs):
+        raise ValueError("malformed evidence")
+    monkeypatch.setattr("quodeq.services.evidence_rescore.parse_jsonl_to_evidence", _boom)
+    with caplog.at_level("WARNING", logger="quodeq.services.evidence_rescore"):
+        out = score_dimension_from_evidence(
+            run_dir, DIM, EvidenceScoreRequest(
+                dismissed=set(), deleted=set(),
+                source_file_count=10, files_read=5, params=DEFAULT_PARAMS))
+    assert out is None
+    assert any("malformed evidence" in r.message for r in caplog.records)
+
+
 def test_scoring_engine_out_of_scope_error_propagates(run_dir, monkeypatch):
     """A bug outside the engine's traced (ValueError, KeyError, TypeError,
     ArithmeticError) surface is a genuine defect and must surface, not be

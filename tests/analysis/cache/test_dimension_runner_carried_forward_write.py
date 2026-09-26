@@ -13,6 +13,8 @@ from the running scan.
 import json
 from pathlib import Path
 
+import pytest
+
 from quodeq.analysis.cache.dimension_helpers import ClassifyResult
 from quodeq.analysis.cache.dimension_runner import (
     emit_cached_findings,
@@ -70,6 +72,51 @@ def test_emit_cached_findings_uses_injected_writer_factory(tmp_path: Path):
     assert writers[0].path == events_log
     assert len(writers[0].events) == 2
     assert all(e.payload.title in {"carry-a", "carry-b"} for e in writers[0].events)
+
+
+def test_emit_cached_findings_logs_and_continues_past_a_failing_finding(tmp_path: Path, caplog):
+    """One finding's emit() raising TypeError (e.g. an unserializable
+    payload) must be logged and skipped, not abort the rest of the
+    replay's event mirroring."""
+    class _FlakyWriter:
+        def __init__(self, path: Path) -> None:
+            self.path = path
+            self.events = []
+            self._calls = 0
+
+        def emit(self, event) -> None:
+            self._calls += 1
+            if self._calls == 1:
+                raise TypeError("not serializable")
+            self.events.append(event)
+
+    writer = _FlakyWriter(tmp_path / "events.jsonl")
+
+    with caplog.at_level("WARNING"):
+        emit_cached_findings(
+            tmp_path / "events.jsonl", [_finding("carry-a"), _finding("carry-b")],
+            writer_factory=lambda _path: writer,
+        )
+
+    assert len(writer.events) == 1
+    assert any("event emit failed" in r.message for r in caplog.records)
+
+
+def test_emit_cached_findings_propagates_unnamed_emit_error(tmp_path: Path):
+    """An emit() failure outside (OSError, TypeError, ValueError) must
+    propagate, not be swallowed."""
+    class _BrokenWriter:
+        def __init__(self, path: Path) -> None:
+            self.path = path
+
+        def emit(self, event) -> None:
+            raise RuntimeError("unexpected")
+
+    with pytest.raises(RuntimeError, match="unexpected"):
+        emit_cached_findings(
+            tmp_path / "events.jsonl", [_finding("carry-a")],
+            writer_factory=lambda _path: _BrokenWriter(tmp_path / "events.jsonl"),
+        )
 
 
 def test_write_findings_forwards_injected_writer_factory(tmp_path: Path):

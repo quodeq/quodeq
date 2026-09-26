@@ -99,3 +99,19 @@ def test_kill_logs_a_swallowed_terminate_failure(windows_pty_module, caplog):
         r.levelno >= logging.WARNING and "terminate" in r.message.lower()
         for r in caplog.records
     )
+
+
+def test_kill_propagates_a_terminate_failure_outside_the_narrowed_tuple(windows_pty_module):
+    """A RuntimeError from terminate() is not OSError, so it is a real bug,
+    not an already-gone-process race, and now escapes instead of being
+    swallowed as a warning."""
+    pty = windows_pty_module.WindowsPty(argv=["cmd.exe"])
+    pty.spawn(cwd="C:\\", cols=80, rows=24)
+
+    def _boom(force=False):
+        raise RuntimeError("unexpected bug")
+
+    pty._proc.terminate = _boom
+
+    with pytest.raises(RuntimeError):
+        pty.kill()

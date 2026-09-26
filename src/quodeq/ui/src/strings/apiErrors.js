@@ -44,7 +44,6 @@ const CODE_KEYS = {
   PATH_MISSING: 'apiError.pathMissing',
   MISSING_PATH: 'apiError.pathMissing',
   NOT_DIR: 'apiError.notDirectory',
-  REGISTRATION_FAILED: 'apiError.registrationFailed',
 
   // Provider configuration.
   MISSING_API_KEY: 'apiError.missingApiKey',

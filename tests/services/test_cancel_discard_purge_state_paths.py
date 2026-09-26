@@ -7,6 +7,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from quodeq.services.evaluation_mixin import discard_run_state
 
 
@@ -138,3 +140,57 @@ def test_discard_allows_legitimate_paths(tmp_path: Path):
     assert not (evidence / "security_evidence.jsonl").exists(), (
         "legitimate paths must delete evidence"
     )
+
+
+def test_discard_logs_and_continues_past_an_invalid_sidecar_key(tmp_path: Path):
+    """A ValueError from one key's cache.delete (invalid sidecar key) is
+    logged, and the remaining keys still get deleted."""
+    reports = tmp_path / "reports"
+    evidence = reports / "proj" / "run1" / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "security_dispatch_keys.json").write_text(
+        json.dumps({"a.py": "bad-key", "b.py": "good-key"})
+    )
+
+    deleted: list[str] = []
+    warnings: list[str] = []
+
+    class _FakeCache:
+        def delete(self, key: str) -> None:
+            if key == "bad-key":
+                raise ValueError("malformed key")
+            deleted.append(key)
+
+    class _FakeLog:
+        def warning(self, message: str) -> None:
+            warnings.append(message)
+
+    discard_run_state(
+        str(reports), {"outputProject": "proj", "outputRunId": "run1"},
+        cache=_FakeCache(), log=_FakeLog(),
+    )
+
+    assert deleted == ["good-key"], "the loop must keep going after one bad key"
+    assert any("bad-key" in w for w in warnings)
+
+
+def test_discard_unnamed_cache_delete_exception_propagates(tmp_path: Path):
+    """A RuntimeError from cache.delete is outside the (ValueError,) tuple: it
+    signals a real bug in the cache backend, not a malformed key, and must
+    propagate rather than be silently swallowed."""
+    reports = tmp_path / "reports"
+    evidence = reports / "proj" / "run1" / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "security_dispatch_keys.json").write_text(
+        json.dumps({"a.py": "key-a"})
+    )
+
+    class _FakeCache:
+        def delete(self, key: str) -> None:
+            raise RuntimeError("cache backend is broken")
+
+    with pytest.raises(RuntimeError, match="cache backend is broken"):
+        discard_run_state(
+            str(reports), {"outputProject": "proj", "outputRunId": "run1"},
+            cache=_FakeCache(),
+        )

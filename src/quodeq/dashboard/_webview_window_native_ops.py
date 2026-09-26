@@ -110,7 +110,8 @@ def save_via_dialog(window: object, content: str, filename: str) -> bool:
     try:
         Path(path).write_text(content, encoding='utf-8')
         return True
-    except OSError:
+    except OSError as exc:
+        _logger.warning("save to %s failed: %s", path, exc, exc_info=True)
         return False
 
 
@@ -187,7 +188,9 @@ def _current_url(window: object) -> str | None:
     """
     try:
         url = window.get_current_url()  # type: ignore[union-attr]
-    except Exception:  # noqa: BLE001 — backend-specific; the window may be mid-teardown
+    except (webview.errors.WebViewException, AttributeError, RuntimeError):
+        # Backend-specific; the window may be mid-teardown. An unavailable
+        # URL just means "raise the window without refreshing".
         _logger.debug("get_current_url failed; focusing without reload", exc_info=True)
         return None
     return url if isinstance(url, str) and is_safe_reload_url(url) else None

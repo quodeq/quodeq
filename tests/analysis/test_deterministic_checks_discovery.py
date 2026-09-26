@@ -95,6 +95,41 @@ class TestFailSoft:
 
         assert _judge(project, compiled(STANDARD)) == []
 
+    def test_a_checker_that_raises_does_not_stop_the_next_checker_running(
+        self, project, compiled, monkeypatch,
+    ):
+        """One checker's run_isolated boundary must not take the whole
+        loop down: a second, distinct checker declared alongside it still
+        runs and its judgments still land."""
+        from quodeq.analysis.checks import registry
+        from quodeq.core.events.models import Judgment
+
+        def boom(_context):
+            raise RuntimeError("checker exploded")
+
+        good_judgment = Judgment(
+            practice_id="CLEA-FRM-01", verdict="violation", dimension="clean-architecture",
+            file="app/domain/order.py", line=1, reason="x",
+        )
+
+        def good(_context):
+            return [good_judgment]
+
+        monkeypatch.setitem(registry.CHECKERS, "framework-imports", boom)
+        monkeypatch.setitem(registry.CHECKERS, "entity-imports", good)
+
+        two_checkers = {
+            "id": "clean-architecture",
+            "principles": [
+                {"name": "Independence from Frameworks", "requirements": [
+                    {"id": "CLEA-FRM-01", "text": "x", "check": "framework-imports"}]},
+                {"name": "Entities", "requirements": [
+                    {"id": "CLEA-FRM-01", "text": "x", "check": "entity-imports"}]},
+            ],
+        }
+
+        assert _judge(project, compiled(two_checkers)) == [good_judgment]
+
     def test_a_broken_standard_does_not_take_the_run_down(
         self, project, compiled, monkeypatch,
     ):

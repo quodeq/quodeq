@@ -1,7 +1,18 @@
+import logging
+import socket
 import time
 from pathlib import Path
+from unittest.mock import patch
 
 from quodeq.dashboard._instance import InstanceController
+
+
+def _send_reload(sock_path: Path, url: str) -> None:
+    """Send a reload as a second instance does: learn the owner's address
+    first (on Windows try_acquire reads the TCP port file), then send."""
+    sender = InstanceController(sock_path)
+    assert sender.try_acquire() is False
+    sender.send_reload(url)
 
 
 def test_first_instance_acquires_lock(tmp_path: Path):
@@ -115,3 +126,96 @@ def test_start_listening_reports_success_when_acquired(tmp_path: Path):
     ctrl.try_acquire()
     assert ctrl.start_listening(on_reload=lambda _url: None) is True
     ctrl.shutdown()
+
+
+def test_listener_survives_an_on_reload_failure_and_keeps_serving(tmp_path: Path):
+    """R-FT-7 -- an exception from on_reload (anything past the socket errors
+    _serve_one already handles) must not kill the listener thread; the next
+    reload must still reach it."""
+    sock_path = tmp_path / "test.sock"
+    received: list[str] = []
+
+    def _on_reload(url: str) -> None:
+        received.append(url)
+        if len(received) == 1:
+            raise RuntimeError("boom")
+
+    ctrl1 = InstanceController(sock_path)
+    assert ctrl1.try_acquire() is True
+    ctrl1.start_listening(on_reload=_on_reload)
+
+    _send_reload(sock_path, "http://localhost:7863/first")
+    time.sleep(0.2)
+    _send_reload(sock_path, "http://localhost:7863/second")
+    time.sleep(0.2)
+
+    ctrl1.shutdown()
+
+    assert received == [
+        "http://localhost:7863/first",
+        "http://localhost:7863/second",
+    ]
+
+
+def test_listener_logs_a_warning_on_an_on_reload_failure(tmp_path: Path, caplog):
+    sock_path = tmp_path / "test.sock"
+
+    def _on_reload(_url: str) -> None:
+        raise RuntimeError("boom")
+
+    ctrl1 = InstanceController(sock_path)
+    assert ctrl1.try_acquire() is True
+    with caplog.at_level(logging.WARNING, logger="quodeq.dashboard._instance"):
+        ctrl1.start_listening(on_reload=_on_reload)
+        _send_reload(sock_path, "http://localhost:7863")
+        time.sleep(0.2)
+    ctrl1.shutdown()
+
+    matching = [r for r in caplog.records if "reload listener failed" in r.getMessage()]
+    assert matching, [r.getMessage() for r in caplog.records]
+    assert any(r.exc_info for r in matching)
+
+
+def test_listener_survives_a_connection_reset_and_closes_the_connection(tmp_path: Path):
+    """Review fix -- an OSError from conn.recv (e.g. a peer reset) is a
+    per-connection failure, not the listening socket dying: it must not stop
+    the loop, and the connection must still be closed."""
+    sock_path = tmp_path / "test.sock"
+    received: list[str] = []
+
+    ctrl1 = InstanceController(sock_path)
+    assert ctrl1.try_acquire() is True
+    ctrl1.start_listening(on_reload=received.append)
+
+    real_recv = socket.socket.recv
+    calls = {"n": 0}
+    raised_on: dict[str, socket.socket] = {}
+
+    def _flaky_recv(self, *args, **kwargs):
+        # Drain the client's payload first so its sendall() completes cleanly
+        # (closing conn unread would race the client with a spurious
+        # BrokenPipeError), then fail the first read that carried a reload.
+        # A liveness probe sends nothing, so it is never the one reset,
+        # whenever the listener thread gets to it.
+        data = real_recv(self, *args, **kwargs)
+        if data and calls["n"] == 0:
+            calls["n"] += 1
+            raised_on["conn"] = self
+            raise ConnectionResetError("peer reset")
+        return data
+
+    sender = InstanceController(sock_path)
+    assert sender.try_acquire() is False
+    with patch.object(socket.socket, "recv", _flaky_recv):
+        sender.send_reload("http://localhost:7863/first")
+        time.sleep(0.2)
+        sender.send_reload("http://localhost:7863/second")
+        time.sleep(0.2)
+
+    ctrl1.shutdown()
+
+    # The reset connection never reached on_reload, but the listener kept
+    # going and served the next one.
+    assert received == ["http://localhost:7863/second"]
+    # Closed despite the recv failure: fileno() is -1 once a socket is closed.
+    assert raised_on["conn"].fileno() == -1

@@ -24,7 +24,6 @@ from quodeq.services.wiring import (
 from quodeq.services._fs_clone import CloneError
 from quodeq.services.fs_project_helpers import find_existing_project
 from quodeq.services._registration_scan import zero_run_scan_fallback
-from quodeq.services._registration_url import strip_credentials
 from quodeq.services._project_registration_steps import (
     MaterializeRequest,
     materialize_and_scan,
@@ -161,13 +160,12 @@ def register_project_with_rollback(
         return _rollback_and_report(
             rollback, CreateProjectStatus.CLONE_FAILED, str(exc), clone_error_kind=exc.kind,
         )
-    except Exception as exc:
-        # error_response (route layer) swallows the traceback Flask's own 500
-        # handler would have logged; record it before converting to a
-        # generic, no-detail result (the exception text can carry filesystem
-        # paths or backend internals that must not reach the remote caller).
-        log.error(f"Registration failed for repo={strip_credentials(spec.repo)!r}: {exc}")
-        return _rollback_and_report(rollback, CreateProjectStatus.INTERNAL_ERROR)
+    except Exception:
+        # An unhandled failure: clean up any partial project directory, then
+        # let it propagate. The app-wide handler in api/_error_handlers.py
+        # logs the traceback and answers it with the coded INTERNAL_ERROR.
+        rollback()
+        raise
 
     # scan.json is now always present after register_project succeeds.
     project_dir = reports_root_path / project_uuid

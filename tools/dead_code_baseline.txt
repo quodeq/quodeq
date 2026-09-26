@@ -13,4 +13,3 @@
 # silently absorb genuinely new dead code added in the same change.
 src/quodeq/core/events/models.py:112:has_valid_verdict
 src/quodeq/core/types/project.py:40:scan_date
-src/quodeq/update/selfupdate.py:59:set_shutdown_callback

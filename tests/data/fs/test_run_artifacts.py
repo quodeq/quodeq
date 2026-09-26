@@ -7,6 +7,7 @@ the publish flow converts them to PublishError at its own boundary.
 from __future__ import annotations
 
 import json
+import logging
 
 import pytest
 
@@ -140,3 +141,28 @@ class TestReplaceJsonFile:
 
         # No leftover temp file, and the destination was never created.
         assert list(tmp_path.iterdir()) == []
+
+    def test_cleanup_unlink_failure_is_logged_not_swallowed_silently(
+        self, tmp_path, monkeypatch, caplog,
+    ):
+        """A double failure (the write fails, then cleanup of its temp file
+        also fails) must not vanish. The write's own OSError still
+        propagates -- that is the module's whole contract -- and the
+        cleanup failure is now a warning instead of a silent suppress()."""
+        import quodeq.data.fs.run_artifacts as run_artifacts_mod
+
+        def boom_replace(*args, **kwargs):
+            raise OSError("disk full")
+
+        def boom_unlink(*args, **kwargs):
+            raise OSError("cannot remove leftover")
+
+        monkeypatch.setattr(run_artifacts_mod.os, "replace", boom_replace)
+        monkeypatch.setattr(run_artifacts_mod.os, "unlink", boom_unlink)
+
+        path = tmp_path / "published.json"
+        with caplog.at_level(logging.WARNING, logger="quodeq.data.fs.run_artifacts"):
+            with pytest.raises(OSError, match="disk full"):
+                replace_json_file(path, {"a": 1})
+
+        assert any("not removed" in r.message for r in caplog.records)

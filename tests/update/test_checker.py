@@ -1,7 +1,10 @@
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from quodeq.update import checker
 from quodeq.update.source import LatestInfo
@@ -41,10 +44,25 @@ def test_run_check_persists_latest(tmp_path) -> None:
     assert state.last_check_ts is not None
 
 
-def test_run_check_is_fail_silent(tmp_path) -> None:
+@pytest.mark.parametrize("exc", [AttributeError("boom"), TypeError("boom")])
+def test_run_check_is_fail_silent_for_the_narrowed_tuple(tmp_path, exc) -> None:
+    """A malformed-JSON leak from fetch_latest (e.g. a list item where a dict
+    was expected) is caught; the attempt timestamp is still persisted."""
+    env = _env(tmp_path)
+    with patch("quodeq.update.checker.fetch_latest", side_effect=exc):
+        checker.run_check(env, force=True)  # must not raise
+    assert read_state(env).last_check_ts is not None
+
+
+def test_run_check_propagates_an_unexpected_error_but_still_persists_the_attempt(tmp_path) -> None:
+    """R-FT-7 -- an error outside (AttributeError, TypeError) must propagate.
+    Review fix: fetch_latest can raise something outside that tuple too (e.g.
+    httpx.InvalidURL); the attempt must still be persisted -- it is written
+    BEFORE the network call now, not from inside this narrowed except."""
     env = _env(tmp_path)
     with patch("quodeq.update.checker.fetch_latest", side_effect=RuntimeError("boom")):
-        checker.run_check(env, force=True)  # must not raise
+        with pytest.raises(RuntimeError, match="boom"):
+            checker.run_check(env, force=True)
     assert read_state(env).last_check_ts is not None
 
 
@@ -137,6 +155,15 @@ def test_should_check_invalid_timestamp_returns_true(tmp_path) -> None:
     assert checker.should_check(state, env) is True
 
 
+def test_should_check_naive_timestamp_returns_true(tmp_path) -> None:
+    """Review fix -- a naive (no tzinfo) last_check_ts makes the aware-minus-
+    naive subtraction raise TypeError, which used to escape should_check and
+    500 the /api/update/check route. Now counts as 'due', per the docstring."""
+    env = _env(tmp_path)
+    state = UpdateState(last_check_ts="2026-01-01T00:00:00")
+    assert checker.should_check(state, env) is True
+
+
 def test_run_check_skips_write_when_gated_out(tmp_path) -> None:
     """run_check returns without writing state when should_check is False."""
     env = _env(tmp_path)
@@ -224,3 +251,46 @@ def test_check_async_invokes_run_check(tmp_path) -> None:
 
     assert len(called_with) == 1
     assert called_with[0] == (env,)
+
+
+def test_check_async_thread_survives_a_run_check_failure(tmp_path, caplog) -> None:
+    """R-FT-7 -- the run_isolated boundary at the thread target: an exception
+    from run_check itself (e.g. an unexpected fetch_latest bug) is logged and
+    does not escape as an unhandled exception on the daemon thread."""
+    env = _env(tmp_path)
+
+    class _SyncThread:
+        def __init__(self, target, daemon=False):
+            self._target = target
+
+        def start(self):
+            self._target()  # run synchronously so the test can assert on it
+
+    with patch("quodeq.update.checker.threading.Thread", _SyncThread), \
+         patch("quodeq.update.checker.fetch_latest", side_effect=RuntimeError("boom")), \
+         caplog.at_level(logging.WARNING, logger="quodeq.update.checker"):
+        checker.check_async(env)  # must not raise
+
+    assert "update check failed" in caplog.text
+    # Review fix -- the attempt timestamp is now persisted BEFORE the network
+    # call, so it's there even though run_isolated caught the failure above.
+    assert read_state(env).last_check_ts is not None
+
+
+def test_check_async_logs_a_warning_on_thread_start_failure(tmp_path, caplog) -> None:
+    """R-FT-7 -- Thread.start()'s only documented failure (RuntimeError) is
+    now logged at warning, not swallowed at debug."""
+    env = _env(tmp_path)
+
+    class _FailingThread:
+        def __init__(self, target, daemon=False):
+            pass
+
+        def start(self):
+            raise RuntimeError("can't start new thread")
+
+    with patch("quodeq.update.checker.threading.Thread", _FailingThread), \
+         caplog.at_level(logging.WARNING, logger="quodeq.update.checker"):
+        checker.check_async(env)  # must not raise
+
+    assert "could not start update-check thread" in caplog.text

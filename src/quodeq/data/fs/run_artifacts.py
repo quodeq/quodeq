@@ -7,14 +7,16 @@ nothing here may swallow one.
 """
 from __future__ import annotations
 
-import contextlib
 import json
+import logging
 import os
 import shutil
 import tempfile
 from pathlib import Path
 
 from quodeq.shared.json_state import dump_json_and_replace
+
+_logger = logging.getLogger(__name__)
 
 
 def ensure_dir(path: Path) -> None:
@@ -69,5 +71,7 @@ def replace_json_file(path: Path, data: dict) -> None:
         cleanup_tmp = None  # ownership transferred to final path
     finally:
         if cleanup_tmp is not None:
-            with contextlib.suppress(OSError):
+            try:
                 os.unlink(cleanup_tmp)
+            except OSError as exc:
+                _logger.warning("leftover temp file %s not removed: %s", cleanup_tmp, exc)
