@@ -67,6 +67,7 @@ class StatusWriter:
         write_status: Callable[[Path, RunStatus], None],
     ) -> None:
         self.run_dir = run_dir
+        self.commit_sha: str | None = None
         self.job_id = job_id
         self.started_at = utc_now_iso(timespec=ISO_SECONDS)
         self.dimensions = list(dimensions)
@@ -91,6 +92,7 @@ class StatusWriter:
             ai_provider=self.ai_provider,
             ai_model=self.ai_model,
             time_limit_s=self.time_limit_s,
+            commit_sha=self.commit_sha,
         )
         self._write_status(self.run_dir, status)
 

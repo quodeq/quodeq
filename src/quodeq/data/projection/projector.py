@@ -23,6 +23,9 @@ class ProjectionResult:
     rebuilt: bool
 
 
+_NO_REPORTS_STAMP = "0"  # report_stamp() for a run without evaluation/*.json; unstamped rows match it
+
+
 @dataclass(frozen=True)
 class _StalenessCheck:
     """What ``_detect_staleness`` found -- consumed by ``_apply_projection_deltas``."""
@@ -32,6 +35,7 @@ class _StalenessCheck:
     actions_changed: bool
     actions_log: Path | None
     grades_stale: bool
+    coverage_stale: bool = False
 
 
 class EnsureLockRegistry:
@@ -160,12 +164,20 @@ class Projector:
         from quodeq.core.scoring.projector_scoring import GRADE_ALGO_VERSION  # noqa: PLC0415
         grades_stale = store.get_grades_algo_version() != GRADE_ALGO_VERSION
 
+        # The coverage columns come from the dimension reports, which the CLI
+        # writes after the last event; a newer report than the one graded
+        # (or none stamped yet) re-derives the tables once.
+        from quodeq.data.projection.grade_projector import report_stamp  # noqa: PLC0415
+        stamped = store.get_coverage_stamp() or _NO_REPORTS_STAMP
+        coverage_stale = stamped != report_stamp(events_path.parent)
+
         return _StalenessCheck(
             events_changed=events_changed,
             pre_pr1_db=pre_pr1_db,
             actions_changed=actions_changed,
             actions_log=actions_log,
             grades_stale=grades_stale,
+            coverage_stale=coverage_stale,
         )
 
     def _apply_projection_deltas(
@@ -197,7 +209,8 @@ class Projector:
         # whenever either source changed, or when the stored grades were
         # computed with an older version of the math (recompute_grades
         # stamps the current one).
-        if staleness.events_changed or staleness.actions_changed or staleness.grades_stale:
+        if (staleness.events_changed or staleness.actions_changed or staleness.grades_stale
+                or staleness.coverage_stale):
             from quodeq.data.projection.grade_projector import recompute_grades  # noqa: PLC0415
             recompute_grades(run_dir)
 
@@ -224,7 +237,8 @@ class Projector:
 
             staleness = self._detect_staleness(store, events_path, project_dir)
 
-            if not staleness.events_changed and not staleness.actions_changed and not staleness.grades_stale:
+            if not (staleness.events_changed or staleness.actions_changed
+                    or staleness.grades_stale or staleness.coverage_stale):
                 return ProjectionResult(events_projected=0, rebuilt=False)
 
             return self._apply_projection_deltas(events_path, run_dir, staleness)

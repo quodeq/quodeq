@@ -55,6 +55,7 @@ class RunStatus:
     ai_provider: str | None = None
     ai_model: str | None = None
     time_limit_s: int | None = None
+    commit_sha: str | None = None
 
     @classmethod
     def from_status_dict(cls, d: dict[str, Any]) -> "RunStatus":
@@ -73,6 +74,7 @@ class RunStatus:
             ai_provider=d.get("ai_provider"),
             ai_model=d.get("ai_model"),
             time_limit_s=d.get("time_limit_s"),
+            commit_sha=d.get("commit_sha"),
         )
 
 

@@ -38,6 +38,12 @@ class _FakeStore:
     def get_projected_size(self):
         return self.projected_size
 
+    def get_coverage_stamp(self):
+        return None
+
+    def save_coverage_stamp(self, stamp):
+        pass
+
     def get_grades_algo_version(self):
         # Report current so grades_stale stays False — these tests exercise
         # the event/actions projection seams, not grade reconciliation.

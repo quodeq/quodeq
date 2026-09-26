@@ -98,6 +98,7 @@ from quodeq.data.fs.stream_files import (  # noqa: F401
 # quodeq.data.sqlite.findings_queries.read_finding_details).
 from quodeq.data.fs.report_parser.finding_details import (  # noqa: F401
     iter_eval_reports,
+    iter_readable_eval_reports,
     read_eval_report,
     read_finding_details_from_json_eval,
 )
@@ -216,6 +217,7 @@ from quodeq.data.fs.shared_repo import (  # noqa: F401
 )
 
 # Run status + dim-state file names and readers.
+from quodeq.data.fs.report_parser.run_dates import project_run_dates  # noqa: F401
 from quodeq.data.fs.run_status_store import (  # noqa: F401
     STATUS_FILENAME,
     UnsupportedSchemaError,

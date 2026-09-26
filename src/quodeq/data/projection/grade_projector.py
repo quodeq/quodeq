@@ -19,6 +19,7 @@ from quodeq.data.fs.report_parser.finding_details import iter_readable_eval_repo
 from quodeq.data.sqlite.row_mappers import row_to_finding
 from quodeq.data.sqlite.connection import open_evaluation_db
 from quodeq.data.sqlite.state_store import SQLiteStateStore
+from quodeq.shared.constants import JSON_SUFFIX
 from quodeq.core.scoring.projector_scoring import (
     GRADE_ALGO_VERSION,
     PrincipleGradeScale,
@@ -158,8 +159,40 @@ def recompute_grades(run_dir: Path, params: ScoringParams | None = None) -> None
     for row in dimension_rows:
         row["exit_reason"] = exit_by_dim.get(str(row["dimension"]).lower())
 
+    # Coverage comes from the dimension report the CLI wrote; the grade
+    # tables carry it so the SQL read path can state density per 100 files.
+    coverage_by_dim = {
+        str(dim_id).lower(): report
+        for dim_id, report in iter_readable_eval_reports(run_dir)
+        if isinstance(report, dict)
+    }
+    for row in dimension_rows:
+        report = coverage_by_dim.get(str(row["dimension"]).lower(), {})
+        row["files_read"] = int(report.get("filesRead") or 0)
+        row["source_count"] = int(report.get("sourceFileCount") or 0)
+        row["coverage_pct"] = float(report.get("coveragePct") or 0.0)
+
     store = SQLiteStateStore(run_dir)
     store.batch_rewrite_grades(principle_rows, dimension_rows)
     # Stamp the math these tables now embody, so ensure_projected can tell a
-    # run graded with older scoring apart from one that is merely unchanged.
+    # run graded with older scoring apart from one that is merely unchanged,
+    # and the reports the coverage came from, so a report written after the
+    # last event re-derives the tables instead of leaving coverage at zero.
     store.save_grades_algo_version(GRADE_ALGO_VERSION)
+    store.save_coverage_stamp(report_stamp(run_dir))
+
+
+def report_stamp(run_dir: Path) -> str:
+    """Newest modification time (ns) among ``evaluation/*.json``, ``"0"`` when
+    there is none. Cheap to compute (stats only), so staleness checks can use it."""
+    eval_dir = run_dir / "evaluation"
+    if not eval_dir.is_dir():
+        return "0"
+    newest = 0
+    for path in eval_dir.iterdir():
+        if path.suffix == JSON_SUFFIX:
+            try:
+                newest = max(newest, path.stat().st_mtime_ns)
+            except OSError:
+                continue
+    return str(newest)

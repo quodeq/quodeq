@@ -30,6 +30,7 @@ from quodeq.services.wiring import (
     read_run_data,
 )
 from quodeq.services.rescore import rescore_dimension
+from quodeq.services.run_metadata import read_run_metadata
 from quodeq.services.suppression_keys import SuppressionKeys
 from quodeq.shared.validation import validate_path_segment
 
@@ -281,7 +282,8 @@ def build_dashboard(
 
     ctx, annotations = _select_run(reports_root, project, runs, run, params)
     payload = compute_dashboard_payload(reports_root, project, ctx, cc, params)
-    return build_dashboard_result(project, runs, ctx.run, payload, annotations)
+    metadata = read_run_metadata(reports_root / project / ctx.run.run_id)
+    return build_dashboard_result(project, runs, ctx.run, payload, annotations, run_metadata=metadata)
 
 
 __all__ = [

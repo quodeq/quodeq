@@ -192,6 +192,10 @@ class RunLifecycleContext:
         self._status.current_dimension = current_dimension
         self._write(self._current_state)
 
+    def set_commit_sha(self, commit_sha: str | None) -> None:
+        """Record the commit the run evaluates; set before entering so the first write carries it."""
+        self._status.commit_sha = commit_sha
+
     def set_deadline(self, deadline_at: str | None) -> None:
         """Record the run-level deadline. Visible immediately in status.json."""
         self._status.deadline_at = deadline_at
