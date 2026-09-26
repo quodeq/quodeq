@@ -218,6 +218,7 @@ from quodeq.data.fs.shared_repo import (  # noqa: F401
 
 # Run status + dim-state file names and readers.
 from quodeq.data.fs.report_parser.run_dates import project_run_dates  # noqa: F401
+from quodeq.data.git_cli import GIT_FLAG_C, run_git as git_stdout  # noqa: F401
 from quodeq.data.fs.run_status_store import (  # noqa: F401
     STATUS_FILENAME,
     UnsupportedSchemaError,
