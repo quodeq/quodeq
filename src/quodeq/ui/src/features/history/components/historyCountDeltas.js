@@ -1,25 +1,49 @@
-import { runCounts } from '../../dashboard/headlineStats.js';
-
 /**
- * Per-row run-over-run deltas of majors and open types, newest first: each
- * row against the next row that has that count, so a row without counts (an
- * in-progress stub, an old run) never nulls out its neighbours' deltas.
+ * Per-row run-over-run deltas of majors and open types, newest first.
+ *
+ * Runs refresh different dimension sets (a cancelled run scored two, a
+ * scoped run one), so a delta over each row's grand total would swing with
+ * the set, not the code. Each scored row compares with the next scored row
+ * over the dimensions they share; a row with no score (a partial) takes no
+ * part, and rows sharing no dimension get no delta.
  * @returns {Array<{majors: number|null, openTypes: number|null}>} aligned with `rows`
  */
+
+function countsByDimension(row) {
+  const map = new Map();
+  for (const d of row?.dimensionDetails || []) {
+    if (d?.dimension && typeof d.majors === 'number' && typeof d.openTypes === 'number') {
+      map.set(String(d.dimension).toLowerCase(), { majors: d.majors, openTypes: d.openTypes });
+    }
+  }
+  return map;
+}
+
+function isScored(row) {
+  return !Number.isNaN(parseFloat(row?.numericAverage));
+}
+
+function sharedDelta(current, next, field) {
+  let shared = 0;
+  let total = 0;
+  for (const [dim, counts] of current) {
+    const before = next.get(dim);
+    if (!before) continue;
+    shared += 1;
+    total += counts[field] - before[field];
+  }
+  return shared > 0 ? total : null;
+}
+
 export function computeCountDeltas(rows) {
   const deltas = rows.map(() => ({ majors: null, openTypes: null }));
-  let nextMajors = null;
-  let nextTypes = null;
+  let next = null;
   for (let i = rows.length - 1; i >= 0; i--) {
-    const { majors, openTypes } = runCounts(rows[i]);
-    if (majors !== null) {
-      if (nextMajors !== null) deltas[i].majors = majors - nextMajors;
-      nextMajors = majors;
-    }
-    if (openTypes !== null) {
-      if (nextTypes !== null) deltas[i].openTypes = openTypes - nextTypes;
-      nextTypes = openTypes;
-    }
+    if (!isScored(rows[i])) continue;
+    const current = countsByDimension(rows[i]);
+    if (current.size === 0) continue;
+    if (next) deltas[i] = { majors: sharedDelta(current, next, 'majors'), openTypes: sharedDelta(current, next, 'openTypes') };
+    next = current;
   }
   return deltas;
 }

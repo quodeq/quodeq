@@ -17,7 +17,7 @@ function densityText(headline) {
 }
 
 /**
- * `**Majors:** 3 (0 critical) · **Open types:** 37 · **Score:** 9.0/10 Exemplary · **Density:** 32.3 per 100 files read (95% coverage)`
+ * `**Majors:** 3 (0 critical) · **Open types:** 37 · **Score:** 9/10 Exemplary · **Density:** 32.3 per 100 files read (95% coverage)`
  * @param {{headline: Object|null, score: string, grade: string}} args
  */
 export function buildHeadlineLine({ headline, score, grade }) {
@@ -56,6 +56,7 @@ function runsLine(since, currentSha) {
 }
 
 function scopeLine(since) {
+  if (since.scope === SCOPE_MIXED) return 'in all files (baselines differ per dimension)';
   if (since.scope !== SCOPE_CHANGED) return 'in all files (no commit recorded or the tree had uncommitted changes)';
   return `${since.changedFiles} files changed`;
 }

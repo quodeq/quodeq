@@ -1603,5 +1603,6 @@
   "history.seriesLegend": "score · majors · open types",
   "history.tooltipCounts": "{majors} majors · {openTypes} open types",
   "history.colMajors": "MAJORS",
-  "history.colTypes": "TYPES"
+  "history.colTypes": "TYPES",
+  "history.tooltipCountsRun": "latest run {date}: {majors} majors · {openTypes} open types"
 }

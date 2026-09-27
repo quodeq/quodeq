@@ -62,7 +62,7 @@ function partialNote(entry) {
 export const RunHistoryTooltip = makeScoreTooltip({
   label: periodOrDateLabel,
   missingScore: MISSING_SCORE,
-  extra: (entry) => <>{countsLine(entry)}{partialNote(entry)}</>,
+  extra: (entry) => <>{countsLine(entry, { runLabel: entry.dateLabel })}{partialNote(entry)}</>,
 });
 
 const CHART_PRESENTATION = {

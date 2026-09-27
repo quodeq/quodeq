@@ -46,3 +46,9 @@ test('the overview report takes the same headline and since', () => {
   assert.match(md, /\*\*Open types:\*\* 37/);
   assert.match(md, /## Since baseline/);
 });
+
+test('a mixed scope names its own reason, like the panel', () => {
+  const mixed = buildSinceBaselineSection({ ...since, scope: 'mixed', changedFiles: null, againstRunIds: ['r0', 'r1'] }).join('\n');
+  assert.ok(mixed.includes('against 2 baseline runs · in all files (baselines differ per dimension)'));
+  assert.ok(!mixed.includes('no commit recorded'));
+});
