@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHeadline, dimensionOpenTypes, formatDensity, filterSinceBaseline, sinceBaselineFor, sumSinceBaseline, SCOPE_ALL, SCOPE_CHANGED, SCOPE_MIXED } from './headlineStats.js';
+import { buildHeadline, dimensionOpenTypes, formatDensity, filterSinceBaseline, reduceDiffToSinceMap, runCounts, sinceBaselineFor, sumSinceBaseline, SCOPE_ALL, SCOPE_CHANGED, SCOPE_MIXED } from './headlineStats.js';
 
 const dim = (over = {}) => ({
   dimension: 'maintainability',
@@ -113,4 +113,30 @@ test('sinceBaselineFor gives the dimension entry only for the run the summary de
   assert.equal(sinceBaselineFor(map, 'maintainability', { runId: 'r0', baselineRunId: 'r1' }), undefined);
   assert.equal(sinceBaselineFor(map, 'maintainability', { runId: undefined, baselineRunId: 'r1' }), undefined);
   assert.equal(sinceBaselineFor(undefined, 'maintainability', { runId: 'r1', baselineRunId: 'r1' }), undefined);
+});
+
+test('runCounts sums dimensionDetails and ignores the top-level totals when details exist', () => {
+  const entry = { majors: 99, openTypes: 99, dimensionDetails: [{ majors: 2, openTypes: 5 }, { majors: 1, openTypes: 4 }] };
+  assert.deepEqual(runCounts(entry), { majors: 3, openTypes: 9 });
+});
+
+test('runCounts falls back to the top-level totals, then to null', () => {
+  assert.deepEqual(runCounts({ majors: 4, openTypes: 7, dimensionDetails: [] }), { majors: 4, openTypes: 7 });
+  assert.deepEqual(runCounts({ dimensionDetails: [{ score: '7.0' }] }), { majors: null, openTypes: null });
+  assert.deepEqual(runCounts({}), { majors: null, openTypes: null });
+});
+
+test('reduceDiffToSinceMap gives the dashboard map shape', () => {
+  const diff = { runId: 'r1', commitSha: 'abc', dimensions: { maintainability: {
+    counts: { carried: 1, same: 2, moved: 0, new: 3, resolved: 4, notReevaluated: 0 }, majorsDelta: -1,
+    types: { closed: ['M-A-1'], opened: [], perReq: {} }, againstRunId: 'r0', againstCommitSha: 'def',
+    sinceBaseline: { scope: 'changed-files', changedFiles: 2, majorsDelta: -1, counts: { new: 1, resolved: 2 }, types: { closed: ['M-A-1'], opened: [] }, new: [], resolved: [] },
+  } } };
+  const map = reduceDiffToSinceMap(diff);
+  assert.deepEqual(Object.keys(map), ['maintainability']);
+  assert.equal(map.maintainability.againstRunId, 'r0');
+  assert.deepEqual(map.maintainability.sinceBaseline, { scope: 'changed-files', changedFiles: 2, majorsDelta: -1, counts: { new: 1, resolved: 2 }, types: { closed: ['M-A-1'], opened: [] } });
+  assert.deepEqual(map.maintainability.all, { majorsDelta: -1, counts: { new: 3, resolved: 4 }, types: { closed: ['M-A-1'], opened: [] } });
+  assert.notEqual(sumSinceBaseline(map), null);
+  assert.deepEqual(reduceDiffToSinceMap(null), {});
 });

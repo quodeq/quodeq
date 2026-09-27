@@ -14,9 +14,13 @@ export const SCOPE_MIXED = 'mixed';
 const PER_FILES = 100; // density is violations per 100 files read
 const PCT = 100;       // coverage is a percentage
 
+function isNumber(v) {
+  return typeof v === 'number';
+}
+
 /** Distinct requirement codes with an active finding in one dimension. */
 export function dimensionOpenTypes(d) {
-  if (typeof d?.openTypes === 'number') return d.openTypes;
+  if (isNumber(d?.openTypes)) return d.openTypes;
   return new Set((d?.violations || []).map((v) => v.req).filter(Boolean)).size;
 }
 
@@ -120,4 +124,58 @@ export function sinceBaselineFor(sinceBaseline, dimension, { runId, baselineRunI
   if (!sinceBaseline || !runId || runId !== baselineRunId) return undefined;
   const key = Object.keys(sinceBaseline).find((k) => k.toLowerCase() === String(dimension).toLowerCase());
   return key ? sinceBaseline[key] : undefined;
+}
+
+function sumDetail(details, field) {
+  const values = details.map((d) => d?.[field]).filter(isNumber);
+  return values.length > 0 ? values.reduce((a, b) => a + b, 0) : null;
+}
+
+/**
+ * A trend row's majors and open types over the dimensions it carries: the
+ * per-dimension details (which the visible-standards filter keeps in step),
+ * else the row's own totals, else null.
+ * @returns {{majors: number|null, openTypes: number|null}}
+ */
+export function runCounts(entry) {
+  const details = entry?.dimensionDetails || [];
+  const majors = sumDetail(details, 'majors');
+  const openTypes = sumDetail(details, 'openTypes');
+  return {
+    majors: majors ?? (isNumber(entry?.majors) ? entry.majors : null),
+    openTypes: openTypes ?? (isNumber(entry?.openTypes) ? entry.openTypes : null),
+  };
+}
+
+const SCOPED_KEYS = ['scope', 'changedFiles', 'majorsDelta', 'counts', 'types'];
+
+function scopedBlock(entry) {
+  const scoped = entry.sinceBaseline || {};
+  return Object.fromEntries(SCOPED_KEYS.map((k) => [k, scoped[k]]));
+}
+
+function wholeRunBlock(entry) {
+  const counts = entry.counts || {};
+  const types = entry.types || {};
+  return {
+    majorsDelta: entry.majorsDelta ?? 0,
+    counts: { new: counts.new ?? 0, resolved: counts.resolved ?? 0 },
+    types: { closed: types.closed || [], opened: types.opened || [] },
+  };
+}
+
+/** The run-diff payload reduced to the dashboard's since-baseline map, so the
+ * panel and the fold read one shape whichever route the data came from. */
+export function reduceDiffToSinceMap(diff) {
+  const out = {};
+  for (const [dim, entry] of Object.entries(diff?.dimensions || {})) {
+    const safe = entry || {};
+    out[dim] = {
+      againstRunId: safe.againstRunId ?? null,
+      againstCommitSha: safe.againstCommitSha ?? null,
+      sinceBaseline: scopedBlock(safe),
+      all: wholeRunBlock(safe),
+    };
+  }
+  return out;
 }
