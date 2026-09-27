@@ -154,3 +154,17 @@ describe('HelpPage violations by type', () => {
     expect(screen.getAllByText(/Dismiss all/).length).toBeGreaterThan(0);
   });
 });
+
+describe('HelpPage history majors and open types', () => {
+  it('documents the count series, the table columns and the since-baseline panel', () => {
+    const { container } = render(<HelpPage initialSection="history" />);
+    expect(screen.getByRole('heading', { level: 3, name: /Since the baseline/ })).toBeInTheDocument();
+    expect((container.textContent.match(/majors/gi) || []).length).toBeGreaterThan(1);
+    expect((container.textContent.match(/open types/gi) || []).length).toBeGreaterThan(1);
+  });
+
+  it('describes the report order on the Overview page', () => {
+    render(<HelpPage initialSection="overview" />);
+    expect(screen.getByText(/leads with the same numbers as the header/)).toBeInTheDocument();
+  });
+});

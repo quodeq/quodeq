@@ -27,4 +27,4 @@ Under the header, the panel names the baseline run and the current run with thei
 
 ### The report
 
-The **Report** button in the top bar renders the whole overview as a Markdown report in the side pane, ready to download and share outside Quodeq.
+The **Report** button in the top bar renders the whole overview as a Markdown report in the side pane, ready to download and share outside Quodeq. The report leads with the same numbers as the header (majors, open types, score, density), then the since-baseline summary, and keeps the raw violations total in its summary at the end.

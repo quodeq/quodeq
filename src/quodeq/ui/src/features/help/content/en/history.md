@@ -6,12 +6,17 @@ The **History** tab is your project's quality timeline. Every completed run live
 
 - **Grade and score** for each run.
 - **Delta** against the previous run, so you can spot regressions immediately.
+- **Majors and types** the run's open majors (critical plus major) and open requirement types, each with the change against the previous run. Down is good for both.
 - **Run metadata** model, sub-agent count, scope, branch, duration.
 - **Tombstones** deleted runs leave a marker so the trend stays continuous.
 
 ### The trend chart
 
-A small chart above the list plots overall score over time, with per-dimension lines you can toggle. Hover a point to see that run's stats; click to open it.
+A small chart above the list plots each run's own score over time. Two thinner lines follow it on their own scale: majors (dashed) and open types (dotted). Hover a bar to read the run's score, majors and open types; click to highlight that run.
+
+### Since the baseline
+
+Under the chart, the since-baseline panel follows the highlighted run: which run it is compared with, how many files changed in between, the majors delta, the types closed and opened, and the new and resolved findings in that scope. **see findings** opens them. Shared repositories have no baseline here.
 
 ### Group the Overview chart by day, week, or month
 
