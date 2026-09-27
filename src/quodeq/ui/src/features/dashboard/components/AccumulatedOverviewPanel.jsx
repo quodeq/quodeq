@@ -10,7 +10,7 @@ import { t } from '../../../strings/index.js';
 import { DEFAULT_SCORE_HISTORY_GRANULARITY } from '../../../constants.js';
 import { HERO_CARD_KIND } from '../dashboardVocab.js';
 import SinceBaselinePanel, { baselineDateLabel } from './SinceBaselinePanel.jsx';
-import { filterSinceBaseline, sumSinceBaseline } from '../headlineStats.js';
+import { buildHeadline, filterSinceBaseline, sumSinceBaseline } from '../headlineStats.js';
 import { useSeeFindings } from '../hooks/useSeeFindings.js';
 import { SEVERITY_FILTER_ALL } from '../../../vocab/severity.js';
 import { useAccumulatedComputations, computeAccumulatedStats } from '../hooks/useAccumulatedComputations.js';
@@ -114,12 +114,10 @@ function makeCardNavigate({ onNavigate, filteredDimensions, reportProjectName })
 
 function AccumulatedOverviewSections({
   data, callbacks, currentOverviewRun, selectedDayDimNames, filteredPeriodTrend, filteredDimensions,
-  filteredAccumulated, filteredStats, chartMountable, dimTrends, topFiles, onCardNavigate,
+  filteredAccumulated, filteredStats, chartMountable, dimTrends, topFiles, onCardNavigate, sinceState,
 }) {
   const { onRunClick, onDimensionClick, onNavigate } = callbacks;
-  // Only the dimensions on show: a hidden standard must not move the headline.
-  const visibleSince = filterSinceBaseline(data.sinceBaseline, (filteredDimensions || []).map((d) => d.dimension));
-  const since = sumSinceBaseline(visibleSince);
+  const { visibleSince, since } = sinceState;
   const { seeFindings } = useSeeFindings({
     project: data.selectedProject, runId: data.selectedRun?.runId, dateLabel: data.selectedRun?.dateLabel, since, onNavigate,
     selectedSource: data.selectedSource, dimensionNames: (filteredDimensions || []).map((d) => d.dimension),
@@ -173,7 +171,13 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
     [filteredDimensions]
   );
 
-  const reportProjectName = useAccumulatedReportSpec({ data, filteredAccumulated, filteredDimensions });
+  // Only the dimensions on show: a hidden standard must not move the headline.
+  const sinceState = useMemo(() => {
+    const visibleSince = filterSinceBaseline(data.sinceBaseline, (filteredDimensions || []).map((d) => d.dimension));
+    return { visibleSince, since: sumSinceBaseline(visibleSince) };
+  }, [data.sinceBaseline, filteredDimensions]);
+  const headline = useMemo(() => buildHeadline(filteredAccumulated?.dimensions), [filteredAccumulated]);
+  const reportProjectName = useAccumulatedReportSpec({ data, filteredAccumulated, filteredDimensions, headline, since: sinceState.since });
 
   const onCardNavigate = useMemo(
     () => makeCardNavigate({ onNavigate, filteredDimensions, reportProjectName }),
@@ -186,7 +190,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
       selectedDayDimNames={selectedDayDimNames} filteredPeriodTrend={filteredPeriodTrend}
       filteredDimensions={filteredDimensions} filteredAccumulated={filteredAccumulated}
       filteredStats={filteredStats} chartMountable={chartMountable} dimTrends={dimTrends}
-      topFiles={topFiles} onCardNavigate={onCardNavigate}
+      topFiles={topFiles} onCardNavigate={onCardNavigate} sinceState={sinceState}
     />
   );
 }

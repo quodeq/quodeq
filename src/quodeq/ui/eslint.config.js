@@ -18,6 +18,7 @@ const NOT_USER_FACING = [
   'src/utils/reportBuilder/shared.js',
   'src/utils/reportBuilder/dimensionSummary.js',
   'src/utils/reportBuilder/runBuilders.js',
+  'src/utils/reportBuilder/headline.js',
   'src/utils/reportBuilder/principleBuilder.js',
   'src/utils/reportBuilder/fileBuilder.js',
 ];

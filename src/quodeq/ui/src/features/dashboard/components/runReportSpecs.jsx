@@ -8,12 +8,12 @@ import { t } from '../../../strings/index.js';
 // Named .jsx (not the brief's .js) since both specs' `render` needs real JSX
 // (<ReportContent/>) -- Vite/esbuild only auto-enables JSX parsing for .jsx
 // files, not .js.
-export function useRunReportSpecs({ dashboard, runSummary, selectedRunId, projectName }) {
+export function useRunReportSpecs({ dashboard, runSummary, selectedRunId, projectName, headline = null, since = null }) {
   const reportSpec = useMemo(() => {
     if (!dashboard?.dimensions) return null;
     const runId = dashboard?.selectedRun?.runId || selectedRunId || 'current';
     const dateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId) || 'run';
-    const buildMarkdown = () => buildRunReport({ dashboard, runSummary, projectName });
+    const buildMarkdown = () => buildRunReport({ dashboard, runSummary, projectName, headline, since });
     const filenameLabel = (dateLabel || runId).replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
     return {
       id: `report:run:${runId}`,
@@ -23,7 +23,7 @@ export function useRunReportSpecs({ dashboard, runSummary, selectedRunId, projec
       copy: () => buildMarkdown(),
       download: () => ({ filename: `run-${filenameLabel}-report.md`, body: buildMarkdown() }),
     };
-  }, [dashboard, runSummary, selectedRunId, projectName]);
+  }, [dashboard, runSummary, selectedRunId, projectName, headline, since]);
   useRegisterWindowSpec('report', reportSpec);
 
   const fixPlanSpec = useMemo(() => {

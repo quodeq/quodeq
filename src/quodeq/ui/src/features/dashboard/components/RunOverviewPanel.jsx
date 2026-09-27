@@ -11,7 +11,7 @@ import buildRunSummary from '../buildRunSummary.js';
 import { t } from '../../../strings/index.js';
 import { RunHeroSection } from './RunHeroSection.jsx';
 import SinceBaselinePanel, { baselineDateLabel } from './SinceBaselinePanel.jsx';
-import { sumSinceBaseline } from '../headlineStats.js';
+import { buildHeadline, sumSinceBaseline } from '../headlineStats.js';
 import { useSeeFindings } from '../hooks/useSeeFindings.js';
 import { useRunReportSpecs } from './runReportSpecs.jsx';
 import { HERO_CARD_KIND } from '../dashboardVocab.js';
@@ -100,7 +100,8 @@ function useRunOverviewModel({ dashboard, selectedRunId, selectedProject, select
   const runTopFiles = useMemo(() => withDimensionsStr(buildTopOffendingFiles(dashboard?.dimensions || [])), [dashboard]);
   const runDateLabel = dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId);
   const onCardNavigate = useCardNavigate({ dashboard, selectedRunId, projectName, runDateLabel, onNavigate });
-  useRunReportSpecs({ dashboard, runSummary, selectedRunId, projectName });
+  const headline = useMemo(() => buildHeadline(dashboard?.dimensions), [dashboard]);
+  useRunReportSpecs({ dashboard, runSummary, selectedRunId, projectName, headline, since });
   const trendDeltas = useTrendDeltas(dashboard);
   return { runSummary, runTopFiles, onCardNavigate, trendDeltas, since, seeFindings };
 }

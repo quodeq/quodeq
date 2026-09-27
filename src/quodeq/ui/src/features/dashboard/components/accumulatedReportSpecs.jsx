@@ -17,7 +17,7 @@ function reportProjectNameFor(data) {
 
 // Returns reportProjectName so the caller can reuse it (AccumulatedOverviewPanel's
 // onCardNavigate needs the same value) without recomputing it.
-export function useAccumulatedReportSpec({ data, filteredAccumulated, filteredDimensions }) {
+export function useAccumulatedReportSpec({ data, filteredAccumulated, filteredDimensions, headline = null, since = null }) {
   const reportProjectName = reportProjectNameFor(data);
   const hasReportData = Boolean(
     filteredAccumulated?.summary
@@ -26,7 +26,7 @@ export function useAccumulatedReportSpec({ data, filteredAccumulated, filteredDi
   );
   const reportSpec = useMemo(() => {
     if (!hasReportData) return null;
-    const buildMarkdown = () => buildOverviewReport(filteredAccumulated, filteredDimensions || [], reportProjectName);
+    const buildMarkdown = () => buildOverviewReport(filteredAccumulated, filteredDimensions || [], reportProjectName, { headline, since, commitSha: data.selectedRun?.commitSha });
     return {
       id: `report:overview:${reportProjectName}`,
       type: 'report',
@@ -35,7 +35,7 @@ export function useAccumulatedReportSpec({ data, filteredAccumulated, filteredDi
       copy: () => buildMarkdown(),
       download: () => ({ filename: `code-quality-report-${reportProjectName}.md`, body: buildMarkdown() }),
     };
-  }, [hasReportData, reportProjectName, filteredAccumulated, filteredDimensions]);
+  }, [hasReportData, reportProjectName, filteredAccumulated, filteredDimensions, headline, since, data.selectedRun?.commitSha]);
   useRegisterWindowSpec('report', reportSpec);
 
   return reportProjectName;

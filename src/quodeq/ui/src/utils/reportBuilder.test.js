@@ -39,7 +39,7 @@ test('buildRunReport includes title with project name and run header', () => {
   assert.match(md, /^# MyApp run report/);
   assert.match(md, /\*\*Date:\*\* 21 Apr 2025/);
   assert.match(md, /\*\*Run:\*\* abc12345/);
-  assert.match(md, /\*\*Overall Score:\*\* 7\.8\/10 B/);
+  assert.match(md, /\*\*Score:\*\* 7\.8\/10 B/);
 });
 
 test('buildRunReport includes dimensions table and crit/major section', () => {
