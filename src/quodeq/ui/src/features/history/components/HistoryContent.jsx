@@ -7,6 +7,8 @@ import { t } from '../../../strings/index.js';
 import { EvaluationsTable } from './EvaluationsTable.jsx';
 import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
 import { computeCountDeltas } from './historyCountDeltas.js';
+import SinceBaselinePanel from '../../dashboard/components/SinceBaselinePanel.jsx';
+import { useHistorySinceBaseline } from '../hooks/useHistorySinceBaseline.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { roundOneDecimal } from '../../../utils/rounding.js';
 import { pluralKey } from '../../../utils/plural.js';
@@ -118,7 +120,7 @@ function useHistoryVisibleRows({ availableRuns, trend, partialRuns }) {
  * The History page's main (non-empty) content: chart, run navigator and the
  * evaluations table.
  * @param {object} props
- * @param {{trend: Array, partialRuns: Array, selectedRunId: string, availableRuns: Array}} props.data
+ * @param {{trend: Array, partialRuns: Array, selectedRunId: string, availableRuns: Array, selectedProject: string, visibleStandards: string[]}} props.data
  * @param {object} props.callbacks - row click/hover, run change and delete handlers.
  * @param {object} props.runNav - the run navigator's prev/next/latest state.
  * @param {string} props.languageSub - the header's language subtitle.
@@ -126,8 +128,11 @@ function useHistoryVisibleRows({ availableRuns, trend, partialRuns }) {
  * @param {boolean} props.isRefreshing - dims the page while a refetch is in flight.
  */
 export function HistoryContent({ data, callbacks, runNav, languageSub, selectedSource, isRefreshing }) {
-  const { trend, partialRuns, selectedRunId, availableRuns } = data;
-  const { onRunClick, onRunHover, onRunHoverEnd, onRunChange, onDeleteRun } = callbacks;
+  const { trend, partialRuns, selectedRunId, availableRuns, selectedProject, visibleStandards } = data;
+  const { onRunClick, onRunHover, onRunHoverEnd, onRunChange, onDeleteRun, onNavigate } = callbacks;
+  const baseline = useHistorySinceBaseline({
+    project: selectedProject, selectedSource, runId: selectedRunId, trend, dimensionNames: visibleStandards, onNavigate,
+  });
   // Toast state for clicks on running runs that have no scored dimensions yet.
   // toastKey forces remount so consecutive clicks restart the auto-dismiss timer.
   const [toastKey, setToastKey] = useState(0);
@@ -150,6 +155,8 @@ export function HistoryContent({ data, callbacks, runNav, languageSub, selectedS
           <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={onRunChange} />
         </Suspense>
       </ChartErrorBoundary>
+
+      <SinceBaselinePanel since={baseline.since} selectedRun={baseline.selectedRun} availableRuns={availableRuns} onSeeFindings={baseline.seeFindings} />
 
       <EvaluationsTable
         visible={visible}

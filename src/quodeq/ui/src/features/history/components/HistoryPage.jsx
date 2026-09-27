@@ -154,10 +154,10 @@ export default function HistoryPage({ trend: rawTrend, partialRuns: rawPartialRu
 
   return (
     <HistoryContent
-      data={{ trend, partialRuns, selectedRunId, availableRuns }}
+      data={{ trend, partialRuns, selectedRunId, availableRuns, selectedProject, visibleStandards: [...visibleSet] }}
       isRefreshing={isRefreshing}
       callbacks={{
-        onRunClick, onRunHover: prefetchRun, onRunHoverEnd: cancelPrefetch, onRunChange,
+        onRunClick, onRunHover: prefetchRun, onRunHoverEnd: cancelPrefetch, onRunChange, onNavigate,
         // Shared-repo runs have no delete route on the backend (mutation is
         // local-only by design). Passing undefined here — rather than always
         // handleDeleteRun — is what makes the row's delete button vanish,
