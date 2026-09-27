@@ -151,8 +151,6 @@ src/quodeq/ui/src/features/evaluation/hooks/useEvaluationMutations.js:4
 src/quodeq/ui/src/features/evaluation/hooks/useEvaluationQueries.js:4
 src/quodeq/ui/src/features/evaluation/hooks/useReEvalInfo.js:8
 src/quodeq/ui/src/features/evaluation/hooks/useReEvaluateCard.js:5
-src/quodeq/ui/src/features/history/components/historyChartStats.js:24
-src/quodeq/ui/src/features/history/components/historyChartStats.js:6
 src/quodeq/ui/src/features/history/components/historyRowAssembly.js:3
 src/quodeq/ui/src/features/history/hooks/useHistoryDeleteRun.js:9
 src/quodeq/ui/src/features/map/viz/components/galaxyPrincipleStars.js:5

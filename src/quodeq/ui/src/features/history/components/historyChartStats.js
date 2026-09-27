@@ -4,10 +4,10 @@ import { runCounts } from '../../dashboard/headlineStats.js';
 
 /**
  * Stats computed from the full trend (not just the windowed slice), matching
- * the mockup's LATEST / AVG / MIN / MAX header row. Extracted verbatim from
- * HistoryChartPanel.jsx; still called from inside a useMemo(fn, [trend])
- * there so the O(N) scan doesn't re-run on every hover render (hoveredIndex
- * changes fire a re-render on each mouse move).
+ * the mockup's LATEST / AVG / MIN / MAX header row. The panel calls this
+ * from inside a useMemo(fn, [trend]) so the O(N) scan doesn't re-run on
+ * every hover render (hoveredIndex changes fire a re-render on each mouse
+ * move).
  */
 export function computeHistoryChartStats(trend) {
   const scores = trend
@@ -22,8 +22,7 @@ export function computeHistoryChartStats(trend) {
 }
 
 /**
- * Keyboard-accessible items mirroring the chart's bars. Extracted verbatim
- * from HistoryChartPanel.jsx.
+ * Keyboard-accessible items mirroring the chart's bars, one per plotted run.
  */
 export function buildHistoryKbdItems({ data, onBarClick, selectedRunId }) {
   return onBarClick
