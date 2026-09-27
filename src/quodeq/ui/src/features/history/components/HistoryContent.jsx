@@ -6,6 +6,7 @@ import SharedReadOnlyBadge from '../../../components/SharedReadOnlyBadge.jsx';
 import { t } from '../../../strings/index.js';
 import { EvaluationsTable } from './EvaluationsTable.jsx';
 import { assembleHistoryRows, HIDDEN_STATUSES } from './historyRowAssembly.js';
+import { computeCountDeltas } from './historyCountDeltas.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { roundOneDecimal } from '../../../utils/rounding.js';
 import { pluralKey } from '../../../utils/plural.js';
@@ -109,7 +110,8 @@ function useHistoryVisibleRows({ availableRuns, trend, partialRuns }) {
     return historyRows.filter((entry) => !HIDDEN_STATUSES.has(statusByRunId.get(entry.runId)));
   }, [historyRows, statusByRunId]);
   const deltas = useMemo(() => computeDeltas(visible), [visible]);
-  return { statusByRunId, visible, deltas };
+  const countDeltas = useMemo(() => computeCountDeltas(visible), [visible]);
+  return { statusByRunId, visible, deltas, countDeltas };
 }
 
 /**
@@ -134,7 +136,7 @@ export function HistoryContent({ data, callbacks, runNav, languageSub, selectedS
     setToastVisible(true);
     setToastKey((k) => k + 1);
   };
-  const { statusByRunId, visible, deltas } = useHistoryVisibleRows({ availableRuns, trend, partialRuns });
+  const { statusByRunId, visible, deltas, countDeltas } = useHistoryVisibleRows({ availableRuns, trend, partialRuns });
 
   return (
     <div className={`history-page history-page--terminal${isRefreshing ? ' dashboard-refreshing' : ''}`}>
@@ -153,6 +155,7 @@ export function HistoryContent({ data, callbacks, runNav, languageSub, selectedS
         visible={visible}
         selectedRunId={selectedRunId}
         deltas={deltas}
+        countDeltas={countDeltas}
         statusByRunId={statusByRunId}
         onRunClick={onRunClick}
         onRunHover={onRunHover}

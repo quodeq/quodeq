@@ -1324,6 +1324,8 @@ button.term-sev-badge--clickable:focus-visible {
 .history-row__col--grade  { flex: 0 0 44px; text-align: left; }
 .history-row__col--score  { flex: 0 0 52px; text-align: left; font-variant-numeric: tabular-nums; }
 .history-row__col--delta  { flex: 0 0 56px; text-align: left; font-variant-numeric: tabular-nums; }
+.history-row__col--majors, .history-row__col--types { flex: 0 0 44px; text-align: left; font-variant-numeric: tabular-nums; }
+.history-row__col--majors-delta, .history-row__col--types-delta { flex: 0 0 48px; text-align: left; font-variant-numeric: tabular-nums; }
 .history-row__col--dims   { flex: 1 1 auto; min-width: 0; }
 .history-row__col--chevron {
   flex: 0 0 44px;

@@ -94,3 +94,28 @@ describe('EvaluationsTable partial row', () => {
     expect(screen.getByText('partial')).toBeInTheDocument();
   });
 });
+
+describe('EvaluationsTable majors and types columns', () => {
+  const done = (runId, majors, openTypes) => ({ runId, dateISO: '2026-09-02T10:00:00Z', dateLabel: '2 Sep', runNumericAverage: '8.5', runOverallGrade: 'Good', dimensionDetails: [{ majors, openTypes }] });
+
+  it('shows the counts with their deltas, down reading as good for majors', () => {
+    useHistoryRunLive.mockReturnValue({ liveDims: {}, plannedDimensions: [], hasScoredDimension: false });
+    renderTable({
+      visible: [done('r2', 3, 30), done('r1', 5, 33)],
+      deltas: [0.5, null],
+      countDeltas: [{ majors: -2, openTypes: -3 }, { majors: null, openTypes: null }],
+    });
+    expect(screen.getByText('MAJORS')).toBeInTheDocument();
+    expect(screen.getByText('TYPES')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('30')).toBeInTheDocument();
+    const majorsDelta = screen.getByText('-2');
+    expect(majorsDelta.className).toContain('history-delta--up');
+  });
+
+  it('an in-progress row shows placeholders in the count cells', () => {
+    useHistoryRunLive.mockReturnValue({ liveDims: {}, plannedDimensions: [], hasScoredDimension: false });
+    renderTable({ countDeltas: [{ majors: null, openTypes: null }] });
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(5);
+  });
+});

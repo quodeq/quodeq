@@ -1601,5 +1601,7 @@
   "sinceBaseline.newFileAllCapped": "new in all files (first {count})",
   "violations.dismissTypeCountDiffers": "Dismissed {actual} of the {expected} findings shown; the rest were already dismissed or are not in this run.",
   "history.seriesLegend": "score · majors · open types",
-  "history.tooltipCounts": "{majors} majors · {openTypes} open types"
+  "history.tooltipCounts": "{majors} majors · {openTypes} open types",
+  "history.colMajors": "MAJORS",
+  "history.colTypes": "TYPES"
 }
