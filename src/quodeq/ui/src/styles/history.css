@@ -296,3 +296,10 @@
   border-color: var(--color-text-muted);
   color: var(--color-text);
 }
+
+/* Series legend under the History chart header: score, majors, open types. */
+.chart-legend { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); padding: 0 var(--space-3) var(--space-1); }
+.chart-legend__swatch { width: 14px; height: 0; border-top: 2px solid var(--color-accent); }
+.chart-legend__swatch--majors { border-top-style: dashed; border-top-color: var(--color-sev-major-text); }
+.chart-legend__swatch--types { border-top-style: dotted; border-top-color: var(--color-text-muted); }
+.rht-counts { display: block; color: var(--color-text-muted); font-size: 0.72rem; }

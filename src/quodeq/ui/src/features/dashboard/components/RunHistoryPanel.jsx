@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { formatPeriodLabel } from '../../../utils/formatters.js';
+import { runCounts } from '../headlineStats.js';
 import { t } from '../../../strings/index.js';
 import { granularityLabel } from '../../../strings/labels.js';
 import {
@@ -11,6 +12,7 @@ import {
   tooltipScore,
 } from '../../../components/scoreChartPanel.jsx';
 import { PANEL_CHART_HEIGHT_PX, runChartInteraction } from '../../../components/scoreChartHelpers.js';
+import { countsLine } from '../../history/components/chartTooltipCounts.jsx';
 
 const MAX_CHART_RUNS = 20;
 const MAX_BAR_SIZE = 28;
@@ -29,6 +31,7 @@ function buildTrendData(trend, granularity = 'day') {
     const numericAverage = parseFloat(row.numericAverage);
     return {
       ...row,
+      ...runCounts(row),
       numericAverage,
       periodLabel: formatPeriodLabel(row, granularity),
       delta: i > 0 ? numericAverage - parseFloat(arr[i - 1].numericAverage) : null,
@@ -43,19 +46,23 @@ function buildTrendData(trend, granularity = 'day') {
 // the line comparable across runs. The cost is that a point refreshed by 1 of
 // 7 dimensions looks identical to one backed by a full sweep, so say when the
 // refresh was partial. A complete scan needs no annotation.
+function partialNote(entry) {
+  const refreshed = entry.dimensionsCount;
+  const total = entry.accumulatedDimensionsCount;
+  if (!Number.isFinite(refreshed) || !Number.isFinite(total) || refreshed >= total) return null;
+  return (
+    <span className="rht-coverage">
+      {t('history.partialRefresh', { count: refreshed, total })}
+    </span>
+  );
+}
+
+// The counts line is the bucket's newest run's majors and open types: the
+// run the tooltip names, not a project-wide figure.
 export const RunHistoryTooltip = makeScoreTooltip({
   label: periodOrDateLabel,
   missingScore: MISSING_SCORE,
-  extra: (entry) => {
-    const refreshed = entry.dimensionsCount;
-    const total = entry.accumulatedDimensionsCount;
-    if (!Number.isFinite(refreshed) || !Number.isFinite(total) || refreshed >= total) return null;
-    return (
-      <span className="rht-coverage">
-        {t('history.partialRefresh', { count: refreshed, total })}
-      </span>
-    );
-  },
+  extra: (entry) => <>{countsLine(entry)}{partialNote(entry)}</>,
 });
 
 const CHART_PRESENTATION = {

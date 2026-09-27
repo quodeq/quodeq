@@ -44,6 +44,8 @@ const TREND_LINE_STROKE_WIDTH = 2;
 const TREND_LINE_OPACITY = 0.9;
 const AREA_TOP_OPACITY = 0.08;
 const TOOLTIP_OFFSET = 20;
+const COUNT_AXIS_ID = 'counts'; // majors and open types share a hidden right-hand axis
+const COUNT_LINE_STROKE_WIDTH = 1.5;
 
 /**
  * The dot marking the selected run on the trend line. Renders nothing for
@@ -114,6 +116,30 @@ function makeChartClickHandler(data, onActivate) {
   };
 }
 
+// The count lines ride a hidden axis of their own: they must be immediate
+// children of the ComposedChart (see the Cell/ReferenceLine note above), so
+// this returns an array of elements rather than a wrapping component.
+function renderCountSeries(countSeries) {
+  if (countSeries.length === 0) return null;
+  return [
+    <YAxis key="count-axis" yAxisId={COUNT_AXIS_ID} orientation="right" domain={[0, 'auto']} hide />,
+    ...countSeries.map((s) => (
+      <Line
+        key={s.dataKey}
+        yAxisId={COUNT_AXIS_ID}
+        dataKey={s.dataKey}
+        type="monotone"
+        stroke={s.stroke}
+        strokeDasharray={s.dash}
+        strokeWidth={COUNT_LINE_STROKE_WIDTH}
+        dot={false}
+        activeDot={false}
+        isAnimationActive={false}
+      />
+    )),
+  ];
+}
+
 /**
  * The score-history chart.
  *
@@ -129,10 +155,12 @@ function makeChartClickHandler(data, onActivate) {
  * @param {(index: number|null) => void} props.setHoveredIndex
  * @param {string|null} props.selectedRunId
  * @param {((point: Object) => void)|undefined} props.onActivate Called with the clicked point, when clicking is enabled.
+ * @param {Array<{dataKey: string, stroke: string, dash?: string}>} [props.countSeries] Count lines (majors,
+ *   open types) drawn on a hidden right-hand axis of their own, so they never rescale the score.
  */
 export function ScoreHistoryChart({
   data, height, fillHeight, maxBarSize, gradientId, tooltip, showSelectedDot,
-  hoveredIndex, setHoveredIndex, selectedRunId, onActivate,
+  hoveredIndex, setHoveredIndex, selectedRunId, onActivate, countSeries = [],
 }) {
   const handleClick = onActivate ? makeChartClickHandler(data, onActivate) : undefined;
   return (
@@ -172,6 +200,7 @@ export function ScoreHistoryChart({
           dot={showSelectedDot ? <SelectedDot selectedRunId={selectedRunId} /> : false}
           activeDot={false}
         />
+        {renderCountSeries(countSeries)}
       </ComposedChart>
     </ResponsiveContainer>
   );
