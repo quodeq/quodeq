@@ -104,12 +104,20 @@ test('shouldShowProjectTabs: shared gates on sharedProjectInfo resolving', () =>
 
 test('selectSidebarCounts: prefers the filtered numbers, falls back to unfiltered', () => {
   const counts = selectSidebarCounts({
-    filteredAccumulated: { summary: { totalViolations: 5 } },
-    accumulated: { summary: { totalViolations: 9 } },
+    filteredAccumulated: { summary: { totalViolations: 12, severity: { critical: 1, major: 4, minor: 7 } } },
+    accumulated: { summary: { totalViolations: 9, severity: { critical: 0, major: 9, minor: 0 } } },
     filteredTrend: [1, 2],
     dashboard: { trend: [1, 2, 3] },
   });
   assert.deepEqual(counts, { violationsCount: 5, historyCount: 2 });
+});
+
+test('selectSidebarCounts: zero majors shows 0, not the total and not null', () => {
+  const counts = selectSidebarCounts({
+    filteredAccumulated: { summary: { totalViolations: 9, severity: { critical: 0, major: 0, minor: 9 } } },
+    accumulated: null, filteredTrend: [], dashboard: null,
+  });
+  assert.equal(counts.violationsCount, 0);
 });
 
 test('selectSidebarCounts: nulls out immediately when nothing has landed yet', () => {

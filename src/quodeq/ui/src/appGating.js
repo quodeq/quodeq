@@ -98,9 +98,17 @@ export function shouldShowProjectTabs({ selectedSource, hasCurrentProjectRuns, s
  * screen until the new project's fetch lands. Exported so this contract is
  * unit-testable without mounting the whole App.
  */
+// The badge counts majors (critical + major), the number that only moves when
+// the code moves; the raw violations total lives in the Violations footer.
+function majorsOf(summary) {
+  const severity = summary?.severity;
+  if (!severity || typeof severity !== 'object') return null;
+  return (severity.critical || 0) + (severity.major || 0);
+}
+
 export function selectSidebarCounts({ filteredAccumulated, accumulated, filteredTrend, dashboard }) {
   return {
-    violationsCount: filteredAccumulated?.summary?.totalViolations ?? accumulated?.summary?.totalViolations ?? null,
+    violationsCount: majorsOf(filteredAccumulated?.summary) ?? majorsOf(accumulated?.summary) ?? null,
     historyCount: (filteredTrend || []).length || dashboard?.trend?.length || null,
   };
 }

@@ -148,23 +148,23 @@ describe('shouldShowProjectTabs', () => {
 describe('selectSidebarCounts', () => {
   it('reads violations/history counts off the filtered view when present', () => {
     const result = selectSidebarCounts({
-      filteredAccumulated: { summary: { totalViolations: 12 } },
-      accumulated: { summary: { totalViolations: 99 } },
+      filteredAccumulated: { summary: { totalViolations: 12, severity: { critical: 2, major: 3, minor: 7 } } },
+      accumulated: { summary: { totalViolations: 99, severity: { critical: 0, major: 99, minor: 0 } } },
       filteredTrend: [{ runId: 'r1' }, { runId: 'r2' }],
       dashboard: { trend: [{ runId: 'r1' }] },
     });
-    expect(result.violationsCount).toBe(12);
+    expect(result.violationsCount).toBe(5);
     expect(result.historyCount).toBe(2);
   });
 
   it('falls back to the unfiltered accumulated/dashboard when the filtered view has nothing', () => {
     const result = selectSidebarCounts({
       filteredAccumulated: null,
-      accumulated: { summary: { totalViolations: 7 } },
+      accumulated: { summary: { totalViolations: 7, severity: { critical: 1, major: 1, minor: 5 } } },
       filteredTrend: [],
       dashboard: { trend: [{ runId: 'r1' }, { runId: 'r2' }] },
     });
-    expect(result.violationsCount).toBe(7);
+    expect(result.violationsCount).toBe(2);
     expect(result.historyCount).toBe(2);
   });
 
