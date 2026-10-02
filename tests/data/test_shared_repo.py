@@ -72,7 +72,7 @@ def test_unshallow_failure_falls_through_to_plain_fetch_and_is_logged(tmp_path, 
 
     real_run_git = run_git
 
-    def flaky_unshallow(args, cwd=None, timeout=None):
+    def flaky_unshallow(args, cwd=None, timeout=None, env=None):
         if "--unshallow" in args:
             return False, "fatal: could not read from remote repository"
         return real_run_git(args, cwd=cwd, timeout=timeout)
@@ -100,7 +100,7 @@ def test_refresh_shared_clone_passes_explicit_timeout_to_both_git_calls(tmp_path
     seen_timeouts: list[int] = []
     real_run_git = run_git
 
-    def _spy(args, *, cwd=None, timeout=None):
+    def _spy(args, *, cwd=None, timeout=None, env=None):
         seen_timeouts.append(timeout)
         return real_run_git(args, cwd=cwd, timeout=timeout)
 
@@ -121,7 +121,7 @@ def test_refresh_shared_clone_default_timeout_is_bounded_not_300s(tmp_path, monk
     seen_timeouts: list[int] = []
     real_run_git = run_git
 
-    def _spy(args, *, cwd=None, timeout=None):
+    def _spy(args, *, cwd=None, timeout=None, env=None):
         seen_timeouts.append(timeout)
         return real_run_git(args, cwd=cwd, timeout=timeout)
 

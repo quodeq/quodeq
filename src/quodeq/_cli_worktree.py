@@ -26,6 +26,7 @@ import tempfile as _tempfile
 import time
 from pathlib import Path
 
+from quodeq.data.git_cli import git_env_floor
 from quodeq.shared.constants import GIT_BIN, GIT_FLAG_C, RETRY_JITTER_S
 
 _logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ def _git(repo_dir: Path, *args: str, timeout: float, check: bool = False) -> sub
     return subprocess.run(
         [GIT_BIN, GIT_FLAG_C, str(repo_dir), *args],
         capture_output=True, text=True, encoding="utf-8", check=check, timeout=timeout,
+        env=git_env_floor(), stdin=subprocess.DEVNULL,
     )
 
 

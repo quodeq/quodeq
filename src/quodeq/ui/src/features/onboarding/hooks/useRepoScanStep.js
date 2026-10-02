@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { getProjectScan as apiGetProjectScan } from '../../../api/index.js';
-import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { useRef, useState } from 'react';
+import { getProjectScan as apiGetProjectScan, probeGit as apiProbeGit } from '../../../api/index.js';
+import { apiErrorMessage, apiErrorDetail, isAccessCode } from '../../../strings/apiErrors.js';
 import { writeString } from '../../../adapters/storage.js';
 import { LAST_CLONE_ROOT_STORAGE_KEY, HTTP_STATUS } from '../../../constants.js';
 
@@ -8,7 +8,7 @@ import { LAST_CLONE_ROOT_STORAGE_KEY, HTTP_STATUS } from '../../../constants.js'
 // picker (once a remote URL needs a local destination).
 export const REPO_SCAN_SUB_STEP = Object.freeze({ INPUT: 'input', CLONE_TARGET: 'cloneTarget' });
 
-const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
+const URL_RE = /^(https?:\/\/|git@|ssh:\/\/)/i;
 // Lifts the adapter's 30s default so a resume scan (which reads a project
 // that may not have finished its first scan yet) isn't cut short.
 const RESUME_SCAN_TIMEOUT_MS = 120000;
@@ -85,21 +85,33 @@ export function makeHandleSubmit({ state, actions, createProject, setSubStep, se
   };
 }
 
+function accessFailureFrom(err) {
+  const b = err?.body || {};
+  return { kind: b.kind, detail: b.detail || '', host: b.host || '', isGitHub: Boolean(b.isGitHub) };
+}
+
 /**
- * Builds the clone-target submit handler: clones the URL into the chosen
- * destination and scans it. A non-ephemeral destination is remembered as the
- * default for the next clone. Like handleSubmit, an already-registered repo
- * resumes rather than fails.
+ * Builds the clone-target submit handler. Probes the URL first: an unreachable
+ * verdict opens the access panel instead of starting a clone that cannot
+ * succeed. A reachable one clones into the chosen destination and scans. The
+ * last submit is remembered so the panel can retry it once access is fixed.
  */
-export function makeHandleCloneTargetSubmit({ state, actions, createProject, setSubStep, setCloneError, setCloneSubmitting, tryResumeExisting }) {
+export function makeHandleCloneTargetSubmit({ state, actions, createProject, probeGit, setSubStep, setCloneError, setCloneDetail, setCloneSubmitting, setAccessFailure, lastSubmitRef, tryResumeExisting }) {
   return async function handleCloneTargetSubmit({ cloneDest, ephemeral }) {
     const repo = state.repo.value?.trim();
+    lastSubmitRef.current = { cloneDest, ephemeral };
     setCloneSubmitting(true);
     setCloneError(null);
-    actions.startScan();
+    setCloneDetail('');
+    setAccessFailure(null);
     try {
-      const payload = { repo, cloneDest, ephemeral };
-      const { projectId, scanData } = await createProject(payload);
+      const access = await probeGit(repo);
+      if (!access.reachable) {
+        setAccessFailure({ kind: access.kind, detail: access.detail || '', host: access.host || '', isGitHub: Boolean(access.isGitHub) });
+        return;
+      }
+      actions.startScan();
+      const { projectId, scanData } = await createProject({ repo, cloneDest, ephemeral });
       if (cloneDest && !ephemeral) {
         const ok = writeString(LAST_CLONE_ROOT_STORAGE_KEY, cloneDest);
         if (!ok) console.warn('[useRepoScanStep] could not persist clone destination'); // private mode
@@ -111,8 +123,14 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
         setSubStep(REPO_SCAN_SUB_STEP.INPUT);
         return;
       }
+      if (isAccessCode(err.code)) {
+        setAccessFailure(accessFailureFrom(err));
+        actions.resetScan();
+        return;
+      }
       const message = friendlyCloneError(err);
       setCloneError(message);
+      setCloneDetail(apiErrorDetail(err));
       actions.failScan({ message, status: err.status, existingProjectId: err.existingProjectId, code: err.code });
     } finally {
       setCloneSubmitting(false);
@@ -126,27 +144,51 @@ export function makeHandleCloneTargetSubmit({ state, actions, createProject, set
  *
  * `getProjectScan` is injectable for tests.
  */
-export function useRepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan = apiGetProjectScan }) {
+export function useRepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan = apiGetProjectScan, probeGit = apiProbeGit }) {
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
   const [subStep, setSubStep] = useState(REPO_SCAN_SUB_STEP.INPUT);
   const [cloneSubmitting, setCloneSubmitting] = useState(false);
   const [cloneError, setCloneError] = useState(null);
+  const [cloneDetail, setCloneDetail] = useState('');
+  const [accessFailure, setAccessFailure] = useState(null);
+  const lastSubmitRef = useRef(null);
+  // A ref, not cloneSubmitting: two retries in the same tick ("test again"
+  // and a sign-in finishing) would both read the stale state and clone twice.
+  const cloneInFlightRef = useRef(false);
 
   const tryResumeExisting = makeTryResumeExisting({ getProjectInfo, getProjectScan, actions });
   const handleSubmit = makeHandleSubmit({ state, actions, createProject, setSubStep, setCloneError, tryResumeExisting });
-  const handleCloneTargetSubmit = makeHandleCloneTargetSubmit({
-    state, actions, createProject, setSubStep, setCloneError, setCloneSubmitting, tryResumeExisting,
+  const submitCloneTarget = makeHandleCloneTargetSubmit({
+    state, actions, createProject, probeGit, setSubStep, setCloneError, setCloneDetail, setCloneSubmitting,
+    setAccessFailure, lastSubmitRef, tryResumeExisting,
   });
+
+  async function handleCloneTargetSubmit(args) {
+    cloneInFlightRef.current = true;
+    try {
+      await submitCloneTarget(args);
+    } finally {
+      cloneInFlightRef.current = false;
+    }
+  }
 
   function handleFolderSelect(path) {
     actions.setRepo({ value: path, source: 'local' });
     setFolderBrowserOpen(false);
   }
 
+  function clearAccessFailure() { setAccessFailure(null); }
+  function retryClone() {
+    // A retry while a probe or clone is still running is a no-op: the running one already uses the latest access.
+    if (!lastSubmitRef.current || cloneInFlightRef.current) return Promise.resolve();
+    return handleCloneTargetSubmit(lastSubmitRef.current);
+  }
+
   return {
     folderBrowserOpen, setFolderBrowserOpen,
     subStep, setSubStep,
-    cloneSubmitting, cloneError, setCloneError,
+    cloneSubmitting, cloneError, setCloneError, cloneDetail,
+    accessFailure, clearAccessFailure, retryClone,
     handleSubmit, handleCloneTargetSubmit, handleFolderSelect,
   };
 }

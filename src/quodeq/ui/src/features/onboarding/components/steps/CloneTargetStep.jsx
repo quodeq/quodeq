@@ -3,12 +3,13 @@ import { TermHeader } from '../../../../components/terminal/index.js';
 import { t } from '../../../../strings/index.js';
 import { readString } from '../../../../adapters/storage.js';
 import { LAST_CLONE_ROOT_STORAGE_KEY } from '../../../../constants.js';
+import AccessPanel from '../../../github-access/components/AccessPanel.jsx';
 
 function readInitialDest() {
   return readString(LAST_CLONE_ROOT_STORAGE_KEY) || '~';
 }
 
-function CloneTargetForm({ cloneDest, setCloneDest, submitting, error, handleSubmit, onBack }) {
+function CloneTargetForm({ cloneDest, setCloneDest, submitting, error, detail, accessFailure, handleSubmit, onBack }) {
   return (
     <form onSubmit={handleSubmit} className="onboarding-clone-target__form">
       <label htmlFor="clone-dest-input" className="onboarding-clone-target__label">{t('onboarding.cloneDestLabel')}</label>
@@ -24,7 +25,12 @@ function CloneTargetForm({ cloneDest, setCloneDest, submitting, error, handleSub
       <p className="onboarding-clone-target__hint">
         {t('onboarding.cloneDestDesc')}
       </p>
-      {error && <p className="onboarding-clone-target__error" role="alert">{error}</p>}
+      {!accessFailure && error && (
+        <div className="onboarding-clone-target__error" role="alert">
+          <p>{error}</p>
+          {detail && <pre className="access-card__cmd"><code>{detail}</code></pre>}
+        </div>
+      )}
 
       <div className="onboarding-step__actions">
         <button
@@ -53,6 +59,10 @@ export default function CloneTargetStep({
   onBack,
   submitting = false,
   error = null,
+  detail = '',
+  accessFailure = null,
+  onAccessResolved,
+  onRetry,
   stepIndex = 0,
   stepTotal = 0,
 }) {
@@ -75,8 +85,12 @@ export default function CloneTargetStep({
 
       <CloneTargetForm
         cloneDest={cloneDest} setCloneDest={setCloneDest} submitting={submitting} error={error}
+        detail={detail} accessFailure={accessFailure}
         handleSubmit={handleSubmit} onBack={onBack}
       />
+      {accessFailure && (
+        <AccessPanel failure={accessFailure} url={repoUrl} onResolved={onAccessResolved} onRetry={onRetry} />
+      )}
 
       <div className="onboarding-clone-target__escape-hatch">
         <button

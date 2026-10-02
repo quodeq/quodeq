@@ -134,3 +134,13 @@ def test_default_status_used_when_omitted(monkeypatch):
     shared_connect_job._default_status.set(state="running")
     assert is_connect_running()
     assert start_connect(_URL, spawn=_inline) == ConnectStartResult.ALREADY_RUNNING
+
+
+def test_run_connect_job_forwards_env_to_connect(status):
+    seen = {}
+
+    def connect(url, **kw):
+        seen.update(kw)
+        return ConnectOutcome(status=RepoFormat.OK, url=url)
+    run_connect_job(_URL, status=status, connect=connect, env={"GIT_CONFIG_COUNT": "1"})
+    assert seen["env"] == {"GIT_CONFIG_COUNT": "1"}

@@ -96,6 +96,31 @@ const CODE_KEYS = {
 
   // Confirmation gates: delete-all findings, delete project.
   CONFIRMATION_REQUIRED: 'apiError.confirmationRequired',
+
+  // Access ladder (routes_github_access.py): the pre-clone probe's verdict,
+  // the clone's own new codes, and GitHub sign-in.
+  ACCESS_AUTH_REQUIRED: 'apiError.accessAuthRequired',
+  ACCESS_NOT_FOUND: 'apiError.accessNotFound',
+  ACCESS_HOST_KEY: 'apiError.accessHostKey',
+  ACCESS_NETWORK: 'apiError.accessNetwork',
+  ACCESS_TIMEOUT: 'apiError.accessTimeout',
+  ACCESS_GIT_MISSING: 'apiError.accessGitMissing',
+  ACCESS_GIT_TOO_OLD: 'apiError.accessGitTooOld',
+  ACCESS_UNKNOWN: 'apiError.accessUnknown',
+  ACCESS_USE_HTTPS: 'apiError.accessUseHttps',
+  CLONE_UNKNOWN: 'apiError.cloneUnknown',
+  CLONE_TIMEOUT: 'apiError.cloneTimeout',
+  HOST_KEY_UNVERIFIED: 'apiError.hostKeyUnverified',
+  GIT_MISSING: 'apiError.gitMissing',
+  TOKEN_INVALID: 'apiError.tokenInvalid',
+  TOKEN_SCOPE: 'apiError.tokenScope',
+  TOKEN_REQUIRED: 'apiError.tokenRequired',
+  OFFLINE: 'apiError.githubOffline',
+  GITHUB_NOT_CONFIGURED: 'apiError.githubNotConfigured',
+  GITHUB_REFUSED: 'apiError.githubRefused',
+  NO_FLOW: 'apiError.noFlow',
+  FLOW_START_FAILED: 'apiError.flowStartFailed',
+  FLOW_FAILED: 'apiError.flowFailed',
 };
 
 /** The catalog key for a backend code, or null when the code is unmapped. */
@@ -136,4 +161,17 @@ export function apiErrorMessage(err, fallbackKey) {
   if (key) return t(key, envelopeVars(err));
   const message = err?.message;
   return (typeof message === 'string' && message !== '') ? message : t(fallbackKey);
+}
+
+const ACCESS_CODE_PREFIX = 'ACCESS_';
+
+/** The output tail the backend attached to a clone or probe failure, or ''. */
+export function apiErrorDetail(err) {
+  const detail = err?.body?.detail;
+  return typeof detail === 'string' ? detail : '';
+}
+
+/** True for a pre-clone probe verdict (ACCESS_<KIND>), which the access panel renders. */
+export function isAccessCode(code) {
+  return typeof code === 'string' && code.toUpperCase().startsWith(ACCESS_CODE_PREFIX);
 }

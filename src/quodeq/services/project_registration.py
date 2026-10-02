@@ -90,7 +90,8 @@ def register_project(
         repo=spec.repo, repo_resolved=repo_resolved, project_name=project_name,
         project_uuid=project_uuid, project_dir=project_dir, reports_path=reports_path,
         scope_path=spec.scope_path, is_url=is_url, ephemeral=spec.ephemeral,
-        clone_dest=spec.clone_dest, clones_dir=clones_dir, log=log,
+        clone_dest=spec.clone_dest, clones_dir=clones_dir,
+        git_env=spec.git_env, clone_url=spec.clone_url, log=log,
     ))
 
     _sync_repo_index_on_create(
@@ -158,7 +159,8 @@ def register_project_with_rollback(
         return _rollback_and_report(rollback, CreateProjectStatus.INVALID_REPO, str(exc))
     except CloneError as exc:
         return _rollback_and_report(
-            rollback, CreateProjectStatus.CLONE_FAILED, str(exc), clone_error_kind=exc.kind,
+            rollback, CreateProjectStatus.CLONE_FAILED, str(exc),
+            clone_error_kind=exc.kind, clone_stderr=exc.stderr,
         )
     except Exception:
         # An unhandled failure: clean up any partial project directory, then

@@ -4,8 +4,9 @@ import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { t } from '../../../strings/index.js';
-import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { apiErrorMessage, isAccessCode } from '../../../strings/apiErrors.js';
 import { SettingsRowLabel } from './settingsRowParts.jsx';
+import AccessPanel from '../../github-access/components/AccessPanel.jsx';
 import { runExclusive } from '../settingsHelpers.js';
 
 // Groups the section's own useState/useRef declarations so the outer
@@ -16,11 +17,12 @@ function useSharedRepoFields() {
   const [newUrl, setNewUrl] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState(null);
+  const [accessFailure, setAccessFailure] = useState(null);
   // Guards for synchronous dedup of save/disconnect calls
   const savingRef = useRef(false);
   const disconnectingRef = useRef(false);
   const initializedRef = useRef(false);
-  return { newUrl, setNewUrl, confirming, setConfirming, error, setError, savingRef, disconnectingRef, initializedRef };
+  return { newUrl, setNewUrl, confirming, setConfirming, error, setError, accessFailure, setAccessFailure, savingRef, disconnectingRef, initializedRef };
 }
 
 // Initialize newUrl when currentUrl changes (only once per status update)
@@ -35,15 +37,22 @@ function useInitNewUrl({ currentUrl, setNewUrl, initializedRef }) {
   }, [currentUrl]);
 }
 
-function buildConnectMutationConfig({ connectShared, setError, setNewUrl, refetchStatus, savingRef, queryClient }) {
+function buildConnectMutationConfig({ connectShared, setError, setAccessFailure, setNewUrl, refetchStatus, savingRef, queryClient }) {
   return {
     mutationFn: (url) => runExclusive(savingRef, async () => {
       setError(null);
+      setAccessFailure(null);
       const result = await connectShared(url);
       setNewUrl(result?.url || url);
       await refetchStatus();
       return result;
-    }, (err) => setError(apiErrorMessage(err, 'settings.connectFailed'))),
+    }, (err) => {
+      if (isAccessCode(err?.code)) {
+        setAccessFailure({ kind: err.body?.kind, detail: err.body?.detail || '', host: err.body?.host || '', isGitHub: Boolean(err.body?.isGitHub), cloneUrl: err.body?.cloneUrl || '' });
+        return;
+      }
+      setError(apiErrorMessage(err, 'settings.connectFailed'));
+    }),
     onSuccess: () => {
       // Everything "shared"-prefixed, not just status: ProjectsPage's
       // useSharedProjects and usePublish read the SAME cache entries (audit
@@ -197,7 +206,7 @@ export default function SharedRepoSection({ onDisconnected }) {
   const { getSharedStatus, connectShared, disconnectShared } = useApi();
   const queryClient = useQueryClient();
 
-  const { newUrl, setNewUrl, confirming, setConfirming, error, setError, savingRef, disconnectingRef, initializedRef } = useSharedRepoFields();
+  const { newUrl, setNewUrl, confirming, setConfirming, error, setError, accessFailure, setAccessFailure, savingRef, disconnectingRef, initializedRef } = useSharedRepoFields();
 
   const { data: status, isLoading, refetch: refetchStatus } = useQuery(buildStatusQueryConfig(getSharedStatus));
 
@@ -206,7 +215,7 @@ export default function SharedRepoSection({ onDisconnected }) {
 
   useInitNewUrl({ currentUrl, setNewUrl, initializedRef });
 
-  const connectMutation = useMutation(buildConnectMutationConfig({ connectShared, setError, setNewUrl, refetchStatus, savingRef, queryClient }));
+  const connectMutation = useMutation(buildConnectMutationConfig({ connectShared, setError, setAccessFailure, setNewUrl, refetchStatus, savingRef, queryClient }));
 
   const disconnectMutation = useMutation(buildDisconnectMutationConfig({
     disconnectShared, setError, setNewUrl, setConfirming, refetchStatus, disconnectingRef, queryClient, onDisconnected,
@@ -234,7 +243,13 @@ export default function SharedRepoSection({ onDisconnected }) {
 
       <UrlStatusRow isLoading={isLoading} status={status} configured={configured} currentUrl={currentUrl} />
       <UrlInputRow newUrl={newUrl} setNewUrl={setNewUrl} isSaving={isSaving} isDisconnecting={isDisconnecting} handleSave={handleSave} />
-      <ErrorRow error={error} />
+      {accessFailure ? (
+        <div className="settings-row settings-row--last">
+          <AccessPanel failure={accessFailure} url={newUrl.trim()} onResolved={handleSave} onRetry={handleSave} />
+        </div>
+      ) : (
+        <ErrorRow error={error} />
+      )}
 
       <DisconnectRow
         configured={configured} confirming={confirming} setConfirming={setConfirming}

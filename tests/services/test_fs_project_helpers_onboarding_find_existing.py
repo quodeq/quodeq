@@ -139,7 +139,7 @@ def test_find_existing_project_resolves_a_url_registered_project(tmp_path):
     clone_dest.mkdir()
     url = "https://github.com/example/repo.git"
 
-    def fake_clone(_url, dest):
+    def fake_clone(_url, dest, env=None):
         Path(dest).mkdir(parents=True, exist_ok=True)
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()

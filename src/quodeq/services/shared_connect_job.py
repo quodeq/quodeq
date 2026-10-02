@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from http import HTTPStatus
 from typing import Callable
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.services.github_access import forget_url
 from quodeq.services.job_status import JobSlotStatus
 from quodeq.services.shared_connect import ConnectOutcome, ConnectStatus, connect_shared_repo
 from quodeq.services.shared_repo import RepoFormat, validate_remote_url
@@ -127,10 +129,12 @@ def _fail(status: ConnectJobStatus, message: str, code: str) -> None:
 
 def _do_connect(
     url: str, status: ConnectJobStatus, connect: Callable[..., ConnectOutcome] | None,
-    log: LogSink,
+    log: LogSink, env: Mapping[str, str] | None = None,
 ) -> None:
-    failure = connect_failure((connect or connect_shared_repo)(url, log=log))
+    failure = connect_failure((connect or connect_shared_repo)(url, log=log, env=env))
     if failure is not None:
+        if failure.code == CODE_CLONE_FAILED:
+            forget_url(url)  # a stale "reachable" cache entry must not outlive a failed clone
         _fail(status, failure.message, failure.code)
         return
     status.set(state=ConnectState.DONE, code=None, error=None, finished_at=time.time())
@@ -139,7 +143,7 @@ def _do_connect(
 def run_connect_job(
     url: str, *, status: ConnectJobStatus,
     connect: Callable[..., ConnectOutcome] | None = None,
-    log: LogSink = NULL_LOG,
+    log: LogSink = NULL_LOG, env: Mapping[str, str] | None = None,
 ) -> None:
     """Connect to *url* and record the result in *status*.
 
@@ -148,7 +152,7 @@ def run_connect_job(
     the slot never stays stuck at running.
     """
     run_isolated(
-        lambda: _do_connect(url, status, connect, log),
+        lambda: _do_connect(url, status, connect, log, env),
         label="connect", log=log,
         on_error=lambda _exc: _fail(status, MESSAGE_CONNECT_UNEXPECTED, CODE_CONNECT_FAILED),
     )
@@ -171,6 +175,7 @@ def start_connect(
     status: ConnectJobStatus | None = None,
     spawn: Callable[[Callable[[], None]], None] = _spawn_daemon,
     log: LogSink = NULL_LOG,
+    env: Mapping[str, str] | None = None,
 ) -> ConnectStartResult:
     """Kick off a background connect to *url*.
 
@@ -181,7 +186,7 @@ def start_connect(
     if not status.claim(url):
         return ConnectStartResult.ALREADY_RUNNING
     try:
-        spawn(lambda: run_connect_job(url, status=status, log=log))
+        spawn(lambda: run_connect_job(url, status=status, log=log, env=env))
     except RuntimeError as exc:
         _fail(status, MESSAGE_CONNECT_START_FAILED, CODE_CONNECT_FAILED)
         log.error(f"failed to start connect thread, {exc}")

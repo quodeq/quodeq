@@ -15,6 +15,11 @@ export function makeFakeApi(overrides = {}) {
     getSharedStatus: vi.fn(async () => ({ configured: false, url: null })),
     connectShared: vi.fn(async (url) => ({ configured: true, url })),
     disconnectShared: vi.fn(async () => ({ configured: false })),
+    probeGit: vi.fn(),
+    getGithubAccount: vi.fn(),
+    startDeviceFlow: vi.fn(),
+    getDeviceFlow: vi.fn(),
+    pasteGithubToken: vi.fn(),
     ...overrides,
   };
 }

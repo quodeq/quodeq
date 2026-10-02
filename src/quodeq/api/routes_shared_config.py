@@ -16,6 +16,8 @@ from typing import Callable
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_INVALID_INPUT, QUERY_FLAG_TRUE
+from quodeq.api.routes_github_access import same_url_access_error
+from quodeq.services.github_access import refresh_access_env, resolve_access
 from quodeq.services.shared_connect_job import (
     ConnectStartResult,
     get_connect_status,
@@ -34,11 +36,11 @@ from quodeq.services.shared_settings import read_settings
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import path_segment_error
 
-from .helpers import json_error, optional_json_object_or_response
+from ._url_body import required_url_or_error
+from .helpers import json_error
 from .routes_common import reports_dir
 from .routes_shared_common import no_shared_repo_error
 
-CODE_URL_REQUIRED = "URL_REQUIRED"
 CODE_CONNECT_IN_PROGRESS = "CONNECT_IN_PROGRESS"
 CODE_CONNECT_START_FAILED = "CONNECT_START_FAILED"
 CODE_CONFIRMATION_REQUIRED = "CONFIRMATION_REQUIRED"
@@ -88,16 +90,19 @@ def shared_config_put() -> Response | tuple[Response, int]:
     check run as a background job and this answers 202; the outcome is
     reported under ``connect`` in GET /api/shared/status.
     """
-    body = optional_json_object_or_response(CODE_INVALID_INPUT)
-    if not isinstance(body, dict):
-        return body
-    url = str(body.get("url") or "").strip()
-    if not url:
-        return json_error("url is required", HTTPStatus.BAD_REQUEST, CODE_URL_REQUIRED)
+    url = required_url_or_error()
+    if not isinstance(url, str):
+        return url
     failure = url_failure(url)
     if failure is not None:
         return json_error(failure.message, failure.http_status, failure.code)
-    outcome = start_connect(url, log=SHARED_LOG)
+    # The clone dir is keyed by the configured URL, so an ssh results-repo URL
+    # reachable only through a token rung (https) is refused with the https form.
+    access = resolve_access(url)
+    error = same_url_access_error(url, access)
+    if error is not None:
+        return error
+    outcome = start_connect(url, log=SHARED_LOG, env=access.env)
     if outcome == ConnectStartResult.ALREADY_RUNNING:
         return json_error(MESSAGE_CONNECT_IN_PROGRESS, HTTPStatus.CONFLICT, CODE_CONNECT_IN_PROGRESS)
     if outcome != ConnectStartResult.STARTED:
@@ -129,11 +134,11 @@ def shared_config_delete() -> Response | tuple[Response, int]:
     return jsonify({"configured": False})
 
 
-def _shared_refresh(refresh_clone: Callable[[str], tuple[bool, str | None]]) -> Response | tuple[Response, int]:
+def _shared_refresh(refresh_clone: Callable[..., tuple[bool, str | None]]) -> Response | tuple[Response, int]:
     settings = read_settings()
     if not settings.url:
         return no_shared_repo_error(HTTPStatus.BAD_REQUEST)
-    ok, reason = refresh_clone(settings.url)
+    ok, reason = refresh_clone(settings.url, env=refresh_access_env(settings.url))
     if not ok:
         return (
             jsonify(
@@ -156,7 +161,11 @@ def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tu
     settings = read_settings()
     if not settings.url:
         return no_shared_repo_error(HTTPStatus.BAD_REQUEST)
-    outcome = start_publish(project, settings.url, evaluations_root=Path(reports_dir()))
+    access = resolve_access(settings.url)
+    error = same_url_access_error(settings.url, access)
+    if error is not None:
+        return error
+    outcome = start_publish(project, settings.url, evaluations_root=Path(reports_dir()), env=access.env)
     if outcome == PublishStartResult.ALREADY_RUNNING:
         return json_error("a publish is already running", HTTPStatus.CONFLICT, "PUBLISH_IN_PROGRESS")
     if outcome != PublishStartResult.STARTED:

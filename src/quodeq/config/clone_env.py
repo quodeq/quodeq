@@ -32,3 +32,16 @@ def clone_shallow_months(env: dict[str, str] | None = None) -> int:
     Malformed values fall back to the default (4).
     """
     return env_int("QUODEQ_CLONE_SHALLOW_MONTHS", _DEFAULT_SHALLOW_MONTHS, env=env, warn=False)
+
+
+_GIT_PROBE_TIMEOUT_DEFAULT_S = 15  # QUODEQ_GIT_PROBE_TIMEOUT_S fallback
+
+
+def git_probe_timeout_s(env: dict[str, str] | None = None) -> int:
+    """Timeout for the pre-clone reachability probe (``git ls-remote``).
+
+    Honors QUODEQ_GIT_PROBE_TIMEOUT_S; malformed or sub-1 values fall back
+    to the default (15). Short on purpose: the probe exists so a missing
+    credential surfaces in seconds, not at the 300 s clone timeout.
+    """
+    return env_int("QUODEQ_GIT_PROBE_TIMEOUT_S", _GIT_PROBE_TIMEOUT_DEFAULT_S, minimum=1, env=env)

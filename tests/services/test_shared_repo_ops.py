@@ -21,7 +21,7 @@ def test_connect_uses_injected_ops():
         calls["read_state"] = url
         return RepoFormat.MISSING
 
-    def fake_ensure_clone(url):
+    def fake_ensure_clone(url, env=None):
         calls["ensure_clone"] = url
         return "fake-repo-handle"
 
@@ -57,7 +57,7 @@ def test_connect_invalid_url_never_reaches_clone():
     def fake_validate(url):
         raise ValueError("bad url")
 
-    def fake_ensure_clone(url):
+    def fake_ensure_clone(url, env=None):
         calls["ensure_clone"] += 1
         return None
 
@@ -72,7 +72,7 @@ def test_connect_default_ops_still_resolve_to_the_patched_module_globals():
     """Existing patch targets keep biting: no ops injected -> falls back to
     shared_connect's own validate_remote_url/ensure_shared_clone globals."""
     with patch("quodeq.services.shared_connect.validate_remote_url", lambda url: None), \
-         patch("quodeq.services.shared_connect.ensure_shared_clone", lambda url: None):
+         patch("quodeq.services.shared_connect.ensure_shared_clone", lambda url, env=None: None):
         outcome = connect_shared_repo("https://example.com/repo.git")
 
     assert outcome.status == ConnectStatus.CLONE_FAILED

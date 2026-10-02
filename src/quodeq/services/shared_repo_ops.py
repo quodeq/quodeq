@@ -25,8 +25,8 @@ class SharedRepoOps:
 
     validate: Callable[[str], None] | None = None
     read_state: Callable[[str], "RepoFormat"] | None = None
-    ensure_clone: Callable[[str], object] | None = None
-    refresh_clone: Callable[[str], object] | None = None
+    ensure_clone: Callable[..., object] | None = None
+    refresh_clone: Callable[..., object] | None = None
     check_format: Callable[[object], "RepoFormat"] | None = None
     read_settings: Callable[[], "SharedSettings"] | None = None
     write_settings: Callable[..., None] | None = None

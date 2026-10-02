@@ -27,6 +27,7 @@ const SECTIONS = [
   { id: 'getting-started', labelKey: 'help.navGettingStarted' },
   { id: 'projects', labelKey: 'help.navProjects' },
   { id: 'shared-repo', labelKey: 'help.navSharedRepo' },
+  { id: 'github-access', labelKey: 'help.navGithubAccess' },
   { id: 'providers', labelKey: 'help.navProviders' },
   { id: 'evaluations', labelKey: 'help.navEvaluations' },
   { id: HELP_SECTION.OVERVIEW, labelKey: 'help.navOverview' },

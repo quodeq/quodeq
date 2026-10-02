@@ -24,7 +24,7 @@ def test_refresh_failure_returns_502(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
     monkeypatch.setattr(
         "quodeq.api.routes_shared_config.refresh_shared_clone",
-        lambda url: (False, "Could not resolve host"),
+        lambda url, env=None: (False, "Could not resolve host"),
     )
     resp = client.post("/api/shared/refresh", headers=_ORIGIN)
     assert resp.status_code == 502
@@ -39,7 +39,7 @@ def test_refresh_failure_body_carries_error_reason(client, tmp_path, monkeypatch
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
     monkeypatch.setattr(
         "quodeq.api.routes_shared_config.refresh_shared_clone",
-        lambda url: (False, "Could not resolve host github.com"),
+        lambda url, env=None: (False, "Could not resolve host github.com"),
     )
     resp = client.post("/api/shared/refresh", headers=_ORIGIN)
     assert resp.status_code == 502
@@ -51,7 +51,7 @@ def test_refresh_failure_has_code(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
     monkeypatch.setattr(
         "quodeq.api.routes_shared_config.refresh_shared_clone",
-        lambda url: (False, "Could not resolve host"),
+        lambda url, env=None: (False, "Could not resolve host"),
     )
     resp = client.post("/api/shared/refresh", headers=_ORIGIN)
     assert resp.status_code == 502
@@ -64,7 +64,7 @@ def test_refresh_failure_has_code(client, tmp_path, monkeypatch):
 def test_refresh_success_200(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
     monkeypatch.setattr(
-        "quodeq.api.routes_shared_config.refresh_shared_clone", lambda url: (True, "")
+        "quodeq.api.routes_shared_config.refresh_shared_clone", lambda url, env=None: (True, "")
     )
     resp = client.post("/api/shared/refresh", headers=_ORIGIN)
     assert resp.status_code == 200

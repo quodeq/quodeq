@@ -14,7 +14,7 @@ from quodeq.services.base import NewProjectSpec
 from quodeq.services.filesystem import FilesystemActionProvider
 
 
-def _fake_clone(_url: str, dest: Path) -> None:
+def _fake_clone(_url: str, dest: Path, env=None) -> None:
     Path(dest).mkdir(parents=True, exist_ok=True)
     (Path(dest) / ".git").mkdir()
     (Path(dest) / "main.py").write_text("print('hi')\n")

@@ -34,6 +34,7 @@ from quodeq.services._publish_staging import (
     merge_actions_log,
     stage_project,
 )
+from quodeq.services.github_access import forget_url
 from quodeq.services.job_status import JobSlotStatus
 from quodeq.services.wiring import (
     RepoFormat,
@@ -97,13 +98,13 @@ def _prepare_workspace(
         yield project_dir, repo
 
 
-def _commit_and_push(repo: Path, project_id: str, count: int) -> None:
+def _commit_and_push(repo: Path, project_id: str, count: int, env: dict | None = None) -> None:
     ok, out = stage_publish_paths(repo, project_id)
     if not ok:
         raise PublishError(f"git add failed, {out.strip()[:GIT_ERROR_SNIPPET_MAX_CHARS]}")
 
     commit_staged_changes(repo, project_id, count)
-    push_with_rebase_fallback(repo)
+    push_with_rebase_fallback(repo, env)
 
 
 def publish_project(
@@ -123,7 +124,7 @@ def publish_project(
         except (OSError, ValueError) as exc:
             raise PublishError(f"failed to stage project files, {exc}") from exc
 
-        _commit_and_push(repo, project_id, count)
+        _commit_and_push(repo, project_id, count, env)
         return count
 
 
@@ -170,19 +171,22 @@ def get_publish_status(status: PublishStatus | None = None) -> dict:
 
 def _do_publish(
     project_id: str, url: str, evaluations_root: Path, status: PublishStatus,
+    env: dict | None = None,
 ) -> None:
     try:
-        count = publish_project(project_id, url, evaluations_root=evaluations_root)
+        count = publish_project(project_id, url, evaluations_root=evaluations_root, env=env)
         status.set(state=PublishState.DONE, runs=count, error=None, finished_at=time.time())
     except PublishError as exc:
+        forget_url(url)  # a stale "reachable" cache entry must not outlive a failed push
         status.set(state=PublishState.ERROR, error=str(exc), finished_at=time.time())
 
 
 def _run_publish(
     project_id: str, url: str, evaluations_root: Path, status: PublishStatus,
+    env: dict | None = None,
 ) -> None:
     run_isolated(
-        lambda: _do_publish(project_id, url, evaluations_root, status),
+        lambda: _do_publish(project_id, url, evaluations_root, status, env),
         label="publish", log=logger,
         on_error=lambda _exc: status.set(
             state=PublishState.ERROR,
@@ -204,6 +208,7 @@ def start_publish(
     project_id: str, url: str, *,
     evaluations_root: Path,
     status: PublishStatus | None = None,
+    env: dict | None = None,
 ) -> str:
     """Kick off a background publish.
 
@@ -217,7 +222,7 @@ def start_publish(
         return PublishStartResult.ALREADY_RUNNING
     try:
         thread = threading.Thread(
-            target=_run_publish, args=(project_id, url, evaluations_root, status),
+            target=_run_publish, args=(project_id, url, evaluations_root, status, env),
             daemon=True,
         )
         thread.start()

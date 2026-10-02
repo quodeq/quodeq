@@ -12,6 +12,7 @@ vi.mock('../../../api/index.js', () => ({
   listStandards: vi.fn().mockResolvedValue([{ id: 'std-a', name: 'Security 101', description: 'Common checks' }]),
   getProjectInfo: vi.fn().mockResolvedValue({ id: 'uuid-9', runsCount: 0 }),
   getProjectScan: vi.fn().mockResolvedValue({ total_files: 7, languages: { py: 7 }, branches: ['main'], modules: [] }),
+  probeGit: vi.fn().mockResolvedValue({ reachable: true, kind: 'ok' }),
 }));
 
 describe('OnboardingWizard', () => {

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from quodeq.core.types import EvalPending, JobSnapshot, ViolationResponse, ViolationSummary
+from quodeq.shared.git_errors import GitFailureKind
 from quodeq.shared.constants import (  # re-export for backward compat
     DEFAULT_MAX_SUBAGENTS,
     DEFAULT_TIME_LIMIT,
@@ -51,6 +52,10 @@ class NewProjectSpec:
     scope_path: str | None = None
     clone_dest: str | None = None
     ephemeral: bool = False
+    # Environment for the clone subprocess, from the access ladder; None = ambient git.
+    git_env: dict[str, str] | None = field(default=None, repr=False)
+    # What to clone when it differs from ``repo`` (the ladder's HTTPS form); None = clone ``repo``.
+    clone_url: str | None = None
 
 
 class CreateProjectStatus(StrEnum):
@@ -70,7 +75,8 @@ class CreateProjectResult:
     scan_data: dict | None = None
     existing_project_id: str | None = None
     message: str = ""
-    clone_error_kind: str | None = None
+    clone_error_kind: GitFailureKind | None = None
+    clone_stderr: str = ""  # git's output for a CLONE_FAILED result; routes show its tail
 
 
 class ProjectActions(Protocol):
