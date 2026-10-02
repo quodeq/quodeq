@@ -89,7 +89,7 @@ def test_refresh_waits_for_publish(tmp_path, monkeypatch):
     commit_reached = threading.Event()
     real_run_git = shared_repo.run_git
 
-    def _recording_run_git(args, *, cwd=None, timeout=None):
+    def _recording_run_git(args, *, cwd=None, timeout=None, env=None):
         op = args[0] if args else "?"
         if op == "commit":
             commit_reached.set()

@@ -51,3 +51,20 @@ def test_push_failure_message_truncated_to_the_shared_length(tmp_path, monkeypat
     except PublishError as exc:
         embedded = str(exc).rsplit(". ", 1)[-1]
         assert len(embedded) == GIT_ERROR_SNIPPET_MAX_CHARS
+
+
+def test_push_with_rebase_fallback_forwards_env_to_remote_commands(tmp_path, monkeypatch):
+    seen = []
+
+    def fake_run_git(args, *, cwd=None, env=None):
+        seen.append((args[0], env))
+        return args[0] == "pull", ""
+
+    monkeypatch.setattr(shared_publish, "run_git", fake_run_git)
+    env = {"GIT_CONFIG_COUNT": "1"}
+    try:
+        push_with_rebase_fallback(tmp_path, env=env)
+    except PublishError:
+        pass  # the second push fails too; only the forwarded env matters here
+    remote = [e for verb, e in seen if verb in ("push", "pull", "ls-remote")]
+    assert len(remote) >= 3 and all(e == env for e in remote)

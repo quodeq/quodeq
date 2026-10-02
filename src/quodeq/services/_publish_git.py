@@ -27,11 +27,17 @@ _GIT_REMOTE_ORIGIN = "origin"
 _GIT_HEAD = "HEAD"
 
 
-def _run_git(args, *, cwd=None):
-    """Thin wrapper over shared_publish.run_git (see module docstring)."""
+def _run_git(args, *, cwd=None, env=None):
+    """Thin wrapper over shared_publish.run_git (see module docstring).
+
+    *env* (the access ladder's token environment) is forwarded only when set,
+    so ambient calls keep the plain ``run_git(args, cwd=...)`` shape.
+    """
     from quodeq.services import shared_publish as _sp
 
-    return _sp.run_git(args, cwd=cwd)
+    if env is None:
+        return _sp.run_git(args, cwd=cwd)
+    return _sp.run_git(args, cwd=cwd, env=env)
 
 
 def _warn_abort_failed(repo: Path, out: str) -> None:
@@ -109,7 +115,7 @@ def commit_staged_changes(repo: Path, project_id: str, count: int) -> None:
             raise PublishError(f"git commit failed, {out.strip()[:GIT_ERROR_SNIPPET_MAX_CHARS]}")
 
 
-def _push(repo: Path) -> tuple[bool, str]:
+def _push(repo: Path, env: dict | None = None) -> tuple[bool, str]:
     """Push HEAD to the remote's default branch.
 
     A fresh clone of a brand-new empty bare repo has no commits and no
@@ -118,18 +124,18 @@ def _push(repo: Path) -> tuple[bool, str]:
     instead, deriving the target branch name from the remote's symref (or
     falling back to the local clone's current branch name).
     """
-    ok, out = _run_git(["push", _GIT_REMOTE_ORIGIN, _GIT_HEAD], cwd=repo)
+    ok, out = _run_git(["push", _GIT_REMOTE_ORIGIN, _GIT_HEAD], cwd=repo, env=env)
     if ok:
         return ok, out
 
     # Fall back for a still-unborn remote default branch: push HEAD to an
     # explicit ref name rather than relying on origin/HEAD resolution.
-    branch = _remote_default_branch(repo) or _local_branch_name(repo)
-    return _run_git(["push", _GIT_REMOTE_ORIGIN, f"HEAD:refs/heads/{branch}"], cwd=repo)
+    branch = _remote_default_branch(repo, env) or _local_branch_name(repo)
+    return _run_git(["push", _GIT_REMOTE_ORIGIN, f"HEAD:refs/heads/{branch}"], cwd=repo, env=env)
 
 
-def _remote_default_branch(repo: Path) -> str | None:
-    ok, out = _run_git(["ls-remote", "--symref", _GIT_REMOTE_ORIGIN, _GIT_HEAD], cwd=repo)
+def _remote_default_branch(repo: Path, env: dict | None = None) -> str | None:
+    ok, out = _run_git(["ls-remote", "--symref", _GIT_REMOTE_ORIGIN, _GIT_HEAD], cwd=repo, env=env)
     if not ok:
         return None
     for line in out.splitlines():
@@ -147,16 +153,18 @@ def _local_branch_name(repo: Path) -> str:
     return name if ok and name and name != _GIT_HEAD else "main"
 
 
-def push_with_rebase_fallback(repo: Path) -> None:
+def push_with_rebase_fallback(repo: Path, env: dict | None = None) -> None:
     """Push, retrying once via rebase on a rejected push (a race with
     another publisher), and raise PublishError if both attempts fail."""
     from quodeq.services.shared_publish import GIT_ERROR_SNIPPET_MAX_CHARS, PublishError
 
-    ok, out = _push(repo)
+    ok, out = _push(repo, env)
     if not ok:
-        ok_rebase, out_rebase = _run_git(["pull", "--rebase", _GIT_REMOTE_ORIGIN, _GIT_HEAD], cwd=repo)
+        ok_rebase, out_rebase = _run_git(
+            ["pull", "--rebase", _GIT_REMOTE_ORIGIN, _GIT_HEAD], cwd=repo, env=env,
+        )
         if ok_rebase:
-            ok, out = _push(repo)
+            ok, out = _push(repo, env)
         else:
             # A real conflict wedges the persistent clone with a
             # lingering .git/rebase-merge directory, breaking every

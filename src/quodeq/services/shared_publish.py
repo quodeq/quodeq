@@ -97,13 +97,13 @@ def _prepare_workspace(
         yield project_dir, repo
 
 
-def _commit_and_push(repo: Path, project_id: str, count: int) -> None:
+def _commit_and_push(repo: Path, project_id: str, count: int, env: dict | None = None) -> None:
     ok, out = stage_publish_paths(repo, project_id)
     if not ok:
         raise PublishError(f"git add failed, {out.strip()[:GIT_ERROR_SNIPPET_MAX_CHARS]}")
 
     commit_staged_changes(repo, project_id, count)
-    push_with_rebase_fallback(repo)
+    push_with_rebase_fallback(repo, env)
 
 
 def publish_project(
@@ -123,7 +123,7 @@ def publish_project(
         except (OSError, ValueError) as exc:
             raise PublishError(f"failed to stage project files, {exc}") from exc
 
-        _commit_and_push(repo, project_id, count)
+        _commit_and_push(repo, project_id, count, env)
         return count
 
 

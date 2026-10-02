@@ -118,7 +118,7 @@ def ensure_shared_clone(url: str, env: Mapping[str, str] | None = None) -> Path 
         if (repo / GIT_DIR_NAME).exists():
             return repo
         repo.parent.mkdir(parents=True, exist_ok=True)
-        ok, out = run_git(["clone", "--", url, str(repo)])
+        ok, out = run_git(["clone", "--", url, str(repo)], env=env)
         if not ok:
             logger.warning("shared clone failed for %s: %s", url, out.strip()[:500])
             remove_clone_dir(repo)
@@ -137,7 +137,9 @@ def _refresh_missing_clone(url: str, env: Mapping[str, str] | None) -> tuple[boo
     return False, reason
 
 
-def _fetch_and_reset_clone(url: str, repo: Path, timeout: int) -> tuple[bool, str]:
+def _fetch_and_reset_clone(
+    url: str, repo: Path, timeout: int, env: Mapping[str, str] | None = None,
+) -> tuple[bool, str]:
     # Unshallowing only applies to NEW clones: ensure_shared_clone stopped
     # passing --depth 1 in a prior fix, but a shared-clone cache directory
     # created back when it still did stays shallow forever otherwise --
@@ -147,15 +149,15 @@ def _fetch_and_reset_clone(url: str, repo: Path, timeout: int) -> tuple[bool, st
     # failure there (network hiccup, odd remote) is not fatal -- fall through
     # to the plain fetch below, and a later refresh call retries the unshallow.
     if (repo / GIT_DIR_NAME / "shallow").exists():
-        ok, out = run_git(["fetch", "--unshallow", "origin"], cwd=repo, timeout=timeout)
+        ok, out = run_git(["fetch", "--unshallow", "origin"], cwd=repo, timeout=timeout, env=env)
         if not ok:
             logger.debug("refresh_shared_clone: unshallow failed for %s: %s", url, out.strip()[:200])
-    ok, out = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout)
+    ok, out = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout, env=env)
     if not ok:
         reason = out.strip()[:200]
         logger.warning("refresh_shared_clone: fetch failed for %s: %s", url, reason)
         return False, reason
-    ok, out = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout)
+    ok, out = run_git(["reset", "--hard", "FETCH_HEAD"], cwd=repo, timeout=timeout, env=env)
     if not ok:
         reason = out.strip()[:200]
         logger.warning("refresh_shared_clone: reset failed for %s: %s", url, reason)
@@ -196,7 +198,7 @@ def refresh_shared_clone(
         repo = shared_repo_path(url, env)
         if not (repo / GIT_DIR_NAME).exists():
             return _refresh_missing_clone(url, env)
-        return _fetch_and_reset_clone(url, repo, timeout)
+        return _fetch_and_reset_clone(url, repo, timeout, env)
 
 
 def last_synced_at(url: str, env: Mapping[str, str] | None = None) -> float | None:
