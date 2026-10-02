@@ -111,6 +111,33 @@ describe('ProjectsPage — header actions and the connect card', () => {
   });
 });
 
+// A failed connect is reported by the card only; the strip keeps the working repository.
+describe('ProjectsPage — a failed connect', () => {
+  const foreign = { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO', url: 'https://github.com/team/other.git', finishedAt: 5 };
+
+  it('with nothing configured, opens the card with the error and the failed URL, so connect retries it (no lastConnectUrl needed)', async () => {
+    const user = userEvent.setup();
+    const { api } = makeApi({ slots: { connect: foreign } });
+    renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
+    expect(await screen.findByText('That address is not a quodeq results repository.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /team results repository url/i })).toHaveValue(foreign.url);
+    await user.click(screen.getByRole('button', { name: 'connect' }));
+    await waitFor(() => expect(api.connectShared).toHaveBeenCalledWith(foreign.url));
+  });
+
+  it('with a repository configured, the strip stays on synced and the error shows once, in the card', async () => {
+    const user = userEvent.setup();
+    const { api } = makeApi({ configured: true, slots: { connect: foreign } });
+    renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
+    expect(await screen.findByText('1 project · synced 2 min ago')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'update team results' })).toBeInTheDocument();
+    expect(screen.queryByText('That address is not a quodeq results repository.')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'more repository actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'change repository' }));
+    expect(screen.getAllByText('That address is not a quodeq results repository.')).toHaveLength(1);
+  });
+});
+
 describe('ProjectsPage — sync strip actions', () => {
   it('copy invite fetches the invite and flashes "copied"', async () => {
     const user = userEvent.setup();

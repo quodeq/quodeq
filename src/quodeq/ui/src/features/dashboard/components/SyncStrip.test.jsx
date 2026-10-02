@@ -39,14 +39,14 @@ describe('SyncStrip', () => {
   it('shows connecting to the host/path with an indeterminate bar, even before the repo is configured', () => {
     const status = { ...base, configured: false, url: null, lastSynced: null, connect: { state: 'running', phase: SYNC_PHASE.CONNECTING, percent: null, url: 'https://github.com/quodeq/evaluations.git' } };
     render(<SyncStrip status={status} projectsCount={0} />);
-    expect(screen.getByText('connecting to github.com/quodeq/evaluations…')).toBeInTheDocument();
+    expect(screen.getByText('connecting to github.com/quodeq/evaluations…', { selector: '.sync-strip__meta' })).toBeInTheDocument();
     const bar = screen.getByRole('progressbar');
     expect(bar).toHaveAttribute('aria-busy', 'true');
     expect(bar).not.toHaveAttribute('aria-valuenow');
   });
   it('shows downloading without a size when the job has not counted bytes', () => {
     render(<SyncStrip status={{ ...base, connect: { state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: null, bytes: null } }} projectsCount={0} />);
-    expect(screen.getByText('downloading evaluations…')).toBeInTheDocument();
+    expect(screen.getByText('downloading evaluations…', { selector: '.sync-strip__meta' })).toBeInTheDocument();
   });
   it('formats a size under 1 MB in KB', () => {
     render(<SyncStrip status={{ ...base, refresh: { state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: 10, bytes: 2048 } }} projectsCount={0} />);
@@ -54,7 +54,7 @@ describe('SyncStrip', () => {
   });
   it('shows updating while a refresh connects, and no update button', () => {
     render(<SyncStrip status={{ ...base, refresh: { state: 'running', phase: SYNC_PHASE.CONNECTING } }} projectsCount={5} onUpdate={vi.fn()} />);
-    expect(screen.getByText('updating…')).toBeInTheDocument();
+    expect(screen.getByText('updating…', { selector: '.sync-strip__meta' })).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByRole('button', { name: /update/i })).not.toBeInTheDocument();
   });
@@ -64,11 +64,40 @@ describe('SyncStrip', () => {
     expect(screen.getByText(/reading projects · 2 found/)).toBeInTheDocument();
     expect(screen.queryByText(/update failed/)).not.toBeInTheDocument();
   });
-  it('shows a failed connect with its mapped copy and a retry', () => {
-    const onRetryConnect = vi.fn();
-    render(<SyncStrip status={{ ...base, connect: { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO', error: 'raw' } }} projectsCount={5} onRetryConnect={onRetryConnect} />);
-    expect(screen.getByText(/That repository belongs to a different project\./)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /retry/i })); expect(onRetryConnect).toHaveBeenCalled();
+  // A failed connect is the connect card's to report (pickStripState): with a
+  // repository configured the strip keeps describing the one that still works.
+  it('a failed change of repository leaves the strip on synced, with the count and the update action', () => {
+    const onUpdate = vi.fn();
+    render(<SyncStrip status={{ ...base, connect: { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO', error: 'raw' } }} projectsCount={5} onUpdate={onUpdate} />);
+    expect(screen.getByText('5 projects · synced 2 min ago')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'update team results' })).toBeInTheDocument();
+    expect(screen.queryByText(/not a quodeq results repository/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'retry' })).not.toBeInTheDocument();
+  });
+  it('a failed first connect renders no strip (the card carries the error)', () => {
+    const { container } = render(<SyncStrip status={{ ...base, configured: false, url: null, connect: { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO' } }} projectsCount={0} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+  it('a failure row without a retry handler ends without a dangling separator', () => {
+    const refreshFailed = { ...base, refresh: { state: 'error', phase: SYNC_PHASE.ERROR } };
+    const { container, rerender } = render(<SyncStrip status={refreshFailed} projectsCount={5} />);
+    const row = () => container.querySelector('.sync-strip__meta');
+    expect(row().textContent).toMatch(/2 min ago$/);
+    expect(screen.queryByRole('button', { name: 'retry' })).not.toBeInTheDocument();
+    rerender(<SyncStrip status={base} loadFailed projectsCount={5} />);
+    expect(row().textContent).toBe('could not read team results');
+    rerender(<SyncStrip status={refreshFailed} projectsCount={5} onUpdate={vi.fn()} />);
+    expect(row().textContent).toMatch(/2 min ago · retry$/);
+  });
+  it('announces only the phase while a job runs, not every percent', () => {
+    const { rerender } = render(<SyncStrip status={{ ...base, connect: { state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: 45, bytes: 12582912 } }} projectsCount={0} />);
+    expect(screen.getByRole('status')).toHaveTextContent('downloading evaluations…');
+    rerender(<SyncStrip status={{ ...base, connect: { state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: 46, bytes: 12682912 } }} projectsCount={0} />);
+    expect(screen.getByRole('status')).toHaveTextContent('downloading evaluations…');
+    rerender(<SyncStrip status={{ ...base, connect: { state: 'running', phase: SYNC_PHASE.READING, projectsFound: 2 } }} projectsCount={0} />);
+    expect(screen.getByRole('status')).toHaveTextContent('reading projects…');
+    rerender(<SyncStrip status={base} projectsCount={5} />);
+    expect(screen.getByRole('status')).toHaveTextContent('5 projects · synced 2 min ago');
   });
   it('shows offline with the last sync when the status poll fails', () => {
     render(<SyncStrip status={base} offline projectsCount={5} onUpdate={vi.fn()} />);

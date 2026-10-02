@@ -10,10 +10,11 @@ import AccessPanel from '../../github-access/components/AccessPanel.jsx';
  * slot's mapped error under the field.
  *
  * Props come from useSharedProjects (the screen's one status poll):
- * `onConnect(url)`, `connecting`, `error` (display text), `accessFailure`.
+ * `onConnect(url)`, `connecting`, `error` (display text), `accessFailure`,
+ * and `initialUrl` (the URL of a failed connect, so pressing connect retries it).
  */
-export default function ConnectTeamCard({ onConnect, connecting = false, error = null, accessFailure = null }) {
-  const [url, setUrl] = useState('');
+export default function ConnectTeamCard({ onConnect, connecting = false, error = null, accessFailure = null, initialUrl = null }) {
+  const [url, setUrl] = useState(initialUrl ?? '');
   const titleId = useId();
   const trimmed = url.trim();
   const submit = () => {

@@ -4,7 +4,7 @@ import { relativeTimeFine } from '../../../utils/relativeTime.js';
 import { pluralKey } from '../../../utils/plural.js';
 import { useDismissOnOutside } from '../../../hooks/useDismissOnOutside.js';
 import { SyncBar } from './SyncBar.jsx';
-import { STRIP_STATE, pickStripState, progressLabel, connectFailureLabel, repoLabel } from './syncStripState.js';
+import { STRIP_STATE, pickStripState, progressLabel, progressAnnouncement, repoLabel } from './syncStripState.js';
 
 function StripButton({ onClick, label, children }) {
   return (
@@ -64,22 +64,28 @@ function InviteControl({ invite, onCopyInvite }) {
   );
 }
 
-// The status line: what the strip says, with an inline retry where the row offers one.
-function StripLabel({ state, status, when, projectsCount, onUpdate, onRetryConnect }) {
-  const retry = (fn) => fn && (
-    <button type="button" className="sync-strip__retry" onClick={fn}>{t('sync.retry')}</button>
+// A failure row's "· retry", only when there is a handler: no dangling separator otherwise.
+function Retry({ onRetry }) {
+  if (!onRetry) return null;
+  return (
+    <>
+      {' '}<span aria-hidden="true">·</span>{' '}
+      <button type="button" className="sync-strip__retry" onClick={onRetry}>{t('sync.retry')}</button>
+    </>
   );
+}
+
+// The status line: what the strip says, with an inline retry where the row offers one.
+function StripLabel({ state, status, when, projectsCount, onUpdate }) {
   switch (state.kind) {
     case STRIP_STATE.PROGRESS:
       return <span className="sync-strip__meta">{progressLabel(state.slot, state.slotKind, state.slot.url ?? status.url)}</span>;
     case STRIP_STATE.OFFLINE:
       return <span className="sync-strip__meta">{t('sync.offline', { when })}</span>;
     case STRIP_STATE.UPDATE_FAILED:
-      return <span className="sync-strip__meta sync-strip__meta--warn">{t('sync.updateFailed', { when })}{retry(onUpdate)}</span>;
+      return <span className="sync-strip__meta sync-strip__meta--warn">{t('sync.updateFailed', { when })}<Retry onRetry={onUpdate} /></span>;
     case STRIP_STATE.LOAD_FAILED:
-      return <span className="sync-strip__meta sync-strip__meta--warn">{t('sync.loadFailed')}{retry(onUpdate)}</span>;
-    case STRIP_STATE.CONNECT_FAILED:
-      return <span className="sync-strip__meta sync-strip__meta--warn">{connectFailureLabel(state.slot)}{retry(onRetryConnect)}</span>;
+      return <span className="sync-strip__meta sync-strip__meta--warn">{t('sync.loadFailed')}<Retry onRetry={onUpdate} /></span>;
     default:
       return (
         <span className="sync-strip__meta">
@@ -91,6 +97,19 @@ function StripLabel({ state, status, when, projectsCount, onUpdate, onRetryConne
   }
 }
 
+// The live region. While a job runs it carries the phase only (the visible
+// label's percent and counts change on every 1 s poll and would be re-read
+// each time); otherwise it is the visible row's text.
+function StripAnnouncement({ state, status, children }) {
+  if (state.kind !== STRIP_STATE.PROGRESS) return <span role="status" className="sync-strip__status">{children}</span>;
+  return (
+    <span className="sync-strip__status">
+      {children}
+      <span role="status" className="sr-only">{progressAnnouncement(state.slot, state.slotKind, state.slot.url ?? status.url)}</span>
+    </span>
+  );
+}
+
 /**
  * The team repository's one-line status under the Repositories header
  * (spec 4.2): exactly one state at a time, picked by pickStripState from the
@@ -98,7 +117,7 @@ function StripLabel({ state, status, when, projectsCount, onUpdate, onRetryConne
  */
 export default function SyncStrip({
   status, offline = false, updateFailed = false, loadFailed = false, lastSynced, projectsCount = 0, invite,
-  onUpdate, onRetryConnect, onCopyInvite, onChange, onDisconnect,
+  onUpdate, onCopyInvite, onChange, onDisconnect,
 }) {
   const state = pickStripState({ status, offline, updateFailed, loadFailed });
   if (state.kind === STRIP_STATE.HIDDEN) return null;
@@ -109,9 +128,9 @@ export default function SyncStrip({
     <div className={`sync-strip${working ? ' sync-strip--working' : ''}`}>
       <span className="sync-strip__cloud" aria-hidden="true">☁</span>
       {url && <span className="sync-strip__repo">{repoLabel(url)}</span>}
-      <span role="status" className="sync-strip__status">
-        <StripLabel state={state} status={status} when={when} projectsCount={projectsCount} onUpdate={onUpdate} onRetryConnect={onRetryConnect} />
-      </span>
+      <StripAnnouncement state={state} status={status}>
+        <StripLabel state={state} status={status} when={when} projectsCount={projectsCount} onUpdate={onUpdate} />
+      </StripAnnouncement>
       <span className="sync-strip__grow" />
       {working ? <SyncBar percent={state.slot.percent} label={t('sync.progressAria')} /> : (
         <span className="sync-strip__actions">

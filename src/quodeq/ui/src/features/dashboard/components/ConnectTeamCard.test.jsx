@@ -94,7 +94,7 @@ describe('ConnectTeamCard', () => {
   it('a connect slot in ERROR with FOREIGN_REPO shows the mapped copy under the field', async () => {
     const failed = { ...unconfigured, connect: { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO', error: 'raw server text' } };
     renderCard(makeApi({ getSyncStatus: vi.fn(async () => failed), getSharedStatus: vi.fn(async () => failed) }));
-    expect(await screen.findByText('That repository belongs to a different project.')).toBeInTheDocument();
+    expect(await screen.findByText('That address is not a quodeq results repository.')).toBeInTheDocument();
     expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
   });
 

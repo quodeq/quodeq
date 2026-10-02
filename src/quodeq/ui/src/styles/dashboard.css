@@ -3163,7 +3163,7 @@
   margin: 0 0 var(--space-1);
   font-family: var(--term-font-mono);
   font-size: var(--text-sm);
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   color: var(--color-text);
 }
 

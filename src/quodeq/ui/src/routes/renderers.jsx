@@ -76,8 +76,6 @@ function dashboardElement(props, runMode, callbacks = {}) {
 // whole App (which needs ~8 providers). Calling e.g.
 // ROUTE_RENDERERS.file(params, props) just builds the React element tree; it
 // doesn't render, so the returned element's props can be asserted on directly.
-// What the grade-formula editor knows about the reader's run: the worked
-// example and the TYPES tab read the selected run's dimensions.
 // After a disconnect (from Settings or the Repositories strip), a team
 // project selection has nowhere left to resolve: move it to a local one.
 function reselectAfterSharedDisconnect(navigation) {
@@ -88,6 +86,8 @@ function reselectAfterSharedDisconnect(navigation) {
   if (next) navigation.handleProjectChange(next.id, next.source);
 }
 
+// What the grade-formula editor knows about the reader's run: the worked
+// example and the TYPES tab read the selected run's dimensions.
 function gradeFormulaScope(params, props) {
   const dashboard = props.dashboardData.dashboard;
   const runDimensions = dashboard?.dimensions || [];
