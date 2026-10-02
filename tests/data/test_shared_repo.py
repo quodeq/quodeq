@@ -11,6 +11,7 @@ from quodeq.data.fs.shared_repo import (
     shared_cache_dir,
     shared_repo_path,
 )
+from quodeq.data.fs.git_stream import run_git_streaming
 from quodeq.data.fs.shared_repo_git import git_env
 from tests.data._shared_repo_helpers import _make_origin
 
@@ -104,7 +105,14 @@ def test_refresh_shared_clone_passes_explicit_timeout_to_both_git_calls(tmp_path
         seen_timeouts.append(timeout)
         return real_run_git(args, cwd=cwd, timeout=timeout)
 
+    real_stream = run_git_streaming
+
+    def _stream_spy(args, *, cwd=None, timeout, env=None, on_line):
+        seen_timeouts.append(timeout)
+        return real_stream(args, cwd=cwd, timeout=timeout, env=env, on_line=on_line)
+
     monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git", _spy)
+    monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git_streaming", _stream_spy)
 
     ok, _ = refresh_shared_clone(url, timeout=7)
     assert ok is True
@@ -125,7 +133,14 @@ def test_refresh_shared_clone_default_timeout_is_bounded_not_300s(tmp_path, monk
         seen_timeouts.append(timeout)
         return real_run_git(args, cwd=cwd, timeout=timeout)
 
+    real_stream = run_git_streaming
+
+    def _stream_spy(args, *, cwd=None, timeout, env=None, on_line):
+        seen_timeouts.append(timeout)
+        return real_stream(args, cwd=cwd, timeout=timeout, env=env, on_line=on_line)
+
     monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git", _spy)
+    monkeypatch.setattr("quodeq.data.fs.shared_repo.run_git_streaming", _stream_spy)
 
     ok, _ = refresh_shared_clone(url)
     assert ok is True
