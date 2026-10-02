@@ -7,14 +7,13 @@ services/shared_connect_job.py.
 """
 from __future__ import annotations
 
-import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from enum import StrEnum
-from typing import Callable
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types.sync_phase import SyncKind, SyncPhase
+from quodeq.services.job_spawn import spawn_daemon, start_claimed_job
 from quodeq.services.job_status import JobSlotStatus
 from quodeq.services.shared_repo import refresh_shared_clone, sync_shared_index
 from quodeq.services.sync_progress import SYNC_IDLE_FIELDS, progress_writer
@@ -117,25 +116,17 @@ class RefreshStartResult(StrEnum):
     FAILED = "failed"  # the worker thread could not be started; the status carries the error
 
 
-def _spawn_daemon(target: Callable[[], None]) -> None:
-    threading.Thread(target=target, daemon=True).start()
-
-
 def start_refresh(
     url: str, *,
     status: RefreshStatus | None = None,
-    spawn: Callable[[Callable[[], None]], None] = _spawn_daemon,
+    spawn: Callable[[Callable[[], None]], None] = spawn_daemon,
     env: Mapping[str, str] | None = None,
     log: LogSink = NULL_LOG,
 ) -> RefreshStartResult:
     """Kick off a background refresh of *url*; ``FAILED`` means it could not start."""
     status = status or _default_status
-    if not status.claim(url):
-        return RefreshStartResult.ALREADY_RUNNING
-    try:
-        spawn(lambda: run_refresh_job(url, status=status, env=env, log=log))
-    except RuntimeError as exc:
-        _fail(status, MESSAGE_REFRESH_START_FAILED, CODE_REFRESH_UNEXPECTED)
-        log.error(f"failed to start refresh thread, {exc}")
-        return RefreshStartResult.FAILED
-    return RefreshStartResult.STARTED
+    outcome = start_claimed_job(
+        status.claim(url), lambda: run_refresh_job(url, status=status, env=env, log=log),
+        spawn=spawn, on_start_failed=lambda: _fail(status, MESSAGE_REFRESH_START_FAILED, CODE_REFRESH_UNEXPECTED), log=log, label="refresh",
+    )
+    return RefreshStartResult(outcome.value)

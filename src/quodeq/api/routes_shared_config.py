@@ -19,7 +19,7 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api._constants import CODE_INVALID_INPUT, QUERY_FLAG_TRUE
 from quodeq.api.routes_github_access import same_url_access_error
 from quodeq.services.base import ActionProvider
-from quodeq.services.github_access import resolve_access
+from quodeq.services.github_access import AccessResult, resolve_access
 from quodeq.services.shared_connect_job import (
     ConnectStartResult,
     get_connect_status,
@@ -159,15 +159,23 @@ def shared_config_delete(provider: ActionProvider) -> Response | tuple[Response,
     return jsonify({"configured": False})
 
 
+def _connected_access() -> tuple[str, AccessResult, None] | tuple[None, None, Response | tuple[Response, int]]:
+    """The configured shared URL with its resolved access, or the error response to return."""
+    url = read_settings().url
+    if not url:
+        return None, None, no_shared_repo_error(HTTPStatus.BAD_REQUEST)
+    access = resolve_access(url)
+    error = same_url_access_error(url, access)
+    if error is not None:
+        return None, None, error
+    return url, access, None
+
+
 def _shared_refresh_start(start: Callable[..., RefreshStartResult]) -> Response | tuple[Response, int]:
-    settings = read_settings()
-    if not settings.url:
-        return no_shared_repo_error(HTTPStatus.BAD_REQUEST)
-    access = resolve_access(settings.url)
-    error = same_url_access_error(settings.url, access)
+    url, access, error = _connected_access()
     if error is not None:
         return error
-    outcome = start(settings.url, env=access.env, log=SHARED_LOG)
+    outcome = start(url, env=access.env, log=SHARED_LOG)
     if outcome == RefreshStartResult.ALREADY_RUNNING:
         return json_error("a refresh is already running", HTTPStatus.CONFLICT, CODE_REFRESH_IN_PROGRESS)
     if outcome != RefreshStartResult.STARTED:
@@ -190,14 +198,10 @@ def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tu
     err = path_segment_error(project)
     if err is not None:
         return json_error(err, HTTPStatus.BAD_REQUEST, CODE_INVALID_INPUT)
-    settings = read_settings()
-    if not settings.url:
-        return no_shared_repo_error(HTTPStatus.BAD_REQUEST)
-    access = resolve_access(settings.url)
-    error = same_url_access_error(settings.url, access)
+    url, access, error = _connected_access()
     if error is not None:
         return error
-    outcome = start_publish(project, settings.url, evaluations_root=Path(reports_dir()), env=access.env)
+    outcome = start_publish(project, url, evaluations_root=Path(reports_dir()), env=access.env)
     if outcome == PublishStartResult.ALREADY_RUNNING:
         return json_error("a publish is already running", HTTPStatus.CONFLICT, "PUBLISH_IN_PROGRESS")
     if outcome != PublishStartResult.STARTED:

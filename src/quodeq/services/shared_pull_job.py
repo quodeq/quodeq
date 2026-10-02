@@ -6,16 +6,16 @@ services/shared_connect_job.py.
 """
 from __future__ import annotations
 
-import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Callable
 
 from quodeq.core.observability import NULL_LOG, LogSink
-from quodeq.core.types.sync_phase import SyncKind, SyncPhase
+from quodeq.services.job_spawn import spawn_daemon, start_claimed_job
 from quodeq.services.job_status import JobSlotStatus
 from quodeq.services.sync_progress import SYNC_IDLE_FIELDS
+from quodeq.core.types.sync_phase import SyncKind, SyncPhase
 from quodeq.shared.fault_isolation import run_isolated
 
 # Wire ``code`` values for a failed pull; API contract.
@@ -135,25 +135,17 @@ class PullStartResult(StrEnum):
     FAILED = "failed"  # the worker thread could not be started; the status carries the error
 
 
-def _spawn_daemon(target: Callable[[], None]) -> None:
-    threading.Thread(target=target, daemon=True).start()
-
-
 def start_pull(
     project: str, *, pull: Callable[[str], PullOutcome],
     status: PullStatus | None = None,
-    spawn: Callable[[Callable[[], None]], None] = _spawn_daemon,
+    spawn: Callable[[Callable[[], None]], None] = spawn_daemon,
     on_done: Callable[[], None] | None = None,
     log: LogSink = NULL_LOG,
 ) -> PullStartResult:
     """Kick off a background pull of *project*; ``FAILED`` means it could not start."""
     status = status or _default_status
-    if not status.claim(project):
-        return PullStartResult.ALREADY_RUNNING
-    try:
-        spawn(lambda: run_pull_job(project, status=status, pull=pull, on_done=on_done, log=log))
-    except RuntimeError as exc:
-        _fail(status, MESSAGE_PULL_START_FAILED, CODE_PULL_UNEXPECTED)
-        log.error(f"failed to start pull thread, {exc}")
-        return PullStartResult.FAILED
-    return PullStartResult.STARTED
+    outcome = start_claimed_job(
+        status.claim(project), lambda: run_pull_job(project, status=status, pull=pull, on_done=on_done, log=log),
+        spawn=spawn, on_start_failed=lambda: _fail(status, MESSAGE_PULL_START_FAILED, CODE_PULL_UNEXPECTED), log=log, label="pull",
+    )
+    return PullStartResult(outcome.value)
