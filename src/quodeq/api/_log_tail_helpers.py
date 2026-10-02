@@ -43,6 +43,42 @@ def resolve_run_dir(provider, job_id: str) -> tuple[Path | None, int]:
     return run_dir, 0
 
 
+def is_preparing_job(provider, job_id: str) -> bool:
+    """Return True if *job_id* refers to a job that may still produce output.
+
+    Used by the SSE routes to keep the EventSource alive while a runner is
+    in the "preparing" phase — resolving inputs, cloning a remote repo,
+    creating the run directory — but hasn't yet emitted the ``report_path``
+    marker that lets the dashboard locate the run directory. A non-200
+    answer in that window closes the browser's EventSource for good (the
+    spec forbids a retry), which left the Evaluate screen without live
+    findings for the whole run.
+
+    Returns False for unknown ids so a typo or a stale jobId from the
+    client doesn't keep a connection (and a polling Python thread) open
+    forever.
+    """
+    if provider is None:
+        return False
+    # Internal job: must be in the in-memory store with a non-terminal
+    # status. Pre-marker, ``output_project`` is None so ``get_log_run_dir``
+    # returns None — without this check the route would 404 the moment the
+    # frontend opens the stream after Start.
+    in_memory_job = getattr(provider, "in_memory_job", None)
+    job = in_memory_job(job_id) if callable(in_memory_job) else None
+    if job is not None and job.status not in JOB_FINISHED:
+        return True
+    # External job: the CLI creates the run directory before opening the
+    # ``run.log`` writer, so there is a brief window where the directory
+    # exists but the file does not. If the provider can resolve a real
+    # run_dir, treat the run as live.
+    if hasattr(provider, "get_log_run_dir"):
+        run_dir = provider.get_log_run_dir(job_id)
+        if run_dir is not None and run_dir.is_dir():
+            return True
+    return False
+
+
 def resolve_run_log(provider, job_id: str) -> tuple[Path | None, int]:
     """Return (log_path, status_hint). status_hint is 0 on success, HTTP code on error."""
     run_dir, status = resolve_run_dir(provider, job_id)

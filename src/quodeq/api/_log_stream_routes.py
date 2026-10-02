@@ -6,9 +6,9 @@ from http import HTTPStatus
 
 from flask import Flask, Response, current_app, jsonify, request
 
-from quodeq.core.run.job_status import JOB_FINISHED
 from quodeq.api._constants import CODE_INVALID_INPUT, CODE_NOT_FOUND
 from quodeq.api._log_tail_helpers import (
+    is_preparing_job as _is_preparing_job,
     is_visible_log_line,
     read_tail,
     resolve_run_log,
@@ -19,38 +19,6 @@ from quodeq.api._sse_log_helpers import event_stream_response, initial_offset
 from quodeq.api._sse_log_helpers import sse_tail_generator as _sse_tail_generator
 from quodeq.api.helpers import json_error
 from quodeq.shared.validation import validate_path_segment
-
-
-def _is_preparing_job(provider, job_id: str) -> bool:
-    """Return True if *job_id* refers to a job that may still produce output.
-
-    Used by the SSE log-stream route to keep the EventSource alive while a
-    runner is in the "preparing" phase — resolving inputs, cloning a remote
-    repo, creating the run directory — but hasn't yet emitted the
-    ``report_path`` marker that lets the dashboard locate ``run.log``.
-
-    Returns False for unknown ids so a typo or a stale jobId from the
-    client doesn't keep a connection (and a polling Python thread) open
-    forever.
-    """
-    if provider is None:
-        return False
-    # Internal job: must be in the in-memory store with a non-terminal
-    # status. Pre-marker, ``output_project`` is None so ``get_log_run_dir``
-    # returns None — without this check the route would 404 the moment the
-    # frontend opens the stream after Start.
-    job = provider.in_memory_job(job_id)
-    if job is not None and job.status not in JOB_FINISHED:
-        return True
-    # External job: the CLI creates the run directory before opening the
-    # ``run.log`` writer, so there is a brief window where the directory
-    # exists but the file does not. If the provider can resolve a real
-    # run_dir, treat the run as live.
-    if hasattr(provider, "get_log_run_dir"):
-        run_dir = provider.get_log_run_dir(job_id)
-        if run_dir is not None and run_dir.is_dir():
-            return True
-    return False
 
 
 def _job_done_checker(provider, job_id: str):

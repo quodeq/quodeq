@@ -18,7 +18,7 @@ import time
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 from quodeq.api._run_event_serializers import (  # noqa: F401 — re-export
     serialize_dimension_event,
@@ -160,3 +160,42 @@ def run_events_generator(
         else:
             # tick_seconds=0.0 means "drain once and exit" for tests.
             return
+
+
+def run_events_generator_awaiting_dir(
+    resolve_run_dir: Callable[[], Path | None],
+    is_complete: Callable[[], bool],
+    terminal_state: Callable[[], str],
+    *,
+    last_event_ts: datetime | None = None,
+) -> Iterator[str]:
+    """Wait for a preparing job's run dir, then stream it like run_events_generator.
+
+    The run dir only exists once the runner prints its report_path marker,
+    a moment after the UI opened the stream. Answering 410 in that window
+    closed the browser's EventSource for good (the spec forbids a retry
+    after a non-200), so the Evaluate screen never saw a live finding.
+
+    Ends with ``event: done`` if the job reaches a terminal state before its
+    run dir ever appears (a runner that failed while preparing). A tick of 0
+    (``QUODEQ_SSE_TICK_MS=0``) checks once and returns, the same drain-once
+    contract run_events_generator has for tests.
+    """
+    sleep_s = _tick_ms() / 1000.0
+    heartbeat_s = _heartbeat_s()
+    last_emit_at = time.monotonic()
+    yield ":keepalive\n\n"
+    while True:
+        run_dir = resolve_run_dir()
+        if run_dir is not None:
+            yield from run_events_generator(run_dir, last_event_ts=last_event_ts)
+            return
+        if is_complete():
+            yield _done_frame(terminal_state())
+            return
+        if time.monotonic() - last_emit_at >= heartbeat_s:
+            yield heartbeat_frame()
+            last_emit_at = time.monotonic()
+        if sleep_s <= 0:
+            return
+        time.sleep(sleep_s)
