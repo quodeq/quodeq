@@ -18,7 +18,8 @@ from typing import Any, Callable
 from quodeq.core.types import ProjectEntry
 from quodeq.core.types.project_source import ProjectSource
 from quodeq.services import fs_projects
-from quodeq.services.shared_repo import last_synced_at, published_meta
+from quodeq.services.score_cache import score_cache_path_override
+from quodeq.services.shared_repo import last_synced_at, published_meta, shared_score_cache_path
 
 
 def _merge_published_meta(info: dict, key: str, meta: dict) -> dict:
@@ -66,10 +67,17 @@ def warm_shared_listing(eval_root: Path, url: str) -> int:
     The connect and refresh jobs call this before reporting DONE: the first
     listing of a fresh clone computes every project-card summary inline and
     can outlast the UI's request timeout. Returns the number of projects.
+
+    The summaries go to the clone's own score cache, the DB the list route
+    reads under ``with_shared_root``. A job thread does not inherit the
+    route's contextvar override, so this scopes its own; without it the
+    warm-up would fill the LOCAL cache (a miss for the route, and shared
+    rows mixed into local ones).
     """
     if not eval_root.is_dir():
         return 0
-    projects, _meta = _hydrate(eval_root, url)
+    with score_cache_path_override(shared_score_cache_path(url)):
+        projects, _meta = _hydrate(eval_root, url)
     return len(projects)
 
 
