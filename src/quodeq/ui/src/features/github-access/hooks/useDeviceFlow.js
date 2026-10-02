@@ -37,6 +37,7 @@ export function useDeviceFlow({ startDeviceFlow, getDeviceFlow, onSignedIn, poll
     try {
       status = await latest.current.getDeviceFlow();
     } catch (err) {
+      console.warn('[useDeviceFlow] poll failed:', err);
       if (!isStale(runId)) setFlow((f) => ({ ...f, phase: FLOW_PHASE.ERROR, error: apiErrorMessage(err, 'githubAccess.pollFailed') }));
       return;
     }
@@ -60,6 +61,7 @@ export function useDeviceFlow({ startDeviceFlow, getDeviceFlow, onSignedIn, poll
       setFlow({ ...IDLE, phase: FLOW_PHASE.AWAITING_USER, userCode: code.userCode, verificationUri: code.verificationUri });
       timerRef.current = setTimeout(() => poll(runId), latest.current.pollMs);
     } catch (err) {
+      console.warn('[useDeviceFlow] start failed:', err);
       if (!isStale(runId)) setFlow({ ...IDLE, phase: FLOW_PHASE.ERROR, error: apiErrorMessage(err, 'githubAccess.startFailed') });
     }
   }, [poll, stop]);

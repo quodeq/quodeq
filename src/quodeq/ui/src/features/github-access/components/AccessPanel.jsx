@@ -23,7 +23,7 @@ function useAccount(getGithubAccount, enabled) {
   useEffect(() => {
     if (!enabled) return undefined;
     let alive = true;
-    getGithubAccount().then((a) => { if (alive) setAccount(a); }).catch(() => {});
+    getGithubAccount().then((a) => { if (alive) setAccount(a); }).catch((err) => { console.warn('[AccessPanel] account lookup failed:', err); });
     return () => { alive = false; };
   }, [getGithubAccount, enabled]);
   return account;
@@ -62,7 +62,7 @@ export default function AccessPanel({ failure, url, onResolved, onRetry }) {
     try {
       const result = await probeGit(url);
       if (result.reachable) onResolved(); else setBlocked(true);
-    } catch { setBlocked(true); } finally { setTesting(false); }
+    } catch (err) { console.warn('[AccessPanel] probe failed:', err); setBlocked(true); } finally { setTesting(false); }
   }
 
   const heading = t(HEADINGS[kind] || 'githubAccess.headingUnknown', { host });

@@ -1,6 +1,6 @@
 import pytest
 
-from quodeq.data.fs.repo_validation import _remote_host, validate_remote_url
+from quodeq.data.fs.repo_validation import validate_remote_url
 from quodeq.shared.repo import is_repo_url
 
 
@@ -18,15 +18,6 @@ def test_git_scheme_is_not_a_repo_url():
 def test_http_still_rejected():
     with pytest.raises(ValueError):
         is_repo_url("http://github.com/o/r.git")
-
-
-@pytest.mark.parametrize("url,host", [
-    ("ssh://git@github.com/o/r.git", "github.com"),
-    ("ssh://git@github.com:22/o/r.git", "github.com"),
-    ("ssh://github.com/o/r.git", "github.com"),
-])
-def test_remote_host_for_ssh_urls(url, host):
-    assert _remote_host(url) == host
 
 
 @pytest.mark.parametrize("url", ["ssh://git@127.0.0.1/x", "ssh://git@127.0.0.1:2222/x.git"])

@@ -98,8 +98,3 @@ def _drop_cleartext_export(paths: ConfigPaths) -> None:
         os.chmod(env_file, _OWNER_RW_PERMS)
     except OSError as exc:
         log_debug(f"cleartext delete for '{ACCOUNT_KEY}' failed: {exc}")
-
-
-def is_expired(account: GitHubAccount, now: float) -> bool:
-    """True when the token has an expiry and *now* has reached it."""
-    return account.expires_at is not None and now >= account.expires_at

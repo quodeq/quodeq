@@ -9,7 +9,7 @@ import pytest
 from quodeq.config import ai_provider, github_account
 from quodeq.config.ai_provider_errors import PlaintextKeyRefusedError
 from quodeq.config.github_account import (
-    ACCOUNT_KEY, GitHubAccount, TokenMethod, delete_account, is_expired, load_account, store_account,
+    ACCOUNT_KEY, GitHubAccount, TokenMethod, delete_account, load_account, store_account,
 )
 from quodeq.config.paths import ConfigPaths
 
@@ -81,9 +81,3 @@ def test_corrupt_entry_loads_as_none(paths, fake_keyring):
     assert load_account() is None
     fake_keyring[("quodeq", ACCOUNT_KEY)] = json.dumps({"token": "t"})  # missing fields
     assert load_account() is None
-
-
-def test_is_expired():
-    assert is_expired(_ACCT, now=100.0) is True
-    assert is_expired(_ACCT, now=99.0) is False
-    assert is_expired(GitHubAccount("t", "l", TokenMethod.PASTED), now=1e12) is False
