@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.data.fs.repo_clone import GitCloneClient

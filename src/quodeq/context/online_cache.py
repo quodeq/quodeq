@@ -29,6 +29,7 @@ from quodeq.config.context_env import (
     git_child_env,
     online_cache_disabled,
 )
+from quodeq.data.git_cli import git_env_floor
 
 _logger = logging.getLogger(__name__)
 
@@ -89,10 +90,11 @@ def is_inside_cache(path: str | Path) -> bool:
 
 def _git(args: list[str], *, cwd: Path | None = None,
          timeout: int = _DEFAULT_CLONE_TIMEOUT_S) -> bool:
-    env = git_child_env()
+    env = git_env_floor(git_child_env())
     try:
         subprocess.run(
             ["git", *args], check=True, env=env, timeout=timeout,
+            stdin=subprocess.DEVNULL,
             cwd=str(cwd) if cwd is not None else None,
         )
         return True

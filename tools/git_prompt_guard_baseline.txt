@@ -1,5 +1,3 @@
 # git subprocesses lacking stdin=DEVNULL or env= (relpath:lineno)
-src/quodeq/_cli_worktree.py:38
 src/quodeq/analysis/diff_resolver.py:24
-src/quodeq/context/online_cache.py:94
 src/quodeq/data/fs/git_stats.py:26
