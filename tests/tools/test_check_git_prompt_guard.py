@@ -47,3 +47,25 @@ def test_accepts_a_guarded_call(tmp_path):
 def test_ignores_non_git_subprocess(tmp_path):
     _write(tmp_path, "src/quodeq/x.py", "import subprocess\nsubprocess.run(['gh', 'auth', 'token'], timeout=5)\n")
     assert check_git_prompt_guard.scan_tree(tmp_path / "src") == []
+
+
+def _hit_lines(tmp_path: Path, source: str) -> list[int]:
+    _write(tmp_path, "src/quodeq/x.py", source)
+    return [h.line for h in check_git_prompt_guard.scan_tree(tmp_path / "src")]
+
+
+def test_flags_a_from_import_bare_run(tmp_path):
+    assert _hit_lines(tmp_path, "from subprocess import run\nrun(['git', 'x'], timeout=5)\n") == [2]
+
+
+def test_flags_an_aliased_subprocess_module(tmp_path):
+    assert _hit_lines(tmp_path, "import subprocess as sp\nsp.run(['git', 'x'], timeout=5)\n") == [2]
+
+
+def test_ignores_run_on_a_non_subprocess_receiver(tmp_path):
+    assert _hit_lines(tmp_path, "import subprocess\nfoo.run(['git', 'x'], timeout=5)\n") == []
+
+
+def test_flags_keyword_argv_without_stdin(tmp_path):
+    src = "import subprocess\nsubprocess.run(args=['git', 'x'], env={}, timeout=5)\n"
+    assert _hit_lines(tmp_path, src) == [2]
