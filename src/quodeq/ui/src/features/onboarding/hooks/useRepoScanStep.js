@@ -8,7 +8,7 @@ import { LAST_CLONE_ROOT_STORAGE_KEY, HTTP_STATUS } from '../../../constants.js'
 // picker (once a remote URL needs a local destination).
 export const REPO_SCAN_SUB_STEP = Object.freeze({ INPUT: 'input', CLONE_TARGET: 'cloneTarget' });
 
-const URL_RE = /^(https?:\/\/|git@|ssh:\/\/|git:\/\/)/i;
+const URL_RE = /^(https?:\/\/|git@|ssh:\/\/)/i;
 // Lifts the adapter's 30s default so a resume scan (which reads a project
 // that may not have finished its first scan yet) isn't cut short.
 const RESUME_SCAN_TIMEOUT_MS = 120000;

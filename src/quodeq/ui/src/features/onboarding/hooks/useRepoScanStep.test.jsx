@@ -34,6 +34,43 @@ describe('makeHandleSubmit', () => {
     expect(actions.failScan.mock.calls[0][0].message).not.toBe(err.message);
   });
 
+  it('git:// is no longer a remote URL: it goes to createProject as a local path', async () => {
+    const createProject = vi.fn().mockResolvedValue({ projectId: 'p1', scanData: {} });
+    const setSubStep = vi.fn();
+    const actions = { startScan: vi.fn(), failScan: vi.fn(), succeedScan: vi.fn() };
+    const handleSubmit = makeHandleSubmit({
+      state: { repo: { value: 'git://x/y' } },
+      actions,
+      createProject,
+      setSubStep,
+      setCloneError: vi.fn(),
+      tryResumeExisting: vi.fn().mockResolvedValue(false),
+    });
+
+    await handleSubmit();
+
+    expect(createProject).toHaveBeenCalledWith({ repo: 'git://x/y' });
+    expect(setSubStep).not.toHaveBeenCalled();
+  });
+
+  it('ssh:// enters the clone-target sub-step', async () => {
+    const createProject = vi.fn();
+    const setSubStep = vi.fn();
+    const handleSubmit = makeHandleSubmit({
+      state: { repo: { value: 'ssh://git@github.com/o/r.git' } },
+      actions: { startScan: vi.fn(), failScan: vi.fn(), succeedScan: vi.fn() },
+      createProject,
+      setSubStep,
+      setCloneError: vi.fn(),
+      tryResumeExisting: vi.fn().mockResolvedValue(false),
+    });
+
+    await handleSubmit();
+
+    expect(setSubStep).toHaveBeenCalledWith('cloneTarget');
+    expect(createProject).not.toHaveBeenCalled();
+  });
+
   it('an unmapped code keeps showing the backend message, unchanged', async () => {
     const err = Object.assign(new Error('Project not found'), { code: 'NOT_FOUND' });
     const createProject = vi.fn().mockRejectedValue(err);

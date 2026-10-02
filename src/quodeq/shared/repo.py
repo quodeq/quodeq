@@ -24,9 +24,9 @@ def is_repo_url(repo_input: str) -> bool:
     if repo_input.startswith("http://"):
         raise ValueError(
             "Cleartext HTTP repository URLs are rejected to protect credentials. "
-            "Use https:// or git@ instead."
+            "Use https://, ssh:// or git@ instead."
         )
-    return repo_input.startswith(("https://", "git@"))
+    return repo_input.startswith(("https://", "git@", "ssh://"))
 
 
 def project_name_from_repo(repo: str) -> str:
