@@ -222,7 +222,7 @@ def stream_log_names(
         proc = subprocess.Popen(
             ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
             cwd=str(repo_dir), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, encoding="utf-8",
+            text=True, encoding="utf-8", env=git_env_floor(), stdin=subprocess.DEVNULL,
         )
     except OSError:
         return
