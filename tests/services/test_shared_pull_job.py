@@ -46,3 +46,38 @@ def test_pull_phase_is_downloading_while_running(status):
     status.claim("abc")
     run_pull_job("abc", status=status, pull=pull)
     assert seen == [SyncPhase.DOWNLOADING]
+
+
+class _RecordingLog:
+    def __init__(self):
+        self.messages = []
+
+    def warning(self, message):
+        self.messages.append(message)
+
+    error = warning
+
+
+def _raise(*_a, **_k):
+    raise RuntimeError("bug")
+
+
+def test_failing_on_done_never_downgrades_a_finished_pull(status):
+    log = _RecordingLog()
+    status.claim("abc")
+    run_pull_job("abc", status=status, pull=lambda p: PullOutcome(True, "new-id", "Billing"), on_done=_raise, log=log)
+    snap = get_pull_status(status)
+    assert snap["state"] == PullState.DONE and snap["phase"] is SyncPhase.DONE
+    assert snap["project_id"] == "new-id" and log.messages
+
+
+def test_unexpected_exception_from_pull_is_pull_unexpected(status):
+    status.claim("abc")
+    run_pull_job("abc", status=status, pull=_raise)
+    snap = get_pull_status(status)
+    assert snap["state"] == PullState.ERROR and snap["code"] == "PULL_UNEXPECTED"
+
+
+def test_start_pull_spawn_failure_is_failed_not_running(status):
+    assert start_pull("abc", pull=_raise, status=status, spawn=_raise, log=_RecordingLog()) is PullStartResult.FAILED
+    assert get_pull_status(status)["state"] == PullState.ERROR

@@ -54,3 +54,15 @@ def test_unexpected_exception_is_captured(status):
     status.claim(_URL)
     run_refresh_job(_URL, status=status, refresh=boom, sync_index=lambda u: None)
     assert get_refresh_status(status)["state"] == RefreshState.ERROR
+
+
+def test_start_refresh_spawn_failure_is_failed_not_running(status):
+    def no_thread(fn):
+        raise RuntimeError("no thread")
+
+    class _Log:
+        def error(self, message):
+            pass
+
+    assert start_refresh(_URL, status=status, spawn=no_thread, log=_Log()) is RefreshStartResult.FAILED
+    assert get_refresh_status(status)["state"] == RefreshState.ERROR

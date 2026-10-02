@@ -84,8 +84,13 @@ def _fail(status: PullStatus, message: str, code: str) -> None:
     status.set(state=PullState.ERROR, phase=SyncPhase.ERROR, code=code, error=message, finished_at=time.time())
 
 
+def _notify_done(on_done: Callable[[], None], log: LogSink) -> None:
+    run_isolated(on_done, label="pull on_done", log=log)
+
+
 def _do_pull(
-    project: str, status: PullStatus, pull: Callable[[str], PullOutcome], on_done: Callable[[], None] | None,
+    project: str, status: PullStatus, pull: Callable[[str], PullOutcome],
+    on_done: Callable[[], None] | None, log: LogSink,
 ) -> None:
     status.set(phase=SyncPhase.DOWNLOADING, percent=None)
     outcome = pull(project)
@@ -98,7 +103,7 @@ def _do_pull(
         code=None, error=None, finished_at=time.time(),
     )
     if on_done is not None:
-        on_done()
+        _notify_done(on_done, log)  # the import is done; a failing hook must not downgrade the slot
 
 
 def run_pull_job(
@@ -111,7 +116,7 @@ def run_pull_job(
     the slot never stays stuck at running.
     """
     run_isolated(
-        lambda: _do_pull(project, status, pull, on_done),
+        lambda: _do_pull(project, status, pull, on_done, log),
         label="pull", log=log,
         on_error=lambda _exc: _fail(status, MESSAGE_PULL_UNEXPECTED, CODE_PULL_UNEXPECTED),
     )
