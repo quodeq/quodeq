@@ -22,7 +22,8 @@ from quodeq.services.github_access import forget_url
 from quodeq.services.job_status import JobSlotStatus
 from quodeq.services.shared_connect import ConnectOutcome, ConnectStatus, connect_shared_repo
 from quodeq.services.shared_repo import RepoFormat, shared_evaluations_root, validate_remote_url
-from quodeq.services.sync_progress import SYNC_IDLE_FIELDS, count_projects, progress_writer
+from quodeq.services.shared_listing import warm_shared_listing
+from quodeq.services.sync_progress import SYNC_IDLE_FIELDS, WarmListing, progress_writer, read_projects
 from quodeq.shared.fault_isolation import run_isolated
 
 # Wire ``code`` values for a failed connect. The UI maps each to a
@@ -136,7 +137,7 @@ def _fail(status: ConnectJobStatus, message: str, code: str) -> None:
 
 def _do_connect(
     url: str, status: ConnectJobStatus, connect: Callable[..., ConnectOutcome] | None,
-    log: LogSink, env: Mapping[str, str] | None = None,
+    log: LogSink, env: Mapping[str, str] | None = None, warm: WarmListing | None = None,
 ) -> None:
     outcome = (connect or connect_shared_repo)(url, log=log, env=env, progress=progress_writer(status))
     failure = connect_failure(outcome)
@@ -145,7 +146,9 @@ def _do_connect(
             forget_url(url)  # a stale "reachable" cache entry must not outlive a failed clone
         _fail(status, failure.message, failure.code)
         return
-    found = count_projects(shared_evaluations_root(url, env), status)
+    found = read_projects(
+        shared_evaluations_root(url, env), url, status, warm=warm or warm_shared_listing, log=log,
+    )
     status.set(
         state=ConnectState.DONE, phase=SyncPhase.DONE, percent=_PERCENT_DONE, projects_found=found,
         code=None, error=None, finished_at=time.time(),
@@ -156,15 +159,17 @@ def run_connect_job(
     url: str, *, status: ConnectJobStatus,
     connect: Callable[..., ConnectOutcome] | None = None,
     log: LogSink = NULL_LOG, env: Mapping[str, str] | None = None,
+    warm: WarmListing | None = None,
 ) -> None:
     """Connect to *url* and record the result in *status*.
 
-    *connect* defaults to ``connect_shared_repo``, looked up at call time.
-    An unexpected exception is logged and recorded as ``CONNECT_FAILED`` so
-    the slot never stays stuck at running.
+    *connect* defaults to ``connect_shared_repo`` and *warm* (the READING
+    phase's listing hydration) to ``warm_shared_listing``, both looked up at
+    call time. An unexpected exception is logged and recorded as
+    ``CONNECT_FAILED`` so the slot never stays stuck at running.
     """
     run_isolated(
-        lambda: _do_connect(url, status, connect, log, env),
+        lambda: _do_connect(url, status, connect, log, env, warm),
         label="connect", log=log,
         on_error=lambda _exc: _fail(status, MESSAGE_CONNECT_UNEXPECTED, CODE_CONNECT_FAILED),
     )
@@ -188,6 +193,7 @@ def start_connect(
     spawn: Callable[[Callable[[], None]], None] = _spawn_daemon,
     log: LogSink = NULL_LOG,
     env: Mapping[str, str] | None = None,
+    warm: WarmListing | None = None,
 ) -> ConnectStartResult:
     """Kick off a background connect to *url*.
 
@@ -198,7 +204,7 @@ def start_connect(
     if not status.claim(url):
         return ConnectStartResult.ALREADY_RUNNING
     try:
-        spawn(lambda: run_connect_job(url, status=status, log=log, env=env))
+        spawn(lambda: run_connect_job(url, status=status, log=log, env=env, warm=warm))
     except RuntimeError as exc:
         _fail(status, MESSAGE_CONNECT_START_FAILED, CODE_CONNECT_FAILED)
         log.error(f"failed to start connect thread, {exc}")
