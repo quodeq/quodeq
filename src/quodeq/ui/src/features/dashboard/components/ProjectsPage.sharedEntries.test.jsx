@@ -52,7 +52,7 @@ function renderWithApi(ui, fakeApi) {
 
 
 // Split from ProjectsPage.test.jsx: shared-only cards (configured
-// shared repo) — rendering, sync indicator states, and the pull flow.
+// shared repo) — rendering, the strip's stale state, and the pull flow.
 
 describe('ProjectsPage — shared entries (configured)', () => {
   function configuredApi(overrides = {}) {
@@ -107,7 +107,7 @@ describe('ProjectsPage — shared entries (configured)', () => {
     expect(onSelect).toHaveBeenCalledWith('shared-1', 'shared');
   });
 
-  it('shows "· stale" in the toolbar sync indicator when the listing is stale (no em-dash)', async () => {
+  it('a stale listing shows "update failed · showing results from <when>" in the strip (no em-dash)', async () => {
     const fakeApi = configuredApi({
       sharedListProjects: vi.fn(async () => ({
         projects: [{ id: 'shared-1', name: 'demo-repo', publishedBy: 'ana', publishedAt: '2026-07-16T00:00:00Z' }],
@@ -117,15 +117,14 @@ describe('ProjectsPage — shared entries (configured)', () => {
     });
     renderWithApi(<ProjectsPage projects={[]} actions={{}} />, fakeApi);
 
-    await waitFor(() => expect(screen.getByText(/synced .* · stale/)).toBeInTheDocument());
-    const label = screen.getByText(/synced .* · stale/);
+    await waitFor(() => expect(screen.getByText(/update failed · showing results from .* ago/)).toBeInTheDocument());
+    const label = screen.getByText(/update failed · showing results from/);
     expect(label.textContent).not.toMatch(/—/);
+    expect(screen.getByRole('button', { name: 'retry' })).toBeInTheDocument();
   });
 
-  // relativeTime() returns 'today'/'yesterday' with no trailing "ago" for a
-  // same-day/one-day-old timestamp (see components/LastFetchedLine.jsx). This
-  // locks in the exact "synced today · stale" rendering in the toolbar.
-  it('renders "synced today · stale" when lastSynced is same-day', async () => {
+  // relativeTimeFine() reads "just now" for a timestamp under a minute old.
+  it('renders "showing results from just now" when lastSynced is this minute', async () => {
     const fakeApi = configuredApi({
       sharedListProjects: vi.fn(async () => ({
         projects: [{ id: 'shared-1', name: 'demo-repo', publishedBy: 'ana', publishedAt: '2026-07-16T00:00:00Z' }],
@@ -135,10 +134,10 @@ describe('ProjectsPage — shared entries (configured)', () => {
     });
     renderWithApi(<ProjectsPage projects={[]} actions={{}} />, fakeApi);
 
-    await waitFor(() => expect(screen.getByText('synced today · stale')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/update failed · showing results from just now/)).toBeInTheDocument());
   });
 
-  it('toolbar refresh button starts a refresh job and the list refetches when it finishes', async () => {
+  it('the strip\'s update button starts a refresh job and the list refetches when it finishes', async () => {
     const user = userEvent.setup();
     const slots = { refresh: { state: 'idle', phase: null } };
     const fakeApi = configuredApi({
@@ -152,7 +151,7 @@ describe('ProjectsPage — shared entries (configured)', () => {
     expect(fakeApi.startRefresh).not.toHaveBeenCalled();
     fakeApi.sharedListProjects.mockClear();
 
-    await user.click(screen.getByRole('button', { name: 'refresh' }));
+    await user.click(screen.getByRole('button', { name: 'update team results' }));
 
     await waitFor(() => expect(fakeApi.startRefresh).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1));

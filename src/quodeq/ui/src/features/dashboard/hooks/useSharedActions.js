@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { accessFailureFrom } from '../../github-access/accessFailure.js';
 
 /**
  * connect()/pull(): in-flight guards -- aria-disabled on the triggering
@@ -14,11 +15,14 @@ import { apiErrorMessage } from '../../../strings/apiErrors.js';
  *
  * Both calls only START a background job (the server answers 202); the
  * outcome arrives through the sync status (hooks/useSyncStatus.js), so
- * `connectError` here covers just a failure to start the job.
+ * `connectError` here covers just a failure to start the job. A start refused
+ * by the access probe (ACCESS_<KIND>) is kept as `accessFailure` instead, the
+ * envelope the access panel renders.
  */
 export function useSharedActions({ connectShared, startPull }) {
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState(null);
+  const [accessFailure, setAccessFailure] = useState(null);
   const connectingRef = useRef(false);
   const pullingRef = useRef(false);
 
@@ -27,10 +31,13 @@ export function useSharedActions({ connectShared, startPull }) {
     connectingRef.current = true;
     setConnecting(true);
     setConnectError(null);
+    setAccessFailure(null);
     try {
       await connectShared(nextUrl);
     } catch (err) {
-      setConnectError(apiErrorMessage(err, 'projects.connectFailed'));
+      const failure = accessFailureFrom(err);
+      if (failure) setAccessFailure(failure);
+      else setConnectError(apiErrorMessage(err, 'projects.connectFailed'));
     } finally {
       connectingRef.current = false;
       setConnecting(false);
@@ -47,5 +54,5 @@ export function useSharedActions({ connectShared, startPull }) {
     }
   }, [startPull]);
 
-  return { connecting, connectError, connect, pull };
+  return { connecting, connectError, accessFailure, connect, pull };
 }

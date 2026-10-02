@@ -7,9 +7,10 @@ import { isSlotActive } from '../../../api/syncStatus.js';
 import { useSyncStatus } from '../../../hooks/useSyncStatus.js';
 import { connectSlotError } from '../../../hooks/connectSlotError.js';
 import { t } from '../../../strings/index.js';
-import { apiErrorMessage, isAccessCode } from '../../../strings/apiErrors.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { SettingsRowLabel } from './settingsRowParts.jsx';
 import AccessPanel from '../../github-access/components/AccessPanel.jsx';
+import { accessFailureFrom } from '../../github-access/accessFailure.js';
 import { runExclusive } from '../settingsHelpers.js';
 
 // Groups the section's own useState/useRef declarations so the outer
@@ -50,8 +51,9 @@ function buildConnectMutationConfig({ connectShared, setError, setAccessFailure,
       await refetchStatus();
       return result;
     }, (err) => {
-      if (isAccessCode(err?.code)) {
-        setAccessFailure({ kind: err.body?.kind, detail: err.body?.detail || '', host: err.body?.host || '', isGitHub: Boolean(err.body?.isGitHub), cloneUrl: err.body?.cloneUrl || '' });
+      const failure = accessFailureFrom(err);
+      if (failure) {
+        setAccessFailure(failure);
         return;
       }
       setError(apiErrorMessage(err, 'settings.connectFailed'));

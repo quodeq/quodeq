@@ -24,6 +24,24 @@ describe('useSharedActions', () => {
     expect(result.current.connectError).toBe('a connect is already running');
   });
 
+  it('connect keeps an ACCESS_ refusal as accessFailure (the access panel envelope), not as connectError', async () => {
+    const refusal = Object.assign(new Error('auth required'), {
+      code: 'ACCESS_AUTH_REQUIRED', body: { kind: 'auth_required', host: 'github.com', isGitHub: true },
+    });
+    const connectShared = vi.fn(async () => { throw refusal; });
+    const { result } = renderHook(() => useSharedActions({ connectShared, startPull: vi.fn() }));
+
+    await act(async () => { await result.current.connect('x'); });
+
+    expect(result.current.connectError).toBeNull();
+    expect(result.current.accessFailure).toEqual({ kind: 'auth_required', detail: '', host: 'github.com', isGitHub: true, cloneUrl: '' });
+
+    // The next attempt clears it.
+    connectShared.mockResolvedValueOnce({ started: true });
+    await act(async () => { await result.current.connect('x'); });
+    expect(result.current.accessFailure).toBeNull();
+  });
+
   it('pull passes the project and action to startPull and returns its answer', async () => {
     const startPull = vi.fn(async (project) => ({ started: true, project }));
     const { result } = renderHook(() => useSharedActions({ connectShared: vi.fn(), startPull }));

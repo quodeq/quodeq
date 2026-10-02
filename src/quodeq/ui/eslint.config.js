@@ -44,7 +44,7 @@ export default [
           ignoreProps: true,
           noAttributeStrings: false,
           // Pure punctuation/symbol glyphs are not translatable text.
-          allowedStrings: [' ', '×', '·', '•', '…', ':', '(', ')', '[', ']', '/', ',', '-', '%', '—', '‹', '›', '→', '@', '↑', '↓', '+', '▸', '▶', '✓', '✕', '↻', 'Δ', '⟳', '▾', '?', '.', '←', '>_', '--'],
+          allowedStrings: [' ', '×', '·', '•', '…', ':', '(', ')', '[', ']', '/', ',', '-', '%', '—', '‹', '›', '→', '@', '↑', '↓', '+', '▸', '▶', '✓', '✕', '↻', 'Δ', '⟳', '▾', '?', '.', '←', '>_', '--', '⋯', '☁'],
         },
       ],
       'i18n/no-literal-visible-attrs': 'error',

@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { TermHeader } from '../../../components/terminal/index.js';
+import { useCallback, useState } from 'react';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import { useProjectsPageData } from '../hooks/useProjectsPageData.js';
 import { usePullToLocal } from '../hooks/usePullToLocal.js';
@@ -8,12 +7,11 @@ import { ProjectCard } from './projectCards/ProjectCard.jsx';
 import { ProjectCardGroup, useRelocateDialog } from './projectCards/ProjectCardGroup.jsx';
 import { OnlineCardFooter } from './projectCards/OnlineCardFooter.jsx';
 import { ProjectsToolbar } from './ProjectsToolbar.jsx';
+import { ProjectsPageHeader, EVAL_BLOCKED_TITLE } from './ProjectsPageHeader.jsx';
+import { TeamResultsArea } from './TeamResultsArea.jsx';
 import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { projectIdOrSelf } from '../../../utils/projectIdentity.js';
-import { pluralKey } from '../../../utils/plural.js';
-
-const EVAL_BLOCKED_TITLE = t('projects.evalBlockedTitle');
 
 function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
   // The button stays clickable while evaluating so the handler can fire a
@@ -45,50 +43,6 @@ function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-// Until the list has loaded there is no count to report, so the header says
-// "loading" rather than "0 repositories evaluated".
-function headerSub(projectsLoaded, count) {
-  if (!projectsLoaded) return t('overview.loading');
-  return t(pluralKey(count, 'projects.reposEvaluatedOne', 'projects.reposEvaluatedMany'), { count });
-}
-
-function ProjectsPageHeader({ projectsLoaded, projects, isEmpty, onImportProject, onAddProject, isEvaluating }) {
-  return (
-    <div className="projects-page__header">
-      <TermHeader
-        name={t('projects.termName')}
-        sub={headerSub(projectsLoaded, projects.length)}
-      />
-      {!isEmpty && (
-        <div className="projects-page__header-actions">
-          {onImportProject && (
-            <button
-              type="button"
-              className={`projects-page__import-btn${evalBlockedClass(isEvaluating)}`}
-              onClick={onImportProject}
-              aria-label={t('projects.importAria')}
-              {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE, t('projects.importTitle'))}
-            >
-              {t('projects.importProject')}
-            </button>
-          )}
-          {onAddProject && (
-            <button
-              type="button"
-              className={`term-btn term-btn--primary term-btn--filled projects-page__add-btn${evalBlockedClass(isEvaluating)}`}
-              onClick={onAddProject}
-              aria-label={t('projects.addAria')}
-              {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE)}
-            >
-              <span aria-hidden="true">▸</span> {t('projects.addProject')}
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -137,7 +91,7 @@ function LocalProjectEntry({ entry, project, selection, actions }) {
 }
 
 function SharedProjectEntry({ entry, ctx }) {
-  const { onSelect, pullConflictId, handlePull, handleConfirmCopy, cancelConflict, pulledIds } = ctx;
+  const { onSelect, pullConflictId, pullingId, handlePull, handleConfirmCopy, cancelConflict, pulledIds } = ctx;
   const sharedId = projectIdOrSelf(entry.shared);
   return (
     <ProjectCard
@@ -154,6 +108,7 @@ function SharedProjectEntry({ entry, ctx }) {
             onConfirmCopy={handleConfirmCopy}
             onCancelConflict={cancelConflict}
             pulled={pulledIds.has(sharedId)}
+            pulling={pullingId === sharedId}
           />
         ),
       }}
@@ -180,16 +135,7 @@ function ProjectsCardsList({ visibleEntries, ctx }) {
 function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }) {
   return (
     <>
-      <ProjectsToolbar
-        filters={filters}
-        onFiltersChange={onFiltersChange}
-        configured={shared.configured}
-        lastSynced={shared.lastSynced}
-        stale={shared.stale}
-        error={shared.error}
-        refreshing={shared.refreshing}
-        onRefresh={shared.refresh}
-      />
+      <ProjectsToolbar filters={filters} onFiltersChange={onFiltersChange} configured={shared.configured} />
       <ProjectsCardsList visibleEntries={visibleEntries} ctx={cardsListCtx} />
     </>
   );
@@ -206,11 +152,11 @@ function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
   // merge, subproject nesting, query filter) lives in useProjectsPageData.
   const { shared, children, localEntryById, publishActions, isEmpty, visibleEntries } = useProjectsPageData({ projects, filters });
 
-  const { pullConflictId, pulledIds, handlePull, handleConfirmCopy, cancelConflict } = usePullToLocal({ shared });
+  const { pullConflictId, pullingId, pulledIds, handlePull, handleConfirmCopy, cancelConflict } = usePullToLocal({ shared });
 
   const cardsListCtx = {
     children, selectedProject, onSelect, onResumeSetup, confirming, setConfirming, onDelete, onExport,
-    relocateActions, publishActions, localEntryById, shared, pullConflictId, handlePull, handleConfirmCopy,
+    relocateActions, publishActions, localEntryById, shared, pullConflictId, pullingId, handlePull, handleConfirmCopy,
     cancelConflict, pulledIds,
   };
   return { shared, isEmpty, visibleEntries, cardsListCtx };
@@ -225,18 +171,30 @@ function ProjectsPageContent({ projectsLoaded, isEmpty, emptyProps, bodyProps })
 }
 
 export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
-  const { onAddProject, onImportProject, onFiltersChange } = actions;
+  const { onAddProject, onImportProject, onFiltersChange, onSharedDisconnected } = actions;
   const { shared, isEmpty, visibleEntries, cardsListCtx } = useProjectsCardsCtx({ projects, filters, selectedProject, actions });
+  // The connect card, opened by the header's "connect team results" or the strip's "change repository".
+  const [connectOpen, setConnectOpen] = useState(false);
+  const toggleConnect = useCallback(() => setConnectOpen((open) => !open), []);
 
   return (
     <section className="projects-page projects-page--terminal">
       <ProjectsPageHeader
-        projectsLoaded={projectsLoaded}
-        projects={projects}
+        counts={{ projectsLoaded, localCount: projects.length, teamCount: shared.projects.length }}
         isEmpty={isEmpty}
+        configured={shared.configured}
+        connectOpen={connectOpen}
+        onToggleConnect={toggleConnect}
         onImportProject={onImportProject}
         onAddProject={onAddProject}
         isEvaluating={isEvaluating}
+      />
+      <TeamResultsArea
+        shared={shared}
+        connectOpen={connectOpen}
+        onConnectOpenChange={setConnectOpen}
+        emptyPage={projectsLoaded && isEmpty}
+        onSharedDisconnected={onSharedDisconnected}
       />
       <ProjectsPageContent
         projectsLoaded={projectsLoaded}

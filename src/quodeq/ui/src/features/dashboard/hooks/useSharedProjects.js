@@ -1,7 +1,7 @@
 /**
  * Shared-repo status and project list for the merged Projects page (one list,
- * no tabs -- see ProjectsPage.jsx). Feeds the shared-only cards, the toolbar's
- * SyncedIndicator, and -- through useMergedProjects -- every local card's
+ * no tabs -- see ProjectsPage.jsx). Feeds the shared-only cards, the sync
+ * strip (SyncStrip), and -- through useMergedProjects -- every local card's
  * chips and action.
  *
  * Status comes from useSyncStatus, the app's only poller of
@@ -12,14 +12,14 @@
  * the server has cached and never blocks on a git fetch. useSyncStatus
  * invalidates that list while a job is reading and when it finishes, so this
  * hook never re-lists on its own, and nothing refreshes the remote on mount:
- * `refresh()` is the explicit toolbar action and only starts the job.
+ * `refresh()` is the strip's explicit "update" action and only starts the job.
  *
  * Error handling has two tiers. A failed *initial* load (status, or the first
  * list once configured, i.e. before either has ever produced data) surfaces
  * `error`, since there is nothing to show yet. A failed *refresh* of an
  * already-loaded page does NOT blank the view: it flags `stale` (the refresh
- * job ended in ERROR, or could not be started) so the toolbar's
- * SyncedIndicator can show "synced <time> ago - stale" over the still-valid
+ * job ended in ERROR, or could not be started) so the sync strip can show
+ * "update failed, showing results from <when>" over the still-valid
  * last-known listing.
  *
  * `lastSynced` seeds from the STATUS payload, so a list-only failure still
@@ -27,7 +27,7 @@
  * has its own envelope, that value overrides it.
  *
  * `refresh()` also re-reads the status, so it doubles as the retry
- * affordance behind the toolbar's "sync failed - retry" state even when the
+ * affordance behind the strip's "retry" even when the
  * original failure was the status fetch itself.
  */
 import { useCallback, useState } from 'react';
@@ -87,7 +87,7 @@ function deriveSharedProjectsState({ sync, listQuery, configured, startFailed })
   };
 }
 
-// Starts a refresh job and re-reads the status so the toolbar flips to
+// Starts a refresh job and re-reads the status so the strip flips to
 // "refreshing" now rather than at the next idle poll. A failure to start
 // keeps the page's data and flags it stale; the exact API message isn't
 // shown, the stale banner copy is fixed regardless of cause.
@@ -126,7 +126,10 @@ export function useSharedProjects() {
     await sync.refetch(); // show the running job now, not at the next idle poll
     return started;
   }, [actions.pull, sync.refetch]);
+  // The last URL this screen tried, so a failed connect can be retried from the strip.
+  const [lastConnectUrl, setLastConnectUrl] = useState(null);
   const connect = useCallback(async (nextUrl) => {
+    setLastConnectUrl(nextUrl);
     await actions.connect(nextUrl);
     await sync.refetch(); // show the running job now, not at the next idle poll
   }, [actions.connect, sync.refetch]);
@@ -139,9 +142,18 @@ export function useSharedProjects() {
   return {
     configured, url, projects, lastSynced, stale,
     loading, error,
+    // The raw status for the sync strip; `offline` is a failed poll over a
+    // status that last said a repository is configured (the strip keeps
+    // showing the last-known results).
+    status: sync.status,
+    offline: sync.isError && sync.status !== undefined && configured,
+    // An update that failed outside the refresh slot: the job could not be
+    // started, or the server marked the cached listing stale.
+    updateFailed: startFailed || Boolean(listQuery.data?.stale),
     connecting: actions.connecting || isSlotActive(sync.connect),
     connectError: actions.connectError ?? connectSlotError(sync.connect, 'projects.connectFailed'),
-    connect,
+    accessFailure: actions.accessFailure,
+    connect, lastConnectUrl,
     refreshing: isSlotActive(sync.refresh), refresh,
     pull, pullSlot: sync.pull,
   };
