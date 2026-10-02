@@ -37,7 +37,7 @@ def _inline_refresh(monkeypatch, status, refresh_fn):
 def test_refresh_starts_job_202(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
     status = RefreshStatus()
-    _inline_refresh(monkeypatch, status, lambda url, env=None, progress=None: (True, ""))
+    _inline_refresh(monkeypatch, status, lambda url, env=None, progress=None, **_: (True, ""))
     resp = client.post("/api/shared/refresh", headers=_ORIGIN)
     assert resp.status_code == 202
     assert resp.get_json() == {"started": True}
@@ -47,7 +47,7 @@ def test_refresh_starts_job_202(client, tmp_path, monkeypatch):
 def test_refresh_failure_lands_in_slot_with_code(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
     status = RefreshStatus()
-    _inline_refresh(monkeypatch, status, lambda url, env=None, progress=None: (False, "Could not resolve host"))
+    _inline_refresh(monkeypatch, status, lambda url, env=None, progress=None, **_: (False, "Could not resolve host"))
     resp = client.post("/api/shared/refresh", headers=_ORIGIN)
     assert resp.status_code == 202
     slot = client.get("/api/shared/status").get_json()["refresh"]
@@ -59,7 +59,7 @@ def test_refresh_while_running_is_409(client, tmp_path, monkeypatch):
     (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
     status = RefreshStatus()
     status.claim("git@github.com:t/r.git")
-    _inline_refresh(monkeypatch, status, lambda url, env=None, progress=None: (True, ""))
+    _inline_refresh(monkeypatch, status, lambda url, env=None, progress=None, **_: (True, ""))
     resp = client.post("/api/shared/refresh", headers=_ORIGIN)
     assert resp.status_code == 409
     assert resp.get_json()["code"] == "REFRESH_IN_PROGRESS"

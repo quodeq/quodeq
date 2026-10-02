@@ -8,7 +8,6 @@ publish job in services/shared_publish.py.
 """
 from __future__ import annotations
 
-import threading
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -19,6 +18,7 @@ from typing import Callable
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.core.types.sync_phase import SyncKind, SyncPhase
 from quodeq.services.github_access import forget_url
+from quodeq.services.job_spawn import spawn_daemon
 from quodeq.services.job_status import JobSlotStatus
 from quodeq.services.shared_connect import ConnectOutcome, ConnectStatus, connect_shared_repo
 from quodeq.services.shared_repo import RepoFormat, shared_evaluations_root, validate_remote_url
@@ -183,14 +183,10 @@ class ConnectStartResult(StrEnum):
     FAILED = "failed"  # the worker thread could not be started; the status carries the error
 
 
-def _spawn_daemon(target: Callable[[], None]) -> None:
-    threading.Thread(target=target, daemon=True).start()
-
-
 def start_connect(
     url: str, *,
     status: ConnectJobStatus | None = None,
-    spawn: Callable[[Callable[[], None]], None] = _spawn_daemon,
+    spawn: Callable[[Callable[[], None]], None] = spawn_daemon,
     log: LogSink = NULL_LOG,
     env: Mapping[str, str] | None = None,
     warm: WarmListing | None = None,

@@ -18,6 +18,7 @@ from quodeq.services.job_spawn import spawn_daemon, start_claimed_job
 from quodeq.services.job_status import JobSlotStatus
 from quodeq.services.shared_listing import warm_shared_listing
 from quodeq.services.shared_repo import refresh_shared_clone, shared_evaluations_root, sync_shared_index
+from quodeq.services.wiring import DEFAULT_GIT_TIMEOUT_S
 from quodeq.services.sync_progress import SYNC_IDLE_FIELDS, WarmListing, progress_writer, read_projects
 from quodeq.shared.fault_isolation import run_isolated
 
@@ -92,7 +93,11 @@ class RefreshSteps:
 def _do_refresh(
     url: str, status: RefreshStatus, steps: RefreshSteps, env: Mapping[str, str] | None, log: LogSink,
 ) -> None:
-    ok, reason = (steps.refresh or refresh_shared_clone)(url, env, progress=progress_writer(status))
+    # A background job, not a request: the fetch gets the clone's git timeout,
+    # not refresh_shared_clone's short in-request default.
+    ok, reason = (steps.refresh or refresh_shared_clone)(
+        url, env, timeout=DEFAULT_GIT_TIMEOUT_S, progress=progress_writer(status),
+    )
     if not ok:
         _fail(status, reason or MESSAGE_REFRESH_DEFAULT, CODE_REFRESH_FAILED)
         return

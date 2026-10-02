@@ -5,6 +5,7 @@ import pytest
 
 from quodeq.core.types.sync_phase import SyncKind, SyncPhase
 from quodeq.data.fs.git_progress import ProgressUpdate
+from quodeq.data.fs.shared_repo_git import DEFAULT_GIT_TIMEOUT_S
 from quodeq.services.shared_refresh_job import (
     RefreshStartResult, RefreshState, RefreshStatus, RefreshSteps, get_refresh_status, is_refresh_running, run_refresh_job, start_refresh,
 )
@@ -31,6 +32,18 @@ def test_refresh_done_walks_phases(status):
     assert snap["state"] == RefreshState.DONE and snap["phase"] is SyncPhase.DONE
     assert snap["percent"] == 100 and snap["bytes"] == 7000 and snap["kind"] is SyncKind.REFRESH
     assert synced == [_URL]
+
+
+def test_refresh_uses_the_job_git_timeout_not_the_request_default(status):
+    seen = {}
+
+    def refresh(url, env=None, *, timeout=None, progress=None):
+        seen["timeout"] = timeout
+        return True, ""
+
+    status.claim(_URL)
+    run_refresh_job(_URL, status=status, steps=RefreshSteps(refresh=refresh, sync_index=lambda u: None))
+    assert seen["timeout"] == DEFAULT_GIT_TIMEOUT_S == 300
 
 
 def test_refresh_failure_keeps_reason_and_does_not_sync_index(status):
