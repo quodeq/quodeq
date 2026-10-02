@@ -90,7 +90,8 @@ export default function RepoScanStep({ state, actions, createProject, getProject
   const {
     folderBrowserOpen, setFolderBrowserOpen,
     subStep, setSubStep,
-    cloneSubmitting, cloneError, setCloneError,
+    cloneSubmitting, cloneError, setCloneError, cloneDetail,
+    accessFailure, clearAccessFailure, retryClone,
     handleSubmit, handleCloneTargetSubmit, handleFolderSelect,
   } = useRepoScanStep({ state, actions, createProject, getProjectInfo, getProjectScan });
 
@@ -99,9 +100,13 @@ export default function RepoScanStep({ state, actions, createProject, getProject
       <CloneTargetStep
         repoUrl={state.repo.value?.trim()}
         onSubmit={handleCloneTargetSubmit}
-        onBack={() => { setSubStep(REPO_SCAN_SUB_STEP.INPUT); setCloneError(null); }}
+        onBack={() => { setSubStep(REPO_SCAN_SUB_STEP.INPUT); setCloneError(null); clearAccessFailure(); }}
         submitting={cloneSubmitting}
         error={cloneError}
+        detail={cloneDetail}
+        accessFailure={accessFailure}
+        onAccessResolved={retryClone}
+        onRetry={retryClone}
         stepIndex={stepIndex}
         stepTotal={stepTotal}
       />

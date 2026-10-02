@@ -3,6 +3,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import RepoScanStep from './RepoScanStep.jsx';
 
+vi.mock('../../../../api/index.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  probeGit: vi.fn().mockResolvedValue({ reachable: true, kind: 'ok' }),
+}));
+
 const noop = () => {};
 
 describe('RepoScanStep', () => {
