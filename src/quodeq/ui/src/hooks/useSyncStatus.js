@@ -16,8 +16,8 @@ function useSyncTransitions(status, tick, queryClient) {
     if (!status) return;
     const before = prev.current;
     prev.current = status;
-    const reading = [status.connect, status.refresh].some((s) => s?.phase === SYNC_PHASE.READING);
-    if (reading) queryClient.invalidateQueries({ queryKey: sharedKeys.list() });
+    // Only the DONE edge re-lists. The job hydrates the listing during READING;
+    // a list request then would run that same cold hydration a second time.
     for (const kind of SYNC_KINDS) {
       const was = before?.[kind]?.phase;
       const now = status[kind]?.phase;

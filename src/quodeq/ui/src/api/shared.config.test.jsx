@@ -122,6 +122,25 @@ describe('shared repo API client', () => {
       expect(calls[0].opts?.method).toBeUndefined();
     });
 
+    it('sharedListProjects waits two minutes, not the default 30s (a fresh clone lists slowly)', async () => {
+      vi.useFakeTimers();
+      try {
+        let signal;
+        vi.stubGlobal('fetch', vi.fn((url, opts) => new Promise((_resolve, reject) => {
+          signal = opts.signal;
+          signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        })));
+        const settled = expect(shared.sharedListProjects()).rejects.toThrow();
+        await vi.advanceTimersByTimeAsync(119999);
+        expect(signal.aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        await settled;
+        expect(signal.aborted).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('sharedListProjects GETs /shared/projects with refresh=1 when requested', async () => {
       await shared.sharedListProjects({ refresh: true });
       expect(calls[0].url).toBe('/api/shared/projects?refresh=1');

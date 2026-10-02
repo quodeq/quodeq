@@ -20,12 +20,13 @@ function setup(statuses, opts) {
 const keyCalls = (spy, key) => spy.mock.calls.filter(([a]) => JSON.stringify(a.queryKey) === JSON.stringify(key)).length;
 
 describe('useSyncStatus', () => {
-  it('invalidates the shared list on each reading tick and once on done, plus projects on connect done', async () => {
+  it('leaves the shared list alone while reading and invalidates it once on done, plus projects on connect done', async () => {
     const reading = { ...base, connect: { state: 'running', phase: 'reading', projectsFound: 2 } };
     const done = { ...base, connect: { state: 'done', phase: 'done', projectsFound: 5 } };
-    const { spy } = setup([reading, reading, done, done]);
-    await waitFor(() => expect(spy.mock.calls.filter(([a]) => a.queryKey?.[1] === 'list' && a.queryKey?.[0] === 'shared').length).toBeGreaterThanOrEqual(3));
-    await waitFor(() => expect(spy.mock.calls.some(([a]) => JSON.stringify(a.queryKey) === JSON.stringify(projectsKeys.list()))).toBe(true));
+    const { spy, api } = setup([reading, reading, reading, done, done]);
+    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(5), { timeout: 500 });
+    expect(keyCalls(spy, sharedKeys.list())).toBe(1);
+    expect(keyCalls(spy, projectsKeys.list())).toBe(1);
   });
 
   it('polls fast while active and slow when idle', async () => {

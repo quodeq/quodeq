@@ -10,9 +10,10 @@
  * background. The list is a react-query query on `sharedKeys.list()` that
  * always passes `refresh: false`, so the UI renders instantly from whatever
  * the server has cached and never blocks on a git fetch. useSyncStatus
- * invalidates that list while a job is reading and when it finishes, so this
- * hook never re-lists on its own, and nothing refreshes the remote on mount:
- * `refresh()` is the strip's explicit "update" action and only starts the job.
+ * invalidates that list when a job finishes (the job has already warmed the
+ * server's listing by then), so this hook only re-lists on its own to heal an
+ * errored list on retry, and nothing refreshes the remote on mount:
+ * `refresh()` is the strip's explicit "update" action and starts the job.
  *
  * Error handling has two tiers. A failed *initial* load (status, or the first
  * list once configured, i.e. before either has ever produced data) surfaces
@@ -90,9 +91,12 @@ function deriveSharedProjectsState({ sync, listQuery, configured, startFailed })
 // Starts a refresh job and re-reads the status so the strip flips to
 // "refreshing" now rather than at the next idle poll. A failure to start
 // keeps the page's data and flags it stale; the exact API message isn't
-// shown, the stale banner copy is fixed regardless of cause.
-function useRefreshStart({ startRefresh, refetchStatus }) {
+// shown, the stale banner copy is fixed regardless of cause. A list that
+// errored (it timed out on a cold clone) is re-read too, so "retry" heals the
+// list even when no refresh job reaches DONE to invalidate it.
+function useRefreshStart({ startRefresh, refetchStatus, listQuery }) {
   const [startFailed, setStartFailed] = useState(false);
+  const { isError: listFailed, refetch: refetchList } = listQuery;
   const refresh = useCallback(async () => {
     setStartFailed(false);
     try {
@@ -102,7 +106,8 @@ function useRefreshStart({ startRefresh, refetchStatus }) {
       setStartFailed(true);
     }
     await refetchStatus();
-  }, [startRefresh, refetchStatus]);
+    if (listFailed) await refetchList();
+  }, [startRefresh, refetchStatus, listFailed, refetchList]);
   return { startFailed, refresh };
 }
 
@@ -133,7 +138,7 @@ export function useSharedProjects() {
     await actions.connect(nextUrl);
     await sync.refetch(); // show the running job now, not at the next idle poll
   }, [actions.connect, sync.refetch]);
-  const { startFailed, refresh } = useRefreshStart({ startRefresh, refetchStatus: sync.refetch });
+  const { startFailed, refresh } = useRefreshStart({ startRefresh, refetchStatus: sync.refetch, listQuery });
 
   const { url, projects, lastSynced, stale, loading, error } = deriveSharedProjectsState({
     sync, listQuery, configured, startFailed,
