@@ -19,7 +19,7 @@ from quodeq.api._url_body import required_url_or_error
 from quodeq.api.helpers import json_error, optional_json_object_or_response
 from quodeq.config.ai_provider_errors import PLAINTEXT_KEY_REFUSED_MESSAGE, PlaintextKeyRefusedError
 from quodeq.config.github_account import GitHubAccount, TokenMethod, delete_account, load_account, store_account
-from quodeq.config.github_app import GITHUB_OAUTH_SCOPE
+from quodeq.config.github_app import GITHUB_OAUTH_SCOPE, github_client_id
 from quodeq.services.github_access import AccessResult, clear_access_cache, resolve_access
 from quodeq.services.github_device_flow import (
     DeviceFlowState, FlowDeps, StartResult, get_device_flow_status, start_device_flow,
@@ -27,11 +27,15 @@ from quodeq.services.github_device_flow import (
 from quodeq.services.github_gh_cli import GhStatus, gh_status
 from quodeq.services.github_oauth_client import GitHubOAuthClient, GitHubRefused, GitHubUnreachable, TokenRejected
 from quodeq.services.shared_repo import validate_remote_url
+from quodeq.shared.git_errors import GitFailureKind
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.repo import is_repo_url
 
 CODE_ACCESS_PREFIX = "ACCESS_"
 CODE_INVALID_URL = "INVALID_URL"
+CODE_ACCESS_USE_HTTPS = "ACCESS_USE_HTTPS"
+KIND_USE_HTTPS = "use_https"
+MESSAGE_INVALID_URL = "use an https or ssh URL to a public host"
 CODE_GITHUB_NOT_CONFIGURED = "GITHUB_NOT_CONFIGURED"
 CODE_OFFLINE = "OFFLINE"
 CODE_FLOW_START_FAILED = "FLOW_START_FAILED"
@@ -61,13 +65,36 @@ def _start_flow() -> StartResult:
 
 def access_failure_response(result: AccessResult) -> tuple[Response, int]:
     """400 body for a URL the ladder could not reach: the kind as a code suffix
-    plus the fields the UI's access panel renders from."""
+    plus the fields the UI's access panel renders from. A URL the guard
+    refused before any probe answers the plain INVALID_URL every route uses."""
+    if result.kind is GitFailureKind.INVALID_URL:
+        return json_error(MESSAGE_INVALID_URL, HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)
     body = {
         "error": f"could not reach {result.host}: {result.kind}",
         "code": f"{CODE_ACCESS_PREFIX}{result.kind.upper()}",
         "kind": result.kind, "detail": result.detail, "host": result.host, "isGitHub": result.is_github,
     }
     return jsonify(body), HTTPStatus.BAD_REQUEST
+
+
+def same_url_access_error(url: str, result: AccessResult) -> tuple[Response, int] | None:
+    """The 400 for a route that must use *url* exactly as given (the shared
+    results repo: its clone dir is keyed by the configured URL), else None.
+
+    Unreachable is the usual access failure. Reachable only over a different
+    URL (an ssh address reached through a token rung, which speaks https
+    only) is ``ACCESS_USE_HTTPS`` with the address that works.
+    """
+    if not result.reachable:
+        return access_failure_response(result)
+    if result.clone_url and result.clone_url != url:
+        body = {
+            "error": "sign-in works over https only, use the https address",
+            "code": CODE_ACCESS_USE_HTTPS, "kind": KIND_USE_HTTPS, "detail": "",
+            "host": result.host, "isGitHub": result.is_github, "cloneUrl": result.clone_url,
+        }
+        return jsonify(body), HTTPStatus.BAD_REQUEST
+    return None
 
 
 @dataclass(frozen=True)
@@ -82,6 +109,7 @@ class RouteDeps:
     start_flow: Callable[[], StartResult] = _start_flow
     flow_status: Callable[[], dict] = get_device_flow_status
     client: GitHubOAuthClient | None = None  # None: a real client, built per call
+    client_id: Callable[[], str] = github_client_id
 
 
 def _probe(deps: RouteDeps) -> Response | tuple[Response, int]:
@@ -93,7 +121,7 @@ def _probe(deps: RouteDeps) -> Response | tuple[Response, int]:
             return json_error("not a recognised remote repository URL", HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)
         validate_remote_url(url)
     except ValueError:
-        return json_error("use an https or ssh URL to a public host", HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)
+        return json_error(MESSAGE_INVALID_URL, HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)
     r = deps.resolve(url)
     return jsonify({
         "reachable": r.reachable, "method": r.method, "kind": r.kind, "detail": r.detail,
@@ -108,7 +136,7 @@ def _account(deps: RouteDeps) -> Response:
     return jsonify({
         "signedIn": account is not None, "login": account.login if account else None, "method": method,
         "expiresAt": account.expires_at if account else None,
-        "ghAvailable": gh.available, "ghLoggedIn": gh.logged_in,
+        "ghAvailable": gh.available, "ghLoggedIn": gh.logged_in, "signInAvailable": bool(deps.client_id()),
     })
 
 
@@ -132,7 +160,7 @@ def _device_flow_status(deps: RouteDeps) -> Response | tuple[Response, int]:
         return json_error("no sign-in in progress", HTTPStatus.CONFLICT, CODE_NO_FLOW)
     return jsonify({
         "state": snap["state"], "login": snap["login"], "error": snap["error"],
-        "code": None if snap["error"] is None else CODE_FLOW_FAILED,
+        "code": None if snap["error"] is None else snap.get("code") or CODE_FLOW_FAILED,
         "userCode": snap["user_code"], "verificationUri": snap["verification_uri"],
     })
 

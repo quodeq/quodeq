@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import base64
 
+import pytest
+
 from quodeq.config.github_account import GitHubAccount, TokenMethod
 from quodeq.data.fs.git_access_probe import ProbeResult
 from quodeq.services.github_access import (
@@ -40,8 +42,14 @@ def _token_in(env):
     return raw.split(":", 1)[1]
 
 
+@pytest.fixture(autouse=True)
+def _no_dns(monkeypatch):
+    """The URL guard resolves public hosts; keep DNS out of the ladder tests."""
+    monkeypatch.setattr("quodeq.data.fs.repo_validation._resolves_to_private", lambda host: False)
+
+
 def _deps(probe, account=None, gh=GhStatus(False, False)):
-    return AccessDeps(probe=probe, load_account=lambda: account, gh=lambda **_: gh, env={})
+    return AccessDeps(probe=probe, load_account=lambda: account, gh=lambda **_: gh, env={}, pin=lambda url: [])
 
 
 def test_remote_host_and_github_detection():

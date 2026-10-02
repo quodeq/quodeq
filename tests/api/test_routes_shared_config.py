@@ -48,6 +48,9 @@ def _skip_url_validation(monkeypatch):
     # and in the connect use case, so a local bare origin can be connected.
     monkeypatch.setattr("quodeq.services.shared_connect_job.validate_remote_url", lambda url: None)
     monkeypatch.setattr("quodeq.services.shared_connect.validate_remote_url", lambda url: None)
+    # The access ladder runs the same guard (plus the remote-URL shape check) before probing.
+    monkeypatch.setattr("quodeq.services.github_access.validate_remote_url", lambda url: None)
+    monkeypatch.setattr("quodeq.services.github_access.is_repo_url", lambda url: True)
 
 
 def _fake_outcome(monkeypatch, kind):

@@ -96,3 +96,11 @@ def test_probe_timeout_env(monkeypatch):
     assert git_probe_timeout_s({}) == 15
     assert git_probe_timeout_s({"QUODEQ_GIT_PROBE_TIMEOUT_S": "40"}) == 40
     assert git_probe_timeout_s({"QUODEQ_GIT_PROBE_TIMEOUT_S": "0"}) == 15
+
+
+def test_git_config_entries_prefix_the_argv_as_c_pairs():
+    pin = "http.curloptResolve=github.com:443:140.82.121.3"
+    run = _fake_run()
+    probe_remote(_URL, env={}, run=run, git_config=[pin])
+    argv, _ = run.calls[-1]
+    assert argv[1:4] == ["-c", pin, "ls-remote"]

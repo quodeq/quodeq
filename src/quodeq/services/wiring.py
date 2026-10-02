@@ -100,6 +100,7 @@ from quodeq.data.fs.report_parser.finding_details import (  # noqa: F401
 # Git clone subprocess invocation.
 from quodeq.data.fs.repo_clone import clone_repo  # noqa: F401
 from quodeq.data.fs.git_access_probe import ProbeResult, probe_remote  # noqa: F401
+from quodeq.data.fs.git_pin import pinned_git_config  # noqa: F401
 
 # Per-run findings-table reads (SQL stays in the adapter) and the row-dict →
 # Finding mapper that decodes what those reads return.

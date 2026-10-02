@@ -3,22 +3,18 @@
 from __future__ import annotations
 
 import errno
-import ipaddress
 import logging
 import subprocess as _subprocess
 from collections.abc import Mapping
 from pathlib import Path
-from urllib.parse import urlparse
 
-from quodeq.services.wiring import clone_repo, remove_clone_dir
+from quodeq.services.wiring import clone_repo, pinned_git_config, remove_clone_dir
 from quodeq.config.clone_env import clone_shallow_months, git_clone_timeout_s
-from quodeq.shared.constants import SCHEME_HTTP, SCHEME_HTTPS
 from quodeq.shared.git_errors import GitFailureKind, classify_git_output
 from quodeq.shared.ssrf import resolve_addresses
 
 _logger = logging.getLogger(__name__)
 
-_DEFAULT_PORTS = {SCHEME_HTTP: 80, SCHEME_HTTPS: 443}
 _KIND_NETWORK = GitFailureKind.NETWORK
 
 
@@ -46,31 +42,16 @@ _RETRYABLE_KINDS = (GitFailureKind.NETWORK, GitFailureKind.UNKNOWN)
 
 def _pinned_git_config(url: str) -> list[str]:
     """``http.curloptResolve`` entries pinning git's connection to the
-    addresses *url*'s host resolves to right now.
+    addresses *url*'s host resolves to right now (see data/fs/git_pin.py).
 
-    The URL was validated against the private-address policy before the
-    clone, but git runs its own DNS lookup, and a rebinding host can answer
-    that second lookup with an internal address. Resolving once here, judging
-    that answer, and handing the same addresses to git closes the gap for
-    http(s) remotes. Other schemes (scp-like ``git@host:``) cannot be pinned
-    and get no entry.
+    A host that does not resolve, or resolves to an internal address, is a
+    NETWORK ``CloneError``. The resolver is this module's ``resolve_addresses``,
+    the seam the clone tests replace.
     """
-    parsed = urlparse(url)
-    hostname = parsed.hostname
-    if parsed.scheme not in _DEFAULT_PORTS or not hostname:
-        return []
-    addresses = resolve_addresses(hostname)
-    if not addresses:
-        raise CloneError(_KIND_NETWORK, f"could not resolve {hostname}")
-    if any(_is_internal(a) for a in addresses):
-        raise CloneError(_KIND_NETWORK, f"{hostname} resolves to a private/internal address")
-    port = parsed.port or _DEFAULT_PORTS[parsed.scheme]
-    return [f"http.curloptResolve={hostname}:{port}:{','.join(addresses)}"]
-
-
-def _is_internal(address: str) -> bool:
-    addr = ipaddress.ip_address(address)
-    return addr.is_private or addr.is_loopback or addr.is_link_local
+    try:
+        return pinned_git_config(url, resolve=resolve_addresses)
+    except ValueError as exc:
+        raise CloneError(_KIND_NETWORK, str(exc)) from exc
 
 
 def _clone_once(

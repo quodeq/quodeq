@@ -9,6 +9,7 @@ fixture.
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import subprocess
 from pathlib import Path
@@ -24,7 +25,9 @@ from quodeq.data.fs.shared_repo import (
     shared_repo_path,
     sync_shared_index,
 )
-from quodeq.services.github_access import AccessMethod, AccessResult
+from quodeq.data.fs.git_access_probe import ProbeResult
+from quodeq.services.github_access import clear_access_cache
+from quodeq.services.github_gh_cli import GhStatus
 from quodeq.services.shared_settings import SharedSettings, write_settings
 from quodeq.shared.git_errors import GitFailureKind
 from tests._timeouts import budget
@@ -115,9 +118,34 @@ def shared_clone_fixture(tmp_path, monkeypatch):
     return url
 
 
+def _literal_is_internal(host: str) -> bool:
+    """The URL guard's DNS check without DNS: only IP literals and localhost count as internal."""
+    try:
+        addr = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return host == "localhost"
+    return addr.is_private or addr.is_loopback or addr.is_link_local
+
+
 @pytest.fixture(autouse=True)
 def _ambient_access(monkeypatch):
-    """Routes that clone or push probe the access ladder first; keep every api test off the network."""
-    reachable = AccessResult(True, AccessMethod.AMBIENT, GitFailureKind.OK, "", "github.com", True, None)
-    for module in ("routes_project_create", "routes_shared_config"):
-        monkeypatch.setattr(f"quodeq.api.{module}.resolve_access", lambda url: reachable)
+    """Routes that clone or push walk the access ladder first; keep every api test off the network.
+
+    Patched at the probe boundary, not at ``resolve_access``, so the real
+    ladder (URL guard first, then the probe) runs and its call order is
+    observable. ``probe_calls`` records every probe.
+    """
+    probe_calls: list[str] = []
+
+    def probe(url, **_kwargs):
+        probe_calls.append(url)
+        return ProbeResult(GitFailureKind.OK)
+
+    clear_access_cache()
+    monkeypatch.setattr("quodeq.services.github_access.probe_remote", probe)
+    monkeypatch.setattr("quodeq.services.github_access.pinned_git_config", lambda url: [])
+    monkeypatch.setattr("quodeq.services.github_access.gh_status", lambda **_kwargs: GhStatus(False, False))
+    monkeypatch.setattr("quodeq.services.github_access.load_account", lambda: None)
+    monkeypatch.setattr("quodeq.data.fs.repo_validation._resolves_to_private", _literal_is_internal)
+    yield probe_calls
+    clear_access_cache()

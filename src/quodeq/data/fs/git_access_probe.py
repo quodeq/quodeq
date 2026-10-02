@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 import subprocess
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 from quodeq.config.clone_env import git_probe_timeout_s
@@ -57,16 +57,21 @@ def _too_old(version: tuple[int, int] | None) -> bool:
 
 def probe_remote(
     url: str, *, env: Mapping[str, str] | None = None, timeout_s: int | None = None,
-    run: Callable[..., object] = subprocess.run,
+    run: Callable[..., object] = subprocess.run, git_config: Sequence[str] = (),
 ) -> ProbeResult:
-    """Classified reachability of *url* for git running under *env*."""
+    """Classified reachability of *url* for git running under *env*.
+
+    *git_config* entries (``key=value``, e.g. the DNS pin from
+    data/fs/git_pin.py) apply to this git process only, as ``-c`` pairs.
+    """
     version = git_version(env=env, run=run)
     if _too_old(version):
         return ProbeResult(GitFailureKind.GIT_TOO_OLD, f"git {version[0]}.{version[1]}")
     timeout = timeout_s if timeout_s is not None else git_probe_timeout_s(env)
+    config_flags = [flag for entry in git_config for flag in ("-c", entry)]
     try:
         proc = run(
-            [GIT_BIN, "ls-remote", "--exit-code", "--heads", "--", url],
+            [GIT_BIN, *config_flags, "ls-remote", "--exit-code", "--heads", "--", url],
             env=git_env_floor(env), stdin=subprocess.DEVNULL,
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=timeout,

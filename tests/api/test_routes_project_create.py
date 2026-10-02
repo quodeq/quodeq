@@ -108,7 +108,7 @@ def test_post_projects_rejects_metadata_endpoint_ssrf(client):
             headers=_ORIGIN,
         )
     assert resp.status_code == 400, resp.get_json()
-    assert resp.get_json()["code"] == "INVALID_REPO"
+    assert resp.get_json()["code"] == "INVALID_URL"  # the access ladder's URL guard answers first
     assert clone_calls == [], "SSRF: git clone must never run for a metadata-endpoint URL"
 
 
