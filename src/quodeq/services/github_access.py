@@ -8,7 +8,9 @@
 
 Rungs 2-3 only run for GitHub hosts and only when rung 1 failed for a reason
 sign-in can fix (see shared/git_errors.SIGN_IN_KINDS). The winning method is
-cached per host for the process so repeat clones do not re-probe.
+cached per repository (normalized URL) for the process so repeat clones do not
+re-probe; reachability depends on the repo, so it is never shared across repos.
+Token rungs authenticate over https only, so their result carries `clone_url`.
 """
 from __future__ import annotations
 
@@ -50,6 +52,7 @@ class AccessResult:
     host: str
     is_github: bool
     env: dict[str, str] | None  # the environment to clone with; None = ambient
+    clone_url: str | None = None  # None = clone the URL exactly as given
 
 
 @dataclass(frozen=True)
@@ -62,27 +65,30 @@ class AccessDeps:
     env: Mapping[str, str] | None = None
 
 
+_Entry = tuple[AccessMethod, dict[str, str] | None, str | None]  # method, env, clone_url
+
+
 class AccessCache:
-    """Per-host memory of the method that worked, behind a lock."""
+    """Per-repository memory of the method that worked, behind a lock."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._hosts: dict[str, tuple[AccessMethod, dict[str, str] | None]] = {}
+        self._hosts: dict[str, _Entry] = {}
 
-    def get(self, host: str) -> tuple[AccessMethod, dict[str, str] | None] | None:
-        """The cached method and env for *host*, if any."""
+    def get(self, key: str) -> _Entry | None:
+        """The cached method, env and clone_url for *key*, if any."""
         with self._lock:
-            return self._hosts.get(host)
+            return self._hosts.get(key)
 
-    def put(self, host: str, method: AccessMethod, env: dict[str, str] | None) -> None:
-        """Remember the method that worked for *host*."""
+    def put(self, key: str, method: AccessMethod, env: dict[str, str] | None, clone_url: str | None = None) -> None:
+        """Remember the method that worked for *key*."""
         with self._lock:
-            self._hosts[host] = (method, env)
+            self._hosts[key] = (method, env, clone_url)
 
-    def forget(self, host: str) -> None:
-        """Drop *host* from the cache."""
+    def forget(self, key: str) -> None:
+        """Drop *key* from the cache."""
         with self._lock:
-            self._hosts.pop(host, None)
+            self._hosts.pop(key, None)
 
     def clear(self) -> None:
         """Drop every cached host."""
@@ -91,6 +97,19 @@ class AccessCache:
 
 
 _default_cache = AccessCache()
+
+
+def cache_key(url: str) -> str:
+    """The per-repository cache key: the normalized URL, else the URL itself."""
+    return normalize_remote_url(url) or url
+
+
+def https_form(url: str) -> str:
+    """The https clone URL for a remote (scp/ssh forms are mapped); https is unchanged."""
+    if url.lower().startswith("https://"):
+        return url
+    normalized = normalize_remote_url(url)
+    return f"https://{normalized}.git" if normalized else url
 
 
 def remote_host(url: str) -> str:
@@ -116,24 +135,25 @@ def access_env(token: str, base: Mapping[str, str] | None = None) -> dict[str, s
     }
 
 
-def _result(reachable: bool, method: AccessMethod, probe: ProbeResult, host: str, env: dict[str, str] | None) -> AccessResult:
-    return AccessResult(reachable, method, probe.kind, probe.detail, host, is_github_host(host), env)
+def _result(reachable: bool, method: AccessMethod, probe: ProbeResult, host: str, env: dict[str, str] | None, clone_url: str | None = None) -> AccessResult:
+    return AccessResult(reachable, method, probe.kind, probe.detail, host, is_github_host(host), env, clone_url)
 
 
 def _try_tokens(url: str, host: str, first: ProbeResult, deps: AccessDeps) -> AccessResult:
     probe = deps.probe or probe_remote
     load = deps.load_account or load_account
     gh = deps.gh or gh_status
+    https = https_form(url)
     account = load()
     if account is not None:
         env = access_env(account.token, deps.env)
-        if probe(url, env=env).kind is GitFailureKind.OK:
-            return _result(True, AccessMethod.QUODEQ, ProbeResult(GitFailureKind.OK), host, env)
+        if probe(https, env=env).kind is GitFailureKind.OK:
+            return _result(True, AccessMethod.QUODEQ, ProbeResult(GitFailureKind.OK), host, env, https)
     status = gh(env=deps.env)
     if status.token:
         env = access_env(status.token, deps.env)
-        if probe(url, env=env).kind is GitFailureKind.OK:
-            return _result(True, AccessMethod.GH, ProbeResult(GitFailureKind.OK), host, env)
+        if probe(https, env=env).kind is GitFailureKind.OK:
+            return _result(True, AccessMethod.GH, ProbeResult(GitFailureKind.OK), host, env, https)
     return _result(False, AccessMethod.NONE, first, host, None)
 
 
@@ -144,28 +164,29 @@ def resolve_access(
     deps = deps or AccessDeps()
     cache = cache or _default_cache
     host = remote_host(url)
-    cached = cache.get(host)
+    key = cache_key(url)
+    cached = cache.get(key)
     if cached is not None:
-        method, env = cached
-        return _result(True, method, ProbeResult(GitFailureKind.OK), host, env)
+        method, env, clone_url = cached
+        return _result(True, method, ProbeResult(GitFailureKind.OK), host, env, clone_url)
     probe = deps.probe or probe_remote
     first = probe(url, env=deps.env)
     if first.kind is GitFailureKind.OK:
-        cache.put(host, AccessMethod.AMBIENT, None)
+        cache.put(key, AccessMethod.AMBIENT, None)
         return _result(True, AccessMethod.AMBIENT, first, host, None)
     if first.kind not in SIGN_IN_KINDS or not is_github_host(host):
         return _result(False, AccessMethod.NONE, first, host, None)
     result = _try_tokens(url, host, first, deps)
     if result.reachable:
-        cache.put(host, result.method, result.env)
+        cache.put(key, result.method, result.env, result.clone_url)
     return result
 
 
 def clear_access_cache() -> None:
-    """Empty the process-wide per-host cache."""
+    """Empty the process-wide cache."""
     _default_cache.clear()
 
 
-def forget_host(url: str) -> None:
-    """Drop the cached method for *url*'s host (after a clone that failed anyway)."""
-    _default_cache.forget(remote_host(url))
+def forget_url(url: str) -> None:
+    """Drop the cached method for *url* (after a clone that failed anyway)."""
+    _default_cache.forget(cache_key(url))

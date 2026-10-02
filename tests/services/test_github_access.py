@@ -6,7 +6,8 @@ import base64
 from quodeq.config.github_account import GitHubAccount, TokenMethod
 from quodeq.data.fs.git_access_probe import ProbeResult
 from quodeq.services.github_access import (
-    AccessCache, AccessDeps, AccessMethod, access_env, is_github_host, remote_host, resolve_access,
+    AccessCache, AccessDeps, AccessMethod, access_env, cache_key, https_form, is_github_host,
+    remote_host, resolve_access,
 )
 from quodeq.services.github_gh_cli import GhStatus
 from quodeq.shared.git_errors import GitFailureKind
@@ -105,13 +106,43 @@ def test_non_github_host_stops_at_rung_one():
     assert not result.reachable and not result.is_github and probe.calls == [None]
 
 
-def test_cache_hit_skips_the_probe_and_forget_restores_it():
+def test_cache_is_per_repository_and_forget_restores_probing():
     probe = _Probe({None: _NOT_FOUND, "gho_stored": _OK})
     cache = AccessCache()
     first = resolve_access(_GH_URL, deps=_deps(probe, account=_ACCT), cache=cache)
-    second = resolve_access("https://github.com/other/repo.git", deps=_deps(probe, account=_ACCT), cache=cache)
-    assert second.method is first.method is AccessMethod.QUODEQ
+    again = resolve_access(_GH_URL, deps=_deps(probe, account=_ACCT), cache=cache)
+    assert again.method is first.method is AccessMethod.QUODEQ
+    assert again.clone_url == first.clone_url
     assert probe.calls == [None, "gho_stored"]  # second call never probed
-    cache.forget("github.com")
+    resolve_access("https://github.com/other/repo.git", deps=_deps(probe, account=_ACCT), cache=cache)
+    assert len(probe.calls) == 4  # a different repo on the same host probes again
+    cache.forget(cache_key(_GH_URL))
     resolve_access(_GH_URL, deps=_deps(probe, account=_ACCT), cache=cache)
-    assert len(probe.calls) == 4
+    assert len(probe.calls) == 6
+
+
+def test_https_form_maps_scp_and_ssh_and_keeps_https():
+    assert https_form("git@github.com:o/r.git") == _GH_URL
+    assert https_form("ssh://git@github.com/o/r.git") == _GH_URL
+    assert https_form(_GH_URL) == _GH_URL
+
+
+def test_scp_url_token_rung_probes_and_clones_over_https():
+    seen: list[str] = []
+
+    def probe(url, *, env=None, **_):
+        seen.append(url)
+        return _OK if _token_in(env) == "gho_stored" else _NOT_FOUND
+
+    result = resolve_access("git@github.com:o/r.git", deps=_deps(probe, account=_ACCT), cache=AccessCache())
+    assert result.method is AccessMethod.QUODEQ
+    assert result.clone_url == _GH_URL
+    assert seen == ["git@github.com:o/r.git", _GH_URL]
+
+
+def test_https_token_result_clone_url_is_the_url_and_ambient_has_none():
+    probe = _Probe({None: _NOT_FOUND, "gho_stored": _OK})
+    token = resolve_access(_GH_URL, deps=_deps(probe, account=_ACCT), cache=AccessCache())
+    assert token.clone_url == _GH_URL
+    ambient = resolve_access(_GH_URL, deps=_deps(_Probe({None: _OK})), cache=AccessCache())
+    assert ambient.clone_url is None
