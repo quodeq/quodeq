@@ -15,6 +15,7 @@ from typing import Callable
 from flask import Flask, Response, jsonify
 
 from quodeq.api._constants import CODE_INVALID_INPUT, CODE_KEYRING_UNAVAILABLE
+from quodeq.api._url_body import required_url_or_error
 from quodeq.api.helpers import json_error, optional_json_object_or_response
 from quodeq.config.ai_provider_errors import PLAINTEXT_KEY_REFUSED_MESSAGE, PlaintextKeyRefusedError
 from quodeq.config.github_account import GitHubAccount, TokenMethod, delete_account, load_account, store_account
@@ -30,7 +31,6 @@ from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.repo import is_repo_url
 
 CODE_ACCESS_PREFIX = "ACCESS_"
-CODE_URL_REQUIRED = "URL_REQUIRED"
 CODE_INVALID_URL = "INVALID_URL"
 CODE_GITHUB_NOT_CONFIGURED = "GITHUB_NOT_CONFIGURED"
 CODE_OFFLINE = "OFFLINE"
@@ -85,12 +85,9 @@ class RouteDeps:
 
 
 def _probe(deps: RouteDeps) -> Response | tuple[Response, int]:
-    body = optional_json_object_or_response(CODE_INVALID_INPUT)
-    if not isinstance(body, dict):
-        return body
-    url = str(body.get("url") or "").strip()
-    if not url:
-        return json_error("url is required", HTTPStatus.BAD_REQUEST, CODE_URL_REQUIRED)
+    url = required_url_or_error()
+    if not isinstance(url, str):
+        return url
     try:
         if not is_repo_url(url):
             return json_error("not a recognised remote repository URL", HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)

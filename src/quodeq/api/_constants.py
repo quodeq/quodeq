@@ -27,6 +27,7 @@ QUERY_FLAG_TRUTHY = (QUERY_FLAG_TRUE_NUMERIC, QUERY_FLAG_TRUE)  # accepted truth
 # routes predate the standards_* CRUD split and never adopted it) -- the
 # values are API contract and must not change.
 CODE_INVALID_INPUT = "INVALID_INPUT"
+CODE_URL_REQUIRED = "URL_REQUIRED"
 CODE_INVALID_PARAM = "INVALID_PARAM"
 CODE_MISSING_PARAM = "MISSING_PARAM"
 CODE_INVALID_REPO = "INVALID_REPO"

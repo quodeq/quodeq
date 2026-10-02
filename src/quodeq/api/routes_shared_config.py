@@ -36,11 +36,11 @@ from quodeq.services.shared_settings import read_settings
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import path_segment_error
 
-from .helpers import json_error, optional_json_object_or_response
+from ._url_body import required_url_or_error
+from .helpers import json_error
 from .routes_common import reports_dir
 from .routes_shared_common import no_shared_repo_error
 
-CODE_URL_REQUIRED = "URL_REQUIRED"
 CODE_CONNECT_IN_PROGRESS = "CONNECT_IN_PROGRESS"
 CODE_CONNECT_START_FAILED = "CONNECT_START_FAILED"
 CODE_CONFIRMATION_REQUIRED = "CONFIRMATION_REQUIRED"
@@ -90,12 +90,9 @@ def shared_config_put() -> Response | tuple[Response, int]:
     check run as a background job and this answers 202; the outcome is
     reported under ``connect`` in GET /api/shared/status.
     """
-    body = optional_json_object_or_response(CODE_INVALID_INPUT)
-    if not isinstance(body, dict):
-        return body
-    url = str(body.get("url") or "").strip()
-    if not url:
-        return json_error("url is required", HTTPStatus.BAD_REQUEST, CODE_URL_REQUIRED)
+    url = required_url_or_error()
+    if not isinstance(url, str):
+        return url
     failure = url_failure(url)
     if failure is not None:
         return json_error(failure.message, failure.http_status, failure.code)
