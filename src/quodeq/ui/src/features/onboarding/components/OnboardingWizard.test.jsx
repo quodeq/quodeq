@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import OnboardingWizard from './OnboardingWizard.jsx';
+import { STEP_REPO_SCAN } from '../wizardSteps.js';
 
 vi.mock('../hooks/useProviderDetection.js', () => ({
   useProviderDetection: () => ({ status: 'detected', preselection: { id: 'codex-cli', classification: 'cli', model: 'gpt-5.2-codex' } }),
@@ -36,5 +37,13 @@ describe('OnboardingWizard', () => {
   it('skipping welcome via startStep="repo-scan" mounts the RepoScan step directly', () => {
     render(<OnboardingWizard entry={{ startStep: 'repo-scan', isFirstProject: false }} onClose={() => {}} onLaunch={() => {}} />);
     expect(screen.getByPlaceholderText(/git@github.com/i)).toBeInTheDocument();
+  });
+
+  // useWizardLifecycle decides whether shared content may close the wizard
+  // from the step reported here, so the initial step must be reported on mount.
+  it('reports its initial step through onStepChange on mount', () => {
+    const onStepChange = vi.fn();
+    render(<OnboardingWizard entry={{ startStep: STEP_REPO_SCAN, isFirstProject: false }} onClose={() => {}} onLaunch={() => {}} onStepChange={onStepChange} />);
+    expect(onStepChange).toHaveBeenCalledWith(STEP_REPO_SCAN);
   });
 });

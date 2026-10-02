@@ -66,6 +66,23 @@ describe('useWizardLifecycle auto-open (derived)', () => {
     expect(result.current.wizardEntry).toBeNull();
   });
 
+  it('a manually opened welcome wizard is not closed by shared content', () => {
+    const { result, update } = renderLifecycle({ projects: [{ id: 'a' }] });
+    act(() => { result.current.setWizardEntry({ startStep: STEP_WELCOME }); });
+    act(() => { result.current.wizardHandlers.onStepChange(STEP_WELCOME); });
+    update({ projects: [{ id: 'a' }, { id: 'pulled' }] });
+    update({ projects: [{ id: 'a' }, { id: 'pulled' }], sharedSignal: SHARED_CONTENT });
+    expect(result.current.wizardEntry).toEqual({ startStep: STEP_WELCOME });
+  });
+
+  it('does not reopen after an auto-close when the content disappears again', () => {
+    const { result, update } = renderLifecycle();
+    update({ sharedSignal: SHARED_CONTENT });
+    expect(result.current.wizardEntry).toBeNull();
+    update({ sharedSignal: NOTHING });
+    expect(result.current.wizardEntry).toBeNull();
+  });
+
   it('closes itself when local projects arrive (a pull or import) while it sits on the welcome step', () => {
     const { result, update } = renderLifecycle();
     update({ projects: [{ id: 'pulled' }] });

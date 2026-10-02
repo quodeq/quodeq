@@ -194,8 +194,8 @@ export function useSharedProjects() {
   };
 }
 
-// This signal feeds a one-time startup decision (wizard auto-open, initial
-// landing). Focus revalidation belongs to the pages that render the list, not
+// This signal feeds the derived wizard auto-open and no-projects landing
+// redirect, both re-evaluated whenever it changes. Focus revalidation belongs to the pages that render the list, not
 // here -- refetching on focus would let hasContent flip mid-session for users
 // who never open those pages. This is a per-observer option and does not
 // affect useSharedProjects' own observers on the same query keys.

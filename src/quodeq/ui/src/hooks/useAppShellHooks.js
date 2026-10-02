@@ -125,7 +125,7 @@ export function useAppStartupGate({ state, activeTab }) {
   return { showStartupLoader };
 }
 
-/** The one-shot initial-landing redirect and the native macOS Help-menu nav bridge. */
+/** The derived no-projects landing redirect and the native macOS Help-menu nav bridge. */
 export function useAppNavigationEffects({ state, activeTab, navTab, sharedSignal }) {
   useInitialLandingEffect({ state, sharedSignal, activeTab, navTab });
   useNativeNavBridge(navTab);

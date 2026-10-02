@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
@@ -8,6 +8,18 @@ import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { projectsKeys } from '../../../api/queryKeys.js';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { SidePaneProvider } from '../../side-pane/index.js';
+
+// The invalidateQueries spy patches QueryClient.prototype, so it is restored
+// even when an assertion fails, or it would leak into later tests.
+let invalidateSpy = null;
+function spyOnInvalidate() {
+  invalidateSpy = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+  return invalidateSpy;
+}
+afterEach(() => {
+  invalidateSpy?.mockRestore();
+  invalidateSpy = null;
+});
 
 // One merged local+shared list, no tabs. The local list renders
 // unconditionally; the shared list layers in once useSharedProjects resolves
@@ -172,7 +184,7 @@ describe('ProjectsPage — shared entries (configured)', () => {
   it('a plain pull refetches the project list and shows "pulled to local" on that card', async () => {
     const user = userEvent.setup();
     const pullSharedProject = vi.fn(async (id) => ({ imported: true, projectId: id }));
-    const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+    const invalidate = spyOnInvalidate();
     const projectListRefetches = () => invalidate.mock.calls.filter(([arg]) => (
       JSON.stringify(arg?.queryKey) === JSON.stringify(projectsKeys.list())
     )).length;
@@ -190,7 +202,6 @@ describe('ProjectsPage — shared entries (configured)', () => {
     expect(screen.getByText('pulled to local')).toBeInTheDocument();
     // The pull button for that card is replaced by the confirmation.
     expect(screen.queryByRole('button', { name: 'pull local copy' })).not.toBeInTheDocument();
-    invalidate.mockRestore();
   });
 
   it('the copy-retry path (409 then copy) also refetches the project list and shows "pulled to local"', async () => {
@@ -203,7 +214,7 @@ describe('ProjectsPage — shared entries (configured)', () => {
       }
       return { imported: true, projectId: id };
     });
-    const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+    const invalidate = spyOnInvalidate();
     const projectListRefetches = () => invalidate.mock.calls.filter(([arg]) => (
       JSON.stringify(arg?.queryKey) === JSON.stringify(projectsKeys.list())
     )).length;
@@ -220,6 +231,5 @@ describe('ProjectsPage — shared entries (configured)', () => {
 
     await waitFor(() => expect(projectListRefetches()).toBe(1));
     expect(screen.getByText('pulled to local')).toBeInTheDocument();
-    invalidate.mockRestore();
   });
 });

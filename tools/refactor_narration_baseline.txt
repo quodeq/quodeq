@@ -111,7 +111,7 @@ src/quodeq/ui/src/features/dashboard/components/DashboardPage.selectorAndStartup
 src/quodeq/ui/src/features/dashboard/components/ProjectsPage.badgesAndFilters.test.jsx:38
 src/quodeq/ui/src/features/dashboard/components/ProjectsPage.groupingAndSync.test.jsx:38
 src/quodeq/ui/src/features/dashboard/components/ProjectsPage.publishAction.test.jsx:38
-src/quodeq/ui/src/features/dashboard/components/ProjectsPage.sharedEntries.test.jsx:40
+src/quodeq/ui/src/features/dashboard/components/ProjectsPage.sharedEntries.test.jsx:52
 src/quodeq/ui/src/features/dashboard/hooks/useCoalescedRefresh.js:20
 src/quodeq/ui/src/features/dashboard/hooks/useDashboard.core.test.jsx:50
 src/quodeq/ui/src/features/dashboard/hooks/useDashboard.frozenAndInfo.test.jsx:50

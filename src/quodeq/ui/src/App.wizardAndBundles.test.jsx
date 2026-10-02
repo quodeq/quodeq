@@ -63,11 +63,11 @@ describe('buildAssistantSessionPayload', () => {
   });
 });
 
-// The wizard registers a project on its Repo & Scan step, but the projects
-// list in React state is only reloaded at boot and when an evaluation
-// finishes. Both wizard exits that leave a registered project behind (saved
-// close and launch) must reload the list so the new project appears in the
-// Projects tab immediately, before any run exists.
+// The wizard registers a project on its Repo & Scan step, and the projects
+// list is a query that refetches only when invalidated. Both wizard exits
+// that leave a registered project behind (saved close and launch) must
+// invalidate it so the new project appears in the Projects tab immediately,
+// before any run exists.
 describe('buildWizardHandlers', () => {
   const PROJECTS_LIST = { queryKey: projectsKeys.list() };
   function stubClient() {

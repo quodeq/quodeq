@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApiProvider } from '../api/ApiContext.jsx';
@@ -10,6 +10,10 @@ function setup(api) {
   const wrapper = ({ children }) => <QueryClientProvider client={qc}><ApiProvider value={api}>{children}</ApiProvider></QueryClientProvider>;
   return { qc, ...renderHook(() => useProjectState(), { wrapper }) };
 }
+
+// Restored here, not at the end of the test, so a failed assertion in the
+// fake-timer poll test cannot leave later tests on fake timers.
+afterEach(() => { vi.useRealTimers(); });
 
 describe('useProjectState as a query', () => {
   it('loads once, exposes projectsLoaded, and refetches on invalidation', async () => {
@@ -41,7 +45,6 @@ describe('useProjectState as a query', () => {
     expect(listProjects).toHaveBeenCalledTimes(2);
     await act(async () => { await vi.advanceTimersByTimeAsync(6200); });
     expect(listProjects).toHaveBeenCalledTimes(2);
-    vi.useRealTimers();
   });
 
   it('loadProjects invalidates the list and resolves with the refetched projects', async () => {

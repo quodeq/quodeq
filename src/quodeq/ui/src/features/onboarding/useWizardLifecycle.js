@@ -85,22 +85,27 @@ function hasWorkingView(state, sharedSignal) {
  * once. It never opens while the project list or the shared signal is still
  * resolving, nor when the user opted out (the skip flag only suppresses
  * auto-open; it never blocks "Add a project" or "Take the tour"). Once the
- * user has a working view (local projects or shared content) a wizard still
- * on its welcome step steps aside, so a team repo connected mid-session
+ * user has a working view (local projects or shared content) a wizard this
+ * hook auto-opened that is still on its welcome step steps aside (one the
+ * user opened, e.g. "Take the tour", is never closed for them), so a team repo connected mid-session
  * replaces the "nothing here yet" wizard without a reload.
  *
  * `session` records what this page load has already seen: the wizard was
  * opened or closed (a user's close is final; re-popping it on the next input
  * change would fight them), or the user had a working view (deleting the
  * last project, or a disconnect, must not pop a first-run wizard over the
- * app), plus the step the open wizard is on.
+ * app), the entry this hook auto-opened (only that exact entry may be
+ * auto-closed), plus the step the open wizard is on.
  */
 function useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, setWizardEntry, session }) {
   useEffect(() => {
     const seen = session.current;
     if (hasWorkingView(state, sharedSignal)) {
       seen.spent = true;
-      if (wizardEntry && seen.step === STEP_WELCOME) setWizardEntry(null);
+      if (wizardEntry && wizardEntry === seen.autoEntry && seen.step === STEP_WELCOME) {
+        seen.autoEntry = null;
+        setWizardEntry(null);
+      }
       return;
     }
     if (seen.spent || wizardEntry) return;
@@ -113,9 +118,9 @@ function useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, set
       sharedHasContent: sharedSignal.hasContent,
     })) return;
     if (readString(SKIPPED_KEY, null) === SKIPPED_VALUE) return;
-    seen.spent = true;
-    seen.step = STEP_WELCOME;
-    setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: true });
+    const entry = { startStep: STEP_WELCOME, isFirstProject: true };
+    Object.assign(seen, { spent: true, autoEntry: entry, step: STEP_WELCOME });
+    setWizardEntry(entry);
   }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]); // eslint-disable-line react-hooks/exhaustive-deps -- re-evaluates on input changes only; wizardEntry and the setter are read current
 }
 
@@ -129,14 +134,14 @@ function useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, set
  */
 export function useWizardLifecycle({ state, navTab, isEvaluating, sharedSignal }) {
   const [wizardEntry, setWizardEntry] = useState(null);
-  const session = useRef({ spent: false, step: null });
+  const session = useRef({ spent: false, autoEntry: null, step: null });
   const queryClient = useQueryClient();
 
   useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, setWizardEntry, session });
 
   // Any close (X, Maybe later, saved exit, launch) is final for this session.
   const closeAware = (entry) => {
-    if (entry === null) Object.assign(session.current, { spent: true, step: null });
+    if (entry === null) Object.assign(session.current, { spent: true, autoEntry: null, step: null });
     setWizardEntry(entry);
   };
   const wizardHandlers = {
