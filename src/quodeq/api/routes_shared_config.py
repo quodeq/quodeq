@@ -9,6 +9,7 @@ patch "quodeq.api.routes_shared_config.start_refresh" /
 """
 from __future__ import annotations
 
+from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from typing import Callable
@@ -17,6 +18,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_INVALID_INPUT, QUERY_FLAG_TRUE
 from quodeq.api.routes_github_access import same_url_access_error
+from quodeq.services.base import ActionProvider
 from quodeq.services.github_access import resolve_access
 from quodeq.services.shared_connect_job import (
     ConnectStartResult,
@@ -136,7 +138,7 @@ def shared_config_put() -> Response | tuple[Response, int]:
     return jsonify({"started": True, "url": url}), HTTPStatus.ACCEPTED
 
 
-def shared_config_delete() -> Response | tuple[Response, int]:
+def shared_config_delete(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Disconnect from the shared repository and drop the local clone.
 
     The clone is deleted from disk, so the caller must pass ``?confirm=true``
@@ -153,6 +155,7 @@ def shared_config_delete() -> Response | tuple[Response, int]:
     # Ordering + locking business rule lives in
     # services/shared_repo.disconnect_shared_repo.
     disconnect_shared_repo(log=SHARED_LOG)
+    provider.invalidate_projects_cache()
     return jsonify({"configured": False})
 
 
@@ -206,11 +209,11 @@ def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tu
     return jsonify({"started": True}), HTTPStatus.ACCEPTED
 
 
-def register_shared_config_routes(app: Flask) -> None:
+def register_shared_config_routes(app: Flask, provider: ActionProvider) -> None:
     """Bind the shared-repo status, config, refresh and publish routes."""
     app.get("/api/shared/status")(shared_status)
     app.put("/api/shared/config")(shared_config_put)
-    app.delete("/api/shared/config")(shared_config_delete)
+    app.delete("/api/shared/config", endpoint="shared_config_delete")(partial(shared_config_delete, provider))
 
     app.get("/api/shared/invite")(shared_invite)
 

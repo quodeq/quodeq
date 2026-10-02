@@ -90,7 +90,8 @@ def _pull_outcome(
     return _import_pulled_zip(project, zip_path, action, remote_addr, reports)
 
 
-def _shared_pull(provider: ActionProvider, project: str, eval_root: Path, url: str) -> Response | tuple[Response, int]:
+def handle_shared_pull(provider: ActionProvider, project: str, eval_root: Path, url: str) -> Response | tuple[Response, int]:
+    """Handle POST /api/shared/projects/<project>/pull: validate, then start the pull job."""
     err = validate_segment(project)
     if err:
         return err
@@ -139,6 +140,6 @@ def register_shared_pull_routes(app: Flask, provider: ActionProvider) -> None:
     """
 
     def shared_pull(project: str, eval_root: Path, url: str) -> Response | tuple[Response, int]:
-        return _shared_pull(provider, project, eval_root, url)
+        return handle_shared_pull(provider, project, eval_root, url)
 
     app.post("/api/shared/projects/<project>/pull")(with_shared_root(shared_pull))

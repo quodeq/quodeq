@@ -41,6 +41,6 @@ from .routes_shared_mirrors import register_shared_mirror_routes
 
 def register_shared_routes(app: Flask, provider: ActionProvider) -> None:
     """Bind every /api/shared/* route: config, pull, and the read mirrors."""
-    register_shared_config_routes(app)
+    register_shared_config_routes(app, provider)
     register_shared_pull_routes(app, provider)
     register_shared_mirror_routes(app)
