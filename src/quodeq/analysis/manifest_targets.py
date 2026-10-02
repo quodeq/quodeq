@@ -20,6 +20,23 @@ from quodeq.config.discipline_registry import DisciplineRegistry
 
 MIN_FILES_PER_TARGET = 3
 _UNKNOWN_LANG = "unknown"
+# How much of a file to sniff for a NUL byte (git's own binary heuristic).
+_BINARY_SNIFF_BYTES = 8192
+
+
+def _looks_binary(path: str) -> bool:
+    """Return True when *path* has a NUL byte in its first few KB.
+
+    Extensions are ambiguous: ``.ts`` is TypeScript and MPEG transport
+    stream. A video segment queued as source can only fail (the model has
+    nothing to parse), and a run of them trips the failure-streak breaker.
+    An unreadable file is not called binary; it keeps its old fate.
+    """
+    try:
+        with open(path, "rb") as f:
+            return b"\x00" in f.read(_BINARY_SNIFF_BYTES)
+    except OSError:
+        return False
 
 
 def _matches_skip_pattern(rel_path: str, skip_patterns: list[str]) -> bool:
@@ -117,7 +134,8 @@ def iter_source_files(
     """Walk *walk_root* once, yielding ``(rel_path, suffix, language)`` per source file.
 
     Applies the walk spec's skip_dirs, skip_patterns and .quodeqignore
-    patterns (anchored at *src*, not *walk_root*). Paths come back POSIX-style
+    patterns (anchored at *src*, not *walk_root*), and drops binary files that
+    wear a source extension. Paths come back POSIX-style
     and relative to *src* so manifest paths are consistent across platforms —
     downstream consumers and scope-prefix matching all assume "/".
 
@@ -153,5 +171,7 @@ def iter_source_files(
                 continue
             if tracked is not None and src_abs / rel not in tracked:
                 counts.skipped_untracked += 1
+                continue
+            if _looks_binary(os.path.join(dirpath, fname)):
                 continue
             yield rel, suffix, ext_map.get(suffix, _UNKNOWN_LANG)
