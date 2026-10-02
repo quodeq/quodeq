@@ -8,9 +8,21 @@ import { SyncBar } from '../SyncBar.jsx';
 //
 // The states follow the pull slot: `pulling` while the background pull for
 // this card runs (no git progress for a pull, so the bar is indeterminate),
-// then `pulled`, or the inline conflict confirm on a collision.
+// then `pulled`, the inline conflict confirm on a collision, or `pullError`
+// (the failure's message next to the pull button, which is the retry).
+// `pullBusy` disables the button while another card's pull runs (one slot).
 
-export function OnlineCardFooter({ projectId, onPull, pullConflict, onConfirmCopy, onCancelConflict, pulled, pulling = false }) {
+function PullButton({ projectId, onPull, disabled }) {
+  return (
+    <button type="button" className="project-delete-btn" disabled={disabled} onClick={(e) => { e.stopPropagation(); onPull?.(projectId); }}>
+      {t('projects.pullLocalCopy')}
+    </button>
+  );
+}
+
+export function OnlineCardFooter({
+  projectId, onPull, pullConflict, onConfirmCopy, onCancelConflict, pulled, pulling = false, pullError = null, pullBusy = false,
+}) {
   if (pulling) {
     return (
       <div className="project-card-actions project-card-pulling">
@@ -37,7 +49,13 @@ export function OnlineCardFooter({ projectId, onPull, pullConflict, onConfirmCop
       </div>
     );
   }
-  return (
-    <button type="button" className="project-delete-btn" onClick={(e) => { e.stopPropagation(); onPull?.(projectId); }}>{t('projects.pullLocalCopy')}</button>
-  );
+  if (pullError) {
+    return (
+      <div className="project-card-actions">
+        <span className="inline-error project-card-pull-error" role="alert">{t('projects.pullFailedRetry', { message: pullError })}</span>
+        <PullButton projectId={projectId} onPull={onPull} disabled={pullBusy} />
+      </div>
+    );
+  }
+  return <PullButton projectId={projectId} onPull={onPull} disabled={pullBusy} />;
 }

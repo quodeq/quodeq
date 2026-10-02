@@ -22,8 +22,10 @@ function useBaselineKey(slot) {
  * only starts it, and the outcome is read from the pull slot of the sync
  * status (`shared.pullSlot`): running, DONE (the card shows "pulled"), or
  * ERROR. A PROJECT_EXISTS error is the same-uuid/same-identity collision and
- * opens the card's inline copy confirm; any other error is toasted. The
- * projects list is refetched by useSyncStatus when the slot reaches DONE.
+ * opens the card's inline copy confirm; any other error is `pullError`, shown
+ * on that card until the next run. Only a pull that could not START (the
+ * POST was refused) is toasted. The projects list is refetched by
+ * useSyncStatus when the slot reaches DONE.
  */
 export function usePullToLocal({ shared }) {
   const { showToast } = useSidePane();
@@ -33,7 +35,6 @@ export function usePullToLocal({ shared }) {
   const fresh = Boolean(slot) && key !== baseline;
   const [pulledIds, setPulledIds] = useState(() => new Set());
   const [dismissedKey, setDismissedKey] = useState(null);
-  const reportedKey = useRef(null);
 
   const finished = fresh && slot.phase === SYNC_PHASE.DONE;
   const failed = fresh && slot.phase === SYNC_PHASE.ERROR;
@@ -42,12 +43,6 @@ export function usePullToLocal({ shared }) {
   useEffect(() => {
     if (finished) setPulledIds((prev) => (prev.has(slot.project) ? prev : new Set(prev).add(slot.project)));
   }, [finished, slot?.project]);
-
-  useEffect(() => {
-    if (!failed || collided || reportedKey.current === key) return;
-    reportedKey.current = key;
-    showToast(apiErrorMessage({ code: slot.code, message: slot.error }, 'projects.pullFailed'));
-  }, [failed, collided, key]);
 
   async function start(id, action) {
     setDismissedKey(key); // a started pull answers the collision; the next run has its own key
@@ -59,10 +54,13 @@ export function usePullToLocal({ shared }) {
   }
 
   const conflictOpen = collided && dismissedKey !== key;
+  // Keyed by the run like the conflict: pressing pull again (a new run) clears it.
+  const errorOpen = failed && !collided && dismissedKey !== key;
   return {
     pullConflictId: conflictOpen ? slot.project : null,
-    // Same shape the import-conflict dialog reads (`kind`), plus the colliding local project.
-    pullConflict: conflictOpen ? { kind: slot.conflictKind, projectId: slot.sourceProjectId } : null,
+    pullError: errorOpen
+      ? { projectId: slot.project, message: apiErrorMessage({ code: slot.code, message: slot.error }, 'projects.pullFailed') }
+      : null,
     pulledIds,
     pullingId: isSlotActive(slot) ? slot.project : null,
     handlePull: (id) => start(id),

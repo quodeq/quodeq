@@ -43,7 +43,7 @@ function makeFail(onError) {
 
 /**
  * Builds the delete handler. It moves the selection to another project when
- * the deleted one was selected, then refetches the shared project list.
+ * the deleted one was selected, then refetches the local project list.
  *
  * @returns {(projectId: string) => Promise<{ok: boolean, messageKey?: string, vars?: object}>}
  */

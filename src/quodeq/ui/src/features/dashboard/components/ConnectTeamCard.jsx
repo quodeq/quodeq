@@ -12,8 +12,9 @@ import AccessPanel from '../../github-access/components/AccessPanel.jsx';
  * Props come from useSharedProjects (the screen's one status poll):
  * `onConnect(url)`, `connecting`, `error` (display text), `accessFailure`,
  * and `initialUrl` (the URL of a failed connect, so pressing connect retries it).
+ * `onClose`, when given, renders a "close" control (dismisses the card or its error).
  */
-export default function ConnectTeamCard({ onConnect, connecting = false, error = null, accessFailure = null, initialUrl = null }) {
+export default function ConnectTeamCard({ onConnect, connecting = false, error = null, accessFailure = null, initialUrl = null, onClose = null }) {
   const [url, setUrl] = useState(initialUrl ?? '');
   const titleId = useId();
   const trimmed = url.trim();
@@ -23,9 +24,16 @@ export default function ConnectTeamCard({ onConnect, connecting = false, error =
   };
   return (
     <section className="connect-team-card" aria-labelledby={titleId}>
-      <h3 className="connect-team-card__title" id={titleId}>
-        <span className="connect-team-card__marker" aria-hidden="true">▸</span> {t('projects.connectTeamTitle')}
-      </h3>
+      <div className="connect-team-card__head">
+        <h3 className="connect-team-card__title" id={titleId}>
+          <span className="connect-team-card__marker" aria-hidden="true">▸</span> {t('projects.connectTeamTitle')}
+        </h3>
+        {onClose && (
+          <button type="button" className="term-btn connect-team-card__close" onClick={onClose}>
+            {t('projects.connectTeamClose')}
+          </button>
+        )}
+      </div>
       <p className="connect-team-card__desc">{t('projects.connectTeamDesc')}</p>
       <form
         className="connect-team-card__row"

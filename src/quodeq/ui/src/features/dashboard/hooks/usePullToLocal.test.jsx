@@ -67,12 +67,12 @@ describe('usePullToLocal', () => {
     expect(result.current.pulledIds.size).toBe(0);
   });
 
-  it('a PROJECT_EXISTS error opens the conflict, carrying the collision kind, and cancel closes it', () => {
+  it('a PROJECT_EXISTS error opens the conflict on that card, and cancel closes it', () => {
     const { result, rerender } = setup(idle);
 
     rerender({ slot: collision });
     expect(result.current.pullConflictId).toBe('proj-1');
-    expect(result.current.pullConflict).toEqual({ kind: 'same_uuid', projectId: 'local-1' });
+    expect(result.current.pullError).toBeNull();
     expect(showToast).not.toHaveBeenCalled();
 
     act(() => result.current.cancelConflict());
@@ -88,16 +88,36 @@ describe('usePullToLocal', () => {
     expect(result.current.pullConflictId).toBeNull();
   });
 
-  it('another pull error shows the mapped translation once, not the raw backend message', () => {
+  it('another pull error is the pullError of its card, mapped, never a toast', () => {
     const { result, rerender } = setup(idle);
-    const failed = { state: 'error', phase: 'error', project: 'proj-1', code: 'CONNECT_FAILED', error: 'raw backend sentence', finishedAt: 7 };
+    const failed = { state: 'error', phase: 'error', project: 'proj-1', code: 'PULL_TOO_LARGE', error: 'raw backend sentence', finishedAt: 7 };
 
     rerender({ slot: failed });
     rerender({ slot: { ...failed } });
 
-    expect(showToast).toHaveBeenCalledTimes(1);
-    expect(showToast).toHaveBeenCalledWith(catalog['apiError.connectFailed']);
+    expect(result.current.pullError).toEqual({ projectId: 'proj-1', message: catalog['apiError.pullTooLarge'] });
+    expect(showToast).not.toHaveBeenCalled();
     expect(result.current.pullConflictId).toBeNull();
+  });
+
+  it('a new run clears the pullError: at once when pull is pressed again, and through the running slot', async () => {
+    const { result, rerender } = setup(idle);
+    const failed = { state: 'error', phase: 'error', project: 'proj-1', code: 'EXPORT_ERROR', error: 'Failed to build', finishedAt: 7 };
+    rerender({ slot: failed });
+    expect(result.current.pullError?.message).toBe('Failed to build');
+
+    await act(async () => { await result.current.handlePull('proj-1'); });
+    expect(result.current.pullError).toBeNull();
+
+    rerender({ slot: running });
+    expect(result.current.pullError).toBeNull();
+    rerender({ slot: { ...failed, finishedAt: 9 } });
+    expect(result.current.pullError?.projectId).toBe('proj-1');
+  });
+
+  it('a failed pull already in the slot when the hook mounts is not shown', () => {
+    const { result } = setup({ state: 'error', phase: 'error', project: 'proj-1', code: 'EXPORT_ERROR', finishedAt: 7 });
+    expect(result.current.pullError).toBeNull();
   });
 
   it('handlePull surfaces a failure to start via showToast, not window.alert', async () => {

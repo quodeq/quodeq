@@ -161,8 +161,11 @@ function UrlInputRow({ newUrl, setNewUrl, isSaving, isDisconnecting, handleSave 
   );
 }
 
-function DisconnectRow({ configured, confirming, setConfirming, isSaving, isDisconnecting, handleDisconnect }) {
+// Disconnect deletes the clone, so it waits while a refresh rewrites it (the
+// server answers 409 REFRESH_IN_PROGRESS then).
+function DisconnectRow({ configured, confirming, setConfirming, isSaving, isRefreshing, isDisconnecting, handleDisconnect }) {
   if (!configured) return null;
+  const blocked = isSaving || isRefreshing || isDisconnecting;
   if (!confirming) {
     return (
       <div className="settings-row settings-row--last">
@@ -170,8 +173,8 @@ function DisconnectRow({ configured, confirming, setConfirming, isSaving, isDisc
           type="button"
           className="settings-pill settings-pill--accent"
           onClick={() => setConfirming(true)}
-          disabled={isSaving || isDisconnecting}
-          aria-disabled={isSaving || isDisconnecting || undefined}
+          disabled={blocked}
+          aria-disabled={blocked || undefined}
         >
           {t('settings.disconnect')}
         </button>
@@ -185,8 +188,8 @@ function DisconnectRow({ configured, confirming, setConfirming, isSaving, isDisc
         type="button"
         className="settings-pill settings-pill--confirm"
         onClick={handleDisconnect}
-        disabled={isDisconnecting}
-        aria-disabled={isDisconnecting || undefined}
+        disabled={blocked}
+        aria-disabled={blocked || undefined}
       >
         {isDisconnecting ? t('settings.disconnecting') : t('settings.yes')}
       </button>
@@ -253,7 +256,8 @@ export default function SharedRepoSection({ onDisconnected }) {
 
       <DisconnectRow
         configured={configured} confirming={confirming} setConfirming={setConfirming}
-        isSaving={isSaving} isDisconnecting={isDisconnecting} handleDisconnect={handleDisconnect}
+        isSaving={isSaving} isRefreshing={isSlotActive(sync.refresh)}
+        isDisconnecting={isDisconnecting} handleDisconnect={handleDisconnect}
       />
     </section>
   );

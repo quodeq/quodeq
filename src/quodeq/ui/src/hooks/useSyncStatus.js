@@ -18,10 +18,13 @@ function useSyncTransitions(status, tick, queryClient) {
     prev.current = status;
     // Only the DONE edge re-lists. The job hydrates the listing during READING;
     // a list request then would run that same cold hydration a second time.
+    // A second job of the same kind can start and finish between two polls
+    // (DONE -> DONE), so a new finishedAt is an edge too.
     for (const kind of SYNC_KINDS) {
-      const was = before?.[kind]?.phase;
-      const now = status[kind]?.phase;
-      if (now !== SYNC_PHASE.DONE || was === SYNC_PHASE.DONE) continue;
+      const was = before?.[kind];
+      const now = status[kind];
+      if (now?.phase !== SYNC_PHASE.DONE) continue;
+      if (was?.phase === SYNC_PHASE.DONE && was.finishedAt === now.finishedAt) continue;
       queryClient.invalidateQueries({ queryKey: sharedKeys.list() });
       // A refresh only re-reads the shared list; connect and pull change what is local or configured.
       if (kind !== SYNC_KIND.REFRESH) queryClient.invalidateQueries({ queryKey: projectsKeys.list() });

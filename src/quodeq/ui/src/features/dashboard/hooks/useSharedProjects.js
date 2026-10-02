@@ -157,6 +157,8 @@ export function useSharedProjects() {
     updateFailed: startFailed || Boolean(listQuery.data?.stale),
     connecting: actions.connecting || isSlotActive(sync.connect),
     connectError: actions.connectError ?? connectSlotError(sync.connect, 'projects.connectFailed'),
+    // The PUT's own rejection, apart from the slot's: closing a failed connect hides only the latter.
+    connectStartError: actions.connectError ?? null,
     accessFailure: actions.accessFailure,
     connect, lastConnectUrl,
     refreshing: isSlotActive(sync.refresh), refresh,

@@ -94,7 +94,7 @@ describe('ConnectTeamCard', () => {
   it('a connect slot in ERROR with FOREIGN_REPO shows the mapped copy under the field', async () => {
     const failed = { ...unconfigured, connect: { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO', error: 'raw server text' } };
     renderCard(makeApi({ getSyncStatus: vi.fn(async () => failed), getSharedStatus: vi.fn(async () => failed) }));
-    expect(await screen.findByText('That address is not a quodeq results repository.')).toBeInTheDocument();
+    expect(await screen.findByText('That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.')).toBeInTheDocument();
     expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
   });
 
@@ -103,5 +103,17 @@ describe('ConnectTeamCard', () => {
     renderCard(makeApi({ getSyncStatus: vi.fn(async () => running), getSharedStatus: vi.fn(async () => running) }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'connecting…' })).toBeDisabled());
     expect(screen.getByRole('textbox', { name: /team results repository url/i })).toBeDisabled();
+  });
+});
+
+describe('ConnectTeamCard close', () => {
+  it('renders "close" only with onClose, and calls it', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const { rerender } = render(<ConnectTeamCard onConnect={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'close' })).not.toBeInTheDocument();
+    rerender(<ConnectTeamCard onConnect={vi.fn()} onClose={onClose} />);
+    await user.click(screen.getByRole('button', { name: 'close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

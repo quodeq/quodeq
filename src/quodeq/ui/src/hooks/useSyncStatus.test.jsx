@@ -75,6 +75,22 @@ describe('useSyncStatus', () => {
     }
   });
 
+  it('two DONE snapshots with different finishedAt are two jobs and invalidate twice', async () => {
+    const first = { ...base, pull: { state: 'done', phase: 'done', project: 'a', finishedAt: 10 } };
+    const second = { ...base, pull: { state: 'done', phase: 'done', project: 'b', finishedAt: 20 } };
+    const { spy, api } = setup([first, second, second, second]);
+    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(4), { timeout: 500 });
+    expect(keyCalls(spy, projectsKeys.list())).toBe(2);
+    expect(keyCalls(spy, sharedKeys.list())).toBe(2);
+  });
+
+  it('identical DONE snapshots (same finishedAt) invalidate once', async () => {
+    const done = { ...base, pull: { state: 'done', phase: 'done', project: 'a', finishedAt: 10 } };
+    const { spy, api } = setup([done, { ...done, pull: { ...done.pull } }, done, done]);
+    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(4), { timeout: 500 });
+    expect(keyCalls(spy, projectsKeys.list())).toBe(1);
+  });
+
   it('error, done, error, done fires once per DONE edge', async () => {
     const mk = (phase) => ({ ...base, pull: { state: phase, phase } });
     const { spy, api } = setup([mk('error'), mk('done'), mk('error'), mk('done'), mk('done'), mk('done')]);

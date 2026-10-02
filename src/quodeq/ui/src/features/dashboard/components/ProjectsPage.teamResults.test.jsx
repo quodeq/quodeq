@@ -1,55 +1,19 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { useQuery } from '@tanstack/react-query';
 import ProjectsPage from './ProjectsPage.jsx';
-import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
-import { ApiProvider, useApi } from '../../../api/ApiContext.jsx';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { projectsKeys } from '../../../api/queryKeys.js';
-import { SidePaneProvider } from '../../side-pane/index.js';
 import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
 import { copyToClipboard } from '../../../utils/clipboard.js';
+import { URL, LOCAL, makeApi, pageActions, renderPage } from './_projectsPageTeam.fixtures.jsx';
 
 vi.mock('../../../utils/confirmDialog.js', () => ({ confirmDialog: vi.fn(async () => true) }));
 // copyToClipboard resolves false when the webview has no clipboard (see its own tests).
 vi.mock('../../../utils/clipboard.js', () => ({ copyToClipboard: vi.fn(async () => true) }));
-
-const URL = 'https://github.com/team/results.git';
-const idle = { state: 'idle', phase: null };
-const SHARED = { id: 'shared-1', name: 'demo-repo', publishedBy: 'ana', publishedAt: '2026-07-16T00:00:00Z' };
-
-// The fake server: `slots` and `configured` are mutable so a test can move a job along.
-function makeApi({ configured = false, slots = {}, ...overrides } = {}) {
-  const server = { configured, slots: { connect: idle, refresh: idle, pull: idle, ...slots } };
-  const status = vi.fn(async () => ({
-    configured: server.configured, url: server.configured ? URL : null, lastSynced: Date.now() - 120000, ...server.slots,
-  }));
-  const api = {
-    getSharedStatus: status,
-    getSyncStatus: status,
-    sharedListProjects: vi.fn(async () => ({ projects: server.configured ? [SHARED] : [], lastSynced: null, stale: false })),
-    connectShared: vi.fn(async (url) => ({ started: true, url })),
-    disconnectShared: vi.fn(async () => ({ configured: false })),
-    startRefresh: vi.fn(async () => ({ started: true })),
-    startPull: vi.fn(async (id) => ({ started: true, project: id })),
-    publishProject: vi.fn(async () => ({ started: true })),
-    getInvite: vi.fn(async () => ({ text: `Open quodeq, choose Join your team's results, paste ${URL}` })),
-    getGithubAccount: vi.fn(async () => ({})),
-    probeGit: vi.fn(async () => ({ reachable: false })),
-    ...overrides,
-  };
-  return { api, server };
-}
-
-function renderPage(api, ui) {
-  const QC = withQueryClient();
-  return render(<QC><ApiProvider value={api}><SidePaneProvider>{ui}</SidePaneProvider></ApiProvider></QC>);
-}
-
-const LOCAL = [{ id: 'a', name: 'app', latestDate: '2026-07-19T00:00:00Z' }];
-const pageActions = { onAddProject: vi.fn(), onImportProject: vi.fn() };
 
 afterEach(() => { vi.clearAllMocks(); });
 
@@ -119,7 +83,7 @@ describe('ProjectsPage — a failed connect', () => {
     const user = userEvent.setup();
     const { api } = makeApi({ slots: { connect: foreign } });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
-    expect(await screen.findByText('That address is not a quodeq results repository.')).toBeInTheDocument();
+    expect(await screen.findByText('That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /team results repository url/i })).toHaveValue(foreign.url);
     await user.click(screen.getByRole('button', { name: 'connect' }));
     await waitFor(() => expect(api.connectShared).toHaveBeenCalledWith(foreign.url));
@@ -131,10 +95,10 @@ describe('ProjectsPage — a failed connect', () => {
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
     expect(await screen.findByText('1 project · synced 2 min ago')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'update team results' })).toBeInTheDocument();
-    expect(screen.queryByText('That address is not a quodeq results repository.')).not.toBeInTheDocument();
+    expect(screen.queryByText('That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'more repository actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'change repository' }));
-    expect(screen.getAllByText('That address is not a quodeq results repository.')).toHaveLength(1);
+    expect(screen.getAllByText('That address is not a quodeq results repository. It needs a quodeq.json and an evaluations folder.')).toHaveLength(1);
   });
 });
 

@@ -12,6 +12,7 @@ import { TeamResultsArea } from './TeamResultsArea.jsx';
 import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { projectIdOrSelf } from '../../../utils/projectIdentity.js';
+import { isSlotActive } from '../../../api/syncStatus.js';
 
 function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
   // The button stays clickable while evaluating so the handler can fire a
@@ -91,7 +92,7 @@ function LocalProjectEntry({ entry, project, selection, actions }) {
 }
 
 function SharedProjectEntry({ entry, ctx }) {
-  const { onSelect, pullConflictId, pullingId, handlePull, handleConfirmCopy, cancelConflict, pulledIds } = ctx;
+  const { onSelect, pullConflictId, pullingId, pullError, handlePull, handleConfirmCopy, cancelConflict, pulledIds } = ctx;
   const sharedId = projectIdOrSelf(entry.shared);
   return (
     <ProjectCard
@@ -109,6 +110,8 @@ function SharedProjectEntry({ entry, ctx }) {
             onCancelConflict={cancelConflict}
             pulled={pulledIds.has(sharedId)}
             pulling={pullingId === sharedId}
+            pullBusy={Boolean(pullingId)}
+            pullError={pullError?.projectId === sharedId ? pullError.message : null}
           />
         ),
       }}
@@ -152,20 +155,24 @@ function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
   // merge, subproject nesting, query filter) lives in useProjectsPageData.
   const { shared, children, localEntryById, publishActions, isEmpty, visibleEntries } = useProjectsPageData({ projects, filters });
 
-  const { pullConflictId, pullingId, pulledIds, handlePull, handleConfirmCopy, cancelConflict } = usePullToLocal({ shared });
+  const { pullConflictId, pullingId, pullError, pulledIds, handlePull, handleConfirmCopy, cancelConflict } = usePullToLocal({ shared });
 
   const cardsListCtx = {
     children, selectedProject, onSelect, onResumeSetup, confirming, setConfirming, onDelete, onExport,
-    relocateActions, publishActions, localEntryById, shared, pullConflictId, pullingId, handlePull, handleConfirmCopy,
+    relocateActions, publishActions, localEntryById, shared, pullConflictId, pullingId, pullError, handlePull, handleConfirmCopy,
     cancelConflict, pulledIds,
   };
   return { shared, isEmpty, visibleEntries, cardsListCtx };
 }
 
-// The page has three mutually exclusive bodies. A function rather than a
-// ternary chain in the JSX, so each branch reads on its own line.
-function ProjectsPageContent({ projectsLoaded, isEmpty, emptyProps, bodyProps }) {
+// The page has four mutually exclusive bodies. A function rather than a
+// ternary chain in the JSX, so each branch reads on its own line. While a
+// connect is still reading the team's projects, an empty page is not "add
+// your first project": the strip above says what is happening, so one quiet
+// line says where the results will land.
+function ProjectsPageContent({ projectsLoaded, isEmpty, connectActive, emptyProps, bodyProps }) {
   if (!projectsLoaded) return <LoadingScreen variant="inline" />;
+  if (isEmpty && connectActive) return <p className="projects-empty">{t('projects.teamResultsArriving')}</p>;
   if (isEmpty) return <EmptyProjectsCTA {...emptyProps} />;
   return <ProjectsPageBody {...bodyProps} />;
 }
@@ -199,6 +206,7 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
       <ProjectsPageContent
         projectsLoaded={projectsLoaded}
         isEmpty={isEmpty}
+        connectActive={isSlotActive(shared.status?.connect)}
         emptyProps={{ onAddProject, onImportProject, isEvaluating }}
         bodyProps={{ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }}
       />

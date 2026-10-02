@@ -150,7 +150,7 @@ src/quodeq/ui/src/features/onboarding/components/OnboardingStepSwitch.jsx:9
 src/quodeq/ui/src/features/onboarding/components/steps/RepoScanSummary.jsx:9
 src/quodeq/ui/src/features/onboarding/hooks/useActiveProviderState.js:42
 src/quodeq/ui/src/features/settings/components/SharedRepoSection.connect.test.jsx:8
-src/quodeq/ui/src/features/settings/components/SharedRepoSection.disconnect.test.jsx:11
+src/quodeq/ui/src/features/settings/components/SharedRepoSection.disconnect.test.jsx:12
 src/quodeq/ui/src/features/settings/components/_sharedRepoSection.fixtures.jsx:10
 src/quodeq/ui/src/features/settings/hooks/useOllamaModels.js:10
 src/quodeq/ui/src/features/settings/hooks/useOmlxModels.js:10
