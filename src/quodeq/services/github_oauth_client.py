@@ -20,11 +20,21 @@ _DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 _REFRESH_GRANT = "refresh_token"
 _SCOPES_HEADER = "x-oauth-scopes"
 _HTTP_UNAUTHORIZED = 401
+_HTTP_CLIENT_ERROR_MIN = 400
+_HTTP_SERVER_ERROR_MIN = 500
 _DEFAULT_TIMEOUT_S = 20
 
 
 class GitHubUnreachable(Exception):
     """GitHub did not answer (DNS, connection, timeout, 5xx)."""
+
+
+class GitHubRefused(Exception):
+    """GitHub answered a 4xx that is not a token problem (rate limit, SSO block, bad request, not found)."""
+
+    def __init__(self, status: int) -> None:
+        super().__init__(f"GitHub answered {status}")
+        self.status = status
 
 
 class TokenRejected(Exception):
@@ -84,10 +94,23 @@ class UserInfo:
 
 
 def _grant(payload: dict) -> TokenGrant:
+    token = payload.get("access_token")
+    if not isinstance(token, str) or not token:
+        raise _malformed()
     return TokenGrant(
-        access_token=str(payload["access_token"]), scope=str(payload.get("scope", "")),
+        access_token=token, scope=str(payload.get("scope", "")),
         expires_in=payload.get("expires_in"), refresh_token=payload.get("refresh_token"),
     )
+
+
+def _text(value: object) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError("not text")
+    return value
+
+
+def _malformed() -> GitHubUnreachable:
+    return GitHubUnreachable("malformed response from GitHub")
 
 
 class GitHubOAuthClient:
@@ -107,21 +130,30 @@ class GitHubOAuthClient:
                 payload = json.loads(resp.read().decode("utf-8") or "{}")
                 headers = {k.lower(): v for k, v in resp.headers.items()}
         except urllib.error.HTTPError as exc:
-            if exc.code == _HTTP_UNAUTHORIZED:
-                raise TokenRejected(str(exc)) from exc
+            if exc.code == _HTTP_UNAUTHORIZED and token is not None:
+                raise TokenRejected(f"GitHub answered {exc.code}") from exc
+            if _HTTP_CLIENT_ERROR_MIN <= exc.code < _HTTP_SERVER_ERROR_MIN:
+                raise GitHubRefused(exc.code) from exc
             raise GitHubUnreachable(f"GitHub answered {exc.code}") from exc
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        except ValueError as exc:
+            raise _malformed() from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise GitHubUnreachable(str(exc)) from exc
-        return (payload if isinstance(payload, dict) else {}), headers
+        if not isinstance(payload, dict):
+            raise _malformed()
+        return payload, headers
 
     def request_device_code(self, client_id: str, scope: str) -> DeviceCode:
         """Start the device flow and return the codes to show the user."""
         payload, _ = self._call(GITHUB_DEVICE_CODE_URL, form={"client_id": client_id, "scope": scope})
-        return DeviceCode(
-            device_code=str(payload["device_code"]), user_code=str(payload["user_code"]),
-            verification_uri=str(payload["verification_uri"]),
-            expires_in=int(payload["expires_in"]), interval=int(payload["interval"]),
-        )
+        try:
+            return DeviceCode(
+                device_code=_text(payload["device_code"]), user_code=_text(payload["user_code"]),
+                verification_uri=_text(payload["verification_uri"]),
+                expires_in=int(payload["expires_in"]), interval=int(payload["interval"]),
+            )
+        except (KeyError, ValueError, TypeError) as exc:
+            raise _malformed() from exc
 
     def poll_token(self, client_id: str, device_code: str) -> TokenPoll:
         """Poll once for the token and classify the answer."""

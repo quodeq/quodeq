@@ -10,7 +10,7 @@ import pytest
 
 from quodeq.config.github_app import GITHUB_ACCESS_TOKEN_URL, GITHUB_API_USER_URL, GITHUB_DEVICE_CODE_URL
 from quodeq.services.github_oauth_client import (
-    GitHubOAuthClient, GitHubUnreachable, PollKind, TokenRejected, UserInfo,
+    GitHubOAuthClient, GitHubRefused, GitHubUnreachable, PollKind, TokenRejected, UserInfo,
 )
 
 
@@ -111,3 +111,45 @@ def test_refresh_posts_refresh_grant_without_a_secret():
     data = opener.seen[0][1]
     assert b"grant_type=refresh_token" in data and b"refresh_token=ghr_old" in data and b"client_secret" not in data
     assert grant.access_token == "ghu_new"
+
+
+def _http_error(code):
+    return urllib.error.HTTPError("https://x", code, "err", Message(), io.BytesIO(b"{}"))
+
+
+@pytest.mark.parametrize("payload", [{}, {"device_code": "d"}, {"device_code": None, "user_code": "u", "verification_uri": "v", "expires_in": 1, "interval": 1}, {"device_code": "d", "user_code": "u", "verification_uri": "v", "expires_in": "soon", "interval": 1}])
+def test_malformed_device_code_is_unreachable(payload):
+    with pytest.raises(GitHubUnreachable, match="malformed"):
+        GitHubOAuthClient(opener=_opener([_Response(payload)])).request_device_code("Iv1.x", "repo")
+
+
+def test_granted_with_non_string_token_is_unreachable():
+    with pytest.raises(GitHubUnreachable, match="malformed"):
+        GitHubOAuthClient(opener=_opener([_Response({"access_token": 5})])).poll_token("Iv1.x", "d")
+
+
+def test_403_on_user_is_refused_with_status():
+    with pytest.raises(GitHubRefused) as info:
+        GitHubOAuthClient(opener=_opener([_http_error(403)])).fetch_user("t")
+    assert info.value.status == 403
+
+
+def test_401_without_a_token_is_refused_not_rejected():
+    with pytest.raises(GitHubRefused):
+        GitHubOAuthClient(opener=_opener([_http_error(401)])).request_device_code("bad", "repo")
+
+
+def test_502_is_unreachable():
+    with pytest.raises(GitHubUnreachable):
+        GitHubOAuthClient(opener=_opener([_http_error(502)])).fetch_user("t")
+
+
+def test_non_object_body_is_unreachable():
+    with pytest.raises(GitHubUnreachable, match="malformed"):
+        GitHubOAuthClient(opener=_opener([_Response([])])).fetch_user("t")
+
+
+def test_refresh_refusal_is_token_rejected():
+    opener = _opener([_Response({"error": "bad_refresh_token"})])
+    with pytest.raises(TokenRejected):
+        GitHubOAuthClient(opener=opener).refresh("Iv1.x", "ghr_old")
