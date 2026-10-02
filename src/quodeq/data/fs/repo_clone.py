@@ -95,12 +95,16 @@ class OnlineCacheOps:
 
 
 def clone_repo(
-    url: str, dest: Path, extra_args: list[str], *, timeout_s: int, git_config: Sequence[str] = (),
+    url: str, dest: Path, extra_args: list[str], *, timeout_s: int,
+    git_config: Sequence[str] = (), env: Mapping[str, str] | None = None,
 ) -> None:
-    """Compat wrapper around :meth:`GitCloneClient.clone_progress` on the
-    module default instance. See that method for the argv-shape rationale.
+    """Compat wrapper around :meth:`GitCloneClient.clone_progress`. See that
+    method for the argv-shape rationale. *env* (None = process environment)
+    is the base environment the clone inherits; a non-None value builds a
+    one-off client instead of using the module default.
     """
-    _default_git_client.clone_progress(url, dest, extra_args, timeout_s=timeout_s, git_config=git_config)
+    client = _default_git_client if env is None else GitCloneClient(env)
+    client.clone_progress(url, dest, extra_args, timeout_s=timeout_s, git_config=git_config)
 
 
 def _legacy_tempdir_clone(repo_input: str, *, client: GitCloneClient | None = None) -> str:

@@ -8,6 +8,7 @@ from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from quodeq.core.types import EvalPending, JobSnapshot, ViolationResponse, ViolationSummary
+from quodeq.shared.git_errors import GitFailureKind
 from quodeq.shared.constants import (  # re-export for backward compat
     DEFAULT_MAX_SUBAGENTS,
     DEFAULT_TIME_LIMIT,
@@ -70,7 +71,8 @@ class CreateProjectResult:
     scan_data: dict | None = None
     existing_project_id: str | None = None
     message: str = ""
-    clone_error_kind: str | None = None
+    clone_error_kind: GitFailureKind | None = None
+    clone_stderr: str = ""  # git's output for a CLONE_FAILED result; routes show its tail
 
 
 class ProjectActions(Protocol):

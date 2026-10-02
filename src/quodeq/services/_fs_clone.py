@@ -6,73 +6,42 @@ import errno
 import ipaddress
 import logging
 import subprocess as _subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import urlparse
 
 from quodeq.services.wiring import clone_repo, remove_clone_dir
 from quodeq.config.clone_env import clone_shallow_months, git_clone_timeout_s
 from quodeq.shared.constants import SCHEME_HTTP, SCHEME_HTTPS
+from quodeq.shared.git_errors import GitFailureKind, classify_git_output
 from quodeq.shared.ssrf import resolve_addresses
 
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_PORTS = {SCHEME_HTTP: 80, SCHEME_HTTPS: 443}
-_KIND_NETWORK = "network"
+_KIND_NETWORK = GitFailureKind.NETWORK
 
 
 class CloneError(RuntimeError):
-    """Raised when git clone fails. ``kind`` is one of:
-    auth | network | repo_not_found | dest_exists | disk | unknown.
+    """Raised when git clone fails. ``kind`` is a ``GitFailureKind``.
 
     Inherits from RuntimeError so existing ``except RuntimeError`` blocks
     still catch it. ``retryable`` marks failures where a different clone
     strategy could still succeed (used for the shallow → full fallback).
     """
 
-    def __init__(self, kind: str, message: str, stderr: str = "", *, retryable: bool = False) -> None:
+    def __init__(self, kind: GitFailureKind, message: str, stderr: str = "", *, retryable: bool = False) -> None:
         super().__init__(message)
         self.kind = kind
         self.stderr = stderr
         self.retryable = retryable
 
 
-_AUTH_MARKERS = (
-    "Permission denied",
-    "Authentication failed",
-    "could not read Username",
-    "Host key verification failed",
-)
-_NETWORK_MARKERS = (
-    "Could not resolve host",
-    "Connection timed out",
-    "Connection refused",
-    "Operation timed out",
-)
-_NOT_FOUND_MARKERS = ("Repository not found", "repository '", "' not found")
-_DEST_EXISTS_MARKERS = ("already exists and is not an empty directory",)
-_DISK_MARKERS = ("No space left on device", "disk full")
-
-
-def _classify_stderr(stderr: str) -> str:
-    s = stderr or ""
-    if any(m in s for m in _AUTH_MARKERS):
-        return "auth"
-    if any(m in s for m in _NOT_FOUND_MARKERS):
-        return "repo_not_found"
-    if any(m in s for m in _DEST_EXISTS_MARKERS):
-        return "dest_exists"
-    if any(m in s for m in _DISK_MARKERS):
-        return "disk"
-    if any(m in s for m in _NETWORK_MARKERS):
-        return "network"
-    return "unknown"
-
-
 # Kinds where a shallow-specific rejection is indistinguishable from a real
 # failure (servers answer unsatisfiable --shallow-since requests with generic
 # hang-up/protocol errors), so a full clone may still succeed. Deterministic
-# kinds (auth, repo_not_found, dest_exists, disk) would fail identically.
-_RETRYABLE_KINDS = ("network", "unknown")
+# kinds (auth, not found, dest exists, disk) would fail identically.
+_RETRYABLE_KINDS = (GitFailureKind.NETWORK, GitFailureKind.UNKNOWN)
 
 
 def _pinned_git_config(url: str) -> list[str]:
@@ -106,36 +75,35 @@ def _is_internal(address: str) -> bool:
 
 def _clone_once(
     url: str, clone_dest: Path, extra_args: list[str], *, timeout_s: int | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> None:
     # The subprocess invocation lives in the data layer (ports.clone_repo);
     # this function owns mapping its raw failures onto CloneError kinds.
     resolved_timeout = timeout_s if timeout_s is not None else git_clone_timeout_s()
     git_config = _pinned_git_config(url)
     try:
-        clone_repo(url, clone_dest, extra_args, timeout_s=resolved_timeout, git_config=git_config)
+        clone_repo(url, clone_dest, extra_args, timeout_s=resolved_timeout, git_config=git_config, env=env)
     except _subprocess.CalledProcessError as exc:
         raw = exc.stderr
-        if isinstance(raw, bytes):
-            stderr = raw.decode("utf-8", errors="replace")
-        else:
-            stderr = raw or ""
-        kind = _classify_stderr(stderr)
+        stderr = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else (raw or "")
+        kind = classify_git_output(stderr)
         raise CloneError(
             kind, f"git clone failed ({kind})", stderr, retryable=kind in _RETRYABLE_KINDS,
         ) from exc
     except _subprocess.TimeoutExpired as exc:
         # Not retryable: the attempt already spent the whole clone timeout,
         # a full clone can only be slower.
-        raise CloneError("network", "git clone timed out") from exc
+        raise CloneError(GitFailureKind.TIMEOUT, "git clone timed out") from exc
     except FileNotFoundError as exc:
-        raise CloneError("unknown", f"git binary not found: {exc}") from exc
+        raise CloneError(GitFailureKind.GIT_MISSING, f"git binary not found: {exc}") from exc
     except OSError as exc:
-        kind = "disk" if exc.errno == errno.ENOSPC else "unknown"
+        kind = GitFailureKind.DISK if exc.errno == errno.ENOSPC else GitFailureKind.UNKNOWN
         raise CloneError(kind, f"git clone could not start: {exc}") from exc
 
 
 def run_git_clone(
     url: str, clone_dest: Path, *, timeout_s: int | None = None, shallow_months: int | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> None:
     """Execute ``git clone`` for *url* into *clone_dest*. Raises CloneError on failure.
 
@@ -155,10 +123,12 @@ def run_git_clone(
 
     *timeout_s* and *shallow_months* default to the config-resolved values
     (each getter call is lazy, so env overrides set after import still apply).
+    *env* is the base environment for the git process (``None`` means the
+    process environment); the access ladder passes a token-carrying one.
     """
     months = shallow_months if shallow_months is not None else clone_shallow_months()
     if months <= 0:
-        _clone_once(url, clone_dest, [], timeout_s=timeout_s)
+        _clone_once(url, clone_dest, [], timeout_s=timeout_s, env=env)
         return
     try:
         _clone_once(
@@ -166,6 +136,7 @@ def run_git_clone(
             clone_dest,
             ["--single-branch", "--no-tags", f"--shallow-since={months} months ago"],
             timeout_s=timeout_s,
+            env=env,
         )
     except CloneError as exc:
         if not exc.retryable:
@@ -175,4 +146,4 @@ def run_git_clone(
         # killed or on checkout-phase errors; a leftover partial dir would
         # turn the retry into a bogus dest_exists failure.
         remove_clone_dir(clone_dest)
-        _clone_once(url, clone_dest, [], timeout_s=timeout_s)
+        _clone_once(url, clone_dest, [], timeout_s=timeout_s, env=env)

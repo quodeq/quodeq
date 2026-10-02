@@ -15,6 +15,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.services._fs_clone import CloneError, run_git_clone
+from quodeq.shared.git_errors import GitFailureKind
 
 
 @pytest.fixture(autouse=True)
@@ -102,8 +103,8 @@ def test_fallback_removes_partial_clone_with_readonly_objects(
 @pytest.mark.parametrize(
     "stderr_text,expected_kind",
     [
-        ("Permission denied (publickey).", "auth"),
-        ("Repository not found.", "repo_not_found"),
+        ("Permission denied (publickey).", GitFailureKind.AUTH_REQUIRED),
+        ("Repository not found.", GitFailureKind.NOT_FOUND),
         ("destination path 'foo' already exists and is not an empty directory.", "dest_exists"),
         ("No space left on device", "disk"),
     ],
@@ -125,7 +126,7 @@ def test_timeout_does_not_retry(tmp_path):
     with patch("quodeq.services._fs_clone._subprocess.run", side_effect=timeout) as run_mock:
         with pytest.raises(CloneError) as exc:
             run_git_clone("https://x/y.git", tmp_path / "dest")
-    assert exc.value.kind == "network"
+    assert exc.value.kind == GitFailureKind.TIMEOUT
     assert run_mock.call_count == 1
 
 

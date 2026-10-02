@@ -10,7 +10,10 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from quodeq.services.base import CreateProjectResult
+import pytest
+
+from quodeq.services.base import CreateProjectResult, CreateProjectStatus
+from quodeq.shared.git_errors import GitFailureKind
 from tests.api.test_routes_project_create import _ORIGIN, client  # noqa: F401 -- client is a pytest fixture
 
 
@@ -151,3 +154,29 @@ def test_post_projects_non_string_discipline_returns_400(client):
     assert resp.is_json
     assert resp.get_json()["code"]
     mock_create.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "kind,code,status",
+    [
+        (GitFailureKind.HOST_KEY, "HOST_KEY_UNVERIFIED", 400),
+        (GitFailureKind.TIMEOUT, "CLONE_TIMEOUT", 504),
+        (GitFailureKind.GIT_MISSING, "GIT_MISSING", 500),
+        (GitFailureKind.UNKNOWN, "CLONE_UNKNOWN", 502),
+    ],
+)
+def test_clone_failure_codes_and_detail(client, kind, code, status):
+    result = CreateProjectResult(
+        status=CreateProjectStatus.CLONE_FAILED, message="git clone failed",
+        clone_error_kind=kind, clone_stderr="fatal: the real reason\n",
+    )
+    with patch(
+        "quodeq.services.filesystem.FilesystemActionProvider.create_project", return_value=result,
+    ):
+        resp = client.post(
+            "/api/projects", json={"repo": "https://github.com/o/r.git", "ephemeral": True}, headers=_ORIGIN,
+        )
+    assert resp.status_code == status
+    body = resp.get_json()
+    assert body["code"] == code
+    assert body["detail"] == "fatal: the real reason"

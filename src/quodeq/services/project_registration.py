@@ -158,7 +158,8 @@ def register_project_with_rollback(
         return _rollback_and_report(rollback, CreateProjectStatus.INVALID_REPO, str(exc))
     except CloneError as exc:
         return _rollback_and_report(
-            rollback, CreateProjectStatus.CLONE_FAILED, str(exc), clone_error_kind=exc.kind,
+            rollback, CreateProjectStatus.CLONE_FAILED, str(exc),
+            clone_error_kind=exc.kind, clone_stderr=exc.stderr,
         )
     except Exception:
         # An unhandled failure: clean up any partial project directory, then
