@@ -21,6 +21,8 @@ export function useSharedStatusAndList({ getSharedStatus, sharedListProjects, en
     ...observerOptions,
   });
   const configured = !!statusQuery.data?.configured;
-  const listQuery = useQuery(sharedListQueryOptions({ sharedListProjects, configured, enabled, observerOptions }));
+  const listQuery = useQuery(sharedListQueryOptions({
+    sharedListProjects, configured, status: statusQuery.data, enabled, observerOptions,
+  }));
   return { statusQuery, configured, listQuery };
 }

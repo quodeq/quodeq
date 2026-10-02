@@ -123,7 +123,7 @@ export function useSharedProjects() {
 
   const sync = useSyncStatus();
   const { configured } = sync;
-  const listQuery = useQuery(sharedListQueryOptions({ sharedListProjects, configured }));
+  const listQuery = useQuery(sharedListQueryOptions({ sharedListProjects, configured, status: sync.status }));
 
   const actions = useSharedActions({ connectShared, startPull });
   const pull = useCallback(async (projectId, action) => {

@@ -20,3 +20,17 @@ test('list query: enabled only when configured and the caller gate allows it', (
     false,
   );
 });
+
+test('list query: waits while a connect is active, never for a refresh or pull', () => {
+  const sharedListProjects = () => 'list';
+  const enabledFor = (status) => sharedListQueryOptions({ sharedListProjects, configured: true, status }).enabled;
+  const slot = (phase) => ({ state: 'running', phase });
+  assert.equal(enabledFor({ connect: slot('reading') }), false);
+  assert.equal(enabledFor({ connect: slot('downloading') }), false);
+  assert.equal(enabledFor({ connect: slot('connecting') }), false);
+  assert.equal(enabledFor({ connect: { state: 'done', phase: 'done' } }), true);
+  assert.equal(enabledFor({ refresh: slot('downloading') }), true);
+  assert.equal(enabledFor({ pull: slot('reading') }), true);
+  assert.equal(enabledFor({ connect: { state: 'idle', phase: null } }), true);
+  assert.equal(enabledFor(undefined), true);
+});
