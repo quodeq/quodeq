@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
@@ -53,7 +53,7 @@ class NewProjectSpec:
     clone_dest: str | None = None
     ephemeral: bool = False
     # Environment for the clone subprocess, from the access ladder; None = ambient git.
-    git_env: dict[str, str] | None = None
+    git_env: dict[str, str] | None = field(default=None, repr=False)
     # What to clone when it differs from ``repo`` (the ladder's HTTPS form); None = clone ``repo``.
     clone_url: str | None = None
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from quodeq.shared.env_resolve import resolve_env
 
@@ -23,7 +23,7 @@ class GhStatus:
 
     available: bool  # gh is on PATH
     logged_in: bool  # `gh auth token` answered a token
-    token: str | None = None
+    token: str | None = field(default=None, repr=False)
 
 
 def gh_status(

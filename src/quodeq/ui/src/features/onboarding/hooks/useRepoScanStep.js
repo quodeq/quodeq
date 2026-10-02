@@ -152,13 +152,25 @@ export function useRepoScanStep({ state, actions, createProject, getProjectInfo,
   const [cloneDetail, setCloneDetail] = useState('');
   const [accessFailure, setAccessFailure] = useState(null);
   const lastSubmitRef = useRef(null);
+  // A ref, not cloneSubmitting: two retries in the same tick ("test again"
+  // and a sign-in finishing) would both read the stale state and clone twice.
+  const cloneInFlightRef = useRef(false);
 
   const tryResumeExisting = makeTryResumeExisting({ getProjectInfo, getProjectScan, actions });
   const handleSubmit = makeHandleSubmit({ state, actions, createProject, setSubStep, setCloneError, tryResumeExisting });
-  const handleCloneTargetSubmit = makeHandleCloneTargetSubmit({
+  const submitCloneTarget = makeHandleCloneTargetSubmit({
     state, actions, createProject, probeGit, setSubStep, setCloneError, setCloneDetail, setCloneSubmitting,
     setAccessFailure, lastSubmitRef, tryResumeExisting,
   });
+
+  async function handleCloneTargetSubmit(args) {
+    cloneInFlightRef.current = true;
+    try {
+      await submitCloneTarget(args);
+    } finally {
+      cloneInFlightRef.current = false;
+    }
+  }
 
   function handleFolderSelect(path) {
     actions.setRepo({ value: path, source: 'local' });
@@ -167,7 +179,9 @@ export function useRepoScanStep({ state, actions, createProject, getProjectInfo,
 
   function clearAccessFailure() { setAccessFailure(null); }
   function retryClone() {
-    return lastSubmitRef.current ? handleCloneTargetSubmit(lastSubmitRef.current) : Promise.resolve();
+    // A retry while a probe or clone is still running is a no-op: the running one already uses the latest access.
+    if (!lastSubmitRef.current || cloneInFlightRef.current) return Promise.resolve();
+    return handleCloneTargetSubmit(lastSubmitRef.current);
   }
 
   return {

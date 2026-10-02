@@ -178,6 +178,23 @@ describe('useRepoScanStep access ladder', () => {
     expect(result.current.accessFailure).toBeNull();
   });
 
+  it('a retry while a clone is in flight is a no-op', async () => {
+    let finish;
+    const createProject = vi.fn(() => new Promise((resolve) => { finish = () => resolve({ projectId: 'p', scanData: {} }); }));
+    const answers = [{ reachable: false, kind: 'auth_required', detail: '', host: 'github.com', isGitHub: true }, { reachable: true, kind: 'ok' }];
+    const probeGit = vi.fn(async () => answers.shift());
+    const { result } = renderRepoScanHook({ createProject, probeGit, repo: 'https://github.com/o/r.git' });
+    await act(async () => { await result.current.handleCloneTargetSubmit({ cloneDest: '/tmp/x', ephemeral: false }); });
+    let first;
+    await act(async () => {
+      first = result.current.retryClone();
+      await result.current.retryClone(); // "test again" and a finished sign-in in the same tick
+    });
+    await act(async () => { finish(); await first; });
+    expect(probeGit).toHaveBeenCalledTimes(2);
+    expect(createProject).toHaveBeenCalledTimes(1);
+  });
+
   it('an ACCESS_ code from createProject itself also opens the panel', async () => {
     const err = Object.assign(new Error('x'), { status: 400, code: 'ACCESS_AUTH_REQUIRED', body: { kind: 'auth_required', detail: 'd', host: 'github.com', isGitHub: true } });
     const createProject = vi.fn(async () => { throw err; });

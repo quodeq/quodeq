@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 
 import keyring
@@ -37,11 +37,11 @@ class TokenMethod(StrEnum):
 class GitHubAccount:
     """A stored GitHub token with the login it belongs to and its lifetime."""
 
-    token: str
+    token: str = field(repr=False)
     login: str
     method: TokenMethod
     expires_at: float | None = None  # epoch seconds; None = does not expire
-    refresh_token: str | None = None
+    refresh_token: str | None = field(default=None, repr=False)
     scope: str = ""
 
 

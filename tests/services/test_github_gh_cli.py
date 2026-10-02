@@ -46,3 +46,7 @@ def test_empty_token_is_logged_out():
     def run(argv, **kwargs):
         return SimpleNamespace(returncode=0, stdout="\n", stderr="")
     assert gh_status(env={}, which=lambda n, path=None: "/x/gh", run=run) == GhStatus(True, False)
+
+
+def test_repr_never_shows_the_token():
+    assert "gho_gh" not in repr(GhStatus(True, True, "gho_gh"))

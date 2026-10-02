@@ -10,7 +10,7 @@ target ``quodeq.services._project_registration_steps.<name>``.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
@@ -138,7 +138,7 @@ class MaterializeRequest:
     ephemeral: bool
     clone_dest: str | None
     clones_dir: Path | None
-    git_env: dict[str, str] | None = None
+    git_env: dict[str, str] | None = field(default=None, repr=False)
     clone_url: str | None = None
     log: LogSink = NULL_LOG
 

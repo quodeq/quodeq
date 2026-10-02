@@ -81,3 +81,8 @@ def test_corrupt_entry_loads_as_none(paths, fake_keyring):
     assert load_account() is None
     fake_keyring[("quodeq", ACCOUNT_KEY)] = json.dumps({"token": "t"})  # missing fields
     assert load_account() is None
+
+
+def test_repr_never_shows_the_tokens():
+    acct = GitHubAccount(token="gho_secret", login="v", method=TokenMethod.PASTED, refresh_token="ghr_secret")
+    assert "gho_secret" not in repr(acct) and "ghr_secret" not in repr(acct)
