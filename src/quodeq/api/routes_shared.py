@@ -11,7 +11,7 @@ A thin orchestrator over four modules:
   - routes_shared_common.py: ``with_shared_root``, ``shared_project_dir``
     and ``no_shared_repo_error``, shared by the three registrars below.
   - routes_shared_config.py: status / config PUT-DELETE / refresh / publish.
-    Owns the ``refresh_shared_clone`` / ``start_publish`` imports used by
+    Owns the ``start_refresh`` / ``start_publish`` imports used by
     its own routes.
   - routes_shared_pull.py: the one write exception to the read-only
     invariant (materializing a shared project as a local copy).
@@ -27,6 +27,8 @@ from __future__ import annotations
 
 from flask import Flask
 
+from quodeq.services.base import ActionProvider
+
 from .routes_shared_common import (  # noqa: F401 — re-export
     logger,
     shared_project_dir,
@@ -37,8 +39,8 @@ from .routes_shared_pull import register_shared_pull_routes
 from .routes_shared_mirrors import register_shared_mirror_routes
 
 
-def register_shared_routes(app: Flask) -> None:
+def register_shared_routes(app: Flask, provider: ActionProvider) -> None:
     """Bind every /api/shared/* route: config, pull, and the read mirrors."""
-    register_shared_config_routes(app)
-    register_shared_pull_routes(app)
+    register_shared_config_routes(app, provider)
+    register_shared_pull_routes(app, provider)
     register_shared_mirror_routes(app)

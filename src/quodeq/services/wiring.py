@@ -102,8 +102,7 @@ from quodeq.data.fs.repo_clone import clone_repo  # noqa: F401
 from quodeq.data.fs.git_access_probe import ProbeResult, probe_remote  # noqa: F401
 from quodeq.data.fs.git_pin import pinned_git_config  # noqa: F401
 
-# Per-run findings-table reads (SQL stays in the adapter) and the row-dict →
-# Finding mapper that decodes what those reads return.
+# Per-run findings-table reads (SQL stays in the adapter) and their row-dict → Finding mapper.
 from quodeq.data.sqlite.findings_queries import (  # noqa: F401
     find_dismissed_matching,
     read_active_findings,
@@ -193,11 +192,13 @@ from quodeq.data.fs.report_parser.runs import (  # noqa: F401
 from quodeq.data.fs.repo_handler import is_valid_repo_url  # noqa: F401
 from quodeq.data.fs.children import find_children  # noqa: F401
 
-# Shared-results repo: clone lifecycle, git invocation, layout + format
-# checks, path/state lookups, and remote-URL validation.
+# Shared-results repo: clone lifecycle, git, layout/format checks, paths, URL validation.
 from quodeq.data.fs.shared_repo import (  # noqa: F401
+    DEFAULT_GIT_TIMEOUT_S,
     MARKER_FILENAME,
     PUBLISHED_META_FILENAME,
+    ProgressCallback,
+    ProgressUpdate,
     RepoFormat,
     bootstrap_repo_layout,
     check_repo_format,

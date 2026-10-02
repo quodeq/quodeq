@@ -46,6 +46,7 @@ HOME_MODULES = frozenset({
     "quodeq/analysis/mcp/schemas.py",
     "quodeq/core/types/provider.py",
     "quodeq/core/types/finding_type.py",
+    "quodeq/core/types/sync_phase.py",
 })
 
 # One word set per vocabulary. A word may belong to several (``done`` is a
@@ -68,6 +69,7 @@ VOCABULARIES: dict[str, frozenset[str]] = {
     "DimState": frozenset({"pending", "running", "done", "incomplete"}),
     "Provider": frozenset({"claude", "codex", "gemini", "copilot", "ollama", "llamacpp", "openrouter", "custom"}),
     "FindingType": frozenset({"violation", "compliance"}),
+    "SyncPhase": frozenset({"connecting", "downloading", "reading", "done", "error"}),
 }
 
 VOCAB_WORDS = frozenset().union(*VOCABULARIES.values())

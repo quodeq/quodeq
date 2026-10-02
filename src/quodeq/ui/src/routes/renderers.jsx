@@ -76,6 +76,16 @@ function dashboardElement(props, runMode, callbacks = {}) {
 // whole App (which needs ~8 providers). Calling e.g.
 // ROUTE_RENDERERS.file(params, props) just builds the React element tree; it
 // doesn't render, so the returned element's props can be asserted on directly.
+// After a disconnect (from Settings or the Repositories strip), a team
+// project selection has nowhere left to resolve: move it to a local one.
+function reselectAfterSharedDisconnect(navigation) {
+  const next = resolveSelectionAfterSharedDisconnect({
+    selectedSource: navigation.selectedSource,
+    projects: navigation.projects,
+  });
+  if (next) navigation.handleProjectChange(next.id, next.source);
+}
+
 // What the grade-formula editor knows about the reader's run: the worked
 // example and the TYPES tab read the selected run's dimensions.
 function gradeFormulaScope(params, props) {
@@ -183,13 +193,7 @@ export const ROUTE_RENDERERS = {
   settings: (params, props) => <SettingsCase
     settings={props.settings}
     onOpenGradeFormula={() => props.navigation.handleNavigate(NAV_TAB.GRADE_FORMULA)}
-    onSharedDisconnected={() => {
-      const next = resolveSelectionAfterSharedDisconnect({
-        selectedSource: props.navigation.selectedSource,
-        projects: props.navigation.projects,
-      });
-      if (next) props.navigation.handleProjectChange(next.id, next.source);
-    }}
+    onSharedDisconnected={() => reselectAfterSharedDisconnect(props.navigation)}
   />,
   [NAV_TAB.GRADE_FORMULA]: (params, props) => (
     <GradeFormulaPage
@@ -217,7 +221,7 @@ export const ROUTE_RENDERERS = {
         onImportProject: props.navigation.onImportProject,
         onResumeSetup: props.navigation.onResumeSetup,
         onFiltersChange: (filters) => props.navigation.handleNavigateReplace(NAV_TAB.PROJECTS, { filters }),
-        onProjectsReload: props.navigation.loadProjects,
+        onSharedDisconnected: () => reselectAfterSharedDisconnect(props.navigation),
       }}
     />
   ),

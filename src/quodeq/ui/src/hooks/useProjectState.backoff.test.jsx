@@ -4,6 +4,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 vi.mock('../api/index.js', () => ({ listProjects: vi.fn() }));
 import { listProjects } from '../api/index.js';
 import { useProjectState } from './useProjectState.js';
+import { withQueryClient } from '../test-utils/withQueryClient.jsx';
 
 const noStorage = { getItem: () => '', setItem: () => {} };
 
@@ -20,7 +21,7 @@ describe('useProjectState — retry backoff grows per attempt', () => {
     listProjects.mockRejectedValue(new Error('down'));
 
     renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 100, maxRetries: 2 }));
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 100, maxRetries: 2 }), { wrapper: withQueryClient() });
 
     // Initial attempt fires synchronously (microtask), rejects immediately.
     await vi.advanceTimersByTimeAsync(0);
@@ -44,7 +45,7 @@ describe('useProjectState — retry backoff grows per attempt', () => {
       .mockRejectedValueOnce(new Error('down'))
       .mockResolvedValueOnce([{ id: 'p1', name: 'proj1' }]);
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 1 }));
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 1 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.projects).toHaveLength(1));
   });

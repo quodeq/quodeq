@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
+import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import SharedRepoSection from './SharedRepoSection.jsx';
 import { makeFakeApi, renderWithApi } from './_sharedRepoSection.fixtures.jsx';
 
@@ -35,6 +36,19 @@ describe('SharedRepoSection', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /disconnect/i })).toBeTruthy();
     });
+  });
+
+  it('disables disconnect while a refresh rewrites the clone', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({
+        configured: true, url: 'https://github.com/team/results.git',
+        refresh: { state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: 10 },
+      })),
+    });
+
+    renderWithApi(fakeApi);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /disconnect/i })).toBeDisabled());
   });
 
   it('calls disconnectShared when disconnect confirm is accepted', async () => {

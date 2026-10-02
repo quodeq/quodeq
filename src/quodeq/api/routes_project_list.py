@@ -32,7 +32,7 @@ from quodeq.shared.validation import validate_canonical_absolute
 _logger = logging.getLogger(__name__)
 
 
-def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Response, int]:
+def handle_delete_project(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle DELETE /api/projects/<project>."""
     project = request.view_args["project"]
     if request.args.get("confirm") != QUERY_FLAG_TRUE:
@@ -41,6 +41,7 @@ def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Respons
     ok = provider.delete_project(reports_dir(), project)
     if not ok:
         return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
+    provider.invalidate_projects_cache()
     return jsonify({"deleted": project})
 
 
@@ -88,7 +89,7 @@ def _validated_target_path(new_path: str) -> str | tuple[dict[str, Any], int]:
     return str(resolved)
 
 
-def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Response, int]:
+def handle_update_project_path(provider: ActionProvider) -> Response | tuple[Response, int]:
     """Handle PATCH /api/projects/<project>/path.
 
     ``provider.update_project_path`` only ever returns a bare bool, so
@@ -115,7 +116,17 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     ok = provider.update_project_path(reports_dir(), project, new_path)
     if not ok:
         return json_error("Project not found", HTTPStatus.NOT_FOUND, CODE_NOT_FOUND)
+    provider.invalidate_projects_cache()
     return jsonify({"updated": project, "path": new_path})
+
+
+def handle_import_project(provider: ActionProvider) -> Response | tuple[Response, int]:
+    """Handle POST /api/projects/import, then drop the stale project cache."""
+    response = _import_project(reports_dir())
+    status = response[1] if isinstance(response, tuple) else response.status_code
+    if status < HTTPStatus.BAD_REQUEST:
+        provider.invalidate_projects_cache()
+    return response
 
 
 def _invalid_project_name(project: str) -> tuple[Response, int] | None:
@@ -178,7 +189,7 @@ def register_project_list_routes(
     @app.patch("/api/projects/<project>/path")
     def update_project_path(project: str) -> Response | tuple[Response, int]:
         """Update the local filesystem path for a project."""
-        return _invalid_project_name(project) or _handle_update_project_path(provider)
+        return _invalid_project_name(project) or handle_update_project_path(provider)
 
     @app.get("/api/projects/<project>/export")
     def export_project(project: str) -> Response | tuple[Response, int]:
@@ -193,12 +204,12 @@ def register_project_list_routes(
         and an optional ``action`` field (``replace`` or ``copy``) used to
         resolve a 409 collision returned from a prior call.
         """
-        return _import_project(reports_dir())
+        return handle_import_project(provider)
 
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:
         """Delete a project and all its run data."""
-        return _invalid_project_name(project) or _handle_delete_project(provider)
+        return _invalid_project_name(project) or handle_delete_project(provider)
 
     @app.get("/api/projects/<project>/info")
     def project_info(project: str) -> Response | tuple[Response, int]:

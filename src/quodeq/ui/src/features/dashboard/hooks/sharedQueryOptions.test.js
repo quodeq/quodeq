@@ -1,23 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sharedStatusQueryOptions, sharedListQueryOptions } from './sharedQueryOptions.js';
+import { sharedListQueryOptions } from './sharedQueryOptions.js';
 import { sharedKeys } from '../../../api/queryKeys.js';
-
-const getSharedStatus = async () => ({ configured: true });
-
-test('status query: shared status key, no enabled flag unless one is given', () => {
-  const opts = sharedStatusQueryOptions({ getSharedStatus });
-  assert.deepEqual(opts.queryKey, sharedKeys.status());
-  assert.equal(opts.queryFn, getSharedStatus);
-  assert.equal('enabled' in opts, false);
-  assert.equal('refetchOnWindowFocus' in opts, false);
-  assert.equal(sharedStatusQueryOptions({ getSharedStatus, enabled: false }).enabled, false);
-});
-
-test('status query carries extra observer options', () => {
-  const opts = sharedStatusQueryOptions({ getSharedStatus, observerOptions: { refetchOnWindowFocus: false } });
-  assert.equal(opts.refetchOnWindowFocus, false);
-});
 
 test('list query: enabled only when configured and the caller gate allows it', () => {
   const calls = [];
@@ -35,4 +19,18 @@ test('list query: enabled only when configured and the caller gate allows it', (
     sharedListQueryOptions({ sharedListProjects, configured: true, observerOptions: { refetchOnWindowFocus: false } }).refetchOnWindowFocus,
     false,
   );
+});
+
+test('list query: waits while a connect is active, never for a refresh or pull', () => {
+  const sharedListProjects = () => 'list';
+  const enabledFor = (status) => sharedListQueryOptions({ sharedListProjects, configured: true, status }).enabled;
+  const slot = (phase) => ({ state: 'running', phase });
+  assert.equal(enabledFor({ connect: slot('reading') }), false);
+  assert.equal(enabledFor({ connect: slot('downloading') }), false);
+  assert.equal(enabledFor({ connect: slot('connecting') }), false);
+  assert.equal(enabledFor({ connect: { state: 'done', phase: 'done' } }), true);
+  assert.equal(enabledFor({ refresh: slot('downloading') }), true);
+  assert.equal(enabledFor({ pull: slot('reading') }), true);
+  assert.equal(enabledFor({ connect: { state: 'idle', phase: null } }), true);
+  assert.equal(enabledFor(undefined), true);
 });

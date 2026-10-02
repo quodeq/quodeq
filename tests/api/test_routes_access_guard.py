@@ -6,6 +6,7 @@ call order: the SSRF guard must answer before any probe runs.
 """
 from __future__ import annotations
 
+import functools
 import json
 
 import pytest
@@ -13,6 +14,7 @@ import pytest
 from quodeq.config.github_account import GitHubAccount, TokenMethod
 from quodeq.data.fs.git_access_probe import ProbeResult
 from quodeq.services.github_access import AccessMethod, resolve_access
+from quodeq.services import shared_refresh_job
 from quodeq.shared.git_errors import GitFailureKind
 from tests.api._routes_shared_fixtures import (  # noqa: F401 -- fixtures
     _ORIGIN,
@@ -103,6 +105,16 @@ def test_connect_ssh_url_reachable_only_by_token_is_use_https(client, monkeypatc
     assert started == []
 
 
+def _inline_refresh(monkeypatch, refresh_fn):
+    monkeypatch.setattr(shared_refresh_job, "_default_status", shared_refresh_job.RefreshStatus())
+    monkeypatch.setattr(
+        "quodeq.api.routes_shared_config.start_refresh",
+        functools.partial(shared_refresh_job.start_refresh, spawn=lambda fn: fn()),
+    )
+    monkeypatch.setattr("quodeq.services.shared_refresh_job.refresh_shared_clone", refresh_fn)
+    monkeypatch.setattr("quodeq.services.shared_refresh_job.sync_shared_index", lambda u: None)
+
+
 def test_refresh_runs_under_the_cached_token_env(client, tmp_path, monkeypatch):
     url = "https://github.com/t/r.git"
     _configure(tmp_path, url)
@@ -112,12 +124,12 @@ def test_refresh_runs_under_the_cached_token_env(client, tmp_path, monkeypatch):
     calls.clear()
     seen = {}
 
-    def fake_refresh(u, env=None):
+    def fake_refresh(u, env=None, progress=None, **_):
         seen.update(url=u, env=env)
         return True, ""
 
-    monkeypatch.setattr("quodeq.api.routes_shared_config.refresh_shared_clone", fake_refresh)
-    assert client.post("/api/shared/refresh", headers=_ORIGIN).status_code == 200
+    _inline_refresh(monkeypatch, fake_refresh)
+    assert client.post("/api/shared/refresh", headers=_ORIGIN).status_code == 202
     assert seen == {"url": url, "env": access.env} and calls == []  # cached: no probe
 
 
@@ -126,8 +138,21 @@ def test_refresh_after_restart_walks_the_ladder_once(client, tmp_path, monkeypat
     _configure(tmp_path, url)
     calls = _token_probe(monkeypatch, GitFailureKind.NOT_FOUND)
     envs = []
-    monkeypatch.setattr(
-        "quodeq.api.routes_shared_config.refresh_shared_clone", lambda u, env=None: envs.append(env) or (True, ""),
-    )
+    _inline_refresh(monkeypatch, lambda u, env=None, progress=None, **_: envs.append(env) or (True, ""))
     client.post("/api/shared/refresh", headers=_ORIGIN)
     assert envs[0] and envs[0].get("GIT_CONFIG_VALUE_0") and len(calls) == 2  # ambient, then the token
+
+
+def test_refresh_unreachable_is_access_400_and_never_starts(client, tmp_path, monkeypatch):
+    _configure(tmp_path, "https://github.com/t/r.git")
+    monkeypatch.setattr(
+        "quodeq.services.github_access.probe_remote",
+        lambda url, **_kw: ProbeResult(GitFailureKind.NOT_FOUND, "remote: Repository not found."),
+    )
+    started = []
+    monkeypatch.setattr("quodeq.api.routes_shared_config.start_refresh", lambda *a, **kw: started.append(a))
+    resp = client.post("/api/shared/refresh", headers=_ORIGIN)
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "ACCESS_NOT_FOUND" and body["kind"] == "not_found"
+    assert started == []

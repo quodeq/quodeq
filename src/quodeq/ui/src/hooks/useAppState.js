@@ -40,7 +40,6 @@ function useProjects({ onNoProjects }) {
       projects: projectState.projects,
       selectedProject: projectState.selectedProject,
       handleProjectChange: projectState.handleProjectChange,
-      loadProjects: projectState.loadProjects,
     },
     // Route project-action failures through the toast instead of a
     // blocking alert(). The message is rendered here so useProjectActions
@@ -180,12 +179,12 @@ function useDisplaySettings() {
 // hand the provider), the dependencies the provider needs, and the one value
 // it renders from: whether a run is in flight.
 function useAppEvaluation({ navTab, navReset, projectBundle }) {
-  const { loadProjects, setProjects, selectProjectAndRun, selectedProject } = projectBundle;
+  const { selectProjectAndRun, selectedProject } = projectBundle;
   const liveEvaluation = useLiveEvaluationStore();
   const isEvaluating = useLiveEvaluationValue(liveEvaluation, selectIsEvaluating);
   const evaluationDeps = {
     navigation: { navTab, navReset },
-    projects: { loadProjects, setProjects, selectProjectAndRun },
+    projects: { selectProjectAndRun },
     selectedProject,
   };
   return { liveEvaluation, isEvaluating, evaluationDeps };

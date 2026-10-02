@@ -16,7 +16,8 @@ import check_vocab_literals
 
 _UI_CONFIG = Path(__file__).resolve().parents[2] / "src" / "quodeq" / "ui" / "eslint.vocab.config.js"
 # Gated in Python only: FileDoneStatus has no UI reader, and the UI's provider
-# words would collide with the assistant-mode word "custom".
+# words would collide with the assistant-mode word "custom"; SyncPhase has no UI gate
+# entry yet.
 _PYTHON_ONLY = {"FileDoneStatus", "Provider"}
 
 

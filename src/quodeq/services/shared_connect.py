@@ -14,6 +14,7 @@ from enum import StrEnum
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.shared_repo import (
+    ProgressCallback,
     RepoFormat,
     check_repo_format,
     ensure_shared_clone,
@@ -48,7 +49,7 @@ class ConnectOutcome:
 
 def connect_shared_repo(
     url: str, *, log: LogSink = NULL_LOG, ops: SharedRepoOps | None = None,
-    env: Mapping[str, str] | None = None,
+    env: Mapping[str, str] | None = None, progress: ProgressCallback | None = None,
 ) -> ConnectOutcome:
     """Validate, clone (or refresh an existing clone of), and format-check *url*.
 
@@ -78,11 +79,11 @@ def connect_shared_repo(
     # clone_lock itself (RLock, so nesting would be safe too, but there
     # is nothing else in this route that needs the lock held around it).
     pre_existing = read_state_fn(url) != RepoFormat.MISSING
-    repo = ensure_clone(url, env)
+    repo = ensure_clone(url, env, progress=progress)
     if repo is None:
         return ConnectOutcome(status=ConnectStatus.CLONE_FAILED, url=url)
     if pre_existing:
-        refresh_clone(url, env)  # best effort; failure just leaves the pre-existing clone as-is, reason already logged internally
+        refresh_clone(url, env, progress=progress)  # best effort; failure just leaves the pre-existing clone as-is, reason already logged internally
     # Format validation only makes sense once the clone actually exists,
     # so it runs AFTER ensure_shared_clone, not before -- a foreign or
     # too-new repo must never reach write_settings (that would connect

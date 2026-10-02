@@ -83,7 +83,7 @@ def register_all_routes(
     register_runs_routes(app)
     register_run_diff_routes(app)
     register_grade_explain_routes(app)
-    register_shared_routes(app)
+    register_shared_routes(app, provider)
     register_github_access_routes(app)
     register_grade_formula_routes(app)
     register_llm_bridge_routes(app)

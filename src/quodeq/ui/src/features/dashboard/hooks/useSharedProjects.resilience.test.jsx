@@ -5,9 +5,10 @@ import { useSharedProjects } from './useSharedProjects.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
+import catalog from '../../../strings/en.json' with { type: 'json' };
 
 function makeFakeApi(overrides = {}) {
-  return {
+  const api = {
     getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
     sharedListProjects: vi.fn(async () => ({
       projects: [{ id: 'p1', name: 'demo' }],
@@ -15,10 +16,12 @@ function makeFakeApi(overrides = {}) {
       stale: false,
     })),
     connectShared: vi.fn(async (url) => ({ configured: true, url })),
-    refreshShared: vi.fn(async () => ({ stale: false, lastSynced: '2026-07-17T00:00:00Z' })),
-    pullSharedProject: vi.fn(async (id) => ({ imported: true, projectId: id })),
+    startRefresh: vi.fn(async () => ({ started: true })),
+    startPull: vi.fn(async (id) => ({ started: true, project: id })),
     ...overrides,
   };
+  // The status poll reads getSyncStatus; these tests drive it through getSharedStatus.
+  return { getSyncStatus: (...a) => api.getSharedStatus(...a), ...api };
 }
 
 // A promise the test controls the settlement of, so we can assert on
@@ -43,7 +46,7 @@ function wrap(fakeApi, children) {
 
 // Split from useSharedProjects.test.jsx: status-error recovery,
 // lastSynced fallback, ghost-cache gating, pull(), and the connect/
-// refresh/pull double-submit and coalescing guards.
+// connect/pull double-submit guards.
 
 describe('useSharedProjects', () => {
   // A one-shot mount fetch with no retry used to leave
@@ -129,7 +132,7 @@ describe('useSharedProjects', () => {
     expect(result.current.projects).toEqual([]);
   });
 
-  it('pull(id, action) delegates to pullSharedProject', async () => {
+  it('pull(id, action) starts the job through startPull', async () => {
     const fakeApi = makeFakeApi();
     const { result } = renderHook(() => useSharedProjects(), {
       wrapper: ({ children }) => wrap(fakeApi, children),
@@ -140,7 +143,7 @@ describe('useSharedProjects', () => {
       await result.current.pull('p1', 'copy');
     });
 
-    expect(fakeApi.pullSharedProject).toHaveBeenCalledWith('p1', 'copy');
+    expect(fakeApi.startPull).toHaveBeenCalledWith('p1', 'copy');
   });
 
   // Double-submit guards: aria-disabled doesn't block a click in this
@@ -177,51 +180,39 @@ describe('useSharedProjects', () => {
     expect(fakeApi.connectShared).toHaveBeenCalledTimes(1);
   });
 
-  // Coalescing, not dropping (audit C3 groundwork): a refresh() that arrives
-  // while one is already running must not be silently ignored -- it must be
-  // satisfied by exactly one MORE round once the in-flight one settles, so
-  // callers like the post-publish "refresh the chips" effect never get
-  // dropped on the floor just because a background revalidate happened to
-  // be running at that instant. Two overlapping calls -> two POSTs total,
-  // not one (dropped) and not three (one per call).
-  it('refresh() coalesces a call that arrives while one is in flight into exactly one more round', async () => {
-    const d = deferred();
-    const fakeApi = makeFakeApi();
+  it('exposes the connect slot error, mapped by its code, while the connect job is in error', async () => {
+    const failed = { configured: false, url: null, connect: { state: 'error', phase: 'error', code: 'FOREIGN_REPO', error: 'raw backend sentence' } };
+    const fakeApi = makeFakeApi({ getSharedStatus: vi.fn(async () => failed) });
     const { result } = renderHook(() => useSharedProjects(), {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    // Let the mount's own background revalidate settle first, so the
-    // deferred stub below only governs the two manual refresh() calls,
-    // not the mount's in-flight refresh.
-    await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(2));
-    fakeApi.refreshShared.mockClear();
-    fakeApi.refreshShared.mockImplementationOnce(() => d.promise);
 
-    let p1;
-    let p2;
-    act(() => {
-      p1 = result.current.refresh();
-      p2 = result.current.refresh();
+    await waitFor(() => expect(result.current.connectError).toBe(catalog['apiError.foreignRepo']));
+  });
+
+  it('connecting follows the connect slot while its job is active', async () => {
+    const running = { configured: false, url: null, connect: { state: 'running', phase: 'downloading' } };
+    const fakeApi = makeFakeApi({ getSharedStatus: vi.fn(async () => running) });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
     });
 
-    expect(fakeApi.refreshShared).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.connecting).toBe(true));
+  });
 
-    d.resolve({ stale: false, lastSynced: '2026-07-17T00:00:00Z' });
-    await act(async () => {
-      await p1;
-      await p2;
+  it('exposes the pull slot for usePullToLocal', async () => {
+    const pull = { state: 'running', phase: 'downloading', project: 'p1' };
+    const fakeApi = makeFakeApi({ getSharedStatus: vi.fn(async () => ({ configured: true, url: 'u', pull })) });
+    const { result } = renderHook(() => useSharedProjects(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
     });
 
-    // The second call, queued while the first was in flight, triggered
-    // exactly one more POST once the first settled -- not zero (dropped),
-    // not two-per-caller.
-    expect(fakeApi.refreshShared).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(result.current.pullSlot).toMatchObject(pull));
   });
 
   it('pull() ignores a second call while the first pull is still in flight', async () => {
     const d = deferred();
-    const fakeApi = makeFakeApi({ pullSharedProject: vi.fn(() => d.promise) });
+    const fakeApi = makeFakeApi({ startPull: vi.fn(() => d.promise) });
     const { result } = renderHook(() => useSharedProjects(), {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
@@ -234,14 +225,14 @@ describe('useSharedProjects', () => {
       p2 = result.current.pull('p1');
     });
 
-    expect(fakeApi.pullSharedProject).toHaveBeenCalledTimes(1);
+    expect(fakeApi.startPull).toHaveBeenCalledTimes(1);
 
-    d.resolve({ imported: true, projectId: 'p1' });
+    d.resolve({ started: true, project: 'p1' });
     await act(async () => {
       await p1;
       await p2;
     });
 
-    expect(fakeApi.pullSharedProject).toHaveBeenCalledTimes(1);
+    expect(fakeApi.startPull).toHaveBeenCalledTimes(1);
   });
 });

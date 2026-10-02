@@ -15,9 +15,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.core.types import ProjectEntry
 from quodeq.core.types.project_source import ProjectSource
 from quodeq.services import fs_projects
-from quodeq.services.shared_repo import last_synced_at, published_meta
+from quodeq.services.score_cache import score_cache_path_override
+from quodeq.services.shared_repo import last_synced_at, published_meta, shared_score_cache_path
 
 
 def _merge_published_meta(info: dict, key: str, meta: dict) -> dict:
@@ -39,6 +41,44 @@ def enrich_shared_info(info: dict, key: str, url: str) -> dict:
     calling it once per project would multiply that cost by project count.
     """
     return _merge_published_meta(info, key, published_meta(url))
+
+
+def _hydrate(eval_root: Path, url: str) -> tuple[list[ProjectEntry], dict[str, dict]]:
+    """The listing's expensive half: every project entry, plus publish attribution.
+
+    backfill=False: the shared clone is a git worktree, not a local
+    evaluations dir -- writing onboardingCompletedAt into
+    repository_info.json here would dirty it, and a dirty worktree can make
+    publish's `pull --rebase` refuse (confusing wedge) the next time someone
+    publishes into this clone.
+
+    inline_summaries=True: the shared clone has no warm-up engine to fill a
+    missing project-card summary later, so a cache miss computes it inline
+    here instead of reporting it pending forever. That is the slow part on a
+    fresh clone, and the reason ``warm_shared_listing`` exists.
+    """
+    projects = fs_projects.build_project_list(eval_root, backfill=False, inline_summaries=True)
+    return projects, published_meta(url)
+
+
+def warm_shared_listing(eval_root: Path, url: str) -> int:
+    """Run the listing's hydration once so the next listing answers from cache.
+
+    The connect and refresh jobs call this before reporting DONE: the first
+    listing of a fresh clone computes every project-card summary inline and
+    can outlast the UI's request timeout. Returns the number of projects.
+
+    The summaries go to the clone's own score cache, the DB the list route
+    reads under ``with_shared_root``. A job thread does not inherit the
+    route's contextvar override, so this scopes its own; without it the
+    warm-up would fill the LOCAL cache (a miss for the route, and shared
+    rows mixed into local ones).
+    """
+    if not eval_root.is_dir():
+        return 0
+    with score_cache_path_override(shared_score_cache_path(url)):
+        projects, _meta = _hydrate(eval_root, url)
+    return len(projects)
 
 
 def list_shared_projects(
@@ -66,19 +106,8 @@ def list_shared_projects(
             stale = False
         else:
             stale = True
-    # backfill=False: the shared clone is a git worktree, not a local
-    # evaluations dir -- writing onboardingCompletedAt into
-    # repository_info.json here would dirty it, and a dirty worktree can
-    # make publish's `pull --rebase` refuse (confusing wedge) the next
-    # time someone publishes into this clone.
-    # inline_summaries=True: this route has no warm-up engine to fill a
-    # missing project-card summary later, so a cache miss must compute
-    # it inline here instead of reporting it pending forever.
-    projects = fs_projects.build_project_list(
-        eval_root, backfill=False, inline_summaries=True,
-    )
+    projects, meta = _hydrate(eval_root, url)
     listing = {"projects": [serialize(p) for p in projects]}
-    meta = published_meta(url)
     for project in listing["projects"]:
         key = project.get("id") or project.get("name")
         _merge_published_meta(project, key, meta)

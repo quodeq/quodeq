@@ -81,7 +81,8 @@ const CODE_KEYS = {
   CONNECT_IN_PROGRESS: 'apiError.connectInProgress',
   CONNECT_START_FAILED: 'apiError.connectStartFailed',
   CONNECT_FAILED: 'apiError.connectFailed',
-  CONNECT_TIMEOUT: 'apiError.connectTimeout',
+  // The pull job's export over QUODEQ_MAX_ZIP_SIZE_MB (routes_shared_pull.py).
+  PULL_TOO_LARGE: 'apiError.pullTooLarge',
 
   // Assistant workspace: diff/apply/discard on the isolated write worktree
   // (assistant_workspace_routes.py).

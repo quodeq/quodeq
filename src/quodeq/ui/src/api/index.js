@@ -20,13 +20,14 @@ export {
   applyAssistantWorkspace, createAssistantWorkspacePr, discardAssistantWorkspace, fetchAssistantWorkspaceDiff,
 } from './assistant.js';
 export {
-  getSharedStatus, connectShared, disconnectShared, refreshShared,
+  getSharedStatus, connectShared, disconnectShared,
   sharedListProjects, sharedGetProjectInfo, sharedGetRuns,
   sharedGetDashboard, sharedGetAccumulated, sharedGetProjectScores,
   sharedGetRunScores, sharedGetFindingDetail, sharedGetDimensionEval, sharedGetViolations,
   sharedListDismissedFindings, sharedListVerifiedFindings,
-  publishProject, pullSharedProject, sharedGetCompareSummary, sharedGetFleetCompare,
+  publishProject, sharedGetCompareSummary, sharedGetFleetCompare,
 } from './shared.js';
+export { getSyncStatus, startRefresh, startPull, getInvite } from './syncStatus.js';
 export { listTerminalSessions, createTerminalSession, killTerminalSession, killTerminal } from './terminal.js';
 
 export {

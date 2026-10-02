@@ -126,15 +126,16 @@ export function shouldShowCompareTab({ projects, sharedHasContent }) {
 }
 
 /**
- * One-shot initial-landing decision. With zero local projects the default
+ * The landing decision. With zero local projects the default
  * 'overview' landing is a dead-end empty state; when a configured shared
  * repo has published content, land on the repositories tab instead so the
  * remote projects are visible without scanning anything locally. Only the
  * default 'overview' landing redirects: a user who already navigated
  * elsewhere (settings, help) before the signals settled keeps their page,
  * and a restored 'shared' selection is already a working view. The caller
- * latches the decision once inputs settle, so mid-session deletions or
- * disconnects never yank the user. Exported for unit tests.
+ * (useInitialLandingEffect) re-runs it when the project list or the shared
+ * signal changes, never on a tab change, and only while the user is still on
+ * the landing. Exported for unit tests.
  */
 export function shouldRedirectToRemoteRepositories({ projectsLoaded, projectsCount, selectedSource, sharedSettled, sharedHasContent, activeTab }) {
   if (!projectsLoaded || !sharedSettled) return false;

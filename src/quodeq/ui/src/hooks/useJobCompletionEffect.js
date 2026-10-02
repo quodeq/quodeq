@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { projectKeys } from '../api/queryKeys.js';
+import { invalidateProjects } from './invalidateProjects.js';
 import { JOB_STATUS } from '../vocab/jobStatus.js';
 import { PROJECT_SOURCE } from '../vocab/projectSource.js';
 import { NAV_TAB } from '../vocab/navTab.js';
 
 /**
- * useEvaluationLifecycle.js's job-completion effect: on-start nav, the
- * project-list refresh, and the scores/compare-summary cache invalidation.
- * Extracted verbatim -- invalidation keys unchanged.
+ * The evaluation job-completion effect: on-start nav, then, once per
+ * finished run, the project-list refetch, the scores/compare-summary cache
+ * invalidation, and the selection move to the new run.
  */
-export function useJobCompletionEffect({ job, navTab, loadProjects, setProjects, queryClient, selectedProject, selectProjectAndRun }) {
+export function useJobCompletionEffect({ job, navTab, queryClient, selectedProject, selectProjectAndRun }) {
   const prevJobRef = useRef(null);
   const refreshedRunRef = useRef(null);
   useEffect(() => {
@@ -18,8 +19,7 @@ export function useJobCompletionEffect({ job, navTab, loadProjects, setProjects,
     const finished = job && job.status !== JOB_STATUS.RUNNING && job.outputProject && job.outputRunId;
     if (finished && refreshedRunRef.current !== job.outputRunId) {
       refreshedRunRef.current = job.outputRunId;
-      loadProjects()
-        .then((list) => setProjects(list))
+      invalidateProjects(queryClient)
         .catch((err) => console.error('Failed to refresh projects:', err));
       // useAppState's dashboard-key effect (removed as redundant: the
       // selectProjectAndRun call below mints a new dashboard query key on its

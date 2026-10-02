@@ -25,7 +25,7 @@ import os
 import shutil
 import stat
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 # Re-exported so the api layer can validate a shared-repo URL without
@@ -34,7 +34,10 @@ from pathlib import Path
 # not api -> data). services/evaluation_mixin.py imports the same function
 # straight from quodeq.data.fs.repo_validation for the same reason.
 from quodeq.data.fs.repo_validation import validate_remote_url  # noqa: F401
+from quodeq.data.fs.git_progress import ProgressUpdate, parse_progress
+from quodeq.data.fs.git_stream import run_git_streaming
 from quodeq.data.fs.shared_repo_git import (  # noqa: F401 -- re-exported for existing callers
+    DEFAULT_GIT_TIMEOUT_S,
     EVALUATIONS_DIRNAME,
     run_git,
     shared_cache_dir,
@@ -61,6 +64,19 @@ from quodeq.data.fs.shared_repo_meta import (  # noqa: F401
 )
 
 logger = logging.getLogger(__name__)
+
+ProgressCallback = Callable[[ProgressUpdate], None]
+
+
+def _forward_progress(progress: ProgressCallback | None) -> Callable[[str], None]:
+    """An on_line callback that parses git's progress lines into *progress*."""
+    def on_line(line: str) -> None:
+        if progress is None:
+            return
+        update = parse_progress(line)
+        if update is not None:
+            progress(update)
+    return on_line
 
 
 def _clear_readonly_and_retry(func, path, exc):  # noqa: ARG001
@@ -106,19 +122,26 @@ def clone_lock(url: str, env: Mapping[str, str] | None = None) -> threading.RLoc
         return _CLONE_LOCKS.setdefault(key, threading.RLock())
 
 
-def ensure_shared_clone(url: str, env: Mapping[str, str] | None = None) -> Path | None:
+def ensure_shared_clone(
+    url: str, env: Mapping[str, str] | None = None, *, progress: ProgressCallback | None = None,
+) -> Path | None:
     """Return the clone path for *url*, cloning it once if it is not there yet.
 
     None when the clone failed; the half-written directory is removed so the
-    next call starts clean. Keeps run_git's 300s default, unlike
+    next call starts clean. Keeps the 300s default, unlike
     ``refresh_shared_clone`` -- a first clone can legitimately take minutes.
+    Streams git's --progress lines into *progress* (see
+    git_progress.parse_progress) so a UI can show the download.
     """
     with clone_lock(url, env):
         repo = shared_repo_path(url, env)
         if (repo / GIT_DIR_NAME).exists():
             return repo
         repo.parent.mkdir(parents=True, exist_ok=True)
-        ok, out = run_git(["clone", "--", url, str(repo)], env=env)
+        ok, out = run_git_streaming(
+            ["clone", "--progress", "--", url, str(repo)],
+            timeout=DEFAULT_GIT_TIMEOUT_S, env=env, on_line=_forward_progress(progress),
+        )
         if not ok:
             logger.warning("shared clone failed for %s: %s", url, out.strip()[:500])
             remove_clone_dir(repo)
@@ -129,8 +152,10 @@ def ensure_shared_clone(url: str, env: Mapping[str, str] | None = None) -> Path 
 _DEFAULT_REFRESH_TIMEOUT_S = 30
 
 
-def _refresh_missing_clone(url: str, env: Mapping[str, str] | None) -> tuple[bool, str]:
-    if ensure_shared_clone(url, env) is not None:
+def _refresh_missing_clone(
+    url: str, env: Mapping[str, str] | None, progress: ProgressCallback | None = None,
+) -> tuple[bool, str]:
+    if ensure_shared_clone(url, env, progress=progress) is not None:
         return True, ""
     reason = f"could not clone the repository, check that git can access {url}"
     logger.warning("refresh_shared_clone: %s", reason)
@@ -139,6 +164,7 @@ def _refresh_missing_clone(url: str, env: Mapping[str, str] | None) -> tuple[boo
 
 def _fetch_and_reset_clone(
     url: str, repo: Path, timeout: int, env: Mapping[str, str] | None = None,
+    progress: ProgressCallback | None = None,
 ) -> tuple[bool, str]:
     # Unshallowing only applies to NEW clones: ensure_shared_clone stopped
     # passing --depth 1 in a prior fix, but a shared-clone cache directory
@@ -152,7 +178,10 @@ def _fetch_and_reset_clone(
         ok, out = run_git(["fetch", "--unshallow", "origin"], cwd=repo, timeout=timeout, env=env)
         if not ok:
             logger.debug("refresh_shared_clone: unshallow failed for %s: %s", url, out.strip()[:200])
-    ok, out = run_git(["fetch", "origin", "HEAD"], cwd=repo, timeout=timeout, env=env)
+    ok, out = run_git_streaming(
+        ["fetch", "--progress", "origin", "HEAD"], cwd=repo, timeout=timeout, env=env,
+        on_line=_forward_progress(progress),
+    )
     if not ok:
         reason = out.strip()[:200]
         logger.warning("refresh_shared_clone: fetch failed for %s: %s", url, reason)
@@ -166,7 +195,8 @@ def _fetch_and_reset_clone(
 
 
 def refresh_shared_clone(
-    url: str, env: Mapping[str, str] | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S
+    url: str, env: Mapping[str, str] | None = None, *, timeout: int = _DEFAULT_REFRESH_TIMEOUT_S,
+    progress: ProgressCallback | None = None,
 ) -> tuple[bool, str]:
     """Fetch + hard-reset the clone to the remote's HEAD.
 
@@ -197,8 +227,8 @@ def refresh_shared_clone(
     with clone_lock(url, env):
         repo = shared_repo_path(url, env)
         if not (repo / GIT_DIR_NAME).exists():
-            return _refresh_missing_clone(url, env)
-        return _fetch_and_reset_clone(url, repo, timeout, env)
+            return _refresh_missing_clone(url, env, progress)
+        return _fetch_and_reset_clone(url, repo, timeout, env, progress)
 
 
 def last_synced_at(url: str, env: Mapping[str, str] | None = None) -> float | None:

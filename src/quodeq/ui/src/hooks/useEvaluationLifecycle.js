@@ -77,7 +77,7 @@ function makeEvalDismissHandler({ job, startedProject, selectedProject, selectPr
 export function useEvaluationLifecycle({ navigation, projects, selectedProject = null, storage: _storage }) {
   const storage = _storage || localStorage;
   const { navTab, navReset } = navigation;
-  const { loadProjects, setProjects, selectProjectAndRun } = projects;
+  const { selectProjectAndRun } = projects;
   const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation, startedProject } = useEvaluation();
   const queryClient = useQueryClient();
   // Set when a start request is refused because another evaluation is
@@ -92,7 +92,7 @@ export function useEvaluationLifecycle({ navigation, projects, selectedProject =
     writeAnalysisPower(storage, level);
   }
 
-  useJobCompletionEffect({ job, navTab, loadProjects, setProjects, queryClient, selectedProject, selectProjectAndRun });
+  useJobCompletionEffect({ job, navTab, queryClient, selectedProject, selectProjectAndRun });
 
   const handleStartEvaluation = makeStartEvaluationHandler({ job, setBlockedStartError, storage, analysisPower, startEvaluation });
   const handleEvalDismiss = makeEvalDismissHandler({ job, startedProject, selectedProject, selectProjectAndRun, navReset, setBlockedStartError, clearJob });

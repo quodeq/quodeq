@@ -77,7 +77,7 @@ function computeDerivedState(accumulated, dashboard, selectedProject, projects) 
  * that keeps both selections and the cache consistent.
  */
 export function useSelectedRunDashboard({ activePage, projectBundle, historySelectedRun, setHistorySelectedRun }) {
-  const { selectedProject, selectedSource, selectedRun, setSelectedRun, loadProjects } = projectBundle;
+  const { selectedProject, selectedSource, selectedRun, setSelectedRun } = projectBundle;
   const isHistoryRun = activePage.page === NAV_TAB.HISTORY_RUN, isHistoryTab = activePage.page === NAV_TAB.HISTORY;
   // History views (the History tab and its run-detail page) show specific
   // past runs in a comparison-oriented mental model — flashing the previous
@@ -93,7 +93,7 @@ export function useSelectedRunDashboard({ activePage, projectBundle, historySele
     keepPlaceholder: !isHistoryRun && !isHistoryTab,
   });
   const { dropRunFromCache, scheduleDashboardReconcile } = dashboardState;
-  const handleRunDeleted = useHandleRunDeleted({ dropRunFromCache, setSelectedRun, historySelectedRun, setHistorySelectedRun, scheduleDashboardReconcile, loadProjects });
+  const handleRunDeleted = useHandleRunDeleted({ dropRunFromCache, setSelectedRun, historySelectedRun, setHistorySelectedRun, scheduleDashboardReconcile });
   return { ...dashboardState, handleRunDeleted };
 }
 

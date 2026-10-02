@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { evaluationKeys, projectKeys, systemKeys, standardsKeys, settingsKeys } from "./queryKeys";
+import { evaluationKeys, projectKeys, systemKeys, standardsKeys, settingsKeys, projectsKeys } from "./queryKeys";
 
 describe("query key factories", () => {
   it("evaluationKeys.evaluation returns the run-scope prefix", () => {
@@ -66,6 +66,10 @@ describe("query key factories", () => {
 
   it("systemKeys.ollama is the global ollama key", () => {
     expect(systemKeys.ollama()).toEqual(["system", "ollama"]);
+  });
+
+  it("projectsKeys.list points to the projects list", () => {
+    expect(projectsKeys.list()).toEqual(["projects", "list"]);
   });
 
   it("standardsKeys.list points to the standards list", () => {

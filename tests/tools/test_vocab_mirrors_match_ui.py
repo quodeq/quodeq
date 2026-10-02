@@ -27,6 +27,7 @@ from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.project_source import ProjectSource
 from quodeq.core.types.provider import Provider, ProviderType
 from quodeq.core.types.severity import Severity
+from quodeq.core.types.sync_phase import SyncKind, SyncPhase
 from quodeq.llm_bridge import LOCAL_PROVIDERS
 from quodeq.services.shared_publish import PublishState
 from quodeq.services.grade_formula_job import RescoreState
@@ -50,6 +51,8 @@ _MIRRORS = [
     ("vocab/scopeGateRule.js", "SCOPE_GATE_RULE", ScopeGateRule),
     ("vocab/rescoreState.js", "RESCORE_STATE", RescoreState),
     ("vocab/providerType.js", "PROVIDER_TYPE", ProviderType),
+    ("vocab/syncPhase.js", "SYNC_PHASE", SyncPhase),
+    ("vocab/syncPhase.js", "SYNC_KIND", SyncKind),
     ("features/dashboard/dashboardVocab.js", "PUBLISH_STATE", PublishState),
 ]
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { registerProject, getProjectInfo } from '../../../api/index.js';
 import { useWizardState } from '../hooks/useWizardState.js';
 import { useOnboardingEffects } from '../hooks/useOnboardingEffects.js';
@@ -17,12 +17,16 @@ function visibleSteps(providerConfigured) {
   return seen;
 }
 
-export default function OnboardingWizard({ entry, onClose, onLaunch }) {
+export default function OnboardingWizard({ entry, onClose, onLaunch, onStepChange }) {
   const initialStep = entry.startStep || STEP_WELCOME;
   const wizard = useWizardState({ initial: { step: initialStep, isFirstProject: entry.isFirstProject ?? true } });
   const [standards, setStandards] = useState([]);
 
   useOnboardingEffects({ wizard, entry, setStandards });
+  // Reports the live step to the lifecycle, which only lets shared content
+  // close a wizard that is still on its welcome step. Keyed on the step
+  // alone: the callback's identity changes every render and need not re-fire.
+  useEffect(() => { onStepChange?.(wizard.state.step); }, [wizard.state.step]);
 
   const providerConfigured = Boolean(wizard.state.provider.id && wizard.state.provider.model);
   const visible = useMemo(() => visibleSteps(providerConfigured), [providerConfigured]);

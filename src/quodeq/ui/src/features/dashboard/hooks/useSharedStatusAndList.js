@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { sharedStatusQueryOptions, sharedListQueryOptions } from './sharedQueryOptions.js';
+import { sharedKeys } from '../../../api/queryKeys.js';
+import { sharedListQueryOptions } from './sharedQueryOptions.js';
 
 /**
  * Observe the shared-repo status and, once it reports a configured repo, the
- * shared project list.
+ * shared project list. Passive: this never polls (hooks/useSyncStatus.js owns
+ * the poll on the same cache key), so signal-only observers stay cheap.
  * @param {Object} params
  * @param {() => Promise<Object>} params.getSharedStatus
  * @param {(opts: {refresh: boolean}) => Promise<Object>} params.sharedListProjects
@@ -12,8 +14,15 @@ import { sharedStatusQueryOptions, sharedListQueryOptions } from './sharedQueryO
  * @returns {{statusQuery: Object, configured: boolean, listQuery: Object}}
  */
 export function useSharedStatusAndList({ getSharedStatus, sharedListProjects, enabled, observerOptions }) {
-  const statusQuery = useQuery(sharedStatusQueryOptions({ getSharedStatus, enabled, observerOptions }));
+  const statusQuery = useQuery({
+    queryKey: sharedKeys.status(),
+    queryFn: getSharedStatus,
+    ...(enabled === undefined ? {} : { enabled }),
+    ...observerOptions,
+  });
   const configured = !!statusQuery.data?.configured;
-  const listQuery = useQuery(sharedListQueryOptions({ sharedListProjects, configured, enabled, observerOptions }));
+  const listQuery = useQuery(sharedListQueryOptions({
+    sharedListProjects, configured, status: statusQuery.data, enabled, observerOptions,
+  }));
   return { statusQuery, configured, listQuery };
 }

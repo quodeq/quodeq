@@ -53,7 +53,7 @@ from ._project_import_validation import (
 
 _ACTION_REPLACE = "replace"
 _ACTION_COPY = "copy"
-_ALLOWED_ACTIONS = frozenset({_ACTION_REPLACE, _ACTION_COPY})
+IMPORT_ACTIONS = frozenset({_ACTION_REPLACE, _ACTION_COPY})
 IO_ERROR_CODE = "IO_ERROR"
 IO_ERROR_MESSAGE = "Failed to write imported project. Check disk space and permissions."
 
@@ -274,9 +274,9 @@ def import_zip_stream(
     :class:`ImportOutcome`. *action* is ``"replace"``/``"copy"`` to resolve a
     409 collision; *remote_addr* is only for the audit log.
     """
-    if action is not None and action not in _ALLOWED_ACTIONS:
+    if action is not None and action not in IMPORT_ACTIONS:
         return error_outcome(
-            f"Invalid action; expected one of {sorted(_ALLOWED_ACTIONS)}.",
+            f"Invalid action; expected one of {sorted(IMPORT_ACTIONS)}.",
             HTTPStatus.BAD_REQUEST, CODE_INVALID_ACTION,
         )
     size_limit = max_zip_size_bytes()

@@ -4,6 +4,7 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 vi.mock('../api/index.js', () => ({ listProjects: vi.fn() }));
 import { listProjects } from '../api/index.js';
 import { useProjectState } from './useProjectState.js';
+import { withQueryClient } from '../test-utils/withQueryClient.jsx';
 
 const noStorage = { getItem: () => '', setItem: () => {} };
 
@@ -14,7 +15,7 @@ describe('useProjectState — resilience to a transient projects-fetch failure',
     listProjects.mockRejectedValue(new DOMException('aborted', 'AbortError'));
     const onNoProjects = vi.fn();
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects, storage: noStorage, retryDelayMs: 0, maxRetries: 2 }));
+      useProjectState({ onNoProjects, storage: noStorage, retryDelayMs: 0, maxRetries: 2 }), { wrapper: withQueryClient() });
 
     // initial attempt + 2 retries = 3 calls
     await waitFor(() => expect(listProjects).toHaveBeenCalledTimes(3));
@@ -30,7 +31,7 @@ describe('useProjectState — resilience to a transient projects-fetch failure',
       .mockResolvedValueOnce([{ id: 'p1', name: 'proj1' }]);
     const onNoProjects = vi.fn();
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects, storage: noStorage, retryDelayMs: 0, maxRetries: 3 }));
+      useProjectState({ onNoProjects, storage: noStorage, retryDelayMs: 0, maxRetries: 3 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.projects).toHaveLength(1));
     expect(result.current.selectedProject).toBe('p1');
@@ -41,7 +42,7 @@ describe('useProjectState — resilience to a transient projects-fetch failure',
     listProjects.mockResolvedValue([]);
     const onNoProjects = vi.fn();
     renderHook(() =>
-      useProjectState({ onNoProjects, storage: noStorage, retryDelayMs: 0 }));
+      useProjectState({ onNoProjects, storage: noStorage, retryDelayMs: 0 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(onNoProjects).toHaveBeenCalledTimes(1));
   });
@@ -49,7 +50,7 @@ describe('useProjectState — resilience to a transient projects-fetch failure',
   it('selects the first project on a successful non-empty load', async () => {
     listProjects.mockResolvedValue([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }]);
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0 }));
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.selectedProject).toBe('a'));
   });
@@ -59,7 +60,7 @@ describe('useProjectState — recoverable failure state (v1.9.0 infinite spinner
   it('exposes projectsLoadFailed=true after retries exhaust', async () => {
     listProjects.mockRejectedValue(new DOMException('aborted', 'AbortError'));
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 1 }));
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 1 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.projectsLoadFailed).toBe(true));
     expect(result.current.projectsLoaded).toBe(false);
@@ -68,14 +69,14 @@ describe('useProjectState — recoverable failure state (v1.9.0 infinite spinner
   it('retryLoadProjects clears the failure, reloads, and resolves the initial selection', async () => {
     listProjects.mockRejectedValue(new DOMException('aborted', 'AbortError'));
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0 }));
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.projectsLoadFailed).toBe(true));
 
     listProjects.mockResolvedValue([{ id: 'p1', name: 'proj1' }]);
     await act(async () => { await result.current.retryLoadProjects(); });
 
-    expect(result.current.projectsLoaded).toBe(true);
+    await waitFor(() => expect(result.current.projectsLoaded).toBe(true));
     expect(result.current.projectsLoadFailed).toBe(false);
     expect(result.current.selectedProject).toBe('p1');
   });
@@ -85,7 +86,7 @@ describe('useProjectState — recoverable failure state (v1.9.0 infinite spinner
     try {
       listProjects.mockRejectedValue(new Error('down'));
       const { result } = renderHook(() =>
-        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0, autoRetryMs: 1000 }));
+        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0, autoRetryMs: 1000 }), { wrapper: withQueryClient() });
 
       await act(async () => { await vi.advanceTimersByTimeAsync(0); });
       expect(result.current.projectsLoadFailed).toBe(true);
@@ -106,13 +107,14 @@ describe('useProjectState — recoverable failure state (v1.9.0 infinite spinner
     try {
       listProjects.mockRejectedValue(new Error('down'));
       const { result } = renderHook(() =>
-        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0, autoRetryMs: 1000 }));
+        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0, autoRetryMs: 1000 }), { wrapper: withQueryClient() });
 
       await act(async () => { await vi.advanceTimersByTimeAsync(0); });
       expect(result.current.projectsLoadFailed).toBe(true);
 
       listProjects.mockResolvedValue({ projects: [{ id: 'p1', name: 'proj1' }] });
-      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); }); // flush the batched observer notify
 
       expect(result.current.projectsLoaded).toBe(true);
       expect(result.current.projectsLoadFailed).toBe(false);
@@ -125,7 +127,7 @@ describe('useProjectState — recoverable failure state (v1.9.0 infinite spinner
   it('a failed retry raises the failure flag again', async () => {
     listProjects.mockRejectedValue(new DOMException('aborted', 'AbortError'));
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0 }));
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.projectsLoadFailed).toBe(true));
 

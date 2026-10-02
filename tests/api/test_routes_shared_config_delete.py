@@ -18,7 +18,7 @@ from quodeq.data.fs.shared_repo import (
     shared_cache_dir,
     shared_repo_path,
 )
-from quodeq.services import shared_connect_job
+from quodeq.services import shared_connect_job, shared_refresh_job
 from quodeq.services.shared_connect_job import ConnectJobStatus
 from tests._timeouts import budget
 from tests.api._routes_shared_fixtures import (  # noqa: F401 -- client/_clean_publish_status are pytest fixtures
@@ -84,6 +84,20 @@ def test_delete_config_refused_while_connecting(client, monkeypatch, tmp_path):
     resp = client.delete(_CONFIRMED, headers=_ORIGIN)
     assert resp.status_code == 409
     assert resp.get_json()["code"] == "CONNECT_IN_PROGRESS"
+    assert client.get("/api/shared/status").get_json()["configured"] is True
+
+
+def test_delete_config_refused_while_refreshing(client, monkeypatch, tmp_path):
+    """A running refresh is rewriting the clone DELETE would remove, so
+    DELETE answers 409 and changes nothing."""
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    status = shared_refresh_job.RefreshStatus()
+    status.claim("git@github.com:t/r.git")
+    monkeypatch.setattr(shared_refresh_job, "_default_status", status)
+    (tmp_path / "shared.json").write_text(json.dumps({"url": "git@github.com:t/r.git"}))
+    resp = client.delete(_CONFIRMED, headers=_ORIGIN)
+    assert resp.status_code == 409
+    assert resp.get_json()["code"] == "REFRESH_IN_PROGRESS"
     assert client.get("/api/shared/status").get_json()["configured"] is True
 
 

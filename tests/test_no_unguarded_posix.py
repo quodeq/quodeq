@@ -49,6 +49,11 @@ _ALLOWLIST: set[str] = {
     "menubar/_process.py:98",
     "menubar/_app_lifecycle.py:156",
     "menubar/_app_lifecycle.py:168",
+    # _terminate's POSIX branch: `if _IS_WINDOWS` returns after proc.kill()
+    # before this line, and the call is wrapped in `except OSError`. Kills the
+    # streaming git process group (git plus any ssh/credential helper that
+    # holds stderr) at the deadline.
+    "data/fs/git_stream.py:62",
 }
 
 

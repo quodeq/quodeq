@@ -18,6 +18,12 @@ import { fleetQuery, sharedProjectPath } from './paths.js';
 
 // ── Project List & Info ─────────────────────────────────────────────────────
 
+// The first listing of a freshly cloned repository computes every project
+// card inline on the server and can take longer than the default 30s abort.
+// The connect and refresh jobs warm it before reporting done, so this wider
+// window is the safety net for a listing that still lands cold.
+const SHARED_LIST_TIMEOUT_MS = 120000;
+
 /**
  * List projects from the shared repository.
  * Unlike listProjects's envelope, this envelope carries sync metadata
@@ -30,7 +36,7 @@ import { fleetQuery, sharedProjectPath } from './paths.js';
  */
 export async function sharedListProjects({ refresh = false } = {}) {
   const refreshParam = refresh ? '1' : '0';
-  const data = await request(`/shared/projects?refresh=${refreshParam}`);
+  const data = await request(`/shared/projects?refresh=${refreshParam}`, { timeout: SHARED_LIST_TIMEOUT_MS });
   const list = data?.projects ?? data ?? [];
   const projects = Array.isArray(list) ? list.map(createProject) : [];
 

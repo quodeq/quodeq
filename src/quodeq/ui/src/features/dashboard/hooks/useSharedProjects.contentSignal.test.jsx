@@ -5,7 +5,7 @@ import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 
 function makeFakeApi(overrides = {}) {
-  return {
+  const api = {
     getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
     sharedListProjects: vi.fn(async () => ({
       projects: [{ id: 'p1', name: 'demo' }],
@@ -13,10 +13,12 @@ function makeFakeApi(overrides = {}) {
       stale: false,
     })),
     connectShared: vi.fn(async (url) => ({ configured: true, url })),
-    refreshShared: vi.fn(async () => ({ stale: false, lastSynced: '2026-07-17T00:00:00Z' })),
-    pullSharedProject: vi.fn(async (id) => ({ imported: true, projectId: id })),
+    startRefresh: vi.fn(async () => ({ started: true })),
+    startPull: vi.fn(async (id) => ({ started: true, project: id })),
     ...overrides,
   };
+  // The status poll reads getSyncStatus; these tests drive it through getSharedStatus.
+  return { getSyncStatus: (...a) => api.getSharedStatus(...a), ...api };
 }
 
 // A promise the test controls the settlement of, so we can assert on
@@ -109,6 +111,6 @@ describe('useSharedContentSignal', () => {
       wrapper: ({ children }) => wrap(fakeApi, children),
     });
     await waitFor(() => expect(result.current.settled).toBe(true));
-    expect(fakeApi.refreshShared).not.toHaveBeenCalled();
+    expect(fakeApi.startRefresh).not.toHaveBeenCalled();
   });
 });

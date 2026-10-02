@@ -25,6 +25,7 @@ from quodeq.core.scoring.constants import Grade
 from quodeq.core.types.finding_type import FindingType
 from quodeq.core.types.provider import Provider
 from quodeq.core.types.severity import Severity
+from quodeq.core.types.sync_phase import SyncPhase
 from quodeq.analysis.mcp.schemas import FileDoneStatus
 
 # Every VOCABULARIES entry's enum, by name. RunState is checked separately
@@ -38,6 +39,7 @@ _ENUMS_BY_EQUALITY = {
     "DimState": DimState,
     "Provider": Provider,
     "FindingType": FindingType,
+    "SyncPhase": SyncPhase,
 }
 
 

@@ -1,12 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
+import { isSlotActive } from '../../../api/syncStatus.js';
+import { useSyncStatus } from '../../../hooks/useSyncStatus.js';
+import { connectSlotError } from '../../../hooks/connectSlotError.js';
 import { t } from '../../../strings/index.js';
-import { apiErrorMessage, isAccessCode } from '../../../strings/apiErrors.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { SettingsRowLabel } from './settingsRowParts.jsx';
 import AccessPanel from '../../github-access/components/AccessPanel.jsx';
+import { accessFailureFrom } from '../../github-access/accessFailure.js';
 import { runExclusive } from '../settingsHelpers.js';
 
 // Groups the section's own useState/useRef declarations so the outer
@@ -47,8 +51,9 @@ function buildConnectMutationConfig({ connectShared, setError, setAccessFailure,
       await refetchStatus();
       return result;
     }, (err) => {
-      if (isAccessCode(err?.code)) {
-        setAccessFailure({ kind: err.body?.kind, detail: err.body?.detail || '', host: err.body?.host || '', isGitHub: Boolean(err.body?.isGitHub), cloneUrl: err.body?.cloneUrl || '' });
+      const failure = accessFailureFrom(err);
+      if (failure) {
+        setAccessFailure(failure);
         return;
       }
       setError(apiErrorMessage(err, 'settings.connectFailed'));
@@ -56,9 +61,9 @@ function buildConnectMutationConfig({ connectShared, setError, setAccessFailure,
     onSuccess: () => {
       // Everything "shared"-prefixed, not just status: ProjectsPage's
       // useSharedProjects and usePublish read the SAME cache entries (audit
-      // C6), so a connect made here must reach them too, not just this
-      // section's own settings-detail status query (refetchStatus below
-      // already covers that one specifically, for the inline UI).
+      // C6), so a connect made here must reach them too, not just the
+      // status this section reads (refetchStatus in the mutation already
+      // covers that one specifically, for the inline UI).
       queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
     },
   };
@@ -94,18 +99,14 @@ function buildDisconnectMutationConfig({ disconnectShared, setError, setNewUrl, 
   };
 }
 
-function buildStatusQueryConfig(getSharedStatus) {
-  return {
-    queryKey: [...sharedKeys.status(), 'settings-detail'],
-    queryFn: () => getSharedStatus().catch((err) => {
-      // A server 500 and "genuinely not configured" must not collapse
-      // into the same silent {configured: false} with no trace: log the
-      // real failure so a backend outage is debuggable, even though the
-      // UI still shows the not-configured empty state either way.
-      console.error('Failed to fetch shared repo status:', err);
-      return { configured: false, url: null };
-    }),
-  };
+// A server 500 and "genuinely not configured" must not collapse into the same
+// silent not-configured state with no trace: log the real failure so a backend
+// outage is debuggable, even though the UI still shows the not-configured
+// empty state either way.
+function useLogStatusFailure(error) {
+  useEffect(() => {
+    if (error) console.error('Failed to fetch shared repo status:', error);
+  }, [error]);
 }
 
 function ErrorRow({ error }) {
@@ -160,8 +161,11 @@ function UrlInputRow({ newUrl, setNewUrl, isSaving, isDisconnecting, handleSave 
   );
 }
 
-function DisconnectRow({ configured, confirming, setConfirming, isSaving, isDisconnecting, handleDisconnect }) {
+// Disconnect deletes the clone, so it waits while a refresh rewrites it (the
+// server answers 409 REFRESH_IN_PROGRESS then).
+function DisconnectRow({ configured, confirming, setConfirming, isSaving, isRefreshing, isDisconnecting, handleDisconnect }) {
   if (!configured) return null;
+  const blocked = isSaving || isRefreshing || isDisconnecting;
   if (!confirming) {
     return (
       <div className="settings-row settings-row--last">
@@ -169,8 +173,8 @@ function DisconnectRow({ configured, confirming, setConfirming, isSaving, isDisc
           type="button"
           className="settings-pill settings-pill--accent"
           onClick={() => setConfirming(true)}
-          disabled={isSaving || isDisconnecting}
-          aria-disabled={isSaving || isDisconnecting || undefined}
+          disabled={blocked}
+          aria-disabled={blocked || undefined}
         >
           {t('settings.disconnect')}
         </button>
@@ -184,8 +188,8 @@ function DisconnectRow({ configured, confirming, setConfirming, isSaving, isDisc
         type="button"
         className="settings-pill settings-pill--confirm"
         onClick={handleDisconnect}
-        disabled={isDisconnecting}
-        aria-disabled={isDisconnecting || undefined}
+        disabled={blocked}
+        aria-disabled={blocked || undefined}
       >
         {isDisconnecting ? t('settings.disconnecting') : t('settings.yes')}
       </button>
@@ -203,15 +207,14 @@ function DisconnectRow({ configured, confirming, setConfirming, isSaving, isDisc
 }
 
 export default function SharedRepoSection({ onDisconnected }) {
-  const { getSharedStatus, connectShared, disconnectShared } = useApi();
+  const { connectShared, disconnectShared } = useApi();
   const queryClient = useQueryClient();
 
   const { newUrl, setNewUrl, confirming, setConfirming, error, setError, accessFailure, setAccessFailure, savingRef, disconnectingRef, initializedRef } = useSharedRepoFields();
 
-  const { data: status, isLoading, refetch: refetchStatus } = useQuery(buildStatusQueryConfig(getSharedStatus));
-
-  const configured = status?.configured ?? false;
-  const currentUrl = status?.url ?? null;
+  const sync = useSyncStatus();
+  const { status, isLoading, refetch: refetchStatus, configured, url: currentUrl } = sync;
+  useLogStatusFailure(sync.error);
 
   useInitNewUrl({ currentUrl, setNewUrl, initializedRef });
 
@@ -230,7 +233,7 @@ export default function SharedRepoSection({ onDisconnected }) {
 
   const handleDisconnect = () => disconnectMutation.mutate();
 
-  const isSaving = connectMutation.isPending;
+  const isSaving = connectMutation.isPending || isSlotActive(sync.connect);
   const isDisconnecting = disconnectMutation.isPending;
 
   return (
@@ -248,12 +251,13 @@ export default function SharedRepoSection({ onDisconnected }) {
           <AccessPanel failure={accessFailure} url={newUrl.trim()} onResolved={handleSave} onRetry={handleSave} />
         </div>
       ) : (
-        <ErrorRow error={error} />
+        <ErrorRow error={error ?? connectSlotError(sync.connect, 'settings.connectFailed')} />
       )}
 
       <DisconnectRow
         configured={configured} confirming={confirming} setConfirming={setConfirming}
-        isSaving={isSaving} isDisconnecting={isDisconnecting} handleDisconnect={handleDisconnect}
+        isSaving={isSaving} isRefreshing={isSlotActive(sync.refresh)}
+        isDisconnecting={isDisconnecting} handleDisconnect={handleDisconnect}
       />
     </section>
   );

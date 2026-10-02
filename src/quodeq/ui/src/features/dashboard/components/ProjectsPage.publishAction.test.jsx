@@ -12,15 +12,17 @@ import { SidePaneProvider } from '../../side-pane/index.js';
 // (cached-first, see that hook's own tests), so every render touches the API
 // -- an ApiProvider is required from here on regardless of project count.
 function makeFakeApi(overrides = {}) {
-  return {
+  const api = {
     getSharedStatus: vi.fn(async () => ({ configured: true, url: null, publish: { state: 'idle' } })),
     sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
     connectShared: vi.fn(async (url) => ({ configured: true, url })),
-    refreshShared: vi.fn(async () => ({ stale: false, lastSynced: '2026-07-17T00:00:00Z' })),
-    pullSharedProject: vi.fn(async (id) => ({ imported: true, projectId: id })),
+    startRefresh: vi.fn(async () => ({ started: true })),
+    startPull: vi.fn(async (id) => ({ started: true, project: id })),
     publishProject: vi.fn(async () => ({ started: true })),
     ...overrides,
   };
+  // The status poll reads getSyncStatus; these tests drive it through getSharedStatus.
+  return { getSyncStatus: (...a) => api.getSharedStatus(...a), ...api };
 }
 
 function renderWithApi(ui, fakeApi) {

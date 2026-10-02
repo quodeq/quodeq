@@ -8,6 +8,11 @@ from __future__ import annotations
 
 import json
 
+from quodeq.services import shared_connect_job, shared_pull_job, shared_refresh_job
+from quodeq.services.shared_connect_job import ConnectJobStatus
+from quodeq.services.shared_pull_job import PullStatus
+from quodeq.services.shared_refresh_job import RefreshStatus
+from quodeq.core.types.sync_phase import SyncPhase
 from tests.api._routes_shared_fixtures import (  # noqa: F401 -- client/_clean_publish_status are pytest fixtures
     _clean_publish_status,
     client,
@@ -61,3 +66,25 @@ def test_shared_status_shape_is_camel_case_with_top_level_error(client):
     publish = body["publish"]
     assert "finishedAt" in publish
     assert "finished_at" not in publish
+
+
+def test_status_carries_sync_blocks(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("QUODEQ_DIR", str(tmp_path))
+    (tmp_path / "shared.json").write_text(json.dumps({"url": "https://example.invalid/t/r.git"}))
+    cs = ConnectJobStatus()
+    cs.claim("https://example.invalid/t/r.git")
+    cs.set(phase=SyncPhase.DOWNLOADING, percent=45, bytes=12000)
+    monkeypatch.setattr(shared_connect_job, "_default_status", cs)
+    monkeypatch.setattr(shared_refresh_job, "_default_status", RefreshStatus())
+    ps = PullStatus()
+    ps.claim("abc")
+    monkeypatch.setattr(shared_pull_job, "_default_status", ps)
+    body = client.get("/api/shared/status").get_json()
+    assert body["syncing"] is True
+    assert body["connect"]["kind"] == "connect" and body["connect"]["phase"] == "downloading"
+    assert body["connect"]["percent"] == 45 and body["connect"]["bytes"] == 12000
+    assert body["connect"]["projectsFound"] is None
+    assert body["refresh"]["state"] == "idle" and body["refresh"]["phase"] is None
+    assert body["pull"]["project"] == "abc" and body["pull"]["phase"] == "downloading"
+    assert "finishedAt" in body["pull"]
+    assert "finished_at" not in body["connect"] and "projects_found" not in body["connect"]
