@@ -81,3 +81,15 @@ def test_unexpected_exception_from_pull_is_pull_unexpected(status):
 def test_start_pull_spawn_failure_is_failed_not_running(status):
     assert start_pull("abc", pull=_raise, status=status, spawn=_raise, log=_RecordingLog()) is PullStartResult.FAILED
     assert get_pull_status(status)["state"] == PullState.ERROR
+
+
+def test_conflict_detail_defaults_to_none_and_passes_through(status):
+    assert PullOutcome(True).conflict_kind is None and PullOutcome(True).source_project_id is None
+    assert get_pull_status(status)["conflict_kind"] is None
+    status.claim("abc")
+    run_pull_job(
+        "abc", status=status,
+        pull=lambda p: PullOutcome(False, code="PROJECT_EXISTS", conflict_kind="same_uuid", source_project_id="abc"),
+    )
+    snap = get_pull_status(status)
+    assert (snap["conflict_kind"], snap["source_project_id"]) == ("same_uuid", "abc")

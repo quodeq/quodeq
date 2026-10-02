@@ -60,6 +60,9 @@ def sync_block(snapshot: dict) -> dict:
     if "project_id" in out:
         out["projectId"] = out.pop("project_id")
         out["projectName"] = out.pop("project_name", None)
+    if "source_project_id" in out:
+        out["sourceProjectId"] = out.pop("source_project_id")
+        out["conflictKind"] = out.pop("conflict_kind", None)
     return out
 
 

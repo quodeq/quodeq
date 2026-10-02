@@ -39,6 +39,9 @@ class PullOutcome:
     renamed: bool = False
     code: str | None = None
     error: str | None = None
+    # Collision detail for PROJECT_EXISTS (the slot's own ``kind`` is the sync kind).
+    conflict_kind: str | None = None
+    source_project_id: str | None = None
 
 
 class PullState(StrEnum):
@@ -57,7 +60,7 @@ class PullStatus(JobSlotStatus):
         super().__init__(
             {
                 "state": PullState.IDLE, "project": None, "project_id": None, "project_name": None,
-                "renamed": None, "error": None, "code": None, "finished_at": None, **SYNC_IDLE_FIELDS,
+                "renamed": None, "conflict_kind": None, "source_project_id": None, "error": None, "code": None, "finished_at": None, **SYNC_IDLE_FIELDS,
             },
             PullState.RUNNING,
         )
@@ -95,6 +98,7 @@ def _do_pull(
     status.set(phase=SyncPhase.DOWNLOADING, percent=None)
     outcome = pull(project)
     if not outcome.ok:
+        status.set(conflict_kind=outcome.conflict_kind, source_project_id=outcome.source_project_id)
         _fail(status, outcome.error or MESSAGE_PULL_DEFAULT, outcome.code or CODE_PULL_FAILED)
         return
     status.set(

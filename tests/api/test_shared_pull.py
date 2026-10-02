@@ -180,6 +180,16 @@ def test_pull_collision_lands_in_slot(client, uuid_named_shared_clone_fixture, l
     assert slot["code"] == "PROJECT_EXISTS"
 
 
+def test_pull_collision_slot_carries_kind_and_source_id_on_the_wire(
+    client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision, pull_slot,
+):
+    _, project_uuid = uuid_named_shared_clone_fixture
+    _pull(client, project_uuid)
+    pull = client.get("/api/shared/status").get_json()["pull"]
+    assert pull["conflictKind"] == "same_uuid"
+    assert pull["sourceProjectId"] == project_uuid
+
+
 def test_pull_collision_replace_overwrites(
     client, uuid_named_shared_clone_fixture, local_eval_dir_with_collision, pull_slot,
 ):
@@ -211,11 +221,14 @@ def test_pull_collision_copy_creates_new_uuid(
     assert (local_eval_dir_with_collision / slot["project_id"]).exists()
 
 
-def test_pull_unknown_action_lands_in_slot(client, uuid_named_shared_clone_fixture, local_eval_dir, pull_slot):
+def test_pull_unknown_action_returns_400_without_starting_a_job(
+    client, uuid_named_shared_clone_fixture, local_eval_dir, pull_slot,
+):
     _, project_uuid = uuid_named_shared_clone_fixture
     resp = _pull(client, project_uuid, action="nuke")
-    assert resp.status_code == 202
-    assert pull_slot.copy()["code"] == "INVALID_ACTION"
+    assert resp.status_code == 400
+    assert resp.get_json()["code"] == "INVALID_ACTION"
+    assert pull_slot.copy()["state"] == shared_pull_job.PullState.IDLE
 
 
 def test_pull_non_string_action_returns_400(client, uuid_named_shared_clone_fixture, local_eval_dir):

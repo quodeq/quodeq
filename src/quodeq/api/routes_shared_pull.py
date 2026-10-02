@@ -21,7 +21,8 @@ from quodeq.api.helpers import json_error, optional_json_object_or_response, val
 from quodeq.api.import_project import IMPORT_LOG
 from quodeq.api.zip import build_project_zip
 from quodeq.services.base import ActionProvider
-from quodeq.services.project_import import import_zip_stream
+from quodeq.services.project_import import IMPORT_ACTIONS, import_zip_stream
+from quodeq.services.shared_repo import clone_lock
 from quodeq.services.shared_pull_job import (
     CODE_PULL_FAILED,
     PullOutcome,
@@ -50,17 +51,22 @@ def _build_pull_zip(project: str, project_path: Path) -> tuple[Path, None] | tup
         )
 
 
-def _outcome_from_import(status: int, body: dict) -> PullOutcome:
+def _outcome_from_import(status: int, body: dict, project: str) -> PullOutcome:
     if status == HTTPStatus.OK:
         return PullOutcome(True, body.get("projectId"), body.get("projectName"), bool(body.get("renamed")))
-    return PullOutcome(False, code=body.get("code") or CODE_PULL_FAILED, error=body.get("error"))
+    return PullOutcome(
+        False, code=body.get("code") or CODE_PULL_FAILED, error=body.get("error"),
+        conflict_kind=body.get("kind"), source_project_id=body.get("sourceProjectId") or project,
+    )
 
 
-def _import_pulled_zip(project: str, zip_path: Path, action: str | None, remote_addr: str | None) -> PullOutcome:
+def _import_pulled_zip(
+    project: str, zip_path: Path, action: str | None, remote_addr: str | None, reports: str,
+) -> PullOutcome:
     try:
         with zip_path.open("rb") as stream:
-            outcome = import_zip_stream(stream, reports_dir(), action, remote_addr=remote_addr, log=IMPORT_LOG)
-        return _outcome_from_import(outcome.status, outcome.body)
+            outcome = import_zip_stream(stream, reports, action, remote_addr=remote_addr, log=IMPORT_LOG)
+        return _outcome_from_import(outcome.status, outcome.body, project)
     except OSError:
         logger.exception("Failed to read zip for shared pull of %s", project)
         return PullOutcome(
@@ -73,15 +79,18 @@ def _import_pulled_zip(project: str, zip_path: Path, action: str | None, remote_
             logger.warning("Failed to remove temp zip %s: %s", zip_path, exc)
 
 
-def _pull_outcome(project: str, project_path: Path, action: str | None, remote_addr: str | None) -> PullOutcome:
-    """The job body: zip the shared project and import it locally."""
-    zip_path, failure = _build_pull_zip(project, project_path)
+def _pull_outcome(
+    project: str, project_path: Path, url: str, action: str | None, remote_addr: str | None, reports: str,
+) -> PullOutcome:
+    """The job body: zip the shared project (under the clone lock) and import it locally."""
+    with clone_lock(url):  # a refresh may rewrite the clone; only the zip build reads it
+        zip_path, failure = _build_pull_zip(project, project_path)
     if failure is not None:
         return failure
-    return _import_pulled_zip(project, zip_path, action, remote_addr)
+    return _import_pulled_zip(project, zip_path, action, remote_addr, reports)
 
 
-def _shared_pull(provider: ActionProvider, project: str, eval_root: Path) -> Response | tuple[Response, int]:
+def _shared_pull(provider: ActionProvider, project: str, eval_root: Path, url: str) -> Response | tuple[Response, int]:
     err = validate_segment(project)
     if err:
         return err
@@ -97,11 +106,14 @@ def _shared_pull(provider: ActionProvider, project: str, eval_root: Path) -> Res
     action = payload.get("action")
     if action is not None and not isinstance(action, str):
         return json_error("action must be a string", HTTPStatus.BAD_REQUEST, CODE_INVALID_ACTION)
-    # The job thread has no Flask request context, so read the address here.
+    if action is not None and action not in IMPORT_ACTIONS:
+        return json_error("action must be copy or replace", HTTPStatus.BAD_REQUEST, CODE_INVALID_ACTION)
+    # The job thread has no Flask request context or app state, so read them here.
     remote_addr = request.remote_addr
+    reports = reports_dir()
     outcome = start_pull(
         project,
-        pull=lambda p: _pull_outcome(p, project_path, action, remote_addr),
+        pull=lambda p: _pull_outcome(p, project_path, url, action, remote_addr, reports),
         on_done=provider.invalidate_projects_cache,
         log=IMPORT_LOG,
     )
@@ -126,7 +138,7 @@ def register_shared_pull_routes(app: Flask, provider: ActionProvider) -> None:
     collision from a previous attempt, as for the manual import route.
     """
 
-    def shared_pull(project: str, eval_root: Path) -> Response | tuple[Response, int]:
-        return _shared_pull(provider, project, eval_root)
+    def shared_pull(project: str, eval_root: Path, url: str) -> Response | tuple[Response, int]:
+        return _shared_pull(provider, project, eval_root, url)
 
     app.post("/api/shared/projects/<project>/pull")(with_shared_root(shared_pull))
