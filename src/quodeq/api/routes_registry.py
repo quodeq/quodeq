@@ -39,6 +39,7 @@ from quodeq.api.routes_runs import register_runs_routes
 from quodeq.api.routes_grade_explain import register_grade_explain_routes
 from quodeq.api.routes_run_diff import register_run_diff_routes
 from quodeq.api.routes_shared import register_shared_routes
+from quodeq.api.routes_github_access import register_github_access_routes
 from quodeq.api._grade_formula_routes import register_grade_formula_routes
 from quodeq.services.warmup import engine as warmup_engine
 from quodeq.services.base import ActionProvider
@@ -83,6 +84,7 @@ def register_all_routes(
     register_run_diff_routes(app)
     register_grade_explain_routes(app)
     register_shared_routes(app)
+    register_github_access_routes(app)
     register_grade_formula_routes(app)
     register_llm_bridge_routes(app)
     if log_buffer:
