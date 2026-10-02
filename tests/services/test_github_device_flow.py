@@ -1,6 +1,7 @@
 """Device-flow job state machine (inline spawn, fake clock, no network)."""
 from __future__ import annotations
 
+from quodeq.config.ai_provider_errors import PLAINTEXT_KEY_REFUSED_MESSAGE, PlaintextKeyRefusedError
 from quodeq.config.github_account import TokenMethod
 from quodeq.services.github_device_flow import (
     SLOW_DOWN_EXTRA_S, DeviceFlowState, DeviceFlowStatus, FlowDeps, StartResult, get_device_flow_status,
@@ -126,3 +127,20 @@ def test_second_start_while_awaiting_is_already_running():
     deps_noop_spawn = FlowDeps(**{**deps.__dict__, "spawn": lambda fn: None})  # claim, never run
     assert start_device_flow(status=status, deps=deps_noop_spawn) is StartResult.STARTED
     assert start_device_flow(status=status, deps=deps_noop_spawn) is StartResult.ALREADY_RUNNING
+
+
+def test_missing_keychain_finishes_error_with_the_keyring_message_and_code():
+    status = DeviceFlowStatus()
+
+    def refuse(acct):
+        raise PlaintextKeyRefusedError("GITHUB_ACCOUNT_API_KEY")
+
+    deps = FlowDeps(
+        client=_Client([TokenPoll(PollKind.GRANTED, _GRANT)]), client_id="Iv1.x", store=refuse,
+        spawn=lambda fn: fn(), sleep=lambda s: None, now=lambda: 1000.0,
+    )
+    start_device_flow(status=status, deps=deps)
+    snap = get_device_flow_status(status)
+    assert snap["state"] == DeviceFlowState.ERROR
+    assert snap["error"] == PLAINTEXT_KEY_REFUSED_MESSAGE.format(env_var="GITHUB_ACCOUNT_API_KEY")
+    assert snap["code"] == "KEYRING_UNAVAILABLE"

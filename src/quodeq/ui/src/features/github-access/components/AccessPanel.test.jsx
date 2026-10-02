@@ -9,7 +9,7 @@ const URL_ = 'https://github.com/o/r.git';
 function api(overrides = {}) {
   return {
     probeGit: vi.fn(async () => ({ reachable: true, kind: 'ok' })),
-    getGithubAccount: vi.fn(async () => ({ signedIn: false, login: null, method: 'none', ghAvailable: false, ghLoggedIn: false })),
+    getGithubAccount: vi.fn(async () => ({ signedIn: false, login: null, method: 'none', ghAvailable: false, ghLoggedIn: false, signInAvailable: true })),
     startDeviceFlow: vi.fn(), getDeviceFlow: vi.fn(), pasteGithubToken: vi.fn(),
     ...overrides,
   };
@@ -25,7 +25,7 @@ describe('AccessPanel', () => {
   it('auth_required on GitHub shows sign-in, other ways, and the git detail', async () => {
     renderPanel({ kind: 'auth_required', detail: 'fatal: could not read Username', host: 'github.com', isGitHub: true });
     expect(screen.getByText(/can't access this repository yet/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /sign in with github/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /sign in with github/i })).toBeInTheDocument();
     expect(screen.getByText(/other ways to connect/i)).toBeInTheDocument();
     expect(screen.getByText(/could not read Username/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/gh auth login/)).toBeInTheDocument());
@@ -35,13 +35,13 @@ describe('AccessPanel', () => {
     renderPanel({ kind: 'not_found', detail: '', host: 'github.com', isGitHub: true });
     expect(screen.getByText(/no repository at this address/i)).toBeInTheDocument();
     expect(screen.getByText(/private repositories as not found/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /sign in with github/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /sign in with github/i })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/gh auth login/)).toBeInTheDocument());
   });
 
   it('gh card appears only when gh is installed and logged out', async () => {
     renderPanel({ kind: 'auth_required', detail: '', host: 'github.com', isGitHub: true }, {}, {
-      getGithubAccount: vi.fn(async () => ({ signedIn: false, login: null, method: 'none', ghAvailable: true, ghLoggedIn: false })),
+      getGithubAccount: vi.fn(async () => ({ signedIn: false, login: null, method: 'none', ghAvailable: true, ghLoggedIn: false, signInAvailable: true })),
     });
     await waitFor(() => expect(screen.getByText(/gh auth login/)).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /check again/i })).toBeInTheDocument();
@@ -76,6 +76,31 @@ describe('AccessPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /test again/i }));
     await waitFor(() => expect(onResolved).toHaveBeenCalled());
     expect(a.probeGit).toHaveBeenCalledWith(URL_);
+  });
+
+  it('without a client id: no sign-in card, a hint, and the other ways open', async () => {
+    renderPanel({ kind: 'auth_required', detail: '', host: 'github.com', isGitHub: true }, {}, {
+      getGithubAccount: vi.fn(async () => ({ signedIn: false, login: null, method: 'none', ghAvailable: true, ghLoggedIn: false, signInAvailable: false })),
+    });
+    expect(await screen.findByText(/sign-in is not set up in this build/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /sign in with github/i })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/ghp_/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /other ways to connect/i })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('renders no sign-in card while the account is still loading', () => {
+    renderPanel({ kind: 'auth_required', detail: '', host: 'github.com', isGitHub: true }, {}, {
+      getGithubAccount: vi.fn(() => new Promise(() => {})),
+    });
+    expect(screen.queryByRole('button', { name: /sign in with github/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/sign-in is not set up/i)).not.toBeInTheDocument();
+  });
+
+  it('use_https shows the https address as guidance, no sign-in', () => {
+    renderPanel({ kind: 'use_https', detail: '', host: 'github.com', isGitHub: true, cloneUrl: 'https://github.com/o/r.git' });
+    expect(screen.getByText(/sign-in works over https/i)).toBeInTheDocument();
+    expect(screen.getByText('https://github.com/o/r.git')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /sign in with github/i })).not.toBeInTheDocument();
   });
 
   it('pasting a token calls the api and resolves', async () => {

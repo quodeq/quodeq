@@ -8,6 +8,7 @@ from flask import Flask
 from quodeq.api.routes_github_access import RouteDeps, register_github_access_routes
 from quodeq.config.ai_provider_errors import PlaintextKeyRefusedError
 from quodeq.config.github_account import GitHubAccount, TokenMethod
+from quodeq.config.github_app import github_client_id
 from quodeq.services.github_access import AccessMethod, AccessResult
 from quodeq.services.github_device_flow import DeviceFlowState, StartResult
 from quodeq.services.github_gh_cli import GhStatus
@@ -38,6 +39,7 @@ def _app(**overrides):
         start_flow=lambda: StartResult.STARTED,
         flow_status=lambda: dict(state["flow"]),
         client=_Client(),
+        client_id=lambda: "",
     )
     deps = RouteDeps(**{**deps.__dict__, **overrides})
     app = Flask(__name__)
@@ -71,13 +73,13 @@ def test_probe_validation():
 
 def test_account_states():
     client, _ = _app()
-    assert client.get("/api/github/account").get_json() == {"signedIn": False, "login": None, "method": "none", "expiresAt": None, "ghAvailable": False, "ghLoggedIn": False}
+    assert client.get("/api/github/account").get_json() == {"signedIn": False, "login": None, "method": "none", "expiresAt": None, "ghAvailable": False, "ghLoggedIn": False, "signInAvailable": False}
     client, _ = _app(gh=lambda: GhStatus(True, True, "gho_gh"))
     body = client.get("/api/github/account").get_json()
     assert body["method"] == "gh" and body["ghLoggedIn"] is True and body["signedIn"] is False
     client, _ = _app(load_account=lambda: _ACCT, gh=lambda: GhStatus(True, True, "gho_gh"))
     body = client.get("/api/github/account").get_json()
-    assert body == {"signedIn": True, "login": "victor", "method": "quodeq", "expiresAt": 123.0, "ghAvailable": True, "ghLoggedIn": True}
+    assert body == {"signedIn": True, "login": "victor", "method": "quodeq", "expiresAt": 123.0, "ghAvailable": True, "ghLoggedIn": True, "signInAvailable": False}
 
 
 @pytest.mark.parametrize("result,status,code", [
@@ -148,6 +150,21 @@ def test_paste_token_without_keyring_reports_env_var():
     resp = client.post("/api/github/token", json={"token": "t"})
     assert resp.status_code == 500
     assert resp.get_json()["code"] == "KEYRING_UNAVAILABLE" and resp.get_json()["envVar"] == "GITHUB_ACCOUNT_API_KEY"
+
+
+def test_account_reports_whether_sign_in_is_available():
+    client, _ = _app(client_id=lambda: github_client_id({"QUODEQ_GITHUB_CLIENT_ID": "Iv1.abc"}))
+    assert client.get("/api/github/account").get_json()["signInAvailable"] is True
+    client, _ = _app(client_id=lambda: github_client_id({}))
+    assert client.get("/api/github/account").get_json()["signInAvailable"] is False
+
+
+def test_device_flow_status_passes_the_slot_code_through():
+    failed = {"state": DeviceFlowState.ERROR, "user_code": None, "verification_uri": None, "expires_in": None, "interval": None, "login": None, "error": "No OS keyring", "code": "KEYRING_UNAVAILABLE", "finished_at": 1.0}
+    client, _ = _app(flow_status=lambda: dict(failed))
+    assert client.get("/api/github/device-flow").get_json()["code"] == "KEYRING_UNAVAILABLE"
+    client, _ = _app(flow_status=lambda: {**failed, "code": None})
+    assert client.get("/api/github/device-flow").get_json()["code"] == "FLOW_FAILED"
 
 
 def test_sign_out():

@@ -16,6 +16,7 @@ const HEADINGS = {
   [ACCESS_KIND.GIT_MISSING]: 'githubAccess.headingGitMissing',
   [ACCESS_KIND.GIT_TOO_OLD]: 'githubAccess.headingGitTooOld',
   [ACCESS_KIND.UNKNOWN]: 'githubAccess.headingUnknown',
+  [ACCESS_KIND.USE_HTTPS]: 'githubAccess.headingUseHttps',
 };
 
 function useAccount(getGithubAccount, enabled) {
@@ -29,20 +30,34 @@ function useAccount(getGithubAccount, enabled) {
   return account;
 }
 
+/**
+ * Which GitHub rungs to offer. Nothing until the account answers: a build
+ * without an OAuth client id must never offer a sign-in that can only fail.
+ */
+function rungsFor(account, isGitHub) {
+  if (!isGitHub || account == null) return { showSignIn: false, showGhCard: false, showGhHint: false, signInMissing: false };
+  return {
+    showSignIn: Boolean(account.signInAvailable),
+    showGhCard: Boolean(account.ghAvailable && !account.ghLoggedIn),
+    showGhHint: !account.ghAvailable,
+    signInMissing: !account.signInAvailable && !account.ghLoggedIn,
+  };
+}
+
 function SignInRungs({ failure, url, onResolved, onTestAgain, testing, blocked }) {
   const { getGithubAccount } = useApi();
   const { kind, detail, isGitHub } = failure;
   const account = useAccount(getGithubAccount, isGitHub);
-  const showGhCard = isGitHub && account?.ghAvailable && !account?.ghLoggedIn;
-  const showGhHint = isGitHub && account && !account.ghAvailable;
+  const { showSignIn, showGhCard, showGhHint, signInMissing } = rungsFor(account, isGitHub);
   return (
     <>
       {kind === ACCESS_KIND.NOT_FOUND && isGitHub && <p className="access-panel__help">{t('githubAccess.privateHint')}</p>}
       <Detail detail={detail} />
-      {isGitHub && <SignInCard onSignedIn={() => onResolved()} />}
+      {showSignIn && <SignInCard onSignedIn={() => onResolved()} />}
       {showGhCard && <GhCliCard onCheckAgain={onTestAgain} checking={testing} />}
       {showGhHint && <p className="access-panel__hint">{t('githubAccess.ghInstallHint')}</p>}
-      <OtherWaysCards url={url} isGitHub={isGitHub} onTokenAccepted={() => onResolved()} onTestAgain={onTestAgain} testing={testing} blocked={blocked} />
+      {signInMissing && <p className="access-panel__hint">{t('githubAccess.signInUnavailable')}</p>}
+      <OtherWaysCards url={url} isGitHub={isGitHub} onTokenAccepted={() => onResolved()} onTestAgain={onTestAgain} testing={testing} blocked={blocked} defaultOpen={signInMissing} />
     </>
   );
 }
@@ -71,7 +86,7 @@ export default function AccessPanel({ failure, url, onResolved, onRetry }) {
       <p className="access-panel__heading">{heading}</p>
       {SIGN_IN_KINDS.includes(kind)
         ? <SignInRungs failure={failure} url={url} onResolved={onResolved} onTestAgain={testAgain} testing={testing} blocked={blocked} />
-        : <GuidanceOnly kind={kind} host={host} url={url} detail={detail} onRetry={onRetry} />}
+        : <GuidanceOnly kind={kind} host={host} url={url} cloneUrl={failure.cloneUrl} detail={detail} onRetry={onRetry} />}
     </div>
   );
 }

@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
+from quodeq.config.ai_provider_errors import PLAINTEXT_KEY_REFUSED_MESSAGE, PlaintextKeyRefusedError
 from quodeq.config.github_account import GitHubAccount, TokenMethod, store_account
 from quodeq.config.github_app import GITHUB_OAUTH_SCOPE, github_client_id
 from quodeq.core.observability import NULL_LOG, LogSink
@@ -28,6 +29,7 @@ MESSAGE_FLOW_UNEXPECTED = "An unexpected error occurred while signing in."
 MESSAGE_GITHUB_UNREACHABLE = "GitHub could not be reached."
 MESSAGE_GITHUB_REFUSED = "GitHub refused the request (HTTP {status})."
 MESSAGE_START_FAILED = "Failed to start the sign-in background job."
+CODE_KEYRING_UNAVAILABLE = "KEYRING_UNAVAILABLE"
 
 
 class DeviceFlowState(StrEnum):
@@ -66,7 +68,8 @@ class DeviceFlowStatus(JobSlotStatus):
         super().__init__(
             {
                 "state": DeviceFlowState.IDLE, "user_code": None, "verification_uri": None,
-                "expires_in": None, "interval": None, "login": None, "error": None, "finished_at": None,
+                "expires_in": None, "interval": None, "login": None, "error": None, "code": None,
+                "finished_at": None,
             },
             DeviceFlowState.AWAITING_USER,
         )
@@ -153,6 +156,11 @@ def run_device_flow_job(code: DeviceCode, *, status: DeviceFlowStatus, deps: Flo
             _finish(status, DeviceFlowState.ERROR, now, error=MESSAGE_GITHUB_UNREACHABLE)
         except GitHubRefused as exc:
             _finish(status, DeviceFlowState.ERROR, now, error=MESSAGE_GITHUB_REFUSED.format(status=exc.status))
+        except PlaintextKeyRefusedError as exc:  # no OS keychain: say so, not "unexpected"
+            _finish(
+                status, DeviceFlowState.ERROR, now,
+                error=PLAINTEXT_KEY_REFUSED_MESSAGE.format(env_var=exc.env_var), code=CODE_KEYRING_UNAVAILABLE,
+            )
 
     _isolated(attempt, lambda _exc: _finish(status, DeviceFlowState.ERROR, now, error=MESSAGE_FLOW_UNEXPECTED), deps.log)
 

@@ -55,13 +55,17 @@ function OwnGitCard({ url, onTestAgain, testing, blocked }) {
   );
 }
 
-/** The collapsed "other ways" group, or the own-git card alone for non-GitHub hosts. */
-export default function OtherWaysCards({ url, isGitHub, onTokenAccepted, onTestAgain, testing, blocked }) {
-  const [open, setOpen] = useState(false);
+/**
+ * The collapsed "other ways" group, or the own-git card alone for non-GitHub hosts.
+ * `defaultOpen` expands it until the user toggles it (no sign-in card above it).
+ */
+export default function OtherWaysCards({ url, isGitHub, onTokenAccepted, onTestAgain, testing, blocked, defaultOpen = false }) {
+  const [toggled, setToggled] = useState(null);
+  const open = toggled ?? defaultOpen;
   if (!isGitHub) return <OwnGitCard url={url} onTestAgain={onTestAgain} testing={testing} blocked={blocked} />;
   return (
     <div className="access-other-ways">
-      <button type="button" className="onboarding-edit-link" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{t('githubAccess.otherWays')}</button>
+      <button type="button" className="onboarding-edit-link" aria-expanded={open} onClick={() => setToggled(!open)}>{t('githubAccess.otherWays')}</button>
       {open && (
         <>
           <PasteTokenCard onTokenAccepted={onTokenAccepted} />

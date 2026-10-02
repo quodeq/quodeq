@@ -26,6 +26,9 @@ export default function GitHubAccessSection() {
   const { data: account, refetch } = useQuery({ queryKey: QUERY_KEY, queryFn: getGithubAccount });
   const [showSignIn, setShowSignIn] = useState(false);
   const [busy, setBusy] = useState(false);
+  const notSignedIn = account != null && !account.signedIn;
+  const canSignIn = notSignedIn && Boolean(account.signInAvailable);
+  const signInMissing = notSignedIn && !account.signInAvailable && account.method !== ACCOUNT_METHOD.GH;
 
   async function signOut() {
     setBusy(true);
@@ -39,11 +42,12 @@ export default function GitHubAccessSection() {
       </div>
       <div className="settings-row">
         <SettingsRowLabel hintSlot={false} label={t('settings.githubStatus')} description={statusText(account)} />
-        {!account?.signedIn && !showSignIn && (
+        {canSignIn && !showSignIn && (
           <button type="button" className="settings-pill" onClick={() => setShowSignIn(true)}>{t('settings.githubSignIn')}</button>
         )}
       </div>
-      {showSignIn && !account?.signedIn && (
+      {signInMissing && <div className="settings-row"><p className="access-panel__hint">{t('githubAccess.signInUnavailable')}</p></div>}
+      {showSignIn && canSignIn && (
         <div className="settings-row"><SignInCard onSignedIn={() => { setShowSignIn(false); refetch(); }} /></div>
       )}
       {account?.signedIn && <SignOutRow onSignOut={signOut} busy={busy} />}

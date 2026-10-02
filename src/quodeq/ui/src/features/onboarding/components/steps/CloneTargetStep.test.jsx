@@ -60,7 +60,7 @@ describe('CloneTargetStep', () => {
   });
 
   it('renders the access panel instead of the error line when access failed', () => {
-    const api = { probeGit: vi.fn(), getGithubAccount: vi.fn(async () => ({ ghAvailable: false, ghLoggedIn: false })), startDeviceFlow: vi.fn(), getDeviceFlow: vi.fn(), pasteGithubToken: vi.fn() };
+    const api = { probeGit: vi.fn(), getGithubAccount: vi.fn(async () => ({ ghAvailable: false, ghLoggedIn: false, signInAvailable: true })), startDeviceFlow: vi.fn(), getDeviceFlow: vi.fn(), pasteGithubToken: vi.fn() };
     render(
       <ApiProvider value={api}>
         <CloneTargetStep repoUrl="https://github.com/o/r.git" onSubmit={vi.fn()} onBack={vi.fn()} error="should not show"
