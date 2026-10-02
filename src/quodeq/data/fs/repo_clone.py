@@ -22,8 +22,8 @@ from quodeq.context.online_cache import (
     ensure_clone,
     is_inside_cache,
 )
+from quodeq.data.git_cli import git_env_floor
 from quodeq.data.fs.repo_validation import validate_remote_url as _validate_remote_url
-from quodeq.shared.env_resolve import resolve_env
 from quodeq.config.clone_env import git_clone_timeout_s
 
 _logger = logging.getLogger(__name__)
@@ -61,22 +61,23 @@ class GitCloneClient:
         services layer owns retry orchestration and mapping them to
         user-facing clone errors.
         """
-        env = {**resolve_env(self._env), "GIT_LFS_SKIP_SMUDGE": "1", "LC_ALL": "C", "LANG": "C"}
+        env = git_env_floor(self._env)
         config_flags = [flag for entry in git_config for flag in ("-c", entry)]
         subprocess.run(
             ["git", *config_flags, "clone", "--progress", *extra_args, "--", url, str(dest)],
             check=True,
             env=env,
+            stdin=subprocess.DEVNULL,
             timeout=timeout_s,
             capture_output=True,
         )
 
     def clone_legacy(self, repo_input: str, dest: Path, *, timeout_s: int) -> None:
         """Run ``git clone`` for *repo_input* into *dest* (mkdtemp fallback path)."""
-        env = {**resolve_env(self._env), "GIT_LFS_SKIP_SMUDGE": "1"}
+        env = git_env_floor(self._env)
         subprocess.run(
             ["git", "clone", "--progress", repo_input, str(dest)],
-            check=True, env=env, timeout=timeout_s,
+            check=True, env=env, stdin=subprocess.DEVNULL, timeout=timeout_s,
         )
 
 

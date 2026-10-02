@@ -12,10 +12,11 @@ import logging
 import subprocess
 import threading
 import unicodedata
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 
 from quodeq.shared.constants import GIT_BIN, GIT_DIR_NAME, GIT_FLAG_C
+from quodeq.shared.env_resolve import resolve_env
 from quodeq.shared.repo import normalize_remote_url
 
 _logger = logging.getLogger(__name__)
@@ -32,6 +33,25 @@ _GIT_LOG_STREAM_TIMEOUT_S = 60
 # which forwards it into stream_log_names(months=...).
 DEFAULT_GIT_LOOKBACK_MONTHS = 3
 
+# Every git subprocess in quodeq runs with this floor. GIT_TERMINAL_PROMPT=0
+# makes git fail instead of waiting on a credential prompt nobody can answer
+# (the calls below also close stdin); GIT_LFS_SKIP_SMUDGE skips LFS blobs we
+# never read; LC_ALL/LANG=C pin English output so shared/git_errors.py's
+# markers match. ssh reads /dev/tty directly and is not covered: a host-key
+# confirmation or a passphrase without an agent still blocks until the
+# timeout, which the probe then reports as `timeout`.
+GIT_PROMPT_GUARD: dict[str, str] = {
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_LFS_SKIP_SMUDGE": "1",
+    "LC_ALL": "C",
+    "LANG": "C",
+}
+
+
+def git_env_floor(env: Mapping[str, str] | None = None) -> dict[str, str]:
+    """*env* (None = process environment) layered with :data:`GIT_PROMPT_GUARD`."""
+    return {**resolve_env(env), **GIT_PROMPT_GUARD}
+
 
 def run_git(
     args: Sequence[str], *, cwd: Path | str | None = None,
@@ -42,6 +62,7 @@ def run_git(
         result = subprocess.run(
             [GIT_BIN, *args],
             cwd=str(cwd) if cwd is not None else None,
+            env=git_env_floor(), stdin=subprocess.DEVNULL,
             capture_output=True, text=True, encoding="utf-8", timeout=timeout,
         )
     except (subprocess.SubprocessError, OSError):

@@ -47,7 +47,7 @@ BASELINE_PATH = Path(__file__).resolve().parent / "blocking_timeouts_baseline.tx
 # redundant.
 ALLOWLIST: frozenset[str] = frozenset({
     # proc.wait() right after proc.kill(), inside stream_log_names' finally.
-    "src/quodeq/data/git_cli.py:225:subprocess-wait",
+    "src/quodeq/data/git_cli.py:246:subprocess-wait",
     # await process.wait() right after process.kill() (asyncio subprocess).
     "src/quodeq/data/copilot_models.py:153:subprocess-wait",
     # process.wait() right after process.kill(), in _terminate_then_kill's

@@ -8,6 +8,7 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
+from quodeq.data.git_cli import git_env_floor
 from quodeq.shared.constants import GIT_BIN
 from quodeq.shared.env_paths import home_state_dir
 from quodeq.shared.env_resolve import resolve_env
@@ -22,11 +23,7 @@ EVALUATIONS_DIRNAME = "evaluations"  # the clone's evaluations/ tree; see shared
 
 
 def git_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
-    """Environment for git subprocess calls, layered over *env*.
-
-    GIT_LFS_SKIP_SMUDGE avoids pulling LFS blobs we don't need. GIT_TERMINAL_PROMPT=0
-    stops git from blocking on an interactive credential or passphrase prompt, since
-    these subprocess calls have stdin closed (see run_git) and nobody is there to answer.
+    """The app-wide git floor (see ``data.git_cli.GIT_PROMPT_GUARD``), layered over *env*.
 
     Known limitation: GIT_TERMINAL_PROMPT only covers prompts issued by git
     itself. ssh reads from /dev/tty directly, so a first-contact host-key
@@ -34,7 +31,7 @@ def git_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
     the call only dies at the run_git timeout. ssh remotes need the host in
     known_hosts and the key in an agent (or use an https remote instead).
     """
-    return {**resolve_env(env), "GIT_LFS_SKIP_SMUDGE": "1", "GIT_TERMINAL_PROMPT": "0"}
+    return git_env_floor(env)
 
 
 def run_git(
