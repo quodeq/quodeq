@@ -60,7 +60,8 @@ class PullStatus(JobSlotStatus):
         super().__init__(
             {
                 "state": PullState.IDLE, "project": None, "project_id": None, "project_name": None,
-                "renamed": None, "conflict_kind": None, "source_project_id": None, "error": None, "code": None, "finished_at": None, **SYNC_IDLE_FIELDS,
+                "renamed": None, "conflict_kind": None, "source_project_id": None,
+                "error": None, "code": None, "finished_at": None, **SYNC_IDLE_FIELDS,
             },
             PullState.RUNNING,
         )
