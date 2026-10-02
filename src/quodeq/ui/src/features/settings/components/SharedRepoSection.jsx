@@ -5,7 +5,7 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
 import { isSlotActive } from '../../../api/syncStatus.js';
 import { useSyncStatus } from '../../../hooks/useSyncStatus.js';
-import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
+import { connectSlotError } from '../../../hooks/connectSlotError.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage, isAccessCode } from '../../../strings/apiErrors.js';
 import { SettingsRowLabel } from './settingsRowParts.jsx';
@@ -59,9 +59,9 @@ function buildConnectMutationConfig({ connectShared, setError, setAccessFailure,
     onSuccess: () => {
       // Everything "shared"-prefixed, not just status: ProjectsPage's
       // useSharedProjects and usePublish read the SAME cache entries (audit
-      // C6), so a connect made here must reach them too, not just this
-      // section's own settings-detail status query (refetchStatus below
-      // already covers that one specifically, for the inline UI).
+      // C6), so a connect made here must reach them too, not just the
+      // status this section reads (refetchStatus in the mutation already
+      // covers that one specifically, for the inline UI).
       queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
     },
   };
@@ -105,13 +105,6 @@ function useLogStatusFailure(error) {
   useEffect(() => {
     if (error) console.error('Failed to fetch shared repo status:', error);
   }, [error]);
-}
-
-// The connect job runs in the background, so its failure arrives through the
-// status's connect slot rather than as a rejection of the PUT.
-function connectSlotError(connect) {
-  if (connect?.phase !== SYNC_PHASE.ERROR) return null;
-  return apiErrorMessage({ code: connect.code, message: connect.error }, 'settings.connectFailed');
 }
 
 function ErrorRow({ error }) {
@@ -253,7 +246,7 @@ export default function SharedRepoSection({ onDisconnected }) {
           <AccessPanel failure={accessFailure} url={newUrl.trim()} onResolved={handleSave} onRetry={handleSave} />
         </div>
       ) : (
-        <ErrorRow error={error ?? connectSlotError(sync.connect)} />
+        <ErrorRow error={error ?? connectSlotError(sync.connect, 'settings.connectFailed')} />
       )}
 
       <DisconnectRow

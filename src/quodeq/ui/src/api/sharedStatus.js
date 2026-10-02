@@ -27,12 +27,24 @@ export function epochSecondsToMs(seconds) {
   return typeof seconds === 'number' && seconds ? seconds * MS_PER_SECOND : null;
 }
 
+/**
+ * One sync job's slot with its finish time in ms (a missing slot becomes an
+ * empty one). Every reader of /shared/status goes through this, so the single
+ * status cache entry has one shape no matter who fetched it.
+ * @param {Object|null|undefined} raw
+ * @returns {Object}
+ */
+function normalizeSlot(raw) {
+  const s = raw || {};
+  return { ...s, finishedAt: epochSecondsToMs(s.finishedAt) };
+}
+
 // ── Config Management ───────────────────────────────────────────────────────
 
 /**
  * Get the shared repository connection status.
- * @returns {Promise<{configured: boolean, url: string|null, lastSynced: number|null, publish: Object}>}
- *   lastSynced is epoch-milliseconds (converted from the backend's epoch
+ * @returns {Promise<import('./syncStatus.js').SyncStatus & {publish: Object}>}
+ *   lastSynced and each slot's finishedAt are epoch-milliseconds (converted from the backend's epoch
  *   seconds; see epochSecondsToMs). `publish.finishedAt`, if present, is
  *   passed through unconverted (raw epoch seconds) -- no UI consumer currently
  *   formats it as a date.
@@ -42,6 +54,7 @@ export async function getSharedStatus() {
   return {
     ...data,
     lastSynced: epochSecondsToMs(data?.lastSynced),
+    connect: normalizeSlot(data?.connect), refresh: normalizeSlot(data?.refresh), pull: normalizeSlot(data?.pull),
   };
 }
 

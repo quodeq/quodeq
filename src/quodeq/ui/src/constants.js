@@ -183,7 +183,7 @@ export const URL_PROTOCOL = Object.freeze({ HTTP: 'http:', HTTPS: 'https:' });
 export const LATEST_RUN_ID = 'latest';
 
 // Fetch/DOMException .name values from AbortSignal.timeout(): api/projects.js
-// (registerProject) and api/sharedPublish.js (pullSharedProject) both treat
+// (registerProject) treats
 // either as "the request timed out or was aborted", not a real server error.
 export const FETCH_ERROR_NAME = Object.freeze({ TIMEOUT: 'TimeoutError', ABORT: 'AbortError' });
 

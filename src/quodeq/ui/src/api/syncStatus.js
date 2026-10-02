@@ -1,5 +1,5 @@
 import { request } from './request.js';
-import { epochSecondsToMs } from './sharedStatus.js';
+import { getSharedStatus } from './sharedStatus.js';
 import { SYNC_ACTIVE_PHASES } from '../vocab/syncPhase.js';
 
 /**
@@ -34,19 +34,9 @@ import { SYNC_ACTIVE_PHASES } from '../vocab/syncPhase.js';
  * @property {SlotView} pull
  */
 
-function slot(raw) {
-  const s = raw || {};
-  return { ...s, finishedAt: epochSecondsToMs(s.finishedAt) };
-}
-
 /** The shared repository's connection and its three sync jobs, timestamps in ms. */
-export async function getSyncStatus() {
-  const d = await request('/shared/status');
-  return {
-    ...d,
-    lastSynced: epochSecondsToMs(d?.lastSynced),
-    connect: slot(d?.connect), refresh: slot(d?.refresh), pull: slot(d?.pull),
-  };
+export function getSyncStatus() {
+  return getSharedStatus();
 }
 
 /** Start a background refresh. Answers 202 {started}. */

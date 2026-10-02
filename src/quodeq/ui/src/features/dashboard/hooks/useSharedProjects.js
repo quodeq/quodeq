@@ -37,7 +37,7 @@ import { isSlotActive } from '../../../api/syncStatus.js';
 import { useSyncStatus } from '../../../hooks/useSyncStatus.js';
 import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { t } from '../../../strings/index.js';
-import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { connectSlotError } from '../../../hooks/connectSlotError.js';
 import { sharedListQueryOptions } from './sharedQueryOptions.js';
 import { useSharedActions } from './useSharedActions.js';
 import { useSharedStatusAndList } from './useSharedStatusAndList.js';
@@ -106,12 +106,6 @@ function useRefreshStart({ startRefresh, refetchStatus }) {
   return { startFailed, refresh };
 }
 
-// The connect job's own failure, shown while its slot is in ERROR.
-function connectSlotError(connect) {
-  if (connect?.phase !== SYNC_PHASE.ERROR) return null;
-  return apiErrorMessage({ code: connect.code, message: connect.error }, 'projects.connectFailed');
-}
-
 /**
  * The shared-repo screen's data and actions: whether sharing is configured,
  * the remote project list and its freshness, plus connect, refresh and pull.
@@ -146,7 +140,7 @@ export function useSharedProjects() {
     configured, url, projects, lastSynced, stale,
     loading, error,
     connecting: actions.connecting || isSlotActive(sync.connect),
-    connectError: actions.connectError ?? connectSlotError(sync.connect),
+    connectError: actions.connectError ?? connectSlotError(sync.connect, 'projects.connectFailed'),
     connect,
     refreshing: isSlotActive(sync.refresh), refresh,
     pull, pullSlot: sync.pull,

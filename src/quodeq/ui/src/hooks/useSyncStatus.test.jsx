@@ -63,4 +63,22 @@ describe('useSyncStatus', () => {
     await waitFor(() => expect(result.current.configured).toBe(true));
     expect(result.current).toMatchObject({ url: 'u', lastSynced: 1, connect: idle, refresh: idle, pull: idle, active: false });
   });
+
+  it('a connect DONE edge invalidates the projects list exactly once, and so does a pull DONE edge', async () => {
+    for (const kind of ['connect', 'pull']) {
+      const running = { ...base, [kind]: { state: 'running', phase: 'downloading' } };
+      const done = { ...base, [kind]: { state: 'done', phase: 'done' } };
+      const { spy, api } = setup([running, done, done, done]);
+      await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(4), { timeout: 500 });
+      expect(keyCalls(spy, projectsKeys.list())).toBe(1);
+    }
+  });
+
+  it('error, done, error, done fires once per DONE edge', async () => {
+    const mk = (phase) => ({ ...base, pull: { state: phase, phase } });
+    const { spy, api } = setup([mk('error'), mk('done'), mk('error'), mk('done'), mk('done'), mk('done')]);
+    await waitFor(() => expect(api.getSyncStatus.mock.calls.length).toBeGreaterThanOrEqual(6), { timeout: 500 });
+    expect(keyCalls(spy, projectsKeys.list())).toBe(2);
+    expect(keyCalls(spy, sharedKeys.list())).toBe(2);
+  });
 });

@@ -46,7 +46,7 @@ function wrap(fakeApi, children) {
 
 // Split from useSharedProjects.test.jsx: status-error recovery,
 // lastSynced fallback, ghost-cache gating, pull(), and the connect/
-// refresh/pull double-submit and coalescing guards.
+// connect/pull double-submit guards.
 
 describe('useSharedProjects', () => {
   // A one-shot mount fetch with no retry used to leave
