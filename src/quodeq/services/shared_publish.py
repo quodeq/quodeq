@@ -170,9 +170,10 @@ def get_publish_status(status: PublishStatus | None = None) -> dict:
 
 def _do_publish(
     project_id: str, url: str, evaluations_root: Path, status: PublishStatus,
+    env: dict | None = None,
 ) -> None:
     try:
-        count = publish_project(project_id, url, evaluations_root=evaluations_root)
+        count = publish_project(project_id, url, evaluations_root=evaluations_root, env=env)
         status.set(state=PublishState.DONE, runs=count, error=None, finished_at=time.time())
     except PublishError as exc:
         status.set(state=PublishState.ERROR, error=str(exc), finished_at=time.time())
@@ -180,9 +181,10 @@ def _do_publish(
 
 def _run_publish(
     project_id: str, url: str, evaluations_root: Path, status: PublishStatus,
+    env: dict | None = None,
 ) -> None:
     run_isolated(
-        lambda: _do_publish(project_id, url, evaluations_root, status),
+        lambda: _do_publish(project_id, url, evaluations_root, status, env),
         label="publish", log=logger,
         on_error=lambda _exc: status.set(
             state=PublishState.ERROR,
@@ -204,6 +206,7 @@ def start_publish(
     project_id: str, url: str, *,
     evaluations_root: Path,
     status: PublishStatus | None = None,
+    env: dict | None = None,
 ) -> str:
     """Kick off a background publish.
 
@@ -217,7 +220,7 @@ def start_publish(
         return PublishStartResult.ALREADY_RUNNING
     try:
         thread = threading.Thread(
-            target=_run_publish, args=(project_id, url, evaluations_root, status),
+            target=_run_publish, args=(project_id, url, evaluations_root, status, env),
             daemon=True,
         )
         thread.start()

@@ -146,7 +146,7 @@ def test_put_config_rejects_non_string_url(client, monkeypatch, tmp_path):
 
 def test_put_config_clone_failure_reports_clone_failed(client, monkeypatch):
     _skip_url_validation(monkeypatch)
-    monkeypatch.setattr("quodeq.services.shared_connect.ensure_shared_clone", lambda url: None)
+    monkeypatch.setattr("quodeq.services.shared_connect.ensure_shared_clone", lambda url, env=None: None)
     url = "https://github.com/example/repo.git"
     connect = _connect(client, url)
     assert connect["state"] == "error"
@@ -231,7 +231,7 @@ def test_put_config_happy_path(client, monkeypatch, tmp_path):
     fake_repo = tmp_path / "fake-clone"
     fake_repo.mkdir()
     _skip_url_validation(monkeypatch)
-    monkeypatch.setattr("quodeq.services.shared_connect.ensure_shared_clone", lambda url: fake_repo)
+    monkeypatch.setattr("quodeq.services.shared_connect.ensure_shared_clone", lambda url, env=None: fake_repo)
     connect = _connect(client, "https://github.com/example/repo.git")
     assert connect["state"] == "done"
     assert connect["url"] == "https://github.com/example/repo.git"

@@ -26,7 +26,7 @@ def test_register_url_repo_persists_origin_url(tmp_path, monkeypatch):
     reports.mkdir()
     url = "https://github.com/example/repo.git"
 
-    def fake_clone(u, dest):
+    def fake_clone(u, dest, env=None):
         dest.mkdir(parents=True)
         (dest / ".git").mkdir()
         (dest / "main.py").write_text("print('hi')\n")

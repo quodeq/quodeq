@@ -30,3 +30,4 @@ def _clean_publish_status(monkeypatch):
     hermetic across the whole suite.
     """
     monkeypatch.setattr(shared_publish, "_default_status", shared_publish.PublishStatus())
+

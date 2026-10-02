@@ -55,9 +55,10 @@ def _resolve_target_path(request: MaterializeRequest) -> Path:
         # the host from a public to a private IP. run_git_clone then resolves
         # the host once more, judges that answer and pins git's connection to
         # it (http.curloptResolve), so git's own lookup cannot land elsewhere.
-        validate_remote_url(request.repo)
+        clone_target = request.clone_url or request.repo
+        validate_remote_url(clone_target)
         # run_git_clone raises CloneError on failure; it propagates.
-        run_git_clone(request.repo, target_path)
+        run_git_clone(clone_target, target_path, env=request.git_env)
         return target_path
 
     target_path = Path(request.repo_resolved)
@@ -137,6 +138,8 @@ class MaterializeRequest:
     ephemeral: bool
     clone_dest: str | None
     clones_dir: Path | None
+    git_env: dict[str, str] | None = None
+    clone_url: str | None = None
     log: LogSink = NULL_LOG
 
 

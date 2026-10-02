@@ -69,7 +69,7 @@ def test_register_url_clones_to_dest_then_scans(tmp_path):
     clone_dest = tmp_path / "code"
     clone_dest.mkdir()
 
-    def fake_clone(url, dest):
+    def fake_clone(url, dest, env=None):
         Path(dest).mkdir(parents=True, exist_ok=True)
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
@@ -94,7 +94,7 @@ def test_register_url_ephemeral_clones_under_clones_root(tmp_path, monkeypatch):
     fake_home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: fake_home)
 
-    def fake_clone(url, dest):
+    def fake_clone(url, dest, env=None):
         Path(dest).mkdir(parents=True, exist_ok=True)
         (Path(dest) / "README.md").write_text("# fake\n")
         (Path(dest) / ".git").mkdir()
@@ -167,7 +167,7 @@ def test_register_url_rejects_private_address_before_clone(tmp_path, monkeypatch
 
     clone_calls = []
 
-    def fake_clone(url, dest):
+    def fake_clone(url, dest, env=None):
         clone_calls.append(url)
         Path(dest).mkdir(parents=True, exist_ok=True)
         (Path(dest) / "README.md").write_text("# fake\n")
@@ -193,7 +193,7 @@ def test_register_url_rejects_localhost_before_clone(tmp_path, monkeypatch):
 
     clone_calls = []
 
-    def fake_clone(url, dest):
+    def fake_clone(url, dest, env=None):
         clone_calls.append(url)
         Path(dest).mkdir(parents=True, exist_ok=True)
         (Path(dest) / "README.md").write_text("# fake\n")
@@ -221,7 +221,7 @@ def test_register_url_revalidates_immediately_before_clone(tmp_path, monkeypatch
 
     clone_calls = []
 
-    def fake_clone(url, dest):
+    def fake_clone(url, dest, env=None):
         clone_calls.append(url)
 
     # First call (top-of-registration guard) passes; second call (the

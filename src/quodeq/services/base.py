@@ -52,6 +52,10 @@ class NewProjectSpec:
     scope_path: str | None = None
     clone_dest: str | None = None
     ephemeral: bool = False
+    # Environment for the clone subprocess, from the access ladder; None = ambient git.
+    git_env: dict[str, str] | None = None
+    # What to clone when it differs from ``repo`` (the ladder's HTTPS form); None = clone ``repo``.
+    clone_url: str | None = None
 
 
 class CreateProjectStatus(StrEnum):

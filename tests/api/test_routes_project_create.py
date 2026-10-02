@@ -8,6 +8,8 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.api.app import create_app
+from quodeq.services.github_access import AccessMethod, AccessResult
+from quodeq.shared.git_errors import GitFailureKind
 
 _ORIGIN = {"Origin": "http://localhost"}
 
@@ -176,3 +178,53 @@ def test_post_projects_local_repo_path_must_be_directory_not_file(client, tmp_pa
     body = resp.get_json()
     assert body["code"] == "INVALID_REPO"
     assert "file, not a directory" in body["error"]
+
+
+def _capture_spec(specs):
+    def fake_register(reports_dir, spec, **kw):
+        specs.append(spec)
+        d = Path(reports_dir) / "u1"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "scan.json").write_text(json.dumps({"total_files": 1}))
+        (d / "repository_info.json").write_text(json.dumps({"location": "local", "ephemeral": True}))
+        return "u1"
+    return fake_register
+
+
+def test_create_project_url_probes_first_and_threads_env(client, monkeypatch):
+    env = {"GIT_CONFIG_COUNT": "1"}
+    reachable = AccessResult(True, AccessMethod.GH, GitFailureKind.OK, "", "github.com", True, env, "https://github.com/o/r.git")
+    monkeypatch.setattr("quodeq.api.routes_project_create.resolve_access", lambda url: reachable)
+    specs = []
+    with patch("quodeq.services.project_registration.register_project", side_effect=_capture_spec(specs)):
+        client.post("/api/projects", json={"repo": "git@github.com:o/r.git", "ephemeral": True}, headers=_ORIGIN)
+    assert specs[0].git_env == env
+    assert specs[0].clone_url == "https://github.com/o/r.git"
+    assert specs[0].repo == "git@github.com:o/r.git"
+
+
+def test_create_project_url_probe_failure_is_400(client, monkeypatch):
+    unreachable = AccessResult(False, AccessMethod.NONE, GitFailureKind.NOT_FOUND, "nope", "github.com", True, None)
+    monkeypatch.setattr("quodeq.api.routes_project_create.resolve_access", lambda url: unreachable)
+    specs = []
+    with patch("quodeq.services.project_registration.register_project", side_effect=_capture_spec(specs)):
+        resp = client.post("/api/projects", json={"repo": "https://github.com/o/r.git", "ephemeral": True}, headers=_ORIGIN)
+    assert resp.status_code == 400 and resp.get_json()["code"] == "ACCESS_NOT_FOUND"
+    assert specs == []
+
+
+def test_create_project_local_path_never_probes(client, monkeypatch, tmp_path):
+    monkeypatch.setattr("quodeq.api.routes_project_create.resolve_access", lambda url: pytest.fail("probed a local path"))
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    client.post("/api/projects", json={"repo": str(repo)}, headers=_ORIGIN)
+
+
+def test_create_project_clone_failure_forgets_the_cached_method(client, monkeypatch):
+    from quodeq.services.base import CreateProjectResult, CreateProjectStatus
+    forgotten = []
+    monkeypatch.setattr("quodeq.api.routes_project_create.forget_url", forgotten.append)
+    result = CreateProjectResult(status=CreateProjectStatus.CLONE_FAILED, message="x", clone_error_kind=GitFailureKind.UNKNOWN)
+    with patch("quodeq.services.filesystem.FilesystemActionProvider.create_project", return_value=result):
+        client.post("/api/projects", json={"repo": "https://github.com/o/r.git", "ephemeral": True}, headers=_ORIGIN)
+    assert forgotten == ["https://github.com/o/r.git"]

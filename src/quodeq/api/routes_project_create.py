@@ -24,7 +24,9 @@ from quodeq.api.helpers import (
     optional_json_object_or_response,
     scan_target_error as _scan_target_error,
 )
+from quodeq.api.routes_github_access import access_failure_response
 from quodeq.services.base import ActionProvider, CreateProjectStatus, NewProjectSpec
+from quodeq.services.github_access import forget_url, resolve_access
 from quodeq.shared.git_errors import GitFailureKind, output_tail
 from quodeq.shared.paths import not_a_directory_reason
 from quodeq.shared.utils import is_repo_url
@@ -221,11 +223,20 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
     if error is not None:
         return error
 
+    git_env, clone_url = None, None
+    if parsed.is_url:
+        access = resolve_access(parsed.repo)
+        if not access.reachable:
+            return access_failure_response(access)
+        git_env, clone_url = access.env, access.clone_url
+
     spec = NewProjectSpec(
         repo=parsed.repo, discipline=parsed.discipline, scope_path=parsed.scope_path,
-        clone_dest=clone_dest, ephemeral=parsed.ephemeral,
+        clone_dest=clone_dest, ephemeral=parsed.ephemeral, git_env=git_env, clone_url=clone_url,
     )
     result = provider.create_project(parsed.reports_root, spec)
+    if result.status == CreateProjectStatus.CLONE_FAILED:
+        forget_url(parsed.repo)  # a stale "reachable" cache entry must not outlive a failed clone
 
     error = _create_project_error_response(result)
     if error is not None:

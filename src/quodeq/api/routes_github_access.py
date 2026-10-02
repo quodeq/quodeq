@@ -29,6 +29,7 @@ from quodeq.services.shared_repo import validate_remote_url
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.repo import is_repo_url
 
+CODE_ACCESS_PREFIX = "ACCESS_"
 CODE_URL_REQUIRED = "URL_REQUIRED"
 CODE_INVALID_URL = "INVALID_URL"
 CODE_GITHUB_NOT_CONFIGURED = "GITHUB_NOT_CONFIGURED"
@@ -56,6 +57,17 @@ _START_FAILURES = {
 def _start_flow() -> StartResult:
     """Start the device flow with production logging wired in."""
     return start_device_flow(deps=FlowDeps(log=SHARED_LOG))
+
+
+def access_failure_response(result: AccessResult) -> tuple[Response, int]:
+    """400 body for a URL the ladder could not reach: the kind as a code suffix
+    plus the fields the UI's access panel renders from."""
+    body = {
+        "error": f"could not reach {result.host}: {result.kind}",
+        "code": f"{CODE_ACCESS_PREFIX}{result.kind.upper()}",
+        "kind": result.kind, "detail": result.detail, "host": result.host, "isGitHub": result.is_github,
+    }
+    return jsonify(body), HTTPStatus.BAD_REQUEST
 
 
 @dataclass(frozen=True)

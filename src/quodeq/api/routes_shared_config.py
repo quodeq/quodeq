@@ -16,6 +16,8 @@ from typing import Callable
 from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_INVALID_INPUT, QUERY_FLAG_TRUE
+from quodeq.api.routes_github_access import access_failure_response
+from quodeq.services.github_access import resolve_access
 from quodeq.services.shared_connect_job import (
     ConnectStartResult,
     get_connect_status,
@@ -97,7 +99,12 @@ def shared_config_put() -> Response | tuple[Response, int]:
     failure = url_failure(url)
     if failure is not None:
         return json_error(failure.message, failure.http_status, failure.code)
-    outcome = start_connect(url, log=SHARED_LOG)
+    access = resolve_access(url)
+    if not access.reachable:
+        return access_failure_response(access)
+    # clone_url is ignored: the clone dir is keyed by the configured URL, so an ssh
+    # results-repo URL only works with the user's own SSH setup in v1.
+    outcome = start_connect(url, log=SHARED_LOG, env=access.env)
     if outcome == ConnectStartResult.ALREADY_RUNNING:
         return json_error(MESSAGE_CONNECT_IN_PROGRESS, HTTPStatus.CONFLICT, CODE_CONNECT_IN_PROGRESS)
     if outcome != ConnectStartResult.STARTED:
@@ -156,7 +163,10 @@ def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tu
     settings = read_settings()
     if not settings.url:
         return no_shared_repo_error(HTTPStatus.BAD_REQUEST)
-    outcome = start_publish(project, settings.url, evaluations_root=Path(reports_dir()))
+    access = resolve_access(settings.url)
+    if not access.reachable:
+        return access_failure_response(access)
+    outcome = start_publish(project, settings.url, evaluations_root=Path(reports_dir()), env=access.env)
     if outcome == PublishStartResult.ALREADY_RUNNING:
         return json_error("a publish is already running", HTTPStatus.CONFLICT, "PUBLISH_IN_PROGRESS")
     if outcome != PublishStartResult.STARTED:

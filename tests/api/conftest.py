@@ -24,7 +24,9 @@ from quodeq.data.fs.shared_repo import (
     shared_repo_path,
     sync_shared_index,
 )
+from quodeq.services.github_access import AccessMethod, AccessResult
 from quodeq.services.shared_settings import SharedSettings, write_settings
+from quodeq.shared.git_errors import GitFailureKind
 from tests._timeouts import budget
 
 _VIOLATION = dict(
@@ -111,3 +113,11 @@ def shared_clone_fixture(tmp_path, monkeypatch):
 
     write_settings(SharedSettings(url=url))
     return url
+
+
+@pytest.fixture(autouse=True)
+def _ambient_access(monkeypatch):
+    """Routes that clone or push probe the access ladder first; keep every api test off the network."""
+    reachable = AccessResult(True, AccessMethod.AMBIENT, GitFailureKind.OK, "", "github.com", True, None)
+    for module in ("routes_project_create", "routes_shared_config"):
+        monkeypatch.setattr(f"quodeq.api.{module}.resolve_access", lambda url: reachable)
