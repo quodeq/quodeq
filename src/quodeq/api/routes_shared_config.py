@@ -1,10 +1,10 @@
 """Config/status/lifecycle routes for the shared results repository.
 
 Status, config PUT/DELETE, refresh, and the local project-publish route.
-``refresh_shared_clone``, ``start_publish`` and ``start_connect`` are
+``start_refresh``, ``start_publish`` and ``start_connect`` are
 imported directly from their real owner, never through the ``routes_shared``
 facade, so this module never imports back a sibling that imports it. Tests
-patch "quodeq.api.routes_shared_config.refresh_shared_clone" /
+patch "quodeq.api.routes_shared_config.start_refresh" /
 "...start_publish" / "...start_connect".
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._constants import CODE_INVALID_INPUT, QUERY_FLAG_TRUE
 from quodeq.api.routes_github_access import same_url_access_error
-from quodeq.services.github_access import refresh_access_env, resolve_access
+from quodeq.services.github_access import resolve_access
 from quodeq.services.shared_connect_job import (
     ConnectStartResult,
     get_connect_status,
@@ -25,13 +25,15 @@ from quodeq.services.shared_connect_job import (
     start_connect,
     url_failure,
 )
+from quodeq.services.shared_pull_job import get_pull_status, is_pull_running
 from quodeq.services.shared_publish import PublishStartResult, get_publish_status, start_publish
-from quodeq.services.shared_repo import (
-    disconnect_shared_repo,
-    last_synced_at,
-    read_state,
-    refresh_shared_clone,
+from quodeq.services.shared_refresh_job import (
+    RefreshStartResult,
+    get_refresh_status,
+    is_refresh_running,
+    start_refresh,
 )
+from quodeq.services.shared_repo import disconnect_shared_repo, last_synced_at, read_state
 from quodeq.services.shared_settings import read_settings
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.validation import path_segment_error
@@ -45,6 +47,20 @@ CODE_CONNECT_IN_PROGRESS = "CONNECT_IN_PROGRESS"
 CODE_CONNECT_START_FAILED = "CONNECT_START_FAILED"
 CODE_CONFIRMATION_REQUIRED = "CONFIRMATION_REQUIRED"
 MESSAGE_CONNECT_IN_PROGRESS = "a connect is already running"
+CODE_REFRESH_IN_PROGRESS = "REFRESH_IN_PROGRESS"
+CODE_REFRESH_START_FAILED = "REFRESH_START_FAILED"
+INVITE_TEXT = "Open quodeq, choose Join your team's results, paste {url}"
+
+
+def sync_block(snapshot: dict) -> dict:
+    """camelCase one job slot for the wire."""
+    out = dict(snapshot)
+    out["finishedAt"] = out.pop("finished_at", None)
+    out["projectsFound"] = out.pop("projects_found", None)
+    if "project_id" in out:
+        out["projectId"] = out.pop("project_id")
+        out["projectName"] = out.pop("project_name", None)
+    return out
 
 
 def shared_status() -> Response:
@@ -59,14 +75,15 @@ def shared_status() -> Response:
     # dicts are service-internal snake_case structures, so rename at the boundary.
     publish = get_publish_status()
     publish["finishedAt"] = publish.pop("finished_at", None)
-    connect = get_connect_status()
-    connect["finishedAt"] = connect.pop("finished_at", None)
+    connect = sync_block(get_connect_status())
+    refresh = sync_block(get_refresh_status())
+    pull = sync_block(get_pull_status())
     return jsonify(
         {
             "configured": settings.url is not None,
             "url": settings.url,
             "lastSynced": synced,
-            "syncing": False,
+            "syncing": is_connect_running() or is_refresh_running() or is_pull_running(),
             # Reserved for sync-level failures; always present so the UI
             # can bind to it without existence checks. A reserved slot is
             # not an error response, so it carries no "code" (the
@@ -74,6 +91,8 @@ def shared_status() -> Response:
             "error": None,
             "publish": publish,
             "connect": connect,
+            "refresh": refresh,
+            "pull": pull,
             # ok | empty | foreign | unsupported_version | missing | None
             # (unconfigured) -- lets the UI distinguish "healthy but
             # never published into" from the failure states instead of
@@ -134,24 +153,31 @@ def shared_config_delete() -> Response | tuple[Response, int]:
     return jsonify({"configured": False})
 
 
-def _shared_refresh(refresh_clone: Callable[..., tuple[bool, str | None]]) -> Response | tuple[Response, int]:
+def _shared_refresh_start(start: Callable[..., RefreshStartResult]) -> Response | tuple[Response, int]:
     settings = read_settings()
     if not settings.url:
         return no_shared_repo_error(HTTPStatus.BAD_REQUEST)
-    ok, reason = refresh_clone(settings.url, env=refresh_access_env(settings.url))
-    if not ok:
-        return (
-            jsonify(
-                {
-                    "stale": True,
-                    "lastSynced": last_synced_at(settings.url),
-                    "error": reason,
-                    "code": "REFRESH_FAILED",
-                }
-            ),
-            HTTPStatus.BAD_GATEWAY,
+    access = resolve_access(settings.url)
+    error = same_url_access_error(settings.url, access)
+    if error is not None:
+        return error
+    outcome = start(settings.url, env=access.env, log=SHARED_LOG)
+    if outcome == RefreshStartResult.ALREADY_RUNNING:
+        return json_error("a refresh is already running", HTTPStatus.CONFLICT, CODE_REFRESH_IN_PROGRESS)
+    if outcome != RefreshStartResult.STARTED:
+        return json_error(
+            "could not start the refresh job, see server logs",
+            HTTPStatus.INTERNAL_SERVER_ERROR, CODE_REFRESH_START_FAILED,
         )
-    return jsonify({"stale": False, "lastSynced": last_synced_at(settings.url)})
+    return jsonify({"started": True}), HTTPStatus.ACCEPTED
+
+
+def shared_invite() -> Response | tuple[Response, int]:
+    """The sentence a teammate needs to join: where to click and what to paste."""
+    settings = read_settings()
+    if not settings.url:
+        return no_shared_repo_error(HTTPStatus.BAD_REQUEST)
+    return jsonify({"text": INVITE_TEXT.format(url=settings.url)})
 
 
 def _shared_publish_start(project: str, start_publish: Callable[..., str]) -> tuple[Response, int]:
@@ -183,9 +209,11 @@ def register_shared_config_routes(app: Flask) -> None:
     app.put("/api/shared/config")(shared_config_put)
     app.delete("/api/shared/config")(shared_config_delete)
 
+    app.get("/api/shared/invite")(shared_invite)
+
     @app.post("/api/shared/refresh")
     def shared_refresh() -> Response | tuple[Response, int]:
-        return _shared_refresh(refresh_shared_clone)
+        return _shared_refresh_start(start_refresh)
 
     @app.post("/api/projects/<project>/publish")
     def shared_publish_start(project: str) -> tuple[Response, int]:

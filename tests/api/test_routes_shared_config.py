@@ -139,7 +139,7 @@ def test_status_reports_idle_connect_slot(client):
     connect = client.get("/api/shared/status").get_json()["connect"]
     assert connect == {
         "state": "idle", "url": None, "code": None, "error": None, "finishedAt": None,
-        "kind": None, "phase": None, "percent": None, "bytes": None, "projects_found": None,
+        "kind": None, "phase": None, "percent": None, "bytes": None, "projectsFound": None,
     }
 
 
