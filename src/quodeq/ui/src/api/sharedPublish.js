@@ -34,7 +34,8 @@ export function publishProject(projectId) {
  *
  * @param {string} projectId
  * @param {string} [action] - 'copy' or 'replace' (resolves a 409 collision)
- * @returns {Promise<{imported: boolean, projectId: string}>}
+ * @returns {Promise<{started: boolean, project: string}>} the 202 body; the pull runs in a
+ *   background job whose progress is the `pull` slot of /shared/status (api/syncStatus.js)
  * @throws {Error & { status: number, code?: string, kind?: string, existingProjectId?: string, projectName?: string }} on non-2xx
  */
 export async function pullSharedProject(projectId, action) {

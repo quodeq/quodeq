@@ -140,11 +140,19 @@ export const systemKeys = {
   omlx: () => [SYSTEM_SCOPE, "omlx"],
 };
 
+const LIST_KEY = "list"; // the list subkey shared by the projects, standards and shared scopes
+const PROJECTS_SCOPE = "projects"; // query-key prefix for the projectsKeys.* subtree
+
+export const projectsKeys = {
+  all: () => [PROJECTS_SCOPE],
+  list: () => [PROJECTS_SCOPE, LIST_KEY],
+};
+
 const STANDARDS_SCOPE = "standards"; // query-key prefix for the standardsKeys.* subtree below
 
 export const standardsKeys = {
   all: () => [STANDARDS_SCOPE],
-  list: () => [STANDARDS_SCOPE, "list"],
+  list: () => [STANDARDS_SCOPE, LIST_KEY],
   library: () => [STANDARDS_SCOPE, "library"],
   cwes: () => [STANDARDS_SCOPE, "cwes"],
   overrides: (projectId) => [STANDARDS_SCOPE, "overrides", projectId],
@@ -168,7 +176,7 @@ const SHARED_SCOPE = "shared"; // query-key prefix for the sharedKeys.* subtree 
 export const sharedKeys = {
   all: () => [SHARED_SCOPE],
   status: () => [SHARED_SCOPE, "status"],
-  list: () => [SHARED_SCOPE, "list"],
+  list: () => [SHARED_SCOPE, LIST_KEY],
 };
 
 // The grade-formula editor's rescore-progress poll. Outside the `project`

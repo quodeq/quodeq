@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as shared from './shared.js';
+import { startRefresh } from './syncStatus.js';
 import { createProject } from '../models/project.js';
 
 /**
@@ -82,42 +83,11 @@ describe('shared repo API client', () => {
       });
     });
 
-    // PUT answers 202 {started: true}; the clone runs server-side and the
-    // outcome arrives under `connect` in /shared/status.
-    function stubConnectJob(states) {
-      const seen = [];
-      vi.stubGlobal('fetch', vi.fn(async (url, opts) => {
-        seen.push({ url, method: opts?.method });
-        const body = opts?.method === 'PUT' ? { started: true, url: 'u' } : { connect: states.shift() };
-        return { ok: true, json: async () => body };
-      }));
-      return seen;
-    }
-
-    it('connectShared polls /shared/status until the connect job is done', async () => {
-      vi.useFakeTimers();
-      const seen = stubConnectJob([{ state: 'running' }, { state: 'done', url: 'u' }]);
-      const result = shared.connectShared('u');
-      await vi.advanceTimersByTimeAsync(3 * shared.CONNECT_POLL_INTERVAL_MS);
-      await expect(result).resolves.toEqual({ configured: true, url: 'u' });
-      expect(seen.map((c) => c.method ?? 'GET')).toEqual(['PUT', 'GET', 'GET']);
-    });
-
-    it('connectShared rejects with the job code and a request()-shaped error', async () => {
-      vi.useFakeTimers();
-      stubConnectJob([{ state: 'error', code: 'CLONE_FAILED', error: 'could not clone' }]);
-      const result = shared.connectShared('u').catch((e) => e);
-      await vi.advanceTimersByTimeAsync(shared.CONNECT_POLL_INTERVAL_MS);
-      const err = await result;
-      expect([err.message, err.code, err.status]).toEqual(['could not clone', 'CLONE_FAILED', 502]);
-    });
-
-    it('connectShared gives up with CONNECT_TIMEOUT after the deadline', async () => {
-      vi.useFakeTimers();
-      stubConnectJob(new Array(1000).fill({ state: 'running' }));
-      const result = shared.connectShared('u').catch((e) => e);
-      await vi.advanceTimersByTimeAsync(shared.CONNECT_DEADLINE_MS + shared.SHARED_STATUS_POLL_CAP_MS);
-      expect((await result).code).toBe('CONNECT_TIMEOUT');
+    it('connectShared resolves with the 202 body after a single PUT', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 202, json: async () => ({ started: true, url: 'u' }) })));
+      await expect(shared.connectShared('u')).resolves.toEqual({ started: true, url: 'u' });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0][1].method).toBe('PUT');
     });
 
     it('connectShared lets a PUT error through without polling', async () => {
@@ -133,8 +103,8 @@ describe('shared repo API client', () => {
       expect(calls[0].opts.method).toBe('DELETE');
     });
 
-    it('refreshShared POSTs /shared/refresh', async () => {
-      await shared.refreshShared();
+    it('startRefresh POSTs /shared/refresh', async () => {
+      await startRefresh();
       expect(calls[0].url).toBe('/api/shared/refresh');
       expect(calls[0].opts.method).toBe('POST');
     });

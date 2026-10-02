@@ -1,5 +1,5 @@
 /**
- * Shared repository config management — connect, disconnect, refresh,
+ * Shared repository config management — connect, disconnect,
  * and connection status.
  *
  * Timestamp units: the backend (services/shared_repo.py's published_meta and
@@ -14,7 +14,6 @@
 
 import { request } from './request.js';
 import { MS_PER_SECOND } from '../utils/time.js';
-import { backoffDelay } from '../utils/backoff.js';
 
 /**
  * Convert a UNIX epoch-seconds timestamp (as sent by the backend) to
@@ -46,82 +45,16 @@ export async function getSharedStatus() {
   };
 }
 
-// The connect job states GET /shared/status reports under `connect`
-// (services/shared_connect_job.py's ConnectState).
-const CONNECT_STATE = Object.freeze({
-  IDLE: 'idle',
-  RUNNING: 'running',
-  DONE: 'done',
-  ERROR: 'error',
-});
-
-export const CONNECT_POLL_INTERVAL_MS = 1500;
-// Polls back off from CONNECT_POLL_INTERVAL_MS up to this cap during a long clone.
-export const SHARED_STATUS_POLL_CAP_MS = 5000;
-// Matches the backend's git clone timeout, so the UI never gives up on a
-// clone the server is still running.
-export const CONNECT_DEADLINE_MS = 300000;
-const CODE_CLONE_FAILED = 'CLONE_FAILED';
-const CODE_CONNECT_FAILED = 'CONNECT_FAILED';
-const CODE_CONNECT_TIMEOUT = 'CONNECT_TIMEOUT';
-const HTTP_BAD_REQUEST = 400;
-const HTTP_BAD_GATEWAY = 502;
-const HTTP_GATEWAY_TIMEOUT = 504;
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * The Error a failed connect job rejects with, shaped like request()'s
- * (status, code, body) so apiErrorMessage() maps it the same way. A job that
- * left `running` without reaching `done` (e.g. the server restarted) counts
- * as a failure too.
- */
-function connectError(connect) {
-  const err = new Error(connect.error || 'Connect failed');
-  err.status = connect.code === CODE_CLONE_FAILED ? HTTP_BAD_GATEWAY : HTTP_BAD_REQUEST;
-  err.code = connect.code ?? CODE_CONNECT_FAILED;
-  err.body = { error: connect.error, code: err.code };
-  return err;
-}
-
-function connectTimeoutError() {
-  const err = new Error('Timed out waiting for the shared repository to connect');
-  err.status = HTTP_GATEWAY_TIMEOUT;
-  err.code = CODE_CONNECT_TIMEOUT;
-  err.body = { error: err.message, code: CODE_CONNECT_TIMEOUT };
-  return err;
-}
-
-async function waitForConnect(url) {
-  const deadline = Date.now() + CONNECT_DEADLINE_MS;
-  let attempt = 0;
-  while (Date.now() < deadline) {
-    await wait(backoffDelay(attempt++, CONNECT_POLL_INTERVAL_MS, SHARED_STATUS_POLL_CAP_MS));
-    const { connect } = await getSharedStatus();
-    if (connect?.state === CONNECT_STATE.RUNNING) continue;
-    if (connect?.state !== CONNECT_STATE.DONE) throw connectError(connect ?? {});
-    return { configured: true, url: connect.url || url };
-  }
-  throw connectTimeoutError();
-}
-
 /**
  * Connect to a shared repository.
  *
- * The server clones in a background job: PUT answers 202 {started: true} and
- * the outcome appears under `connect` in /shared/status. This polls until the
- * job leaves `running`, so the returned promise stays pending for the whole
- * clone and rejects with the job's error code on failure.
+ * The server clones in a background job: PUT answers 202 {started, url} and
+ * progress appears under `connect` in /shared/status (see api/syncStatus.js).
  * @param {string} url - Git repository URL
- * @returns {Promise<{configured: boolean, url: string}>}
+ * @returns {Promise<{started: boolean, url: string}>}
  */
-export async function connectShared(url) {
-  const started = await request('/shared/config', {
-    method: 'PUT',
-    body: JSON.stringify({ url }),
-  });
-  if (!started?.started) return started;
-  return waitForConnect(url);
+export function connectShared(url) {
+  return request('/shared/config', { method: 'PUT', body: JSON.stringify({ url }) });
 }
 
 /**
@@ -132,15 +65,5 @@ export async function connectShared(url) {
 export function disconnectShared() {
   return request('/shared/config?confirm=true', {
     method: 'DELETE',
-  });
-}
-
-/**
- * Refresh the shared repository (fetch latest changes).
- * @returns {Promise<{stale: boolean, lastSynced: string}>}
- */
-export function refreshShared() {
-  return request('/shared/refresh', {
-    method: 'POST',
   });
 }
