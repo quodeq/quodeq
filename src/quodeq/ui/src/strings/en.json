@@ -21,7 +21,6 @@
   "apiError.connectFailed": "Couldn't connect the shared repository. Check the server logs.",
   "apiError.connectInProgress": "A connect is already running. Wait for it to finish.",
   "apiError.connectStartFailed": "Couldn't start connecting. Check the server logs.",
-  "apiError.connectTimeout": "Connecting took too long. Check that git can reach the repository and try again.",
   "apiError.flowFailed": "The GitHub sign-in failed. Try again.",
   "apiError.flowStartFailed": "Couldn't start the sign-in. Check the server logs.",
   "apiError.forbidden": "You do not have permission to do that.",

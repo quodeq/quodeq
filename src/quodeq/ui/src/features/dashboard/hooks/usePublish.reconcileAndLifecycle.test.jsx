@@ -210,12 +210,10 @@ describe('usePublish', () => {
   // react-query dedupes: mounting them together issues exactly one status
   // fetch and one list fetch, not one pair per hook.
   it('mounting alongside useSharedProjects issues exactly one status fetch and one list fetch (react-query dedup)', async () => {
-    // Held open so the background revalidate useSharedProjects fires after
-    // its own first successful list never completes during this test --
-    // otherwise its own re-list would add a second, legitimate list fetch
-    // and muddy the "exactly one" assertion this test is making.
-    const refreshShared = vi.fn(() => new Promise(() => {}));
-    const fakeApi = makeFakeApi({ refreshShared });
+    // useSharedProjects polls getSyncStatus and usePublish reads getSharedStatus
+    // from the same cache key; the fake routes both to one counted function.
+    const fakeApi = makeFakeApi();
+    fakeApi.getSyncStatus = (...a) => fakeApi.getSharedStatus(...a);
 
     function BothHooks() {
       useSharedProjects();

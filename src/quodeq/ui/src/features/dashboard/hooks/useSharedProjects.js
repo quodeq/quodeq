@@ -2,93 +2,54 @@
  * Shared-repo status and project list for the merged Projects page (one list,
  * no tabs -- see ProjectsPage.jsx). Feeds the shared-only cards, the toolbar's
  * SyncedIndicator, and -- through useMergedProjects -- every local card's
- * chips and action. It wraps the shared-repo API client (getSharedStatus,
- * sharedListProjects, connectShared, refreshShared, pullSharedProject) behind
- * two react-query queries (`sharedKeys.status()`, `sharedKeys.list()`) plus a
- * small coalescing refresh.
+ * chips and action.
  *
- * This module is the app's single source of shared status/list data: usePublish
- * and Settings' SharedRepoSection read, and on their own mutations invalidate,
- * these SAME cache entries, so a connect, disconnect, publish or refresh
- * anywhere is reflected everywhere through one cache rather than three
- * independently fetched copies that could drift apart.
- *
- * Cached-first mount: the list query's `queryFn` always passes
- * `refresh: false`, so the UI renders instantly from whatever the server has
- * cached and never blocks on a synchronous git fetch. Once that cached render
- * lands, a background `refresh()` kicks off automatically, exactly once, to
- * revalidate against the remote. Every other re-list (after connect, after a
- * publish job completes, or the explicit toolbar refresh button) also passes
- * `refresh: false`; `refreshShared()` is what triggers the real remote fetch.
+ * Status comes from useSyncStatus, the app's only poller of
+ * GET /api/shared/status: it carries whether sharing is configured, when it
+ * last synced, and the connect, refresh and pull jobs the server runs in the
+ * background. The list is a react-query query on `sharedKeys.list()` that
+ * always passes `refresh: false`, so the UI renders instantly from whatever
+ * the server has cached and never blocks on a git fetch. useSyncStatus
+ * invalidates that list while a job is reading and when it finishes, so this
+ * hook never re-lists on its own, and nothing refreshes the remote on mount:
+ * `refresh()` is the explicit toolbar action and only starts the job.
  *
  * Error handling has two tiers. A failed *initial* load (status, or the first
  * list once configured, i.e. before either has ever produced data) surfaces
  * `error`, since there is nothing to show yet. A failed *refresh* of an
- * already-loaded page does NOT blank the view: it flags `stale` so the
- * toolbar's SyncedIndicator can show "synced <time> ago - stale" over the
- * still-valid last-known listing.
+ * already-loaded page does NOT blank the view: it flags `stale` (the refresh
+ * job ended in ERROR, or could not be started) so the toolbar's
+ * SyncedIndicator can show "synced <time> ago - stale" over the still-valid
+ * last-known listing.
  *
- * `lastSynced` seeds from the STATUS payload, which the server reports on
- * every /status response, so a list-only failure still shows when the repo
- * last synced instead of "not synced yet"; once the list has its own
- * envelope, that value overrides it.
+ * `lastSynced` seeds from the STATUS payload, so a list-only failure still
+ * shows when the repo last synced instead of "not synced yet"; once the list
+ * has its own envelope, that value overrides it.
  *
- * `refresh()` coalesces rather than drops: a call arriving while one is
- * already running does not start a second POST, it marks the run pending and
- * is satisfied by exactly one more round once the current one settles, no
- * matter how many calls stack up. Both the POST and the follow-up re-list
- * invalidate `sharedKeys.all()`, not just the list, so `refresh()` doubles as
- * the retry affordance behind the toolbar's "sync failed - retry" state even
- * when the original failure was the status fetch itself: a stuck
- * `configured=false` with no data would otherwise never get another chance,
- * because a disabled list query never fetches on its own.
+ * `refresh()` also re-reads the status, so it doubles as the retry
+ * affordance behind the toolbar's "sync failed - retry" state even when the
+ * original failure was the status fetch itself.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { sharedKeys } from '../../../api/queryKeys.js';
+import { isSlotActive } from '../../../api/syncStatus.js';
+import { useSyncStatus } from '../../../hooks/useSyncStatus.js';
+import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { t } from '../../../strings/index.js';
-import { useCoalescedRefresh } from './useCoalescedRefresh.js';
+import { apiErrorMessage } from '../../../strings/apiErrors.js';
+import { sharedListQueryOptions } from './sharedQueryOptions.js';
 import { useSharedActions } from './useSharedActions.js';
 import { useSharedStatusAndList } from './useSharedStatusAndList.js';
-
-// react-query's own query-state status ('pending'|'error'|'success'), not
-// the run/job/dim vocabulary -- kept local rather than forced into vocab/*.js.
-const QUERY_STATUS_ERROR = 'error';
-
-// One refresh round: POST, then let the caller re-list. Failures keep the
-// page's data and flag it stale instead of rejecting.
-function makeRefreshCore({ refreshShared, queryClient, setStaleOverride }) {
-  return async () => {
-    try {
-      await refreshShared();
-    } catch (err) {
-      // Keep whatever projects/lastSynced are already on screen; just flag
-      // it stale. The exact API error message isn't shown here -- the
-      // stale banner copy is fixed regardless of cause.
-      console.warn('[useSharedProjects] refresh failed:', err);
-      setStaleOverride(true);
-      return;
-    }
-    try {
-      await queryClient.invalidateQueries({ queryKey: sharedKeys.all() });
-      const listState = queryClient.getQueryState(sharedKeys.list());
-      setStaleOverride(listState?.status === QUERY_STATUS_ERROR);
-    } catch (err) {
-      console.warn('[useSharedProjects] post-refresh invalidate failed:', err);
-      setStaleOverride(true);
-    }
-  };
-}
 
 /**
  * Message for an INITIAL load failure, meaning no data has ever landed for
  * that query. A background refresh failure after data already exists is
  * `stale`, not `error`, so it never blanks an already-working view.
  */
-function deriveSharedError({ statusQuery, listQuery, configured }) {
-  if (statusQuery.isError && statusQuery.data === undefined) {
-    return statusQuery.error?.message || t('projects.sharedStatusFailed');
+function deriveSharedError({ sync, listQuery, configured }) {
+  if (sync.isError && sync.status === undefined) {
+    return sync.error?.message || t('projects.sharedStatusFailed');
   }
   if (configured && listQuery.isError && listQuery.data === undefined) {
     return listQuery.error?.message || t('projects.sharedStatusFailed');
@@ -102,15 +63,14 @@ function deriveSharedError({ statusQuery, listQuery, configured }) {
  * isPending, is "no data yet AND actively fetching", so an unconfigured
  * repo's never-run list query does not hold it true forever.
  */
-function deriveSharedFreshness({ statusQuery, listQuery, configured, staleOverride }) {
+function deriveSharedFreshness({ sync, listQuery, configured, startFailed }) {
   return {
-    stale: staleOverride || !!listQuery.data?.stale,
-    loading: statusQuery.isLoading || (configured && listQuery.isLoading),
+    stale: startFailed || sync.refresh?.phase === SYNC_PHASE.ERROR || !!listQuery.data?.stale,
+    loading: sync.isLoading || (configured && listQuery.isLoading),
   };
 }
 
-function deriveSharedProjectsState({ statusQuery, listQuery, configured, staleOverride }) {
-  const url = statusQuery.data?.url ?? null;
+function deriveSharedProjectsState({ sync, listQuery, configured, startFailed }) {
   // Gated on `configured`, not just read off listQuery.data: the list query
   // is disabled (not removed) when unconfigured, so a lingering cache entry
   // from before a disconnect (or from a DIFFERENT shared repo before a
@@ -118,79 +78,78 @@ function deriveSharedProjectsState({ statusQuery, listQuery, configured, staleOv
   // buttons -- on a page that has nothing connected (ghost shared cards
   // after disconnect).
   const projects = configured ? (listQuery.data?.projects || []) : [];
-  const lastSynced = listQuery.data?.lastSynced ?? statusQuery.data?.lastSynced ?? null;
   return {
-    url,
+    url: sync.url,
     projects,
-    lastSynced,
-    ...deriveSharedFreshness({ statusQuery, listQuery, configured, staleOverride }),
-    error: deriveSharedError({ statusQuery, listQuery, configured }),
+    lastSynced: listQuery.data?.lastSynced ?? sync.lastSynced,
+    ...deriveSharedFreshness({ sync, listQuery, configured, startFailed }),
+    error: deriveSharedError({ sync, listQuery, configured }),
   };
 }
 
-// Background revalidate: fires once, the first time the cached list lands
-// successfully (never when unconfigured, since the list query never runs in
-// that case).
-function useBackgroundRevalidate(listQuerySuccess, refresh) {
-  const bgTriggeredRef = useRef(false);
-  useEffect(() => {
-    if (listQuerySuccess && !bgTriggeredRef.current) {
-      bgTriggeredRef.current = true;
-      // No .catch needed here or at the toolbar's onRefresh: refreshCore
-      // (makeRefreshCore above) catches both of its phases and reports
-      // failure through setStaleOverride, so the promise refresh() returns
-      // never rejects. useCoalescedRefresh's waiter rejection only surfaces
-      // a refreshCore throw, which this core cannot produce.
-      refresh();
+// Starts a refresh job and re-reads the status so the toolbar flips to
+// "refreshing" now rather than at the next idle poll. A failure to start
+// keeps the page's data and flags it stale; the exact API message isn't
+// shown, the stale banner copy is fixed regardless of cause.
+function useRefreshStart({ startRefresh, refetchStatus }) {
+  const [startFailed, setStartFailed] = useState(false);
+  const refresh = useCallback(async () => {
+    setStartFailed(false);
+    try {
+      await startRefresh();
+    } catch (err) {
+      console.warn('[useSharedProjects] refresh failed to start:', err);
+      setStartFailed(true);
     }
-  }, [listQuerySuccess, refresh]);
+    await refetchStatus();
+  }, [startRefresh, refetchStatus]);
+  return { startFailed, refresh };
+}
+
+// The connect job's own failure, shown while its slot is in ERROR.
+function connectSlotError(connect) {
+  if (connect?.phase !== SYNC_PHASE.ERROR) return null;
+  return apiErrorMessage({ code: connect.code, message: connect.error }, 'projects.connectFailed');
 }
 
 /**
  * The shared-repo screen's data and actions: whether sharing is configured,
  * the remote project list and its freshness, plus connect, refresh and pull.
- *
- * A refresh is one POST followed by a re-list, coalesced so concurrent callers
- * share a single round; a failed round marks the list stale rather than
- * rejecting, so the toolbar shows "stale" instead of an error.
+ * All three actions only start a background job; progress and outcome come
+ * back through the sync status (`pullSlot` is the pull job's, for
+ * usePullToLocal).
  */
 export function useSharedProjects() {
-  const { getSharedStatus, sharedListProjects, connectShared, refreshShared, pullSharedProject } = useApi();
-  const queryClient = useQueryClient();
+  const { sharedListProjects, connectShared, startRefresh, startPull } = useApi();
 
-  const { statusQuery, configured, listQuery } = useSharedStatusAndList({ getSharedStatus, sharedListProjects });
+  const sync = useSyncStatus();
+  const { configured } = sync;
+  const listQuery = useQuery(sharedListQueryOptions({ sharedListProjects, configured }));
 
-  // Overridden to true by a failed refresh() round (either the POST or the
-  // re-list that follows it); reset on the next round's outcome. Combined
-  // with the list envelope's own `stale` flag below -- either can make the
-  // toolbar show "· stale".
-  const [staleOverride, setStaleOverride] = useState(false);
-
-  // connect()/pull(): see useSharedActions -- same in-flight-ref idiom as
-  // usePublishTrigger.
-  const { connecting, connectError, connect, pull } = useSharedActions({ connectShared, pullSharedProject, queryClient });
-
-  const refreshCore = useCallback(
-    makeRefreshCore({ refreshShared, queryClient, setStaleOverride }),
-    [refreshShared, queryClient],
-  );
-
-  // refresh(): coalescing wrapper around one POST + re-list round (see
-  // useCoalescedRefresh).
-  const { refreshing, refresh } = useCoalescedRefresh(refreshCore);
-
-  useBackgroundRevalidate(listQuery.isSuccess, refresh);
+  const actions = useSharedActions({ connectShared, startPull });
+  const pull = useCallback(async (projectId, action) => {
+    const started = await actions.pull(projectId, action);
+    await sync.refetch(); // show the running job now, not at the next idle poll
+    return started;
+  }, [actions.pull, sync.refetch]);
+  const connect = useCallback(async (nextUrl) => {
+    await actions.connect(nextUrl);
+    await sync.refetch(); // show the running job now, not at the next idle poll
+  }, [actions.connect, sync.refetch]);
+  const { startFailed, refresh } = useRefreshStart({ startRefresh, refetchStatus: sync.refetch });
 
   const { url, projects, lastSynced, stale, loading, error } = deriveSharedProjectsState({
-    statusQuery, listQuery, configured, staleOverride,
+    sync, listQuery, configured, startFailed,
   });
 
   return {
     configured, url, projects, lastSynced, stale,
     loading, error,
-    connecting, connectError, connect,
-    refreshing, refresh,
-    pull,
+    connecting: actions.connecting || isSlotActive(sync.connect),
+    connectError: actions.connectError ?? connectSlotError(sync.connect),
+    connect,
+    refreshing: isSlotActive(sync.refresh), refresh,
+    pull, pullSlot: sync.pull,
   };
 }
 
@@ -207,7 +166,7 @@ const SIGNAL_OBSERVER_OPTIONS = { refetchOnWindowFocus: false };
  * landing, zero-local empty states). Reads the SAME sharedKeys.status()/
  * sharedKeys.list() cache entries as useSharedProjects (react-query dedupes
  * by key, so mounting both costs one fetch each), but deliberately has no
- * background refresh, no mutations, and no error surface: a failed status
+ * polling, no mutations, and no error surface: a failed status
  * or list load settles as hasContent=false, which falls back to today's
  * local-only flow.
  *

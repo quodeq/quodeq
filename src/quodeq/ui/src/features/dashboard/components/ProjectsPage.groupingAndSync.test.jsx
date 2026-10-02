@@ -12,15 +12,17 @@ import { SidePaneProvider } from '../../side-pane/index.js';
 // (cached-first, see that hook's own tests), so every render touches the API
 // -- an ApiProvider is required from here on regardless of project count.
 function makeFakeApi(overrides = {}) {
-  return {
+  const api = {
     getSharedStatus: vi.fn(async () => ({ configured: true, url: null, publish: { state: 'idle' } })),
     sharedListProjects: vi.fn(async () => ({ projects: [], lastSynced: null, stale: false })),
     connectShared: vi.fn(async (url) => ({ configured: true, url })),
-    refreshShared: vi.fn(async () => ({ stale: false, lastSynced: '2026-07-17T00:00:00Z' })),
-    pullSharedProject: vi.fn(async (id) => ({ imported: true, projectId: id })),
+    startRefresh: vi.fn(async () => ({ started: true })),
+    startPull: vi.fn(async (id) => ({ started: true, project: id })),
     publishProject: vi.fn(async () => ({ started: true })),
     ...overrides,
   };
+  // The status poll reads getSyncStatus; these tests drive it through getSharedStatus.
+  return { getSyncStatus: (...a) => api.getSharedStatus(...a), ...api };
 }
 
 function renderWithApi(ui, fakeApi) {
@@ -172,12 +174,12 @@ describe('ProjectsPage — SyncedIndicator: "not synced yet" and unconfigured hi
   // the retry affordance -- clicking it calls the refresh endpoint (which
   // useSharedProjects' refresh() also uses to re-check status, see that
   // hook's own tests).
-  it('shows "sync failed · retry" (no em-dash) when the shared list fails to load, and the button retries via refreshShared()', async () => {
-    const refreshShared = vi.fn(async () => ({ stale: false, lastSynced: '2026-07-19T00:00:00Z' }));
+  it('shows "sync failed · retry" (no em-dash) when the shared list fails to load, and the button retries via startRefresh()', async () => {
+    const startRefresh = vi.fn(async () => ({ stale: false, lastSynced: '2026-07-19T00:00:00Z' }));
     const fakeApi = makeFakeApi({
       getSharedStatus: vi.fn(async () => ({ configured: true, url: 'https://github.com/team/results.git' })),
       sharedListProjects: vi.fn(async () => { throw new Error('list failed'); }),
-      refreshShared,
+      startRefresh,
     });
     const user = userEvent.setup();
     renderWithApi(<ProjectsPage projects={[{ id: 'a', name: 'app' }]} actions={{}} />, fakeApi);
@@ -188,7 +190,7 @@ describe('ProjectsPage — SyncedIndicator: "not synced yet" and unconfigured hi
 
     await user.click(screen.getByRole('button', { name: 'refresh' }));
 
-    await waitFor(() => expect(refreshShared).toHaveBeenCalled());
+    await waitFor(() => expect(startRefresh).toHaveBeenCalled());
   });
 
   it('hides the sync indicator and its refresh button entirely when no shared repo is configured', async () => {

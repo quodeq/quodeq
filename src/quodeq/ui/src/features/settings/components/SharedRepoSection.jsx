@@ -1,8 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect } from 'react';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { sharedKeys } from '../../../api/queryKeys.js';
+import { isSlotActive } from '../../../api/syncStatus.js';
+import { useSyncStatus } from '../../../hooks/useSyncStatus.js';
+import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
 import { t } from '../../../strings/index.js';
 import { apiErrorMessage, isAccessCode } from '../../../strings/apiErrors.js';
 import { SettingsRowLabel } from './settingsRowParts.jsx';
@@ -94,18 +97,21 @@ function buildDisconnectMutationConfig({ disconnectShared, setError, setNewUrl, 
   };
 }
 
-function buildStatusQueryConfig(getSharedStatus) {
-  return {
-    queryKey: [...sharedKeys.status(), 'settings-detail'],
-    queryFn: () => getSharedStatus().catch((err) => {
-      // A server 500 and "genuinely not configured" must not collapse
-      // into the same silent {configured: false} with no trace: log the
-      // real failure so a backend outage is debuggable, even though the
-      // UI still shows the not-configured empty state either way.
-      console.error('Failed to fetch shared repo status:', err);
-      return { configured: false, url: null };
-    }),
-  };
+// A server 500 and "genuinely not configured" must not collapse into the same
+// silent not-configured state with no trace: log the real failure so a backend
+// outage is debuggable, even though the UI still shows the not-configured
+// empty state either way.
+function useLogStatusFailure(error) {
+  useEffect(() => {
+    if (error) console.error('Failed to fetch shared repo status:', error);
+  }, [error]);
+}
+
+// The connect job runs in the background, so its failure arrives through the
+// status's connect slot rather than as a rejection of the PUT.
+function connectSlotError(connect) {
+  if (connect?.phase !== SYNC_PHASE.ERROR) return null;
+  return apiErrorMessage({ code: connect.code, message: connect.error }, 'settings.connectFailed');
 }
 
 function ErrorRow({ error }) {
@@ -203,15 +209,14 @@ function DisconnectRow({ configured, confirming, setConfirming, isSaving, isDisc
 }
 
 export default function SharedRepoSection({ onDisconnected }) {
-  const { getSharedStatus, connectShared, disconnectShared } = useApi();
+  const { connectShared, disconnectShared } = useApi();
   const queryClient = useQueryClient();
 
   const { newUrl, setNewUrl, confirming, setConfirming, error, setError, accessFailure, setAccessFailure, savingRef, disconnectingRef, initializedRef } = useSharedRepoFields();
 
-  const { data: status, isLoading, refetch: refetchStatus } = useQuery(buildStatusQueryConfig(getSharedStatus));
-
-  const configured = status?.configured ?? false;
-  const currentUrl = status?.url ?? null;
+  const sync = useSyncStatus();
+  const { status, isLoading, refetch: refetchStatus, configured, url: currentUrl } = sync;
+  useLogStatusFailure(sync.error);
 
   useInitNewUrl({ currentUrl, setNewUrl, initializedRef });
 
@@ -230,7 +235,7 @@ export default function SharedRepoSection({ onDisconnected }) {
 
   const handleDisconnect = () => disconnectMutation.mutate();
 
-  const isSaving = connectMutation.isPending;
+  const isSaving = connectMutation.isPending || isSlotActive(sync.connect);
   const isDisconnecting = disconnectMutation.isPending;
 
   return (
@@ -248,7 +253,7 @@ export default function SharedRepoSection({ onDisconnected }) {
           <AccessPanel failure={accessFailure} url={newUrl.trim()} onResolved={handleSave} onRetry={handleSave} />
         </div>
       ) : (
-        <ErrorRow error={error} />
+        <ErrorRow error={error ?? connectSlotError(sync.connect)} />
       )}
 
       <DisconnectRow

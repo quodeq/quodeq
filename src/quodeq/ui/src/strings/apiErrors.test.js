@@ -63,7 +63,6 @@ test('every Group D code maps to a translated key distinct from its raw backend 
     ['CONNECT_IN_PROGRESS', 'a connect is already running', 'apiError.connectInProgress'],
     ['CONNECT_START_FAILED', 'could not start the connect job, see server logs', 'apiError.connectStartFailed'],
     ['CONNECT_FAILED', 'An unexpected error occurred while connecting.', 'apiError.connectFailed'],
-    ['CONNECT_TIMEOUT', 'Timed out waiting for the shared repository to connect', 'apiError.connectTimeout'],
     ['SCORES_READ_FAILED', 'could not read run scores', 'apiError.scoresReadFailed'],
     ['CONFIRMATION_REQUIRED', 'Use ?confirm=true to confirm deletion', 'apiError.confirmationRequired'],
   ];

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { makeFakeApi, renderWithApi } from './_sharedRepoSection.fixtures.jsx';
+import catalog from '../../../strings/en.json' with { type: 'json' };
 
 /**
  * Split from SharedRepoSection.test.jsx: status display and connect/save.
@@ -130,5 +131,31 @@ describe('SharedRepoSection', () => {
     await waitFor(() => {
       expect(screen.getByText(new RegExp(errorMsg, 'i'))).toBeTruthy();
     });
+  });
+
+  it('shows the connect slot error, mapped through its code, while the slot is in error', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({
+        configured: false, url: null,
+        connect: { state: 'error', phase: 'error', code: 'FOREIGN_REPO', error: 'raw backend sentence' },
+      })),
+    });
+
+    renderWithApi(fakeApi);
+
+    await waitFor(() => expect(screen.getByText(catalog['apiError.foreignRepo'])).toBeTruthy());
+    expect(screen.queryByText('raw backend sentence')).toBeNull();
+  });
+
+  it('disables save while the connect job is still running in the background', async () => {
+    const fakeApi = makeFakeApi({
+      getSharedStatus: vi.fn(async () => ({
+        configured: false, url: null, connect: { state: 'running', phase: 'downloading' },
+      })),
+    });
+
+    renderWithApi(fakeApi);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /saving/i })).toBeDisabled());
   });
 });

@@ -1,23 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sharedStatusQueryOptions, sharedListQueryOptions } from './sharedQueryOptions.js';
+import { sharedListQueryOptions } from './sharedQueryOptions.js';
 import { sharedKeys } from '../../../api/queryKeys.js';
-
-const getSharedStatus = async () => ({ configured: true });
-
-test('status query: shared status key, no enabled flag unless one is given', () => {
-  const opts = sharedStatusQueryOptions({ getSharedStatus });
-  assert.deepEqual(opts.queryKey, sharedKeys.status());
-  assert.equal(opts.queryFn, getSharedStatus);
-  assert.equal('enabled' in opts, false);
-  assert.equal('refetchOnWindowFocus' in opts, false);
-  assert.equal(sharedStatusQueryOptions({ getSharedStatus, enabled: false }).enabled, false);
-});
-
-test('status query carries extra observer options', () => {
-  const opts = sharedStatusQueryOptions({ getSharedStatus, observerOptions: { refetchOnWindowFocus: false } });
-  assert.equal(opts.refetchOnWindowFocus, false);
-});
 
 test('list query: enabled only when configured and the caller gate allows it', () => {
   const calls = [];

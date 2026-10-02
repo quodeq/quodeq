@@ -81,7 +81,6 @@ const CODE_KEYS = {
   CONNECT_IN_PROGRESS: 'apiError.connectInProgress',
   CONNECT_START_FAILED: 'apiError.connectStartFailed',
   CONNECT_FAILED: 'apiError.connectFailed',
-  CONNECT_TIMEOUT: 'apiError.connectTimeout',
 
   // Assistant workspace: diff/apply/discard on the isolated write worktree
   // (assistant_workspace_routes.py).
