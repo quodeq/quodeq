@@ -17,10 +17,12 @@ from http import HTTPStatus
 from typing import Callable
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.types.sync_phase import SyncKind, SyncPhase
 from quodeq.services.github_access import forget_url
 from quodeq.services.job_status import JobSlotStatus
 from quodeq.services.shared_connect import ConnectOutcome, ConnectStatus, connect_shared_repo
-from quodeq.services.shared_repo import RepoFormat, validate_remote_url
+from quodeq.services.shared_repo import RepoFormat, shared_evaluations_root, validate_remote_url
+from quodeq.services.sync_progress import SYNC_IDLE_FIELDS, count_projects, progress_writer
 from quodeq.shared.fault_isolation import run_isolated
 
 # Wire ``code`` values for a failed connect. The UI maps each to a
@@ -30,6 +32,8 @@ CODE_CLONE_FAILED = "CLONE_FAILED"
 CODE_FOREIGN_REPO = "FOREIGN_REPO"
 CODE_UNSUPPORTED_VERSION = "UNSUPPORTED_VERSION"
 CODE_CONNECT_FAILED = "CONNECT_FAILED"
+
+_PERCENT_DONE = 100
 
 MESSAGE_CONNECT_UNEXPECTED = "An unexpected error occurred while connecting."
 MESSAGE_CONNECT_START_FAILED = "Failed to start connect background job."
@@ -101,13 +105,16 @@ class ConnectJobStatus(JobSlotStatus):
 
     def __init__(self) -> None:
         super().__init__(
-            {"state": ConnectState.IDLE, "url": None, "code": None, "error": None, "finished_at": None},
+            {
+                "state": ConnectState.IDLE, "url": None, "code": None, "error": None,
+                "finished_at": None, **SYNC_IDLE_FIELDS,
+            },
             ConnectState.RUNNING,
         )
 
     def claim(self, url: str) -> bool:
         """Atomically take the connect slot; False when a connect is running."""
-        return self.claim_slot(url=url)
+        return self.claim_slot(url=url, kind=SyncKind.CONNECT, phase=SyncPhase.CONNECTING)
 
 
 _default_status = ConnectJobStatus()
@@ -124,20 +131,25 @@ def is_connect_running(status: ConnectJobStatus | None = None) -> bool:
 
 
 def _fail(status: ConnectJobStatus, message: str, code: str) -> None:
-    status.set(state=ConnectState.ERROR, code=code, error=message, finished_at=time.time())
+    status.set(state=ConnectState.ERROR, phase=SyncPhase.ERROR, code=code, error=message, finished_at=time.time())
 
 
 def _do_connect(
     url: str, status: ConnectJobStatus, connect: Callable[..., ConnectOutcome] | None,
     log: LogSink, env: Mapping[str, str] | None = None,
 ) -> None:
-    failure = connect_failure((connect or connect_shared_repo)(url, log=log, env=env))
+    outcome = (connect or connect_shared_repo)(url, log=log, env=env, progress=progress_writer(status))
+    failure = connect_failure(outcome)
     if failure is not None:
         if failure.code == CODE_CLONE_FAILED:
             forget_url(url)  # a stale "reachable" cache entry must not outlive a failed clone
         _fail(status, failure.message, failure.code)
         return
-    status.set(state=ConnectState.DONE, code=None, error=None, finished_at=time.time())
+    found = count_projects(shared_evaluations_root(url, env), status)
+    status.set(
+        state=ConnectState.DONE, phase=SyncPhase.DONE, percent=_PERCENT_DONE, projects_found=found,
+        code=None, error=None, finished_at=time.time(),
+    )
 
 
 def run_connect_job(

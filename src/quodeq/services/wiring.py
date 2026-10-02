@@ -193,11 +193,12 @@ from quodeq.data.fs.report_parser.runs import (  # noqa: F401
 from quodeq.data.fs.repo_handler import is_valid_repo_url  # noqa: F401
 from quodeq.data.fs.children import find_children  # noqa: F401
 
-# Shared-results repo: clone lifecycle, git invocation, layout + format
-# checks, path/state lookups, and remote-URL validation.
+# Shared-results repo: clone lifecycle, git, layout/format checks, paths, URL validation.
 from quodeq.data.fs.shared_repo import (  # noqa: F401
     MARKER_FILENAME,
     PUBLISHED_META_FILENAME,
+    ProgressCallback,
+    ProgressUpdate,
     RepoFormat,
     bootstrap_repo_layout,
     check_repo_format,

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.wiring import (  # noqa: F401 — re-exported API
+    ProgressCallback,
     RepoFormat,
     check_repo_format,
     clone_lock,

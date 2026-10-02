@@ -31,7 +31,7 @@ class _FakePopen:
         read_fd, write_fd = os.pipe()
         os.close(write_fd)
         self.stderr = os.fdopen(read_fd, "rb")
-        self.pid = 0
+        self.pid = 4_194_304  # no such process: a stray killpg raises instead of hitting the runner's group
         self.returncode = 0
 
     def wait(self, timeout=None):
