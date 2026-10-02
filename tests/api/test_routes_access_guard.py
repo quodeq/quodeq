@@ -124,7 +124,7 @@ def test_refresh_runs_under_the_cached_token_env(client, tmp_path, monkeypatch):
     calls.clear()
     seen = {}
 
-    def fake_refresh(u, env=None, progress=None):
+    def fake_refresh(u, env=None, progress=None, **_):
         seen.update(url=u, env=env)
         return True, ""
 
@@ -138,6 +138,21 @@ def test_refresh_after_restart_walks_the_ladder_once(client, tmp_path, monkeypat
     _configure(tmp_path, url)
     calls = _token_probe(monkeypatch, GitFailureKind.NOT_FOUND)
     envs = []
-    _inline_refresh(monkeypatch, lambda u, env=None, progress=None: envs.append(env) or (True, ""))
+    _inline_refresh(monkeypatch, lambda u, env=None, progress=None, **_: envs.append(env) or (True, ""))
     client.post("/api/shared/refresh", headers=_ORIGIN)
     assert envs[0] and envs[0].get("GIT_CONFIG_VALUE_0") and len(calls) == 2  # ambient, then the token
+
+
+def test_refresh_unreachable_is_access_400_and_never_starts(client, tmp_path, monkeypatch):
+    _configure(tmp_path, "https://github.com/t/r.git")
+    monkeypatch.setattr(
+        "quodeq.services.github_access.probe_remote",
+        lambda url, **_kw: ProbeResult(GitFailureKind.NOT_FOUND, "remote: Repository not found."),
+    )
+    started = []
+    monkeypatch.setattr("quodeq.api.routes_shared_config.start_refresh", lambda *a, **kw: started.append(a))
+    resp = client.post("/api/shared/refresh", headers=_ORIGIN)
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["code"] == "ACCESS_NOT_FOUND" and body["kind"] == "not_found"
+    assert started == []

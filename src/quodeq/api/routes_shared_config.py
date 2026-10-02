@@ -51,6 +51,7 @@ CODE_CONFIRMATION_REQUIRED = "CONFIRMATION_REQUIRED"
 MESSAGE_CONNECT_IN_PROGRESS = "a connect is already running"
 CODE_REFRESH_IN_PROGRESS = "REFRESH_IN_PROGRESS"
 CODE_REFRESH_START_FAILED = "REFRESH_START_FAILED"
+MESSAGE_REFRESH_IN_PROGRESS = "a refresh is already running"
 INVITE_TEXT = "Open quodeq, choose Join your team's results, paste {url}"
 
 
@@ -143,7 +144,8 @@ def shared_config_delete(provider: ActionProvider) -> Response | tuple[Response,
 
     The clone is deleted from disk, so the caller must pass ``?confirm=true``
     (same gate as the other destructive DELETEs). Refused while a connect job
-    runs: its settings write would reconnect right after the disconnect.
+    runs (its settings write would reconnect right after the disconnect) and
+    while a refresh runs (it is rewriting the clone this would delete).
     """
     if request.args.get("confirm") != QUERY_FLAG_TRUE:
         return json_error(
@@ -152,6 +154,8 @@ def shared_config_delete(provider: ActionProvider) -> Response | tuple[Response,
         )
     if is_connect_running():
         return json_error(MESSAGE_CONNECT_IN_PROGRESS, HTTPStatus.CONFLICT, CODE_CONNECT_IN_PROGRESS)
+    if is_refresh_running():
+        return json_error(MESSAGE_REFRESH_IN_PROGRESS, HTTPStatus.CONFLICT, CODE_REFRESH_IN_PROGRESS)
     # Ordering + locking business rule lives in
     # services/shared_repo.disconnect_shared_repo.
     disconnect_shared_repo(log=SHARED_LOG)
@@ -177,7 +181,7 @@ def _shared_refresh_start(start: Callable[..., RefreshStartResult]) -> Response 
         return error
     outcome = start(url, env=access.env, log=SHARED_LOG)
     if outcome == RefreshStartResult.ALREADY_RUNNING:
-        return json_error("a refresh is already running", HTTPStatus.CONFLICT, CODE_REFRESH_IN_PROGRESS)
+        return json_error(MESSAGE_REFRESH_IN_PROGRESS, HTTPStatus.CONFLICT, CODE_REFRESH_IN_PROGRESS)
     if outcome != RefreshStartResult.STARTED:
         return json_error(
             "could not start the refresh job, see server logs",

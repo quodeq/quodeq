@@ -21,6 +21,7 @@ from quodeq.api.helpers import json_error, optional_json_object_or_response, val
 from quodeq.api.import_project import IMPORT_LOG
 from quodeq.api.zip import build_project_zip
 from quodeq.services.base import ActionProvider
+from quodeq.services.project_archive_export import ExportSizeLimitError
 from quodeq.services.project_import import IMPORT_ACTIONS, import_zip_stream
 from quodeq.services.shared_repo import clone_lock
 from quodeq.services.shared_pull_job import (
@@ -35,6 +36,7 @@ from .routes_shared_common import logger, shared_project_dir, with_shared_root
 
 CODE_PULL_IN_PROGRESS = "PULL_IN_PROGRESS"
 CODE_PULL_START_FAILED = "PULL_START_FAILED"
+CODE_PULL_TOO_LARGE = "PULL_TOO_LARGE"
 
 
 def _build_pull_zip(project: str, project_path: Path) -> tuple[Path, None] | tuple[None, PullOutcome]:
@@ -42,9 +44,10 @@ def _build_pull_zip(project: str, project_path: Path) -> tuple[Path, None] | tup
     success, (None, failed outcome) on failure."""
     try:
         return build_project_zip(project_path), None
-    except ValueError:
-        return None, PullOutcome(False, code="TOO_LARGE", error="Project too large to pull")
-    except (OSError, zipfile.BadZipFile):
+    except ExportSizeLimitError as exc:
+        # public_message is the service's fixed text (limits and the env var), never str(exc).
+        return None, PullOutcome(False, code=CODE_PULL_TOO_LARGE, error=exc.public_message)
+    except (OSError, zipfile.BadZipFile, ValueError):
         logger.exception("Failed to build zip for shared pull of %s", project)
         return None, PullOutcome(
             False, code="EXPORT_ERROR", error="Failed to build project archive from the shared repository",
