@@ -682,6 +682,7 @@
   "help.navProviders": "AI Providers",
   "help.navSettings": "Settings",
   "help.navSharedRepo": "Shared Repository",
+  "help.navGithubAccess": "GitHub Access",
   "help.navStandards": "Custom Standards",
   "help.navTerminal": "Terminal",
   "help.navViolations": "Violations & Fix Plans",

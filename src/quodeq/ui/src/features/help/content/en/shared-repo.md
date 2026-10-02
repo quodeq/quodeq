@@ -12,7 +12,7 @@ Open **Settings**, find the *shared repository* section, paste the repository UR
 
 ### Authentication
 
-Quodeq uses your own git setup and never asks for credentials. The rule of thumb: if `git clone` works for that URL in a terminal, it works here.
+quodeq checks access before cloning and, when your git cannot reach the repository, offers to sign in with GitHub or use another method. See GitHub access. Interactive prompts are disabled for every git command quodeq runs.
 
 - **SSH** needs the key loaded in your agent and the host already in `known_hosts`.
 - **HTTPS** needs a credential helper holding a token. Interactive prompts are disabled, so a URL that would ask for a password fails instead of hanging.
