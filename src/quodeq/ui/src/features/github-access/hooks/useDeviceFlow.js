@@ -14,45 +14,57 @@ export function useDeviceFlow({ startDeviceFlow, getDeviceFlow, onSignedIn, poll
   const [flow, setFlow] = useState(IDLE);
   const timerRef = useRef(null);
   const aliveRef = useRef(true);
+  // Generation: begin() and reset() bump it, so work started before them goes stale.
+  const runRef = useRef(0);
+  // Latest props, so a pending timer never calls a stale callback.
+  const latest = useRef({});
+  latest.current = { startDeviceFlow, getDeviceFlow, onSignedIn, pollMs };
 
   const stop = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
   }, []);
 
-  useEffect(() => () => { aliveRef.current = false; stop(); }, [stop]);
+  useEffect(() => {
+    aliveRef.current = true; // StrictMode re-mounts after the cleanup below
+    return () => { aliveRef.current = false; stop(); };
+  }, [stop]);
 
-  const poll = useCallback(async () => {
+  const isStale = (runId) => !aliveRef.current || runId !== runRef.current;
+
+  const poll = useCallback(async (runId) => {
     let status;
     try {
-      status = await getDeviceFlow();
+      status = await latest.current.getDeviceFlow();
     } catch (err) {
-      if (aliveRef.current) setFlow((f) => ({ ...f, phase: FLOW_PHASE.ERROR, error: apiErrorMessage(err, 'githubAccess.pollFailed') }));
+      if (!isStale(runId)) setFlow((f) => ({ ...f, phase: FLOW_PHASE.ERROR, error: apiErrorMessage(err, 'githubAccess.pollFailed') }));
       return;
     }
-    if (!aliveRef.current) return;
+    if (isStale(runId)) return;
     if (TERMINAL.has(status.state)) {
       setFlow((f) => ({ ...f, phase: status.state, login: status.login ?? null, error: status.error ?? null }));
-      if (status.state === DEVICE_FLOW_STATE.DONE) onSignedIn?.(status.login);
+      if (status.state === DEVICE_FLOW_STATE.DONE) latest.current.onSignedIn?.(status.login);
       return;
     }
-    timerRef.current = setTimeout(poll, pollMs);
-  }, [getDeviceFlow, onSignedIn, pollMs]);
+    timerRef.current = setTimeout(() => poll(runId), latest.current.pollMs);
+  }, []);
 
   const begin = useCallback(async () => {
     stop();
+    runRef.current += 1;
+    const runId = runRef.current;
     setFlow({ ...IDLE, phase: FLOW_PHASE.STARTING });
     try {
-      const code = await startDeviceFlow();
-      if (!aliveRef.current) return;
+      const code = await latest.current.startDeviceFlow();
+      if (isStale(runId)) return;
       setFlow({ ...IDLE, phase: FLOW_PHASE.AWAITING_USER, userCode: code.userCode, verificationUri: code.verificationUri });
-      timerRef.current = setTimeout(poll, pollMs);
+      timerRef.current = setTimeout(() => poll(runId), latest.current.pollMs);
     } catch (err) {
-      if (aliveRef.current) setFlow({ ...IDLE, phase: FLOW_PHASE.ERROR, error: apiErrorMessage(err, 'githubAccess.startFailed') });
+      if (!isStale(runId)) setFlow({ ...IDLE, phase: FLOW_PHASE.ERROR, error: apiErrorMessage(err, 'githubAccess.startFailed') });
     }
-  }, [startDeviceFlow, poll, pollMs, stop]);
+  }, [poll, stop]);
 
-  const reset = useCallback(() => { stop(); setFlow(IDLE); }, [stop]);
+  const reset = useCallback(() => { stop(); runRef.current += 1; setFlow(IDLE); }, [stop]);
 
   return { ...flow, begin, reset };
 }
