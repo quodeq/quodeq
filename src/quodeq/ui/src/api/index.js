@@ -69,3 +69,5 @@ export {
 } from './updates.js';
 
 export { getMenubar, setMenubar } from './menubar.js';
+
+export { probeGit, getGithubAccount, startDeviceFlow, getDeviceFlow, pasteGithubToken, signOutGithub } from './githubAccess.js';

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { apiErrorKey, apiErrorMessage } from './apiErrors.js';
+import { apiErrorKey, apiErrorMessage, apiErrorDetail, isAccessCode } from './apiErrors.js';
 import catalog from './en.json' with { type: 'json' };
 
 test('every mapped code resolves to a key that exists in the catalog', () => {
@@ -101,4 +101,37 @@ test('KEYRING_UNAVAILABLE copy names the env var from the envelope', () => {
   assert.ok(msg.includes('GEMINI_API_KEY'), msg);
   assert.ok(msg.includes('QUODEQ_ALLOW_PLAINTEXT_KEY=1'), msg);
   assert.ok(!msg.includes('{envVar}'), msg);
+});
+
+test('maps every access and clone code to its own key', () => {
+  const pairs = {
+    ACCESS_AUTH_REQUIRED: 'apiError.accessAuthRequired', ACCESS_NOT_FOUND: 'apiError.accessNotFound',
+    ACCESS_HOST_KEY: 'apiError.accessHostKey', ACCESS_NETWORK: 'apiError.accessNetwork',
+    ACCESS_TIMEOUT: 'apiError.accessTimeout', ACCESS_GIT_MISSING: 'apiError.accessGitMissing',
+    ACCESS_GIT_TOO_OLD: 'apiError.accessGitTooOld', ACCESS_UNKNOWN: 'apiError.accessUnknown',
+    CLONE_UNKNOWN: 'apiError.cloneUnknown', CLONE_TIMEOUT: 'apiError.cloneTimeout',
+    HOST_KEY_UNVERIFIED: 'apiError.hostKeyUnverified', GIT_MISSING: 'apiError.gitMissing',
+    TOKEN_INVALID: 'apiError.tokenInvalid', TOKEN_SCOPE: 'apiError.tokenScope', TOKEN_REQUIRED: 'apiError.tokenRequired',
+    OFFLINE: 'apiError.githubOffline', GITHUB_NOT_CONFIGURED: 'apiError.githubNotConfigured',
+    NO_FLOW: 'apiError.noFlow', FLOW_START_FAILED: 'apiError.flowStartFailed',
+    GITHUB_REFUSED: 'apiError.githubRefused', FLOW_FAILED: 'apiError.flowFailed',
+  };
+  for (const [code, key] of Object.entries(pairs)) {
+    assert.equal(apiErrorKey(code), key);
+    assert.ok(key in catalog, `${key} missing from en.json`);
+  }
+});
+
+test('no onboarding clone code resolves to shared-repository copy', () => {
+  for (const code of ['CLONE_UNKNOWN', 'CLONE_TIMEOUT', 'AUTH_REQUIRED', 'REPO_NOT_FOUND']) {
+    assert.doesNotMatch(apiErrorKey(code), /sharedRepo/);
+  }
+});
+
+test('apiErrorDetail reads the envelope detail or empty', () => {
+  assert.equal(apiErrorDetail({ body: { detail: 'fatal: x' } }), 'fatal: x');
+  assert.equal(apiErrorDetail({ body: { detail: '' } }), '');
+  assert.equal(apiErrorDetail({}), '');
+  assert.equal(isAccessCode('ACCESS_NOT_FOUND'), true);
+  assert.equal(isAccessCode('REPO_NOT_FOUND'), false);
 });
