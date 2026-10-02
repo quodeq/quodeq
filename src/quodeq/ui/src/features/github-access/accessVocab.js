@@ -2,6 +2,7 @@
 export const ACCESS_KIND = Object.freeze({
   OK: 'ok', AUTH_REQUIRED: 'auth_required', NOT_FOUND: 'not_found', HOST_KEY: 'host_key',
   NETWORK: 'network', TIMEOUT: 'timeout', GIT_MISSING: 'git_missing', GIT_TOO_OLD: 'git_too_old', UNKNOWN: 'unknown',
+  USE_HTTPS: 'use_https', // routes_github_access.KIND_USE_HTTPS: reachable only over the https form
 });
 export const SIGN_IN_KINDS = Object.freeze([ACCESS_KIND.AUTH_REQUIRED, ACCESS_KIND.NOT_FOUND]);
 export const DEVICE_FLOW_STATE = Object.freeze({

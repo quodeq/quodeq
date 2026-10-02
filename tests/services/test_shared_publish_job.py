@@ -43,11 +43,14 @@ def test_publish_job_success(tmp_path, monkeypatch, status):
 
 def test_publish_job_error_captured(tmp_path, monkeypatch, status):
     _run_inline(monkeypatch)
+    forgotten = []
+    monkeypatch.setattr(shared_publish, "forget_url", forgotten.append)
     with patch.object(shared_publish, "publish_project", side_effect=PublishError("boom")):
         start_publish("p1", "u", evaluations_root=tmp_path, status=status)
     result = get_publish_status(status)
     assert result["state"] == "error"
     assert result["error"] == "boom"
+    assert forgotten == ["u"]  # the ladder re-probes after a failed push
 
 
 def test_publish_job_unexpected_error_captured(tmp_path, monkeypatch, status, caplog):

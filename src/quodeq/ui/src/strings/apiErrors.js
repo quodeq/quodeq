@@ -107,6 +107,7 @@ const CODE_KEYS = {
   ACCESS_GIT_MISSING: 'apiError.accessGitMissing',
   ACCESS_GIT_TOO_OLD: 'apiError.accessGitTooOld',
   ACCESS_UNKNOWN: 'apiError.accessUnknown',
+  ACCESS_USE_HTTPS: 'apiError.accessUseHttps',
   CLONE_UNKNOWN: 'apiError.cloneUnknown',
   CLONE_TIMEOUT: 'apiError.cloneTimeout',
   HOST_KEY_UNVERIFIED: 'apiError.hostKeyUnverified',

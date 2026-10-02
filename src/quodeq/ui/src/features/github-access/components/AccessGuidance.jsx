@@ -25,12 +25,13 @@ function httpsFormOf(url) {
 }
 
 /** Kinds that sign-in cannot fix: say what to do, then offer try again. */
-export function GuidanceOnly({ kind, host, url, detail, onRetry }) {
+export function GuidanceOnly({ kind, host, url, cloneUrl, detail, onRetry }) {
   const help = HELP[kind];
   return (
     <>
       {help && <p className="access-panel__help">{t(help, { host })}</p>}
       {kind === ACCESS_KIND.HOST_KEY && <pre className="access-card__cmd"><code>{httpsFormOf(url)}</code></pre>}
+      {kind === ACCESS_KIND.USE_HTTPS && cloneUrl && <pre className="access-card__cmd"><code>{cloneUrl}</code></pre>}
       <Detail detail={detail} />
       <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onRetry}>{t('githubAccess.tryAgain')}</button>
     </>

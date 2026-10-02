@@ -33,6 +33,7 @@ from quodeq.api.routes_shared_findings_mirrors import register_shared_findings_m
 from quodeq.services import fs_reports, fs_projects
 from quodeq.api.fleet_request import FLEET_LOG, fleet_projects_or_error
 from quodeq.services.compare import build_compare_summary, build_fleet_compare
+from quodeq.services.github_access import refresh_access_env
 from quodeq.services.run_constants import LATEST_RUN
 from quodeq.services.runs_unit import build_runs_unit
 from quodeq.services.scoring import get_project_scores, get_scores_slim
@@ -48,6 +49,11 @@ from quodeq.shared.serialization import to_camel_dict
 from .routes_shared_common import logger, with_shared_root
 
 _PROJECT_NOT_FOUND = "Project not found"  # repeated across the shared-mirror read routes
+
+
+def _refresh_with_access(url: str) -> tuple[bool, str]:
+    """Refresh under the env the access ladder reached *url* with (a token rung's header)."""
+    return refresh_shared_clone(url, env=refresh_access_env(url))
 
 
 def _shared_projects(
@@ -257,7 +263,7 @@ def register_shared_mirror_routes(app: Flask) -> None:
     @with_shared_root
     def shared_projects(eval_root: Path, url: str):
         return _shared_projects(
-            eval_root, url, refresh_shared_clone, sync_shared_index,
+            eval_root, url, _refresh_with_access, sync_shared_index,
         )
 
     app.get("/api/shared/projects/<project>/info")(shared_project_info)

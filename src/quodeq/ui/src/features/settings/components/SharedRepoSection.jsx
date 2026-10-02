@@ -48,7 +48,7 @@ function buildConnectMutationConfig({ connectShared, setError, setAccessFailure,
       return result;
     }, (err) => {
       if (isAccessCode(err?.code)) {
-        setAccessFailure({ kind: err.body?.kind, detail: err.body?.detail || '', host: err.body?.host || '', isGitHub: Boolean(err.body?.isGitHub) });
+        setAccessFailure({ kind: err.body?.kind, detail: err.body?.detail || '', host: err.body?.host || '', isGitHub: Boolean(err.body?.isGitHub), cloneUrl: err.body?.cloneUrl || '' });
         return;
       }
       setError(apiErrorMessage(err, 'settings.connectFailed'));

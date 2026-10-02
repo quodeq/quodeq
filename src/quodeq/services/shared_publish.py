@@ -34,6 +34,7 @@ from quodeq.services._publish_staging import (
     merge_actions_log,
     stage_project,
 )
+from quodeq.services.github_access import forget_url
 from quodeq.services.job_status import JobSlotStatus
 from quodeq.services.wiring import (
     RepoFormat,
@@ -176,6 +177,7 @@ def _do_publish(
         count = publish_project(project_id, url, evaluations_root=evaluations_root, env=env)
         status.set(state=PublishState.DONE, runs=count, error=None, finished_at=time.time())
     except PublishError as exc:
+        forget_url(url)  # a stale "reachable" cache entry must not outlive a failed push
         status.set(state=PublishState.ERROR, error=str(exc), finished_at=time.time())
 
 
