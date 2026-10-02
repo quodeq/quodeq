@@ -134,7 +134,9 @@ class FailureStreakWatcher:
                 "failure-streak breaker tripped: %d consecutive errors; recent=%s",
                 streak, [(e.file, e.reason) for e in event.recent],
             )
-            cancellation.request_cancel()
+            # Named, so the dim runner can tell this cancel from a signal or a
+            # provider-fatal one and release it once the dimension drains.
+            cancellation.request_cancel(reason=REASON_CIRCUIT_BREAKER)
         self._tripped.set()
         return True
 
