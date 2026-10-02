@@ -117,7 +117,7 @@ def _http_error(code):
     return urllib.error.HTTPError("https://x", code, "err", Message(), io.BytesIO(b"{}"))
 
 
-@pytest.mark.parametrize("payload", [{}, {"device_code": "d"}, {"device_code": None, "user_code": "u", "verification_uri": "v", "expires_in": 1, "interval": 1}, {"device_code": "d", "user_code": "u", "verification_uri": "v", "expires_in": "soon", "interval": 1}])
+@pytest.mark.parametrize("payload", [{}, {"device_code": "d"}, {"device_code": None, "user_code": "u", "verification_uri": "v", "expires_in": 1, "interval": 1}, {"device_code": "d", "user_code": "u", "verification_uri": "v", "expires_in": "soon", "interval": 1}, {"device_code": "d", "user_code": "u", "verification_uri": "v", "expires_in": float("inf"), "interval": 1}])
 def test_malformed_device_code_is_unreachable(payload):
     with pytest.raises(GitHubUnreachable, match="malformed"):
         GitHubOAuthClient(opener=_opener([_Response(payload)])).request_device_code("Iv1.x", "repo")

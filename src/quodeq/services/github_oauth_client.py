@@ -152,7 +152,7 @@ class GitHubOAuthClient:
                 verification_uri=_text(payload["verification_uri"]),
                 expires_in=int(payload["expires_in"]), interval=int(payload["interval"]),
             )
-        except (KeyError, ValueError, TypeError) as exc:
+        except (KeyError, ValueError, TypeError, OverflowError) as exc:
             raise _malformed() from exc
 
     def poll_token(self, client_id: str, device_code: str) -> TokenPoll:

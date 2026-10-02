@@ -20,10 +20,13 @@ from quodeq.config.ai_provider_errors import PLAINTEXT_KEY_REFUSED_MESSAGE, Plai
 from quodeq.config.github_account import GitHubAccount, TokenMethod, delete_account, load_account, store_account
 from quodeq.config.github_app import GITHUB_OAUTH_SCOPE
 from quodeq.services.github_access import AccessResult, clear_access_cache, resolve_access
-from quodeq.services.github_device_flow import DeviceFlowState, StartResult, get_device_flow_status, start_device_flow
+from quodeq.services.github_device_flow import (
+    DeviceFlowState, FlowDeps, StartResult, get_device_flow_status, start_device_flow,
+)
 from quodeq.services.github_gh_cli import GhStatus, gh_status
 from quodeq.services.github_oauth_client import GitHubOAuthClient, GitHubRefused, GitHubUnreachable, TokenRejected
 from quodeq.services.shared_repo import validate_remote_url
+from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.repo import is_repo_url
 
 CODE_URL_REQUIRED = "URL_REQUIRED"
@@ -50,6 +53,11 @@ _START_FAILURES = {
 }
 
 
+def _start_flow() -> StartResult:
+    """Start the device flow with production logging wired in."""
+    return start_device_flow(deps=FlowDeps(log=SHARED_LOG))
+
+
 @dataclass(frozen=True)
 class RouteDeps:
     """Every collaborator the routes call, injectable for tests."""
@@ -59,7 +67,7 @@ class RouteDeps:
     delete_account: Callable[[], None] = delete_account
     store_account: Callable[[GitHubAccount], tuple[bool, bool]] = store_account
     gh: Callable[[], GhStatus] = gh_status
-    start_flow: Callable[[], StartResult] = start_device_flow
+    start_flow: Callable[[], StartResult] = _start_flow
     flow_status: Callable[[], dict] = get_device_flow_status
     client: GitHubOAuthClient | None = None  # None: a real client, built per call
 

@@ -15,13 +15,13 @@ from enum import StrEnum
 
 from quodeq.config.github_account import GitHubAccount, TokenMethod, store_account
 from quodeq.config.github_app import GITHUB_OAUTH_SCOPE, github_client_id
+from quodeq.core.observability import NULL_LOG, LogSink
 from quodeq.services.github_access import clear_access_cache
 from quodeq.services.github_oauth_client import (
     DeviceCode, GitHubOAuthClient, GitHubRefused, GitHubUnreachable, PollKind, TokenGrant,
 )
 from quodeq.services.job_status import JobSlotStatus
 from quodeq.shared.fault_isolation import run_isolated
-from quodeq.shared.log_sink import SHARED_LOG
 
 SLOW_DOWN_EXTRA_S = 5
 MESSAGE_FLOW_UNEXPECTED = "An unexpected error occurred while signing in."
@@ -86,6 +86,7 @@ class FlowDeps:
     sleep: Callable[[float], None] | None = None
     now: Callable[[], float] | None = None
     on_signed_in: Callable[[], None] | None = None
+    log: LogSink = NULL_LOG
 
 
 def _spawn_daemon(target: Callable[[], None]) -> None:
@@ -136,6 +137,11 @@ def _poll_until_terminal(code: DeviceCode, *, status: DeviceFlowStatus, deps: Fl
         return
 
 
+def _isolated(attempt: Callable[[], None], on_error: Callable[[BaseException], None], log: LogSink) -> None:
+    """Run *attempt* behind the fault-isolation boundary."""
+    run_isolated(attempt, label="github-device-flow", log=log, on_error=on_error)
+
+
 def run_device_flow_job(code: DeviceCode, *, status: DeviceFlowStatus, deps: FlowDeps) -> None:
     """Poll GitHub until the flow ends; every failure lands in *status*, never a stuck slot."""
     now = deps.now or time.time
@@ -148,10 +154,7 @@ def run_device_flow_job(code: DeviceCode, *, status: DeviceFlowStatus, deps: Flo
         except GitHubRefused as exc:
             _finish(status, DeviceFlowState.ERROR, now, error=MESSAGE_GITHUB_REFUSED.format(status=exc.status))
 
-    run_isolated(
-        attempt, label="github-device-flow", log=SHARED_LOG,
-        on_error=lambda _exc: _finish(status, DeviceFlowState.ERROR, now, error=MESSAGE_FLOW_UNEXPECTED),
-    )
+    _isolated(attempt, lambda _exc: _finish(status, DeviceFlowState.ERROR, now, error=MESSAGE_FLOW_UNEXPECTED), deps.log)
 
 
 def start_device_flow(*, status: DeviceFlowStatus | None = None, deps: FlowDeps | None = None) -> StartResult:
