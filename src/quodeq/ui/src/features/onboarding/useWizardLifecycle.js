@@ -1,10 +1,12 @@
 /**
- * Onboarding-wizard lifecycle: entry state, the once-per-session auto-open
- * decision, and the exit handlers. Moved out of App.jsx (move-only); the
+ * Onboarding-wizard lifecycle: entry state, the derived auto-open decision,
+ * and the exit handlers. Moved out of App.jsx (move-only); the
  * pure decision helpers stay exported so the contracts remain unit-testable
  * without mounting the whole App (which needs ~8 providers).
  */
 import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateProjects } from '../../hooks/invalidateProjects.js';
 import { readString } from '../../adapters/storage.js';
 import { STEP_WELCOME, SKIPPED_KEY, SKIPPED_VALUE } from './wizardSteps.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
@@ -20,8 +22,8 @@ import { NAV_TAB } from '../../vocab/navTab.js';
  * content (sharedHasContent, see useSharedContentSignal) gives the user
  * remote repositories to browse -- the wizard must not open over those
  * either. While the shared signal is still resolving (sharedSettled=false)
- * the decision is DEFERRED: return false but do not latch, same as the
- * other transient blocks.
+ * the decision is DEFERRED: useWizardLifecycle re-evaluates it whenever an
+ * input changes.
  */
 export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, selectedSource, isEvaluating, sharedSettled = true, sharedHasContent = false }) {
   if (!projectsLoaded) return false;
@@ -36,24 +38,26 @@ export function shouldAutoOpenOnboardingWizard({ projectsLoaded, projectsCount, 
 /**
  * Exit handlers for the onboarding wizard. The wizard registers the project
  * on its Repo & Scan step (POST /api/projects), well before either exit
- * fires — so both exits that leave a registered project behind (a saved
- * close and a launch) must reload the projects list, or the new project
- * stays invisible in the Projects tab until an evaluation finishes (the
- * only other path that calls loadProjects). Exported so the reload contract
- * is testable without mounting the whole App.
+ * fires, so both exits that leave a registered project behind (a saved
+ * close and a launch) refetch the shared project list, or the new project
+ * stays invisible in the Projects tab. Exported so the refetch contract is
+ * testable without mounting the whole App.
  */
-export function buildWizardHandlers({ state, setWizardEntry, navTab }) {
+export function buildWizardHandlers({ state, setWizardEntry, navTab, queryClient }) {
+  const refreshProjects = () => {
+    invalidateProjects(queryClient).catch((err) => console.warn('[wizard] project list refetch failed:', err));
+  };
   return {
     onClose: ({ saved, projectId }) => {
       setWizardEntry(null);
       if (saved && projectId) {
-        state.loadProjects?.();
+        refreshProjects();
         state.refreshDashboard?.();
       }
     },
     onLaunch: ({ projectId, repo, scopePath, branch, provider, standardIds, totalTimeLimitS }) => {
       setWizardEntry(null);
-      state.loadProjects?.();
+      refreshProjects();
       const payload = {
         repo: repo || projectId,
         dimensions: standardIds,
@@ -70,28 +74,36 @@ export function buildWizardHandlers({ state, setWizardEntry, navTab }) {
   };
 }
 
-/**
- * Wizard entry state + the auto-open-on-first-paint effect.
- *
- * Auto-open is a once-per-session decision. Without the latch, closing the
- * wizard sets wizardEntry → null, which re-fires the effect and re-opens
- * the wizard immediately because projects.length is still 0. The user's
- * close action (X, Maybe later, or Start evaluation) is the signal that the
- * auto-open job is done for this page load.
- *
- * @returns {{ wizardEntry: Object|null, setWizardEntry: Function, wizardHandlers: { onClose: Function, onLaunch: Function } }}
- */
-export function useWizardLifecycle({ state, navTab, isEvaluating, sharedSignal }) {
-  const [wizardEntry, setWizardEntry] = useState(null);
-  const autoOpenedRef = useRef(false);
+// Whether the user has something to look at besides the wizard: local
+// projects, or a settled shared repo with published content.
+function hasWorkingView(state, sharedSignal) {
+  return state.projects.length > 0 || (sharedSignal.settled && sharedSignal.hasContent);
+}
 
-  // Auto-open wizard on first paint when there are no projects and the user
-  // has not explicitly skipped. The skip flag only suppresses auto-open — it
-  // never blocks "Add a project" or "Take the tour" buttons.
+/**
+ * The auto-open, derived from its inputs on every change instead of decided
+ * once. It never opens while the project list or the shared signal is still
+ * resolving, nor when the user opted out (the skip flag only suppresses
+ * auto-open; it never blocks "Add a project" or "Take the tour"). Once the
+ * user has a working view (local projects or shared content) a wizard still
+ * on its welcome step steps aside, so a team repo connected mid-session
+ * replaces the "nothing here yet" wizard without a reload.
+ *
+ * `session` records what this page load has already seen: the wizard was
+ * opened or closed (a user's close is final; re-popping it on the next input
+ * change would fight them), or the user had a working view (deleting the
+ * last project, or a disconnect, must not pop a first-run wizard over the
+ * app), plus the step the open wizard is on.
+ */
+function useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, setWizardEntry, session }) {
   useEffect(() => {
-    if (autoOpenedRef.current) return;
-    if (!state.projectsLoaded) return;
-    if (state.projects.length > 0) { autoOpenedRef.current = true; return; }
+    const seen = session.current;
+    if (hasWorkingView(state, sharedSignal)) {
+      seen.spent = true;
+      if (wizardEntry && seen.step === STEP_WELCOME) setWizardEntry(null);
+      return;
+    }
+    if (seen.spent || wizardEntry) return;
     if (!shouldAutoOpenOnboardingWizard({
       projectsLoaded: state.projectsLoaded,
       projectsCount: state.projects.length,
@@ -99,32 +111,38 @@ export function useWizardLifecycle({ state, navTab, isEvaluating, sharedSignal }
       isEvaluating,
       sharedSettled: sharedSignal.settled,
       sharedHasContent: sharedSignal.hasContent,
-    })) {
-      // A settled "shared repo has content" outcome is FINAL for this page
-      // load, not transient: if it later flips (repo disconnected in
-      // Settings, background refresh reveals an emptied repo), the wizard
-      // must not pop over the user's working view -- the wall/empty states
-      // are the non-modal fallback. Latch here; the remaining blocks
-      // (unsettled signal, shared selection, evaluation in flight) stay
-      // unlatched so the decision is reconsidered when they lift.
-      if (sharedSignal.settled && sharedSignal.hasContent) {
-        autoOpenedRef.current = true;
-      }
-      // Otherwise blocked for a transient reason (shared selection, an
-      // evaluation in flight, shared signal still resolving) -- do NOT mark
-      // autoOpenedRef: once the block lifts (source switches back to local,
-      // the evaluation finishes, the signal settles) while local projects
-      // are still zero, the decision must be reconsidered rather than
-      // permanently skipped.
-      return;
-    }
-    autoOpenedRef.current = true;
-    if (readString(SKIPPED_KEY, null) !== SKIPPED_VALUE) {
-      setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: true });
-    }
-  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]); // eslint-disable-line react-hooks/exhaustive-deps
+    })) return;
+    if (readString(SKIPPED_KEY, null) === SKIPPED_VALUE) return;
+    seen.spent = true;
+    seen.step = STEP_WELCOME;
+    setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: true });
+  }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]); // eslint-disable-line react-hooks/exhaustive-deps -- re-evaluates on input changes only; wizardEntry and the setter are read current
+}
 
-  const wizardHandlers = buildWizardHandlers({ state, setWizardEntry, navTab });
+/**
+ * Wizard entry state, the derived auto-open (useWizardAutoOpen) and the exit
+ * handlers. `onStepChange` lets the mounted wizard report its current step,
+ * which is what decides whether shared content may close it.
+ *
+ * @returns {{ wizardEntry: Object|null, setWizardEntry: Function,
+ *   wizardHandlers: { onClose: Function, onLaunch: Function, onStepChange: Function } }}
+ */
+export function useWizardLifecycle({ state, navTab, isEvaluating, sharedSignal }) {
+  const [wizardEntry, setWizardEntry] = useState(null);
+  const session = useRef({ spent: false, step: null });
+  const queryClient = useQueryClient();
+
+  useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, setWizardEntry, session });
+
+  // Any close (X, Maybe later, saved exit, launch) is final for this session.
+  const closeAware = (entry) => {
+    if (entry === null) Object.assign(session.current, { spent: true, step: null });
+    setWizardEntry(entry);
+  };
+  const wizardHandlers = {
+    ...buildWizardHandlers({ state, setWizardEntry: closeAware, navTab, queryClient }),
+    onStepChange: (step) => { session.current.step = step; },
+  };
 
   return { wizardEntry, setWizardEntry, wizardHandlers };
 }

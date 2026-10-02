@@ -12,7 +12,9 @@
  * `{ ok: false, messageKey, vars }` and a caller owns how (or whether) to
  * present them.
  */
+import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/ApiContext.jsx';
+import { invalidateProjects } from './invalidateProjects.js';
 import { chooseDialog } from '../utils/chooseDialog.js';
 import { t } from '../strings/index.js';
 import { apiErrorMessage } from '../strings/apiErrors.js';
@@ -41,11 +43,11 @@ function makeFail(onError) {
 
 /**
  * Builds the delete handler. It moves the selection to another project when
- * the deleted one was selected, then reloads the list.
+ * the deleted one was selected, then refetches the shared project list.
  *
  * @returns {(projectId: string) => Promise<{ok: boolean, messageKey?: string, vars?: object}>}
  */
-export function makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail }) {
+export function makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, refreshProjects, fail }) {
   return async function handleDeleteProject(projectId) {
     try {
       await deleteProject(projectId);
@@ -53,7 +55,7 @@ export function makeHandleDeleteProject({ deleteProject, projects, selectedProje
       return fail('projects.deleteProjectFailed', { error: apiErrorMessage(err, 'projects.deleteProjectFailed') });
     }
     if (selectedProject === projectId) handleProjectChange(projects.find((p) => projectIdOrSelf(p) !== projectId)?.id ?? '');
-    loadProjects();
+    refreshProjects();
     return { ok: true };
   };
 }
@@ -78,7 +80,7 @@ function makeHandleExportProject({ projects, getProjectExportUrl }) {
   };
 }
 
-function makeHandleRelocateProject({ relocateProject, loadProjects, fail }) {
+function makeHandleRelocateProject({ relocateProject, refreshProjects, fail }) {
   return async function handleRelocateProject(projectId, newPath) {
     try {
       await relocateProject(projectId, newPath);
@@ -86,7 +88,7 @@ function makeHandleRelocateProject({ relocateProject, loadProjects, fail }) {
       console.error('Relocate failed:', err);
       return fail('projects.relocateFailed', { error: err.message || t('common.unknownError') });
     }
-    loadProjects();
+    refreshProjects();
     return { ok: true };
   };
 }
@@ -149,7 +151,7 @@ async function pickImportFile() {
   return file;
 }
 
-function makeHandleImportProject({ importProject, loadProjects, fail }) {
+function makeHandleImportProject({ importProject, refreshProjects, fail }) {
   const attemptImport = makeAttemptImport(importProject);
   const resolveImportConflict = makeResolveImportConflict(attemptImport);
   return async function handleImportProject() {
@@ -164,8 +166,16 @@ function makeHandleImportProject({ importProject, loadProjects, fail }) {
     if (!attempt.ok) {
       return fail('projects.importProjectFailed', { error: attempt.err.message || t('common.unknownError') });
     }
-    loadProjects();
+    refreshProjects();
     return { ok: true };
+  };
+}
+
+// A failed list refetch after a mutation that already succeeded is not the
+// mutation failing: the list query surfaces its own failure state.
+function makeRefreshProjects(queryClient) {
+  return function refreshProjects() {
+    invalidateProjects(queryClient).catch((err) => console.warn('[useProjectActions] project list refetch failed:', err));
   };
 }
 
@@ -177,16 +187,17 @@ function makeHandleImportProject({ importProject, loadProjects, fail }) {
  * through `onError(messageKey, vars)` so the caller owns how they are shown.
  */
 export function useProjectActions(
-  { projects, selectedProject, handleProjectChange, loadProjects },
+  { projects, selectedProject, handleProjectChange },
   { onError = () => {} } = {},
 ) {
   const { deleteProject, getProjectExportUrl, relocateProject, importProject } = useApi();
+  const refreshProjects = makeRefreshProjects(useQueryClient());
   const fail = makeFail(onError);
 
-  const handleDeleteProject = makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, loadProjects, fail });
+  const handleDeleteProject = makeHandleDeleteProject({ deleteProject, projects, selectedProject, handleProjectChange, refreshProjects, fail });
   const handleExportProject = makeHandleExportProject({ projects, getProjectExportUrl });
-  const handleRelocateProject = makeHandleRelocateProject({ relocateProject, loadProjects, fail });
-  const handleImportProject = makeHandleImportProject({ importProject, loadProjects, fail });
+  const handleRelocateProject = makeHandleRelocateProject({ relocateProject, refreshProjects, fail });
+  const handleImportProject = makeHandleImportProject({ importProject, refreshProjects, fail });
 
   return { handleDeleteProject, handleExportProject, handleRelocateProject, handleImportProject };
 }

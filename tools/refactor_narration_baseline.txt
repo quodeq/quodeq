@@ -80,7 +80,7 @@ src/quodeq/ui/src/App.errorThreadingAndAssistant.test.jsx:5
 src/quodeq/ui/src/App.navigationBundle.test.jsx:5
 src/quodeq/ui/src/App.onboardingAndTabs.test.jsx:12
 src/quodeq/ui/src/App.startupLoader.test.jsx:10
-src/quodeq/ui/src/App.wizardAndBundles.test.jsx:11
+src/quodeq/ui/src/App.wizardAndBundles.test.jsx:12
 src/quodeq/ui/src/api/applyMutationDelta.bulkKinds.test.jsx:72
 src/quodeq/ui/src/api/applyMutationDelta.dismissDerived.test.jsx:64
 src/quodeq/ui/src/api/applyMutationDelta.dismissScores.test.jsx:72
@@ -111,7 +111,7 @@ src/quodeq/ui/src/features/dashboard/components/DashboardPage.selectorAndStartup
 src/quodeq/ui/src/features/dashboard/components/ProjectsPage.badgesAndFilters.test.jsx:38
 src/quodeq/ui/src/features/dashboard/components/ProjectsPage.groupingAndSync.test.jsx:38
 src/quodeq/ui/src/features/dashboard/components/ProjectsPage.publishAction.test.jsx:38
-src/quodeq/ui/src/features/dashboard/components/ProjectsPage.sharedEntries.test.jsx:38
+src/quodeq/ui/src/features/dashboard/components/ProjectsPage.sharedEntries.test.jsx:40
 src/quodeq/ui/src/features/dashboard/hooks/useCoalescedRefresh.js:20
 src/quodeq/ui/src/features/dashboard/hooks/useDashboard.core.test.jsx:50
 src/quodeq/ui/src/features/dashboard/hooks/useDashboard.frozenAndInfo.test.jsx:50
@@ -171,7 +171,6 @@ src/quodeq/ui/src/hooks/evaluationLifecycleHelpers.js:8
 src/quodeq/ui/src/hooks/projectScoresDerived.js:3
 src/quodeq/ui/src/hooks/useAppState.evalCompletion.test.jsx:9
 src/quodeq/ui/src/hooks/useAppState.reconcile.test.jsx:10
-src/quodeq/ui/src/hooks/useJobCompletionEffect.js:10
 src/quodeq/ui/src/hooks/useNavStack.historyState.test.jsx:22
 src/quodeq/ui/src/hooks/useNavStack.purity.test.jsx:22
 src/quodeq/ui/src/hooks/useNavStack.replace.test.jsx:22

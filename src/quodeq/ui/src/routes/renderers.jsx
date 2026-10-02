@@ -217,7 +217,6 @@ export const ROUTE_RENDERERS = {
         onImportProject: props.navigation.onImportProject,
         onResumeSetup: props.navigation.onResumeSetup,
         onFiltersChange: (filters) => props.navigation.handleNavigateReplace(NAV_TAB.PROJECTS, { filters }),
-        onProjectsReload: props.navigation.loadProjects,
       }}
     />
   ),

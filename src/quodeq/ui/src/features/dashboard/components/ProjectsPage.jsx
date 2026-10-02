@@ -198,7 +198,7 @@ function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, ca
 // Everything the cards list needs: the merged/filtered entries plus the
 // per-card action context (confirm/relocate dialogs, publish, pull-to-local).
 function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
-  const { onSelect, onDelete, onExport, onRelocate, onResumeSetup, onProjectsReload } = actions;
+  const { onSelect, onDelete, onExport, onRelocate, onResumeSetup } = actions;
   const [confirming, setConfirming] = useState(null);
   const relocateActions = useRelocateDialog(onRelocate);
 
@@ -206,7 +206,7 @@ function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
   // merge, subproject nesting, query filter) lives in useProjectsPageData.
   const { shared, children, localEntryById, publishActions, isEmpty, visibleEntries } = useProjectsPageData({ projects, filters });
 
-  const { pullConflictId, pulledIds, handlePull, handleConfirmCopy, cancelConflict } = usePullToLocal({ shared, onProjectsReload });
+  const { pullConflictId, pulledIds, handlePull, handleConfirmCopy, cancelConflict } = usePullToLocal({ shared });
 
   const cardsListCtx = {
     children, selectedProject, onSelect, onResumeSetup, confirming, setConfirming, onDelete, onExport,

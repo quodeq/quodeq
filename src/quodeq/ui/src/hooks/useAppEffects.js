@@ -87,28 +87,38 @@ export function useEvaluateBounceEffect({ state, selectedProjectInfo, hasCurrent
   }, [state.projectsLoaded, state.projects.length, selectedProjectInfo, hasCurrentProjectRuns, state.activeTab, state.selectedSource]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+// The no-project landing is the default Overview tab itself, not a page
+// pushed on top of it.
+function isOnNoProjectLanding(activeTab, activePage) {
+  return activeTab === NAV_TAB.OVERVIEW && (!activePage || activePage.page === NAV_TAB.OVERVIEW);
+}
+
 /**
- * Initial landing: decided exactly once, the first render after both the
- * local projects list and the shared signal have settled (whatever the
- * outcome). Mid-session changes never re-trigger it.
+ * The landing redirect, derived instead of decided once: it re-runs whenever
+ * the local project list or the shared signal changes (load settling, a team
+ * repo connected mid-session, a first sync landing), so shared content that
+ * arrives after boot moves the empty "no projects" Overview to the projects
+ * list without a reload. It only ever moves a user who is still on that
+ * landing; a tab change alone does not re-run it, so a page the user chose,
+ * Overview included, is never yanked away.
  */
 export function useInitialLandingEffect({ state, sharedSignal, activeTab, navTab }) {
-  const initialLandingDecidedRef = useRef(false);
+  const latest = useRef(null);
+  latest.current = { selectedSource: state.selectedSource, activePage: state.activePage, activeTab, navTab };
   useEffect(() => {
-    if (initialLandingDecidedRef.current) return;
-    if (!state.projectsLoaded || !sharedSignal.settled) return;
-    initialLandingDecidedRef.current = true;
+    const { selectedSource, activePage, activeTab: tab, navTab: go } = latest.current;
+    if (!isOnNoProjectLanding(tab, activePage)) return;
     if (shouldRedirectToRemoteRepositories({
       projectsLoaded: state.projectsLoaded,
       projectsCount: state.projects.length,
-      selectedSource: state.selectedSource,
+      selectedSource,
       sharedSettled: sharedSignal.settled,
       sharedHasContent: sharedSignal.hasContent,
-      activeTab,
+      activeTab: tab,
     })) {
-      navTab(NAV_TAB.PROJECTS);
+      go(NAV_TAB.PROJECTS);
     }
-  }, [state.projectsLoaded, state.projects.length, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent, activeTab, navTab]);
+  }, [state.projectsLoaded, sharedSignal.settled, state.projects.length, sharedSignal.hasContent]);
 }
 
 /**

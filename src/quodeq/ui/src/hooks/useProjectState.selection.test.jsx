@@ -4,6 +4,7 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 vi.mock('../api/index.js', () => ({ listProjects: vi.fn() }));
 import { listProjects } from '../api/index.js';
 import { useProjectState } from './useProjectState.js';
+import { withQueryClient } from '../test-utils/withQueryClient.jsx';
 
 const noStorage = { getItem: () => '', setItem: () => {} };
 
@@ -22,7 +23,7 @@ describe('useProjectState — source-aware project selection', () => {
   it('defaults selectedSource to "local" when nothing is stored', async () => {
     listProjects.mockResolvedValue([{ id: 'a', name: 'A' }]);
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0 }));
+      useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.selectedProject).toBe('a'));
     expect(result.current.selectedSource).toBe('local');
@@ -32,7 +33,7 @@ describe('useProjectState — source-aware project selection', () => {
     listProjects.mockResolvedValue([{ id: 'a', name: 'A' }]);
     const storage = makeMemoryStorage();
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }));
+      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.selectedProject).toBe('a'));
 
@@ -51,9 +52,10 @@ describe('useProjectState — source-aware project selection', () => {
     // handleProjectChange and overwrite the seeded source first.
     const storage = makeMemoryStorage({ quodeq_selected_project: 'a', quodeq_selected_source: 'shared' });
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }));
+      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }), { wrapper: withQueryClient() });
 
-    await waitFor(() => expect(result.current.selectedProject).toBe('a'));
+    await waitFor(() => expect(result.current.projectsLoaded).toBe(true));
+    expect(result.current.selectedProject).toBe('a');
     // Restored from storage before any change is made.
     expect(result.current.selectedSource).toBe('shared');
 
@@ -68,7 +70,7 @@ describe('useProjectState — source-aware project selection', () => {
     listProjects.mockResolvedValue([{ id: 'a', name: 'A' }]);
     const storage = makeMemoryStorage({ quodeq_selected_project: 'a', quodeq_selected_source: 'bogus' });
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }));
+      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.selectedProject).toBe('a'));
     expect(result.current.selectedSource).toBe('local');
@@ -83,7 +85,7 @@ describe('useProjectState — source-aware project selection', () => {
     const storage = makeMemoryStorage({ quodeq_selected_project: 'shared-xyz', quodeq_selected_source: 'shared' });
     const onNoProjects = vi.fn();
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects, storage, retryDelayMs: 0 }));
+      useProjectState({ onNoProjects, storage, retryDelayMs: 0 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.projectsLoaded).toBe(true));
     await new Promise((r) => setTimeout(r, 0)); // flush the resolution effect
@@ -97,7 +99,7 @@ describe('useProjectState — source-aware project selection', () => {
     listProjects.mockResolvedValue([{ id: 'a', name: 'A' }]);
     const storage = makeMemoryStorage();
     const { result } = renderHook(() =>
-      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }));
+      useProjectState({ onNoProjects: vi.fn(), storage, retryDelayMs: 0 }), { wrapper: withQueryClient() });
 
     await waitFor(() => expect(result.current.selectedProject).toBe('a'));
 
@@ -123,12 +125,13 @@ describe('useProjectState — warm-up pending poll', () => {
         .mockResolvedValueOnce({ projects: [{ id: 'a', name: 'A', summaryPending: true }] })
         .mockResolvedValue({ projects: [{ id: 'a', name: 'A', summaryPending: false }] });
       const { result } = renderHook(() =>
-        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, summaryPollMs: 1000 }));
+        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, summaryPollMs: 1000 }), { wrapper: withQueryClient() });
 
       await act(async () => { await vi.advanceTimersByTimeAsync(0); });
       expect(result.current.projects[0].summaryPending).toBe(true);
 
-      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); }); // flush the batched observer notify
       expect(listProjects).toHaveBeenCalledTimes(2);
       expect(result.current.projects[0].summaryPending).toBe(false);
 
@@ -146,10 +149,10 @@ describe('useProjectState — warm-up pending poll', () => {
         .mockResolvedValueOnce({ projects: [{ id: 'a', name: 'A', summaryPending: true }] })
         .mockRejectedValue(new Error('down'));
       const { result } = renderHook(() =>
-        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0, summaryPollMs: 1000 }));
+        useProjectState({ onNoProjects: vi.fn(), storage: noStorage, retryDelayMs: 0, maxRetries: 0, summaryPollMs: 1000 }), { wrapper: withQueryClient() });
 
       await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });   // poll fires, fails
+      await act(async () => { await vi.advanceTimersByTimeAsync(1100); });   // poll fires, fails
       await act(async () => { await vi.advanceTimersByTimeAsync(0); });
       expect(result.current.projectsLoadFailed).toBe(true);
       const calls = listProjects.mock.calls.length;

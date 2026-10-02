@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateProjects } from '../../../hooks/invalidateProjects.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { useSidePane } from '../../side-pane/SidePaneContext.jsx';
 import { HTTP_STATUS } from '../../../constants.js';
@@ -7,18 +9,19 @@ import { HTTP_STATUS } from '../../../constants.js';
  * Pull-to-local (shared-only cards): mirrors the delete-confirm idiom for
  * the 409 same-uuid collision case.
  */
-export function usePullToLocal({ shared, onProjectsReload }) {
+export function usePullToLocal({ shared }) {
+  const queryClient = useQueryClient();
   const { showToast } = useSidePane();
   const [pullConflictId, setPullConflictId] = useState(null);
   const [pulledIds, setPulledIds] = useState(() => new Set());
 
-  // Record the pull and reload the local list. Without the reload, a project
+  // Record the pull and refetch the local list. Without the refetch, a project
   // pulled here never appears in the merged list until some unrelated action
   // happens to reload the project list -- the user has no way to tell the
   // pull actually landed a local copy.
   async function markPulled(id) {
     setPulledIds((prev) => new Set(prev).add(id));
-    await Promise.resolve(onProjectsReload?.()).catch((err) => console.warn('[pull] projects reload failed:', err));
+    await invalidateProjects(queryClient).catch((err) => console.warn('[pull] projects reload failed:', err));
   }
 
   async function handlePull(id) {
