@@ -33,6 +33,8 @@ from quodeq.analysis.evidence_parser import parse_evidence_from_jsonl
 from quodeq.analysis.run_types import RunConfig, AnalysisContext
 from quodeq.analysis.errors import REASON_CIRCUIT_BREAKER
 from quodeq.core.run.exit_reason import ExitReason
+from quodeq.data.fs.evidence_markers import tally_evidence_markers
+from quodeq.shared import cancellation
 from quodeq.analysis.cache._dimension_context import (
     CacheContext,
     prepare_cache_context,
@@ -41,6 +43,7 @@ from quodeq.analysis.cache.failure_streak import (
     STOP_JOIN_TIMEOUT_S,
     CircuitBreakerError,
     FailureStreakWatcher,
+    TripEvent,
 )
 from quodeq.analysis.cache._persist_watcher import (
     PERSIST_INTERVAL_S,
@@ -167,6 +170,34 @@ def _start_watchers(
     return stop_event, watcher, breaker
 
 
+def _release_breaker_cancel(dim_id: str, cctx: CacheContext, trip: TripEvent) -> None:
+    """Scope a breaker trip to this dimension when the model is clearly alive.
+
+    The trip cancelled the run-wide token so this dimension's pool would stop
+    spawning. By now dispatch has returned and the pool has drained, so the
+    question is whether the rest of the run deserves to continue. A dimension
+    that analysed files before the streak is looking at bad input or a passing
+    blip (Shaka Player: 524 files fine, then five binary ``.ts`` video
+    segments in a row), so the token is released and the next dimension
+    starts fresh. A dimension where nothing succeeded is the dead-endpoint
+    case the breaker exists for, and the cancel stands. Only the breaker's
+    own cancel is released; a signal or provider-fatal cancel keeps its hold.
+    """
+    ok, err = tally_evidence_markers(cctx.jsonl)
+    if ok == 0 or cancellation.cancel_reason() != REASON_CIRCUIT_BREAKER:
+        _logger.error(
+            "failure-streak breaker: no file in %s succeeded before %d consecutive "
+            "errors; stopping the run", dim_id, trip.streak,
+        )
+        return
+    _logger.warning(
+        "failure-streak breaker: %s stopped early (%d analysed, %d failed) after %d "
+        "consecutive errors; continuing with the next dimension",
+        dim_id, ok, err, trip.streak,
+    )
+    cancellation.reset()
+
+
 def _handle_breaker_trip(
     config: RunConfig, ctx: AnalysisContext, cctx: CacheContext,
 ) -> Evidence:
@@ -217,6 +248,7 @@ def _dispatch_misses_with_watchers(
         watcher.join()
         breaker.stop_and_join(timeout=STOP_JOIN_TIMEOUT_S)
     if breaker.trip_event is not None:
+        _release_breaker_cancel(dim_id, cctx, breaker.trip_event)
         return _handle_breaker_trip(config, dispatch.ctx, cctx)
     return _handle_dispatch_result(
         config, dispatch.ctx, cctx, miss_evidence,
