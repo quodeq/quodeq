@@ -9,6 +9,7 @@ import AssistantProviderTabs from './AssistantProviderTabs.jsx';
 import EvaluationSection from './EvaluationSection.jsx';
 import TerminalSection from './TerminalSection.jsx';
 import ServerSection from './ServerSection.jsx';
+import GitHubAccessSection from './GitHubAccessSection.jsx';
 import SharedRepoSection from './SharedRepoSection.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
 import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
@@ -47,6 +48,7 @@ export default function SettingsPage({ theme, onOpenGradeFormula, onSharedDiscon
         <EvaluationSection />
         <TerminalSection />
         <ServerSection />
+        <GitHubAccessSection />
         <SharedRepoSection onDisconnected={onSharedDisconnected} />
         <section className="panel settings-section">
           <div className="panel-header">
