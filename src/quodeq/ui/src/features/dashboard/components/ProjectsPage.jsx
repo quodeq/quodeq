@@ -14,6 +14,8 @@ import { useSharedConnection } from '../hooks/useSharedProjects.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { projectIdOrSelf } from '../../../utils/projectIdentity.js';
 import { isSlotActive } from '../../../api/syncStatus.js';
+import { useCloneGhost } from '../hooks/useCloneGhost.js';
+import CloningTile from './CloningTile.jsx';
 
 // The empty page: the welcome's two paths side by side. With an evaluations
 // repository connected (but nothing published yet) its card names it; there
@@ -122,10 +124,11 @@ function ProjectsCardsList({ visibleEntries, ctx }) {
   );
 }
 
-function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }) {
+function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, cardsListCtx, ghost }) {
   return (
     <>
       <ProjectsToolbar filters={filters} onFiltersChange={onFiltersChange} configured={shared.configured} />
+      {ghost}
       <ProjectsCardsList visibleEntries={visibleEntries} ctx={cardsListCtx} />
     </>
   );
@@ -156,17 +159,26 @@ function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
 // ternary chain in the JSX, so each branch reads on its own line. While a
 // connect is still reading the team's projects, an empty page is not "add
 // your first project": the strip above says what is happening, so one quiet
-// line says where the results will land.
-function ProjectsPageContent({ projectsLoaded, isEmpty, connectActive, emptyProps, bodyProps }) {
+// line says where the results will land. The same goes for a clone that is
+// running: the ghost tile heads the page and one line says what comes next.
+function ProjectsPageContent({ projectsLoaded, isEmpty, status, ghost, emptyProps, bodyProps }) {
   if (!projectsLoaded) return <LoadingScreen variant="inline" />;
-  if (isEmpty && connectActive) return <p className="projects-empty">{t('projects.teamResultsArriving')}</p>;
-  if (isEmpty) return <EmptyProjectsPaths {...emptyProps} />;
-  return <ProjectsPageBody {...bodyProps} />;
+  if (isEmpty && status.cloneActive) return <>{ghost}<p className="projects-empty">{t('projects.projectArriving')}</p></>;
+  if (isEmpty && status.connectActive) return <>{ghost}<p className="projects-empty">{t('projects.teamResultsArriving')}</p></>;
+  if (isEmpty) return <>{ghost}<EmptyProjectsPaths {...emptyProps} /></>;
+  return <ProjectsPageBody {...bodyProps} ghost={ghost} />;
+}
+
+function useGhostTile() {
+  const { slot, active, onRetry, onClose } = useCloneGhost();
+  const ghost = slot ? <CloningTile slot={slot} onRetry={onRetry} onClose={onClose} /> : null;
+  return { ghost, cloneActive: active };
 }
 
 export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
   const { onAddProject, onStartAnalyze, onImportProject, onConnectEvaluations, onFiltersChange, onSharedDisconnected } = actions;
   const { shared, isEmpty, visibleEntries, cardsListCtx } = useProjectsCardsCtx({ projects, filters, selectedProject, actions });
+  const { ghost, cloneActive } = useGhostTile();
 
   return (
     <section className="projects-page projects-page--terminal">
@@ -187,7 +199,8 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
       <ProjectsPageContent
         projectsLoaded={projectsLoaded}
         isEmpty={isEmpty}
-        connectActive={isSlotActive(shared.status?.connect)}
+        status={{ connectActive: isSlotActive(shared.status?.connect), cloneActive }}
+        ghost={ghost}
         emptyProps={{ onStartAnalyze, onConnectEvaluations, onImportProject, isEvaluating }}
         bodyProps={{ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }}
       />
