@@ -3,6 +3,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { useEvaluation } from "./useEvaluation";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
+import { MockEventSource } from "../../../test-utils/MockEventSource.js";
 
 vi.mock("../../../utils/confirmDialog.js", () => ({
   confirmDialog: vi.fn().mockResolvedValue({ ok: true, checked: false }),
@@ -48,29 +49,24 @@ function makeWrapper() {
 beforeEach(() => {
   Object.values(fakeApi).forEach((fn) => fn.mockReset?.());
   fakeApi.listEvaluations.mockResolvedValue([]);
-  vi.stubEnv("VITE_USE_SSE_EVENTS", "false");
+  // jsdom has no EventSource; the stream opens against the mock.
+  vi.stubGlobal("EventSource", MockEventSource);
   localStorage.setItem("cc-active-provider", "ollama");
   localStorage.setItem("cc-ollama-model", "llama3.1");
 });
 
 describe("statusRefetchInterval", () => {
-  it("polls fast with SSE off", async () => {
-    const { statusRefetchInterval, JOB_POLL_MS } = await import("./useEvaluation.helpers.js");
-    const { STREAM_STATE } = await import("./runEventSourceRegistry.js");
-    expect(statusRefetchInterval(STREAM_STATE.OPEN, false)).toBe(JOB_POLL_MS);
-  });
-
-  it("under SSE only refetches on the slow safety net while the stream is up", async () => {
+  it("only refetches on the slow safety net while the stream is up", async () => {
     const { statusRefetchInterval, SSE_STATUS_SAFETY_NET_MS } = await import("./useEvaluation.helpers.js");
     const { STREAM_STATE } = await import("./runEventSourceRegistry.js");
-    expect(statusRefetchInterval(STREAM_STATE.OPEN, true)).toBe(SSE_STATUS_SAFETY_NET_MS);
-    expect(statusRefetchInterval(STREAM_STATE.IDLE, true)).toBe(SSE_STATUS_SAFETY_NET_MS);
+    expect(statusRefetchInterval(STREAM_STATE.OPEN)).toBe(SSE_STATUS_SAFETY_NET_MS);
+    expect(statusRefetchInterval(STREAM_STATE.IDLE)).toBe(SSE_STATUS_SAFETY_NET_MS);
   });
 
   it("falls back to the fast poll while the stream is in error", async () => {
     const { statusRefetchInterval, JOB_POLL_MS } = await import("./useEvaluation.helpers.js");
     const { STREAM_STATE } = await import("./runEventSourceRegistry.js");
-    expect(statusRefetchInterval(STREAM_STATE.ERROR, true)).toBe(JOB_POLL_MS);
+    expect(statusRefetchInterval(STREAM_STATE.ERROR)).toBe(JOB_POLL_MS);
   });
 });
 

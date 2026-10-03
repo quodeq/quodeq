@@ -2,19 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { projectKeys } from '../api/queryKeys.js';
-import { useRunningRunsRefresh } from '../hooks/useRunningRunsRefresh.js';
 import { useViolationsTabKeyReset } from '../features/violations/hooks/useViolationsPageState.js';
 import { createPageStateCache } from '../utils/pageStateCache.js';
 import { countFetches } from '../test-utils/budgets.jsx';
 
 // Switching Overview -> History -> Violations -> Overview with fresh data
-// must fire no request. Each tab mounts the hook that used to invalidate on
-// mount, plus an observer on the query that tab reads; the seeded cache is
-// fresh, so the only way a fetch can happen is a mount-time invalidation.
+// must fire no request. Each tab mounts an observer on the query it reads
+// (Violations also its tab-key reset, which used to invalidate on mount);
+// the seeded cache is fresh, so the only way a fetch can happen is a
+// mount-time invalidation.
 
 const PROJECT = 'p1';
 const SOURCE = 'local';
-const RUNS = [{ runId: 'r1', status: 'done' }];
 const KEYS = {
   dashboard: projectKeys.dashboard(PROJECT, null, SOURCE),
   scores: projectKeys.scores(PROJECT, null, SOURCE),
@@ -35,7 +34,6 @@ function Overview() {
 }
 
 function History() {
-  useRunningRunsRefresh({ selectedProject: PROJECT, selectedSource: SOURCE, availableRuns: RUNS });
   useQuery({ queryKey: KEYS.scores });
   return null;
 }

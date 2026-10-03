@@ -1,6 +1,6 @@
 /**
- * SSE-on behaviour of useEvaluation's status query. SSE_ENABLED is read once
- * at module load, so the flag is stubbed before a fresh import here.
+ * Stream-driven behaviour of useEvaluation's status query: a healthy stream
+ * means no fast poll, a broken one falls back to it.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
@@ -32,7 +32,6 @@ async function makeWrapper() {
 
 async function renderWithSseOn() {
   vi.resetModules();
-  vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
   const { useEvaluation } = await import("./useEvaluation.js");
   const { JOB_POLL_MS } = await import("./useEvaluation.helpers.js");
   const utils = renderHook(() => useEvaluation(), { wrapper: await makeWrapper() });

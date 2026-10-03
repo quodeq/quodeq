@@ -5,6 +5,7 @@ import { useEvaluation } from "./useEvaluation";
 import { CANCEL_CHOICE } from "../cancelDialog.js";
 import { CANCEL_RECONCILE_DELAYS_MS } from "./useEvaluationMutations.js";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
+import { MockEventSource } from "../../../test-utils/MockEventSource.js";
 
 vi.mock("../../../utils/confirmDialog.js", () => ({
   confirmDialog: vi.fn().mockResolvedValue({ ok: true, checked: false }),
@@ -59,8 +60,8 @@ describe("useEvaluation cancel reconcile", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     Object.values(fakeApi).forEach((fn) => fn.mockReset?.());
     fakeApi.listEvaluations.mockResolvedValue([]);
-    // Polling mode (jsdom has no EventSource); the reconcile runs either way.
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "false");
+    // jsdom has no EventSource; the stream opens against the mock.
+    vi.stubGlobal("EventSource", MockEventSource);
     localStorage.setItem("cc-active-provider", "ollama");
     localStorage.setItem("cc-ollama-model", "llama3.1");
   });

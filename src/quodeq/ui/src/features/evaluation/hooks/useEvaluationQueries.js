@@ -13,7 +13,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NO_JOB_ID, evaluationKeys } from "../../../api/queryKeys.js";
-import { SSE_ENABLED, statusRefetchInterval } from "./useEvaluation.helpers.js";
+import { statusRefetchInterval } from "./useEvaluation.helpers.js";
 
 // The rows the cache already holds, per dimension, in cache order.
 function groupFindingsByDimension(findings) {
@@ -45,7 +45,7 @@ export function useEvaluationQueries(api, jobId, streamState) {
     queryKey: evaluationKeys.status(jobId || NO_JOB_ID),
     queryFn: () => api.getEvaluation(jobId),
     enabled: !!jobId,
-    staleTime: SSE_ENABLED ? Infinity : 0,
+    staleTime: Infinity,
     refetchInterval: statusRefetchInterval(streamState),
   });
 

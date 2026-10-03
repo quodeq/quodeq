@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// The status query's polling path, which SSE_ENABLED (read once at import)
-// turns off by default. Pin the flag before the hook is imported. Findings
-// never poll: the test writes them into the cache slot the stream fills.
-vi.hoisted(() => { import.meta.env.VITE_USE_SSE_EVENTS = 'false'; });
-
 import { render, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { evaluationKeys } from '../../api/queryKeys.js';
@@ -18,6 +13,7 @@ import { ApiProvider } from '../../api/ApiContext.jsx';
 import { EvaluationLiveProvider, useLiveJob, useLiveFindings, useEvaluationActions } from './EvaluationLiveContext.jsx';
 import { createLiveEvaluationStore } from './liveEvaluationStore.js';
 import { countCommits } from '../../test-utils/budgets.jsx';
+import { MockEventSource } from '../../test-utils/MockEventSource.js';
 
 // A poll tick must not reach the page the user is on. The live values are
 // published to a store, so only the components that read them re-render; a
@@ -86,6 +82,9 @@ function renderShell(store, page, strip, client) {
 
 describe('live evaluation render budget', () => {
   beforeEach(() => {
+    // jsdom has no EventSource; the stream opens against the mock and the
+    // test writes findings into the cache slot the stream fills.
+    vi.stubGlobal('EventSource', MockEventSource);
     getEvaluationProgress.mockReset();
     getEvaluationProgress.mockResolvedValue(PROGRESS);
   });

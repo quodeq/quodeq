@@ -3,6 +3,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { useEvaluation } from "./useEvaluation";
 import { withQueryClient } from "../../../test-utils/withQueryClient.jsx";
 import { ApiProvider } from "../../../api/ApiContext.jsx";
+import { MockEventSource } from "../../../test-utils/MockEventSource.js";
 
 vi.mock("../../../utils/confirmDialog.js", () => ({
   confirmDialog: vi.fn().mockResolvedValue({ ok: true, checked: false }),
@@ -41,8 +42,8 @@ describe("useEvaluation", () => {
   beforeEach(() => {
     Object.values(fakeApi).forEach((fn) => fn.mockReset?.());
     fakeApi.listEvaluations.mockResolvedValue([]);
-    // Default: SSE off — refetchInterval path
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "false");
+    // jsdom has no EventSource; the stream opens against the mock.
+    vi.stubGlobal("EventSource", MockEventSource);
     // preparePayload reads localStorage; seed a working provider+model.
     localStorage.setItem("cc-active-provider", "ollama");
     localStorage.setItem("cc-ollama-model", "llama3.1");

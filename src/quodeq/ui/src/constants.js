@@ -3,20 +3,6 @@ import { SECONDS_PER_MINUTE, MS_PER_SECOND } from './utils/time.js';
 
 const UNDEFINED_TYPEOF = 'undefined'; // typeof sentinel for the event-dispatch helpers' "are we in a browser" guard
 
-// Vite env vars are always strings, never coerced to boolean; every reader
-// of a VITE_* boolean flag compares against these instead of the literals.
-export const ENV_TRUE = 'true';
-export const ENV_FALSE = 'false';
-
-/**
- * Whether live run updates arrive over the per-run SSE stream (default) or
- * by polling. Only an explicit VITE_USE_SSE_EVENTS=false turns the stream
- * off. Read at call time, not import time, so a test can stub the env.
- */
-export function isSseEnabled() {
-  return import.meta.env?.VITE_USE_SSE_EVENTS !== ENV_FALSE;
-}
-
 export const ISO_25010_URL = 'https://www.iso.org/';
 
 // Upper bound of every dimension/principle/overall score axis: scores are
