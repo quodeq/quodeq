@@ -3,12 +3,17 @@
    (scan, review, score) on the alternate surface, the two ways in
    on the right (WelcomePaths). Tokens only, so every theme and
    dark mode follow. Imported by WelcomeStep.jsx.
+
+   The step switch imports this file BEFORE onboarding.css lands, so the
+   generic `.onboarding-step` (flex column, 640px) and `.onboarding-wizard__panel-frame`
+   (640px) rules come later in the cascade. The compound selectors below
+   outrank them whatever the import order.
    ────────────────────────────────────────────────────────────── */
-.onboarding-wizard__panel-frame--wide {
+.onboarding-wizard__panel-frame.onboarding-wizard__panel-frame--wide {
   max-width: 880px;
 }
 
-.onboarding-welcome--split {
+.onboarding-step.onboarding-welcome--split {
   /* The left column opens with the "▶ welcome" prompt; the right column
      keeps the same band empty (the close button sits in it), so both
      column titles start on one line. */
@@ -178,7 +183,7 @@
 
 /* Narrow windows: the columns stack, how it works on top. */
 @media (max-width: 720px) {
-  .onboarding-welcome--split {
+  .onboarding-step.onboarding-welcome--split {
     grid-template-columns: minmax(0, 1fr);
   }
   .onboarding-how {
