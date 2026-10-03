@@ -56,7 +56,7 @@ function useConnectCard({ shared, connectOpen, onConnectOpenChange, emptyPage })
 /**
  * The team results block under the Repositories header: the sync strip while
  * a repository is configured (or a first connect runs), and the connect card
- * when the header's "connect team results" or the strip's "change
+ * when the header's "connect evaluations repository" or the strip's "change
  * repository" opened it, or always on an empty page with nothing connected.
  * A failed connect is reported by the card only (see pickStripState): with
  * nothing configured the card opens on its own so the error is never hidden,

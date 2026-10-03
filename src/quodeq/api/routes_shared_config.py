@@ -52,7 +52,7 @@ MESSAGE_CONNECT_IN_PROGRESS = "a connect is already running"
 CODE_REFRESH_IN_PROGRESS = "REFRESH_IN_PROGRESS"
 CODE_REFRESH_START_FAILED = "REFRESH_START_FAILED"
 MESSAGE_REFRESH_IN_PROGRESS = "a refresh is already running"
-INVITE_TEXT = "Open quodeq, choose Join your team's results, paste {url}"
+INVITE_TEXT = "Open quodeq, choose Connect evaluations repository, paste {url}"
 
 
 def sync_block(snapshot: dict) -> dict:

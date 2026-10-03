@@ -46,15 +46,15 @@ function renderCard(api) {
 describe('ConnectTeamCard', () => {
   it('shows the title and the description', async () => {
     renderCard(makeApi());
-    expect(screen.getByText('team results')).toBeInTheDocument();
-    expect(screen.getByText("Connect your team's results repository to browse published evaluations next to your own projects.")).toBeInTheDocument();
+    expect(screen.getByText('evaluations repository')).toBeInTheDocument();
+    expect(screen.getByText("A git repository where evaluations are published, yours or your team's. Connect it to browse them next to your own projects.")).toBeInTheDocument();
   });
 
   it('typing a URL and pressing connect calls connectShared with it', async () => {
     const api = makeApi();
     const user = userEvent.setup();
     renderCard(api);
-    await user.type(screen.getByRole('textbox', { name: /team results repository url/i }), '  https://github.com/team/results.git ');
+    await user.type(screen.getByRole('textbox', { name: /evaluations repository url/i }), '  https://github.com/team/results.git ');
     await user.click(screen.getByRole('button', { name: 'connect' }));
     await waitFor(() => expect(api.connectShared).toHaveBeenCalledWith('https://github.com/team/results.git'));
     expect(api.connectShared).toHaveBeenCalledTimes(1);
@@ -72,7 +72,7 @@ describe('ConnectTeamCard', () => {
     const api = makeApi();
     const user = userEvent.setup();
     renderCard(api);
-    await user.type(screen.getByRole('textbox', { name: /team results repository url/i }), 'https://github.com/team/results.git{Enter}');
+    await user.type(screen.getByRole('textbox', { name: /evaluations repository url/i }), 'https://github.com/team/results.git{Enter}');
     await waitFor(() => expect(api.connectShared).toHaveBeenCalledWith('https://github.com/team/results.git'));
   });
 
@@ -84,7 +84,7 @@ describe('ConnectTeamCard', () => {
     const api = makeApi({ connectShared: vi.fn(async () => { throw refusal; }) });
     const user = userEvent.setup();
     const { container } = renderCard(api);
-    await user.type(screen.getByRole('textbox', { name: /team results repository url/i }), 'https://github.com/team/private.git');
+    await user.type(screen.getByRole('textbox', { name: /evaluations repository url/i }), 'https://github.com/team/private.git');
     await user.click(screen.getByRole('button', { name: 'connect' }));
     await waitFor(() => expect(container.querySelector('.connect-team-card .access-panel')).toBeInTheDocument());
     // The panel replaces the plain error line; the raw message is not shown twice.
@@ -102,7 +102,7 @@ describe('ConnectTeamCard', () => {
     const running = { ...unconfigured, connect: { state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: 10 } };
     renderCard(makeApi({ getSyncStatus: vi.fn(async () => running), getSharedStatus: vi.fn(async () => running) }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'connecting…' })).toBeDisabled());
-    expect(screen.getByRole('textbox', { name: /team results repository url/i })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: /evaluations repository url/i })).toBeDisabled();
   });
 });
 

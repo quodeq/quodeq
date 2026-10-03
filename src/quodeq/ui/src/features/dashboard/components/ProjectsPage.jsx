@@ -180,7 +180,7 @@ function ProjectsPageContent({ projectsLoaded, isEmpty, connectActive, emptyProp
 export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
   const { onAddProject, onImportProject, onFiltersChange, onSharedDisconnected } = actions;
   const { shared, isEmpty, visibleEntries, cardsListCtx } = useProjectsCardsCtx({ projects, filters, selectedProject, actions });
-  // The connect card, opened by the header's "connect team results" or the strip's "change repository".
+  // The connect card, opened by the header's "connect evaluations repository" or the strip's "change repository".
   const [connectOpen, setConnectOpen] = useState(false);
   const toggleConnect = useCallback(() => setConnectOpen((open) => !open), []);
 

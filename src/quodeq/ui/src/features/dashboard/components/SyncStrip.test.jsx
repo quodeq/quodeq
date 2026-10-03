@@ -70,7 +70,7 @@ describe('SyncStrip', () => {
     const onUpdate = vi.fn();
     render(<SyncStrip status={{ ...base, connect: { state: 'error', phase: SYNC_PHASE.ERROR, code: 'FOREIGN_REPO', error: 'raw' } }} projectsCount={5} onUpdate={onUpdate} />);
     expect(screen.getByText('5 projects · synced 2 min ago')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'update team results' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'update evaluations repository' })).toBeInTheDocument();
     expect(screen.queryByText(/not a quodeq results repository/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'retry' })).not.toBeInTheDocument();
   });
@@ -85,7 +85,7 @@ describe('SyncStrip', () => {
     expect(row().textContent).toMatch(/2 min ago$/);
     expect(screen.queryByRole('button', { name: 'retry' })).not.toBeInTheDocument();
     rerender(<SyncStrip status={base} loadFailed projectsCount={5} />);
-    expect(row().textContent).toBe('could not read team results');
+    expect(row().textContent).toBe('could not read the evaluations repository');
     rerender(<SyncStrip status={refreshFailed} projectsCount={5} onUpdate={vi.fn()} />);
     expect(row().textContent).toMatch(/2 min ago · retry$/);
   });

@@ -92,7 +92,7 @@ describe('ProjectsPage — shared entries (configured)', () => {
 
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Add project' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Import project' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import evaluations' })).toBeInTheDocument();
   });
 
   it('clicking a shared-only card calls onSelect(id, "shared")', async () => {
@@ -151,7 +151,7 @@ describe('ProjectsPage — shared entries (configured)', () => {
     expect(fakeApi.startRefresh).not.toHaveBeenCalled();
     fakeApi.sharedListProjects.mockClear();
 
-    await user.click(screen.getByRole('button', { name: 'update team results' }));
+    await user.click(screen.getByRole('button', { name: 'update evaluations repository' }));
 
     await waitFor(() => expect(fakeApi.startRefresh).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(fakeApi.sharedListProjects).toHaveBeenCalledTimes(1));

@@ -1,10 +1,10 @@
 ## Shared Repository
 
-A shared repository is a plain git repo your team uses to exchange results. You publish a project's finished runs to it; teammates who connect the same repo see that project in their own list, grades and findings included, without running anything themselves.
+An evaluations repository is a plain git repo where evaluations are published. It can be yours, to reach your results from every machine, or your team's, to exchange them. You publish a project's finished runs to it; anyone who connects the same repo sees that project in their own list, grades and findings included, without running anything themselves.
 
 ### Connecting
 
-Connect it from the Repositories tab: press **connect team results**, paste the address, and watch the strip at the top download it. HTTPS (`https://github.com/team/results.git`) and SSH (`git@github.com:team/results.git`) forms both work.
+Connect it from the Repositories tab: press **connect evaluations repository**, paste the address, and watch the strip at the top download it. HTTPS (`https://github.com/team/evaluations.git`) and SSH (`git@github.com:team/evaluations.git`) forms both work.
 
 The strip stays while a repository is connected. It shows *connecting*, *downloading evaluations* with a percentage and size, *reading projects* with a count, then *N projects · synced* with a time. Press **update** to check again. If an update fails, the strip says *update failed · showing results from* a time, with **retry**; when you are offline it shows the last synced results the same way. **copy invite** puts a two-line message on your clipboard for teammates. The **⋯** menu has **change repository** and **disconnect**, and Settings keeps both too.
 

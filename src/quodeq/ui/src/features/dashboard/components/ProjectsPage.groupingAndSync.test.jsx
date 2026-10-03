@@ -186,8 +186,8 @@ describe('ProjectsPage — sync strip: "not synced yet", load failure and unconf
     const user = userEvent.setup();
     renderWithApi(<ProjectsPage projects={[{ id: 'a', name: 'app' }]} actions={{}} />, fakeApi);
 
-    await waitFor(() => expect(screen.getByText(/could not read team results/)).toBeInTheDocument());
-    expect(screen.getByText(/could not read team results/).textContent).not.toMatch(/—/);
+    await waitFor(() => expect(screen.getByText(/could not read the evaluations repository/)).toBeInTheDocument());
+    expect(screen.getByText(/could not read the evaluations repository/).textContent).not.toMatch(/—/);
     expect(screen.queryByText(/not synced yet/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'retry' }));

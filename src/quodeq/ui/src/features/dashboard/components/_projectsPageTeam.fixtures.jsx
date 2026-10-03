@@ -25,7 +25,7 @@ export function makeApi({ configured = false, slots = {}, ...overrides } = {}) {
     startRefresh: vi.fn(async () => ({ started: true })),
     startPull: vi.fn(async (id) => ({ started: true, project: id })),
     publishProject: vi.fn(async () => ({ started: true })),
-    getInvite: vi.fn(async () => ({ text: `Open quodeq, choose Join your team's results, paste ${URL}` })),
+    getInvite: vi.fn(async () => ({ text: `Open quodeq, choose Connect evaluations repository, paste ${URL}` })),
     getGithubAccount: vi.fn(async () => ({})),
     probeGit: vi.fn(async () => ({ reachable: false })),
     ...overrides,

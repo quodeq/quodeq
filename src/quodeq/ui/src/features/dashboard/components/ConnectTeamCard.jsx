@@ -3,7 +3,7 @@ import { t } from '../../../strings/index.js';
 import AccessPanel from '../../github-access/components/AccessPanel.jsx';
 
 /**
- * "▸ team results": the Repositories tab's inline form for connecting the
+ * "▸ evaluations repository": the Repositories tab's inline form for connecting the
  * team's results repository (spec 4.1). Submitting only starts the connect
  * job; its progress shows in the sync strip and a failure comes back here,
  * either as the access panel (the probe refused the URL) or as the connect

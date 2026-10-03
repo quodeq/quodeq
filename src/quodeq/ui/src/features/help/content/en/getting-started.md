@@ -20,6 +20,7 @@ Want to see the welcome again later, even after skipping it? Open **Settings**, 
 - The **Evaluate** tab streams the run live, including findings as they appear.
 - When it finishes, the **Overview** tab opens with grades and top findings.
 - **Violations**, **Map**, and **History** let you drill in from different angles.
+- To reach your results from another machine or share them with your team, connect an evaluations repository from the **Projects** tab. **import evaluations** restores a previously exported archive.
 
 ### Requirements
 

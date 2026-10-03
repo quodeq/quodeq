@@ -49,7 +49,7 @@ export function startPull(projectId, action) {
   });
 }
 
-/** The invite text for teammates. */
+/** The invite text for others. */
 export function getInvite() { return request('/shared/invite'); }
 
 /** True while the slot's job is connecting, downloading or reading. */
