@@ -118,6 +118,49 @@ export function chipDeltas(since) {
   return { critical, major: (since.majorsDelta || 0) - critical };
 }
 
+function isNumber(v) {
+  return typeof v === 'number';
+}
+
+function periodCounts(row) {
+  const map = new Map();
+  for (const d of row?.dimensionDetails || []) {
+    if (d?.dimension && isNumber(d.critical) && isNumber(d.majors)) {
+      map.set(String(d.dimension).toLowerCase(), { critical: d.critical, majors: d.majors });
+    }
+  }
+  return map;
+}
+
+/**
+ * The chip deltas of the Overview hero, following the chart's grouping the
+ * way the score arrow does: the selected period's row against the previous
+ * period's, over the dimensions both rows scored, so a dimension one period
+ * skipped moves neither number. Criticals come out of the majors delta, as
+ * the MAJ chip counts majors only.
+ * @param {Array} periodTrend newest first, already collapsed to the grouping
+ * @param {string|null|undefined} selectedRunId the row on show; the newest when unknown
+ * @returns {{critical: number, major: number}|null} null without a previous period to compare with
+ */
+export function periodChipDeltas(periodTrend, selectedRunId) {
+  const rows = periodTrend || [];
+  const found = selectedRunId ? rows.findIndex((r) => r.runId === selectedRunId) : 0;
+  if (found < 0 || found + 1 >= rows.length) return null;
+  const current = periodCounts(rows[found]);
+  const previous = periodCounts(rows[found + 1]);
+  let critical = 0;
+  let majors = 0;
+  let shared = 0;
+  for (const [dim, counts] of current) {
+    const before = previous.get(dim);
+    if (!before) continue;
+    shared += 1;
+    critical += counts.critical - before.critical;
+    majors += counts.majors - before.majors;
+  }
+  return shared > 0 ? { critical, major: majors - critical } : null;
+}
+
 /** The map restricted to the named dimensions (case-insensitive), so a
  * headline over visible dimensions never counts a hidden one. */
 export function filterSinceBaseline(sinceBaseline, dimensionNames) {
@@ -150,10 +193,6 @@ export function dimensionHeadlineInput(allViolations, severity, evalData) {
     filesRead: evalData?.filesRead,
     sourceFileCount: evalData?.sourceFileCount,
   };
-}
-
-function isNumber(v) {
-  return typeof v === 'number';
 }
 
 function sumDetail(details, field) {

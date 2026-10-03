@@ -10,9 +10,10 @@ import TrendBadge from '../TrendBadge.jsx';
  *                     This is the layout used inside the VIOLATIONS stat
  *                     card on the overview.
  *
- * A `delta` (the change since a baseline run) renders after the label as
- * the app's trend badge, inverted: "-83" with the up arrow is good for a
- * finding count, "+1" with the down arrow is bad; zero and null render
+ * A `delta` (the change since the previous run or period) renders after
+ * the label as the app's trend badge: the arrow follows the number ("-83"
+ * points down, "+1" points up) and the colour follows what it means for a
+ * finding count (fewer is good, more is bad); zero and null render
  * nothing.
  *
  * @param {object} props
@@ -28,15 +29,17 @@ const ABBR = { critical: 'crit', major: 'maj', minor: 'min' };
 const FORMAT_SHORT = 'short';
 const FORMAT_COUNT_ABBR = 'count-abbr';
 
-// The same badge the score tile uses for its trend, inverted: fewer
-// findings is the improving direction, so "-83" gets the up arrow and the
-// app's trend-up colour. Counts are whole numbers, so any change is a full
-// arrow, never the soft one the score's small deltas get.
+// The same badge the score tile uses for its trend, with the two signals
+// split: the colour is inverted (fewer findings is the improving direction,
+// so "-83" gets the trend-up colour), the arrow is not (a falling count
+// points down). Counts are whole numbers, so any change is a full arrow,
+// never the soft one the score's small deltas get.
 function renderDelta(delta) {
   if (!delta) return null;
+  const fewer = delta < 0;
   return (
     <span className="term-sev-badge__delta">
-      <TrendBadge delta={String(delta)} trend={delta < 0 ? 'up' : 'down'} invert />
+      <TrendBadge delta={String(delta)} trend={fewer ? 'up' : 'down'} arrow={fewer ? 'down' : 'up'} invert />
     </span>
   );
 }
