@@ -5,6 +5,7 @@ import AccessPanel from '../../github-access/components/AccessPanel.jsx';
 import RepoSourceSwitch from '../../onboarding/components/analyze/RepoSourceSwitch.jsx';
 import FolderField from '../../onboarding/components/analyze/FolderField.jsx';
 import { REPO_SOURCE, FILE_URL_PREFIX } from '../../onboarding/onboardingVocab.js';
+import { fileUrlFromPath, pathFromFileUrl } from '../../../utils/fileUrl.js';
 
 function sourceOf(url) {
   return url?.startsWith(FILE_URL_PREFIX) ? REPO_SOURCE.FOLDER : REPO_SOURCE.URL;
@@ -56,13 +57,13 @@ export default function EvaluationsRepoForm({ onConnect, connecting = false, err
   const [source, setSource] = useState(() => sourceOf(initialUrl));
   const [url, setUrl] = useState(initialUrl ?? '');
   const trimmed = url.trim();
-  const folderPath = url.startsWith(FILE_URL_PREFIX) ? url.slice(FILE_URL_PREFIX.length) : '';
+  const folderPath = pathFromFileUrl(url);
   const submitNow = () => {
     if (trimmed && !connecting) onConnect(trimmed);
   };
   const pickFolder = async () => {
     const path = await browseFolder?.();
-    if (path) setUrl(`${FILE_URL_PREFIX}${path}`);
+    if (path) setUrl(fileUrlFromPath(path));
   };
   const switchSource = (next) => {
     if (next === source) return;

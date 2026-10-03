@@ -12,7 +12,7 @@ def test_a_local_repo_is_reachable_without_any_probe(tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     origin = tmp_path / "origin.git"
     subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True, timeout=30)
-    url = f"file://{origin}"
+    url = (origin).as_uri()
     deps = AccessDeps(probe=_boom, pin=_boom, load_account=_boom, gh=_boom)
     result = resolve_access(url, deps=deps, cache=AccessCache())
     assert result.reachable is True
@@ -27,6 +27,6 @@ def test_a_local_repo_is_reachable_without_any_probe(tmp_path, monkeypatch):
 def test_a_plain_folder_is_rejected_as_not_a_git_repo(tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     (tmp_path / "plain").mkdir()
-    result = resolve_access(f"file://{tmp_path / 'plain'}", deps=AccessDeps(probe=_boom, pin=_boom), cache=AccessCache())
+    result = resolve_access((tmp_path / 'plain').as_uri(), deps=AccessDeps(probe=_boom, pin=_boom), cache=AccessCache())
     assert result.reachable is False
     assert result.kind is GitFailureKind.NOT_A_GIT_REPO

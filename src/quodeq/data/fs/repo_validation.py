@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sys
 import urllib.parse
 from pathlib import Path
 
@@ -61,6 +62,23 @@ def is_valid_repo_url(url: str) -> bool:
     return _REPO_URL_RE.match(url) is not None
 
 
+_WINDOWS_DRIVE_REMAINDER = re.compile(r"^/[A-Za-z]:[/\\]")
+_IS_WINDOWS = sys.platform == "win32"
+
+
+def local_path_from_file_url_remainder(raw: str, *, windows: bool = _IS_WINDOWS) -> str:
+    """Turn the decoded remainder of a ``file:///`` URL into a local path.
+
+    On POSIX the remainder is the path. On Windows ``Path.as_uri()`` writes
+    ``file:///C:/Users/...``, so the remainder carries a leading slash before
+    the drive letter that no Windows path has; drop it, or the path resolves
+    under the current drive and is never "under home".
+    """
+    if windows and _WINDOWS_DRIVE_REMAINDER.match(raw):
+        return raw[1:]
+    return raw
+
+
 def validate_local_git_repo(file_url: str) -> None:
     """Accept a ``file://`` URL only for a git repository under the home folder.
 
@@ -77,7 +95,7 @@ def validate_local_git_repo(file_url: str) -> None:
     if not raw.startswith("/") or raw.rstrip("/").rsplit("/", 1)[-1] in _DOT_SEGMENTS:
         raise ValueError(MESSAGE_LOCAL_OUTSIDE_HOME)
     try:
-        folder = Path(contained_path(raw, Path.home()))
+        folder = Path(contained_path(local_path_from_file_url_remainder(raw), Path.home()))
     except ValueError as exc:
         raise ValueError(MESSAGE_LOCAL_OUTSIDE_HOME) from exc
     if not folder.is_dir():

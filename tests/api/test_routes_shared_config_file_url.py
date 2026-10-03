@@ -14,7 +14,7 @@ def _bare(tmp_path):
 
 def test_a_local_bare_repo_connects_and_reports_configured(client, tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
-    url = f"file://{_bare(tmp_path)}"
+    url = (_bare(tmp_path)).as_uri()
     resp = client.put("/api/shared/config", json={"url": url}, headers=_ORIGIN)
     assert resp.status_code == 202
     status = client.get("/api/shared/status").get_json()
@@ -25,7 +25,7 @@ def test_a_local_bare_repo_connects_and_reports_configured(client, tmp_path, mon
 def test_a_plain_folder_is_a_400_not_a_git_repo(client, tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     (tmp_path / "plain").mkdir()
-    resp = client.put("/api/shared/config", json={"url": f"file://{tmp_path / 'plain'}"}, headers=_ORIGIN)
+    resp = client.put("/api/shared/config", json={"url": (tmp_path / 'plain').as_uri()}, headers=_ORIGIN)
     assert resp.status_code == 400
     body = resp.get_json()
     assert body["code"] == "NOT_A_GIT_REPO"
@@ -36,7 +36,7 @@ def test_a_plain_folder_is_a_400_not_a_git_repo(client, tmp_path, monkeypatch):
 def test_a_folder_outside_home_is_invalid_url(client, tmp_path, monkeypatch):
     (tmp_path / "home").mkdir()
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path / "home")
-    resp = client.put("/api/shared/config", json={"url": f"file://{_bare(tmp_path)}"}, headers=_ORIGIN)
+    resp = client.put("/api/shared/config", json={"url": (_bare(tmp_path)).as_uri()}, headers=_ORIGIN)
     assert resp.status_code == 400
     assert resp.get_json()["code"] == "INVALID_URL"
 
@@ -44,6 +44,6 @@ def test_a_folder_outside_home_is_invalid_url(client, tmp_path, monkeypatch):
 def test_probe_route_answers_not_a_git_repo_for_a_plain_folder(client, tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     (tmp_path / "plain").mkdir()
-    resp = client.post("/api/git/probe", json={"url": f"file://{tmp_path / 'plain'}"}, headers=_ORIGIN)
+    resp = client.post("/api/git/probe", json={"url": (tmp_path / 'plain').as_uri()}, headers=_ORIGIN)
     assert resp.status_code == 400
     assert resp.get_json()["code"] == "NOT_A_GIT_REPO"
