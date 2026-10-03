@@ -3023,7 +3023,7 @@
   gap: var(--space-2);
 }
 
-.evals-repo-form__field {
+.repo-form__field {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -3031,16 +3031,16 @@
   min-width: 0;
 }
 
-.evals-repo-form__field > .term-input {
+.repo-form__field > .term-input {
   flex: 1 1 auto;
   min-width: 0;
 }
-.evals-repo-form__field .term-input__field {
+.repo-form__field .term-input__field {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.evals-repo-form__path {
+.repo-form__path {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -3050,7 +3050,7 @@
   font-size: var(--text-xs);
   color: var(--color-text);
 }
-.evals-repo-form__path--empty {
+.repo-form__path--empty {
   color: var(--color-text-muted);
 }
 
@@ -3278,27 +3278,6 @@
   font-size: var(--text-xs);
   line-height: 1.5;
   color: var(--color-text-muted);
-}
-
-.connect-team-card__input {
-  flex: 1 1 300px;
-  min-width: 0;
-  padding: 6px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--term-radius);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: var(--term-font-mono);
-  font-size: var(--text-xs);
-}
-
-.connect-team-card__input:focus {
-  outline: none;
-  border-color: var(--color-accent);
-}
-
-.connect-team-card__input:disabled {
-  opacity: 0.6;
 }
 
 .connect-team-card__access {

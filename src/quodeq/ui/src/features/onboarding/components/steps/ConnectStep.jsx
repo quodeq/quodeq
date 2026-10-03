@@ -47,7 +47,7 @@ export default function ConnectStep({ onBack, onCancel, onConnectStarted }) {
       <div className="onboarding-step__actions">
         {onBack
           ? <button type="button" className="term-btn term-btn--secondary" onClick={onBack}>{t('common.back')}</button>
-          : <button type="button" className="term-btn term-btn--secondary" onClick={onCancel}>{t('common.cancel')}</button>}
+          : <button type="button" className="term-btn term-btn--secondary" onClick={onCancel}>{t('onboarding.cancel')}</button>}
       </div>
       {picker}
     </div>

@@ -17,14 +17,16 @@ import { isSlotActive } from '../../../api/syncStatus.js';
 
 // The empty page: the welcome's two paths side by side. With an evaluations
 // repository connected (but nothing published yet) its card names it; there
-// is no "go to repositories" here, this is the Repositories tab.
-function EmptyProjectsPaths({ onAddProject, onConnectEvaluations, onImportProject }) {
+// is no "go to repositories" here, this is the Repositories tab. Start opens
+// the analyze screen directly (the welcome would show these cards again).
+function EmptyProjectsPaths({ onStartAnalyze, onConnectEvaluations, onImportProject, isEvaluating }) {
   const { configured, host } = useSharedConnection();
   return (
     <div className="projects-empty projects-empty--paths">
       <WelcomePaths
         compact
-        onStart={onAddProject}
+        isEvaluating={isEvaluating}
+        onStart={onStartAnalyze}
         onConnect={onConnectEvaluations}
         onImport={onImportProject}
         adaptation={{ connected: configured, host, hasLocalProjects: false }}
@@ -163,7 +165,7 @@ function ProjectsPageContent({ projectsLoaded, isEmpty, connectActive, emptyProp
 }
 
 export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
-  const { onAddProject, onImportProject, onConnectEvaluations, onFiltersChange, onSharedDisconnected } = actions;
+  const { onAddProject, onStartAnalyze, onImportProject, onConnectEvaluations, onFiltersChange, onSharedDisconnected } = actions;
   const { shared, isEmpty, visibleEntries, cardsListCtx } = useProjectsCardsCtx({ projects, filters, selectedProject, actions });
 
   return (
@@ -186,7 +188,7 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
         projectsLoaded={projectsLoaded}
         isEmpty={isEmpty}
         connectActive={isSlotActive(shared.status?.connect)}
-        emptyProps={{ onAddProject, onConnectEvaluations, onImportProject }}
+        emptyProps={{ onStartAnalyze, onConnectEvaluations, onImportProject, isEvaluating }}
         bodyProps={{ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }}
       />
     </section>

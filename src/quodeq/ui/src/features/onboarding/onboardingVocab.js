@@ -1,5 +1,6 @@
 // The wizard's repo-scan sub-step states (`repoScanSubState`): written by
-// hooks/useWizardState.js, read by RepoScanStep.jsx and the wizard handlers.
+// hooks/useWizardState.js, read by the wizard handlers (a resumed or
+// registered project is SCANNED, so closing keeps it).
 // Its own vocabulary, not the run/job/dim one in src/vocab.
 export const SCAN_SUB_STATE = Object.freeze({ IDLE: 'idle', SCANNING: 'scanning', SCANNED: 'scanned', ERROR: 'error' });
 
@@ -15,6 +16,15 @@ export const WIZARD_SOURCE = Object.freeze({
   ADD: 'add',
   SETTINGS: 'settings',
   CONNECT: 'connect',
+});
+
+// Where provider detection stands (useProviderDetection's `status`): still
+// probing, a provider found, none found, or the probe pass itself failed.
+export const DETECTION_STATUS = Object.freeze({
+  DETECTING: 'detecting',
+  DETECTED: 'detected',
+  NONE: 'none',
+  ERROR: 'error',
 });
 
 // Where a repository comes from in the url-or-folder forms (the connect

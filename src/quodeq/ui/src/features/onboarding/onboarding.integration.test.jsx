@@ -21,10 +21,9 @@ vi.mock('../../api/index.js', async () => {
   };
 });
 
-// ScanProgress depends on <EvalLogProvider> which is not in the wizard tree —
-// for this integration test we render a simple stub instead.
-vi.mock('../evaluation/components/ScanProgress.jsx', () => ({
-  default: () => <div data-testid="scan-progress-stub" />,
+// No provider is detected here: the configured one (seeded below) decides.
+vi.mock('./hooks/useProviderDetection.js', () => ({
+  useProviderDetection: () => ({ status: 'none', results: [], preselection: null }),
 }));
 
 // ProviderTabs is the same component the Settings page uses — heavy and not
@@ -49,7 +48,7 @@ describe('Onboarding integration — happy path', () => {
     localStorage.setItem('quodeq-visible-standards', JSON.stringify(['std-a', 'std-b']));
   });
 
-  it('walks Welcome → Repo & Scan → Provider → Standard & Launch and emits onLaunch', async () => {
+  it('walks Welcome → Analyze and emits onLaunch with the configured provider and the default standard', async () => {
     const onLaunch = vi.fn();
     const onClose = vi.fn();
     render(<OnboardingWizard entry={{ isFirstProject: true }} onLaunch={onLaunch} onClose={onClose} />, { wrapper: withQueryClient() });
@@ -58,29 +57,16 @@ describe('Onboarding integration — happy path', () => {
     expect(screen.getByText('how quodeq works')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'start' }));
 
-    // Repo & Scan — placeholder is the most stable on-screen identifier
-    // for "we're on the repo step" after the terminal redesign.
-    fireEvent.change(screen.getByPlaceholderText(/git@github.com/i), { target: { value: '/local/path' } });
-    fireEvent.click(screen.getByRole('button', { name: /scan repository/i }));
-    // Scanned-state stat tile — total_files=7 from the mock. Use getAllByText
-    // because '7' also appears as a language count in the pill row.
-    await waitFor(() => expect(screen.getAllByText('7').length).toBeGreaterThan(0));
-    fireEvent.click(screen.getAllByRole('button', { name: /^continue$/i })[0]);
+    // Analyze: a configured provider collapses the reviewer and the standard
+    // (every visible standard, read as the default) into one line.
+    expect(await screen.findByText('reviewed by Codex CLI · against quodeq default standard')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'repository' }), { target: { value: 'https://github.com/acme/billing.git' } });
+    fireEvent.click(screen.getByRole('button', { name: 'scan and run' }));
 
-    // Provider — embedded ProviderTabs (stubbed); the active provider/model
-    // comes from localStorage and the summary line shows it.
-    expect(await screen.findByTestId('provider-tabs-stub')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('button', { name: /^continue$/i })).not.toBeDisabled());
-    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
-
-    // Standard & Launch — pitch text is unchanged and uniquely identifies this step
-    expect(screen.getByText(/pick one for your first run/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('radio', { name: /security 101/i }));
-    fireEvent.click(screen.getByRole('button', { name: /start evaluation/i }));
-
+    // Task 10 registers the project (and so carries its id) before launching.
     await waitFor(() => expect(onLaunch).toHaveBeenCalled());
-    expect(onLaunch.mock.calls[0][0].standardIds).toEqual(['std-a']);
-    expect(onLaunch.mock.calls[0][0].projectId).toBe('uuid-9');
+    expect(onLaunch.mock.calls[0][0].standardIds).toEqual(['std-a', 'std-b']);
+    expect(onLaunch.mock.calls[0][0].repo).toBe('https://github.com/acme/billing.git');
     expect(onLaunch.mock.calls[0][0].provider.id).toBe('codex');
     expect(onLaunch.mock.calls[0][0].provider.model).toBe('gpt-5.2-codex');
   });

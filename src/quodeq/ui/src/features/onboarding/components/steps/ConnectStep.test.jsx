@@ -56,7 +56,7 @@ describe('ConnectStep', () => {
     const user = userEvent.setup();
     const onBack = vi.fn();
     renderStep(makeApi(), { onBack });
-    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'cancel' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'back' }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
@@ -66,7 +66,7 @@ describe('ConnectStep', () => {
     const onCancel = vi.fn();
     renderStep(makeApi(), { onCancel });
     expect(screen.queryByRole('button', { name: 'back' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'cancel' }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });

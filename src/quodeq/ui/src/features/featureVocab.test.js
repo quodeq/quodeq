@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { SCAN_SUB_STATE } from './onboarding/onboardingVocab.js';
+import { SCAN_SUB_STATE, DETECTION_STATUS } from './onboarding/onboardingVocab.js';
 import { PUBLISH_STATE } from './dashboard/dashboardVocab.js';
 import { SERVER_STATUS } from './settings/settingsVocab.js';
 
@@ -13,5 +13,6 @@ test('feature vocab modules spell their values and are frozen', () => {
   assert.deepEqual(SCAN_SUB_STATE, { IDLE: 'idle', SCANNING: 'scanning', SCANNED: 'scanned', ERROR: 'error' });
   assert.deepEqual(PUBLISH_STATE, { IDLE: 'idle', RUNNING: 'running', DONE: 'done', ERROR: 'error' });
   assert.deepEqual(SERVER_STATUS, { ONLINE: 'online', OFFLINE: 'offline' });
-  for (const obj of [SCAN_SUB_STATE, PUBLISH_STATE, SERVER_STATUS]) assert.equal(Object.isFrozen(obj), true);
+  assert.deepEqual(DETECTION_STATUS, { DETECTING: 'detecting', DETECTED: 'detected', NONE: 'none', ERROR: 'error' });
+  for (const obj of [SCAN_SUB_STATE, DETECTION_STATUS, PUBLISH_STATE, SERVER_STATUS]) assert.equal(Object.isFrozen(obj), true);
 });

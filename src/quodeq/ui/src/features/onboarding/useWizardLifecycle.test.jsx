@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { withQueryClient } from '../../test-utils/withQueryClient.jsx';
 import { useWizardLifecycle } from './useWizardLifecycle.js';
-import { SKIPPED_KEY, SKIPPED_VALUE, STEP_WELCOME, STEP_REPO_SCAN } from './wizardSteps.js';
+import { SKIPPED_KEY, SKIPPED_VALUE, STEP_WELCOME, STEP_ANALYZE } from './wizardSteps.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 import { NAV_TAB } from '../../vocab/navTab.js';
 import { WIZARD_SOURCE } from './onboardingVocab.js';
@@ -93,7 +93,7 @@ describe('useWizardLifecycle auto-open (derived)', () => {
 
   it('stays open once the user has moved past the welcome step', () => {
     const { result, update } = renderLifecycle();
-    act(() => { result.current.wizardHandlers.onStepChange(STEP_REPO_SCAN); });
+    act(() => { result.current.wizardHandlers.onStepChange(STEP_ANALYZE); });
     update({ sharedSignal: SHARED_CONTENT });
     expect(result.current.wizardEntry).not.toBeNull();
   });

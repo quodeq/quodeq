@@ -220,6 +220,7 @@ export const ROUTE_RENDERERS = {
         onExport: props.navigation.handleExportProject,
         onRelocate: props.navigation.handleRelocateProject,
         onAddProject: props.navigation.onAddProject,
+        onStartAnalyze: props.navigation.onStartAnalyze,
         onImportProject: props.navigation.onImportProject,
         onConnectEvaluations: props.navigation.onConnectEvaluations,
         onResumeSetup: props.navigation.onResumeSetup,
@@ -274,7 +275,7 @@ export function MainContent({ activePage, props }) {
     }
     return (
       <EmptyStateWithTour
-        onAdd={() => props.navigation.onAddProject()}
+        onAdd={() => props.navigation.onStartAnalyze()}
         onTour={() => props.navigation.onTakeTour()}
         onBrowseRemote={props.navigation.onBrowseRemote}
         isEvaluating={props.navigation.isEvaluating}

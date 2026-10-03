@@ -15,7 +15,7 @@ The **Projects** tab is your home base. Every codebase you evaluate becomes a pr
 | --- | --- |
 | Select project | Open it. Goes to Overview if it has runs, otherwise Evaluate. |
 | Connect evaluations repository | In the header while no repository is configured: paste the address of a git repository where evaluations are published, yours or your team's, or choose a local folder that is a git repository. Once connected, a strip shows its state. |
-| Add project | Open the wizard at Repo Scan to add another codebase. |
+| Add project | Open the welcome. Its repository card's start opens the analyze screen: the repository, the model that reviews it and the standard, on one screen. |
 | Import evaluations archive | Restore evaluations from a previously exported file (the strip's **⋯** menu, or the empty page's evaluations card). |
 | Resume setup | Pick up an interrupted wizard with the same draft. |
 | Relocate | Update the local path if the repo moved on disk. |
@@ -24,7 +24,7 @@ The **Projects** tab is your home base. Every codebase you evaluate becomes a pr
 | Publish / update | Send completed runs to the connected evaluations repository. |
 | Pull local copy | Import a teammate's shared project into your local list. |
 
-The header offers **connect evaluations repository** (until one is connected) and **add project**. With nothing here yet, the page shows the welcome's two paths instead: a repository to score, or an evaluations repository to connect. With an evaluations repository connected, a sync strip above the list shows its state, with **update**, **copy invite**, and a **⋯** menu for *change repository*, *import evaluations archive* and *disconnect*. A connect that fails comes back as a card under the header, with the address kept so connect retries it. Every card also carries a *LOCAL*, *PUBLISHED*, or *REMOTE* badge, and a location filter appears above the list. The **Shared Repository** help section covers the whole workflow.
+The header offers **connect evaluations repository** (until one is connected) and **add project**. With nothing here yet, the page shows the welcome's two paths instead: a repository to score (start opens the analyze screen), or an evaluations repository to connect. With an evaluations repository connected, a sync strip above the list shows its state, with **update**, **copy invite**, and a **⋯** menu for *change repository*, *import evaluations archive* and *disconnect*. A connect that fails comes back as a card under the header, with the address kept so connect retries it. Every card also carries a *LOCAL*, *PUBLISHED*, or *REMOTE* badge, and a location filter appears above the list. The **Shared Repository** help section covers the whole workflow.
 
 ### Sub-projects and monorepos
 

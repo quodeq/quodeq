@@ -1,0 +1,84 @@
+import { TermHeader, TermInput } from '../../../../components/terminal/index.js';
+import { t } from '../../../../strings/index.js';
+import { REPO_SOURCE } from '../../onboardingVocab.js';
+import { useAnalyzeForm } from '../../hooks/useAnalyzeForm.js';
+import RepoSourceSwitch from '../analyze/RepoSourceSwitch.jsx';
+import FolderField from '../analyze/FolderField.jsx';
+import WorkingCopyNote from '../analyze/WorkingCopyNote.jsx';
+import ReviewedByRow from '../analyze/ReviewedByRow.jsx';
+import AgainstRow from '../analyze/AgainstRow.jsx';
+
+function RepositoryBlock({ form }) {
+  const { workingCopy } = form;
+  return (
+    <section className="analyze-block">
+      <h3 className="analyze-block__title">{t('onboarding.yourRepository')}</h3>
+      <p className="analyze-block__hint">{t('onboarding.repoHint')}</p>
+      <RepoSourceSwitch value={form.source} onChange={form.setSource} />
+      <div className="analyze-block__row">
+        {form.source === REPO_SOURCE.URL ? (
+          <span className="repo-form__field">
+            <TermInput command="repo" value={form.repo} onChange={form.setRepo} ariaLabel={t('onboarding.repoAria')} placeholder={t('onboarding.repoPlaceholder')} />
+          </span>
+        ) : (
+          <FolderField folderPath={form.repo} onPick={form.browseRepoFolder} />
+        )}
+      </div>
+      {form.source === REPO_SOURCE.URL && form.repo.trim() && (
+        <WorkingCopyNote
+          path={workingCopy.path}
+          onChange={workingCopy.change}
+          onReset={workingCopy.changed ? workingCopy.reset : undefined}
+        />
+      )}
+    </section>
+  );
+}
+
+function ReviewSummary({ form }) {
+  return (
+    <p className="analyze-summary">
+      <span className="analyze-summary__text">
+        {t('onboarding.reviewSummary', { provider: form.provider.label, standard: form.standard.name })}
+      </span>
+      <button type="button" className="onboarding-edit-link" onClick={form.expand}>{t('onboarding.change')}</button>
+    </p>
+  );
+}
+
+/**
+ * The one analyze screen: the repository (a git url or a local folder, with
+ * where its working copy goes), who reviews it and against which standard.
+ * A returning user (a provider configured) sees the last two as one summary
+ * line with `change`. `detect` is injectable for tests.
+ *
+ * `scan and run` hands `onLaunch` the form's request ({ repo, source,
+ * standardIds, cloneDest? }).
+ */
+export default function AnalyzeStep({ state, actions, standards, detect, onLaunch }) {
+  const form = useAnalyzeForm({ wizard: { ...actions, state }, standards, detect });
+  // Task 10 replaces this stub with useAnalyzeLaunch (clone job, progress, errors).
+  const launch = { run: () => onLaunch(form.request()), busy: false };
+  return (
+    <div className="onboarding-step onboarding-step--analyze">
+      <TermHeader name={t('onboarding.termAnalyze')} sub={t('onboarding.subAnalyze')} />
+      <RepositoryBlock form={form} />
+      {form.collapsed
+        ? <ReviewSummary form={form} />
+        : (
+          <>
+            <ReviewedByRow provider={form.provider} />
+            <AgainstRow standard={form.standard} standards={standards} />
+          </>
+        )}
+      {/* CloneProgress (Task 10) renders here while the clone runs or failed. */}
+      <div className="onboarding-step__actions">
+        <button type="button" className="term-btn term-btn--primary term-btn--filled" disabled={!form.canSubmit || launch.busy} onClick={launch.run}>
+          {t('onboarding.scanAndRun')}
+        </button>
+      </div>
+      {form.pickers.repo}
+      {form.pickers.workingCopy}
+    </div>
+  );
+}

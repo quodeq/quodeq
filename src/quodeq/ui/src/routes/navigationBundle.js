@@ -1,5 +1,5 @@
 import { t } from '../strings/index.js';
-import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_CONNECT } from '../features/onboarding/wizardSteps.js';
+import { STEP_WELCOME, STEP_ANALYZE, STEP_PROVIDER, STEP_CONNECT } from '../features/onboarding/wizardSteps.js';
 import { WIZARD_SOURCE } from '../features/onboarding/onboardingVocab.js';
 import { NAV_TAB } from '../vocab/navTab.js';
 
@@ -16,10 +16,24 @@ function guardedWhileEvaluating({ isEvaluating, showToast, busyKey }, action) {
   };
 }
 
-function makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects }) {
+// The Repositories header's "add project": the welcome, where the first card
+// reads "add another" once there are projects (its start opens the analyze screen).
+function makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }) {
   return guardedWhileEvaluating(
     { isEvaluating, showToast, busyKey: 'evaluate.busyAddProject' },
-    () => setWizardEntry({ startStep: STEP_REPO_SCAN, isFirstProject: projects.length === 0, source: WIZARD_SOURCE.ADD }),
+    () => setWizardEntry({
+      startStep: STEP_WELCOME, isFirstProject: projects.length === 0, source: WIZARD_SOURCE.ADD, onImportProject,
+    }),
+  );
+}
+
+// A card's "start" outside the wizard (the empty Repositories page, the
+// empty dashboard): straight to the analyze screen, never a welcome that
+// shows the same card again.
+function makeOnStartAnalyze({ isEvaluating, showToast, setWizardEntry, projects }) {
+  return guardedWhileEvaluating(
+    { isEvaluating, showToast, busyKey: 'evaluate.busyAddProject' },
+    () => setWizardEntry({ startStep: STEP_ANALYZE, isFirstProject: projects.length === 0, source: WIZARD_SOURCE.ADD }),
   );
 }
 
@@ -96,7 +110,8 @@ export function buildNavigationBundle({ state, navTab, navStackLength, isEvaluat
   return {
     ...state,
     navTab, navStackLength,
-    onAddProject: makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects }),
+    onAddProject: makeOnAddProject({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }),
+    onStartAnalyze: makeOnStartAnalyze({ isEvaluating, showToast, setWizardEntry, projects }),
     onImportProject,
     onTakeTour: makeOnTakeTour({ isEvaluating, showToast, setWizardEntry, projects, onImportProject }),
     onConnectEvaluations: makeOnConnectEvaluations({ setWizardEntry, onImportProject }),

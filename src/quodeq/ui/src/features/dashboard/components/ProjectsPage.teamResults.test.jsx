@@ -65,17 +65,26 @@ describe('ProjectsPage — the empty page', () => {
     expect(screen.queryByRole('textbox', { name: /evaluations repository url/i })).not.toBeInTheDocument();
   });
 
-  it('start adds a project, connect opens the connect step and the link imports an archive', async () => {
+  it('start opens the analyze screen (not the welcome), connect opens the connect step and the link imports an archive', async () => {
     const user = userEvent.setup();
-    const actions = { onAddProject: vi.fn(), onImportProject: vi.fn(), onConnectEvaluations: vi.fn() };
+    const actions = { onAddProject: vi.fn(), onStartAnalyze: vi.fn(), onImportProject: vi.fn(), onConnectEvaluations: vi.fn() };
     const { api } = makeApi();
     renderPage(api, <ProjectsPage projects={[]} actions={actions} />);
     await user.click(await screen.findByRole('button', { name: 'start' }));
     await user.click(screen.getByRole('button', { name: 'connect' }));
     await user.click(screen.getByRole('button', { name: 'or import an exported archive' }));
-    expect(actions.onAddProject).toHaveBeenCalledTimes(1);
+    expect(actions.onStartAnalyze).toHaveBeenCalledTimes(1);
+    expect(actions.onAddProject).not.toHaveBeenCalled();
     expect(actions.onConnectEvaluations).toHaveBeenCalledTimes(1);
     expect(actions.onImportProject).toHaveBeenCalledTimes(1);
+  });
+
+  it('while an evaluation runs, start reads as blocked and says why', async () => {
+    const { api } = makeApi();
+    renderPage(api, <ProjectsPage projects={[]} isEvaluating actions={{ ...pageActions, onStartAnalyze: vi.fn() }} />);
+    const start = await screen.findByRole('button', { name: 'start' });
+    expect(start).toHaveAttribute('aria-disabled', 'true');
+    expect(start).toHaveAttribute('title', 'Cannot add a project while an evaluation is running');
   });
 });
 

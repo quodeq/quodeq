@@ -1,13 +1,11 @@
 ## Getting Started
 
-The first time you launch Quodeq, the onboarding wizard opens automatically. Four short steps and you have your first evaluation running.
+The first time you launch Quodeq, the onboarding wizard opens automatically. Two screens and you have your first evaluation running.
 
 ### The onboarding wizard
 
-1. **Welcome** a quick orientation.
-2. **Repo Scan** paste a local path, GitHub URL, or SSH path. Quodeq scans and shows file counts and detected languages.
-3. **Provider** pick where the AI runs. Skipped automatically if you already have one configured.
-4. **Standard Launch** choose dimensions, scope, branch, and a time budget, then start the evaluation.
+1. **Welcome** how quodeq works, and the two ways in: a repository to score, or an evaluations repository to connect.
+2. **Analyze** one screen: your repository (a git url or a local folder; for a url, quodeq keeps a working copy in `~/quodeq/repos` unless you change it), the model that reviews it (the one configured in Settings, else the best one found on this machine) and the standard (the quodeq default standard unless you change it). Press **scan and run**.
 
 > **Drafts are saved**
 >

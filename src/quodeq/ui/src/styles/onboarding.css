@@ -81,7 +81,7 @@
   flex-wrap: wrap;
 }
 /* Wizard CTA rows: on narrow viewports the buttons grow to fill the
-   row so longer labels (e.g. "scan repository", "start evaluation")
+   row so longer labels (e.g. "scan and run", "start evaluation")
    stay legible and the primary action is comfortably tappable. */
 @media (max-width: 600px) {
   .onboarding-step__actions > .term-btn--primary,
@@ -95,15 +95,82 @@
 /* The welcome step's split panel lives in onboarding-welcome.css. */
 
 /* ──────────────────────────────────────────────────────────────
-   Repo & Scan step
+   Analyze step: the repository block, the reviewer and standard rows
+   (or the one summary line), the working-copy note
    ────────────────────────────────────────────────────────────── */
-.onboarding-repo-row {
+.analyze-block,
+.analyze-row {
   display: flex;
+  flex-direction: column;
   gap: var(--term-space-2);
-  align-items: stretch;
 }
-.onboarding-repo-row .term-input { flex: 1; }
-.onboarding-repo-row__browse { white-space: nowrap; }
+.analyze-block__title,
+.analyze-row__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.analyze-block__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+.analyze-block__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--term-space-2);
+}
+.analyze-row__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--term-space-2);
+  min-width: 0;
+}
+.analyze-row__name {
+  color: var(--color-text);
+  font-size: 13px;
+}
+.analyze-row__meta {
+  min-width: 0;
+  overflow-wrap: break-word;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.analyze-row__tag {
+  font-size: 11px;
+  color: var(--color-accent);
+}
+.analyze-row__drawer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--term-space-2);
+}
+.analyze-row__drawer > .onboarding-provider-tabs-host,
+.analyze-row__drawer > .onboarding-standard-list {
+  align-self: stretch;
+}
+.analyze-working-copy,
+.analyze-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--term-space-2);
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.analyze-working-copy__text,
+.analyze-summary__text {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.analyze-summary__text { color: var(--color-text); }
+
 .onboarding-edit-link {
   background: none;
   border: none;
@@ -116,48 +183,9 @@
   align-self: flex-start;
 }
 .onboarding-edit-link:hover { color: var(--color-text); }
-.onboarding-form-locked input { opacity: 0.7; pointer-events: none; }
-.onboarding-scan-progress {
-  display: flex;
-  flex-direction: column;
-  gap: var(--term-space-2);
-}
-.onboarding-scan-progress__hint {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  margin: 0;
-}
-.onboarding-scan-error {
-  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
-  border-radius: var(--term-radius);
-  padding: var(--term-space-2) var(--term-space-3);
-  color: var(--color-text);
-  font-size: 13px;
-}
-.onboarding-scan-error p { margin: 0 0 var(--term-space-2); }
-.onboarding-scan-summary {
-  display: flex;
-  flex-direction: column;
-  gap: var(--term-space-2);
-}
-.onboarding-scan-summary__langs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--term-space-1);
-}
-.onboarding-scan-summary__lang-pill {
-  display: inline-flex;
-  gap: 4px;
-  font-family: var(--term-font-mono);
-  font-size: 11px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--term-radius);
-  padding: 2px 6px;
-  color: var(--color-text);
-}
-.onboarding-scan-summary__lang-name { color: var(--color-text); }
-.onboarding-scan-summary__lang-count { color: var(--color-accent); }
+.analyze-row__body > .onboarding-edit-link,
+.analyze-working-copy > .onboarding-edit-link,
+.analyze-summary > .onboarding-edit-link { align-self: baseline; }
 
 /* ──────────────────────────────────────────────────────────────
    Clone-target step

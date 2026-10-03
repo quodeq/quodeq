@@ -1,4 +1,5 @@
 import { t } from '../../../strings/index.js';
+import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
 // The cards' styles; imported here too because the empty Repositories page
 // renders the cards without the welcome step.
 import '../../../styles/onboarding-welcome.css';
@@ -18,17 +19,18 @@ import '../../../styles/onboarding-welcome.css';
  *
  * @param {object} props
  * @param {boolean} [props.compact]
+ * @param {boolean} [props.isEvaluating] - marks start as blocked (aria-disabled + why); the handler swallows the click
  * @param {Function} props.onStart
  * @param {Function} props.onConnect
  * @param {Function} [props.onImport]
  * @param {Function} [props.onGoToRepositories]
  * @param {{ connected: boolean, host: string|null, hasLocalProjects: boolean }} props.adaptation
  */
-export default function WelcomePaths({ compact = false, onStart, onConnect, onImport, onGoToRepositories, adaptation }) {
+export default function WelcomePaths({ compact = false, isEvaluating = false, onStart, onConnect, onImport, onGoToRepositories, adaptation }) {
   const { connected = false, host = null, hasLocalProjects = false } = adaptation ?? {};
   return (
     <div className={`onboarding-paths__cards${compact ? ' onboarding-paths__cards--compact' : ''}`}>
-      <RepoPathCard hasLocalProjects={hasLocalProjects} onStart={onStart} />
+      <RepoPathCard hasLocalProjects={hasLocalProjects} onStart={onStart} isEvaluating={isEvaluating} />
       <EvalsPathCard
         connected={connected}
         host={host}
@@ -40,13 +42,18 @@ export default function WelcomePaths({ compact = false, onStart, onConnect, onIm
   );
 }
 
-function RepoPathCard({ hasLocalProjects, onStart }) {
+function RepoPathCard({ hasLocalProjects, onStart, isEvaluating }) {
   return (
     <article className="onboarding-path-card onboarding-path-card--primary">
       <h3 className="onboarding-path-card__title">{t('onboarding.pathRepoTitle')}</h3>
       <p className="onboarding-path-card__desc">{t('onboarding.pathRepoDesc')}</p>
       <div className="onboarding-path-card__actions">
-        <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onStart}>
+        <button
+          type="button"
+          className={`term-btn term-btn--primary term-btn--filled${evalBlockedClass(isEvaluating)}`}
+          onClick={onStart}
+          {...evalBlockedProps(isEvaluating, t('onboarding.cannotAddWhileRunning'))}
+        >
           {hasLocalProjects ? t('onboarding.pathRepoAddAnother') : t('onboarding.pathRepoStart')}
         </button>
       </div>

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildNavigationBundle } from './navigationBundle.js';
-import { STEP_REPO_SCAN, STEP_WELCOME, STEP_CONNECT } from '../features/onboarding/wizardSteps.js';
+import { STEP_ANALYZE, STEP_WELCOME, STEP_CONNECT } from '../features/onboarding/wizardSteps.js';
 import { WIZARD_SOURCE } from '../features/onboarding/onboardingVocab.js';
 
 function args(state, extra = {}) {
@@ -72,9 +72,31 @@ test('buildNavigationBundle action handlers short-circuit while evaluating', () 
     isEvaluating: true, showToast: (m) => toasts.push(m), setWizardEntry,
   }));
   bundle.onAddProject();
+  bundle.onStartAnalyze();
   bundle.onTakeTour();
   bundle.onResumeSetup('p1');
-  assert.equal(toasts.length, 3);
+  assert.equal(toasts.length, 4);
+});
+
+test('add project opens the welcome, where the first card reads add another', () => {
+  const entries = [];
+  const bundle = buildNavigationBundle(args({ projects: [{ id: 'a' }], handleImportProject: () => {} }, {
+    setWizardEntry: (e) => entries.push(e),
+  }));
+  bundle.onAddProject();
+  assert.equal(entries[0].startStep, STEP_WELCOME);
+  assert.equal(entries[0].source, WIZARD_SOURCE.ADD);
+  assert.equal(entries[0].isFirstProject, false);
+  assert.equal(entries[0].onImportProject, bundle.onImportProject);
+});
+
+test('onStartAnalyze opens the analyze screen directly, never the welcome again', () => {
+  const entries = [];
+  const bundle = buildNavigationBundle(args({ projects: [] }, { setWizardEntry: (e) => entries.push(e) }));
+  bundle.onStartAnalyze();
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].startStep, STEP_ANALYZE);
+  assert.equal(entries[0].source, WIZARD_SOURCE.ADD);
 });
 
 test('buildNavigationBundle entries carry where the wizard was opened from', () => {
@@ -86,7 +108,7 @@ test('buildNavigationBundle entries carry where the wizard was opened from', () 
   bundle.onTakeTour();
   bundle.onTakeTour(WIZARD_SOURCE.SETTINGS);
   assert.deepEqual(entries.map((e) => [e.startStep, e.source, e.isFirstProject]), [
-    [STEP_REPO_SCAN, WIZARD_SOURCE.ADD, false],
+    [STEP_WELCOME, WIZARD_SOURCE.ADD, false],
     [STEP_WELCOME, WIZARD_SOURCE.ADD, false],
     [STEP_WELCOME, WIZARD_SOURCE.SETTINGS, false],
   ]);

@@ -3,6 +3,7 @@ import { t } from '../../../strings/index.js';
 import { TermInput } from '../../../components/terminal/index.js';
 import AccessPanel from '../../github-access/components/AccessPanel.jsx';
 import RepoSourceSwitch from '../../onboarding/components/analyze/RepoSourceSwitch.jsx';
+import FolderField from '../../onboarding/components/analyze/FolderField.jsx';
 import { REPO_SOURCE, FILE_URL_PREFIX } from '../../onboarding/onboardingVocab.js';
 
 function sourceOf(url) {
@@ -11,7 +12,7 @@ function sourceOf(url) {
 
 function UrlField({ url, setUrl, connecting }) {
   return (
-    <span className="evals-repo-form__field">
+    <span className="repo-form__field">
       <TermInput
         value={url}
         onChange={setUrl}
@@ -19,19 +20,6 @@ function UrlField({ url, setUrl, connecting }) {
         ariaLabel={t('projects.connectTeamUrlAria')}
         disabled={connecting}
       />
-    </span>
-  );
-}
-
-function FolderField({ folderPath, onPick, connecting }) {
-  return (
-    <span className="evals-repo-form__field evals-repo-form__folder">
-      <span className={`evals-repo-form__path${folderPath ? '' : ' evals-repo-form__path--empty'}`}>
-        {folderPath || t('onboarding.noFolderYet')}
-      </span>
-      <button type="button" className="term-btn term-btn--secondary" onClick={onPick} disabled={connecting}>
-        {t('onboarding.chooseFolder')}
-      </button>
     </span>
   );
 }
@@ -87,7 +75,7 @@ export default function EvaluationsRepoForm({ onConnect, connecting = false, err
       <div className="evals-repo-form__row">
         {source === REPO_SOURCE.URL
           ? <UrlField url={url} setUrl={setUrl} connecting={connecting} />
-          : <FolderField folderPath={folderPath} onPick={pickFolder} connecting={connecting} />}
+          : <FolderField folderPath={folderPath} onPick={pickFolder} disabled={connecting} />}
         <button type="submit" className="term-btn term-btn--primary term-btn--filled evals-repo-form__submit" disabled={connecting || !trimmed}>
           {connecting ? t('projects.connectTeamConnecting') : t('projects.connectTeamButton')}
         </button>

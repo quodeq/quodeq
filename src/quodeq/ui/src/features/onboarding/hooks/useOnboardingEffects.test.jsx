@@ -21,11 +21,13 @@ function setup(overrides = {}) {
       standardIds: new Set(), totalTimeLimitS: null,
     },
     succeedScan: vi.fn(),
+    seedStandards: vi.fn(),
   };
   const entry = { presetProjectId: 'proj-1' };
-  return renderHook(() => useOnboardingEffects({
+  const hook = renderHook(() => useOnboardingEffects({
     wizard, entry, setStandards: vi.fn(), ...overrides,
   }));
+  return { ...hook, wizard };
 }
 
 describe('useOnboardingEffects', () => {
@@ -41,6 +43,19 @@ describe('useOnboardingEffects', () => {
         expect.any(Error),
       );
     });
+  });
+
+  it('seeds the default standard: the default id when listed, else every visible standard', async () => {
+    localStorage.setItem('quodeq-visible-standards', JSON.stringify(['security', 'performance', 'default']));
+    getProjectScan.mockResolvedValue(null);
+    listStandards.mockResolvedValueOnce([{ id: 'security' }, { id: 'performance' }, { id: 'hidden' }]);
+    const first = setup();
+    await waitFor(() => expect(first.wizard.seedStandards).toHaveBeenCalledWith(['security', 'performance']));
+
+    listStandards.mockResolvedValueOnce([{ id: 'security' }, { id: 'default' }]);
+    const second = setup();
+    await waitFor(() => expect(second.wizard.seedStandards).toHaveBeenCalledWith(['default']));
+    localStorage.clear();
   });
 
   it('logs a failed standards fetch instead of swallowing it', async () => {

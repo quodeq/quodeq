@@ -1,12 +1,12 @@
 import { clearDraft, markWelcomeSkipped } from './useWizardDraft.js';
-import { SETUP_ORDER, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
+import { SETUP_ORDER } from '../wizardSteps.js';
 import { SCAN_SUB_STATE } from '../onboardingVocab.js';
 
 /**
  * OnboardingWizard.jsx's exit/launch/navigation handlers, extracted
  * verbatim.
  */
-export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, onGoToRepositories, providerConfigured, fromSettings = false }) {
+export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, onGoToRepositories, fromSettings = false }) {
   // A welcome opened from Settings offers no skip; even if one fires, a user
   // who went looking for the welcome has not opted out. Skip lands on Repositories.
   function handleSkipWelcome() {
@@ -51,12 +51,10 @@ export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, onGoToR
     });
   }
 
+  // The resume-setup walk (SETUP_ORDER: provider, then standard and launch).
   function nextStep() {
     const i = SETUP_ORDER.indexOf(wizard.state.step);
-    let next = SETUP_ORDER[i + 1] || wizard.state.step;
-    // Auto-skip Provider if already configured.
-    if (next === STEP_PROVIDER && providerConfigured) next = STEP_STANDARD_LAUNCH;
-    wizard.goToStep(next);
+    wizard.goToStep(SETUP_ORDER[i + 1] || wizard.state.step);
   }
 
   function prevStep() {

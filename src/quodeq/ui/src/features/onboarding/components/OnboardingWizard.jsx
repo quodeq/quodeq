@@ -1,22 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { registerProject, getProjectInfo } from '../../../api/index.js';
+import { useEffect, useState } from 'react';
 import { useWizardState } from '../hooks/useWizardState.js';
 import { useOnboardingEffects } from '../hooks/useOnboardingEffects.js';
 import { useOnboardingWizardHandlers } from '../hooks/useOnboardingWizardHandlers.js';
-import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
+import { STEP_WELCOME, SETUP_ORDER } from '../wizardSteps.js';
 import { WIZARD_SOURCE } from '../onboardingVocab.js';
 import { OnboardingStepSwitch } from './OnboardingStepSwitch.jsx';
 import { t } from '../../../strings/index.js';
 import '../../../styles/onboarding.css';
-
-// The steps the "step N of M" counter counts. Welcome is excluded, and the
-// provider step only appears while no provider is configured.
-function visibleSteps(providerConfigured) {
-  const seen = [STEP_REPO_SCAN];
-  if (!providerConfigured) seen.push(STEP_PROVIDER);
-  seen.push(STEP_STANDARD_LAUNCH);
-  return seen;
-}
 
 export default function OnboardingWizard({ entry, onClose, onLaunch, onGoToRepositories, onStepChange }) {
   const initialStep = entry.startStep || STEP_WELCOME;
@@ -29,14 +19,13 @@ export default function OnboardingWizard({ entry, onClose, onLaunch, onGoToRepos
   // alone: the callback's identity changes every render and need not re-fire.
   useEffect(() => { onStepChange?.(wizard.state.step); }, [wizard.state.step]);
 
-  const providerConfigured = Boolean(wizard.state.provider.id && wizard.state.provider.model);
-  const visible = useMemo(() => visibleSteps(providerConfigured), [providerConfigured]);
-  const currentIndex = visible.indexOf(wizard.state.step) + 1;
+  // The "step N of M" counter of the resume-setup walk (the only steps that show one).
+  const currentIndex = SETUP_ORDER.indexOf(wizard.state.step) + 1;
 
   const {
     handleSkipWelcome, handleImport, handleClose, handleLaunch, nextStep, prevStep,
   } = useOnboardingWizardHandlers({
-    wizard, onClose, onLaunch, onGoToRepositories, providerConfigured, fromSettings: entry.source === WIZARD_SOURCE.SETTINGS,
+    wizard, onClose, onLaunch, onGoToRepositories, fromSettings: entry.source === WIZARD_SOURCE.SETTINGS,
   });
   // The welcome's two columns need a wider frame than the single-column steps.
   const frameClass = wizard.state.step === STEP_WELCOME
@@ -58,9 +47,7 @@ export default function OnboardingWizard({ entry, onClose, onLaunch, onGoToRepos
           entry={entry}
           standards={standards}
           currentIndex={currentIndex}
-          visibleCount={visible.length}
-          createProject={registerProject}
-          getProjectInfo={getProjectInfo}
+          visibleCount={SETUP_ORDER.length}
           nextStep={nextStep}
           prevStep={prevStep}
           handleSkipWelcome={handleSkipWelcome}

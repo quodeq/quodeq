@@ -1,9 +1,9 @@
 import WelcomeStep from './steps/WelcomeStep.jsx';
 import ConnectStep from './steps/ConnectStep.jsx';
-import RepoScanStep from './steps/RepoScanStep.jsx';
+import AnalyzeStep from './steps/AnalyzeStep.jsx';
 import ProviderStep from './steps/ProviderStep.jsx';
 import StandardLaunchStep from './steps/StandardLaunchStep.jsx';
-import { STEP_WELCOME, STEP_CONNECT, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
+import { STEP_WELCOME, STEP_CONNECT, STEP_ANALYZE, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
 import { WIZARD_SOURCE } from '../onboardingVocab.js';
 import { useSharedConnection } from '../../dashboard/hooks/useSharedProjects.js';
 
@@ -22,8 +22,7 @@ function WelcomeRoute({ wizard, entry, handleSkipWelcome, handleImport, onGoToRe
   };
   return (
     <WelcomeStep
-      // Opens the existing repo-scan flow until the analyze step exists; then start goes to STEP_ANALYZE.
-      onStart={() => wizard.goToStep(STEP_REPO_SCAN)}
+      onStart={() => wizard.goToStep(STEP_ANALYZE)}
       onConnect={() => wizard.goToStep(STEP_CONNECT)}
       onImport={entry.onImportProject ? () => handleImport(entry.onImportProject) : undefined}
       onSkip={handleSkipWelcome}
@@ -52,16 +51,17 @@ function ConnectRoute({ wizard, entry, handleClose, onGoToRepositories }) {
 
 /**
  * OnboardingWizard.jsx's step-switch JSX (which step component renders for
- * the wizard's current step).
+ * the wizard's current step). The provider and standard steps are the
+ * resume-setup walk (SETUP_ORDER); the provider step opens it, so it has no back.
  */
 export function OnboardingStepSwitch({
   wizard, entry, standards, currentIndex, visibleCount,
-  createProject, getProjectInfo,
   nextStep, prevStep, handleSkipWelcome, handleImport, handleLaunch, handleClose, onGoToRepositories,
 }) {
+  const step = wizard.state.step;
   return (
     <>
-      {wizard.state.step === STEP_WELCOME && (
+      {step === STEP_WELCOME && (
         <WelcomeRoute
           wizard={wizard}
           entry={entry}
@@ -71,34 +71,27 @@ export function OnboardingStepSwitch({
         />
       )}
 
-      {wizard.state.step === STEP_CONNECT && (
+      {step === STEP_CONNECT && (
         <ConnectRoute wizard={wizard} entry={entry} handleClose={handleClose} onGoToRepositories={onGoToRepositories} />
       )}
 
-      {wizard.state.step === STEP_REPO_SCAN && (
-        <RepoScanStep
-          state={wizard.state}
-          actions={wizard}
-          createProject={createProject}
-          getProjectInfo={getProjectInfo}
-          onContinue={nextStep}
-          stepIndex={currentIndex}
-          stepTotal={visibleCount}
-        />
+      {step === STEP_ANALYZE && (
+        // Until useAnalyzeLaunch (Task 10) registers the project first, the
+        // request's standards go straight to the launch.
+        <AnalyzeStep state={wizard.state} actions={wizard} standards={standards} onLaunch={(request) => handleLaunch(request.standardIds)} />
       )}
 
-      {wizard.state.step === STEP_PROVIDER && (
+      {step === STEP_PROVIDER && (
         <ProviderStep
           state={wizard.state}
           actions={wizard}
           onContinue={nextStep}
-          onBack={prevStep}
           stepIndex={currentIndex}
           stepTotal={visibleCount}
         />
       )}
 
-      {wizard.state.step === STEP_STANDARD_LAUNCH && (
+      {step === STEP_STANDARD_LAUNCH && (
         <StandardLaunchStep
           state={wizard.state}
           actions={wizard}

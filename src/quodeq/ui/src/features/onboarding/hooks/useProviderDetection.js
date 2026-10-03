@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { runDetection } from './providerProbes.js';
+import { DETECTION_STATUS } from '../onboardingVocab.js';
 
 const PRIORITY = ['codex-cli', 'claude-code', 'ollama', 'openai', 'anthropic'];
 
@@ -24,7 +25,7 @@ function rank(results) {
  * @returns {{status: string, results: object[], preselection: {id: string, classification: string, model: string|null}|null}}
  */
 export function useProviderDetection({ detect = runDetection } = {}) {
-  const [status, setStatus] = useState('detecting');
+  const [status, setStatus] = useState(DETECTION_STATUS.DETECTING);
   const [results, setResults] = useState([]);
   const [preselection, setPreselection] = useState(null);
 
@@ -35,16 +36,16 @@ export function useProviderDetection({ detect = runDetection } = {}) {
       const ranked = rank(res);
       setResults(res);
       if (ranked.length === 0) {
-        setStatus('none');
+        setStatus(DETECTION_STATUS.NONE);
         setPreselection(null);
       } else {
-        setStatus('detected');
+        setStatus(DETECTION_STATUS.DETECTED);
         const top = ranked[0];
         setPreselection({ id: top.id, classification: top.classification, model: top.defaultModel || null });
       }
     }).catch(() => {
       if (cancelled) return;
-      setStatus('error');
+      setStatus(DETECTION_STATUS.ERROR);
     });
     return () => { cancelled = true; };
   }, []);
