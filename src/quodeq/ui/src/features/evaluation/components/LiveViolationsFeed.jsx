@@ -6,7 +6,7 @@ import { staggerDelayStyle } from '../../../utils/animation.js';
 import { SectionLabel, SevBadge } from '../../../components/terminal/index.js';
 import { useEvaluationProgress } from '../hooks/useEvaluationProgress.js';
 import { useDimensionActivity } from '../hooks/useDimensionActivity.js';
-import { orderDimensions } from './liveViolationsOrdering.js';
+import { orderDimensions, autoOpenTarget } from './liveViolationsOrdering.js';
 import { t } from '../../../strings/index.js';
 import { severityLabel } from '../../../strings/labels.js';
 import { JOB_STATUS } from '../../../vocab/jobStatus.js';
@@ -86,20 +86,18 @@ function DimensionGroup({ dim, violations, open, onToggle }) {
   );
 }
 
-// Single-open-at-a-time accordion. The topmost (most recently active) dim
-// auto-expands; whenever the topmost changes — i.e. a new dimension starts
-// producing violations — the previous one collapses and the new one opens.
-// The user can still click any header to switch which one is open.
-function useAutoOpenTopDim(orderedDims) {
+// Single-open-at-a-time accordion, following `autoOpenTarget`: whenever the
+// target changes (a new dimension starts producing findings, the run moves
+// on to one that has none yet, the run ends) the accordion follows it. The
+// user can still click any header to switch which one is open.
+function useAutoOpenDim(target) {
   const [openDim, setOpenDim] = useState(null);
-  const topDim = orderedDims[0]?.dim;
-  const prevTopRef = useRef(null);
+  const prevTargetRef = useRef(undefined);
   useEffect(() => {
-    if (topDim && prevTopRef.current !== topDim) {
-      prevTopRef.current = topDim;
-      setOpenDim(topDim);
-    }
-  }, [topDim]);
+    if (target === undefined || prevTargetRef.current === target) return;
+    prevTargetRef.current = target;
+    setOpenDim(target);
+  }, [target]);
   return [openDim, setOpenDim];
 }
 
@@ -167,12 +165,13 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
   const runningDim = (progress?.dimensions || []).find((d) => d?.state === DIM_STATE.RUNNING);
   const queued = computeQueuedFiles(runningDim);
 
-  const orderedDims = useMemo(() => orderDimensions(liveViolations, lastActivity),
+  const currentDimension = progress?.currentDimension;
+  const orderedDims = useMemo(() => orderDimensions(liveViolations, lastActivity, currentDimension),
     // lastActivity is a ref's current value — it's intentionally not in deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [liveViolations]);
+    [liveViolations, currentDimension]);
 
-  const [openDim, setOpenDim] = useAutoOpenTopDim(orderedDims);
+  const [openDim, setOpenDim] = useAutoOpenDim(autoOpenTarget({ isRunning, progress, orderedDims }));
 
   const totalCount = orderedDims.reduce((sum, d) => sum + d.violations.length, 0);
   // A fully-cached dimension yields zero NEW findings. Bailing out here
@@ -187,7 +186,7 @@ export default function LiveViolationsFeed({ liveViolations, job = null, hiddenC
         orderedDimsCount={orderedDims.length}
         hiddenCarriedCount={hiddenCarriedCount}
         isRunning={isRunning}
-        currentDimension={progress?.currentDimension}
+        currentDimension={currentDimension}
       />
       {(totalCount > 0 || isRunning) && (
         <LiveViolationsCard orderedDims={orderedDims} openDim={openDim} setOpenDim={setOpenDim} isRunning={isRunning} queued={queued} />
