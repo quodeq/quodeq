@@ -22,7 +22,6 @@ describe("useRunEventStream (replayed runs and run-page freshness)", () => {
     // A new connection replays the run from its first event. History opens
     // one per visit, so appending the replay onto the rows the last visit
     // left behind doubled the list every time, up to the cap.
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const client = new QueryClient();
     const wrapper = wrapperFor(client);
     const replay = () => act(() => {
@@ -42,7 +41,6 @@ describe("useRunEventStream (replayed runs and run-page freshness)", () => {
     // Dropping the oldest row on every event shifts all the others by one,
     // and the cache then deep-compares each of them against its neighbour:
     // milliseconds per finding, seconds for a replayed run.
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const client = new QueryClient();
     renderHook(() => useRunEventStream("job-1"), { wrapper: wrapperFor(client) });
     const key = evaluationKeys.findings("job-1");
@@ -59,7 +57,6 @@ describe("useRunEventStream (replayed runs and run-page freshness)", () => {
   });
 
   it("trims the oldest findings in one block once the cache overshoots its cap", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const client = new QueryClient();
     renderHook(() => useRunEventStream("job-1"), { wrapper: wrapperFor(client) });
     const key = evaluationKeys.findings("job-1");
@@ -81,7 +78,6 @@ describe("useRunEventStream (replayed runs and run-page freshness)", () => {
     ["the job's output run", "job-1", { outputProject: "proj", outputRunId: "run-1" }],
     ["the run id History subscribes with", "run-1", null],
   ])("marks the run's project queries stale when a dimension completes (%s)", (_label, jobId, cachedJob) => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const client = new QueryClient();
     const wrapper = wrapperFor(client);
     if (cachedJob) client.setQueryData(evaluationKeys.status(jobId), { jobId, status: "running", ...cachedJob });

@@ -11,9 +11,6 @@
  * EventSource itself is shared per run via runEventSourceRegistry: any
  * number of subscribers to the same run hold one connection.
  *
- * Gated by VITE_USE_SSE_EVENTS (default on). When off, components fall
- * back to useQuery's refetchInterval polling.
- *
  * Each cache write is preceded by a fire-and-forget cancelQueries on
  * the same key. This prevents an in-flight initial fetch (or poll)
  * from landing AFTER our setQueryData and overwriting the streamed
@@ -27,7 +24,6 @@ import { createViolation } from "../../../models/violation.js";
 import { applyStatusFrame } from "../../../models/job.js";
 import { JOB_FINISHED } from "../../../vocab/jobStatus.js";
 import { SSE_EVENT } from "../../../vocab/sseEvent.js";
-import { isSseEnabled } from "../../../constants.js";
 import {
   acquireRunStream, getRunStreamState, subscribeRunStream,
 } from "./runEventSourceRegistry.js";
@@ -130,10 +126,9 @@ function wireRunEventSource({ source, finish, jobId, writeCache, queryClient }) 
  * straight into the query caches, so the screens reading those keys update
  * without polling.
  *
- * No-op when the job id is absent or SSE is disabled (VITE_USE_SSE_EVENTS),
- * in which case the polling queries cover it. The shared stream is released
- * on unmount (closed once its last subscriber goes) and closed for good when
- * the run finishes.
+ * No-op when the job id is absent. The shared stream is released on unmount
+ * (closed once its last subscriber goes) and closed for good when the run
+ * finishes.
  *
  * @returns {string} the stream's STREAM_STATE
  */
@@ -141,7 +136,6 @@ export function useRunEventStream(jobId) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!isSseEnabled()) return undefined;
     if (!jobId) return undefined;
 
     const writeCache = (key, updater) => {

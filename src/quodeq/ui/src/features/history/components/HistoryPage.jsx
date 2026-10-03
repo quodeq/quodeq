@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
-import { useRunningRunsRefresh } from '../../../hooks/useRunningRunsRefresh.js';
 import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
 import { usePrefetchRun } from '../../dashboard/hooks/usePrefetchRun.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
@@ -122,10 +121,6 @@ export default function HistoryPage({ trend: rawTrend, partialRuns: rawPartialRu
   const { selectedRunId } = selection;
   const { onRunClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
-  // Background refresh while a run is alive so the running row flips
-  // to "done" without the user manually reloading. Scoped to this
-  // page only — other tabs don't poll.
-  useRunningRunsRefresh({ selectedProject, selectedSource, availableRuns });
   // Warm the run-detail cache on row hover so clicking through is instant.
   const { prefetchRun, cancelPrefetch } = usePrefetchRun(selectedProject, selectedSource);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);

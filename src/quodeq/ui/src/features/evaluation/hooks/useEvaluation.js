@@ -6,7 +6,7 @@
  *
  * Data sources:
  *   - statusQuery: ['evaluation', jobId, 'status'] — fetched via api.getEvaluation
- *     and updated by useRunEventStream when VITE_USE_SSE_EVENTS=true.
+ *     and updated by useRunEventStream's status frames.
  *   - findingsQuery: ['evaluation', jobId, 'findings'] — populated entirely
  *     by useRunEventStream's setQueryData writes (queryFn is a no-op). The
  *     server decides which judgments are findings, once, on the stream.
@@ -120,7 +120,6 @@ export function useEvaluation() {
   const [startedProject, setStartedProject] = useState(null);
 
   // SSE side-effect — writes status/dimensions/findings into cache.
-  // No-op when VITE_USE_SSE_EVENTS is off; refetchInterval below covers.
   // Its connection state drives the status query's poll interval.
   const streamState = useRunEventStream(jobId);
   useResumeRunningJob(api, queryClient, setJobId, setJobError);

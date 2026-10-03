@@ -221,7 +221,7 @@ describe('EvaluationStatus live-findings filter', () => {
   });
 
   it('hides snake_case carried_forward findings too (SSE payloads with no violation-model mapping)', async () => {
-    // Under VITE_USE_SSE_EVENTS, findings land in the cache as raw wire
+    // Findings used to land in the cache as raw wire
     // payloads, so they carry `carried_forward` instead of `carriedForward`.
     const QC = withQueryClient();
     render(

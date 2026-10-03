@@ -4,27 +4,25 @@
  * Split out of useEvaluation.js (see that file's header for the hook's
  * overall data-flow doc). Kept logic-identical to the pre-split version.
  */
-import { ACTIVE_PROVIDER_KEY, providerKey, isSseEnabled } from "../../../constants.js";
+import { ACTIVE_PROVIDER_KEY, providerKey } from "../../../constants.js";
 import { resolveProviderSettings } from "../../../utils/effectiveProviderSettings.js";
 import { t } from "../../../strings/index.js";
 import { STREAM_STATE } from "./runEventSourceRegistry.js";
 
-export const SSE_ENABLED = isSseEnabled();
 export const JOB_POLL_MS = 1500;
-// Under SSE the status query still refetches, slowly, as a safety net
-// against a frame the stream dropped or a server that never sent one.
+// The status query still refetches, slowly, as a safety net against a frame
+// the stream dropped or a server that never sent one.
 export const SSE_STATUS_SAFETY_NET_MS = 10_000;
 
 /**
  * Poll interval for the job status query. Exported for tests.
  *
- * With SSE off it is the plain fast poll. With SSE on the stream feeds the
- * cache, so the query only refetches on a slow safety net, except while the
- * stream is in error: then the fast poll takes over until it reconnects,
- * so a dropped connection never leaves the screen frozen on a stale job.
+ * The stream feeds the cache, so the query only refetches on a slow safety
+ * net, except while the stream is in error: then the fast poll takes over
+ * until it reconnects, so a dropped connection never leaves the screen
+ * frozen on a stale job.
  */
-export function statusRefetchInterval(streamState, sseEnabled = SSE_ENABLED) {
-  if (!sseEnabled) return JOB_POLL_MS;
+export function statusRefetchInterval(streamState) {
   if (streamState === STREAM_STATE.ERROR) return JOB_POLL_MS;
   return SSE_STATUS_SAFETY_NET_MS;
 }

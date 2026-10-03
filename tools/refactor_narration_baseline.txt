@@ -136,11 +136,11 @@ src/quodeq/ui/src/features/evaluation/components/scanProgressTotals.aggregate.te
 src/quodeq/ui/src/features/evaluation/components/scanProgressTotals.basic.test.js:6
 src/quodeq/ui/src/features/evaluation/components/scanProgressTotals.coverage.test.js:6
 src/quodeq/ui/src/features/evaluation/hooks/useDimensionActivity.js:6
-src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.cancelLifecycle.test.jsx:37
-src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.core.test.jsx:38
-src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.errorsAndAdoption.test.jsx:37
+src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.cancelLifecycle.test.jsx:38
+src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.core.test.jsx:39
+src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.errorsAndAdoption.test.jsx:38
 src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.helpers.js:4
-src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.misc.test.jsx:37
+src/quodeq/ui/src/features/evaluation/hooks/useEvaluation.misc.test.jsx:38
 src/quodeq/ui/src/features/evaluation/hooks/useEvaluationMutations.js:4
 src/quodeq/ui/src/features/evaluation/hooks/useReEvalInfo.js:8
 src/quodeq/ui/src/features/evaluation/hooks/useReEvaluateCard.js:5

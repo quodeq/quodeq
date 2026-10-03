@@ -41,8 +41,7 @@ describe("useRunEventStream (cache-writer)", () => {
     MockEventSource.instances = [];
   });
 
-  it("opens an EventSource against the events endpoint when SSE is enabled", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
+  it("opens an EventSource against the events endpoint", () => {
     renderStreamAndQuery("job-123", evaluationKeys.status("job-123"));
     expect(MockEventSource.last.url).toBe("/api/evaluations/job-123/events");
   });
@@ -52,7 +51,6 @@ describe("useRunEventStream (cache-writer)", () => {
     // RunState. Readers expect the REST Job (camelCase, `status`), so writing
     // the frame raw left `job.status` undefined and the status pill fell
     // through to "cancelled" on a running job.
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { result } = renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
     act(() => {
       MockEventSource.last.emit("status", {
@@ -70,7 +68,6 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("maps the pending and finalizing run states onto a running job", async () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { result } = renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
     act(() => MockEventSource.last.emit("status", { state: "pending" }));
     await waitFor(() => expect(result.current.data?.status).toBe("running"));
@@ -79,7 +76,6 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("keeps REST-only job fields when a status frame lands on a cached job", async () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { client } = renderStreamWithSpy("job-1");
     // A previous REST fetch populated the slot with the full Job.
     client.setQueryData(evaluationKeys.status("job-1"), {
@@ -98,7 +94,6 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("appends finding events into evaluationKeys.findings cache slot", async () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { result } = renderStreamAndQuery("job-1", evaluationKeys.findings("job-1"));
     act(() => {
       MockEventSource.last.emit("finding", { id: 1, practice_id: "P1" });
@@ -115,7 +110,6 @@ describe("useRunEventStream (cache-writer)", () => {
     // The frame is serialised straight off the payload, so it says
     // practice_id where every component reads principle. Writing it verbatim
     // left the live feed's rule column blank for the whole run.
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { result } = renderStreamAndQuery("job-1", evaluationKeys.findings("job-1"));
     act(() => {
       MockEventSource.last.emit("finding", {
@@ -136,7 +130,6 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("writes dimension-completed events as a map keyed by dimension", async () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { result } = renderStreamAndQuery("job-1", evaluationKeys.dimensions("job-1"));
     act(() => {
       MockEventSource.last.emit("dimension-completed", {
@@ -153,7 +146,6 @@ describe("useRunEventStream (cache-writer)", () => {
   it("shares one EventSource between every subscriber to the same run", () => {
     // Five History rows for one run used to hold five connections; browsers
     // cap SSE connections per origin at six.
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const wrapper = withQueryClient();
     const rows = 5;
     const { unmount } = renderHook(
@@ -167,7 +159,6 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("keeps the stream open while any subscriber remains", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const wrapper = withQueryClient();
     const first = renderHook(() => useRunEventStream("job-shared"), { wrapper });
     const source = MockEventSource.last;
@@ -179,7 +170,6 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("reports the connection state so the poll policy can fall back", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const wrapper = withQueryClient();
     const { result } = renderHook(() => useRunEventStream("job-err"), { wrapper });
     expect(result.current).toBe(STREAM_STATE.OPEN);
@@ -191,14 +181,12 @@ describe("useRunEventStream (cache-writer)", () => {
     expect(result.current).toBe(STREAM_STATE.IDLE);
   });
 
-  it("reports IDLE when SSE is off or there is no job", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "false");
-    const { result } = renderHook(() => useRunEventStream("job-1"), { wrapper: withQueryClient() });
+  it("reports IDLE when there is no job", () => {
+    const { result } = renderHook(() => useRunEventStream(""), { wrapper: withQueryClient() });
     expect(result.current).toBe(STREAM_STATE.IDLE);
   });
 
   it("closes the source on done event", async () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
     act(() => {
       MockEventSource.last.emit("done", { state: "done" });
@@ -207,14 +195,7 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("does not open EventSource when jobId is empty", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     renderStreamAndQuery("", evaluationKeys.status(""));
-    expect(MockEventSource.last).toBeNull();
-  });
-
-  it("is a no-op when VITE_USE_SSE_EVENTS is not 'true'", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "false");
-    renderStreamAndQuery("job-1", evaluationKeys.status("job-1"));
     expect(MockEventSource.last).toBeNull();
   });
 
@@ -224,7 +205,6 @@ describe("useRunEventStream (cache-writer)", () => {
     ["failed", "job-term-2"],
     ["cancelled", "job-term-3"],
   ])("invalidates project trend on terminal status (%s)", (state, jobId) => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { invalidateSpy } = renderStreamWithSpy(jobId);
     act(() => {
       MockEventSource.last.emit("status", { state });
@@ -233,7 +213,6 @@ describe("useRunEventStream (cache-writer)", () => {
   });
 
   it("does NOT invalidate project trend on non-terminal status", () => {
-    vi.stubEnv("VITE_USE_SSE_EVENTS", "true");
     const { invalidateSpy } = renderStreamWithSpy("job-running");
     act(() => {
       MockEventSource.last.emit("status", { state: "running" });
