@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSharedContentSignal } from '../features/dashboard/hooks/useSharedProjects.js';
 import { readActiveProviderSelection, readActiveProviderModel } from '../utils/effectiveProviderSettings.js';
 import { formatDayLabel } from './useAppState.js';
+import { useCloneTransitions } from './useCloneTransitions.js';
 import { useNativeNavBridge } from './useNativeNavBridge.js';
 import { useStartupTheme, useStartupLoader } from './useStartupTheme.js';
 import { useWizardLifecycle } from '../features/onboarding/useWizardLifecycle.js';
@@ -43,6 +44,7 @@ export function computeIsEvaluating(state) {
 export function useAppBootExtras() {
   useEffect(() => { warmOverviewChunks(); }, []);
   const sharedSignal = useSharedContentSignal();
+  useCloneTransitions();
   const [sidebarPinned, setSidebarPinned] = useState(false);
   // Incremented after every successful dismiss POST so the violations
   // page's dismissed sub-tab knows to refetch its list. Without this, a
