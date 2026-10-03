@@ -69,15 +69,29 @@ describe('AnalyzeStep', () => {
     user = userEvent.setup();
   });
 
-  it('first run: detected provider is recommended, default standard shown, run disabled until a repo is typed', async () => {
+  it('first run: a detected provider with its model, default standard shown, run disabled until a repo is typed', async () => {
     renderAnalyze({ detect: claudeDetected });
-    expect(await screen.findByText('found · recommended')).toBeInTheDocument();
+    expect(await screen.findByText('claude-sonnet-5-5')).toBeInTheDocument();
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
     expect(screen.getByText('quodeq default standard')).toBeInTheDocument();
     expect(screen.getByText(/security, maintainability, performance/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'scan and run' })).toBeDisabled();
     await user.type(screen.getByRole('textbox', { name: 'repository' }), 'https://github.com/acme/billing.git');
     expect(screen.getByText(/quodeq keeps a working copy in .*quodeq\/repos\/billing/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'scan and run' })).toBeEnabled();
+  });
+
+  it('a detected provider without a model stays unlaunchable until one is chosen', async () => {
+    renderAnalyze({ detect: async () => [{ id: 'codex-cli', classification: 'cli', detected: true, defaultModel: null }] });
+    expect(await screen.findByText('found · choose a model')).toBeInTheDocument();
+    expect(screen.getByText('Codex CLI')).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: 'repository' }), 'https://github.com/acme/billing.git');
+    expect(screen.getByRole('button', { name: 'scan and run' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'choose a model' }));
+    expect(screen.getByTestId('provider-tabs-stub')).toBeInTheDocument();
+    writeActiveProviderState({ id: 'codex', model: 'gpt-5' });
+    await user.click(screen.getByRole('button', { name: 'done' }));
+    expect(screen.getByText('reviewed by Codex CLI · against quodeq default standard')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'scan and run' })).toBeEnabled();
   });
 
@@ -102,7 +116,7 @@ describe('AnalyzeStep', () => {
     const onLaunch = vi.fn();
     picks.next = '/Users/me/code/app';
     const { api } = renderAnalyze({ detect: claudeDetected, onLaunch });
-    await screen.findByText('found · recommended');
+    await screen.findByText('claude-sonnet-5-5');
     await user.click(screen.getByRole('radio', { name: 'choose a local folder' }));
     await user.click(screen.getByRole('button', { name: 'choose a folder' }));
     expect(await screen.findByText('/Users/me/code/app')).toBeInTheDocument();
@@ -117,7 +131,7 @@ describe('AnalyzeStep', () => {
 
   it('a changed working-copy root is sent as cloneDest; the default is not', async () => {
     const { api, poll } = renderAnalyze({ detect: claudeDetected });
-    await screen.findByText('found · recommended');
+    await screen.findByText('claude-sonnet-5-5');
     await user.type(screen.getByRole('textbox', { name: 'repository' }), 'https://github.com/acme/billing.git');
     await user.click(screen.getByRole('button', { name: 'scan and run' }));
     await waitFor(() => expect(api.registerProject).toHaveBeenCalledTimes(1));
@@ -137,7 +151,7 @@ describe('AnalyzeStep', () => {
 
   it('a url shows the clone in the panel and scan and run waits for it', async () => {
     const { poll } = renderAnalyze({ detect: claudeDetected });
-    await screen.findByText('found · recommended');
+    await screen.findByText('claude-sonnet-5-5');
     await user.type(screen.getByRole('textbox', { name: 'repository' }), 'https://github.com/acme/billing.git');
     await user.click(screen.getByRole('button', { name: 'scan and run' }));
     await poll({ ...IDLE_SLOT, state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: 45, bytes: 12582912, repo: 'https://github.com/acme/billing.git' });

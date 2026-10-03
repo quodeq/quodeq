@@ -38,10 +38,30 @@ describe('useAnalyzeForm', () => {
     await waitFor(() => expect(result.current.form.provider.status).toBe('detected'));
   });
 
-  it('the detected provider becomes the wizard provider under its server id', async () => {
+  it('a detected provider without a model is named but not launchable', async () => {
     const { result } = setup();
+    act(() => result.current.form.setRepo('/tmp/app'));
     await waitFor(() => expect(result.current.form.provider.label).toBe('Codex CLI'));
-    expect(result.current.wizard.state.provider).toMatchObject({ id: 'codex', classification: 'cli' });
+    expect(result.current.form.provider.detectedId).toBe('codex');
+    expect(result.current.form.provider.selection).toBeNull();
+    expect(result.current.wizard.state.provider.id).toBeNull();
+    expect(result.current.form.canSubmit).toBe(false);
+  });
+
+  it('choose a model opens the drawer on the detected provider', async () => {
+    const { result } = setup();
+    await waitFor(() => expect(result.current.form.provider.detectedId).toBe('codex'));
+    act(() => result.current.form.provider.chooseModel());
+    expect(result.current.form.provider.drawerOpen).toBe(true);
+    expect(localStorage.getItem('cc-active-provider')).toBe('codex');
+  });
+
+  it('a detected provider that carries a model becomes the wizard provider under its server id', async () => {
+    const { result } = setup({ detect: async () => [{ id: 'codex-cli', classification: 'cli', detected: true, defaultModel: 'gpt-5' }] });
+    act(() => result.current.form.setRepo('/tmp/app'));
+    await waitFor(() => expect(result.current.form.provider.model).toBe('gpt-5'));
+    expect(result.current.wizard.state.provider).toMatchObject({ id: 'codex', model: 'gpt-5', classification: 'cli' });
+    expect(result.current.form.canSubmit).toBe(true);
   });
 
   it('a configured provider wins, collapses the screen, and carries its time limit', async () => {

@@ -59,7 +59,8 @@ export function useAnalyzeForm({ wizard, standards, detect }) {
   useSyncProvider(wizard, provider);
 
   const trimmed = repo.trim();
-  const reviewerReady = provider.configured || Boolean(provider.selection);
+  // A model is required for every provider: a detection without one is not ready.
+  const reviewerReady = provider.configured || Boolean(provider.selection?.model);
   const request = () => ({
     repo: trimmed,
     source,

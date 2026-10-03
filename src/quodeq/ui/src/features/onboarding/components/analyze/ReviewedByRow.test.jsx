@@ -21,20 +21,30 @@ describe('ReviewedByRow', () => {
     expect(screen.getByText('looking for a model on this machine…')).toBeInTheDocument();
   });
 
-  it('a detected provider is recommended, with its model when known, and change opens the drawer', () => {
+  it('a detected provider without a model asks for one, and choose a model opens its tab', () => {
+    const p = provider({ chooseModel: vi.fn() });
+    render(<ReviewedByRow provider={p} />);
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    expect(screen.getByText('found · choose a model')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'choose a model' }));
+    expect(p.chooseModel).toHaveBeenCalledTimes(1);
+    expect(p.openDrawer).not.toHaveBeenCalled();
+  });
+
+  it('a detected provider with a model is named with it, and change opens the drawer', () => {
     const p = provider({ model: 'claude-sonnet-5-5' });
     render(<ReviewedByRow provider={p} />);
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
     expect(screen.getByText('claude-sonnet-5-5')).toBeInTheDocument();
-    expect(screen.getByText('found · recommended')).toBeInTheDocument();
+    expect(screen.queryByText('found · choose a model')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'change the reviewer' }));
     expect(p.openDrawer).toHaveBeenCalledTimes(1);
   });
 
-  it('a configured provider is not labelled recommended', () => {
+  it('a configured provider is named without a found tag', () => {
     render(<ReviewedByRow provider={provider({ status: 'none', configured: true, model: 'gpt-5' , label: 'Codex CLI' })} />);
     expect(screen.getByText('Codex CLI')).toBeInTheDocument();
-    expect(screen.queryByText('found · recommended')).toBeNull();
+    expect(screen.queryByText(/found ·/)).toBeNull();
     expect(screen.queryByText('no model found on this machine')).toBeNull();
   });
 
