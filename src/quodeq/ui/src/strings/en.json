@@ -1006,7 +1006,7 @@
   "projects.cloneFailedTile": "download failed · {message}",
   "projects.cloningTile": "cloning · {percent}% · {size}",
   "projects.cloningTileBare": "cloning…",
-  "projects.conflictSameId":"A project with this ID already exists. Replace it, import as a separate copy, or cancel.",
+  "projects.conflictSameId": "A project with this ID already exists. Replace it, import as a separate copy, or cancel.",
   "projects.conflictSameIdNamed": "A project \"{name}\" with this ID already exists. Replace it, import as a separate copy, or cancel.",
   "projects.conflictSameRepo": "A project for this repository already exists. Import as a separate copy or cancel.",
   "projects.conflictSameRepoNamed": "A project \"{name}\" for this repository already exists. Import as a separate copy or cancel.",

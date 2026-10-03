@@ -39,7 +39,7 @@ export default function CloningTile({ slot, onRetry, onClose }) {
   const failed = slot.phase === SYNC_PHASE.ERROR;
   const percent = slot.phase === SYNC_PHASE.DOWNLOADING ? slot.percent : null;
   return (
-    <article className="project-card project-card--ghost" aria-live="polite">
+    <article className="project-card project-card--ghost">
       <header className="project-card--ghost__head">
         <h3 className="project-card--ghost__name">{name}</h3>
         <span className="badge badge--local">{t('projects.badgeLocal')}</span>
