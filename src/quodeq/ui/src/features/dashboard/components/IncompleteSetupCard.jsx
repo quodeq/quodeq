@@ -11,12 +11,15 @@ import { PROJECT_LOCATION } from '../../../models/project.js';
  * and turns the project into a normal local project.
  */
 export default function IncompleteSetupCard({ projectInfo, onComplete }) {
-  const repoUrl = projectInfo?.path || projectInfo?.repo || '';
-  // useCompleteSetup runs unconditionally, before the early return below, so
-  // hook order stays stable across the legacy-online / not-applicable branches.
-  const { open, setOpen, submitting, error, handleSubmit } = useCompleteSetup({ repoUrl, onComplete });
-
   if (!projectInfo || projectInfo.location !== PROJECT_LOCATION.ONLINE) return null;
+  return <SetupFlow repoUrl={projectInfo.path || projectInfo.repo || ''} onComplete={onComplete} />;
+}
+
+// The flow itself, mounted only for a legacy online project: it follows the
+// shared clone slot (a url completes as a 202 job), so its hooks live here
+// rather than above the gate.
+function SetupFlow({ repoUrl, onComplete }) {
+  const { open, setOpen, submitting, error, handleSubmit } = useCompleteSetup({ repoUrl, onComplete });
 
   if (!open) {
     return (

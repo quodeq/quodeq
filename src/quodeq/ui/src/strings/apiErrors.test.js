@@ -139,3 +139,13 @@ test('a file:// folder that is not a git repository gets its own copy', () => {
   assert.equal(apiErrorKey('NOT_A_GIT_REPO'), 'apiError.notAGitRepo');
   assert.equal(apiErrorMessage({ code: 'NOT_A_GIT_REPO', message: 'not a git repository' }, 'x.y'), catalog['apiError.notAGitRepo']);
 });
+
+test('CLONE_START_FAILED (the clone job never started) renders its own copy', () => {
+  assert.equal(apiErrorKey('CLONE_START_FAILED'), 'apiError.cloneStartFailed');
+  assert.equal(apiErrorMessage({ code: 'CLONE_START_FAILED', message: 'could not start the clone job' }, 'x.y'), 'Could not start the download.');
+});
+
+test('CLONE_IN_PROGRESS (a second clone while one runs) renders its own copy', () => {
+  assert.equal(apiErrorKey('CLONE_IN_PROGRESS'), 'apiError.cloneInProgress');
+  assert.equal(apiErrorMessage({ code: 'CLONE_IN_PROGRESS', message: 'a clone is already running' }, 'x.y'), 'A download is already running. Wait for it to finish.');
+});

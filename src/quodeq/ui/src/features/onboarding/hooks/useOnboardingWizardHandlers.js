@@ -3,8 +3,11 @@ import { SETUP_ORDER } from '../wizardSteps.js';
 import { SCAN_SUB_STATE } from '../onboardingVocab.js';
 
 /**
- * OnboardingWizard.jsx's exit/launch/navigation handlers, extracted
- * verbatim.
+ * The wizard's exits and launch: skipping the welcome (to Repositories, and
+ * remembered unless opened from Settings), stepping aside for an archive
+ * import, closing (a scanned project counts as saved), starting the
+ * evaluation with the wizard's scope, branch, provider and time limit, and
+ * the resume-setup walk's step navigation. Each exit clears the draft.
  */
 export function useOnboardingWizardHandlers({ wizard, onClose, onLaunch, onGoToRepositories, fromSettings = false }) {
   // A welcome opened from Settings offers no skip; even if one fires, a user

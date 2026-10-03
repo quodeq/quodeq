@@ -32,6 +32,9 @@ const CODE_KEYS = {
   REPO_NOT_FOUND: 'apiError.cloneRepoNotFound',
   DEST_EXISTS: 'apiError.cloneDestExists',
   DISK_ERROR: 'apiError.cloneDiskError',
+  // The clone job itself: it could not start, or one already runs.
+  CLONE_START_FAILED: 'apiError.cloneStartFailed',
+  CLONE_IN_PROGRESS: 'apiError.cloneInProgress',
   INVALID_REPO_URL: 'apiError.invalidRepoUrl',
   INVALID_URL: 'apiError.invalidRepoUrl',
   INVALID_REPO: 'apiError.invalidRepoUrl',

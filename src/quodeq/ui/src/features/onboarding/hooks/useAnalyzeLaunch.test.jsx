@@ -21,8 +21,8 @@ const failed = (code, detail = '', finishedAt = 1700000002000) => ({
 function fakeWizard() {
   return { state: { repo: { source: 'url', value: URL }, projectId: null }, startScan: vi.fn(), succeedScan: vi.fn(), failScan: vi.fn(), setRepo: vi.fn() };
 }
-function fakeForm(request = { repo: URL, source: 'url', standardIds: ['default'] }) {
-  return { request: () => request };
+function fakeForm(request = { repo: URL, source: 'url', standardIds: ['default'] }, canSubmit = true) {
+  return { request: () => request, canSubmit };
 }
 
 // The hook only observes the clone slot; the test plays the app-level poller
@@ -223,6 +223,13 @@ describe('useAnalyzeLaunch', () => {
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
     expect(api.registerProject).not.toHaveBeenCalled();
   });
+  it('an attached clone landing while the form cannot submit (no model) shows the project, never launches', async () => {
+    const { result, onLaunch, wizard, poll } = setup({ slot: running(), form: fakeForm(undefined, false) });
+    await waitFor(() => expect(result.current.busy).toBe(true));
+    await poll(done());
+    await waitFor(() => expect(wizard.succeedScan).toHaveBeenCalledWith('p1', { files: 3 }));
+    expect({ launches: onLaunch.mock.calls.length, busy: result.current.busy }).toEqual({ launches: 0, busy: false });
+  });
   // An unmounted panel never launches, even after a slow await.
   it('a folder registration that resolves after the panel closed never launches', async () => {
     let resolve;
@@ -248,17 +255,15 @@ describe('useAnalyzeLaunch', () => {
     expect(onLaunch).not.toHaveBeenCalled();
   });
 
-  // An attached launch sends the repo that landed, not the field.
   it('an attached launch sends the slot repo even if the field was edited', async () => {
     const request = { repo: URL, source: 'url', standardIds: ['default'] };
-    const { result, onLaunch, poll } = setup({ registerProject: accepted(), slot: running(), form: { request: () => request } });
+    const { result, onLaunch, poll } = setup({ registerProject: accepted(), slot: running(), form: { request: () => request, canSubmit: true } });
     await waitFor(() => expect(result.current.busy).toBe(true));
     request.repo = OTHER;
     await poll(done());
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
     expect(onLaunch.mock.calls[0][0]).toMatchObject({ projectId: 'p1', repo: URL });
   });
-
   it('a followed clone that vanishes (slot back to idle) ends with an error', async () => {
     const { result, onLaunch, poll } = setup({ registerProject: accepted() });
     await act(async () => { await result.current.run(); });
@@ -269,7 +274,6 @@ describe('useAnalyzeLaunch', () => {
     expect(result.current.busy).toBe(false);
     expect(onLaunch).not.toHaveBeenCalled();
   });
-
   it('a failed status read after a 409 follows this repo, not the cached one', async () => {
     const registerProject = vi.fn(async () => { throw conflict('CLONE_IN_PROGRESS'); });
     const { result, api, onLaunch, poll } = setup({ registerProject, slot: done(OTHER, 1600000000000, 'old') });

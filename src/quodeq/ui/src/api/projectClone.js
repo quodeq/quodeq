@@ -11,6 +11,9 @@ const REPO_FALLBACK_NAME = 'repo';
 const GIT_SUFFIX = /\.git$/;
 const PATH_SEPARATORS = /[/:]/;
 
+/** The clone slot's code for a repo the server already holds; `detail` is its id. */
+export const CLONE_CODE_PROJECT_EXISTS = 'PROJECT_EXISTS';
+
 /** @returns {Promise<Object>} the clone slot, finishedAt in epoch ms */
 export async function getCloneStatus() {
   return normalizeSlot(await request('/projects/clone-status'));

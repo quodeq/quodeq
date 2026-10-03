@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { useCloneStatus } from '../../../hooks/useCloneStatus.js';
+import { CLONE_CODE_PROJECT_EXISTS } from '../../../api/projectClone.js';
 import { HTTP_STATUS } from '../../../constants.js';
 import { apiErrorMessage } from '../../../strings/apiErrors.js';
 import { t } from '../../../strings/index.js';
@@ -9,14 +10,11 @@ import { REPO_SOURCE } from '../onboardingVocab.js';
 import { makeTryResumeExisting, resumedExisting } from './resumeExisting.js';
 import { startFolder, startUrl } from './analyzeLaunchStart.js';
 
-// The clone slot's code for a repo the server already holds; `detail` is its id.
-const CODE_PROJECT_EXISTS = 'PROJECT_EXISTS';
-
 // A clone that failed: resume and run the existing project on PROJECT_EXISTS
 // (when it has no evaluations yet), otherwise the mapped message and git's output.
 async function landFailure(slot, latest, setters) {
   const { tryResume, form, launch } = latest.current;
-  const exists = slot.code === CODE_PROJECT_EXISTS;
+  const exists = slot.code === CLONE_CODE_PROJECT_EXISTS;
   if (exists && slot.detail) {
     const conflict = { status: HTTP_STATUS.CONFLICT, existingProjectId: slot.detail };
     if (await resumedExisting(conflict, tryResume)) {
@@ -46,8 +44,9 @@ async function localRepo(api, { projectId, repo }) {
 /**
  * Acts once on the terminal edge of the clone this panel follows: the slot is
  * for `pending.repo` and its finishedAt is new (not the one cached before the
- * post, not one already handled). DONE launches; ERROR shows or resumes;
- * another repository's clone finishing (a 409 attach) lets this one start.
+ * post, not one already handled). DONE launches when the form can submit;
+ * ERROR shows or resumes; another repository's clone finishing (a 409
+ * attach) lets this one start.
  */
 function useCloneLanding({ clone, pending, setPending, latest, setters }) {
   const handled = useRef(null);
@@ -64,6 +63,8 @@ function useCloneLanding({ clone, pending, setPending, latest, setters }) {
     if (clone.done) {
       const { wizard, form, launch } = latest.current;
       wizard.succeedScan(slot.projectId, slot.scanData ?? null);
+      // A form that cannot run (a provider with no model): the project appears, nothing launches.
+      if (!form.canSubmit) { setPending(null); return; }
       // The repo that landed, not the field (which a reopened panel may hold differently).
       launch({ projectId: slot.projectId, repo: slot.repo, standardIds: form.request().standardIds })
         .catch((err) => console.warn('[useAnalyzeLaunch] launching the cloned project failed:', err));
@@ -133,7 +134,7 @@ function useLaunchState() {
  * `onLaunch({ projectId, repo, standardIds })` starts the evaluation with the
  * project's local path as `repo`; never after the panel unmounted.
  *
- * @param {{ wizard: object, form: { request: () => object }, onLaunch: Function }} args
+ * @param {{ wizard: object, form: { request: () => object, canSubmit: boolean }, onLaunch: Function }} args
  */
 export function useAnalyzeLaunch({ wizard, form, onLaunch }) {
   const api = useApi();

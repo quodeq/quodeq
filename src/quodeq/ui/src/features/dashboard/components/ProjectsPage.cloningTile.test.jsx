@@ -8,6 +8,7 @@ import { ApiProvider } from '../../../api/ApiContext.jsx';
 import { projectsKeys } from '../../../api/queryKeys.js';
 import { SidePaneProvider } from '../../side-pane/index.js';
 import { SYNC_PHASE } from '../../../vocab/syncPhase.js';
+import { CLONE_CODE_PROJECT_EXISTS } from '../../../api/projectClone.js';
 import { DISMISSED_CLONE_KEY } from '../hooks/useDismissedCloneFailure.js';
 import { LOCAL, makeApi, pageActions } from './_projectsPageTeam.fixtures.jsx';
 
@@ -56,13 +57,22 @@ describe('ProjectsPage ghost tile', () => {
     expect(tile.compareDocumentPosition(cards) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('a failed clone on an empty page shows the error row above the compact cards, retry re-posts into the parent folder', async () => {
+  it('a failed clone on an empty page shows the error row above the compact cards, retry re-posts to the default root', async () => {
     const user = userEvent.setup();
     const { api } = setup(failed, []);
     expect(await screen.findByText(/download failed · /)).toBeInTheDocument();
     expect(screen.queryByText('Your project will appear here when the scan finishes.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'retry' }));
-    expect(api.registerProject).toHaveBeenCalledWith({ repo: REPO, cloneDest: '/u/quodeq/repos' });
+    // The server derives the default root: the slot cannot recover an explicit one.
+    expect(api.registerProject).toHaveBeenCalledWith({ repo: REPO });
+  });
+
+  it('a slot that ended because the project already exists shows no ghost tile', async () => {
+    const exists = { ...failed, code: CLONE_CODE_PROJECT_EXISTS, error: 'A project for this repository already exists.', detail: 'p-1' };
+    const { client } = setup(exists);
+    await waitFor(() => expect(client.getQueryData(projectsKeys.clone())).toEqual(exists));
+    expect(screen.queryByText(/download failed · /)).not.toBeInTheDocument();
+    expect(screen.queryByText('billing')).not.toBeInTheDocument();
   });
 
   it('a dismissed failure stays hidden for the same finishedAt and shows again for a new one', async () => {
