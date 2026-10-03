@@ -15,9 +15,14 @@ describe('CloneTargetStep', () => {
     expect(screen.getByLabelText(/clone destination/i)).toHaveValue('/Users/v/code');
   });
 
-  it('falls back to ~ when no localStorage value', () => {
+  it('falls back to ~/quodeq/repos when no localStorage value', () => {
     render(<CloneTargetStep repoUrl="https://x/y.git" onSubmit={vi.fn()} onBack={vi.fn()} />);
-    expect(screen.getByLabelText(/clone destination/i)).toHaveValue('~');
+    expect(screen.getByLabelText(/clone destination/i)).toHaveValue('~/quodeq/repos');
+  });
+
+  it('offers a folder picker next to the destination', () => {
+    render(<CloneTargetStep repoUrl="https://x/y.git" onSubmit={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'choose a folder' })).toBeInTheDocument();
   });
 
   it('submitting calls onSubmit with cloneDest and ephemeral=false', () => {
