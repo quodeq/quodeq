@@ -22,6 +22,7 @@ class GitFailureKind(StrEnum):
     DEST_EXISTS = "dest_exists"
     DISK = "disk"
     INVALID_URL = "invalid_url"
+    NOT_A_GIT_REPO = "not_a_git_repo"
     GIT_MISSING = "git_missing"
     GIT_TOO_OLD = "git_too_old"
     UNKNOWN = "unknown"

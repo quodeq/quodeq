@@ -64,5 +64,33 @@ def test_file_url_escaping_home_through_dotdot_is_refused(tmp_path, monkeypatch)
         validate_remote_url(f"file://{home}/../{origin.name}")
 
 
+def test_only_the_absolute_form_is_valid(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.chdir(tmp_path)
+    _bare(tmp_path)
+    for url in ("file://origin.git", f"file://localhost{tmp_path}/origin.git", "file://", "file://q/../origin.git"):
+        with pytest.raises(ValueError, match="absolute") as caught:
+            validate_remote_url(url)
+        assert not isinstance(caught.value, NotAGitRepoError)
+
+
+def test_a_trailing_dot_segment_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    origin = _bare(tmp_path)
+    for suffix in ("/.", "/..", "/sub/..", "/./", "/%2e", "/%2E%2E"):
+        with pytest.raises(ValueError, match="absolute"):
+            validate_remote_url(f"file://{origin}{suffix}")
+
+
+def test_a_symlink_under_home_to_a_repo_outside_home_is_refused(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr("pathlib.Path.home", lambda: home)
+    outside = _bare(tmp_path)
+    (home / "link.git").symlink_to(outside)
+    with pytest.raises(ValueError, match="home folder"):
+        validate_remote_url(f"file://{home}/link.git")
+
+
 def test_file_urls_are_not_valid_for_the_project_relocate_check(tmp_path):
     assert not is_valid_repo_url(f"file://{tmp_path}")

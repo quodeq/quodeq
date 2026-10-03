@@ -67,6 +67,8 @@ def access_failure_response(result: AccessResult) -> tuple[Response, int]:
     """400 body for a URL the ladder could not reach: the kind as a code suffix
     plus the fields the UI's access panel renders from. A URL the guard
     refused before any probe answers the plain INVALID_URL every route uses."""
+    if result.kind is GitFailureKind.NOT_A_GIT_REPO:
+        return json_error(NOT_A_GIT_REPO_MESSAGE, HTTPStatus.BAD_REQUEST, NOT_A_GIT_REPO_CODE)
     if result.kind is GitFailureKind.INVALID_URL:
         return json_error(MESSAGE_INVALID_URL, HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)
     body = {

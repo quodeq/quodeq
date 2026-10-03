@@ -24,9 +24,9 @@ def test_a_local_repo_is_reachable_without_any_probe(tmp_path, monkeypatch):
     assert result.is_github is False
 
 
-def test_a_plain_folder_is_rejected_as_invalid(tmp_path, monkeypatch):
+def test_a_plain_folder_is_rejected_as_not_a_git_repo(tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     (tmp_path / "plain").mkdir()
     result = resolve_access(f"file://{tmp_path / 'plain'}", deps=AccessDeps(probe=_boom, pin=_boom), cache=AccessCache())
     assert result.reachable is False
-    assert result.kind is GitFailureKind.INVALID_URL
+    assert result.kind is GitFailureKind.NOT_A_GIT_REPO

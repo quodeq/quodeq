@@ -28,6 +28,10 @@ _PRIVATE_HOST_RE = re.compile(
 )
 
 
+_DOT_SEGMENTS = (".", "..")
+MESSAGE_LOCAL_OUTSIDE_HOME = "Local repositories must be an absolute file:/// path under your home folder"
+
+
 def _resolves_to_private(hostname: str) -> bool:
     """Return True if *hostname* resolves to a private/loopback IP address.
 
@@ -58,21 +62,29 @@ def is_valid_repo_url(url: str) -> bool:
 
 
 def validate_local_git_repo(file_url: str) -> None:
-    """Accept a ``file://`` URL only for a git repository inside the home folder.
+    """Accept a ``file://`` URL only for a git repository under the home folder.
 
-    The path is URL-decoded, resolved (symlinks followed) and must sit under
-    ``Path.home()``; it must be a worktree (``.git`` present) or a bare
-    repository (``HEAD`` file and ``objects`` directory). Messages are fixed:
-    the path is never echoed.
+    Only the absolute form ``file:///path`` is valid, so what is checked is
+    exactly what git reads: the decoded remainder must start with ``/`` and
+    its last segment may not be ``.`` or ``..``. The path is resolved
+    (symlinks followed) and must sit under ``Path.home()``; it must be a
+    worktree (``.git`` present) or a bare repository (``HEAD`` file and
+    ``objects`` directory). Pointers inside the repository itself (a ``.git``
+    file, ``objects/info/alternates``) are the user's own and are not
+    followed or restricted. Messages are fixed: the path is never echoed.
     """
     raw = urllib.parse.unquote(file_url[len(FILE_URL_PREFIX):])
+    if not raw.startswith("/") or raw.rstrip("/").rsplit("/", 1)[-1] in _DOT_SEGMENTS:
+        raise ValueError(MESSAGE_LOCAL_OUTSIDE_HOME)
     try:
         folder = Path(contained_path(raw, Path.home()))
     except ValueError as exc:
-        raise ValueError("Local repositories must live under your home folder") from exc
+        raise ValueError(MESSAGE_LOCAL_OUTSIDE_HOME) from exc
+    if not folder.is_dir():
+        raise NotAGitRepoError()
     is_worktree = (folder / ".git").exists()
     is_bare = (folder / "HEAD").is_file() and (folder / "objects").is_dir()
-    if not folder.is_dir() or not (is_worktree or is_bare):
+    if not (is_worktree or is_bare):
         raise NotAGitRepoError()
 
 
