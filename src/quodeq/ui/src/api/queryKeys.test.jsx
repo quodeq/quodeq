@@ -72,6 +72,10 @@ describe("query key factories", () => {
     expect(projectsKeys.list()).toEqual(["projects", "list"]);
   });
 
+  it("projectsKeys.clone points to the clone job slot", () => {
+    expect(projectsKeys.clone()).toEqual(["projects", "clone"]);
+  });
+
   it("standardsKeys.list points to the standards list", () => {
     expect(standardsKeys.list()).toEqual(["standards", "list"]);
   });

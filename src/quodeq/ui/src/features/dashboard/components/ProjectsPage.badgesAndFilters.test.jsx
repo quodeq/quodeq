@@ -73,7 +73,7 @@ describe('ProjectsPage', () => {
 // to arrive. `projectsLoaded` now gates that, mirroring the other pages'
 // !projectsLoaded contract (frame stays, contained loader, no fullscreen).
 describe('ProjectsPage — initial loading gate (P4)', () => {
-  it('renders a contained loader inside the page frame while projectsLoaded is false, not the empty CTA', async () => {
+  it('renders a contained loader inside the page frame while projectsLoaded is false, not the empty paths', async () => {
     const fakeApi = makeFakeApi();
     const { container } = renderWithApi(
       <ProjectsPage projects={[]} projectsLoaded={false} actions={{}} />,
@@ -83,7 +83,7 @@ describe('ProjectsPage — initial loading gate (P4)', () => {
     expect(frame).toBeTruthy();
     const loader = frame.querySelector('.loading-screen--inline');
     expect(loader).toBeTruthy();
-    expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
+    expect(screen.queryByText('An evaluations repository')).not.toBeInTheDocument();
     // The header must not claim "0 repositories evaluated" while the real
     // count is still unknown -- match the "loading…" vocabulary used by
     // the other pages' TermHeader subs (Violations/Map/History).
@@ -91,11 +91,11 @@ describe('ProjectsPage — initial loading gate (P4)', () => {
     expect(screen.getByText('loading…')).toBeInTheDocument();
   });
 
-  it('renders the empty CTA once projectsLoaded is true and there are still no projects', async () => {
+  it('renders the empty paths once projectsLoaded is true and there are still no projects', async () => {
     const fakeApi = makeFakeApi();
     const { container } = renderWithApi(<ProjectsPage projects={[]} projectsLoaded actions={{}} />, fakeApi);
     await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
-    expect(screen.getByText('Add your first project')).toBeInTheDocument();
+    expect(screen.getByText('An evaluations repository')).toBeInTheDocument();
     expect(container.querySelector('.loading-screen--inline')).not.toBeInTheDocument();
   });
 });

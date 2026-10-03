@@ -15,6 +15,10 @@ from quodeq.shared.constants import LOCALHOST
 SCHEME_RE = re.compile(r"^(https?://)")
 
 
+# A local git repository given as a URL (validated in data/fs/repo_validation.py).
+FILE_URL_PREFIX = "file://"
+
+
 def is_repo_url(repo_input: str) -> bool:
     """Return True if the input looks like a remote repository URL.
 
@@ -26,7 +30,7 @@ def is_repo_url(repo_input: str) -> bool:
             "Cleartext HTTP repository URLs are rejected to protect credentials. "
             "Use https://, ssh:// or git@ instead."
         )
-    return repo_input.startswith(("https://", "git@", "ssh://"))
+    return repo_input.startswith(("https://", "git@", "ssh://", FILE_URL_PREFIX))
 
 
 def project_name_from_repo(repo: str) -> str:

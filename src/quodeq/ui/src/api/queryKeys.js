@@ -150,11 +150,13 @@ export const systemKeys = {
 };
 
 const LIST_KEY = "list"; // the list subkey shared by the projects, standards and shared scopes
+const CLONE_KEY = "clone"; // the projects subkey of the clone job slot
 const PROJECTS_SCOPE = "projects"; // query-key prefix for the projectsKeys.* subtree
 
 export const projectsKeys = {
   all: () => [PROJECTS_SCOPE],
   list: () => [PROJECTS_SCOPE, LIST_KEY],
+  clone: () => [PROJECTS_SCOPE, CLONE_KEY],
 };
 
 const STANDARDS_SCOPE = "standards"; // query-key prefix for the standardsKeys.* subtree below

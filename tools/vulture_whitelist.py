@@ -27,6 +27,7 @@ _._gzip_large_json  # api/_compression.py: Flask view function; the route decora
 _._open_scope  # api/_metrics_routes.py: Flask before_request hook; the decorator is its only caller.
 _._emit_server_timing  # api/_metrics_routes.py: Flask after_request hook; the decorator is its only caller.
 _._close_scope  # api/_metrics_routes.py: Flask teardown_request hook; the decorator is its only caller.
+_.clone_status  # api/routes_project_clone.py: Flask view function; the route decorator is its only caller.
 _.debug_metrics  # api/_metrics_routes.py: Flask view function; the route decorator is its only caller.
 _._handle_project_not_found  # api/routes_findings.py: Flask view function; the route decorator is its only caller.
 _._handle_unexpected_error  # api/_error_handlers.py: Flask errorhandler; the decorator is its only caller.
@@ -314,3 +315,4 @@ _.load_standard_catalog  # data/fs/standard_index_loader.py: admission catalog l
 
 # pywebview window event. The toolkit fires it; we only subscribe.
 _.minimized  # dashboard/_webview_window_visibility.py: pywebview window event, fired by the toolkit.
+

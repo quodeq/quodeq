@@ -26,6 +26,7 @@ from quodeq.data.fs.shared_repo import (
     sync_shared_index,
 )
 from quodeq.data.fs.git_access_probe import ProbeResult
+from quodeq.services import project_clone_job
 from quodeq.services.github_access import clear_access_cache
 from quodeq.services.github_gh_cli import GhStatus
 from quodeq.services.shared_settings import SharedSettings, write_settings
@@ -149,3 +150,10 @@ def _ambient_access(monkeypatch):
     monkeypatch.setattr("quodeq.data.fs.repo_validation._resolves_to_private", _literal_is_internal)
     yield probe_calls
     clear_access_cache()
+
+
+@pytest.fixture()
+def inline_clone_job(monkeypatch):
+    """Run the add-project job on the calling thread against a fresh slot."""
+    monkeypatch.setattr(project_clone_job, "_default_status", project_clone_job.CloneStatus())
+    monkeypatch.setattr(project_clone_job, "spawn_daemon", lambda target: target())

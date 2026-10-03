@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { invalidateProjects } from '../../hooks/invalidateProjects.js';
 import { readString } from '../../adapters/storage.js';
 import { STEP_WELCOME, SKIPPED_KEY, SKIPPED_VALUE } from './wizardSteps.js';
+import { WIZARD_SOURCE } from './onboardingVocab.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
 import { NAV_TAB } from '../../vocab/navTab.js';
 
@@ -62,6 +63,9 @@ export function buildWizardHandlers({ state, setWizardEntry, navTab, queryClient
         repo: repo || projectId,
         dimensions: standardIds,
       };
+      // The in-progress card names the project that landed, not the global
+      // selection, until the run's own project resolves.
+      if (projectId) payload.uiProject = projectId;
       if (scopePath) payload.scopePath = scopePath;
       if (branch) payload.branch = branch;
       if (provider?.id) payload.aiCmd = provider.id;
@@ -70,6 +74,11 @@ export function buildWizardHandlers({ state, setWizardEntry, navTab, queryClient
       if (totalTimeLimitS != null) payload.timeLimit = totalTimeLimitS;
       state.liveEvaluation.actions.startEvaluation(payload);
       navTab(NAV_TAB.EVALUATE);
+    },
+    // The welcome's "go to repositories" once an evaluations repository is connected.
+    onGoToRepositories: () => {
+      setWizardEntry(null);
+      navTab(NAV_TAB.PROJECTS);
     },
   };
 }
@@ -118,7 +127,9 @@ function useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, set
       sharedHasContent: sharedSignal.hasContent,
     })) return;
     if (readString(SKIPPED_KEY, null) === SKIPPED_VALUE) return;
-    const entry = { startStep: STEP_WELCOME, isFirstProject: true };
+    const entry = {
+      startStep: STEP_WELCOME, isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN, onImportProject: state.handleImportProject,
+    };
     Object.assign(seen, { spent: true, autoEntry: entry, step: STEP_WELCOME });
     setWizardEntry(entry);
   }, [state.projectsLoaded, state.projects.length, isEvaluating, state.selectedSource, sharedSignal.settled, sharedSignal.hasContent]); // eslint-disable-line react-hooks/exhaustive-deps -- re-evaluates on input changes only; wizardEntry and the setter are read current
@@ -130,7 +141,7 @@ function useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, set
  * which is what decides whether shared content may close it.
  *
  * @returns {{ wizardEntry: Object|null, setWizardEntry: Function,
- *   wizardHandlers: { onClose: Function, onLaunch: Function, onStepChange: Function } }}
+ *   wizardHandlers: { onClose: Function, onLaunch: Function, onGoToRepositories: Function, onStepChange: Function } }}
  */
 export function useWizardLifecycle({ state, navTab, isEvaluating, sharedSignal }) {
   const [wizardEntry, setWizardEntry] = useState(null);
@@ -139,7 +150,8 @@ export function useWizardLifecycle({ state, navTab, isEvaluating, sharedSignal }
 
   useWizardAutoOpen({ state, isEvaluating, sharedSignal, wizardEntry, setWizardEntry, session });
 
-  // Any close (X, Maybe later, saved exit, launch) is final for this session.
+  // Any close (X, skip for now, import, go to repositories, saved exit,
+  // launch) is final for this session.
   const closeAware = (entry) => {
     if (entry === null) Object.assign(session.current, { spent: true, autoEntry: null, step: null });
     setWizardEntry(entry);

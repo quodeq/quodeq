@@ -6,6 +6,10 @@ call, and passed in.
 """
 from __future__ import annotations
 
+import os
+from collections.abc import Mapping
+from pathlib import Path
+
 from quodeq.shared.env import env_int
 
 # One month of slack over the default git churn lookback (git_lookback_months,
@@ -45,3 +49,12 @@ def git_probe_timeout_s(env: dict[str, str] | None = None) -> int:
     credential surfaces in seconds, not at the 300 s clone timeout.
     """
     return env_int("QUODEQ_GIT_PROBE_TIMEOUT_S", _GIT_PROBE_TIMEOUT_DEFAULT_S, minimum=1, env=env)
+
+
+def default_clone_root(env: Mapping[str, str] | None = None) -> Path:
+    """Where a project cloned without an explicit destination lands.
+
+    Honors QUODEQ_REPOS_DIR when set and non-blank, else ``~/quodeq/repos``.
+    """
+    configured = (os.environ if env is None else env).get("QUODEQ_REPOS_DIR", "").strip()
+    return Path(configured) if configured else Path.home() / "quodeq" / "repos"

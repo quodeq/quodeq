@@ -14,9 +14,7 @@
 
 import { PROVIDER_TYPE } from '../../../vocab/providerType.js';
 import { SETTLED_FULFILLED } from '../../../constants.js';
-
-// Onboarding-side IDs differ from the server's ai_providers.json IDs.
-const CLI_SERVER_ID = { 'codex-cli': 'codex', 'claude-code': 'claude' };
+import { serverProviderId } from '../providerLabels.js';
 /** How long each detection probe waits before aborting its fetch. */
 export const PROBE_TIMEOUT_MS = 5000;
 
@@ -43,7 +41,8 @@ async function probe(id, classification, url, read) {
 }
 
 async function detectCliProvider(id) {
-  const serverId = CLI_SERVER_ID[id] || id;
+  // Onboarding-side IDs differ from the server's ai_providers.json IDs.
+  const serverId = serverProviderId(id);
   return probe(id, PROBE_CLASSIFICATION.CLI, '/api/ai-clients', async (res) => {
     const data = await res.json();
     const detected = (data.clients || []).some((c) => c.id === serverId && c.type === PROVIDER_TYPE.CLI && c.installed !== false);

@@ -28,6 +28,7 @@ export {
   publishProject, sharedGetCompareSummary, sharedGetFleetCompare,
 } from './shared.js';
 export { getSyncStatus, startRefresh, startPull, getInvite } from './syncStatus.js';
+export { getCloneStatus, isCloneActive, cloneNameFromUrl } from './projectClone.js';
 export { listTerminalSessions, createTerminalSession, killTerminalSession, killTerminal } from './terminal.js';
 
 export {

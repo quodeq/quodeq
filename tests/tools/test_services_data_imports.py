@@ -11,7 +11,7 @@ import ast
 from pathlib import Path
 
 _SERVICES = Path(__file__).resolve().parents[2] / "src" / "quodeq" / "services"
-_ALLOWED_FILES = {"wiring.py", "ports.py"}
+_ALLOWED_FILES = {"wiring.py", "wiring_sync.py", "ports.py"}
 
 _BASELINE = frozenset({
     "_browse_entries.py:quodeq.data.fs.report_parser",

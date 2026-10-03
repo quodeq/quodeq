@@ -48,7 +48,7 @@ Both ship disabled. The *Assistant* section turns the chat drawer on and picks i
 
 ### Onboarding
 
-The *onboarding* section has one row, **show welcome**: it opens the welcome and the first-run steps again, even if you skipped them before. Nothing else changes; your projects and settings stay as they are.
+The *onboarding* section has one row, **show welcome**: it opens the welcome and the first-run steps again, even if you skipped them before. Nothing else changes; your projects and settings stay as they are. If you already have projects or a connected repository, the welcome adapts to say so, and showing it never marks onboarding as skipped.
 
 ### Grade formula
 

@@ -1,23 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import { registerProject, getProjectInfo } from '../../../api/index.js';
+import { useEffect, useState } from 'react';
 import { useWizardState } from '../hooks/useWizardState.js';
 import { useOnboardingEffects } from '../hooks/useOnboardingEffects.js';
 import { useOnboardingWizardHandlers } from '../hooks/useOnboardingWizardHandlers.js';
-import { STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH } from '../wizardSteps.js';
+import { STEP_WELCOME, SETUP_ORDER } from '../wizardSteps.js';
+import { WIZARD_SOURCE } from '../onboardingVocab.js';
 import { OnboardingStepSwitch } from './OnboardingStepSwitch.jsx';
 import { t } from '../../../strings/index.js';
 import '../../../styles/onboarding.css';
 
-// The steps the "step N of M" counter counts. Welcome is excluded, and the
-// provider step only appears while no provider is configured.
-function visibleSteps(providerConfigured) {
-  const seen = [STEP_REPO_SCAN];
-  if (!providerConfigured) seen.push(STEP_PROVIDER);
-  seen.push(STEP_STANDARD_LAUNCH);
-  return seen;
-}
-
-export default function OnboardingWizard({ entry, onClose, onLaunch, onStepChange }) {
+export default function OnboardingWizard({ entry, onClose, onLaunch, onGoToRepositories, onStepChange }) {
   const initialStep = entry.startStep || STEP_WELCOME;
   const wizard = useWizardState({ initial: { step: initialStep, isFirstProject: entry.isFirstProject ?? true } });
   const [standards, setStandards] = useState([]);
@@ -28,17 +19,22 @@ export default function OnboardingWizard({ entry, onClose, onLaunch, onStepChang
   // alone: the callback's identity changes every render and need not re-fire.
   useEffect(() => { onStepChange?.(wizard.state.step); }, [wizard.state.step]);
 
-  const providerConfigured = Boolean(wizard.state.provider.id && wizard.state.provider.model);
-  const visible = useMemo(() => visibleSteps(providerConfigured), [providerConfigured]);
-  const currentIndex = visible.indexOf(wizard.state.step) + 1;
+  // The "step N of M" counter of the resume-setup walk (the only steps that show one).
+  const currentIndex = SETUP_ORDER.indexOf(wizard.state.step) + 1;
 
   const {
-    handleSkipWelcome, handleClose, handleLaunch, nextStep, prevStep,
-  } = useOnboardingWizardHandlers({ wizard, onClose, onLaunch, providerConfigured });
+    handleSkipWelcome, handleImport, handleClose, handleLaunch, nextStep, prevStep,
+  } = useOnboardingWizardHandlers({
+    wizard, onClose, onLaunch, onGoToRepositories, fromSettings: entry.source === WIZARD_SOURCE.SETTINGS,
+  });
+  // The welcome's two columns need a wider frame than the single-column steps.
+  const frameClass = wizard.state.step === STEP_WELCOME
+    ? 'onboarding-wizard__panel-frame onboarding-wizard__panel-frame--wide'
+    : 'onboarding-wizard__panel-frame';
 
   return (
     <div className="onboarding-wizard" role="dialog" aria-modal="true" aria-label={t('onboarding.dialogAria')}>
-      <div className="onboarding-wizard__panel-frame">
+      <div className={frameClass}>
         <button type="button" className="onboarding-wizard__close" aria-label={t('onboarding.close')} onClick={handleClose}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <line x1="18" y1="6" x2="6" y2="18" />
@@ -48,15 +44,17 @@ export default function OnboardingWizard({ entry, onClose, onLaunch, onStepChang
 
         <OnboardingStepSwitch
           wizard={wizard}
+          entry={entry}
           standards={standards}
           currentIndex={currentIndex}
-          visibleCount={visible.length}
-          createProject={registerProject}
-          getProjectInfo={getProjectInfo}
+          visibleCount={SETUP_ORDER.length}
           nextStep={nextStep}
           prevStep={prevStep}
           handleSkipWelcome={handleSkipWelcome}
+          handleImport={handleImport}
           handleLaunch={handleLaunch}
+          handleClose={handleClose}
+          onGoToRepositories={onGoToRepositories}
         />
       </div>
     </div>

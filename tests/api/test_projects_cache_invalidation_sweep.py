@@ -15,7 +15,7 @@ import inspect
 
 import pytest
 
-from quodeq.api import routes_project_create, routes_project_list, routes_shared_config, routes_shared_pull
+from quodeq.api import routes_project_clone, routes_project_create, routes_project_list, routes_shared_config, routes_shared_pull
 from quodeq.api.app import create_app
 
 _NAME = "invalidate_projects_cache"
@@ -37,6 +37,7 @@ EXEMPT = {
 
 MUTATION_ROUTES = [
     (routes_project_create.handle_create_project, _CALL),
+    (routes_project_clone.start_clone_job, _CALLBACK),
     (routes_project_list.handle_import_project, _CALL),
     (routes_project_list.handle_delete_project, _CALL),
     (routes_project_list.handle_update_project_path, _CALL),

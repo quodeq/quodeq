@@ -92,6 +92,7 @@ def register_project(
         scope_path=spec.scope_path, is_url=is_url, ephemeral=spec.ephemeral,
         clone_dest=spec.clone_dest, clones_dir=clones_dir,
         git_env=spec.git_env, clone_url=spec.clone_url, log=log,
+        progress=spec.progress, on_phase=spec.on_phase,
     ))
 
     _sync_repo_index_on_create(

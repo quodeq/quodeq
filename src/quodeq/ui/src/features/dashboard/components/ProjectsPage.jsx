@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import { useProjectsPageData } from '../hooks/useProjectsPageData.js';
 import { usePullToLocal } from '../hooks/usePullToLocal.js';
@@ -7,43 +7,32 @@ import { ProjectCard } from './projectCards/ProjectCard.jsx';
 import { ProjectCardGroup, useRelocateDialog } from './projectCards/ProjectCardGroup.jsx';
 import { OnlineCardFooter } from './projectCards/OnlineCardFooter.jsx';
 import { ProjectsToolbar } from './ProjectsToolbar.jsx';
-import { ProjectsPageHeader, EVAL_BLOCKED_TITLE } from './ProjectsPageHeader.jsx';
+import { ProjectsPageHeader } from './ProjectsPageHeader.jsx';
 import { TeamResultsArea } from './TeamResultsArea.jsx';
-import { evalBlockedClass, evalBlockedProps } from '../../../utils/evalBlocked.js';
+import WelcomePaths from '../../onboarding/components/WelcomePaths.jsx';
+import { useSharedConnection } from '../hooks/useSharedProjects.js';
 import { PROJECT_SOURCE } from '../../../vocab/projectSource.js';
 import { projectIdOrSelf } from '../../../utils/projectIdentity.js';
 import { isSlotActive } from '../../../api/syncStatus.js';
+import { useCloneGhost } from '../hooks/useCloneGhost.js';
+import CloningTile from './CloningTile.jsx';
 
-function EmptyProjectsCTA({ onAddProject, onImportProject, isEvaluating }) {
-  // The button stays clickable while evaluating so the handler can fire a
-  // snackbar explaining the block. ``aria-disabled`` + the visual muted class
-  // preserve the disabled affordance without swallowing the click.
+// The empty page: the welcome's two paths side by side. With an evaluations
+// repository connected (but nothing published yet) its card names it; there
+// is no "go to repositories" here, this is the Repositories tab. Start opens
+// the analyze screen directly (the welcome would show these cards again).
+function EmptyProjectsPaths({ onStartAnalyze, onConnectEvaluations, onImportProject, isEvaluating }) {
+  const { configured, host } = useSharedConnection();
   return (
-    <div className="projects-empty projects-empty--cta">
-      <h3 className="projects-empty__title">{t('projects.addFirstTitle')}</h3>
-      <p className="projects-empty__hint">
-        {t('projects.addFirstHint')}
-      </p>
-      <div className="projects-empty__cta-row">
-        <button
-          type="button"
-          className={`term-btn term-btn--primary term-btn--filled projects-empty__cta-btn${evalBlockedClass(isEvaluating)}`}
-          onClick={onAddProject}
-          {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE)}
-        >
-          <span aria-hidden="true">▸</span> {t('projects.addProject')}
-        </button>
-        {onImportProject && (
-          <button
-            type="button"
-            className={`projects-page__import-btn projects-empty__cta-btn${evalBlockedClass(isEvaluating)}`}
-            onClick={onImportProject}
-            {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE, t('projects.importTitle'))}
-          >
-            {t('projects.importProject')}
-          </button>
-        )}
-      </div>
+    <div className="projects-empty projects-empty--paths">
+      <WelcomePaths
+        compact
+        isEvaluating={isEvaluating}
+        onStart={onStartAnalyze}
+        onConnect={onConnectEvaluations}
+        onImport={onImportProject}
+        adaptation={{ connected: configured, host, hasLocalProjects: false }}
+      />
     </div>
   );
 }
@@ -135,10 +124,11 @@ function ProjectsCardsList({ visibleEntries, ctx }) {
   );
 }
 
-function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }) {
+function ProjectsPageBody({ filters, onFiltersChange, shared, visibleEntries, cardsListCtx, ghost }) {
   return (
     <>
       <ProjectsToolbar filters={filters} onFiltersChange={onFiltersChange} configured={shared.configured} />
+      {ghost}
       <ProjectsCardsList visibleEntries={visibleEntries} ctx={cardsListCtx} />
     </>
   );
@@ -169,20 +159,26 @@ function useProjectsCardsCtx({ projects, filters, selectedProject, actions }) {
 // ternary chain in the JSX, so each branch reads on its own line. While a
 // connect is still reading the team's projects, an empty page is not "add
 // your first project": the strip above says what is happening, so one quiet
-// line says where the results will land.
-function ProjectsPageContent({ projectsLoaded, isEmpty, connectActive, emptyProps, bodyProps }) {
+// line says where the results will land. The same goes for a clone that is
+// running: the ghost tile heads the page and one line says what comes next.
+function ProjectsPageContent({ projectsLoaded, isEmpty, status, ghost, emptyProps, bodyProps }) {
   if (!projectsLoaded) return <LoadingScreen variant="inline" />;
-  if (isEmpty && connectActive) return <p className="projects-empty">{t('projects.teamResultsArriving')}</p>;
-  if (isEmpty) return <EmptyProjectsCTA {...emptyProps} />;
-  return <ProjectsPageBody {...bodyProps} />;
+  if (isEmpty && status.cloneActive) return <>{ghost}<p className="projects-empty">{t('projects.projectArriving')}</p></>;
+  if (isEmpty && status.connectActive) return <>{ghost}<p className="projects-empty">{t('projects.teamResultsArriving')}</p></>;
+  if (isEmpty) return <>{ghost}<EmptyProjectsPaths {...emptyProps} /></>;
+  return <ProjectsPageBody {...bodyProps} ghost={ghost} />;
+}
+
+function useGhostTile() {
+  const { slot, active, onRetry, onClose } = useCloneGhost();
+  const ghost = slot ? <CloningTile slot={slot} onRetry={onRetry} onClose={onClose} /> : null;
+  return { ghost, cloneActive: active };
 }
 
 export default function ProjectsPage({ projects = [], projectsLoaded = true, selectedProject, isEvaluating = false, filters, actions }) {
-  const { onAddProject, onImportProject, onFiltersChange, onSharedDisconnected } = actions;
+  const { onAddProject, onStartAnalyze, onImportProject, onConnectEvaluations, onFiltersChange, onSharedDisconnected } = actions;
   const { shared, isEmpty, visibleEntries, cardsListCtx } = useProjectsCardsCtx({ projects, filters, selectedProject, actions });
-  // The connect card, opened by the header's "connect evaluations repository" or the strip's "change repository".
-  const [connectOpen, setConnectOpen] = useState(false);
-  const toggleConnect = useCallback(() => setConnectOpen((open) => !open), []);
+  const { ghost, cloneActive } = useGhostTile();
 
   return (
     <section className="projects-page projects-page--terminal">
@@ -190,24 +186,22 @@ export default function ProjectsPage({ projects = [], projectsLoaded = true, sel
         counts={{ projectsLoaded, localCount: projects.length, teamCount: shared.projects.length }}
         isEmpty={isEmpty}
         configured={shared.configured}
-        connectOpen={connectOpen}
-        onToggleConnect={toggleConnect}
-        onImportProject={onImportProject}
+        onConnectEvaluations={onConnectEvaluations}
         onAddProject={onAddProject}
         isEvaluating={isEvaluating}
       />
       <TeamResultsArea
         shared={shared}
-        connectOpen={connectOpen}
-        onConnectOpenChange={setConnectOpen}
-        emptyPage={projectsLoaded && isEmpty}
+        onConnectEvaluations={onConnectEvaluations}
+        onImportProject={onImportProject}
         onSharedDisconnected={onSharedDisconnected}
       />
       <ProjectsPageContent
         projectsLoaded={projectsLoaded}
         isEmpty={isEmpty}
-        connectActive={isSlotActive(shared.status?.connect)}
-        emptyProps={{ onAddProject, onImportProject, isEvaluating }}
+        status={{ connectActive: isSlotActive(shared.status?.connect), cloneActive }}
+        ghost={ghost}
+        emptyProps={{ onStartAnalyze, onConnectEvaluations, onImportProject, isEvaluating }}
         bodyProps={{ filters, onFiltersChange, shared, visibleEntries, cardsListCtx }}
       />
     </section>

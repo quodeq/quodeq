@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { withQueryClient } from '../../test-utils/withQueryClient.jsx';
 import { useWizardLifecycle } from './useWizardLifecycle.js';
-import { SKIPPED_KEY, SKIPPED_VALUE, STEP_WELCOME, STEP_REPO_SCAN } from './wizardSteps.js';
+import { SKIPPED_KEY, SKIPPED_VALUE, STEP_WELCOME, STEP_ANALYZE } from './wizardSteps.js';
 import { PROJECT_SOURCE } from '../../vocab/projectSource.js';
+import { NAV_TAB } from '../../vocab/navTab.js';
+import { WIZARD_SOURCE } from './onboardingVocab.js';
 
 // The auto-open is derived from its inputs rather than decided once: it is
 // re-evaluated whenever the project list or the shared signal changes, never
@@ -35,7 +37,7 @@ beforeEach(() => { localStorage.clear(); });
 describe('useWizardLifecycle auto-open (derived)', () => {
   it('opens on the welcome step for a fresh install with nothing to show', () => {
     const { result } = renderLifecycle();
-    expect(result.current.wizardEntry).toEqual({ startStep: STEP_WELCOME, isFirstProject: true });
+    expect(result.current.wizardEntry).toEqual({ startStep: STEP_WELCOME, isFirstProject: true, source: WIZARD_SOURCE.FIRST_RUN });
   });
 
   it('does not open while the project list or the shared signal is still resolving', () => {
@@ -91,7 +93,7 @@ describe('useWizardLifecycle auto-open (derived)', () => {
 
   it('stays open once the user has moved past the welcome step', () => {
     const { result, update } = renderLifecycle();
-    act(() => { result.current.wizardHandlers.onStepChange(STEP_REPO_SCAN); });
+    act(() => { result.current.wizardHandlers.onStepChange(STEP_ANALYZE); });
     update({ sharedSignal: SHARED_CONTENT });
     expect(result.current.wizardEntry).not.toBeNull();
   });
@@ -116,5 +118,34 @@ describe('useWizardLifecycle auto-open (derived)', () => {
     expect(result.current.wizardEntry).toBeNull();
     update({ isEvaluating: false });
     expect(result.current.wizardEntry).not.toBeNull();
+  });
+
+  it('a welcome opened from add project is not closed by shared content', () => {
+    const { result, update } = renderLifecycle();
+    act(() => { result.current.wizardHandlers.onClose({ saved: false }); });
+    const entry = { startStep: STEP_WELCOME, isFirstProject: true, source: WIZARD_SOURCE.ADD };
+    act(() => { result.current.setWizardEntry(entry); });
+    act(() => { result.current.wizardHandlers.onStepChange(STEP_WELCOME); });
+    update({ sharedSignal: SHARED_CONTENT });
+    expect(result.current.wizardEntry).toBe(entry);
+  });
+});
+
+describe('useWizardLifecycle welcome exits', () => {
+  it('closing a welcome opened from Settings never writes the skip flag', () => {
+    const { result } = renderLifecycle({ projects: [{ id: 'a' }] });
+    act(() => { result.current.setWizardEntry({ startStep: STEP_WELCOME, isFirstProject: false, source: WIZARD_SOURCE.SETTINGS }); });
+    act(() => { result.current.wizardHandlers.onClose({ saved: false }); });
+    expect(result.current.wizardEntry).toBeNull();
+    expect(localStorage.getItem(SKIPPED_KEY)).toBeNull();
+  });
+
+  it('go to repositories closes the wizard and opens the repositories tab', () => {
+    const p = props({});
+    const { result } = renderHook((q) => useWizardLifecycle(q), { initialProps: p, wrapper: withQueryClient() });
+    expect(result.current.wizardEntry).not.toBeNull();
+    act(() => { result.current.wizardHandlers.onGoToRepositories(); });
+    expect(result.current.wizardEntry).toBeNull();
+    expect(p.navTab).toHaveBeenCalledWith(NAV_TAB.PROJECTS);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useSharedContentSignal } from './useSharedProjects.js';
+import { useSharedContentSignal, useSharedConnection } from './useSharedProjects.js';
 import { withQueryClient } from '../../../test-utils/withQueryClient.jsx';
 import { ApiProvider } from '../../../api/ApiContext.jsx';
 
@@ -115,5 +115,28 @@ describe('useSharedContentSignal', () => {
     });
     await waitFor(() => expect(result.current.settled).toBe(true));
     expect(fakeApi.startRefresh).not.toHaveBeenCalled();
+  });
+});
+
+// The welcome panel's passive "is an evaluations repository connected, and
+// where?" read: the host reads like the sync strip's, without the scheme.
+describe('useSharedConnection', () => {
+  it('reports the connected repository as host/path', async () => {
+    const fakeApi = makeFakeApi();
+    const { result } = renderHook(() => useSharedConnection(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(result.current.configured).toBe(true));
+    expect(result.current.host).toBe('github.com/team/results');
+    expect(fakeApi.startRefresh).not.toHaveBeenCalled();
+  });
+
+  it('reports nothing connected, with no host, when sharing is not configured', async () => {
+    const fakeApi = makeFakeApi({ getSharedStatus: vi.fn(async () => ({ configured: false, url: null })) });
+    const { result } = renderHook(() => useSharedConnection(), {
+      wrapper: ({ children }) => wrap(fakeApi, children),
+    });
+    await waitFor(() => expect(fakeApi.getSharedStatus).toHaveBeenCalled());
+    expect(result.current).toEqual({ configured: false, host: null });
   });
 });

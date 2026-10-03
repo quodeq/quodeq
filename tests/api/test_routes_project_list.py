@@ -91,6 +91,13 @@ class TestUpdateProjectPathValidation:
         assert body["code"] == "INVALID_URL"
         assert "my-proj" not in provider.updated_paths
 
+    def test_file_url_is_refused_with_invalid_url(self, client, provider, tmp_path):
+        """A project path is a folder, not a URL: file:// is for the results repo only."""
+        resp = client.patch("/api/projects/my-proj/path", json={"path": f"file://{tmp_path}"})
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "INVALID_URL"
+        assert "my-proj" not in provider.updated_paths
+
     def test_non_string_path_is_refused(self, client, provider):
         resp = client.patch("/api/projects/my-proj/path", json={"path": 123})
         assert resp.status_code == 400

@@ -104,7 +104,7 @@ def test_post_projects_real_bool_ephemeral_true_is_unaffected(client):
     mock_create.assert_called_once()
 
 
-def test_post_projects_real_bool_ephemeral_false_is_unaffected(client, tmp_path):
+def test_post_projects_real_bool_ephemeral_false_is_unaffected(client, tmp_path, inline_clone_job):
     # cloneDest must be an existing dir under home; the shared `client`
     # fixture patches Path.home to tmp_path.
     clone_dest = tmp_path / "code"
@@ -118,11 +118,11 @@ def test_post_projects_real_bool_ephemeral_false_is_unaffected(client, tmp_path)
             json={"repo": "https://x/y.git", "ephemeral": False, "cloneDest": str(clone_dest)},
             headers=_ORIGIN,
         )
-    assert resp.status_code == 200
+    assert resp.status_code == 202
     mock_create.assert_called_once()
 
 
-def test_post_projects_null_ephemeral_is_treated_as_absent(client, tmp_path):
+def test_post_projects_null_ephemeral_is_treated_as_absent(client, tmp_path, inline_clone_job):
     clone_dest = tmp_path / "code"
     clone_dest.mkdir()
     with patch(
@@ -134,13 +134,13 @@ def test_post_projects_null_ephemeral_is_treated_as_absent(client, tmp_path):
             json={"repo": "https://x/y.git", "ephemeral": None, "cloneDest": str(clone_dest)},
             headers=_ORIGIN,
         )
-    assert resp.status_code == 200
+    assert resp.status_code == 202
     mock_create.assert_called_once()
 
 
 def test_post_projects_non_string_discipline_returns_400(client):
-    # ephemeral: True avoids the unrelated "cloneDest is required" branch, so
-    # this isolates the discipline-specific type check.
+    # ephemeral: True keeps the request synchronous, so this isolates the
+    # discipline-specific type check from the clone job.
     with patch(
         "quodeq.services.filesystem.FilesystemActionProvider.create_project",
         return_value=_created_result(),

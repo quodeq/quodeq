@@ -39,4 +39,4 @@ export function renderPage(api, ui) {
 }
 
 export const LOCAL = [{ id: 'a', name: 'app', latestDate: '2026-07-19T00:00:00Z' }];
-export const pageActions = { onAddProject: vi.fn(), onImportProject: vi.fn() };
+export const pageActions = { onAddProject: vi.fn(), onImportProject: vi.fn(), onConnectEvaluations: vi.fn() };

@@ -22,9 +22,27 @@ class GitFailureKind(StrEnum):
     DEST_EXISTS = "dest_exists"
     DISK = "disk"
     INVALID_URL = "invalid_url"
+    NOT_A_GIT_REPO = "not_a_git_repo"
     GIT_MISSING = "git_missing"
     GIT_TOO_OLD = "git_too_old"
     UNKNOWN = "unknown"
+
+
+NOT_A_GIT_REPO_CODE = "NOT_A_GIT_REPO"
+NOT_A_GIT_REPO_MESSAGE = (
+    "That folder is not a git repository. Run git init there first, or point at a bare repository."
+)
+
+
+class NotAGitRepoError(ValueError):
+    """A ``file://`` repository URL names a folder that is not a git repository.
+
+    A ``ValueError`` so every existing URL guard still rejects it; the
+    distinct type lets the routes answer the fixed ``NOT_A_GIT_REPO`` code.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(NOT_A_GIT_REPO_MESSAGE)
 
 
 # Kinds where signing in to GitHub can change the answer. GitHub reports a

@@ -42,6 +42,7 @@ import { connectSlotError } from '../../../hooks/connectSlotError.js';
 import { sharedListQueryOptions } from './sharedQueryOptions.js';
 import { useSharedActions } from './useSharedActions.js';
 import { useSharedStatusAndList } from './useSharedStatusAndList.js';
+import { repoLabel } from '../components/syncStripState.js';
 
 /**
  * Message for an INITIAL load failure, meaning no data has ever landed for
@@ -157,8 +158,6 @@ export function useSharedProjects() {
     updateFailed: startFailed || Boolean(listQuery.data?.stale),
     connecting: actions.connecting || isSlotActive(sync.connect),
     connectError: actions.connectError ?? connectSlotError(sync.connect, 'projects.connectFailed'),
-    // The PUT's own rejection, apart from the slot's: closing a failed connect hides only the latter.
-    connectStartError: actions.connectError ?? null,
     accessFailure: actions.accessFailure,
     connect, lastConnectUrl,
     refreshing: isSlotActive(sync.refresh), refresh,
@@ -202,4 +201,22 @@ export function useSharedContentSignal() {
   const hasContent = publishedCount > 0;
 
   return { settled, hasContent, publishedCount };
+}
+
+/**
+ * useSharedConnection — passive "is an evaluations repository connected, and
+ * which one?" read for the welcome panel. Same cache entries and observer
+ * options as useSharedContentSignal (no poll, no refresh, no error surface);
+ * `host` reads like the sync strip's repository label, host and path without
+ * the scheme (e.g. "github.com/quodeq/evaluations"), and is null while
+ * nothing is connected.
+ * @returns {{ configured: boolean, host: string|null }}
+ */
+export function useSharedConnection() {
+  const { getSharedStatus, sharedListProjects } = useApi();
+  const { statusQuery, configured } = useSharedStatusAndList({
+    getSharedStatus, sharedListProjects, observerOptions: SIGNAL_OBSERVER_OPTIONS,
+  });
+  const url = configured ? statusQuery.data?.url : null;
+  return { configured, host: url ? repoLabel(url) : null };
 }

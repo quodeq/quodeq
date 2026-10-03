@@ -2,17 +2,21 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApiProvider } from '../api/ApiContext.jsx';
-import { sharedKeys } from '../api/queryKeys.js';
+import { projectsKeys, sharedKeys } from '../api/queryKeys.js';
 import { SYNC_PHASE } from '../vocab/syncPhase.js';
 import { useSyncActivity } from './useSyncActivity.js';
 
 const idle = { state: 'idle', phase: null };
 const base = { configured: true, url: 'u', lastSynced: 1, syncing: false, connect: idle, refresh: idle, pull: idle };
 
-function setup(status) {
+// `status` is one snapshot, or a list the polls walk through (the last one repeats).
+function setup(status, clone) {
   const statuses = Array.isArray(status) ? status : [status];
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const api = { getSyncStatus: vi.fn(async () => (statuses.length > 1 ? statuses.shift() : statuses[0])) };
+  const api = {
+    getSyncStatus: vi.fn(async () => (statuses.length > 1 ? statuses.shift() : statuses[0])),
+    getCloneStatus: vi.fn(async () => clone ?? { state: 'idle', phase: null }),
+  };
   const wrapper = ({ children }) => (
     <QueryClientProvider client={qc}><ApiProvider value={api}>{children}</ApiProvider></QueryClientProvider>
   );
@@ -39,6 +43,13 @@ describe('useSyncActivity', () => {
     await waitFor(() => expect(result.current).toBe(false));
     await new Promise((resolve) => setTimeout(resolve, 60));
     expect(api.getSyncStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('is true with an idle shared status and a downloading clone, and false once it is done', async () => {
+    const { qc, result } = setup(base, { state: 'running', phase: SYNC_PHASE.DOWNLOADING, percent: 5 });
+    await waitFor(() => expect(result.current).toBe(true));
+    qc.setQueryData(projectsKeys.clone(), { state: 'done', phase: SYNC_PHASE.DONE, finishedAt: 1 });
+    await waitFor(() => expect(result.current).toBe(false));
   });
 
   // The strip's poll lives on the Repositories tab only; away from it this

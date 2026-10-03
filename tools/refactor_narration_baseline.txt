@@ -146,8 +146,6 @@ src/quodeq/ui/src/features/evaluation/hooks/useReEvalInfo.js:8
 src/quodeq/ui/src/features/evaluation/hooks/useReEvaluateCard.js:5
 src/quodeq/ui/src/features/history/components/historyRowAssembly.js:3
 src/quodeq/ui/src/features/map/viz/components/galaxyPrincipleStars.js:5
-src/quodeq/ui/src/features/onboarding/components/OnboardingStepSwitch.jsx:9
-src/quodeq/ui/src/features/onboarding/components/steps/RepoScanSummary.jsx:9
 src/quodeq/ui/src/features/onboarding/hooks/useActiveProviderState.js:42
 src/quodeq/ui/src/features/settings/components/SharedRepoSection.connect.test.jsx:8
 src/quodeq/ui/src/features/settings/components/SharedRepoSection.disconnect.test.jsx:12

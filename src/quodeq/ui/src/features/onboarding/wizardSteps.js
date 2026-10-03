@@ -1,7 +1,10 @@
 // Wizard step ids: the `step` state value, goToStep's argument and the
-// startStep an entry point opens on. STEP_ORDER is the forward path.
+// startStep an entry point opens on. STEP_ORDER is the welcome's forward
+// path (its start opens the analyze screen); SETUP_ORDER is the provider,
+// standard-and-launch walk that "resume setup" (a registered project with no
+// evaluation yet) still takes, so nextStep/prevStep follow it.
 // SKIPPED_KEY is the localStorage flag set when the user dismisses the
-// welcome step ("Maybe later").
+// welcome step ("skip for now").
 //
 // Leaf module by design (imports only the import-free storage adapter):
 // routes/navigationBundle.js, useWizardLifecycle.js, EmptyStateWithTour.jsx
@@ -10,10 +13,12 @@
 import { STORED_TRUE } from '../../adapters/storage.js';
 
 export const STEP_WELCOME = 'welcome';
-export const STEP_REPO_SCAN = 'repo-scan';
 export const STEP_PROVIDER = 'provider';
 export const STEP_STANDARD_LAUNCH = 'standard-launch';
-export const STEP_ORDER = [STEP_WELCOME, STEP_REPO_SCAN, STEP_PROVIDER, STEP_STANDARD_LAUNCH];
+export const STEP_ANALYZE = 'analyze';
+export const STEP_CONNECT = 'connect';
+export const STEP_ORDER = [STEP_WELCOME, STEP_ANALYZE];
+export const SETUP_ORDER = [STEP_PROVIDER, STEP_STANDARD_LAUNCH];
 
 export const SKIPPED_KEY = 'quodeq_onboarding_skipped';
 // The only value ever written under SKIPPED_KEY (absence, not 'false', means

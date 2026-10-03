@@ -21,9 +21,7 @@ describe('ProjectsPage — closing a failed connect', () => {
     const user = userEvent.setup();
     const { api } = makeApi({ configured: true, slots: { connect: foreign } });
     renderPage(api, <ProjectsPage projects={LOCAL} actions={pageActions} />);
-    await user.click(await screen.findByRole('button', { name: 'more repository actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'change repository' }));
-    expect(screen.getByText(FOREIGN_COPY)).toBeInTheDocument();
+    expect(await screen.findByText(FOREIGN_COPY)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'close' }));
     expect(urlField()).not.toBeInTheDocument();
@@ -38,11 +36,6 @@ describe('ProjectsPage — closing a failed connect', () => {
 
     await user.click(screen.getByRole('button', { name: 'close' }));
     expect(urlField()).not.toBeInTheDocument();
-
-    // Reopened on purpose, the card no longer carries the closed failure.
-    const toggle = screen.getByRole('button', { name: 'connect evaluations repository' });
-    await user.click(toggle);
-    expect(urlField()).toBeInTheDocument();
     expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
 
     // A fresh mount (the next visit) reads the same slot and keeps it closed.
@@ -68,31 +61,32 @@ describe('ProjectsPage — closing a failed connect', () => {
     expect(urlField()).toHaveValue(foreign.url);
   });
 
-  it('on an empty page the card stays as the connect entry and only its error closes', async () => {
+  it('on an empty page the failure shows above the two paths, and close leaves just the paths', async () => {
     const user = userEvent.setup();
     const { api } = makeApi({ slots: { connect: foreign } });
     renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
     expect(await screen.findByText(FOREIGN_COPY)).toBeInTheDocument();
+    expect(screen.getByText('An evaluations repository')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'close' }));
     expect(screen.queryByText(FOREIGN_COPY)).not.toBeInTheDocument();
-    expect(urlField()).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'close' })).not.toBeInTheDocument();
+    expect(urlField()).not.toBeInTheDocument();
+    expect(screen.getByText('An evaluations repository')).toBeInTheDocument();
   });
 });
 
 describe('ProjectsPage — an empty page while a connect reads the team projects', () => {
-  it('says the results are on their way instead of "add your first project", then shows the cards at DONE', async () => {
+  it('says the results are on their way instead of the two paths, then shows the cards at DONE', async () => {
     const reading = { state: 'running', phase: SYNC_PHASE.READING, projectsFound: 1, url: 'u' };
     const { api, server } = makeApi({ configured: true, slots: { connect: reading } });
     renderPage(api, <ProjectsPage projects={[]} actions={pageActions} />);
 
     expect(await screen.findByText("Published evaluations will appear here when reading finishes.")).toBeInTheDocument();
-    expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
+    expect(screen.queryByText('An evaluations repository')).not.toBeInTheDocument();
 
     server.slots.connect = { state: 'done', phase: SYNC_PHASE.DONE, projectsFound: 1, finishedAt: 8 };
     await waitFor(() => expect(screen.getByText('demo-repo')).toBeInTheDocument(), { timeout: 4000 });
     expect(screen.queryByText("Published evaluations will appear here when reading finishes.")).not.toBeInTheDocument();
-    expect(screen.queryByText('Add your first project')).not.toBeInTheDocument();
+    expect(screen.queryByText('An evaluations repository')).not.toBeInTheDocument();
   });
 });

@@ -29,8 +29,8 @@ from quodeq.config.github_app import GITHUB_HOST
 from quodeq.services.github_gh_cli import GhStatus, gh_status
 from quodeq.services.wiring import ProbeResult, pinned_git_config, probe_remote, validate_remote_url
 from quodeq.shared.env_resolve import resolve_env
-from quodeq.shared.git_errors import SIGN_IN_KINDS, GitFailureKind
-from quodeq.shared.repo import is_repo_url
+from quodeq.shared.git_errors import SIGN_IN_KINDS, GitFailureKind, NotAGitRepoError
+from quodeq.shared.repo import FILE_URL_PREFIX, is_repo_url
 
 _HEADER_KEY = "http.https://github.com/.extraHeader"
 _TOKEN_USER = "x-access-token"
@@ -44,6 +44,7 @@ class AccessMethod(StrEnum):
     AMBIENT = "ambient"
     QUODEQ = "quodeq"
     GH = "gh"
+    LOCAL = "local"  # a file:// repository on this machine: nothing to reach
     NONE = "none"
 
 
@@ -178,16 +179,19 @@ def _result(reachable: bool, method: AccessMethod, probe: ProbeResult, host: str
     return AccessResult(reachable, method, probe.kind, probe.detail, host, is_github_host(host), env, clone_url)
 
 
-def _url_rejected(url: str) -> bool:
-    """True for anything the clone would refuse: not a remote URL, cleartext
-    http, a private/internal host (same rules as POST /api/git/probe)."""
+def _url_rejection(url: str) -> GitFailureKind | None:
+    """Why the clone would refuse *url* (not a remote URL, cleartext http, a
+    private/internal host, a local folder that is not a repository: same
+    rules as POST /api/git/probe); None when it passes."""
     try:
         if not is_repo_url(url):
-            return True
+            return GitFailureKind.INVALID_URL
         validate_remote_url(url)
+    except NotAGitRepoError:
+        return GitFailureKind.NOT_A_GIT_REPO
     except ValueError:
-        return True
-    return False
+        return GitFailureKind.INVALID_URL
+    return None
 
 
 def _pin(url: str, deps: AccessDeps) -> list[str] | None:
@@ -228,8 +232,11 @@ def resolve_access(
     deps = deps or AccessDeps()
     cache = cache or _default_cache
     host = remote_host(url)
-    if _url_rejected(url):
-        return AccessResult(False, AccessMethod.NONE, GitFailureKind.INVALID_URL, "", host, False, None)
+    rejection = _url_rejection(url)
+    if rejection is not None:
+        return AccessResult(False, AccessMethod.NONE, rejection, "", host, False, None)
+    if url.startswith(FILE_URL_PREFIX):
+        return AccessResult(True, AccessMethod.LOCAL, GitFailureKind.OK, "", "", False, None, url)
     key = cache_key(url)
     cached = cache.get(key)
     if cached is not None:

@@ -15,35 +15,21 @@ function headerSub({ projectsLoaded, localCount, teamCount, configured }) {
 }
 
 /**
- * The Repositories header: title, counts, and the three actions (spec 4.1):
- * `import evaluations`, `connect evaluations repository` (only while no team repository is
- * configured; toggles the connect card), and the primary `▸ add project`.
- * The actions are hidden on an empty page, whose own call to action carries them.
+ * The Repositories header: title, counts, and the two actions (spec 4.1):
+ * `connect evaluations repository` (only while no evaluations repository is
+ * configured; opens the welcome's connect step) and the primary `add project`.
+ * Importing an exported archive lives in the strip's `⋯` menu and on the
+ * empty page's evaluations card. The actions are hidden on an empty page,
+ * whose two paths carry them.
  */
-export function ProjectsPageHeader({ counts, isEmpty, configured, connectOpen, onToggleConnect, onImportProject, onAddProject, isEvaluating }) {
+export function ProjectsPageHeader({ counts, isEmpty, configured, onConnectEvaluations, onAddProject, isEvaluating }) {
   return (
     <div className="projects-page__header">
       <TermHeader name={t('projects.termName')} sub={headerSub({ ...counts, configured })} />
       {!isEmpty && (
         <div className="projects-page__header-actions">
-          {onImportProject && (
-            <button
-              type="button"
-              className={`projects-page__import-btn${evalBlockedClass(isEvaluating)}`}
-              onClick={onImportProject}
-              aria-label={t('projects.importAria')}
-              {...evalBlockedProps(isEvaluating, EVAL_BLOCKED_TITLE, t('projects.importTitle'))}
-            >
-              {t('projects.importProject')}
-            </button>
-          )}
-          {!configured && onToggleConnect && (
-            <button
-              type="button"
-              className="projects-page__import-btn"
-              onClick={onToggleConnect}
-              aria-expanded={connectOpen}
-            >
+          {!configured && onConnectEvaluations && (
+            <button type="button" className="projects-page__import-btn" onClick={onConnectEvaluations}>
               {t('projects.connectTeam')}
             </button>
           )}

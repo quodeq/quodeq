@@ -14,7 +14,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.core.observability import NULL_LOG, LogSink
+from quodeq.core.types.sync_phase import SyncPhase
 from quodeq.services._fs_clone import run_git_clone
+from quodeq.services.base import PhaseCallback, ProgressCallback
 from quodeq.services.fs_scan import scan_project
 from quodeq.services._registration_scan import scan_parent_project
 from quodeq.services._registration_url import read_origin_remote, strip_credentials
@@ -58,7 +60,9 @@ def _resolve_target_path(request: MaterializeRequest) -> Path:
         clone_target = request.clone_url or request.repo
         validate_remote_url(clone_target)
         # run_git_clone raises CloneError on failure; it propagates.
-        run_git_clone(clone_target, target_path, env=request.git_env)
+        # progress is passed only when asked for: the buffered path keeps its exact call shape.
+        extra = {"progress": request.progress} if request.progress is not None else {}
+        run_git_clone(clone_target, target_path, env=request.git_env, **extra)
         return target_path
 
     target_path = Path(request.repo_resolved)
@@ -141,6 +145,8 @@ class MaterializeRequest:
     git_env: dict[str, str] | None = field(default=None, repr=False)
     clone_url: str | None = None
     log: LogSink = NULL_LOG
+    progress: ProgressCallback | None = field(default=None, repr=False)
+    on_phase: PhaseCallback | None = field(default=None, repr=False)
 
 
 def materialize_and_scan(request: MaterializeRequest) -> None:
@@ -152,6 +158,8 @@ def materialize_and_scan(request: MaterializeRequest) -> None:
     )
 
     # Scan now that files are guaranteed on disk.
+    if request.on_phase:
+        request.on_phase(SyncPhase.READING)
     scan_project(target_path, output_dir=request.project_dir)
     if request.scope_path:
         scan_parent_project(request.project_dir, request.reports_path, target_path, log=request.log)

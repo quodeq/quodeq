@@ -73,7 +73,7 @@ def test_timeout_kills_and_reports(fake_git):
 
 def test_missing_binary_never_raises(monkeypatch):
     monkeypatch.setattr(git_stream, "GIT_BIN", "/nonexistent/git")
-    assert run_git_streaming(["clone"], timeout=1, env={}, on_line=lambda _l: None) == (False, "git command failed to run")
+    assert run_git_streaming(["clone"], timeout=1, env={}, on_line=lambda _l: None) == (False, git_stream.GIT_MISSING)
 
 
 def test_prompt_guard_and_stdin(fake_git, monkeypatch):

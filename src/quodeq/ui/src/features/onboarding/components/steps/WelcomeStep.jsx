@@ -1,35 +1,67 @@
+import { useId } from 'react';
 import { TermHeader } from '../../../../components/terminal/index.js';
 import { t } from '../../../../strings/index.js';
-import { BRAND_NAME } from '../../../../strings/brand.js';
+import WelcomePaths from '../WelcomePaths.jsx';
+import '../../../../styles/onboarding-welcome.css';
 
-const PREVIEW_ITEMS = [
-  { label: t('onboarding.previewRepoLabel'), sub: t('onboarding.previewRepoSub') },
-  { label: t('onboarding.previewProviderLabel'), sub: t('onboarding.previewProviderSub') },
-  { label: t('onboarding.previewStandardLabel'), sub: t('onboarding.previewStandardSub') },
-];
+// The three things quodeq does, in order; `num` is the mono row marker.
+// Built per render so the string catalog is read at render time.
+function howRows() {
+  return [
+    { num: '01', label: t('onboarding.how1Label'), text: t('onboarding.how1') },
+    { num: '02', label: t('onboarding.how2Label'), text: t('onboarding.how2') },
+    { num: '03', label: t('onboarding.how3Label'), text: t('onboarding.how3') },
+  ];
+}
 
-export default function WelcomeStep({ onStart, onSkip }) {
+function HowItWorks() {
+  const titleId = useId();
   return (
-    <div className="onboarding-step onboarding-step--welcome">
-      <TermHeader name={t('onboarding.termWelcome')} sub={t('onboarding.subPickPath')} />
-      <h1 className="onboarding-welcome__title">
-        {t('onboarding.welcomeTo')} <span className="onboarding-welcome__title-accent">{BRAND_NAME}</span>
-      </h1>
-      <ul className="onboarding-welcome__preview">
-        {PREVIEW_ITEMS.map((p) => (
-          <li key={p.label}>
-            <span className="onboarding-welcome__marker" aria-hidden="true">▸</span>
-            <span className="onboarding-welcome__row-text">
-              <span className="onboarding-welcome__row-label">{p.label}</span>
-              <span className="onboarding-welcome__row-sub">{p.sub}</span>
+    <section className="onboarding-how" aria-labelledby={titleId}>
+      <TermHeader name={t('onboarding.termWelcome')} />
+      <h2 id={titleId} className="onboarding-how__title">{t('onboarding.howTitle')}</h2>
+      <ol className="onboarding-how__list">
+        {howRows().map((row) => (
+          <li key={row.num} className="onboarding-how__row">
+            <span className="onboarding-how__num" aria-hidden="true">{row.num}</span>
+            <span className="onboarding-how__body">
+              <span className="onboarding-how__label">{row.label}</span>
+              <span className="onboarding-how__text">{row.text}</span>
             </span>
           </li>
         ))}
-      </ul>
-      <div className="onboarding-welcome__actions">
-        <button type="button" className="term-btn term-btn--primary term-btn--filled" onClick={onStart}>{t('onboarding.getStarted')}</button>
-        <button type="button" className="term-btn term-btn--secondary" onClick={onSkip}>{t('onboarding.maybeLater')}</button>
-      </div>
+      </ol>
+    </section>
+  );
+}
+
+/**
+ * The welcome panel: how quodeq works on the left (scan, review, score), the
+ * two ways in on the right (WelcomePaths). `adaptation` says what already
+ * exists: a connected evaluations repository and its host, local projects,
+ * and whether Settings opened it (then there is no "skip for now").
+ */
+export default function WelcomeStep({ onStart, onConnect, onImport, onSkip, onGoToRepositories, adaptation }) {
+  const pathsTitleId = useId();
+  const fromSettings = Boolean(adaptation?.fromSettings);
+  return (
+    <div className="onboarding-step onboarding-step--welcome onboarding-welcome--split">
+      <HowItWorks />
+      <section className="onboarding-paths" aria-labelledby={pathsTitleId}>
+        <h2 id={pathsTitleId} className="onboarding-paths__title">{t('onboarding.startWith')}</h2>
+        <WelcomePaths
+          onStart={onStart}
+          onConnect={onConnect}
+          onImport={onImport}
+          onGoToRepositories={onGoToRepositories}
+          adaptation={adaptation}
+        />
+        {!fromSettings && (
+          <footer className="onboarding-welcome__footer">
+            <button type="button" className="term-btn term-btn--ghost" onClick={onSkip}>{t('onboarding.skipForNow')}</button>
+          </footer>
+        )}
+      </section>
     </div>
   );
 }

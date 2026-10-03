@@ -16,6 +16,7 @@ from quodeq.api._run_events_routes import register_run_events_routes
 from quodeq.api._ollama_log_routes import register_ollama_log_routes
 from quodeq.api._llamacpp_log_routes import register_llamacpp_log_routes
 from quodeq.api._rate_limit import RateLimitStore
+from quodeq.api.routes_project_clone import register_project_clone_routes
 from quodeq.api.routes import (
     register_project_list_routes,
     register_project_data_routes,
@@ -65,6 +66,7 @@ def register_all_routes(
     register_unhandled_error_handler(app)
     register_project_list_routes(app, provider, warmup_engine)
     register_project_data_routes(app, provider)
+    register_project_clone_routes(app)
     register_evaluation_list_routes(app, provider, eval_store)
     register_evaluation_item_routes(app, provider)
     register_log_stream_routes(app)

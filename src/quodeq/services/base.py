@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
+from quodeq.core.types.sync_phase import SyncPhase
+from quodeq.services.wiring_sync import ProgressUpdate
 from quodeq.core.types import EvalPending, JobSnapshot, ViolationResponse, ViolationSummary
 from quodeq.shared.git_errors import GitFailureKind
 from quodeq.shared.constants import (  # re-export for backward compat
@@ -37,6 +39,10 @@ class EvaluationOptions:
     provider_api_base: str = ""
 
 
+ProgressCallback = Callable[[ProgressUpdate], None]
+PhaseCallback = Callable[[SyncPhase], None]
+
+
 @dataclass(frozen=True)
 class NewProjectSpec:
     """Request-boundary-validated inputs for registering a new project.
@@ -56,6 +62,9 @@ class NewProjectSpec:
     git_env: dict[str, str] | None = field(default=None, repr=False)
     # What to clone when it differs from ``repo`` (the ladder's HTTPS form); None = clone ``repo``.
     clone_url: str | None = None
+    # Live clone progress and the scan phase, for a caller running registration as a job.
+    progress: ProgressCallback | None = field(default=None, repr=False, compare=False)
+    on_phase: PhaseCallback | None = field(default=None, repr=False, compare=False)
 
 
 class CreateProjectStatus(StrEnum):

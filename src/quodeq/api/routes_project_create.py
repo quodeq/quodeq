@@ -25,30 +25,15 @@ from quodeq.api.helpers import (
     scan_target_error as _scan_target_error,
 )
 from quodeq.api.routes_github_access import access_failure_response
+from quodeq.api.routes_project_clone import start_clone_job
+from quodeq.config.clone_env import default_clone_root
 from quodeq.services.base import ActionProvider, CreateProjectStatus, NewProjectSpec
+from quodeq.services.clone_codes import clone_code_for
 from quodeq.services.github_access import forget_url, resolve_access
-from quodeq.shared.git_errors import GitFailureKind, output_tail
+from quodeq.shared.git_errors import output_tail
 from quodeq.shared.paths import not_a_directory_reason
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import contained_path, relative_scope_error
-
-CODE_CLONE_UNKNOWN = "CLONE_UNKNOWN"
-CODE_CLONE_TIMEOUT = "CLONE_TIMEOUT"
-CODE_HOST_KEY_UNVERIFIED = "HOST_KEY_UNVERIFIED"
-CODE_GIT_MISSING = "GIT_MISSING"
-
-# GitFailureKind -> (wire code, HTTP status) for a failed clone in POST /api/projects.
-_CLONE_CODES: dict[GitFailureKind, tuple[str, HTTPStatus]] = {
-    GitFailureKind.AUTH_REQUIRED: ("AUTH_REQUIRED", HTTPStatus.BAD_REQUEST),
-    GitFailureKind.HOST_KEY: (CODE_HOST_KEY_UNVERIFIED, HTTPStatus.BAD_REQUEST),
-    GitFailureKind.NOT_FOUND: ("REPO_NOT_FOUND", HTTPStatus.NOT_FOUND),
-    GitFailureKind.DEST_EXISTS: ("DEST_EXISTS", HTTPStatus.CONFLICT),
-    GitFailureKind.NETWORK: ("NETWORK_ERROR", HTTPStatus.BAD_GATEWAY),
-    GitFailureKind.TIMEOUT: (CODE_CLONE_TIMEOUT, HTTPStatus.GATEWAY_TIMEOUT),
-    GitFailureKind.DISK: ("DISK_ERROR", HTTPStatus.INSUFFICIENT_STORAGE),
-    GitFailureKind.GIT_MISSING: (CODE_GIT_MISSING, HTTPStatus.INTERNAL_SERVER_ERROR),
-    GitFailureKind.UNKNOWN: (CODE_CLONE_UNKNOWN, HTTPStatus.BAD_GATEWAY),
-}
 
 
 def _reports_dir() -> str:
@@ -57,7 +42,9 @@ def _reports_dir() -> str:
 
 
 @dataclass
-class _CreateProjectRequest:
+class CreateProjectRequest:
+    """A validated POST /api/projects body, parsed once at the request boundary."""
+
     repo: str
     discipline: str | None
     scope_path: str | None
@@ -69,7 +56,7 @@ class _CreateProjectRequest:
 
 def _parse_create_project_request(
     data: dict,
-) -> tuple[_CreateProjectRequest | None, tuple[Response, int] | None]:
+) -> tuple[CreateProjectRequest | None, tuple[Response, int] | None]:
     """Parse and validate the create_project request body. Returns
     (parsed, error): parsed is None on failure, error is None on success."""
     raw_repo = data.get("repo")
@@ -103,7 +90,7 @@ def _parse_create_project_request(
     except ValueError:
         return None, json_error("Invalid repo URL", HTTPStatus.BAD_REQUEST, "INVALID_REPO_URL")
 
-    return _CreateProjectRequest(
+    return CreateProjectRequest(
         repo=repo, discipline=discipline, scope_path=scope_path,
         clone_dest=clone_dest, ephemeral=ephemeral,
         reports_root=reports_root, is_url=is_url,
@@ -120,46 +107,64 @@ def _expand_home(clone_dest: str) -> str:
     return clone_dest
 
 
+def _ensure_default_clone_root() -> tuple[str | None, tuple[Response, int] | None]:
+    """No cloneDest sent: the configured root (QUODEQ_REPOS_DIR may sit
+    outside home) is the operator's choice, so it is trusted and created on
+    demand. A failure names the default folder, not a cloneDest nobody sent."""
+    dest = str(default_clone_root())
+    try:
+        os.makedirs(dest, exist_ok=True)
+        created = os.path.isdir(dest)
+    except OSError:
+        created = False
+    if created:
+        return dest, None
+    return None, json_error(
+        "The default working-copy folder could not be created",
+        HTTPStatus.BAD_REQUEST,
+        CODE_INVALID_CLONE_DEST,
+    )
+
+
 def _resolve_create_project_clone_dest(
     ephemeral: bool, clone_dest: str | None,
 ) -> tuple[str | None, tuple[Response, int] | None]:
-    """For a URL repo, resolve/validate cloneDest. Returns (resolved_clone_dest, error)."""
-    if not ephemeral and not clone_dest:
+    """For a URL repo, resolve/validate cloneDest. Returns (resolved_clone_dest, error).
+
+    An absent cloneDest means the default working-copy root, created on demand.
+    """
+    if ephemeral:
+        return clone_dest, None
+    if not clone_dest:
+        return _ensure_default_clone_root()
+    try:
+        # Containment and the directory check both live in the try
+        # so every rejection exits here. Falling through past a
+        # failed containment check on a sentinel would leave the
+        # unguarded value live on one path. A leading "~" is the old
+        # wizard default and means the home folder; a missing folder
+        # under home is created, the way the default root is.
+        dest = contained_path(_expand_home(clone_dest), Path.home())
+        if os.path.exists(dest) and not os.path.isdir(dest):
+            raise ValueError("cloneDest is not a directory")
+        os.makedirs(dest, exist_ok=True)
+        if not os.path.isdir(dest):
+            raise ValueError("cloneDest is not an existing directory")
+    except OSError:
         return None, json_error(
-            "cloneDest is required for URL repos when ephemeral is false",
+            "Invalid cloneDest path",
             HTTPStatus.BAD_REQUEST,
-            "MISSING_CLONE_DEST",
+            CODE_INVALID_CLONE_DEST,
         )
-    if not ephemeral and clone_dest:
-        try:
-            # Containment and the directory check both live in the try
-            # so every rejection exits here. Falling through past a
-            # failed containment check on a sentinel would leave the
-            # unguarded value live on one path. A leading "~" is the
-            # wizard's default and means the home folder; a missing
-            # folder under home is created, the way the default working
-            # copy root is.
-            dest = contained_path(_expand_home(clone_dest), Path.home())
-            if os.path.exists(dest) and not os.path.isdir(dest):
-                raise ValueError("cloneDest is not a directory")
-            os.makedirs(dest, exist_ok=True)
-        except OSError:
-            return None, json_error(
-                "Invalid cloneDest path",
-                HTTPStatus.BAD_REQUEST,
-                CODE_INVALID_CLONE_DEST,
-            )
-        except ValueError:
-            return None, json_error(
-                "cloneDest must be an existing directory under your home folder",
-                HTTPStatus.BAD_REQUEST,
-                CODE_INVALID_CLONE_DEST,
-            )
-        # Hand the *contained* path to the cloner. The previous code
-        # resolved into a local and then passed the raw request string
-        # on, so the check guarded a value nothing downstream used.
-        return dest, None
-    return clone_dest, None
+    except ValueError:
+        return None, json_error(
+            "cloneDest must be an existing directory under your home folder",
+            HTTPStatus.BAD_REQUEST,
+            CODE_INVALID_CLONE_DEST,
+        )
+    # Hand the *contained* path to the cloner, not the raw request string,
+    # so the check guards the value everything downstream uses.
+    return dest, None
 
 
 def _validate_local_create_project_repo(repo: str, reports_root: str) -> tuple[Response, int] | None:
@@ -197,7 +202,7 @@ def _create_project_error_response(result) -> tuple[Response, int] | None:
     if result.status == CreateProjectStatus.INVALID_REPO:
         return json_error(result.message, HTTPStatus.BAD_REQUEST, CODE_INVALID_REPO)
     if result.status == CreateProjectStatus.CLONE_FAILED:
-        code, status = _CLONE_CODES.get(result.clone_error_kind, (CODE_CLONE_UNKNOWN, HTTPStatus.BAD_GATEWAY))
+        code, status = clone_code_for(result.clone_error_kind)
         body = {"error": result.message, "code": code, "detail": output_tail(result.clone_stderr)}
         return jsonify(body), status
     return None
@@ -222,9 +227,14 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
 
     Body: ``{ repo, cloneDest?, ephemeral?, branch?, scopePath?, discipline? }``
 
-    For URL repos: requires either ``cloneDest`` (existing dir under home)
-    or ``ephemeral: true``. For local-path repos: ``cloneDest`` and
-    ``ephemeral`` are ignored.
+    A URL repo with ``ephemeral`` false answers 202 and runs the clone and scan
+    as the background job reported by ``GET /api/projects/clone-status``.
+    ``cloneDest`` is optional there: absent, it defaults to
+    ``default_clone_root()``, created on demand and trusted wherever it is
+    configured (QUODEQ_REPOS_DIR may sit outside home); a cloneDest the
+    request sends must sit under the home folder. Local paths and ``ephemeral: true`` stay synchronous (200, or the
+    usual 4xx/409 codes); for a local path ``cloneDest`` and ``ephemeral`` are
+    ignored.
     """
     body = optional_json_object_or_response(CODE_INVALID_INPUT)
     if not isinstance(body, dict):
@@ -242,6 +252,8 @@ def handle_create_project(provider: ActionProvider) -> Response | tuple[Response
         access = resolve_access(parsed.repo)
         if not access.reachable:
             return access_failure_response(access)
+        if not parsed.ephemeral:
+            return start_clone_job(provider, parsed, clone_dest, access)
         git_env, clone_url = access.env, access.clone_url
 
     spec = NewProjectSpec(

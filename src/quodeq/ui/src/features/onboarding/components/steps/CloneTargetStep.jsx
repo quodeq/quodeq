@@ -53,7 +53,7 @@ function CloneTargetForm({ cloneDest, setCloneDest, submitting, error, detail, a
           className="term-btn term-btn--primary term-btn--filled"
           disabled={submitting || !cloneDest.trim()}
         >
-          {submitting ? t('onboarding.cloning') : t('onboarding.cloneAndScan')}
+          {submitting ? t('onboarding.cloningNoPercent') : t('onboarding.cloneAndScan')}
         </button>
         <button
           type="button"

@@ -35,7 +35,7 @@ export function clearDraft(storage) {
   removeKey(DRAFT_KEY, storage);
 }
 
-/** Mark that the user dismissed the welcome step ("Maybe later"). */
+/** Mark that the user dismissed the welcome step ("skip for now"). */
 export function markWelcomeSkipped(storage) {
   writeString(SKIPPED_KEY, SKIPPED_VALUE, storage);
 }

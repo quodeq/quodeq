@@ -1,27 +1,23 @@
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import { t } from '../../../strings/index.js';
-import AccessPanel from '../../github-access/components/AccessPanel.jsx';
+import EvaluationsRepoForm from './EvaluationsRepoForm.jsx';
+import { useFolderPicker } from '../hooks/useFolderPicker.jsx';
 
 /**
- * "▸ evaluations repository": the Repositories tab's inline form for connecting the
- * evaluations repository (spec 4.1). Submitting only starts the connect
- * job; its progress shows in the sync strip and a failure comes back here,
- * either as the access panel (the probe refused the URL) or as the connect
- * slot's mapped error under the field.
+ * "▸ evaluations repository": the Repositories tab's card for a failed
+ * connect (spec 4.1). The connect itself starts from the welcome's connect
+ * step; when its job fails the failure comes back here, either as the access
+ * panel (the probe refused the URL) or as the connect slot's mapped error
+ * under the field, with the url-or-folder form prefilled so connect retries.
  *
  * Props come from useSharedProjects (the screen's one status poll):
  * `onConnect(url)`, `connecting`, `error` (display text), `accessFailure`,
  * and `initialUrl` (the URL of a failed connect, so pressing connect retries it).
- * `onClose`, when given, renders a "close" control (dismisses the card or its error).
+ * `onClose`, when given, renders a "close" control (dismisses the card).
  */
 export default function ConnectTeamCard({ onConnect, connecting = false, error = null, accessFailure = null, initialUrl = null, onClose = null }) {
-  const [url, setUrl] = useState(initialUrl ?? '');
   const titleId = useId();
-  const trimmed = url.trim();
-  const submit = () => {
-    if (!trimmed || connecting) return;
-    onConnect?.(trimmed);
-  };
+  const { browseFolder, picker } = useFolderPicker();
   return (
     <section className="connect-team-card" aria-labelledby={titleId}>
       <div className="connect-team-card__head">
@@ -35,32 +31,15 @@ export default function ConnectTeamCard({ onConnect, connecting = false, error =
         )}
       </div>
       <p className="connect-team-card__desc">{t('projects.connectTeamDesc')}</p>
-      <form
-        className="connect-team-card__row"
-        onSubmit={(e) => { e.preventDefault(); submit(); }}
-      >
-        <input
-          type="text"
-          className="connect-team-card__input"
-          placeholder={t('projects.connectTeamPlaceholder')}
-          aria-label={t('projects.connectTeamUrlAria')}
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          disabled={connecting}
-          spellCheck={false}
-          autoComplete="off"
-        />
-        <button type="submit" className="term-btn term-btn--primary term-btn--filled connect-team-card__btn" disabled={connecting}>
-          {connecting ? t('projects.connectTeamConnecting') : t('projects.connectTeamButton')}
-        </button>
-      </form>
-      {accessFailure ? (
-        <div className="connect-team-card__access">
-          <AccessPanel failure={accessFailure} url={trimmed} onResolved={submit} onRetry={submit} />
-        </div>
-      ) : (
-        error && <p className="inline-error connect-team-card__error" role="alert">{error}</p>
-      )}
+      <EvaluationsRepoForm
+        onConnect={(url) => onConnect?.(url)}
+        connecting={connecting}
+        error={error}
+        accessFailure={accessFailure}
+        initialUrl={initialUrl}
+        browseFolder={browseFolder}
+      />
+      {picker}
     </section>
   );
 }

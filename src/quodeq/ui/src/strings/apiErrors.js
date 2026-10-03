@@ -25,21 +25,25 @@
 import { t } from './index.js';
 
 const CODE_KEYS = {
-  // Clone / repository registration. This copy previously lived as a
-  // hardcoded English switch in RepoScanStep; it moved here unchanged.
+  // Clone / repository registration: the POST /api/projects refusal and the
+  // clone job's slot error both resolve through these.
   AUTH_REQUIRED: 'apiError.cloneAuthRequired',
   NETWORK_ERROR: 'apiError.cloneNetwork',
   REPO_NOT_FOUND: 'apiError.cloneRepoNotFound',
   DEST_EXISTS: 'apiError.cloneDestExists',
   DISK_ERROR: 'apiError.cloneDiskError',
+  // The clone job itself: it could not start, or one already runs.
+  CLONE_START_FAILED: 'apiError.cloneStartFailed',
+  CLONE_IN_PROGRESS: 'apiError.cloneInProgress',
   INVALID_REPO_URL: 'apiError.invalidRepoUrl',
   INVALID_URL: 'apiError.invalidRepoUrl',
   INVALID_REPO: 'apiError.invalidRepoUrl',
   INVALID_CLONE_DEST: 'apiError.invalidCloneDest',
-  MISSING_CLONE_DEST: 'apiError.missingCloneDest',
   MISSING_REPO: 'apiError.missingRepo',
   PROJECT_EXISTS: 'apiError.projectExists',
   FOREIGN_REPO: 'apiError.foreignRepo',
+  // A file:// evaluations repository whose folder is not a git repository.
+  NOT_A_GIT_REPO: 'apiError.notAGitRepo',
   NOT_LOCAL: 'apiError.notLocal',
   PATH_MISSING: 'apiError.pathMissing',
   MISSING_PATH: 'apiError.pathMissing',

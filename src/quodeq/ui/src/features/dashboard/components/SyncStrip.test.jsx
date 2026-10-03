@@ -118,6 +118,15 @@ describe('SyncStrip', () => {
     fireEvent.click(screen.getByRole('button', { name: /more repository actions/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'disconnect' })); expect(onDisconnect).toHaveBeenCalled();
   });
+  it('the ⋯ menu imports an evaluations archive only when wired', () => {
+    const onImport = vi.fn();
+    const { rerender } = render(<SyncStrip status={base} projectsCount={5} />);
+    fireEvent.click(screen.getByRole('button', { name: /more repository actions/i }));
+    expect(screen.queryByRole('menuitem', { name: 'import evaluations archive' })).not.toBeInTheDocument();
+    rerender(<SyncStrip status={base} projectsCount={5} onImport={onImport} />);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'import evaluations archive' }));
+    expect(onImport).toHaveBeenCalledTimes(1);
+  });
   it('shows the repository as host/path', () => {
     render(<SyncStrip status={base} projectsCount={5} />);
     expect(screen.getByText('github.com/quodeq/evaluations')).toBeInTheDocument();

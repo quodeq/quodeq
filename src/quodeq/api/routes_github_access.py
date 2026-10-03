@@ -27,7 +27,7 @@ from quodeq.services.github_device_flow import (
 from quodeq.services.github_gh_cli import GhStatus, gh_status
 from quodeq.services.github_oauth_client import GitHubOAuthClient, GitHubRefused, GitHubUnreachable, TokenRejected
 from quodeq.services.shared_repo import validate_remote_url
-from quodeq.shared.git_errors import GitFailureKind
+from quodeq.shared.git_errors import NOT_A_GIT_REPO_CODE, NOT_A_GIT_REPO_MESSAGE, GitFailureKind, NotAGitRepoError
 from quodeq.shared.log_sink import SHARED_LOG
 from quodeq.shared.repo import is_repo_url
 
@@ -67,6 +67,8 @@ def access_failure_response(result: AccessResult) -> tuple[Response, int]:
     """400 body for a URL the ladder could not reach: the kind as a code suffix
     plus the fields the UI's access panel renders from. A URL the guard
     refused before any probe answers the plain INVALID_URL every route uses."""
+    if result.kind is GitFailureKind.NOT_A_GIT_REPO:
+        return json_error(NOT_A_GIT_REPO_MESSAGE, HTTPStatus.BAD_REQUEST, NOT_A_GIT_REPO_CODE)
     if result.kind is GitFailureKind.INVALID_URL:
         return json_error(MESSAGE_INVALID_URL, HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)
     body = {
@@ -120,6 +122,8 @@ def _probe(deps: RouteDeps) -> Response | tuple[Response, int]:
         if not is_repo_url(url):
             return json_error("not a recognised remote repository URL", HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)
         validate_remote_url(url)
+    except NotAGitRepoError:
+        return json_error(NOT_A_GIT_REPO_MESSAGE, HTTPStatus.BAD_REQUEST, NOT_A_GIT_REPO_CODE)
     except ValueError:
         return json_error(MESSAGE_INVALID_URL, HTTPStatus.BAD_REQUEST, CODE_INVALID_URL)
     r = deps.resolve(url)

@@ -42,7 +42,7 @@ from quodeq.shared.validation import path_segment_error
 
 from ._url_body import required_url_or_error
 from .helpers import json_error
-from .routes_common import reports_dir
+from .routes_common import reports_dir, sync_block
 from .routes_shared_common import no_shared_repo_error
 
 CODE_CONNECT_IN_PROGRESS = "CONNECT_IN_PROGRESS"
@@ -53,20 +53,6 @@ CODE_REFRESH_IN_PROGRESS = "REFRESH_IN_PROGRESS"
 CODE_REFRESH_START_FAILED = "REFRESH_START_FAILED"
 MESSAGE_REFRESH_IN_PROGRESS = "a refresh is already running"
 INVITE_TEXT = "Open quodeq, choose Connect evaluations repository, paste {url}"
-
-
-def sync_block(snapshot: dict) -> dict:
-    """camelCase one job slot for the wire."""
-    out = dict(snapshot)
-    out["finishedAt"] = out.pop("finished_at", None)
-    out["projectsFound"] = out.pop("projects_found", None)
-    if "project_id" in out:
-        out["projectId"] = out.pop("project_id")
-        out["projectName"] = out.pop("project_name", None)
-    if "source_project_id" in out:
-        out["sourceProjectId"] = out.pop("source_project_id")
-        out["conflictKind"] = out.pop("conflict_kind", None)
-    return out
 
 
 def shared_status() -> Response:

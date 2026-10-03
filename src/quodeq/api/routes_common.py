@@ -40,3 +40,19 @@ LOCALHOST_ADDRS = frozenset({"127.0.0.1", "::1"})
 def is_local_request() -> bool:
     """True when the current request comes from a loopback address."""
     return (request.remote_addr or "") in LOCALHOST_ADDRS
+
+
+def sync_block(snapshot: dict) -> dict:
+    """camelCase one job slot for the wire."""
+    out = dict(snapshot)
+    out["finishedAt"] = out.pop("finished_at", None)
+    out["projectsFound"] = out.pop("projects_found", None)
+    if "project_id" in out:
+        out["projectId"] = out.pop("project_id")
+        out["projectName"] = out.pop("project_name", None)
+    if "scan_data" in out:
+        out["scanData"] = out.pop("scan_data")
+    if "source_project_id" in out:
+        out["sourceProjectId"] = out.pop("source_project_id")
+        out["conflictKind"] = out.pop("conflict_kind", None)
+    return out

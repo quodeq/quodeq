@@ -4,7 +4,7 @@ An evaluations repository is a plain git repo where evaluations are published. I
 
 ### Connecting
 
-Connect it from the Repositories tab: press **connect evaluations repository**, paste the address, and watch the strip at the top download it. HTTPS (`https://github.com/team/evaluations.git`) and SSH (`git@github.com:team/evaluations.git`) forms both work.
+Connect it from the Repositories tab: press **connect evaluations repository**, paste the address, and watch the strip at the top download it. HTTPS (`https://github.com/team/evaluations.git`) and SSH (`git@github.com:team/evaluations.git`) forms both work. You can also connect from the welcome, which opens on a first run: its evaluations card has **connect**, and the panel closes while the strip streams the download. Instead of an address you can choose a local folder that is a git repository. Prefer a bare one (`git init --bare`), since publishing into a checked-out branch is refused. A folder that is not a git repository is rejected with a message saying so.
 
 The strip stays while a repository is connected. It shows *connecting*, *downloading evaluations* with a percentage and size, *reading projects* with a count, then *N projects · synced* with a time. Press **update** to check again. If an update fails, the strip says *update failed · showing results from* a time, with **retry**; when you are offline it shows the last synced results the same way. **copy invite** puts a two-line message on your clipboard for teammates. The **⋯** menu has **change repository** and **disconnect**, and Settings keeps both too.
 
